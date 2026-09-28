@@ -24,9 +24,11 @@ export const swapKeys = (layer, from, to) => layoutKeys(layer, [
 export const TIER_FIELDS = {tap: "tap", hold: "hold", long: "longHold"};
 export const DEFAULT_REPEAT_HZ = "20";
 
+// A new behaviour starts by tapping its own key, which is what the key did
+// before. A custom key sends nothing of itself, so its behaviour starts empty.
 export const addBehaviour = (keycode, identity) => ({
     type: "addBehavior", expectedBase: identity,
-    behavior: {keycode, steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: keycode}}]},
+    behavior: {keycode, steps: /^CUSTOM_KEY_\d+$/.test(keycode) ? [] : [{tapCount: 0, tap: {helper: "TAP_SENDS", action: keycode}}]},
 });
 export const deleteBehaviour = (keycode, identity) => ({type: "deleteBehavior", keycode, expectedBase: identity});
 export const retargetBehaviour = (keycode, target, identity, conflict) =>
@@ -159,6 +161,7 @@ export const deleteLedGroup = (name) => ({type: "deleteRgbReusableLedGroup", nam
 export const macroMessage = (keycode, payload, identity) => ({type: "updateViaMacro", keycode, payload, expectedFingerprint: identity});
 // A VIA macro's name; its steps stay as they are.
 export const macroNameMessage = (keycode, name, identity) => ({type: "updateViaMacro", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
+export const customKeyNameMessage = (keycode, name, identity) => ({type: "updateCustomKey", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
 
 export const pdMode = (slot, config, identity) => ({type: "savePdMode", slot, expectedBase: identity, config});
 export const clearPdMode = (slot, identity) => ({type: "clearPdMode", slot, expectedBase: identity});

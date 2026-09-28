@@ -22,7 +22,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x0000ffff,
+    FEATURE_FLAGS: 0x0001ffff,
     REQUIRED_READ_FEATURES: 0x0000000f,
     STATE_FLAGS: 0x01ff,
     SUPPORTED_DOMAINS: 0x1f,
@@ -48,6 +48,10 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     // Behaviours send QMK and keyboard functions (DPI_MOD, RGB Matrix…)
     // through QMK's key processing, so they may sit in a behaviour.
     BEHAVIOR_QMK_FUNCTIONS: 1 << 15,
+    // Userspace keycodes sit in fixed blocks, action kind 7 is a custom key and
+    // settings v5 names the 64 custom keys. It comes with the action ABI the
+    // app knows (schema/actions.js), so the model tests that digest.
+    CUSTOM_KEYS: 1 << 16,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({
@@ -200,7 +204,7 @@ function decodeCapabilityPages(pages) {
         maxRgbStageGroupRows: capacity[8],
         physicalLedCount: capacity[9],
         ledBitmapSize: capacity[10],
-        hardcodedMacroSlots: capacity[11],
+        customKeySlots: capacity[11],
         viaMacroSlots: capacity[12],
         maxProfilePayload: readU16(capacity, 13),
         profileSlotPayload: readU16(capacity, 15),

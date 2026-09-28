@@ -131,13 +131,13 @@ stays fixed when a mode is renamed or reconfigured in Charybdis Live:
   movement
 - `PD_SLOT_1` (Volume) and `PD_SLOT_2` (Brightness): vertical ball motion changes system
   volume or display brightness
-- `CLICK_SPAM`: not a pointing mode, but a mouse-button combo output that uses
-  the behavior table to repeat left-click while held
+- `CUSTOM_KEY_2` (Click Spam): not a pointing mode, but a mouse-button combo
+  output that uses the behavior table to repeat left-click while held
 - window drags: also not a pointing mode, but hold branches that hold an extra
   mouse button so the ball resizes the window under the pointer (`MS_BTN3`
-  double-tap hold, button 7) or moves it (`DRAG_WINDOW` hold, button 6); in my
-  setup [Rectangle Pro](https://rectangleapp.com/pro) is what binds those
-  buttons to window management
+  double-tap hold, button 7) or moves it (`CUSTOM_KEY_3` (Drag Window) hold,
+  button 6); in my setup [Rectangle Pro](https://rectangleapp.com/pro) is what
+  binds those buttons to window management
 - auto-mouse and auto-sniping layers that keep pointer work available
   automatically while you move between typing and trackball use
 
@@ -244,15 +244,20 @@ Charybdis Live`, or press `F5` with the `Run Charybdis Live` launch
 configuration for an Extension Development Host.
 
 It reads everything it edits from the keyboard — layout, key behaviours,
-combos, the named VIA macros, lighting, the eight pointing-mode slots, layers and
-settings — and shows compiled defaults only when the keyboard reports no
-committed profile. While a read runs, all screen menus are disabled and a
-loading step replaces the screen. The Configure menus and board open when the
-complete profile is ready for editing. After a read fails, **Device** is
-available if the keyboard reported its capabilities; **Profile & backups**
-opens if the connected keyboard supports complete-profile backup.
+combos, the named VIA macros, custom-key names, lighting, the eight
+pointing-mode slots, layers and settings — and shows compiled defaults only
+when the keyboard reports no committed profile. While a read runs, all screen
+menus are disabled and a loading step replaces the screen. The Configure menus
+and board open when the complete profile is ready for editing. After a read
+fails, **Device** is available if the keyboard reported its capabilities;
+**Profile & backups** opens if the connected keyboard supports complete-profile
+backup.
 Macro keycodes are shown as `VIA_MACRO_0` through `VIA_MACRO_63` in the live
 editor, including slots whose QMK values have no named constant.
+**Custom keys** lists the 64 custom keys: rename one, add or edit its
+behaviour, place it on a key, and see where it is used; the key picker offers
+them in its own Custom keys section. Their names are stored on the keyboard; a
+keyboard with none stored reports the names authored in `keymap.c`.
 Every edit goes into one local draft with undo, redo and a history, and reaches
 the keyboard only through **Review and apply**. Apply
 saves a recovery copy, then commits the complete profile to both halves as one
@@ -327,11 +332,12 @@ The next sections explain the keymap and RGB models that Profile Studio edits.
 ## The Keymap Model
 
 The authored defaults live in the four keymap files. `keymap.c` holds the
-layouts and layer names, each macro's name beside its payload, the combos with
-any window of their own (`COMBO_WINDOW`), and the behaviours; `config.h` the
-timing and policy values; `pd_config.c` the pointing modes; `rgb_config.c` the
-lighting, including LED groups kept for later. A keyboard with nothing stored
-reports exactly these; a stored profile keeps its own.
+layouts and layer names, each custom key's name, each macro's name beside its
+payload, the combos with any window of their own (`COMBO_WINDOW`), and the
+behaviours; `config.h` the timing and policy values; `pd_config.c` the
+pointing modes; `rgb_config.c` the lighting, including LED groups kept for
+later. A keyboard with nothing stored reports exactly these; a stored profile
+keeps its own.
 
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) is the
 main profile file. It is where you make the board yours.
@@ -341,7 +347,7 @@ Use it for:
 - the physical layer layout
 - combos
 - VIA macro defaults
-- custom keycodes
+- custom keys and their names
 - `key_behaviors[]`
 - pointing-mode key placement and richer mode gestures
 
@@ -365,8 +371,8 @@ Combos can enter that same table too. If a combo emits a keycode that has a
 `key_behaviors[]` row, the chord can reuse the same tap, hold, longer-hold, and
 multi-tap behavior as a physical key.
 
-Here is the shape of one authored row, based on the `VIA_MACRO_19` (Right Thumb) row in
-[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c#L456).
+Here is the shape of one authored row, based on the `CUSTOM_KEY_0` (Right Thumb) row in
+[`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c#L478).
 The lines between the keycode and `.tap_counts` are optional row-local
 settings, shown here at their default values: three timing overrides and one
 policy flag. The snippet shows one useful helper mix, not the full helper
@@ -374,7 +380,7 @@ vocabulary; the list below shows the other helpers you can use.
 
 ```c
 {
-    .keycode = VIA_MACRO_19,
+    .keycode = CUSTOM_KEY_0,
     .tap_hold_term = 150,
     .longer_hold_term = 400,
     .multi_tap_term = 150,
@@ -401,8 +407,14 @@ vocabulary; the list below shows the other helpers you can use.
 },
 ```
 
-In that example, `VIA_MACRO_19` can be placed directly on a layer or emitted by a
+In that example, `CUSTOM_KEY_0` can be placed directly on a layer or emitted by a
 combo. Either way, the behavior row is the same.
+
+`CUSTOM_KEY_0` through `CUSTOM_KEY_63` are custom keys: named keys that do only
+what their behavior row says. Each is named in the `CUSTOM_KEYS(KEY)` table in
+`keymap.c` (at most 20 printable ASCII characters, `""` for an unused slot).
+Without a row a custom key does nothing, and no behavior step can send one;
+keymap validation and Charybdis Live both refuse that.
 
 The double-tap `.hold` uses the release-based helper because that branch also
 has a later `.long_hold`. The single-tap layer hold and the media long-holds use
@@ -421,7 +433,8 @@ The vocabulary is:
 - `.keeps_auto_mouse_anchored = true` marks the row as a mouse gesture, so
   pressing it keeps the pointer layer up instead of letting auto mouse reset on
   it. Needed for keys that drive the mouse without being mouse keycodes or
-  pointer-mode keys, such as `DRAG_WINDOW` and `CLICK_SPAM`
+  pointer-mode keys, such as `CUSTOM_KEY_3` (Drag Window) and `CUSTOM_KEY_2`
+  (Click Spam)
 
 The helper vocabulary is:
 
@@ -599,7 +612,7 @@ If you want to adapt the profile, start here:
 
 | File | Use It For |
 | --- | --- |
-| [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | layers, combos, macros, custom keycodes, and `key_behaviors[]` |
+| [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | layers, combos, macros, custom keys, and `key_behaviors[]` |
 | [`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, LED groups, pointing-mode colors, combo feedback, key feedback, and auto-mouse fade |
 | [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing defaults, auto-mouse settings, RGB feedback toggles, and pointer policy |
 | [`users/noah/config.h`](./users/noah/config.h) | split transport, LED geometry, pointing-device hardware settings, and shared board-level QMK overrides |

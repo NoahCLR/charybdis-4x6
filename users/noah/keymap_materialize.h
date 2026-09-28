@@ -8,6 +8,10 @@
 #define _KEYMAP_VIA_MACRO_PAYLOAD_ENTRY(keycode_, name_, payload_) [((keycode_) - VIA_MACRO_0)] = (payload_),
 #define _KEYMAP_VIA_MACRO_NAME_ENTRY(keycode_, name_, payload_) [((keycode_) - VIA_MACRO_0)] = name_,
 #define _KEYMAP_VIA_MACRO_NAME_CHECK(keycode_, name_, payload_) _Static_assert(sizeof(name_) <= NOAH_MACRO_NAME_SIZE, #keycode_ ": a macro name holds at most 20 characters");
+#define _KEYMAP_CUSTOM_KEY_NAME_ENTRY(keycode_, name_) [((keycode_) - CUSTOM_KEY_0)] = name_,
+#define _KEYMAP_CUSTOM_KEY_NAME_CHECK(keycode_, name_)                                                                         \
+    _Static_assert(NOAH_KEYCODE_IS_CUSTOM_KEY(keycode_), #keycode_ ": CUSTOM_KEYS rows name custom keys");                      \
+    _Static_assert(sizeof(name_) <= NOAH_MACRO_NAME_SIZE, #keycode_ ": a custom key name holds at most 20 characters");
 #define _KEYMAP_STRIP_PARENS(...) __VA_ARGS__
 // COMBO(result, keys) follows COMBO_TERM; COMBO_WINDOW(result, keys, ms) has
 // its own window.
@@ -62,6 +66,8 @@
 #endif
 
 #define MATERIALIZE_KEYMAP_DATA()                                                                                               \
+    CUSTOM_KEYS(_KEYMAP_CUSTOM_KEY_NAME_CHECK)                                                                                  \
+    const char custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {CUSTOM_KEYS(_KEYMAP_CUSTOM_KEY_NAME_ENTRY)};     \
     VIA_MACROS(_KEYMAP_VIA_MACRO_NAME_CHECK)                                                                                    \
     const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT]                 = {VIA_MACROS(_KEYMAP_VIA_MACRO_PAYLOAD_ENTRY)}; \
     const char        via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {VIA_MACROS(_KEYMAP_VIA_MACRO_NAME_ENTRY)}; \

@@ -1,5 +1,5 @@
 "use strict";
-const {actionLimitsFor, keycodeAction, pdSlotOfCode} = require("../schema/actions");
+const {ACTION_ABI, actionLimitsFor, keycodeAction, pdSlotOfCode} = require("../schema/actions");
 const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
@@ -7,7 +7,11 @@ const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/ke
 const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {CUSTOM_KEY_BASE, LAYER_LOCK_BASE, LAYER_LOCK_SLOTS, PD_HOLD_BASE, PD_LOCK_BASE, customKeyOfCode} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
+
+// The vocabulary before the userspace keycode blocks (users/noah/noah_keymap_ids.h).
+const PRE_BLOCK_ACTION_ABI = 0x61072732;
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
 const u16 = value => Number.isInteger(value) && value >= 0 && value <= 65535;
 const PHYSICAL_MATRIX_SLOTS = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => row * 6 + column));
@@ -137,6 +141,7 @@ function validateSnapshot(value, capabilities) {
         return validateSnapshot(upgradeFiveLayerSnapshot(value), capabilities);
     }
     if (capabilities?.schema?.major === 2 && value.version === 1) return validateSnapshot(upgradePdSnapshot(value), capabilities);
+    if (capabilities?.actionAbiDigest === ACTION_ABI && value.version === 2 && value.actionAbiDigest === PRE_BLOCK_ACTION_ABI) return validateSnapshot(upgradeKeycodeBlocks(value), capabilities);
     const capacity = capabilities?.viaMacroBytes ?? macroBankBytes(value);
     if (capabilities && (value.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== value.layers.length || (capabilities.supportedDomainMask & (value.version === 2 ? 31 : 15)) !== (value.version === 2 ? 31 : 15))) throw fail("The connected firmware does not support this profile's action vocabulary or eight-layer storage.");
     const bank = macroBank(macros, capacity);
@@ -161,6 +166,43 @@ function upgradePdSnapshot(source) {
     const result = {...source, version: 2, actionAbiDigest: 0x61072732, profile: profile.toString("base64")};
     delete result.pdModeSource;
     validateSnapshot(result);
+    return result;
+}
+
+// A backup from before the keycode blocks, renumbered key by key: pointing
+// holds 0x7e50+n and locks 0x7e56+n (slots 6/7 at 0x7ef0..0x7ef3), layer locks
+// 0x7e5c+n and the keymap's own keys from 0x7e64 each move to their block; the
+// keymap keys become custom keys 0, 1, 2… in order. A retired user macro
+// (0x7e40..0x7e4f, action kind 7) did nothing, so a key holding one is emptied;
+// one a behaviour or combo sends has no counterpart and refuses the import.
+function upgradeKeycodeBlocks(source) {
+    const value = validateSnapshot(source), result = JSON.parse(JSON.stringify(source));
+    const native = code => {
+        if (code >= 0x7e40 && code <= 0x7e4f) return 0x0000;
+        if (code >= 0x7e50 && code <= 0x7e55) return PD_HOLD_BASE + code - 0x7e50;
+        if (code >= 0x7e56 && code <= 0x7e5b) return PD_LOCK_BASE + code - 0x7e56;
+        if (code >= 0x7ef0 && code <= 0x7ef3) return ((code - 0x7ef0) % 2 ? PD_LOCK_BASE : PD_HOLD_BASE) + 6 + ((code - 0x7ef0) >> 1);
+        if (code >= 0x7e5c && code < 0x7e5c + LAYER_LOCK_SLOTS) return LAYER_LOCK_BASE + code - 0x7e5c;
+        if (code >= 0x7e64 && code < 0x7e64 + 64) return CUSTOM_KEY_BASE + code - 0x7e64;
+        if (code >= 0x7e40 && code <= 0x7fff) throw fail(`A key of the older firmware (0x${code.toString(16)}) has no counterpart in this firmware.`);
+        return code;
+    };
+    result.layers = source.layers.map(layer => layer.map(native));
+    const action = a => {
+        if (a.kind === 7) throw fail("A behaviour or combo sends a retired user macro, which this firmware no longer has.");
+        if (a.kind !== 1) return;
+        a.operand = native(a.operand);
+        const custom = customKeyOfCode(a.operand);
+        if (custom !== undefined) {a.kind = 7; a.operand = custom;}
+    };
+    walkActions(value.behaviors, action); walkActions(value.combos, action);
+    const options = actionLimitsFor(2);
+    result.actionAbiDigest = ACTION_ABI;
+    result.profile = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [
+        {id: 16, version: 2, payload: encodeRgbDomainV1(value.rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(value.behaviors, options)},
+        {id: 48, version: value.combos.version, payload: encodeComboDomain(value.combos, options)}, {id: 64, version: value.settings.formatVersion, payload: encodeSettings(value.settings)},
+        {id: 80, version: 1, payload: encodePdDomain(value.pdModes)},
+    ]}).toString("base64");
     return result;
 }
 
@@ -215,8 +257,8 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     function native(code) {
         if (!renumbers) return code;
         if (code >= 0x4000 && code <= 0x4fff) {const layer = (code >> 8) & 15; if (layer >= 8) throw fail("A key points outside the layer bank."); return (code & 0xf0ff) | (reach(layer) << 8);}
-        for (const start of [0x5200, 0x5220, 0x5240, 0x5260, 0x5280, 0x52c0, 0x52e0, 0x7e5c]) {
-            const width = start === 0x7e5c ? 8 : 32;
+        for (const start of [0x5200, 0x5220, 0x5240, 0x5260, 0x5280, 0x52c0, 0x52e0, LAYER_LOCK_BASE]) {
+            const width = start === LAYER_LOCK_BASE ? LAYER_LOCK_SLOTS : 32;
             if (code >= start && code < start + width) {if (code - start >= 8) throw fail("A key points outside the layer bank."); return start + reach(code - start);}
         }
         // Layer-mod stores a four-bit layer followed by five modifier bits.
@@ -278,4 +320,4 @@ function summaryOf(value) {
         macros: value.document.macros.filter(Boolean).length + (value.settings.macros || []).filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {comboTableOf, upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {comboTableOf, upgradePdSnapshot, upgradeKeycodeBlocks, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

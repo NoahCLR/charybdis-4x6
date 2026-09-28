@@ -771,7 +771,7 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
 
     CHECK(noah_profile_action_runtime_v1_from_native(TEST_MULTI_TAP_KEY, &target) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
     CHECK(noah_profile_action_runtime_v1_from_native(KC_Z, &tap_zero) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
-    CHECK(noah_profile_action_runtime_v1_from_native(MACRO_7, &tap_one) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+    CHECK(noah_profile_action_runtime_v1_from_native(VIA_MACRO_7, &tap_one) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
     steps[0] = (noah_key_behavior_step_v1_t){
         .tap_index     = 0u,
         .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP | NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD,
@@ -814,7 +814,7 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
     CHECK(behavior.single.hold.present && behavior.single.hold.action == MO(2));
     CHECK(key_behavior_keeps_auto_mouse_anchored(TEST_MULTI_TAP_KEY));
     step = key_behavior_view_step(&behavior, 2u);
-    CHECK(step.tap.present && step.tap.action == MACRO_7);
+    CHECK(step.tap.present && step.tap.action == VIA_MACRO_7);
 
     // A live behavior domain is a complete replacement: an omitted compiled
     // row is removed rather than silently leaking through from source data.

@@ -13,7 +13,7 @@
 
 enum {
     TEST_QMK_BEHAVIOR_ACTION = OSM(MOD_LSFT),
-    TEST_CUSTOM_ACTION       = NOAH_KEYMAP_SAFE_RANGE + 1,
+    TEST_CUSTOM_ACTION       = CUSTOM_KEY_0 + 1,
     TEST_RAW_LAYER_ACTION    = LT(2, KC_C),
 };
 
@@ -265,7 +265,7 @@ static void test_descriptor_classifies_dispatch_shapes(void) {
 
     CHECK(noah_action_desc_is_press_only(noah_action_describe(LOCK_LAYER(3))));
     CHECK(noah_action_desc_is_press_only(noah_action_describe(PD_SLOT_4_LOCK)));
-    CHECK(noah_action_desc_is_press_only(noah_action_describe(MACRO_0)));
+    CHECK(!noah_action_desc_is_press_only(noah_action_describe(CUSTOM_KEY_0)));
     CHECK(noah_action_desc_consumes_direct_press(noah_action_describe(VIA_MACRO_6)));
     CHECK(noah_action_desc_requires_per_key_hold(noah_action_describe(MO(2))));
     CHECK(noah_action_desc_uses_shared_hold(noah_action_describe(KC_C)));
@@ -408,20 +408,6 @@ static void test_tap_at_preserves_pd_lock_origin_key_pos(void) {
 }
 
 static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
-    keypos_t key_pos = test_keypos(1, 2);
-
-    // A retired user macro is consumed and does nothing; tapped as a keycode
-    // it would read as a modified basic key.
-    test_reset_stubs();
-
-    noah_action_tap(MACRO_0);
-    noah_action_tap(MACRO_15);
-    noah_action_press(key_pos, MACRO_7);
-    CHECK(literal_tap_call.keycode == KC_NO);
-    CHECK(register_code16_call.keycode == KC_NO);
-    CHECK(synthetic_tap_call.keycode == KC_NO);
-    CHECK(synthetic_record_call.keycode == KC_NO);
-
     test_reset_stubs();
 
     noah_action_tap(TEST_CUSTOM_ACTION);

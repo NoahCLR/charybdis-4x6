@@ -3,6 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // This translation unit owns the authored keymap data:
+//   - CUSTOM_KEYS(KEY), each custom key's name
 //   - VIA_MACROS(MACRO), with each macro's name
 //   - COMBOS(COMBO, COMBO_WINDOW)
 //   - key_behaviors[]
@@ -10,34 +11,87 @@
 //   - keymaps[][]
 //
 // Userspace-owned keycodes live in users/noah/noah_keymap_ids.h.
-// Keymap-local custom keycodes live below.
 // Default standard QMK hooks live in users/noah/hooks.c; shared runtime
 // processing lives in the userspace runtime modules under users/noah/lib/.
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "noah_keymap.h"
 
-// ─── Keymap-Local Custom Keycodes ──────────────────────────────────────────
-//
-// Add keymap-local custom keycodes here. The VIA -> QMK converter reads this
-// enum and maps later CUSTOM(n) tokens back to these symbolic names.
-//
-// Keep the sentinel, then add real keycodes below it. The first real keycode
-// will naturally start at NOAH_KEYMAP_SAFE_RANGE. Those keycodes can be
-// handled in process_record_user() and used inside key_behaviors[] actions
-// such as TAP_SENDS(...), TAP_AT_HOLD_THRESHOLD(...),
-// TAP_ON_RELEASE_AFTER_HOLD(...), REPEAT_WHILE_HELD(...),
-// or PRESS_AND_HOLD_UNTIL_RELEASE(...).
-//
-enum keymap_custom_keycodes {
-    KEYMAP_CUSTOM_KEYCODE_SENTINEL = NOAH_KEYMAP_SAFE_RANGE - 1,
-    RIGHT_THUMB,
-    LEFT_THUMB,
-    CLICK_SPAM,
-    DRAG_WINDOW,
-    // MY_CUSTOM_KEY,
-    // MY_OTHER_KEY,
-};
+// ─── Custom Keys ────────────────────────────────────────────────────────────
+// CUSTOM_KEY_0–63 are named keys that do only what their key_behaviors[] row
+// says: place one on a layer or emit it from a combo. Without a row it does
+// nothing, and a behaviour step cannot send one. All 64 slots are listed here
+// so the slot limit stays visible in keymap.c.
+// Each row is:
+//   KEY(CUSTOM_KEY_n, "name")
+// The name is what Charybdis Live shows for the key: at most 20 printable
+// ASCII characters. Use an empty string for an unused slot. A profile saved
+// from Charybdis Live keeps its own names.
+#define CUSTOM_KEYS(KEY)             \
+    KEY(CUSTOM_KEY_0, "Right Thumb") \
+    KEY(CUSTOM_KEY_1, "Left Thumb")  \
+    KEY(CUSTOM_KEY_2, "Click Spam")  \
+    KEY(CUSTOM_KEY_3, "Drag Window") \
+    KEY(CUSTOM_KEY_4, "")            \
+    KEY(CUSTOM_KEY_5, "")            \
+    KEY(CUSTOM_KEY_6, "")            \
+    KEY(CUSTOM_KEY_7, "")            \
+    KEY(CUSTOM_KEY_8, "")            \
+    KEY(CUSTOM_KEY_9, "")            \
+    KEY(CUSTOM_KEY_10, "")           \
+    KEY(CUSTOM_KEY_11, "")           \
+    KEY(CUSTOM_KEY_12, "")           \
+    KEY(CUSTOM_KEY_13, "")           \
+    KEY(CUSTOM_KEY_14, "")           \
+    KEY(CUSTOM_KEY_15, "")           \
+    KEY(CUSTOM_KEY_16, "")           \
+    KEY(CUSTOM_KEY_17, "")           \
+    KEY(CUSTOM_KEY_18, "")           \
+    KEY(CUSTOM_KEY_19, "")           \
+    KEY(CUSTOM_KEY_20, "")           \
+    KEY(CUSTOM_KEY_21, "")           \
+    KEY(CUSTOM_KEY_22, "")           \
+    KEY(CUSTOM_KEY_23, "")           \
+    KEY(CUSTOM_KEY_24, "")           \
+    KEY(CUSTOM_KEY_25, "")           \
+    KEY(CUSTOM_KEY_26, "")           \
+    KEY(CUSTOM_KEY_27, "")           \
+    KEY(CUSTOM_KEY_28, "")           \
+    KEY(CUSTOM_KEY_29, "")           \
+    KEY(CUSTOM_KEY_30, "")           \
+    KEY(CUSTOM_KEY_31, "")           \
+    KEY(CUSTOM_KEY_32, "")           \
+    KEY(CUSTOM_KEY_33, "")           \
+    KEY(CUSTOM_KEY_34, "")           \
+    KEY(CUSTOM_KEY_35, "")           \
+    KEY(CUSTOM_KEY_36, "")           \
+    KEY(CUSTOM_KEY_37, "")           \
+    KEY(CUSTOM_KEY_38, "")           \
+    KEY(CUSTOM_KEY_39, "")           \
+    KEY(CUSTOM_KEY_40, "")           \
+    KEY(CUSTOM_KEY_41, "")           \
+    KEY(CUSTOM_KEY_42, "")           \
+    KEY(CUSTOM_KEY_43, "")           \
+    KEY(CUSTOM_KEY_44, "")           \
+    KEY(CUSTOM_KEY_45, "")           \
+    KEY(CUSTOM_KEY_46, "")           \
+    KEY(CUSTOM_KEY_47, "")           \
+    KEY(CUSTOM_KEY_48, "")           \
+    KEY(CUSTOM_KEY_49, "")           \
+    KEY(CUSTOM_KEY_50, "")           \
+    KEY(CUSTOM_KEY_51, "")           \
+    KEY(CUSTOM_KEY_52, "")           \
+    KEY(CUSTOM_KEY_53, "")           \
+    KEY(CUSTOM_KEY_54, "")           \
+    KEY(CUSTOM_KEY_55, "")           \
+    KEY(CUSTOM_KEY_56, "")           \
+    KEY(CUSTOM_KEY_57, "")           \
+    KEY(CUSTOM_KEY_58, "")           \
+    KEY(CUSTOM_KEY_59, "")           \
+    KEY(CUSTOM_KEY_60, "")           \
+    KEY(CUSTOM_KEY_61, "")           \
+    KEY(CUSTOM_KEY_62, "")           \
+    KEY(CUSTOM_KEY_63, "")
 
 // ─── VIA Macros ─────────────────────────────────────────────────────────────
 // VIA_MACRO_0–63 are the authored aliases for VIA's dynamic macro slots.
@@ -75,8 +129,8 @@ enum keymap_custom_keycodes {
     MACRO(VIA_MACRO_15, "", "")                                                  \
     MACRO(VIA_MACRO_16, "", "")                                                  \
     MACRO(VIA_MACRO_17, "", "")                                                  \
-    MACRO(VIA_MACRO_18, "Left Thumb", "")                                        \
-    MACRO(VIA_MACRO_19, "Right Thumb", "")                                       \
+    MACRO(VIA_MACRO_18, "", "")                                                  \
+    MACRO(VIA_MACRO_19, "", "")                                                  \
     MACRO(VIA_MACRO_20, "", "")                                                  \
     MACRO(VIA_MACRO_21, "", "")                                                  \
     MACRO(VIA_MACRO_22, "", "")                                                  \
@@ -155,7 +209,7 @@ enum keymap_custom_keycodes {
 // hold threshold, set in Charybdis Live.
 #define COMBOS(COMBO, COMBO_WINDOW)                                                   \
     COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))                                        \
-    COMBO(CLICK_SPAM, (PD_SLOT_5, MS_BTN3))                                           \
+    COMBO(CUSTOM_KEY_2, (PD_SLOT_5, MS_BTN3))                                         \
     COMBO(KC_LGUI, (KC_N, KC_M))                                                      \
     COMBO_WINDOW(G(KC_N), (KC_M, KC_COMM, KC_DOT, LT(LAYER_NAV, KC_SLSH)), 100)       \
     COMBO_WINDOW(G(KC_N), (MS_BTN1, MS_BTN2, PD_SLOT_0, LT(LAYER_NAV, KC_SLSH)), 100) \
@@ -266,8 +320,9 @@ enum keymap_custom_keycodes {
 //     any other pointer-mode key also clears the previous lock.
 //   - Use VIA_MACRO_n for a macro, as a key or as the action in any helper:
 //     TAP_SENDS(VIA_MACRO_n), PRESS_AND_HOLD_UNTIL_RELEASE(VIA_MACRO_n).
-//     Its default contents come from VIA_MACROS(MACRO) above. MACRO_0–15,
-//     the former user macros, are retired and do nothing.
+//     Its default contents come from VIA_MACROS(MACRO) above.
+//   - A custom key (CUSTOM_KEY_n) is not an action: it is the keycode of its
+//     own row, placed on a layer or emitted by a combo.
 //   - Modded keycodes like G(KC_RIGHT), A(KC_LEFT), or S(KC_1) let one action
 //     send GUI, Alt, Shift, and similar variants without adding separate keys.
 //     Custom held actions decompose those into owned real mods plus the base
@@ -405,9 +460,10 @@ const key_behavior_t
                     },
             },
 
-            // ─── Custom Keycodes ────────────────────────────────────────────────────────────
+            // ─── Custom Keys ─────────────────────────────────────────────────────────────────
+            // Left Thumb
             {
-                .keycode       = VIA_MACRO_18,
+                .keycode       = CUSTOM_KEY_1,
                 .tap_hold_term = 150,
                 .tap_counts =
                     {
@@ -418,8 +474,9 @@ const key_behavior_t
                     },
             },
 
+            // Right Thumb
             {
-                .keycode       = VIA_MACRO_19,
+                .keycode       = CUSTOM_KEY_0,
                 .tap_hold_term = 150,
                 .tap_counts =
                     {
@@ -430,8 +487,9 @@ const key_behavior_t
                     },
             },
 
+            // Drag Window
             {
-                .keycode                   = DRAG_WINDOW,
+                .keycode                   = CUSTOM_KEY_3,
                 .multi_tap_term            = 100,
                 .tap_hold_term             = 100,
                 .keeps_auto_mouse_anchored = true,
@@ -441,8 +499,9 @@ const key_behavior_t
                     },
             },
 
+            // Click Spam
             {
-                .keycode                   = CLICK_SPAM,
+                .keycode                   = CUSTOM_KEY_2,
                 .tap_hold_term             = 1,
                 .keeps_auto_mouse_anchored = true,
                 .tap_counts =
@@ -495,7 +554,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
             KC_LEFT_CTRL,  LT(LAYER_SYM,KC_Z),             KC_X,              KC_C,              KC_V,              KC_B,                KC_N,             KC_M,          KC_COMM,           KC_DOT,  LT(LAYER_NAV,KC_SLSH),     KC_RIGHT_ALT,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-                                                                       KC_LEFT_GUI,          KC_SPACE,      VIA_MACRO_18,         VIA_MACRO_19,          KC_ENTER,
+                                                                       KC_LEFT_GUI,          KC_SPACE,      CUSTOM_KEY_1,         CUSTOM_KEY_0,          KC_ENTER,
                                                                                             KC_DELETE,      KC_BACKSPACE,         KC_BACKSPACE
   //                                                                ╰────────────────────────────────────────────────────╯ ╰────────────────────────────────────────────────────╯
     ),
@@ -551,7 +610,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,            PD_SLOT_2,         PD_SLOT_5,           MS_BTN3,       DRAG_WINDOW,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,            PD_SLOT_2,         PD_SLOT_5,           MS_BTN3,      CUSTOM_KEY_3,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,            PD_SLOT_1,           MS_BTN1,           MS_BTN2,         PD_SLOT_0,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯

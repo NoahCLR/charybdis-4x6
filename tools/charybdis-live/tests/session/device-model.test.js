@@ -38,16 +38,16 @@ function layoutWith(keys) {
 }
 
 test("device shortcut labels stay complete and semantic names require the advertised ABI", () => {
-    const values = [0x0806, 0x0a1d, 0x7e50, 0x7e61, 0x7e62];
+    const values = [0x0806, 0x0a1d, 0x7e80, 0x7ec5, 0x7ec6, 0x7e42];
     const state = {
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0xdcb00959},
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x1d3fcacc},
     };
     const model = buildDeviceModel(state);
-    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["Cmd+C", "Shift+Cmd+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6"],
-        "a layer lock is a user slot under the native ABI, named by what it does to which layer");
-    assert.equal(model.layers[0].positions[2].keycode, "QK_USER_16", "the editable identity still encodes to the original numeric value");
-    assert.equal(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[2].display, "User 16");
+    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["Cmd+C", "Shift+Cmd+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
+        "a layer lock and a custom key are user slots under the native ABI, named by what they are");
+    assert.equal(model.layers[0].positions[5].keycode, "QK_USER_2", "the editable identity still encodes to the original numeric value");
+    assert.equal(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[5].display, "User 2", "an unknown ABI names no custom key");
 });
 
 test("a position carries what its value means, not only what the keyboard calls it", () => {
@@ -55,15 +55,18 @@ test("a position carries what its value means, not only what the keyboard calls 
     // user keycodes, while every other domain names them semantically. The
     // position publishes both, so a lookup from a key to what it reaches has
     // something to match on and does not re-derive the mapping.
-    const values = [0x7e50, 0x7700, 0x0004];
+    const values = [0x7e80, 0x7700, 0x0004, 0x7e40];
     const model = buildDeviceModel({
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         committed: decodedDeviceProfile(),
-        capabilities: {actionAbiDigest: 0xdcb00959},
+        capabilities: {actionAbiDigest: 0x1d3fcacc},
         macroView: {viaMacros: [{keycode: "VIA_MACRO_0", kind: "via", name: "Sign-off"}]},
+        customKeyView: {keys: [{slot: 0, keycode: "CUSTOM_KEY_0", code: 0x7e40, name: "Right Thumb", hasBehavior: true}]},
     });
     assert.deepEqual(model.layers[0].positions.map((key) => [key.keycode, key.semantic]), [
-        ["QK_USER_16", "PD_SLOT_0"], ["QK_MACRO_0", "VIA_MACRO_0"], ["KC_A", "KC_A"]]);
+        ["0x7E80", "PD_SLOT_0"], ["QK_MACRO_0", "VIA_MACRO_0"], ["KC_A", "KC_A"], ["QK_USER_0", "CUSTOM_KEY_0"]]);
+    assert.equal(model.qmkKeyLabels.QK_USER_0, "Right Thumb", "a named custom key is labelled by its name");
+    assert.ok(model.qmkKeycodes.some(key => key.value === "CUSTOM_KEY_63" && key.keycode === 0x7e7f && key.group === "Custom keys"), "every custom key is offered");
     assert.equal(model.qmkKeyLabels.QK_MACRO_0, "Sign-off", "a named macro is labelled by its name");
 });
 
@@ -356,10 +359,10 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
         row({kind: 6, flags: 0, operand: 0}),   // VIA_MACRO_0
     ]}};
     const macroView = {viaMacros: [{kind: "via", keycode: "VIA_MACRO_0", payload: ""}], hardcodedMacros: []};
-    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0xdcb00959}}).qmkKeyLabels;
-    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0xdcb00959}}).qmkKeyLabels;
+    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0x1d3fcacc}}).qmkKeyLabels;
+    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0x1d3fcacc}}).qmkKeyLabels;
     assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
     assert.equal(labels.QK_MACRO_0, "Macro 0", "the macro screen's name");
-    assert.equal(labels.QK_USER_30, "Lock Layer 2", "a bare user slot reads by what it does to which layer");
+    assert.equal(labels["0x7EC2"], "Lock Layer 2", "a bare user slot reads by what it does to which layer");
     assert.equal(labels["LOCK_LAYER(2)"], "Lock Layer 2");
 });

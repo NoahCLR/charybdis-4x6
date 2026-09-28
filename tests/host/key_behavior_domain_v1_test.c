@@ -124,7 +124,7 @@ static size_t encode_representative(uint8_t *output, size_t capacity, noah_profi
         },
     };
     static const noah_key_behavior_step_v1_t pd_steps[] = {
-        {.tap_index = 1u, .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP, .tap = {.kind = NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO, .operand = 2u}},
+        {.tap_index = 1u, .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP, .tap = {.kind = NOAH_PROFILE_ACTION_V1_CUSTOM_KEY, .operand = 2u}},
     };
     static const noah_key_behavior_row_v1_t rows[] = {
         {.target = {.kind = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, .operand = 2u}, .steps = pd_steps, .step_count = 1u},
@@ -197,7 +197,7 @@ static void test_incremental_validation(const char *fixture_path) {
         NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_ACTION, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION,
     };
     static const uint8_t expected_kinds[] = {
-        NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_VIA_MACRO, NOAH_PROFILE_ACTION_V1_LAYER_LOCK, NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO,
+        NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_VIA_MACRO, NOAH_PROFILE_ACTION_V1_LAYER_LOCK, NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, NOAH_PROFILE_ACTION_V1_CUSTOM_KEY,
     };
     static const uint16_t                           expected_operands[] = {0x1234u, 0x28u, 10u, 3u, 2u, 2u};
     uint8_t                                         payload[TEST_BUFFER_SIZE];
@@ -332,7 +332,7 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     target = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_NONE};
     expect_result(noah_key_behavior_domain_v1_find_target(&domain, &target, &found_row, &found, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     expect_result(noah_key_behavior_domain_v1_step_at(&domain, 1u, 0u, &step, &error), NOAH_PROFILE_CODEC_V1_OK);
-    assert(step.tap.kind == NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO && step.tap.operand == 2u);
+    assert(step.tap.kind == NOAH_PROFILE_ACTION_V1_CUSTOM_KEY && step.tap.operand == 2u);
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 2u, &row, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     expect_result(noah_key_behavior_domain_v1_step_at(&domain, 0u, 2u, &step, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     assert(state.max_read <= 12u);

@@ -77,7 +77,7 @@ Initial action kinds:
 | 4 | stable PD-mode id, momentary |
 | 5 | stable PD-mode id, lock |
 | 6 | VIA macro slot |
-| 7 | retired user macro slot (`MACRO_0`–`15`); accepted so stored profiles decode, and inert |
+| 7 | custom key `0..63` (`CUSTOM_KEY_n`, native `0x7e40 + n`); under earlier action vocabularies this kind named the retired user macros, and a digest mismatch keeps the two apart |
 
 Userspace-owned actions are never encoded as raw custom-keycode enum values.
 Unsupported action kinds or operands reject the complete candidate.
@@ -341,7 +341,8 @@ Capabilities use two pages. Page 0 contains the response-layout version, page
 count, protocol/schema versions, report and chunk sizes, status-page count,
 feature flags, action-ABI digest, firmware version, and compiled-default
 digest. Page 1 contains compiled and maximum layer/behavior/combo/RGB/macro
-capacities plus the selected schema's payload/slot capacities and advertised VIA
+capacities, the custom-key slot count (payload byte 11, `64`; it carried the
+retired user-macro count, 16, before feature bit 16) plus the selected schema's payload/slot capacities and advertised VIA
 macro bound (7,191 bytes on eight-layer firmware; 7,551 on the five-layer bridge). Feature bits distinguish schema/storage knowledge from candidate
 write, commit, preview, activation, and peer support, so read-only firmware
 does not advertise write operations prematurely.
@@ -366,6 +367,7 @@ Capability feature bits are:
 | 13 | legacy pointing-mode source (see [pd-mode-domain-v1.md](./pd-mode-domain-v1.md)) |
 | 14 | owned layer keys: `TG()`, `TO()`, `TT()` and `OSL()` act through userspace layer ownership, so a host may offer them in behaviours and combos where the placement rules allow (`TT()` and `OSL()` joined the bit on the same unreleased branch; every flashed build that sets it has all four) |
 | 15 | behaviour QMK functions: a behaviour sends QMK and keyboard keycodes past the layer keycodes and below the user range (the Charybdis DPI and sniping keys, RGB Matrix, Magic, `QK_BOOT`…) as a synthetic QMK record, so they run as they do on a key, and a key whose own keycode is one keeps a plain key's fallback hold; a host may offer them in a behaviour's target, tap and hold. Without it, the engine sends them as report keys, keeping only the low byte, and a host must refuse them there |
+| 16 | custom keys and keycode blocks: userspace keycodes sit in fixed blocks (custom keys `0x7e40`, pointing holds `0x7e80`, pointing locks `0x7ea0`, layer locks `0x7ec0`, each reserved beyond what is supported), action kind 7 is a custom key, and settings version 5 names the 64 custom keys. It comes with its own action ABI digest; a host knowing that digest may offer custom keys as keys and combo outputs, never as behaviour steps |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with

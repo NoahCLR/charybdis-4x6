@@ -11,6 +11,7 @@ const {decodeSettings} = require("../schema/settings-domain-v1");
 const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
 const {settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
+const {customKeyEditorView} = require("../model/custom-key-editor");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
@@ -414,6 +415,7 @@ class ProfileDeviceService {
             result.options = await readKeyboardOptions(this.connection, this.requestIds);
             this.portable = result;
             this.macroView = macroEditorView(result, this.capabilities);
+            this.customKeyView = customKeyEditorView(result, this.capabilities);
             this.settingsView = settingsEditorView(result);
         });
         this.portableProgress = "";
@@ -453,6 +455,7 @@ class ProfileDeviceService {
             result.options = keyboardOptions;
             this.portable = result;
             this.macroView = macroEditorView(result, this.capabilities);
+            this.customKeyView = customKeyEditorView(result, this.capabilities);
             this.settingsView = settingsEditorView(result);
             if (result.performance) {
                 const seconds = (result.performance.elapsedMs / 1000).toFixed(1);
@@ -510,6 +513,7 @@ class ProfileDeviceService {
             portableProgress: this.portableProgress || "",
             settingsView: this.settingsView ? JSON.parse(JSON.stringify(this.settingsView)) : null,
             macroView: this.macroView ? JSON.parse(JSON.stringify(this.macroView)) : null,
+            customKeyView: this.customKeyView ? JSON.parse(JSON.stringify(this.customKeyView)) : null,
             liveApply: cloneLiveApply(this.liveApply),
             layout: this.layout ? JSON.parse(JSON.stringify(this.layout)) : null,
             committed: this.committed ? JSON.parse(JSON.stringify(this.committed)) : null,
@@ -559,6 +563,7 @@ class ProfileDeviceService {
     clearConnection() {
         this.portable = undefined; this.portableProgress = "";
         this.macroView = undefined;
+        this.customKeyView = undefined;
         this.settingsView = undefined;
         this.profileBytes = undefined;
         this.layout = undefined;

@@ -37,7 +37,8 @@ int main(int argc, char **argv) {
     assert(noah_profile_pd_v1_tap_key_valid(0x082e));
     assert(noah_profile_pd_v1_tap_key_valid(0xaa));
     assert(!noah_profile_pd_v1_tap_key_valid(0x08aa));
-    assert(!noah_profile_pd_v1_tap_key_valid(0x7e50));
+    assert(!noah_profile_pd_v1_tap_key_valid(0x7e80));
+    assert(!noah_profile_pd_v1_tap_key_valid(0x7e40));
     printf("PD domain v1: %zu cross-language cases (%zu valid, %zu rejected) passed\n", count, accepted, rejected);
     return 0;
 }

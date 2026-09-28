@@ -38,7 +38,9 @@ static void test_invalid_schema_and_generation_are_rejected(void) {
 
     CHECK(noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){0}) == 0u);
     CHECK(!noah_qmk_via_sync_metadata_decode(0u, &decoded));
-    CHECK(!noah_qmk_via_sync_metadata_decode(UINT32_C(0x30000001), &decoded));
+    CHECK(!noah_qmk_via_sync_metadata_decode(UINT32_C(0x40000001), &decoded));
+    // A schema-2 bank predates the keycode blocks and is never adopted.
+    CHECK(!noah_qmk_via_sync_metadata_decode(UINT32_C(0x20000001), &decoded));
     CHECK(!noah_qmk_via_sync_metadata_decode(UINT32_C(0x10000000), &decoded));
     CHECK(!noah_qmk_via_sync_metadata_decode(UINT32_C(0x10000001), NULL));
 }

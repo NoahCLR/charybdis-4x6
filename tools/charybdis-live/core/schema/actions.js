@@ -10,12 +10,16 @@
 
 const keycodes = require("../data/keycode-catalog");
 const {PD_BINDINGS, pdBindingOfCode} = require("../data/pd-bindings");
+const {customKeyOfCode} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS: ACTION} = require("./profile-blob-v1");
 const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 
-// The native action ABIs whose semantic actions map onto VIA keycodes.
-const NATIVE_ACTION_ABI_V1 = 0xdcb00959;
-const KNOWN_ACTION_ABIS = Object.freeze([NATIVE_ACTION_ABI_V1, 0xeb80829c, 0x61072732]);
+// The native action ABIs whose semantic actions map onto VIA keycodes: the
+// one with the userspace keycode blocks (Profile Wire feature bit 16). Older
+// vocabularies number those keys differently; only an imported backup is
+// translated from them (model/portable-profile.js).
+const ACTION_ABI = 0x1d3fcacc;
+const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);
 
 // An action's name, the one every edit message and row lookup uses.
@@ -26,7 +30,7 @@ function actionName(action) {
         case ACTION.LAYER_MOMENTARY: return `MO(${action.operand})`;
         case ACTION.LAYER_LOCK: return `LOCK_LAYER(${action.operand})`;
         case ACTION.VIA_MACRO: return `VIA_MACRO_${action.operand}`;
-        case ACTION.HARDCODED_MACRO: return `MACRO_${action.operand}`;
+        case ACTION.CUSTOM_KEY: return `CUSTOM_KEY_${action.operand}`;
         case ACTION.PD_MODE_MOMENTARY:
         case ACTION.PD_MODE_LOCK: {
             const binding = PD_BINDINGS[action.operand];
@@ -71,7 +75,8 @@ const isOwnedLayerCode = (code, layerCount) =>
 // key, a press-and-hold branch or a combo (a combo holds its output); OSL() is
 // a key, a tap or a combo; LM() is a key or a combo; LT() is only a key; TG(),
 // TO() and LOCK_LAYER() go anywhere; DF() and PDF(), which the keyboard does not
-// own, go nowhere. Returns what is wrong, or undefined.
+// own, go nowhere. A custom key does what its own behaviour says, so it is a
+// key or a combo output, never a step. Returns what is wrong, or undefined.
 const PLACEMENT = Object.freeze({KEY: "key", TAP: "tap", HOLD_PRESS: "holdPress", HOLD_OTHER: "holdOther", COMBO_OUTPUT: "comboOutput"});
 
 function layerRuleOf(code, layerCount) {
@@ -88,6 +93,10 @@ function layerRuleOf(code, layerCount) {
 }
 
 function placementProblem(action, placement, {layerCount = 8} = {}) {
+    if (action.kind === ACTION.CUSTOM_KEY || (action.kind === ACTION.QMK_KEYCODE && customKeyOfCode(action.operand) !== undefined)) {
+        return [PLACEMENT.KEY, PLACEMENT.COMBO_OUTPUT].includes(placement) ? undefined
+            : `${actionName(action)} is a custom key: it does what its own behaviour says, so it works as a key or a combo output, not inside a behaviour.`;
+    }
     const code = action.kind === ACTION.LAYER_MOMENTARY ? 0x5220 | action.operand : nativeCode(action);
     const rule = code === undefined ? undefined : layerRuleOf(code, layerCount);
     if (!rule || rule.places.includes(placement)) return undefined;
@@ -116,4 +125,4 @@ function behaviorEmitProblem(action, {behaviorQmkFunctions = false} = {}) {
     return `${actionName(action)} runs in QMK's own key handling, which this keyboard's behaviours do not reach yet, so it only works as a key or a combo here. A firmware update lets behaviours send it.`;
 }
 
-module.exports = {PLACEMENT, placementProblem, behaviorEmitProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, NATIVE_ACTION_ABI_V1, knownActionAbi, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef};
+module.exports = {PLACEMENT, placementProblem, behaviorEmitProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef};

@@ -46,7 +46,7 @@ function representative() {
     return {rows: [
         {
             target: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: 2},
-            steps: [{tapIndex: 1, tap: {kind: PROFILE_ACTION_KINDS.HARDCODED_MACRO, operand: 2}}],
+            steps: [{tapIndex: 1, tap: {kind: PROFILE_ACTION_KINDS.CUSTOM_KEY, operand: 2}}],
         },
         {
             target: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: 0x1234},
@@ -115,7 +115,7 @@ test("empty and representative key-behavior payloads match exact golden bytes", 
                 longerHoldTerm: 0,
                 multiTapTerm: 0,
                 keepsAutoMouseAnchored: false,
-                steps: [{tapIndex: 1, tap: {kind: PROFILE_ACTION_KINDS.HARDCODED_MACRO, flags: 0, operand: 2}}],
+                steps: [{tapIndex: 1, tap: {kind: PROFILE_ACTION_KINDS.CUSTOM_KEY, flags: 0, operand: 2}}],
             },
         ],
         rowCount: 2,

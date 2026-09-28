@@ -54,6 +54,8 @@ export const state = {
     feedbackRow: "hold",
     macroSlot: null,
     macroSearch: "",
+    customKey: null,
+    customKeySearch: "",
     macroForms: {},       // keycode → {draft, step, cursor}: one macro slot's unsaved text, the step being built, where it goes
     recording: null,     // {slot, before, last, captured} only while a take is being captured
     lastTake: null,      // {slot, before}: the finished take Clear take can undo
@@ -159,6 +161,7 @@ export const writable = () => Boolean(getModel()?.draft?.matching && !getModel()
 const AREA_CAPABILITY = {
     settings: (model) => Boolean(model?.settingsEditing?.writable),
     macros: (model) => Boolean(model?.macroEditing?.writable),
+    customKeys: (model) => Boolean(model?.customKeyEditing?.writable),
     pointing: (model) => Boolean(model?.pdModeEditing?.writable),
     combos: (model) => model?.comboReadback?.writable !== false,
     layers: (model) => Boolean(model?.portable?.available && model.portable.eightLayers && !model.portable.busy),

@@ -44,10 +44,10 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     assert.match(field("Left"), /Inherit modifiers/);
     const model = buildDeviceModel({...draft.editingState({connected: true, selectedDeviceId: "board", capabilities: caps}), capabilities: caps});
     assert.equal(model.pdModes[7].name, "History");
-    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7" && key.keycode === 0x7ef2 && key.label === "History · hold"));
-    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7_LOCK" && key.keycode === 0x7ef3 && key.label === "History · toggle"));
+    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7" && key.keycode === 0x7e87 && key.label === "History · hold"));
+    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7_LOCK" && key.keycode === 0x7ea7 && key.label === "History · toggle"));
     assert(!model.qmkKeycodes.some(key => key.value === "SLOT_7_MODE"));
-    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_6" && key.keycode === 0x7ef0 && key.label === "Slot 6 · hold (empty)"),
+    assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_6" && key.keycode === 0x7e86 && key.label === "Slot 6 · hold (empty)"),
         "an unconfigured slot still offers its keycodes, so a button can be placed before the mode exists");
     assert(!settingsEditorView(draft.current).sections.some(section => section.fields.some(field => field.id >= 10 && field.id <= 14)));
     draft.undo(draft.revision); draft.undo(draft.revision); draft.undo(draft.revision);

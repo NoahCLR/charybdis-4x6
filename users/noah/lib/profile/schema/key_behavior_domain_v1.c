@@ -74,7 +74,7 @@ static noah_profile_codec_v1_result_t resolve_limits(const noah_key_behavior_lim
     if (limits->max_rows == 0u || limits->max_rows > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS || limits->max_populated_steps == 0u || limits->max_populated_steps > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS || limits->max_tap_steps_per_row == 0u || limits->max_tap_steps_per_row > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW || limits->max_repeat_hz == 0u || limits->max_repeat_hz > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ || limits->max_payload_size == 0u || limits->max_payload_size > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE) {
         return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
     }
-    if (action_limits->max_logical_layers > UINT32_C(0x10000) || action_limits->max_pd_modes > UINT32_C(0x10000) || action_limits->max_via_macro_slots > UINT32_C(0x10000) || action_limits->max_hardcoded_macro_slots > UINT32_C(0x10000)) {
+    if (action_limits->max_logical_layers > UINT32_C(0x10000) || action_limits->max_pd_modes > UINT32_C(0x10000) || action_limits->max_via_macro_slots > UINT32_C(0x10000) || action_limits->max_custom_keys > UINT32_C(0x10000)) {
         return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
     }
     return NOAH_PROFILE_CODEC_V1_OK;

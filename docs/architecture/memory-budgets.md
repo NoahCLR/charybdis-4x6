@@ -266,3 +266,16 @@ left pair ELFs each link 4,152 bytes of `.data` and 53,452 bytes of `.bss`:
 57,604 bytes, exactly 288 more, and 2,812 below the 60,416-byte tripwire. The
 boot core-memory span is 204,536 bytes per half and fixed linked occupancy
 65,064 bytes. The reviewed stack paths still pass at the same figures.
+
+## Custom-key names — 2026-09-28
+
+Settings version 5 names the 64 custom keys, which grows the effective
+settings cache from 1,656 to 3,000 bytes (312 + 128 × 21). A fresh left pair ELF
+(`NOAH_PHYSICAL_HALF=left`, `FORCE_SLAVE=yes`) links 4,188 bytes of `.data` and
+54,756 bytes of `.bss`: 58,944 bytes of `.data + .bss`, 1,472 below the
+60,416-byte tripwire. The SRAM0–3 fixed prefix is 58,952 bytes and the boot
+linker/core-memory span 203,192 bytes. These are linked measurements, not
+runtime high-water. The custom-key and macro name tables are `const` and stay
+in flash. The next static buffer of this size would cross the tripwire, not the
+RP2040's SRAM: it needs fresh accounting and a policy decision, not a
+workaround.

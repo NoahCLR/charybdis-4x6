@@ -23,7 +23,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "core", "pro
 const {RGB_LOCALITIES} = require(path.join(here, "..", "core", "schema", "rgb-domain-v1"));
 const {document: pdDocument} = require(path.join(here, "fixtures", "pd-profile"));
 
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0x61072732};
+const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0x1d3fcacc};
 
 function session() {
     const doc = pdDocument();
@@ -344,12 +344,13 @@ test("a macro name is posted without its steps, and review shows the rename", ()
     assert.ok(draft.view({selectedDeviceId: "test-device", connected: true}).changes.some((change) => change.unit === "macro:5" && change.fields.some((field) => field.label === "Name" && field.after === "Sign-off")));
 });
 
-test("a macro left holding a key is refused, and macro keys land as the keyboard's own values", () => {
+test("a macro left holding a key is refused, and macro and custom keys land as the keyboard's own values", () => {
     const draft = session();
     assert.throws(() => stage(draft, edits.macroMessage("VIA_MACRO_0", "{+KC_A}", draft.current.fingerprint)), /Release/);
-    stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 0, keycode: "VIA_MACRO_63"}, {layoutIndex: 1, keycode: "MACRO_15"}]));
+    stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 0, keycode: "VIA_MACRO_63"}, {layoutIndex: 1, keycode: "CUSTOM_KEY_15"}]));
     assert.equal(draft.document.layers[0][slotOf(0)], 0x773f);
     assert.equal(draft.document.layers[0][slotOf(1)], 0x7e4f);
+    assert.throws(() => stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 1, keycode: "MACRO_15"}])), /Cannot represent/, "the retired user macros are gone");
 });
 
 test("a recorded take appends to what the payload held, with no pause before the first key", () => {

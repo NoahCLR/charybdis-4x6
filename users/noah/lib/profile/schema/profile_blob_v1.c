@@ -85,7 +85,7 @@ noah_profile_action_v1_limits_t noah_profile_action_v1_default_limits(void) {
         .max_logical_layers        = NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS,
         .max_pd_modes              = NOAH_PROFILE_ACTION_V1_MAX_PD_MODES,
         .max_via_macro_slots       = NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS,
-        .max_hardcoded_macro_slots = NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS,
+        .max_custom_keys = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS,
     };
     return limits;
 }
@@ -311,7 +311,7 @@ static noah_profile_codec_v1_result_t validate_action(const noah_profile_action_
         return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, offset, UINT8_MAX, 0u);
     }
     limits = supplied_limits ? *supplied_limits : noah_profile_action_v1_default_limits();
-    if (limits.max_logical_layers > UINT32_C(0x10000) || limits.max_pd_modes > UINT32_C(0x10000) || limits.max_via_macro_slots > UINT32_C(0x10000) || limits.max_hardcoded_macro_slots > UINT32_C(0x10000)) {
+    if (limits.max_logical_layers > UINT32_C(0x10000) || limits.max_pd_modes > UINT32_C(0x10000) || limits.max_via_macro_slots > UINT32_C(0x10000) || limits.max_custom_keys > UINT32_C(0x10000)) {
         return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, offset, UINT8_MAX, 0u);
     }
     if (action->flags != 0u) {
@@ -337,8 +337,8 @@ static noah_profile_codec_v1_result_t validate_action(const noah_profile_action_
         case NOAH_PROFILE_ACTION_V1_VIA_MACRO:
             capacity = limits.max_via_macro_slots;
             break;
-        case NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO:
-            capacity = limits.max_hardcoded_macro_slots;
+        case NOAH_PROFILE_ACTION_V1_CUSTOM_KEY:
+            capacity = limits.max_custom_keys;
             break;
         default:
             return fail(error, NOAH_PROFILE_CODEC_V1_UNKNOWN_ACTION_KIND, offset, UINT8_MAX, 0u);
@@ -407,7 +407,7 @@ noah_profile_codec_v1_result_t noah_profile_action_v1_decode(const uint8_t *byte
 _Static_assert(NOAH_PROFILE_BLOB_V1_HEADER_SIZE + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE <= NOAH_PROFILE_BLOB_V1_MAX_SIZE, "Profile blob envelope must fit the payload ceiling");
 _Static_assert(NOAH_PROFILE_BLOB_V1_MAX_DOMAINS == sizeof(ordered_domain_ids) / sizeof(ordered_domain_ids[0]), "Known domain table and decoded view capacity drifted");
 _Static_assert(NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS == NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS, "action and storage layer ceilings drifted");
-_Static_assert(NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS == NOAH_PROFILE_WIRE_V1_MAX_HARDCODED_MACRO_SLOTS, "action and storage macro ceilings drifted");
+_Static_assert(NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS == NOAH_PROFILE_WIRE_V1_MAX_CUSTOM_KEYS, "action and storage macro ceilings drifted");
 #ifdef VIA_ENABLE
 _Static_assert(NOAH_PROFILE_BLOB_V1_MAX_SIZE == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX, "canonical blob must fit exactly within a profile slot payload");
 #endif

@@ -26,7 +26,7 @@ test("empty domains are explicit and replace flashed behaviours and combos", () 
 test("reorder moves matrix data, RGB, pointer policy and every layer action reference together", () => {
     const source = document(), reordered = reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7]);
     const actual = validateSnapshot(reordered);
-    assert.deepEqual(reordered.layers[0].slice(0, 5), [0x5224, 0x4431, 0x7e5d, 0x5082, 0x52c4]);
+    assert.deepEqual(reordered.layers[0].slice(0, 5), [0x5224, 0x4431, 0x7ec1, 0x5082, 0x52c4]);
     assert.equal(actual.settings.names[1], "Pointer"); assert.equal(actual.settings.values[5], 1);
     assert.equal(actual.rgb.layerColors.find(row => row.layerId === 1).color.v, 150);
     assert.equal(fingerprint(reorderLayers(reordered, [0, 4, 2, 3, 1, 5, 6, 7])), fingerprint(source));
@@ -204,4 +204,22 @@ test("the five-layer bridge migrates custom triggers and adds transparent space"
     assert.equal(source.layers.length, 5);
     source.layers[0][0] = 0x7fff;
     assert.throws(() => validateSnapshot(source, {compiledLayerCount: 8, supportedDomainMask: 15, actionAbiDigest: 0xeb80829c}), /no corresponding slot/);
+});
+test("a backup from before the keycode blocks is renumbered key by key for the firmware that has them", () => {
+    const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
+    const source = require("../fixtures/pd-profile").document();
+    source.actionAbiDigest = 0x61072732;
+    // PD hold 0 and lock 1, slot 6's lock, layer lock 3, the keymap's first and third keys, a retired user macro.
+    source.layers[0].splice(0, 7, 0x7e50, 0x7e57, 0x7ef1, 0x7e5f, 0x7e64, 0x7e66, 0x7e45);
+    const blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
+    const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload, {actionLimits: {maxPdModes: 8}});
+    behaviors.rows = [{target: {kind: 1, operand: 0x7e66}, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false, steps: [{tapIndex: 0, tap: {kind: 1, operand: 0x04}}]}];
+    blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors, {actionLimits: {maxPdModes: 8}});
+    source.profile = encodeProfileBlob(blob).toString("base64");
+    const keyboard = {schema: {major: 2}, actionAbiDigest: 0x1d3fcacc, compiledLayerCount: 8, supportedDomainMask: 31};
+    const result = validateSnapshot(source, keyboard);
+    assert.equal(result.document.actionAbiDigest, 0x1d3fcacc);
+    assert.deepEqual(result.document.layers[0].slice(0, 7), [0x7e80, 0x7ea1, 0x7ea6, 0x7ec3, 0x7e40, 0x7e42, 0x0000]);
+    assert.deepEqual(result.behaviors.rows[0].target, {kind: 7, flags: 0, operand: 2}, "the keymap's third key is custom key 2");
+    assert.throws(() => validateSnapshot({...source, layers: source.layers.map((layer, i) => i ? layer : [0x7ef8, ...layer.slice(1)])}, keyboard), /no counterpart/);
 });

@@ -18,8 +18,8 @@
 // Cold readback workspace, never used by key events or RGB rendering.
 void noah_qmk_portable_storage_init(void) {
     uint32_t word = eeconfig_read_user();
-    // Geometry changed from five to eight. Never interpret the old macro
-    // prefix as keycodes even when both builds happen on the same date.
+    // An older bank's layout uses another keycode numbering or geometry. Never
+    // interpret it, even when both builds happen on the same date.
     if ((word >> 28) != NOAH_QMK_VIA_SYNC_METADATA_SCHEMA) via_eeprom_set_valid(false);
 }
 // The dual-role setting is QMK's tapping term. Quick tap follows it, as it
@@ -113,15 +113,28 @@ _Static_assert((int)LAYER_COUNT == (int)NOAH_SETTINGS_LAYERS, "Settings name eve
 _Static_assert(NOAH_LAYER_NAME_SIZE == NOAH_SETTINGS_NAME_BYTES, "A layer name fills one settings name field");
 _Static_assert(VIA_MACRO_SLOT_COUNT == NOAH_SETTINGS_MACRO_NAMES, "Settings name every VIA macro");
 _Static_assert(NOAH_MACRO_NAME_SIZE == NOAH_SETTINGS_MACRO_NAME_ASCII_MAX + 1u, "A macro name is at most 20 characters");
+_Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_SETTINGS_CUSTOM_KEY_NAMES, "Settings name every custom key");
 enum { LAYER_NAMES_OFFSET = 8u + NOAH_SETTINGS_COUNT * 4u };
+// Name records after the fixed part: the macros' (v3), then the custom keys' (v5).
+#if NOAH_PROFILE_SETTINGS_VERSION >= 5u
+enum { NAME_RECORDS = NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES, CUSTOM_KEY_NAME_HEADER = NOAH_SETTINGS_CUSTOM_KEY_NAMES };
+#else
+enum { NAME_RECORDS = NOAH_SETTINGS_MACRO_NAMES, CUSTOM_KEY_NAME_HEADER = 0 };
+#endif
 static uint8_t name_length(const char *name, uint8_t max) {
     uint8_t length = 0;
     while (length < max && name[length])
         length++;
     return length;
 }
-static uint8_t macro_name_length(uint8_t slot) {
-    return name_length(via_macro_names[slot], NOAH_SETTINGS_MACRO_NAME_ASCII_MAX);
+static const char *record_name(uint8_t record) {
+#if NOAH_PROFILE_SETTINGS_VERSION >= 5u
+    if (record >= NOAH_SETTINGS_MACRO_NAMES) return custom_key_names[record - NOAH_SETTINGS_MACRO_NAMES];
+#endif
+    return via_macro_names[record];
+}
+static uint8_t record_name_length(uint8_t record) {
+    return name_length(record_name(record), NOAH_SETTINGS_MACRO_NAME_ASCII_MAX);
 }
 // Settings readback streams from the effective settings rather than keeping
 // a second copy. Page 0 describes the bytes as they are now; a change between
@@ -130,9 +143,9 @@ static uint16_t settings_length(void) {
     uint16_t length = noah_effective_settings_length();
     if (length) return length;
 #if NOAH_PROFILE_SETTINGS_VERSION >= 3u
-    length = NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES;
-    for (uint8_t slot = 0; slot < NOAH_SETTINGS_MACRO_NAMES; slot++)
-        length += macro_name_length(slot);
+    length = NOAH_SETTINGS_FIXED_SIZE + NAME_RECORDS;
+    for (uint8_t record = 0; record < NAME_RECORDS; record++)
+        length += record_name_length(record);
     return length;
 #else
     return NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACROS * 2u;
@@ -147,10 +160,10 @@ static uint8_t settings_byte(uint16_t offset) {
     }
     if (noah_effective_settings_length()) return noah_effective_settings_byte(offset);
     // No profile settings are live: the current version with the keymap's
-    // layer and macro names (v3), or its layer names and every user macro
-    // empty (v1).
+    // layer, macro (v3) and custom-key (v5) names, or its layer names and
+    // every user macro empty (v1).
 #if NOAH_PROFILE_SETTINGS_VERSION >= 3u
-    const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, 0, 0, 0, 0};
+    const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, CUSTOM_KEY_NAME_HEADER, 0, 0, 0};
 #else
     const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACROS, 0, 0, 0, 0};
 #endif
@@ -164,10 +177,10 @@ static uint8_t settings_byte(uint16_t offset) {
     }
 #if NOAH_PROFILE_SETTINGS_VERSION >= 3u
     offset -= NOAH_SETTINGS_FIXED_SIZE;
-    for (uint8_t slot = 0; slot < NOAH_SETTINGS_MACRO_NAMES; slot++) {
-        uint8_t length = macro_name_length(slot);
+    for (uint8_t record = 0; record < NAME_RECORDS; record++) {
+        uint8_t length = record_name_length(record);
         if (offset == 0u) return length;
-        if (offset <= length) return (uint8_t)via_macro_names[slot][offset - 1u];
+        if (offset <= length) return (uint8_t)record_name(record)[offset - 1u];
         offset -= length + 1u;
     }
 #endif

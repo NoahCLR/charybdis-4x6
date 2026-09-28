@@ -14,12 +14,35 @@ test("settings reject invalid durations, names, padding and macro streams", () =
     assert.throws(() => validateMacroIr(Buffer.from([5, 17])), /length/);
     assert.throws(() => validateMacroIr(Buffer.from([2, 1])), /Truncated/);
 });
+test("v5 adds the 64 custom-key names after the macros, and a name edit upgrades only as far as it needs", () => {
+    const {SETTINGS, upgradeSettings, customKeyNamesOf} = require("../../core/schema/settings-domain-v1");
+    const {macros, ...base} = defaults();
+    const pd = {...base, values: base.values.map((v, id) => id >= 10 && id < 15 ? 0 : v)};
+    const v4 = {...pd, formatVersion: 4, macroNames: Array.from({length: 64}, (_, i) => `${i}`.padEnd(20, "~"))};
+    const full = {...v4, formatVersion: 5, customKeyNames: Array.from({length: 64}, (_, i) => `Key ${i}`.padEnd(20, "!"))};
+    const bytes = encodeSettings(full);
+    assert.equal(bytes.length, SETTINGS.V5_MAX_SIZE);
+    assert.deepEqual([...bytes.subarray(0, 8)], [5, 8, 28, 64, 64, 0, 0, 0]);
+    assert.deepEqual(decodeSettings(bytes), full);
+    assert.throws(() => encodeSettings({...full, customKeyNames: full.customKeyNames.map((n, i) => i ? n : "x".repeat(21))}), /custom key name/);
+    assert.throws(() => encodeSettings({...full, customKeyNames: full.customKeyNames.slice(1)}), /custom key names/);
+    // A v4 header must not count custom keys, and a v5 one must.
+    const relabelled = Buffer.from(encodeSettings(v4)); relabelled[4] = 64;
+    assert.throws(() => decodeSettings(relabelled), /Unsupported settings format/);
+    assert.deepEqual(customKeyNamesOf(v4), Array(64).fill(""));
+    // A macro name stays v4; a custom key name takes it to v5, names kept.
+    assert.equal(upgradeSettings(v4), v4);
+    const upgraded = upgradeSettings(v4, 5);
+    assert.equal(upgraded.formatVersion, 5);
+    assert.deepEqual(upgraded.macroNames, v4.macroNames);
+    assert.deepEqual(upgraded.customKeyNames, Array(64).fill(""));
+});
 test("v4 holds all 64 macro names at 20 plain characters, and v3 keeps its own ceiling", () => {
     const {SETTINGS, CURRENT_VERSION} = require("../../core/schema/settings-domain-v1");
     const {macros, ...base} = defaults();
     const pd = {...base, values: base.values.map((v, id) => id >= 10 && id < 15 ? 0 : v)};
     const full = {...pd, formatVersion: 4, macroNames: Array.from({length: 64}, (_, i) => `${i}`.padEnd(20, "~"))};
-    assert.equal(CURRENT_VERSION, 4);
+    assert.equal(CURRENT_VERSION, 5);
     const bytes = encodeSettings(full);
     assert.equal(bytes.length, SETTINGS.V4_MAX_SIZE);
     assert.equal(bytes.length, 1656);

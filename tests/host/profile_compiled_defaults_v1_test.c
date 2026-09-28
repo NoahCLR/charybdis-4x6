@@ -18,13 +18,12 @@ enum {
     OUTPUT_CAPACITY = NOAH_PROFILE_BLOB_V1_MAX_SIZE,
 };
 
-// Migration tripwire: adding PD slots must not renumber deployed native keys.
-_Static_assert(MACRO_0 == 0x7e40 && MACRO_15 == 0x7e4f, "preserve macro identities");
-_Static_assert(PD_SLOT_0 == 0x7e50 && PD_SLOT_1 == 0x7e51 && PD_SLOT_2 == 0x7e52 && PD_SLOT_3 == 0x7e53 && PD_SLOT_4 == 0x7e54 && PD_SLOT_5 == 0x7e55, "preserve PD momentary identities");
-_Static_assert(PD_SLOT_0_LOCK == 0x7e56 && PD_SLOT_1_LOCK == 0x7e57 && PD_SLOT_2_LOCK == 0x7e58 && PD_SLOT_3_LOCK == 0x7e59 && PD_SLOT_4_LOCK == 0x7e5a && PD_SLOT_5_LOCK == 0x7e5b, "preserve PD lock identities");
-_Static_assert(PD_SLOT_6 == 0x7ef0 && PD_SLOT_6_LOCK == 0x7ef1 && PD_SLOT_7 == 0x7ef2 && PD_SLOT_7_LOCK == 0x7ef3, "preserve PD extension identities");
-_Static_assert(LAYER_LOCK_BASE == 0x7e5c, "preserve layer lock identities");
-_Static_assert(NOAH_KEYMAP_SAFE_RANGE == 0x7e5c + LAYER_COUNT, "preserve authored custom trigger identities");
+// Migration tripwire: each userspace family keeps its block, so adding
+// pointing slots or layers renumbers nothing.
+_Static_assert(CUSTOM_KEY_0 == 0x7e40 && CUSTOM_KEY_63 == 0x7e7f, "preserve custom key identities");
+_Static_assert(PD_SLOT_0 == 0x7e80 && PD_SLOT_5 == 0x7e85 && PD_SLOT_6 == 0x7e86 && PD_SLOT_7 == 0x7e87, "preserve PD hold identities");
+_Static_assert(PD_SLOT_0_LOCK == 0x7ea0 && PD_SLOT_5_LOCK == 0x7ea5 && PD_SLOT_6_LOCK == 0x7ea6 && PD_SLOT_7_LOCK == 0x7ea7, "preserve PD lock identities");
+_Static_assert(LAYER_LOCK_BASE == 0x7ec0 && LOCK_LAYER(7) == 0x7ec7, "preserve layer lock identities");
 
 static uint8_t     output[OUTPUT_CAPACITY];
 static size_t      output_length;
@@ -118,7 +117,7 @@ static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_a
     value.logical_layer_count                       = LAYER_COUNT;
     value.supported_pd_mode_mask                    = (uint8_t)((1u << PD_MODE_COUNT) - 1u);
     value.via_macro_slot_count                      = VIA_MACRO_SLOT_COUNT;
-    value.hardcoded_macro_slot_count                = NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS;
+    value.custom_key_count                = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     value.rgb_limits.logical_layer_count            = LAYER_COUNT;
     value.rgb_limits.supported_pd_mode_mask         = value.supported_pd_mode_mask;
     value.rgb_limits.maximum_brightness             = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
@@ -251,7 +250,7 @@ static void test_real_authored_profile(void) {
     assert(runtime_compatibility.logical_layer_count == LAYER_COUNT);
     assert(runtime_compatibility.supported_pd_mode_mask == (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u));
     assert(runtime_compatibility.via_macro_slot_count == VIA_MACRO_SLOT_COUNT);
-    assert(runtime_compatibility.hardcoded_macro_slot_count == NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS);
+    assert(runtime_compatibility.custom_key_count == NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS);
     assert(runtime_compatibility.rgb_limits.logical_layer_count == LAYER_COUNT);
     assert(runtime_compatibility.rgb_limits.maximum_brightness == RGB_MATRIX_MAXIMUM_BRIGHTNESS);
     assert(runtime_compatibility.rgb_limits.compiled_stage_mask == NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL);
@@ -325,12 +324,12 @@ static void test_semantic_action_translation(void) {
     assert(noah_profile_compiled_v1_action(MO(LAYER_NAV), &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY && action.operand == LAYER_NAV);
     assert(noah_profile_compiled_v1_action(LOCK_LAYER(LAYER_SYM), &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK && action.operand == LAYER_SYM);
     assert(noah_profile_compiled_v1_action(VIA_MACRO_10, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_VIA_MACRO && action.operand == 10u);
-    assert(noah_profile_compiled_v1_action(MACRO_7, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO && action.operand == 7u);
+    assert(noah_profile_compiled_v1_action(CUSTOM_KEY_7, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_CUSTOM_KEY && action.operand == 7u);
     assert(noah_profile_compiled_v1_action(pd_modes[PD_MODE_INDEX_ZOOM].keycode, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && action.operand == PD_MODE_INDEX_ZOOM);
     assert(noah_profile_compiled_v1_action(pd_modes[PD_MODE_INDEX_ARROW].lock_action, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK && action.operand == PD_MODE_INDEX_ARROW);
 
     const uint16_t round_trip_actions[] = {
-        KC_NO, KC_A, MO(LAYER_NAV), LOCK_LAYER(LAYER_SYM), VIA_MACRO_10, MACRO_7, pd_modes[PD_MODE_INDEX_ZOOM].keycode, pd_modes[PD_MODE_INDEX_ARROW].lock_action,
+        KC_NO, KC_A, MO(LAYER_NAV), LOCK_LAYER(LAYER_SYM), VIA_MACRO_10, CUSTOM_KEY_7, CUSTOM_KEY_63, pd_modes[PD_MODE_INDEX_ZOOM].keycode, pd_modes[PD_MODE_INDEX_ARROW].lock_action,
     };
     for (size_t index = 0u; index < ARRAY_SIZE(round_trip_actions); index++) {
         assert(noah_profile_action_runtime_v1_from_native(round_trip_actions[index], &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);

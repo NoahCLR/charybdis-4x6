@@ -33,8 +33,15 @@ versions fail validation. Files are limited to 100,000 bytes.
 The temporary bridge also exports five-layer documents. Import into the
 standard image recognizes the deployed `0xdcb00959` action vocabulary, adds
 three transparent layers, and translates native user triggers from `0x7e61`
-upward by three positions. The eight-layer vocabulary is `0xeb80829c`. Other
-legacy vocabularies are rejected. Large legacy macro banks must fit the new
+upward by three positions. The eight-layer vocabulary is `0xeb80829c`; the
+schema-2 pointing vocabulary `0x61072732`. Firmware with the userspace keycode
+blocks uses `0x1d3fcacc`, and import into it translates a `0x61072732`
+document key by key: pointing holds, locks and layer locks move to their
+blocks, the keymap's own keys from `0x7e64` become custom keys 0, 1, 2… (a
+behaviour target or combo output among them becomes action kind 7), and a key
+holding a retired user macro is emptied. A retired user macro that a behaviour
+or combo sends, or a user keycode with no counterpart, refuses the import.
+Other legacy vocabularies are rejected. Large legacy macro banks must fit the new
 7,191-byte capacity, including 64 terminators and the final validity byte.
 
 RGB and behaviour domains come from the effective committed domain or the
@@ -107,10 +114,8 @@ payload's first byte must agree. The minimum is 376 bytes, all names empty.
 The firmware never reads a name; they are profile data for the app, saved and
 copied to the other half with everything else. The firmware no longer plays
 user macros at all: a version-2 domain's macro records are kept and read back
-as stored, but never run, and a `MACRO_n` key is consumed and does nothing.
-The keycodes `MACRO_0`–`MACRO_15` (`QK_USER_0`–`QK_USER_15`) keep their
-values so every later custom keycode and the action ABI digest are unchanged.
-The app upgrades a profile to version 3 only when a macro is named; any other
+as stored, but never run. Their keycodes are gone: `0x7e40..0x7e4f` are now
+custom keys 0–15 (version 5). The app upgrades a profile to version 3 only when a macro is named; any other
 edit keeps the version it read, and a schema-1 profile cannot carry names.
 
 ### Version 4: every macro name gets 20 characters
@@ -130,6 +135,22 @@ keeps its printable ASCII characters, trimmed and cut to 20, and review shows
 any name that changed. The effective settings cache grows to 1,656 bytes, 288
 bytes more static RAM per half; see
 [memory budgets](memory-budgets.md#retired-user-macros-and-streamed-settings-readback--2026-09-23).
+
+### Version 5: custom-key names
+
+The 64 custom keys (`CUSTOM_KEY_n`, action kind 7) are named here, the way the
+macros are: version 5 keeps version 4's layout and follows the 64 macro-name
+records with 64 custom-key name records in the same form, 0–20 bytes of
+printable ASCII each. Header byte 4, zero before, counts them (`64`). The
+ceiling is 3,000 bytes (312 + 128 × 21), so every name can be full length at
+once. A custom key does only what its behaviour row says; its name is profile
+data for the app, which the firmware never reads.
+
+Firmware with the userspace keycode blocks (Profile Wire feature bit 16)
+writes version 5 and still reads versions 2–4. The app upgrades to version 5
+only when a custom key is named; a macro name alone still upgrades to 4. The
+effective settings cache grows to 3,000 bytes, 1,344 bytes more static RAM per
+half.
 
 | Scalar ID | Meaning |
 | ---: | --- |
@@ -169,8 +190,8 @@ These use the existing Profile Wire custom GET envelope and request ID.
 
 GET value `0x07` reads the effective settings domain with its scalars overlaid
 by their live QMK owners. With no profile settings live it returns the current
-version named by the keymap: `layer_names[]` and the name in each
-`VIA_MACROS` row. Page 0's 12-byte payload is version `1`,
+version named by the keymap: `layer_names[]`, the name in each `VIA_MACROS`
+row and, in version 5, in each `CUSTOM_KEYS` row. Page 0's 12-byte payload is version `1`,
 chunk size `25`, uint16 length, CRC32, and FNV-1a digest of the bytes as they
 are at that moment. Pages 1 onward return successive 25-byte chunks with an
 exact short final chunk, streamed from the live domain rather than a snapshot.

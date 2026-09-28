@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import keyNames from "../core/model/key-names.js";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {behaviourFor, cellLabel, comboAnswers, comboInputKeys, comboInputShown, combosOnKey, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachInView, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosInView, combosForKey, keyFace, keyMeaning, keyName, layerOfKeycode, macroKeycodes, macroPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, toggleComboInput, visibleKeycode} from "../webview/view/keyface.mjs";
+import {behaviourFor, cellLabel, comboAnswers, comboInputKeys, comboInputShown, combosOnKey, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachInView, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosInView, combosForKey, keyFace, keyMeaning, keyName, layerOfKeycode, macroKeycodes, macroPlacements, customKeyPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, toggleComboInput, visibleKeycode} from "../webview/view/keyface.mjs";
 
 // Slots come from the host with their binding keycodes; the tests use the
 // host's own registry rather than a copy of it.
@@ -176,12 +176,12 @@ test("an empty slot's bindings are found by the keyboard's own values, not by a 
     // A cleared slot has no name for the model to resolve, so its keys arrive
     // as whatever the catalogue calls the raw value. The slot still answers to
     // the same two numbers, so that is what the lookup matches on.
-    assert.deepEqual(slotKeycodes(slotWith({id: 0})), [0x7e50, 0x7e56], "hold and toggle for a named slot");
-    assert.deepEqual(slotKeycodes(slotWith({id: 6})), [0x7ef0, 0x7ef1], "and for a numbered one");
+    assert.deepEqual(slotKeycodes(slotWith({id: 0})), [0x7e80, 0x7ea0], "hold and toggle for a named slot");
+    assert.deepEqual(slotKeycodes(slotWith({id: 6})), [0x7e86, 0x7ea6], "and for a numbered one");
     const model = {
-        qmkKeycodes: [{keycode: 0x7ef0, value: "QK_USER_32"}],
+        qmkKeycodes: [{keycode: 0x7e86, value: "QK_USER_32"}],
         layers: [{name: "Layer 0", displayName: "Base", positions: [
-            {layoutIndex: 5, keycode: "QK_USER_32", value: 0x7ef0},
+            {layoutIndex: 5, keycode: "QK_USER_32", value: 0x7e86},
             {layoutIndex: 6, keycode: "KC_A", value: 0x0004},
         ]}],
         keyBehaviors: [{keycode: "LEFT_THUMB", steps: [{tapCount: 0, hold: {action: "QK_USER_32"}}]}],
@@ -819,6 +819,25 @@ test("a macro's layers are the ones that hold a way to it themselves", () => {
         "a combo firing from that layer's keys sends it");
     assert.deepEqual(summary("VIA_MACRO_10"), [], "VIA_MACRO_1 does not match VIA_MACRO_10");
     assert.deepEqual(macroPlacements(model, undefined, "VIA_MACRO_1"), []);
+});
+
+test("a custom key's layers are the ones where a key carries it or a combo sends it", () => {
+    const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
+    const model = {
+        customKeys: [0, 1, 2].map((slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, name: `Key ${slot}`, hasBehavior: true})),
+        qmkKeycodeAliases: {QK_USER_2: "CUSTOM_KEY_2"},
+        keyBehaviors: [],
+        combos: [{id: 0, badge: "C1", inputs: ["KC_B", "KC_C"], output: "QK_USER_2"}],
+    };
+    const stack = [
+        {index: 0, name: "Base", positions: [at(0, "QK_USER_0", "CUSTOM_KEY_0"), at(1, "KC_B"), at(2, "KC_C")]},
+        {index: 1, name: "Numbers", positions: [at(0, "KC_TRANSPARENT"), at(1, "QK_USER_1", "CUSTOM_KEY_1"), at(2, "KC_NO")]},
+    ];
+    const summary = (keycode) => customKeyPlacements(model, stack, keycode)
+        .map((entry) => [entry.layer.name, entry.at, entry.routes.map((route) => [route.group, route.keys.sort()])]);
+    assert.deepEqual(summary("CUSTOM_KEY_0"), [["Base", 0, [["here", [0]]]]], "Numbers only falls through to Base's");
+    assert.deepEqual(summary("CUSTOM_KEY_1"), [["Numbers", 1, [["here", [1]]]]]);
+    assert.deepEqual(summary("CUSTOM_KEY_2"), [["Base", 0, [["combos", [1, 2]]]]], "a combo firing from Base's keys sends it");
 });
 
 test("a behaviour cell reads by the host's name for its key, and by its keycode when it has none", () => {

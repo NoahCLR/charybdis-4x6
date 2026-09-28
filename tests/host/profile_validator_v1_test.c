@@ -118,7 +118,7 @@ static noah_profile_validator_v1_compatibility_t compatibility(void) {
     value.logical_layer_count               = 3u;
     value.supported_pd_mode_mask            = NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL;
     value.via_macro_slot_count              = 11u;
-    value.hardcoded_macro_slot_count        = 3u;
+    value.custom_key_count        = 3u;
     value.rgb_limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL;
     value.rgb_limits.logical_layer_count    = value.logical_layer_count;
     value.rgb_limits.maximum_brightness     = 200u;
@@ -343,7 +343,7 @@ static void test_stable_action_cross_references(const char *fixture_path) {
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
     compatible.supported_pd_mode_mask            = NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL;
     compatible.rgb_limits.supported_pd_mode_mask = compatible.supported_pd_mode_mask;
-    compatible.hardcoded_macro_slot_count        = 2u;
+    compatible.custom_key_count        = 2u;
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION);
 }
 

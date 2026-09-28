@@ -280,17 +280,14 @@ bool noah_action_kind_match_qmk_function(uint16_t action, pd_mode_mask_t pd_mode
     return true;
 }
 
-bool noah_action_kind_match_keymap_custom(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
+bool noah_action_kind_match_custom_key(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
     (void)pd_mode;
 
-#ifdef NOAH_PD_PROFILE_ENABLE
-    if (action >= PD_SLOT_6 && action <= PD_SLOT_7_LOCK) return false;
-#endif
-    if (!(out && action >= NOAH_KEYMAP_SAFE_RANGE)) {
+    if (!(out && NOAH_KEYCODE_IS_CUSTOM_KEY(action))) {
         return false;
     }
 
-    *out = noah_action_desc_build(NOAH_ACTION_KIND_KEYMAP_CUSTOM, action, 0, 0);
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_CUSTOM_KEY, action, 0, 0);
     return true;
 }
 

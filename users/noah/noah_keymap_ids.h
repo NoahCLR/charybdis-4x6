@@ -25,9 +25,9 @@ _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAM
 #endif
 
 #define VIA_MACRO_SLOT_COUNT 64
-// The names Charybdis Live shows until a layer or macro is renamed there:
-// a layer name holds 23 UTF-8 bytes, a macro name 20 printable ASCII
-// characters, each followed by its terminator.
+// The names Charybdis Live shows until a layer, macro or custom key is renamed
+// there: a layer name holds 23 UTF-8 bytes, a macro or custom-key name 20
+// printable ASCII characters, each followed by its terminator.
 #define NOAH_LAYER_NAME_SIZE 24
 #define NOAH_MACRO_NAME_SIZE 21
 #ifdef VIA_ENABLE
@@ -105,68 +105,131 @@ enum {
 
 _Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA macro slot count exceeds QMK macro keycode range");
 
-// ─── Custom Keycodes ────────────────────────────────────────────────────────
+// ─── Userspace Keycodes ─────────────────────────────────────────────────────
 //
-// Custom keycodes are assigned values starting from SAFE_RANGE so they don't
-// collide with any built-in QMK or Charybdis keycodes.
+// QMK's user range starts at SAFE_RANGE (0x7e40). Each family owns one fixed,
+// aligned block, reserved beyond what is supported today, so adding pointing
+// modes or layers never moves another keycode:
 //
-// MACRO_0–15 once played the firmware's user macros. Those are retired: the
-// identities keep their values, so stored profiles and the action ABI stay
-// valid, but the keys do nothing. Name and edit VIA macros instead.
-// VIA macros use the VIA_MACRO_0–63 aliases.
-// PD_SLOT_n keycodes address configurable pointing slots as momentary holds.
-// Add a key_behaviors[] row when you want those keys to grow explicit tap,
-// hold, longer-hold, or multi-tap behavior on top of that default.
-// Use the generated *_LOCK keycode for a persistent toggle inside tap/hold rows.
-// Each slot gets an explicit generated lock keycode, so mode identity no
-// longer depends on contiguous enum math.
-// LAYER_LOCK_BASE reserves LAYER_COUNT keycodes for layer locking via
-// actions authored in key_behaviors[]. Use the LOCK_LAYER(n) macro there.
-// Keymap-local custom keycodes are declared in keymap.c's
-// enum keymap_custom_keycodes. Keep the sentinel there, then add real
-// keycodes below it so the first one lands on NOAH_KEYMAP_SAFE_RANGE.
-// Those keycodes can be handled in process_record_user() and used directly in
-// key_behaviors[] actions such as TAP_SENDS(...).
+//   0x7e40–0x7e7f  CUSTOM_KEY_0–63      named keys that do what their behaviour says
+//   0x7e80–0x7e9f  PD_SLOT_n            hold pointing slot n    (32 reserved)
+//   0x7ea0–0x7ebf  PD_SLOT_n_LOCK       toggle pointing slot n  (32 reserved)
+//   0x7ec0–0x7edf  LOCK_LAYER(n)        toggle layer n's lock   (32 reserved)
+//   0x7ee0–0x7eff  unassigned
+//
+// A custom key does nothing by itself: give it a key_behaviors[] row and place
+// it on a layer or as a combo output. Its name comes from CUSTOM_KEYS in
+// keymap.c until Charybdis Live renames it. A behaviour step cannot send one.
+// PD_SLOT_n holds a configurable pointing slot; add a key_behaviors[] row for
+// explicit tap, hold, longer-hold or multi-tap behavior on top of that default.
+// LOCK_LAYER(n) toggles a layer lock from actions authored in key_behaviors[].
 
-enum custom_keycodes {
-    MACRO_0 = SAFE_RANGE,
-    MACRO_1,
-    MACRO_2,
-    MACRO_3,
-    MACRO_4,
-    MACRO_5,
-    MACRO_6,
-    MACRO_7,
-    MACRO_8,
-    MACRO_9,
-    MACRO_10,
-    MACRO_11,
-    MACRO_12,
-    MACRO_13,
-    MACRO_14,
-    MACRO_15,
-#define NOAH_PD_MODE_KEYCODE(name, keycode) keycode,
-    NOAH_PD_MODE_BASE_LIST(NOAH_PD_MODE_KEYCODE)
-#undef NOAH_PD_MODE_KEYCODE
-#define NOAH_PD_MODE_LOCK_KEYCODE(name, keycode) keycode##_LOCK,
-        NOAH_PD_MODE_BASE_LIST(NOAH_PD_MODE_LOCK_KEYCODE)
-#undef NOAH_PD_MODE_LOCK_KEYCODE
-            LAYER_LOCK_BASE,
-    CUSTOM_KEYCODES_END = LAYER_LOCK_BASE + LAYER_COUNT,
+#define NOAH_KEYCODE_CUSTOM_KEY_BASE (SAFE_RANGE + 0x00)
+#define NOAH_KEYCODE_PD_HOLD_BASE (SAFE_RANGE + 0x40)
+#define NOAH_KEYCODE_PD_LOCK_BASE (SAFE_RANGE + 0x60)
+#define NOAH_KEYCODE_LAYER_LOCK_BASE (SAFE_RANGE + 0x80)
+#define NOAH_KEYCODE_USERSPACE_END (SAFE_RANGE + 0xa0)
+#define NOAH_KEYCODE_CUSTOM_KEY_RESERVED 64
+#define NOAH_KEYCODE_PD_RESERVED 32
+#define NOAH_KEYCODE_LAYER_LOCK_RESERVED 32
+#define CUSTOM_KEY_SLOT_COUNT 64
+
+enum {
+    CUSTOM_KEY_0  = NOAH_KEYCODE_CUSTOM_KEY_BASE + 0,
+    CUSTOM_KEY_1  = NOAH_KEYCODE_CUSTOM_KEY_BASE + 1,
+    CUSTOM_KEY_2  = NOAH_KEYCODE_CUSTOM_KEY_BASE + 2,
+    CUSTOM_KEY_3  = NOAH_KEYCODE_CUSTOM_KEY_BASE + 3,
+    CUSTOM_KEY_4  = NOAH_KEYCODE_CUSTOM_KEY_BASE + 4,
+    CUSTOM_KEY_5  = NOAH_KEYCODE_CUSTOM_KEY_BASE + 5,
+    CUSTOM_KEY_6  = NOAH_KEYCODE_CUSTOM_KEY_BASE + 6,
+    CUSTOM_KEY_7  = NOAH_KEYCODE_CUSTOM_KEY_BASE + 7,
+    CUSTOM_KEY_8  = NOAH_KEYCODE_CUSTOM_KEY_BASE + 8,
+    CUSTOM_KEY_9  = NOAH_KEYCODE_CUSTOM_KEY_BASE + 9,
+    CUSTOM_KEY_10 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 10,
+    CUSTOM_KEY_11 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 11,
+    CUSTOM_KEY_12 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 12,
+    CUSTOM_KEY_13 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 13,
+    CUSTOM_KEY_14 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 14,
+    CUSTOM_KEY_15 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 15,
+    CUSTOM_KEY_16 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 16,
+    CUSTOM_KEY_17 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 17,
+    CUSTOM_KEY_18 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 18,
+    CUSTOM_KEY_19 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 19,
+    CUSTOM_KEY_20 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 20,
+    CUSTOM_KEY_21 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 21,
+    CUSTOM_KEY_22 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 22,
+    CUSTOM_KEY_23 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 23,
+    CUSTOM_KEY_24 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 24,
+    CUSTOM_KEY_25 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 25,
+    CUSTOM_KEY_26 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 26,
+    CUSTOM_KEY_27 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 27,
+    CUSTOM_KEY_28 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 28,
+    CUSTOM_KEY_29 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 29,
+    CUSTOM_KEY_30 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 30,
+    CUSTOM_KEY_31 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 31,
+    CUSTOM_KEY_32 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 32,
+    CUSTOM_KEY_33 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 33,
+    CUSTOM_KEY_34 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 34,
+    CUSTOM_KEY_35 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 35,
+    CUSTOM_KEY_36 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 36,
+    CUSTOM_KEY_37 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 37,
+    CUSTOM_KEY_38 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 38,
+    CUSTOM_KEY_39 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 39,
+    CUSTOM_KEY_40 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 40,
+    CUSTOM_KEY_41 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 41,
+    CUSTOM_KEY_42 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 42,
+    CUSTOM_KEY_43 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 43,
+    CUSTOM_KEY_44 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 44,
+    CUSTOM_KEY_45 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 45,
+    CUSTOM_KEY_46 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 46,
+    CUSTOM_KEY_47 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 47,
+    CUSTOM_KEY_48 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 48,
+    CUSTOM_KEY_49 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 49,
+    CUSTOM_KEY_50 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 50,
+    CUSTOM_KEY_51 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 51,
+    CUSTOM_KEY_52 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 52,
+    CUSTOM_KEY_53 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 53,
+    CUSTOM_KEY_54 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 54,
+    CUSTOM_KEY_55 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 55,
+    CUSTOM_KEY_56 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 56,
+    CUSTOM_KEY_57 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 57,
+    CUSTOM_KEY_58 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 58,
+    CUSTOM_KEY_59 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 59,
+    CUSTOM_KEY_60 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 60,
+    CUSTOM_KEY_61 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 61,
+    CUSTOM_KEY_62 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 62,
+    CUSTOM_KEY_63 = NOAH_KEYCODE_CUSTOM_KEY_BASE + 63,
 };
 
-// Appended identities must never shift deployed layer or authored keycodes.
-enum { PD_SLOT_6 = SAFE_RANGE + 0xb0, PD_SLOT_6_LOCK, PD_SLOT_7, PD_SLOT_7_LOCK };
-_Static_assert(PD_SLOT_6 == 0x7ef0, "PD extension ABI changed");
+enum {
+    NOAH_KEYCODE_PD_HOLD_BEFORE = NOAH_KEYCODE_PD_HOLD_BASE - 1,
+#define NOAH_PD_MODE_KEYCODE(name, keycode) keycode,
+    NOAH_PD_MODE_LIST(NOAH_PD_MODE_KEYCODE)
+#undef NOAH_PD_MODE_KEYCODE
+};
+enum {
+    NOAH_KEYCODE_PD_LOCK_BEFORE = NOAH_KEYCODE_PD_LOCK_BASE - 1,
+#define NOAH_PD_MODE_LOCK_KEYCODE(name, keycode) keycode##_LOCK,
+    NOAH_PD_MODE_LIST(NOAH_PD_MODE_LOCK_KEYCODE)
+#undef NOAH_PD_MODE_LOCK_KEYCODE
+};
+#define LAYER_LOCK_BASE NOAH_KEYCODE_LAYER_LOCK_BASE
+
+_Static_assert(NOAH_KEYCODE_CUSTOM_KEY_BASE == 0x7e40 && NOAH_KEYCODE_PD_HOLD_BASE == 0x7e80 && NOAH_KEYCODE_PD_LOCK_BASE == 0x7ea0 && NOAH_KEYCODE_LAYER_LOCK_BASE == 0x7ec0, "userspace keycode blocks are the action ABI");
+_Static_assert(CUSTOM_KEY_SLOT_COUNT <= NOAH_KEYCODE_CUSTOM_KEY_RESERVED && NOAH_KEYCODE_CUSTOM_KEY_BASE + NOAH_KEYCODE_CUSTOM_KEY_RESERVED == NOAH_KEYCODE_PD_HOLD_BASE, "custom keys fill their block");
+_Static_assert(PD_SLOT_7 - PD_SLOT_0 + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_HOLD_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_PD_LOCK_BASE, "pointing holds stay inside their block");
+_Static_assert(PD_SLOT_7_LOCK - PD_SLOT_0_LOCK + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_LAYER_LOCK_BASE, "pointing locks stay inside their block");
+_Static_assert(LAYER_COUNT <= NOAH_KEYCODE_LAYER_LOCK_RESERVED && NOAH_KEYCODE_LAYER_LOCK_BASE + NOAH_KEYCODE_LAYER_LOCK_RESERVED == NOAH_KEYCODE_USERSPACE_END, "layer locks stay inside their block");
+_Static_assert(NOAH_KEYCODE_USERSPACE_END - 1 <= QK_USER_MAX, "userspace keycodes stay in QMK's user range");
 
 #define PD_MODE_KEYCODE_COUNT PD_MODE_COUNT
 #define PD_MODE_LOCK_KEYCODE_COUNT PD_MODE_COUNT
-#define NOAH_KEYCODE_IS_RETIRED_MACRO(keycode_) ((keycode_) >= MACRO_0 && (keycode_) <= MACRO_15)
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
-#define NOAH_KEYMAP_SAFE_RANGE CUSTOM_KEYCODES_END
+#define NOAH_KEYCODE_IS_CUSTOM_KEY(keycode_) ((keycode_) >= CUSTOM_KEY_0 && (keycode_) <= CUSTOM_KEY_63)
 
 extern const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT];
 extern const char        via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
+extern const char        custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
 extern const char        layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE];
 #ifdef COMBO_ENABLE
 extern combo_t       key_combos[];

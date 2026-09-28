@@ -9,9 +9,13 @@ test("an action has one name and one native keycode", () => {
     assert.equal(actionName({kind: ACTION.PD_MODE_MOMENTARY, operand: 0}), "PD_SLOT_0");
     assert.equal(actionName({kind: ACTION.PD_MODE_LOCK, operand: 7}), "PD_SLOT_7_LOCK");
     assert.equal(nativeCode({kind: ACTION.QMK_KEYCODE, operand: 0x04}), 0x04);
-    assert.equal(nativeCode({kind: ACTION.PD_MODE_LOCK, operand: 0}), 0x7e56);
+    assert.equal(nativeCode({kind: ACTION.PD_MODE_LOCK, operand: 0}), 0x7ea0);
+    assert.equal(actionName({kind: ACTION.CUSTOM_KEY, operand: 63}), "CUSTOM_KEY_63");
+    assert.equal(nativeCode({kind: ACTION.CUSTOM_KEY, operand: 3}), 0x7e43);
+    assert.equal(nativeCode({kind: ACTION.LAYER_LOCK, operand: 7}), 0x7ec7);
     assert.deepEqual(keycodeAction(0x29), {kind: ACTION.QMK_KEYCODE, operand: 0x29});
-    assert.equal(pdSlotOfCode(0x7ef2), 7);
+    assert.equal(pdSlotOfCode(0x7e87), 7);
+    assert.equal(pdSlotOfCode(0x7ea7), 7);
     assert.equal(pdSlotOfCode(0x0004), undefined);
     assert.throws(() => actionName({kind: ACTION.PD_MODE_MOMENTARY, operand: 9}), /pointing slot/);
 });
@@ -22,7 +26,8 @@ test("decode limits follow the schema version, and a layer reference reads back"
     assert.equal(layerRef(3), "Layer 3");
     assert.equal(layerOfRef("Layer 3"), 3);
     assert.equal(layerOfRef("Numbers"), undefined);
-    assert.equal(knownActionAbi(0x61072732), true);
+    assert.equal(knownActionAbi(0x1d3fcacc), true, "the vocabulary with the keycode blocks");
+    assert.equal(knownActionAbi(0x61072732), false, "older numbering is only translated on import");
     assert.equal(knownActionAbi(1), false);
 });
 
@@ -41,4 +46,6 @@ test("placement follows the keyboard's rule: only layer keycodes are restricted"
     assert.equal(places(code(0x4104)), "ok - - - -", "LT is a key of its own");
     assert.equal(places(code(0x5062)), "ok - - - ok", "LM(3, Shift) is a key or a combo");
     for (const unowned of [0x5241, 0x52e1, 0x5102, 0x5268]) assert.equal(places(code(unowned)), "- - - - -", `0x${unowned.toString(16)} goes nowhere`);
+    assert.equal(places({kind: ACTION.CUSTOM_KEY, operand: 2}), "ok - - - ok", "a custom key is a key or a combo output, never a step");
+    assert.equal(places(code(0x7e42)), "ok - - - ok", "however it is stored");
 });

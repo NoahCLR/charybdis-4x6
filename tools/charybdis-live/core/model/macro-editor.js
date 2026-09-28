@@ -48,7 +48,6 @@ function macroEditorView(snapshot, capabilities) {
 // domain, so naming a macro upgrades that domain to v4.
 function editMacro(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.");
-    if (/^MACRO_\d+$/.test(message.keycode || "")) throw fail("User macros are retired; use a VIA macro.");
     const match = /^VIA_MACRO_(\d+)$/.exec(message.keycode || "");
     const index = match && Number(match[1]);
     if (!match || index >= 64 || String(index) !== match[1]) throw fail("Choose a macro slot reported by the keyboard.");

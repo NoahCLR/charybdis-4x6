@@ -14,9 +14,6 @@ const NAVIGATION = new Set([
 
 const valueOf = (entry) => entry.value || entry.key || entry.name || "";
 const inGroups = (...groups) => (entry) => groups.includes(entry.group);
-// QK_USER_0..15 were the retired user macros. The values stay reserved so
-// every later custom keycode keeps its number, but nothing answers them.
-const RETIRED = /^QK_USER_(?:[0-9]|1[0-5])$/;
 // Macro slots are offered by their VIA_MACRO_n names in the Macros section.
 const NATIVE_MACRO = /^QK_MACRO_\d+$/;
 // Charybdis's own drag scroll ignores the pointing-mode settings; drag scroll
@@ -42,10 +39,12 @@ const UNBUILT = new RegExp("^(?:" + [
 ].join("|") + ")");
 const unbuilt = (entry) => UNBUILT_GROUPS.has(entry.group) || UNBUILT.test(valueOf(entry));
 // Whether the picker offers an entry at all, in any section or search.
-export const pickable = (entry) => !RETIRED.test(valueOf(entry)) && !NATIVE_MACRO.test(valueOf(entry)) && !UNSUPPORTED.has(valueOf(entry)) && !unbuilt(entry);
+export const pickable = (entry) => !NATIVE_MACRO.test(valueOf(entry)) && !UNSUPPORTED.has(valueOf(entry)) && !unbuilt(entry);
 // The Charybdis's own keys: DPI and sniping.
 const isKeyboardKey = inGroups("kb");
-const isCustom = inGroups("user", "macro", "internal");
+// The keyboard's 64 custom keys, by the names the model gives them, with the
+// bare user slots a keyboard of unknown vocabulary reports and KC_NO/KC_TRNS.
+const isCustom = inGroups("Custom keys", "user", "internal");
 const isSymbol = (entry) => entry.group === "shifted" || (entry.group === "basic" && SYMBOLS.has(valueOf(entry)));
 const isNavigation = (entry) => entry.group === "basic" && NAVIGATION.has(valueOf(entry));
 const isNumpad = (entry) => entry.group === "basic" && /^KC_(?:KP|NUMPAD)_/.test(valueOf(entry));
@@ -67,7 +66,7 @@ export function pickerSections() {
         {id: "media", label: "Media", kind: "catalogue", filter: inGroups("media", "audio")},
         {id: "lighting", label: "Lighting", kind: "catalogue", filter: inGroups("backlight", "led_matrix", "underglow", "rgb", "rgb_matrix")},
         {id: "magic", label: "Magic", kind: "catalogue", filter: inGroups("magic", "swap_hands")},
-        {id: "custom", label: "Custom", kind: "catalogue", filter: isCustom},
+        {id: "custom", label: "Custom keys", kind: "catalogue", filter: isCustom},
         {id: "more", label: "More keys", kind: "catalogue", filter: isMoreKey},
         {id: "other", label: "Other QMK", kind: "catalogue", filter: inGroups(
             "connection", "joystick", "midi", "programmable_button", "quantum", "sequencer", "steno", "system",

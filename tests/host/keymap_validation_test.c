@@ -16,7 +16,7 @@
 static char log_buffer[4096];
 
 enum {
-    TEST_PRESENT_KEY = NOAH_KEYMAP_SAFE_RANGE,
+    TEST_PRESENT_KEY = CUSTOM_KEY_0,
     TEST_COMBO_KEY,
     TEST_DUP_COMBO_KEY,
     TEST_DEAD_KEY,

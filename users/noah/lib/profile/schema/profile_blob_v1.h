@@ -8,27 +8,27 @@
 #include "profile_versions.h"
 
 enum {
-    NOAH_PROFILE_BLOB_V1_HEADER_SIZE                 = 8u,
-    NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE          = 4u,
-    NOAH_PROFILE_BLOB_V1_ACTION_SIZE                 = 4u,
-    NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR                = NOAH_PROFILE_SCHEMA_MAJOR,
-    NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR                = 0u,
-    NOAH_PROFILE_BLOB_V1_CANONICAL_FLAG              = 1u,
-    NOAH_PROFILE_BLOB_V1_KNOWN_FLAGS                 = 1u,
-    NOAH_PROFILE_BLOB_V1_MAX_SIZE                    = NOAH_PROFILE_PAYLOAD_MAX,
-    NOAH_PROFILE_BLOB_V1_MAX_DOMAINS                 = NOAH_PROFILE_DOMAIN_COUNT,
-    NOAH_PROFILE_DOMAIN_V1_PD                        = 0x50u,
-    NOAH_PROFILE_DOMAIN_V1_SETTINGS                  = 0x40u,
-    NOAH_PROFILE_DOMAIN_V1_COMBOS                    = 0x30u,
-    NOAH_PROFILE_DOMAIN_V1_COMBOS_VERSION            = 1u,
-    NOAH_PROFILE_DOMAIN_V1_RGB                       = 0x10u,
-    NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS             = 0x20u,
-    NOAH_PROFILE_DOMAIN_V1_RGB_VERSION               = NOAH_PROFILE_RGB_VERSION,
-    NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION      = 1u,
-    NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS        = 8u,
-    NOAH_PROFILE_ACTION_V1_MAX_PD_MODES              = NOAH_PROFILE_PD_COUNT,
-    NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS       = 64u,
-    NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS = 16u,
+    NOAH_PROFILE_BLOB_V1_HEADER_SIZE            = 8u,
+    NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE     = 4u,
+    NOAH_PROFILE_BLOB_V1_ACTION_SIZE            = 4u,
+    NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR           = NOAH_PROFILE_SCHEMA_MAJOR,
+    NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR           = 0u,
+    NOAH_PROFILE_BLOB_V1_CANONICAL_FLAG         = 1u,
+    NOAH_PROFILE_BLOB_V1_KNOWN_FLAGS            = 1u,
+    NOAH_PROFILE_BLOB_V1_MAX_SIZE               = NOAH_PROFILE_PAYLOAD_MAX,
+    NOAH_PROFILE_BLOB_V1_MAX_DOMAINS            = NOAH_PROFILE_DOMAIN_COUNT,
+    NOAH_PROFILE_DOMAIN_V1_PD                   = 0x50u,
+    NOAH_PROFILE_DOMAIN_V1_SETTINGS             = 0x40u,
+    NOAH_PROFILE_DOMAIN_V1_COMBOS               = 0x30u,
+    NOAH_PROFILE_DOMAIN_V1_COMBOS_VERSION       = 1u,
+    NOAH_PROFILE_DOMAIN_V1_RGB                  = 0x10u,
+    NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS        = 0x20u,
+    NOAH_PROFILE_DOMAIN_V1_RGB_VERSION          = NOAH_PROFILE_RGB_VERSION,
+    NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION = 1u,
+    NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS   = 8u,
+    NOAH_PROFILE_ACTION_V1_MAX_PD_MODES         = NOAH_PROFILE_PD_COUNT,
+    NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS  = 64u,
+    NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS      = 64u,
 };
 
 typedef enum {
@@ -39,7 +39,9 @@ typedef enum {
     NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY = 4u,
     NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK      = 5u,
     NOAH_PROFILE_ACTION_V1_VIA_MACRO         = 6u,
-    NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO   = 7u,
+    // Kind 7 named the retired user macros in earlier action vocabularies;
+    // this vocabulary (a different action ABI digest) gives it to custom keys.
+    NOAH_PROFILE_ACTION_V1_CUSTOM_KEY = 7u,
 } noah_profile_action_v1_kind_t;
 
 typedef enum {
@@ -119,7 +121,7 @@ typedef struct {
     uint32_t max_logical_layers;
     uint32_t max_pd_modes;
     uint32_t max_via_macro_slots;
-    uint32_t max_hardcoded_macro_slots;
+    uint32_t max_custom_keys;
 } noah_profile_action_v1_limits_t;
 
 noah_profile_action_v1_limits_t noah_profile_action_v1_default_limits(void);

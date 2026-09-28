@@ -21,7 +21,7 @@ test("a combo's keys read as the screens read them, with no stored name where no
     const {pdModes:slots,settings}=validateSnapshot(pdDocument());
     const base=combos(pdDocument(),()=>comboRows()), before=snapshot(base);
     // LT(3,KC_SLASH) and a pointing-mode key: once "/ / layer 3 (LT(3,KC_SLASH))" and "User 16".
-    const after=snapshot(combos(base,rows=>rows.map((row,id)=>id===0?{...row,inputs:[{kind:1,flags:0,operand:0x4338},{kind:1,flags:0,operand:0x7e50}]}:row)));
+    const after=snapshot(combos(base,rows=>rows.map((row,id)=>id===0?{...row,inputs:[{kind:1,flags:0,operand:0x4338},{kind:1,flags:0,operand:0x7e80}]}:row)));
     const keys=profileReview(before,after).find(row=>row.unit==="combo:0").fields.find(field=>field.label==="Keys");
     assert.equal(keys.after,`/ / ${settings.names[3]} + ${slots[0].name} · hold`,"a layer by its name");
 });

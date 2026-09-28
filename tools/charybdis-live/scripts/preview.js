@@ -28,9 +28,9 @@ const PREVIEW_BASE = [
 ];
 
 // Keys the keyboard stores as bare user keycodes: a configured pointing mode, an
-// empty slot, and a VIA macro. The preview carries all three because they are
-// the values whose stored name and semantic name differ.
-const PREVIEW_PD_BINDINGS = {50: 0x7e50, 52: 0x7ef0, 48: 0x7700};
+// empty slot, a VIA macro and a custom key. The preview carries them because
+// they are the values whose stored name and semantic name differ.
+const PREVIEW_PD_BINDINGS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7e40};
 
 function fillPreviewLayer(document) {
     for (const [layoutIndex, code] of Object.entries(PREVIEW_PD_BINDINGS)) {
@@ -49,7 +49,7 @@ function fillPreviewLayer(document) {
 const capabilities = {
     compiledLayerCount: 8,
     supportedDomainMask: 31,
-    actionAbiDigest: 0x61072732,
+    actionAbiDigest: 0x1d3fcacc,
     featureFlags: 0xffff,
     responseVersion: 1,
     reportSize: 32,

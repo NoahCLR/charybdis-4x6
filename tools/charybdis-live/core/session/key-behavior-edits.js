@@ -42,7 +42,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     };
     const encode = (rows) => checkPlacements(rows) ?? encodeKeyBehaviorDomain({rows}, {
         limits: {maxRows: capabilities.maxBehaviorRows, maxPopulatedSteps: capabilities.maxPopulatedBehaviorSteps, maxTapStepsPerBehavior: capabilities.maxTapStepsPerBehavior},
-        actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxViaMacroSlots: capabilities.viaMacroSlots, maxHardcodedMacroSlots: capabilities.hardcodedMacroSlots},
+        actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxViaMacroSlots: capabilities.viaMacroSlots, maxCustomKeys: capabilities.customKeySlots},
     });
     const action = (value, previous) => {
         const name = String(value ?? "").trim();

@@ -171,9 +171,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     switch (keycode) {
-        case MY_CUSTOM_KEY:
+        case KC_F13:
             if (record->event.pressed) {
-                // Custom action here.
+                // Keymap-specific action here.
             }
             noah_process_record_user_finalize(keycode, record, false);
             return false;
@@ -182,6 +182,10 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 }
 ```
+
+Custom keys never reach that `switch`: the shared path consumes one that has
+no behaviour row. Give a key of your own a behaviour row instead; see
+[Custom Keys](#custom-keys).
 
 If you also override the post-process hook, keep the shared finalize path:
 
@@ -290,22 +294,48 @@ If you change hook wiring or override behavior, run:
 - `sh tests/host/run_all_host_tests.sh`
 - `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
 
-## Custom Keycodes
+## Custom Keys
 
-Keymap-local custom keycodes belong in
+A key of your own is a custom key, not a new keycode or a
+`process_record_user()` handler. The userspace reserves `CUSTOM_KEY_0` through
+`CUSTOM_KEY_63` (`0x7e40`–`0x7e7f`) in
+[`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h). It gives
+each userspace family one fixed, aligned block, so adding pointing modes or
+layers never moves another keycode:
+
+| Keycodes | Range | Reserved |
+| --- | --- | --- |
+| `CUSTOM_KEY_0`–`63` | `0x7e40`–`0x7e7f` | 64 |
+| `PD_SLOT_n` (pointing hold) | `0x7e80`–`0x7e9f` | 32 (8 used) |
+| `PD_SLOT_n_LOCK` | `0x7ea0`–`0x7ebf` | 32 |
+| `LOCK_LAYER(n)` | `0x7ec0`–`0x7edf` | 32 (8 used) |
+| unassigned | `0x7ee0`–`0x7eff` | |
+
+Name the key in the `CUSTOM_KEYS(KEY)` table in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c),
-not in [`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h):
+one row per slot (at most 20 printable ASCII characters, `""` for an unused
+slot), then give it what it does as a `key_behaviors[]` row:
 
 ```c
-enum keymap_custom_keycodes {
-    KEYMAP_CUSTOM_KEYCODE_SENTINEL = NOAH_KEYMAP_SAFE_RANGE - 1,
-    MY_CUSTOM_KEY,
-    MY_OTHER_KEY,
-};
+#define CUSTOM_KEYS(KEY)             \
+    KEY(CUSTOM_KEY_0, "Right Thumb") \
+    KEY(CUSTOM_KEY_1, "My Key")      \
+    ...
+
+{
+    .keycode = CUSTOM_KEY_1,
+    .tap_counts =
+        {
+            [0] = {.tap = TAP_SENDS(KC_MPLY), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))},
+        },
+},
 ```
 
-Those keycodes can be handled in `process_record_user()` and also used in
-`key_behaviors[]` actions such as `TAP_SENDS(...)`,
-`TAP_AT_HOLD_THRESHOLD(...)`, `TAP_ON_RELEASE_AFTER_HOLD(...)`,
-`REPEAT_WHILE_HELD(...)`, and
-`PRESS_AND_HOLD_UNTIL_RELEASE(...)`.
+Place the key on a layer or make it a combo output. Without a behaviour row it
+does nothing: the shared process path consumes its press, so it never reaches a
+`process_record_user()` override. A behaviour step (`TAP_SENDS(...)`,
+`PRESS_AND_HOLD_UNTIL_RELEASE(...)` and the other helpers) cannot send a
+custom key; firmware keymap validation and Charybdis Live both refuse that.
+Charybdis Live edits the same keys on its **Custom keys** screen; names it
+saves are stored on the keyboard, and a keyboard with none stored reports the
+names in `CUSTOM_KEYS`.

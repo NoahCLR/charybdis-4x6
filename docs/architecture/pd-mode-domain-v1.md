@@ -354,33 +354,35 @@ sorts in one startup scan on the authored profile. The compiled-cache integratio
 test requires zero behavior-row sorts during warming and checks every PD byte
 boundary against the full golden serialization. No watchdog timeout is relaxed.
 
-Existing native IDs are fixed by executable assertions:
+Native IDs are fixed by executable assertions:
 
 The canonical keycode vocabulary is `PD_SLOT_n` for a momentary hold and
-`PD_SLOT_n_LOCK` for its persistent toggle, for `n = 0..7`. The first six
-hold values remain `0x7e50 + n`, and their lock values remain `0x7e56 + n`.
-The extension pair values are interleaved: slot 6 is `0x7ef0/0x7ef1` and
-slot 7 is `0x7ef2/0x7ef3`. A slot keycode selects its numbered slot; the
-mode's name and behavior come from the active profile. Former names such as
-`DRAGSCROLL` and `VOLUME_MODE` identify factory presets only and remain
-compatibility aliases for older portable profile expressions. They are not firmware
-keycode symbols. Renaming the symbols does not change the numeric action ABI,
-stored bindings, or the behavior of an already running schema-2 profile.
+`PD_SLOT_n_LOCK` for its persistent toggle, for `n = 0..7`. Each userspace
+family owns one fixed, aligned block (`users/noah/noah_keymap_ids.h`), reserved
+beyond what is supported, so adding pointing slots or layers renumbers nothing:
+slot `n` holds at `0x7e80 + n` and toggles at `0x7ea0 + n`. A slot keycode
+selects its numbered slot; the mode's name and behavior come from the active
+profile. Former names such as `DRAGSCROLL` and `VOLUME_MODE` identify factory
+presets only and remain compatibility aliases for older portable profile
+expressions. They are not firmware keycode symbols.
 
-| Native action | Deployed eight-layer value |
-| --- | --- |
-| Macro 0–15 | `0x7e40..0x7e4f` |
-| PD hold 0–5 | `0x7e50..0x7e55` |
-| PD lock 0–5 | `0x7e56..0x7e5b` |
-| Layer lock 0–7 | `0x7e5c..0x7e63` |
-| Right thumb, left thumb, click spam, drag window | `0x7e64..0x7e67` |
+| Native action | Block | Supported |
+| --- | --- | --- |
+| Custom key 0–63 | `0x7e40..0x7e7f` | 64 |
+| PD hold | `0x7e80..0x7e9f` | 8 (`0x7e80..0x7e87`) |
+| PD lock | `0x7ea0..0x7ebf` | 8 (`0x7ea0..0x7ea7`) |
+| Layer lock | `0x7ec0..0x7edf` | 8 (`0x7ec0..0x7ec7`) |
+| Unassigned | `0x7ee0..0x7eff` | — |
 
-Historical five-layer profiles used a different custom-action base, `0x7e61`;
-portable import requires explicit translation when supported. New
-hold-6/lock-6/hold-7/lock-7 values are `0x7ef0..0x7ef3`, within QMK's user range
-and unused by current authored actions. These are allocated explicitly and excluded from generic custom-action
-dispatch; enum expansion preserves all old values. A final ABI digest comes from the actual
-integrated vocabulary, never a guessed constant.
+Profiles store pointing and layer-lock actions by slot (action kinds 2–5), so
+the blocks change only raw keycodes: VIA layouts and custom keys. The blocks
+came with a new action ABI digest and VIA sync metadata schema 3, so firmware
+never adopts an older stored profile or layout bank, and the app translates an
+older backup key by key on import (portable-profile-v1.md). Before the blocks,
+holds 0–5 were `0x7e50 + n`, locks 0–5 `0x7e56 + n`, slots 6 and 7
+`0x7ef0..0x7ef3` interleaved, layer locks `0x7e5c + n`, the keymap's own keys
+followed from `0x7e64`, and the retired user macros held `0x7e40..0x7e4f`;
+historical five-layer profiles used a custom-action base of `0x7e61`.
 
 Old backups lack compiled thresholds and modifier/scroll policies. Action ABI
 alone cannot recover that tuning. The retired bridge once supplied the source

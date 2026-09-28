@@ -5,6 +5,7 @@ const {layerOfRef, nativeCode} = require("../schema/actions");
 const {keyLabel, keyLabelWithName, profileKeyNames} = require("./key-names");
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView} = require("./settings-editor");
+const {customKeyNamesOf} = require("../schema/settings-domain-v1");
 const {macroEditorView} = require("./macro-editor");
 const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
@@ -20,15 +21,16 @@ const named = (values, value) => words(Object.entries(values).find(([, id]) => i
 function action(value, names = {}, withName = false) {
     if (!value || value.kind === 0) return "None";
     const id = value.operand;
-    const code = value.kind === 7 ? undefined : nativeCode(value);
+    const code = nativeCode(value);
     if (code !== undefined) return (withName ? keyLabelWithName : keyLabel)(names.keys, code);
-    return `${value.kind === 7 ? "User macro" : "Action"} ${id}`;
+    return `Action ${id}`;
 }
 // An action as a field: shown by its name, compared by what is stored.
 const actionField = (value, names, extra = {}) => ({text: action(value, names), detail: action(value, names, true), key: JSON.stringify(value), ...extra});
 // The names an action can be read by in one snapshot.
 const namesIn = (value, macros) => ({layers: value.settings.names,
-    keys: profileKeyNames({actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes})});
+    keys: profileKeyNames({actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
+        customKeys: customKeyNamesOf(value.settings).map((name, slot) => ({slot, name}))})});
 // The mark an action carries: what it reaches, when that has a colour of its
 // own — a pointing mode's light, a layer's colour.
 const actionMark = value => !value ? undefined
@@ -292,6 +294,12 @@ function profileReview(before, after) {
         const fields = (macro) => new Map([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"]]);
         const old = macrosA.viaMacros[i], next = macrosB.viaMacros[i], has = (macro) => Boolean(macro.payload || macro.name);
         item("Macros", `macro:${i}`, `Macro ${i}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
+    });
+    // A custom key is its name here; what it does is its behaviour's item.
+    const keyNamesA = customKeyNamesOf(a.settings), keyNamesB = customKeyNamesOf(b.settings);
+    keyNamesA.forEach((old, i) => {
+        const next = keyNamesB[i], fields = name => new Map([["Name", name || "no name"]]);
+        item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old), fields(next), {kind: "customKey", index: i}, [Boolean(old), Boolean(next)]);
     });
     // Settings are saved a section at a time, so a section is one item.
     const sections = (snapshot, settings) => settingsEditorView(snapshot).sections.map(section => ({id: section.id, label: section.label, area: section.area, stage: section.stage,

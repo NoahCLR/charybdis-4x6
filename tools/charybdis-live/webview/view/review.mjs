@@ -8,7 +8,7 @@
 // item knows how to go to its editor.
 
 // The order areas are read in, as the rail lists the screens they live on.
-export const AREAS = ["Layout", "Layers", "Behaviours", "Combos", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
+export const AREAS = ["Layout", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
 const rank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
 
 // Items by area, in rail order, and within an area as blocks in the order the
@@ -55,6 +55,7 @@ export function statusSummary(changes) {
 // lighting stage counts with that stage. `names` are the file's layer names;
 // `stages` the lighting stages in paint order, as the vocabulary words them.
 export const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Other"];
+// A custom key's name is counted with the keys, where its behaviour is too.
 const SECTIONS = {
     keyTiming: ["Keys", "Tap & hold timing", 31], startupLayers: ["Keys", "Startup layers", 22], comboSettings: ["Keys", "Combo settings", 40], comboReferences: ["Keys", "Combo layer matching", 41],
     keyboardOptions: ["Keys", "Key options", 50], rgbAppearance: ["Lighting", "Base effect", 1], lightingFeedback: ["Lighting", "Key feedback", 15],
@@ -70,6 +71,7 @@ function categoryOf(item, names, stages) {
         case "behaviour": return ["Keys", "Behaviours", 30];
         case "combo": return ["Keys", "Combos", 40];
         case "macro": return ["Macros", "Macros", 0];
+        case "customKey": return ["Keys", "Custom key names", 35];
         case "pointing": return ["Pointing modes", "Pointing modes", 0];
         case "lighting": {
             if (!place.stage) return ["Lighting", "Stages on or off", 0];
@@ -129,6 +131,7 @@ export function placeState(place, layers = []) {
         // asked for by id and the tab picks it where it finds it.
         case "combo": return {screen: "keys", tab: "combos", pickCombo: place.index, reveal: '[data-reach][data-picked="true"]'};
         case "macro": return {screen: "macros", macroSlot: `VIA_MACRO_${place.index}`};
+        case "customKey": return {screen: "customKeys", customKey: `CUSTOM_KEY_${place.index}`};
         case "pointing": return {screen: "pointing", pdSlot: place.slot, pdKind: null, pdButtons: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
         // A section is edited on the screen its area names: a lighting stage
@@ -166,7 +169,7 @@ export function draftMarks(changes = []) {
     return marks;
 }
 function computeMarks(changes) {
-    const marks = {keys: new Map(), layers: new Set(), behaviours: new Set(), combos: new Set(), macros: new Set(),
+    const marks = {keys: new Map(), layers: new Set(), behaviours: new Set(), combos: new Set(), macros: new Set(), customKeys: new Set(),
         pointing: new Set(), lighting: new Set(), lightingLayers: new Set(), lightingSlots: new Set(), settings: new Set(), layerNames: false};
     for (const change of changes) {
         const {place} = change;
@@ -178,6 +181,7 @@ function computeMarks(changes) {
         } else if (place.kind === "behaviour") marks.behaviours.add(place.keycode);
         else if (place.kind === "combo") marks.combos.add(place.index);
         else if (place.kind === "macro") marks.macros.add(`VIA_MACRO_${place.index}`);
+        else if (place.kind === "customKey") marks.customKeys.add(`CUSTOM_KEY_${place.index}`);
         else if (place.kind === "pointing") marks.pointing.add(place.slot);
         else if (place.kind === "lighting") {
             if (place.stage) marks.lighting.add(place.stage);

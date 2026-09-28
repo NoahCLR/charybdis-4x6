@@ -287,8 +287,8 @@ static void test_action_descriptor_classifies_common_actions(void) {
     noah_action_desc_t qmk_behavior = noah_action_describe(OSM(MOD_LSFT));
     noah_action_desc_t pd_key       = noah_action_describe(PD_SLOT_4);
     noah_action_desc_t pd_lock      = noah_action_describe(PD_SLOT_4_LOCK);
-    noah_action_desc_t macro_action = noah_action_describe(MACRO_0);
-    noah_action_desc_t custom       = noah_action_describe(NOAH_KEYMAP_SAFE_RANGE + 1);
+    noah_action_desc_t macro_action = noah_action_describe(VIA_MACRO_0);
+    noah_action_desc_t custom       = noah_action_describe(CUSTOM_KEY_0 + 1);
     noah_action_desc_t literal      = noah_action_describe(KC_C);
 
     CHECK(layer_lock.kind == NOAH_ACTION_KIND_LAYER_LOCK);
@@ -498,11 +498,14 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supports_fallback_hold(macro_action));
     CHECK(noah_action_desc_default_tap_action(macro_action) == KC_NO);
 
-    CHECK(custom.kind == NOAH_ACTION_KIND_KEYMAP_CUSTOM);
+    // A custom key is a row's own keycode and a combo output, never a step.
+    CHECK(custom.kind == NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_desc_supported_as_behavior_keycode(custom));
-    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_TAP));
-    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
-    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(noah_action_desc_supported_as_combo_output(custom));
+    CHECK(!noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(!noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(!noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY && noah_action_describe(PD_SLOT_0).kind != NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(custom));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(custom));
     CHECK(!noah_action_desc_is_pure_modifier_literal(custom));
@@ -515,7 +518,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_is_layer_lock(literal));
     CHECK(noah_action_desc_supported_as_combo_output(literal));
     CHECK(!noah_action_desc_is_macro(literal));
-    CHECK(!noah_action_desc_is_keymap_custom(literal));
+    CHECK(!noah_action_desc_is_custom_key(literal));
     CHECK(noah_action_desc_supported_as_behavior_keycode(literal));
     CHECK(noah_action_desc_supported_as_authored_action(literal, NOAH_ACTION_AUTHORED_USE_TAP));
     CHECK(noah_action_desc_supported_as_authored_action(literal, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));

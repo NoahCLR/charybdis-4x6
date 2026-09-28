@@ -2,19 +2,19 @@
 
 // The keyboard's pointing-mode keycodes: a fixed registry the firmware owns.
 //
-// Every slot has one canonical hold and lock name. Slots 0–5 retain their
-// deployed numeric values in the user-keycode block; slots 6 and 7 occupy the
-// later extension block. Every module that names or decodes a slot reads this
-// table. Older portable files can still supply the former preset names.
+// Every slot has one canonical hold and lock name: slot n holds at
+// PD_HOLD_BASE + n and toggles at PD_LOCK_BASE + n (user-keycodes.js). Every
+// module that names or decodes a slot reads this table. Older portable files
+// can still supply the former preset names.
+
+const {PD_HOLD_BASE, PD_LOCK_BASE} = require("./user-keycodes");
 
 const FORMER_NAMES = Object.freeze(["DRAGSCROLL", "VOLUME_MODE", "BRIGHTNESS_MODE", "ZOOM_MODE", "ARROW_MODE", "PINCH_MODE"]);
-const DEPLOYED_PD_SLOTS = 6;
-const DEPLOYED_BASE = 0x7e50, EXTENSION_BASE = 0x7ef0;
 
 const PD_BINDINGS = Object.freeze(Array.from({length: 8}, (_, slot) => Object.freeze({
     slot, hold: `PD_SLOT_${slot}`, lock: `PD_SLOT_${slot}_LOCK`,
-    holdCode: slot < DEPLOYED_PD_SLOTS ? DEPLOYED_BASE + slot : EXTENSION_BASE + (slot - DEPLOYED_PD_SLOTS) * 2,
-    lockCode: slot < DEPLOYED_PD_SLOTS ? DEPLOYED_BASE + DEPLOYED_PD_SLOTS + slot : EXTENSION_BASE + (slot - DEPLOYED_PD_SLOTS) * 2 + 1,
+    holdCode: PD_HOLD_BASE + slot,
+    lockCode: PD_LOCK_BASE + slot,
 })));
 
 // The slot a native keycode or a binding name reaches, and whether it locks.
@@ -37,4 +37,4 @@ const pdBindingOfName = name => {
     return undefined;
 };
 
-module.exports = {PD_BINDINGS, DEPLOYED_PD_SLOTS, FORMER_NAMES, pdBindingOfCode, pdBindingOfName};
+module.exports = {PD_BINDINGS, FORMER_NAMES, pdBindingOfCode, pdBindingOfName};

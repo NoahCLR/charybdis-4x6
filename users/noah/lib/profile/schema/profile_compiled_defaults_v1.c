@@ -612,12 +612,11 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
     emit(&writer, magic, sizeof(magic));
     emit_u8(&writer, NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR);
     emit_u8(&writer, NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR);
-    emit_u8(&writer, NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO);
+    emit_u8(&writer, NOAH_PROFILE_ACTION_V1_CUSTOM_KEY);
     emit_u8(&writer, LAYER_COUNT);
     emit_u8(&writer, PD_MODE_COUNT);
     emit_u8(&writer, VIA_MACRO_SLOT_COUNT);
-    // The retired user-macro range stays in the digest: its identities remain.
-    emit_u8(&writer, NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS);
+    emit_u8(&writer, NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS);
 #ifdef VIA_FIRMWARE_VERSION
     emit_u32(&writer, VIA_FIRMWARE_VERSION);
 #else
@@ -630,7 +629,7 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
     emit_u16(&writer, OSM(0));
     emit_u16(&writer, MT(0, KC_NO));
     emit_u16(&writer, QK_MACRO_0);
-    emit_u16(&writer, MACRO_0);
+    emit_u16(&writer, CUSTOM_KEY_0);
     emit_u16(&writer, LAYER_LOCK_BASE);
     for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
         emit_u8(&writer, layer);
@@ -643,7 +642,7 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
         emit_u16(&writer, pd_modes[id].keycode);
         emit_u16(&writer, pd_modes[id].lock_action);
     }
-    emit_u16(&writer, NOAH_KEYMAP_SAFE_RANGE);
+    emit_u16(&writer, NOAH_KEYCODE_USERSPACE_END);
     emit_u16(&writer, UINT16_MAX);
     if (writer.result != NOAH_PROFILE_COMPILED_V1_OK) {
         return fail(error, writer.result, NOAH_PROFILE_COMPILED_V1_SURFACE_ACTION_ABI, UINT8_MAX, UINT8_MAX);
@@ -822,7 +821,7 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     result.logical_layer_count               = LAYER_COUNT;
     result.supported_pd_mode_mask            = (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u);
     result.via_macro_slot_count              = VIA_MACRO_SLOT_COUNT;
-    result.hardcoded_macro_slot_count        = NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS;
+    result.custom_key_count        = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     result.rgb_limits.logical_layer_count    = LAYER_COUNT;
     result.rgb_limits.supported_pd_mode_mask = result.supported_pd_mode_mask;
     result.rgb_limits.tap_branch_color_count = KEY_BEHAVIOR_MAX_TAP_COUNT - 1u;

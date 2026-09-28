@@ -74,7 +74,7 @@ static void encode_capabilities_page_one(uint8_t *payload, const noah_profile_wi
     payload[8]  = capabilities->max_rgb_stage_group_rows;
     payload[9]  = capabilities->physical_led_count;
     payload[10] = capabilities->led_bitmap_size;
-    payload[11] = capabilities->hardcoded_macro_slots;
+    payload[11] = capabilities->custom_key_slots;
     payload[12] = capabilities->via_macro_slots;
     write_u16(&payload[13], capabilities->max_profile_payload);
     write_u16(&payload[15], capabilities->profile_slot_payload);

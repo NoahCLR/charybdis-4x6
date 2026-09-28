@@ -616,9 +616,20 @@ export const macroKeycodes = (keycode) =>
  * listed for that layer, not repeated for every layer above it. `at` is the
  * layer's position in the stack, which is how a screen selects it.
  */
-export function macroPlacements(model, stack, keycode) {
+export const macroPlacements = (model, stack, keycode) => placementsVia(macroReach, model, stack, keycode);
+
+export const customKeyKeycodes = (keycode) =>
+    [...String(keycode || "").matchAll(/\b(CUSTOM_KEY_\d+)\b/g)].map((match) => match[1]);
+
+// A custom key is reached by a key carrying it or a combo sending it; no
+// behaviour branch can send one.
+export const customKeyReach = (model, stack, at) => reachGroups(model, stack, at, customKeyKeycodes,
+    (model?.customKeys || []).filter((key) => key.name || key.hasBehavior).map((key) => key.keycode));
+export const customKeyPlacements = (model, stack, keycode) => placementsVia(customKeyReach, model, stack, keycode);
+
+function placementsVia(reachOf, model, stack, keycode) {
     return (stack || []).map((layer, at) => {
-        const reach = macroReach(model, stack, at);
+        const reach = reachOf(model, stack, at);
         const routes = [["here", reach.onKeys], ["branches", reach.fromBranches], ["combos", reach.fromCombos]]
             .map(([group, entries]) => ({group, entry: entries.find((entry) => entry.name === keycode)}))
             .filter((route) => route.entry)

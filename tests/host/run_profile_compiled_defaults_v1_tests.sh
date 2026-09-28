@@ -41,6 +41,12 @@ const {encodeSettings} = require(app + "/core/schema/settings-domain-v1");
 let named = require(app + "/tests/fixtures/pd-profile").document();
 for (let slot = 0; slot < 64; slot++) named = editMacro({document: named, fingerprint: fingerprint(named)}, {keycode: `VIA_MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(20, "!"), expectedFingerprint: fingerprint(named)});
 fs.writeFileSync(process.argv[3] + '.pd4', validateSnapshot(named).profile);
+// Settings v5 at its worst case: every macro and every custom key named at 20
+// characters, as the live app writes it.
+const {editCustomKey} = require(app + "/core/model/custom-key-editor");
+const keyboard = {actionAbiDigest: named.actionAbiDigest, compiledLayerCount: 8, supportedDomainMask: 31};
+for (let slot = 0; slot < 64; slot++) named = editCustomKey({document: named, fingerprint: fingerprint(named)}, {keycode: `CUSTOM_KEY_${slot}`, name: `Custom key ${slot}`.padEnd(20, "?"), expectedFingerprint: fingerprint(named)}, keyboard);
+fs.writeFileSync(process.argv[3] + '.pd5', validateSnapshot(named).profile);
 const stored = validateSnapshot(require(app + "/tests/fixtures/pd-profile").document());
 const {macros, ...rest} = stored.settings;
 const v3 = encodeSettings({...rest, formatVersion: 3, macroNames: Array.from({length: 64}, (_, i) => i === 63 ? "Édition ⌘" : i === 0 ? "Sign-off" : "")});
@@ -91,6 +97,7 @@ build_and_run() {
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd"
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd3"
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd4"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd5"
         if [ -n "${NOAH_TEST_PD_IMPORT:-}" ]; then
             "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$NOAH_TEST_PD_IMPORT"
         fi

@@ -723,18 +723,14 @@ def extract_rgb_led_group_table_body(text: str, table_name: str) -> str:
     return text[paren_start + 1 : paren_end]
 
 
-def parse_keymap_custom_keycodes(text: str) -> list[str]:
-    match = re.search(r"enum\s+keymap_custom_keycodes\s*\{(?P<body>.*?)\};", text, re.DOTALL)
-    if not match:
-        die("could not find enum keymap_custom_keycodes")
-
-    keycodes: list[str] = []
-    for entry in split_top_level(match.group("body")):
-        token = entry.split("=", 1)[0].strip()
-        if not token or token == "KEYMAP_CUSTOM_KEYCODE_SENTINEL":
-            continue
-        keycodes.append(token)
-    return keycodes
+def parse_custom_keys(text: str) -> list[dict[str, str]]:
+    keys: list[dict[str, str]] = []
+    for row in parse_macro_table(text, "CUSTOM_KEYS", "KEY"):
+        if len(row) != 2 or not (row[1].startswith('"') and row[1].endswith('"')):
+            die(f"unexpected CUSTOM_KEYS row: {row!r}")
+        if row[1][1:-1]:
+            keys.append({"keycode": row[0], "name": row[1][1:-1]})
+    return keys
 
 
 def parse_config_layers(text: str) -> list[str]:
@@ -964,7 +960,7 @@ def parse_pd_mode_colors(raw_text: str, known_values: dict[str, str]) -> list[di
 
 def parse_pd_mode_manifest(text: str) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    for row in parse_macro_table(text, "NOAH_PD_MODE_BASE_LIST", "PDM") + parse_macro_table(text, "NOAH_PD_MODE_LIST", "PDM"):
+    for row in parse_macro_table(text, "NOAH_PD_MODE_LIST", "PDM"):
         if len(row) != 2:
             die(f"unexpected pd mode manifest row: {row!r}")
         name, mode_keycode = row
@@ -1955,7 +1951,7 @@ def build_profile_model() -> dict[str, object]:
         config_macros,
         owner_field=".layer",
     )
-    keymap_custom_keycodes = parse_keymap_custom_keycodes(keymap_text)
+    custom_keys = parse_custom_keys(keymap_text)
     via_macros = parse_macro_slots(parse_macro_table(keymap_text, "VIA_MACROS", "MACRO"), kind="via")
     behaviors = parse_key_behaviors(keymap_text, config_macros)
     combos = parse_combos(keymap_text)
@@ -2049,7 +2045,7 @@ def build_profile_model() -> dict[str, object]:
         "combo_count": len(combos),
         "via_macro_count": len(via_macros),
         "via_macro_non_empty_count": sum(not slot.empty for slot in via_macros),
-        "keymap_custom_keycode_count": len(keymap_custom_keycodes),
+        "named_custom_key_count": len(custom_keys),
         "pd_mode_count": len(pd_modes),
         "pd_mode_color_count": len(pd_mode_colors),
         "reusable_led_group_count": len(reusable_led_groups),
@@ -2092,7 +2088,7 @@ def build_profile_model() -> dict[str, object]:
             "key_behavior_feedback_colors": key_behavior_feedback_colors,
             "key_behavior_feedback_led_groups": key_behavior_feedback_led_groups,
         },
-        "keymap_custom_keycodes": keymap_custom_keycodes,
+        "custom_keys": custom_keys,
         "via_macros": via_slots,
         "combos": combos_rows,
         "key_behaviors": behavior_rows,
@@ -2205,7 +2201,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
         "### Shared Keycode Surfaces",
         "",
         f"- Layers: {', '.join(f'`{layer}`' for layer in config['layers'])}",
-        f"- Keymap-local custom keycodes: {', '.join(f'`{name}`' for name in profile['keymap_custom_keycodes']) or '`none`'}",
+        f"- Named custom keys: {', '.join(f"`{key['keycode']}` ({key['name']})" for key in profile['custom_keys']) or '`none`'}",
     ]
     if features["rgb_pd_mode_feedback_enabled"]:
         pd_color_modes = ", ".join(f"`{row['pointing_mode']}`" for row in rgb["pd_mode_colors"]) or "`none`"

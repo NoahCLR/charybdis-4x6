@@ -1612,7 +1612,7 @@ static void test_pointer_volume_exact_third_tap_defers_mute_until_release(void) 
     test_pointer_terminal_double_tap_wraps_on_exact_third_press(PD_SLOT_1);
 }
 
-// DRAG_WINDOW is a keymap-local keycode, so find it the way its own tap tier
+// Drag Window is a custom key, so find it the way its own tap tier
 // does: the pointer-layer key sitting on top of the base-layer 'l'. It is not a
 // mouse keycode, so only its authored anchor keeps QMK from resetting auto
 // mouse on the press -- and without the pointer layer the transparent tap tier
@@ -1627,7 +1627,7 @@ static void test_pointer_drag_window_tap_falls_through_to_the_base_layer_key(voi
     layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_POINTER));
 
     drag_window = test_keycode_at(LAYER_POINTER, key_pos);
-    CHECK(drag_window >= NOAH_KEYMAP_SAFE_RANGE);
+    CHECK(drag_window == CUSTOM_KEY_3);
     CHECK(test_resolve_keycode(key_pos) == drag_window);
 
     test_press_resolved(key_pos);

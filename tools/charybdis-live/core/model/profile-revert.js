@@ -3,7 +3,8 @@
 // Put chosen units of a draft back to what the keyboard holds.
 //
 // A unit is what a review item is (profile-review.js): a key, a layer name,
-// a behaviour, a combo, the combo timing, a macro with its name, one settings
+// a behaviour, a combo, the combo timing, a macro with its name, a custom
+// key's name, one settings
 // section, a pointing slot, or one lighting record. Each is copied from `before` into `after` at the
 // level the keyboard stores it, and every domain it touched is encoded again,
 // so the result passes the same validation as any other edit.
@@ -15,7 +16,7 @@ const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../s
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
-const {decodeSettings, encodeSettings, macroNamesOf} = require("../schema/settings-domain-v1");
+const {customKeyNamesOf, decodeSettings, encodeSettings, macroNamesOf} = require("../schema/settings-domain-v1");
 const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {singleComboRemovalIndex} = require("./profile-review");
 
@@ -69,6 +70,11 @@ function revertUnits(before, after, units, capabilities) {
             const name = macroNamesOf(settings.theirs)[index] || "";
             if (settings.mine.macroNames) settings.mine.macroNames[index] = name;
             else if (name) throw fail("This macro name cannot be put back on its own.");
+        } else if (kind === "customKey") {
+            const settings = domain(PROFILE_DOMAIN_IDS.SETTINGS), index = Number(rest);
+            const name = customKeyNamesOf(settings.theirs)[index] || "";
+            if (settings.mine.customKeyNames) settings.mine.customKeyNames[index] = name;
+            else if (name) throw fail("This custom key name cannot be put back on its own.");
         } else if (kind === "layerName") {
             const settings = domain(PROFILE_DOMAIN_IDS.SETTINGS);
             settings.mine.names[Number(rest)] = settings.theirs.names[Number(rest)];

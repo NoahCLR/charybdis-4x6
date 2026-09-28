@@ -24,6 +24,7 @@ import {screenSettings} from "./ui/settings.mjs";
 import {screenMouse} from "./ui/mouse.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
 import {screenMacros} from "./ui/macros.mjs";
+import {screenCustomKeys} from "./ui/custom-keys.mjs";
 import {screenProfile} from "./ui/profile.mjs";
 import {commitBar, rail, topbar, unavailable} from "./ui/shell.mjs";
 
@@ -39,6 +40,7 @@ const SCREENS = {
     mouse: screenMouse,
     pointing: screenPointing,
     macros: screenMacros,
+    customKeys: screenCustomKeys,
     profile: screenProfile,
 };
 

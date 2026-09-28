@@ -15,7 +15,7 @@ test("the 64 VIA macros populate the model, including empty slots and their name
     let current = snapshot(pdDocument());
     current = snapshot(editMacro(current, {keycode: "VIA_MACRO_63", payload: "{KC_LGUI,KC_N}", name: "New note", expectedFingerprint: current.fingerprint}));
     const view = macroEditorView(current);
-    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 8, actionAbiDigest: 0x61072732}});
+    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 8, actionAbiDigest: 0x1d3fcacc}});
     assert.equal(model.viaMacros.length, 64);
     assert.equal(model.viaMacros[0].empty, true);
     assert.equal(model.viaMacros[63].name, "New note");
@@ -81,12 +81,11 @@ test("a stored v3 name v4 cannot hold keeps its plain characters, cut to 20", ()
     assert.deepEqual(upgraded.macroNames.slice(0, 5), ["", "Screenshot", "Caf mute", "x".repeat(20), "Fine"]);
 });
 
-test("stale drafts, wrong slots and retired user macros are rejected before a write", () => {
+test("stale drafts and wrong slots are rejected before a write", () => {
     const current = snapshot(document());
     const message = {keycode: "VIA_MACRO_0", payload: "hello", expectedFingerprint: current.fingerprint};
     assert.throws(() => editMacro(current, {...message, expectedFingerprint: "stale"}), /changed/);
-    for (const keycode of ["VIA_MACRO_64", "VIA_MACRO_01", "KC_A"]) assert.throws(() => editMacro(current, {...message, keycode}), /slot/);
-    assert.throws(() => editMacro(current, {...message, keycode: "MACRO_2"}), /retired/);
+    for (const keycode of ["VIA_MACRO_64", "VIA_MACRO_01", "KC_A", "MACRO_2", "CUSTOM_KEY_2"]) assert.throws(() => editMacro(current, {...message, keycode}), /slot/);
     assert.throws(() => editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint}), /steps, its name/);
     assert.throws(() => editMacro(current, {...message, payload: "x".repeat(7191)}), /bytes/);
     assert.throws(() => editMacro(current, {...message, name: "Too early"}), /schema 2/, "a schema-1 profile has no room for names");
@@ -127,7 +126,7 @@ test("the model reports each macro's program size and the bank; an unplayable ma
     assert.equal(view.macroBank.programMax, 512);
     assert.equal(view.macroBank.reserveTaps, 10);
     assert.equal(view.macroBank.available, 64);
-    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 8, actionAbiDigest: 0x61072732}});
+    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 8, actionAbiDigest: 0x1d3fcacc}});
     assert.deepEqual(model.macroBank, view.macroBank);
     // 170 taps play; 171 would be kept but never play, so the edit is refused.
     assert.doesNotThrow(() => editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}".repeat(170), expectedFingerprint: current.fingerprint}));

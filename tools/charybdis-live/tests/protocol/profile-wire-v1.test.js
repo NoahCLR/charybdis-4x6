@@ -93,7 +93,7 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         maxRgbStageGroupRows: 32,
         physicalLedCount: 58,
         ledBitmapSize: 8,
-        hardcodedMacroSlots: 16,
+        customKeySlots: 64,
         viaMacroSlots: 64,
         maxProfilePayload: 4064,
         profileSlotPayload: 4064,
@@ -159,7 +159,7 @@ test("patterned capability vectors decode every semantic field exactly", () => {
     identity.writeUInt32LE(0x89abcdef, 17);
     identity.writeUInt32LE(0x0badf00d, 21);
     const capacity = Buffer.alloc(25);
-    capacity.set([5, 8, 64, 5, 128, 32, 4, 16, 32, 58, 8, 16, 64], 0);
+    capacity.set([5, 8, 64, 5, 128, 32, 4, 16, 32, 58, 8, 64, 64], 0);
     capacity.writeUInt16LE(4000, 13);
     capacity.writeUInt16LE(4064, 15);
     capacity.writeUInt16LE(4096, 17);
@@ -187,7 +187,7 @@ test("patterned capability vectors decode every semantic field exactly", () => {
         maxRgbStageGroupRows: 32,
         physicalLedCount: 58,
         ledBitmapSize: 8,
-        hardcodedMacroSlots: 16,
+        customKeySlots: 64,
         viaMacroSlots: 64,
         maxProfilePayload: 4000,
         profileSlotPayload: 4064,

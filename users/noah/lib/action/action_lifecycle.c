@@ -10,13 +10,7 @@
 #include "noah_keymap_ids.h"
 
 static bool noah_action_handle_macro_preflight(noah_action_desc_t desc) {
-    if (noah_qmk_contract_try_play_via_macro(desc.action)) {
-        return true;
-    }
-
-    // A retired user macro does nothing. Consume it: tapped as a keycode it
-    // would read as a modified basic key.
-    return NOAH_KEYCODE_IS_RETIRED_MACRO(desc.action);
+    return noah_qmk_contract_try_play_via_macro(desc.action);
 }
 
 void noah_action_tap(uint16_t action) {

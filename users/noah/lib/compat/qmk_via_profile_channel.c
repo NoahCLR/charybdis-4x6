@@ -71,7 +71,7 @@ static noah_profile_wire_v1_read_service_t noah_profile_wire_v1_read_service = {
             // paths exist; the frozen schema ceilings below are declaration
             // metadata, not a claim that writes are accepted.
             .candidate_chunk_max          = 0u,
-            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS,
+            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS,
             .action_abi_digest            = 0u,
             .firmware_version             = VIA_FIRMWARE_VERSION,
             .compiled_default_digest      = 0u,
@@ -86,7 +86,7 @@ static noah_profile_wire_v1_read_service_t noah_profile_wire_v1_read_service = {
             .max_rgb_stage_group_rows     = NOAH_PROFILE_WIRE_V1_MAX_RGB_STAGE_GROUP_ROWS,
             .physical_led_count           = NOAH_PROFILE_LED_COUNT,
             .led_bitmap_size              = NOAH_PROFILE_WIRE_V1_LED_BITMAP_SIZE,
-            .hardcoded_macro_slots        = NOAH_PROFILE_WIRE_V1_MAX_HARDCODED_MACRO_SLOTS,
+            .custom_key_slots             = NOAH_PROFILE_WIRE_V1_MAX_CUSTOM_KEYS,
             .via_macro_slots              = DYNAMIC_KEYMAP_MACRO_COUNT,
             .max_profile_payload          = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,
             .profile_slot_payload         = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,
@@ -110,7 +110,7 @@ static void noah_profile_channel_refresh_owner_capabilities(const noah_profile_o
     if (!owner) {
         return;
     }
-    noah_profile_wire_v1_read_service.capabilities.feature_flags           = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES | NOAH_PD_SOURCE_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS;
+    noah_profile_wire_v1_read_service.capabilities.feature_flags           = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES | NOAH_PD_SOURCE_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS;
     noah_profile_wire_v1_read_service.capabilities.action_abi_digest       = owner->action_abi_digest;
     noah_profile_wire_v1_read_service.capabilities.compiled_default_digest = owner->compiled_default_digest;
     noah_profile_wire_v1_read_service.capabilities.supported_domain_mask   = owner->supported_domain_mask;

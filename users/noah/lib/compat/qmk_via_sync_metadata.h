@@ -7,7 +7,9 @@
 #include <stdint.h>
 
 enum {
-    NOAH_QMK_VIA_SYNC_METADATA_SCHEMA = 2u,
+    // 3: userspace keycodes moved to fixed blocks, so a schema-2 bank holds
+    // keycodes this firmware would misread. 2: geometry went to eight layers.
+    NOAH_QMK_VIA_SYNC_METADATA_SCHEMA = 3u,
     NOAH_QMK_VIA_SYNC_METADATA_GENERATION_BITS = 27u,
 };
 

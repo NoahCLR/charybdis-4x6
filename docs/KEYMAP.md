@@ -70,7 +70,7 @@ while Pinch + mouse button 3 emits Click Spam.
 There are also current per-key exceptions:
 
 - `LT(LAYER_NAV, KC_SLSH)` uses `.tap_hold_term = 100`
-- `CLICK_SPAM` uses `.tap_hold_term = 1`
+- `CUSTOM_KEY_2` (Click Spam) uses `.tap_hold_term = 1`
 
 ## Base Layer Highlights
 
@@ -81,15 +81,15 @@ lot of the profile's structure:
 - `LT(LAYER_SYM, KC_J)` puts symbol access on the right home row
 - `LT(LAYER_SYM, KC_Z)` adds a second symbol entry point on the lower left
 - `LT(LAYER_NAV, KC_SLSH)` gives a second nav entry point on the lower right
-- `VIA_MACRO_18` and `VIA_MACRO_19` are empty macro slots named Left Thumb
-  and Right Thumb, with their actions supplied by behaviour rows
+- `CUSTOM_KEY_1` (Left Thumb) and `CUSTOM_KEY_0` (Right Thumb) are custom
+  keys, with their actions supplied by behaviour rows
 - `KC_RIGHT_ALT` is a profile-specific dual-use key: tap toggles
   `PD_SLOT_4_LOCK`, hold stays normal right `Alt`
 
 The current combo set is intentionally small:
 
 - `KC_D` + `LT(LAYER_NAV, KC_F)` -> `KC_TAB`
-- `PD_SLOT_5` + `MS_BTN3` -> `CLICK_SPAM`
+- `PD_SLOT_5` + `MS_BTN3` -> `CUSTOM_KEY_2` (Click Spam)
 - `KC_N` + `KC_M` -> `KC_LEFT_GUI`
 - `PD_SLOT_1` + `MS_BTN1` -> `KC_LEFT_GUI`
 
@@ -162,9 +162,11 @@ The base-layer punctuation keys follow the same pattern on hold:
 
 ### Thumbs
 
-The empty macro slots `VIA_MACRO_18` (Left Thumb) and `VIA_MACRO_19`
-(Right Thumb) carry the thumb behaviours. Their names are authored in the
-`VIA_MACROS` table; their macro payloads are empty.
+The custom keys `CUSTOM_KEY_1` (Left Thumb) and `CUSTOM_KEY_0` (Right Thumb)
+carry the thumb behaviours. Their names are authored in the `CUSTOM_KEYS`
+table; everything they do comes from their `key_behaviors[]` rows. A custom
+key without a row does nothing, and a behaviour step cannot send one, so they
+live on layers and as combo outputs.
 
 Left Thumb selects a layer by tap count: single for Symbol, double for Number,
 triple for Function (`LAYER_EXTRA_1`), and quadruple for Game (`LAYER_EXTRA_2`).
@@ -234,19 +236,19 @@ two switches.
 
 ### Click Spam
 
-`CLICK_SPAM` is a keymap-local custom keycode used only as a combo output. It
+`CUSTOM_KEY_2` (Click Spam) is a custom key used only as a combo output. It
 does not appear directly in `keymaps[][]`.
 
 The current authored path is:
 
-- `PD_SLOT_5` + `MS_BTN3` combo -> `CLICK_SPAM`
-- `CLICK_SPAM` hold -> `REPEAT_WHILE_HELD(MS_BTN1, 100)`
+- `PD_SLOT_5` + `MS_BTN3` combo -> `CUSTOM_KEY_2` (Click Spam)
+- `CUSTOM_KEY_2` hold -> `REPEAT_WHILE_HELD(MS_BTN1, 100)`
 
 So pressing both primary mouse buttons together on `LAYER_NAV` or
 `LAYER_POINTER` turns into a held repeat action that taps left click at `100 Hz`
 until release.
 
-Because `CLICK_SPAM` is combo-backed, localized key-feedback RGB follows the
+Because Click Spam is combo-backed, localized key-feedback RGB follows the
 combo footprint rather than the fake QMK combo position `(0,0)`. In
 `RGB_KEY_HALF`, that means it can light both halves when a combo
 really spans both sides.
@@ -272,9 +274,9 @@ second.
 - `MS_BTN3` tap -> middle click
 - `MS_BTN3` double-tap hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)`, resizing
   the window under the pointer
-- `DRAG_WINDOW` tap -> transparent, so it falls through to the base-layer key
-  under it
-- `DRAG_WINDOW` hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)`, moving the
+- `CUSTOM_KEY_3` (Drag Window) tap -> transparent, so it falls through to the
+  base-layer key under it
+- `CUSTOM_KEY_3` hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)`, moving the
   window under the pointer
 
 The point is to put a whole window drag under one finger. While the key is held
@@ -287,7 +289,7 @@ under the pointer. The move drag has its own key, so it can afford a plain hold;
 both rows tighten `.multi_tap_term` to `100`, since these branches are entered
 from a deliberate burst rather than typing rhythm.
 
-`DRAG_WINDOW` is not a mouse keycode, so its row also sets
+`CUSTOM_KEY_3` is not a mouse keycode, so its row also sets
 `.keeps_auto_mouse_anchored = true`. Without that, auto mouse resets on the
 press and takes `LAYER_POINTER` with it, which both interrupts the drag surface
 and leaves the transparent tap tier with no layer to fall through from. See
@@ -369,7 +371,7 @@ side becomes a focused cluster for:
 - `MS_BTN1`
 - `MS_BTN2`
 - `MS_BTN3`, which also carries the resize drag described above
-- `DRAG_WINDOW`, the move drag described above
+- `CUSTOM_KEY_3` (Drag Window), the move drag described above
 
 The pointer layer also changes the thumb cluster slightly by putting
 `LT(LAYER_NUM, KC_SPC)` on space, so the pointer surface can still chain into
@@ -425,8 +427,6 @@ The profile's macros are VIA macro slots:
   name
 - `VIA_MACRO_0` through `VIA_MACRO_10` currently have source defaults in
   `VIA_MACROS(MACRO)`
-- the former hardcoded `MACRO_0` through `MACRO_15` are retired; their keys are
-  consumed and do nothing
 
 VIA macros play through one scan-driven engine. Starting a
 macro does not wait inside the triggering key event: delays, text, chords, and

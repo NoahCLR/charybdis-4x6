@@ -20,5 +20,5 @@ action.PD_MODE_LOCK.operand=1
 action.PD_MODE_LOCK.hex=05000100
 action.VIA_MACRO.operand=63
 action.VIA_MACRO.hex=06003f00
-action.HARDCODED_MACRO.operand=15
-action.HARDCODED_MACRO.hex=07000f00
+action.CUSTOM_KEY.operand=63
+action.CUSTOM_KEY.hex=07003f00

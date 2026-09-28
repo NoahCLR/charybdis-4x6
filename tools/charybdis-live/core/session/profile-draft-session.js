@@ -10,6 +10,7 @@ const {LEVELS: CHECK_LEVELS} = require("../model/layer-reach");
 const {draftProfileChecks} = require("../model/profile-checks");
 const {baseLighting, editSettings, settingsEditorView} = require("../model/settings-editor");
 const {editMacro, macroEditorView} = require("../model/macro-editor");
+const {customKeyEditorView, editCustomKey} = require("../model/custom-key-editor");
 const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("./device-profile-edits");
 const {BEHAVIOR_EDITS} = require("./key-behavior-edits");
 const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/actions");
@@ -37,7 +38,7 @@ const EDIT_LABELS = {
     saveBehavior: "Edited a behaviour", addBehavior: "Added a behaviour", deleteBehavior: "Removed a behaviour",
     addCombo: "Added a combo", saveCombo: "Edited a combo", deleteCombo: "Removed a combo", updateComboHoldTerm: "Changed the combo hold threshold", updateComboDefaultTerm: "Changed the default combo window",
     savePdMode: "Edited a pointing mode", clearPdMode: "Cleared a pointing mode", duplicatePdMode: "Duplicated a pointing mode",
-    updateConfigDefaults: "Saved a settings section", updateViaMacro: "Edited a macro", applyAllChanges: "Changed keys",
+    updateConfigDefaults: "Saved a settings section", updateViaMacro: "Edited a macro", updateCustomKey: "Renamed a custom key", applyAllChanges: "Changed keys",
 };
 function editLabel(message, document) {
     if (message.type === "updateLayoutKeys") {
@@ -75,7 +76,7 @@ function placed(item) {
     if (item.place?.kind === "behaviour") return {...item, place: {kind: "behaviour", keycode: actionName(item.place.target)}};
     return item;
 }
-const DRAFT_EDITS = new Set([...PD_EDITS, ...RGB_EDITS, ...COMBO_EDITS, ...BEHAVIOR_EDITS, "updateConfigDefaults", "updateViaMacro", "updateLayoutKeys", "applyAllChanges"]);
+const DRAFT_EDITS = new Set([...PD_EDITS, ...RGB_EDITS, ...COMBO_EDITS, ...BEHAVIOR_EDITS, "updateConfigDefaults", "updateViaMacro", "updateCustomKey", "updateLayoutKeys", "applyAllChanges"]);
 
 class ProfileDraftSession {
     constructor(snapshot, deviceId, capabilities, connectionToken = null) {
@@ -188,6 +189,7 @@ class ProfileDraftSession {
         let document;
         if (message.type === "updateConfigDefaults") document = editSettings(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
         else if (message.type === "updateViaMacro") document = editMacro(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
+        else if (message.type === "updateCustomKey") document = editCustomKey(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
         else if (["updateLayoutKeys", "applyAllChanges"].includes(message.type)) document = this.editLayout(message);
         else {
             if (!DRAFT_EDITS.has(message.type)) throw fail("Unsupported draft edit.");
@@ -452,7 +454,7 @@ class ProfileDraftSession {
         return {...state, busy: state.busy || this.stale || !state.connected,
             layout: {state: "read", layers: current.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[row * 6 + column], resolved: keycodes.resolve(values[row * 6 + column])}))}))},
             committed: {...state.committed, state: "read", failures: [], domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings: value.settings, pdModes: value.pdModes}},
-            baseRgb, combos: this.combos(), macroView: macroEditorView(current, this.capabilities), settingsView: settingsEditorView(current)};
+            baseRgb, combos: this.combos(), macroView: macroEditorView(current, this.capabilities), customKeyView: customKeyEditorView(current, this.capabilities), settingsView: settingsEditorView(current)};
     }
     view(state) {
         const matching = state.selectedDeviceId === this.deviceId, connected = matching && state.connected;

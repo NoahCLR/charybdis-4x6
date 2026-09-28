@@ -12,7 +12,7 @@ test("semantic target aliases link the native ABI and stay absent for an unknown
     const behaviors = decodedDeviceProfile().domains.keyBehaviors.rows;
     const {aliases} = profileKeyNames({behaviors, actionsKnown: true});
     assert.equal(aliases[keycodes.resolve(PD_SLOT_0).name], "PD_SLOT_0");
-    assert.equal(aliases[keycodes.resolve(0x7e55).name], "PD_SLOT_5");
+    assert.equal(aliases[keycodes.resolve(PD_BINDINGS[5].holdCode).name], "PD_SLOT_5");
     assert.deepEqual(profileKeyNames({behaviors, actionsKnown: false}).aliases, {});
 });
 
@@ -30,6 +30,17 @@ test("a key reads by the profile's name for it, under every name it is known by"
     assert.equal(names.labels.VIA_MACRO_1, "Macro 1", "an unnamed macro reads by its number");
     assert.equal(keyLabel(names, 0x04), "A", "the rest reads as the catalogue names it");
     assert.equal(keyLabel(profileKeyNames(), PD_SLOT_0), keycodes.resolve(PD_SLOT_0).label, "no profile, no renaming");
+});
+
+test("every custom key reads by its name, or by its number without one", () => {
+    const names = profileKeyNames({actionsKnown: true, customKeys: [{slot: 0, name: "Right Thumb"}, {slot: 1, name: ""}]});
+    assert.equal(keyLabel(names, 0x7e40), "Right Thumb");
+    assert.equal(names.labels.CUSTOM_KEY_0, "Right Thumb");
+    assert.equal(keyLabel(names, 0x7e41), "Custom key 1");
+    assert.equal(keyLabel(names, 0x7e7f), "Custom key 63", "all 64 exist, named or not");
+    assert.equal(names.custom.length, 64);
+    assert.equal(names.aliases[keycodes.resolve(0x7e40).name], "CUSTOM_KEY_0");
+    assert.deepEqual(profileKeyNames({actionsKnown: false}).custom, [], "an unknown ABI numbers its keys otherwise");
 });
 
 test("a key's name is added only where it tells two alike labels apart", () => {

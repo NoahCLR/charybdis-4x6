@@ -60,6 +60,10 @@ enum {
     // QK_BOOT…) through QMK's key processing, so a host may offer them in a
     // behaviour's target, tap and hold.
     NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS = 1u << 15,
+    // Userspace keycodes sit in fixed blocks (custom keys 0x7e40, pointing
+    // holds 0x7e80, locks 0x7ea0, layer locks 0x7ec0); action kind 7 is a
+    // custom key and settings v5 names the custom keys.
+    NOAH_PROFILE_FEATURE_CUSTOM_KEYS = 1u << 16,
 };
 
 enum {
@@ -105,7 +109,7 @@ typedef struct {
     uint8_t  max_rgb_stage_group_rows;
     uint8_t  physical_led_count;
     uint8_t  led_bitmap_size;
-    uint8_t  hardcoded_macro_slots;
+    uint8_t  custom_key_slots;
     uint8_t  via_macro_slots;
     uint16_t max_profile_payload;
     uint16_t profile_slot_payload;

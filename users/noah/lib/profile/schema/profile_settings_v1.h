@@ -12,7 +12,8 @@
 // length (0..23) and that many UTF-8 bytes, within v2's 1,368-byte ceiling, so
 // the names share the space the user macros had. v4 keeps v3's records but
 // limits each name to 20 printable ASCII bytes (0x20..0x7e), and its ceiling
-// holds all 64 at full length.
+// holds all 64 at full length. v5 follows them with 64 custom-key names in the
+// same form, counted in header byte 4.
 enum {
     NOAH_SETTINGS_VERSION     = NOAH_PROFILE_SETTINGS_VERSION,
     NOAH_SETTINGS_COUNT       = 28,
@@ -23,10 +24,14 @@ enum {
     NOAH_SETTINGS_MACRO_NAMES = 64,
     NOAH_SETTINGS_MACRO_NAME_MAX = 23,
     NOAH_SETTINGS_MACRO_NAME_ASCII_MAX = 20,
+    NOAH_SETTINGS_CUSTOM_KEY_NAMES     = 64,
     NOAH_SETTINGS_FIXED_SIZE  = 8 + 28 * 4 + 8 * 24,
     NOAH_SETTINGS_V3_MAX_SIZE = NOAH_SETTINGS_FIXED_SIZE + 16 * 2 + 1024,
     NOAH_SETTINGS_V4_MAX_SIZE = NOAH_SETTINGS_FIXED_SIZE + 64 * (1 + 20),
-#if NOAH_PROFILE_SETTINGS_VERSION >= 4u
+    NOAH_SETTINGS_V5_MAX_SIZE = NOAH_SETTINGS_FIXED_SIZE + (64 + 64) * (1 + 20),
+#if NOAH_PROFILE_SETTINGS_VERSION >= 5u
+    NOAH_SETTINGS_MAX_SIZE = NOAH_SETTINGS_V5_MAX_SIZE,
+#elif NOAH_PROFILE_SETTINGS_VERSION >= 4u
     NOAH_SETTINGS_MAX_SIZE = NOAH_SETTINGS_V4_MAX_SIZE,
 #else
     NOAH_SETTINGS_MAX_SIZE = NOAH_SETTINGS_V3_MAX_SIZE,

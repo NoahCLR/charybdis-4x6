@@ -108,6 +108,7 @@ void noah_qmk_portable_apply_lighting(uint32_t mode, uint32_t color) {
 // The keymap's names, at both length limits.
 const char via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {[5] = "Drag Screenshot", [63] = "Twenty characters!!!"};
 const char layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE]              = {"Base", [7] = "Twenty-three bytes long"};
+const char custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {[0] = "Right Thumb", [63] = "Last"};
 
 static uint8_t frame[32];
 static void    get(uint8_t page) {
@@ -161,9 +162,9 @@ int main(int argc, char **argv) {
     assert(argc < 3 || named);
     length = read_all(bytes, named);
     if (named) assert(fclose(named) == 0);
-    assert(length == NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES + 15 + 20);
-    const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, 0, 0, 0, 0};
-    assert(!memcmp(bytes, header, 8));
+    assert(length == NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES + 15 + 20 + NOAH_SETTINGS_CUSTOM_KEY_NAMES + 11 + 4);
+    const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
+    assert(NOAH_SETTINGS_VERSION == 5u && !memcmp(bytes, header, 8));
     assert(u32(bytes + 8 + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
     keyrecord_t record = {0};
     assert(get_tapping_term(0, &record) == TAPPING_TERM && get_quick_tap_term(0, &record) == TAPPING_TERM);
@@ -175,19 +176,23 @@ int main(int argc, char **argv) {
     memcpy(names_at, "Base", 4);
     memcpy(names_at + 7 * NOAH_SETTINGS_NAME_BYTES, "Twenty-three bytes long", 23);
     uint8_t *macro = expected + NOAH_SETTINGS_FIXED_SIZE;
-    for (uint8_t slot = 0; slot < NOAH_SETTINGS_MACRO_NAMES; slot++) {
-        uint8_t name_length = (uint8_t)strlen(via_macro_names[slot]);
-        *macro++ = name_length;
-        memcpy(macro, via_macro_names[slot], name_length);
+    // Then each macro's name, and each custom key's.
+    for (uint8_t record = 0; record < NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES; record++) {
+        const char *name        = record < NOAH_SETTINGS_MACRO_NAMES ? via_macro_names[record] : custom_key_names[record - NOAH_SETTINGS_MACRO_NAMES];
+        uint8_t     name_length = (uint8_t)strlen(name);
+        *macro++                = name_length;
+        memcpy(macro, name, name_length);
         macro += name_length;
     }
     assert(macro - expected == length);
     assert(!memcmp(bytes + 8 + NOAH_SETTINGS_COUNT * 4, names_at, length - (8 + NOAH_SETTINGS_COUNT * 4)));
 
-    // A live v3 domain reads back as stored, with its values overlaid by the
+    // A live v4 domain reads back as stored, with its values overlaid by the
     // live QMK owners, and without a second copy held for the read.
     const uint32_t values[28] = {180, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0x76543210};
-    memcpy(stored, header, 8);
+    // Stored by an app that wrote v4: no custom-key names, streamed as stored.
+    const uint8_t v4_header[8] = {4, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, 0, 0, 0, 0};
+    memcpy(stored, v4_header, 8);
     for (uint8_t id = 0; id < 28; id++)
         for (uint8_t j = 0; j < 4; j++)
             stored[8 + id * 4 + j] = values[id] >> (j * 8);

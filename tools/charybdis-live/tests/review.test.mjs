@@ -62,6 +62,10 @@ test("Show goes to where each kind of item is edited", () => {
     assert.deepEqual(placeState({kind: "key", layer: 2, layoutIndex: 13}, layers), {screen: "keys", tab: "key", layer: 2, selected: 13});
     assert.equal(placeState({kind: "behaviour", keycode: "KC_ESCAPE"}).behaviourRow, "KC_ESCAPE");
     assert.equal(placeState({kind: "macro", index: 4}).macroSlot, "VIA_MACRO_4");
+    assert.deepEqual(placeState({kind: "customKey", index: 2}), {screen: "customKeys", customKey: "CUSTOM_KEY_2"});
+    assert.ok(draftMarks([{place: {kind: "customKey", index: 2}, status: "changed"}]).customKeys.has("CUSTOM_KEY_2"));
+    assert.deepEqual(categorySummary([{place: {kind: "customKey", index: 2}, status: "changed"}]).map(({category, rows}) => [category, rows]),
+        [["Keys", [{label: "Custom key names", count: 1}]]]);
     assert.equal(placeState({kind: "pointing", slot: 6}).pdSlot, 6);
     assert.equal(placeState({kind: "lighting", stage: "pd"}).stage, "pd");
     assert.equal(placeState(null), null, "the profile fallback has nowhere to go");

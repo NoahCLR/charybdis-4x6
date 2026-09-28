@@ -26,6 +26,7 @@ matrix.
 | Layout and eight layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
 | Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
+| Custom keys | 64 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | Eight device-owned slots and eight RGB rows; see [PD-mode domain v1](architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
@@ -66,6 +67,13 @@ Remaining before calling the product complete:
 - **`LT()` row tap/hold timing** (D-L34): the runtime times a press from when
   QMK delivers it, so an authored `LT()` row's tap/hold term likely starts only
   after QMK's own tapping term (the dual-role setting, D-L38). Not yet measured.
+- **The keycode-block migration has not run on hardware** (D-L42). Flashing
+  it should make each half refuse its stored profile by action ABI digest,
+  reset its VIA bank (sync metadata schema 3) and run the compiled defaults,
+  which reproduce the captured profile with the thumbs, Click Spam and Drag
+  Window on custom keys 0–3. Confirm that on both halves, that the halves
+  converge, and that the pre-migration backup imports through the key-by-key
+  translation, before relying on it.
 - **The picker's list of unbuilt QMK features is written by hand** (D-L05).
   `webview/view/picker-sections.mjs` hides keycodes for features this build
   does not include, matched against its rules files and QMK's defaults. It
@@ -913,12 +921,44 @@ contract is [PD-mode domain v1](architecture/pd-mode-domain-v1.md).
 
 ### D-L41 — Pointing keycodes name slots, not factory presets
 
-The eight configurable pointing modes use one keycode vocabulary:
-`PD_SLOT_n` for hold and `PD_SLOT_n_LOCK` for toggle. The original six
-factory preset names are no longer firmware keycode symbols. Slot assignment
-is stable, and the first six keycodes keep their deployed numeric values;
-the schema-2 firmware, stored profiles and action ABI do not change when
-the symbols change. Charybdis Live reads each slot's current name and behavior
-from the device and keeps former preset expressions as import aliases for
-older portable files. See the [PD-mode domain contract](architecture/pd-mode-domain-v1.md)
-for the fixed native values.
+The eight configurable pointing modes use one keycode vocabulary: `PD_SLOT_n`
+for hold and `PD_SLOT_n_LOCK` for toggle. The original six factory preset
+names are no longer firmware keycode symbols. Slot assignment is stable; the
+keycodes' numeric values moved to their fixed block with D-L42. Charybdis Live
+reads each slot's current name and behavior from the device and keeps former
+preset expressions as import aliases for older portable files. See the
+[PD-mode domain contract](architecture/pd-mode-domain-v1.md) for the fixed
+native values.
+
+### D-L42 — Userspace keycodes sit in fixed blocks, and custom keys are named
+
+The userspace keycode families were numbered by enum order: pointing holds and
+locks for six slots, then layer locks, then the keymap's own keys wherever the
+layer count left them, and the two later pointing slots in a distant pair.
+Adding a slot or a layer moved every keycode after it. Each family now owns one
+aligned block, reserved beyond what is supported: custom keys `0x7e40`, pointing
+holds `0x7e80`, pointing locks `0x7ea0`, layer locks `0x7ec0`, 32 each for the
+last three and `0x7ee0` onward unassigned. Adding pointing modes or layers
+changes storage and masks, never another keycode.
+
+The keymap's hand-numbered keys (the thumbs, Click Spam, Drag Window) became
+the first of 64 **custom keys**: `CUSTOM_KEY_n`, a named key that does only
+what its behaviour row says, like a macro slot without a payload. Without a
+row it does nothing. It goes on a layer or out of a combo; a behaviour step
+cannot send one, because the synthetic record a step sends bypasses behaviour
+lookup and would silently do nothing, so the firmware's keymap validation and
+the app refuse it rather than implying chaining. Action kind 7, which named
+the retired user macros, now names a custom key; the change came with a new
+action ABI digest (`0x1d3fcacc`), so nothing decodes an old kind 7 as a
+custom key.
+
+Names live on the keyboard in settings version 5, beside the macro names, and
+the keymap authors the defaults inline (`CUSTOM_KEYS`). The app offers custom
+keys only on the known digest (Profile Wire feature bit 16), in their own
+screen and picker section. Renumbering was a deliberate migration: firmware
+refuses an older stored profile by digest and resets its VIA layout bank
+(sync metadata schema 3), falling back to compiled defaults that reproduce
+the profile; the app translates an older backup key by key on import. See
+[PD-mode domain](architecture/pd-mode-domain-v1.md) for the blocks and
+[portable profile](architecture/portable-profile-v1.md) for version 5 and the
+translation.

@@ -10,7 +10,7 @@ const keycodes = require("../../core/data/keycode-catalog");
 test("every v1 semantic action has an explicit display, including unknown numeric keycodes", () => {
     const cases = [[0, 0, "KC_NO"], [1, 4, "KC_A"], [1, 0xfffe, "0xFFFE"], [2, 0, "MO(0)"],
         [3, 4, "LOCK_LAYER(4)"], [4, 0, "PD_SLOT_0"], [4, 5, "PD_SLOT_5"],
-        [5, 0, "PD_SLOT_0_LOCK"], [5, 2, "PD_SLOT_2_LOCK"], [6, 0, "VIA_MACRO_0"], [7, 15, "MACRO_15"]];
+        [5, 0, "PD_SLOT_0_LOCK"], [5, 2, "PD_SLOT_2_LOCK"], [6, 0, "VIA_MACRO_0"], [7, 15, "CUSTOM_KEY_15"]];
     for (const [kind, operand, name] of cases) assert.equal(actionName({kind, flags: 0, operand}), name);
     assert.throws(() => actionName({kind: 8, operand: 0}), /Unsupported/);
 });
@@ -55,7 +55,7 @@ test("decoded behaviors preserve sparse branches, all hold modes, anchors and ti
     assert.equal(view[0].steps[0].tapCount, 4);
     assert.equal(view[0].steps[0].tapCountName, "Quintuple tap");
     assert.equal(view[0].steps[0].tap.action, "VIA_MACRO_0");
-    assert.equal(view[0].steps[0].longHold.action, "MACRO_15");
+    assert.equal(view[0].steps[0].longHold.action, "CUSTOM_KEY_15");
 });
 
 test("real device RGB retains every value and reference through the presentation conversion", () => {

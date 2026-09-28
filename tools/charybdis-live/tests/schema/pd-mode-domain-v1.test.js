@@ -8,16 +8,18 @@ const slots = () => structuredClone(fixture.slots);
 const bytes = () => Buffer.from(fixture.hex, "hex");
 const reject = (fn, code) => assert.throws(fn, error => error.code === code);
 
-test("deployed native PD, layer-lock and custom identities stay stable during expansion", () => {
+test("native PD, layer-lock and custom-key identities sit in their fixed blocks", () => {
     const {resolveNativeQmkExpression} = require("../../core/schema/compiled-profile-v1");
-    const model = {layers: Array.from({length: 8}, (_, id) => ({id})), customKeycodes: ["RIGHT_THUMB", "LEFT_THUMB", "CLICK_SPAM", "DRAG_WINDOW"]};
-    const names = ["PD_SLOT_0", "PD_SLOT_1", "PD_SLOT_2", "PD_SLOT_3", "PD_SLOT_4", "PD_SLOT_5"];
-    names.forEach((name, id) => {
-        assert.equal(resolveNativeQmkExpression(name, model), 0x7e50 + id);
-        assert.equal(resolveNativeQmkExpression(name + "_LOCK", model), 0x7e56 + id);
-    });
-    for (let id = 0; id < 8; id++) assert.equal(resolveNativeQmkExpression(`LOCK_LAYER(${id})`, model), 0x7e5c + id);
-    model.customKeycodes.forEach((name, id) => assert.equal(resolveNativeQmkExpression(name, model), 0x7e64 + id));
+    const model = {layers: Array.from({length: 8}, (_, id) => ({id}))};
+    for (let id = 0; id < 8; id++) {
+        assert.equal(resolveNativeQmkExpression(`PD_SLOT_${id}`, model), 0x7e80 + id);
+        assert.equal(resolveNativeQmkExpression(`PD_SLOT_${id}_LOCK`, model), 0x7ea0 + id);
+        assert.equal(resolveNativeQmkExpression(`LOCK_LAYER(${id})`, model), 0x7ec0 + id);
+    }
+    assert.equal(resolveNativeQmkExpression("LOCK_LAYER(8)", model), undefined, "only eight layers have a lock");
+    for (const id of [0, 3, 63]) assert.equal(resolveNativeQmkExpression(`CUSTOM_KEY_${id}`, model), 0x7e40 + id);
+    assert.equal(resolveNativeQmkExpression("CUSTOM_KEY_64", model), undefined);
+    assert.equal(resolveNativeQmkExpression("MACRO_0", model), undefined, "the retired user macros are gone");
 });
 
 test("eight PD slots match the independent byte fixture and preserve the full preset policies", () => {
@@ -61,8 +63,8 @@ test("PD decoder rejects malformed framing, hidden disabled state and noncanonic
 
 test("directional output vocabulary excludes controls, mouse actions, macros and recursive mode actions", () => {
     for (const key of [4, 0xa4, 0xa5, 0xc2, 0x082e, 0x114f, 0x1f50]) assert.ok(isPdTapKey(key));
-    for (const key of [0, 1, 3, 0xc3, 0xd1, 0xe0, 0x1004, 0x08aa, 0x2004, 0x5220, 0x7700, 0x7e50, 0x7c00, -1, 65536, NaN]) assert.equal(isPdTapKey(key), false);
-    for (const tap of [{keycode: 0x7e50}, {keycode: 0, mask: 1}, {keycode: 4, modifierPolicy: 1},
+    for (const key of [0, 1, 3, 0xc3, 0xd1, 0xe0, 0x1004, 0x08aa, 0x2004, 0x5220, 0x7700, 0x7e80, 0x7e40, 0x7c00, -1, 65536, NaN]) assert.equal(isPdTapKey(key), false);
+    for (const tap of [{keycode: 0x7e80}, {keycode: 0, mask: 1}, {keycode: 4, modifierPolicy: 1},
         {keycode: 4, modifierPolicy: 2, mask: 8}, {keycode: 4, modifierPolicy: 3}]) {
         const value = slots(); value[1].directions.up = tap;
         reject(() => encodePdDomain(value), "INVALID_ACTION");

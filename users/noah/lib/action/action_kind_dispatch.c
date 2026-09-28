@@ -157,17 +157,19 @@ static void noah_action_release_owned_momentary_layer(noah_action_desc_t desc, k
     (void)layer_ownership_momentary_release(key_pos);
 }
 
-static void noah_action_tap_keymap_custom(noah_action_desc_t desc, keypos_t key_pos) {
+// Replays a custom key's own record. Behaviour steps cannot send one (the kind
+// has no authored capability), so only generic dispatch reaches these.
+static void noah_action_tap_custom_key(noah_action_desc_t desc, keypos_t key_pos) {
     (void)key_pos;
     noah_dispatch_synthetic_tap(desc.action);
 }
 
-static void noah_action_press_keymap_custom(noah_action_desc_t desc, keypos_t key_pos) {
+static void noah_action_press_custom_key(noah_action_desc_t desc, keypos_t key_pos) {
     (void)key_pos;
     noah_dispatch_synthetic_record(desc.action, true);
 }
 
-static void noah_action_release_keymap_custom(noah_action_desc_t desc, keypos_t key_pos) {
+static void noah_action_release_custom_key(noah_action_desc_t desc, keypos_t key_pos) {
     (void)key_pos;
     noah_dispatch_synthetic_record(desc.action, false);
 }

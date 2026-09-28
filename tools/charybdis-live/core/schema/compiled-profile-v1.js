@@ -3,12 +3,11 @@
 // Expressions as the keyboard's vocabulary spells them — KC_A, LT(1, KC_A),
 // PD_SLOT_0, VIA_MACRO_3 — resolved to profile actions and native keycodes.
 
-const {PD_BINDINGS, DEPLOYED_PD_SLOTS, FORMER_NAMES, pdBindingOfName} = require("../data/pd-bindings");
+const {PD_BINDINGS, FORMER_NAMES, pdBindingOfName} = require("../data/pd-bindings");
+const {customKeyCode, customKeyOfName, layerLockCode, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
 
-const QMK_USER_BASE = 0x7e40;
 const QMK_MACRO_BASE = 0x7700;
-const HARDCODED_MACRO_SLOTS = 16;
 const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
     DPI_MOD: 0x7e00,
     DPI_RMOD: 0x7e01,
@@ -66,8 +65,8 @@ function semanticActionForExpression(value, model, label = "Action") {
 
     let match = expression.match(/^VIA_MACRO_(\d+)$/);
     if (match) return {kind: PROFILE_ACTION_KINDS.VIA_MACRO, operand: Number(match[1])};
-    match = expression.match(/^MACRO_(\d+)$/);
-    if (match) return {kind: PROFILE_ACTION_KINDS.HARDCODED_MACRO, operand: Number(match[1])};
+    match = expression.match(/^CUSTOM_KEY_(\d+)$/);
+    if (match) return {kind: PROFILE_ACTION_KINDS.CUSTOM_KEY, operand: Number(match[1])};
 
     const call = parseCall(expression);
     if (call?.name === "MO" || call?.name === "LOCK_LAYER") {
@@ -81,7 +80,6 @@ function semanticActionForExpression(value, model, label = "Action") {
     return {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: numeric};
 }
 
-const LOCK_LAYER_SLOTS = 8;
 const QK_MODS_MAX = 0x1fff;
 
 function resolveNativeQmkExpression(value, model) {
@@ -98,14 +96,11 @@ function resolveNativeQmkExpression(value, model) {
 
     let match = expression.match(/^VIA_MACRO_(\d+)$/);
     if (match && Number(match[1]) < 64) return QMK_MACRO_BASE + Number(match[1]);
-    match = expression.match(/^MACRO_(\d+)$/);
-    if (match && Number(match[1]) < HARDCODED_MACRO_SLOTS) return QMK_USER_BASE + Number(match[1]);
+    const custom = customKeyOfName(expression);
+    if (custom !== undefined) return customKeyCode(custom);
 
     const pd = pdBindingOfName(expression);
     if (pd) return pd.locked ? PD_BINDINGS[pd.slot].lockCode : PD_BINDINGS[pd.slot].holdCode;
-
-    const custom = localCustomKeycodeValues(model);
-    if (Number.isInteger(custom[expression])) return custom[expression];
 
     const call = parseCall(expression);
     if (!call) return undefined;
@@ -114,13 +109,11 @@ function resolveNativeQmkExpression(value, model) {
         const bases = {TO: 0x5200, MO: 0x5220, DF: 0x5240, TG: 0x5260, OSL: 0x5280};
         return layer === undefined || layer > 0x1f ? undefined : bases[call.name] | layer;
     }
-    // The firmware reserves LAYER_COUNT lock keycodes (noah_keymap_ids.h); a
-    // higher layer would land on the custom keycodes that follow them.
+    // The firmware supports a lock for each of its eight layers; the rest of
+    // the reserved block has no key behind it.
     if (call.name === "LOCK_LAYER" && call.args.length === 1) {
         const layer = layerIdOrUndefined(call.args[0], model);
-        return layer === undefined || layer >= LOCK_LAYER_SLOTS
-            ? undefined
-            : QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (DEPLOYED_PD_SLOTS * 2) + layer;
+        return layer === undefined || layer >= LAYER_LOCK_SLOTS ? undefined : layerLockCode(layer);
     }
     // A modifier wrapper only applies to a basic or already-modified key
     // (QK_MODS, up to 0x1FFF). Anything above would OR the modifier bits into
@@ -146,12 +139,6 @@ function resolveNativeQmkExpression(value, model) {
         return mods === undefined || keycode === undefined || keycode > 0xff ? undefined : 0x2000 | (mods << 8) | keycode;
     }
     return undefined;
-}
-
-function localCustomKeycodeValues(model) {
-    const layerCount = Array.isArray(model?.layers) ? model.layers.length : 0;
-    const first = QMK_USER_BASE + HARDCODED_MACRO_SLOTS + (DEPLOYED_PD_SLOTS * 2) + layerCount;
-    return Object.fromEntries((model?.customKeycodes || []).map((name, index) => [name, first + index]));
 }
 
 function resolveModifierBits(value) {

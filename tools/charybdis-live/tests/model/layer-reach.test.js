@@ -8,7 +8,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout"
 // Base answers every key with KC_A; the other layers start transparent.
 const KC_A = 0x04, KC_B = 0x05, KC_ESC = 0x29, TRNS = 0x01, NO = 0x00;
 const MO = (n) => 0x5220 | n, TG = (n) => 0x5260 | n, TO = (n) => 0x5200 | n, TT = (n) => 0x52c0 | n, DF = (n) => 0x5240 | n;
-const LOCK_LAYER = (n) => 0x7e5c + n;
+const LOCK_LAYER = (n) => 0x7ec0 + n;
 const code = (operand) => ({kind: 1, flags: 0, operand});
 function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}} = {}) {
     const layers = Array.from({length: 8}, (_, layer) => Array(60).fill(layer === 0 ? KC_A : (fill[layer] ?? TRNS)));

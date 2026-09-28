@@ -30,6 +30,7 @@
 
 const keycodes = require("../data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {layerLockOfCode} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {actionName, nativeCode} = require("../schema/actions");
@@ -49,7 +50,7 @@ const MAX_TRAPS = 4;
 
 const bit = (layer) => 1 << layer;
 const layersIn = (mask) => Array.from({length: LAYERS}, (_, layer) => layer).filter((layer) => mask & bit(layer));
-const codeName = (code) => (code >= 0x7e5c && code < 0x7e5c + LAYERS ? `LOCK_LAYER(${code - 0x7e5c})`
+const codeName = (code) => (layerLockOfCode(code) !== undefined ? `LOCK_LAYER(${layerLockOfCode(code)})`
     : keycodes.resolve(code)?.name || `0x${code.toString(16).toUpperCase().padStart(4, "0")}`);
 
 // What a native keycode does to the layers, if anything. `unowned` is a layer
@@ -58,7 +59,7 @@ function layerEffects(code) {
     const within = (layer, effects) => (layer < LAYERS ? effects : [{kind: "unowned", layer}]);
     if (code >= 0x4000 && code <= 0x4fff) return within((code >> 8) & 15, [{kind: "hold", layer: (code >> 8) & 15}]);
     if (code >= 0x5000 && code <= 0x51ff) return within((code >> 5) & 15, [{kind: "hold", layer: (code >> 5) & 15}]);
-    if (code >= 0x7e5c && code < 0x7e5c + LAYERS) return [{kind: "lock", layer: code - 0x7e5c}];
+    if (layerLockOfCode(code) !== undefined) return [{kind: "lock", layer: layerLockOfCode(code)}];
     if (code < 0x5200 || code >= 0x5300) return [];
     const layer = code & 31;
     switch (code & ~31) {

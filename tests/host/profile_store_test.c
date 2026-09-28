@@ -849,7 +849,7 @@ static void test_pd_store_accepts_every_settings_version_the_validator_does(void
         initialize_pd_store(&store);
         noah_profile_store_result_t result = commit_pd(&store, payload, &candidate);
         CHECK((result == NOAH_PROFILE_STORE_OK) == NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED(version));
-        CHECK(NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED(version) == (version >= 2u && version <= 4u));
+        CHECK(NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED(version) == (version >= 2u && version <= 5u));
     }
 }
 

@@ -125,7 +125,7 @@ typedef struct {
     uint8_t logical_layer_count;
     uint8_t supported_pd_mode_mask;
     uint8_t via_macro_slot_count;
-    uint8_t hardcoded_macro_slot_count;
+    uint8_t custom_key_count;
 
     // Optional firmware translation gate. Rejects native aliases of the same
     // combo input and actions the installed engine cannot execute.

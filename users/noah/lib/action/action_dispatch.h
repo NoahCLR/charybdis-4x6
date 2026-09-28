@@ -5,8 +5,8 @@
 // Dispatches authored key actions, including custom layer-lock and
 // pointing-device lock actions.
 //
-// Actions are keycode-like values. Keymap-local custom keycodes starting at
-// NOAH_KEYMAP_SAFE_RANGE are routed back through process_record_user().
+// Actions are keycode-like values. A custom key (CUSTOM_KEY_n) replays as its
+// own record through process_record_user().
 // Non-layer QMK behavior keycodes such as OSM()/MT() need explicit handling
 // too, because tap_code16/register_code16 only model plain key press/release.
 // QMK layer keycodes act through the userspace layer ownership model:
@@ -105,7 +105,7 @@ static inline bool noah_action_keycode_is_raw_qmk_layer_action(uint16_t action) 
 }
 
 static inline bool noah_action_keycode_is_macro(uint16_t action) {
-    return (action >= MACRO_0 && action <= MACRO_15) || IS_QK_MACRO(action);
+    return IS_QK_MACRO(action);
 }
 
 // QMK and keyboard functions past the layer keycodes and below the user range:
@@ -210,8 +210,8 @@ static inline bool noah_action_desc_is_macro(noah_action_desc_t desc) {
     return desc.kind == NOAH_ACTION_KIND_MACRO;
 }
 
-static inline bool noah_action_desc_is_keymap_custom(noah_action_desc_t desc) {
-    return desc.kind == NOAH_ACTION_KIND_KEYMAP_CUSTOM;
+static inline bool noah_action_desc_is_custom_key(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_CUSTOM_KEY;
 }
 
 static inline bool noah_action_desc_is_layer_action(noah_action_desc_t desc) {

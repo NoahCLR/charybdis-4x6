@@ -240,8 +240,8 @@ semantics without taking another platform timer sample.
 The authored profile boundary is intentionally outside `users/noah/lib/`:
 
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c` owns layers,
-  combos, VIA macro defaults, key behaviors, and
-  keymap-local custom keycodes.
+  combos, VIA macro defaults, key behaviors, and custom-key names
+  (`CUSTOM_KEYS`).
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h` owns keymap-facing
   timing, layer ids, pointer tuning, and RGB feature flags.
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c` owns authored

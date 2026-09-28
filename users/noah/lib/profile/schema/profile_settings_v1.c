@@ -114,9 +114,13 @@ static bool utf8_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
         return false;
     return true;
 }
-// v3: one byte of the 64 length-prefixed VIA macro names.
+// v3: one byte of the 64 length-prefixed VIA macro names; v5 continues with
+// the 64 custom-key names, one slot count past them.
+static uint8_t name_slots(uint8_t version) {
+    return version >= 5u ? NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES : version >= 3u ? NOAH_SETTINGS_MACRO_NAMES : NOAH_SETTINGS_MACROS;
+}
 static bool macro_name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
-    if (s->slot >= NOAH_SETTINGS_MACRO_NAMES) return false;
+    if (s->slot >= name_slots(s->version)) return false;
     if (!s->macro_offset) {
         if (b > (s->version >= 4u ? NOAH_SETTINGS_MACRO_NAME_ASCII_MAX : NOAH_SETTINGS_MACRO_NAME_MAX)) return false;
         s->macro_length   = b;
@@ -176,11 +180,12 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
         if (!offset) {
             if (!NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(b) || (s->expected_version && b != s->expected_version)) return false;
             // Each version keeps its own ceiling: v3's also bounds its names.
-            if (length > (b >= 4u ? NOAH_SETTINGS_V4_MAX_SIZE : NOAH_SETTINGS_V3_MAX_SIZE)) return false;
+            if (length > (b >= 5u ? NOAH_SETTINGS_V5_MAX_SIZE : b >= 4u ? NOAH_SETTINGS_V4_MAX_SIZE : NOAH_SETTINGS_V3_MAX_SIZE)) return false;
             s->version = b;
             return true;
         }
         if (offset == 3) return b == (s->version >= 3u ? NOAH_SETTINGS_MACRO_NAMES : NOAH_SETTINGS_MACROS);
+        if (offset == 4) return b == (s->version >= 5u ? NOAH_SETTINGS_CUSTOM_KEY_NAMES : 0u);
         return b == header[offset];
     }
     if (offset < 8 + 28 * 4) {
@@ -220,5 +225,5 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
     return true;
 }
 bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *s, uint16_t length) {
-    return s && s->offset == length && s->slot == (s->version >= 3u ? NOAH_SETTINGS_MACRO_NAMES : NOAH_SETTINGS_MACROS) && !s->macro_offset;
+    return s && s->offset == length && s->slot == name_slots(s->version) && !s->macro_offset;
 }

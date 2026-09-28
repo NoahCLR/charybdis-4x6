@@ -29,6 +29,7 @@ function buildDeviceModel(state = {}) {
         layers: state.committed?.domains?.settings?.names,
         actionsKnown: knownActionAbi(state.capabilities?.actionAbiDigest),
         macros: state.macroView?.viaMacros,
+        customKeys: state.customKeyView?.keys,
         behaviors: state.committed?.state === "read" ? state.committed.domains?.keyBehaviors?.rows : [],
         pdModes: state.committed?.domains?.pdModes,
     });
@@ -39,6 +40,12 @@ function buildDeviceModel(state = {}) {
     for (const {name, native, code, label} of names.pointing) {
         const entry = catalog.entries.find(entry => entry.keycode === code);
         const presentation = {value: name, key: name, label, group: "Pointing modes", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
+        if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
+    }
+    // So is each custom key, under its name.
+    for (const {name, native, code, label} of names.custom) {
+        const entry = catalog.entries.find(entry => entry.keycode === code);
+        const presentation = {value: name, key: name, label, group: "Custom keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
         if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
     }
     // Every keycode the profile holds is in the table by its name here, so the
@@ -82,6 +89,10 @@ function buildDeviceModel(state = {}) {
         configDefaults: state.settingsView?.sections || [],
         settingsEditing: {identity: state.settingsView?.identity || "", writable: Boolean(state.settingsView) && state.capabilities?.compiledLayerCount === 8 && !state.busy},
         macroPayloadKeycodes: state.macroView?.macroPayloadKeycodes || [],
+        // The 64 named custom keys, on a keyboard with the keycode blocks.
+        customKeys: state.customKeyView?.keys || [],
+        customKeyNameSpace: state.customKeyView?.names || null,
+        customKeyEditing: {identity: state.customKeyView?.identity || "", writable: Boolean(state.customKeyView) && !state.busy},
 
         // TT(), OSL() and TO() are offered only by a keyboard that runs them
         // through its own layer ownership (Profile Wire feature bit 14).

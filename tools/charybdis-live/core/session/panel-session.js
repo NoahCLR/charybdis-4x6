@@ -70,7 +70,7 @@ function buildPanelModel(session, state) {
         }
         const actual = deviceSummary({
             capabilities: state.capabilities, status: state.status, layout: state.layout, committed: state.committed,
-            baseRgb: state.baseRgb, combos: state.combos, macroView: state.macroView, settingsView: state.settingsView,
+            baseRgb: state.baseRgb, combos: state.combos, macroView: state.macroView, customKeyView: state.customKeyView, settingsView: state.settingsView,
             busy, device,
         });
         model.device = actual.device;

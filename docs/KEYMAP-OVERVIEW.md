@@ -69,14 +69,14 @@ Timing legend for the layer-local behavior tables:
 | `RALT` | `RALT` (`KC_RIGHT_ALT`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_6)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `triple` | `TAP_SENDS(OSM(MOD_LSFT))` | `-` | `-` | `multi_tap(150)` |
-| `VIA18` | `VIA18` (`VIA_MACRO_18`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `VIA18` | `VIA18` (`VIA_MACRO_18`) | `double` | `TAP_SENDS(LOCK_LAYER(LAYER_NUM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NUM))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `VIA18` | `VIA18` (`VIA_MACRO_18`) | `triple` | `TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_1))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_1))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `VIA18` | `VIA18` (`VIA_MACRO_18`) | `quadruple` | `TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_2))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_2))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `VIA19` | `VIA19` (`VIA_MACRO_19`) | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_NAV))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `VIA19` | `VIA19` (`VIA_MACRO_19`) | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `tap_hold=150, long_hold(400), multi_tap(150)` |
-| `VIA19` | `VIA19` (`VIA_MACRO_19`) | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
-| `VIA19` | `VIA19` (`VIA_MACRO_19`) | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
+| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `tap_hold=150, multi_tap(150)` |
+| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `double` | `TAP_SENDS(LOCK_LAYER(LAYER_NUM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NUM))` | `-` | `tap_hold=150, multi_tap(150)` |
+| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `triple` | `TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_1))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_1))` | `-` | `tap_hold=150, multi_tap(150)` |
+| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `quadruple` | `TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_2))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_2))` | `-` | `tap_hold=150, multi_tap(150)` |
+| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_NAV))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))` | `-` | `tap_hold=150, multi_tap(150)` |
+| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `tap_hold=150, long_hold(400), multi_tap(150)` |
+| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
+| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
 | `ENT` | `ENT` (`KC_ENT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))` | `-` | `tap_hold(150)` |
 
 #### PD Modes Reachable On This Layer
@@ -202,7 +202,7 @@ No authored combos resolve entirely from keys on this layer.
 | `PD_SLOT_5` | `PD_SLOT_5` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `PD_SLOT_5` | `PD_SLOT_5` | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_3)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `MS_BTN3` | `MS_BTN3` | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)` | `-` | `tap_hold=100, multi_tap=100` |
-| `DRAG_WINDOW` | `DRAG_WINDOW` | `single` | `TAP_SENDS(KC_TRNS)` | `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)` | `-` | `tap_hold=100` |
+| `CUSTOM_KEY_3` | `CUSTOM_KEY_3` | `single` | `TAP_SENDS(KC_TRNS)` | `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)` | `-` | `tap_hold=100` |
 | `PD_SLOT_1` | `PD_SLOT_1` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `PD_SLOT_1` | `PD_SLOT_1` | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` | `multi_tap(150)` |
 | `PD_SLOT_0` | `PD_SLOT_0` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
@@ -222,7 +222,7 @@ No authored combos resolve entirely from keys on this layer.
 
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
-| `C1` | `PD_SLOT_5` + `MS_BTN3` | `CLICK_SPAM` |
+| `C1` | `PD_SLOT_5` + `MS_BTN3` | `CUSTOM_KEY_2` |
 | `C2` | `MS_BTN1` + `PD_SLOT_1` | `LGUI` (`KC_LGUI`) |
 | `C3` | `MS_BTN1` + `MS_BTN2` + `PD_SLOT_0` | `G(T)` (`G(KC_T)`) |
 | `C4` | `MS_BTN1` + `MS_BTN2` | `MS_BTN6` |
@@ -417,8 +417,6 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `VIA_MACRO_8` | VS Code Preview MD | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ VIA8` |
 | `VIA_MACRO_9` | VS Code Run Task | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ VIA9` |
 | `VIA_MACRO_10` | Select All + Copy | `{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}` | `G(KC_C) double tap` |
-| `VIA_MACRO_18` | Left Thumb | - | `LAYER_BASE @ VIA18` |
-| `VIA_MACRO_19` | Right Thumb | - | `LAYER_BASE @ VIA19` |
 
 ## Reference
 
@@ -435,7 +433,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 ### Shared Keycode Surfaces
 
 - Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`, `LAYER_EXTRA_1`, `LAYER_EXTRA_2`, `LAYER_EXTRA_3`
-- Keymap-local custom keycodes: `RIGHT_THUMB`, `LEFT_THUMB`, `CLICK_SPAM`, `DRAG_WINDOW`
+- Named custom keys: `CUSTOM_KEY_0` (Right Thumb), `CUSTOM_KEY_1` (Left Thumb), `CUSTOM_KEY_2` (Click Spam), `CUSTOM_KEY_3` (Drag Window)
 - PD color overlays: `PD_MODE_SLOT_6`, `PD_MODE_SLOT_7`, `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback locality: `RGB_KEY_HALF`
@@ -480,8 +478,8 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | `key_behavior_step_count` | `49` |
 | `combo_count` | `10` |
 | `via_macro_count` | `64` |
-| `via_macro_non_empty_count` | `13` |
-| `keymap_custom_keycode_count` | `4` |
+| `via_macro_non_empty_count` | `11` |
+| `named_custom_key_count` | `4` |
 | `pd_mode_count` | `8` |
 | `pd_mode_color_count` | `8` |
 | `reusable_led_group_count` | `4` |

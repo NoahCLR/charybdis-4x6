@@ -43,7 +43,7 @@ noah_profile_validator_v1_compatibility_t noah_profile_validator_v1_default_comp
     compatibility.logical_layer_count               = NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS;
     compatibility.supported_pd_mode_mask            = NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL;
     compatibility.via_macro_slot_count              = NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS;
-    compatibility.hardcoded_macro_slot_count        = NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS;
+    compatibility.custom_key_count        = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     compatibility.behavior_limits                   = noah_key_behavior_domain_v1_default_limits();
     compatibility.rgb_limits                        = noah_profile_rgb_v1_default_limits();
     compatibility.rgb_limits.logical_layer_count    = compatibility.logical_layer_count;
@@ -94,7 +94,7 @@ static bool rgb_limits_are_valid(const noah_profile_validator_v1_compatibility_t
 }
 
 static bool compatibility_is_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
-    if (!compatibility || (compatibility->allowed_domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u || (compatibility->required_domain_mask & (uint8_t)~compatibility->allowed_domain_mask) != 0u || compatibility->max_blob_size < NOAH_PROFILE_BLOB_V1_HEADER_SIZE || compatibility->max_blob_size > NOAH_PROFILE_BLOB_V1_MAX_SIZE || compatibility->logical_layer_count > NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS || (compatibility->supported_pd_mode_mask & (uint8_t)~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u || compatibility->via_macro_slot_count > NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS || compatibility->hardcoded_macro_slot_count > NOAH_PROFILE_ACTION_V1_MAX_HARDCODED_MACRO_SLOTS) {
+    if (!compatibility || (compatibility->allowed_domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u || (compatibility->required_domain_mask & (uint8_t)~compatibility->allowed_domain_mask) != 0u || compatibility->max_blob_size < NOAH_PROFILE_BLOB_V1_HEADER_SIZE || compatibility->max_blob_size > NOAH_PROFILE_BLOB_V1_MAX_SIZE || compatibility->logical_layer_count > NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS || (compatibility->supported_pd_mode_mask & (uint8_t)~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u || compatibility->via_macro_slot_count > NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS || compatibility->custom_key_count > NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS) {
         return false;
     }
     return behavior_limits_are_valid(&compatibility->behavior_limits) && rgb_limits_are_valid(compatibility);
@@ -502,8 +502,8 @@ static bool action_reference_is_valid(const noah_profile_validator_v1_t *validat
             return action->operand < NOAH_PROFILE_RGB_V1_MAX_PD_MODES && (validator->compatibility.supported_pd_mode_mask & (1u << action->operand)) != 0u;
         case NOAH_PROFILE_ACTION_V1_VIA_MACRO:
             return action->operand < validator->compatibility.via_macro_slot_count;
-        case NOAH_PROFILE_ACTION_V1_HARDCODED_MACRO:
-            return action->operand < validator->compatibility.hardcoded_macro_slot_count;
+        case NOAH_PROFILE_ACTION_V1_CUSTOM_KEY:
+            return action->operand < validator->compatibility.custom_key_count;
         default:
             return false;
     }

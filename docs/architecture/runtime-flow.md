@@ -78,6 +78,10 @@ before preflight, whichever mode is active by then, and finalizes the token.
 The release of a press the mode did not take is never offered to the mode; it
 stays with the behavior that owns what that press started.
 
+A custom key (`CUSTOM_KEY_0`–`63`) does only what its `key_behaviors[]` row
+says. One without a row reaches the key runtime's last process stage,
+`idle_custom_key`, which consumes its press so the keycode never reaches QMK.
+
 Literal taps go through the ownership ledger (`owned_keycode_tap_literal()`),
 never straight to QMK's `tap_code16()`, whose final unregister would clear a
 usage another owner still holds. A usage already held stays held and its tap
@@ -298,17 +302,15 @@ flowchart TD
     verify --> rgb_invalidate["Post-commit RGB and macro cache invalidation"]
 ```
 
-The former user macros (`MACRO_0`–`15`) are retired: the keys are consumed
-and do nothing, and the profile names VIA macros instead. VIA macros are QMK
-dynamic macro slots with
-source-authored defaults and durable split reconciliation. Macro reset does not
-publish until the authored defaults have seeded successfully. A transfer is
-limited to one storage/digest chunk or one RPC per scan, and a clean generation
-is replicated only after the receiving half verifies and acknowledges the full
-snapshot. The best-effort write-through mirror uses the same callback-mailbox
-boundary: the split thread copies at most one frame, and scan context performs
-the QMK dynamic-keymap or macro storage mutation. A full mailbox may drop a
-mirror frame because durable reconciliation remains the repair path.
+VIA macros are QMK dynamic macro slots with source-authored defaults and
+durable split reconciliation. Macro reset does not publish until the authored
+defaults have seeded successfully. A transfer is limited to one storage/digest
+chunk or one RPC per scan, and a clean generation is replicated only after the
+receiving half verifies and acknowledges the full snapshot. The best-effort
+write-through mirror uses the same callback-mailbox boundary: the split thread
+copies at most one frame, and scan context performs the QMK dynamic-keymap or
+macro storage mutation. A full mailbox may drop a mirror frame because durable
+reconciliation remains the repair path.
 
 Macro text is QMK ASCII, not arbitrary bytes: text positions accept
 `0x01..0x7F`, while zero terminates a VIA slot. Bytes above `0x7F` remain valid

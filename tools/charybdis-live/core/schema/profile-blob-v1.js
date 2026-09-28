@@ -30,9 +30,9 @@ const PROFILE_DOMAIN_VERSIONS = Object.freeze({
 });
 
 const PROFILE_BLOB_V2 = Object.freeze({...PROFILE_BLOB_V1, SCHEMA_MAJOR: 2, MAX_SIZE: 5088});
-// Settings v3 names the VIA macros where v2 carried user macros; a keyboard
-// may still store v2, so both are read.
-const PROFILE_DOMAIN_VERSIONS_V2 = Object.freeze({...PROFILE_DOMAIN_VERSIONS, 16: 2, 64: [2, 3, 4], 80: 1});
+// Settings v3 names the VIA macros where v2 carried user macros, and v5 the
+// custom keys too; a keyboard may still store v2, so all are read.
+const PROFILE_DOMAIN_VERSIONS_V2 = Object.freeze({...PROFILE_DOMAIN_VERSIONS, 16: 2, 64: [2, 3, 4, 5], 80: 1});
 function schemaFormat(major) {
     if (major === 1) return PROFILE_BLOB_V1;
     if (major === 2) return PROFILE_BLOB_V2;
@@ -47,14 +47,15 @@ const PROFILE_ACTION_KINDS = Object.freeze({
     PD_MODE_MOMENTARY: 4,
     PD_MODE_LOCK: 5,
     VIA_MACRO: 6,
-    HARDCODED_MACRO: 7,
+    // Kind 7 named the retired user macros under earlier action vocabularies.
+    CUSTOM_KEY: 7,
 });
 
 const PROFILE_ACTION_LIMITS = Object.freeze({
     maxLogicalLayers: 8,
     maxPdModes: 6,
     maxViaMacroSlots: 64,
-    maxHardcodedMacroSlots: 16,
+    maxCustomKeys: 64,
 });
 
 const MAGIC_BYTES = Buffer.from(PROFILE_BLOB_V1.MAGIC, "ascii");
@@ -277,8 +278,8 @@ function normalizeSemanticAction(action, options = {}) {
         case PROFILE_ACTION_KINDS.VIA_MACRO:
             assertOperandSlot(kind, operand, limits.maxViaMacroSlots, "VIA macro slot");
             break;
-        case PROFILE_ACTION_KINDS.HARDCODED_MACRO:
-            assertOperandSlot(kind, operand, limits.maxHardcodedMacroSlots, "hardcoded macro slot");
+        case PROFILE_ACTION_KINDS.CUSTOM_KEY:
+            assertOperandSlot(kind, operand, limits.maxCustomKeys, "custom key");
             break;
         default:
             throw profileBlobError("UNKNOWN_ACTION_KIND", `Unknown semantic action kind ${kind}.`, {kind});

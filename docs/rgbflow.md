@@ -279,8 +279,8 @@ for a single tap on a multi-tap row is therefore *your press duration + 151*.
 
 Eleven authored rows carry a multi-tap branch, so every single tap on them waits
 that window: `KC_ESC`, `KC_LEFT_GUI`, `LT(LAYER_NAV,KC_SLSH)`, `G(KC_C)`,
-`G(KC_V)`, `MS_BTN3`, `PD_SLOT_5`, `PD_SLOT_1`, `PD_SLOT_0`, `LEFT_THUMB`,
-`RIGHT_THUMB`. A row with only `tap_counts[0]` has no window and fires
+`G(KC_V)`, `MS_BTN3`, `PD_SLOT_5`, `PD_SLOT_1`, `PD_SLOT_0`, `CUSTOM_KEY_1`
+(Left Thumb), `CUSTOM_KEY_0` (Right Thumb). A row with only `tap_counts[0]` has no window and fires
 immediately.
 
 ---
@@ -348,9 +348,9 @@ layer colour: branch 2 `#0006FF` is `LAYER_SYM`, branch 4 `#00FF00` is `LAYER_NU
 and the tap colour `#FFFFFF` is `LAYER_POINTER`. Because every layer here paints
 `KEYS_MAPPED_ON_THIS_LAYER_ONLY` and this stage repaints the whole half, the signal
 is degraded rather than lost: the key you pressed does not change colour, while the
-unmapped keys around it do. The sharpest instance is on `RIGHT_THUMB`, where the
-quadruple-tap branch is exactly the colour that same key's double-tap long hold
-turns the board. Branch 2 also sits only 11° from `LAYER_NAV` `#3C00FF`. Latent:
+unmapped keys around it do. The sharpest instance is on `CUSTOM_KEY_0` (Right
+Thumb), where the quadruple-tap branch is exactly the colour that same key's
+double-tap long hold turns the board. Branch 2 also sits only 11° from `LAYER_NAV` `#3C00FF`. Latent:
 branch 5 `#FF9600` is 7° from `hold_active_color` `#FF6C00` and they would be
 consecutive states in one gesture — no row authors five branches today.
 

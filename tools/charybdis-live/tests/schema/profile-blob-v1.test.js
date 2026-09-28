@@ -175,7 +175,7 @@ test("semantic action decode rejects kinds, flags, operands, truncation, and cap
     assert.throws(() => decodeSemanticAction(Buffer.from("02000800", "hex")), (error) => error.code === "INVALID_OPERAND");
     assert.throws(() => decodeSemanticAction(Buffer.from("04000600", "hex")), (error) => error.code === "INVALID_OPERAND");
     assert.throws(() => decodeSemanticAction(Buffer.from("06004000", "hex")), (error) => error.code === "INVALID_OPERAND");
-    assert.throws(() => decodeSemanticAction(Buffer.from("07001000", "hex")), (error) => error.code === "INVALID_OPERAND");
+    assert.throws(() => decodeSemanticAction(Buffer.from("07004000", "hex")), (error) => error.code === "INVALID_OPERAND");
     assert.throws(() => decodeSemanticAction(Buffer.alloc(3)), (error) => error.code === "INVALID_LENGTH");
     assert.throws(() => encodeSemanticAction({kind: 1, operand: 0x10000}), /16-bit/);
 });
