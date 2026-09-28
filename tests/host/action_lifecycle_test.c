@@ -625,9 +625,27 @@ static void test_qmk_functions_dispatch_as_synthetic_qmk_records(void) {
     CHECK(!noah_action_desc_supports_fallback_hold(noah_action_describe(OSM(MOD_LSFT))));
 }
 
+// An unassigned userspace code sends nothing, whichever way it is dispatched.
+static void test_unassigned_userspace_codes_send_nothing(void) {
+    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + PD_MODE_COUNT, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, QK_USER_MAX};
+    keypos_t       key_pos      = {.row = 1, .col = 2};
+    for (size_t index = 0; index < ARRAY_SIZE(unassigned); index++) {
+        test_reset_stubs();
+        noah_action_tap(unassigned[index]);
+        noah_action_press(key_pos, unassigned[index]);
+        noah_action_release(key_pos, unassigned[index]);
+        CHECK(literal_tap_call.keycode == KC_NO);
+        CHECK(register_code16_call.keycode == KC_NO && unregister_code16_call.keycode == KC_NO);
+        CHECK(owned_register_call.keycode == KC_NO && owned_unregister_call.keycode == KC_NO);
+        CHECK(synthetic_tap_call.keycode == KC_NO && synthetic_record_call.keycode == KC_NO);
+        CHECK(synthetic_qmk_tap_call.keycode == KC_NO && synthetic_qmk_record_call.keycode == KC_NO);
+    }
+}
+
 int main(void) {
     test_descriptor_classifies_dispatch_shapes();
     test_every_action_kind_has_metadata_and_dispatch_coverage();
+    test_unassigned_userspace_codes_send_nothing();
     test_invalid_action_kind_is_rejected_consistently();
     test_tap_handles_layer_lock_and_pd_lock();
     test_oneshot_layer_taps_arm_and_presses_hold();

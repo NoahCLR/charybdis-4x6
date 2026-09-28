@@ -186,6 +186,15 @@ int main(int argc, char **argv) {
     }
     assert(macro - expected == length);
     assert(!memcmp(bytes + 8 + NOAH_SETTINGS_COUNT * 4, names_at, length - (8 + NOAH_SETTINGS_COUNT * 4)));
+    // Pages read backwards, and one twice, give the same names as a forward read.
+    for (uint8_t page = (uint8_t)((length + 24) / 25); page >= 1; page--) {
+        get(page);
+        assert(!memcmp(frame + 7, bytes + (page - 1) * 25, frame[6]));
+    }
+    get(12);
+    assert(!memcmp(frame + 7, bytes + 11 * 25, frame[6]));
+    get(3);
+    assert(!memcmp(frame + 7, bytes + 2 * 25, frame[6]));
 
     // A live v4 domain reads back as stored, with its values overlaid by the
     // live QMK owners, and without a second copy held for the read.

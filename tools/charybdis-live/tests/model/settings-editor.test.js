@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {document} = require("../fixtures/portable-profile");
+const {legacyDocument: document} = require("../fixtures/portable-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {settingsEditorView, editSettings} = require("../../core/model/settings-editor");
 const {buildDeviceModel} = require("../../core/session/device-model");

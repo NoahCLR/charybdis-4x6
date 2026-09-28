@@ -16,7 +16,7 @@ const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../s
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
-const {customKeyNamesOf, decodeSettings, encodeSettings, macroNamesOf} = require("../schema/settings-domain-v1");
+const {MACRO_NAME_VERSION, customKeyNamesOf, decodeSettings, encodeSettings, macroNamesOf, upgradeSettings} = require("../schema/settings-domain-v1");
 const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {singleComboRemovalIndex} = require("./profile-review");
 
@@ -68,13 +68,15 @@ function revertUnits(before, after, units, capabilities) {
             document.macros[index] = a.document.macros[index];
             const settings = domain(PROFILE_DOMAIN_IDS.SETTINGS);
             const name = macroNamesOf(settings.theirs)[index] || "";
+            // An imported profile's older settings have nowhere to keep the
+            // name: they take the version that does, as naming it would.
+            if (name) settings.mine = upgradeSettings(settings.mine, MACRO_NAME_VERSION);
             if (settings.mine.macroNames) settings.mine.macroNames[index] = name;
-            else if (name) throw fail("This macro name cannot be put back on its own.");
         } else if (kind === "customKey") {
             const settings = domain(PROFILE_DOMAIN_IDS.SETTINGS), index = Number(rest);
             const name = customKeyNamesOf(settings.theirs)[index] || "";
+            if (name) settings.mine = upgradeSettings(settings.mine, 5);
             if (settings.mine.customKeyNames) settings.mine.customKeyNames[index] = name;
-            else if (name) throw fail("This custom key name cannot be put back on its own.");
         } else if (kind === "layerName") {
             const settings = domain(PROFILE_DOMAIN_IDS.SETTINGS);
             settings.mine.names[Number(rest)] = settings.theirs.names[Number(rest)];
@@ -130,6 +132,7 @@ function revertUnits(before, after, units, capabilities) {
     for (const [id, {mine}] of open) {
         const row = blob.domains.find(entry => entry.id === id);
         row.payload = codecs[id][1](mine);
+        if (id === PROFILE_DOMAIN_IDS.SETTINGS && mine.formatVersion) row.version = mine.formatVersion;
     }
     if (open.size) document.profile = encodeProfileBlob(blob).toString("base64");
     return document;

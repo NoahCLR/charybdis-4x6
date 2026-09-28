@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {document} = require("../fixtures/portable-profile");
+const {legacyDocument: document} = require("../fixtures/portable-profile");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {macroEditorView, editMacro, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");

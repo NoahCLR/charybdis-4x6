@@ -682,6 +682,28 @@ static void test_action_placement_rules(void) {
     }
 }
 
+// A userspace code no block assigns does nothing and goes nowhere: not a
+// behaviour's key, a step or a combo output. The blocks' last codes keep
+// their kinds.
+static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
+    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + PD_MODE_COUNT, NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED - 1, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, QK_USER_MAX};
+    const noah_action_placement_t placements[] = {NOAH_ACTION_PLACEMENT_KEY, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT};
+    for (uint8_t i = 0; i < ARRAY_SIZE(unassigned); i++) {
+        CHECK(noah_action_describe(unassigned[i]).kind == NOAH_ACTION_KIND_UNASSIGNED_USER);
+        for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++)
+            CHECK(!noah_action_supported_at(unassigned[i], placements[p]));
+    }
+    CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY);
+    CHECK(noah_action_describe(PD_SLOT_4).kind == NOAH_ACTION_KIND_PD_MODE_HOLD);
+    CHECK(noah_action_describe(PD_SLOT_4_LOCK).kind == NOAH_ACTION_KIND_PD_MODE_LOCK);
+    CHECK(noah_action_describe(LOCK_LAYER(LAYER_COUNT - 1)).kind == NOAH_ACTION_KIND_LAYER_LOCK);
+    CHECK(noah_action_describe(QK_USER - 1).kind != NOAH_ACTION_KIND_UNASSIGNED_USER);
+
+    const noah_profile_action_v1_t stray = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = NOAH_KEYCODE_USERSPACE_END};
+    CHECK(!noah_profile_action_placement_v1_supported(&stray, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(!noah_profile_action_placement_v1_supported(&stray, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
+}
+
 // The keyboard's check of a saved profile asks the same rules of a Profile
 // Wire action, placement for placement.
 static void test_saved_profile_placement_matches_the_rules(void) {
@@ -708,6 +730,7 @@ static void test_saved_profile_placement_matches_the_rules(void) {
 int main(void) {
     test_action_placement_rules();
     test_saved_profile_placement_matches_the_rules();
+    test_unassigned_userspace_codes_are_refused_everywhere();
     test_action_descriptor_classifies_common_actions();
     test_action_dispatch_keeps_runtime_default_policy();
     test_explicit_action_emit_can_skip_fallback_hold_settlement();

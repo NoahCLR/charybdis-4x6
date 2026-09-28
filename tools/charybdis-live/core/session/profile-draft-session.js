@@ -81,6 +81,9 @@ const DRAFT_EDITS = new Set([...PD_EDITS, ...RGB_EDITS, ...COMBO_EDITS, ...BEHAV
 class ProfileDraftSession {
     constructor(snapshot, deviceId, capabilities, connectionToken = null) {
         if (!deviceId || snapshot.incomplete || capabilities.compiledLayerCount !== 8) throw fail("Read a complete eight-layer profile before editing.");
+        // Every edit reads or writes keycodes, which only firmware numbering its
+        // keys as this app does can be trusted with.
+        if (!knownActionAbi(capabilities.actionAbiDigest)) throw fail("This keyboard's firmware numbers its keys differently from this app. Update both halves before editing.");
         validateSnapshot(snapshot.document, capabilities);
         this.deviceId = deviceId;
         this.connectionToken = connectionToken ?? null;

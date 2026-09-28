@@ -188,14 +188,21 @@ function upgradeKeycodeBlocks(source) {
         return code;
     };
     result.layers = source.layers.map(layer => layer.map(native));
-    const action = a => {
+    const renumber = a => {
         if (a.kind === 7) throw fail("A behaviour or combo sends a retired user macro, which this firmware no longer has.");
-        if (a.kind !== 1) return;
-        a.operand = native(a.operand);
-        const custom = customKeyOfCode(a.operand);
-        if (custom !== undefined) {a.kind = 7; a.operand = custom;}
+        if (a.kind === 1) a.operand = native(a.operand);
     };
-    walkActions(value.behaviors, action); walkActions(value.combos, action);
+    walkActions(value.behaviors, renumber); walkActions(value.combos, renumber);
+    // A behaviour names its custom key by kind, as the keyboard encodes it;
+    // combos keep native keycodes, as the keyboard reads them back. A step
+    // that sent a keymap key did nothing and has no counterpart here.
+    for (const row of value.behaviors.rows) {
+        const custom = row.target.kind === 1 ? customKeyOfCode(row.target.operand) : undefined;
+        if (custom !== undefined) row.target = {...row.target, kind: 7, operand: custom};
+        walkActions({steps: row.steps}, a => {
+            if (a.kind === 1 && customKeyOfCode(a.operand) !== undefined) throw fail(`A behaviour step sends CUSTOM_KEY_${customKeyOfCode(a.operand)}, which a step cannot send in this firmware. Remove that step on the older firmware and take the backup again.`);
+        });
+    }
     const options = actionLimitsFor(2);
     result.actionAbiDigest = ACTION_ABI;
     result.profile = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [
@@ -204,6 +211,18 @@ function upgradeKeycodeBlocks(source) {
         {id: 80, version: 1, payload: encodePdDomain(value.pdModes)},
     ]}).toString("base64");
     return result;
+}
+
+// A profile with a renamed macro or custom key. Every name fits the settings
+// domain, but the whole profile shares one ceiling, so a long name can meet it
+// once behaviours, combos and other names have used the room.
+function encodeNamedProfile(profile) {
+    try {
+        return encodeProfileBlob(profile);
+    } catch (error) {
+        if (error.code !== "CAPACITY_EXCEEDED") throw error;
+        throw Object.assign(new Error("The keyboard's profile is full, so this name does not fit. Shorten another name, or remove a behaviour or combo."), {code: "PROFILE_FULL"});
+    }
 }
 
 function walkActions(value, action) {
@@ -249,6 +268,9 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // the saved base HSV as its own all-key colour after it becomes an overlay.
 function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     if (document.layers?.length !== 8) throw fail("Layer ordering becomes available after the eight-layer update.");
+    // Renumbering reads every layer key, and older firmware numbered them
+    // differently.
+    if (document.actionAbiDigest !== ACTION_ABI) throw fail("Layer ordering needs the firmware this app was made for. Update both halves first.");
     const validated = validateSnapshot(document), result = JSON.parse(JSON.stringify(document));
     if (!Array.isArray(order) || order.length !== 8 || new Set(order).size !== 8 || order.some(id => !Number.isInteger(id) || id < 0 || id >= 8)) throw fail("Include every layer once.");
     const remap = []; order.forEach((old, next) => {remap[old] = next;});
@@ -320,4 +342,4 @@ function summaryOf(value) {
         macros: value.document.macros.filter(Boolean).length + (value.settings.macros || []).filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {comboTableOf, upgradePdSnapshot, upgradeKeycodeBlocks, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {encodeNamedProfile, comboTableOf, upgradePdSnapshot, upgradeKeycodeBlocks, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

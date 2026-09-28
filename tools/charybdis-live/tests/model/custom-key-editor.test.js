@@ -45,6 +45,21 @@ test("a macro name edit keeps the v5 custom-key names", () => {
     assert.equal(macroEditorView(current).viaMacros[3].name, "OCR Copy");
 });
 
+test("an imported profile without custom-key names can take one name back from the keyboard", () => {
+    let keyboard = snapshot(pdDocument());
+    keyboard = snapshot(editCustomKey(keyboard, {keycode: "CUSTOM_KEY_0", name: "Right Thumb", expectedFingerprint: keyboard.fingerprint}, capabilities));
+    keyboard = snapshot(editCustomKey(keyboard, {keycode: "CUSTOM_KEY_1", name: "Left Thumb", expectedFingerprint: keyboard.fingerprint}, capabilities));
+    const imported = snapshot(pdDocument());
+    assert.equal(validateSnapshot(imported.document).settings.formatVersion, 2, "a backup from before the custom keys");
+    assert.deepEqual(profileReview(keyboard, imported).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:0", "customKey:1"]);
+    const kept = snapshot(revertUnits(keyboard, imported, new Set(["customKey:0"]), capabilities));
+    const settings = validateSnapshot(kept.document, capabilities).settings;
+    assert.equal(settings.formatVersion, 5);
+    assert.deepEqual(settings.customKeyNames.slice(0, 2), ["Right Thumb", ""]);
+    assert.deepEqual(macroNamesOf(settings), macroNamesOf(validateSnapshot(imported.document).settings), "the imported macro names stay");
+    assert.deepEqual(profileReview(keyboard, kept).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:1"]);
+});
+
 test("wrong keys, stale drafts, long names and older firmware are refused", () => {
     const current = snapshot(pdDocument());
     const message = {keycode: "CUSTOM_KEY_0", name: "Thumb", expectedFingerprint: current.fingerprint};
@@ -56,4 +71,10 @@ test("wrong keys, stale drafts, long names and older firmware are refused", () =
     assert.equal(customKeyEditorView(current, older), null, "no custom keys on firmware without the keycode blocks");
     assert.throws(() => editCustomKey(current, message, older), /keycode blocks/);
     assert.equal(editCustomKey(current, {...message, name: ""}, capabilities), validateSnapshot(current.document, capabilities).document, "an unchanged name is no edit");
+});
+
+test("a name that meets the profile's ceiling says the profile is full", () => {
+    const {encodeNamedProfile} = require("../../core/model/portable-profile");
+    assert.throws(() => encodeNamedProfile({schema: {major: 2, minor: 0}, domains: [{id: 0x40, version: 5, payload: Buffer.alloc(5100)}]}),
+        error => error.code === "PROFILE_FULL" && /profile is full/.test(error.message));
 });

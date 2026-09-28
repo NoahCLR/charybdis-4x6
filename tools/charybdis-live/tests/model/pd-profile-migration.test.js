@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {document} = require("../fixtures/portable-profile");
+const {legacyDocument: document} = require("../fixtures/portable-profile");
 const pdFixture = require("../../../../tests/fixtures/pd_mode_domain_v1.json");
 const {upgradePdSnapshot, validateSnapshot, fingerprint} = require("../../core/model/portable-profile");
 const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");

@@ -58,10 +58,6 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
     return 0;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
-    (void)action;
-    return false;
-}
 
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
     (void)layer;
@@ -83,9 +79,20 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return true;
 }
 
+// Lock keycodes resolve as the firmware's registry does, so a lock placed as a
+// step is validated as a pointing lock rather than as a plain keycode.
 const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
-    (void)action;
+    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
+        if (pd_modes[i].lock_action == action) {
+            return &pd_modes[i];
+        }
+    }
+
     return NULL;
+}
+
+bool is_pd_mode_lock_action(uint16_t action) {
+    return pd_mode_lock_action_lookup(action) != NULL;
 }
 
 bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
@@ -225,6 +232,13 @@ static void export_authored_via(void) {
 static void check_authored_names(void) {
     for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
         const char *name = via_macro_names[slot];
+        CHECK(memchr(name, '\0', NOAH_MACRO_NAME_SIZE) != NULL);
+        for (const char *c = name; *c; c++)
+            CHECK(*c >= 0x20 && *c <= 0x7e);
+    }
+    // Custom-key names follow the macro rule: plain ASCII, as settings v5 stores them.
+    for (uint8_t slot = 0; slot < CUSTOM_KEY_SLOT_COUNT; slot++) {
+        const char *name = custom_key_names[slot];
         CHECK(memchr(name, '\0', NOAH_MACRO_NAME_SIZE) != NULL);
         for (const char *c = name; *c; c++)
             CHECK(*c >= 0x20 && *c <= 0x7e);

@@ -372,7 +372,7 @@ expressions. They are not firmware keycode symbols.
 | PD hold | `0x7e80..0x7e9f` | 8 (`0x7e80..0x7e87`) |
 | PD lock | `0x7ea0..0x7ebf` | 8 (`0x7ea0..0x7ea7`) |
 | Layer lock | `0x7ec0..0x7edf` | 8 (`0x7ec0..0x7ec7`) |
-| Unassigned | `0x7ee0..0x7eff` | — |
+| Unassigned | `0x7ee0..0x7fff` | — |
 
 Profiles store pointing and layer-lock actions by slot (action kinds 2–5), so
 the blocks change only raw keycodes: VIA layouts and custom keys. The blocks

@@ -2201,7 +2201,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
         "### Shared Keycode Surfaces",
         "",
         f"- Layers: {', '.join(f'`{layer}`' for layer in config['layers'])}",
-        f"- Named custom keys: {', '.join(f"`{key['keycode']}` ({key['name']})" for key in profile['custom_keys']) or '`none`'}",
+        "- Named custom keys: " + (", ".join(f"`{key['keycode']}` ({key['name']})" for key in profile["custom_keys"]) or "`none`"),
     ]
     if features["rgb_pd_mode_feedback_enabled"]:
         pd_color_modes = ", ".join(f"`{row['pointing_mode']}`" for row in rgb["pd_mode_colors"]) or "`none`"

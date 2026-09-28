@@ -115,7 +115,7 @@ _Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA mac
 //   0x7e80–0x7e9f  PD_SLOT_n            hold pointing slot n    (32 reserved)
 //   0x7ea0–0x7ebf  PD_SLOT_n_LOCK       toggle pointing slot n  (32 reserved)
 //   0x7ec0–0x7edf  LOCK_LAYER(n)        toggle layer n's lock   (32 reserved)
-//   0x7ee0–0x7eff  unassigned
+//   0x7ee0–0x7fff  unassigned: inert, refused as a step or combo output
 //
 // A custom key does nothing by itself: give it a key_behaviors[] row and place
 // it on a layer or as a combo output. Its name comes from CUSTOM_KEYS in

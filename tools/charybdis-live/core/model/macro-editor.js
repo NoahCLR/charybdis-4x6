@@ -1,7 +1,7 @@
 "use strict";
 
-const {decodedOf, macroBankBytes, validateSnapshot} = require("./portable-profile");
-const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
+const {decodedOf, encodeNamedProfile, macroBankBytes, validateSnapshot} = require("./portable-profile");
+const {decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {SETTINGS, asciiName, encodeSettings, macroNamesOf, upgradeSettings} = require("../schema/settings-domain-v1");
 const {macroKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
 const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
@@ -67,7 +67,7 @@ function editMacro(snapshot, message, capabilities) {
         const settings = upgradeSettings(value.settings);
         settings.macroNames[index] = message.name.trim();
         const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, version: settings.formatVersion, payload: encodeSettings(settings)} : domain);
-        document.profile = encodeProfileBlob({schema: {major: value.document.version, minor: 0}, domains}).toString("base64");
+        document.profile = encodeNamedProfile({schema: {major: value.document.version, minor: 0}, domains}).toString("base64");
     }
     validateSnapshot(document, capabilities);
     return document;

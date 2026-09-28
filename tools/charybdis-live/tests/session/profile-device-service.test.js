@@ -357,3 +357,11 @@ test("request id allocation wraps from 255 to 1 without emitting zero", () => {
     assert.deepEqual([ids.next(), ids.next(), ids.next(), ids.next()], [0xfe, 0xff, 1, 2]);
     assert.throws(() => new ProfileRequestIdSequence(0), /1 through 255/);
 });
+
+test("the layout read counts only keys the app cannot name", () => {
+    const {unnamedKeyCount} = require("../../core/session/profile-device-service");
+    const keycodes = require("../../core/data/keycode-catalog");
+    const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
+    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x1d3fcacc}), 2, "an unused pointing slot and a code past the blocks");
+    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x61072732}), 5, "older firmware's user keys are not read as blocks");
+});

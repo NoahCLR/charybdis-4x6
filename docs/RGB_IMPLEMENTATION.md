@@ -199,8 +199,8 @@ flowchart TD
 ```
 
 `keeps_registered_feedback` comes from the action kind table. It is true for
-`LITERAL`, `MACRO`, `QMK_BEHAVIOR` and `KEYMAP_CUSTOM`, and false for every layer
-and pointer-mode kind. That single flag is why a held modifier flashes and a held
+`LITERAL`, `MACRO`, `QMK_BEHAVIOR`, `QMK_FUNCTION` and `CUSTOM_KEY`, and false for
+every layer and pointer-mode kind and for unassigned userspace codes. That single flag is why a held modifier flashes and a held
 momentary layer does not.
 
 Pulses are a separate one-shot channel lasting one

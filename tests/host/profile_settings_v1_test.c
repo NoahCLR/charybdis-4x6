@@ -7,10 +7,10 @@ static unsigned applied;
 void            noah_qmk_portable_apply(void) {
     applied++;
 }
-static uint8_t  bytes[NOAH_SETTINGS_V4_MAX_SIZE + 1];
+static uint8_t  bytes[NOAH_SETTINGS_V5_MAX_SIZE + 1];
 static uint16_t length;
 // A legacy domain carries 16 empty user-macro records; v3 carries 64 empty
-// VIA macro names in their place.
+// VIA macro names in their place, and v5 64 empty custom-key names after them.
 static void defaults_as(uint8_t version) {
     const uint32_t values[28] = {200, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 100, 0, 0, 400, 400, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0x76543210};
     memset(bytes, 0, sizeof(bytes));
@@ -18,7 +18,8 @@ static void defaults_as(uint8_t version) {
     bytes[1] = 8;
     bytes[2] = 28;
     bytes[3] = version >= 3 ? 64 : 16;
-    length   = version >= 3 ? NOAH_SETTINGS_FIXED_SIZE + 64 : NOAH_SETTINGS_FIXED_SIZE + 32;
+    bytes[4] = version >= 5 ? NOAH_SETTINGS_CUSTOM_KEY_NAMES : 0;
+    length   = version >= 5 ? NOAH_SETTINGS_FIXED_SIZE + 128 : version >= 3 ? NOAH_SETTINGS_FIXED_SIZE + 64 : NOAH_SETTINGS_FIXED_SIZE + 32;
     for (uint8_t i = 0; i < 28; i++)
         for (uint8_t j = 0; j < 4; j++)
             bytes[8 + i * 4 + j] = values[i] >> (j * 8);
@@ -71,11 +72,11 @@ static void test_macro_names(void) {
     length--; // only 63 names
     assert(!valid());
 }
-// Every one of the 64 names at `size` bytes of `fill`.
+// Every name (64, or 128 with v5's custom keys) at `size` bytes of `fill`.
 static void names_of(uint8_t version, uint8_t size, char fill) {
     defaults_as(version);
     length = NOAH_SETTINGS_FIXED_SIZE;
-    for (uint8_t slot = 0; slot < 64; slot++) {
+    for (uint8_t slot = 0; slot < (version >= 5 ? 128 : 64); slot++) {
         bytes[length++] = size;
         memset(bytes + length, fill, size);
         length += size;
@@ -110,6 +111,46 @@ static void test_macro_names_v4(void) {
     assert(!valid());
     names_of(3, 15, 'A');
     assert(length <= NOAH_SETTINGS_V3_MAX_SIZE && valid());
+}
+// v5 adds 64 custom-key names after the macro names, each under the v4 rule,
+// so the domain's worst case is 128 names of 20 characters.
+static void test_custom_key_names_v5(void) {
+    defaults_as(5);
+    assert(valid() && valid_as(5) && !valid_as(4));
+    bytes[4] = 0; // v5 names its custom-key count
+    assert(!valid());
+    defaults_as(4);
+    bytes[4] = NOAH_SETTINGS_CUSTOM_KEY_NAMES; // v4 has none
+    assert(!valid());
+    defaults_as(5);
+    length = NOAH_SETTINGS_FIXED_SIZE + 64; // the macro names alone
+    assert(!valid());
+    names_of(5, 20, 'A');
+    assert(length == NOAH_SETTINGS_V5_MAX_SIZE && length == 3000);
+    assert(valid());
+    uint16_t custom = NOAH_SETTINGS_FIXED_SIZE + 64 * 21; // the first custom-key record
+    bytes[custom + 1] = 0xc3;
+    assert(!valid());
+    bytes[custom + 1] = 0x07;
+    assert(!valid());
+    names_of(5, 20, 'A');
+    bytes[custom] = 21; // one name past 20
+    assert(!valid());
+    // A v5 domain publishes and reads back whole.
+    defaults_as(5);
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 64] = 2;
+    memmove(bytes + NOAH_SETTINGS_FIXED_SIZE + 67, bytes + NOAH_SETTINGS_FIXED_SIZE + 65, 63);
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 65] = 'O';
+    bytes[NOAH_SETTINGS_FIXED_SIZE + 66] = 'K';
+    length += 2;
+    assert(valid());
+    noah_effective_profile_snapshot_t view = {0};
+    view.reader                            = noah_profile_reader_from_memory(bytes, length);
+    view.profile.domain_mask               = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
+    view.profile.settings                  = (noah_profile_settings_v1_view_t){0, length};
+    noah_effective_settings_invalidate(NULL, 4, view.identity, view.identity, &view);
+    assert(noah_effective_settings_length() == length);
+    assert(noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 64) == 2 && noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 66) == 'K');
 }
 #endif
 int main(void) {
@@ -165,6 +206,7 @@ int main(void) {
 #ifdef NOAH_PD_PROFILE_ENABLE
     test_macro_names();
     test_macro_names_v4();
+    test_custom_key_names_v5();
     // A v3 domain's names read back as stored.
     defaults_as(3);
     bytes[NOAH_SETTINGS_FIXED_SIZE + 5]  = 2;

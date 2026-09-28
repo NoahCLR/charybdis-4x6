@@ -1,14 +1,14 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
-const {document} = require("../fixtures/portable-profile");
+const {document, legacyDocument} = require("../fixtures/portable-profile");
 const {options} = require("../fixtures/keyboard-options");
 const {fingerprint, reorderLayers, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {settingsEditorView} = require("../../core/model/settings-editor");
 const {behaviorRowsForView} = require("../../core/session/device-profile-view");
 function fixture() {
     const value = document(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}, options:options()};
-    const caps = {compiledLayerCount:8,supportedDomainMask:15,actionAbiDigest:value.actionAbiDigest};
+    const caps = {compiledLayerCount:8,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest};
     return {snapshot, caps, draft:new ProfileDraftSession(snapshot, "board", caps)};
 }
 function settings(draft, id, updates) {
@@ -17,6 +17,10 @@ function settings(draft, id, updates) {
         fields:section.fields.map(field => field.kind === "toggle" ? {macro:field.macro, enabled:updates[field.macro] ?? field.enabled} : {macro:field.macro,value:updates[field.macro] ?? field.value})};
 }
 function stage(draft, edit) {return draft.stage({...edit,draftRevision:draft.revision});}
+test("a draft opens only on firmware whose key numbering the app knows", () => {
+    const value = legacyDocument(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}};
+    assert.throws(() => new ProfileDraftSession(snapshot, "board", {compiledLayerCount:8, supportedDomainMask:15, actionAbiDigest:value.actionAbiDigest}), /numbers its keys differently/);
+});
 test("review blockers stop Apply before a recovery copy or device write", async () => {
     const {snapshot, caps} = fixture();
     snapshot.limits.brightnessMax = 100;

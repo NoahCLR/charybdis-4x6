@@ -22,10 +22,11 @@ behavior. The UI must explain every intentional non-live boundary.
 | Hold mode and repeat rate | Milestone A behavior policy | 04 | behavior validator and lifecycle runtime |
 | `keymaps[][]` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic keymap/VIA reconciliation |
 | `VIA_MACROS` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic macro storage |
-| Macro names | Portable settings domain `0x40` v4, 64 names of up to 20 ASCII characters each; replaces the retired user macros (v2's 16 instruction streams and v3's shared 23-byte names are still read) | 06 | profile schema |
+| Macro names | Portable settings domain `0x40` v4 onward, 64 names of up to 20 ASCII characters each; replaces the retired user macros (v2's 16 instruction streams and v3's shared 23-byte names are still read) | 06 | profile schema |
+| Custom-key names | Portable settings domain `0x40` v5, 64 names of up to 20 ASCII characters each after the macro names; `CUSTOM_KEYS` in C is the compiled default | 06 | profile schema |
 | `COMBOS` | GET `0x06` readout; optional live domain `0x30` for rows, timing and matching flags | 07 | combo validator/provider |
 | Logical layer names/order | Eight-layer bank; portable names and reference-preserving order | 07 | whole-profile cross-reference validator |
-| Custom-keycode enum and handler code | Executable firmware/action ABI | flash required | firmware build |
+| Userspace keycode blocks and the 64 custom-key slots | Executable firmware/action ABI; what a custom key does is its `key_behaviors[]` row | flash required | firmware build |
 
 ## `rgb_config.c`
 

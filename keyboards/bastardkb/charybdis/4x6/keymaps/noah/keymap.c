@@ -185,7 +185,7 @@
 // Group the key list in parentheses so 2-key and 3+-key combos read the same way.
 // COMBO follows COMBO_TERM; COMBO_WINDOW gives that combo its own window.
 //
-// Valid combo outputs include plain keycodes, hardcoded macros (MACRO_n),
+// Valid combo outputs include plain keycodes, custom keys (CUSTOM_KEY_n),
 // VIA macros (VIA_MACRO_n), LOCK_LAYER(...), explicit pd-mode lock keycodes
 // such as PD_SLOT_4_LOCK, and keycodes that also have rows in key_behaviors[].
 //

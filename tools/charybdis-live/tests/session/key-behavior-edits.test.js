@@ -5,7 +5,7 @@ const {bytes, capabilities} = require("../fixtures/device-profile");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {behaviorRowsForView} = require("../../core/session/device-profile-view");
-const {actionName} = require("../../core/schema/actions");
+const {ACTION_ABI, actionName} = require("../../core/schema/actions");
 const {editDeviceProfile} = require("../../core/session/device-profile-edits");
 const {editKeyBehaviors} = require("../../core/session/key-behavior-edits");
 
@@ -63,12 +63,15 @@ test("simple additions and all hold modes produce canonical rows", () => {
 });
 
 test("native aliases update existing semantic targets without duplicating or renumbering them", () => {
+    // 0x7E80 is pointing slot 0 in the firmware's keycode blocks; the bridge
+    // fixture's own firmware numbered it differently.
+    const current = {...capabilities, actionAbiDigest: ACTION_ABI};
     const row = views.find(row => row.keycode === "PD_SLOT_0");
-    const result = edit({type: "saveBehavior", behavior: {...row, keycode: "0x7E80", tapHoldTerm: "125"}});
+    const result = edit({type: "saveBehavior", behavior: {...row, keycode: "0x7E80", tapHoldTerm: "125"}}, current);
     assert.equal(decodeKeyBehaviorDomain(result).rowCount, original.rowCount);
     assert.equal(rowFor(result, "PD_SLOT_0").target.kind, 4);
     assert.equal(rowFor(result, "PD_SLOT_0").tapHoldTerm, 125);
-    assert.throws(() => edit({type: "addBehavior", behavior: {...form(), keycode: "0x7E80"}}), /already/);
+    assert.throws(() => edit({type: "addBehavior", behavior: {...form(), keycode: "0x7E80"}}, current), /already/);
     const anchored = views.find(row => row.keepsAutoMouseAnchored);
     const {keepsAutoMouseAnchored, ...withoutFlag} = anchored;
     assert.deepEqual(edit({type: "saveBehavior", behavior: withoutFlag}), payload);

@@ -142,8 +142,11 @@ The 64 custom keys (`CUSTOM_KEY_n`, action kind 7) are named here, the way the
 macros are: version 5 keeps version 4's layout and follows the 64 macro-name
 records with 64 custom-key name records in the same form, 0–20 bytes of
 printable ASCII each. Header byte 4, zero before, counts them (`64`). The
-ceiling is 3,000 bytes (312 + 128 × 21), so every name can be full length at
-once. A custom key does only what its behaviour row says; its name is profile
+ceiling is 3,000 bytes (312 + 128 × 21), so every name fits the domain at full
+length. The whole profile still shares the 5,088-byte ceiling: a profile with 37
+behaviours, 10 combos and eight pointing slots leaves room for about 120
+full-length names, and a name edit that meets the ceiling is refused as "the
+profile is full" rather than shortened. A custom key does only what its behaviour row says; its name is profile
 data for the app, which the firmware never reads.
 
 Firmware with the userspace keycode blocks (Profile Wire feature bit 16)

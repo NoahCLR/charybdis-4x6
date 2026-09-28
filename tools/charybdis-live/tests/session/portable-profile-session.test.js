@@ -2,7 +2,7 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {captureProfile, restoreProfile, fingerprint, summary, validateSnapshot} = require("../../core/session/portable-profile-session");
-const {document} = require("../fixtures/portable-profile");
+const {legacyDocument: document} = require("../fixtures/portable-profile");
 const pd = require("../fixtures/pd-profile");
 const {changedRanges, viaStorageDigest} = require("../../core/protocol/via-storage-v1");
 const {decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");

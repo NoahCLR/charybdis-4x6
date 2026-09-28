@@ -499,6 +499,8 @@ streams from the effective settings cache instead of a second copy, saving
 1,400 bytes of static RAM per half; see
 [memory budgets](architecture/memory-budgets.md#retired-user-macros-and-streamed-settings-readback--2026-09-23)
 and [portable profile](architecture/portable-profile-v1.md#version-3-via-macro-names-instead-of-user-macros).
+D-L42 later renumbered every userspace keycode and gave action kind 7 to custom
+keys, under a new action ABI digest; the `MACRO_n` numbers are gone.
 
 ### D-L26 — Macro slots share one visible memory, and every slot says what fits
 

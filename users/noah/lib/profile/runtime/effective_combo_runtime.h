@@ -31,7 +31,7 @@ combo_t *noah_effective_combo_get(uint16_t index);
 bool     noah_effective_combo_valid(void);
 uint16_t noah_effective_combo_term(uint16_t index);
 // The window a combo without its own follows, and whether a combo does.
-// Compiled combos all follow COMBO_TERM.
+// A compiled COMBO follows COMBO_TERM; a COMBO_WINDOW row has its own.
 uint16_t noah_effective_combo_default_term(void);
 bool     noah_effective_combo_follows_default(uint16_t index);
 uint16_t noah_effective_combo_hold_term(void);

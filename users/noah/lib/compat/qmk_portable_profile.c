@@ -177,12 +177,20 @@ static uint8_t settings_byte(uint16_t offset) {
     }
 #if NOAH_PROFILE_SETTINGS_VERSION >= 3u
     offset -= NOAH_SETTINGS_FIXED_SIZE;
-    for (uint8_t record = 0; record < NAME_RECORDS; record++) {
+    // Reads run forward, so resume from the record the last byte was in; the
+    // authored names never change, so the cursor stays valid across reads.
+    static uint8_t  cursor_record;
+    static uint16_t cursor_start;
+    if (offset < cursor_start) cursor_record = 0u, cursor_start = 0u;
+    for (uint8_t record = cursor_record; record < NAME_RECORDS; record++) {
         uint8_t length = record_name_length(record);
-        if (offset == 0u) return length;
-        if (offset <= length) return (uint8_t)record_name(record)[offset - 1u];
-        offset -= length + 1u;
+        if (offset - cursor_start <= length) {
+            cursor_record = record;
+            return offset == cursor_start ? length : (uint8_t)record_name(record)[offset - cursor_start - 1u];
+        }
+        cursor_start += length + 1u;
     }
+    cursor_record = NAME_RECORDS;
 #endif
     return 0u;
 }

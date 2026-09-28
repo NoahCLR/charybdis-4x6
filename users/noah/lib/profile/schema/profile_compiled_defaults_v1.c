@@ -407,7 +407,8 @@ static bool rgb_group_is_first(uint8_t index, const uint8_t bitmap[NOAH_PROFILE_
 static noah_profile_compiled_v1_result_t rgb_group_count(uint8_t *count, noah_profile_compiled_v1_error_t *error) {
     uint8_t rows   = rgb_group_row_count();
     uint8_t unique = 0u;
-    if (!count || rows > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
+    // Saved groups are groups, not stage rows: each limit bounds its own rows.
+    if (!count || saved_led_group_count > NOAH_PROFILE_RGB_V1_MAX_GROUPS || rows - saved_led_group_count > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
     for (uint8_t index = 0u; index < rows; index++) {
         uint8_t bitmap[NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE];
         if (!rgb_group_bitmap(rgb_group_row_at(index), bitmap)) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, index, UINT8_MAX);

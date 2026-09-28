@@ -291,6 +291,21 @@ bool noah_action_kind_match_custom_key(uint16_t action, pd_mode_mask_t pd_mode, 
     return true;
 }
 
+// A userspace code no block assigns (an unused pointing slot, a layer lock past
+// the bank, anything after the blocks) does nothing wherever it is dispatched,
+// and is refused as a behaviour step or combo output. Every assigned family
+// matches first.
+bool noah_action_kind_match_unassigned_user(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
+    (void)pd_mode;
+
+    if (!(out && action >= QK_USER && action <= QK_USER_MAX)) {
+        return false;
+    }
+
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_UNASSIGNED_USER, action, 0, 0);
+    return true;
+}
+
 bool noah_action_kind_match_pd_mode_hold(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
     if (!(out && pd_mode != 0)) {
         return false;

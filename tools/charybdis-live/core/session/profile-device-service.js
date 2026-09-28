@@ -2,7 +2,9 @@
 
 const {baseLighting} = require("../model/settings-editor");
 const {profilePlacementProblem} = require("../model/profile-placement");
-const {actionLimitsFor} = require("../schema/actions");
+const {actionLimitsFor, knownActionAbi} = require("../schema/actions");
+const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
+const {pdBindingOfCode} = require("../data/pd-bindings");
 const {layerName} = require("../model/vocabulary");
 const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {readSettingsLimits} = require("../protocol/portable-profile-v1");
@@ -213,13 +215,11 @@ class ProfileDeviceService {
                     })),
                 })),
             };
-            const unknown = this.layout.layers
-                .flatMap((entry) => entry.keys)
-                .filter((key) => !key.resolved.known).length;
+            const unknown = unnamedKeyCount(this.layout.layers, this.capabilities);
             this.addDiagnostic(
                 unknown === 0
                     ? `Read ${layerCount} layers from the keyboard.`
-                    : `Read ${layerCount} layers; ${unknown} keycodes are not in the vendored catalog.`
+                    : `Read ${layerCount} layers; ${unknown} keycodes are ones this app cannot name.`
             );
         });
     }
@@ -432,7 +432,10 @@ class ProfileDeviceService {
                 ? this.portable
                 : undefined;
             const limits = cachedBase?.limits || await readSettingsLimits(this.connection, this.requestIds);
-            const lighting = baseLighting(validateSnapshot(document, this.capabilities).settings.values);
+            // What is checked is what would be written: an older backup as
+            // this keyboard numbers its keys.
+            const target = validateSnapshot(document, this.capabilities);
+            const lighting = baseLighting(target.settings.values);
             const brightness = lighting.brightness;
             if (limits && brightness > limits.brightnessMax) throw Object.assign(new Error(`This profile's brightness exceeds the keyboard's reported limit of ${limits.brightnessMax}. Lower the brightness before restoring it.`), {code: "SETTINGS_LIMIT_EXCEEDED"});
             const keyboardOptions = cachedBase?.options || await readKeyboardOptions(this.connection, this.requestIds);
@@ -440,7 +443,7 @@ class ProfileDeviceService {
             if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
             // The keyboard refuses a profile whose actions sit where it cannot
             // run them; say which one before anything is sent.
-            const misplaced = profilePlacementProblem(Buffer.from(document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? 8,
+            const misplaced = profilePlacementProblem(Buffer.from(target.document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? 8,
                 behaviorQmkFunctions: Boolean(this.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)});
             if (misplaced) throw Object.assign(new Error(`${misplaced} Fix it before saving this profile.`), {code: "PLACEMENT_REFUSED"});
             started = true;
@@ -800,6 +803,15 @@ function cloneCandidateStatus(status) {
     };
 }
 
+// Keys neither QMK's catalogue nor the keyboard's own blocks name. The
+// catalogue ends at QK_USER_31; the blocks count only on the ABI the app knows.
+function unnamedKeyCount(layers, capabilities) {
+    const ownBlocks = knownActionAbi(capabilities?.actionAbiDigest);
+    const named = ({keycode, resolved}) => resolved.known
+        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdBindingOfCode(keycode) !== undefined);
+    return layers.flatMap((entry) => entry.keys).filter((key) => !named(key)).length;
+}
+
 function candidateStateName(state) {
     return CANDIDATE_STATE_NAMES[state] || `UNKNOWN_${state}`;
 }
@@ -815,4 +827,5 @@ module.exports = {
     evaluateProfileCompatibility,
     evaluateLiveMutationCompatibility,
     normalizeProfileSummary,
+    unnamedKeyCount,
 };

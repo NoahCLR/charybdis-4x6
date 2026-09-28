@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const {ProfileDeviceService} = require("../../core/session/profile-device-service");
 const {settingsEditorView} = require("../../core/model/settings-editor");
 const {fingerprint} = require("../../core/model/portable-profile");
-const {document} = require("../fixtures/portable-profile");
+const {legacyDocument: document} = require("../fixtures/portable-profile");
 const {wire} = require("../fixtures/keyboard-options");
 test("a profile exceeding the connected keyboard's brightness limit is refused before any writes", async () => {
     const service = new ProfileDeviceService(), requests = [];

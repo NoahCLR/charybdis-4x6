@@ -6,8 +6,8 @@
 // and a behaviour step cannot send one: it is placed on a layer or emitted by
 // a combo.
 
-const {decodedOf, validateSnapshot} = require("./portable-profile");
-const {decodeProfileBlob, encodeProfileBlob, PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
+const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
+const {decodeProfileBlob, PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {SETTINGS, asciiName, customKeyNamesOf, encodeSettings, upgradeSettings} = require("../schema/settings-domain-v1");
 const {knownActionAbi} = require("../schema/actions");
 const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../data/user-keycodes");
@@ -24,7 +24,7 @@ function customKeyEditorView(snapshot, capabilities) {
     const behaved = new Set(behaviors.rows.filter(row => row.target.kind === ACTION.CUSTOM_KEY).map(row => row.target.operand));
     return {identity: snapshot.fingerprint,
         keys: names.map((name, slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: customKeyCode(slot), name, hasBehavior: behaved.has(slot)})),
-        // Every key can hold a full-length name, whatever the others hold.
+        // Each name may be 20 characters; the profile as a whole has a ceiling.
         names: {perName: SETTINGS.MACRO_NAME_CHARS}};
 }
 
@@ -45,7 +45,7 @@ function editCustomKey(snapshot, message, capabilities) {
     const settings = upgradeSettings(value.settings, 5);
     settings.customKeyNames[slot] = name;
     const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, version: settings.formatVersion, payload: encodeSettings(settings)} : domain);
-    document.profile = encodeProfileBlob({schema: {major: 2, minor: 0}, domains}).toString("base64");
+    document.profile = encodeNamedProfile({schema: {major: 2, minor: 0}, domains}).toString("base64");
     validateSnapshot(document, capabilities);
     return document;
 }

@@ -8,7 +8,7 @@ const {encodeSettings, decodeSettings} = require("../../core/schema/settings-dom
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
-const {settings, document} = require("../fixtures/portable-profile");
+const {settings, document, legacyDocument} = require("../fixtures/portable-profile");
 test("complete snapshots flatten effective domains and round-trip without destination defaults", () => {
     const source = document(), actual = validateSnapshot(JSON.stringify(source));
     assert.equal(actual.behaviors.rows.length, 37); assert.equal(actual.combos.rows.length, 1);
@@ -30,6 +30,12 @@ test("reorder moves matrix data, RGB, pointer policy and every layer action refe
     assert.equal(actual.settings.names[1], "Pointer"); assert.equal(actual.settings.values[5], 1);
     assert.equal(actual.rgb.layerColors.find(row => row.layerId === 1).color.v, 150);
     assert.equal(fingerprint(reorderLayers(reordered, [0, 4, 2, 3, 1, 5, 6, 7])), fingerprint(source));
+});
+test("reorder refuses a document from firmware that numbered its keys differently", () => {
+    const legacy = legacyDocument();
+    assert.equal(legacy.layers[0][CHARYBDIS_4X6_LAYOUT_MATRIX[2][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[2][1]], 0x7e60, "LOCK_LAYER(4) before the blocks");
+    assert.throws(() => reorderLayers(legacy, [0, 4, 2, 3, 1, 5, 6, 7]), /firmware this app was made for/);
+    assert.equal(document().layers[0][CHARYBDIS_4X6_LAYOUT_MATRIX[2][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[2][1]], 0x7ec4, "the import renumbers it to its block");
 });
 test("behaviour targets and tap/hold branches follow their layers", () => {
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
@@ -222,4 +228,21 @@ test("a backup from before the keycode blocks is renumbered key by key for the f
     assert.deepEqual(result.document.layers[0].slice(0, 7), [0x7e80, 0x7ea1, 0x7ea6, 0x7ec3, 0x7e40, 0x7e42, 0x0000]);
     assert.deepEqual(result.behaviors.rows[0].target, {kind: 7, flags: 0, operand: 2}, "the keymap's third key is custom key 2");
     assert.throws(() => validateSnapshot({...source, layers: source.layers.map((layer, i) => i ? layer : [0x7ef8, ...layer.slice(1)])}, keyboard), /no counterpart/);
+
+    // A combo keeps native keycodes, as the keyboard reads its combos back, so
+    // the import compares equal with the next read of the same table.
+    const {decodeComboDomain, encodeComboDomain} = require("../../core/schema/combo-domain-v1");
+    const combos = decodeComboDomain(blob.domains[2].payload, blob.domains[2].version);
+    combos.rows = [{id: 0, termMs: 50, mustHold: false, mustTap: false, ordered: false, inputs: [{kind: 1, flags: 0, operand: 0x7e55}, {kind: 1, flags: 0, operand: 0x04}], output: {kind: 1, flags: 0, operand: 0x7e66}}];
+    blob.domains[2].payload = encodeComboDomain(combos);
+    source.profile = encodeProfileBlob(blob).toString("base64");
+    const combo = validateSnapshot(source, keyboard).combos.rows[0];
+    assert.deepEqual(combo.inputs[0], {kind: 1, flags: 0, operand: 0x7e85}, "pointing hold 5 moves to its block");
+    assert.deepEqual(combo.output, {kind: 1, flags: 0, operand: 0x7e42}, "Click Spam stays a native keycode");
+
+    // A step that sent a keymap key did nothing; this firmware refuses it.
+    behaviors.rows[0].steps[0].tap = {kind: 1, flags: 0, operand: 0x7e64};
+    blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors, {actionLimits: {maxPdModes: 8}});
+    source.profile = encodeProfileBlob(blob).toString("base64");
+    assert.throws(() => validateSnapshot(source, keyboard), /step sends CUSTOM_KEY_0/);
 });
