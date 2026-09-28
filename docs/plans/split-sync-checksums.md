@@ -162,10 +162,11 @@ response. Each is checked on its own; the sequence also needs:
 
 - One byte per data frame: 43.4 µs at 230,400 baud, nominal. No transaction
   and no turnaround is added.
-- The largest steady cost is the left-matrix checksum poll every scan: 3 bytes
-  becomes 4, about 43 µs per scan. Measure it with the diagnostics build. If
-  it matters, exempt transactions whose contents are already checked end to
-  end: the matrix checksum and data, and the RPC info block.
+- The largest steady cost would be the left-matrix checksum poll every scan:
+  about 500 polls/s at 245 µs (baseline, 2026-09-28), so a fourth byte costs
+  about 2.2% of the loop. It is exempt: its content is itself a checksum, and
+  a garbled one only triggers the matrix data read, which carries the CRC.
+  Every other frame together costs about 0.3%.
 - Static staging buffers sized to the largest frame in the transaction table,
   on each half. Account them per half with fresh linked numbers, following
   [memory-budgets.md](../architecture/memory-budgets.md); check the slave
@@ -173,7 +174,7 @@ response. Each is checked on its own; the sequence also needs:
 
 ## Open questions
 
-- Whether the exemption above is needed at all, answered by measurement.
+- None left before implementation.
 
 ## Steps
 
@@ -195,7 +196,9 @@ response. Each is checked on its own; the sequence also needs:
      slave still skips the execute and zeroes the reply;
    - a stale request length after a dropped info;
    - a mixed pair fails at the handshake;
-   - nothing changes on a clean link.
+   - nothing changes on a clean link;
+   - the matrix checksum poll carries no CRC, and a garbled one leads to a
+     checked data read.
 3. Userspace: make fragment default, opt-out, compat assert, pair script,
    build test; docs.
 4. Measure with the diagnostics build, CRC against no CRC: per-scan split

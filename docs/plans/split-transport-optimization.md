@@ -217,6 +217,38 @@ Neither earns a calculated report-rate improvement in this plan.
 Deliverable: transaction distribution and elapsed costs on the actual keyboard.
 Proceed with A if activity traffic follows the source-backed expectation.
 
+Baseline, 2026-09-28, `diagnostic_cadence` pair from `feat/split_sync_rework`
+(coalescing on, 230,400 baud), ten-second captures with both halves connected:
+
+| | idle | motion | motion + typing |
+| --- | ---: | ---: | ---: |
+| Pointing polls/s (one per loop; bounds reports) | 538 | 497 | 436 (417–480) |
+| Share of the loop in split transactions | 17.9% | 18.2% | 17.6% |
+| Estimated polls/s with no split time | ~655 | ~608 | ~529 |
+| Poll gaps 1.5–2 ms / 2–5 ms | 78% / 21% | 72% / 28% | 57% / 41% |
+| Poll gaps ≥ 5 ms | ~3/s | ~3/s | ~8.5/s |
+| Longest poll gap | 8.8 ms | 8.9 ms | 9.8 ms |
+| Failed transactions | 1 | 3 | 6 |
+
+The matrix checksum poll is most of the split time (12–13% of the loop, about
+245 µs each, half of it direction turnarounds). Activity runs at about 30/s in
+motion. Everything else is QMK's 100 ms forced resend, about 10/s each. RPCs
+run 6–9/s at 2.1–2.4 ms each, about 2% of the loop.
+
+What follows from it:
+
+- No loop is shorter than 1.5 ms and four fifths of it is not split work, so
+  the report rate is bounded by the master's own per-loop work: lighting,
+  userspace runtime, sensor read, USB. That is not measured yet and is the next
+  measurement: time the runtime's existing diagnostic stages (RGB render, key
+  runtime, split sync, pointing task) under the cadence flag.
+- Gaps of 5 ms or more are the hitches. The likely main source is RPCs with
+  32-byte frames (VIA sync, profile reconciliation), about 3.8 ms of link time
+  each; typing adds runtime work, feedback syncs and more failed transactions.
+  Attribute them with the stage timing before changing anything.
+- The frame-aware coalescing candidate below is not indicated: no bursts.
+- Stage 2 is worth about 1% of the loop at these rates.
+
 ### 1. Coalesce activity timestamps, preserve behavior
 
 Ownership: keep policy in a small tested compat helper under
@@ -304,6 +336,7 @@ Exit: one confirmed exchange per runtime domain; measured gap reduction during
 feedback transitions; no mode/lighting/recovery regression. Do not optimize away
 heartbeats just because a static snapshot appears unchanged.
 
+Not indicated by the baseline (6–9 RPCs/s, no bursts); kept for the record.
 Candidate, to decide with the recorder's per-id counts: the runtime syncs
 send every change at once, so several changes within one 32 ms lighting frame
 spend four-transaction RPCs on states the slave never draws. The activity
