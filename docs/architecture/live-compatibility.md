@@ -41,6 +41,17 @@ its codecs or integration recipes, then run `npm run test:compat` from Live with
 explicit paths. For joint protocol work, run that bridge before merging either
 side.
 
+## Local and published revisions
+
+Local work needs no remote in either direction: firmware gates read only this
+checkout, and Live's bridge compares local working copies by path. Publishing
+does. Live pins a firmware commit, and before pushing a pin change it requires
+that commit to be on this repository's remote `main`. A squash or rebase merge
+replaces a branch's commits, so a Live pin to one of them must move to the
+merged commit; say so in the merge handoff. Likewise, push a QMK fork commit to
+`noah-userspace-contracts` before pushing firmware that needs it, since CI
+builds against that remote branch.
+
 ## Diagnostics
 
 Firmware diagnostics owns its Node dependency in `tools/package.json` and its

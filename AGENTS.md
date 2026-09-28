@@ -164,5 +164,7 @@ format, fixture bytes or a contract spec, or moves a source or probe Live's
 integration runners compile, name the Live follow-up in your handoff (see
 [what Live consumes](docs/architecture/live-compatibility.md#what-live-consumes)).
 `run_firmware_client_independence_tests.sh` fails if any tracked non-doc file
-names the app. Install firmware diagnostics dependencies with
+names the app. Develop locally without remotes; before publishing, push QMK fork
+commits first, and note that a squash or rebase merge moves Live's pin (see
+[local and published revisions](docs/architecture/live-compatibility.md#local-and-published-revisions)). Install firmware diagnostics dependencies with
 `npm ci --prefix tools` when using hardware diagnostics.
