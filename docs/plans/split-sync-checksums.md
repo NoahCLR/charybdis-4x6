@@ -10,7 +10,7 @@ Goal: a garbled split frame is refused instead of used, with no extra round
 trip on the link.
 
 Status: steps 1–3 are implemented and on by default (`NOAH_SPLIT_CRC=no` builds
-without). The fork change is `f4f77a2aaf` on `sol`; `tests/host/run_split_frame_crc_tests.sh`
+without). The fork change is `f4f77a2aaf` and `c69104c423` on `sol`; `tests/host/run_split_frame_crc_tests.sh`
 drives the fork's real protocol over a link that corrupts or drops bytes.
 Steps 4–7, measurement and hardware acceptance, remain.
 
@@ -97,7 +97,10 @@ which transaction the report is about. This adds no byte:
 - The diagnostics recorder counts drops per transaction id on the master,
   where it already runs. No slave-side counter or readout is needed.
 - The report is lost when the echo carrying it is garbled; that transaction
-  fails anyway. Counts can therefore miss a drop, never invent one.
+  fails anyway. The drop bit itself is unchecked: a bit error that sets only
+  that bit passes the handshake and reports a drop that did not happen. It
+  costs one unneeded resend and one miscount, so counts can both miss and,
+  rarely, invent a drop.
 - Two echo values are valid instead of one, a negligible loss of handshake
   checking.
 - Reads need no report: the master checks their CRC itself.
@@ -118,7 +121,13 @@ reported drop is resent on the next scan:
 - Not by spoiling the master's copy of the last-sent value: if the real state
   happened to equal the spoiled copy, the resend would never happen.
 - A lost report falls back to the forced resend (≤ 100 ms). A noisy link adds
-  resends only for frames that actually dropped.
+  resends for frames that dropped, and rarely for an invented report.
+- A resend repairs state, not events. Syncs that carry one-shot flags,
+  RGBLIGHT's change flags and the haptic play request, resend their current
+  value, as QMK's forced resend does; neither is in this build.
+- A dropped write in a transaction that also returns data would time out on
+  the master, since the slave skips the reply. No transaction in the table
+  both sends and returns data.
 
 The repair lands about one scan after the drop, a few milliseconds instead
 of up to 100 ms.
@@ -177,9 +186,13 @@ response. Each is checked on its own; the sequence also needs:
   about 2.2% of the loop. It is exempt: its content is itself a checksum, and
   a garbled one only triggers the matrix data read, which carries the CRC.
   Every other frame together costs about 0.3%.
-- One static staging buffer per half, sized to the shared memory plus the id
-  and CRC bytes (138 bytes), and 22 resend flags: 172 bytes of static RAM per
-  half, recorded in [memory-budgets.md](../architecture/memory-budgets.md).
+- One static staging buffer per half, sized to the largest frame plus the id
+  and CRC bytes: `SPLIT_TRANSPORT_CRC_MAX_FRAME`, by default the larger RPC
+  buffer (32), so 34 bytes. Every transaction table entry is checked against
+  it at compile time, so a larger sync fails the build rather than the link;
+  a runtime check covers RPC lengths, which arrive over the wire. With 22
+  resend flags, 64 bytes of static RAM per half, recorded in
+  [memory-budgets.md](../architecture/memory-budgets.md).
   The frame code inlines into the slave thread's 40-byte root frame; its
   reviewed paths pass.
 

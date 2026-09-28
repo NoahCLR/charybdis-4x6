@@ -12,7 +12,6 @@ and each mixed pair.
 """
 
 from pathlib import Path
-import re
 import subprocess
 import sys
 
@@ -27,7 +26,7 @@ def between(text, start, end, include_end=False):
     return text[first:last + (len(end) if include_end else 0)]
 
 
-macros = "\n".join(line for line in transactions.splitlines() if re.match(r"#define (sizeof_member|trans_|transport_(write|read|exec)\b)", line))
+macros = between(transactions, "#define sizeof_member", "#if defined(SPLIT_TRANSACTION_RPC)\n// Forward-declare")
 forward = between(transactions, "#if defined(SPLIT_TRANSACTION_RPC)\n// Forward-declare", "#endif // defined(SPLIT_TRANSACTION_RPC)", include_end=True)
 resends = between(transactions, "// Frame CRC resends", "////////////////////////////////////////////////////\n// Helpers")
 send_if = between(transactions, "inline static bool send_if_condition(", "inline static bool send_if_data_mismatch(")
@@ -48,6 +47,9 @@ stubs.mkdir(exist_ok=True)
 #define RPC_M2S_BUFFER_SIZE 32
 #define RPC_S2M_BUFFER_SIZE 32
 #define FORCED_SYNC_THROTTLE_MS 100
+#ifndef SPLIT_TRANSPORT_CRC_MAX_FRAME
+#    define SPLIT_TRANSPORT_CRC_MAX_FRAME 32
+#endif
 enum serial_transaction_id {
     GET_SLAVE_MATRIX_CHECKSUM, GET_SLAVE_MATRIX_DATA, PUT_LAYER_STATE,
     PUT_RPC_INFO, PUT_RPC_REQ_DATA, EXECUTE_RPC, GET_RPC_RESP_DATA, PUT_USER_RPC,
@@ -148,3 +150,9 @@ for variant, master_crc, slave_crc in (("crc", True, True), ("plain", False, Fal
     harness_defines = [f"-DMASTER_CRC={int(master_crc)}", f"-DSLAVE_CRC={int(slave_crc)}"]
     subprocess.run(flags + harness_defines + includes + [str(root / "tests/host/split_frame_crc_harness.c"), str(qmk / "quantum/crc.c"), *objects, "-lpthread", "-o", str(binary)], check=True)
     subprocess.run([str(binary)], check=True)
+
+# A table entry larger than the staging buffer fails the build: the RPC
+# buffers are 32 bytes.
+oversized = subprocess.run(flags + ["-DSPLIT_TRANSPORT_CRC", "-DSPLIT_TRANSPORT_CRC_MAX_FRAME=31"] + includes + ["-include", str(stubs / "instance_m.h"), "-c", str(part), "-o", str(build / "oversized.o")], capture_output=True, text=True)
+assert oversized.returncode != 0 and "split frame exceeds SPLIT_TRANSPORT_CRC_MAX_FRAME" in oversized.stderr, oversized.stderr
+print("split frame CRC tests passed: an oversized frame fails the build")
