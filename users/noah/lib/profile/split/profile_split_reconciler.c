@@ -814,6 +814,14 @@ static void handle_protocol_error(noah_profile_split_reconciler_t *reconciler, c
         transport_lost(reconciler, now);
         return;
     }
+    // The receiver could not use the request, and says so without naming a
+    // copy: the wire garbled it and the receiver acted on nothing. That is a
+    // lost exchange like a garbled reply, not a verdict on the copy. Every
+    // error about a copy names its generation and digest, never zero.
+    if (response->status == NOAH_PROFILE_SPLIT_V1_STATUS_INVALID_FRAME && response->generation == 0u && response->payload_digest == 0u) {
+        transport_lost(reconciler, now);
+        return;
+    }
     // The receiver could not store this copy, typically one failed flash
     // write. Before the commit is authorized nothing is durable on either
     // half and the receiver has released its storage, so send the copy again

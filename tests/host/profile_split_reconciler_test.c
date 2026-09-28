@@ -44,6 +44,9 @@ typedef struct {
     // This exchange answers with `injected` and never delivers the request.
     uint32_t                      inject_response_exchange;
     noah_profile_split_v1_frame_t injected;
+    // This exchange delivers the request with one bit flipped, as a noisy
+    // wire does; the peer sees a frame whose checksum fails.
+    uint32_t garble_request_exchange;
     uint8_t                       previous_response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
     bool                          connected;
     bool                          corrupt_next_response;
@@ -209,7 +212,13 @@ static bool exchange(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_
         link->inject_response_exchange = 0u;
         return noah_profile_split_v1_frame_encode(&link->injected, response);
     }
-    if (!link->connected || !link->peer || !noah_profile_split_reconciler_receive(&link->peer->reconciler, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE)) {
+    uint8_t delivered[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    memcpy(delivered, request, sizeof(delivered));
+    if (link->garble_request_exchange == link->exchanges) {
+        link->garble_request_exchange = 0u;
+        delivered[5] ^= 0x10u;
+    }
+    if (!link->connected || !link->peer || !noah_profile_split_reconciler_receive(&link->peer->reconciler, delivered, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE)) {
         return false;
     }
     memcpy(link->previous_response, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
@@ -1049,6 +1058,52 @@ static void test_prepared_push_survives_one_lost_exchange_anywhere(void) {
     assert(exchanges_clean > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
 }
 
+// The wire garbles a request: the peer cannot decode it, answers
+// INVALID_FRAME and acts on nothing. That is a lost exchange like a garbled
+// reply, and the copy carries on; on hardware at 460,800 baud one garbled
+// request anywhere in the copy used to end the whole Apply.
+static void test_prepared_push_survives_one_garbled_request_anywhere(void) {
+    uint32_t exchanges_clean = 0u;
+
+    for (uint32_t garble = 1u;; garble++) {
+        half_t                          left;
+        half_t                          right;
+        noah_profile_split_descriptor_t descriptor;
+        staged_source_t                 source   = {.bytes = max_profile, .length = sizeof(max_profile)};
+        uint32_t                        start_at = 100000u;
+        bool                            done     = false;
+
+        half_storage_init(&left);
+        half_storage_init(&right);
+        pair_init(&left, &right);
+        run_pair_until_converged(&left, &right, false);
+        descriptor                = committed_descriptor(&right, 32u, 1u);
+        descriptor.payload_length = sizeof(max_profile);
+        descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
+        descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
+        right.link.garble_request_exchange = right.link.exchanges + garble;
+        assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+        for (uint32_t scan = 0u; scan < MAX_SCANS * 2u && !done; scan++) {
+            uint32_t now = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+            assert_one_scan_budget(&right, true, now);
+            assert_one_scan_budget(&left, false, now);
+            done = right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED || noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL);
+        }
+        // The copy ends at the barrier or on the receiver's real verdict on
+        // this all-zero payload, never on the garbled frame itself.
+        if (right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED && right.reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_INVALID_FRAME) {
+            fprintf(stderr, "copy stopped: exchange %u garbled, last status %u\n", (unsigned)garble, (unsigned)right.reconciler.last_status);
+            assert(!"a garbled request stopped the copy");
+        }
+        assert(done);
+        if (right.link.garble_request_exchange != 0u) {
+            exchanges_clean = garble;
+            break;
+        }
+    }
+    assert(exchanges_clean > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
+}
+
 // Sends a full-size prepared copy with one fault planted at exchange `fault`
 // (counted from the start of the copy) and reports whether the fault fired.
 // The copy must end on its own: at the barrier, or stopped with the
@@ -1801,6 +1856,7 @@ int main(void) {
     test_cancel_refuses_matching_durable_peer();
     test_crossed_prepare_begin_loser_abort_does_not_deadlock();
     test_prepared_push_survives_one_lost_exchange_anywhere();
+    test_prepared_push_survives_one_garbled_request_anywhere();
     test_prepared_push_survives_one_replayed_reply_anywhere();
     test_prepared_push_resumes_from_the_metadata_poll();
     test_stale_receive_lease_expires_while_the_link_stays_busy();
