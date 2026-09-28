@@ -249,18 +249,6 @@ void noah_rgb_runtime_post_init(void) {
     static const rgb_runtime_stage_fn_t stages[] = {
         noah_rgb_validate_config,
         rgb_runtime_layer_stage_post_init,
-#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-        rgb_runtime_automouse_stage_post_init,
-#    endif
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-        rgb_runtime_pd_mode_stage_post_init,
-#    endif
-#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
-        rgb_runtime_combo_feedback_stage_post_init,
-#    endif
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-        rgb_runtime_key_feedback_stage_post_init,
-#    endif
     };
 
     rgb_runtime_render_snapshot_invalidate();

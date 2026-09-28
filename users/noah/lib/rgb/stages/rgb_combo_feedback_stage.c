@@ -8,10 +8,6 @@
 
 #    include "../../key/runtime/feedback.h"
 
-void rgb_runtime_combo_feedback_stage_post_init(void) {
-    // Retained as a pipeline hook; effective colors are resolved per frame.
-}
-
 static bool rgb_runtime_combo_feedback_stage_paint_range(rgb_runtime_frame_t *frame, rgb_t color, uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 

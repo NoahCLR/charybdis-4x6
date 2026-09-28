@@ -180,7 +180,6 @@ static void test_reset(void) {
     }
 
     rgb_runtime_layer_stage_post_init();
-    rgb_runtime_automouse_stage_post_init();
 }
 
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {

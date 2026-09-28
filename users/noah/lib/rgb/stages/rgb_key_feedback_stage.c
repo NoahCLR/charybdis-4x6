@@ -18,10 +18,6 @@ typedef struct {
 #        error "RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS must be greater than zero"
 #    endif
 
-void rgb_runtime_key_feedback_stage_post_init(void) {
-    // Retained as a pipeline hook; effective colors are resolved per frame.
-}
-
 static uint8_t rgb_runtime_key_feedback_stage_tap_branch_color_index(const rgb_effective_key_feedback_t *config, uint8_t tap_branch) {
     uint8_t index;
 

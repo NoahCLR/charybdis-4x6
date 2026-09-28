@@ -82,10 +82,6 @@ static bool rgb_runtime_pd_mode_stage_paint_owner_keys(rgb_runtime_frame_t *fram
     return painted;
 }
 
-void rgb_runtime_pd_mode_stage_post_init(void) {
-    // Retained as a pipeline hook; effective colors are resolved per frame.
-}
-
 static split_side_mask_t rgb_runtime_pd_mode_stage_resolve_trigger_sides(pd_mode_snapshot_t snapshot) {
     split_side_mask_t owner_sides = snapshot.display.owner_sides;
 

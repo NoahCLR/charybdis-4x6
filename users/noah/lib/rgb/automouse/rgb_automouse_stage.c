@@ -72,10 +72,6 @@ static layer_state_t rgb_runtime_automouse_stage_state_without_layer(layer_state
     return state & ~((layer_state_t)1u << layer);
 }
 
-void rgb_runtime_automouse_stage_post_init(void) {
-    // Retained as a pipeline hook; effective fade configuration is per frame.
-}
-
 bool rgb_runtime_automouse_stage_should_render(layer_state_t state) {
     return rgb_runtime_automouse_stage_should_render_effective(state, NULL);
 }
