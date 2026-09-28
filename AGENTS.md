@@ -21,11 +21,12 @@ and [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-
 
 ### The tools, and the line between them
 
-- **`tools/charybdis-live/`** edits the connected keyboard over Raw HID. It
-  is the app and the active development target. It must never read the
-  firmware repository; see its own
-  [`AGENTS.md`](./tools/charybdis-live/AGENTS.md) for the layer rules before
-  adding files.
+- **Charybdis Live** edits the connected keyboard over Raw HID. Active app
+  development belongs in the independent `charybdis-live` repository; read
+  that checkout's `AGENTS.md` before editing it. The retained
+  `tools/charybdis-live/` copy awaits cleanup and is not a development target.
+  The app runtime must never read firmware source; developer inspection and
+  Live-owned integration tests may read explicitly selected firmware checkouts.
 - **`tools/charybdis-profile-studio/`** edits `keymap.c`, `config.h`, and
   `rgb_config.c`. It is **frozen** at its `refactor/aug` state. Bug fixes only.
   Do not add features to it, and do not give it device capabilities.
@@ -46,10 +47,11 @@ tracked under "Current Product Status" in
 
 - Start every task with `git status --short`.
 - Assume the worktree may already be dirty. Never revert or overwrite unrelated user changes.
-- This repo is one folder in a multi-root VS Code workspace. The workspace also includes sibling directories such as `../bastardkb-qmk` and `../builds`.
+- Work in the firmware worktree assigned to this task, not automatically in the main checkout. See the local paths and worktree discovery in [README.md](README.md#local-repositories-and-worktrees).
+- The main checkout belongs to a multi-root VS Code workspace with QMK, Live and build artifacts. Worktrees may live elsewhere; do not assume its sibling layout applies.
 - Treat `charybdis-4x6` as the default write target. Do not edit sibling workspace folders unless the task explicitly requires it and the user wants that scope.
 - In general, prefer changes in this repo over changes in sibling workspace folders. `../builds` is output/artifact space, not source.
-- If the task depends on upstream QMK behavior or build wiring, inspect the relevant files in `../bastardkb-qmk` instead of guessing how upstream behaves.
+- If the task depends on upstream QMK behavior or build wiring, inspect the selected QMK checkout instead of guessing how upstream behaves. Use the local workspace map in README to locate it.
 - `README.md` and the files under `docs/` are the main human-facing documentation set for this repo.
 - For doc fixes, doc updates, doc audits, or user-facing explanation work, check `README.md` and the relevant files under `docs/` first.
 - For refactors or runtime architecture work, read `docs/LIVE_EDIT_APP_DIRECTION.md` first. It carries the current direction, the decisions behind it, and what is deliberately left undesigned.

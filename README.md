@@ -6,6 +6,32 @@ For the editor's build, test and compilation-database tasks, see the
 [VS Code workflow](.vscode/README.md). Charybdis Live's editor tasks now belong
 to its independent sibling repository.
 
+## Local repositories and worktrees
+
+On Noah's machine, the main checkouts are:
+
+- Firmware: `/Users/noah/dev/charybdis/charybdis-4x6`.
+- Live: `/Users/noah/dev/charybdis/charybdis-live`.
+- Upstream QMK build dependency: `/Users/noah/dev/charybdis/bastardkb-qmk`.
+
+Use the worktree assigned to your task. Run `git worktree list` in the relevant
+repository to discover its other checkouts; do not assume the main checkout
+contains another agent's branch. Relative sibling paths below describe the main
+workspace layout and may not hold in a worktree. Select QMK explicitly with
+`QMK_ROOT` for host tests and `QMK_HOME` for the QMK CLI, and set `QMK_USERSPACE`
+to the firmware worktree being built. The legacy Profile Studio tooling check
+also discovers QMK through a sibling named `bastardkb-qmk` or `qmk_firmware`.
+
+Firmware agents own this checkout's C code, tests and firmware documentation.
+Live agents own the independent app checkout and its documentation; read its
+`AGENTS.md` and `README.md` there. The retained `tools/charybdis-live/` copy is
+not an active development target. Inspecting another checkout is allowed;
+editing it requires that scope in the task. Coordinate shared QMK build output
+and keyboard access with other agents. Firmware tests and builds require no
+Live checkout; Live owns the optional cross-repository integration tests.
+
+## Firmware overview
+
 It is intentionally Charybdis-specific. The trackball behavior, split sync,
 auto-mouse layer, and RGB assumptions are built around this split trackball
 board rather than stock QMK conventions.
@@ -233,8 +259,8 @@ Open Profile Studio`. The full guide is
 
 ## Charybdis Live
 
-[Charybdis Live](./tools/charybdis-live/) edits the connected keyboard over
-Raw HID. It never reads this repository, so it needs no firmware workspace: the
+Charybdis Live edits the connected keyboard over
+Raw HID. Its runtime never reads this repository, so it needs no firmware workspace: the
 keyboard is the source of truth and the app is its client. Profile Studio owns
 `.c` authoring; this app owns the device.
 
@@ -330,7 +356,9 @@ Readback and Apply need the side-specific firmware pair from
 `sh tools/build-firmware-pair.sh`, which carries the live-profile owner; the
 generic image does not.
 
-The app's own guide is [`tools/charybdis-live/README.md`](./tools/charybdis-live/README.md).
+The app's current guide is `README.md` in the independent Live checkout listed
+under [local repositories](#local-repositories-and-worktrees); its `docs/`
+directory owns app development guidance. The retained in-tree guide is historical.
 The direction, the decisions behind it, and what is deliberately left
 undesigned are in
 [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md).
