@@ -5,6 +5,9 @@ p[0]=7;p[2]=10;p[3]=1;p[6]=25;p[7]=1;p[8]=8;p[10]=1;p.writeUInt32LE(10000000,11)
 assert.deepEqual(decode(0,p),{transactionCount:8,armed:false,frozen:true,durationUs:10000000,activityId:0});
 p[4]=2;p[8]=1;p.writeUInt32LE(400,9);p.writeUInt32LE(1,13);p.writeUInt32LE(5600,17);p.writeUInt32LE(250000,21);p.writeUInt32LE(5000,25);
 assert.deepEqual(decode(2,p),{id:1,attempts:400,failures:1,attemptedBytes:5600,totalUs:250000,maxUs:5000});
+p[7]=2;p.writeUInt16LE(3,29);
+assert.deepEqual(decode(2,p),{id:1,attempts:400,failures:1,attemptedBytes:5600,totalUs:250000,maxUs:5000,crcFailures:3});
+p[7]=3;assert.throws(()=>decode(2,p));p[7]=1;
 p[5]=3;assert.throws(()=>decode(2,p));p[5]=0;p[8]=2;assert.throws(()=>decode(2,p));assert.throws(()=>decode(2,[]));
 
 const {decodeCadence, summarizeCadence} = require('../../tools/capture-split-diagnostics.cjs');
@@ -54,11 +57,11 @@ assert.ok(Math.abs(staged.coverage-1)<1e-9);
 const fs = require('node:fs');
 const path = require('node:path');
 const {summarizeCaptures} = require('../../tools/summarize-cadence-captures.cjs');
-const capture = stages => ({metadata:{durationUs:10000000},transactions:[{id:0,attempts:5000,failures:2,totalUs:1500000,maxUs:400},{id:11,attempts:90,failures:0,totalUs:36000,maxUs:1500}],
+const capture = stages => ({metadata:{durationUs:10000000},transactions:[{id:0,attempts:5000,failures:2,totalUs:1500000,maxUs:400,crcFailures:1},{id:11,attempts:90,failures:0,totalUs:36000,maxUs:1500}],
     cadence:{windows:9,pointingPollsPerSecond:{mean:500,min:498,max:502},matrixScansPerSecond:500,maxPointingGapUs:9000,gapHistogram:{'<2000us':3000,'>=5000us':27},...stages}});
 const plain = summarizeCaptures([{name:'a',capture:capture({})}]);
 assert.match(plain,/\| Pointing polls\/s \| 500 \(498–502\) \|/);assert.match(plain,/\| Split transaction share \| 15\.4% \|/);
-assert.match(plain,/\| Poll gaps ≥ 5 ms per second \| 3\.0 \|/);assert.match(plain,/\| 11 \| 9\.0\/s · 400 µs · 1\.5 ms \|/);assert.match(plain,/2 failed/);
+assert.match(plain,/\| Poll gaps ≥ 5 ms per second \| 3\.0 \|/);assert.match(plain,/\| 11 \| 9\.0\/s · 400 µs · 1\.5 ms \|/);assert.match(plain,/2 failed · 1 CRC/);
 assert.doesNotMatch(plain,/Stage:/);
 const both = summarizeCaptures([{name:'a',capture:capture({})},{name:'b',capture:capture({coverage:1,stages:{matrixScan:{share:0.35,meanPerScanUs:700,maxLoopUs:2200}}})}]);
 assert.match(both,/\| `matrixScan` \| — \| 35\.0% · 700 µs · 2\.2 ms \|/);

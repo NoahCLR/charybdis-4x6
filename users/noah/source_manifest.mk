@@ -40,6 +40,7 @@ NOAH_COMMON_SOURCES := \
     lib/compat/qmk_durable_io.c \
     lib/compat/qmk_split_activity.c \
     lib/compat/qmk_split_diagnostics.c \
+    lib/compat/qmk_split_transport_crc.c \
     lib/compat/qmk_loop_stages.c \
     lib/compat/qmk_profile_eeprom.c \
     lib/compat/qmk_physical_half.c \

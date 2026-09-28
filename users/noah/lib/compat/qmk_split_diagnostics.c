@@ -11,6 +11,7 @@
 // and explicitly armed after boot; USB readback is refused until frozen.
 typedef struct {
     uint32_t attempts, failures, attempted_bytes, total_us, max_us;
+    uint16_t crc_failures;
 } split_measurement_t;
 static split_measurement_t measurements[NUM_TOTAL_TRANSACTIONS];
 static uint32_t            started, duration;
@@ -39,6 +40,14 @@ void split_transaction_diagnostic(uint8_t id, uint8_t request_bytes, uint8_t res
     if (elapsed_us > m->max_us) m->max_us = elapsed_us;
     freeze_if_due();
 }
+#    ifdef SPLIT_TRANSPORT_CRC
+// A frame of this transaction failed its CRC: a write the slave dropped and
+// reported, or a read this half rejected.
+void split_transaction_diagnostic_crc(uint8_t id) {
+    if (!armed || id >= NUM_TOTAL_TRANSACTIONS) return;
+    if (measurements[id].crc_failures != UINT16_MAX) ++measurements[id].crc_failures;
+}
+#    endif
 static void put32(uint8_t *p, uint32_t v) {
     for (unsigned i = 0; i < 4; ++i)
         p[i] = (uint8_t)(v >> (8 * i));
@@ -74,7 +83,7 @@ bool noah_split_diagnostics_command(uint8_t *data, uint8_t length) {
         return true;
     }
     data[6] = 25;
-    data[7] = 1; // format version
+    data[7] = 2; // format version
     if (page == 0) {
         data[8]  = NUM_TOTAL_TRANSACTIONS;
         data[9]  = armed;
@@ -95,6 +104,8 @@ bool noah_split_diagnostics_command(uint8_t *data, uint8_t length) {
     put32(data + 17, m->attempted_bytes);
     put32(data + 21, m->total_us);
     put32(data + 25, m->max_us);
+    data[29] = (uint8_t)m->crc_failures;
+    data[30] = (uint8_t)(m->crc_failures >> 8);
     return true;
 }
 #endif

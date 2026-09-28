@@ -33,11 +33,13 @@ class SplitTransportBuildTest(unittest.TestCase):
                         self.assertNotIn("SERIAL_USART_SPEED", result.stdout)
 
     def test_feature_selection(self):
-        # Coalescing is on unless turned off; diagnostics are off unless on.
+        # Coalescing and the frame CRC are on unless turned off; diagnostics
+        # are off unless on.
         with tempfile.TemporaryDirectory() as directory:
             probe = Path(directory) / "probe.mk"
             probe.write_text("all:\n\t@echo $(OPT_DEFS)\n")
             for name, flag, default in (("NOAH_SPLIT_ACTIVITY_COALESCE", "NOAH_SPLIT_ACTIVITY_COALESCE_ENABLE", True),
+                                        ("NOAH_SPLIT_CRC", "SPLIT_TRANSPORT_CRC", True),
                                         ("NOAH_SPLIT_DIAGNOSTICS", "SPLIT_TRANSACTION_DIAGNOSTICS", False)):
                 for value in (None, "", "no", "yes", "invalid"):
                     with self.subTest(name=name, value=value):
@@ -55,8 +57,8 @@ class SplitTransportBuildTest(unittest.TestCase):
                         self.assertEqual(f"-D{flag}" in result.stdout.split(), enabled)
 
     def test_pair_flags_and_artifact_names(self):
-        for baud, owner, activity, diagnostic, cadence in (("", True, "", "", ""), ("", True, "yes", "", ""), ("", True, "no", "", ""), ("", True, "", "yes", ""), ("", True, "", "yes", "yes"), ("", False, "no", "yes", "yes"), ("460800", True, "yes", "", "")):
-            with self.subTest(baud=baud, owner=owner, activity=activity, diagnostic=diagnostic, cadence=cadence), tempfile.TemporaryDirectory() as directory:
+        for baud, owner, activity, crc, diagnostic, cadence in (("", True, "", "", "", ""), ("", True, "yes", "yes", "", ""), ("", True, "no", "", "", ""), ("", True, "", "no", "", ""), ("", True, "", "", "yes", ""), ("", True, "", "", "yes", "yes"), ("", False, "no", "no", "yes", "yes"), ("460800", True, "yes", "", "", "")):
+            with self.subTest(baud=baud, owner=owner, activity=activity, crc=crc, diagnostic=diagnostic, cadence=cadence), tempfile.TemporaryDirectory() as directory:
                 workspace = Path(directory)
                 qmk = workspace / "qmk checkout"
                 qmk.mkdir()
@@ -74,7 +76,7 @@ class SplitTransportBuildTest(unittest.TestCase):
                 mock.chmod(0o755)
                 log = workspace / "calls.jsonl"
                 env = dict(os.environ, QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
-                           NOAH_SPLIT_BAUD=baud, NOAH_SPLIT_ACTIVITY_COALESCE=activity, NOAH_SPLIT_DIAGNOSTICS=diagnostic,
+                           NOAH_SPLIT_BAUD=baud, NOAH_SPLIT_ACTIVITY_COALESCE=activity, NOAH_SPLIT_CRC=crc, NOAH_SPLIT_DIAGNOSTICS=diagnostic,
                            NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=cadence, PAIR_TEST_LOG=str(log),
                            PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
                 command = ["sh", str(ROOT / "tools/build-firmware-pair.sh")]
@@ -98,10 +100,12 @@ class SplitTransportBuildTest(unittest.TestCase):
                     # The default build coalesces; only the opt-out is passed on.
                     self.assertFalse("NOAH_SPLIT_ACTIVITY_COALESCE=yes" in call)
                     self.assertEqual("NOAH_SPLIT_ACTIVITY_COALESCE=no" in call, activity == "no")
+                    self.assertFalse("NOAH_SPLIT_CRC=yes" in call)
+                    self.assertEqual("NOAH_SPLIT_CRC=no" in call, crc == "no")
                     self.assertEqual("NOAH_SPLIT_DIAGNOSTICS=yes" in call, diagnostic == "yes")
                     self.assertEqual("NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes" in call, cadence == "yes")
                 suffix = "" if owner else "_no_owner"
-                suffix += ("_no_activity" if activity == "no" else "") + ("_diagnostic" if diagnostic else "") + ("_cadence" if cadence else "")
+                suffix += ("_no_activity" if activity == "no" else "") + ("_no_crc" if crc == "no" else "") + ("_diagnostic" if diagnostic else "") + ("_cadence" if cadence else "")
                 artifacts = sorted(path.name for path in (workspace / "output").rglob("*.uf2"))
                 self.assertEqual(artifacts, [f"1_charybdis_{half}{suffix}.uf2" for half in ("left", "right")])
                 self.assertEqual("WITHOUT the live-profile owner" in result.stdout, not owner)

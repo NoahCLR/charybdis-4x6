@@ -15,6 +15,17 @@ else ifneq ($(NOAH_SPLIT_ACTIVITY_COALESCE_SELECTED),no)
     $(error NOAH_SPLIT_ACTIVITY_COALESCE must be yes or no)
 endif
 
+# Every split data frame carries a CRC8 by default, which needs the fork's
+# frame CRC (sol at f4f77a2aaf or later, QMK_SPLIT_TRANSPORT_CRC_VERSION 1). Both halves must match: a
+# mixed pair fails at the handshake. NOAH_SPLIT_CRC=no builds the comparison
+# firmware without it.
+NOAH_SPLIT_CRC_SELECTED := $(or $(strip $(NOAH_SPLIT_CRC)),yes)
+ifeq ($(NOAH_SPLIT_CRC_SELECTED),yes)
+    OPT_DEFS += -DSPLIT_TRANSPORT_CRC
+else ifneq ($(NOAH_SPLIT_CRC_SELECTED),no)
+    $(error NOAH_SPLIT_CRC must be yes or no)
+endif
+
 ifneq ($(strip $(NOAH_SPLIT_DIAGNOSTICS)),)
     ifeq ($(strip $(NOAH_SPLIT_DIAGNOSTICS)),yes)
         OPT_DEFS += -DSPLIT_TRANSACTION_DIAGNOSTICS

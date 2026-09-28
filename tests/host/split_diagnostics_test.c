@@ -10,6 +10,9 @@ bool is_keyboard_master(void) {
     return true;
 }
 void            split_transaction_diagnostic(uint8_t, uint8_t, uint8_t, uint32_t, bool);
+#ifdef SPLIT_TRANSPORT_CRC
+void split_transaction_diagnostic_crc(uint8_t);
+#endif
 static uint32_t get32(uint8_t *p) {
     return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
 }
@@ -30,6 +33,11 @@ int main(void) {
     assert(data[5] == 0);
     split_transaction_diagnostic(1, 12, 0, 700, true);
     split_transaction_diagnostic(1, 12, 0, 5000, false);
+#ifdef SPLIT_TRANSPORT_CRC
+    split_transaction_diagnostic_crc(1);
+    split_transaction_diagnostic_crc(1);
+    split_transaction_diagnostic_crc(200);
+#endif
     command(data, 7, 2);
     assert(data[5] == 3);
     now += 10000000u;
@@ -39,6 +47,12 @@ int main(void) {
     assert(data[5] == 0 && data[8] == 1);
     assert(get32(data + 9) == 2 && get32(data + 13) == 1 && get32(data + 17) == 28);
     assert(get32(data + 21) == 5700 && get32(data + 25) == 5000);
+    assert(data[7] == 2);
+#ifdef SPLIT_TRANSPORT_CRC
+    assert(data[29] == 2 && data[30] == 0);
+#else
+    assert(data[29] == 0 && data[30] == 0);
+#endif
     split_transaction_diagnostic(1, 12, 0, 9999, true);
     command(data, 7, 2);
     assert(get32(data + 9) == 2);

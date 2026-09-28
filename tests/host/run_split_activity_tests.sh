@@ -22,10 +22,12 @@ uint32_t test_clock(void);
 bool is_keyboard_master(void);
 #define chSysGetRealtimeCounterX test_clock
 HEADER
-cc -std=c11 -Wall -Wextra -Werror -DSPLIT_TRANSACTION_DIAGNOSTICS \
-    -DQMK_KEYBOARD_H='"diagnostic_qmk.h"' -I"$BUILD_DIR/include" -I"$ROOT" \
-    "$ROOT/tests/host/split_diagnostics_test.c" "$ROOT/users/noah/lib/compat/qmk_split_diagnostics.c" -o "$BUILD_DIR/diagnostics"
-"$BUILD_DIR/diagnostics"
+for crc in "" "-DSPLIT_TRANSPORT_CRC"; do
+    cc -std=c11 -Wall -Wextra -Werror -DSPLIT_TRANSACTION_DIAGNOSTICS $crc \
+        -DQMK_KEYBOARD_H='"diagnostic_qmk.h"' -I"$BUILD_DIR/include" -I"$ROOT" \
+        "$ROOT/tests/host/split_diagnostics_test.c" "$ROOT/users/noah/lib/compat/qmk_split_diagnostics.c" -o "$BUILD_DIR/diagnostics"
+    "$BUILD_DIR/diagnostics"
+done
 
 node "$ROOT/tests/host/split_diagnostics_tool_test.cjs"
 

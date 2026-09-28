@@ -130,6 +130,9 @@ data; note it in the set record.
   build flag. Name it in both set records.
 - Compare the same recorder format. Stage timing (format 2) costs 8–10% of the
   poll rate, so format 2 rates read low against format 1 rates.
+- The split frame CRC is on by default; a `_no_crc` pair is a different build.
+  Its transaction table's attempted bytes include each frame's CRC byte, and
+  CRC failures appear per transaction.
 - Read stage shares as shares of the loop, not as absolute cost: the timing's
   own cost inflates every stage slightly.
 - The `matrixScan` stage includes the split transactions in the transaction

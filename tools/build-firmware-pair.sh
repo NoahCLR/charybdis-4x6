@@ -49,6 +49,13 @@ case "${NOAH_SPLIT_ACTIVITY_COALESCE:-}" in
     no) TRANSPORT_ARGS="$TRANSPORT_ARGS -e NOAH_SPLIT_ACTIVITY_COALESCE=no"; SUFFIX="${SUFFIX}_no_activity" ;;
     *) echo "NOAH_SPLIT_ACTIVITY_COALESCE must be yes or no" >&2; exit 1 ;;
 esac
+# The split frame CRC is the default; =no builds the comparison pair. Both
+# halves must match: a mixed pair fails at the handshake.
+case "${NOAH_SPLIT_CRC:-}" in
+    ""|yes) ;;
+    no) TRANSPORT_ARGS="$TRANSPORT_ARGS -e NOAH_SPLIT_CRC=no"; SUFFIX="${SUFFIX}_no_crc" ;;
+    *) echo "NOAH_SPLIT_CRC must be yes or no" >&2; exit 1 ;;
+esac
 case "${NOAH_SPLIT_DIAGNOSTICS:-}" in
     ""|no) ;;
     yes) TRANSPORT_ARGS="$TRANSPORT_ARGS -e NOAH_SPLIT_DIAGNOSTICS=yes"; SUFFIX="${SUFFIX}_diagnostic" ;;

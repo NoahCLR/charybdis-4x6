@@ -984,4 +984,6 @@ coalescing, profile copies logged roughly 20–30 split transport failures per A
 at 460,800 and none across three Applies at 230,400, and the other half's lighting
 flickered, because QMK's lighting sync carries no checksum. Setting
 `NOAH_SPLIT_BAUD` now fails the build. A faster link needs checksummed syncs
-first, and new measurements.
+first, and new measurements. The split frame CRC
+([plan](plans/split-sync-checksums.md)) is now in the default build; 460,800
+stays removed until it is accepted on hardware and measured again.

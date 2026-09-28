@@ -144,6 +144,9 @@ also orders completion relative to the preceding callback/worker activity.
 Candidate dedicated fixed-size runtime exchange: one transaction per domain,
 request = 2-byte sequence + P-byte snapshot + 1-byte CRC8; response = 2-byte
 sequence + 1-byte status + 1-byte CRC8. CRC covers domain identity and contents.
+The split frame CRC, now in the default build, adds that byte to every frame
+and binds it to the transaction id, so the candidate needs no CRC fields of its
+own; the byte counts below include them, as the frame CRC does.
 That is **P + 9 bytes**, with a response produced after validation/publication.
 This candidate saves **4 bytes = 173.611 us and 3 handshakes per update** while
 adding explicit publication confirmation. Final framing and capability/version

@@ -4,14 +4,18 @@
 const {createRequire} = require('node:module');
 const path = require('node:path');
 
+// Format 2 adds each transaction's CRC failures: writes the slave dropped and
+// reported, and reads the master rejected (zero without the frame CRC).
 function decode(page, response) {
     const data = Buffer.from(response);
-    if (data.length !== 32 || data[0] !== 7 || data[1] !== 0 || data[2] !== 10 || data[3] !== 1 || data[4] !== page || data[5] !== 0 || data[6] !== 25 || data[7] !== 1) {
+    if (data.length !== 32 || data[0] !== 7 || data[1] !== 0 || data[2] !== 10 || data[3] !== 1 || data[4] !== page || data[5] !== 0 || data[6] !== 25 || (data[7] !== 1 && data[7] !== 2)) {
         throw new Error(`Invalid/unavailable diagnostic page ${page}: ${data.toString('hex')}`);
     }
     if (page === 0) return {transactionCount: data[8], armed: !!data[9], frozen: !!data[10], durationUs: data.readUInt32LE(11), activityId: data[15]};
     if (data[8] !== page - 1) throw new Error('Transaction page identity mismatch');
-    return {id: data[8], attempts: data.readUInt32LE(9), failures: data.readUInt32LE(13), attemptedBytes: data.readUInt32LE(17), totalUs: data.readUInt32LE(21), maxUs: data.readUInt32LE(25)};
+    const entry = {id: data[8], attempts: data.readUInt32LE(9), failures: data.readUInt32LE(13), attemptedBytes: data.readUInt32LE(17), totalUs: data.readUInt32LE(21), maxUs: data.readUInt32LE(25)};
+    if (data[7] === 2) entry.crcFailures = data.readUInt16LE(29);
+    return entry;
 }
 
 // Pointing-cadence recorder (value 0x03, NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS

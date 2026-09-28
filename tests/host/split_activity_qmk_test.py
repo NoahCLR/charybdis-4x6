@@ -23,6 +23,9 @@ static bool connected=true, fail;
 static unsigned calls;
 static split_slave_activity_sync_t current, staging, received;
 static noah_split_activity_policy_t policy;
+static bool resend;
+static bool split_resend_due(int id) {assert(id==PUT_ACTIVITY); return resend;}
+static void split_resend_done(int id) {assert(id==PUT_ACTIVITY); resend=false;}
 static uint32_t timer_read32(void) {return now;}
 static uint32_t timer_elapsed32(uint32_t then) {return now-then;}
 static bool is_transport_connected(void) {return connected;}
@@ -68,6 +71,15 @@ int main(void) {
         assert(activity_handlers_master(NULL,NULL));
     }
     assert(calls-before==32); // first immediate plus one latest snapshot per 32 ms
+    // A write the slave reported dropped is resent on the next scan, past
+    // coalescing, and the flag clears once the resend succeeds.
+    now=2000; current.pointing_device_timestamp=2000; before=calls; resend=true;
+    assert(activity_handlers_master(NULL,NULL)); assert(calls==before+1); assert(!resend);
+    assert(received.pointing_device_timestamp==2000);
+    fail=true; resend=true; ++now;
+    assert(!activity_handlers_master(NULL,NULL)); assert(resend);
+    fail=false; ++now;
+    assert(activity_handlers_master(NULL,NULL)); assert(!resend);
     puts("actual QMK activity sender tests passed: 1000 motion scans -> 32 writes");
 }
 '''

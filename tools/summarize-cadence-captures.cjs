@@ -64,9 +64,9 @@ function summarizeCaptures(entries) {
     const ids = [...new Set(figures.flatMap(f => [...f.transactions.keys()]))].sort((a, b) => a - b);
     const txRows = ids.map(id => [`${id}`, ...figures.map(f => {
         const t = f.transactions.get(id);
-        return t ? `${(t.attempts / f.durationUs * 1e6).toFixed(1)}/s · ${us(t.totalUs / t.attempts)} · ${ms(t.maxUs)}${t.failures ? ` · ${t.failures} failed` : ''}` : '—';
+        return t ? `${(t.attempts / f.durationUs * 1e6).toFixed(1)}/s · ${us(t.totalUs / t.attempts)} · ${ms(t.maxUs)}${t.failures ? ` · ${t.failures} failed` : ''}${t.crcFailures ? ` · ${t.crcFailures} CRC` : ''}` : '—';
     })]);
-    sections.push('Split transaction: attempts/s · mean · longest\n\n' + table(['Id', ...names], txRows));
+    sections.push('Split transaction: attempts/s · mean · longest; failed attempts and CRC failures when any\n\n' + table(['Id', ...names], txRows));
     return sections.join('\n\n') + '\n';
 }
 

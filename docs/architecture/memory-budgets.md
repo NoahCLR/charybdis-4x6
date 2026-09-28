@@ -285,3 +285,16 @@ engine, which LTO inlines into `pointing_device_task`: a fallback settlement
 at 1,248 bytes, a literal tap at 456 and a QMK-function tap at 520; the retired
 per-preset handlers are no longer listed. The largest main-process path is
 still 1,800 bytes.
+
+## Split frame CRC — 2026-09-28
+
+The frame CRC (`SPLIT_TRANSPORT_CRC`, default on) adds one static staging
+buffer per half in the fork's serial protocol, sized to the split shared
+memory plus the id and CRC bytes (138 bytes), and the master's 22 per-id
+resend flags. A fresh left pair ELF (`NOAH_PHYSICAL_HALF=left`,
+`FORCE_SLAVE=yes`) links 4,188 bytes of `.data` and 54,964 bytes of `.bss`:
+59,152 bytes of `.data + .bss`, 1,264 below the 60,416-byte tripwire; the same
+pair built with `NOAH_SPLIT_CRC=no` links 58,984. These are linked
+measurements, not runtime high-water. The frame code inlines into the split
+slave thread's 40-byte root frame, and the reviewed stack paths of both gates
+pass.

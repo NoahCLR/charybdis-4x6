@@ -9,6 +9,11 @@ spec under `docs/architecture/` and delete this file (D-L07).
 Goal: a garbled split frame is refused instead of used, with no extra round
 trip on the link.
 
+Status: steps 1–3 are implemented and on by default (`NOAH_SPLIT_CRC=no` builds
+without). The fork change is `f4f77a2aaf` on `sol`; `tests/host/run_split_frame_crc_tests.sh`
+drives the fork's real protocol over a link that corrupts or drops bytes.
+Steps 4–7, measurement and hardware acceptance, remain.
+
 The split link stays at QMK's default 230,400 baud. 460,800 was measured and
 removed (D-L43); it is worth measuring again only once this is in place.
 
@@ -62,8 +67,11 @@ syncs userspace cannot reach.
   only then copy it into `split_shmem`, all inside the lock
   `react_to_transaction` already holds. The main loop never sees a bad or
   half-copied frame.
-- On a bad CRC: leave `split_shmem` unchanged, skip the slave callback, clear
-  the receive queue as a failed transaction does today, and count the drop.
+- On a bad CRC: leave `split_shmem` unchanged, skip the slave callback, and
+  count the drop. Keep the receive queue: the frame arrived whole, so the link
+  is in step, and the master's next transaction id is usually already queued
+  behind it. Clearing it, as a timeout does, would cost that transaction a
+  5 ms timeout and lose the drop report with it.
 - The slave keeps showing the previous value until the master's next send.
   The staleness bounds in the table become "shows the previous value" instead
   of "shows garbage". The drop is reported to the master in the next
@@ -133,6 +141,8 @@ response. Each is checked on its own; the sequence also needs:
 
 - A drop of info or request data is reported in the next step's echo, so the
   master stops the sequence there and `transaction_rpc_exec` returns false.
+  The info step's own echo reports on the write before the sequence, such as
+  the previous sequence's request, so the step flags are cleared after it.
   The runtime syncs' retry backoff then resends at once instead of waiting for
   a heartbeat. A drop of execute's own data is reported on the response step,
   with the same result.
@@ -167,10 +177,11 @@ response. Each is checked on its own; the sequence also needs:
   about 2.2% of the loop. It is exempt: its content is itself a checksum, and
   a garbled one only triggers the matrix data read, which carries the CRC.
   Every other frame together costs about 0.3%.
-- Static staging buffers sized to the largest frame in the transaction table,
-  on each half. Account them per half with fresh linked numbers, following
-  [memory-budgets.md](../architecture/memory-budgets.md); check the slave
-  thread's stack against its 1,024-byte working area.
+- One static staging buffer per half, sized to the shared memory plus the id
+  and CRC bytes (138 bytes), and 22 resend flags: 172 bytes of static RAM per
+  half, recorded in [memory-budgets.md](../architecture/memory-budgets.md).
+  The frame code inlines into the slave thread's 40-byte root frame; its
+  reviewed paths pass.
 
 ## Open questions
 
@@ -202,12 +213,14 @@ response. Each is checked on its own; the sequence also needs:
 3. Userspace: make fragment default, opt-out, compat assert, pair script,
    build test; docs.
 4. Measure with the diagnostics build, CRC against no CRC: per-scan split
-   time, matrix poll time, report rate, drops and retries.
+   time, matrix poll time, report rate, drops and retries. The split recorder
+   (format 2) counts CRC failures per transaction id. Record both sets under
+   `measurements/pointing-cadence/`.
 5. Hardware acceptance at 230,400: Apply, lighting, typing on the left,
    pointing modes, peer reboot.
 6. Only then consider measuring 460,800 again.
-7. Update the optimization plan: stage 2's candidate exchange no longer needs
-   its own CRC field.
+7. Done: the optimization plan notes that stage 2's candidate exchange needs
+   no CRC field of its own.
 
 ## Reviewed and kept
 
