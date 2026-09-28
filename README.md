@@ -717,4 +717,6 @@ names. For a measurement pair add `NOAH_SPLIT_DIAGNOSTICS=yes` (the ten-second
 transaction recorder, `_diagnostic`) and `NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes`
 (the pointing-cadence recorder with per-stage loop timing, `_cadence`), then run
 `node tools/capture-split-diagnostics.cjs` after flashing; it reads both. Build with Homebrew Python 3.12+ on PATH for the profile tooling.
-See [the activity contract and measurement protocol](docs/architecture/split-activity-sync.md).
+See [the activity contract](docs/architecture/split-activity-sync.md), and follow
+[the capture procedure](measurements/pointing-cadence/README.md) so captures
+compare; recorded sets live under [`measurements/`](measurements/README.md).

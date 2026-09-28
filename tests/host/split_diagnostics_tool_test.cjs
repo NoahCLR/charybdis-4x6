@@ -48,4 +48,29 @@ const staged = summarizeStages({...meta2,stageCount:2},[stageWin(500,[600000,400
 assert.deepEqual(staged.stages.matrixScan,{share:0.55,meanPerScanUs:1100000/900,maxLoopUs:8000});
 assert.deepEqual(staged.stages.durableIo,{share:0.45,meanPerScanUs:900000/900,maxLoopUs:900});
 assert.ok(Math.abs(staged.coverage-1)<1e-9);
+
+// The summarizer: one column per capture, stage rows only when a capture has
+// stages, and every committed capture must still summarize.
+const fs = require('node:fs');
+const path = require('node:path');
+const {summarizeCaptures} = require('../../tools/summarize-cadence-captures.cjs');
+const capture = stages => ({metadata:{durationUs:10000000},transactions:[{id:0,attempts:5000,failures:2,totalUs:1500000,maxUs:400},{id:11,attempts:90,failures:0,totalUs:36000,maxUs:1500}],
+    cadence:{windows:9,pointingPollsPerSecond:{mean:500,min:498,max:502},matrixScansPerSecond:500,maxPointingGapUs:9000,gapHistogram:{'<2000us':3000,'>=5000us':27},...stages}});
+const plain = summarizeCaptures([{name:'a',capture:capture({})}]);
+assert.match(plain,/\| Pointing polls\/s \| 500 \(498–502\) \|/);assert.match(plain,/\| Split transaction share \| 15\.4% \|/);
+assert.match(plain,/\| Poll gaps ≥ 5 ms per second \| 3\.0 \|/);assert.match(plain,/\| 11 \| 9\.0\/s · 400 µs · 1\.5 ms \|/);assert.match(plain,/2 failed/);
+assert.doesNotMatch(plain,/Stage:/);
+const both = summarizeCaptures([{name:'a',capture:capture({})},{name:'b',capture:capture({coverage:1,stages:{matrixScan:{share:0.35,meanPerScanUs:700,maxLoopUs:2200}}})}]);
+assert.match(both,/\| `matrixScan` \| — \| 35\.0% · 700 µs · 2\.2 ms \|/);
+assert.throws(()=>summarizeCaptures([{name:'x',capture:{metadata:{durationUs:1},transactions:[],cadence:{unavailable:'no'}}}]),/no cadence data/);
+const measurements = path.resolve(__dirname, '../../measurements/pointing-cadence');
+let committed = 0;
+for (const set of fs.readdirSync(measurements, {withFileTypes:true}).filter(e => e.isDirectory())) {
+    const files = fs.readdirSync(path.join(measurements, set.name)).filter(f => f.endsWith('.json'));
+    assert.ok(files.length, `${set.name} has no captures`);
+    assert.ok(fs.existsSync(path.join(measurements, set.name, 'README.md')), `${set.name} has no set record`);
+    summarizeCaptures(files.map(f => ({name:f,capture:JSON.parse(fs.readFileSync(path.join(measurements, set.name, f),'utf8'))})));
+    committed += files.length;
+}
+assert.ok(committed > 0);
 console.log('split diagnostic tool decoding tests passed');

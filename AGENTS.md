@@ -55,6 +55,7 @@ tracked under "Current Product Status" in
 - For refactors or runtime architecture work, read `docs/LIVE_EDIT_APP_DIRECTION.md` first. It carries the current direction, the decisions behind it, and what is deliberately left undesigned.
 - The durable specs live under `docs/architecture/`: the Profile Wire and split protocols, the authority state tables, the storage and resource baseline, the PD-mode domain, and the field classification. Treat those as the contract; change them deliberately.
 - This repo no longer keeps dated review folders or finding registers. Record decisions in the doc they govern, next to the thing they constrain.
+- Hardware measurements are the exception: raw captures live under `measurements/<subject>/YYYY-MM-DD-<label>/` with a set record, captured with the subject's procedure. Read [`measurements/README.md`](./measurements/README.md) before taking or quoting a measurement; never edit a capture file.
 
 ## Repo Boundaries
 

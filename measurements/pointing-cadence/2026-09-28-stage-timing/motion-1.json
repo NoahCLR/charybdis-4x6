@@ -1,0 +1,189 @@
+{
+  "metadata": {
+    "transactionCount": 22,
+    "armed": false,
+    "frozen": true,
+    "durationUs": 10000590,
+    "activityId": 10
+  },
+  "transactions": [
+    {
+      "id": 0,
+      "attempts": 4483,
+      "failures": 2,
+      "attemptedBytes": 13449,
+      "totalUs": 1338695,
+      "maxUs": 395
+    },
+    {
+      "id": 1,
+      "attempts": 99,
+      "failures": 0,
+      "attemptedBytes": 693,
+      "totalUs": 37732,
+      "maxUs": 420
+    },
+    {
+      "id": 2,
+      "attempts": 101,
+      "failures": 2,
+      "attemptedBytes": 707,
+      "totalUs": 45251,
+      "maxUs": 5105
+    },
+    {
+      "id": 3,
+      "attempts": 98,
+      "failures": 0,
+      "attemptedBytes": 588,
+      "totalUs": 35498,
+      "maxUs": 413
+    },
+    {
+      "id": 4,
+      "attempts": 99,
+      "failures": 0,
+      "attemptedBytes": 297,
+      "totalUs": 21313,
+      "maxUs": 290
+    },
+    {
+      "id": 5,
+      "attempts": 99,
+      "failures": 0,
+      "attemptedBytes": 297,
+      "totalUs": 22932,
+      "maxUs": 286
+    },
+    {
+      "id": 6,
+      "attempts": 121,
+      "failures": 2,
+      "attemptedBytes": 2178,
+      "totalUs": 110054,
+      "maxUs": 5104
+    },
+    {
+      "id": 10,
+      "attempts": 298,
+      "failures": 0,
+      "attemptedBytes": 4172,
+      "totalUs": 220803,
+      "maxUs": 811
+    },
+    {
+      "id": 11,
+      "attempts": 60,
+      "failures": 0,
+      "attemptedBytes": 360,
+      "totalUs": 24109,
+      "maxUs": 459
+    },
+    {
+      "id": 12,
+      "attempts": 60,
+      "failures": 0,
+      "attemptedBytes": 1670,
+      "totalUs": 76385,
+      "maxUs": 1572
+    },
+    {
+      "id": 13,
+      "attempts": 60,
+      "failures": 0,
+      "attemptedBytes": 180,
+      "totalUs": 11739,
+      "maxUs": 207
+    },
+    {
+      "id": 14,
+      "attempts": 60,
+      "failures": 0,
+      "attemptedBytes": 760,
+      "totalUs": 38687,
+      "maxUs": 1664
+    }
+  ],
+  "cadence": {
+    "windows": 10,
+    "pointingPollsPerSecond": {
+      "mean": 447.9,
+      "min": 444,
+      "max": 450
+    },
+    "matrixScansPerSecond": 448,
+    "maxPointingGapUs": 9153,
+    "gapHistogram": {
+      "<1000us": 0,
+      "<1250us": 0,
+      "<1500us": 0,
+      "<2000us": 2750,
+      "<5000us": 1694,
+      ">=5000us": 35
+    },
+    "stages": {
+      "matrixScan": {
+        "share": 0.3573552,
+        "meanPerScanUs": 797.6678571428571,
+        "maxLoopUs": 7014
+      },
+      "durableIo": {
+        "share": 0.125056,
+        "meanPerScanUs": 279.14285714285717,
+        "maxLoopUs": 4587
+      },
+      "keyRuntime": {
+        "share": 0.009184,
+        "meanPerScanUs": 20.5,
+        "maxLoopUs": 60
+      },
+      "splitSync": {
+        "share": 0.13092,
+        "meanPerScanUs": 292.23214285714283,
+        "maxLoopUs": 6517
+      },
+      "qmkTasks": {
+        "share": 0.0782672,
+        "meanPerScanUs": 174.70357142857142,
+        "maxLoopUs": 295
+      },
+      "processRecord": {
+        "share": 0,
+        "meanPerScanUs": 0,
+        "maxLoopUs": 0
+      },
+      "rgbRender": {
+        "share": 0.0685264,
+        "meanPerScanUs": 152.9607142857143,
+        "maxLoopUs": 1079
+      },
+      "sensorRead": {
+        "share": 0.1026016,
+        "meanPerScanUs": 229.02142857142857,
+        "maxLoopUs": 312
+      },
+      "pointingTask": {
+        "share": 0.009712,
+        "meanPerScanUs": 21.678571428571427,
+        "maxLoopUs": 35
+      },
+      "pointingReport": {
+        "share": 0.0778096,
+        "meanPerScanUs": 173.68214285714285,
+        "maxLoopUs": 281
+      },
+      "outsideKeyboardTask": {
+        "share": 0.0405104,
+        "meanPerScanUs": 90.425,
+        "maxLoopUs": 191
+      }
+    },
+    "coverage": 0.9999424000000001
+  },
+  "ceiling": {
+    "splitShare": 0.1983080998221105,
+    "pointingPollsPerSecond": 558.6934331014374,
+    "usbCapPerSecond": 1000
+  },
+  "note": "attemptedBytes includes nominal complete frames for failed attempts; it is not a physical byte count. Times are measured transaction spans, not CPU utilization. Pointing polls are pointing-task runs, an upper bound on USB mouse reports. The ceiling is an estimate: polls with split transaction time removed. Stage times are exclusive wall time per loop stage; matrixScan includes the split transactions above."
+}

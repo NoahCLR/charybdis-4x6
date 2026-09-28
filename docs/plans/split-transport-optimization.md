@@ -193,8 +193,9 @@ Neither earns a calculated report-rate improvement in this plan.
 
 ### 0. Establish attribution with bounded measurement
 
-1. Hold baud, profile, firmware feature set, DPI, lighting and app state fixed.
-   Measure connected idle, connected motion, and motion while typing on the
+1. Capture with the procedure in `measurements/pointing-cadence/README.md`,
+   which holds baud, profile, firmware feature set, lighting and app state
+   fixed, and record each set there. Measure connected idle, connected motion, and motion while typing on the
    left. Not with the left half disconnected: the master then keeps probing
    and waiting on transport timeouts, so the reading includes stalls a
    connected keyboard never has. Instead the capture tool estimates the
@@ -242,8 +243,8 @@ What follows from it:
 - Gaps of 5 ms or more are the hitches; RPCs landing in one loop are the
   likely source.
 
-Stage timing, same day and workloads, `diagnostic_cadence` pair with the
-cadence recorder's per-stage timing (stages in
+Stage timing, same day and workloads, set
+`measurements/pointing-cadence/2026-09-28-stage-timing/` (stages in
 `docs/architecture/split-activity-sync.md`). Share of the idle loop, which is
 about 2.0 ms:
 

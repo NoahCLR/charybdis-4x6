@@ -85,8 +85,9 @@ VIA custom channel 0, value `0x0A`, diagnostic builds only:
 then reads frozen pages as JSON. It uses the existing Charybdis Live node-hid
 installation but is a separate engineering tool. Close competing app/VIA
 connections. Select `--path` if more than one matching keyboard is attached.
-Capture baseline and optimized firmware with the same profile, cable,
-lighting and motion workload.
+Capture with the procedure in
+[`measurements/pointing-cadence/`](../../measurements/pointing-cadence/README.md),
+which also keeps the recorded sets.
 
 The same run reads the pointing-cadence recorder (custom value `0x03`) when
 the firmware is built with `NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes`. It keeps
