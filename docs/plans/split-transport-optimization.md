@@ -7,8 +7,9 @@ Reduce split work on the right master's mouse-report path at the existing
 combos and holds, mouse buttons and pointing modes, lighting wake/sleep and
 feedback, and Charybdis Live's durable apply/recovery contract.
 
-Activity coalescing and bounded transaction diagnostics are now implemented as
-opt-in builds; physical measurement and acceptance remain pending. The runtime
+Activity coalescing is on in the default build (stage 1 below); bounded
+transaction diagnostics stay opt-in. Physical measurement and acceptance of
+coalescing remain pending. The runtime
 RPC replacement and asynchronous stages remain unimplemented behind their
 measurement gates. See `docs/architecture/split-activity-sync.md` for the current
 contract. This document is not a hardware performance result. After completion, fold durable contracts into
@@ -257,6 +258,15 @@ the original at each simulated frame. Preserve per-scan left matrix acquisition.
 
 Exit: substantial measured drop in PUT_ACTIVITY count, improved reporting or
 split elapsed time, no regression in the above behavior. Keep baud unchanged.
+
+Status: the hook is fork commit `6889960271` on `sol`, and coalescing is the
+default build; `NOAH_SPLIT_ACTIVITY_COALESCE=no` builds the comparison pair.
+It was made the default after daily use on hardware, with Applies saving on
+both halves and no split transport failure across three Applies at 230,400.
+Still to measure: the mouse report rate with coalescing at 230,400 (about
+600 Hz was seen with 460,800, against about 400 Hz originally). Still to
+accept: RGB wake/sleep and timeout boundaries, left keys, chords, holds,
+pointing modes, peer reboot, and error behaviour.
 
 ### 2. Reduce custom snapshot handshake overhead
 

@@ -1,7 +1,8 @@
 # Split activity admission and measurement
 
-Activity coalescing is an opt-in firmware build feature pending physical
-acceptance. Enable `NOAH_SPLIT_ACTIVITY_COALESCE=yes` on the flashable pair.
+Activity coalescing is on in the default build. `NOAH_SPLIT_ACTIVITY_COALESCE=no`
+builds the uncoalesced comparison firmware. Physical acceptance is still open;
+see the [optimization handoff](../plans/split-transport-optimization.md).
 The split link runs at QMK's default 230,400 baud, with no speed selector; see
 D-L43 for why 460,800 was removed.
 
@@ -14,11 +15,10 @@ processing, or the RGB renderer. The fork's activity sender owns the last
 successfully written snapshot and calls the version-1 admission/result hooks.
 Its weak default admits every changed snapshot, preserving ordinary QMK use.
 
-The required QMK changes live on `feat/split_sync_optimize` in the isolated
-`/Users/noah/dev/charybdis/bastardkb-qmk-split-optimize` checkout. The original
-fork checkout is unchanged. The reproducible patch is
-`tools/qmk-patches/split-activity-policy.patch`. Enabling coalescing against a fork without
-`QMK_SPLIT_ACTIVITY_POLICY_VERSION == 1` fails compilation. Activity wire bytes
+The hook is fork commit `6889960271` on `sol`, so the default build needs that
+commit or later. Building coalescing against a fork without
+`QMK_SPLIT_ACTIVITY_POLICY_VERSION == 1` fails compilation and names the
+opt-out. Activity wire bytes
 and transaction IDs are unchanged, so this optimization alone does not require
 a new runtime protocol or a storage migration.
 

@@ -20,10 +20,12 @@ scattered runtime rewrites.
 > very opinionated firmware model.
 >
 > **Firmware note:** This userspace is updated for QMK `0.32.5` and builds
-> against my [`qmk-latest` firmware branch](https://github.com/NoahCLR/bastardkb-qmk/tree/qmk-latest)
-> rather than the older `bkb-master`-based setup. That branch also carries my
-> auto-mouse timer getter changes, which this userspace uses for the
-> auto-mouse RGB timeout fade and split-synced progress.
+> against my [`sol` firmware branch](https://github.com/NoahCLR/bastardkb-qmk/tree/sol)
+> rather than the older `bkb-master`-based setup. The default build needs
+> commit `6889960271` or later on that branch. On top of QMK it carries two
+> small changes this userspace uses: the auto-mouse timer getters, for the
+> auto-mouse RGB timeout fade and split-synced progress, and the split
+> activity hook, for activity coalescing.
 >
 > **Build note:** Use that firmware fork, point `QMK_USERSPACE` at this repo,
 > and build with:
@@ -701,21 +703,18 @@ format limits, compatibility, restore ordering and remaining hardware checks.
 
 ## Split transport comparison builds
 
-The activity-sync optimization is available for hardware comparison. The split
-link always runs at QMK's default 230,400 baud; a faster link garbled split
-messages and was removed (D-L43). It reduces repeated lighting-activity messages while retaining
-per-scan key acquisition. Physical RGB/timing acceptance is pending.
+The firmware coalesces split activity messages by default: it sends fewer
+repeated lighting-activity messages to the other half while still reading its
+keys on every scan. The split link always runs at QMK's default 230,400 baud; a
+faster link garbled split messages and was removed (D-L43). Physical RGB/timing
+acceptance is still open.
 
 ```sh
-QMK_HOME=/Users/noah/dev/charybdis/bastardkb-qmk-split-optimize \
-QMK_ROOT=/Users/noah/dev/charybdis/bastardkb-qmk-split-optimize \
-NOAH_SPLIT_ACTIVITY_COALESCE=yes sh tools/build-firmware-pair.sh
+NOAH_SPLIT_ACTIVITY_COALESCE=no sh tools/build-firmware-pair.sh
 ```
 
-Use the matching QMK branch with the activity-policy hook. Add
-`NOAH_SPLIT_DIAGNOSTICS=yes` for the ten-second transaction recorder, then run
-`node tools/capture-split-diagnostics.cjs` after flashing. A baseline diagnostic
-pair omits `NOAH_SPLIT_ACTIVITY_COALESCE`. Build with Homebrew Python 3.12+ on PATH
-for this branch's profile tooling. Artifact names distinguish activity and
-instrumented variants.
+builds the uncoalesced comparison pair, with `_no_activity` in its artifact
+names. Add `NOAH_SPLIT_DIAGNOSTICS=yes` for the ten-second transaction recorder
+(`_diagnostic`), then run `node tools/capture-split-diagnostics.cjs` after
+flashing. Build with Homebrew Python 3.12+ on PATH for the profile tooling.
 See [the activity contract and measurement protocol](docs/architecture/split-activity-sync.md).

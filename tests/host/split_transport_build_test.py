@@ -33,26 +33,29 @@ class SplitTransportBuildTest(unittest.TestCase):
                         self.assertNotIn("SERIAL_USART_SPEED", result.stdout)
 
     def test_feature_selection(self):
+        # Coalescing is on unless turned off; diagnostics are off unless on.
         with tempfile.TemporaryDirectory() as directory:
             probe = Path(directory) / "probe.mk"
             probe.write_text("all:\n\t@echo $(OPT_DEFS)\n")
-            for name, flag in (("NOAH_SPLIT_ACTIVITY_COALESCE", "NOAH_SPLIT_ACTIVITY_COALESCE_ENABLE"),
-                               ("NOAH_SPLIT_DIAGNOSTICS", "SPLIT_TRANSACTION_DIAGNOSTICS")):
-                for value in ("", "no", "yes", "invalid"):
-                    result = subprocess.run(
-                        ["make", "--no-print-directory", "-f",
-                         str(ROOT / "users/noah/lib/compat/qmk_split_transport.mk"),
-                         "-f", str(probe), f"{name}={value}"],
-                        capture_output=True, text=True,
-                    )
-                    if value == "invalid":
-                        self.assertNotEqual(result.returncode, 0)
-                    else:
+            for name, flag, default in (("NOAH_SPLIT_ACTIVITY_COALESCE", "NOAH_SPLIT_ACTIVITY_COALESCE_ENABLE", True),
+                                        ("NOAH_SPLIT_DIAGNOSTICS", "SPLIT_TRANSACTION_DIAGNOSTICS", False)):
+                for value in (None, "", "no", "yes", "invalid"):
+                    with self.subTest(name=name, value=value):
+                        command = ["make", "--no-print-directory", "-f",
+                                   str(ROOT / "users/noah/lib/compat/qmk_split_transport.mk"), "-f", str(probe)]
+                        if value is not None:
+                            command.append(f"{name}={value}")
+                        env = {key: val for key, val in os.environ.items() if key != name}
+                        result = subprocess.run(command, capture_output=True, text=True, env=env)
+                        if value == "invalid":
+                            self.assertNotEqual(result.returncode, 0)
+                            continue
                         self.assertEqual(result.returncode, 0, result.stderr)
-                        self.assertEqual(result.stdout.strip(), f"-D{flag}" if value == "yes" else "")
+                        enabled = value == "yes" or (default and value in (None, ""))
+                        self.assertEqual(f"-D{flag}" in result.stdout.split(), enabled)
 
     def test_pair_flags_and_artifact_names(self):
-        for baud, owner, activity, diagnostic in (("", True, "", ""), ("", True, "yes", ""), ("", True, "", "yes"), ("", False, "yes", "yes"), ("460800", True, "yes", "")):
+        for baud, owner, activity, diagnostic in (("", True, "", ""), ("", True, "yes", ""), ("", True, "no", ""), ("", True, "", "yes"), ("", False, "no", "yes"), ("460800", True, "yes", "")):
             with self.subTest(baud=baud, owner=owner, activity=activity, diagnostic=diagnostic), tempfile.TemporaryDirectory() as directory:
                 workspace = Path(directory)
                 qmk = workspace / "qmk checkout"
@@ -91,10 +94,12 @@ class SplitTransportBuildTest(unittest.TestCase):
                     self.assertIn(f"FORCE_{role}=yes", call)
                     self.assertFalse(any("NOAH_SPLIT_BAUD" in argument for argument in call))
                     self.assertEqual("NOAH_LIVE_PROFILE_OWNER=no" in call, not owner)
-                    self.assertEqual("NOAH_SPLIT_ACTIVITY_COALESCE=yes" in call, activity == "yes")
+                    # The default build coalesces; only the opt-out is passed on.
+                    self.assertFalse("NOAH_SPLIT_ACTIVITY_COALESCE=yes" in call)
+                    self.assertEqual("NOAH_SPLIT_ACTIVITY_COALESCE=no" in call, activity == "no")
                     self.assertEqual("NOAH_SPLIT_DIAGNOSTICS=yes" in call, diagnostic == "yes")
                 suffix = "" if owner else "_no_owner"
-                suffix += ("_activity" if activity else "") + ("_diagnostic" if diagnostic else "")
+                suffix += ("_no_activity" if activity == "no" else "") + ("_diagnostic" if diagnostic else "")
                 artifacts = sorted(path.name for path in (workspace / "output").rglob("*.uf2"))
                 self.assertEqual(artifacts, [f"1_charybdis_{half}{suffix}.uf2" for half in ("left", "right")])
                 self.assertEqual("WITHOUT the live-profile owner" in result.stdout, not owner)

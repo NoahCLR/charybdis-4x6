@@ -7,7 +7,7 @@
 #    include "../profile/runtime/effective_settings_runtime.h"
 
 #    ifndef QMK_SPLIT_ACTIVITY_POLICY_VERSION
-#        error "Activity coalescing requires the QMK split activity policy hook"
+#        error "Activity coalescing needs the fork's split activity hook (sol at 6889960271 or later); NOAH_SPLIT_ACTIVITY_COALESCE=no builds without it"
 #    endif
 _Static_assert(QMK_SPLIT_ACTIVITY_POLICY_VERSION == 1, "QMK activity hook contract changed");
 

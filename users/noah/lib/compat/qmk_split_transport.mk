@@ -5,13 +5,14 @@ ifneq ($(strip $(NOAH_SPLIT_BAUD)),)
     $(error NOAH_SPLIT_BAUD was removed: the split link stays at QMK's default speed (D-L43))
 endif
 
-# Enabled explicitly for A/B until physical timing and RGB acceptance pass.
-ifneq ($(strip $(NOAH_SPLIT_ACTIVITY_COALESCE)),)
-    ifeq ($(strip $(NOAH_SPLIT_ACTIVITY_COALESCE)),yes)
-        OPT_DEFS += -DNOAH_SPLIT_ACTIVITY_COALESCE_ENABLE
-    else ifneq ($(strip $(NOAH_SPLIT_ACTIVITY_COALESCE)),no)
-        $(error NOAH_SPLIT_ACTIVITY_COALESCE must be yes or no)
-    endif
+# Activity coalescing is on by default and needs the fork's activity hook
+# (sol at 6889960271 or later). NOAH_SPLIT_ACTIVITY_COALESCE=no builds the
+# uncoalesced comparison firmware.
+NOAH_SPLIT_ACTIVITY_COALESCE_SELECTED := $(or $(strip $(NOAH_SPLIT_ACTIVITY_COALESCE)),yes)
+ifeq ($(NOAH_SPLIT_ACTIVITY_COALESCE_SELECTED),yes)
+    OPT_DEFS += -DNOAH_SPLIT_ACTIVITY_COALESCE_ENABLE
+else ifneq ($(NOAH_SPLIT_ACTIVITY_COALESCE_SELECTED),no)
+    $(error NOAH_SPLIT_ACTIVITY_COALESCE must be yes or no)
 endif
 
 ifneq ($(strip $(NOAH_SPLIT_DIAGNOSTICS)),)

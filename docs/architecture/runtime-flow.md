@@ -242,7 +242,7 @@ truth; it consumes snapshots and authored color tables.
 
 ## Split Sync Flow
 
-QMK activity timestamp traffic has an opt-in admission policy, separate from
+QMK activity timestamp traffic has an admission policy, on by default, separate from
 these runtime snapshot domains; see [split activity sync](split-activity-sync.md).
 
 ```mermaid

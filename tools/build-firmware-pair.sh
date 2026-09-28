@@ -43,9 +43,10 @@ if [ -n "${NOAH_SPLIT_BAUD:-}" ]; then
     exit 1
 fi
 
+# Activity coalescing is the default; =no builds the comparison pair.
 case "${NOAH_SPLIT_ACTIVITY_COALESCE:-}" in
-    ""|no) ;;
-    yes) TRANSPORT_ARGS="$TRANSPORT_ARGS -e NOAH_SPLIT_ACTIVITY_COALESCE=yes"; SUFFIX="${SUFFIX}_activity" ;;
+    ""|yes) ;;
+    no) TRANSPORT_ARGS="$TRANSPORT_ARGS -e NOAH_SPLIT_ACTIVITY_COALESCE=no"; SUFFIX="${SUFFIX}_no_activity" ;;
     *) echo "NOAH_SPLIT_ACTIVITY_COALESCE must be yes or no" >&2; exit 1 ;;
 esac
 case "${NOAH_SPLIT_DIAGNOSTICS:-}" in
