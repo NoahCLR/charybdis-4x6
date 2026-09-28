@@ -279,3 +279,9 @@ runtime high-water. The custom-key and macro name tables are `const` and stay
 in flash. The next static buffer of this size would cross the tripwire, not the
 RP2040's SRAM: it needs fresh accounting and a policy decision, not a
 workaround.
+
+The reviewed stack paths pass. The pointing paths follow the one directional
+engine, which LTO inlines into `pointing_device_task`: a fallback settlement
+at 1,248 bytes, a literal tap at 456 and a QMK-function tap at 520; the retired
+per-preset handlers are no longer listed. The largest main-process path is
+still 1,800 bytes.
