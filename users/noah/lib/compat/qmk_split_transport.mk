@@ -6,7 +6,7 @@ ifneq ($(strip $(NOAH_SPLIT_BAUD)),)
 endif
 
 # Activity coalescing is on by default and needs the fork's activity hook
-# (sol at 6889960271 or later). NOAH_SPLIT_ACTIVITY_COALESCE=no builds the
+# (noah-userspace-contracts at 6889960271 or later). NOAH_SPLIT_ACTIVITY_COALESCE=no builds the
 # uncoalesced comparison firmware.
 NOAH_SPLIT_ACTIVITY_COALESCE_SELECTED := $(or $(strip $(NOAH_SPLIT_ACTIVITY_COALESCE)),yes)
 ifeq ($(NOAH_SPLIT_ACTIVITY_COALESCE_SELECTED),yes)
@@ -16,7 +16,7 @@ else ifneq ($(NOAH_SPLIT_ACTIVITY_COALESCE_SELECTED),no)
 endif
 
 # Every split data frame carries a CRC8 by default, which needs the fork's
-# frame CRC (sol at f4f77a2aaf or later, QMK_SPLIT_TRANSPORT_CRC_VERSION 1). Both halves must match: a
+# frame CRC (noah-userspace-contracts at f4f77a2aaf or later, QMK_SPLIT_TRANSPORT_CRC_VERSION 1). Both halves must match: a
 # mixed pair fails at the handshake. NOAH_SPLIT_CRC=no builds the comparison
 # firmware without it.
 NOAH_SPLIT_CRC_SELECTED := $(or $(strip $(NOAH_SPLIT_CRC)),yes)

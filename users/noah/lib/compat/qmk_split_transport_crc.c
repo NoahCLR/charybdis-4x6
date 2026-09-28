@@ -14,7 +14,7 @@
 #    include "transactions.h"
 
 #    ifndef QMK_SPLIT_TRANSPORT_CRC_VERSION
-#        error "The split frame CRC needs the fork's serial transport CRC (sol at f4f77a2aaf or later); NOAH_SPLIT_CRC=no builds without it"
+#        error "The split frame CRC needs the fork's serial transport CRC (noah-userspace-contracts at f4f77a2aaf or later); NOAH_SPLIT_CRC=no builds without it"
 #    endif
 _Static_assert(QMK_SPLIT_TRANSPORT_CRC_VERSION == 1, "QMK split frame CRC contract changed");
 #endif

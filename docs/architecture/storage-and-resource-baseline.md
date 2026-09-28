@@ -1,7 +1,7 @@
 # Stage 00 Baseline
 
 Measured on 2026-08-25 from userspace commit `058f7fdd` against sibling QMK
-branch `sol` at `aac9f637ee`.
+branch `noah-userspace-contracts` at `aac9f637ee`.
 
 ## Firmware And Test Baseline
 
@@ -9,11 +9,11 @@ branch `sol` at `aac9f637ee`.
 | --- | --- |
 | Full host suite | pass |
 | Firmware compile | pass; ELF and UF2 produced |
-| QMK fork contract | sampled auto-mouse API present on `sol` |
+| QMK fork contract | sampled auto-mouse API present on `noah-userspace-contracts` |
 | Hardware live-link probe | not run; no matching board was visible during the transport audit |
 
 The full host suite passed only after the sibling checkout moved from
-`qmk-latest` to `sol`, which contains `auto_mouse_get_time_elapsed_at()`.
+`qmk-latest` to `noah-userspace-contracts`, which contains `auto_mouse_get_time_elapsed_at()`.
 
 ## Target Resource Map
 

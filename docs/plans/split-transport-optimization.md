@@ -322,7 +322,7 @@ the original at each simulated frame. Preserve per-scan left matrix acquisition.
 Exit: substantial measured drop in PUT_ACTIVITY count, improved reporting or
 split elapsed time, no regression in the above behavior. Keep baud unchanged.
 
-Status: the hook is fork commit `6889960271` on `sol`, and coalescing is the
+Status: the hook is fork commit `6889960271` on `noah-userspace-contracts`, and coalescing is the
 default build; `NOAH_SPLIT_ACTIVITY_COALESCE=no` builds the comparison pair.
 It was made the default after daily use on hardware, with Applies saving on
 both halves and no split transport failure across three Applies at 230,400.

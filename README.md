@@ -24,12 +24,13 @@ scattered runtime rewrites.
 > very opinionated firmware model.
 >
 > **Firmware note:** This userspace is updated for QMK `0.32.5` and builds
-> against my [`sol` firmware branch](https://github.com/NoahCLR/bastardkb-qmk/tree/sol)
+> against my [`noah-userspace-contracts` firmware branch](https://github.com/NoahCLR/bastardkb-qmk/tree/noah-userspace-contracts)
 > rather than the older `bkb-master`-based setup. The default build needs
-> commit `6889960271` or later on that branch. On top of QMK it carries two
+> commit `f4f77a2aaf` or later on that branch. On top of QMK it carries three
 > small changes this userspace uses: the auto-mouse timer getters, for the
-> auto-mouse RGB timeout fade and split-synced progress, and the split
-> activity hook, for activity coalescing.
+> auto-mouse RGB timeout fade and split-synced progress; the split activity
+> hook, for activity coalescing; and the split frame CRC, which refuses
+> garbled split messages.
 >
 > **Build note:** Use that firmware fork, point `QMK_USERSPACE` at this repo,
 > and build with:

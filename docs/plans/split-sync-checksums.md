@@ -10,7 +10,7 @@ Goal: a garbled split frame is refused instead of used, with no extra round
 trip on the link.
 
 Status: steps 1–3 are implemented and on by default (`NOAH_SPLIT_CRC=no` builds
-without). The fork change is `f4f77a2aaf` and `c69104c423` on `sol`; `tests/host/run_split_frame_crc_tests.sh`
+without). The fork change is `f4f77a2aaf` and `c69104c423` on `noah-userspace-contracts`; `tests/host/run_split_frame_crc_tests.sh`
 drives the fork's real protocol over a link that corrupts or drops bytes.
 Steps 4–7, measurement and hardware acceptance, remain.
 
@@ -202,7 +202,7 @@ response. Each is checked on its own; the sequence also needs:
 
 ## Steps
 
-1. Fork, on `sol`: frame CRC, staging, handshake constant and drop report in
+1. Fork, on `noah-userspace-contracts`: frame CRC, staging, handshake constant and drop report in
    `serial_protocol.c`; per-id drop counts in the transaction diagnostic; the
    resend-due flag in `send_if_condition` and the activity, sync timer and mods
    handlers, and the RPC early stop and sequence guard, in `transactions.c`;

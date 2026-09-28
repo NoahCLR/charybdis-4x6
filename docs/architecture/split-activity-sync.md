@@ -16,7 +16,7 @@ processing, or the RGB renderer. The fork's activity sender owns the last
 successfully written snapshot and calls the version-1 admission/result hooks.
 Its weak default admits every changed snapshot, preserving ordinary QMK use.
 
-The hook is fork commit `6889960271` on `sol`, so the default build needs that
+The hook is fork commit `6889960271` on `noah-userspace-contracts`, so the default build needs that
 commit or later. Building coalescing against a fork without
 `QMK_SPLIT_ACTIVITY_POLICY_VERSION == 1` fails compilation and names the
 opt-out. Activity wire bytes
