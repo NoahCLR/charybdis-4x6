@@ -15,10 +15,13 @@ function decode(page, response) {
 }
 
 // Pointing-cadence recorder (value 0x03, NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS
-// builds): rolling one-second windows kept since boot, no arming.
+// builds): rolling one-second windows kept since boot, no arming. It is read
+// with VIA's id_custom_get_value (0x08), unlike the split recorder above,
+// which reads with 7 and arms with 8.
+const VIA_CUSTOM_GET = 8;
 function decodeCadence(page, response) {
     const data = Buffer.from(response);
-    if (data.length !== 32 || data[0] !== 7 || data[1] !== 0 || data[2] !== 3 || data[3] !== 1 || data[4] !== page || data[5] !== 0 || data[6] !== 25) {
+    if (data.length !== 32 || data[0] !== VIA_CUSTOM_GET || data[1] !== 0 || data[2] !== 3 || data[3] !== 1 || data[4] !== page || data[5] !== 0 || data[6] !== 25) {
         throw new Error(`Invalid/unavailable cadence page ${page}: ${data.toString('hex')}`);
     }
     const payload = data.subarray(7);
@@ -88,11 +91,11 @@ async function main(argv = process.argv.slice(2)) {
     // Windows roll every second; retry if one rolled while its pages were read.
     function readCadence() {
         for (let attempt = 0; attempt < 3; ++attempt) {
-            const metadata = decodeCadence(0, exchange(7, 0, 3));
+            const metadata = decodeCadence(0, exchange(VIA_CUSTOM_GET, 0, 3));
             const windows = [];
             let consistent = true;
             for (let p = 1; p <= metadata.completed; ++p) {
-                const w = decodeCadence(p, exchange(7, p, 3));
+                const w = decodeCadence(p, exchange(VIA_CUSTOM_GET, p, 3));
                 if (w.sequence !== metadata.sequence) { consistent = false; break; }
                 if (w.index !== null) windows.push(w);
             }

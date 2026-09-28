@@ -67,13 +67,15 @@ Compare instrumented and ordinary firmware to establish measurement overhead.
 
 VIA custom channel 0, value `0x0A`, diagnostic builds only:
 
-- 32-byte request: byte 0 = GET `7` or SET `8`; byte 1 = 0; byte 2 = `0x0A`;
+- 32-byte request: byte 0 = `7` to read or `8` to arm, VIA's `id_custom_set_value`
+  and `id_custom_get_value` used the other way round (QMK routes both to the
+  same handler); the cadence recorder reads with `8`. Byte 1 = 0; byte 2 = `0x0A`;
   byte 3 = nonzero correlation; byte 4 = page; bytes 5–31 zero.
-- SET page 0 clears/arms capture. It changes only volatile diagnostic state.
-- GET page 0 returns metadata. Pages 1..N return transaction ID page-1; reads
+- Arm (`8`) page 0 clears/arms capture. It changes only volatile diagnostic state.
+- Read (`7`) page 0 returns metadata. Pages 1..N return transaction ID page-1; reads
   before freezing return unavailable. Malformed/unknown/unavailable status codes
   match Profile Wire (1/2/3). Replies echo bytes 0–4; status is byte 5.
-- Successful GET has payload length 25 at byte 6, format version 1 at byte 7.
+- A successful read has payload length 25 at byte 6, format version 1 at byte 7.
   Metadata: count at 8, armed at 9, frozen at 10, LE32 duration us at 11,
   PUT_ACTIVITY ID at 15, remaining bytes zero.
 - Transaction page: ID at 8; LE32 attempts/failures/attempted bytes/total us/max us
