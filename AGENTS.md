@@ -159,5 +159,10 @@ through the app. Firmware owns its regression fixtures and C contracts; see
 Live owns its optional cross-repository integration command and runners. Joint
 protocol work runs that gate from Live with explicit checkout paths; firmware's
 required gates remain independent. No Live repository is required to finish a
-firmware-only task. Install firmware diagnostics dependencies with
+firmware-only task. Live does depend on firmware: if a change alters a wire
+format, fixture bytes or a contract spec, or moves a source or probe Live's
+integration runners compile, name the Live follow-up in your handoff (see
+[what Live consumes](docs/architecture/live-compatibility.md#what-live-consumes)).
+`run_firmware_client_independence_tests.sh` fails if any tracked non-doc file
+names the app. Install firmware diagnostics dependencies with
 `npm ci --prefix tools` when using hardware diagnostics.

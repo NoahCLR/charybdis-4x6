@@ -19,6 +19,30 @@ its corresponding implementation. A firmware-only developer can complete the
 firmware gates without installing Live. Joint work runs both suites and Live's
 optional cross-repository integration gate.
 
+## What Live consumes
+
+Independence runs one way: firmware never reads Live, but Live reads firmware.
+These firmware paths are Live's inputs, and changing them does not fail any
+firmware gate:
+
+- Live's `tests/integration/` runners compile the probes
+  `tests/host/{profile_compiled_defaults_v1,profile_pd_v1,qmk_portable_editor,qmk_portable_profile}_test.c`
+  and `tests/host/macro_program_size_probe.c` with sources under
+  `users/noah/lib/{profile,macro,action,compat}/`, headers under
+  `tests/host/include/`, and `tests/host/noah_host_qmk_env.sh`.
+- Live's `upstream/` snapshot pins wire fixtures under `tests/fixtures/` and the
+  wire, domain, transaction and resource specs under `docs/architecture/`.
+
+A firmware change that alters a wire format, fixture bytes or a spec's contract,
+or that moves or rewires those probes and sources, is complete on the firmware
+side once firmware's own gates pass. Name the Live follow-up in the handoff:
+refresh Live's `upstream/` snapshot from the committed firmware revision, update
+its codecs or integration recipes, then run `npm run test:compat` from Live with
+explicit paths. For joint protocol work, run that bridge before merging either
+side.
+
+## Diagnostics
+
 Firmware diagnostics owns its Node dependency in `tools/package.json` and its
 lockfile. Use `npm ci --prefix tools` for hardware diagnostics; neither firmware
 compilation nor its C host tests need that native HID installation. No firmware
