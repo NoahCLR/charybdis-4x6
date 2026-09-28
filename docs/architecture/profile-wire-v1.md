@@ -225,7 +225,7 @@ contract is mirrored in
 - Canonical payload digest is FNV-1a 32-bit in v1 for cheap comparison with the
   existing split tooling. CRC and digest are separate fields.
 - The legacy source-digest status field reports the firmware's compiled-profile
-  digest. The live app reads it from the keyboard and never hashes source files.
+  digest. Ark reads it from the keyboard and never hashes source files.
 - Compiled-default digest is the canonical blob digest materialized into the
   firmware.
 - Action-ABI digest covers supported standard QMK values, stable userspace
@@ -681,7 +681,7 @@ result from an older polled status without inventing another transaction id.
 
 The executable cross-language golden reads live in
 `tests/fixtures/profile_wire_v1_reads.fixture` and are consumed by both the C
-host codec suite and the Charybdis Live JavaScript suite. Exact candidate
+host codec suite and the Charybdis Ark JavaScript suite. Exact candidate
 begin, chunk, validate, commit, abort, acknowledgement, and operation-status
 reports live in `tests/fixtures/profile_candidate_v1.fixture` and are consumed
 by the standalone firmware C codec/coordinator suite.

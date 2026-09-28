@@ -5,7 +5,7 @@
 Reduce split work on the right master's mouse-report path at the existing
 230,400 baud, preserving the connected keyboard experience: left-key response,
 combos and holds, mouse buttons and pointing modes, lighting wake/sleep and
-feedback, and Charybdis Live's durable apply/recovery contract.
+feedback, and Charybdis Ark's durable apply/recovery contract.
 
 Activity coalescing is on in the default build (stage 1 below); bounded
 transaction diagnostics stay opt-in. Coalescing is accepted on hardware; its

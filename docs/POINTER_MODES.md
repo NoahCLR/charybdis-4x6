@@ -11,7 +11,7 @@ top-level [README](../README.md).
 
 The [PD-mode domain contract](architecture/pd-mode-domain-v1.md) specifies the
 eight configurable slots and the remaining hardware acceptance checks. Side-specific schema-2 firmware exposes eight slots in
-Charybdis Live → Pointing modes. The six defaults below are records in those
+Charybdis Ark → Pointing modes. The six defaults below are records in those
 slots, followed by Undo / Redo in slot 6 and an empty slot 7; their names do not
 select special code. Undo / Redo uses horizontal motion at 100 DPI and a
 threshold of 40 to send Cmd+Z or Shift+Cmd+Z. Right Alt double-tap hold activates it.
@@ -45,7 +45,7 @@ motion outputs. Ordinary pointer movement and auto-sniping remain outside the
 slot bank. Dragscroll and Pinch use this repository's scroll implementation.
 All current firmware builds use the eight-slot engine. The generic build runs
 the compiled factory slots without a live profile owner; the side-specific pair
-supports editing and saving them from Charybdis Live.
+supports editing and saving them from Charybdis Ark.
 
 ## Shared Rules
 

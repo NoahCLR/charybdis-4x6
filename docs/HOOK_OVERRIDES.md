@@ -335,7 +335,7 @@ Place the key on a layer or make it a combo output. Without a behaviour row it
 does nothing: the shared process path consumes its press, so it never reaches a
 `process_record_user()` override. A behaviour step (`TAP_SENDS(...)`,
 `PRESS_AND_HOLD_UNTIL_RELEASE(...)` and the other helpers) cannot send a
-custom key; firmware keymap validation and Charybdis Live both refuse that.
-Charybdis Live edits the same keys on its **Custom keys** screen; names it
+custom key; firmware keymap validation and Charybdis Ark both refuse that.
+Charybdis Ark edits the same keys on its **Custom keys** screen; names it
 saves are stored on the keyboard, and a keyboard with none stored reports the
 names in `CUSTOM_KEYS`.

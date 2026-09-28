@@ -27,7 +27,7 @@ and hardware acceptance checks.
   allocator, EEPROM-cache, or stack numbers.
 - Use [profile-wire-v1.md](./profile-wire-v1.md) and
   [profile-split-v1.md](./profile-split-v1.md) for the HID and split protocols
-  the live app speaks.
+  Ark speaks.
 - Use [authority-state-table.md](./authority-state-table.md) for source, device,
   and split authority plus safe activation.
 - Use
@@ -42,7 +42,7 @@ and hardware acceptance checks.
 - Use [device-resident-profile.md](./device-resident-profile.md) for the live
   app's authority, readback, device operations, and performance contracts.
 - The complete user experience and first-grade control-software completion
-  bar that the device-profile architecture serves are in Charybdis Live's
+  bar that the device-profile architecture serves are in Charybdis Ark's
   `docs/PRODUCT_GOAL.md`.
 
 The source trace covers:
@@ -72,7 +72,7 @@ The main rule is:
 | Runtime fact | Owner | Readers or projections |
 | --- | --- | --- |
 | Compiled profile defaults | keymap-owned files under `keyboards/.../keymaps/noah/` | firmware compilation, compiled-defaults readback, validation, profile introspection |
-| Active committed live profile | one logical generation across VIA dynamic storage and the custom profile store | effective runtime views, dynamic keymap, Charybdis Live readback |
+| Active committed live profile | one logical generation across VIA dynamic storage and the custom profile store | effective runtime views, dynamic keymap, Charybdis Ark readback |
 | Action classification and dispatch semantics | `users/noah/lib/action/` | key behavior materialization, key runtime, macro dispatch, direct action taps |
 | QMK and fork compatibility assumptions | `users/noah/lib/compat/` | runtime entry flow, combo origin normalization, VIA split sync, QMK contract checks |
 | Authored key-behavior lookup and materialization | `users/noah/lib/key/behavior/` | key-runtime press planning and validation |
@@ -117,7 +117,7 @@ flowchart TD
 | Change authored key behavior | `keymap.c` `key_behaviors[]` | [change-guide.md](./change-guide.md), [Interaction Model](../INTERACTION_MODEL.md) |
 | Change release or multi-tap semantics | `key/runtime/planning/` and reducer tests | [runtime-flow.md](./runtime-flow.md), [Key Runtime](../KEY_RUNTIME.md) |
 | Change modifier handling | `state/modifiers/` or `state/ownership/keyboard_mod_ownership.*` | [change-guide.md](./change-guide.md) |
-| Configure a PD slot | Charybdis Live or factory `pd_config.c` | [Adding a Pointing Mode](../ADDING_PD_MODE.md) |
+| Configure a PD slot | Charybdis Ark or factory `pd_config.c` | [Adding a Pointing Mode](../ADDING_PD_MODE.md) |
 | Change RGB rendering | `rgb_config.c` for authored colors, `users/noah/lib/rgb/` for render logic | [RGB Configuration](../RGB_CONFIG.md) |
 | Change split mirroring | `users/noah/lib/split/runtime_sync.*` | [runtime-flow.md](./runtime-flow.md) |
 | Change VIA macro behavior | `keymap.c` `VIA_MACROS(MACRO)` defaults or `users/noah/lib/macro/` | [change-guide.md](./change-guide.md) |

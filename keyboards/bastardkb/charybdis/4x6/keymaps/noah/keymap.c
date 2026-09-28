@@ -24,9 +24,9 @@
 // so the slot limit stays visible in keymap.c.
 // Each row is:
 //   KEY(CUSTOM_KEY_n, "name")
-// The name is what Charybdis Live shows for the key: at most 20 printable
+// The name is what Charybdis Ark shows for the key: at most 20 printable
 // ASCII characters. Use an empty string for an unused slot. A profile saved
-// from Charybdis Live keeps its own names.
+// from Charybdis Ark keeps its own names.
 #define CUSTOM_KEYS(KEY)             \
     KEY(CUSTOM_KEY_0, "Right Thumb") \
     KEY(CUSTOM_KEY_1, "Left Thumb")  \
@@ -98,11 +98,11 @@
 // All 64 slots are listed here so the slot limit stays visible in keymap.c.
 // Each row is:
 //   MACRO(VIA_MACRO_n, "name", "payload")
-// The name is what Charybdis Live shows for the macro: at most 20 printable
+// The name is what Charybdis Ark shows for the macro: at most 20 printable
 // ASCII characters. Use empty strings for an unused slot. The firmware seeds
 // VIA's dynamic macro EEPROM defaults from the payloads on init/reset.
 // Workflow: author defaults here -> compile/flash -> reset EEPROM to re-seed
-// them. A profile saved from Charybdis Live keeps its own names and payloads.
+// them. A profile saved from Charybdis Ark keeps its own names and payloads.
 // Payload syntax:
 //   - text {hello} sends "hello" one key at a time
 //   - {KC_A} tap one key, {KC_LGUI,KC_SPC} tap a chord
@@ -206,7 +206,7 @@
 //
 // The default window is COMBO_TERM in config.h (currently 50 ms); the hold
 // threshold is TAPPING_TERM. A live profile stores its own default window and
-// hold threshold, set in Charybdis Live.
+// hold threshold, set in Charybdis Ark.
 #define COMBOS(COMBO, COMBO_WINDOW)                                                   \
     COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))                                        \
     COMBO(CUSTOM_KEY_2, (PD_SLOT_5, MS_BTN3))                                         \
@@ -514,8 +514,8 @@ const key_behavior_t
 
 // ─── Layer Names ────────────────────────────────────────────────────────────
 //
-// What Charybdis Live calls each layer: at most 23 bytes of UTF-8 text. A
-// profile saved from Charybdis Live keeps its own names.
+// What Charybdis Ark calls each layer: at most 23 bytes of UTF-8 text. A
+// profile saved from Charybdis Ark keeps its own names.
 const char layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE] = {
     [LAYER_BASE]    = "Base",
     [LAYER_NUM]     = "Number",

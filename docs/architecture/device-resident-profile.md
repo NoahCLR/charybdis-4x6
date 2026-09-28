@@ -1,13 +1,13 @@
 # Device-Resident Profile Target
 
-This document defines the ownership model for live editing with Charybdis Live
+This document defines the ownership model for live editing with Charybdis Ark
 (the independent app repository in the
 [local workspace map](../../README.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
 authoring files must remain the only source of truth during a live editing
 session.
 
 This is the technical profile contract beneath the broader product goal,
-which Charybdis Live owns in its `docs/PRODUCT_GOAL.md`.
+which Charybdis Ark owns in its `docs/PRODUCT_GOAL.md`.
 The product target is first-grade keyboard control software, not only a working
 live-edit protocol.
 
@@ -20,7 +20,7 @@ the editable values represented by:
 - `keymap.c` layers, behaviors, combos, and macros;
 - `rgb_config.c` colors, feedback policy, and LED groups.
 
-The live app connects to the keyboard, reads that logical profile, edits a
+Ark connects to the keyboard, reads that logical profile, edits a
 local draft based on its exact generation, commits a replacement safely to both
 halves, and reads it back for verification. Reflashing is required only when
 executable firmware capabilities change.
@@ -39,9 +39,9 @@ authority. The three C files remain:
 - the human-reviewable and version-controlled representation, edited directly
   in the firmware repository.
 
-The live app never reads or writes them. Its durable representation is the
+Ark never reads or writes them. Its durable representation is the
 portable profile; `.c` import and export are outside the app (D-L09, an app
-decision in Live's direction). Connecting a keyboard never
+decision in Ark's direction). Connecting a keyboard never
 silently overwrites the keyboard or a draft.
 
 Every editor draft records the device generation and digest it was based on. A
@@ -74,7 +74,7 @@ logical profile.
 
 ## Current Implementation Gap
 
-The live app now reads the complete supported configuration from the keyboard,
+Ark now reads the complete supported configuration from the keyboard,
 edits all current domains, exports/imports a materialized eight-layer snapshot,
 and applies one custom/VIA logical generation without consulting repository
 sources. Both custom halves are durably prepared before the decision marker;
@@ -88,7 +88,7 @@ matrix is recorded, Apply continues to create a recovery file.
 
 ## Required Device-First Operations
 
-The live app must expose these operations with unambiguous direction (reset
+Ark must expose these operations with unambiguous direction (reset
 to compiled defaults is not built yet):
 
 - **Open from keyboard** — read the complete active logical profile and its
@@ -130,8 +130,8 @@ physical capacity.
 
 ## Implementation Sequence
 
-The delivery slices are in Live's product goal and the product's status in
-Live's direction; the firmware's status is in the
+The delivery slices are in Ark's product goal and the product's status in
+Ark's direction; the firmware's status is in the
 [firmware direction](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 The logical-generation manifest and cross-store commit and recovery ordering
 are implemented; external VIA edit adoption remains. The active phase is
@@ -143,5 +143,5 @@ production promotion.
 
 The device-first goal is complete only when a user can connect a keyboard whose
 repository profile is unavailable or stale, read its complete supported
-configuration into the live app, edit it, commit it to both halves, reboot, reconnect,
+configuration into Ark, edit it, commit it to both halves, reboot, reconnect,
 and recover the same editable values without consulting the C files.

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Firmware macro sizing against a frozen regression corpus. Live owns the
+# Firmware macro sizing against a frozen regression corpus. Ark owns the
 # separate comparison against its current encoder and size estimator.
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"

@@ -10,7 +10,7 @@ here.
 ## Who Owns What
 
 Firmware owns the device: its runtime, its stored profile, the wire and split
-protocols, and the specs under `docs/architecture/`. Charybdis Live owns the app,
+protocols, and the specs under `docs/architecture/`. Charybdis Ark owns the app,
 the product goal, the product's status and the app's decisions, in its own
 repository's `docs/PRODUCT_GOAL.md` and `docs/LIVE_EDIT_APP_DIRECTION.md` (checkout
 paths are in the [local workspace map](../README.md#local-repositories-and-worktrees)).
@@ -19,11 +19,11 @@ No firmware task needs that checkout.
 Each decision has one home. Both direction documents keep every D-L heading, so
 a citation resolves in either repository, but only the owner holds the text and
 the other keeps a one-line pointer. Change a decision where its text lives. A
-new firmware decision is numbered from D-F01 here; Live continues the D-L series.
+new firmware decision is numbered from D-F01 here; Ark continues the D-L series.
 
 ## The Direction In One Sentence
 
-The keyboard becomes the source of truth, and the live app becomes a client of
+The keyboard becomes the source of truth, and Ark becomes a client of
 the keyboard rather than a client of the repository.
 
 ## Current Firmware Status
@@ -31,7 +31,7 @@ the keyboard rather than a client of the repository.
 The firmware serves the keyboard's complete configuration, compiled defaults
 included, over Profile Wire, and publishes a complete profile to both halves as
 one atomic logical generation that recovers from interruption and a lost peer
-(D-L21, D-L22, D-L27, D-L39). The app's surface-by-surface status is in Live's
+(D-L21, D-L22, D-L27, D-L39). The app's surface-by-surface status is in Ark's
 direction.
 
 Firmware work remaining before the product is complete:
@@ -86,25 +86,25 @@ Firmware work remaining before the product is complete:
 
 Numbers are stable and cited from code and docs. D-L01 (branch from
 `refactor/live_edit`, revert only Studio's shell) and D-L03 (move `live-link/`
-into the live app, since layered into `core/` by D-L10) were branch setup and
+into Ark, since layered into `core/` by D-L10) were branch setup and
 are complete. D-L16 wired Studio's macro UI into v1 and went with it (D-L35).
-App decisions keep their heading here and their text in Live's direction.
+App decisions keep their heading here and their text in Ark's direction.
 
-### D-L02 — The live app is a VS Code extension for now
+### D-L02 — Ark is a VS Code extension for now
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L04 — The source editor is retired
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L05 — The keycode catalog is vendored, not parsed
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L06 — v1 ported Studio's whole UI and rebuilt only the model source
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L07 — Specs are promoted, process is deleted
 
@@ -127,21 +127,21 @@ from `tools/build-firmware-pair.sh`; a build that sets only
 `FORCE_MASTER`/`FORCE_SLAVE` silently omits the owner. The opt-out stays as the
 lever for comparing ordinary against live behaviour on identical source.
 
-### D-L09 — The live app owns a canonical profile format, not `.c`
+### D-L09 — Ark owns a canonical profile format, not `.c`
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
-### D-L10 — The live app is layered, and the layering is enforced
+### D-L10 — Ark is layered, and the layering is enforced
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L11 — Current state comes from the keyboard, including compiled defaults
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L12 — RGB rule identity and preview appearance are separate
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L13 — Combo readback is device data
 
@@ -186,7 +186,7 @@ stand.
 
 ### D-L15 — A portable profile is the complete effective configuration
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L17 — The keyboard reports its brightness limit
 
@@ -221,11 +221,11 @@ lighting edits save correctly while lighting is off.
 
 ### D-L19 — One whole-profile draft and review
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L20 — Differential Apply
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L21 — Apply publishes one atomic logical generation
 
@@ -277,7 +277,7 @@ the USB cable, not the cable between the halves.
 
 ### D-L23 — Apply shows its steps, and a failure says where, why and what was saved
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L24 — Directional modes can read eight directions
 
@@ -309,7 +309,7 @@ keys, under a new action ABI digest; the `MACRO_n` numbers are gone.
 
 ### D-L26 — Macro slots share one visible memory, and every slot says what fits
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L27 — A stale copy on the other half can no longer hold off every later one
 
@@ -361,23 +361,23 @@ such neighbours, so there it acts as "its neighbours take over". See
 
 ### D-L29 — The review lists items, discarded in the groups their edits made
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L30 — The draft shows itself where it is edited
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L31 — One mark per thing that has a colour
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L32 — Things sit in fixed places
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L33 — One home for each rule the app needs twice
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L34 — Layer keycodes are owned in the firmware, and the app follows
 
@@ -410,15 +410,15 @@ auto-mouse. A 44-step hardware check passed on both halves on 2026-09-24; the
 
 ### D-L35 — Charybdis Live v2 is the app
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L36 — The review checks reachable actions and save blockers
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L37 — Any layer can be the base
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L38 — The dual-role setting is QMK's tapping term
 
@@ -482,7 +482,7 @@ contract is [PD-mode domain v1](architecture/pd-mode-domain-v1.md).
 The eight configurable pointing modes use one keycode vocabulary: `PD_SLOT_n`
 for hold and `PD_SLOT_n_LOCK` for toggle. The original six factory preset
 names are no longer firmware keycode symbols. Slot assignment is stable; the
-keycodes' numeric values moved to their fixed block with D-L42. Charybdis Live
+keycodes' numeric values moved to their fixed block with D-L42. Charybdis Ark
 reads each slot's current name and behavior from the device and keeps former
 preset expressions as import aliases for older portable files. See the
 [PD-mode domain contract](architecture/pd-mode-domain-v1.md) for the fixed
@@ -546,20 +546,24 @@ stays removed until it is accepted on hardware and measured again.
 
 ### D-L44 — The app has its own repository and pinned firmware inputs
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
 ### D-L45 — Compatibility tests select both implementations explicitly
 
-App decision; its text is in Live's direction.
+App decision; its text is in Ark's direction.
 
-### D-L46 — Firmware has no reverse dependency on Live
+### D-L46 — Firmware has no reverse dependency on Ark
 
-Firmware builds, host tests and diagnostics require no Live checkout, and no
+Firmware builds, host tests and diagnostics require no Ark checkout, and no
 tracked firmware file outside prose and frozen fixtures names one;
 `run_firmware_client_independence_tests.sh` enforces both. Firmware owns frozen
-regression vectors in `tests/fixtures/client-regression/`. Live owns
+regression vectors in `tests/fixtures/client-regression/`. Ark owns
 cross-language integration: it reads explicitly selected firmware checkouts and
 compares the current implementations. The in-tree app has been removed and its
 source history remains in Git. See
-[the independence contract](architecture/live-compatibility.md), including what
-Live consumes.
+[the independence contract](architecture/ark-compatibility.md), including what
+Ark consumes.
+
+### D-L47 — The app is named Ark
+
+App decision; its text is in Ark's direction.

@@ -117,7 +117,7 @@ function estimateCeiling(metadata, transactions, cadence) {
 
 async function main(argv = process.argv.slice(2)) {
     if (argv.includes('--help')) {
-        console.log('Usage: node tools/capture-split-diagnostics.cjs [--path HID_PATH]\nClose Charybdis Live/VIA, use a diagnostic build, then move the ball during the ten-second capture. JSON goes to stdout. No profile writes.');
+        console.log('Usage: node tools/capture-split-diagnostics.cjs [--path HID_PATH]\nClose Charybdis Ark/VIA, use a diagnostic build, then move the ball during the ten-second capture. JSON goes to stdout. No profile writes.');
         return;
     }
     if (argv.length && !(argv.length === 2 && argv[0] === '--path')) throw new Error('Expected --path HID_PATH or --help');

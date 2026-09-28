@@ -1,9 +1,9 @@
 # Plan: CI host tests and local hooks
 
-Parked until firmware and Live both have their remotes. Nothing here is
-implemented. Live's half is `docs/plans/ci-and-hooks.md` in the Live repository.
+Parked until firmware and Ark both have their remotes. Nothing here is
+implemented. Ark's half is `docs/plans/ci-and-hooks.md` in the Ark repository.
 When done, fold the lasting rules into `AGENTS.md` and
-[live compatibility](../architecture/live-compatibility.md), then delete this
+[Ark compatibility](../architecture/ark-compatibility.md), then delete this
 file (D-L07).
 
 Goal: every firmware push runs the gates agents run locally, and cheap failures
@@ -42,7 +42,7 @@ and `--no-verify` skips them. CI is the enforcement.
 ## Acceptance
 
 - A planted failing host test fails the CI job, and a clean push passes it.
-- A staged whitespace error, a staged `charybdis-live` reference and a stale
+- A staged whitespace error, a staged `charybdis-ark` reference and a stale
   introspection output each block a commit.
 - A commit in a task worktree runs the same hooks.
 

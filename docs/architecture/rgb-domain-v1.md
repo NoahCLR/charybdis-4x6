@@ -112,7 +112,7 @@ remain ordered data.
 
 ## Validation boundary
 
-Live's `core/schema/rgb-domain-v1.js` and the firmware `profile_rgb_v1.c` reader-backed decoder
+Ark's `core/schema/rgb-domain-v1.js` and the firmware `profile_rgb_v1.c` reader-backed decoder
 perform matching strict validation for versions, reserved fields, compiled
 feature inclusion, complete surfaces, capacities, stable ids, enums,
 selectors, references, geometry, brightness, canonical ordering, and exact

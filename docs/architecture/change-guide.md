@@ -15,7 +15,7 @@ directory and the existing domain docs.
 | Change effect application | `key/runtime/projection/` | planners, unless the decision itself changes | key-runtime integration harness, layer-lock, PD integration, RGB/split tests as relevant |
 | Change modifier preservation or replay | `state/modifiers/` | local ad hoc save/restore logic in callers | keyboard mod ownership, action dispatch, delayed action, modifier-hold, PD integration |
 | Change layer lock or momentary layer ownership | `state/ownership/layer_ownership.*` and key-runtime ownership bridge | direct QMK layer writes from planners | layer ownership, key-runtime layer-lock, feature gate |
-| Configure a PD slot | Charybdis Live; `pd_config.c` only for factory defaults | per-preset C handlers | PD domain, configured engine, PD/key-runtime integration, RGB render |
+| Configure a PD slot | Charybdis Ark; `pd_config.c` only for factory defaults | per-preset C handlers | PD domain, configured engine, PD/key-runtime integration, RGB render |
 | Add a PD engine family | PD domain contract, `pointing/modes/`, `pointing/runtime/` and app schema | key runtime unless interaction semantics change | PD domain, configured engine, PD runtime, pointer layer policy, PD/key-runtime integration, split sync, RGB render |
 | Change combo origin or combo footprint behavior | `compat/qmk_combo_origin.*` and `key/runtime/slot/origin_registry.*` | key runtime reducers as a combo-specific workaround | `run_qmk_combo_origin_tests.sh`, key-runtime scenario if behavior changes, RGB render, split sync, real profile validation |
 | Change RGB colors or LED groups | selected profile `rgb_config.c` | RGB runtime stage logic | profile introspection write/check for the selected profile, `run_profile_introspection_checks.sh`, RGB validation, RGB render, real profile validation |
@@ -56,7 +56,7 @@ directory and the existing domain docs.
   only its hold (tap count 0) goes through layer ownership. Where an action may
   be placed is one rule, `noah_action_supported_at()`: `keymap.c` validation
   and the keyboard's check of a profile it is asked to save both ask it, and
-  the live app mirrors it in `placementProblem()`. A new owned layer keycode is a
+  Ark mirrors it in `placementProblem()`. A new owned layer keycode is a
   matcher in `lib/action/action_kind.c`, not a special case in a caller.
 - Do not treat split sync or RGB as owners. They mirror or render existing
   runtime truth.

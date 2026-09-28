@@ -25,7 +25,7 @@ _Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAM
 #endif
 
 #define VIA_MACRO_SLOT_COUNT 64
-// The names Charybdis Live shows until a layer, macro or custom key is renamed
+// The names Charybdis Ark shows until a layer, macro or custom key is renamed
 // there: a layer name holds 23 UTF-8 bytes, a macro or custom-key name 20
 // printable ASCII characters, each followed by its terminator.
 #define NOAH_LAYER_NAME_SIZE 24
@@ -119,7 +119,7 @@ _Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA mac
 //
 // A custom key does nothing by itself: give it a key_behaviors[] row and place
 // it on a layer or as a combo output. Its name comes from CUSTOM_KEYS in
-// keymap.c until Charybdis Live renames it. A behaviour step cannot send one.
+// keymap.c until Charybdis Ark renames it. A behaviour step cannot send one.
 // PD_SLOT_n holds a configurable pointing slot; add a key_behaviors[] row for
 // explicit tap, hold, longer-hold or multi-tap behavior on top of that default.
 // LOCK_LAYER(n) toggles a layer lock from actions authored in key_behaviors[].

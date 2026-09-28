@@ -3,7 +3,7 @@
 This repo is the shared userspace for my Charybdis 4x6.
 
 For the editor's build, test and compilation-database tasks, see the
-[VS Code workflow](.vscode/README.md). Charybdis Live's editor tasks now belong
+[VS Code workflow](.vscode/README.md). Charybdis Ark's editor tasks now belong
 to its independent sibling repository.
 
 ## Local repositories and worktrees
@@ -11,7 +11,7 @@ to its independent sibling repository.
 On Noah's machine, the main checkouts are:
 
 - Firmware: `/Users/noah/dev/charybdis/charybdis-4x6`.
-- Live: `/Users/noah/dev/charybdis/charybdis-live`.
+- Ark: `/Users/noah/dev/charybdis/charybdis-ark`.
 - Upstream QMK build dependency: `/Users/noah/dev/charybdis/bastardkb-qmk`.
 
 Use the worktree assigned to your task. Run `git worktree list` in the relevant
@@ -22,13 +22,13 @@ workspace layout and may not hold in a worktree. Select QMK explicitly with
 to the firmware worktree being built.
 
 Firmware agents own this checkout's C code, tests and firmware documentation.
-Live agents own the independent app checkout and its documentation; read its
+Ark agents own the independent app checkout and its documentation; read its
 `AGENTS.md` and `README.md` there. The former `tools/charybdis-live/` copy has
 been removed; its source history remains in Git. Inspecting another checkout
 is allowed;
 editing it requires that scope in the task. Coordinate shared QMK build output
 and keyboard access with other agents. Firmware tests and builds require no
-Live checkout; Live owns the optional cross-repository integration tests.
+Ark checkout; Ark owns the optional cross-repository integration tests.
 
 ## Firmware overview
 
@@ -109,7 +109,7 @@ The old five-layer and six-mode readback bridges are retired. This repository
 no longer provides a firmware path for extracting and migrating a profile from
 an old-geometry keyboard. Keep any old firmware and backups you already have;
 flashing schema-2 firmware over that geometry does not preserve its committed
-profile. Existing schema-2 backups still restore through the live app.
+profile. Existing schema-2 backups still restore through Ark.
 
 Physical migration, power-interruption, pointing cadence and stack high-water
 acceptance remain release gates; see the
@@ -152,7 +152,7 @@ behavior:
 
 You can also make the trackball change roles instead of only moving the cursor.
 The current profile assigns these behaviors to slot keycodes. The slot number
-stays fixed when a mode is renamed or reconfigured in Charybdis Live:
+stays fixed when a mode is renamed or reconfigured in Charybdis Ark:
 
 - `PD_SLOT_0` (Dragscroll): ball motion becomes scrolling, as either a momentary hold or a
   lock
@@ -192,26 +192,26 @@ changes with the firmware host tests and regenerate their read-only overview
 with `python3 tools/profile_introspect.py --keymap <name> --write`.
 For the default profile, see [KEYMAP-OVERVIEW.md](docs/KEYMAP-OVERVIEW.md) and
 [KEYMAP.md](docs/KEYMAP.md). On a connected keyboard, the committed device
-profile is the source of truth; edit it with Charybdis Live.
+profile is the source of truth; edit it with Charybdis Ark.
 
-## Charybdis Live
+## Charybdis Ark
 
-Charybdis Live edits the connected keyboard over
+Charybdis Ark edits the connected keyboard over
 Raw HID. Its runtime never reads this repository, so it needs no firmware workspace: the
 keyboard is the source of truth and the app is its client. Authored C files
 remain the firmware's compiled defaults.
 
-The active VS Code installation uses the independent sibling `charybdis-live`
+The active VS Code installation uses the independent sibling `charybdis-ark`
 repository. For a new installation, symlink the sibling folder into VS Code's
 extensions, then reload the window:
 
 ```sh
-cd ../charybdis-live && npm ci
-ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-live-0.1.0
+cd ../charybdis-ark && npm ci
+ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-ark-0.1.0
 ```
 
-Open it from the **Charybdis Live** status bar item or `Charybdis: Open
-Charybdis Live`, or press `F5` with the sibling repo's `Run Charybdis Live`
+Open it from the **Charybdis Ark** status bar item or `Charybdis: Open
+Charybdis Ark`, or press `F5` with the sibling repo's `Run Charybdis Ark`
 launch configuration for an Extension Development Host.
 
 It reads everything it edits from the keyboard — layout, key behaviours,
@@ -293,7 +293,7 @@ Readback and Apply need the side-specific firmware pair from
 `sh tools/build-firmware-pair.sh`, which carries the live-profile owner; the
 generic image does not.
 
-The app's current guide is `README.md` in the independent Live checkout listed
+The app's current guide is `README.md` in the independent Ark checkout listed
 under [local repositories](#local-repositories-and-worktrees); its `docs/`
 directory owns app development guidance. Earlier in-tree guides remain in Git
 history.
@@ -388,7 +388,7 @@ combo. Either way, the behavior row is the same.
 what their behavior row says. Each is named in the `CUSTOM_KEYS(KEY)` table in
 `keymap.c` (at most 20 printable ASCII characters, `""` for an unused slot).
 Without a row a custom key does nothing, and no behavior step can send one;
-keymap validation and Charybdis Live both refuse that.
+keymap validation and Charybdis Ark both refuse that.
 
 The double-tap `.hold` uses the release-based helper because that branch also
 has a later `.long_hold`. The single-tap layer hold and the media long-holds use
@@ -626,7 +626,7 @@ Use the docs based on what you want to change:
   entry point for runtime ownership and source boundaries
 - [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md): the
   firmware side of live editing: status, open issues and firmware decisions. The
-  product goal, app status and app decisions are in the Charybdis Live repository.
+  product goal, app status and app decisions are in the Charybdis Ark repository.
 
 ## AI Workflow Note
 
@@ -644,7 +644,7 @@ documentation.
 
 ### Complete keyboard profiles
 
-Charybdis Live's **Export profile** saves the configuration read from the
+Charybdis Ark's **Export profile** saves the configuration read from the
 keyboard: every layer and key position, behaviours, combos, named VIA macros,
 lighting and global settings. Flashed defaults and live edits become one
 portable file. **Import profile** shows a review, saves a recovery copy, restores
@@ -693,9 +693,9 @@ See [the activity contract](docs/architecture/split-activity-sync.md), and follo
 [the capture procedure](measurements/pointing-cadence/README.md) so captures
 compare; recorded sets live under [`measurements/`](measurements/README.md).
 
-Firmware builds and host tests do not require the Live app. The independent Live
+Firmware builds and host tests do not require Ark. The independent Ark
 repo owns the optional `npm run test:compat` integration gate for joint protocol
-work. See [the independence contract](docs/architecture/live-compatibility.md).
+work. See [the independence contract](docs/architecture/ark-compatibility.md).
 Install this repo's diagnostics dependencies with `npm ci --prefix tools` before
 using `tools/capture-split-diagnostics.cjs`; its HID dependency is independent
-of Live.
+of Ark.

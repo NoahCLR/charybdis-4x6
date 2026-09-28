@@ -106,7 +106,7 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
 
 // ─── Saved LED Groups ───────────────────────────────────────────────────────
 //
-// LED groups Charybdis Live keeps for later without painting them anywhere.
+// LED groups Charybdis Ark keeps for later without painting them anywhere.
 // A group used by a table below is saved with it and need not be listed here.
 static const rgb_led_group_t saved_led_groups_data[] = RGB_SAVED_LED_GROUP_TABLE(
     RGB_LED_GROUP(54, 56),

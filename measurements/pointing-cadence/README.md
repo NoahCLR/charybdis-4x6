@@ -56,7 +56,7 @@ cannot reveal after the fact.
    record, and keep it for the whole set.
 3. Plug directly into the computer: the same port and cable every time, no hub,
    dock or KVM. Record the host and its OS.
-4. Quit Charybdis Live, VIA and anything else that opens the keyboard's raw HID
+4. Quit Charybdis Ark, VIA and anything else that opens the keyboard's raw HID
    interface. Their traffic runs inside the loop being measured.
 5. Leave the lighting as the profile sets it, and awake. The lighting sleeps
    after 15 minutes without input and its render is about a sixth of the

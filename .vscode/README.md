@@ -1,6 +1,6 @@
 # VS Code workflow
 
-Open the parent `charybdis.code-workspace` for the firmware, independent Live
+Open the parent `charybdis.code-workspace` for the firmware, independent Ark
 app, upstream QMK checkout and build artifacts together. Folder tasks bind their
 working directory explicitly to this firmware repository.
 
@@ -20,10 +20,10 @@ working directory explicitly to this firmware repository.
 - Layout overview and source formatting remain available through **Tasks: Run
   Task**.
 
-Charybdis Live launch/check/catalog tasks belong to the sibling `charybdis-live`
+Charybdis Ark launch/check/catalog tasks belong to the sibling `charybdis-ark`
 repo. The shared status bar has **Build
-Firmware**, **Build with DB** and **Format Repo** buttons. The installed Live
-extension supplies the fourth button, **Charybdis Live**, and must point to the
+Firmware**, **Build with DB** and **Format Repo** buttons. The installed Ark
+extension supplies the fourth button, **Charybdis Ark**, and must point to the
 independent repo. Test tasks remain available without status-bar buttons.
 
 C and C++ use clang-format; Python uses Ruff; JavaScript, JSON, HTML and CSS

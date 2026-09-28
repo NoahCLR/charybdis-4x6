@@ -34,7 +34,7 @@ Each item was checked against the code; the reproducing scenario is given.
 
 ### 1. Discarding a custom-key name after importing an old backup throws — fixed
 
-`core/model/profile-revert.js` in the independent Live repository (formerly
+`core/model/profile-revert.js` in the independent Ark repository (formerly
 `tools/charybdis-live/`). A backup's settings
 are v4 or older, so after an import the review lists `customKey:n` (Right Thumb
 → no name), and discarding it fails with "This custom key name cannot be put

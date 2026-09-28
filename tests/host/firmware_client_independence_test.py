@@ -14,7 +14,8 @@ for record in manifest['files']:
 # Every tracked executable surface: tests, tools, build files, userspace, editor
 # tasks and CI. Prose and frozen fixtures may name the app as history or
 # provenance; this file names the rule and is not a consumer.
-forbidden = ['charybdis-live', 'CHARYBDIS_LIVE_ROOT', 'noah_host_live_env', 'requireLive']
+# The app is Charybdis Ark; its former name stays forbidden too.
+forbidden = ['charybdis-ark', 'CHARYBDIS_ARK_ROOT', 'charybdis-live', 'CHARYBDIS_LIVE_ROOT', 'noah_host_live_env', 'requireLive']
 prose = {'.md', '.txt'}
 exempt = {'tests/host/firmware_client_independence_test.py'}
 tracked = subprocess.run(['git', '-C', str(root), 'ls-files', '-z'], check=True, capture_output=True).stdout

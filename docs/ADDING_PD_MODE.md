@@ -1,6 +1,6 @@
 # Adding a Pointing Mode
 
-For ordinary mode creation, use **Charybdis Live → Pointing modes**. The
+For ordinary mode creation, use **Charybdis Ark → Pointing modes**. The
 keyboard has eight fixed device-owned slots. Directional keys and shortcuts,
 scrolling, modifier policies, button overrides, DPI and RGB are profile data;
 editing them requires no C and no reflash. See [Pointer Modes](POINTER_MODES.md)

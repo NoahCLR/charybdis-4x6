@@ -10,7 +10,7 @@ anything supported, saves it safely to both halves, and can back it up or
 recover it later — with no repository, no C, and no reflash.
 
 The direction is one sentence: **the keyboard becomes the source of truth, and
-the live app becomes a client of the keyboard rather than a client of the
+Ark becomes a client of the keyboard rather than a client of the
 repository.**
 
 Read [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md)
@@ -18,22 +18,22 @@ before doing architecture work. It carries the firmware's status, open issues
 and decisions, and says who owns what. The technical authority is
 [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-resident-profile.md).
 The product goal, the app's status and the app's decisions belong to the
-Charybdis Live repository; no firmware task needs them.
+Charybdis Ark repository; no firmware task needs them.
 
 ### The tools, and the line between them
 
-- **Charybdis Live** edits the connected keyboard over Raw HID. Active app
-  development belongs in the independent `charybdis-live` repository; read
+- **Charybdis Ark** edits the connected keyboard over Raw HID. Active app
+  development belongs in the independent `charybdis-ark` repository; read
   that checkout's `AGENTS.md` before editing it. The former
   `tools/charybdis-live/` source lives in Git history, not this checkout.
   The app runtime must never read firmware source; developer inspection and
-  Live-owned integration tests may read explicitly selected firmware checkouts.
+  Ark-owned integration tests may read explicitly selected firmware checkouts.
 - Authored C profiles remain firmware source, edited directly and checked by
   firmware validation and introspection tools.
 
 ### Where we are
 
-The live app reads everything it edits from the keyboard, keeps every change in
+Ark reads everything it edits from the keyboard, keeps every change in
 one reviewed draft with undo and redo, and applies it to both halves through a
 recovery-first logical transaction; complete profiles back up and restore. The
 firmware's remaining work — physical interruption acceptance, external VIA
@@ -45,7 +45,7 @@ adoption and broad hardware acceptance — is under "Current Firmware Status" in
 - Start every task with `git status --short`.
 - Assume the worktree may already be dirty. Never revert or overwrite unrelated user changes.
 - Work in the firmware worktree assigned to this task, not automatically in the main checkout. See the local paths and worktree discovery in [README.md](README.md#local-repositories-and-worktrees).
-- The main checkout belongs to a multi-root VS Code workspace with QMK, Live and build artifacts. Worktrees may live elsewhere; do not assume its sibling layout applies.
+- The main checkout belongs to a multi-root VS Code workspace with QMK, Ark and build artifacts. Worktrees may live elsewhere; do not assume its sibling layout applies.
 - Treat `charybdis-4x6` as the default write target. Do not edit sibling workspace folders unless the task explicitly requires it and the user wants that scope.
 - In general, prefer changes in this repo over changes in sibling workspace folders. `../builds` is output/artifact space, not source.
 - If the task depends on upstream QMK behavior or build wiring, inspect the selected QMK checkout instead of guessing how upstream behaves. Use the local workspace map in README to locate it.
@@ -79,7 +79,7 @@ Required verification workflow:
    - hooks / ownership: `sh tests/host/run_hook_chaining_tests.sh`, `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_owned_keycode_tests.sh`, `sh tests/host/run_held_action_tests.sh`, `sh tests/host/run_layer_ownership_tests.sh`
    - macro / VIA / QMK-contract work: `sh tests/host/run_qmk_contract_checks.sh`, `sh tests/host/run_action_lifecycle_tests.sh`, `sh tests/host/run_qmk_portable_profile_tests.sh`, `sh tests/host/run_macro_payload_tests.sh`, `sh tests/host/run_via_macro_defaults_tests.sh`, `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
    - shared runtime / tracing: `sh tests/host/run_runtime_init_order_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`
-   - Charybdis Live lives in its independent repository and owns its checks; firmware checks must not invoke an app checkout.
+   - Charybdis Ark lives in its independent repository and owns its checks; firmware checks must not invoke an app checkout.
 4. If authored keymap, combo, macro, or RGB data changed, also run:
    `sh tests/host/run_real_profile_validation_tests.sh`
 5. If runtime wiring, source lists, compat surfaces, or header boundaries changed, also run:
@@ -121,7 +121,7 @@ Repo-specific guardrails:
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update `README.md` and the relevant files under `docs/` in the same pass.
 - If any authored input to `tools/profile_introspect.py` changes, regenerate the introspection outputs in the same pass with `python3 tools/profile_introspect.py --write` and verify them with `python3 tools/profile_introspect.py --check`. Current authored inputs are `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`, `users/noah/config.h`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`, and the shared pd-mode manifest `users/noah/lib/pointing/defs/pd_mode_manifest.h`.
-- If architectural work lands, record it in the doc it governs in the same pass: a new or amended firmware decision in `docs/LIVE_EDIT_APP_DIRECTION.md` (numbered from D-F01; keep "Current Firmware Status" and "Open Issues" current), or the matching spec under `docs/architecture/`. App decisions and app status belong to Live; a D-L heading here marked as an app decision is only a pointer.
+- If architectural work lands, record it in the doc it governs in the same pass: a new or amended firmware decision in `docs/LIVE_EDIT_APP_DIRECTION.md` (numbered from D-F01; keep "Current Firmware Status" and "Open Issues" current), or the matching spec under `docs/architecture/`. App decisions and app status belong to Ark; a D-L heading here marked as an app decision is only a pointer.
 - Write decisions and contracts, not logs: verification runs, build numbers, test counts and dated progress notes belong in commit messages. When a plan is finished, fold what still constrains the code into the spec it produced and delete the plan (D-L07).
 
 ## RP2040 Resource Truth
@@ -152,19 +152,19 @@ Repo-specific guardrails:
 
 ## Independent firmware development
 
-Firmware builds and the full host suite must work without any Live checkout.
+Firmware builds and the full host suite must work without any Ark checkout.
 Never import app modules in firmware tests or resolve diagnostics dependencies
 through the app. Firmware owns its regression fixtures and C contracts; see
-[the independence contract](docs/architecture/live-compatibility.md).
-Live owns its optional cross-repository integration command and runners. Joint
-protocol work runs that gate from Live with explicit checkout paths; firmware's
-required gates remain independent. No Live repository is required to finish a
-firmware-only task. Live does depend on firmware: if a change alters a wire
-format, fixture bytes or a contract spec, or moves a source or probe Live's
-integration runners compile, name the Live follow-up in your handoff (see
-[what Live consumes](docs/architecture/live-compatibility.md#what-live-consumes)).
+[the independence contract](docs/architecture/ark-compatibility.md).
+Ark owns its optional cross-repository integration command and runners. Joint
+protocol work runs that gate from Ark with explicit checkout paths; firmware's
+required gates remain independent. No Ark repository is required to finish a
+firmware-only task. Ark does depend on firmware: if a change alters a wire
+format, fixture bytes or a contract spec, or moves a source or probe Ark's
+integration runners compile, name the Ark follow-up in your handoff (see
+[what Ark consumes](docs/architecture/ark-compatibility.md#what-ark-consumes)).
 `run_firmware_client_independence_tests.sh` fails if any tracked non-doc file
 names the app. Develop locally without remotes; before publishing, push QMK fork
-commits first, and note that a squash or rebase merge moves Live's pin (see
-[local and published revisions](docs/architecture/live-compatibility.md#local-and-published-revisions)). Install firmware diagnostics dependencies with
+commits first, and note that a squash or rebase merge moves Ark's pin (see
+[local and published revisions](docs/architecture/ark-compatibility.md#local-and-published-revisions)). Install firmware diagnostics dependencies with
 `npm ci --prefix tools` when using hardware diagnostics.

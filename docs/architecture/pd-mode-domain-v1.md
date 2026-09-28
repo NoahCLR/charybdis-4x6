@@ -221,7 +221,7 @@ behavior. The key runtime owns that routing; see
 Firmware implements whole-payload and single-record cold validators in
 `users/noah/lib/profile/schema/profile_pd_v1.c`; no cache, heap or pointing-path
 decode is introduced. The app codec lives in
-`core/schema/pd-mode-domain-v1.js` in the independent Live repository. It rejects unknown
+`core/schema/pd-mode-domain-v1.js` in the independent Ark repository. It rejects unknown
 object fields, coercion, explicit null values, truncation, trailing bytes,
 reserved data, incorrect ID order and noncanonical encodings.
 

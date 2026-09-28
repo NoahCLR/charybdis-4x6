@@ -4,7 +4,7 @@
 
 | State | Identity | Authority |
 | --- | --- | --- |
-| Live draft | device base generation/digest | none until an explicit device apply |
+| Ark draft | device base generation/digest | none until an explicit device apply |
 | Source files | canonical digest plus file revision | compiled-default representation |
 | Compiled defaults | canonical digest and action-ABI digest | recovery fallback |
 | Device commit | `{counter, origin_half}` plus canonical digest | deployed runtime authority |
@@ -101,7 +101,7 @@ sat unprocessed in the candidate mailbox until a power cycle.
 
 ## Source and device separation
 
-Authored C files are edited and compiled independently. The live app neither
+Authored C files are edited and compiled independently. Ark neither
 writes those files nor combines source writes with a device transaction. Its
 Apply ordering follows the [logical transaction contract](logical-profile-transaction-v1.md).
 
@@ -161,7 +161,7 @@ separate engineering-mutation gate now couples routing with the complete,
 truthful write/commit/activation/peer capability set for hardware testing;
 resource policy and the hardware matrix still block ordinary exposure.
 
-## Connection Status Shown By the Live Client
+## Connection Status Shown By the Ark Client
 
 At minimum:
 
