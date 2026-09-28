@@ -1,19 +1,9 @@
 {
-    "editor.defaultFormatter": "xaver.clang-format",
     "C_Cpp.dimInactiveRegions": false,
     "C_Cpp.intelliSenseEngine": "disabled",
     "files.exclude": {
         "**/.DS_Store": true,
-        ".clang-format": true,
-        ".clangd": true,
         ".claude/": true,
-        ".devcontainer/": true,
-        ".editorconfig": true,
-        ".github/": true,
-        "LICENSE": true,
-        "Makefile": true,
-        "qmk.json": true,
-        ".gitignore": true,
         "layouts/": true,
         "memory/": true,
         "keyboards/.keep": true,
@@ -23,5 +13,33 @@
     },
     "[jsonc]": {
         "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    "[c]": {
+        "editor.defaultFormatter": "xaver.clang-format"
+    },
+    "[cpp]": {
+        "editor.defaultFormatter": "xaver.clang-format"
+    },
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "[json]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    "[html]": {
+        "editor.defaultFormatter": "vscode.html-language-features"
+    },
+    "[css]": {
+        "editor.defaultFormatter": "vscode.css-language-features"
+    },
+    "[yaml]": {
+        "editor.defaultFormatter": "redhat.vscode-yaml"
+    },
+    "[markdown]": {
+        "editor.formatOnSave": false,
+        "files.trimTrailingWhitespace": false
     }
 }

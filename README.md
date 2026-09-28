@@ -2,6 +2,10 @@
 
 This repo is the shared userspace for my Charybdis 4x6.
 
+For the editor's build, test and compilation-database tasks, see the
+[VS Code workflow](.vscode/README.md). Charybdis Live's editor tasks now belong
+to its independent sibling repository.
+
 It is intentionally Charybdis-specific. The trackball behavior, split sync,
 auto-mouse layer, and RGB assumptions are built around this split trackball
 board rather than stock QMK conventions.
@@ -233,17 +237,18 @@ Raw HID. It never reads this repository, so it needs no firmware workspace: the
 keyboard is the source of truth and the app is its client. Profile Studio owns
 `.c` authoring; this app owns the device.
 
-Install it by symlinking the folder into VS Code's extensions, then reload the
-window:
+The active VS Code installation uses the independent sibling `charybdis-live`
+repository. The in-tree copy remains pending cleanup. For a new installation,
+symlink the sibling folder into VS Code's extensions, then reload the window:
 
 ```sh
-cd tools/charybdis-live && npm install
+cd ../charybdis-live && npm ci
 ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-live-0.1.0
 ```
 
 Open it from the **Charybdis Live** status bar item or `Charybdis: Open
-Charybdis Live`, or press `F5` with the `Run Charybdis Live` launch
-configuration for an Extension Development Host.
+Charybdis Live`, or press `F5` with the sibling repo's `Run Charybdis Live`
+launch configuration for an Extension Development Host.
 
 It reads everything it edits from the keyboard — layout, key behaviours,
 combos, the named VIA macros, custom-key names, lighting, the eight
@@ -720,3 +725,8 @@ transaction recorder, `_diagnostic`) and `NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=y
 See [the activity contract](docs/architecture/split-activity-sync.md), and follow
 [the capture procedure](measurements/pointing-cadence/README.md) so captures
 compare; recorded sets live under [`measurements/`](measurements/README.md).
+
+For cross-repository protocol validation, use the independent Live repo's
+`npm run test:compat -- --firmware PATH --live PATH --qmk PATH --report NEW_FILE.json`.
+The [compatibility contract](docs/architecture/live-compatibility.md) explains
+how the selected app participates in firmware host tests.

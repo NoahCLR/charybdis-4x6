@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+. "$ROOT/tests/host/noah_host_live_env.sh"
+noah_host_export_live_root "$ROOT"
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"
@@ -21,8 +23,8 @@ for variant in normal sanitized; do
     # and with nothing stored, the keymap's layer and macro names.
     node - "$ROOT" "$BUILD_DIR/responses.fixture" "$BUILD_DIR/named.fixture" <<'JS'
 const assert = require("node:assert/strict"), fs = require("node:fs");
-const {readSettings} = require(process.argv[2] + "/tools/charybdis-live/core/protocol/portable-profile-v1");
-const {decodeSettings, macroNamesOf} = require(process.argv[2] + "/tools/charybdis-live/core/schema/settings-domain-v1");
+const {readSettings} = require(process.env.CHARYBDIS_LIVE_ROOT + "/core/protocol/portable-profile-v1");
+const {decodeSettings, macroNamesOf} = require(process.env.CHARYBDIS_LIVE_ROOT + "/core/schema/settings-domain-v1");
 function read(path) {
     const fixture = fs.readFileSync(path), pages = fixture.length / 32;
     let id = 0;

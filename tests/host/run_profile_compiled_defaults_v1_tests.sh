@@ -3,6 +3,8 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+. "$ROOT/tests/host/noah_host_live_env.sh"
+noah_host_export_live_root "$ROOT"
 KEYMAP_PATH="$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
 BUILD_DIR="$(mktemp -d)"
 CONFIG="$BUILD_DIR/compile_config.h"
@@ -33,7 +35,7 @@ fs.writeFileSync(process.argv[3] + '.pd', Buffer.from(frozen["pd_profile.hex"], 
 // at 20 characters. The frozen v1 import above stays the stored-v2
 // compatibility check; .pd3 is a stored v3 domain with a UTF-8 name, which v4
 // firmware still reads.
-const app = process.argv[2] + "/tools/charybdis-live";
+const app = process.env.CHARYBDIS_LIVE_ROOT;
 const {fingerprint, validateSnapshot} = require(app + "/core/model/portable-profile");
 const {editMacro} = require(app + "/core/model/macro-editor");
 const {decodeProfileBlob, encodeProfileBlob} = require(app + "/core/schema/profile-blob-v1");

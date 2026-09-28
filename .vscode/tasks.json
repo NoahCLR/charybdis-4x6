@@ -12,7 +12,12 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "problemMatcher": []
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
         },
         {
             "label": "Build Firmware Pair (no live owner)",
@@ -22,30 +27,39 @@
                 "${workspaceFolder}/tools/build-firmware-pair.sh",
                 "--no-owner"
             ],
-            "problemMatcher": []
-        },
-        {
-            "label": "Build QMK",
-            "type": "shell",
-            "command": "zsh -i -c 'qmk-build'",
-            "group": "build",
-            "problemMatcher": []
-        },
-        {
-            "label": "Build QMK with Compilation Database",
-            "type": "shell",
-            "command": "qmk compile --compiledb -kb bastardkb/charybdis/4x6 -km noah",
-            "group": "build",
-            "problemMatcher": []
-        },
-        {
-            "label": "Run VIA to QMK Layout Sync",
-            "type": "process",
-            "command": "python3",
-            "args": [
-                "${workspaceFolder}/tools/via_to_qmk_layout.py"
+            "problemMatcher": [
+                "$gcc"
             ],
-            "problemMatcher": []
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Build right half + compilation database",
+            "type": "process",
+            "command": "qmk",
+            "group": "build",
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}/../bastardkb-qmk",
+                "env": {
+                    "QMK_USERSPACE": "${workspaceFolder}"
+                }
+            },
+            "args": [
+                "compile",
+                "--compiledb",
+                "-kb",
+                "bastardkb/charybdis/4x6",
+                "-km",
+                "noah",
+                "-e",
+                "FORCE_MASTER=yes",
+                "-e",
+                "NOAH_PHYSICAL_HALF=right"
+            ]
         },
         {
             "label": "Generate Layout Overview",
@@ -54,25 +68,10 @@
             "args": [
                 "${workspaceFolder}/tools/profile_introspect.py"
             ],
-            "problemMatcher": []
-        },
-        {
-            "label": "Install Profile Studio Extension",
-            "type": "process",
-            "command": "${workspaceFolder}/tools/charybdis-profile-studio/scripts/install-local.sh",
-            "problemMatcher": []
-        },
-        {
-            "label": "Regenerate Live Keycode Catalog",
-            "type": "process",
-            "command": "npm",
-            "args": [
-                "--prefix",
-                "${workspaceFolder}/tools/charybdis-live",
-                "run",
-                "keycodes"
-            ],
-            "problemMatcher": []
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
         },
         {
             "label": "Format repo",
@@ -82,6 +81,25 @@
                 "-c",
                 "git ls-files '*.c' '*.cc' '*.cpp' '*.h' '*.hpp' | xargs clang-format -i"
             ],
+            "problemMatcher": [],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            }
+        },
+        {
+            "label": "Run all firmware host tests",
+            "type": "process",
+            "command": "sh",
+            "args": [
+                "${workspaceFolder}/tests/host/run_all_host_tests.sh"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
             "problemMatcher": []
         }
     ]

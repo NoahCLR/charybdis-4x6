@@ -4,6 +4,8 @@
 # macros the keyboard plays or keep ones it never will.
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+. "$ROOT/tests/host/noah_host_live_env.sh"
+noah_host_export_live_root "$ROOT"
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"
@@ -22,7 +24,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$BUILD_DIR/probe"
 node - "$ROOT" "$BUILD_DIR/probe" <<'JS'
 const assert = require("node:assert/strict"), {execFileSync} = require("node:child_process");
-const {encodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require(process.argv[2] + "/tools/charybdis-live/core/schema/macro-payload");
+const {encodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require(process.env.CHARYBDIS_LIVE_ROOT + "/core/schema/macro-payload");
 // Fixed edge cases, then seeded random macros built from every step kind.
 const payloads = ["", "a", "a".repeat(255), "a".repeat(256), "a".repeat(600), "{KC_A}", "{KC_A}".repeat(170), "{KC_A}".repeat(171),
     "{120}", "{0}", "{65535}", "a{KC_A}b", "{KC_LGUI,KC_N}", "{KC_LCTL,KC_LSFT,KC_4}", "{+KC_LSFT}{KC_A}{-KC_LSFT}",

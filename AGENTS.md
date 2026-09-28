@@ -153,3 +153,12 @@ Repo-specific guardrails:
   physical/linker bank, fresh linked accounting, the applicable policy, and
   runtime high-water evidence. Preserve conservative designs when useful, but
   do not justify them with policy values presented as hardware capacity.
+
+## Independent Live compatibility
+
+Before merging protocol/schema or cross-language codec changes, run the sibling
+Live repo's `npm run test:compat -- --firmware PATH --live PATH --qmk PATH
+--report NEW_FILE.json` with all paths explicit. Its `docs/COMPATIBILITY.md`
+describes the report and prerequisites. The five host runners honor
+`CHARYBDIS_LIVE_ROOT`; the ordinary firmware suite retains its in-tree default
+until cleanup. An invalid explicit Live root must fail, never fall back.

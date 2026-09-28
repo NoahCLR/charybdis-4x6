@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+. "$ROOT/tests/host/noah_host_live_env.sh"
+noah_host_export_live_root "$ROOT"
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"
@@ -16,7 +18,7 @@ for variant in normal features sanitized; do
     "$BUILD_DIR/test" "$BUILD_DIR/options.fixture"
     node - "$ROOT" "$BUILD_DIR/options.fixture" <<'JS'
 const assert = require("node:assert/strict"), fs = require("node:fs");
-const {readKeyboardOptions} = require(process.argv[2] + "/tools/charybdis-live/core/protocol/keyboard-options-v1");
+const {readKeyboardOptions} = require(process.env.CHARYBDIS_LIVE_ROOT + "/core/protocol/keyboard-options-v1");
 const fixture = fs.readFileSync(process.argv[3]), metadata = fixture.subarray(0,9), data = fixture.subarray(9);
 let id = 0;
 readKeyboardOptions({request: async request => {

@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+. "$ROOT/tests/host/noah_host_live_env.sh"
+noah_host_export_live_root "$ROOT"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 
@@ -8,7 +10,7 @@ node - "$ROOT" "$BUILD_DIR/corpus.bin" <<'JS'
 const fs = require("node:fs");
 const root = process.argv[2];
 const fixture = require(root + "/tests/fixtures/pd_mode_domain_v1.json");
-const {decodePdDomain, encodePdDomain} = require(root + "/tools/charybdis-live/core/schema/pd-mode-domain-v1");
+const {decodePdDomain, encodePdDomain} = require(process.env.CHARYBDIS_LIVE_ROOT + "/core/schema/pd-mode-domain-v1");
 const golden = Buffer.from(fixture.hex, "hex");
 if (!encodePdDomain(fixture.slots).equals(golden)) throw new Error("PD fixture drift");
 const chunks = [];
