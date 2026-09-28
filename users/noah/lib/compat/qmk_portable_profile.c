@@ -109,7 +109,7 @@ static bool external_setting(uint8_t id) {
     return (id >= NOAH_SETTING_AUTO_MOUSE_ENABLED && id <= NOAH_SETTING_AUTO_MOUSE_DEBOUNCE) || (id >= NOAH_SETTING_DEFAULT_DPI && id <= NOAH_SETTING_KEYMAP_OPTIONS);
 }
 // The keymap's names fill a settings domain that no profile has stored.
-_Static_assert(LAYER_COUNT == NOAH_SETTINGS_LAYERS, "Settings name every one of the eight layers");
+_Static_assert((int)LAYER_COUNT == (int)NOAH_SETTINGS_LAYERS, "Settings name every one of the eight layers");
 _Static_assert(NOAH_LAYER_NAME_SIZE == NOAH_SETTINGS_NAME_BYTES, "A layer name fills one settings name field");
 _Static_assert(VIA_MACRO_SLOT_COUNT == NOAH_SETTINGS_MACRO_NAMES, "Settings name every VIA macro");
 _Static_assert(NOAH_MACRO_NAME_SIZE == NOAH_SETTINGS_MACRO_NAME_ASCII_MAX + 1u, "A macro name is at most 20 characters");
