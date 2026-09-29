@@ -346,14 +346,15 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supported_as_authored_action(layer_tap, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
     CHECK(noah_action_desc_uses_authored_layer_tap_contract(layer_tap));
     CHECK(noah_action_desc_default_tap_uses_layer_tap_keycode(layer_tap));
-    CHECK(noah_action_desc_source_sets_momentary_layer_flag(layer_tap));
+    // LT()'s layer is a hold past the term, so it never lends a press-time layer.
+    CHECK(!noah_action_desc_source_sets_momentary_layer_flag(layer_tap));
     CHECK(noah_action_desc_source_sets_layer_tap_flag(layer_tap));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(layer_tap));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(layer_tap));
     CHECK(!noah_action_desc_is_pure_modifier_literal(layer_tap));
     CHECK(!noah_action_desc_supports_fallback_hold(layer_tap));
-    CHECK(noah_action_desc_source_layer_uses_desc_layer(layer_tap));
-    CHECK(noah_action_desc_source_layer(layer_tap) == 4);
+    CHECK(!noah_action_desc_source_layer_uses_desc_layer(layer_tap));
+    CHECK(noah_action_desc_source_layer(layer_tap) == UINT8_MAX);
     CHECK(noah_action_desc_default_tap_action(layer_tap) == KC_V);
 
     CHECK(raw_layer.kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
@@ -422,11 +423,13 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_keycode_layer_mod_mods(LM(3, MOD_LSFT | MOD_LGUI)) == LSG(KC_NO));
     // A right-hand modifier keeps its right-hand bit (0x10): 0x14 is right Alt.
     CHECK(noah_action_keycode_layer_mod_mods(LM(3, 0x14u)) == 0x1400u);
-    // MT()/OSM() hold their modifiers as the same mods-only keycode.
-    CHECK(noah_action_keycode_dual_role_hold_mods(MT(MOD_LSFT | MOD_LGUI, KC_S)) == LSG(KC_NO));
-    CHECK(noah_action_keycode_dual_role_hold_mods(OSM(MOD_RALT)) == 0x1400u);
-    CHECK(noah_action_keycode_dual_role_hold_mods(LT(1, KC_A)) == KC_NO);
-    CHECK(noah_action_keycode_dual_role_hold_mods(KC_LEFT_SHIFT) == KC_NO);
+    // MT()/OSM() hold their modifiers as the same mods-only keycode; LT() holds MO().
+    CHECK(noah_action_keycode_dual_role_hold(MT(MOD_LSFT | MOD_LGUI, KC_S)) == LSG(KC_NO));
+    CHECK(noah_action_keycode_dual_role_hold(OSM(MOD_RALT)) == 0x1400u);
+    CHECK(noah_action_keycode_dual_role_hold(LT(1, KC_A)) == MO(1));
+    CHECK(noah_action_keycode_dual_role_hold(LT(LAYER_COUNT, KC_A)) == KC_NO);
+    CHECK(noah_action_keycode_dual_role_hold(MO(1)) == KC_NO);
+    CHECK(noah_action_keycode_dual_role_hold(KC_LEFT_SHIFT) == KC_NO);
     CHECK(noah_action_describe(LM(LAYER_COUNT, MOD_LSFT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
 
     CHECK(layer_jump.kind == NOAH_ACTION_KIND_LAYER_GOTO);

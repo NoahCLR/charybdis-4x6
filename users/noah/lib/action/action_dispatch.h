@@ -78,10 +78,13 @@ static inline uint16_t noah_action_keycode_layer_mod_mods(uint16_t action) {
     return (uint16_t)(QK_LAYER_MOD_GET_MODS(action) << 8);
 }
 
-// MT(mods, kc) and OSM(mods) hold their modifiers once held past the tap
-// window, as QMK's tapping does. A behaviour row keeps that first hold unless it
-// authors its own, so adding a repeated-tap branch cannot remove it.
-static inline uint16_t noah_action_keycode_dual_role_hold_mods(uint16_t action) {
+// A dual-role key's own hold, which starts only once it is held past the
+// tap-hold term, as QMK's tapping decides: LT(n, kc) holds MO(n), MT(mods, kc)
+// and OSM(mods) hold their modifiers. A behaviour row keeps that first hold
+// unless it authors its own, so adding a repeated-tap branch cannot remove it,
+// and a tap never touches the layer or modifiers.
+static inline uint16_t noah_action_keycode_dual_role_hold(uint16_t action) {
+    if (IS_QK_LAYER_TAP(action) && QK_LAYER_TAP_GET_LAYER(action) < LAYER_COUNT) return (uint16_t)MO(QK_LAYER_TAP_GET_LAYER(action));
     if (IS_QK_MOD_TAP(action)) return (uint16_t)(QK_MOD_TAP_GET_MODS(action) << 8);
     if (IS_QK_ONE_SHOT_MOD(action)) return (uint16_t)(QK_ONE_SHOT_MOD_GET_MODS(action) << 8);
     return KC_NO;

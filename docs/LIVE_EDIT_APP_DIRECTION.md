@@ -598,10 +598,12 @@ connecting to this build. Physical acceptance remains in Open Issues.
 Extend D-F01's authored LT exemption to all runtime-handled keycodes. Authored
 MT/OSM rows and intrinsic TT/OSL ownership must not wait for a separate QMK
 tapping classification before their owning runtime receives them. Unhandled
-LT/MT/OSM remain native. Bypassing native tapping must not drop the key's own
-first hold: an authored MT/OSM row without a first hold holds the key's
-modifiers past its tap-hold term, as native QMK would; its first tap is
-unchanged. The existing fork hook needs no new QMK changes. Feature bit 18 lets clients distinguish this from bit 17's
+LT/MT/OSM remain native. Bypassing native tapping must not change when the
+key's own first hold starts: an authored row without a first hold holds `MO()`
+for LT, or the modifiers for MT/OSM, only once held past its tap-hold term, as
+native QMK decides. A tap never turns the layer or modifiers on; the first tap
+is unchanged. An authored LT row is therefore not a momentary layer: its layer
+is not on from the press, and an interrupting key does not cancel its tap. The existing fork hook needs no new QMK changes. Feature bit 18 lets clients distinguish this from bit 17's
 LT-only exemption; older strict clients must recognize it before connecting.
 
 The real QMK pipeline tests held output thresholds for all four added families,

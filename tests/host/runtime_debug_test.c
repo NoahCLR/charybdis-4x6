@@ -2516,37 +2516,32 @@ static void test_key_runtime_core_layer_lock_observes_live_layer_ownership_state
     CHECK(snapshot.layer_state == 0u);
 }
 
+// The stub resolves LT(2, KC_V) as a tap-only authored row. Its layer is the
+// key's own hold: nothing is on at the press, the layer comes on once the key
+// is held past its term, and release retires both the layer and its lease.
 static void test_key_runtime_core_layer_tap_hold_creates_and_retires_layer_lease(void) {
     projection_snapshot_t snapshot;
     keypos_t              key_pos = test_keypos(2, 4);
-    runtime_event_t       advance = {
-        .kind = RUNTIME_EVENT_KIND_TIMER_ADVANCE,
-        .data.timer_advance =
-            {
-                .advance_ms = (uint16_t)(TAPPING_TERM + 1u),
-            },
-    };
-    runtime_event_t scan = {
-        .kind = RUNTIME_EVENT_KIND_SCAN,
-    };
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
     CHECK(!test_process_record(LT(2, KC_V), key_pos, true));
     snapshot = key_runtime_core_projection_snapshot_capture();
-    CHECK(snapshot.layer_state == ((layer_state_t)1u << 2));
+    CHECK(snapshot.layer_state == 0u);
     CHECK(snapshot.core_shadow_layer_state == 0u);
     CHECK(snapshot.core_lease_count == 0u);
 
-    key_runtime_core_apply_event(&advance, fake_time);
-    fake_time = (uint16_t)(fake_time + advance.data.timer_advance.advance_ms);
-    key_runtime_core_apply_event(&scan, fake_time);
-
+    fake_time = (uint16_t)(fake_time + TAPPING_TERM - 1u);
+    noah_key_runtime_scan();
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+    fake_time = (uint16_t)(fake_time + 1u);
+    noah_key_runtime_scan();
+    // This harness stubs the layer dispatch, so the owned layer shows as the
+    // held MO() and the runtime's layer lease; the QMK pipeline test sees it on.
     snapshot = key_runtime_core_projection_snapshot_capture();
-    CHECK(snapshot.layer_state == ((layer_state_t)1u << 2));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == MO(2));
     CHECK(snapshot.core_shadow_layer_state == ((layer_state_t)1u << 2));
-    CHECK(snapshot.core_lease_count == 1u);
 
     CHECK(!test_process_record(LT(2, KC_V), key_pos, false));
     snapshot = key_runtime_core_projection_snapshot_capture();

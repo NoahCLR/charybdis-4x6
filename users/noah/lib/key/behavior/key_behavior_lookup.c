@@ -275,7 +275,7 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         .source_row         = live.row_index,
         .source_is_live     = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK,
         .handled            = has_authored || noah_action_desc_is_runtime_handled_keycode(desc),
-        .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc) || custom_lt,
+        .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc),
         .is_layer_tap       = custom_lt,
         .has_multi_tap      = tap_depth > 1u,
         .authored_tap_depth = tap_depth,

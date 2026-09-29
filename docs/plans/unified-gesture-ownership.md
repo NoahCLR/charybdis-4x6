@@ -34,8 +34,10 @@ replace:
 - OSM: one-shot modifier activation, consumption, cancellation and locking.
 
 QMK tapping is more than a threshold. Simply exempting all keycodes would not
-implement these defaults. Authored MT/OSM rows without a first hold now keep the
-modifier hold, but not QMK's rollover or interrupt rules; overlapping typing on
+implement these defaults. Authored LT/MT/OSM rows without a first hold now keep
+the layer or modifier hold from the tap-hold term, but not QMK's rollover or
+interrupt rules: a key pressed while one is undecided is not held back, so a
+fast roll can emit it before the tap; overlapping typing on
 a runtime-owned tap key is still an open contract (step 2 below).
 Keeping the native path is a compatibility boundary, not the proposed final
 product model.

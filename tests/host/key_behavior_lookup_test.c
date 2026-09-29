@@ -337,7 +337,9 @@ static void test_authored_lt_uses_custom_runtime(void) {
     key_behavior_view_t behavior = key_behavior_lookup(TEST_AUTHORED_LAYER_TAP);
 
     CHECK(behavior.handled);
-    CHECK(behavior.is_momentary_layer);
+    // Its layer is a hold past the tap-hold term, not held from the press
+    // like MO(): a tap must never turn the layer on.
+    CHECK(!behavior.is_momentary_layer);
     CHECK(behavior.is_layer_tap);
     CHECK(behavior.tap_hold_term == TAPPING_TERM);
     CHECK(behavior.has_multi_tap);
@@ -625,11 +627,15 @@ static void test_transparent_hold_uses_lower_layer_tap_metadata(void) {
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_HOLD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
+    // A lower LT() lends its hold: MO(layer) once held past the term, not a
+    // layer held from the press.
     materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
-    CHECK(!materialized.hold.present);
+    CHECK(materialized.hold.present);
+    CHECK(materialized.hold.action == MO(3));
+    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
     CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
-    CHECK(materialized.layer == 3);
-    CHECK((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0);
+    CHECK(materialized.layer == UINT8_MAX);
+    CHECK((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) == 0);
     CHECK((materialized.flags & HANDLED_KEY_FLAG_LAYER_TAP) != 0);
 }
 
@@ -643,9 +649,10 @@ static void test_transparent_hold_other_uses_lower_layer_tap_metadata(void) {
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
     materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_OTHER_KEY), key_pos);
-    CHECK(!materialized.hold.present);
-    CHECK(materialized.layer == 3);
-    CHECK((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) != 0);
+    CHECK(materialized.hold.present);
+    CHECK(materialized.hold.action == MO(3));
+    CHECK(materialized.layer == UINT8_MAX);
+    CHECK((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) == 0);
 }
 
 static void test_transparent_hold_chains_through_lower_authored_transparency(void) {
@@ -715,8 +722,9 @@ static void test_momentary_layer_query_matches_hold_materialization(void) {
     resolution = handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY);
     ctx        = handled_key_resolution_ctx_make(inherited_key_pos, (layer_state_t)1u << 2);
     test_check_momentary_helper_matches_materialization(resolution, ctx, false);
+    // A lower LT() lends a hold past the term, never a layer from the press.
     ctx.active_layers |= (layer_state_t)1u << 1;
-    test_check_momentary_helper_matches_materialization(resolution, ctx, true);
+    test_check_momentary_helper_matches_materialization(resolution, ctx, false);
 
     test_reset_keymap();
     test_set_keymap_key(0, chained_key_pos, MO(3));

@@ -82,6 +82,8 @@ const key_behavior_t key_behaviors[] = {
     {.keycode = TT(2), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
     {.keycode = OSL(2), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
     {.keycode = OSM(MOD_LSFT), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
+    // An authored LT() outside every combo, so QMK delivers its press at once.
+    {.keycode = LT(TEST_LAYER_NAV, KC_B), .tap_hold_term = 100, .tap_counts[1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(TEST_LAYER_NAV))}},
     // Sparse rows: only a repeated tap is authored.
     {.keycode = MT(MOD_LSFT | MOD_LGUI, KC_S), .tap_hold_term = 100, .tap_counts[1] = {.tap = TAP_SENDS(KC_X)}},
     {.keycode = OSM(MOD_LALT), .tap_hold_term = 100, .tap_counts[1] = {.tap = TAP_SENDS(KC_Y)}},
@@ -1060,7 +1062,10 @@ static void test_raw_lt_hold_dispatches_authored_tap_key_immediately(void) {
     CHECK(pd_mode_local_locked(PD_MODE_ARROW));
 }
 
-static void test_raw_lt_hold_dispatches_authored_plain_tap_immediately(void) {
+// An authored LT() row that another key interrupts before its hold threshold
+// is still a tap: the layer never came on, so neither key is swallowed. Output
+// order under overlapping typing is an open contract (plans/unified-gesture-ownership.md).
+static void test_authored_lt_interrupted_before_hold_keeps_both_taps(void) {
     const uint16_t                       hold_key     = LT(TEST_LAYER_NAV, KC_SLSH);
     const key_runtime_integration_step_t hold_steps[] = {
         KEY_RUNTIME_INTEGRATION_PRESS(hold_key, 1, 4),
@@ -1070,6 +1075,8 @@ static void test_raw_lt_hold_dispatches_authored_plain_tap_immediately(void) {
     };
     const key_runtime_integration_step_t release_steps[] = {
         KEY_RUNTIME_INTEGRATION_RELEASE(hold_key, 1, 4),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(400),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
     };
 
     test_reset_state();
@@ -1077,13 +1084,12 @@ static void test_raw_lt_hold_dispatches_authored_plain_tap_immediately(void) {
     CHECK(key_behavior_lookup(TEST_HANDLED_TAP_KEY).config != NULL);
 
     key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
-    CHECK(tap_code16_count == 1);
-    CHECK(last_tap_code16 == KC_J);
-    CHECK(delayed_action_count == 0);
+    CHECK(!layer_state_cmp(layer_state, TEST_LAYER_NAV));
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
-    CHECK(tap_code16_count == 1);
-    CHECK(delayed_action_count == 0);
+    CHECK(tap_code16_count == 2);
+    CHECK(last_tap_code16 == KC_SLSH);
+    CHECK(!layer_state_cmp(layer_state, TEST_LAYER_NAV));
 }
 
 static void test_authored_layer_hold_dispatches_authored_tap_key_immediately(void) {
@@ -2483,6 +2489,28 @@ static void test_qmk_sparse_dual_role_rows_keep_intrinsic_hold(void) {
     }
 }
 
+// An authored LT() row's layer is its hold: it turns on once the key is held
+// past the tap-hold term, never on a tap, and never from the press itself.
+static void test_qmk_authored_layer_tap_layer_waits_for_hold(void) {
+    test_reset_state(); fake_time = 24000; gesture_test_code = LT(TEST_LAYER_NAV, KC_B);
+    gesture_momentary_layer = UINT8_MAX; tap_code16_count = 0;
+    gesture_at(3, 0, true); gesture_advance(40); gesture_at(3, 0, false); gesture_advance(400);
+    CHECK(gesture_momentary_layer == UINT8_MAX);
+    CHECK(tap_code16_count == 1 && last_tap_code16 == KC_B);
+
+    test_reset_state(); fake_time = 26000; gesture_test_code = LT(TEST_LAYER_NAV, KC_B);
+    gesture_momentary_layer = UINT8_MAX; tap_code16_count = 0;
+    gesture_at(3, 0, true); gesture_advance(99);
+    CHECK(gesture_momentary_layer == UINT8_MAX);
+    CHECK(!layer_state_cmp(layer_state, TEST_LAYER_NAV));
+    gesture_advance(1);
+    CHECK(gesture_momentary_layer == TEST_LAYER_NAV || layer_state_cmp(layer_state, TEST_LAYER_NAV));
+    gesture_advance(100); gesture_at(3, 0, false); gesture_advance(400);
+    CHECK(!layer_state_cmp(layer_state, TEST_LAYER_NAV));
+    CHECK(tap_code16_count == 0);
+    test_assert_button_quiescent(test_keypos(3, 0));
+}
+
 static void test_qmk_dual_role_ownership(void) {
     const uint16_t authored[] = {MT(MOD_LCTL, KC_A), TT(2), OSL(2), OSM(MOD_LSFT)};
     for (unsigned i = 0; i < ARRAY_SIZE(authored); i++) {
@@ -2550,6 +2578,7 @@ int main(void) {
     test_qmk_nested_chords_choose_only_largest();
     test_qmk_dual_role_ownership();
     test_qmk_sparse_dual_role_rows_keep_intrinsic_hold();
+    test_qmk_authored_layer_tap_layer_waits_for_hold();
     test_qmk_combo_output_gui_behaviour();
     puts("QMK gesture pipeline tests passed");
     return 0;
@@ -2568,7 +2597,7 @@ int main(void) {
     test_authored_single_press_preserves_default_pd_mode_hold();
     test_authored_single_press_pd_mode_hold_dispatches_plain_taps_immediately();
     test_raw_lt_hold_dispatches_authored_tap_key_immediately();
-    test_raw_lt_hold_dispatches_authored_plain_tap_immediately();
+    test_authored_lt_interrupted_before_hold_keeps_both_taps();
     test_authored_layer_hold_dispatches_authored_tap_key_immediately();
     test_authored_layer_hold_dispatches_authored_plain_tap_immediately();
     test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_momentary_hold();

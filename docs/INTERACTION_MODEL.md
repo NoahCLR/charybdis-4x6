@@ -103,7 +103,8 @@ In plain terms:
   sequence
 
 Foreign-key interruption only cancels the quick tap for true momentary-layer
-taps. Other authored hold families, such as press-registering modifier holds
+taps (`MO()`, `TT()`, `OSL()`, `LM()`), whose layer is on from the press. An
+`LT()` row is not one: its layer is a hold, so an interrupted tap is still sent. Other authored hold families, such as press-registering modifier holds
 and pd-mode lock gestures, keep their own release contract instead of borrowing
 the momentary-layer interrupt rule.
 
@@ -168,10 +169,12 @@ protection; there is no single constituent press that defines their hold.
 A runtime-owned key is classified once, by userspace. This includes authored
 `LT()`, `MT()` and `OSM()` rows, and `TT()`/`OSL()` which already have intrinsic
 userspace layer ownership. An unhandled `LT()`, `MT()` or `OSM()` still uses native
-QMK tapping. A row that does not author a first hold keeps the key's own: `MT()`
-and `OSM()` hold their modifiers once held past the tap-hold term, and that hold
-sends no tap or one-shot on release. Their first tap stays the key's own tap.
-Adding a repeated-tap branch therefore cannot remove the modifier hold.
+QMK tapping. A row that does not author a first hold keeps the key's own, which
+starts only once the key is held past the tap-hold term: `LT()` holds its layer
+as `MO()`, `MT()` and `OSM()` hold their modifiers. A tap never turns that layer
+or those modifiers on, and a hold sends no tap or one-shot on release. The first
+tap stays the key's own tap, so adding a repeated-tap branch cannot remove the
+hold. A transparent hold over a lower `LT()` inherits the same threshold hold.
 The broader bypass is advertised by feature bit 18; bit 17 alone only promises
 the authored LT bypass. Pointer-mode interception remains earlier than authored
 mouse behaviour: Arrow's button remapping can intentionally consume Button 3.
@@ -212,8 +215,8 @@ In practice, the common families look like this:
   lower key still owns the actual transparent field behavior; for hold and
   long-hold fields that includes helper mode and mode-owned metadata such as
   lower momentary-layer or pd-mode ownership
-- `LT()` rows keep their normal momentary layer hold when only the tap is
-  overridden
+- `LT()` rows keep their layer hold, as `MO()` once held past the tap-hold term,
+  when only the tap is overridden
 - plain pd-mode keycodes keep their default momentary mode hold when only the
   tap is overridden
 - pd-mode keys whose tap path can branch into another pd mode defer the lower

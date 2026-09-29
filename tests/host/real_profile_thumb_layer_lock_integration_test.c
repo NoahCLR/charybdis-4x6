@@ -1840,16 +1840,23 @@ static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
     CHECK(test_keypos_valid(nav_left_pos));
     CHECK(test_resolve_keycode(nav_hold_pos) == nav_hold_keycode);
 
+    // Nav is the key's hold: nothing turns on at the press, so "/" can still be
+    // typed. Once held past its term, Nav keys dispatch immediately.
     test_press_resolved(nav_hold_pos);
-    CHECK(test_layer_active(LAYER_NAV));
-    CHECK(pd_mode_auto_sniping_layer_active());
-    CHECK(!sniping_enabled);
-    CHECK(current_cpi == 0);
+    CHECK(!test_layer_active(LAYER_NAV));
+    CHECK(!pd_mode_auto_sniping_layer_active());
 
+    key_runtime_integration_advance(&fake_time, key_behavior_lookup(nav_hold_keycode).tap_hold_term - 1u);
+    key_runtime_integration_scan();
+    CHECK(!test_layer_active(LAYER_NAV));
+
+    key_runtime_integration_advance(&fake_time, 1u);
     key_runtime_integration_scan();
     CHECK(test_layer_active(LAYER_NAV));
     CHECK(pd_mode_auto_sniping_layer_active());
     CHECK(!sniping_enabled);
+
+    key_runtime_integration_scan();
     CHECK(current_cpi == charybdis_get_pointer_sniping_dpi());
 
     key_runtime_integration_advance(&fake_time, 20);
@@ -2101,7 +2108,8 @@ static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool re
 static void test_raw_nav_layer_hold_enters_dragscroll_mode_cleanly(void) {
     keypos_t nav_hold_pos = test_find_keypos_on_layer(LAYER_BASE, LT(LAYER_NAV, KC_SLSH));
 
-    test_dragscroll_overlap_stays_quiescent(nav_hold_pos, false);
+    // Its Nav layer is a hold, so it needs the scan past its term like the thumb.
+    test_dragscroll_overlap_stays_quiescent(nav_hold_pos, true);
 }
 
 static void test_right_thumb_nav_hold_enters_dragscroll_mode_cleanly(void) {
@@ -2608,9 +2616,9 @@ static void test_gui_double_tap_hold_with_raw_nav_lt_keeps_arrow_taps_immediate(
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
-    test_gui_double_tap_hold_keeps_nav_arrow_taps_immediate_across_release_orders(nav_hold_pos, nav_hold_keycode, false);
-    test_gui_double_tap_hold_keeps_nav_arrow_hold_release_immediate_across_release_orders(nav_hold_pos, nav_hold_keycode, false);
-    test_gui_double_tap_hold_keeps_nav_arrow_long_hold_immediate_across_release_orders(nav_hold_pos, nav_hold_keycode, false);
+    test_gui_double_tap_hold_keeps_nav_arrow_taps_immediate_across_release_orders(nav_hold_pos, nav_hold_keycode, true);
+    test_gui_double_tap_hold_keeps_nav_arrow_hold_release_immediate_across_release_orders(nav_hold_pos, nav_hold_keycode, true);
+    test_gui_double_tap_hold_keeps_nav_arrow_long_hold_immediate_across_release_orders(nav_hold_pos, nav_hold_keycode, true);
 }
 
 static void test_gui_double_tap_hold_with_right_thumb_nav_hold_keeps_arrow_taps_immediate(void) {
@@ -2663,7 +2671,7 @@ static void test_gui_double_tap_hold_with_raw_nav_lt_repeated_arrow_taps_stays_q
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
-    test_gui_double_tap_hold_with_repeated_nav_arrow_taps_stays_quiescent(nav_hold_pos, nav_hold_keycode, false);
+    test_gui_double_tap_hold_with_repeated_nav_arrow_taps_stays_quiescent(nav_hold_pos, nav_hold_keycode, true);
 }
 
 static void test_gui_double_tap_hold_with_right_thumb_repeated_arrow_taps_stays_quiescent(void) {
@@ -2679,7 +2687,7 @@ static void test_gui_pending_double_tap_hold_with_raw_nav_lt_keeps_arrow_hold_re
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
-    test_gui_pending_double_tap_hold_keeps_nav_arrow_hold_release_immediate_across_release_orders(nav_hold_pos, nav_hold_keycode, false);
+    test_gui_pending_double_tap_hold_keeps_nav_arrow_hold_release_immediate_across_release_orders(nav_hold_pos, nav_hold_keycode, true);
 }
 
 static void test_gui_pending_double_tap_hold_keeps_arrow_tap_immediate(keypos_t parent_pos, uint16_t parent_keycode, bool requires_threshold_scan) {
@@ -2734,7 +2742,7 @@ static void test_gui_pending_double_tap_hold_with_raw_nav_lt_keeps_arrow_tap_imm
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
-    test_gui_pending_double_tap_hold_keeps_arrow_tap_immediate(nav_hold_pos, nav_hold_keycode, false);
+    test_gui_pending_double_tap_hold_keeps_arrow_tap_immediate(nav_hold_pos, nav_hold_keycode, true);
 }
 
 static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_arrow_tap_immediate(void) {
@@ -2808,7 +2816,7 @@ static void test_gui_double_tap_hold_with_raw_nav_lt_keeps_dragscroll_immediate(
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
-    test_gui_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent(nav_hold_pos, nav_hold_keycode, false);
+    test_gui_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent(nav_hold_pos, nav_hold_keycode, true);
 }
 
 static void test_gui_double_tap_hold_with_right_thumb_nav_hold_keeps_dragscroll_immediate(void) {
@@ -2824,7 +2832,7 @@ static void test_gui_pending_double_tap_hold_with_raw_nav_lt_keeps_dragscroll_im
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
-    test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent(nav_hold_pos, nav_hold_keycode, false);
+    test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent(nav_hold_pos, nav_hold_keycode, true);
 }
 
 static void test_gui_pending_double_tap_hold_with_right_thumb_nav_hold_keeps_arrow_hold_release_immediate(void) {
@@ -2871,7 +2879,7 @@ static void test_raw_nav_dragscroll_hold_keeps_arrow_taps_immediate(void) {
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
-    test_nav_dragscroll_hold_keeps_arrow_taps_immediate(nav_hold_pos, nav_hold_keycode, false);
+    test_nav_dragscroll_hold_keeps_arrow_taps_immediate(nav_hold_pos, nav_hold_keycode, true);
 }
 
 static void test_right_thumb_dragscroll_hold_keeps_arrow_taps_immediate(void) {
@@ -2922,7 +2930,7 @@ static void test_gui_double_tap_hold_with_raw_nav_dragscroll_active_keeps_arrow_
     keypos_t       nav_hold_pos     = test_find_keypos_on_layer(LAYER_BASE, nav_hold_keycode);
 
     CHECK(test_keypos_valid(nav_hold_pos));
-    test_gui_double_tap_hold_with_nav_dragscroll_active_keeps_arrow_taps_immediate(nav_hold_pos, nav_hold_keycode, false);
+    test_gui_double_tap_hold_with_nav_dragscroll_active_keeps_arrow_taps_immediate(nav_hold_pos, nav_hold_keycode, true);
 }
 
 static void test_gui_double_tap_hold_with_right_thumb_dragscroll_active_keeps_arrow_taps_immediate(void) {
@@ -2949,7 +2957,7 @@ static void test_key_runtime_core_raw_nav_dragscroll_shadow_scenario(void) {
     CHECK(test_keypos_valid(nav_hold_pos));
     CHECK(test_keypos_valid(dragscroll_pos));
 
-    test_activate_nav_parent_hold(nav_hold_pos, nav_hold_keycode, false);
+    test_activate_nav_parent_hold(nav_hold_pos, nav_hold_keycode, true);
     CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
 
     test_press_resolved(dragscroll_pos);
@@ -2973,7 +2981,7 @@ static void test_key_runtime_core_gui_alt_repeated_nav_shadow_scenario(void) {
     CHECK(test_keypos_valid(child_pos));
 
     test_activate_gui_double_tap_alt_hold(gui_pos);
-    test_activate_nav_parent_hold(nav_hold_pos, nav_hold_keycode, false);
+    test_activate_nav_parent_hold(nav_hold_pos, nav_hold_keycode, true);
 
     for (uint8_t iteration = 0; iteration < 4u; iteration++) {
         uint16_t previous_tap_count = test_tap_code16_count;
