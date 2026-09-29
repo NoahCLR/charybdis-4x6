@@ -21,7 +21,10 @@ On Noah's machine, the main checkouts are:
 
 Branches: `dev` is the trunk. Each task branches from `dev` in its own
 worktree and is squash-landed back onto `dev` locally; `main` is the released
-line and only moves by fast-forward from `dev`. This repository is a GitHub
+line and only moves by a promotion merge of `dev`. Landed commits, promotions
+and release tags carry trailers naming the Ark and QMK commits they were tested
+with, so `git log` answers what any build went with. A release is one date tag,
+`vYYYY.MM.DD`, on firmware, Ark and the QMK fork together. This repository is a GitHub
 fork of Bastard Keyboards' userspace: push only to `NoahCLR/charybdis-4x6`, and
 never push or open a pull request upstream. The clone's `gh` default and
 pre-push hook enforce that.
