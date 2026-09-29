@@ -88,8 +88,16 @@ Required verification workflow:
    `sh tests/host/run_feature_gate_compile_tests.sh`
 6. Before handing work back, run the full host suite:
    `sh tests/host/run_all_host_tests.sh`
-7. Run the firmware build only after all required host tests for that pass are green:
-   `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+7. Build the flashable pair only after all required host tests for that pass are green:
+   `sh tools/build-firmware-pair.sh`. A plain `qmk compile` is not enough: it
+   builds a generic image without the live-profile owner (D-L08), which is not
+   the firmware anyone flashes. From a task worktree, set `QMK_ROOT` to the QMK
+   checkout and `BUILD_ROOT` to an output folder, or run the work-queue vault's
+   `_agents/bin/verify`, which runs steps 4–7 as they apply, sets both and
+   serializes builds: every agent shares QMK's one output path, so two
+   concurrent builds would overwrite each other's firmware. Land with the
+   vault's `_agents/bin/land`, which re-verifies the landed tree and files the
+   pair under `builds/dev/`.
 
 Narrow verification exceptions:
 
