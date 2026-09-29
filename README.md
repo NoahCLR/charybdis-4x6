@@ -19,6 +19,13 @@ On Noah's machine, the main checkouts are:
   holding notes, tasks, active plans and keyboard checks for all three
   repositories. Its `AGENTS.md` says how a task is refined and picked up.
 
+Branches: `dev` is the trunk. Each task branches from `dev` in its own
+worktree and is squash-landed back onto `dev` locally; `main` is the released
+line and only moves by fast-forward from `dev`. This repository is a GitHub
+fork of Bastard Keyboards' userspace: push only to `NoahCLR/charybdis-4x6`, and
+never push or open a pull request upstream. The clone's `gh` default and
+pre-push hook enforce that.
+
 Use the worktree assigned to your task. Run `git worktree list` in the relevant
 repository to discover its other checkouts; do not assume the main checkout
 contains another agent's branch. Relative sibling paths below describe the main
@@ -81,7 +88,8 @@ scattered runtime rewrites.
 >
 > That writes numbered left and right images into `../builds/<branch>/`. Add
 > `--no-owner` for the comparison pair without the live-profile owner.
-> GitHub releases build the same flashable pair and publish separate
+> Pushing a `v*` tag makes CI build the same flashable pair and publish a
+> GitHub release with separate
 > `bastardkb_charybdis_4x6_noah_left.uf2` and
 > `bastardkb_charybdis_4x6_noah_right.uf2` assets. The exact byte sizes may
 > differ between CI and local toolchains.

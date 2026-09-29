@@ -32,7 +32,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ github.token }}
-          name: Latest QMK Firmware
+          name: Charybdis 4x6 ${{ inputs.release_name }}
           tag_name: ${{ inputs.release_name || 'latest' }}
           fail_on_unmatched_files: true
           draft: false

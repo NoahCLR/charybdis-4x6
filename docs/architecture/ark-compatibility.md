@@ -46,11 +46,11 @@ side.
 Local work needs no remote in either direction: firmware gates read only this
 checkout, and Ark's bridge compares local working copies by path. Publishing
 does. Ark pins a firmware commit, and before pushing a pin change it requires
-that commit to be on this repository's remote `main`. A squash or rebase merge
+that commit to be on this repository's remote `dev`. A squash or rebase merge
 replaces a branch's commits, so an Ark pin to one of them must move to the
 merged commit; say so in the merge handoff. Likewise, push a QMK fork commit to
-`noah-userspace-contracts` before pushing firmware that needs it, since CI
-builds against that remote branch.
+`noah-userspace-contracts` before pushing firmware that needs it, since a CI
+release build compiles against that remote branch.
 
 ## Diagnostics
 
