@@ -16,7 +16,8 @@ jobs:
     uses: ./.github/workflows/qmk_userspace_build.yml
     with:
       qmk_repo: NoahCLR/bastardkb-qmk
-      qmk_ref: noah-userspace-contracts
+      # A release tag exists in the QMK fork too: build against exactly that.
+      qmk_ref: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'noah-userspace-contracts' }}
 
   publish:
     name: "QMK Userspace Publish"

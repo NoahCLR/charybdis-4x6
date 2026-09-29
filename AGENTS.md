@@ -44,7 +44,7 @@ adoption and broad hardware acceptance — is under "Current Firmware Status" in
 
 - Start every task with `git status --short`.
 - Assume the worktree may already be dirty. Never revert or overwrite unrelated user changes.
-- Branch from `dev`, work in your own worktree, and squash-land onto `dev` locally only when Noah says so. `main` moves only by fast-forward from `dev`. Never push or open a pull request anywhere but `NoahCLR/charybdis-4x6`: this repo is a fork of Bastard Keyboards' userspace, and nothing goes upstream. See [README.md](README.md#local-repositories-and-worktrees).
+- Branch from `dev`, work in your own worktree, and squash-land onto `dev` locally only when Noah says so. `main` moves only by the vault's `_agents/bin/promote`: a merge commit whose tree is exactly `dev`'s, so every `dev` commit stays reachable. Every landed commit, promotion and release tag carries Git trailers naming the Ark and QMK commits it was tested with (`Stack-Ark`, `Stack-QMK`, `Ark-Pins`, `Stack-Tested`); the vault's tools write them, never edit them by hand. Find the last tested combination with `git log -1 --format='%h %s%n%(trailers)' dev`. Never push or open a pull request anywhere but `NoahCLR/charybdis-4x6`: this repo is a fork of Bastard Keyboards' userspace, and nothing goes upstream. See [README.md](README.md#local-repositories-and-worktrees).
 - Work in the firmware worktree assigned to this task, not automatically in the main checkout. See the local paths and worktree discovery in [README.md](README.md#local-repositories-and-worktrees).
 - The main checkout belongs to a multi-root VS Code workspace with QMK, Ark and build artifacts. Worktrees may live elsewhere; do not assume its sibling layout applies.
 - Treat `charybdis-4x6` as the default write target. Do not edit sibling workspace folders unless the task explicitly requires it and the user wants that scope.
@@ -88,8 +88,16 @@ Required verification workflow:
    `sh tests/host/run_feature_gate_compile_tests.sh`
 6. Before handing work back, run the full host suite:
    `sh tests/host/run_all_host_tests.sh`
-7. Run the firmware build only after all required host tests for that pass are green:
-   `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+7. Build the flashable pair only after all required host tests for that pass are green:
+   `sh tools/build-firmware-pair.sh`. A plain `qmk compile` is not enough: it
+   builds a generic image without the live-profile owner (D-L08), which is not
+   the firmware anyone flashes. From a task worktree, set `QMK_ROOT` to the QMK
+   checkout and `BUILD_ROOT` to an output folder, or run the work-queue vault's
+   `_agents/bin/verify`, which runs steps 4–7 as they apply, sets both and
+   serializes builds: every agent shares QMK's one output path, so two
+   concurrent builds would overwrite each other's firmware. Land with the
+   vault's `_agents/bin/land`, which re-verifies the landed tree and files the
+   pair under `builds/dev/`.
 
 Narrow verification exceptions:
 
