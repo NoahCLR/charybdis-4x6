@@ -79,3 +79,9 @@ void     process_record_tap_hint(keyrecord_t *r) {}
 action_t layer_switch_get_action(keypos_t key) {
     return (action_t){.code = 0};
 }
+
+// Scalar/read-only bridge: the host stub's combo_t has a different layout.
+const uint16_t *gesture_engine_combo_keys(uint16_t index) { return gesture_combos[index].keys; }
+uint16_t gesture_engine_combo_output(uint16_t index) { return gesture_combos[index].keycode; }
+bool gesture_engine_combo_active(uint16_t index) { return gesture_combos[index].active; }
+bool gesture_engine_combo_disabled(uint16_t index) { return gesture_combos[index].disabled; }

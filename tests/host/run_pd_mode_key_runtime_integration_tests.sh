@@ -98,7 +98,7 @@ if [ "${NOAH_TEST_QMK_GESTURES:-0}" = 1 ]; then
         -r "$ROOT/tests/host/qmk_gesture_engine.c" \
         "$QMK_ROOT/quantum/process_keycode/process_combo.c" "$QMK_ROOT/quantum/action_tapping.c" \
         -o "$BUILD_DIR/gesture_engine.o"
-    compile_test "$BUILD_DIR/gestures" -DNOAH_TEST_QMK_GESTURES "$BUILD_DIR/gesture_engine.o"
+    compile_test "$BUILD_DIR/gestures" -DNOAH_TEST_QMK_GESTURES -DCOMBO_ENABLE -DCOMBO_TERM_PER_COMBO -DCOMBO_TERM=50 "$BUILD_DIR/gesture_engine.o"
     "$BUILD_DIR/gestures"
     exit
 fi

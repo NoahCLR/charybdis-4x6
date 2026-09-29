@@ -49,6 +49,11 @@ Firmware work remaining before the product is complete:
 
 ## Open Issues
 
+- **Unified gesture ownership.** Native LT/MT/OSM remain a compatibility
+  boundary; adding a row can still change classification semantics. The
+  [migration plan](plans/unified-gesture-ownership.md) proposes explicit defaults
+  and one owner without silently changing the current layout.
+
 - **Physical gesture acceptance (D-F01).** The buffered-repeat defect is
   reproduced and fixed through the real QMK combo/tapping path. Acceptance on
   both halves, pointing-mode routing and host Button 7 bindings remains open:

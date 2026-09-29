@@ -718,3 +718,7 @@ Runtime-owned tapping now also covers authored MT/OSM rows and intrinsic TT/OSL
 keys (Profile Wire bit 18). Native unhandled dual-role keys remain native. The
 [release timing contract](docs/INTERACTION_MODEL.md#release-intervals-and-timing-advice)
 also defines the impossible release interval Ark reports.
+
+The [unified gesture ownership plan](docs/plans/unified-gesture-ownership.md)
+explains why native LT/MT/OSM still exist and the proposed migration to one
+classifier, including combo-output behaviours as a required acceptance case.

@@ -25,6 +25,9 @@
 #include "users/noah/lib/state/shared/runtime_reset.h"
 #include "users/noah/noah_runtime.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
+#ifdef NOAH_TEST_QMK_GESTURES
+#    include "users/noah/lib/compat/qmk_combo_origin.h"
+#endif
 
 #ifndef KC_J
 #    define KC_J 0x000Du
@@ -91,7 +94,12 @@ const key_behavior_t key_behaviors[] = {
     },
     {
         .keycode        = KC_LEFT_GUI,
+#ifdef NOAH_TEST_QMK_GESTURES
+        .tap_hold_term  = 150, // Screenshot: inherited default.
+        .tap_counts[2] = {.tap = TAP_SENDS(OSM(MOD_LSFT))},
+#else
         .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
+#endif
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts[1] =
             {
@@ -302,6 +310,9 @@ static void test_reset_state(void) {
     load_configured_pd();
 #endif
     noah_runtime_reset_for_test();
+#ifdef NOAH_TEST_QMK_GESTURES
+    noah_qmk_combo_origin_reset();
+#endif
     test_reset_keymap();
 
     fake_time                              = 1000;
@@ -388,7 +399,14 @@ void layer_off(uint8_t layer) {
     test_apply_layer_state(layer_state & (layer_state_t) ~((layer_state_t)1u << layer));
 }
 
+#ifdef NOAH_TEST_QMK_GESTURES
+uint16_t gesture_keycode(uint8_t row, uint8_t col);
+#endif
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+#ifdef NOAH_TEST_QMK_GESTURES
+    // Userspace combo origin must see the same members QMK's combo engine does.
+    if (row == 3 || (row >= 4 && row < 6)) return gesture_keycode(row, column);
+#endif
     return test_keymap[layer_num][row][column];
 }
 
@@ -522,7 +540,15 @@ void noah_dispatch_synthetic_tap(uint16_t keycode) {
     (void)keycode;
 }
 
+#ifdef NOAH_TEST_QMK_GESTURES
+static uint16_t gesture_qmk_tap;
+static unsigned gesture_qmk_tap_count;
+#endif
 void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
+#ifdef NOAH_TEST_QMK_GESTURES
+    gesture_qmk_tap = keycode;
+    gesture_qmk_tap_count++;
+#endif
     (void)keycode;
 }
 
@@ -2245,6 +2271,18 @@ static void test_ordinary_mouse_button_double_tap_hold(void) {
 bool combo_key_event_pending(uint8_t row, uint8_t col, bool pressed, uint16_t since, uint16_t term);
 void gesture_engine_event(uint8_t row, uint8_t col, bool down, uint16_t time);
 void gesture_engine_scan(uint16_t time);
+const uint8_t noah_combo_count = 10;
+combo_t key_combos[10];
+const uint16_t *gesture_engine_combo_keys(uint16_t index);
+uint16_t gesture_engine_combo_output(uint16_t index);
+bool gesture_engine_combo_active(uint16_t index);
+bool gesture_engine_combo_disabled(uint16_t index);
+static void gesture_sync_combos(void) {
+    for (uint16_t i = 0; i < noah_combo_count; i++) {
+        key_combos[i] = (combo_t){.keys = gesture_engine_combo_keys(i), .keycode = gesture_engine_combo_output(i),
+            .active = gesture_engine_combo_active(i), .disabled = gesture_engine_combo_disabled(i)};
+    }
+}
 static uint16_t gesture_test_code;
 static uint16_t gesture_delivered_press;
 uint16_t gesture_keycode(uint8_t row, uint8_t col) {
@@ -2258,16 +2296,20 @@ uint16_t gesture_keycode(uint8_t row, uint8_t col) {
 static uint16_t gesture_combo_outputs[32];
 static uint8_t gesture_combo_output_count;
 void gesture_deliver(uint16_t code, uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t taps, bool combo) {
+    gesture_sync_combos();
     if (down) gesture_delivered_press = code;
     if (combo && down) { CHECK(gesture_combo_output_count < ARRAY_SIZE(gesture_combo_outputs)); gesture_combo_outputs[gesture_combo_output_count++] = code; }
     keyrecord_t r = {.event = {.key={row,col}, .pressed=down, .type=combo ? COMBO_EVENT : KEY_EVENT, .time=time}, .tap={.count=taps}};
     bool pass = noah_process_record_user(code, &r);
+
     noah_process_record_user_finalize(code, &r, pass);
 }
 static void gesture_advance(uint16_t ms) {
-    while (ms--) { fake_time++; key_runtime_integration_scan(); gesture_engine_scan(fake_time); }
+    // Mirrors noah_matrix_scan_user: combo-origin housekeeping, then key runtime.
+    while (ms--) { fake_time++; gesture_sync_combos(); noah_qmk_combo_origin_scan(); key_runtime_integration_scan(); gesture_engine_scan(fake_time); }
 }
 static void gesture_at(uint8_t row, uint8_t col, bool down) {
+    gesture_sync_combos();
     keyrecord_t r = {.event={.key={row,col}, .pressed=down, .type=KEY_EVENT, .time=fake_time}};
     CHECK(noah_pre_process_record_user(gesture_keycode(row,col), &r));
     gesture_engine_event(row,col,down,fake_time);
@@ -2344,6 +2386,55 @@ static void test_qmk_queued_release_cannot_become_hold(void) {
     gesture_at(4,4,false); gesture_advance(500);
     test_assert_button_quiescent(test_keypos(4,2));
 }
+// Screenshot C5: Button 1 + Volume -> GUI; GUI double hold -> Alt,
+// triple tap -> OSM(Shift), inherited hold/repeat terms both 150 ms.
+static void gesture_gui_chord(bool down, bool reversed) {
+    const keypos_t keys[] = {{4, 1}, {5, 5}};
+    keypos_t first = keys[reversed ? 1 : 0], second = keys[reversed ? 0 : 1];
+    gesture_at(first.row, first.col, down);
+    gesture_advance(10);
+    gesture_at(second.row, second.col, down);
+}
+static void test_qmk_combo_output_gui_behaviour(void) {
+    for (unsigned press_order = 0; press_order < 2; press_order++) {
+        for (unsigned release_order = 0; release_order < 2; release_order++) {
+            test_reset_state(); fake_time = 12000; gesture_combo_output_count = 0;
+            gesture_gui_chord(true, press_order); gesture_advance(320);
+            CHECK(gesture_combo_output_count == 1 && gesture_combo_outputs[0] == KC_LEFT_GUI);
+            CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) != 0);
+            CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) == 0);
+            CHECK(pd_mode_local_active_snapshot() == 0);
+            gesture_gui_chord(false, release_order); gesture_advance(500);
+            test_assert_button_quiescent(test_keypos(0, 0));
+
+            test_reset_state(); fake_time = 14000; gesture_combo_output_count = 0;
+            gesture_gui_chord(true, press_order); gesture_advance(20);
+            gesture_gui_chord(false, release_order); gesture_advance(60);
+            gesture_gui_chord(true, !press_order); gesture_advance(320);
+            CHECK(gesture_combo_output_count == 2);
+            CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) != 0);
+            CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0);
+            CHECK(pd_mode_local_active_snapshot() == 0);
+            gesture_gui_chord(false, !release_order); gesture_advance(500);
+            test_assert_button_quiescent(test_keypos(0, 0));
+
+            test_reset_state(); fake_time = 16000; gesture_combo_output_count = 0;
+            gesture_qmk_tap_count = 0; gesture_qmk_tap = KC_NO;
+            for (unsigned tap = 0; tap < 3; tap++) {
+                gesture_gui_chord(true, tap % 2 ? !press_order : press_order);
+                gesture_advance(20);
+                CHECK(gesture_qmk_tap_count == 0); // Never send Shift on chord press.
+                gesture_gui_chord(false, release_order);
+                gesture_advance(tap < 2 ? 60 : 500);
+            }
+            CHECK(gesture_combo_output_count == 3);
+            CHECK(gesture_qmk_tap_count == 1 && gesture_qmk_tap == OSM(MOD_LSFT));
+            CHECK(pd_mode_local_active_snapshot() == 0);
+            test_assert_button_quiescent(test_keypos(0, 0));
+        }
+    }
+}
+
 static void test_qmk_dual_role_ownership(void) {
     const uint16_t authored[] = {MT(MOD_LCTL, KC_A), TT(2), OSL(2), OSM(MOD_LSFT)};
     for (unsigned i = 0; i < ARRAY_SIZE(authored); i++) {
@@ -2410,6 +2501,7 @@ int main(void) {
     test_qmk_queued_release_cannot_become_hold();
     test_qmk_nested_chords_choose_only_largest();
     test_qmk_dual_role_ownership();
+    test_qmk_combo_output_gui_behaviour();
     puts("QMK gesture pipeline tests passed");
     return 0;
 #endif
