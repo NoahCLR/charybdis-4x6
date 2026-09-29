@@ -117,24 +117,26 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     noah_qmk_contract_auto_mouse_keyevent(pressed);
 }
 
-// One count on QMK's key tracker while the auto-mouse layer is locked, so
-// neither QMK's timeout nor its reset on the next non-mouse key turns off a
-// layer the runtime still has locked. QMK zeroes the tracker when auto-mouse
-// is switched off or retargeted, so the count is only taken back while one is
-// there to take.
-static bool layer_lock_anchor_active;
+// One count on QMK's key tracker while the runtime locks or holds the
+// auto-mouse layer, so neither QMK's timeout nor its reset on the next
+// non-mouse key turns off a layer the runtime still owns. QMK counts its own
+// MO()/TT() keys, but a behaviour's MO() hold never reaches it as a keycode.
+// QMK zeroes the tracker when auto-mouse is switched off or retargeted, so the
+// count is only taken back while one is there to take.
+static bool layer_ownership_anchor_active;
 
-void pointer_layer_policy_sync_layer_lock_anchor(void) {
-    bool should_anchor = noah_qmk_contract_auto_mouse_enabled() && layer_ownership_is_locked(noah_qmk_contract_auto_mouse_layer());
+void pointer_layer_policy_sync_layer_ownership_anchor(void) {
+    uint8_t auto_mouse_layer = noah_qmk_contract_auto_mouse_layer();
+    bool    should_anchor    = noah_qmk_contract_auto_mouse_enabled() && (layer_ownership_is_locked(auto_mouse_layer) || layer_ownership_is_held(auto_mouse_layer));
 
-    if (should_anchor == layer_lock_anchor_active) {
+    if (should_anchor == layer_ownership_anchor_active) {
         return;
     }
 
     if (should_anchor || noah_qmk_contract_auto_mouse_key_tracker() > 0) {
         noah_qmk_contract_auto_mouse_keyevent(should_anchor);
     }
-    layer_lock_anchor_active = should_anchor;
+    layer_ownership_anchor_active = should_anchor;
 }
 
 void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {
@@ -144,7 +146,7 @@ void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord
 }
 
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
-    pointer_layer_policy_sync_layer_lock_anchor();
+    pointer_layer_policy_sync_layer_ownership_anchor();
 
     pd_mode_snapshot_t snapshot             = pd_mode_snapshot();
     bool               prefers_typing_layer = pd_mode_policy_snapshot_prefers_typing_layer(snapshot);
@@ -222,7 +224,7 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     (void)pressed;
 }
 
-void pointer_layer_policy_sync_layer_lock_anchor(void) {}
+void pointer_layer_policy_sync_layer_ownership_anchor(void) {}
 
 void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord_t *record) {
     (void)keycode;

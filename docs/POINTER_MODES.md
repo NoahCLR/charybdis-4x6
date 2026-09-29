@@ -130,7 +130,10 @@ A lock on the auto-mouse layer is the runtime's own lock, like any other
 layer's (`TG()`, `LOCK_LAYER()`, `TO()`, `TT()`'s locking tap, from a key, a
 behaviour or a combo). While it lasts it holds QMK's auto-mouse on the way a
 held mouse key does, so neither the timeout nor the next ordinary key turns
-the layer off, and `TO(0)` or unlocking it lets it go. QMK's auto-mouse also
+the layer off, and `TO(0)` or unlocking it lets it go. A runtime hold of the
+layer (a behaviour's `MO()` hold, which QMK sees only as a layer change and
+never as an `MO()` key) holds auto-mouse the same way until it is released;
+without it QMK's next pointing task turned the layer straight back off. QMK's auto-mouse also
 flips a toggle of its own on the release of `TG()`/`TO()` of its layer and on
 `TT()`'s locking tap; nothing in the runtime released that second lock, so
 `TO(pointer)` then `TO(0)` used to leave the pointer layer on. The runtime

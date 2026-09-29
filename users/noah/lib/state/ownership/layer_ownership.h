@@ -26,6 +26,7 @@ typedef struct {
 } layer_ownership_debug_snapshot_t;
 
 bool layer_ownership_is_locked(uint8_t layer);
+bool layer_ownership_is_held(uint8_t layer);
 bool layer_ownership_set_lock_state(uint8_t layer, bool locked);
 bool layer_ownership_toggle_lock_state(uint8_t layer);
 // TO(layer): lock only this layer. Other locks are released; held momentary

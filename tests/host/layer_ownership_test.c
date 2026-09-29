@@ -104,6 +104,27 @@ static void test_multiple_keys_share_momentary_layer_reference(void) {
     CHECK(layer_off_calls[2] == 1);
 }
 
+// Held means a key holds the layer, whichever key and however many; a lock
+// alone is not a hold.
+static void test_is_held_tracks_key_holds_not_locks(void) {
+    keypos_t key_a = test_keypos(0, 0);
+    keypos_t key_b = test_keypos(0, 1);
+
+    test_reset_stubs();
+
+    CHECK(!layer_ownership_is_held(2));
+    layer_ownership_momentary_press(key_a, 2);
+    layer_ownership_momentary_press(key_b, 2);
+    CHECK(layer_ownership_is_held(2) && !layer_ownership_is_held(1));
+    (void)layer_ownership_momentary_release(key_a);
+    CHECK(layer_ownership_is_held(2));
+    (void)layer_ownership_momentary_release(key_b);
+    CHECK(!layer_ownership_is_held(2));
+
+    CHECK(layer_ownership_toggle_lock_state(2));
+    CHECK(!layer_ownership_is_held(2));
+}
+
 static void test_same_key_repress_same_layer_does_not_duplicate_refcount(void) {
     keypos_t key_pos = test_keypos(2, 4);
 
@@ -380,6 +401,7 @@ static void test_invalid_layer_requests_are_ignored(void) {
 int main(void) {
     test_single_momentary_press_and_release_toggles_layer();
     test_multiple_keys_share_momentary_layer_reference();
+    test_is_held_tracks_key_holds_not_locks();
     test_same_key_repress_same_layer_does_not_duplicate_refcount();
     test_same_key_can_move_its_momentary_binding_between_layers();
     test_toggle_lock_state_activates_and_deactivates_layer();

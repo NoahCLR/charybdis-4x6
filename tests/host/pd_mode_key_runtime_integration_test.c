@@ -714,6 +714,11 @@ bool layer_ownership_is_locked(uint8_t layer) {
     return false;
 }
 
+bool layer_ownership_is_held(uint8_t layer) {
+    (void)layer;
+    return false;
+}
+
 #ifdef NOAH_TEST_QMK_GESTURES
 static layer_state_t gesture_locks;
 #endif

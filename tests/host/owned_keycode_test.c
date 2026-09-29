@@ -141,7 +141,7 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
     pointer_action_call_count++;
 }
 
-void pointer_layer_policy_sync_layer_lock_anchor(void) {}
+void pointer_layer_policy_sync_layer_ownership_anchor(void) {}
 
 void pointer_layer_policy_settle_record(void) {}
 

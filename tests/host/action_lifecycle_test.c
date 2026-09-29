@@ -245,7 +245,7 @@ void owned_keycode_tap_literal(uint16_t keycode) {
     literal_tap_call.keycode = keycode;
 }
 
-void pointer_layer_policy_sync_layer_lock_anchor(void) {}
+void pointer_layer_policy_sync_layer_ownership_anchor(void) {}
 
 void pointer_layer_policy_settle_record(void) {}
 

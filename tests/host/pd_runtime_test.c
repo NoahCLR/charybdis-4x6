@@ -212,6 +212,11 @@ bool layer_ownership_is_locked(uint8_t layer) {
     return false;
 }
 
+bool layer_ownership_is_held(uint8_t layer) {
+    (void)layer;
+    return false;
+}
+
 void set_auto_mouse_layer(uint8_t layer) {
     auto_mouse_layer = layer;
 }

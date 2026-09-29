@@ -373,7 +373,7 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     // QMK's auto-mouse has already seen this record, synthetic or not; take
     // back any lock it kept for itself before the runtime acts on the key.
     pointer_layer_policy_take_back_qmk_toggle(keycode, record);
-    pointer_layer_policy_sync_layer_lock_anchor();
+    pointer_layer_policy_sync_layer_ownership_anchor();
 
     noah_qmk_combo_origin_normalize_record(keycode, record);
 

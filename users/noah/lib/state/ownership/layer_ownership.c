@@ -113,6 +113,19 @@ bool layer_ownership_is_locked(uint8_t layer) {
     return layer < LAYER_COUNT && (state->locked_mask & layer_ownership_mask_for_layer(layer)) != 0;
 }
 
+// Whether a key holds this layer (MO(), TT(), OSL(), LM() or a behaviour's
+// layer hold), as opposed to a lock.
+bool layer_ownership_is_held(uint8_t layer) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->bindings); i++) {
+        if (state->bindings[i].active && state->bindings[i].layer == layer) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
     noah_layer_ownership_state_t *state = layer_ownership_state();
 

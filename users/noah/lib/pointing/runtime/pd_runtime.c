@@ -101,7 +101,7 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
 #ifdef POINTING_DEVICE_ENABLE
     // QMK's auto-mouse runs right after this task: a layer locked since the
     // last layer change must hold it before QMK looks at its timeout.
-    pointer_layer_policy_sync_layer_lock_anchor();
+    pointer_layer_policy_sync_layer_ownership_anchor();
 
     pd_mode_mask_t active_mode_id = pd_mode_local_active_snapshot();
 

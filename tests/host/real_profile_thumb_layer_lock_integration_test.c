@@ -3612,7 +3612,27 @@ static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
     test_assert_thumb_runtime_quiescent(key_pos);
 }
 
+// A behaviour's MO() hold of the Pointing (auto-mouse) layer reaches QMK only
+// as a layer change. The runtime counts it on QMK's auto-mouse tracker while it
+// is held, so QMK's timeout and non-mouse-key reset cannot turn the layer off
+// under the held key.
+static void test_held_pointing_layer_anchors_auto_mouse(void) {
+    keypos_t pos = test_left_thumb_pos();
+
+    test_reset_state();
+    CHECK(get_auto_mouse_layer() == LAYER_POINTER);
+
+    layer_ownership_momentary_press(pos, LAYER_POINTER);
+    CHECK(test_layer_active(LAYER_POINTER));
+    CHECK(auto_mouse_key_tracker == 1);
+
+    CHECK(layer_ownership_momentary_release(pos));
+    CHECK(!test_layer_active(LAYER_POINTER));
+    CHECK(auto_mouse_key_tracker == 0);
+}
+
 int main(void) {
+    test_held_pointing_layer_anchors_auto_mouse();
     test_oneshot_layer_arms_on_release_for_fast_typing();
     test_oneshot_layer_long_press_and_second_taps_follow_qmk();
     test_layer_mod_holds_its_layer_and_modifiers();
