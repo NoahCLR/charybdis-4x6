@@ -52,13 +52,14 @@ Firmware work remaining before the product is complete:
 - **Unified gesture ownership.** Native LT/MT/OSM remain a compatibility
   boundary; adding a row can still change classification semantics. Runtime-owned
   LT/MT/OSM rows now follow QMK's default overlapping rule (D-F03). The
-  [migration plan](plans/unified-gesture-ownership.md) proposes explicit defaults
+  migration plan (*Unified gesture ownership* in the work-queue vault) proposes explicit defaults
   and one owner without silently changing the current layout.
 
 - **Physical gesture acceptance (D-F01).** The buffered-repeat defect is
   reproduced and fixed through the real QMK combo/tapping path. Acceptance on
   both halves, pointing-mode routing and host Button 7 bindings remains open:
-  [report and remaining plan](plans/gesture-timing-and-combo-arbitration.md).
+  report and remaining plan in *Gesture timing and combo arbitration*
+  (work-queue vault).
 - **One-half power-cycle recovery transition.** On 2026-09-12, after one half
   lost power while the other stayed powered, the first complete read failed
   with VIA storage flags 7 (dirty, recovery required) before settling to clean
@@ -119,8 +120,9 @@ Durable specs live under `docs/architecture/`: the Profile Wire and split
 protocols, the authority state table, the storage and resource baseline, the
 field classification and the domain contracts. The review folders, findings
 registers, prompts and review-process conventions were deleted: process
-history that did not describe how the thing works. A completed plan is folded
-into the spec it produced and deleted.
+history that did not describe how the thing works. Active plans live in the
+work-queue vault (`charybdis-notes`, see README), not in this repository. A
+completed plan is folded into the spec it produced and deleted.
 
 ### D-L08 — The live-profile owner is on by default
 
@@ -550,7 +552,7 @@ at 460,800 and none across three Applies at 230,400, and the other half's lighti
 flickered, because QMK's lighting sync carries no checksum. Setting
 `NOAH_SPLIT_BAUD` now fails the build. A faster link needs checksummed syncs
 first, and new measurements. The split frame CRC
-([plan](plans/split-sync-checksums.md)) is now in the default build; 460,800
+(plan *Split sync checksums* in the work-queue vault) is now in the default build; 460,800
 stays removed until it is accepted on hardware and measured again.
 
 ### D-L44 — The app has its own repository and pinned firmware inputs

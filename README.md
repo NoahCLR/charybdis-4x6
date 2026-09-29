@@ -14,6 +14,10 @@ On Noah's machine, the main checkouts are:
 - Ark: [NoahCLR/charybdis-ark](https://github.com/NoahCLR/charybdis-ark)
   (`/Users/noah/dev/charybdis/charybdis-ark` locally).
 - Upstream QMK build dependency: `/Users/noah/dev/charybdis/bastardkb-qmk`.
+- Work queue: `/Users/noah/dev/charybdis/charybdis-notes`, an Obsidian vault
+  (private [NoahCLR/charybdis-notes](https://github.com/NoahCLR/charybdis-notes))
+  holding notes, tasks, active plans and keyboard checks for all three
+  repositories. Its `AGENTS.md` says how a task is refined and picked up.
 
 Use the worktree assigned to your task. Run `git worktree list` in the relevant
 repository to discover its other checkouts; do not assume the main checkout
@@ -610,7 +614,8 @@ Use the docs based on what you want to change:
   profile choices
 - [`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md): tap, hold,
   longer-hold, and multi-tap semantics
-- [Gesture timing investigation](docs/plans/gesture-timing-and-combo-arbitration.md):
+- Gesture timing investigation (plan *Gesture timing and combo arbitration* in
+  the work-queue vault):
   Button 3 double-hold failure, combo/tapping interactions, and the current-layout
   acceptance plan
 - [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md): what each trackball mode
@@ -721,6 +726,6 @@ unhandled dual-role keys remain native. The
 [release timing contract](docs/INTERACTION_MODEL.md#release-intervals-and-timing-advice)
 also defines the impossible release interval Ark reports.
 
-The [unified gesture ownership plan](docs/plans/unified-gesture-ownership.md)
+The unified gesture ownership plan (in the work-queue vault)
 explains why native LT/MT/OSM still exist and the proposed migration to one
 classifier, including combo-output behaviours as a required acceptance case.

@@ -54,6 +54,7 @@ adoption and broad hardware acceptance — is under "Current Firmware Status" in
 - For refactors or runtime architecture work, read `docs/LIVE_EDIT_APP_DIRECTION.md` first. It carries the current direction, the decisions behind it, and what is deliberately left undesigned.
 - The durable specs live under `docs/architecture/`: the Profile Wire and split protocols, the authority state tables, the storage and resource baseline, the PD-mode domain, and the field classification. Treat those as the contract; change them deliberately.
 - This repo no longer keeps dated review folders or finding registers. Record decisions in the doc they govern, next to the thing they constrain.
+- Work is queued, refined and planned in the work-queue vault at `/Users/noah/dev/charybdis/charybdis-notes` (see [README.md](README.md#local-repositories-and-worktrees)). When a task comes from it, follow that vault's `AGENTS.md` for claiming and status; this file still governs every change in this repo. Active plans live there, not under `docs/`.
 - Hardware measurements are the exception: raw captures live under `measurements/<subject>/YYYY-MM-DD-<label>/` with a set record, captured with the subject's procedure. Read [`measurements/README.md`](./measurements/README.md) before taking or quoting a measurement; never edit a capture file.
 
 ## Repo Boundaries
@@ -122,7 +123,7 @@ Repo-specific guardrails:
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update `README.md` and the relevant files under `docs/` in the same pass.
 - If any authored input to `tools/profile_introspect.py` changes, regenerate the introspection outputs in the same pass with `python3 tools/profile_introspect.py --write` and verify them with `python3 tools/profile_introspect.py --check`. Current authored inputs are `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`, `users/noah/config.h`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`, and the shared pd-mode manifest `users/noah/lib/pointing/defs/pd_mode_manifest.h`.
 - If architectural work lands, record it in the doc it governs in the same pass: a new or amended firmware decision in `docs/LIVE_EDIT_APP_DIRECTION.md` (numbered from D-F01; keep "Current Firmware Status" and "Open Issues" current), or the matching spec under `docs/architecture/`. App decisions and app status belong to Ark; a D-L heading here marked as an app decision is only a pointer.
-- Write decisions and contracts, not logs: verification runs, build numbers, test counts and dated progress notes belong in commit messages. When a plan is finished, fold what still constrains the code into the spec it produced and delete the plan (D-L07).
+- Write decisions and contracts, not logs: verification runs, build numbers, test counts and dated progress notes belong in commit messages. When a plan in the work-queue vault is finished, fold what still constrains the code into the spec it produced and delete the plan (D-L07).
 
 ## RP2040 Resource Truth
 

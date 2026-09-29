@@ -1110,7 +1110,7 @@ static void test_raw_lt_hold_dispatches_authored_tap_key_immediately(void) {
 
 // An authored LT() row that another key interrupts before its hold threshold
 // is still a tap: the layer never came on, so neither key is swallowed. Output
-// order under overlapping typing is an open contract (plans/unified-gesture-ownership.md).
+// order under overlapping typing is an open contract (Unified gesture ownership plan, charybdis-notes).
 static void test_authored_lt_interrupted_before_hold_keeps_both_taps(void) {
     const uint16_t                       hold_key     = LT(TEST_LAYER_NAV, KC_SLSH);
     const key_runtime_integration_step_t hold_steps[] = {

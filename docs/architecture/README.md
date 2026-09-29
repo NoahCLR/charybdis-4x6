@@ -10,7 +10,7 @@ The generated `docs/KEYMAP-OVERVIEW.md` shows the current authored profile.
 This directory explains how the runtime is shaped and where changes belong.
 
 The [split activity sync contract](split-activity-sync.md) covers the implemented
-default activity policy and opt-in diagnostics. The [split transport optimization handoff](../plans/split-transport-optimization.md)
+default activity policy and opt-in diagnostics. The split transport optimization handoff (a plan in the work-queue vault)
 contains the traffic analysis, savings model, remaining implementation stages,
 and hardware acceptance checks.
 
