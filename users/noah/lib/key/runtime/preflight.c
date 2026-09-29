@@ -39,6 +39,15 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record, bool pr
         key_runtime_transition_flush_foreign_multi_tap(keycode, record->event.key, &plan);
         key_runtime_trace_plan("preflight:flush_foreign_multi_tap", &plan);
         key_runtime_transition_execute_plan(&plan);
+    } else if (record->event.pressed) {
+        // Handled keys keep independent series alive, except a tap/hold key's:
+        // its pending tap is typed before the key that followed it.
+        key_runtime_transition_plan_t plan;
+
+        key_runtime_transition_plan_init(&plan);
+        key_runtime_transition_flush_foreign_dual_role_multi_tap(keycode, record->event.key, &plan);
+        key_runtime_trace_plan("preflight:flush_foreign_dual_role_multi_tap", &plan);
+        key_runtime_transition_execute_plan(&plan);
     }
 
     return true;

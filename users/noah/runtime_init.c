@@ -18,6 +18,7 @@
 #include "lib/macro/macro_payload.h"
 #include "lib/macro/via_macro_defaults.h"
 #include "lib/compat/qmk_combo_origin.h"
+#include "lib/compat/qmk_record_admission.h"
 #include "lib/compat/qmk_durable_io.h"
 #include "lib/compat/qmk_loop_stages.h"
 #include "lib/compat/qmk_via_split_mirror.h"
@@ -66,6 +67,7 @@ void noah_matrix_scan_user(void) {
     noah_qmk_combo_origin_scan();
 
     noah_key_runtime_scan();
+    noah_record_admission_task();
 
     macro_payload_engine_scan();
 
@@ -96,7 +98,7 @@ void noah_suspend_power_down_user(void) {
 
 void noah_keyboard_post_init_user(void) {
     static const noah_runtime_init_stage_fn_t stages[] = {
-        noah_runtime_shared_state_post_init, key_origin_registry_init, noah_qmk_combo_origin_init, macro_payload_engine_init, noah_via_macro_defaults_keyboard_post_init, noah_profile_store_runtime_init,
+        noah_runtime_shared_state_post_init, key_origin_registry_init, noah_qmk_combo_origin_init, noah_record_admission_reset, macro_payload_engine_init, noah_via_macro_defaults_keyboard_post_init, noah_profile_store_runtime_init,
 #if defined(NOAH_PD_PROFILE_ENABLE) && !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
         noah_runtime_init_compiled_pd,
 #endif

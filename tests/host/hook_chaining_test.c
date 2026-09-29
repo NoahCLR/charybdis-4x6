@@ -8,6 +8,7 @@
 
 void           eeconfig_init_user(void);
 bool           get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
+bool           process_record_admit_user(keyrecord_t *record);
 bool           pre_process_record_user(uint16_t keycode, keyrecord_t *record);
 bool           process_record_user(uint16_t keycode, keyrecord_t *record);
 void           post_process_record_user(uint16_t keycode, keyrecord_t *record);
@@ -26,6 +27,9 @@ layer_state_t layer_state;
 
 typedef struct {
     unsigned eeconfig_calls;
+    unsigned admit_calls;
+    keyrecord_t *admit_record;
+    bool         admit_return_value;
     unsigned pre_process_calls;
     unsigned process_calls;
     unsigned finalize_calls;
@@ -128,6 +132,12 @@ static void test_reset(void) {
 
 void noah_eeconfig_init_user(void) {
     noah_hook_stub_state.eeconfig_calls++;
+}
+
+bool noah_record_admission_admit(keyrecord_t *record) {
+    noah_hook_stub_state.admit_calls++;
+    noah_hook_stub_state.admit_record = record;
+    return noah_hook_stub_state.admit_return_value;
 }
 
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -343,6 +353,13 @@ static void test_weak_defaults_use_expected_shared_behavior(void) {
 
     eeconfig_init_user();
     CHECK(noah_hook_stub_state.eeconfig_calls == 1);
+
+#ifndef HOOK_CHAINING_TEST_STRONG_OVERRIDE
+    // The weak admission hook asks the record admission module.
+    noah_hook_stub_state.admit_return_value = false;
+    CHECK(!process_record_admit_user(&record));
+    CHECK(noah_hook_stub_state.admit_calls == 1 && noah_hook_stub_state.admit_record == &record);
+#endif
 
     CHECK(!get_hold_on_other_key_press(0x1234u, &record));
 

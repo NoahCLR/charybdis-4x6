@@ -147,7 +147,24 @@ close between them.
 Those pending multi-tap windows are tracked per physical key. Other handled
 keys can keep independent series alive. An unhandled key can settle pending
 taps to preserve typing order, but cannot discard an on-time continuation
-already buffered in QMK.
+already buffered in QMK. A tap/hold key's series (an authored `LT()`, `MT()` or
+`OSM()` row) is settled by any other key's press, so its tap is typed first.
+
+### Keys pressed while a tap/hold key is undecided
+
+While a runtime-owned tap/hold key (an authored `LT()`, `MT()` or `OSM()` row) is
+down and has not reached its hold, keys pressed after it wait, as QMK's tapping
+engine holds keys behind a tapping key:
+
+- released before the tap-hold term, it is a tap: its tap is typed, then the
+  waiting keys, so rolling `/` into `,` types `/,`;
+- held past the term, its hold starts (layer or modifiers), then the waiting
+  keys run on it, so `/` held with an arrow tapped meanwhile sends the Nav arrow.
+
+Waiting keys replay in order with their physical timestamps. The release of a
+key pressed before the tap/hold key is not held back, as in QMK. The wait is at
+most the tap-hold term; a fast roll gains no delay beyond the tap/hold key's
+release. `MO()`, `TT()`, `OSL()`, `LM()` and plain keys do not hold keys back.
 
 ### Physical gestures and buffered delivery
 

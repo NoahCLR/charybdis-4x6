@@ -715,7 +715,9 @@ This requires the paired QMK fork changes and an Ark client recognizing Profile
 Wire feature bit 17. The current layout and timing defaults are unchanged.
 
 Runtime-owned tapping now also covers authored MT/OSM rows and intrinsic TT/OSL
-keys (Profile Wire bit 18). Native unhandled dual-role keys remain native. The
+keys (Profile Wire bit 18). Keys pressed while such a key is undecided wait for
+its tap or hold, as QMK's tapping does, so rolls keep their order. Native
+unhandled dual-role keys remain native. The
 [release timing contract](docs/INTERACTION_MODEL.md#release-intervals-and-timing-advice)
 also defines the impossible release interval Ark reports.
 

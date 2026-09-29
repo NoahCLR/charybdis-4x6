@@ -79,6 +79,14 @@ void noah_key_runtime_scan(void) {
     test_log_stage("key_runtime_scan");
 }
 
+void noah_record_admission_task(void) {
+    test_log_stage("record_admission_task");
+}
+
+void noah_record_admission_reset(void) {
+    test_log_stage("record_admission_reset");
+}
+
 void macro_payload_engine_scan(void) {
     test_log_stage("macro_payload_engine_scan");
 }
@@ -163,7 +171,7 @@ static void test_eeconfig_init_order(void) {
 
 static void test_matrix_scan_order(void) {
     static const char *const expected[] = {
-        "via_macro_defaults_matrix_scan", "qmk_durable_io_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "macro_payload_engine_scan", "split_runtime_sync_tick",
+        "via_macro_defaults_matrix_scan", "qmk_durable_io_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "record_admission_task", "macro_payload_engine_scan", "split_runtime_sync_tick",
     };
 
     test_log_reset();
@@ -185,7 +193,7 @@ static void test_keyboard_post_init_order(void) {
     static const char *const expected[] = {
         // Core defaults must land before any stage can observe key runtime
         // core state.
-        "runtime_shared_state_post_init", "qmk_combo_origin_init", "macro_payload_engine_init", "via_macro_defaults_keyboard_post_init", "profile_store_runtime_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init", "qmk_via_split_mirror_init", "qmk_durable_io_init",
+        "runtime_shared_state_post_init", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "via_macro_defaults_keyboard_post_init", "profile_store_runtime_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init", "qmk_via_split_mirror_init", "qmk_durable_io_init",
     };
 
     test_log_reset();

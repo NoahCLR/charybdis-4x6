@@ -154,6 +154,16 @@ void key_runtime_transition_flush_foreign_multi_tap(uint16_t keycode, keypos_t k
     key_runtime_transition_end_auto_drain(plan, previous_flags, &core_plan);
 }
 
+void key_runtime_transition_flush_foreign_dual_role_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_transition_plan_t *plan) {
+    key_runtime_core_effect_plan_t core_plan;
+    uint8_t                        previous_flags;
+
+    previous_flags = key_runtime_transition_begin_auto_drain(plan);
+    key_runtime_transition_core_plan_init_streaming(&core_plan, plan);
+    key_runtime_core_flush_foreign_dual_role_multi_tap(keycode, key_pos, &core_plan);
+    key_runtime_transition_end_auto_drain(plan, previous_flags, &core_plan);
+}
+
 void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runtime_transition_plan_t *plan) {
     key_runtime_core_effect_plan_t core_plan;
     uint8_t                        previous_flags;

@@ -382,6 +382,15 @@ queued-release query. QMK queues such a release only for a modifier or layer
 key released during another key's tapping term. This separates gesture eligibility from permission to emit
 output without rewinding shared time.
 
+`lib/compat/qmk_record_admission.c` holds records back behind an undecided
+tap/hold key ([the contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)).
+The fork's `process_record_admit_user()` offers every record at the top of
+`process_record()`, after combos and native tapping and before every QMK feature,
+so a held record is processed once, on replay. `noah_matrix_scan_user` runs the
+replay after the key runtime scan, so a hold reached that scan applies first;
+`key_runtime_core_undecided_dual_role_key_pos()` is the only decision it reads.
+The eight-record buffer passes a record through rather than drop it when full.
+
 The fork's `is_tap_keycode_user` hook exempts all runtime-handled keys from native
 tapping. Lookup includes authored MT/OSM rows and intrinsic TT/OSL ownership.
 Unhandled keys retain QMK policy; the pipeline tests each family and native

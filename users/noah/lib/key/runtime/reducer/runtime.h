@@ -406,6 +406,7 @@ bool                           key_runtime_core_press_offered_to_mode(keypos_t k
 bool                           key_runtime_core_take_intercepted_release(keypos_t key_pos);
 void                           key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
+void                           key_runtime_core_flush_foreign_dual_role_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 bool                           key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);

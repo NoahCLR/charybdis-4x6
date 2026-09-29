@@ -82,6 +82,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/trace.c \
     lib/key/runtime/delayed_action.c \
     lib/compat/qmk_combo_origin.c \
+    lib/compat/qmk_record_admission.c \
     lib/key/ownership/held_action.c \
     lib/key/ownership/held_repeat.c \
     lib/action/action_dispatch.c \

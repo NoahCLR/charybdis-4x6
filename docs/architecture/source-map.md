@@ -82,6 +82,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 
 ### `compat/`
 
+- Record admission behind undecided tap/hold keys: `qmk_record_admission.c/h`
 - Combo and split adapters: `qmk_combo_origin.c/h`,
   `qmk_via_split_sync.c/h`, `qmk_via_sync_metadata.c/h`,
   `qmk_via_sync_protocol.c/h`, `qmk_via_sync_state.c/h`, and

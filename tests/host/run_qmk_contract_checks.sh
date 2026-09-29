@@ -116,6 +116,9 @@ for source, signature in [("quantum/action_tapping.c", "bool tapping_key_event_p
                           ("quantum/process_keycode/process_combo.c", "bool combo_key_event_pending(")]:
     if signature not in (qmk / source).read_text():
         raise SystemExit(f"QMK gesture queue contract missing: {signature}")
+record = body(action, "void process_record(keyrecord_t *record)")
+if "process_record_admit_user(record)" not in record or record.index("process_record_admit_user(record)") > record.index("process_record_quantum(record)"):
+    raise SystemExit("QMK must offer every record to process_record_admit_user before any quantum feature")
 
 pre = body(quantum, "bool pre_process_record_quantum(keyrecord_t *record)")
 if pre.index("pre_process_record_kb(") > pre.index("process_combo("):

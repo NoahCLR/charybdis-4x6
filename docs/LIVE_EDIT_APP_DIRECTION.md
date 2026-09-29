@@ -50,7 +50,8 @@ Firmware work remaining before the product is complete:
 ## Open Issues
 
 - **Unified gesture ownership.** Native LT/MT/OSM remain a compatibility
-  boundary; adding a row can still change classification semantics. The
+  boundary; adding a row can still change classification semantics. Runtime-owned
+  LT/MT/OSM rows now follow QMK's default overlapping rule (D-F03). The
   [migration plan](plans/unified-gesture-ownership.md) proposes explicit defaults
   and one owner without silently changing the current layout.
 
@@ -610,3 +611,21 @@ The real QMK pipeline tests held output thresholds for all four added families,
 delivery into intrinsic layer ownership, and preservation of native tapping.
 The release matrix also pins the empty release-interval rule consumed by Ark's
 timing analysis. Physical acceptance remains open under D-F01.
+
+## D-F03 — Keys wait for an undecided tap/hold key
+
+Keys pressed while a runtime-owned tap/hold key (authored LT/MT/OSM row) is down
+and undecided wait for its decision, then replay in order: its tap first on a
+release, its layer or modifiers first on a hold. This is QMK's default tapping
+rule, so rolls keep their order and a key tapped under a held layer resolves on
+it. A tap/hold key's pending taps are settled by any other key's press. Chosen
+over emitting the next key at once (swapped order in rolls) and over settling a
+tap on the next press (breaks quick chords under a held layer); the cost is a
+wait of at most the tap-hold term for keys pressed during an undecided key.
+
+Records are held after combos and native tapping, before every QMK feature,
+through the fork's `process_record_admit_user()` hook, and replayed through
+`process_record()` like QMK's own tapping queue
+([contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)).
+It joins unreleased bit 18. Optional QMK modes (permissive hold, hold on other
+key press) are not reproduced.

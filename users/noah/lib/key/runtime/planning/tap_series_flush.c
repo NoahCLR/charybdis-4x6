@@ -1,5 +1,6 @@
 #include "../../../compat/qmk_gesture_timing.h"
 #include "tap_series.h"
+#include "../../../action/action_dispatch.h"
 
 #include "effect_plan.h"
 #include "../reducer/state_query.h"
@@ -126,7 +127,7 @@ static void key_runtime_core_tap_series_flush_plan_series(key_runtime_core_state
     key_runtime_core_tap_series_clear(state, series);
 }
 
-void key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
+static void key_runtime_core_flush_foreign_series(uint16_t keycode, keypos_t key_pos, bool dual_role_only, key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 
     if (!(state && plan)) {
@@ -142,6 +143,9 @@ void key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos
         if (!(series->active && !(key_runtime_core_tap_series_flush_keypos_equal(series_key_pos, key_pos) && series->keycode == keycode))) {
             continue;
         }
+        if (dual_role_only && noah_action_keycode_dual_role_hold(series->keycode) == KC_NO) {
+            continue;
+        }
 
         owner = key_runtime_core_press_token_at(series_key_pos);
         if ((owner && owner->active) || key_runtime_core_tap_series_pending_gesture(state, series)) {
@@ -150,6 +154,16 @@ void key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos
 
         key_runtime_core_tap_series_flush_plan_series(state, series, series_key_pos, plan);
     }
+}
+
+void key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
+    key_runtime_core_flush_foreign_series(keycode, key_pos, false, plan);
+}
+
+// Another key's press settles a released tap/hold key's pending taps first, as
+// QMK settles an interrupted tap: its tap is typed before the key that followed.
+void key_runtime_core_flush_foreign_dual_role_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
+    key_runtime_core_flush_foreign_series(keycode, key_pos, true, plan);
 }
 
 void key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan) {

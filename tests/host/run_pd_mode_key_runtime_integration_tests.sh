@@ -70,6 +70,7 @@ compile_test() {
     "$ROOT/users/noah/lib/key/runtime/planning/tap_series_flush.c" \
     "$ROOT/users/noah/lib/key/runtime/trace/core_trace.c" \
     "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
+    "$ROOT/users/noah/lib/compat/qmk_record_admission.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \

@@ -22,6 +22,7 @@ uint8_t                  key_runtime_core_pending_multi_tap_tap_count_at(keypos_
 bool                     key_runtime_core_pending_multi_tap_holding_at(keypos_t key_pos);
 bool                     key_runtime_core_has_pending_multi_tap_at(keypos_t key_pos);
 bool                     key_runtime_core_hold_is_complete_at(keypos_t key_pos);
+bool                     key_runtime_core_undecided_dual_role_key_pos(keypos_t *out);
 bool                     key_runtime_core_press_token_hold_eligible(const key_runtime_core_state_t *state, const press_token_t *token, uint16_t now);
 uint8_t                  key_runtime_core_deferred_release_blocker_count(void);
 uint8_t                  key_runtime_core_deferred_release_timed_blocker_count(void);

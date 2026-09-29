@@ -1,6 +1,8 @@
 #include "../../../compat/qmk_gesture_timing.h"
 #include "state_query.h"
 
+#include "../../../action/action_dispatch.h"
+
 #include "ownership_state.h"
 
 #include "../../behavior/handled_key_policy.h"
@@ -420,6 +422,33 @@ bool key_runtime_core_has_other_active_press_token(keypos_t key_pos) {
         if (token->active && !key_runtime_core_query_keypos_equal(token_key_pos, key_pos)) {
             return true;
         }
+    }
+
+    return false;
+}
+
+// A runtime-owned tap/hold key (LT/MT/OSM) that is down and has not reached
+// its hold yet. Keys pressed meanwhile must wait for its decision.
+bool key_runtime_core_undecided_dual_role_key_pos(keypos_t *out) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (!state) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
+        const press_token_t *token = &state->press_tokens[index];
+
+        if (!(token->active && token->handled_key && noah_action_keycode_dual_role_hold(token->resolved_keycode) != KC_NO)) {
+            continue;
+        }
+        if (!(token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW)) {
+            continue;
+        }
+        if (out) {
+            *out = key_runtime_core_query_press_token_resolve_key_pos(state, token);
+        }
+        return true;
     }
 
     return false;

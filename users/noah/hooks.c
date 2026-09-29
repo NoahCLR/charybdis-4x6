@@ -1,4 +1,5 @@
 #include "noah_runtime.h"
+#include "lib/compat/qmk_record_admission.h"
 
 // Weak default QMK hooks for the noah userspace.
 // Any keymap-local override can define the normal QMK *_user hook and call
@@ -12,6 +13,11 @@ __attribute__((weak)) bool get_hold_on_other_key_press(uint16_t keycode, keyreco
     (void)keycode;
     (void)record;
     return false;
+}
+
+// Fork hook at the top of process_record (after combos and native tapping).
+__attribute__((weak)) bool process_record_admit_user(keyrecord_t *record) {
+    return noah_record_admission_admit(record);
 }
 
 __attribute__((weak)) bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
