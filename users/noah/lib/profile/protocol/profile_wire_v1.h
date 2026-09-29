@@ -66,6 +66,7 @@ enum {
     NOAH_PROFILE_FEATURE_CUSTOM_KEYS = 1u << 16,
     // Physical key timestamps survive QMK buffering; authored LT rows own tapping.
     NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING = 1u << 17,
+    NOAH_PROFILE_FEATURE_OWNED_TAPPING = 1u << 18,
 };
 
 enum {

@@ -74,6 +74,12 @@ enum {
 layer_state_t        layer_state = 0;
 static uint16_t      test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 const key_behavior_t key_behaviors[] = {
+#ifdef NOAH_TEST_QMK_GESTURES
+    {.keycode = MT(MOD_LCTL, KC_A), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
+    {.keycode = TT(2), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
+    {.keycode = OSL(2), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
+    {.keycode = OSM(MOD_LSFT), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
+#endif
     {
         .keycode        = KC_RIGHT_ALT,
         .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
@@ -610,7 +616,13 @@ uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
     return (uint8_t)(mods & fake_managed_mods & (uint8_t)~fake_physical_mods);
 }
 
+#ifdef NOAH_TEST_QMK_GESTURES
+static uint8_t gesture_momentary_layer;
+#endif
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
+#ifdef NOAH_TEST_QMK_GESTURES
+    gesture_momentary_layer = layer;
+#endif
     (void)key_pos;
     (void)layer;
 }
@@ -2233,7 +2245,10 @@ static void test_ordinary_mouse_button_double_tap_hold(void) {
 bool combo_key_event_pending(uint8_t row, uint8_t col, bool pressed, uint16_t since, uint16_t term);
 void gesture_engine_event(uint8_t row, uint8_t col, bool down, uint16_t time);
 void gesture_engine_scan(uint16_t time);
+static uint16_t gesture_test_code;
+static uint16_t gesture_delivered_press;
 uint16_t gesture_keycode(uint8_t row, uint8_t col) {
+    if (row == 3 && col == 0) return gesture_test_code;
     static const uint16_t keys[2][8] = {
         {PD_SLOT_5, MS_BTN1, MS_BTN3, LT(3,KC_SLSH), LT(2,KC_A), KC_COMM, PD_SLOT_0, MS_BTN2},
         {KC_M, KC_DOT, KC_N, G(KC_C), G(KC_V), PD_SLOT_1, KC_D, LT(3,KC_F)},
@@ -2243,6 +2258,7 @@ uint16_t gesture_keycode(uint8_t row, uint8_t col) {
 static uint16_t gesture_combo_outputs[32];
 static uint8_t gesture_combo_output_count;
 void gesture_deliver(uint16_t code, uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t taps, bool combo) {
+    if (down) gesture_delivered_press = code;
     if (combo && down) { CHECK(gesture_combo_output_count < ARRAY_SIZE(gesture_combo_outputs)); gesture_combo_outputs[gesture_combo_output_count++] = code; }
     keyrecord_t r = {.event = {.key={row,col}, .pressed=down, .type=combo ? COMBO_EVENT : KEY_EVENT, .time=time}, .tap={.count=taps}};
     bool pass = noah_process_record_user(code, &r);
@@ -2328,6 +2344,38 @@ static void test_qmk_queued_release_cannot_become_hold(void) {
     gesture_at(4,4,false); gesture_advance(500);
     test_assert_button_quiescent(test_keypos(4,2));
 }
+static void test_qmk_dual_role_ownership(void) {
+    const uint16_t authored[] = {MT(MOD_LCTL, KC_A), TT(2), OSL(2), OSM(MOD_LSFT)};
+    for (unsigned i = 0; i < ARRAY_SIZE(authored); i++) {
+        test_reset_state(); fake_time = 9000; gesture_test_code = authored[i]; gesture_delivered_press = KC_NO;
+        gesture_at(3, 0, true);
+        CHECK(gesture_delivered_press == authored[i]);
+        gesture_advance(99);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(3, 0)) == KC_NO);
+        gesture_advance(1);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(3, 0)) == MS_BTN7);
+        gesture_at(3, 0, false); gesture_advance(500);
+        test_assert_button_quiescent(test_keypos(3, 0));
+    }
+    const uint16_t owned[] = {TT(3), OSL(3)};
+    for (unsigned i = 0; i < ARRAY_SIZE(owned); i++) {
+        test_reset_state(); fake_time = 10000; gesture_test_code = owned[i]; gesture_delivered_press = KC_NO; gesture_momentary_layer = UINT8_MAX;
+        gesture_at(3, 0, true);
+        CHECK(gesture_delivered_press == owned[i]);
+        CHECK(gesture_momentary_layer == 3);
+        gesture_advance(250); gesture_at(3, 0, false); gesture_advance(500);
+    }
+    const uint16_t native[] = {LT(2, KC_A), MT(MOD_LCTL, KC_B), OSM(MOD_RSFT)};
+    for (unsigned i = 0; i < ARRAY_SIZE(native); i++) {
+        test_reset_state(); fake_time = 11000; gesture_test_code = native[i]; gesture_delivered_press = KC_NO;
+        gesture_at(3, 0, true); gesture_advance(100);
+        CHECK(gesture_delivered_press != native[i]);
+        gesture_advance(150);
+        CHECK(gesture_delivered_press == native[i]);
+        gesture_at(3, 0, false); gesture_advance(500);
+    }
+}
+
 static void test_qmk_nested_chords_choose_only_largest(void) {
     const keypos_t families[2][4] = {{{4,1},{4,7},{4,6},{4,3}}, {{5,0},{4,5},{5,1},{4,3}}};
     for (unsigned family=0; family<2; family++) {
@@ -2361,6 +2409,7 @@ int main(void) {
     test_qmk_tapping_queue_preserves_member_series();
     test_qmk_queued_release_cannot_become_hold();
     test_qmk_nested_chords_choose_only_largest();
+    test_qmk_dual_role_ownership();
     puts("QMK gesture pipeline tests passed");
     return 0;
 #endif

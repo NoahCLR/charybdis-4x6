@@ -713,3 +713,8 @@ authored layer-tap behaviours use one tap/hold decision. See the
 [timing contract](docs/INTERACTION_MODEL.md#physical-gestures-and-buffered-delivery).
 This requires the paired QMK fork changes and an Ark client recognizing Profile
 Wire feature bit 17. The current layout and timing defaults are unchanged.
+
+Runtime-owned tapping now also covers authored MT/OSM rows and intrinsic TT/OSL
+keys (Profile Wire bit 18). Native unhandled dual-role keys remain native. The
+[release timing contract](docs/INTERACTION_MODEL.md#release-intervals-and-timing-advice)
+also defines the impossible release interval Ark reports.

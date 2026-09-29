@@ -587,3 +587,18 @@ and [the implementation boundary](KEY_RUNTIME.md#physical-event-timing-at-the-qm
 Profile Wire capability bit 17 distinguishes this policy without changing stored
 profile bytes. Clients rejecting unknown feature bits must learn bit 17 before
 connecting to this build. Physical acceptance remains in Open Issues.
+
+## D-F02 — Tapping classification follows runtime ownership
+
+Extend D-F01's authored LT exemption to all runtime-handled keycodes. Authored
+MT/OSM rows and intrinsic TT/OSL ownership must not wait for a separate QMK
+tapping classification before their owning runtime receives them. Unhandled
+LT/MT/OSM remain native. This changes delivery arbitration, not the authored
+action defaults or synthetic QMK action lifecycle. The existing fork hook needs
+no new QMK changes. Feature bit 18 lets clients distinguish this from bit 17's
+LT-only exemption; older strict clients must recognize it before connecting.
+
+The real QMK pipeline tests held output thresholds for all four added families,
+delivery into intrinsic layer ownership, and preservation of native tapping.
+The release matrix also pins the empty release-interval rule consumed by Ark's
+timing analysis. Physical acceptance remains open under D-F01.

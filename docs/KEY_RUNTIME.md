@@ -378,8 +378,10 @@ continuations. Hold planning and phase refresh consult pending releases before
 activating an action. This separates gesture eligibility from permission to emit
 output without rewinding shared time.
 
-The fork's `is_tap_keycode_user` hook exempts handled `LT()` rows from native
-tapping. Its default preserves QMK policy for every other key. Queue queries and
+The fork's `is_tap_keycode_user` hook exempts all runtime-handled keys from native
+tapping. Lookup includes authored MT/OSM rows and intrinsic TT/OSL ownership.
+Unhandled keys retain QMK policy; the pipeline tests each family and native
+controls. Feature bit 18 distinguishes this broader ownership rule from bit 17. Queue queries and
 the hook are fork contracts pinned by `run_qmk_contract_checks.sh`;
 `run_qmk_gesture_pipeline_tests.sh` runs the actual selected QMK combo/tapping
 engines with userspace, including delayed records and timer wrap. The ordinary

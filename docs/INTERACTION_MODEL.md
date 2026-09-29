@@ -165,8 +165,13 @@ and the existing balanced action lifecycle. Synthetic combo outputs still start
 their hold clock on delivery and use the existing combo-origin continuation
 protection; there is no single constituent press that defines their hold.
 
-An authored `LT()` row is classified once, by userspace. A plain `LT()` still
-uses native QMK tapping. Pointer-mode interception remains earlier than authored
+A runtime-owned key is classified once, by userspace. This includes authored
+`LT()`, `MT()` and `OSM()` rows, and `TT()`/`OSL()` which already have intrinsic
+userspace layer ownership. An unhandled `LT()`, `MT()` or `OSM()` still uses native
+QMK tapping. Authored rows retain their existing action/fallback semantics; this
+change does not manufacture native modifier holds for sparse authored MT rows.
+The broader bypass is advertised by feature bit 18; bit 17 alone only promises
+the authored LT bypass. Pointer-mode interception remains earlier than authored
 mouse behaviour: Arrow's button remapping can intentionally consume Button 3.
 These rules are advertised by Profile Wire feature bit 17. Older builds can
 lose a physically on-time repeat during buffering; increasing timing values
@@ -364,3 +369,17 @@ For the full RGB authoring model, render order, and configuration surface, see
 - [KEYMAP.md](./KEYMAP.md): Noah's current concrete profile choices
 - [POINTER_MODES.md](./POINTER_MODES.md): raw pointing-device mode behavior
 - [RGB_CONFIG.md](./RGB_CONFIG.md): RGB authoring and render order
+
+### Release intervals and timing advice
+
+When Hold and Long hold both send on release, Hold can be selected only on a
+release at or after Tap / hold and before Long hold. If Long hold is at or before
+Tap / hold, that interval is empty. The long release action takes precedence on
+a qualifying hold. This rule is covered at threshold minus one, equality and
+plus one by the release matrix. Other hold modes can emit before release and
+must not be inferred unreachable from this rule. Scan cadence and buffered
+delivery can affect which threshold is observed first.
+
+Ark warns about the empty interval and excludes that branch from layer reachability;
+it also advises on overlapping and narrow windows. Transparent inherited actions
+need their resolved context and are not pruned by this simple rule.

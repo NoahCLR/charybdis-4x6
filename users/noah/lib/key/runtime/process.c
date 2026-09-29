@@ -453,8 +453,9 @@ void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {
     noah_process_record_user_finalize(keycode, record, true);
 }
 
-// Authored LT rows already own tap, hold and repeated-tap decisions. QMK
-// still arbitrates combos and other native tapping keys before delivery.
+// Runtime-owned keys already own tap, hold and repeated-tap decisions. This
+// includes authored dual-role rows and intrinsic TT/OSL layer ownership. Native
+// keys without a runtime owner still use QMK tapping.
 bool is_tap_keycode_user(uint16_t keycode, bool default_tap) {
-    return default_tap && !(IS_QK_LAYER_TAP(keycode) && key_behavior_lookup(keycode).handled);
+    return default_tap && !key_behavior_lookup(keycode).handled;
 }

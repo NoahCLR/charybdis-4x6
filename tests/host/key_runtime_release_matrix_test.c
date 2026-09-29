@@ -940,7 +940,36 @@ static void test_pending_multi_tap_release_with_live_tap_release_sibling_keeps_h
     CHECK_CASE(case_name, key_runtime_scenario_effect_at(0)->data.action == TEST_SIBLING_TAP_ACTION);
 }
 
+static void test_release_timing_intervals(void) {
+    // Ark may prune a release-only hold only when no release can choose it.
+    for (uint16_t longer = 99; longer <= 101; longer++) {
+        for (uint16_t elapsed = 99; elapsed <= 102; elapsed++) {
+            key_runtime_scenario_reset();
+            key_behavior_view_t behavior = test_pressable_handled_key(TEST_ACTIVE_KEY);
+            behavior.tap_hold_term = 100;
+            behavior.longer_hold_term = longer;
+            behavior.single.tap = (tap_behavior_t)TAP_SENDS(KC_A);
+            behavior.single.hold = (hold_behavior_t)TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY);
+            behavior.single.long_hold = (hold_behavior_t)TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG);
+            key_runtime_scenario_add_behavior_view(behavior);
+            key_runtime_scenario_step_t steps[] = {
+                KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
+                KEY_RUNTIME_SCENARIO_ADVANCE(elapsed),
+                KEY_RUNTIME_SCENARIO_SCAN(),
+            };
+            test_run_steps(steps, ARRAY_SIZE(steps));
+            key_runtime_scenario_clear_effects();
+            key_runtime_scenario_step_t release[] = {KEY_RUNTIME_SCENARIO_RELEASE(TEST_ACTIVE_KEY, 1, 1)};
+            test_run_steps(release, ARRAY_SIZE(release));
+            test_release_summary_t result = test_release_summary_from_effects("release interval", test_keypos(1, 1), KC_NO);
+            uint16_t expected = elapsed < 100 ? KC_A : elapsed >= longer ? TEST_RELEASE_LONG : TEST_RELEASE_PRIMARY;
+            CHECK_CASE("release interval", result.action == expected);
+        }
+    }
+}
+
 int main(void) {
+    test_release_timing_intervals();
     test_active_and_pending_release_semantics_stay_equivalent();
     test_pending_release_edge_cases();
     test_release_with_live_tap_release_sibling_defers_dispatch();

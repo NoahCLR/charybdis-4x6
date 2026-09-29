@@ -46,7 +46,7 @@ uint16_t engine_keymap_key_to_keycode(uint8_t layer, keypos_t pos) {
 }
 bool is_tap_record(keyrecord_t *r) {
     uint16_t code = engine_get_record_keycode(r, false);
-    return is_tap_keycode_user(code, IS_QK_LAYER_TAP(code));
+    return is_tap_keycode_user(code, IS_QK_LAYER_TAP(code) || IS_QK_MOD_TAP(code) || IS_QK_LAYER_TAP_TOGGLE(code) || IS_QK_ONE_SHOT_LAYER(code) || IS_QK_ONE_SHOT_MOD(code));
 }
 void engine_process_record(keyrecord_t *r) {
     if (IS_EVENT(r->event)) gesture_deliver(engine_get_record_keycode(r, false), r->event.key.row, r->event.key.col, r->event.pressed, r->event.time, r->tap.count, r->event.type == COMBO_EVENT);

@@ -371,6 +371,8 @@ Capability feature bits are:
 
 | 17 | physical gesture timing: handled physical keys measure holds from physical press and repeats from physical release to next press; eligible records buffered by combo/tapping retain their series. Authored `LT()` rows bypass native QMK tapping; plain `LT()` keys retain it. Combo outputs retain their delivery/origin timing contract. This is a runtime capability, not a profile format change |
 
+| 18 | runtime-owned tapping: every key handled by userspace bypasses native QMK tapping, including authored MT/OSM rows and intrinsic TT/OSL ownership. Unhandled LT/MT/OSM keep native QMK tapping. Extends bit 17 without changing its physical timestamp contract or profile bytes |
+
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with
 their schema feature bits. Candidate chunk capacity is

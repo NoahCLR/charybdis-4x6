@@ -121,7 +121,11 @@ The firmware fix preserves physical record timestamps, retains on-time queued
 continuations, prevents scan-time holds after a queued release, and gives authored
 `LT()` rows one userspace tap/hold decision. QMK owns its existing queues and
 combo arbitration; no shadow queue or blanket timing increase was added.
-Capability bit 17 lets Ark distinguish the corrected policy. The Ark branch
+Capability bit 17 lets Ark distinguish the corrected policy. The follow-up
+ownership audit extends the bypass to all runtime-handled keys (D-F02, bit 18),
+with MT/OSM/TT/OSL pipeline tests and native controls. Ark now also reports
+empty release intervals and removes those edges from layer reachability;
+its conservative analysis limits are governed by Ark D-L49. The Ark branch
 adds profile-derived warnings in review and the behaviour editor for older
 firmware; it preserves legal Apply and the user's tuning.
 
