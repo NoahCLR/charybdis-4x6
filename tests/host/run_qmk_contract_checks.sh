@@ -109,6 +109,14 @@ def body(source: str, signature: str) -> str:
                 return source[brace + 1:index]
     raise SystemExit(f"unterminated function: {signature}")
 
+action = (qmk / "quantum/action.c").read_text()
+if "is_tap_keycode_user(get_record_keycode(record, false), is_tap_action(action))" not in body(action, "bool is_tap_record(keyrecord_t *record)"):
+    raise SystemExit("QMK must offer authored dual-role keys to the userspace tapping classifier")
+for source, signature in [("quantum/action_tapping.c", "bool tapping_key_event_pending("),
+                          ("quantum/process_keycode/process_combo.c", "bool combo_key_event_pending(")]:
+    if signature not in (qmk / source).read_text():
+        raise SystemExit(f"QMK gesture queue contract missing: {signature}")
+
 pre = body(quantum, "bool pre_process_record_quantum(keyrecord_t *record)")
 if pre.index("pre_process_record_kb(") > pre.index("process_combo("):
     raise SystemExit("QMK pre-process hook no longer runs before process_combo")

@@ -1,3 +1,4 @@
+#include "../../../compat/qmk_gesture_timing.h"
 #include "tap_series.h"
 
 #include "effect_plan.h"
@@ -58,7 +59,7 @@ bool key_runtime_core_tap_series_has_authored_branch(const tap_series_t *series)
     return series && series->active && series->tap_count > 1u && series->tap_branch_has_authored_step;
 }
 
-bool key_runtime_core_tap_series_pending_combo_output(const key_runtime_core_state_t *state, const tap_series_t *series) {
+bool key_runtime_core_tap_series_pending_gesture(const key_runtime_core_state_t *state, const tap_series_t *series) {
     keypos_t key_pos;
 
     if (!(state && series && series->active)) {
@@ -66,7 +67,7 @@ bool key_runtime_core_tap_series_pending_combo_output(const key_runtime_core_sta
     }
 
     key_pos = key_runtime_core_tap_series_flush_resolve_key_pos(state, series);
-    return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS && noah_qmk_combo_origin_pressed_combo_matches(series->keycode, key_pos, series->last_tap_at, series->tap_term_ms);
+    return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS && (noah_qmk_gesture_press_pending(key_pos, series->last_tap_at, series->tap_term_ms) || noah_qmk_combo_origin_pressed_combo_matches(series->keycode, key_pos, series->last_tap_at, series->tap_term_ms));
 }
 
 bool key_runtime_core_pending_multi_tap_flush_resolution(const tap_series_t *series, uint16_t *action, uint8_t *repeat_count) {
@@ -143,7 +144,7 @@ void key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos
         }
 
         owner = key_runtime_core_press_token_at(series_key_pos);
-        if (owner && owner->active) {
+        if ((owner && owner->active) || key_runtime_core_tap_series_pending_gesture(state, series)) {
             continue;
         }
 

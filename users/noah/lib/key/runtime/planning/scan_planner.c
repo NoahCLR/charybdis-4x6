@@ -1,3 +1,4 @@
+#include "../../../compat/qmk_gesture_timing.h"
 #include "scan_planner.h"
 
 #include "effect_plan.h"
@@ -247,7 +248,7 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
     }
 
     if (!series->pending_hold) {
-        if (key_runtime_core_tap_series_pending_combo_output(state, series)) {
+        if (key_runtime_core_tap_series_pending_gesture(state, series)) {
             return true;
         }
 
@@ -268,6 +269,8 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
     if (!(token && token->active && token->handled_key && series->keycode == token->resolved_keycode)) {
         return false;
     }
+
+    if (noah_qmk_gesture_release_pending(key_runtime_core_scan_press_token_key_pos(state, token), token->pressed_at, state->current_time)) return true;
 
     elapsed = key_runtime_core_scan_elapsed(token->pressed_at, state->current_time);
     if (token->interaction.contract.hold.release_action != KC_NO && elapsed >= token->interaction.binding.tap_hold_term && token->slot_phase != KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING) {
@@ -315,6 +318,7 @@ void key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *st
     }
 
     token_key_pos = key_runtime_core_scan_press_token_key_pos(state, token);
+    if (noah_qmk_gesture_release_pending(token_key_pos, token->pressed_at, state->current_time)) return;
     if (key_runtime_core_press_offered_to_mode(token_key_pos)) {
         return;
     }
@@ -338,6 +342,7 @@ static void key_runtime_core_plan_threshold_hold_effects(key_runtime_core_state_
     }
 
     token_key_pos = key_runtime_core_scan_press_token_key_pos(state, token);
+    if (noah_qmk_gesture_release_pending(token_key_pos, token->pressed_at, state->current_time)) return;
     feedback_kind = key_runtime_core_scan_hold_feedback_pulse_kind(long_hold_level);
 
     if (key_runtime_core_scan_press_token_has_runtime_owned_state(state, token)) {
@@ -437,6 +442,7 @@ void key_runtime_core_plan_active_scan_for_token(key_runtime_core_state_t *state
     }
 
     token_key_pos = key_runtime_core_scan_press_token_key_pos(state, token);
+    if (noah_qmk_gesture_release_pending(token_key_pos, token->pressed_at, state->current_time)) return;
 
     if (key_runtime_core_scan_press_token_has_pending_hold_series(state, token)) {
         return;

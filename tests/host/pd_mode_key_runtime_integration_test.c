@@ -24,6 +24,7 @@
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/lib/state/shared/runtime_reset.h"
 #include "users/noah/noah_runtime.h"
+#include "users/noah/lib/state/ownership/layer_ownership.h"
 
 #ifndef KC_J
 #    define KC_J 0x000Du
@@ -619,7 +620,13 @@ bool layer_ownership_is_locked(uint8_t layer) {
     return false;
 }
 
+#ifdef NOAH_TEST_QMK_GESTURES
+static layer_state_t gesture_locks;
+#endif
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
+#ifdef NOAH_TEST_QMK_GESTURES
+    gesture_locks ^= (layer_state_t)1u << layer;
+#endif
     (void)layer;
     return true;
 }
@@ -2190,7 +2197,174 @@ static void test_configured_consume_button_runs_nothing(void) {
 }
 #endif
 
+// The sparse row above matches a live row with only double-hold authored.
+// Both the first press duration and the released gap must fit their terms.
+static void test_ordinary_mouse_button_double_tap_hold(void) {
+    const struct {
+        uint16_t first_press_ms;
+        uint16_t gap_ms;
+        uint16_t expected_hold;
+    } cases[] = {
+        {40u, 40u, MS_BTN7},
+        {99u, 99u, MS_BTN7},
+        {101u, 40u, MS_BTN3},
+        {40u, 101u, MS_BTN3},
+    };
+    keypos_t pos = test_keypos(4, 2);
+
+    for (uint8_t index = 0; index < ARRAY_SIZE(cases); index++) {
+        test_reset_state();
+        CHECK(!key_runtime_integration_process_record(MS_BTN3, pos, true));
+        key_runtime_integration_advance(&fake_time, cases[index].first_press_ms);
+        key_runtime_integration_scan();
+        CHECK(!key_runtime_integration_process_record(MS_BTN3, pos, false));
+        key_runtime_integration_advance(&fake_time, cases[index].gap_ms);
+        key_runtime_integration_scan();
+        CHECK(!key_runtime_integration_process_record(MS_BTN3, pos, true));
+        key_runtime_integration_advance(&fake_time, 101u);
+        key_runtime_integration_scan();
+        CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == cases[index].expected_hold);
+        test_release_and_settle(MS_BTN3, pos);
+        test_assert_button_quiescent(pos);
+    }
+}
+
+#ifdef NOAH_TEST_QMK_GESTURES
+bool combo_key_event_pending(uint8_t row, uint8_t col, bool pressed, uint16_t since, uint16_t term);
+void gesture_engine_event(uint8_t row, uint8_t col, bool down, uint16_t time);
+void gesture_engine_scan(uint16_t time);
+uint16_t gesture_keycode(uint8_t row, uint8_t col) {
+    static const uint16_t keys[2][8] = {
+        {PD_SLOT_5, MS_BTN1, MS_BTN3, LT(3,KC_SLSH), LT(2,KC_A), KC_COMM, PD_SLOT_0, MS_BTN2},
+        {KC_M, KC_DOT, KC_N, G(KC_C), G(KC_V), PD_SLOT_1, KC_D, LT(3,KC_F)},
+    };
+    return row >= 4 && row < 6 && col < 8 ? keys[row-4][col] : KC_NO;
+}
+static uint16_t gesture_combo_outputs[32];
+static uint8_t gesture_combo_output_count;
+void gesture_deliver(uint16_t code, uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t taps, bool combo) {
+    if (combo && down) { CHECK(gesture_combo_output_count < ARRAY_SIZE(gesture_combo_outputs)); gesture_combo_outputs[gesture_combo_output_count++] = code; }
+    keyrecord_t r = {.event = {.key={row,col}, .pressed=down, .type=combo ? COMBO_EVENT : KEY_EVENT, .time=time}, .tap={.count=taps}};
+    bool pass = noah_process_record_user(code, &r);
+    noah_process_record_user_finalize(code, &r, pass);
+}
+static void gesture_advance(uint16_t ms) {
+    while (ms--) { fake_time++; key_runtime_integration_scan(); gesture_engine_scan(fake_time); }
+}
+static void gesture_at(uint8_t row, uint8_t col, bool down) {
+    keyrecord_t r = {.event={.key={row,col}, .pressed=down, .type=KEY_EVENT, .time=fake_time}};
+    CHECK(noah_pre_process_record_user(gesture_keycode(row,col), &r));
+    gesture_engine_event(row,col,down,fake_time);
+}
+static void gesture_event(bool down) { gesture_at(4,2,down); }
+static void test_qmk_buffered_second_press(void) {
+    const uint16_t gaps[] = {0, 40, 70, 99, 100, 101};
+    const uint16_t starts[] = {1000, 65500};
+    for (uint8_t start = 0; start < ARRAY_SIZE(starts); start++) {
+        for (uint8_t gap = 0; gap < ARRAY_SIZE(gaps); gap++) {
+            test_reset_state(); fake_time = starts[start];
+            gesture_event(true); gesture_advance(40); gesture_event(false);
+            gesture_advance(gaps[gap]); gesture_event(true);
+            gesture_advance(99);
+            CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(4,2)) == KC_NO);
+            gesture_advance(1);
+            CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(4,2)) == (gaps[gap] <= 100 ? MS_BTN7 : MS_BTN3));
+            gesture_event(false); gesture_advance(500);
+            test_assert_button_quiescent(test_keypos(4,2));
+        }
+    }
+}
+// A chord winning after an eligible second press consumes the member. Its old
+// single-tap candidate must settle, not remain reserved after suppression.
+static void test_qmk_combo_consumes_second_press(void) {
+    test_reset_state(); fake_time = 2000;
+    gesture_event(true); gesture_advance(40); gesture_event(false);
+    gesture_advance(70); gesture_event(true);
+    gesture_advance(20); gesture_at(4,0,true);
+    gesture_advance(120);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(4,2)) != MS_BTN7);
+    gesture_event(false); gesture_at(4,0,false); gesture_advance(500);
+    test_assert_button_quiescent(test_keypos(4,2));
+}
+static void test_qmk_member_hold_uses_physical_duration(void) {
+    test_reset_state(); fake_time = 3000;
+    gesture_event(true); gesture_advance(99);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(4,2)) == KC_NO);
+    gesture_advance(1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(4,2)) == MS_BTN3);
+    gesture_event(false); gesture_advance(500);
+    test_assert_button_quiescent(test_keypos(4,2));
+}
+static void test_qmk_authored_layer_tap_has_one_clock(void) {
+    test_reset_state(); fake_time = 4000; gesture_locks = 0;
+    gesture_at(4,3,true); gesture_advance(40); gesture_at(4,3,false);
+    gesture_advance(70); gesture_at(4,3,true);
+    // The 100 ms chord window must not be followed by QMK's 200 ms
+    // tapping window before the authored 100 ms double hold can lock Nav.
+    gesture_advance(102);
+    CHECK(layer_state_cmp(gesture_locks, TEST_LAYER_NAV));
+    gesture_at(4,3,false); gesture_advance(500);
+    CHECK(layer_state_cmp(gesture_locks, TEST_LAYER_NAV));
+}
+static void test_qmk_tapping_queue_preserves_member_series(void) {
+    test_reset_state(); fake_time = 5000;
+    gesture_event(true); gesture_advance(40); gesture_event(false);
+    gesture_advance(10); gesture_at(4,4,true); // plain native LT
+    gesture_advance(60); gesture_event(true);
+    gesture_advance(200);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(4,2)) == MS_BTN7);
+    gesture_event(false); gesture_at(4,4,false); gesture_advance(500);
+    test_assert_button_quiescent(test_keypos(4,2));
+}
+static void test_qmk_queued_release_cannot_become_hold(void) {
+    test_reset_state(); fake_time = 6000;
+    gesture_event(true); gesture_advance(60); // delivered, still below hold
+    gesture_at(4,4,true); gesture_advance(10); // native LT blocks delivery
+    gesture_event(false); // physical release at 70 ms, queued behind LT
+    for (unsigned i=0; i<210; i++) {
+        gesture_advance(1);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(4,2)) == KC_NO);
+    }
+    gesture_at(4,4,false); gesture_advance(500);
+    test_assert_button_quiescent(test_keypos(4,2));
+}
+static void test_qmk_nested_chords_choose_only_largest(void) {
+    const keypos_t families[2][4] = {{{4,1},{4,7},{4,6},{4,3}}, {{5,0},{4,5},{5,1},{4,3}}};
+    for (unsigned family=0; family<2; family++) {
+        for (unsigned a=0; a<4; a++) for (unsigned b=0; b<4; b++) {
+            if (a==b) continue;
+            for (unsigned c=0; c<4; c++) {
+                if (c==a || c==b) continue;
+                unsigned d=6-a-b-c;
+                const unsigned order[]={a,b,c,d};
+                test_reset_state(); fake_time=7000; gesture_combo_output_count=0;
+                for (unsigned i=0;i<4;i++) { keypos_t pos=families[family][order[i]]; gesture_at(pos.row,pos.col,true); gesture_advance(10); }
+                gesture_advance(120);
+                CHECK(gesture_combo_output_count==1);
+                CHECK(gesture_combo_outputs[0]==G(KC_N));
+                for (unsigned i=0;i<4;i++) { keypos_t pos=families[family][order[3-i]]; gesture_at(pos.row,pos.col,false); gesture_advance(10); }
+                gesture_advance(500);
+                CHECK(noah_runtime_debug_active_slot_count()==0);
+                CHECK(noah_runtime_debug_pending_multi_tap_slot_count()==0);
+            }
+        }
+    }
+}
+#endif
+
 int main(void) {
+#ifdef NOAH_TEST_QMK_GESTURES
+    test_qmk_buffered_second_press();
+    test_qmk_combo_consumes_second_press();
+    test_qmk_member_hold_uses_physical_duration();
+    test_qmk_authored_layer_tap_has_one_clock();
+    test_qmk_tapping_queue_preserves_member_series();
+    test_qmk_queued_release_cannot_become_hold();
+    test_qmk_nested_chords_choose_only_largest();
+    puts("QMK gesture pipeline tests passed");
+    return 0;
+#endif
+    test_ordinary_mouse_button_double_tap_hold();
     test_factory_arrow_paste_button_never_holds_itself();
     test_consumed_buttons_run_no_authored_behavior();
     test_button_release_follows_its_press_across_mode_changes();

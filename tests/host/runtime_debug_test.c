@@ -7,6 +7,7 @@
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/behavior/handled_key.h"
+#include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/ownership/held_repeat.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
@@ -476,6 +477,10 @@ void clear_oneshot_mods(void) {
 
 void clear_oneshot_locked_mods(void) {
     fake_oneshot_locked_mods = 0;
+}
+
+key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
+    return (key_behavior_view_t){.handled = handled_key_resolution_is_handled(test_handled_key_resolution(keycode, 1))};
 }
 
 handled_key_resolution_t handled_key_lookup(uint16_t keycode) {

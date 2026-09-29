@@ -369,6 +369,8 @@ Capability feature bits are:
 | 15 | behaviour QMK functions: a behaviour sends QMK and keyboard keycodes past the layer keycodes and below the user range (the Charybdis DPI and sniping keys, RGB Matrix, Magic, `QK_BOOT`…) as a synthetic QMK record, so they run as they do on a key, and a key whose own keycode is one keeps a plain key's fallback hold; a host may offer them in a behaviour's target, tap and hold. Without it, the engine sends them as report keys, keeping only the low byte, and a host must refuse them there |
 | 16 | custom keys and keycode blocks: userspace keycodes sit in fixed blocks (custom keys `0x7e40`, pointing holds `0x7e80`, pointing locks `0x7ea0`, layer locks `0x7ec0`, each reserved beyond what is supported), action kind 7 is a custom key, and settings version 5 names the 64 custom keys. It comes with its own action ABI digest; a host knowing that digest may offer custom keys as keys and combo outputs, never as behaviour steps |
 
+| 17 | physical gesture timing: handled physical keys measure holds from physical press and repeats from physical release to next press; eligible records buffered by combo/tapping retain their series. Authored `LT()` rows bypass native QMK tapping; plain `LT()` keys retain it. Combo outputs retain their delivery/origin timing contract. This is a runtime capability, not a profile format change |
+
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with
 their schema feature bits. Candidate chunk capacity is

@@ -610,6 +610,9 @@ Use the docs based on what you want to change:
   profile choices
 - [`docs/INTERACTION_MODEL.md`](./docs/INTERACTION_MODEL.md): tap, hold,
   longer-hold, and multi-tap semantics
+- [Gesture timing investigation](docs/plans/gesture-timing-and-combo-arbitration.md):
+  Button 3 double-hold failure, combo/tapping interactions, and the current-layout
+  acceptance plan
 - [`docs/POINTER_MODES.md`](./docs/POINTER_MODES.md): what each trackball mode
   does once active
 - [`docs/architecture/pd-mode-domain-v1.md`](./docs/architecture/pd-mode-domain-v1.md):
@@ -704,3 +707,9 @@ work. See [the independence contract](docs/architecture/ark-compatibility.md).
 Install this repo's diagnostics dependencies with `npm ci --prefix tools` before
 using `tools/capture-split-diagnostics.cjs`; its HID dependency is independent
 of Ark.
+
+Handled keys preserve physical gesture timing across combo/tapping buffering;
+authored layer-tap behaviours use one tap/hold decision. See the
+[timing contract](docs/INTERACTION_MODEL.md#physical-gestures-and-buffered-delivery).
+This requires the paired QMK fork changes and an Ark client recognizing Profile
+Wire feature bit 17. The current layout and timing defaults are unchanged.

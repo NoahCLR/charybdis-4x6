@@ -86,7 +86,7 @@ lot of the profile's structure:
 - `KC_RIGHT_ALT` is a profile-specific dual-use key: tap toggles
   `PD_SLOT_4_LOCK`, hold stays normal right `Alt`
 
-The current combo set is intentionally small:
+The ten-combo set includes these four utility chords:
 
 - `KC_D` + `LT(LAYER_NAV, KC_F)` -> `KC_TAB`
 - `PD_SLOT_5` + `MS_BTN3` -> `CUSTOM_KEY_2` (Click Spam)
@@ -244,8 +244,8 @@ The current authored path is:
 - `PD_SLOT_5` + `MS_BTN3` combo -> `CUSTOM_KEY_2` (Click Spam)
 - `CUSTOM_KEY_2` hold -> `REPEAT_WHILE_HELD(MS_BTN1, 100)`
 
-So pressing both primary mouse buttons together on `LAYER_NAV` or
-`LAYER_POINTER` turns into a held repeat action that taps left click at `100 Hz`
+So pressing Pinch and mouse button 3 together on `LAYER_POINTER`
+turns into a held repeat action that taps left click at `100 Hz`
 until release.
 
 Because Click Spam is combo-backed, localized key-feedback RGB follows the
@@ -373,9 +373,8 @@ side becomes a focused cluster for:
 - `MS_BTN3`, which also carries the resize drag described above
 - `CUSTOM_KEY_3` (Drag Window), the move drag described above
 
-The pointer layer also changes the thumb cluster slightly by putting
-`LT(LAYER_NUM, KC_SPC)` on space, so the pointer surface can still chain into
-the numpad layer without fully dropping back out.
+The pointer layer retains the custom thumb behaviours. Layer access follows
+those authored thumb sequences, rather than a separate space layer-tap.
 
 ## Pointer Workflow
 

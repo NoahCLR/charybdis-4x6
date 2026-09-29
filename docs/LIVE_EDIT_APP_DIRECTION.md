@@ -49,6 +49,10 @@ Firmware work remaining before the product is complete:
 
 ## Open Issues
 
+- **Physical gesture acceptance (D-F01).** The buffered-repeat defect is
+  reproduced and fixed through the real QMK combo/tapping path. Acceptance on
+  both halves, pointing-mode routing and host Button 7 bindings remains open:
+  [report and remaining plan](plans/gesture-timing-and-combo-arbitration.md).
 - **One-half power-cycle recovery transition.** On 2026-09-12, after one half
   lost power while the other stayed powered, the first complete read failed
   with VIA storage flags 7 (dirty, recovery required) before settling to clean
@@ -58,9 +62,6 @@ Firmware work remaining before the product is complete:
 - **Why a peer stops acknowledging a push** (D-L22) and **why a peer flash
   write failed mid-copy** (D-L27) are both unknown. Both are now bounded and
   reported; the status fields D-L27 added should identify the cause next time.
-- **`LT()` row tap/hold timing** (D-L34): the runtime times a press from when
-  QMK delivers it, so an authored `LT()` row's tap/hold term likely starts only
-  after QMK's own tapping term (the dual-role setting, D-L38). Not yet measured.
 - **The keycode-block migration has not run on hardware** (D-L42). Flashing
   it should make each half refuse its stored profile by action ABI digest,
   reset its VIA bank (sync metadata schema 3) and run the compiled defaults,
@@ -408,7 +409,7 @@ cancels it); `TO()` keeps held layers on; `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOG
 `TT()` counts taps within `CUSTOM_MULTI_TAP_TERM` like every multi-tap key; a
 `TG()`/`TO()` of the pointer layer from a behaviour is not seen by QMK's
 auto-mouse. A 44-step hardware check passed on both halves on 2026-09-24; the
-`LT()` row timing question stays open (see Open Issues). D-L38 makes the dual-role setting drive QMK's own tapping term.
+`LT()` row timing is now governed by D-F01. D-L38 makes the dual-role setting drive QMK's own tapping term.
 
 ### D-L35 — Charybdis Live v2 is the app
 
@@ -569,3 +570,20 @@ Ark consumes.
 ### D-L47 — The app is named Ark
 
 App decision; its text is in Ark's direction.
+
+## D-F01 — Physical gesture eligibility survives QMK buffering
+
+Handled physical keys use press/release event timestamps; combo/tapping delivery
+latency must not consume a repeated-tap window or extend a released hold.
+Userspace queries existing QMK queues to preserve eligible continuations and
+suppress scan-time holds after physical release. Authored `LT()` rows bypass
+native tapping so one engine decides their behaviour; plain native dual-role
+keys retain QMK semantics. No authored layout, combo or default timing changes.
+
+Output still waits for arbitration. Winning combos suppress their constituent
+keys, and synthetic combo outputs retain their delivery/origin contract. See
+[the timing model](INTERACTION_MODEL.md#physical-gestures-and-buffered-delivery)
+and [the implementation boundary](KEY_RUNTIME.md#physical-event-timing-at-the-qmk-boundary).
+Profile Wire capability bit 17 distinguishes this policy without changing stored
+profile bytes. Clients rejecting unknown feature bits must learn bit 17 before
+connecting to this build. Physical acceptance remains in Open Issues.

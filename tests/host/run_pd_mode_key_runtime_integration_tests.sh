@@ -85,6 +85,24 @@ compile_test() {
     -o "$bin"
 }
 
+if [ "${NOAH_TEST_QMK_GESTURES:-0}" = 1 ]; then
+    cc -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter \
+        -DCOMBO_ENABLE -DCOMBO_TERM_PER_COMBO -DCOMBO_TERM=50 -DTAPPING_TERM=200 -DTAP_CODE_DELAY=0 \
+        -DMATRIX_ROWS=8 -DMATRIX_COLS=8 -DNO_DEBUG \
+        -Dget_record_keycode=engine_get_record_keycode -Dget_event_keycode=engine_get_event_keycode \
+        -Dkeymap_key_to_keycode=engine_keymap_key_to_keycode -Dprocess_record=engine_process_record \
+        -Ddel_weak_mods=engine_del_weak_mods -Dclear_weak_mods=engine_clear_weak_mods \
+        -Dwait_ms=engine_wait_ms -Dget_mods=engine_get_mods -Dset_mods=engine_set_mods \
+        -I"$QMK_ROOT/quantum/process_keycode" -I"$QMK_ROOT/quantum/logging" \
+        -I"$QMK_ROOT/platforms" -I"$QMK_ROOT/tmk_core/protocol" \
+        -r "$ROOT/tests/host/qmk_gesture_engine.c" \
+        "$QMK_ROOT/quantum/process_keycode/process_combo.c" "$QMK_ROOT/quantum/action_tapping.c" \
+        -o "$BUILD_DIR/gesture_engine.o"
+    compile_test "$BUILD_DIR/gestures" -DNOAH_TEST_QMK_GESTURES "$BUILD_DIR/gesture_engine.o"
+    "$BUILD_DIR/gestures"
+    exit
+fi
+
 compile_test "$BUILD_DIR/configured" -DNOAH_PD_PROFILE_ENABLE \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \

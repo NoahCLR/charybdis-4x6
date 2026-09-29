@@ -198,6 +198,7 @@ static keyrecord_t key_runtime_integration_record(keypos_t key_pos, bool pressed
                 .type    = KEY_EVENT,
                 .key     = key_pos,
                 .pressed = pressed,
+                .time    = timer_read(),
             },
     };
 }

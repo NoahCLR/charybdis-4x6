@@ -72,7 +72,7 @@ static noah_profile_wire_v1_read_service_t noah_profile_wire_v1_read_service = {
             // paths exist; the frozen schema ceilings below are declaration
             // metadata, not a claim that writes are accepted.
             .candidate_chunk_max          = 0u,
-            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS,
+            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS | NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING,
             .action_abi_digest            = 0u,
             .firmware_version             = VIA_FIRMWARE_VERSION,
             .compiled_default_digest      = 0u,
@@ -111,7 +111,7 @@ static void noah_profile_channel_refresh_owner_capabilities(const noah_profile_o
     if (!owner) {
         return;
     }
-    noah_profile_wire_v1_read_service.capabilities.feature_flags           = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES | NOAH_PD_SOURCE_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS;
+    noah_profile_wire_v1_read_service.capabilities.feature_flags           = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES | NOAH_PD_SOURCE_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS | NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING;
     noah_profile_wire_v1_read_service.capabilities.action_abi_digest       = owner->action_abi_digest;
     noah_profile_wire_v1_read_service.capabilities.compiled_default_digest = owner->compiled_default_digest;
     noah_profile_wire_v1_read_service.capabilities.supported_domain_mask   = owner->supported_domain_mask;

@@ -148,6 +148,7 @@ typedef struct {
     keypos_t key;
     bool     pressed;
     uint8_t  type;
+    uint16_t time;
 } keyevent_t;
 
 typedef struct {

@@ -360,3 +360,28 @@ stack safety by themselves.
 This runtime no longer preserves the old slot/index internal shapes as API.
 The maintained contracts are user-visible behavior, overlap correctness, and
 the reducer-owned debug/projection surfaces described above.
+
+## Physical-event timing at the QMK boundary
+
+The timing contract is in [INTERACTION_MODEL.md](INTERACTION_MODEL.md#physical-gestures-and-buffered-delivery).
+`lib/compat/qmk_gesture_timing.h` reads physical `KEY_EVENT` timestamps and
+queries the selected QMK fork's existing combo and tapping queues. The queues
+remain QMK-owned; userspace stores no shadow input queue. Queries match physical
+position, event direction and the unsigned 16-bit interval. Consumed combo
+members cease to reserve a key's series. Combo outputs keep their origin-based
+protection and delivery timestamps.
+
+The reducer's global clock stays at delivery/scan time. Tokens retain physical
+press/release times, and released series retain the release timestamp even after
+the token is settled. Expiry and foreign-key flushing consult pending physical
+continuations. Hold planning and phase refresh consult pending releases before
+activating an action. This separates gesture eligibility from permission to emit
+output without rewinding shared time.
+
+The fork's `is_tap_keycode_user` hook exempts handled `LT()` rows from native
+tapping. Its default preserves QMK policy for every other key. Queue queries and
+the hook are fork contracts pinned by `run_qmk_contract_checks.sh`;
+`run_qmk_gesture_pipeline_tests.sh` runs the actual selected QMK combo/tapping
+engines with userspace, including delayed records and timer wrap. The ordinary
+synchronous host harness intentionally keeps delivery-time records; it does not
+prove this boundary. Neither harness substitutes for physical acceptance.

@@ -68,8 +68,8 @@ Default timing lives in the active keymap
 That keymap chooses:
 
 - `TAPPING_TERM` for QMK's dual-role keys: `LT()`, `MT()`, `TT()`, `OSL()`
-  and `OSM()`. QMK's tapping engine resolves their tap or hold before the
-  runtime sees the press. With a live profile the dual-role setting replaces
+  and `OSM()`. Except for `LT()` keys with an authored behaviour row, QMK's
+  tapping engine resolves their tap or hold before the runtime sees the press. With a live profile the dual-role setting replaces
   it through `get_tapping_term()` and `get_quick_tap_term()`, so the edited
   term reaches QMK itself, not only the runtime (D-L38)
 - `CUSTOM_TAP_HOLD_TERM`
@@ -143,18 +143,34 @@ exactly one action. The consequence is that tapping cannot repeat an action insi
 one multi-tap window: to send the same branch twice you have to let the window
 close between them.
 
-Those pending multi-tap windows are tracked per physical key. Pressing a
-different key does not flush an unrelated pending tap series by itself, so
-independent keys can keep separate tap counts and timing windows alive at the
-same time.
+Those pending multi-tap windows are tracked per physical key. Other handled
+keys can keep independent series alive. An unhandled key can settle pending
+taps to preserve typing order, but cannot discard an on-time continuation
+already buffered in QMK.
 
-Behavior change note: this per-key pending-series retention became the intended
-contract on `2026-04-20`. Older runtime policy flushed an unrelated pending
-multi-tap series as soon as a different key was pressed. If independent
-simultaneous tap sequences stop working again, treat that as a regression
-against this document and re-run
-`sh tests/host/run_key_runtime_scenario_tests.sh` plus
-`sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`.
+### Physical gestures and buffered delivery
+
+For a handled physical key, hold time starts at its physical press. Repeated
+taps measures the released gap: release, then press again within the term
+(including equality). Double hold means press–release–press-and-hold, not two
+completed taps followed by a third press. The first press must qualify as a tap.
+A combo can postpone output while it decides which action owns the input; it
+does not shorten the allowed physical gap or restart a hold's clock.
+
+An on-time press waiting in QMK keeps its tap series alive. If it wins a combo,
+the constituent does not run; if delivered as a key, it continues the series.
+A queued physical release prevents scans from inventing a longer hold while
+delivery is delayed. Release settlement uses the actual press/release interval
+and the existing balanced action lifecycle. Synthetic combo outputs still start
+their hold clock on delivery and use the existing combo-origin continuation
+protection; there is no single constituent press that defines their hold.
+
+An authored `LT()` row is classified once, by userspace. A plain `LT()` still
+uses native QMK tapping. Pointer-mode interception remains earlier than authored
+mouse behaviour: Arrow's button remapping can intentionally consume Button 3.
+These rules are advertised by Profile Wire feature bit 17. Older builds can
+lose a physically on-time repeat during buffering; increasing timing values
+can mask that defect while also delaying normal actions.
 
 One important nuance: inside `key_behaviors[]`, an omitted `.tap_hold_term`
 inherits `TAPPING_TERM` for `LT()` rows, but `CUSTOM_TAP_HOLD_TERM` for other
