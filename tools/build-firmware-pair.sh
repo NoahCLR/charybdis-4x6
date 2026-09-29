@@ -90,6 +90,9 @@ build_half() {
     # Object files are shared between the two compiles, so clear them or the
     # second half links the first half's translation units.
     rm -f "$QMK_ROOT/.build/obj_bastardkb_charybdis_4x6_noah"/*.o 2>/dev/null || true
+    # A successful command must produce this half's UF2, not leave the previous
+    # half's artifact at the shared QMK output path.
+    rm -f "$ARTIFACT"
     ( cd "$QMK_ROOT" && qmk compile -kb bastardkb/charybdis/4x6 -km noah \
         -e "$role=yes" -e "NOAH_PHYSICAL_HALF=$half" $OWNER_ARGS $TRANSPORT_ARGS )
     if [ ! -f "$ARTIFACT" ]; then

@@ -80,6 +80,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
+          UF2_FILES=(
+            artifacts/bastardkb_charybdis_4x6_noah_left.uf2
+            artifacts/bastardkb_charybdis_4x6_noah_right.uf2
+          )
+          for file in "${UF2_FILES[@]}"; do
+            test -s "$file"
+          done
           SAFE_BRANCH="${GITHUB_REF_NAME//\//-}"
           TAG="latest-$SAFE_BRANCH"
           TITLE="Charybdis 4x6 (${GITHUB_REF_NAME})"
@@ -93,18 +100,10 @@ jobs:
               --title "$TITLE" \
               --prerelease \
               --latest=false \
-              --notes "Auto release for $GITHUB_SHA ($GITHUB_REF_NAME)" || true
+              --notes "Auto release for $GITHUB_SHA ($GITHUB_REF_NAME)"
           fi
 
-          echo "Uploading UF2 assets to $TAG if any are present"
-          shopt -s nullglob
-          UF2_FILES=(artifacts/**/*.uf2 artifacts/*.uf2)
-          if [ ${#UF2_FILES[@]} -eq 0 ]; then
-            echo "No UF2 files found in artifacts/. Listing contents for debugging:";
-            ls -R artifacts || true
-          else
-            gh release upload "$TAG" "${UF2_FILES[@]}" --clobber --repo "$GITHUB_REPOSITORY"
-          fi
+          gh release upload "$TAG" "${UF2_FILES[@]}" --clobber --repo "$GITHUB_REPOSITORY"
 
   retitle-release:
     name: 'Set release title & notes'

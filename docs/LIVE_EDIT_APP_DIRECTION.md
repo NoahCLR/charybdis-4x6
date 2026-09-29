@@ -126,6 +126,8 @@ without the owner rather than failing (failing would break the plain
 from `tools/build-firmware-pair.sh`; a build that sets only
 `FORCE_MASTER`/`FORCE_SLAVE` silently omits the owner. The opt-out stays as the
 lever for comparing ordinary against live behaviour on identical source.
+Release automation runs that same pair build and publishes both physical-half
+images; a missing half fails the release instead of publishing a generic image.
 
 ### D-L09 — Ark owns a canonical profile format, not `.c`
 

@@ -77,6 +77,10 @@ scattered runtime rewrites.
 >
 > That writes numbered left and right images into `../builds/<branch>/`. Add
 > `--no-owner` for the comparison pair without the live-profile owner.
+> GitHub releases build the same flashable pair and publish separate
+> `bastardkb_charybdis_4x6_noah_left.uf2` and
+> `bastardkb_charybdis_4x6_noah_right.uf2` assets. The exact byte sizes may
+> differ between CI and local toolchains.
 
 This repo is built around the open-source Charybdis from
 [BastardKB](https://bastardkb.com/), designed by Quentin. The hardware files

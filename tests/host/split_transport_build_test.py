@@ -110,6 +110,75 @@ class SplitTransportBuildTest(unittest.TestCase):
                 self.assertEqual(artifacts, [f"1_charybdis_{half}{suffix}.uf2" for half in ("left", "right")])
                 self.assertEqual("WITHOUT the live-profile owner" in result.stdout, not owner)
 
+    def test_release_pair_exports_distinct_halves(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            qmk = workspace / "qmk"
+            qmk.mkdir()
+            bin_dir = workspace / "bin"
+            bin_dir.mkdir()
+            mock = bin_dir / "qmk"
+            mock.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "from pathlib import Path\n"
+                "half = next(arg.split('=', 1)[1] for arg in sys.argv[1:] "
+                "if arg.startswith('NOAH_PHYSICAL_HALF='))\n"
+                "Path('bastardkb_charybdis_4x6_noah.uf2').write_text(half)\n"
+            )
+            mock.chmod(0o755)
+            output = workspace / "release"
+            env = dict(os.environ, QMK_ROOT=str(qmk), OUTPUT_DIR=str(output),
+                       NOAH_SPLIT_BAUD="", NOAH_SPLIT_ACTIVITY_COALESCE="",
+                       NOAH_SPLIT_CRC="", NOAH_SPLIT_DIAGNOSTICS="",
+                       NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS="",
+                       PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+            result = subprocess.run(
+                ["sh", str(ROOT / "tools/build-release-firmware-pair.sh")],
+                env=env, capture_output=True, text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                sorted(path.name for path in output.glob("*.uf2")),
+                [f"bastardkb_charybdis_4x6_noah_{half}.uf2" for half in ("left", "right")],
+            )
+            for half in ("left", "right"):
+                self.assertEqual(
+                    (output / f"bastardkb_charybdis_4x6_noah_{half}.uf2").read_text(), half,
+                )
+
+    def test_pair_rejects_missing_second_artifact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            workspace = Path(directory)
+            qmk = workspace / "qmk"
+            qmk.mkdir()
+            bin_dir = workspace / "bin"
+            bin_dir.mkdir()
+            mock = bin_dir / "qmk"
+            mock.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "from pathlib import Path\n"
+                "if 'NOAH_PHYSICAL_HALF=right' in sys.argv:\n"
+                "    Path('bastardkb_charybdis_4x6_noah.uf2').write_text('right')\n"
+            )
+            mock.chmod(0o755)
+            env = dict(os.environ, QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
+                       NOAH_SPLIT_BAUD="", NOAH_SPLIT_ACTIVITY_COALESCE="",
+                       NOAH_SPLIT_CRC="", NOAH_SPLIT_DIAGNOSTICS="",
+                       NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS="",
+                       PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+            result = subprocess.run(
+                ["sh", str(ROOT / "tools/build-firmware-pair.sh")],
+                env=env, capture_output=True, text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Expected firmware not found", result.stderr)
+            self.assertEqual(
+                [path.name for path in (workspace / "output").rglob("*.uf2")],
+                ["1_charybdis_right.uf2"],
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
