@@ -598,9 +598,10 @@ connecting to this build. Physical acceptance remains in Open Issues.
 Extend D-F01's authored LT exemption to all runtime-handled keycodes. Authored
 MT/OSM rows and intrinsic TT/OSL ownership must not wait for a separate QMK
 tapping classification before their owning runtime receives them. Unhandled
-LT/MT/OSM remain native. This changes delivery arbitration, not the authored
-action defaults or synthetic QMK action lifecycle. The existing fork hook needs
-no new QMK changes. Feature bit 18 lets clients distinguish this from bit 17's
+LT/MT/OSM remain native. Bypassing native tapping must not drop the key's own
+first hold: an authored MT/OSM row without a first hold holds the key's
+modifiers past its tap-hold term, as native QMK would; its first tap is
+unchanged. The existing fork hook needs no new QMK changes. Feature bit 18 lets clients distinguish this from bit 17's
 LT-only exemption; older strict clients must recognize it before connecting.
 
 The real QMK pipeline tests held output thresholds for all four added families,

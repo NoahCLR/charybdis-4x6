@@ -76,7 +76,13 @@ uint8_t biton16(uint16_t bits) {
 }
 void     debug_event(keyevent_t e) {}
 void     process_record_tap_hint(keyrecord_t *r) {}
+// Enough of QMK's keycode-to-action mapping for tapping's release rules: a
+// modifier or layer-tap released during another key's tapping term is held
+// back until that term resolves, as on the keyboard.
 action_t layer_switch_get_action(keypos_t key) {
+    uint16_t code = gesture_keycode(key.row, key.col);
+    if (IS_QK_LAYER_TAP(code)) return (action_t){.code = ACTION_LAYER_TAP_KEY(QK_LAYER_TAP_GET_LAYER(code), QK_LAYER_TAP_GET_TAP_KEYCODE(code))};
+    if (IS_MODIFIER_KEYCODE(code)) return (action_t){.code = ACTION_KEY(code)};
     return (action_t){.code = 0};
 }
 

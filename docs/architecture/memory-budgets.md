@@ -299,3 +299,12 @@ master's 22 per-id resend flags. A fresh left pair ELF
 measurements, not runtime high-water. The frame code inlines into the split
 slave thread's 40-byte root frame, and the reviewed stack paths of both gates
 pass.
+
+## Per-combo origin candidates
+
+Combo-origin completion candidates are keyed by combo index up to the 32-combo
+Profile Wire bound instead of sharing `COMBO_BUFFER_LENGTH` slots, so a chord
+burst cannot fall back to delivery-time timing. The linked table is 768 B of
+SRAM0–3 `.bss` per half (was 96 B, +672 B). The default `noah` build then
+links 52,856 B of `.data + .bss`, 7,560 B below the 60,416 B tripwire. This is a
+linked measurement, not runtime high-water evidence.

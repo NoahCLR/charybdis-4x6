@@ -82,6 +82,9 @@ const key_behavior_t key_behaviors[] = {
     {.keycode = TT(2), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
     {.keycode = OSL(2), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
     {.keycode = OSM(MOD_LSFT), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
+    // Sparse rows: only a repeated tap is authored.
+    {.keycode = MT(MOD_LSFT | MOD_LGUI, KC_S), .tap_hold_term = 100, .tap_counts[1] = {.tap = TAP_SENDS(KC_X)}},
+    {.keycode = OSM(MOD_LALT), .tap_hold_term = 100, .tap_counts[1] = {.tap = TAP_SENDS(KC_Y)}},
 #endif
     {
         .keycode        = KC_RIGHT_ALT,
@@ -478,11 +481,21 @@ void unregister_code(uint8_t keycode) {
     (void)keycode;
 }
 
+#ifdef NOAH_TEST_QMK_GESTURES
+static uint16_t gesture_registered;
+static uint16_t gesture_unregistered;
+#endif
 void register_code16(uint16_t keycode) {
+#ifdef NOAH_TEST_QMK_GESTURES
+    gesture_registered = keycode;
+#endif
     (void)keycode;
 }
 
 void unregister_code16(uint16_t keycode) {
+#ifdef NOAH_TEST_QMK_GESTURES
+    gesture_unregistered = keycode;
+#endif
     (void)keycode;
 }
 
@@ -2374,17 +2387,23 @@ static void test_qmk_tapping_queue_preserves_member_series(void) {
     gesture_event(false); gesture_at(4,4,false); gesture_advance(500);
     test_assert_button_quiescent(test_keypos(4,2));
 }
+// QMK passes most releases straight through a pending tapping key, but holds
+// back a modifier's release until that key resolves. Left GUI is delivered at
+// once, released physically at 50 ms, and its release waits behind a native LT
+// for 200 ms; its 150 ms fallback hold must not fire from delayed delivery.
 static void test_qmk_queued_release_cannot_become_hold(void) {
-    test_reset_state(); fake_time = 6000;
-    gesture_event(true); gesture_advance(60); // delivered, still below hold
-    gesture_at(4,4,true); gesture_advance(10); // native LT blocks delivery
-    gesture_event(false); // physical release at 70 ms, queued behind LT
-    for (unsigned i=0; i<210; i++) {
+    test_reset_state(); fake_time = 6000; gesture_test_code = KC_LEFT_GUI;
+    gesture_at(3,0,true); gesture_advance(20);
+    gesture_at(4,4,true); gesture_advance(30); // native LT becomes QMK's tapping key
+    gesture_at(3,0,false); // physical release at 50 ms, queued behind LT
+    for (unsigned i=0; i<200; i++) {
         gesture_advance(1);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(4,2)) == KC_NO);
+        CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(3,0)) == KC_NO);
     }
     gesture_at(4,4,false); gesture_advance(500);
-    test_assert_button_quiescent(test_keypos(4,2));
+    CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0);
+    test_assert_button_quiescent(test_keypos(3,0));
 }
 // Screenshot C5: Button 1 + Volume -> GUI; GUI double hold -> Alt,
 // triple tap -> OSM(Shift), inherited hold/repeat terms both 150 ms.
@@ -2432,6 +2451,35 @@ static void test_qmk_combo_output_gui_behaviour(void) {
             CHECK(pd_mode_local_active_snapshot() == 0);
             test_assert_button_quiescent(test_keypos(0, 0));
         }
+    }
+}
+
+// A row that authors only a repeated tap keeps the key's own first tap and
+// hold: MT/OSM hold their modifiers past the threshold, as native QMK does,
+// and a hold sends no tap or one-shot on release.
+static void test_qmk_sparse_dual_role_rows_keep_intrinsic_hold(void) {
+    const struct { uint16_t code; uint16_t mods; } rows[] = {
+        {MT(MOD_LSFT | MOD_LGUI, KC_S), LSG(KC_NO)},
+        {OSM(MOD_LALT), LALT(KC_NO)},
+    };
+    for (unsigned i = 0; i < ARRAY_SIZE(rows); i++) {
+        test_reset_state(); fake_time = 20000; gesture_test_code = rows[i].code;
+        gesture_registered = gesture_unregistered = KC_NO; gesture_qmk_tap_count = 0;
+        gesture_at(3, 0, true); gesture_advance(99);
+        CHECK(gesture_registered == KC_NO);
+        gesture_advance(1);
+        CHECK(gesture_registered == rows[i].mods);
+        gesture_advance(150); gesture_at(3, 0, false);
+        CHECK(gesture_unregistered == rows[i].mods);
+        gesture_advance(400);
+        CHECK(gesture_qmk_tap_count == 0);
+        test_assert_button_quiescent(test_keypos(3, 0));
+
+        test_reset_state(); fake_time = 22000; gesture_test_code = rows[i].code;
+        gesture_registered = KC_NO; gesture_qmk_tap_count = 0; gesture_qmk_tap = KC_NO;
+        gesture_at(3, 0, true); gesture_advance(40); gesture_at(3, 0, false); gesture_advance(400);
+        CHECK(gesture_registered == KC_NO);
+        CHECK(gesture_qmk_tap_count == 1 && gesture_qmk_tap == rows[i].code);
     }
 }
 
@@ -2501,6 +2549,7 @@ int main(void) {
     test_qmk_queued_release_cannot_become_hold();
     test_qmk_nested_chords_choose_only_largest();
     test_qmk_dual_role_ownership();
+    test_qmk_sparse_dual_role_rows_keep_intrinsic_hold();
     test_qmk_combo_output_gui_behaviour();
     puts("QMK gesture pipeline tests passed");
     return 0;

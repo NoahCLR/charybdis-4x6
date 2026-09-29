@@ -7,6 +7,7 @@
 #if defined(COMBO_ENABLE)
 
 #    include "qmk_effective_combos.h"
+#    include "../profile/storage/profile_storage_layout.h"
 #    include "../split/runtime_sync.h"
 
 #    ifndef COMBO_ONLY_FROM_LAYER
@@ -50,8 +51,14 @@ static combo_origin_physical_key_state_t physical_key_states[MATRIX_ROWS * MATRI
 #        define COMBO_BUFFER_LENGTH 4
 #    endif
 
+// One completion candidate per combo index. A combo can only complete again
+// after a member is released, and that release makes QMK fire or drop the
+// earlier completion first, so a newer generation always supersedes an older
+// one. Bounded by construction; no burst of chords can refuse a candidate.
+#    define COMBO_ORIGIN_PENDING_CAPACITY NOAH_PROFILE_WIRE_V1_MAX_COMBOS
+
 static combo_origin_active_cache_entry_t      combo_active_cache[COMBO_BUFFER_LENGTH];
-static combo_origin_pending_output_entry_t    combo_pending_output_cache[COMBO_BUFFER_LENGTH];
+static combo_origin_pending_output_entry_t    combo_pending_output_cache[COMBO_ORIGIN_PENDING_CAPACITY];
 static noah_qmk_combo_origin_debug_snapshot_t combo_origin_diagnostics;
 static uint32_t                               combo_origin_press_sequence        = 0;
 static keypos_t                               combo_origin_last_pressed_key_pos  = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
@@ -340,24 +347,8 @@ static void combo_origin_pending_output_entry_clear(combo_origin_pending_output_
     entry->owner_key_pos = (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
 }
 
-static combo_origin_pending_output_entry_t *combo_origin_pending_output_entry_for_store(uint16_t combo_index, uint32_t generation) {
-    for (uint8_t index = 0; index < ARRAY_SIZE(combo_pending_output_cache); index++) {
-        if (!combo_pending_output_cache[index].active) {
-            continue;
-        }
-
-        if (combo_pending_output_cache[index].combo_index == combo_index && combo_pending_output_cache[index].generation == generation) {
-            return &combo_pending_output_cache[index];
-        }
-    }
-
-    for (uint8_t index = 0; index < ARRAY_SIZE(combo_pending_output_cache); index++) {
-        if (!combo_pending_output_cache[index].active) {
-            return &combo_pending_output_cache[index];
-        }
-    }
-
-    return NULL;
+static combo_origin_pending_output_entry_t *combo_origin_pending_output_entry_for_store(uint16_t combo_index) {
+    return combo_index < ARRAY_SIZE(combo_pending_output_cache) ? &combo_pending_output_cache[combo_index] : NULL;
 }
 
 static bool combo_origin_pending_output_store(uint16_t combo_index, uint32_t generation, uint16_t keycode, keypos_t owner_key_pos, uint16_t complete_at, const uint8_t *bitmap) {
@@ -370,13 +361,13 @@ static bool combo_origin_pending_output_store(uint16_t combo_index, uint32_t gen
         }
     }
 
-    entry = combo_origin_pending_output_entry_for_store(combo_index, generation);
+    entry = combo_origin_pending_output_entry_for_store(combo_index);
 
     if (!entry) {
         combo_origin_increment_counter(&combo_origin_diagnostics.cache_full_refusal_count);
         return false;
     }
-    if (entry->active) {
+    if (entry->active && entry->generation == generation) {
         return true;
     }
 

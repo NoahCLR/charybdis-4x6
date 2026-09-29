@@ -7,6 +7,7 @@
 #include "runtime.h"
 #include "../planning/effect_plan.h"
 #include "ownership_state.h"
+#include "state_query.h"
 #include "../planning/release_internal.h"
 #include "../planning/scan_planner.h"
 #include "../planning/tap_series.h"
@@ -373,11 +374,9 @@ static void key_runtime_core_press_token_cancel(key_runtime_core_state_t *state,
 static void key_runtime_core_press_token_refresh_phase(key_runtime_core_state_t *state, press_token_t *token, uint16_t now) {
     press_token_phase_t previous_phase;
 
-    if (!(token && token->active)) {
+    if (!key_runtime_core_press_token_hold_eligible(state, token, now)) {
         return;
     }
-
-    if (noah_qmk_gesture_release_pending(key_runtime_core_press_token_resolve_key_pos(state, token), token->pressed_at, now)) return;
 
     previous_phase = token->phase;
 

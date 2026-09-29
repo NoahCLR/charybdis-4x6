@@ -130,6 +130,14 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
         };
     }
 
+    if (resolution->tap_count == 1 && noah_action_keycode_dual_role_hold_mods(resolution->keycode) != KC_NO) {
+        return (hold_behavior_t){
+            .present = true,
+            .action  = noah_action_keycode_dual_role_hold_mods(resolution->keycode),
+            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+        };
+    }
+
     if (handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
         // Keep stacked PD modes out of the immediate activation path while the
         // tap-count branch is unresolved.

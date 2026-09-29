@@ -96,11 +96,14 @@ source trace because they rewrite or verify human-facing firmware docs.
   (split transaction recorder) and `qmk_loop_stages.c/h` (the loop and sensor
   boundaries the cadence recorder's stage timing needs)
 
-Combo-origin pending entries are bounded compatibility candidates, not runtime
-press ownership. Each is keyed by combo index and physical completion
-generation, reconciled against the pinned QMK active/disabled layout at the
-scan boundary, and either promoted exactly once, suppressed, expired after the
-legal buffered-output window, refused conservatively at capacity, or reset.
+Combo-origin pending entries are compatibility candidates, not runtime press
+ownership. There is one per combo index (up to the 32-combo Profile Wire bound),
+carrying its physical completion generation. A combo completes again only after
+a member release, which makes QMK fire or drop the earlier completion, so the
+newer generation replaces it; a burst of chords cannot crowd a candidate out.
+Each is reconciled against the pinned QMK active/disabled layout at the scan
+boundary, and either promoted exactly once, suppressed, expired after the legal
+buffered-output window, or reset.
 
 Inbound VIA commands are classified and marked dirty before QMK applies them,
 but are never replayed on the slave. `qmk_via_split_sync.c` exchanges only

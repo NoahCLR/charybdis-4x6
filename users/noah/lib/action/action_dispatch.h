@@ -78,6 +78,15 @@ static inline uint16_t noah_action_keycode_layer_mod_mods(uint16_t action) {
     return (uint16_t)(QK_LAYER_MOD_GET_MODS(action) << 8);
 }
 
+// MT(mods, kc) and OSM(mods) hold their modifiers once held past the tap
+// window, as QMK's tapping does. A behaviour row keeps that first hold unless it
+// authors its own, so adding a repeated-tap branch cannot remove it.
+static inline uint16_t noah_action_keycode_dual_role_hold_mods(uint16_t action) {
+    if (IS_QK_MOD_TAP(action)) return (uint16_t)(QK_MOD_TAP_GET_MODS(action) << 8);
+    if (IS_QK_ONE_SHOT_MOD(action)) return (uint16_t)(QK_ONE_SHOT_MOD_GET_MODS(action) << 8);
+    return KC_NO;
+}
+
 // Keys that hold their layer while they are down: MO(), TT(), OSL() and LM().
 static inline bool noah_action_keycode_is_owned_momentary_layer(uint16_t action) {
     return IS_QK_MOMENTARY(action) || noah_action_keycode_is_layer_tap_toggle(action) || noah_action_keycode_is_layer_oneshot(action) || noah_action_keycode_is_layer_mod(action);

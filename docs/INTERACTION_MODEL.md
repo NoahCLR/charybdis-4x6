@@ -168,8 +168,10 @@ protection; there is no single constituent press that defines their hold.
 A runtime-owned key is classified once, by userspace. This includes authored
 `LT()`, `MT()` and `OSM()` rows, and `TT()`/`OSL()` which already have intrinsic
 userspace layer ownership. An unhandled `LT()`, `MT()` or `OSM()` still uses native
-QMK tapping. Authored rows retain their existing action/fallback semantics; this
-change does not manufacture native modifier holds for sparse authored MT rows.
+QMK tapping. A row that does not author a first hold keeps the key's own: `MT()`
+and `OSM()` hold their modifiers once held past the tap-hold term, and that hold
+sends no tap or one-shot on release. Their first tap stays the key's own tap.
+Adding a repeated-tap branch therefore cannot remove the modifier hold.
 The broader bypass is advertised by feature bit 18; bit 17 alone only promises
 the authored LT bypass. Pointer-mode interception remains earlier than authored
 mouse behaviour: Arrow's button remapping can intentionally consume Button 3.

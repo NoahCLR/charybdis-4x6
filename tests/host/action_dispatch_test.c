@@ -422,6 +422,11 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(noah_action_keycode_layer_mod_mods(LM(3, MOD_LSFT | MOD_LGUI)) == LSG(KC_NO));
     // A right-hand modifier keeps its right-hand bit (0x10): 0x14 is right Alt.
     CHECK(noah_action_keycode_layer_mod_mods(LM(3, 0x14u)) == 0x1400u);
+    // MT()/OSM() hold their modifiers as the same mods-only keycode.
+    CHECK(noah_action_keycode_dual_role_hold_mods(MT(MOD_LSFT | MOD_LGUI, KC_S)) == LSG(KC_NO));
+    CHECK(noah_action_keycode_dual_role_hold_mods(OSM(MOD_RALT)) == 0x1400u);
+    CHECK(noah_action_keycode_dual_role_hold_mods(LT(1, KC_A)) == KC_NO);
+    CHECK(noah_action_keycode_dual_role_hold_mods(KC_LEFT_SHIFT) == KC_NO);
     CHECK(noah_action_describe(LM(LAYER_COUNT, MOD_LSFT)).kind == NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION);
 
     CHECK(layer_jump.kind == NOAH_ACTION_KIND_LAYER_GOTO);

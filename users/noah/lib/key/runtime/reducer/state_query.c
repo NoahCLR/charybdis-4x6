@@ -1,3 +1,4 @@
+#include "../../../compat/qmk_gesture_timing.h"
 #include "state_query.h"
 
 #include "ownership_state.h"
@@ -462,6 +463,13 @@ bool key_runtime_core_has_pending_multi_tap_at(keypos_t key_pos) {
 bool key_runtime_core_hold_is_complete_at(keypos_t key_pos) {
     const press_token_t *token = key_runtime_core_press_token_at(key_pos);
     return token && token->active && token->slot_phase == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE;
+}
+
+// The single gate for hold progress. A physical release already queued in QMK
+// ends the gesture at its physical time; delayed delivery must not let a scan
+// invent a longer hold. Every tap/hold transition checks this, not the queue.
+bool key_runtime_core_press_token_hold_eligible(const key_runtime_core_state_t *state, const press_token_t *token, uint16_t now) {
+    return token && token->active && !noah_qmk_gesture_release_pending(key_runtime_core_query_press_token_resolve_key_pos(state, token), token->pressed_at, now);
 }
 
 uint8_t key_runtime_core_deferred_release_blocker_count(void) {

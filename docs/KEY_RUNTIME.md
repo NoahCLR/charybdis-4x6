@@ -374,8 +374,12 @@ protection and delivery timestamps.
 The reducer's global clock stays at delivery/scan time. Tokens retain physical
 press/release times, and released series retain the release timestamp even after
 the token is settled. Expiry and foreign-key flushing consult pending physical
-continuations. Hold planning and phase refresh consult pending releases before
-activating an action. This separates gesture eligibility from permission to emit
+continuations. Hold progress has one gate,
+`key_runtime_core_press_token_hold_eligible()`: a token whose physical release is
+already queued cannot advance toward a hold. Phase refresh and every scan-time
+hold planner go through it; `run_qmk_gesture_pipeline_tests.sh` rejects any other
+queued-release query. QMK queues such a release only for a modifier or layer
+key released during another key's tapping term. This separates gesture eligibility from permission to emit
 output without rewinding shared time.
 
 The fork's `is_tap_keycode_user` hook exempts all runtime-handled keys from native

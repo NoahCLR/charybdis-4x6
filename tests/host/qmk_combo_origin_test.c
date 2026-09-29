@@ -8,7 +8,7 @@
 #include "users/noah/lib/compat/qmk_combo_origin.h"
 
 enum {
-    TEST_PENDING_CAPACITY = 4,
+    TEST_BURST_COMBOS     = 5,
     TEST_COMBO_OUT_LEFT   = 0x7000u,
     TEST_COMBO_OUT_BOTH   = 0x7001u,
     TEST_COMBO_OUT_THREE  = 0x7002u,
@@ -636,9 +636,10 @@ static void test_deadline_expiry_boundaries_and_timer_wrap(void) {
     CHECK(!key_origin_bitmap_has_any(bitmap));
 }
 
-static void test_full_pending_cache_refuses_then_recovers_capacity(void) {
+// Candidates are keyed by combo, so a burst of complete chords cannot crowd
+// one out and silently drop it to delivery-time timing.
+static void test_chord_burst_keeps_every_candidate(void) {
     noah_qmk_combo_origin_debug_snapshot_t snapshot;
-    uint8_t                                bitmap[KEY_ORIGIN_BITMAP_SIZE];
 
     test_reset();
     test_observe_physical_key(test_key(0, 0), true);
@@ -650,32 +651,42 @@ static void test_full_pending_cache_refuses_then_recovers_capacity(void) {
     test_observe_physical_key(test_key(5, 1), true);
     test_observe_physical_key(test_key(0, 2), true);
     test_observe_physical_key(test_key(1, 2), true);
+    fake_time = 1040u;
     test_observe_physical_key(test_key(2, 2), true);
 
     noah_qmk_combo_origin_debug_snapshot(&snapshot);
-    CHECK(snapshot.pending_count == TEST_PENDING_CAPACITY);
-    CHECK(snapshot.pending_high_water == TEST_PENDING_CAPACITY);
-    CHECK(snapshot.cache_full_refusal_count == 1u);
+    CHECK(snapshot.pending_count == TEST_BURST_COMBOS);
+    CHECK(snapshot.pending_high_water == TEST_BURST_COMBOS);
+    CHECK(snapshot.cache_full_refusal_count == 0u);
+    // The last chord to complete keeps its own completion time.
+    CHECK(noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_LONG, test_key(2, 2), 1040u, 0u));
 
-    // Once the refused long combo is no longer physically complete, its
-    // unique member must not survive as an attributed pending origin.
-    test_observe_physical_key(test_key(2, 2), false);
-    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
-    CHECK(!test_bitmap_has(bitmap, 2, 2));
-
-    for (uint8_t index = 0; index < TEST_PENDING_CAPACITY; index++) {
+    for (uint8_t index = 0; index < ARRAY_SIZE(key_combos); index++) {
         test_set_combo_disabled(index, true);
     }
     noah_qmk_combo_origin_scan();
     noah_qmk_combo_origin_debug_snapshot(&snapshot);
     CHECK(snapshot.pending_count == 0u);
+    CHECK(snapshot.suppressed_retirement_count == TEST_BURST_COMBOS);
+}
 
-    test_observe_physical_key(test_key(4, 2), false);
-    test_observe_physical_key(test_key(5, 2), false);
-    test_observe_physical_key(test_key(4, 2), true);
-    test_observe_physical_key(test_key(5, 2), true);
+// Re-completing a combo needs a member release, which settles the earlier
+// completion in QMK; the newer generation takes the combo's candidate.
+static void test_recompleted_combo_supersedes_its_candidate(void) {
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 0), true);
+    test_observe_physical_key(test_key(1, 0), true);
+    test_observe_physical_key(test_key(1, 0), false);
+    fake_time = 1060u;
+    test_observe_physical_key(test_key(1, 0), true);
+
     noah_qmk_combo_origin_debug_snapshot(&snapshot);
     CHECK(snapshot.pending_count == 1u);
+    CHECK(noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_LEFT, test_key(1, 0), 1060u, 0u));
+    test_observe_physical_key(test_key(1, 0), false);
+    CHECK(!noah_qmk_combo_origin_pressed_combo_matches(TEST_COMBO_OUT_LEFT, test_key(1, 0), 1000u, 59u));
 }
 
 static void test_unmatched_output_is_observable_and_does_not_create_origin(void) {
@@ -770,7 +781,8 @@ int main(void) {
     test_overlap_disabled_candidate_retires_before_feedback_bitmap();
     test_delayed_output_gets_final_deadline_scan_opportunity();
     test_deadline_expiry_boundaries_and_timer_wrap();
-    test_full_pending_cache_refuses_then_recovers_capacity();
+    test_chord_burst_keeps_every_candidate();
+    test_recompleted_combo_supersedes_its_candidate();
     test_unmatched_output_is_observable_and_does_not_create_origin();
     test_same_output_generations_promote_and_release_independently();
     test_reset_clears_candidate_diagnostics();
