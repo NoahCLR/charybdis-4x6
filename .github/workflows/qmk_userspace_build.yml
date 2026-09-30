@@ -64,6 +64,9 @@ jobs:
         run: |
           ${{ inputs.preparation_command }}
 
+      - name: Install ripgrep for host-suite guard checks
+        run: apt-get update -qq && apt-get install -y -qq ripgrep
+
       - name: Install Node for diagnostics host tests
         uses: actions/setup-node@v6
         with:

@@ -2571,7 +2571,8 @@ static void gesture_out_dump(const char *name) {
     for (uint8_t i = 0; i < gesture_out_count; i++) fprintf(stderr, " %c%04x@%u", gesture_out[i].kind, gesture_out[i].code, gesture_out[i].at);
     fprintf(stderr, "\n");
 }
-static void gesture_run(uint16_t code, const struct { uint16_t at; uint8_t row, col; bool down; } *steps, uint8_t count, uint16_t until) {
+typedef struct { uint16_t at; uint8_t row, col; bool down; } gesture_step_t;
+static void gesture_run(uint16_t code, const gesture_step_t *steps, uint8_t count, uint16_t until) {
     test_reset_state(); fake_time = 40000; gesture_test_code = code; gesture_out_count = 0;
     gesture_momentary_layer = UINT8_MAX;
     uint8_t next = 0;
@@ -2580,32 +2581,31 @@ static void gesture_run(uint16_t code, const struct { uint16_t at; uint8_t row, 
         gesture_advance(1);
     }
 }
-typedef struct { uint16_t at; uint8_t row, col; bool down; } gesture_step_t;
 static void test_qmk_keys_wait_for_undecided_dual_role(void) {
     const uint16_t lt = LT(TEST_LAYER_NAV, KC_B), mt = MT(MOD_LSFT | MOD_LGUI, KC_S);
 
     const gesture_step_t roll[] = {{0,3,0,true}, {30,3,1,true}, {60,3,0,false}, {80,3,1,false}};
-    gesture_run(lt, (const void *)roll, ARRAY_SIZE(roll), 500);
+    gesture_run(lt, roll, ARRAY_SIZE(roll), 500);
     if (!gesture_out_is("TK", (const uint16_t[]){KC_B, KC_E})) gesture_out_dump("lt roll");
     CHECK(gesture_out_is("TK", (const uint16_t[]){KC_B, KC_E}));
 
     const gesture_step_t hold[] = {{0,3,0,true}, {30,3,1,true}, {50,3,1,false}, {200,3,0,false}};
-    gesture_run(lt, (const void *)hold, ARRAY_SIZE(hold), 500);
+    gesture_run(lt, hold, ARRAY_SIZE(hold), 500);
     if (!gesture_out_is("LK", (const uint16_t[]){TEST_LAYER_NAV, KC_E})) gesture_out_dump("lt hold");
     CHECK(gesture_out_is("LK", (const uint16_t[]){TEST_LAYER_NAV, KC_E}));
     CHECK(gesture_out[0].at >= 40100 && gesture_out[1].at >= gesture_out[0].at);
 
-    gesture_run(mt, (const void *)roll, ARRAY_SIZE(roll), 500);
+    gesture_run(mt, roll, ARRAY_SIZE(roll), 500);
     if (!gesture_out_is("TK", (const uint16_t[]){mt, KC_E})) gesture_out_dump("mt roll");
     CHECK(gesture_out_is("TK", (const uint16_t[]){mt, KC_E}));
 
-    gesture_run(mt, (const void *)hold, ARRAY_SIZE(hold), 500);
+    gesture_run(mt, hold, ARRAY_SIZE(hold), 500);
     if (!gesture_out_is("RK", (const uint16_t[]){LSG(KC_NO), KC_E})) gesture_out_dump("mt hold");
     CHECK(gesture_out_is("RK", (const uint16_t[]){LSG(KC_NO), KC_E}));
 
     // A released LT's pending tap is typed before a handled key that follows.
     const gesture_step_t settle[] = {{0,3,0,true}, {40,3,0,false}, {60,3,2,true}, {80,3,2,false}};
-    gesture_run(lt, (const void *)settle, ARRAY_SIZE(settle), 500);
+    gesture_run(lt, settle, ARRAY_SIZE(settle), 500);
     if (!(gesture_out_count >= 1 && gesture_out[0].kind == 'T' && gesture_out[0].code == KC_B && gesture_out[0].at <= 40061)) gesture_out_dump("lt settle");
     CHECK(gesture_out_count >= 1 && gesture_out[0].kind == 'T' && gesture_out[0].code == KC_B && gesture_out[0].at <= 40061);
     CHECK(noah_record_admission_held_count() == 0);

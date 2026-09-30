@@ -93,9 +93,11 @@ build_half() {
     name="$3"
 
     echo "Building $half half ($role)..."
-    # Object files are shared between the two compiles, so clear them or the
-    # second half links the first half's translation units.
-    rm -f "$QMK_ROOT/.build/obj_bastardkb_charybdis_4x6_noah"/*.o 2>/dev/null || true
+    # The object directory is shared between the two compiles and between
+    # worktrees, so clear all of it: stale objects would link the other half's
+    # translation units, and stale make dependency files name sources in
+    # whichever worktree built last, which fails once that worktree is removed.
+    rm -rf "$QMK_ROOT/.build/obj_bastardkb_charybdis_4x6_noah"
     # A successful command must produce this half's UF2, not leave the previous
     # half's artifact at the shared QMK output path.
     rm -f "$ARTIFACT"

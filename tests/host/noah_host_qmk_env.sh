@@ -45,14 +45,18 @@ noah_host_find_qmk_root() {
     return 1
 }
 
+# QMK is third-party code. Its directories go on C_INCLUDE_PATH, which GCC and
+# clang search as system headers after every -I, so a warning inside a QMK
+# header (GCC rejects some that clang accepts) cannot fail our -Werror builds.
+# Warnings in our own sources and test shims stay errors.
 noah_host_prepend_cpath() {
     include_path="$1"
 
-    case ":${CPATH:-}:" in
+    case ":${C_INCLUDE_PATH:-}:" in
         *":$include_path:"*)
             ;;
         *)
-            CPATH="$include_path${CPATH:+:$CPATH}"
+            C_INCLUDE_PATH="$include_path${C_INCLUDE_PATH:+:$C_INCLUDE_PATH}"
             ;;
     esac
 }
@@ -75,7 +79,7 @@ noah_host_export_qmk_cpath() {
         noah_host_prepend_cpath "$include_path"
     done
 
-    export CPATH
+    export C_INCLUDE_PATH
 }
 
 # Guard scripts express violations as `if rg <forbidden>; then fail; fi`. A

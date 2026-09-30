@@ -30,6 +30,10 @@ keymap = Path(os.environ['QMK_USERSPACE']) / 'keyboards/bastardkb/charybdis/4x6/
 for number in range(1, 6):
     assert f'MAIN_KEYMAP_PATH_{number}={keymap}' in sys.argv, 'a QMK keymap symlink must not select other source'
 assert Path.cwd().resolve() == Path(os.environ['QMK_HOME']).resolve()
+# Nothing from an earlier build may survive: a stale .d names another worktree's sources.
+assert not Path('.build/obj_bastardkb_charybdis_4x6_noah').exists(), 'stale objects or dependency files survived'
+Path('.build/obj_bastardkb_charybdis_4x6_noah').mkdir(parents=True)
+Path('.build/obj_bastardkb_charybdis_4x6_noah/runtime_init.d').write_text('runtime_init.o: /removed/worktree/runtime_init.c')
 assert Path(os.environ['QMK_USERSPACE']).resolve() == Path(os.environ['EXPECTED_USERSPACE']).resolve()
 with open(os.environ['PAIR_TEST_LOG'], 'a') as log:
     log.write(json.dumps(sys.argv) + '\\n')
@@ -37,6 +41,10 @@ half = next(arg.split('=', 1)[1] for arg in sys.argv if arg.startswith('NOAH_PHY
 Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
 ''')
             driver.chmod(0o755)
+            stale = qmk / '.build/obj_bastardkb_charybdis_4x6_noah'
+            stale.mkdir(parents=True)
+            (stale / 'runtime_init.d').write_text('runtime_init.o: /removed/worktree/runtime_init.c\n')
+            (stale / 'runtime_init.o').write_bytes(b'stale')
             env = dict(os.environ, PATH=str(fakebin) + os.pathsep + os.environ['PATH'], QMK_ROOT=str(qmk),
                        QMK_HOME='/wrong/qmk', QMK_USERSPACE='/wrong/userspace', EXPECTED_USERSPACE=str(source),
                        BUILD_ROOT=str(base / 'builds'), PAIR_TEST_LOG=str(base / 'calls'))

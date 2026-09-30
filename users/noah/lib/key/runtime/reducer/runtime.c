@@ -331,7 +331,12 @@ static __attribute__((noinline)) bool key_runtime_core_allocate_token_id(key_run
     }
 
     candidate = state->next_token_id;
-    if (candidate == 0u || candidate > KEY_RUNTIME_CORE_TOKEN_ID_MAX) {
+#if KEY_RUNTIME_CORE_TOKEN_ID_MAX < UINT16_MAX
+    if (candidate > KEY_RUNTIME_CORE_TOKEN_ID_MAX) {
+        candidate = 1u;
+    }
+#endif
+    if (candidate == 0u) {
         candidate = 1u;
     }
     first_candidate = candidate;

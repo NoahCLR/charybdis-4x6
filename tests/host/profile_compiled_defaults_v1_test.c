@@ -275,7 +275,7 @@ static void test_real_authored_profile(void) {
 
     reader        = noah_profile_compiled_v1_reader(&profile);
     copied_reader = reader;
-    assert(NOAH_PROFILE_COMPILED_V1_READER_REPLAY_MAX == NOAH_PROFILE_BLOB_V1_MAX_SIZE);
+    assert((unsigned)NOAH_PROFILE_COMPILED_V1_READER_REPLAY_MAX == (unsigned)NOAH_PROFILE_BLOB_V1_MAX_SIZE);
     assert(noah_profile_reader_read(&copied_reader, 0u, slice, sizeof(slice)));
     assert(memcmp(slice, output, sizeof(slice)) == 0);
     for (size_t offset = 0u; offset < output_length; offset += sizeof(slice)) {

@@ -36,6 +36,13 @@ firmware and Ark CI pass and both firmware assets are present. If publication
 is interrupted, rerun the same command: it resumes the saved release commits,
 even if `dev` has since advanced. Direct tag pushes leave the release in draft.
 
+Development runs the host suite with macOS clang; CI runs it with GCC in the
+QMK container, on every `dev` push and pull request (`host_tests.yml`) as well
+as before a release build. Host tests put QMK's directories on
+`C_INCLUDE_PATH`, so both compilers treat QMK as third-party system headers: a
+warning inside QMK cannot fail a build, while warnings in our own sources and
+test shims remain errors.
+
 The pair builder isolates QMK CLI configuration for the compiler and its code
 generators, so saved `overlay_dir`/`qmk_home` values cannot redirect a task build
 to the main checkout. Explicit keymap paths also override old symlinks inside
@@ -766,7 +773,9 @@ are blocked. GitHub PR merging uses merge commits; squash and rebase merging
 are disabled so the promoted development history stays reachable.
 
 The shared vault's `promote --push` publishes `dev`, opens or resumes its
-promotion PR, waits for the source check, and merges through GitHub. It records
+promotion PR, waits for the source check, and merges through GitHub. It first
+waits for GitHub CI on that `dev` commit and refuses to promote when any job
+failed, never finished, or none ran. It records
 the verified stack in the merge message and reconciles local `main` to GitHub's
 merge identity. Direct `main` pushes are rejected by the local hook as well.
 Normal task development still lands locally onto `dev`.
