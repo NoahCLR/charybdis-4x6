@@ -34,7 +34,9 @@ against the matching QMK tag. Both UF2 files are attached to a draft release;
 the shared vault's `release VERSION --push` makes the releases public only after
 firmware and Ark CI pass and both firmware assets are present. If publication
 is interrupted, rerun the same command: it resumes the saved release commits,
-even if `dev` has since advanced. Direct tag pushes leave the release in draft.
+even if `dev` has since advanced. Direct tag pushes leave the release in draft. The
+third-party action that attaches the pair runs with write access, so it is pinned
+to a reviewed commit hash; move the pin deliberately, after reading the new code.
 
 Development runs the host suite with macOS clang; CI runs it with GCC in the
 QMK container, on every `dev` push and pull request (`host_tests.yml`) as well
@@ -766,14 +768,16 @@ classifier, including combo-output behaviours as a required acceptance case.
 
 ### Protected main promotions
 
-GitHub `main` requires a pull request and the `Promotion from dev` check,
-including for administrators. The check accepts only this repository's `dev`
+GitHub `main` requires a pull request and two checks, including for
+administrators: `Promotion from dev` and `Host suite (GCC)`, the host suite run
+on the promotion PR itself. The check accepts only this repository's `dev`
 branch and a merge tree identical to that branch. Force pushes and deletion
 are blocked. GitHub PR merging uses merge commits; squash and rebase merging
 are disabled so the promoted development history stays reachable.
 
 The shared vault's `promote --push` publishes `dev`, opens or resumes its
-promotion PR, waits for the source check, and merges through GitHub. It first
+promotion PR, waits until GitHub reports every required check passed, and
+merges through GitHub. It first
 waits for GitHub CI on that `dev` commit and refuses to promote when any job
 failed, never finished, or none ran. It records
 the verified stack in the merge message and reconciles local `main` to GitHub's
