@@ -1,7 +1,8 @@
 # Developing this firmware
 
 How this repository is developed, tested and released. What the firmware does
-and how to configure it is in the [README](../README.md).
+and how to configure it is in the [README](../README.md) and the
+[firmware guide](GUIDE.md).
 
 For the editor's build, test and compilation-database tasks, see the
 [VS Code workflow](../.vscode/README.md). Charybdis Ark's editor tasks now belong

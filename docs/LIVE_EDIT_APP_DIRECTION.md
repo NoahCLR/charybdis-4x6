@@ -131,7 +131,7 @@ ordinary firmware, not an engineering artifact. The owner needs a provisioned
 `NOAH_PHYSICAL_HALF`, since durable profile origin identity is side-specific,
 so the generic half-less build reports that at configure time and builds
 without the owner rather than failing (failing would break the plain
-`qmk compile` in the README). The firmware you flash is the side-specific pair
+`qmk compile` in the firmware guide). The firmware you flash is the side-specific pair
 from `tools/build-firmware-pair.sh`; a build that sets only
 `FORCE_MASTER`/`FORCE_SLAVE` silently omits the owner. The opt-out stays as the
 lever for comparing ordinary against live behaviour on identical source.
