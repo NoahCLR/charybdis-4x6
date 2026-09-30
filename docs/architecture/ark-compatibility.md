@@ -62,10 +62,14 @@ test or diagnostic tool resolves code or dependencies through the app.
 
 ## Release verification
 
-Firmware release CI runs this repository's full host suite and builds both
-physical-half images against the corresponding QMK tag. It uploads the pair to
-a draft release. The shared release command tests an immutable three-repository
-candidate, retains its compatibility report and build hashes, and waits for
-both firmware and Ark's tagged CI before publishing. Firmware's own build and
-host runners remain independent of the client. These gates do not substitute
-for the interruption and keyboard acceptance procedures.
+A release is the only way `main` moves, in firmware, Ark and the BK fork's
+released line together. The shared release command tests the exact stack
+`main` will hold (firmware `dev`, Ark `dev`, BK at `qmk-pin.json`) and requires
+Ark to agree with this firmware's contract before promoting anything. Firmware
+release CI runs this repository's full host suite at the pinned BK commit,
+builds both physical-half images there, states the contract
+(`firmware-contract.json`) and uploads them to a draft release; the command
+waits for both repositories' tagged CI before publishing, with the BK pin and
+the agreement table in the notes. Firmware's own build and host runners remain
+independent of the client. These gates do not substitute for the interruption
+and keyboard acceptance procedures.

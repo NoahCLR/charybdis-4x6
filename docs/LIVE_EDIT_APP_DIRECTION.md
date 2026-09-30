@@ -631,3 +631,23 @@ through the fork's `process_record_admit_user()` hook, and replayed through
 ([contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)).
 It joins unreleased bit 18. Optional QMK modes (permissive hold, hold on other
 key press) are not reproduced.
+
+## D-F04 — Firmware pins its BK commit; `main` is a released, agreeing stack
+
+The UF2 is this userspace and the BK fork compiled together, so firmware names
+the exact BK commit it builds with in a committed `qmk-pin.json`, a published
+commit on the fork's `noah-userspace-contracts-dev`. It is a plain file, not a
+submodule, and code enforces it rather than habit: the pair build refuses any
+other BK, CI and the release build check BK out at the pin, and the push hook
+refuses an unpublished pin. A non-required job tests the BK dev head as an
+early warning. Re-pinning (`tools/pin-qmk.sh`) is a deliberate firmware change
+that reports what moved in BK ([the BK pin](../README.md#the-bk-pin)).
+
+Firmware and its client agree by contract, not by commit: firmware states the
+capability pages its keyboard answers, its BK pin and its fixture hashes
+(`tests/host/run_contract_probe.sh`), and the client judges them with its own
+runtime code. `dev` is the development line and tests against its own pins.
+`main` moves only by a release, which promotes the BK released line, firmware
+and the client together after testing that exact stack and their agreement, so
+every `main` has a tag, both halves, the BK pin and the agreement table
+([release verification](architecture/ark-compatibility.md#release-verification)).

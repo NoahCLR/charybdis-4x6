@@ -62,6 +62,11 @@ and reports how far it is ahead of the pin. The vault's `verify` checks BK out
 at the pin itself, and its push hook refuses a push whose pin is not on the
 published BK dev branch.
 
+The BK fork runs no CI of its own (GitHub Actions stay off, so its upstream
+workflows never run): a BK change reaches users only through a firmware re-pin,
+which is tested here. Its released line `noah-userspace-contracts` moves only
+by a release, to exactly the pinned commit.
+
 Re-pin with `sh tools/pin-qmk.sh [REV]` (default: the published BK dev head).
 It lists the BK commits since the old pin and what changed by area: hooks and
 core, keycode numbering, VIA, RGB matrix, the Charybdis board and submodules.
