@@ -52,8 +52,8 @@ jobs:
 
       - name: Configure QMK CLI
         run: |
-          qmk config user.qmk_home=$GITHUB_WORKSPACE/qmk_firmware
-          qmk config user.overlay_dir=$GITHUB_WORKSPACE
+          qmk config user.qmk_home="$GITHUB_WORKSPACE/qmk_firmware"
+          qmk config user.overlay_dir="$GITHUB_WORKSPACE"
 
       - name: Validate userspace
         run: |

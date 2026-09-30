@@ -29,7 +29,8 @@ jobs:
           test -s bastardkb_charybdis_4x6_noah_right.uf2
 
       - name: Attach pair to draft release
-        uses: softprops/action-gh-release@v2
+        # Third-party action with write access: pinned to a reviewed commit.
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           token: ${{ github.token }}
           name: Charybdis 4x6 ${{ inputs.release_name }}
