@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Download binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: Firmware
 
@@ -28,14 +28,14 @@ jobs:
           test -s bastardkb_charybdis_4x6_noah_left.uf2
           test -s bastardkb_charybdis_4x6_noah_right.uf2
 
-      - name: Generate Release
+      - name: Attach pair to draft release
         uses: softprops/action-gh-release@v2
         with:
           token: ${{ github.token }}
           name: Charybdis 4x6 ${{ inputs.release_name }}
           tag_name: ${{ inputs.release_name || 'latest' }}
           fail_on_unmatched_files: true
-          draft: false
+          draft: true
           prerelease: false
           files: |
             bastardkb_charybdis_4x6_noah_left.uf2

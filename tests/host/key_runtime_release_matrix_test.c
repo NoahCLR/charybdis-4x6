@@ -88,24 +88,27 @@ static void test_case_fail(const char *case_name, const char *expr, const char *
 
 #define HOLD_LIT(expr) ((hold_behavior_t)expr)
 #define HOLD_NONE_LIT ((hold_behavior_t){0})
+// Static case tables need constant initializers, not compound literals.
+#define HOLD_INIT(expr) expr
+#define HOLD_NONE_INIT {0}
 
 #define TEST_EXPECT_NONE()                 \
-    (test_release_summary_t) {             \
+    {                                      \
         .kind = TEST_RELEASE_SUMMARY_NONE, \
     }
 
 #define TEST_EXPECT_ACTION(action_, release_owned_)                                                        \
-    (test_release_summary_t) {                                                                             \
+    {                                                                                                      \
         .kind = TEST_RELEASE_SUMMARY_ACTION, .action = (action_), .release_owned_state = (release_owned_), \
     }
 
 #define TEST_EXPECT_HELD(action_, release_owned_)                                                                  \
-    (test_release_summary_t) {                                                                                     \
+    {                                                                                                              \
         .kind = TEST_RELEASE_SUMMARY_HELD_LIFECYCLE, .action = (action_), .release_owned_state = (release_owned_), \
     }
 
 #define TEST_EXPECT_PRESERVE_CHAIN()                                        \
-    (test_release_summary_t) {                                              \
+    {                                                                       \
         .kind = TEST_RELEASE_SUMMARY_PRESERVE_CHAIN, .pending_chain = true, \
     }
 
@@ -411,8 +414,8 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
     static const test_release_equivalence_case_t cases[] = {
         {
             .name            = "release primary dispatches after tap",
-            .hold            = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold       = HOLD_NONE_LIT,
+            .hold            = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold       = HOLD_NONE_INIT,
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
             .pending_setup   = TEST_PENDING_SETUP_NONE,
             .release_elapsed = TEST_TAP_SETUP_ELAPSED_MS,
@@ -420,8 +423,8 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
         },
         {
             .name            = "release long dispatches without primary hold",
-            .hold            = HOLD_NONE_LIT,
-            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .hold            = HOLD_NONE_INIT,
+            .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_LONG,
             .pending_setup   = TEST_PENDING_SETUP_NONE,
             .release_elapsed = TEST_LONG_SETUP_ELAPSED_MS,
@@ -429,8 +432,8 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
         },
         {
             .name            = "release long wins over primary after longer term",
-            .hold            = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .hold            = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
             .pending_setup   = TEST_PENDING_SETUP_NONE,
             .release_elapsed = TEST_LONG_SETUP_ELAPSED_MS,
@@ -438,8 +441,8 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
         },
         {
             .name            = "release primary still wins before longer term",
-            .hold            = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .hold            = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
             .pending_setup   = TEST_PENDING_SETUP_NONE,
             .release_elapsed = TEST_TAP_SETUP_ELAPSED_MS,
@@ -447,8 +450,8 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
         },
         {
             .name            = "threshold hold does not redispatch on release before long",
-            .hold            = HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_THRESHOLD_ACTION)),
-            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .hold            = HOLD_INIT(TAP_AT_HOLD_THRESHOLD(TEST_THRESHOLD_ACTION)),
+            .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
             .pending_setup   = TEST_PENDING_SETUP_SCAN_AT_TAP,
             .release_elapsed = TEST_TAP_SETUP_ELAPSED_MS,
@@ -456,8 +459,8 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
         },
         {
             .name            = "threshold hold releases long action after longer term",
-            .hold            = HOLD_LIT(TAP_AT_HOLD_THRESHOLD(TEST_THRESHOLD_ACTION)),
-            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .hold            = HOLD_INIT(TAP_AT_HOLD_THRESHOLD(TEST_THRESHOLD_ACTION)),
+            .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
             .pending_setup   = TEST_PENDING_SETUP_SCAN_AT_TAP,
             .release_elapsed = TEST_LONG_SETUP_ELAPSED_MS,
@@ -465,8 +468,8 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
         },
         {
             .name            = "held lifecycle survives release before long",
-            .hold            = HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
-            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .hold            = HOLD_INIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
+            .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
             .pending_setup   = TEST_PENDING_SETUP_SCAN_AT_TAP,
             .release_elapsed = TEST_TAP_SETUP_ELAPSED_MS,
@@ -474,8 +477,8 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
         },
         {
             .name            = "held lifecycle releases owned state and long action after longer term",
-            .hold            = HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
-            .long_hold       = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
+            .hold            = HOLD_INIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
+            .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
             .pending_setup   = TEST_PENDING_SETUP_SCAN_AT_TAP,
             .release_elapsed = TEST_LONG_SETUP_ELAPSED_MS,
@@ -497,8 +500,8 @@ static void test_pending_release_edge_cases(void) {
         {
             .name              = "quick release preserves pending chain when more taps remain",
             .second_tap_action = KC_NO,
-            .hold              = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold         = HOLD_NONE_LIT,
+            .hold              = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold         = HOLD_NONE_INIT,
             .has_more_taps     = true,
             .pending_setup     = TEST_PENDING_SETUP_NONE,
             .release_elapsed   = 60,
@@ -507,8 +510,8 @@ static void test_pending_release_edge_cases(void) {
         {
             .name              = "quick release preserves pending chain when later tap has explicit tap action",
             .second_tap_action = TEST_SECOND_TAP_ACTION,
-            .hold              = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold         = HOLD_NONE_LIT,
+            .hold              = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold         = HOLD_NONE_INIT,
             .has_more_taps     = true,
             .pending_setup     = TEST_PENDING_SETUP_NONE,
             .release_elapsed   = 60,
@@ -519,8 +522,8 @@ static void test_pending_release_edge_cases(void) {
             // waits the same multi-tap window and its action fires at the flush.
             .name              = "quick release preserves pending chain when the chain ends",
             .second_tap_action = TEST_SECOND_TAP_ACTION,
-            .hold              = HOLD_LIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
-            .long_hold         = HOLD_NONE_LIT,
+            .hold              = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
+            .long_hold         = HOLD_NONE_INIT,
             .has_more_taps     = false,
             .pending_setup     = TEST_PENDING_SETUP_NONE,
             .release_elapsed   = 60,
@@ -529,8 +532,8 @@ static void test_pending_release_edge_cases(void) {
         {
             .name              = "pending release synthesizes held lifecycle without scan",
             .second_tap_action = KC_NO,
-            .hold              = HOLD_LIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
-            .long_hold         = HOLD_NONE_LIT,
+            .hold              = HOLD_INIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
+            .long_hold         = HOLD_NONE_INIT,
             .has_more_taps     = false,
             .pending_setup     = TEST_PENDING_SETUP_NONE,
             .release_elapsed   = TEST_TAP_SETUP_ELAPSED_MS,

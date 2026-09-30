@@ -58,3 +58,13 @@ Firmware diagnostics owns its Node dependency in `tools/package.json` and its
 lockfile. Use `npm ci --prefix tools` for hardware diagnostics; neither firmware
 compilation nor its C host tests need that native HID installation. No firmware
 test or diagnostic tool resolves code or dependencies through the app.
+
+## Release verification
+
+Firmware release CI runs this repository's full host suite and builds both
+physical-half images against the corresponding QMK tag. It uploads the pair to
+a draft release. The shared release command tests an immutable three-repository
+candidate, retains its compatibility report and build hashes, and waits for
+both firmware and Ark's tagged CI before publishing. Firmware's own build and
+host runners remain independent of the client. These gates do not substitute
+for the interruption and keyboard acceptance procedures.

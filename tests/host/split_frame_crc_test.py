@@ -94,11 +94,11 @@ bool harness_resend_due(int8_t id);
 #include <stddef.h>
 #include <stdbool.h>
 #define THD_WORKING_AREA(name, size) int name[1]
-#define THD_FUNCTION(name, arg) void *name(void *arg)
+#define THD_FUNCTION(name, arg) void name(void *arg)
 #define HIGHPRIO 0
 #define unlikely(x) (x)
 void chRegSetThreadName(const char *name);
-void chThdCreateStatic(void *area, size_t size, int priority, void *(*function)(void *), void *arg);
+void chThdCreateStatic(void *area, size_t size, int priority, void (*function)(void *), void *arg);
 uint32_t chSysGetRealtimeCounterX(void);
 ''')
 (stubs / "synchronization_util.h").write_text("#pragma once\n#define split_shared_memory_lock_autounlock() ((void)0)\n")

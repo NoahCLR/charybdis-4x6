@@ -219,7 +219,8 @@ static uint8_t readback_fill(uint8_t kind, uint16_t offset, uint8_t *target) {
     (void)kind;
 #endif
     if (offset >= length) return 0;
-    uint8_t count = length - offset < 25u ? length - offset : 25u;
+    uint16_t remaining = (uint16_t)(length - offset);
+    uint8_t  count     = remaining < 25u ? (uint8_t)remaining : 25u;
     for (uint8_t i = 0; i < count; i++)
 #ifndef NOAH_PD_PROFILE_ENABLE
         target[i] = kind == 7 ? settings_byte(offset + i) : snapshot[offset + i];

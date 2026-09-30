@@ -178,3 +178,11 @@ names the app. Develop locally without remotes; before publishing, push QMK fork
 commits first, and note that a squash or rebase merge moves Ark's pin (see
 [local and published revisions](docs/architecture/ark-compatibility.md#local-and-published-revisions)). Install firmware diagnostics dependencies with
 `npm ci --prefix tools` when using hardware diagnostics.
+
+### Publishing protected main
+
+`main` publication requires a same-repository `dev` → `main` PR and the
+`Promotion from dev` check, including for administrators. Use the shared
+`promote --push` command only when publishing is requested; never push `main`
+directly or bypass protection. The command accepts GitHub's resulting merge
+identity. `release --push` freezes tags only after those promotion PRs merge.
