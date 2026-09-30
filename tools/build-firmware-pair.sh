@@ -80,6 +80,12 @@ while [ -f "$destdir/${n}_charybdis_right${SUFFIX}.uf2" ]; do
 done
 
 export QMK_USERSPACE="$REPO_ROOT"
+export QMK_HOME="$QMK_ROOT"
+KEYMAP_ROOT="$REPO_ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
+# QMK CLI 1.1.8 prefers saved overlay_dir/qmk_home over environment variables.
+# Isolate this invocation and every QMK generator make calls from that config;
+# otherwise a task worktree can silently build the main checkout instead.
+# Explicit keymap paths also override old keymap symlinks inside the QMK tree.
 
 build_half() {
     role="$1"
@@ -93,7 +99,11 @@ build_half() {
     # A successful command must produce this half's UF2, not leave the previous
     # half's artifact at the shared QMK output path.
     rm -f "$ARTIFACT"
-    ( cd "$QMK_ROOT" && qmk compile -kb bastardkb/charybdis/4x6 -km noah \
+    ( cd "$QMK_ROOT" && qmk --config-file /dev/null compile -kb bastardkb/charybdis/4x6 -km noah \
+        -e "QMK_BIN=qmk --config-file /dev/null" \
+        -e "MAIN_KEYMAP_PATH_1=$KEYMAP_ROOT" -e "MAIN_KEYMAP_PATH_2=$KEYMAP_ROOT" \
+        -e "MAIN_KEYMAP_PATH_3=$KEYMAP_ROOT" -e "MAIN_KEYMAP_PATH_4=$KEYMAP_ROOT" \
+        -e "MAIN_KEYMAP_PATH_5=$KEYMAP_ROOT" \
         -e "$role=yes" -e "NOAH_PHYSICAL_HALF=$half" $OWNER_ARGS $TRANSPORT_ARGS )
     if [ ! -f "$ARTIFACT" ]; then
         echo "Expected firmware not found: $ARTIFACT" >&2

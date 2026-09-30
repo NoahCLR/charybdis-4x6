@@ -1,0 +1,33 @@
+name: Main promotion
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, edited, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  source:
+    name: Promotion from dev
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require this repository's dev branch
+        # No checkout or execution of pull-request code.
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          with open(os.environ['GITHUB_EVENT_PATH']) as f:
+              event = json.load(f)
+          pr = event['pull_request']
+          assert pr['base']['ref'] == 'main', 'Promotions must target main'
+          assert pr['head']['ref'] == 'dev', 'Only dev may be promoted to main'
+          assert pr['head']['repo']['full_name'] == event['repository']['full_name'], 'Fork branches cannot promote main'
+          print('Accepted this repository’s dev → main promotion')
+          PYTHON
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Require the exact dev tree
+        env:
+          DEV_COMMIT: ${{ github.event.pull_request.head.sha }}
+        run: test "$(git rev-parse 'HEAD^{tree}')" = "$(git rev-parse "$DEV_COMMIT^{tree}")"

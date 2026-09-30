@@ -4,6 +4,7 @@ set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
+python3 "$ROOT/pair_build_script_test.py"
 sh "$ROOT/run_firmware_client_independence_tests.sh"
 sh "$ROOT/run_qmk_contract_checks.sh"
 sh "$ROOT/run_split_transport_build_tests.sh"

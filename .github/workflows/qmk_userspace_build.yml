@@ -31,20 +31,13 @@ jobs:
 
     steps:
       - name: Checkout Userspace
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           token: ${{ github.token }}
           submodules: recursive
 
-      - name: Check if qmk_firmware exists
-        id: check_files
-        uses: andstor/file-existence-action@v3
-        with:
-          files: qmk_firmware
-
       - name: Checkout QMK Firmware
-        uses: actions/checkout@v4
-        if: steps.check_files.outputs.files_exists == 'false'
+        uses: actions/checkout@v6
         with:
           token: ${{ github.token }}
           path: qmk_firmware
@@ -71,6 +64,14 @@ jobs:
         run: |
           ${{ inputs.preparation_command }}
 
+      - name: Install Node for diagnostics host tests
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Run firmware host suite
+        run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" sh tests/host/run_all_host_tests.sh
+
       - name: Build flashable left and right firmware
         run: |
           QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" \
@@ -78,7 +79,7 @@ jobs:
             sh tools/build-release-firmware-pair.sh
 
       - name: Upload firmware pair
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Firmware
           if-no-files-found: error

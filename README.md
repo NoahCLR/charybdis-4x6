@@ -29,6 +29,22 @@ fork of Bastard Keyboards' userspace: push only to `NoahCLR/charybdis-4x6`, and
 never push or open a pull request upstream. The clone's `gh` default and
 pre-push hook enforce that.
 
+Release CI runs the complete host suite before building the side-specific pair,
+against the matching QMK tag. Both UF2 files are attached to a draft release;
+the shared vault's `release VERSION --push` makes the releases public only after
+firmware and Ark CI pass and both firmware assets are present. If publication
+is interrupted, rerun the same command: it resumes the saved release commits,
+even if `dev` has since advanced. Direct tag pushes leave the release in draft.
+
+The pair builder isolates QMK CLI configuration for the compiler and its code
+generators, so saved `overlay_dir`/`qmk_home` values cannot redirect a task build
+to the main checkout. Explicit keymap paths also override old symlinks inside
+the QMK tree. Local `verify` records the full tested inputs and artifact checksums. `land`
+reuses that result only while those inputs match, and files its recorded inputs
+beside the firmware pair. The installed pre-push hook requires a matching local
+verification receipt for new protected-branch commits and a stack certificate
+for release tags; a hand-written `Stack-Tested` trailer is insufficient.
+
 Use the worktree assigned to your task. Run `git worktree list` in the relevant
 repository to discover its other checkouts; do not assume the main checkout
 contains another agent's branch. Relative sibling paths below describe the main
@@ -740,3 +756,29 @@ also defines the impossible release interval Ark reports.
 The unified gesture ownership plan (in the work-queue vault)
 explains why native LT/MT/OSM still exist and the proposed migration to one
 classifier, including combo-output behaviours as a required acceptance case.
+
+### Protected main promotions
+
+GitHub `main` requires a pull request and the `Promotion from dev` check,
+including for administrators. The check accepts only this repository's `dev`
+branch and a merge tree identical to that branch. Force pushes and deletion
+are blocked. GitHub PR merging uses merge commits; squash and rebase merging
+are disabled so the promoted development history stays reachable.
+
+The shared vault's `promote --push` publishes `dev`, opens or resumes its
+promotion PR, waits for the source check, and merges through GitHub. It records
+the verified stack in the merge message and reconciles local `main` to GitHub's
+merge identity. Direct `main` pushes are rejected by the local hook as well.
+Normal task development still lands locally onto `dev`.
+
+`release VERSION` verifies a provisional local stack without freezing tags.
+`release VERSION --push` first publishes the promotion PRs, then tests and tags
+the resulting GitHub commits. Retries after that checkpoint retain those exact
+commits. An old checkpoint referencing unpublished local promotion commits is
+rejected rather than silently retagged. Publishing requires the promotion
+workflow to have been landed and pushed to `dev` first.
+
+`dev` cannot be force-pushed or deleted on GitHub, and published `v*` release
+tags cannot be moved or deleted (rulesets without bypass). Merge commits take
+the PR's title and body, so a merge from the GitHub page carries the same
+verification trailers as one made by `promote --push`.
