@@ -26,6 +26,26 @@ QMK_ROOT="${QMK_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/../bastardkb-qmk" && pwd)}"
 BUILD_ROOT="${BUILD_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/.." && pwd)/builds}"
 ARTIFACT="$QMK_ROOT/bastardkb_charybdis_4x6_noah.uf2"
 
+# The pair is firmware and BK compiled together, so it is built only against
+# the BK commit qmk-pin.json names, from a clean checkout. verify and CI check
+# BK out at the pin themselves. NOAH_ALLOW_UNPINNED_QMK=1 is for trials and for
+# testing a BK change against current firmware; such a pair is never released.
+PIN="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["commit"])' "$REPO_ROOT/qmk-pin.json")" || {
+    echo "qmk-pin.json must name the BK commit this firmware builds with (tools/pin-qmk.sh)" >&2
+    exit 1
+}
+QMK_HEAD="$(git -C "$QMK_ROOT" rev-parse HEAD 2>/dev/null || echo "not a Git checkout")"
+QMK_DIRTY="$(git -C "$QMK_ROOT" status --porcelain --ignore-submodules=all 2>/dev/null || true)"
+if [ "$QMK_HEAD" != "$PIN" ] || [ -n "$QMK_DIRTY" ]; then
+    if [ "${NOAH_ALLOW_UNPINNED_QMK:-}" = 1 ]; then
+        echo "TRIAL: building against BK $QMK_HEAD${QMK_DIRTY:+ (modified)}, not the pinned $PIN" >&2
+    else
+        echo "BK at $QMK_ROOT is $QMK_HEAD${QMK_DIRTY:+ with local changes}, but qmk-pin.json pins $PIN." >&2
+        echo "Check BK out at the pin (verify does this itself), or re-pin with tools/pin-qmk.sh." >&2
+        exit 1
+    fi
+fi
+
 OWNER_ARGS=""
 SUFFIX=""
 TRANSPORT_ARGS=""

@@ -48,9 +48,10 @@ checkout, and Ark's bridge compares local working copies by path. Publishing
 does. Ark pins a firmware commit, and before pushing a pin change it requires
 that commit to be on this repository's remote `dev`. A squash or rebase merge
 replaces a branch's commits, so an Ark pin to one of them must move to the
-merged commit; say so in the merge handoff. Likewise, push a QMK fork commit to
-`noah-userspace-contracts` before pushing firmware that needs it, since a CI
-release build compiles against that remote branch.
+merged commit; say so in the merge handoff. Likewise, firmware builds exactly
+the BK commit `qmk-pin.json` names, so push that commit to the fork's
+`noah-userspace-contracts-dev` before pushing firmware that pins it: CI checks
+BK out at the pin, and the push hook refuses an unpublished pin.
 
 ## Diagnostics
 

@@ -50,6 +50,15 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --global --add safe.directory "$GITHUB_WORKSPACE/qmk_firmware"
 
+      - name: Require BK at the commit qmk-pin.json names
+        # A release tag on BK must be exactly the pinned commit; the pair build
+        # also refuses anything else.
+        run: |
+          pin="$(python3 -c 'import json; print(json.load(open("qmk-pin.json"))["commit"])')"
+          head="$(git -C qmk_firmware rev-parse HEAD)"
+          test "$head" = "$pin" || { echo "BK checkout is $head, but qmk-pin.json pins $pin" >&2; exit 1; }
+          echo "Built with bastardkb-qmk @ $pin" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Configure QMK CLI
         run: |
           qmk config user.qmk_home="$GITHUB_WORKSPACE/qmk_firmware"
@@ -81,6 +90,9 @@ jobs:
             OUTPUT_DIR="$GITHUB_WORKSPACE" \
             sh tools/build-release-firmware-pair.sh
 
+      - name: State the firmware contract
+        run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" sh tests/host/run_contract_probe.sh --output "$GITHUB_WORKSPACE/firmware-contract.json"
+
       - name: Upload firmware pair
         uses: actions/upload-artifact@v7
         with:
@@ -89,3 +101,4 @@ jobs:
           path: |
             bastardkb_charybdis_4x6_noah_left.uf2
             bastardkb_charybdis_4x6_noah_right.uf2
+            firmware-contract.json

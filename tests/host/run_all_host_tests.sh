@@ -94,3 +94,5 @@ sh "$ROOT/run_key_runtime_physical_ownership_integration_tests.sh"
 sh "$ROOT/run_feature_gate_compile_tests.sh"
 sh "$ROOT/run_rgb_validation_tests.sh"
 sh "$ROOT/run_rgb_layer_render_tests.sh"
+# The contract Ark is checked against must always build and state itself.
+sh "$ROOT/run_contract_probe.sh" >/dev/null

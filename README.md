@@ -13,7 +13,10 @@ On Noah's machine, the main checkouts are:
 - Firmware: `/Users/noah/dev/charybdis/charybdis-4x6`.
 - Ark: [NoahCLR/charybdis-ark](https://github.com/NoahCLR/charybdis-ark)
   (`/Users/noah/dev/charybdis/charybdis-ark` locally).
-- Upstream QMK build dependency: `/Users/noah/dev/charybdis/bastardkb-qmk`.
+- Upstream QMK build dependency: `/Users/noah/dev/charybdis/bastardkb-qmk`
+  ([NoahCLR/bastardkb-qmk](https://github.com/NoahCLR/bastardkb-qmk):
+  development on `noah-userspace-contracts-dev`, released line
+  `noah-userspace-contracts`, legacy upstream mirror `main`).
 - Work queue: `/Users/noah/dev/charybdis/charybdis-notes`, an Obsidian vault
   (private [NoahCLR/charybdis-notes](https://github.com/NoahCLR/charybdis-notes))
   holding notes, tasks, active plans and keyboard checks for all three
@@ -21,7 +24,7 @@ On Noah's machine, the main checkouts are:
 
 Branches: `dev` is the trunk. Each task branches from `dev` in its own
 worktree and is squash-landed back onto `dev` locally; `main` is the released
-line and only moves by a promotion merge of `dev`. Landed commits, promotions
+line and only moves when a release promotes `dev` into it. Landed commits, promotions
 and release tags carry trailers naming the Ark and QMK commits they were tested
 with, so `git log` answers what any build went with. A release is one date tag,
 `vYYYY.MM.DD`, on firmware, Ark and the QMK fork together. This repository is a GitHub
@@ -44,6 +47,38 @@ as before a release build. Host tests put QMK's directories on
 `C_INCLUDE_PATH`, so both compilers treat QMK as third-party system headers: a
 warning inside QMK cannot fail a build, while warnings in our own sources and
 test shims remain errors.
+
+### The BK pin
+
+The UF2 is this userspace and the BK fork compiled together, so this repository
+names the exact BK commit it builds with in `qmk-pin.json`: a published commit
+on the fork's `noah-userspace-contracts-dev`. Everything uses it:
+`tools/build-firmware-pair.sh` refuses a BK checkout that is not at the pin or
+has local changes (`NOAH_ALLOW_UNPINNED_QMK=1` allows it for a trial, printed
+as such), CI's `Host suite (GCC)` and the release build check BK out at the pin,
+and the release build refuses a BK tag that is not the pinned commit. A
+non-required CI job (also nightly) runs the host suite against the BK dev head
+and reports how far it is ahead of the pin. The vault's `verify` checks BK out
+at the pin itself, and its push hook refuses a push whose pin is not on the
+published BK dev branch.
+
+Re-pin with `sh tools/pin-qmk.sh [REV]` (default: the published BK dev head).
+It lists the BK commits since the old pin and what changed by area: hooks and
+core, keycode numbering, VIA, RGB matrix, the Charybdis board and submodules.
+Keycode, VIA or RGB changes need an Ark follow-up.
+
+### The firmware contract
+
+`sh tests/host/run_contract_probe.sh` states what this firmware promises a
+client: the exact Profile Wire capability pages the keyboard answers once its
+live-profile owner is up (versions, feature flags, capacities, the action-ABI
+digest and the compiled-default digest), the BK pin, and the SHA-256 of every
+fixture under `tests/fixtures`. It builds them from the code the keyboard
+runs: the VIA channel and the probe share `lib/compat/qmk_via_profile_capabilities.h`,
+the digests come from the compiled-defaults code the owner uses, and the bytes
+from the Profile Wire encoder. The host suite runs it; every release build
+attaches it as `firmware-contract.json`. Firmware only states the contract; the
+client's agreement check judges it.
 
 The pair builder isolates QMK CLI configuration for the compiler and its code
 generators, so saved `overlay_dir`/`qmk_home` values cannot redirect a task build
@@ -90,9 +125,11 @@ scattered runtime rewrites.
 > very opinionated firmware model.
 >
 > **Firmware note:** This userspace is updated for QMK `0.32.5` and builds
-> against my [`noah-userspace-contracts` firmware branch](https://github.com/NoahCLR/bastardkb-qmk/tree/noah-userspace-contracts)
-> rather than the older `bkb-master`-based setup. The default build needs
-> commit `f4f77a2aaf` or later on that branch. On top of QMK it carries three
+> against my [BastardKB QMK fork](https://github.com/NoahCLR/bastardkb-qmk)
+> rather than the older `bkb-master`-based setup, at exactly the commit
+> [`qmk-pin.json`](qmk-pin.json) names. Releases use the fork's released
+> [`noah-userspace-contracts`](https://github.com/NoahCLR/bastardkb-qmk/tree/noah-userspace-contracts)
+> branch at that commit, tagged with the same version as this repository. On top of QMK it carries three
 > small changes this userspace uses: the auto-mouse timer getters, for the
 > auto-mouse RGB timeout fade and split-synced progress; the split activity
 > hook, for activity coalescing; and the split frame CRC, which refuses
@@ -768,30 +805,27 @@ classifier, including combo-output behaviours as a required acceptance case.
 
 ### Protected main promotions
 
-GitHub `main` requires a pull request and two checks, including for
-administrators: `Promotion from dev` and `Host suite (GCC)`, the host suite run
-on the promotion PR itself. The check accepts only this repository's `dev`
-branch and a merge tree identical to that branch. Force pushes and deletion
-are blocked. GitHub PR merging uses merge commits; squash and rebase merging
-are disabled so the promoted development history stays reachable.
+`main` moves only by the shared vault's `release`, so every `main` is a
+released, tested stack. GitHub `main` requires a pull request and two checks,
+including for administrators: `Promotion from dev` and `Host suite (GCC)`, the
+host suite run on the promotion PR itself. `Promotion from dev` accepts only this
+repository's `dev` branch and a merge tree identical to that branch. Force pushes
+and deletion are blocked. GitHub PR merging uses merge commits; squash and rebase
+merging are disabled so the promoted development history stays reachable.
 
-The shared vault's `promote --push` publishes `dev`, opens or resumes its
-promotion PR, waits until GitHub reports every required check passed, and
-merges through GitHub. It first
-waits for GitHub CI on that `dev` commit and refuses to promote when any job
-failed, never finished, or none ran. It records
-the verified stack in the merge message and reconciles local `main` to GitHub's
-merge identity. Direct `main` pushes are rejected by the local hook as well.
-Normal task development still lands locally onto `dev`.
-
-`release VERSION` verifies a provisional local stack without freezing tags.
-`release VERSION --push` first publishes the promotion PRs, then tests and tags
-the resulting GitHub commits. Retries after that checkpoint retain those exact
-commits. An old checkpoint referencing unpublished local promotion commits is
-rejected rather than silently retagged. Publishing requires the promotion
-workflow to have been landed and pushed to `dev` first.
+`release VERSION` checks and tests without publishing: its preflight requires
+the BK pin in `qmk-pin.json` to be on the BK fork's development branch and not
+behind its released line, and its stack test runs exactly what `main` will hold
+(this repository's `dev` at its BK pin). `release VERSION --push` then promotes
+the BK fork's released line (fast-forwarded to the pin), this repository and the
+client in that order: it publishes `dev`, opens or resumes the promotion PR,
+waits until GitHub reports every required check passed, merges, and reconciles
+local `main` to GitHub's merge identity. The merge message carries the `dev`
+tip's stack and verification trailers. Retries resume the frozen preparation.
+Direct `main` pushes are rejected by the local hook as well. Normal task
+development still lands locally onto `dev`.
 
 `dev` cannot be force-pushed or deleted on GitHub, and published `v*` release
 tags cannot be moved or deleted (rulesets without bypass). Merge commits take
 the PR's title and body, so a merge from the GitHub page carries the same
-verification trailers as one made by `promote --push`.
+verification trailers as one made by `release`.

@@ -1,15 +1,18 @@
 name: Firmware host suite
 
-# Development runs the host suite with macOS clang; the release build runs it
-# with GCC in the QMK container. Running it here on every dev push and pull
-# request catches compiler differences long before a release tag, and gives
-# promote --push a dev result to require.
+# Development runs the host suite with macOS clang; this runs it with GCC in the
+# QMK container on every dev push and pull request, against exactly the BK
+# commit qmk-pin.json names. `Host suite (GCC)` is required on main. The early
+# warning tests the BK dev head (also nightly), so a pending re-pin is visible;
+# it never blocks.
 on:
   push:
     branches: [dev]
   pull_request:
     branches: [dev, main]
   workflow_dispatch:
+  schedule:
+    - cron: "41 3 * * *"
 
 permissions:
   contents: read
@@ -17,6 +20,7 @@ permissions:
 jobs:
   host:
     name: Host suite (GCC)
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8
@@ -27,12 +31,16 @@ jobs:
           persist-credentials: false
           submodules: recursive
 
-      - name: Checkout QMK fork trunk
+      - name: Read the pinned BK commit
+        id: pin
+        run: python3 -c 'import json; print("commit=" + json.load(open("qmk-pin.json"))["commit"])' >> "$GITHUB_OUTPUT"
+
+      - name: Checkout BK at the pin
         uses: actions/checkout@v6
         with:
           path: qmk_firmware
           repository: NoahCLR/bastardkb-qmk
-          ref: noah-userspace-contracts
+          ref: ${{ steps.pin.outputs.commit }}
           persist-credentials: false
           submodules: recursive
 
@@ -52,4 +60,53 @@ jobs:
           node-version: '24'
 
       - name: Run firmware host suite
+        run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" sh tests/host/run_all_host_tests.sh
+
+  bk-head:
+    # Early warning, not required: firmware against the BK dev branch as it is
+    # now. Red means BK moved in a way firmware must follow before re-pinning.
+    name: Host suite with the BK dev head (early warning)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8
+    steps:
+      - name: Checkout userspace
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Checkout the BK dev head
+        uses: actions/checkout@v6
+        with:
+          path: qmk_firmware
+          repository: NoahCLR/bastardkb-qmk
+          ref: noah-userspace-contracts-dev
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Configure Git safe directories and QMK CLI
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/qmk_firmware"
+          qmk config user.qmk_home="$GITHUB_WORKSPACE/qmk_firmware"
+          qmk config user.overlay_dir="$GITHUB_WORKSPACE"
+
+      - name: Report how far the BK dev head is ahead of the pin
+        run: |
+          pin="$(python3 -c 'import json; print(json.load(open("qmk-pin.json"))["commit"])')"
+          ahead="$(git -C qmk_firmware rev-list --count "$pin..HEAD")"
+          echo "BK dev head is $ahead commit(s) ahead of the pin $pin." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install ripgrep for host-suite guard checks
+        run: apt-get update -qq && apt-get install -y -qq ripgrep
+
+      - name: Install Node for diagnostics host tests
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Run firmware host suite against the BK dev head
         run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" sh tests/host/run_all_host_tests.sh

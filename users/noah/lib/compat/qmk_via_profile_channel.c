@@ -30,71 +30,10 @@
 #    include "../profile/storage/profile_store_runtime.h"
 #    include "../state/diagnostics/runtime_diag.h"
 
-#    ifndef VIA_FIRMWARE_VERSION
-#        define VIA_FIRMWARE_VERSION 0u
-#    endif
-
-#    ifdef SPLIT_KEYBOARD
-#        define NOAH_PROFILE_SPLIT_CAPABILITY NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD
-#    else
-#        define NOAH_PROFILE_SPLIT_CAPABILITY 0u
-#    endif
-
-#    ifdef RGB_MATRIX_ENABLE
-#        define NOAH_PROFILE_LED_COUNT RGB_MATRIX_LED_COUNT
-#    else
-#        define NOAH_PROFILE_LED_COUNT 0u
-#    endif
-
-#    if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(NOAH_PD_PROFILE_ENABLE)
-#        define NOAH_PD_SOURCE_CAPABILITY NOAH_PROFILE_FEATURE_LEGACY_PD_SOURCE
-#    else
-#        define NOAH_PD_SOURCE_CAPABILITY 0u
-#    endif
-
-#    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-#        define NOAH_PROFILE_MUTATION_CAPABILITIES (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION | NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY)
-#        define NOAH_PROFILE_MUTATION_CHUNK_MAX NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX
-#    else
-#        define NOAH_PROFILE_MUTATION_CAPABILITIES 0u
-#        define NOAH_PROFILE_MUTATION_CHUNK_MAX 0u
-#    endif
+#    include "qmk_via_profile_capabilities.h"
 
 static noah_profile_wire_v1_read_service_t noah_profile_wire_v1_read_service = {
-    .capabilities =
-        {
-            .protocol_major = 1u,
-            .protocol_minor = 0u,
-            .schema_major   = NOAH_PROFILE_SCHEMA_MAJOR,
-            .schema_minor   = 0u,
-            // Stage 01 is intentionally read-only. Candidate capacity and domain
-            // support remain zero until the corresponding decoders and activation
-            // paths exist; the frozen schema ceilings below are declaration
-            // metadata, not a claim that writes are accepted.
-            .candidate_chunk_max          = 0u,
-            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS | NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING | NOAH_PROFILE_FEATURE_OWNED_TAPPING,
-            .action_abi_digest            = 0u,
-            .firmware_version             = VIA_FIRMWARE_VERSION,
-            .compiled_default_digest      = 0u,
-            .compiled_layer_count         = DYNAMIC_KEYMAP_LAYER_COUNT,
-            .max_logical_layers           = NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS,
-            .max_behavior_rows            = NOAH_PROFILE_WIRE_V1_MAX_BEHAVIOR_ROWS,
-            .max_tap_steps_per_behavior   = NOAH_PROFILE_WIRE_V1_MAX_TAP_STEPS_PER_BEHAVIOR,
-            .max_populated_behavior_steps = NOAH_PROFILE_WIRE_V1_MAX_POPULATED_BEHAVIOR_STEPS,
-            .max_combos                   = NOAH_PROFILE_WIRE_V1_MAX_COMBOS,
-            .max_keys_per_combo           = NOAH_PROFILE_WIRE_V1_MAX_KEYS_PER_COMBO,
-            .max_reusable_rgb_groups      = NOAH_PROFILE_WIRE_V1_MAX_REUSABLE_RGB_GROUPS,
-            .max_rgb_stage_group_rows     = NOAH_PROFILE_WIRE_V1_MAX_RGB_STAGE_GROUP_ROWS,
-            .physical_led_count           = NOAH_PROFILE_LED_COUNT,
-            .led_bitmap_size              = NOAH_PROFILE_WIRE_V1_LED_BITMAP_SIZE,
-            .custom_key_slots             = NOAH_PROFILE_WIRE_V1_MAX_CUSTOM_KEYS,
-            .via_macro_slots              = DYNAMIC_KEYMAP_MACRO_COUNT,
-            .max_profile_payload          = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,
-            .profile_slot_payload         = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,
-            .profile_slot_size            = NOAH_PROFILE_STORAGE_SLOT_A_SIZE,
-            .via_macro_bytes              = NOAH_PROFILE_STORAGE_VIA_MACRO_SIZE,
-            .supported_domain_mask        = 0u,
-        },
+    .capabilities = NOAH_PROFILE_CHANNEL_BASE_CAPABILITIES,
     .status =
         {
             .state_flags = NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT | NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE,
@@ -111,11 +50,7 @@ static void noah_profile_channel_refresh_owner_capabilities(const noah_profile_o
     if (!owner) {
         return;
     }
-    noah_profile_wire_v1_read_service.capabilities.feature_flags           = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES | NOAH_PD_SOURCE_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS | NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING | NOAH_PROFILE_FEATURE_OWNED_TAPPING;
-    noah_profile_wire_v1_read_service.capabilities.action_abi_digest       = owner->action_abi_digest;
-    noah_profile_wire_v1_read_service.capabilities.compiled_default_digest = owner->compiled_default_digest;
-    noah_profile_wire_v1_read_service.capabilities.supported_domain_mask   = owner->supported_domain_mask;
-    noah_profile_wire_v1_read_service.capabilities.candidate_chunk_max     = NOAH_PROFILE_MUTATION_CHUNK_MAX;
+    noah_profile_channel_apply_owner_capabilities(&noah_profile_wire_v1_read_service.capabilities, owner->action_abi_digest, owner->compiled_default_digest, owner->supported_domain_mask);
 }
 
 static void noah_profile_channel_latch_owner_status(const noah_profile_owner_status_t *owner) {
