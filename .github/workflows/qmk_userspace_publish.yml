@@ -27,6 +27,7 @@ jobs:
         run: |
           test -s bastardkb_charybdis_4x6_noah_left.uf2
           test -s bastardkb_charybdis_4x6_noah_right.uf2
+          test -s firmware-contract.json
 
       - name: Attach pair to draft release
         # Third-party action with write access: pinned to a reviewed commit.
@@ -41,3 +42,4 @@ jobs:
           files: |
             bastardkb_charybdis_4x6_noah_left.uf2
             bastardkb_charybdis_4x6_noah_right.uf2
+            firmware-contract.json

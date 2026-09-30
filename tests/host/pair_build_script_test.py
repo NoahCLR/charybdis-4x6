@@ -16,6 +16,17 @@ class PairBuild(unittest.TestCase):
             for folder in (source / 'tools', qmk, fakebin):
                 folder.mkdir(parents=True)
             shutil.copyfile(Path(__file__).resolve().parents[2] / 'tools/build-firmware-pair.sh', source / 'tools/build-firmware-pair.sh')
+            # BK is a real checkout at the commit qmk-pin.json names.
+            git = lambda root, *args: subprocess.run(['git', '-C', root, '-c', 'user.name=Test',
+                                                      '-c', 'user.email=test@example.invalid', *args],
+                                                     check=True, capture_output=True, text=True).stdout.strip()
+            subprocess.run(['git', 'init', '-q', qmk], check=True)
+            (qmk / '.gitignore').write_text('*.uf2\n.build/\n')
+            git(qmk, 'add', '.gitignore')
+            git(qmk, 'commit', '-qm', 'bk')
+            pinned = git(qmk, 'rev-parse', 'HEAD')
+            (source / 'qmk-pin.json').write_text(json.dumps({'repository': 'https://github.com/NoahCLR/bastardkb-qmk',
+                                                            'commit': pinned}))
             subprocess.run(['git', 'init', '-q', '-b', 'test-pair', source], check=True)
             subprocess.run(['git', '-C', source, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
                             'commit', '--allow-empty', '-qm', 'fixture'], check=True)
@@ -50,6 +61,22 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
                        BUILD_ROOT=str(base / 'builds'), PAIR_TEST_LOG=str(base / 'calls'))
             subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base, env=env, check=True)
             calls = [json.loads(line) for line in (base / 'calls').read_text().splitlines()]
+            # A BK that is not the pin (moved, or locally changed) is refused,
+            # unless explicitly allowed for a trial.
+            (qmk / 'hook.c').write_text('void hook(void) {}\n')
+            refused = subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base, env=env,
+                                     capture_output=True, text=True)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn('qmk-pin.json pins ' + pinned, refused.stderr)
+            git(qmk, 'add', 'hook.c')
+            git(qmk, 'commit', '-qm', 'moved on')
+            refused = subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base, env=env,
+                                     capture_output=True, text=True)
+            self.assertNotEqual(refused.returncode, 0)
+            trial = subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base,
+                                   env=dict(env, NOAH_ALLOW_UNPINNED_QMK='1'), capture_output=True, text=True)
+            self.assertEqual(trial.returncode, 0, trial.stderr)
+            self.assertIn('TRIAL: building against BK', trial.stderr)
             self.assertEqual(len(calls), 2)
             for half in ('right', 'left'):
                 artifact = base / 'builds/test-pair' / f'1_charybdis_{half}.uf2'
