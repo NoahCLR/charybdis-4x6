@@ -13,7 +13,7 @@ Firmware owns the device: its runtime, its stored profile, the wire and split
 protocols, and the specs under `docs/architecture/`. Charybdis Ark owns the app,
 the product goal, the product's status and the app's decisions, in its own
 repository's `docs/PRODUCT_GOAL.md` and `docs/LIVE_EDIT_APP_DIRECTION.md` (checkout
-paths are in the [local workspace map](../README.md#local-repositories-and-worktrees)).
+paths are in the [local workspace map](DEVELOPMENT.md#local-repositories-and-worktrees)).
 No firmware task needs that checkout.
 
 Each decision has one home. Both direction documents keep every D-L heading, so
@@ -641,7 +641,7 @@ submodule, and code enforces it rather than habit: the pair build refuses any
 other BK, CI and the release build check BK out at the pin, and the push hook
 refuses an unpublished pin. A non-required job tests the BK dev head as an
 early warning. Re-pinning (`tools/pin-qmk.sh`) is a deliberate firmware change
-that reports what moved in BK ([the BK pin](../README.md#the-bk-pin)).
+that reports what moved in BK ([the BK pin](DEVELOPMENT.md#the-bk-pin)).
 
 Firmware and its client agree by contract, not by commit: firmware states the
 capability pages its keyboard answers, its BK pin and its fixture hashes
