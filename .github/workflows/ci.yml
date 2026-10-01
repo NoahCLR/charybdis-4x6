@@ -95,17 +95,20 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git config --global --add safe.directory "$GITHUB_WORKSPACE/qmk_firmware"
 
+      # The pair stays inside the workspace and is uploaded by relative paths:
+      # in a container job, ${{ runner.temp }} names the host's path, not the
+      # container's, and the upload would miss files.
       - name: Build the flashable pair
         run: |
-          QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" OUTPUT_DIR="$RUNNER_TEMP/pair" \
+          QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" OUTPUT_DIR="$GITHUB_WORKSPACE/release-pair" \
             sh tools/build-release-firmware-pair.sh
 
       - name: State the firmware contract
-        run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" sh tests/host/run_contract_probe.sh --output "$RUNNER_TEMP/pair/firmware-contract.json"
+        run: QMK_ROOT="$GITHUB_WORKSPACE/qmk_firmware" sh tests/host/run_contract_probe.sh --output "$GITHUB_WORKSPACE/release-pair/firmware-contract.json"
 
       - name: Record what was built
         run: |
-          cd "$RUNNER_TEMP/pair"
+          cd release-pair
           sha256sum bastardkb_charybdis_4x6_noah_left.uf2 bastardkb_charybdis_4x6_noah_right.uf2 > SHA256SUMS
           {
             echo "Built at BK ${{ steps.pin.outputs.commit }} with $(arm-none-eabi-gcc --version | head -n 1)"
@@ -121,10 +124,10 @@ jobs:
           if-no-files-found: error
           retention-days: 90
           path: |
-            ${{ runner.temp }}/pair/bastardkb_charybdis_4x6_noah_left.uf2
-            ${{ runner.temp }}/pair/bastardkb_charybdis_4x6_noah_right.uf2
-            ${{ runner.temp }}/pair/firmware-contract.json
-            ${{ runner.temp }}/pair/SHA256SUMS
+            release-pair/bastardkb_charybdis_4x6_noah_left.uf2
+            release-pair/bastardkb_charybdis_4x6_noah_right.uf2
+            release-pair/firmware-contract.json
+            release-pair/SHA256SUMS
 
   agreement:
     # Ark judges this firmware's contract with its own code (D-F06): against
