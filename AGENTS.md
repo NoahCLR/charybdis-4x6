@@ -2,6 +2,19 @@
 
 Use this repo like production firmware, not a scratch keymap.
 
+## Every change follows the vault's rules
+
+Every change in this repository, with or without a task from the work queue,
+follows the work-queue vault's `AGENTS.md`
+(`/Users/noah/dev/charybdis/charybdis-notes/AGENTS.md`), section **Branches,
+landing and pushing**. Read it before your first change in a session. It covers
+your own worktree and its `<type>/<slug>` branch (rename a branch the harness
+made), `verify`, a draft pull request with `open-pr` linked to the thread (for
+firmware and BK, with the pair to try), landing only on Noah's "land it" with
+`land`, `release` as the only way `main` moves, and saying what each of Noah's
+commands will do before asking for it. The tools enforce part of it; the rest
+is yours to follow. This file still governs the code itself.
+
 ## Current Goal
 
 **Build first-grade control software for this keyboard.** A person connects a
