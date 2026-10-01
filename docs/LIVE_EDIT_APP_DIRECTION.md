@@ -665,3 +665,20 @@ machine. Each pair has a note with its inputs, compiler and SHA-256, so a
 published pair can be matched to a local one. Before this, local pairs used
 Homebrew GCC 8.5.0 and releases GCC 14.2.1; the memory effect is recorded in
 [memory budgets](architecture/memory-budgets.md#release-compiler-gcc-1421--2026-10-01).
+
+## D-F06 — CI runs for releases; the release gate may run Ark's agreement check
+
+Development is verified locally (the work-queue vault's `verify`), so CI does not
+run on `dev` or on pull requests into it. A release's `dev` → `main` pull request
+runs everything `main` requires: `Promotion from dev`, `Host suite (GCC)`,
+`Pair build` and `Agreement with Ark main` (`.github/workflows/ci.yml`). Nightly
+runs check `dev` and BK drift and never block. `Pair build` builds both halves in
+the release image at the pin (D-F05); the release publishes exactly those files
+with `firmware-contract.json`, so nothing is rebuilt at the tag.
+
+Firmware code, tests and tools still never read the app. The one exception is
+that release gate: `Agreement with Ark main` runs the app's own agreement check
+against this firmware, against Ark `main` (Ark `dev` when the release marker says
+the release is joint), so `main` cannot move to a contract the released app does
+not speak, not even through a merge on the GitHub page. The independence test
+exempts that one workflow and nothing else.

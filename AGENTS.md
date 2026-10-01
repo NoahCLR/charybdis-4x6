@@ -2,6 +2,19 @@
 
 Use this repo like production firmware, not a scratch keymap.
 
+## Every change follows the vault's rules
+
+Every change in this repository, with or without a task from the work queue,
+follows the work-queue vault's `AGENTS.md`
+(`/Users/noah/dev/charybdis/charybdis-notes/AGENTS.md`), section **Branches,
+landing and pushing**. Read it before your first change in a session. It covers
+your own worktree and its `<type>/<slug>` branch (rename a branch the harness
+made), `verify`, a draft pull request with `open-pr` linked to the thread (for
+firmware and BK, with the pair to try), landing only on Noah's "land it" with
+`land`, `release` as the only way `main` moves, and saying what each of Noah's
+commands will do before asking for it. The tools enforce part of it; the rest
+is yours to follow. This file still governs the code itself.
+
 ## Current Goal
 
 **Build first-grade control software for this keyboard.** A person connects a
@@ -44,7 +57,7 @@ adoption and broad hardware acceptance — is under "Current Firmware Status" in
 
 - Start every task with `git status --short`.
 - Assume the worktree may already be dirty. Never revert or overwrite unrelated user changes.
-- Branch from `dev`, work in your own worktree and verify with the vault's `_agents/bin/verify`. Open a pull request into `dev` with the vault's `_agents/bin/open-pr`; when Noah says so, the vault's `_agents/bin/land` merges it on GitHub (squash) for exactly the verified commit, without waiting for CI. `dev` takes changes only through pull requests and is never pushed directly. `main` moves only by the vault's `_agents/bin/release`: a merge commit whose tree is exactly `dev`'s, so every `dev` commit stays reachable. Every landed commit, promotion and release tag carries Git trailers naming the Ark and QMK commits it was tested with (`Stack-Ark`, `Stack-QMK`, `Ark-Pins`, `Stack-Tested`); the vault's tools write them, never edit them by hand. Find the last tested combination with `git log -1 --format='%h %s%n%(trailers)' dev`. Never push or open a pull request anywhere but `NoahCLR/charybdis-4x6`: this repo is a fork of Bastard Keyboards' userspace, and nothing goes upstream. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees).
+- Branch from `dev`, work in your own worktree and verify with the vault's `_agents/bin/verify`. Name the branch `<type>/<slug>` (`fix/`, `feat/`, `refactor/`, `docs/`, `chore/`; the work-queue vault's `AGENTS.md`, "Branch names"); `open-pr` and `land` refuse any other name. Open a pull request into `dev` with the vault's `_agents/bin/open-pr`; when Noah says so, the vault's `_agents/bin/land` merges it on GitHub (squash) for exactly the verified commit, without waiting for CI. `dev` takes changes only through pull requests and is never pushed directly. `main` moves only by the vault's `_agents/bin/release`: a merge commit whose tree is exactly `dev`'s, so every `dev` commit stays reachable. Each landed commit's message ends with what verify ran, and it was tested against the BK commit its own `qmk-pin.json` names. Never push or open a pull request anywhere but `NoahCLR/charybdis-4x6`: this repo is a fork of Bastard Keyboards' userspace, and nothing goes upstream. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees).
 - Work in the firmware worktree assigned to this task, not automatically in the main checkout. See the local paths and worktree discovery in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees).
 - The main checkout belongs to a multi-root VS Code workspace with QMK, Ark and build artifacts. Worktrees may live elsewhere; do not assume its sibling layout applies.
 - Treat `charybdis-4x6` as the default write target. Do not edit sibling workspace folders unless the task explicitly requires it and the user wants that scope.
@@ -180,7 +193,8 @@ format, fixture bytes or a contract spec, or moves a source or probe Ark's
 integration runners compile, name the Ark follow-up in your handoff (see
 [what Ark consumes](docs/architecture/ark-compatibility.md#what-ark-consumes)).
 `run_firmware_client_independence_tests.sh` fails if any tracked non-doc file
-names the app. A firmware pull request lands only once the BK commit
+names the app; the one exemption is CI's release gate, `Agreement with Ark main`
+in `.github/workflows/ci.yml` (D-F06). A firmware pull request lands only once the BK commit
 `qmk-pin.json` names is on BK's published trunk (`land` refuses otherwise), and a
 squash merge gives the landed commit a new hash, so Ark pins firmware commits
 taken from `dev` after landing (see
@@ -189,8 +203,9 @@ taken from `dev` after landing (see
 
 ### Publishing protected main
 
-`main` publication requires a same-repository `dev` → `main` PR with the
-`Promotion from dev` and `Host suite (GCC)` checks, including for administrators. Only the shared
-`release --push` opens it, and only when a release is requested; never push `main`
-directly or bypass protection. The command tests the stack first, then accepts
-GitHub's resulting merge identity and tags the promoted commit.
+`main` publication requires a same-repository `dev` → `main` pull request with
+the `Promotion from dev`, `Host suite (GCC)`, `Pair build` and
+`Agreement with Ark main` checks, including for administrators (D-F06). Only the
+shared vault's `release` opens it and only `release --publish` merges it, when
+Noah asks; never push `main` directly or bypass protection. CI runs only on
+those pull requests and nightly, never on `dev`.

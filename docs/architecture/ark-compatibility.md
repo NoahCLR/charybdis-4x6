@@ -64,14 +64,14 @@ test or diagnostic tool resolves code or dependencies through the app.
 
 ## Release verification
 
-A release is the only way `main` moves, in firmware, Ark and the BK fork's
-released line together. The shared release command tests the exact stack
-`main` will hold (firmware `dev`, Ark `dev`, BK at `qmk-pin.json`) and requires
-Ark to agree with this firmware's contract before promoting anything. Firmware
-release CI runs this repository's full host suite at the pinned BK commit,
-builds both physical-half images there, states the contract
-(`firmware-contract.json`) and uploads them to a draft release; the command
-waits for both repositories' tagged CI before publishing, with the BK pin and
-the agreement table in the notes. Firmware's own build and host runners remain
-independent of the client. These gates do not substitute for the interruption
-and keyboard acceptance procedures.
+A release is the only way `main` moves. Firmware (with BK at its pin) and Ark
+release separately, and together when a change touches the contract between
+them. A firmware release's `dev` → `main` pull request runs the full host suite
+at the pinned BK commit, builds both physical-half images there (`Pair build`)
+and runs Ark's agreement check against Ark `main` (Ark `dev` in a joint
+release); the release command re-checks agreement against the other `main` as
+it is when it merges. The release publishes that pull request's pair and
+`firmware-contract.json`, with their SHA-256 in the notes, and fast-forwards and
+tags the BK fork's released line at the pin. Firmware's own build and host
+runners remain independent of the client. These gates do not substitute for
+the interruption and keyboard acceptance procedures.
