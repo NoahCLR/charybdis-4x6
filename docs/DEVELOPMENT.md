@@ -55,18 +55,18 @@ Ark checkout; Ark owns the optional cross-repository integration tests.
 
 ## Tests and CI
 
-Release CI runs the complete host suite before building the side-specific pair,
-against the matching QMK tag. Both UF2 files are attached to a draft release;
-the shared vault's `release VERSION --push` makes the releases public only after
-firmware and Ark CI pass and both firmware assets are present. If publication
-is interrupted, rerun the same command: it resumes the saved release commits,
-even if `dev` has since advanced. Direct tag pushes leave the release in draft. The
-third-party action that attaches the pair runs with write access, so it is pinned
-to a reviewed commit hash; move the pin deliberately, after reading the new code.
+CI runs for releases, not for development (D-F06). A release's `dev` → `main`
+pull request runs the complete host suite with GCC in the QMK container, builds
+the side-specific pair in the release image at the pinned BK commit
+(`Pair build`, kept as the `firmware-pair` artifact with its SHA-256) and checks
+agreement with the Ark release it will sit next to. The shared vault's
+`release --publish` publishes exactly that pair; nothing is rebuilt at the tag.
+If publication is interrupted, rerun the same command: it resumes. The same
+workflow (`.github/workflows/ci.yml`) also runs nightly on `dev`, never
+blocking, and `Pair build` can be started on demand to build any commit.
 
 Development runs the host suite with macOS clang; CI runs it with GCC in the
-QMK container, on every `dev` push and pull request (`host_tests.yml`) as well
-as before a release build. Host tests put QMK's directories on
+QMK container on the promotion pull request and nightly. Host tests put QMK's directories on
 `C_INCLUDE_PATH`, so both compilers treat QMK as third-party system headers: a
 warning inside QMK cannot fail a build, while warnings in our own sources and
 test shims remain errors.
@@ -88,10 +88,9 @@ names the exact BK commit it builds with in `qmk-pin.json`: a published commit
 on the fork's `noah-userspace-contracts-dev`. Everything uses it:
 `tools/build-firmware-pair.sh` refuses a BK checkout that is not at the pin or
 has local changes (`NOAH_ALLOW_UNPINNED_QMK=1` allows it for a trial, printed
-as such), CI's `Host suite (GCC)` and the release build check BK out at the pin,
-and the release build refuses a BK tag that is not the pinned commit. A
-non-required CI job (also nightly) runs the host suite against the BK dev head
-and reports how far it is ahead of the pin. The vault's `verify` checks BK out
+as such), and CI's `Host suite (GCC)` and `Pair build` check BK out at the pin.
+A non-required nightly job runs the host suite against the BK dev head and
+reports how far it is ahead of the pin. The vault's `verify` checks BK out
 at the pin itself, and its `land` refuses a pull request whose pin is not on
 the published BK dev branch.
 
@@ -114,8 +113,8 @@ digest and the compiled-default digest), the BK pin, and the SHA-256 of every
 fixture under `tests/fixtures`. It builds them from the code the keyboard
 runs: the VIA channel and the probe share `lib/compat/qmk_via_profile_capabilities.h`,
 the digests come from the compiled-defaults code the owner uses, and the bytes
-from the Profile Wire encoder. The host suite runs it; every release build
-attaches it as `firmware-contract.json`. Firmware only states the contract; the
+from the Profile Wire encoder. The host suite runs it; a release's `Pair build`
+produces it as `firmware-contract.json`, which the release publishes. Firmware only states the contract; the
 client's agreement check judges it.
 
 ## Charybdis Ark
@@ -189,27 +188,31 @@ the work-queue vault as the plan *Gesture timing and combo arbitration*.
 ## Protected main promotions
 
 `main` moves only by the shared vault's `release`, so every `main` is a
-released, tested stack. GitHub `main` requires a pull request and two checks,
-including for administrators: `Promotion from dev` and `Host suite (GCC)`, the
-host suite run on the promotion PR itself. `Promotion from dev` accepts only this
-repository's `dev` branch and a merge tree identical to that branch. Force pushes
-and deletion are blocked. GitHub PR merging uses merge commits; squash and rebase
-merging are disabled so the promoted development history stays reachable.
+released, tested stack. GitHub `main` requires a pull request and four checks,
+including for administrators, all run on the promotion pull request itself
+(D-F06): `Promotion from dev`, `Host suite (GCC)`, `Pair build` and
+`Agreement with Ark main`. `Promotion from dev` accepts only this repository's
+`dev` branch and a merge tree identical to that branch. Force pushes and
+deletion are blocked. Promotions merge as merge commits, so the promoted
+development history stays reachable; task pull requests into `dev` are squashed.
 
-`release VERSION` checks and tests without publishing: its preflight requires
-the BK pin in `qmk-pin.json` to be on the BK fork's development branch and not
-behind its released line, and its stack test runs exactly what `main` will hold
-(this repository's `dev` at its BK pin). `release VERSION --push` then promotes
-the BK fork's released line (fast-forwarded to the pin), this repository and the
-client in that order: it publishes `dev`, opens or resumes the promotion PR,
-waits until GitHub reports every required check passed, merges, and reconciles
-local `main` to GitHub's merge identity. The merge message carries the `dev`
-tip's stack and verification trailers. Retries resume the frozen preparation.
-Direct `main` pushes are rejected by the local hook as well. Normal task
-development reaches `dev` through task pull requests.
+`release` prepares a release: it decides from Ark's agreement check whether
+this repository releases alone, before Ark or together with it, requires the BK
+pin in `qmk-pin.json` to be on the BK fork's development branch and not behind
+its released line, drafts the notes and opens the `dev` → `main` pull request.
+`release --publish` waits for the required checks, re-checks agreement against
+Ark's `main` as it is then, fast-forwards and tags the BK fork's released line
+at the pin, merges the pull request for exactly the prepared `dev` head, tags it
+and publishes the GitHub release with the pull request's `Pair build` files and
+their SHA-256. Direct `main` pushes are rejected by the local hook as well.
+Normal task development reaches `dev` through task pull requests.
+
+CI does not run on `dev` or on pull requests into it: local verification is the
+gate there. Nightly, never blocking, it runs the host suite on `dev` and against
+the BK dev head. Scheduled runs start from `main`, so they check out `dev`
+explicitly and take effect once a release has promoted the workflow.
 
 `dev` cannot be force-pushed or deleted on GitHub and accepts changes only
-through pull requests, and published `v*` release
-tags cannot be moved or deleted (rulesets without bypass). Merge commits take
-the PR's title and body, so a merge from the GitHub page carries the same
-verification trailers as one made by `release`.
+through pull requests, and published `v*` release tags cannot be moved or
+deleted (rulesets without bypass). Merge commits take the pull request's title
+and body, so a release's notes are its promotion's commit message.

@@ -17,7 +17,10 @@ for record in manifest['files']:
 # The app is Charybdis Ark; its former name stays forbidden too.
 forbidden = ['charybdis-ark', 'CHARYBDIS_ARK_ROOT', 'charybdis-live', 'CHARYBDIS_LIVE_ROOT', 'noah_host_live_env', 'requireLive']
 prose = {'.md', '.txt'}
-exempt = {'tests/host/firmware_client_independence_test.py'}
+# CI's release gate is the one place that may name the app (D-F06): its
+# `Agreement with Ark main` job runs the app's own agreement check against this
+# firmware before main moves. Firmware code, tests and tools still never read it.
+exempt = {'tests/host/firmware_client_independence_test.py', '.github/workflows/ci.yml'}
 tracked = subprocess.run(['git', '-C', str(root), 'ls-files', '-z'], check=True, capture_output=True).stdout
 checked = 0
 for name in tracked.decode().split('\0'):
