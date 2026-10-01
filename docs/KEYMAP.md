@@ -3,8 +3,8 @@
 This is the prose profile doc for the current `noah` Charybdis 4x6 keymap.
 
 If you want the fastest visual snapshot, start with
-[KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md). The top-level [README](../README.md)
-and [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) explain what the shared
+[KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md). The top-level [README](../README.md),
+the [firmware guide](./GUIDE.md) and [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) explain what the shared
 userspace can do; this file explains how the current profile uses those
 capabilities.
 

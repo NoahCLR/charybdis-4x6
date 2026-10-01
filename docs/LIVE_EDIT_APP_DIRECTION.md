@@ -13,7 +13,7 @@ Firmware owns the device: its runtime, its stored profile, the wire and split
 protocols, and the specs under `docs/architecture/`. Charybdis Ark owns the app,
 the product goal, the product's status and the app's decisions, in its own
 repository's `docs/PRODUCT_GOAL.md` and `docs/LIVE_EDIT_APP_DIRECTION.md` (checkout
-paths are in the [local workspace map](../README.md#local-repositories-and-worktrees)).
+paths are in the [local workspace map](DEVELOPMENT.md#local-repositories-and-worktrees)).
 No firmware task needs that checkout.
 
 Each decision has one home. Both direction documents keep every D-L heading, so
@@ -131,7 +131,7 @@ ordinary firmware, not an engineering artifact. The owner needs a provisioned
 `NOAH_PHYSICAL_HALF`, since durable profile origin identity is side-specific,
 so the generic half-less build reports that at configure time and builds
 without the owner rather than failing (failing would break the plain
-`qmk compile` in the README). The firmware you flash is the side-specific pair
+`qmk compile` in the firmware guide). The firmware you flash is the side-specific pair
 from `tools/build-firmware-pair.sh`; a build that sets only
 `FORCE_MASTER`/`FORCE_SLAVE` silently omits the owner. The opt-out stays as the
 lever for comparing ordinary against live behaviour on identical source.
@@ -631,3 +631,37 @@ through the fork's `process_record_admit_user()` hook, and replayed through
 ([contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)).
 It joins unreleased bit 18. Optional QMK modes (permissive hold, hold on other
 key press) are not reproduced.
+
+## D-F04 — Firmware pins its BK commit; `main` is a released, agreeing stack
+
+The UF2 is this userspace and the BK fork compiled together, so firmware names
+the exact BK commit it builds with in a committed `qmk-pin.json`, a published
+commit on the fork's `noah-userspace-contracts-dev`. It is a plain file, not a
+submodule, and code enforces it rather than habit: the pair build refuses any
+other BK, CI and the release build check BK out at the pin, and `land` refuses
+a pull request whose pin is unpublished. A non-required job tests the BK dev head as an
+early warning. Re-pinning (`tools/pin-qmk.sh`) is a deliberate firmware change
+that reports what moved in BK ([the BK pin](DEVELOPMENT.md#the-bk-pin)).
+
+Firmware and its client agree by contract, not by commit: firmware states the
+capability pages its keyboard answers, its BK pin and its fixture hashes
+(`tests/host/run_contract_probe.sh`), and the client judges them with its own
+runtime code. `dev` is the development line and tests against its own pins.
+`main` moves only by a release, which promotes the BK released line, firmware
+and the client together after testing that exact stack and their agreement, so
+every `main` has a tag, both halves, the BK pin and the agreement table
+([release verification](architecture/ark-compatibility.md#release-verification)).
+
+## D-F05 — The flashed pair and the released pair come from one compiler
+
+The firmware Noah flashes and the firmware users download are built by the same
+compiler: `tools/build-firmware-pair.sh` always compiles in the image
+`tools/build-image` names, which CI also builds in, running itself there with
+Docker when it is started outside it, and never falling back to the host's
+compiler. The build is reproducible: QMK's version stamps are fixed
+(`SKIP_VERSION`, so the `QK_VERSION` keycode prints placeholders) and source
+paths are mapped, so one userspace commit and BK pin give the same bytes on any
+machine. Each pair has a note with its inputs, compiler and SHA-256, so a
+published pair can be matched to a local one. Before this, local pairs used
+Homebrew GCC 8.5.0 and releases GCC 14.2.1; the memory effect is recorded in
+[memory budgets](architecture/memory-budgets.md#release-compiler-gcc-1421--2026-10-01).

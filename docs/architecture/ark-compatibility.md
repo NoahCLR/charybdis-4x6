@@ -45,13 +45,15 @@ side.
 
 Local work needs no remote in either direction: firmware gates read only this
 checkout, and Ark's bridge compares local working copies by path. Publishing
-does. Ark pins a firmware commit, and before pushing a pin change it requires
-that commit to be on this repository's remote `dev`. A squash or rebase merge
-replaces a branch's commits, so an Ark pin to one of them must move to the
-merged commit; say so in the merge handoff. Likewise, firmware builds exactly
-the BK commit `qmk-pin.json` names, so push that commit to the fork's
-`noah-userspace-contracts-dev` before pushing firmware that pins it: CI checks
-BK out at the pin, and the push hook refuses an unpublished pin.
+does. Ark pins a firmware commit, and an Ark pin change lands only once that
+commit is on this repository's published `dev`. Firmware pull requests are
+squash-merged, which replaces a branch's commits, so an Ark pin to one of them
+must move to the merged commit; say so in the landing handoff. Likewise,
+firmware builds exactly the BK commit `qmk-pin.json` names, so land that BK
+change on the fork's `noah-userspace-contracts-dev` before the firmware that
+pins it: CI checks BK out at the pin, and `land` refuses a pull request whose
+pin is unpublished. BK lands merge commits, so a pinned BK branch commit stays
+valid.
 
 ## Diagnostics
 
@@ -62,10 +64,14 @@ test or diagnostic tool resolves code or dependencies through the app.
 
 ## Release verification
 
-Firmware release CI runs this repository's full host suite and builds both
-physical-half images against the corresponding QMK tag. It uploads the pair to
-a draft release. The shared release command tests an immutable three-repository
-candidate, retains its compatibility report and build hashes, and waits for
-both firmware and Ark's tagged CI before publishing. Firmware's own build and
-host runners remain independent of the client. These gates do not substitute
-for the interruption and keyboard acceptance procedures.
+A release is the only way `main` moves, in firmware, Ark and the BK fork's
+released line together. The shared release command tests the exact stack
+`main` will hold (firmware `dev`, Ark `dev`, BK at `qmk-pin.json`) and requires
+Ark to agree with this firmware's contract before promoting anything. Firmware
+release CI runs this repository's full host suite at the pinned BK commit,
+builds both physical-half images there, states the contract
+(`firmware-contract.json`) and uploads them to a draft release; the command
+waits for both repositories' tagged CI before publishing, with the BK pin and
+the agreement table in the notes. Firmware's own build and host runners remain
+independent of the client. These gates do not substitute for the interruption
+and keyboard acceptance procedures.

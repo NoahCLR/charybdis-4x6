@@ -387,6 +387,7 @@ For the full RGB authoring model, render order, and configuration surface, see
 ## Related Docs
 
 - [README.md](../README.md): top-level overview of the shared userspace
+- [GUIDE.md](./GUIDE.md): the full `key_behaviors[]` vocabulary and authoring walkthrough
 - [KEY_RUNTIME.md](./KEY_RUNTIME.md): maintainer-facing handled-key runtime map
 - [KEYMAP.md](./KEYMAP.md): Noah's current concrete profile choices
 - [POINTER_MODES.md](./POINTER_MODES.md): raw pointing-device mode behavior

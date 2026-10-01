@@ -20,11 +20,20 @@ set -eu
 # A/B against ordinary behaviour.
 # The split link always runs at QMK's default speed; the faster one garbled
 # split messages (D-L43), so NOAH_SPLIT_BAUD is refused rather than ignored.
+#
+# The pair is always compiled in the image tools/build-image names, the one CI
+# builds releases in, so the firmware flashed here and the firmware users
+# download come from the same compiler. Outside that image this script runs
+# itself inside it with Docker; it never falls back to another compiler. The
+# build is reproducible: QMK's version stamps are fixed (SKIP_VERSION) and
+# source paths are mapped, so one commit and BK pin give the same bytes on any
+# machine. A note beside the pair records the inputs, compiler and hashes.
 
 REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 QMK_ROOT="${QMK_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/../bastardkb-qmk" && pwd)}"
 BUILD_ROOT="${BUILD_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/.." && pwd)/builds}"
 ARTIFACT="$QMK_ROOT/bastardkb_charybdis_4x6_noah.uf2"
+IMAGE="$(sed -n '1p' "$REPO_ROOT/tools/build-image")"
 
 # The pair is firmware and BK compiled together, so it is built only against
 # the BK commit qmk-pin.json names, from a clean checkout. verify and CI check
@@ -44,6 +53,43 @@ if [ "$QMK_HEAD" != "$PIN" ] || [ -n "$QMK_DIRTY" ]; then
         echo "Check BK out at the pin (verify does this itself), or re-pin with tools/pin-qmk.sh." >&2
         exit 1
     fi
+fi
+
+# Outside the build image (CI jobs run inside it), run this script in it.
+# Every checkout and Git directory the build reads is mounted at its own path,
+# so worktree and cached-pin .git pointers still resolve. NOAH_IN_BUILD_IMAGE
+# is set to 1 inside; 0 forces the Docker path (the host tests use it).
+case "${NOAH_IN_BUILD_IMAGE:-}" in
+    1) in_image=1 ;;
+    0) in_image=0 ;;
+    *) in_image=0; [ ! -f /.dockerenv ] || in_image=1 ;;
+esac
+if [ "$in_image" = 0 ]; then
+    command -v docker >/dev/null 2>&1 || {
+        echo "Docker is required: the pair is built in $IMAGE, the image CI uses." >&2; exit 1; }
+    docker info >/dev/null 2>&1 || {
+        echo "Docker is not running; start Docker Desktop. The pair is built in $IMAGE, the image CI uses." >&2; exit 1; }
+    mkdir -p "$BUILD_ROOT"
+    BUILD_ROOT="$(CDPATH= cd -- "$BUILD_ROOT" && pwd)"
+    first="${1:-}"
+    set -- run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e NOAH_IN_BUILD_IMAGE=1 \
+        -e "QMK_ROOT=$QMK_ROOT" -e "BUILD_ROOT=$BUILD_ROOT" \
+        -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e "GIT_CONFIG_VALUE_0=*"
+    for var in $(env | sed -n 's/^\(NOAH_[A-Z0-9_]*\)=.*/\1/p'); do
+        [ "$var" = NOAH_IN_BUILD_IMAGE ] || set -- "$@" -e "$var"
+    done
+    mounted=" "
+    for dir in "$REPO_ROOT" "$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)" \
+               "$QMK_ROOT" "$(git -C "$QMK_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$QMK_ROOT")" \
+               "$BUILD_ROOT"; do
+        case "$mounted" in *" $dir "*) continue ;; esac
+        mounted="$mounted$dir "
+        set -- "$@" -v "$dir:$dir"
+    done
+    set -- "$@" -w "$REPO_ROOT" "$IMAGE" sh "$REPO_ROOT/tools/build-firmware-pair.sh"
+    [ -z "$first" ] || set -- "$@" "$first"
+    echo "Building in $IMAGE..."
+    exec docker "$@"
 fi
 
 OWNER_ARGS=""
@@ -126,6 +172,8 @@ build_half() {
         -e "MAIN_KEYMAP_PATH_1=$KEYMAP_ROOT" -e "MAIN_KEYMAP_PATH_2=$KEYMAP_ROOT" \
         -e "MAIN_KEYMAP_PATH_3=$KEYMAP_ROOT" -e "MAIN_KEYMAP_PATH_4=$KEYMAP_ROOT" \
         -e "MAIN_KEYMAP_PATH_5=$KEYMAP_ROOT" \
+        -e SKIP_VERSION=yes \
+        -e "EXTRAFLAGS=-ffile-prefix-map=$REPO_ROOT=/userspace -ffile-prefix-map=$QMK_ROOT=/qmk" \
         -e "$role=yes" -e "NOAH_PHYSICAL_HALF=$half" $OWNER_ARGS $TRANSPORT_ARGS )
     if [ ! -f "$ARTIFACT" ]; then
         echo "Expected firmware not found: $ARTIFACT" >&2
@@ -137,6 +185,20 @@ build_half() {
 
 build_half FORCE_MASTER right "${n}_charybdis_right${SUFFIX}"
 build_half FORCE_SLAVE left "${n}_charybdis_left${SUFFIX}"
+
+# What the pair was built from and with, and its hashes: a published pair can
+# be matched to a local one byte for byte.
+uncommitted() { [ -z "$(git -C "$1" status --porcelain --ignore-submodules=all 2>/dev/null)" ] || echo " +uncommitted"; }
+{
+    echo "firmware $(git -C "$REPO_ROOT" rev-parse HEAD)$(uncommitted "$REPO_ROOT")"
+    echo "bk $QMK_HEAD$(uncommitted "$QMK_ROOT")"
+    echo "image $IMAGE"
+    echo "compiler $(arm-none-eabi-gcc --version 2>/dev/null | head -n 1 || echo unknown)"
+    for half in right left; do
+        file="${n}_charybdis_${half}${SUFFIX}.uf2"
+        echo "sha256 $(python3 -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$destdir/$file") $file"
+    done
+} > "$destdir/${n}_charybdis${SUFFIX}.build.txt"
 
 echo
 if [ -n "$OWNER_ARGS" ]; then

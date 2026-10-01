@@ -77,7 +77,7 @@ class SplitTransportBuildTest(unittest.TestCase):
                 )
                 mock.chmod(0o755)
                 log = workspace / "calls.jsonl"
-                env = dict(os.environ, NOAH_ALLOW_UNPINNED_QMK="1", QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
+                env = dict(os.environ, NOAH_ALLOW_UNPINNED_QMK="1", NOAH_IN_BUILD_IMAGE="1", QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
                            NOAH_SPLIT_BAUD=baud, NOAH_SPLIT_ACTIVITY_COALESCE=activity, NOAH_SPLIT_CRC=crc, NOAH_SPLIT_DIAGNOSTICS=diagnostic,
                            NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=cadence, PAIR_TEST_LOG=str(log),
                            PATH=f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
@@ -130,7 +130,7 @@ class SplitTransportBuildTest(unittest.TestCase):
             )
             mock.chmod(0o755)
             output = workspace / "release"
-            env = dict(os.environ, NOAH_ALLOW_UNPINNED_QMK="1", QMK_ROOT=str(qmk), OUTPUT_DIR=str(output),
+            env = dict(os.environ, NOAH_ALLOW_UNPINNED_QMK="1", NOAH_IN_BUILD_IMAGE="1", QMK_ROOT=str(qmk), OUTPUT_DIR=str(output),
                        NOAH_SPLIT_BAUD="", NOAH_SPLIT_ACTIVITY_COALESCE="",
                        NOAH_SPLIT_CRC="", NOAH_SPLIT_DIAGNOSTICS="",
                        NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS="",
@@ -165,7 +165,7 @@ class SplitTransportBuildTest(unittest.TestCase):
                 "    Path('bastardkb_charybdis_4x6_noah.uf2').write_text('right')\n"
             )
             mock.chmod(0o755)
-            env = dict(os.environ, NOAH_ALLOW_UNPINNED_QMK="1", QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
+            env = dict(os.environ, NOAH_ALLOW_UNPINNED_QMK="1", NOAH_IN_BUILD_IMAGE="1", QMK_ROOT=str(qmk), BUILD_ROOT=str(workspace / "output"),
                        NOAH_SPLIT_BAUD="", NOAH_SPLIT_ACTIVITY_COALESCE="",
                        NOAH_SPLIT_CRC="", NOAH_SPLIT_DIAGNOSTICS="",
                        NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS="",

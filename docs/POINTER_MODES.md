@@ -7,7 +7,7 @@ It is about shared mode behavior, not the current keymap's physical placement,
 tap / hold gestures, or profile-specific double-tap actions. For the current
 authored choices, see [KEYMAP.md](./KEYMAP.md). For the shared tap / hold /
 multi-tap model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the
-top-level [README](../README.md).
+[firmware guide](./GUIDE.md#authoring-the-profile-in-c).
 
 The [PD-mode domain contract](architecture/pd-mode-domain-v1.md) specifies the
 eight configurable slots and the remaining hardware acceptance checks. Side-specific schema-2 firmware exposes eight slots in
