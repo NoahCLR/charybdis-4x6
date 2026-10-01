@@ -44,7 +44,7 @@ adoption and broad hardware acceptance — is under "Current Firmware Status" in
 
 - Start every task with `git status --short`.
 - Assume the worktree may already be dirty. Never revert or overwrite unrelated user changes.
-- Branch from `dev`, work in your own worktree, and squash-land onto `dev` locally only when Noah says so. `main` moves only by the vault's `_agents/bin/release`: a merge commit whose tree is exactly `dev`'s, so every `dev` commit stays reachable. Every landed commit, promotion and release tag carries Git trailers naming the Ark and QMK commits it was tested with (`Stack-Ark`, `Stack-QMK`, `Ark-Pins`, `Stack-Tested`); the vault's tools write them, never edit them by hand. Find the last tested combination with `git log -1 --format='%h %s%n%(trailers)' dev`. Never push or open a pull request anywhere but `NoahCLR/charybdis-4x6`: this repo is a fork of Bastard Keyboards' userspace, and nothing goes upstream. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees).
+- Branch from `dev`, work in your own worktree and verify with the vault's `_agents/bin/verify`. Open a pull request into `dev` with the vault's `_agents/bin/open-pr`; when Noah says so, the vault's `_agents/bin/land` merges it on GitHub (squash) for exactly the verified commit, without waiting for CI. `dev` takes changes only through pull requests and is never pushed directly. `main` moves only by the vault's `_agents/bin/release`: a merge commit whose tree is exactly `dev`'s, so every `dev` commit stays reachable. Every landed commit, promotion and release tag carries Git trailers naming the Ark and QMK commits it was tested with (`Stack-Ark`, `Stack-QMK`, `Ark-Pins`, `Stack-Tested`); the vault's tools write them, never edit them by hand. Find the last tested combination with `git log -1 --format='%h %s%n%(trailers)' dev`. Never push or open a pull request anywhere but `NoahCLR/charybdis-4x6`: this repo is a fork of Bastard Keyboards' userspace, and nothing goes upstream. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees).
 - Work in the firmware worktree assigned to this task, not automatically in the main checkout. See the local paths and worktree discovery in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees).
 - The main checkout belongs to a multi-root VS Code workspace with QMK, Ark and build artifacts. Worktrees may live elsewhere; do not assume its sibling layout applies.
 - Treat `charybdis-4x6` as the default write target. Do not edit sibling workspace folders unless the task explicitly requires it and the user wants that scope.
@@ -63,7 +63,7 @@ adoption and broad hardware acceptance — is under "Current Firmware Status" in
 - Keep `keyboards/bastardkb/charybdis/4x6/keymaps/noah/` mainly data-driven. That path should primarily hold authored profile data such as layers, combos, `key_behaviors[]`, RGB tables, macros, and other keymap configuration.
 - Put shared runtime policy, reusable engine logic, and QMK/fork integration under `users/noah/`.
 - Treat `users/noah/` as the local userspace/runtime surface for this repo and `../bastardkb-qmk/` as the upstream firmware tree. Keep ownership and changes explicit when work crosses that boundary.
-- This firmware builds against exactly the BK commit in `qmk-pin.json`; the pair build refuses any other. Needing a BK change means: land and push it on BK's `noah-userspace-contracts-dev`, then re-pin here with `sh tools/pin-qmk.sh` in the task that uses it. Never build a release against an unpinned BK.
+- This firmware builds against exactly the BK commit in `qmk-pin.json`; the pair build refuses any other. Needing a BK change means: land its pull request on BK's `noah-userspace-contracts-dev` first (BK lands merge commits, so the pinned commit stays valid), then re-pin here with `sh tools/pin-qmk.sh` in the task that uses it. Never build a release against an unpinned BK.
 - Runtime modules under `users/noah/` must not include `noah_keymap.h`.
 - Keymap-owned translation units under `keyboards/.../keymaps/noah/` must not include `noah_runtime.h`.
 - If a keymap overrides a weak QMK hook, chain back into the matching `noah_*` helper unless the task explicitly replaces the shared behavior and documents that choice.
@@ -101,8 +101,9 @@ Required verification workflow:
    `_agents/bin/verify`, which runs steps 4–7 as they apply, sets both and
    serializes builds: every agent shares QMK's one output path, so two
    concurrent builds would overwrite each other's firmware. Land with the
-   vault's `_agents/bin/land`, which re-verifies the landed tree and files the
-   pair under `builds/dev/`.
+   vault's `_agents/bin/land`, which re-verifies the landed tree if it changed,
+   merges the task's pull request and files the pair and its build note under
+   `builds/dev/`.
 
 Narrow verification exceptions:
 
@@ -179,8 +180,10 @@ format, fixture bytes or a contract spec, or moves a source or probe Ark's
 integration runners compile, name the Ark follow-up in your handoff (see
 [what Ark consumes](docs/architecture/ark-compatibility.md#what-ark-consumes)).
 `run_firmware_client_independence_tests.sh` fails if any tracked non-doc file
-names the app. Develop locally without remotes; before publishing, push the BK
-commit `qmk-pin.json` names first (the push hook refuses otherwise), and note that a squash or rebase merge moves Ark's pin (see
+names the app. A firmware pull request lands only once the BK commit
+`qmk-pin.json` names is on BK's published trunk (`land` refuses otherwise), and a
+squash merge gives the landed commit a new hash, so Ark pins firmware commits
+taken from `dev` after landing (see
 [local and published revisions](docs/architecture/ark-compatibility.md#local-and-published-revisions)). Install firmware diagnostics dependencies with
 `npm ci --prefix tools` when using hardware diagnostics.
 
