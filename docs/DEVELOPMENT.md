@@ -25,7 +25,10 @@ On Noah's machine, the main checkouts are:
   repositories. Its `AGENTS.md` says how a task is refined and picked up.
 
 Branches: `dev` is the trunk. Each task branches from `dev` in its own
-worktree and is squash-landed back onto `dev` locally; `main` is the released
+worktree, is verified locally and reaches `dev` through a pull request, which
+the vault's `land` merges (squash) for exactly the verified commit; no CI runs
+for that merge, because local verification is the gate. GitHub accepts changes
+to `dev` only through pull requests, and it is never pushed directly. `main` is the released
 line and only moves when a release promotes `dev` into it. Landed commits, promotions
 and release tags carry trailers naming the Ark and QMK commits they were tested
 with, so `git log` answers what any build went with. A release is one date tag,
@@ -72,10 +75,11 @@ The pair builder isolates QMK CLI configuration for the compiler and its code
 generators, so saved `overlay_dir`/`qmk_home` values cannot redirect a task build
 to the main checkout. Explicit keymap paths also override old symlinks inside
 the QMK tree. Local `verify` records the full tested inputs and artifact checksums. `land`
-reuses that result only while those inputs match, and files its recorded inputs
-beside the firmware pair. The installed pre-push hook requires a matching local
-verification receipt for new protected-branch commits and a stack certificate
-for release tags; a hand-written `Stack-Tested` trailer is insufficient.
+reuses that result only while those inputs match, merges the task's pull
+request for exactly the verified commit, and files its recorded inputs beside
+the firmware pair. The installed pre-push hook refuses direct pushes to `dev`
+and `main`, and requires a stack certificate for release tags; a hand-written
+`Stack-Tested` trailer is insufficient.
 
 ## The BK pin
 
@@ -88,8 +92,8 @@ as such), CI's `Host suite (GCC)` and the release build check BK out at the pin,
 and the release build refuses a BK tag that is not the pinned commit. A
 non-required CI job (also nightly) runs the host suite against the BK dev head
 and reports how far it is ahead of the pin. The vault's `verify` checks BK out
-at the pin itself, and its push hook refuses a push whose pin is not on the
-published BK dev branch.
+at the pin itself, and its `land` refuses a pull request whose pin is not on
+the published BK dev branch.
 
 The BK fork runs no CI of its own (GitHub Actions stay off, so its upstream
 workflows never run): a BK change reaches users only through a firmware re-pin,
@@ -202,9 +206,10 @@ waits until GitHub reports every required check passed, merges, and reconciles
 local `main` to GitHub's merge identity. The merge message carries the `dev`
 tip's stack and verification trailers. Retries resume the frozen preparation.
 Direct `main` pushes are rejected by the local hook as well. Normal task
-development still lands locally onto `dev`.
+development reaches `dev` through task pull requests.
 
-`dev` cannot be force-pushed or deleted on GitHub, and published `v*` release
+`dev` cannot be force-pushed or deleted on GitHub and accepts changes only
+through pull requests, and published `v*` release
 tags cannot be moved or deleted (rulesets without bypass). Merge commits take
 the PR's title and body, so a merge from the GitHub page carries the same
 verification trailers as one made by `release`.
