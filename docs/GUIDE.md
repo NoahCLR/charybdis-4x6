@@ -387,8 +387,11 @@ sh tools/build-firmware-pair.sh
 
 That writes numbered left and right images into `../builds/<branch>/`. Add
 `--no-owner` for the comparison pair without the live-profile owner.
-Release images are built the same way by CI; the exact byte sizes may differ
-between CI and local toolchains.
+It builds in Docker, in the same image CI builds releases in
+(`tools/build-image`), so the pair you flash and the pair a release publishes
+come from the same compiler and are byte-identical for the same commit. Docker
+must be running. A note beside each pair (`N_charybdis.build.txt`) records the
+firmware and BK commits, the compiler and both files' SHA-256.
 
 All current builds use the eight-slot engine and schema-2 EEPROM geometry. Use
 `sh tools/build-firmware-pair.sh` for the flashable side-specific pair. The

@@ -308,3 +308,25 @@ burst cannot fall back to delivery-time timing. The linked table is 768 B of
 SRAM0–3 `.bss` per half (was 96 B, +672 B). The default `noah` build then
 links 52,856 B of `.data + .bss`, 7,560 B below the 60,416 B tripwire. This is a
 linked measurement, not runtime high-water evidence.
+
+## Release compiler (GCC 14.2.1) — 2026-10-01
+
+The flashable pair is now always built in the release build image
+(`tools/build-image`, `arm-none-eabi-gcc` 14.2.1), not with the host's
+compiler. Releases were already built there; local pairs used Homebrew GCC
+8.5.0. Same source (userspace `556c1e08`, BK `0474783b`), `SKIP_VERSION=yes`,
+`sh tests/host/run_firmware_memory_budget_checks.sh`, per half:
+
+| Measurement | GCC 14.2.1 (image) | GCC 8.5.0 (host) |
+| --- | ---: | ---: |
+| SRAM0–3 `.data` | 4,172 | — |
+| SRAM0–3 `.bss` | 55,904 | — |
+| `.data + .bss` | 60,076 (340 below the 60,416 tripwire) | 59,800 (616 below) |
+| SRAM0–3 fixed linked prefix | 60,088 | 59,808 |
+| SRAM0–3 linker/core-memory span at boot | 202,056 | 202,336 |
+| Fixed linked occupancy across unique SRAM banks | 67,544 | 67,264 |
+
+Both halves link the same SRAM figures under GCC 14 (left `FORCE_SLAVE`, right
+`FORCE_MASTER`). GCC 14 links 276 more static bytes; the tripwire margin is now
+340 bytes, so the next static growth must justify itself against it. These are
+linked measurements, not runtime high-water.
