@@ -180,7 +180,8 @@ format, fixture bytes or a contract spec, or moves a source or probe Ark's
 integration runners compile, name the Ark follow-up in your handoff (see
 [what Ark consumes](docs/architecture/ark-compatibility.md#what-ark-consumes)).
 `run_firmware_client_independence_tests.sh` fails if any tracked non-doc file
-names the app. A firmware pull request lands only once the BK commit
+names the app; the one exemption is CI's release gate, `Agreement with Ark main`
+in `.github/workflows/ci.yml` (D-F06). A firmware pull request lands only once the BK commit
 `qmk-pin.json` names is on BK's published trunk (`land` refuses otherwise), and a
 squash merge gives the landed commit a new hash, so Ark pins firmware commits
 taken from `dev` after landing (see
@@ -189,8 +190,9 @@ taken from `dev` after landing (see
 
 ### Publishing protected main
 
-`main` publication requires a same-repository `dev` → `main` PR with the
-`Promotion from dev` and `Host suite (GCC)` checks, including for administrators. Only the shared
-`release --push` opens it, and only when a release is requested; never push `main`
-directly or bypass protection. The command tests the stack first, then accepts
-GitHub's resulting merge identity and tags the promoted commit.
+`main` publication requires a same-repository `dev` → `main` pull request with
+the `Promotion from dev`, `Host suite (GCC)`, `Pair build` and
+`Agreement with Ark main` checks, including for administrators (D-F06). Only the
+shared vault's `release` opens it and only `release --publish` merges it, when
+Noah asks; never push `main` directly or bypass protection. CI runs only on
+those pull requests and nightly, never on `dev`.
