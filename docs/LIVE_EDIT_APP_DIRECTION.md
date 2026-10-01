@@ -638,8 +638,8 @@ The UF2 is this userspace and the BK fork compiled together, so firmware names
 the exact BK commit it builds with in a committed `qmk-pin.json`, a published
 commit on the fork's `noah-userspace-contracts-dev`. It is a plain file, not a
 submodule, and code enforces it rather than habit: the pair build refuses any
-other BK, CI and the release build check BK out at the pin, and the push hook
-refuses an unpublished pin. A non-required job tests the BK dev head as an
+other BK, CI and the release build check BK out at the pin, and `land` refuses
+a pull request whose pin is unpublished. A non-required job tests the BK dev head as an
 early warning. Re-pinning (`tools/pin-qmk.sh`) is a deliberate firmware change
 that reports what moved in BK ([the BK pin](DEVELOPMENT.md#the-bk-pin)).
 
