@@ -651,3 +651,17 @@ runtime code. `dev` is the development line and tests against its own pins.
 and the client together after testing that exact stack and their agreement, so
 every `main` has a tag, both halves, the BK pin and the agreement table
 ([release verification](architecture/ark-compatibility.md#release-verification)).
+
+## D-F05 — The flashed pair and the released pair come from one compiler
+
+The firmware Noah flashes and the firmware users download are built by the same
+compiler: `tools/build-firmware-pair.sh` always compiles in the image
+`tools/build-image` names, which CI also builds in, running itself there with
+Docker when it is started outside it, and never falling back to the host's
+compiler. The build is reproducible: QMK's version stamps are fixed
+(`SKIP_VERSION`, so the `QK_VERSION` keycode prints placeholders) and source
+paths are mapped, so one userspace commit and BK pin give the same bytes on any
+machine. Each pair has a note with its inputs, compiler and SHA-256, so a
+published pair can be matched to a local one. Before this, local pairs used
+Homebrew GCC 8.5.0 and releases GCC 14.2.1; the memory effect is recorded in
+[memory budgets](architecture/memory-budgets.md#release-compiler-gcc-1421--2026-10-01).
