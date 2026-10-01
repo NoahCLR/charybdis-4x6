@@ -29,10 +29,12 @@ worktree, is verified locally and reaches `dev` through a pull request, which
 the vault's `land` merges (squash) for exactly the verified commit; no CI runs
 for that merge, because local verification is the gate. GitHub accepts changes
 to `dev` only through pull requests, and it is never pushed directly. `main` is the released
-line and only moves when a release promotes `dev` into it. Landed commits, promotions
-and release tags carry trailers naming the Ark and QMK commits they were tested
-with, so `git log` answers what any build went with. A release is one date tag,
-`vYYYY.MM.DD`, on firmware, Ark and the QMK fork together. This repository is a GitHub
+line and only moves when a release promotes `dev` into it. Each landed commit's
+message ends with what verify ran, and the BK commit it was built with is the
+one its own `qmk-pin.json` names. A firmware release is a date tag,
+`vYYYY.MM.DD`, on this repository and on the BK commit it is built with; Ark
+releases separately, and both release together only when the contract between
+them changes. This repository is a GitHub
 fork of Bastard Keyboards' userspace: push only to `NoahCLR/charybdis-4x6`, and
 never push or open a pull request upstream. The clone's `gh` default and
 pre-push hook enforce that.
@@ -74,12 +76,11 @@ test shims remain errors.
 The pair builder isolates QMK CLI configuration for the compiler and its code
 generators, so saved `overlay_dir`/`qmk_home` values cannot redirect a task build
 to the main checkout. Explicit keymap paths also override old symlinks inside
-the QMK tree. Local `verify` records the full tested inputs and artifact checksums. `land`
-reuses that result only while those inputs match, merges the task's pull
-request for exactly the verified commit, and files its recorded inputs beside
-the firmware pair. The installed pre-push hook refuses direct pushes to `dev`
-and `main`, and requires a stack certificate for release tags; a hand-written
-`Stack-Tested` trailer is insufficient.
+the QMK tree. Local `verify` records a pass for the tested tree, the pinned BK
+commit and the build options, with the pair's SHA-256. `land` reuses it only
+while those inputs match, merges the task's pull request for exactly the
+verified commit, and files the pair with the build note beside it. The installed pre-push hook refuses direct pushes to `dev`
+and `main`, and accepts only annotated release tags on the released line.
 
 ## The BK pin
 
