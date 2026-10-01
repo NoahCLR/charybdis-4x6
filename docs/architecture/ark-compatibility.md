@@ -45,13 +45,15 @@ side.
 
 Local work needs no remote in either direction: firmware gates read only this
 checkout, and Ark's bridge compares local working copies by path. Publishing
-does. Ark pins a firmware commit, and before pushing a pin change it requires
-that commit to be on this repository's remote `dev`. A squash or rebase merge
-replaces a branch's commits, so an Ark pin to one of them must move to the
-merged commit; say so in the merge handoff. Likewise, firmware builds exactly
-the BK commit `qmk-pin.json` names, so push that commit to the fork's
-`noah-userspace-contracts-dev` before pushing firmware that pins it: CI checks
-BK out at the pin, and `land` refuses a pull request whose pin is unpublished.
+does. Ark pins a firmware commit, and an Ark pin change lands only once that
+commit is on this repository's published `dev`. Firmware pull requests are
+squash-merged, which replaces a branch's commits, so an Ark pin to one of them
+must move to the merged commit; say so in the landing handoff. Likewise,
+firmware builds exactly the BK commit `qmk-pin.json` names, so land that BK
+change on the fork's `noah-userspace-contracts-dev` before the firmware that
+pins it: CI checks BK out at the pin, and `land` refuses a pull request whose
+pin is unpublished. BK lands merge commits, so a pinned BK branch commit stays
+valid.
 
 ## Diagnostics
 
