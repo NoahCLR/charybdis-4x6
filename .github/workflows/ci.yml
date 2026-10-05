@@ -22,7 +22,7 @@ jobs:
     name: Host suite (GCC)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8
+      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8@sha256:c21e0fc2229613f7e9d633a6b879f7e1f5aacaa18330fbe2593ddba26f030245
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
@@ -69,7 +69,7 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8
+      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8@sha256:c21e0fc2229613f7e9d633a6b879f7e1f5aacaa18330fbe2593ddba26f030245
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
@@ -192,7 +192,7 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8
+      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8@sha256:c21e0fc2229613f7e9d633a6b879f7e1f5aacaa18330fbe2593ddba26f030245
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6

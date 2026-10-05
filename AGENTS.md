@@ -109,7 +109,7 @@ Required verification workflow:
    `tools/build-image` names, the one CI builds releases in, so local and
    released pairs share a compiler and are byte-identical for one commit and BK
    pin; Docker must be running, and the script never falls back to the host
-   compiler. Keep every workflow's `image:` equal to `tools/build-image`. From a task worktree, set `QMK_ROOT` to the QMK
+   compiler. Keep every workflow's `image:` equal to `tools/build-image`, which pins the image by digest (D-F05). From a task worktree, set `QMK_ROOT` to the QMK
    checkout and `BUILD_ROOT` to an output folder, or run the work-queue vault's
    `_agents/bin/verify`, which runs steps 4–7 as they apply, sets both and
    serializes builds: every agent shares QMK's one output path, so two
