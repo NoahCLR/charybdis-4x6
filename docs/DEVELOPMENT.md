@@ -10,16 +10,18 @@ to its independent sibling repository.
 
 ## Local repositories and worktrees
 
-On Noah's machine, the main checkouts are:
+Noah's main checkouts sit side by side in one workspace folder
+(`/Users/noah/dev/charybdis` on his main Mac). A Mac has only the ones it works
+on; building firmware needs the BK checkout beside it:
 
-- Firmware: `/Users/noah/dev/charybdis/charybdis-4x6`.
+- Firmware: `charybdis-4x6`.
 - Ark: [NoahCLR/charybdis-ark](https://github.com/NoahCLR/charybdis-ark)
-  (`/Users/noah/dev/charybdis/charybdis-ark` locally).
-- Upstream QMK build dependency: `/Users/noah/dev/charybdis/bastardkb-qmk`
+  (`charybdis-ark`).
+- Upstream QMK build dependency: `bastardkb-qmk`
   ([NoahCLR/bastardkb-qmk](https://github.com/NoahCLR/bastardkb-qmk):
   development on `noah-userspace-contracts-dev`, released line
   `noah-userspace-contracts`, legacy upstream mirror `main`).
-- Work queue: `/Users/noah/dev/charybdis/charybdis-notes`, an Obsidian vault
+- Work queue: `charybdis-notes`, an Obsidian vault
   (private [NoahCLR/charybdis-notes](https://github.com/NoahCLR/charybdis-notes))
   holding notes, tasks, active plans and keyboard checks for all three
   repositories. Its `AGENTS.md` says how a task is refined and picked up.
