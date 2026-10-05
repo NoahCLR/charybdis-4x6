@@ -77,5 +77,3 @@ Split transaction: attempts/s · mean · longest
   5 ms transaction timeout: a retried scan.
 - The build was committed after the pair was built; the firmware sources of
   `ac9e9508` are the ones the pair was built from.
-- Decisions from this set are in the *Split transport optimization* plan in
-  the work-queue vault (`charybdis-notes`).
