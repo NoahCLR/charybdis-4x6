@@ -88,8 +88,13 @@ The UF2 is this userspace and the BK fork compiled together, so this repository
 names the exact BK commit it builds with in `qmk-pin.json`: a published commit
 on the fork's `noah-userspace-contracts-dev`. Everything uses it:
 `tools/build-firmware-pair.sh` refuses a BK checkout that is not at the pin or
-has local changes (`NOAH_ALLOW_UNPINNED_QMK=1` allows it for a trial, printed
-as such), and CI's `Host suite (GCC)` and `Pair build` check BK out at the pin.
+has local changes, and CI's `Host suite (GCC)` and `Pair build` check BK out at
+the pin. `NOAH_ALLOW_UNPINNED_QMK=1` builds against the BK checkout as it is,
+printed as such and recorded in the pair's note as "not the pin": VS Code's
+build tasks set it, because they are development builds of the checkouts you
+have open, and verify uses it for trials and BK changes. Such a pair is never
+released: a release publishes CI's pair, built at the pin, only when it equals
+a filed pair byte for byte.
 A non-required nightly job runs the host suite against the BK dev head and
 reports how far it is ahead of the pin. The vault's `verify` checks BK out
 at the pin itself, and its `land` refuses a pull request whose pin is not on

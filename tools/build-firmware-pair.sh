@@ -37,8 +37,10 @@ IMAGE="$(sed -n '1p' "$REPO_ROOT/tools/build-image")"
 
 # The pair is firmware and BK compiled together, so it is built only against
 # the BK commit qmk-pin.json names, from a clean checkout. verify and CI check
-# BK out at the pin themselves. NOAH_ALLOW_UNPINNED_QMK=1 is for trials and for
-# testing a BK change against current firmware; such a pair is never released.
+# BK out at the pin themselves. NOAH_ALLOW_UNPINNED_QMK=1 builds against the BK
+# checkout as it is: VS Code's build tasks (development pairs), trials, and BK
+# changes tested against current firmware. Such a pair is never released, and
+# its note says which BK it used and that it is not the pin.
 PIN="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["commit"])' "$REPO_ROOT/qmk-pin.json")" || {
     echo "qmk-pin.json must name the BK commit this firmware builds with (tools/pin-qmk.sh)" >&2
     exit 1
@@ -47,7 +49,9 @@ QMK_HEAD="$(git -C "$QMK_ROOT" rev-parse HEAD 2>/dev/null || echo "not a Git che
 QMK_DIRTY="$(git -C "$QMK_ROOT" status --porcelain --ignore-submodules=all 2>/dev/null || true)"
 if [ "$QMK_HEAD" != "$PIN" ] || [ -n "$QMK_DIRTY" ]; then
     if [ "${NOAH_ALLOW_UNPINNED_QMK:-}" = 1 ]; then
-        echo "TRIAL: building against BK $QMK_HEAD${QMK_DIRTY:+ (modified)}, not the pinned $PIN" >&2
+        echo "Not the pin: building against BK $QMK_HEAD${QMK_DIRTY:+ (modified)}, not the pinned $PIN." >&2
+        echo "A development pair; verify, CI and releases build at the pin." >&2
+        UNPINNED=" (not the pin $PIN)"
     else
         echo "BK at $QMK_ROOT is $QMK_HEAD${QMK_DIRTY:+ with local changes}, but qmk-pin.json pins $PIN." >&2
         echo "Check BK out at the pin (verify does this itself), or re-pin with tools/pin-qmk.sh." >&2
@@ -191,7 +195,7 @@ build_half FORCE_SLAVE left "${n}_charybdis_left${SUFFIX}"
 uncommitted() { [ -z "$(git -C "$1" status --porcelain --ignore-submodules=all 2>/dev/null)" ] || echo " +uncommitted"; }
 {
     echo "firmware $(git -C "$REPO_ROOT" rev-parse HEAD)$(uncommitted "$REPO_ROOT")"
-    echo "bk $QMK_HEAD$(uncommitted "$QMK_ROOT")"
+    echo "bk $QMK_HEAD$(uncommitted "$QMK_ROOT")${UNPINNED:-}"
     echo "image $IMAGE"
     echo "compiler $(arm-none-eabi-gcc --version 2>/dev/null | head -n 1 || echo unknown)"
     for half in right left; do

@@ -85,7 +85,7 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
             trial = subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base,
                                    env=dict(env, NOAH_ALLOW_UNPINNED_QMK='1'), capture_output=True, text=True)
             self.assertEqual(trial.returncode, 0, trial.stderr)
-            self.assertIn('TRIAL: building against BK', trial.stderr)
+            self.assertIn('Not the pin: building against BK', trial.stderr)
             self.assertEqual(len(calls), 2)
             for half in ('right', 'left'):
                 artifact = base / 'builds/test-pair' / f'1_charybdis_{half}.uf2'
@@ -93,6 +93,9 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
             # The note beside the pair names its inputs, image and hashes.
             note = (base / 'builds/test-pair/1_charybdis.build.txt').read_text()
             self.assertIn('bk ' + pinned + '\n', note)
+            # The unpinned pair's note says so, so it is never taken for a pinned one.
+            trial_note = sorted((base / 'builds/test-pair').glob('*_charybdis.build.txt'))[-1].read_text()
+            self.assertIn(' (not the pin ' + pinned + ')\n', trial_note)
             self.assertIn('image ' + (REPO / 'tools/build-image').read_text().strip(), note)
             for half in ('right', 'left'):
                 digest = hashlib.sha256(half.encode()).hexdigest()
@@ -137,6 +140,15 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
                                      env=dict(env, DOCKER_INFO_STATUS='1'), capture_output=True, text=True)
             self.assertNotEqual(stopped.returncode, 0)
             self.assertIn('Docker is not running', stopped.stderr)
+
+    def test_vs_code_builds_the_checkouts_as_they_are(self):
+        # VS Code's pair tasks are development builds: the BK checkout beside this
+        # one need not be at the pin. verify, CI and releases build at the pin.
+        tasks = json.loads((REPO / '.vscode/tasks.json').read_text())['tasks']
+        pair = [t for t in tasks if 'tools/build-firmware-pair.sh' in ' '.join(t.get('args', []))]
+        self.assertEqual(len(pair), 2)
+        for task in pair:
+            self.assertEqual(task['options'].get('env', {}).get('NOAH_ALLOW_UNPINNED_QMK'), '1', task['label'])
 
     def test_every_workflow_builds_in_the_build_image(self):
         image = (REPO / 'tools/build-image').read_text().strip()
