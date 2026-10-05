@@ -180,18 +180,19 @@ unhandled dual-role keys remain native. The
 [release timing contract](INTERACTION_MODEL.md#release-intervals-and-timing-advice)
 also defines the impossible release interval Ark reports.
 
-The unified gesture ownership plan (in the work-queue vault)
-explains why native LT/MT/OSM still exist and the proposed migration to one
-classifier, including combo-output behaviours as a required acceptance case.
+Native LT/MT/OSM remain a compatibility boundary. Moving every key to one
+classifier is not designed yet; it is an
+[open issue](LIVE_EDIT_APP_DIRECTION.md#open-issues), and combo-output
+behaviours are a required acceptance case for it.
 
 ## Open release gates
 
 Physical migration, power-interruption, pointing cadence and stack high-water
 acceptance remain release gates; see the
 [PD-mode domain contract](architecture/pd-mode-domain-v1.md#hardware-acceptance).
-The gesture timing investigation (the Button 3 double-hold failure,
-combo/tapping interactions and the current-layout acceptance plan) is tracked in
-the work-queue vault as the plan *Gesture timing and combo arbitration*.
+Physical gesture acceptance (the Button 3 double-hold failure and
+combo/tapping interactions on the current layout) is also still open; see the
+[open issues](LIVE_EDIT_APP_DIRECTION.md#open-issues).
 
 ## Protected main promotions
 

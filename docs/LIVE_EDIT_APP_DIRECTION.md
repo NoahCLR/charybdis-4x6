@@ -52,14 +52,12 @@ Firmware work remaining before the product is complete:
 - **Unified gesture ownership.** Native LT/MT/OSM remain a compatibility
   boundary; adding a row can still change classification semantics. Runtime-owned
   LT/MT/OSM rows now follow QMK's default overlapping rule (D-F03). The
-  migration plan (*Unified gesture ownership* in the work-queue vault) proposes explicit defaults
-  and one owner without silently changing the current layout.
+  intended direction is explicit defaults and one owner, without silently
+  changing the current layout; it is not designed or implemented.
 
 - **Physical gesture acceptance (D-F01).** The buffered-repeat defect is
   reproduced and fixed through the real QMK combo/tapping path. Acceptance on
-  both halves, pointing-mode routing and host Button 7 bindings remains open:
-  report and remaining plan in *Gesture timing and combo arbitration*
-  (work-queue vault).
+  both halves, pointing-mode routing and host Button 7 bindings remains open.
 - **One-half power-cycle recovery transition.** On 2026-09-12, after one half
   lost power while the other stayed powered, the first complete read failed
   with VIA storage flags 7 (dirty, recovery required) before settling to clean
@@ -543,7 +541,7 @@ using the shortest enabled RGB idle timeout and updates successful state only
 after a successful send. An independently gated, bounded recorder provides
 transaction attribution without streaming during capture. See
 [split activity sync](architecture/split-activity-sync.md). Runtime RPC replacement
-and asynchronous scheduling remain behind the handoff's hardware measurement gates.
+and asynchronous scheduling are not built; either needs hardware measurement first.
 
 The split link stays at QMK's default 230,400 baud. 460,800 was built as a paired
 option and removed after hardware comparison on 2026-09-28: with the same code and
@@ -551,8 +549,7 @@ coalescing, profile copies logged roughly 20–30 split transport failures per A
 at 460,800 and none across three Applies at 230,400, and the other half's lighting
 flickered, because QMK's lighting sync carries no checksum. Setting
 `NOAH_SPLIT_BAUD` now fails the build. A faster link needs checksummed syncs
-first, and new measurements. The split frame CRC
-(plan *Split sync checksums* in the work-queue vault) is now in the default build; 460,800
+first, and new measurements. The split frame CRC is now in the default build; 460,800
 stays removed until it is accepted on hardware and measured again.
 
 ### D-L44 — The app has its own repository and pinned firmware inputs
