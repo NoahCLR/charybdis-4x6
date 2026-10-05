@@ -6,7 +6,12 @@ working directory explicitly to this firmware repository.
 
 - **Build Firmware Pair (flashable)** is the default build task. It uses
   `tools/build-firmware-pair.sh`, which sets both transport role and durable
-  physical-half identity for each half. The former shell-alias build task is
+  physical-half identity for each half. It is a development build: it compiles
+  the firmware and the sibling QMK checkout as they are, uncommitted changes
+  included, into `../builds/<current branch>/`. When QMK is not at the
+  `qmk-pin.json` commit it says so, and the pair's note records the QMK commit
+  it used and that it is not the pin. `verify`, CI and releases build at the
+  pin. The former shell-alias build task is
   retired; the alias itself is not managed here.
 - **Build right half + compilation database** runs `qmk compile --compiledb`
   in the sibling QMK checkout with `QMK_USERSPACE` set to this repo,

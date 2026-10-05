@@ -16,7 +16,10 @@
                 "$gcc"
             ],
             "options": {
-                "cwd": "${workspaceFolder}"
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "NOAH_ALLOW_UNPINNED_QMK": "1"
+                }
             }
         },
         {
@@ -31,7 +34,10 @@
                 "$gcc"
             ],
             "options": {
-                "cwd": "${workspaceFolder}"
+                "cwd": "${workspaceFolder}",
+                "env": {
+                    "NOAH_ALLOW_UNPINNED_QMK": "1"
+                }
             }
         },
         {

@@ -2,18 +2,25 @@
 
 Use this repo like production firmware, not a scratch keymap.
 
-## Every change follows the vault's rules
+## How a change is made
 
-Every change in this repository, with or without a task from the work queue,
-follows the work-queue vault's `AGENTS.md`
-(`/Users/noah/dev/charybdis/charybdis-notes/AGENTS.md`), section **Branches,
-landing and pushing**. Read it before your first change in a session. It covers
-your own worktree and its `<type>/<slug>` branch (rename a branch the harness
-made), `verify`, a draft pull request with `open-pr` linked to the thread (for
-firmware and BK, with the pair to try), landing only on Noah's "land it" with
-`land`, `release` as the only way `main` moves, and saying what each of Noah's
-commands will do before asking for it. The tools enforce part of it; the rest
-is yours to follow. This file still governs the code itself.
+Only Noah works on this repository. His private notes vault, `charybdis-notes`,
+sits beside this repository's main checkout (from any worktree:
+`"$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/../charybdis-notes"`). It holds the work queue and the tools every change goes through.
+If it is there, read its `AGENTS.md` before your first change in a session:
+**Every agent, wherever it starts** (work starts from a note or right here,
+and Noah's commands have skills) and **Branches, landing and pushing** (your
+own worktree on a `<type>/<slug>` branch from `dev`, `verify`, a draft pull
+request with `open-pr` linked to the thread (with the pair to try), landing only on Noah's
+"land it" with `land`, `release` as the only way `main` moves, and saying
+what each of Noah's commands will do before asking for it). The tools enforce
+part of it; the rest is yours to follow. This file still governs the code
+itself.
+
+Without the vault: branch from `dev` as `<type>/<slug>`, run the checks this
+file lists, and open a pull request into `dev` on `NoahCLR/charybdis-4x6`. Never
+push `dev` or `main` directly, and nothing goes upstream. Noah lands
+and releases.
 
 ## Current Goal
 
@@ -68,7 +75,7 @@ adoption and broad hardware acceptance — is under "Current Firmware Status" in
 - For refactors or runtime architecture work, read `docs/LIVE_EDIT_APP_DIRECTION.md` first. It carries the current direction, the decisions behind it, and what is deliberately left undesigned.
 - The durable specs live under `docs/architecture/`: the Profile Wire and split protocols, the authority state tables, the storage and resource baseline, the PD-mode domain, and the field classification. Treat those as the contract; change them deliberately.
 - This repo no longer keeps dated review folders or finding registers. Record decisions in the doc they govern, next to the thing they constrain.
-- Work is queued, refined and planned in the work-queue vault at `/Users/noah/dev/charybdis/charybdis-notes` (see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees)). When a task comes from it, follow that vault's `AGENTS.md` for claiming and status; this file still governs every change in this repo. Active plans live there, not under `docs/`.
+- Work is queued, refined and planned in the work-queue vault, `charybdis-notes` beside this checkout (see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees)). When a task comes from it, follow that vault's `AGENTS.md` for claiming and status; this file still governs every change in this repo. Active plans live there, not under `docs/`.
 - Hardware measurements are the exception: raw captures live under `measurements/<subject>/YYYY-MM-DD-<label>/` with a set record, captured with the subject's procedure. Read [`measurements/README.md`](./measurements/README.md) before taking or quoting a measurement; never edit a capture file.
 
 ## Repo Boundaries
@@ -109,7 +116,7 @@ Required verification workflow:
    `tools/build-image` names, the one CI builds releases in, so local and
    released pairs share a compiler and are byte-identical for one commit and BK
    pin; Docker must be running, and the script never falls back to the host
-   compiler. Keep every workflow's `image:` equal to `tools/build-image`. From a task worktree, set `QMK_ROOT` to the QMK
+   compiler. Keep every workflow's `image:` equal to `tools/build-image`, which pins the image by digest (D-F05). From a task worktree, set `QMK_ROOT` to the QMK
    checkout and `BUILD_ROOT` to an output folder, or run the work-queue vault's
    `_agents/bin/verify`, which runs steps 4–7 as they apply, sets both and
    serializes builds: every agent shares QMK's one output path, so two

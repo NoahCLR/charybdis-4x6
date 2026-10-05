@@ -10,16 +10,18 @@ to its independent sibling repository.
 
 ## Local repositories and worktrees
 
-On Noah's machine, the main checkouts are:
+Noah's main checkouts sit side by side in one workspace folder
+(`/Users/noah/dev/charybdis` on his main Mac). A Mac has only the ones it works
+on; building firmware needs the BK checkout beside it:
 
-- Firmware: `/Users/noah/dev/charybdis/charybdis-4x6`.
+- Firmware: `charybdis-4x6`.
 - Ark: [NoahCLR/charybdis-ark](https://github.com/NoahCLR/charybdis-ark)
-  (`/Users/noah/dev/charybdis/charybdis-ark` locally).
-- Upstream QMK build dependency: `/Users/noah/dev/charybdis/bastardkb-qmk`
+  (`charybdis-ark`).
+- Upstream QMK build dependency: `bastardkb-qmk`
   ([NoahCLR/bastardkb-qmk](https://github.com/NoahCLR/bastardkb-qmk):
   development on `noah-userspace-contracts-dev`, released line
   `noah-userspace-contracts`, legacy upstream mirror `main`).
-- Work queue: `/Users/noah/dev/charybdis/charybdis-notes`, an Obsidian vault
+- Work queue: `charybdis-notes`, an Obsidian vault
   (private [NoahCLR/charybdis-notes](https://github.com/NoahCLR/charybdis-notes))
   holding notes, tasks, active plans and keyboard checks for all three
   repositories. Its `AGENTS.md` says how a task is refined and picked up.
@@ -88,8 +90,13 @@ The UF2 is this userspace and the BK fork compiled together, so this repository
 names the exact BK commit it builds with in `qmk-pin.json`: a published commit
 on the fork's `noah-userspace-contracts-dev`. Everything uses it:
 `tools/build-firmware-pair.sh` refuses a BK checkout that is not at the pin or
-has local changes (`NOAH_ALLOW_UNPINNED_QMK=1` allows it for a trial, printed
-as such), and CI's `Host suite (GCC)` and `Pair build` check BK out at the pin.
+has local changes, and CI's `Host suite (GCC)` and `Pair build` check BK out at
+the pin. `NOAH_ALLOW_UNPINNED_QMK=1` builds against the BK checkout as it is,
+printed as such and recorded in the pair's note as "not the pin": VS Code's
+build tasks set it, because they are development builds of the checkouts you
+have open, and verify uses it for trials and BK changes. Such a pair is never
+released: a release publishes CI's pair, built at the pin, only when it equals
+a filed pair byte for byte.
 A non-required nightly job runs the host suite against the BK dev head and
 reports how far it is ahead of the pin. The vault's `verify` checks BK out
 at the pin itself, and its `land` refuses a pull request whose pin is not on

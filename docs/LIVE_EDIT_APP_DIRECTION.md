@@ -666,6 +666,16 @@ published pair can be matched to a local one. Before this, local pairs used
 Homebrew GCC 8.5.0 and releases GCC 14.2.1; the memory effect is recorded in
 [memory budgets](architecture/memory-budgets.md#release-compiler-gcc-1421--2026-10-01).
 
+`tools/build-image` names the image by its multi-arch index digest
+(`name:tag@sha256:…`; the tag is only for reading), so a tag pushed again
+cannot change the compiler. The index, not one platform's manifest, keeps the
+Mac building in the image's `linux/arm64` variant and CI in its `linux/amd64`
+one. To move to a new image, read its index digest with
+`docker buildx imagetools inspect <name:tag>` (the top-level `Digest`), put the
+new reference in `tools/build-image` and every workflow's `image:` (a host test
+keeps them equal and pinned), and compare a pair built before and after for the
+same firmware commit and BK pin: different bytes mean the compiler changed.
+
 ## D-F06 — CI runs for releases; the release gate may run Ark's agreement check
 
 Development is verified locally (the work-queue vault's `verify`), so CI does not
