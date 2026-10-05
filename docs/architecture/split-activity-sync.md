@@ -2,8 +2,8 @@
 
 Activity coalescing is on in the default build. `NOAH_SPLIT_ACTIVITY_COALESCE=no`
 builds the uncoalesced comparison firmware. It is accepted on hardware in daily
-use; its measured effect on the report rate is still open, see the
-*Split transport optimization* plan in the work-queue vault.
+use; its measured effect on the report rate is still open. Measure it with the
+recorders below.
 The split link runs at QMK's default 230,400 baud, with no speed selector; see
 D-L43 for why 460,800 was removed.
 
@@ -139,6 +139,7 @@ transport timeouts.
 
 ## Remaining work
 
-The runtime RPC replacement and asynchronous transport remain behind the
-measurement gates in the *Split transport optimization* plan (work-queue vault). No 1 kHz claim
-or acceptance is implied by the activity implementation or calculated byte savings.
+A dedicated runtime exchange replacing the four-transaction RPC, and an
+asynchronous transport, are not built. Measure with the recorders below before
+building either. No 1 kHz claim or acceptance is implied by the activity
+implementation or calculated byte savings.
