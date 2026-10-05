@@ -689,3 +689,29 @@ against this firmware, against Ark `main` (Ark `dev` when the release marker say
 the release is joint), so `main` cannot move to a contract the released app does
 not speak, not even through a merge on the GitHub page. The independence test
 exempts that one workflow and nothing else.
+
+## D-F07 — A directional mode can send once per movement
+
+A directional mode either sends once per threshold step, as before, or once per
+movement, so an imprecise movement does not send a burst of the same shortcut.
+A movement ends after a 150 ms pause (the engine's existing idle boundary) or
+the mode ending. Within one, only motion back against the direction that sent,
+a whole threshold of it, sends again, so a back-and-forth sends once per leg
+while a turn, or a single stray report in a long move, sends nothing more;
+leftover motion is dropped. It is byte 87 of the unchanged
+96-byte directional record, zero (once per step) in every existing profile, so
+the domain version stays `1` and older firmware and apps reject a nonzero value
+as reserved, as with axis `3` (D-L24). See
+[PD-mode domain v1](architecture/pd-mode-domain-v1.md).
+
+## D-F08 — A scrolling mode can scroll one axis only
+
+A scrolling mode scrolls both axes, as before, horizontally only or vertically
+only. The engine still chooses and holds an axis per gesture exactly as for
+both axes; a gesture held on the excluded axis sends nothing, and its steps are
+consumed and still decay the other axis. So a sideways swipe in a vertical-only
+mode is dropped whole rather than having its slight vertical drift scroll, and
+excluded motion is never remapped onto the allowed axis. It is byte 3 of the
+scrolling record, which was zero, so every existing profile scrolls both axes;
+the domain version stays `1`, and older firmware and apps reject a nonzero
+value, as with D-F07. See [PD-mode domain v1](architecture/pd-mode-domain-v1.md).

@@ -1,7 +1,7 @@
 #include "profile_pd_v1.h"
 #include <string.h>
 
-_Static_assert(sizeof(noah_pd_config_t) == 96 && offsetof(noah_pd_config_t, scroll) == 70 && offsetof(noah_pd_config_t, directions) == 36 && offsetof(noah_pd_config_t, diagonals) == 70 && offsetof(noah_pd_config_t, empty_direction) == 86, "PD native structure layout drift");
+_Static_assert(sizeof(noah_pd_config_t) == 96 && offsetof(noah_pd_config_t, scroll) == 70 && offsetof(noah_pd_config_t, directions) == 36 && offsetof(noah_pd_config_t, diagonals) == 70 && offsetof(noah_pd_config_t, empty_direction) == 86 && offsetof(noah_pd_config_t, direction_output) == 87, "PD native structure layout drift");
 
 static void write_u16(uint8_t *p, uint16_t value) { p[0] = (uint8_t)value; p[1] = (uint8_t)(value >> 8); }
 void noah_profile_pd_v1_encode_record(const noah_pd_config_t *config, uint8_t output[96]) {
@@ -104,25 +104,30 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *p,
         }
     }
     if (p[1] == 1 && p[3] == NOAH_PD_AXIS_EIGHT) {
-        // Both axes are read, so both need a threshold; bytes 70..86 carry
-        // the diagonals and byte 86 what an empty one does.
+        // Both axes are read, so both need a threshold; bytes 70..85 carry
+        // the diagonals, byte 86 what an empty direction does and byte 87 how
+        // often a direction sends.
         if (p[6]) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 6);
         if (!u16(p + 32) || !u16(p + 34)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 32);
         for (size_t i = 70; i < 86; i += 4) {
             if (!tap_valid(p + i)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ACTION, i);
         }
         if (p[86] > NOAH_PD_EMPTY_DIRECTION_NOTHING) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 86);
-        if (!zero(p + 87, 3)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 87);
+        if (p[87] > NOAH_PD_DIRECTION_OUTPUT_ONCE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 87);
+        if (!zero(p + 88, 2)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 88);
     } else if (p[1] == 1) {
-        // No diagonals; byte 86 is what an empty direction does.
+        // No diagonals; byte 86 is what an empty direction does, byte 87 how
+        // often a direction sends.
         if (p[6] || !zero(p + 70, 16)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 6);
         if (p[86] > NOAH_PD_EMPTY_DIRECTION_NOTHING) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 86);
-        if (!zero(p + 87, 3)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 87);
+        if (p[87] > NOAH_PD_DIRECTION_OUTPUT_ONCE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 87);
+        if (!zero(p + 88, 2)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 88);
         if ((p[3] != 0 && !u16(p + 32)) || (p[3] != 1 && !u16(p + 34))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 32);
         if ((p[3] == 0 && (u16(p + 32) || !zero(p + 36, 8))) ||
             (p[3] == 1 && (u16(p + 34) || !zero(p + 44, 8)))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 32);
     } else {
-        if (p[3] || !zero(p + 32, 20)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 3);
+        // Byte 3 is which axes it scrolls.
+        if (p[3] > NOAH_PD_SCROLL_VERTICAL || !zero(p + 32, 20)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 3);
         if (!u16(p + 70) || !u16(p + 72) || !u16(p + 74) || !u16(p + 76) ||
             !u16(p + 82) || u16(p + 80) < u16(p + 82) || !p[84] || !p[85] || !p[86] || !p[87] ||
             p[84] < p[85] || p[86] < p[87] || (uint32_t)p[86] * p[85] > (uint32_t)p[84] * p[87] ||

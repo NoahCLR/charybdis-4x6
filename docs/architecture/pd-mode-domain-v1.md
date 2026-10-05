@@ -106,7 +106,7 @@ own domain; schema 2 contains eight corresponding ID/HSV/locality rows.
 | 0 | 1 | Slot ID, equal to record index |
 | 1 | 1 | Kind: disabled `0`, directional `1`, scrolling `2` |
 | 2 | 1 | Pointer-layer policy: keep available `0`, prefer typing `1` |
-| 3 | 1 | Directional axis: vertical `0`, horizontal `1`, dominant `2`, eight directions `3`; scrolling uses zero |
+| 3 | 1 | Directional axis: vertical `0`, horizontal `1`, dominant `2`, eight directions `3`. Scrolling axes: both `0`, horizontal only `1`, vertical only `2` |
 | 4 | 2 | DPI: zero inherits; otherwise explicit value |
 | 6 | 1 | Owned scrolling modifiers; directional modes use zero |
 | 7 | 1 | Reserved, zero |
@@ -130,11 +130,13 @@ Eight-direction records (kind `1`, axis `3`, added 2026-09-23) reuse bytes
 | --- | --- | --- |
 | 70, 74, 78, 82 | 4 each | Up-left/up-right/down-left/down-right tap records |
 | 86 | 1 | Empty diagonal: nearest straight direction `0`, both neighbours `1`, nothing `2` |
-| 87 | 3 | Reserved, zero |
+| 87 | 1 | Output: once per step `0`, once per movement `1` |
+| 88 | 2 | Reserved, zero |
 
 Firmware and apps that predate axis `3` reject it as an unknown axis policy,
 so the domain version stays `1`: an older reader refuses such a profile rather
-than misreading it.
+than misreading it. Byte 87 (added 2026-10-05) follows the same rule: older
+readers reject a nonzero value as reserved.
 
 Names contain at most 23 UTF-8 bytes, no embedded NUL, ASCII C0 controls or DEL,
 and no malformed, overlong or surrogate encodings. Configured modes require a
@@ -164,16 +166,37 @@ dropped; a diagonal step is one threshold step along the diagonal, and entering
 a diagonal takes half a step more before its first tap, so a turn from one axis
 to the other passes through it without firing.
 
+Byte 87 is how often every directional mode sends: `0` once per threshold
+step, as above, and `1` once per movement, so an imprecise movement does not
+send a burst of the same shortcut. A movement starts with the first motion
+after the mode starts or after a 150 ms pause. Its first step that sends
+anything spends it in the direction that sent. From then on only a direction
+pointing back against that one, more than 90° from it, may send, a whole
+threshold of its own, and its sending spends the movement in turn; so a turn
+sends nothing more, and a back-and-forth sends once per leg. Any other motion
+is dropped rather than banked. A stray report against the held direction
+releases the hold as usual but sends only if it alone carries a whole step
+back, so a long move with one wobble still sends once. One step is one output under the
+empty-direction policy below: a shortcut, or both neighbours as a pair; a step that sends nothing (a dead zone,
+or both neighbours empty) leaves the movement unspent. The per-report budget
+still applies, and a still report drains nothing once the movement is spent.
+
 Byte 86 is what every directional mode does with motion toward a direction
 that exists but has no shortcut: `0` its neighbours take its share, `1` both
 compass neighbours 45° either side are tapped (a diagonal's two straight
 directions, a straight direction's two diagonals; only eight directions has
 them, so in the other modes `1` acts as `0`; the one the movement leans
 toward is tapped first, and an empty neighbour sends nothing),
-and `2` the motion is consumed. Records with axis 0–2 carry byte 86 too; bytes
-70..85 stay zero outside eight directions, and 87..89 are always zero. A configured
-axis may have no output in either direction. Scrolling modes zero the axis and
-directional fields. Their thresholds, divisors and axis timeout are positive;
+and `2` the motion is consumed. Records with axis 0–2 carry bytes 86 and 87
+too; bytes 70..85 stay zero outside eight directions, and 88..89 are always
+zero. A configured axis may have no output in either direction. Scrolling modes zero the directional
+fields; their byte 3 says which axes they scroll (added 2026-10-05; older
+readers reject a nonzero value). The engine runs as for both axes, choosing
+and holding an axis per gesture with every threshold and ratio, but a gesture
+held on an axis the mode does not scroll sends nothing: its steps are consumed
+and still decay the other axis, so a sideways swipe in a vertical-only mode
+neither scrolls nor leaks its drift into vertical scrolling, and nothing it
+banked can scroll later. Their thresholds, divisors and axis timeout are positive;
 expiry is at least the timeout. Interval zero means no output throttling.
 Ratio numerators and denominators are positive, start and sustain are at least
 1:1, and sustain cannot exceed start. Decay is at least two. Only two inversion

@@ -25,12 +25,13 @@ static void owned_modifiers(uint8_t mask, bool pressed) {
     }
 }
 
-static void emit_tap(const uint8_t *tap) {
+static bool emit_tap(const uint8_t *tap) {
     uint16_t key = u16(tap);
-    if (!key) return;
+    if (!key) return false;
     if (tap[2] == 1u) noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(key, tap[3], true);
     else if (tap[2] == 2u) noah_emit_literal_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
     else noah_emit_synthetic_qmk_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+    return true;
 }
 
 // ── Directional engine ──────────────────────────────────────────────────────
@@ -53,6 +54,18 @@ static void emit_tap(const uint8_t *tap) {
 // axes passes through it without firing. A move against the held direction
 // releases it at once; after DIRECTION_IDLE_MS still, the next move chooses
 // afresh and keeps its progress only if it continues the same way.
+//
+// Byte 87 says how often a direction sends: once per threshold step, or once
+// per movement. A movement starts on the first motion after the mode starts or
+// after DIRECTION_IDLE_MS still, and the first step that sends anything spends
+// it in the direction that sent. From then on only a direction pointing back
+// against that one, more than 90 degrees from it, may send, and its sending
+// spends the movement in turn; any other motion is dropped rather than banked,
+// so the next movement starts from nothing. A stray report against the held
+// direction releases the hold, but sends only if it alone carries a whole step
+// back, so a long move with one wobble does not send twice. A step that sends
+// nothing, in a dead zone or with both neighbours empty, leaves the movement
+// unspent.
 enum {
     DIRECTION_IDLE_MS = 150,
     DIRECTION_NONE    = 0xff,
@@ -81,6 +94,8 @@ typedef struct {
     uint8_t  held;                 // DIRECTION_NONE when free
     bool     motion_known;
     bool     fresh; // after a pause: choose without the margin
+    bool     spent;     // a once-per-movement mode has sent this movement's output
+    uint8_t  spent_dir; // the direction that sent it
 } direction_state_t;
 static direction_state_t direction;
 
@@ -141,10 +156,12 @@ static uint8_t choose_direction(int64_t x, int64_t y, uint8_t available) {
     return best;
 }
 
-static void directional_step(uint8_t dir, uint8_t *budget) {
+// One threshold step toward `dir`; returns whether it sent anything.
+static bool directional_step(uint8_t dir, uint8_t *budget) {
     const uint8_t *slot = direction_slot(dir);
+    bool           sent = false;
     if (u16(slot)) {
-        emit_tap(slot);
+        sent = emit_tap(slot);
         (*budget)--;
     } else if (active[86] == NOAH_PD_EMPTY_DIRECTION_BOTH) {
         // Both compass neighbours: a diagonal's two straight directions, a
@@ -157,12 +174,33 @@ static void directional_step(uint8_t dir, uint8_t *budget) {
             first        = second;
             second       = swap;
         }
-        emit_tap(direction_slot(first));
-        emit_tap(direction_slot(second));
+        sent = emit_tap(direction_slot(first));
+        sent = emit_tap(direction_slot(second)) || sent;
         *budget = *budget >= 2u ? (uint8_t)(*budget - 2u) : 0u;
     } else {
         (*budget)--; // a dead zone still consumes the motion
     }
+    return sent;
+}
+
+// Whether a spent movement keeps the held direction from sending: it does
+// unless the held direction points back against the one that sent.
+static bool directional_blocked(void) {
+    uint8_t held = direction.held, sent = direction.spent_dir;
+    return direction.spent && direction_x[held] * direction_x[sent] + direction_y[held] * direction_y[sent] >= 0;
+}
+
+// Sends the held direction's whole steps, up to the per-report budget. A
+// blocked direction drops its progress instead.
+static void directional_drain(int64_t step, uint8_t *budget) {
+    while (*budget && !directional_blocked() && direction.progress >= step) {
+        if (directional_step(direction.held, budget) && active[87] == NOAH_PD_DIRECTION_OUTPUT_ONCE) {
+            direction.spent     = true;
+            direction.spent_dir = direction.held;
+        }
+        direction.progress -= step;
+    }
+    if (directional_blocked()) direction.progress = 0;
 }
 
 static void directional(report_mouse_t report) {
@@ -176,14 +214,14 @@ static void directional(report_mouse_t report) {
         // A still report drains what the held direction has banked, up to the
         // per-report budget, as the single-axis accumulator always did.
         if (direction.held == DIRECTION_NONE) return;
-        while (budget && direction.progress >= step) {
-            directional_step(direction.held, &budget);
-            direction.progress -= step;
-        }
+        directional_drain(step, &budget);
         return;
     }
     now = timer_read32();
-    if (direction.motion_known && timer_elapsed32(direction.last_motion) > DIRECTION_IDLE_MS) direction.fresh = true;
+    if (direction.motion_known && timer_elapsed32(direction.last_motion) > DIRECTION_IDLE_MS) {
+        direction.fresh = true;
+        direction.spent = false; // a pause ends the movement
+    }
     direction.last_motion  = now;
     direction.motion_known = true;
 
@@ -213,10 +251,7 @@ static void directional(report_mouse_t report) {
     // The backlog keeps at most NOAH_PD_MODE_MAX_BACKLOG_TAPS whole steps and
     // the part of one, as the single-axis accumulator always did.
     if (direction.progress > step * NOAH_PD_MODE_MAX_BACKLOG_TAPS) direction.progress = step * NOAH_PD_MODE_MAX_BACKLOG_TAPS + direction.progress % step;
-    while (budget && direction.progress >= step) {
-        directional_step(chosen, &budget);
-        direction.progress -= step;
-    }
+    directional_drain(step, &budget);
 }
 
 void noah_pd_engine_exit(void) {
