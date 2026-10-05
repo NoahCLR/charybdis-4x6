@@ -140,6 +140,8 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
 
     def test_every_workflow_builds_in_the_build_image(self):
         image = (REPO / 'tools/build-image').read_text().strip()
+        # Pinned by its multi-arch index digest (D-F05): a tag can be pushed again.
+        self.assertRegex(image, r'^[a-z0-9./_-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$')
         found = []
         for workflow in (REPO / '.github/workflows').glob('*.y*ml'):
             for line in workflow.read_text().splitlines():
