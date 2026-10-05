@@ -31,8 +31,11 @@ Apply the draft. The layout key picker reads populated slots from the current
 draft, so a newly named mode appears immediately with its canonical hold and
 toggle actions.
 
-**Advanced** holds pointer-layer policy, active axes and thresholds, per-action
-modifier inheritance, scroll gesture ratios/timing and mouse-button overrides.
+**Advanced** holds pointer-layer policy, active axes and thresholds (with the
+ball movement each threshold is at the mode's DPI), what each direction's
+shortcut does with held modifiers (inherit them, leave chosen ones out, or send
+exactly the shortcut), scroll gesture ratios/timing and mouse-button overrides.
+A mouse-button shortcut keeps the modifier handling it was stored with.
 Volume, brightness, zoom, arrow navigation, history shortcuts and
 modifier-assisted scrolling use the same facilities. Mouse buttons 1–3 can pass
 through, be consumed, tap a shortcut or hold modifiers. Choose what a button
@@ -77,6 +80,14 @@ to synthetic key taps. They share one overload policy:
 - motion beyond the retained bound is intentionally discarded and counted in
   per-mode diagnostics instead of blocking matrix, split, or RGB work
 - reversing direction or leaving the mode clears obsolete retained work
+- a directional mode can instead send **once per movement**: one shortcut
+  however far the ball moves, then nothing until a pause of 150 ms or the mode
+  ending starts the next movement, or the ball moves back against the
+  direction that sent (more than 90° from it), which sends once more; turning
+  into another direction within a movement sends nothing, and a single stray
+  report does not count as moving back. It is the record's output setting
+  (`.direction_output = NOAH_PD_DIRECTION_OUTPUT_ONCE` in `pd_config.c`); the
+  factory slots send once per step
 
 At the configured limits, a saturated backlog drains in no more than eight
 successful polls. `PD_SLOT_0` and `PD_SLOT_5` produce wheel reports through a
@@ -170,6 +181,11 @@ While active:
   motion, so a new gesture cannot inherit stale scroll state
 - horizontal motion can still contribute to horizontal scroll when the host
   surface accepts horizontal wheel input
+- a scrolling mode can be limited to **horizontal only** or **vertical only**
+  (the record's scroll axes, `.axis = NOAH_PD_SCROLL_VERTICAL` in
+  `pd_config.c`); a gesture on the other axis then does nothing, and its
+  drift does not turn into scrolling on the allowed axis. The factory slots
+  scroll both axes
 
 This is the base mode that scroll-like modes build on.
 

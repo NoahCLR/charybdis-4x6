@@ -974,6 +974,128 @@ static void test_configured_dominant_axis(void) {
     noah_pd_engine_exit();
 }
 
+// Once per movement (byte 87): the first step that sends anything spends the
+// movement; after that only motion back against the direction that sent may
+// send, and a pause or the mode ending starts the next movement.
+static void test_configured_once_per_movement(void) {
+    uint8_t slot[96];
+
+    directional_slot(slot, NOAH_PD_AXIS_DOMINANT, 0, false);
+    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    test_reset_stubs();
+    directional_clock = 1000u;
+    noah_pd_engine_enter(slot);
+    // However far it goes, a movement sends one shortcut, and still reports
+    // drain nothing.
+    CHECK(directional_run(10, 0, 6, KC_RIGHT) == 1);
+    directional_move(0, 0);
+    CHECK(synthetic_tap_call_count == 0);
+    // A turn within the movement sends nothing more, even when it then
+    // reverses: up is no more against right than down was.
+    CHECK(directional_run(2, 10, 6, KC_DOWN) == 0);
+    CHECK(directional_run(0, -10, 4, KC_UP) == 0);
+    // Moving back against the direction that sent sends once, and spends the
+    // movement in its own direction: going on sends nothing, coming back once.
+    CHECK(directional_run(-10, 0, 6, KC_LEFT) == 1);
+    CHECK(directional_run(10, 0, 4, KC_RIGHT) == 1);
+    // One stray report against a long move releases the hold but sends
+    // nothing, and the move going on stays spent.
+    directional_clock += 500u;
+    CHECK(directional_run(10, 0, 3, KC_RIGHT) == 1);
+    directional_move(-1, 0);
+    CHECK(synthetic_tap_call_count == 0);
+    CHECK(directional_run(10, 0, 3, KC_RIGHT) == 0);
+    // So does a pause; the spent movement's motion is not banked, so the next
+    // one needs its own threshold.
+    directional_clock += 500u;
+    directional_move(4, 0);
+    CHECK(synthetic_tap_call_count == 0);
+    directional_move(6, 0);
+    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    // A move many steps long in one report sends one shortcut, not the budget.
+    directional_clock += 500u;
+    directional_move(10 * 10, 0);
+    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    // A short pause does not end the movement.
+    directional_clock += 100u;
+    CHECK(directional_run(10, 0, 3, KC_RIGHT) == 0);
+    // Entering the mode again starts afresh.
+    noah_pd_engine_enter(slot);
+    CHECK(directional_run(10, 0, 3, KC_RIGHT) == 1);
+
+    // A dead zone sends nothing, so it does not spend the movement: turning
+    // from an empty diagonal to a straight direction still sends once.
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NOTHING, false);
+    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    noah_pd_engine_enter(slot);
+    CHECK(directional_run(10, -10, 4, KC_NO) == 0);
+    CHECK(directional_run(10, 0, 6, KC_RIGHT) == 1);
+    // A diagonal is spent the same way: a stray report more than 90 degrees
+    // from it sends nothing, and a 90-degree turn is not back against it.
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NEAREST, true);
+    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    noah_pd_engine_enter(slot);
+    CHECK(directional_run(10, 10, 4, KC_PGDN) == 1);
+    directional_move(0, -1);
+    CHECK(synthetic_tap_call_count == 0);
+    CHECK(directional_run(10, 10, 4, KC_PGDN) == 0);
+    CHECK(directional_run(-10, -10, 4, KC_HOME) == 1);
+    CHECK(directional_run(10, -10, 4, KC_PGUP) == 0);
+    // Both neighbours are one step's output: one pair, then nothing.
+    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_BOTH, false);
+    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    noah_pd_engine_enter(slot);
+    uint8_t pairs = 0;
+    for (uint8_t i = 0; i < 6; i++) {
+        directional_move(10, -8);
+        CHECK(synthetic_tap_call_count == 0 || (synthetic_tap_call_count == 2 && tapped(0) == KC_RIGHT && tapped(1) == KC_UP));
+        pairs += synthetic_tap_call_count / 2u;
+    }
+    CHECK(pairs == 1);
+    noah_pd_engine_exit();
+}
+
+// A scrolling slot limited to one axis (byte 3) scrolls only that axis. A
+// gesture on the other axis is dropped whole: it sends nothing, and its drift
+// on the allowed axis is decayed as usual instead of building into a scroll.
+static void test_configured_scroll_one_axis(void) {
+    uint8_t        slot[96];
+    report_mouse_t report;
+    uint32_t       now = 1000u;
+    memcpy(slot, pd_engine_fixture + 8, 96); // Dragscroll
+    test_reset_stubs();
+
+    slot[3] = NOAH_PD_SCROLL_VERTICAL;
+    noah_pd_engine_enter(slot);
+    for (uint8_t i = 0; i < 12; i++) {
+        fake_time32 = now += 20u;
+        report      = noah_pd_engine_motion((report_mouse_t){.x = 18, .y = 3});
+        CHECK(report.x == 0 && report.y == 0 && report.h == 0 && report.v == 0);
+    }
+    fake_time32 = now += 200u;
+    report      = noah_pd_engine_motion((report_mouse_t){.x = 2, .y = -24});
+    CHECK(report.h == 0 && report.v != 0);
+
+    slot[3] = NOAH_PD_SCROLL_HORIZONTAL;
+    noah_pd_engine_enter(slot);
+    for (uint8_t i = 0; i < 12; i++) {
+        fake_time32 = now += 20u;
+        report      = noah_pd_engine_motion((report_mouse_t){.x = 3, .y = -24});
+        CHECK(report.h == 0 && report.v == 0);
+    }
+    fake_time32 = now += 200u;
+    report      = noah_pd_engine_motion((report_mouse_t){.x = 18, .y = 2});
+    CHECK(report.h != 0 && report.v == 0);
+
+    // Both axes, as every existing profile: the same swipes scroll.
+    slot[3] = NOAH_PD_SCROLL_BOTH;
+    noah_pd_engine_enter(slot);
+    fake_time32 = now += 200u;
+    report      = noah_pd_engine_motion((report_mouse_t){.x = 18, .y = 3});
+    CHECK(report.h != 0 && report.v == 0);
+    noah_pd_engine_exit();
+}
+
 static void test_configured_release_ownership_and_custom_slot(void) {
     uint8_t slot[96];
     memcpy(slot, pd_engine_fixture + 8 + 4 * 96, 96);
@@ -1027,6 +1149,8 @@ int main(void) {
     test_configured_eight_directions();
     test_configured_dominant_axis();
     test_configured_empty_directions_and_single_axes();
+    test_configured_once_per_movement();
+    test_configured_scroll_one_axis();
     test_dragscroll_horizontal_lock_filters_vertical_jitter();
     test_dragscroll_vertical_lock_filters_horizontal_jitter();
     test_dragscroll_near_diagonal_motion_waits_for_dominant_axis();

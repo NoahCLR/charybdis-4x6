@@ -31,7 +31,7 @@
     },
     {
       "path": "pd-corpus.bin.gz",
-      "sha256": "bf7c37a2e8b956053c652fb63b4d5c931425eda595fe8b995bf50c44ee6b0da2"
+      "sha256": "513fca08c6abd015aaa1be5cb08145b87535a01c3d7e174d663f199401e73b9c"
     }
   ],
   "generationRecipe": {

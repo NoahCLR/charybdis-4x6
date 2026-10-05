@@ -25,12 +25,23 @@ enum {
     NOAH_PD_AXIS_DOMINANT,
     NOAH_PD_AXIS_EIGHT,
 };
+// Which axes a scrolling mode scrolls (byte 3 of a scrolling record).
+enum {
+    NOAH_PD_SCROLL_BOTH = 0,
+    NOAH_PD_SCROLL_HORIZONTAL,
+    NOAH_PD_SCROLL_VERTICAL,
+};
 // What a directional mode does with motion toward a direction that has no
 // shortcut (byte 86, every directional record).
 enum {
     NOAH_PD_EMPTY_DIRECTION_NEAREST = 0, // its neighbours take its share
     NOAH_PD_EMPTY_DIRECTION_BOTH,        // both compass neighbours (eight directions; elsewhere as nearest)
     NOAH_PD_EMPTY_DIRECTION_NOTHING,     // a dead zone
+};
+// How often a directional mode sends (byte 87, every directional record).
+enum {
+    NOAH_PD_DIRECTION_OUTPUT_REPEAT = 0, // one output per threshold step
+    NOAH_PD_DIRECTION_OUTPUT_ONCE,       // one output per movement
 };
 
 typedef enum {
@@ -70,7 +81,8 @@ typedef struct {
         struct {
             noah_pd_tap_t diagonals[4]; // eight directions: up-left, up-right, down-left, down-right
             uint8_t       empty_direction;
-            uint8_t       diagonal_reserved[3];
+            uint8_t       direction_output;
+            uint8_t       diagonal_reserved[2];
         };
     };
     uint8_t tail_reserved[6];
