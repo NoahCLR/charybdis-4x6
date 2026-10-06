@@ -43,9 +43,11 @@ Those are capabilities, not a fixed layout prescription. `keymap.c` decides
 where these ideas live. Pointing-mode keys can be simple momentary holds, locks,
 or richer tap/hold keys using the same behavior table as the rest of the board.
 
-Charybdis Ark has **Pointing modes** with eight slots and eight matching
+Charybdis Ark has **Pointing modes** with 32 slots and 32 matching
 RGB configurations. Dragscroll, Volume, Brightness, Zoom, Arrow and Pinch occupy
-the first six slots; slot 6 provides Undo / Redo and slot 7 starts empty. Create directional key or
+the first six slots; slot 6 provides Undo / Redo and slots 7–31 start empty
+(`PD_SLOT_0`…`PD_SLOT_31` hold a slot, `PD_SLOT_n_LOCK` locks it). Only the
+slots in use take space in the saved profile. Create directional key or
 shortcut actions with the shared keycode picker, duplicate a mode, or configure
 scrolling with optional held modifiers. The everyday flow shows name, movement,
 DPI and actions; pointer policy, thresholds, timing, modifier rules and mouse
@@ -393,11 +395,11 @@ come from the same compiler and are byte-identical for the same commit. Docker
 must be running. A note beside each pair (`N_charybdis.build.txt`) records the
 firmware and BK commits, the compiler and both files' SHA-256.
 
-All current builds use the eight-slot engine and schema-2 EEPROM geometry. Use
+All current builds use the 32-slot engine and schema-2 EEPROM geometry. Use
 `sh tools/build-firmware-pair.sh` for the flashable side-specific pair. The
 right build uses `NOAH_PHYSICAL_HALF=right` and `FORCE_MASTER=yes`; the left uses
 `NOAH_PHYSICAL_HALF=left` and `FORCE_SLAVE=yes`. A plain `qmk compile` produces
-an eight-slot factory-only image without the live profile owner.
+a 32-slot factory-only image without the live profile owner.
 
 ## Old firmware and profile limits
 

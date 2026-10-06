@@ -260,7 +260,7 @@ This pattern applies to:
 | `matrix_scan_user()` | `noah_matrix_scan_user()` | VIA macro default reseeding, one rotating scan-owned durable-I/O grant across profile discovery/VIA mirroring/VIA reconciliation, key runtime scanning, and split shared-state sync ticks |
 | `matrix_slave_scan_user()` | `noah_matrix_slave_scan_user()` | the slave half's rotating durable-I/O grant, including live-profile initialization and profile/VIA split receiver mailboxes; QMK never routes the slave through `matrix_scan_user()` |
 | `housekeeping_task_user()` | `noah_housekeeping_task_user()` | held-repeat ticking, watchdog refresh, and runtime boot-indicator expiry |
-| `suspend_power_down_user()` | `noah_suspend_power_down_user()` | watchdog refresh while the host has USB suspended; QMK's suspend loop never reaches `housekeeping_task()`, so an override that drops this chain lets the watchdog reset the master about 750 ms after the host sleeps |
+| `suspend_power_down_user()` | `noah_suspend_power_down_user()` | watchdog refresh while the host has USB suspended; QMK's suspend loop never reaches `housekeeping_task()`, so an override that drops this chain lets the watchdog reset the master about 2 s after the host sleeps |
 | `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | VIA macro default seeding, profile-store discovery setup, durable-I/O scheduler setup, RGB runtime init, and split shared-state init |
 | `layer_state_set_user()` | `noah_layer_state_set_user()` | pointer-layer policy, auto-sniping layer state, and queueing scan-time pd-mode DPI policy after layer-owned sniping changes |
 | `pointing_device_task_user()` | `noah_pointing_device_task_user()` | pointer-mode mouse-report transforms and pointing idle-noise suppression |

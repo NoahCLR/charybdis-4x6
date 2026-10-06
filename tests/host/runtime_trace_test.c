@@ -27,7 +27,7 @@ static uint16_t fake_sniping_dpi;
 static uint16_t fake_last_cpi;
 
 static const uint8_t trace_pd_record[96] = {[1] = 1};
-const uint8_t *noah_effective_pd_for_mask(uint8_t mode) { return mode && !(mode & (mode - 1u)) ? trace_pd_record : NULL; }
+const uint8_t *noah_effective_pd_for_mask(uint32_t mode) { return mode && !(mode & (mode - 1u)) ? trace_pd_record : NULL; }
 void noah_pd_engine_enter(const uint8_t *record) { (void)record; }
 void noah_pd_engine_exit(void) {}
 uint8_t noah_pd_engine_masked_mods(const uint8_t *record) { (void)record; return 0; }

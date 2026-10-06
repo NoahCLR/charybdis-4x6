@@ -29,7 +29,7 @@ enum {
     // Regression policy for the payload-independent 32-bit scan state. This
     // is not a hardware SRAM-capacity claim; target resource gates account
     // for the linked instance separately.
-    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 360u,
+    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 368u,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8      = 0xffu,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16     = 0xffffu,
 };
@@ -122,10 +122,11 @@ typedef struct {
     uint32_t action_abi_digest;
 
     // Exact compiled identities used by behavior cross-reference validation.
-    uint8_t logical_layer_count;
-    uint8_t supported_pd_mode_mask;
-    uint8_t via_macro_slot_count;
-    uint8_t custom_key_count;
+    // One bit per PD slot; kept beside the other word so it adds no padding.
+    uint32_t supported_pd_mode_mask;
+    uint8_t  logical_layer_count;
+    uint8_t  via_macro_slot_count;
+    uint8_t  custom_key_count;
 
     // Optional firmware translation gate. Rejects native aliases of the same
     // combo input and actions the installed engine cannot execute.
@@ -152,7 +153,9 @@ typedef struct {
 
 typedef union {
 #ifdef NOAH_PD_PROFILE_ENABLE
-    struct { uint8_t bytes[96]; uint8_t slot, used; bool header; } pd;
+    // A sparse PD domain record by record: index counts records read, count
+    // is the header's record count and minimum the lowest ID the next may use.
+    struct { uint8_t bytes[96]; uint8_t index, used, count, minimum; bool header; } pd;
 #endif
     noah_profile_settings_v1_validation_t    settings;
     noah_profile_combo_v1_validation_t       combos;

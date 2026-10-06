@@ -195,19 +195,20 @@ static uint8_t settings_byte(uint16_t offset) {
     return 0u;
 }
 #ifndef NOAH_PD_PROFILE_ENABLE
-// The bridge's legacy pointing source is encoded once, at page 0.
-static uint8_t  snapshot[NOAH_PROFILE_PD_V1_SIZE];
+// The bridge's legacy pointing source is encoded once, at page 0, in the
+// retired fixed eight-slot version 1 that schema-1 clients read.
+static uint8_t  snapshot[NOAH_PROFILE_PD_V1_LEGACY_SIZE];
 static uint16_t snapshot_length;
 static bool     capture_legacy_pd(void) {
-    const uint8_t header[8] = {1, 8, 96, 0, 0, 0, 0, 0};
+    const uint8_t header[8] = {NOAH_PROFILE_PD_V1_LEGACY_VERSION, NOAH_PROFILE_PD_V1_LEGACY_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0, 0, 0, 0, 0};
     memcpy(snapshot, header, 8);
-    snapshot_length = NOAH_PROFILE_PD_V1_SIZE;
-    for (uint8_t id = 0; id < 8; id++) {
+    snapshot_length = NOAH_PROFILE_PD_V1_LEGACY_SIZE;
+    for (uint8_t id = 0; id < NOAH_PROFILE_PD_V1_LEGACY_SLOT_COUNT; id++) {
         uint8_t *record = snapshot + 8 + (size_t)id * 96;
         noah_profile_pd_v1_encode_record(&noah_pd_defaults[id], record);
 
     }
-    return noah_profile_pd_v1_validate(snapshot, snapshot_length, NULL) == NOAH_PROFILE_PD_V1_OK;
+    return noah_profile_pd_v1_validate_legacy(snapshot, snapshot_length, NULL) == NOAH_PROFILE_PD_V1_OK;
 }
 #endif
 // Up to 25 readback bytes of `kind` from `offset`; 0 past the end.

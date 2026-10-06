@@ -3,10 +3,12 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
-python3 - "$ROOT" "$BUILD_DIR/domain.bin" <<'PY'
+python3 - "$ROOT" "$BUILD_DIR" <<'PY'
 import json, sys
 from pathlib import Path
-Path(sys.argv[2]).write_bytes(bytes.fromhex(json.loads(Path(sys.argv[1], 'tests/fixtures/pd_mode_domain_v1.json').read_text())['hex']))
+cases = {case['name']: case for case in json.loads(Path(sys.argv[1], 'tests/fixtures/pd_mode_domain_v2.json').read_text())['valid']}
+for name in ('presets', 'full'):
+    Path(sys.argv[2], name + '.bin').write_bytes(bytes.fromhex(cases[name]['hex']))
 PY
 for sanitizer in normal sanitized; do
     flags=""
@@ -26,7 +28,7 @@ for sanitizer in normal sanitized; do
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
         -o "$BUILD_DIR/test"
-    "$BUILD_DIR/test" "$BUILD_DIR/domain.bin"
+    "$BUILD_DIR/test" "$BUILD_DIR/presets.bin" "$BUILD_DIR/full.bin"
 done
 arm-none-eabi-gcc -std=c11 -Wall -Wextra -Werror -pedantic -DNOAH_PD_PROFILE_ENABLE \
     -mcpu=cortex-m0plus -mthumb -I"$ROOT/users/noah" \

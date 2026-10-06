@@ -330,3 +330,48 @@ Both halves link the same SRAM figures under GCC 14 (left `FORCE_SLAVE`, right
 `FORCE_MASTER`). GCC 14 links 276 more static bytes; the tripwire margin is now
 340 bytes, so the next static growth must justify itself against it. These are
 linked measurements, not runtime high-water.
+
+## Thirty-two pointing slots — 2026-10-06
+
+D-F09 grows the effective PD cache from eight to 32 materialized slots (3,072
+bytes; the sparse domain is expanded once, at publication, so pointing never
+reads storage) and widens every pd-mode mask from 16 to 32 bits: the
+key-runtime press tokens, persistent intents and projections, the pd-mode
+owner and state tables, and the owner's compatibility limits. Fresh pairs from
+the release image (`arm-none-eabi-gcc` 14.2.1, BK `b8f5e32c`,
+`SKIP_VERSION=yes`, `sh tests/host/run_firmware_memory_budget_checks.sh` on the
+left image), per half:
+
+| Measurement | Before (`dev` `4f4b92bd`) | 32 slots |
+| --- | ---: | ---: |
+| SRAM0–3 `.data` | 4,172 | 4,172 |
+| SRAM0–3 `.bss` | 55,912 | 59,560 |
+| `.data + .bss` | 60,084 | 63,732 |
+| SRAM0–3 fixed linked prefix | 60,096 | 63,744 |
+| SRAM0–3 linker/core-memory span at boot | 202,048 | 198,400 |
+| Fixed linked occupancy across unique SRAM banks | 67,552 | 71,200 |
+
+By symbol, the PD cache grows by 2,296 bytes, the runtime singleton (key
+runtime, pd-mode state and owner tables) by 1,272, the profile owner by 24, and
+the compiled serializer's canonical behaviour order (64 rows, worked out once)
+by 68. The 63,732 bytes fail the 60,416-byte tripwire by 3,316. We explicitly budget
+4,096 additional bytes for this feature, making the schema-2 tripwire 64,512
+bytes and leaving 780 bytes of policy margin; the gate still selects it only
+from the ELF's recorded `NOAH_PD_PROFILE_ENABLE` flag. As with the eight-slot
+increment, this is a regression policy, not a statement of capacity: the
+boot span still leaves 198,400 bytes of SRAM0–3 to the core allocator, and an
+ELF analysis on 2026-10-06 found that the only runtime allocation from it is
+newlib `rand()`'s one-time state, so SRAM0–3 beyond the boot prefix is free at
+runtime. These are linked measurements, not runtime high-water.
+
+The live-owner stack gate's PD cache paths grow by 64–80 bytes (compiled cache
+initialization 816 bytes, published EEPROM read 1,128, record validation 1,120,
+all passing); the boot publication now reaches the cache through the provider
+listener table, a declared indirect edge. In the release image both reviewed
+stack gates report the same failures before and after this change (stale
+adjacencies for paths GCC 14 inlines, such as `directional_step`), so they
+are not new. Under host GCC 8.5.0, which no longer builds the flashed pair
+(D-F05), the ordinary gate's worst main-process path reaches its 1,920-byte
+budget (1,800 before), and two press-observation paths gain adjacency
+failures where that compiler now inlines `handled_key_materialize_hold` and
+`key_runtime_core_allocate_token_id`; both manifests need a GCC 14 review.

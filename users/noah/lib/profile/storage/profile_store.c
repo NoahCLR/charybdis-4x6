@@ -79,12 +79,12 @@ static uint8_t format_domain_mask(uint8_t version) {
 static bool domain_version_valid(uint8_t format, uint8_t id, uint8_t version) {
     if (id == DOMAIN_ID_COMBOS) return NOAH_PROFILE_COMBO_VERSION_ACCEPTED(version);
     if (format == NOAH_PROFILE_STORE_FORMAT_VERSION_PD) {
-        if (id == DOMAIN_ID_RGB) return version == 2u;
+        if (id == DOMAIN_ID_RGB) return NOAH_PROFILE_PD_RGB_VERSION_ACCEPTED(version);
         // The validator's own rule, so a settings version it accepts can
         // never pass validation and then be refused here: a hardcoded list
         // that missed v4 failed every stored copy with named macros.
         if (id == DOMAIN_ID_SETTINGS) return NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED(version);
-        if (id == DOMAIN_ID_PD) return version == 1u;
+        if (id == DOMAIN_ID_PD) return NOAH_PROFILE_PD_DOMAIN_VERSION_ACCEPTED(version);
     } else if (id == DOMAIN_ID_PD) {
         return false;
     }

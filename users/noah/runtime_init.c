@@ -91,7 +91,7 @@ void noah_housekeeping_task_user(void) {
 void noah_suspend_power_down_user(void) {
     // While the host has USB suspended, QMK loops inside protocol_pre_task()
     // and never reaches housekeeping_task(), so the restart watchdog would
-    // reset the master about 750 ms after the host sleeps. The suspend loop
+    // reset the master about 2 s after the host sleeps. The suspend loop
     // calls this every pass (~17 ms), so a hang there still trips the watchdog.
     noah_runtime_diag_heartbeat();
 }

@@ -112,8 +112,8 @@ _Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA mac
 // modes or layers never moves another keycode:
 //
 //   0x7e40–0x7e7f  CUSTOM_KEY_0–63      named keys that do what their behaviour says
-//   0x7e80–0x7e9f  PD_SLOT_n            hold pointing slot n    (32 reserved)
-//   0x7ea0–0x7ebf  PD_SLOT_n_LOCK       toggle pointing slot n  (32 reserved)
+//   0x7e80–0x7e9f  PD_SLOT_n            hold pointing slot n    (32, all used)
+//   0x7ea0–0x7ebf  PD_SLOT_n_LOCK       toggle pointing slot n  (32, all used)
 //   0x7ec0–0x7edf  LOCK_LAYER(n)        toggle layer n's lock   (32 reserved)
 //   0x7ee0–0x7fff  unassigned: inert, refused as a step or combo output
 //
@@ -217,8 +217,8 @@ enum {
 
 _Static_assert(NOAH_KEYCODE_CUSTOM_KEY_BASE == 0x7e40 && NOAH_KEYCODE_PD_HOLD_BASE == 0x7e80 && NOAH_KEYCODE_PD_LOCK_BASE == 0x7ea0 && NOAH_KEYCODE_LAYER_LOCK_BASE == 0x7ec0, "userspace keycode blocks are the action ABI");
 _Static_assert(CUSTOM_KEY_SLOT_COUNT <= NOAH_KEYCODE_CUSTOM_KEY_RESERVED && NOAH_KEYCODE_CUSTOM_KEY_BASE + NOAH_KEYCODE_CUSTOM_KEY_RESERVED == NOAH_KEYCODE_PD_HOLD_BASE, "custom keys fill their block");
-_Static_assert(PD_SLOT_7 - PD_SLOT_0 + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_HOLD_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_PD_LOCK_BASE, "pointing holds stay inside their block");
-_Static_assert(PD_SLOT_7_LOCK - PD_SLOT_0_LOCK + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_LAYER_LOCK_BASE, "pointing locks stay inside their block");
+_Static_assert(PD_SLOT_0 == 0x7e80 && PD_SLOT_31 == 0x7e9f && PD_SLOT_31 - PD_SLOT_0 + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_HOLD_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_PD_LOCK_BASE, "pointing holds stay inside their block");
+_Static_assert(PD_SLOT_0_LOCK == 0x7ea0 && PD_SLOT_31_LOCK == 0x7ebf && PD_SLOT_31_LOCK - PD_SLOT_0_LOCK + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_LAYER_LOCK_BASE, "pointing locks stay inside their block");
 _Static_assert(LAYER_COUNT <= NOAH_KEYCODE_LAYER_LOCK_RESERVED && NOAH_KEYCODE_LAYER_LOCK_BASE + NOAH_KEYCODE_LAYER_LOCK_RESERVED == NOAH_KEYCODE_USERSPACE_END, "layer locks stay inside their block");
 _Static_assert(NOAH_KEYCODE_USERSPACE_END - 1 <= QK_USER_MAX, "userspace keycodes stay in QMK's user range");
 

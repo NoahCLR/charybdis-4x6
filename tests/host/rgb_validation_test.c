@@ -9,7 +9,9 @@
 #include "users/noah/lib/rgb/core/rgb_config_helpers.h"
 #include "users/noah/lib/rgb/core/rgb_validation.h"
 
-static char log_buffer[4096];
+// Large enough for a missing-colour line for each of the 26 slots this stub
+// leaves uncoloured, ahead of the messages checked below.
+static char log_buffer[16384];
 
 static const layer_led_group_t layer_groups[] = {
     {.layer = LAYER_COUNT, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(0, RGB_MATRIX_LED_COUNT)},
@@ -17,7 +19,8 @@ static const layer_led_group_t layer_groups[] = {
 };
 static const pd_mode_led_group_t pd_mode_groups[] = {
     {.pointing_mode = PD_MODE_VOLUME, .color = HSV(1, 1, 1), .led_group = RGB_LED_GROUP(RGB_MATRIX_LED_COUNT)},
-    {.pointing_mode = (pd_mode_mask_t)0x8000u, .color = HSV(2, 2, 2), .led_group = RGB_LED_GROUP(1)},
+    {.pointing_mode = (pd_mode_mask_t)0x3u, // two bits: no registered mode
+      .color = HSV(2, 2, 2), .led_group = RGB_LED_GROUP(1)},
     {.pointing_mode = RGB_PD_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(2)},
 };
 static const combo_feedback_led_group_t combo_feedback_groups[] = {
@@ -51,7 +54,8 @@ const pd_mode_color_t pd_mode_colors[] = {
     {.pointing_mode = PD_MODE_VOLUME, .color = HSV(10, 10, 10), .locality = RGB_RIGHT_HALF},
     {.pointing_mode = PD_MODE_VOLUME, .color = HSV(20, 20, 20), .locality = (rgb_locality_t)0xFFu},
     {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(30, 30, 30), .locality = RGB_KEY_HALF},
-    {.pointing_mode = (pd_mode_mask_t)0x4000u, .color = HSV(40, 40, 40), .locality = RGB_LEFT_HALF},
+    {.pointing_mode = (pd_mode_mask_t)0x6u, // two bits: no registered mode
+      .color = HSV(40, 40, 40), .locality = RGB_LEFT_HALF},
 };
 const uint8_t                              pd_mode_color_count          = (uint8_t)ARRAY_SIZE(pd_mode_colors);
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {

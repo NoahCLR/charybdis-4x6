@@ -299,9 +299,9 @@ static const uint8_t test_pd_records[8][96] = {
 };
 static const uint8_t *active_pd_record;
 
-const uint8_t *noah_effective_pd_for_mask(uint8_t mode) {
+const uint8_t *noah_effective_pd_for_mask(uint32_t mode) {
     for (uint8_t slot = 0; slot < 6; slot++) {
-        if (mode == (uint8_t)(1u << slot)) return test_pd_records[slot];
+        if (mode == (UINT32_C(1) << slot)) return test_pd_records[slot];
     }
     return NULL;
 }

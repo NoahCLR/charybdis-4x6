@@ -1,5 +1,5 @@
 // Compiled factory slot defaults. These values are encoded into the effective
-// eight-slot cache when the firmware has no live profile owner.
+// 32-slot cache when the firmware has no live profile owner.
 #pragma once
 
 #ifndef VOLUME_THRESHOLD

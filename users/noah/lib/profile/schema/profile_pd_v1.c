@@ -136,14 +136,62 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *p,
     return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
 }
 
+bool noah_profile_pd_v1_record_present(const uint8_t *record) {
+    return record && (record[1] != 0u || record[8] != 0u);
+}
+
+noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_header(const uint8_t header[8], size_t payload_length, uint8_t *record_count, noah_profile_pd_v1_error_t *error) {
+    static const uint8_t expected[3] = {NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE};
+    if (!header) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
+    for (size_t i = 0; i < sizeof(expected); i++) {
+        if (header[i] != expected[i]) return fail(error, NOAH_PROFILE_PD_V1_INVALID_HEADER, i);
+    }
+    if (header[3] > NOAH_PROFILE_PD_V1_SLOT_COUNT) return fail(error, NOAH_PROFILE_PD_V1_INVALID_HEADER, 3);
+    for (size_t i = 4; i < NOAH_PROFILE_PD_V1_HEADER_SIZE; i++) {
+        if (header[i]) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, i);
+    }
+    if (payload_length != NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)header[3] * NOAH_PROFILE_PD_V1_RECORD_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
+    if (record_count) *record_count = header[3];
+    return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
+}
+
+noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_entry(const uint8_t *p, size_t length, uint8_t minimum_slot, noah_profile_pd_v1_error_t *error) {
+    if (!p) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
+    if (length != NOAH_PROFILE_PD_V1_RECORD_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
+    if (p[0] >= NOAH_PROFILE_PD_V1_SLOT_COUNT || p[0] < minimum_slot) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ID, 0);
+    noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_record(p, length, p[0], error);
+    if (result != NOAH_PROFILE_PD_V1_OK) return result;
+    if (!noah_profile_pd_v1_record_present(p)) return fail(error, NOAH_PROFILE_PD_V1_NONCANONICAL, 1);
+    return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
+}
+
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error) {
-    static const uint8_t header[8] = {1, 8, 96, 0, 0, 0, 0, 0};
+    uint8_t count;
     if (!bytes) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
-    if (length != NOAH_PROFILE_PD_V1_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
+    if (length < NOAH_PROFILE_PD_V1_HEADER_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
+    noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_header(bytes, length, &count, error);
+    if (result != NOAH_PROFILE_PD_V1_OK) return result;
+    uint8_t minimum = 0;
+    for (uint8_t index = 0; index < count; index++) {
+        size_t offset = NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE;
+        result = noah_profile_pd_v1_validate_entry(bytes + offset, NOAH_PROFILE_PD_V1_RECORD_SIZE, minimum, error);
+        if (result != NOAH_PROFILE_PD_V1_OK) {
+            if (error) error->offset += offset;
+            return result;
+        }
+        minimum = (uint8_t)(bytes[offset] + 1u);
+    }
+    return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
+}
+
+noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_legacy(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error) {
+    static const uint8_t header[8] = {NOAH_PROFILE_PD_V1_LEGACY_VERSION, NOAH_PROFILE_PD_V1_LEGACY_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0, 0, 0, 0, 0};
+    if (!bytes) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
+    if (length != NOAH_PROFILE_PD_V1_LEGACY_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
     for (size_t i = 0; i < sizeof(header); i++) {
         if (bytes[i] != header[i]) return fail(error, NOAH_PROFILE_PD_V1_INVALID_HEADER, i);
     }
-    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
+    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_LEGACY_SLOT_COUNT; slot++) {
         size_t offset = NOAH_PROFILE_PD_V1_HEADER_SIZE + slot * NOAH_PROFILE_PD_V1_RECORD_SIZE;
         noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_record(bytes + offset, NOAH_PROFILE_PD_V1_RECORD_SIZE, slot, error);
         if (result != NOAH_PROFILE_PD_V1_OK) {

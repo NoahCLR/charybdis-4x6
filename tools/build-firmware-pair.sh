@@ -206,8 +206,8 @@ uncommitted() { [ -z "$(git -C "$1" status --porcelain --ignore-submodules=all 2
 
 echo
 if [ -n "$OWNER_ARGS" ]; then
-    echo "Built the eight-PD-slot factory-only comparison pair WITHOUT the live-profile owner."
+    echo "Built the 32-PD-slot factory-only comparison pair WITHOUT the live-profile owner."
 else
-    echo "Built the eight-PD-slot pair."
+    echo "Built the 32-PD-slot pair."
 fi
 echo "Flash the right half to the master side and the left half to the slave side."

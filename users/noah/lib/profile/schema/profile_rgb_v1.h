@@ -29,7 +29,6 @@ enum {
     NOAH_PROFILE_RGB_V1_STAGE_COMBO           = 1u << 3,
     NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR    = 1u << 4,
     NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL        = 0x1fu,
-    NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL      = (1u << NOAH_PROFILE_PD_COUNT) - 1u,
     // Validation performs at most one reader call per step. The v1 header is
     // the largest record; the remaining records are at most 11 bytes.
     NOAH_PROFILE_RGB_V1_VALIDATION_READ_MAX = 20u,
@@ -38,6 +37,9 @@ enum {
     NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET       = 40u,
     NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET = 72u,
 };
+
+// One bit per PD slot; 32 slots fill the word, so it is not an enum constant.
+#define NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL (UINT32_MAX >> (32u - NOAH_PROFILE_PD_COUNT))
 
 typedef enum {
     NOAH_PROFILE_RGB_V1_OK = 0u,
@@ -108,7 +110,7 @@ typedef struct {
     uint8_t  max_logical_layers;
     uint8_t  maximum_brightness;
     uint8_t  tap_branch_color_count;
-    uint8_t  supported_pd_mode_mask;
+    uint32_t supported_pd_mode_mask;
 } noah_profile_rgb_v1_limits_t;
 
 typedef struct {
@@ -218,7 +220,7 @@ typedef struct {
     uint8_t                     phase;
     uint8_t                     row;
     uint8_t                     have_previous_bitmap;
-    uint8_t                     observed_pd_mask;
+    uint32_t                    observed_pd_mask;
     int8_t                      previous_pd_id;
     uint8_t                     result;
 } noah_profile_rgb_v1_validation_t;

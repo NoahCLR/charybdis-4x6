@@ -70,6 +70,11 @@
           "reason": "Provider publication invokes the validated immutable PD cache invalidator."
         },
         {
+          "caller": "noah_profile_store_runtime_matrix_scan_step",
+          "callee": "noah_effective_pd_invalidate",
+          "reason": "Boot publication of the compiled generation, inlined into the scan step, invokes the PD cache invalidator through the provider listener table."
+        },
+        {
           "caller": "noah_profile_reader_read",
           "callee": "compiled_reader_read",
           "reason": "Boot PD cache uses the compiled-profile reader callback before store initialization."
@@ -140,15 +145,15 @@
         },
         {
           "name": "PD compiled cache initialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_pd_invalidate", "noah_profile_reader_read", "compiled_reader_read", "write_pd_payload", "noah_profile_pd_v1_validate_record.part.2"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_reader_read", "compiled_reader_read", "write_pd_payload", "noah_profile_pd_v1_validate_record.part.2"]
         },
         {
           "name": "PD published cache EEPROM read",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "PD published record validation",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "noah_profile_pd_v1_validate_record.part.2"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_validate_entry", "noah_profile_pd_v1_validate_record.part.2"]
         }
       ]
     },

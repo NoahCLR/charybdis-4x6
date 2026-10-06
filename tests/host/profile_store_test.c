@@ -782,7 +782,8 @@ static uint16_t pd_payload(uint8_t *payload, uint8_t mask) {
         if (!(mask & (1u << domain))) continue;
         payload[6]++;
         payload[length++] = (uint8_t)((domain + 1u) * 0x10u);
-        payload[length++] = domain == 0u || domain == 3u ? 2u : 1u;
+        // RGB v3, settings v2 and sparse PD v2: the 32-slot schema 2.0.
+        payload[length++] = domain == 0u ? 3u : domain == 3u || domain == 4u ? 2u : 1u;
         payload[length++] = 1u;
         payload[length++] = 0u;
         payload[length++] = (uint8_t)(0x80u + domain);
@@ -879,6 +880,29 @@ static void test_pd_store_accepts_every_combo_version_the_validator_does(void) {
     }
 }
 
+// The 32-slot domains: the store keeps only RGB v3 and PD v2, the versions
+// the validator accepts. An eight-slot RGB v2 or PD v1 never reaches it.
+static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
+    const struct { uint8_t mask, id; } domains[] = {{1u << 0u, 0x10u}, {1u << 4u, 0x50u}};
+    for (size_t d = 0u; d < sizeof(domains) / sizeof(domains[0]); d++) {
+        for (uint8_t version = 0u; version <= 4u; version++) {
+            uint8_t                        payload[33];
+            uint16_t                       length = pd_payload(payload, domains[d].mask);
+            noah_profile_store_t           store;
+            noah_profile_store_candidate_t candidate;
+            bool accepted = domains[d].id == 0x10u ? NOAH_PROFILE_PD_RGB_VERSION_ACCEPTED(version) : NOAH_PROFILE_PD_DOMAIN_VERSION_ACCEPTED(version);
+
+            CHECK(payload[8] == domains[d].id);
+            payload[9] = version;
+            candidate  = pd_candidate(payload, length, domains[d].mask, 1u, 0u, 0u);
+            reset_eeprom(&eeprom);
+            initialize_pd_store(&store);
+            CHECK((commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_OK) == accepted);
+            CHECK(accepted == (version == (domains[d].id == 0x10u ? 3u : 2u)));
+        }
+    }
+}
+
 static void test_pd_header_all_identity_bits_and_boot_paths(void) {
     for (uint8_t origin = 0u; origin < 2u; origin++) {
         for (uint8_t flags = 0u; flags < 2u; flags++) {
@@ -958,8 +982,9 @@ static void test_pd_header_rejects_bad_contracts_before_writing(void) {
         reset_eeprom(&eeprom);
         initialize_pd_store(&store);
         length = pd_payload(payload, 31u);
-        // A version each domain does not have (combos have 1 and 2).
-        payload[9u + 5u * domain] = domain == 0u || domain == 3u ? 1u : domain == 2u ? 3u : 2u;
+        // A version each domain does not have (combos have 1 and 2); for RGB
+        // and PD it is the eight-slot one (RGB v2, PD v1).
+        payload[9u + 5u * domain] = domain == 3u || domain == 4u ? 1u : domain == 2u ? 3u : 2u;
         candidate = pd_candidate(payload, length, 31u, 1u, 0u, 1u);
         CHECK(commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_INVALID_PAYLOAD);
         CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
@@ -1030,6 +1055,7 @@ static void test_pd_header_power_loss_keeps_complete_generation(void) {
 int main(void) {
     test_pd_store_accepts_every_settings_version_the_validator_does();
     test_pd_store_accepts_every_combo_version_the_validator_does();
+    test_pd_store_accepts_only_32_slot_rgb_and_pd_versions();
     test_pd_header_all_identity_bits_and_boot_paths();
     test_pd_header_rejects_bad_contracts_before_writing();
     test_pd_header_power_loss_keeps_complete_generation();
