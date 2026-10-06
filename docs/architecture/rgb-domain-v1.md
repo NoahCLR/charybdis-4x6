@@ -15,13 +15,13 @@ The payload starts with this fixed 16-byte header:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | payload format version, exactly `1` |
+| 0 | 1 | payload format version, equal to the domain version: `1` in schema 1, `3` in schema-2 firmware with 32 pointing slots |
 | 1 | 1 | reserved, zero |
 | 2 | 2 | stage-enable mask |
 | 4 | 1 | reusable group count, `0..16` |
 | 5 | 1 | layer-color count, `1..8` when compiled |
 | 6 | 1 | layer-group row count |
-| 7 | 1 | PD-color count, `0..8` |
+| 7 | 1 | PD-color count: the firmware's slot count when its PD stage is compiled (`6`, `8`, `32` in versions 1, 2, 3), else `0` |
 | 8 | 1 | PD-group row count |
 | 9 | 1 | combo-group row count |
 | 10 | 1 | tap-branch color count, exactly the compiled count and at most `4` |
@@ -80,9 +80,21 @@ follow the real destination, `1` use the end color only where the base effect
 would show, and `2` use the end color on all keys. Tap-commit policy is `0`
 off or `1` commit non-base taps.
 
-PD ids address the eight device-owned slots `0..7`; their names and behaviors
-come from the [PD-mode domain](pd-mode-domain-v1.md), not from the RGB id.
-A compiled PD stage stores each firmware-supported id exactly once.
+PD ids address the device-owned slots: `0..5` in schema-1 version 1, `0..7` in
+version 2, and `0..31` in version 3; their names and behaviors come from the
+[PD-mode domain](pd-mode-domain-v1.md), not from the RGB id. A compiled PD
+stage stores each firmware-supported id exactly once, in ascending order, so
+version 3's header byte 7 is 32 and the PD colour row at index `n` is slot
+`n`'s.
+
+Version 3 (D-F09) is version 2 with 32 PD colour rows instead of eight; PD
+group-row selectors are a slot below 32 or `0xff`. Every other byte is
+version 2's. Schema-2 firmware with 32 slots accepts only version 3: an
+importer turns a version-2 domain into version 3 by adding, after slot 7's
+row, rows `n 00 00 00 02` (black, right half) for slots 8..31, as the 6 → 8
+upgrade added rows for slots 6 and 7. `tests/fixtures/rgb_domain_v3.json`
+holds the compiled domain and rejection vectors (version 2, a missing PD row,
+33 rows, an id of 32, out-of-order rows, a group selector of 32).
 
 Layer and PD group selectors use `0xff` for all; other values are validated
 layer or stable PD ids. Key-feedback group semantics are `0` tap branch

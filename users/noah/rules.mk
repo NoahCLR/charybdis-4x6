@@ -130,11 +130,11 @@ ifneq ($(strip $(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS)),)
     OPT_DEFS += -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
 endif
 
-# All firmware uses the eight-slot profile engine. The old storage-geometry
+# All firmware uses the 32-slot profile engine. The old storage-geometry
 # readback bridges and their per-mode handlers are retired.
 ifneq ($(strip $(NOAH_PD_PROFILE)),)
     ifneq ($(strip $(NOAH_PD_PROFILE)),yes)
-        $(error NOAH_PD_PROFILE=no is retired; build the eight-slot firmware)
+        $(error NOAH_PD_PROFILE=no is retired; build the 32-slot firmware)
     endif
 endif
 ifneq ($(strip $(NOAH_LEGACY_SNAPSHOT_BRIDGE)),)

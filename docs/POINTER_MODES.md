@@ -10,9 +10,9 @@ multi-tap model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the
 [firmware guide](./GUIDE.md#authoring-the-profile-in-c).
 
 The [PD-mode domain contract](architecture/pd-mode-domain-v1.md) specifies the
-eight configurable slots and the remaining hardware acceptance checks. Side-specific schema-2 firmware exposes eight slots in
+32 configurable slots and the remaining hardware acceptance checks. Side-specific schema-2 firmware exposes 32 slots in
 Charybdis Ark → Pointing modes. The six defaults below are records in those
-slots, followed by Undo / Redo in slot 6 and an empty slot 7; their names do not
+slots, followed by Undo / Redo in slot 6 and empty slots 7–31; their names do not
 select special code. Undo / Redo uses horizontal motion at 100 DPI and a
 threshold of 40 to send Cmd+Z or Shift+Cmd+Z. Right Alt double-tap hold activates it.
 The `PD_SLOT_n` keycodes select slots, while the named behavior in this
@@ -46,7 +46,7 @@ with existing bindings must be unbound before clearing it.
 Macro programs, recursive mode/layer actions and arbitrary scripts are not
 motion outputs. Ordinary pointer movement and auto-sniping remain outside the
 slot bank. Dragscroll and Pinch use this repository's scroll implementation.
-All current firmware builds use the eight-slot engine. The generic build runs
+All current firmware builds use the 32-slot engine. The generic build runs
 the compiled factory slots without a live profile owner; the side-specific pair
 supports editing and saving them from Charybdis Ark.
 

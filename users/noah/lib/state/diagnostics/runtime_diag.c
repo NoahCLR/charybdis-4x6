@@ -12,8 +12,12 @@
 #    include "hardware/watchdog.h"
 #endif
 
+// The watchdog is fed on every eighth heartbeat (the divisor below), so the
+// timeout bounds eight main-loop passes, not one: 2 s leaves 250 ms a pass.
+// 750 ms (94 ms a pass) reset the master while a host read the compiled
+// profile of the 32-slot firmware, each chunk replaying its serialization.
 #ifndef NOAH_RUNTIME_DIAG_WATCHDOG_TIMEOUT_MS
-#    define NOAH_RUNTIME_DIAG_WATCHDOG_TIMEOUT_MS 750u
+#    define NOAH_RUNTIME_DIAG_WATCHDOG_TIMEOUT_MS 2000u
 #endif
 
 #ifndef NOAH_RUNTIME_DIAG_WATCHDOG_HEARTBEAT_DIVISOR

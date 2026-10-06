@@ -1,4 +1,5 @@
-// Eight-slot PD domain contract, advertised by schema-2 owner firmware.
+// PD domain contract, advertised by schema-2 owner firmware: 32 slots, stored
+// sparsely (version 2). The record layout is version 1's, unchanged.
 #pragma once
 
 #include <stdbool.h>
@@ -7,12 +8,19 @@
 
 enum {
     NOAH_PROFILE_PD_V1_DOMAIN_ID   = 0x50,
-    NOAH_PROFILE_PD_V1_VERSION     = 1,
-    NOAH_PROFILE_PD_V1_SLOT_COUNT  = 8,
+    NOAH_PROFILE_PD_V1_VERSION     = 2,
+    NOAH_PROFILE_PD_V1_SLOT_COUNT  = 32,
     NOAH_PROFILE_PD_V1_HEADER_SIZE = 8,
     NOAH_PROFILE_PD_V1_RECORD_SIZE = 96,
     NOAH_PROFILE_PD_V1_NAME_SIZE   = 24,
-    NOAH_PROFILE_PD_V1_SIZE        = 776,
+    // Every slot present: the largest payload a version-2 domain can have.
+    NOAH_PROFILE_PD_V1_MAX_SIZE = NOAH_PROFILE_PD_V1_HEADER_SIZE + NOAH_PROFILE_PD_V1_SLOT_COUNT * NOAH_PROFILE_PD_V1_RECORD_SIZE,
+    // The retired fixed eight-slot version 1 (776 bytes, every slot present).
+    // No schema-2 store accepts it; it remains the shape of the frozen
+    // cross-language corpus and of the schema-1 legacy source readback.
+    NOAH_PROFILE_PD_V1_LEGACY_VERSION    = 1,
+    NOAH_PROFILE_PD_V1_LEGACY_SLOT_COUNT = 8,
+    NOAH_PROFILE_PD_V1_LEGACY_SIZE       = 776,
 };
 
 // Directional axis policies (record byte 3): which directions exist. Vertical
@@ -55,6 +63,9 @@ typedef enum {
     NOAH_PROFILE_PD_V1_INVALID_POLICY,
     NOAH_PROFILE_PD_V1_INVALID_ACTION,
     NOAH_PROFILE_PD_V1_INVALID_PARAMETER,
+    // A present version-2 record that says nothing: disabled with no name.
+    // Such a slot is stored by leaving it out.
+    NOAH_PROFILE_PD_V1_NONCANONICAL,
 } noah_profile_pd_v1_result_t;
 
 typedef struct {
@@ -87,13 +98,27 @@ typedef struct {
     };
     uint8_t tail_reserved[6];
 } noah_pd_config_t;
-extern const noah_pd_config_t noah_pd_defaults[8];
+extern const noah_pd_config_t noah_pd_defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT];
 void noah_profile_pd_v1_encode_record(const noah_pd_config_t *config, uint8_t output[96]);
+// Whether a version-2 domain stores the slot: it is configured, or disabled
+// with a name. Record bytes 1 (kind) and 8 (first name byte) decide it.
+bool noah_profile_pd_v1_record_present(const uint8_t *record);
 
 // Vocabulary is the audited QMK 0.0.8 native ABI, not arbitrary uint16 actions.
 bool noah_profile_pd_v1_tap_key_valid(uint16_t keycode);
 
-// Cold byte validators; they allocate no profile/cache state. The record API
-// permits future bounded reader integration without reading the entire domain.
+// Cold byte validators; they allocate no profile/cache state. The header and
+// entry APIs let a bounded reader validate a version-2 domain one record at a
+// time without holding the whole payload.
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *record, size_t length, uint8_t slot, noah_profile_pd_v1_error_t *error);
+// Version 2: the 8-byte header against the whole payload length. On success
+// *record_count is the number of records that follow.
+noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_header(const uint8_t header[8], size_t payload_length, uint8_t *record_count, noah_profile_pd_v1_error_t *error);
+// Version 2: one present record, whose slot ID (byte 0) must be at least
+// minimum_slot (zero for the first record, the previous ID plus one after) and
+// below the slot count, and which must not be a disabled record without a name.
+noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_entry(const uint8_t *record, size_t length, uint8_t minimum_slot, noah_profile_pd_v1_error_t *error);
+// A whole version-2 payload.
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error);
+// A whole retired version-1 payload: header 01 08 60 00.., eight records.
+noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_legacy(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error);

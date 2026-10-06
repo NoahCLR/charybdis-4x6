@@ -1,8 +1,9 @@
 # Portable keyboard profile v1
 
 > Schema-2 PD extension: side-specific PD-enabled builds keep the v1 HID/split
-> envelope and add domain `0x50` (mask bit 4), profile schema 2.0, RGB/settings
-> v2, eight PD slots, and a 5,088-byte custom payload ceiling. Logical storage
+> envelope and add domain `0x50` (mask bit 4), profile schema 2.0, RGB v3,
+> settings v2–v5, 32 PD slots stored sparsely (PD v2, D-F09), and a 5,088-byte
+> custom payload ceiling. Logical storage
 > is format 3 (`NR`) with the same VIA generation/digest binding; portable
 > documents are version 2. Existing schema-1/format-2 bridge behavior below
 > remains supported by the app. The exact version/geometry/ABI and legacy GET 9
@@ -41,6 +42,21 @@ blocks, the keymap's own keys from `0x7e64` become custom keys 0, 1, 2… (a
 behaviour target or combo output among them becomes action kind 7), and a key
 holding a retired user macro is emptied. A retired user macro that a behaviour
 or combo sends, or a user keycode with no counterpart, refuses the import.
+
+Firmware with 32 pointing slots (D-F09) uses `0xf79c6151`: the same blocks,
+now filled (`PD_SLOT_n` = `0x7e80 + n` and `PD_SLOT_n_LOCK` = `0x7ea0 + n` for
+`n = 0..31`), with each mode flag digested at 32 bits. Import of a `0x1d3fcacc`
+document into it is a key-by-key identity translation: every native keycode
+and every action kind 4/5 operand `0..7` keeps its value. Its profile domains
+change in two places. The PD domain goes from version 1 to version 2: drop
+each disabled record without a name and write the header `02 20 60 nn 00 00
+00 00`. The RGB domain goes from version 2 to version 3: set format byte 0 to
+3 and header byte 7 to 32, and add after slot 7's PD colour row the rows
+`n 00 00 00 02` (black, right half) for `n = 8..31`, as the 6 → 8 upgrade
+added rows for slots 6 and 7. Every other byte is kept. The result grows by
+120 − 96 × (dropped records) bytes and must still fit the 5,088-byte ceiling;
+if it does not, the import is refused with that reason, never trimmed. A
+`0x61072732` document translates to the blocks first, then the same way.
 Other legacy vocabularies are rejected. Large legacy macro banks must fit the new
 7,191-byte capacity, including 64 terminators and the final validity byte.
 
@@ -144,7 +160,7 @@ records with 64 custom-key name records in the same form, 0–20 bytes of
 printable ASCII each. Header byte 4, zero before, counts them (`64`). The
 ceiling is 3,000 bytes (312 + 128 × 21), so every name fits the domain at full
 length. The whole profile still shares the 5,088-byte ceiling: a profile with 37
-behaviours, 10 combos and eight pointing slots leaves room for about 120
+behaviours, 10 combos and eight stored pointing slots leaves room for about 120
 full-length names, and a name edit that meets the ceiling is refused as "the
 profile is full" rather than shortened. A custom key does only what its behaviour row says; its name is profile
 data for the app, which the firmware never reads.

@@ -10,14 +10,25 @@
 // validator passed it, failing every copy to the other half.
 #define NOAH_PROFILE_COMBO_VERSION_ACCEPTED(version) ((version) == 1u || (version) == 2u)
 
+// RGB and PD-domain versions a schema-2 profile may carry, on the same terms:
+// the validator's version and the store's shape check read these. Only the
+// 32-slot versions: RGB v3 and sparse PD v2 (D-F09).
+#define NOAH_PROFILE_PD_RGB_VERSION_ACCEPTED(version) ((version) == 3u)
+#define NOAH_PROFILE_PD_DOMAIN_VERSION_ACCEPTED(version) ((version) == 2u)
+
 // Schema-1 constants remain for codec compatibility tests. Firmware builds
 // always define NOAH_PD_PROFILE_ENABLE and cannot select the old geometry.
 #ifdef NOAH_PD_PROFILE_ENABLE
 #    define NOAH_PROFILE_SCHEMA_MAJOR 2u
 #    define NOAH_PROFILE_PAYLOAD_MAX 5088u
 #    define NOAH_PROFILE_DOMAIN_COUNT 5u
-#    define NOAH_PROFILE_PD_COUNT 8u
-#    define NOAH_PROFILE_RGB_VERSION 2u
+// Thirty-two pointing slots (D-F09). PD domain v2 stores only the slots in
+// use; RGB v3 keeps one PD colour row for every slot. Earlier versions of
+// these two domains (eight slots) are not readable: the app translates an older
+// backup on import, and firmware never adopts an older stored profile.
+#    define NOAH_PROFILE_PD_COUNT 32u
+#    define NOAH_PROFILE_PD_VERSION 2u
+#    define NOAH_PROFILE_RGB_VERSION 3u
 // Settings v3 names the 64 VIA macros where v2 carried 16 user macros; v4
 // guarantees every name 20 ASCII characters; v5 also names the 64 custom keys.
 // v2–v4 stay readable so a stored profile survives the firmware that writes v5.

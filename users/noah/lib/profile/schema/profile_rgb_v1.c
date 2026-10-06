@@ -82,7 +82,7 @@ noah_profile_rgb_v1_limits_t noah_profile_rgb_v1_default_limits(void) {
 
 static noah_profile_rgb_v1_result_t resolve_limits(const noah_profile_rgb_v1_limits_t *supplied, noah_profile_rgb_v1_limits_t *limits, noah_profile_rgb_v1_error_t *error) {
     *limits = supplied ? *supplied : noah_profile_rgb_v1_default_limits();
-    if ((limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) != 0u || limits->max_payload_size == 0u || limits->max_payload_size > NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE || limits->max_logical_layers > NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS || limits->logical_layer_count > limits->max_logical_layers || limits->tap_branch_color_count == 0u || limits->tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (limits->supported_pd_mode_mask & (uint8_t)~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u) {
+    if ((limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) != 0u || limits->max_payload_size == 0u || limits->max_payload_size > NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE || limits->max_logical_layers > NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS || limits->logical_layer_count > limits->max_logical_layers || limits->tap_branch_color_count == 0u || limits->tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u) {
         return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
     }
     return NOAH_PROFILE_RGB_V1_OK;
@@ -154,7 +154,7 @@ static noah_profile_rgb_v1_result_t validate_group_row(const noah_profile_rgb_v1
     if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_LAYER_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && bytes[0] >= view->layer_color_count) {
         return fail(error, NOAH_PROFILE_RGB_V1_INVALID_SELECTOR, offset, table, row, NOAH_PROFILE_RGB_V1_FIELD_SELECTOR);
     }
-    if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_PD_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && (bytes[0] >= NOAH_PROFILE_RGB_V1_MAX_PD_MODES || (view->limits.supported_pd_mode_mask & (1u << bytes[0])) == 0u)) {
+    if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_PD_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && (bytes[0] >= NOAH_PROFILE_RGB_V1_MAX_PD_MODES || (view->limits.supported_pd_mode_mask & (UINT32_C(1) << bytes[0])) == 0u)) {
         return fail(error, NOAH_PROFILE_RGB_V1_INVALID_SELECTOR, offset, table, row, NOAH_PROFILE_RGB_V1_FIELD_SELECTOR);
     }
     if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_KEY_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && bytes[0] > 3u) {
@@ -340,9 +340,9 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
                 result = read_bytes(candidate, offset, bytes, RGB_PD_COLOR_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID, &captured);
                 if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
                 pd_id = bytes[0];
-                if (pd_id >= NOAH_PROFILE_RGB_V1_MAX_PD_MODES || (candidate->limits.supported_pd_mode_mask & (1u << pd_id)) == 0u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ID, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID);
+                if (pd_id >= NOAH_PROFILE_RGB_V1_MAX_PD_MODES || (candidate->limits.supported_pd_mode_mask & (UINT32_C(1) << pd_id)) == 0u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ID, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID);
                 if ((int16_t)pd_id <= validation->previous_pd_id) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID);
-                validation->observed_pd_mask = (uint8_t)(validation->observed_pd_mask | (1u << pd_id));
+                validation->observed_pd_mask |= UINT32_C(1) << pd_id;
                 validation->previous_pd_id   = (int8_t)pd_id;
                 result                       = validate_hsv(candidate, &bytes[1], offset + 1u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, &captured);
                 if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);

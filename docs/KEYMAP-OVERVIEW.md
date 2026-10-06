@@ -310,6 +310,30 @@ Key-local PD RGB localities are gated by `RGB_PD_MODE_ACTIVE_HALF_ENABLE` in [us
 | `PD_MODE_ARROW` | `RGB_RIGHT_HALF` | `HSV(127, 255, 200)` | <img alt="PD_MODE_ARROW color" src="media/profile-introspection/profile-color-swatch-00fffc.svg" width="96" height="28" /> |
 | `PD_MODE_PINCH` | `RGB_RIGHT_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
 | `PD_MODE_ZOOM` | `RGB_RIGHT_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_8` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_8 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_9` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_9 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_10` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_10 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_11` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_11 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_12` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_12 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_13` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_13 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_14` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_14 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_15` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_15 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_16` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_16 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_17` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_17 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_18` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_18 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_19` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_19 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_20` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_20 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_21` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_21 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_22` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_22 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_23` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_23 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_24` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_24 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_25` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_25 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_26` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_26 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_27` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_27 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_28` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_28 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_29` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_29 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_30` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_30 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
+| `PD_MODE_SLOT_31` | `RGB_RIGHT_HALF` | `HSV(0, 0, 0)` | <img alt="PD_MODE_SLOT_31 color" src="media/profile-introspection/profile-color-swatch-000000.svg" width="96" height="28" /> |
 
 ### PD Mode LED Groups
 
@@ -434,7 +458,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 
 - Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`, `LAYER_EXTRA_1`, `LAYER_EXTRA_2`, `LAYER_EXTRA_3`
 - Named custom keys: `CUSTOM_KEY_0` (Right Thumb), `CUSTOM_KEY_1` (Left Thumb), `CUSTOM_KEY_2` (Click Spam), `CUSTOM_KEY_3` (Drag Window)
-- PD color overlays: `PD_MODE_SLOT_6`, `PD_MODE_SLOT_7`, `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`
+- PD color overlays: `PD_MODE_SLOT_6`, `PD_MODE_SLOT_7`, `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`, `PD_MODE_SLOT_8`, `PD_MODE_SLOT_9`, `PD_MODE_SLOT_10`, `PD_MODE_SLOT_11`, `PD_MODE_SLOT_12`, `PD_MODE_SLOT_13`, `PD_MODE_SLOT_14`, `PD_MODE_SLOT_15`, `PD_MODE_SLOT_16`, `PD_MODE_SLOT_17`, `PD_MODE_SLOT_18`, `PD_MODE_SLOT_19`, `PD_MODE_SLOT_20`, `PD_MODE_SLOT_21`, `PD_MODE_SLOT_22`, `PD_MODE_SLOT_23`, `PD_MODE_SLOT_24`, `PD_MODE_SLOT_25`, `PD_MODE_SLOT_26`, `PD_MODE_SLOT_27`, `PD_MODE_SLOT_28`, `PD_MODE_SLOT_29`, `PD_MODE_SLOT_30`, `PD_MODE_SLOT_31`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback locality: `RGB_KEY_HALF`
 - Key-behavior tap-commit feedback: `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`
@@ -480,8 +504,8 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | `via_macro_count` | `64` |
 | `via_macro_non_empty_count` | `11` |
 | `named_custom_key_count` | `4` |
-| `pd_mode_count` | `8` |
-| `pd_mode_color_count` | `8` |
+| `pd_mode_count` | `32` |
+| `pd_mode_color_count` | `32` |
 | `reusable_led_group_count` | `4` |
 | `layer_led_group_count` | `0` |
 | `pd_mode_led_group_count` | `1` |

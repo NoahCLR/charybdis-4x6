@@ -16,7 +16,7 @@ any C and you don't reflash.
 - **Keys that do more than one thing.** Each key can do something different on
   tap, hold and longer hold, and again on double, triple or up to quintuple
   tap, each with its own timing. Combos can use the same behaviours.
-- **A trackball that changes roles.** Eight pointing-mode slots turn the ball
+- **A trackball that changes roles.** Thirty-two pointing-mode slots turn the ball
   into scrolling, volume, brightness, zoom, arrow keys or your own shortcuts,
   held or locked. A pointer layer comes up by itself when you move the ball,
   and you can snipe for precise movement.

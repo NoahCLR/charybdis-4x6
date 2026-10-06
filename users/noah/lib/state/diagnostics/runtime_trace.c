@@ -13,7 +13,7 @@ static noah_runtime_trace_state_t *runtime_trace_state(void) {
     return &noah_runtime_context()->trace;
 }
 
-void noah_runtime_trace_emit(noah_trace_kind_t kind, uint8_t event, uint16_t a, uint16_t b) {
+void noah_runtime_trace_emit(noah_trace_kind_t kind, uint8_t event, uint32_t a, uint32_t b) {
     noah_runtime_trace_state_t *state = runtime_trace_state();
 
     state->entries[state->next_index] = (noah_runtime_trace_entry_t){

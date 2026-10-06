@@ -205,7 +205,9 @@ static void test_compiled_and_live_pd_rendering(const char *fixture_path) {
         .previous           = active,
         .active             = next,
         .snapshot           = &behavior_only,
-        .invalidate_on_call = 6u,
+        // The render's last read: the active slot's colour row is now read
+        // directly by index (one read, not a scan from row 0).
+        .invalidate_on_call = 5u,
     };
     profile_frame.view.reader = (noah_profile_reader_t){.read = invalidating_reader_read, .context = &reader, .length = length};
     CHECK(!rgb_runtime_pd_mode_stage_render_effective_frame(&frame, &profile_frame, 0u, RGB_MATRIX_LED_COUNT));

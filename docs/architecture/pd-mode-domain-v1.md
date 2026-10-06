@@ -3,14 +3,16 @@
 Implemented in schema-2 builds: domain codec, incremental validation, immutable
 effective cache, shared engines, persistence/split writers, portable profiles
 and live editor. Side-specific builds own committed profiles; the generic build
-loads the eight compiled factory slots without a profile owner.
+loads the 32 compiled factory slots without a profile owner. Domain version 2
+(D-F09, 2026-10-06) stores 32 slots sparsely; version 1 below is its record
+layout and the retired fixed eight-slot domain.
 Physical upgrade and release acceptance remain pending; see
 [Hardware acceptance](#hardware-acceptance).
 
 ## Scope
 
-The keyboard owns eight pointing-mode slots, stable IDs `0..7` shown as slots
-1–8, and eight matching PD RGB rows keyed by the same IDs. The app reads, edits
+The keyboard owns 32 pointing-mode slots, stable IDs `0..31` shown as slots
+1–32, and 32 matching PD RGB rows keyed by the same IDs (RGB domain v3). The app reads, edits
 and saves them in the ordinary draft, review and logical Apply; reboot, backup
 and restore preserve them without the repository.
 
@@ -34,7 +36,8 @@ foreground-app switching and volatile device preview.
 
 The original factory records migrated the six pre-slot modes with two disabled
 slots. The current authored profile also configures slot 6 as horizontal Undo /
-Redo; slot 7 remains disabled. Slot contents are profile data, not part of the
+Redo; slots 7–31 are disabled and unnamed, so the compiled domain stores seven
+records. Slot contents are profile data, not part of the
 keycode allocation.
 
 | Slot | Name | Engine | Behavior preserved |
@@ -45,7 +48,8 @@ keycode allocation.
 | 3 | Zoom | Directional, vertical | Cmd-minus/Cmd-equals, threshold 80, DPI 400 |
 | 4 | Arrow | Directional, dominant axis | Arrows, X/Y thresholds 40/50, DPI 400, vertical Alt masking, BTN1 hold right Shift, BTN2 Cmd+C, BTN3 Cmd+V, typing-layer preference |
 | 5 | Pinch | Scrolling | Dragscroll's tuning plus owned left Cmd with managed-only modifier masking |
-| 6, 7 | Empty | Disabled | Inert actions; retained, editable RGB row |
+| 6 | Undo / Redo | Directional, horizontal | Cmd-Z / Shift-Cmd-Z, threshold 40, DPI 100 |
+| 7–31 | Empty | Disabled | Inert actions; not stored; retained, editable RGB row |
 
 Dragscroll and Pinch run this repository's
 [`pd_mode_dragscroll.c`](../../users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
@@ -75,7 +79,7 @@ against the activation that acquired its output, even after another slot
 became active.
 
 Every build links the configured directional engine and shared dragscroll
-algorithm. The mode registry retains the eight stable native hold/lock
+algorithm. The mode registry retains the 32 stable native hold/lock
 identities but no per-preset motion, key, reset, DPI or lifecycle callbacks.
 The old per-preset handlers and readback-bridge build options are retired.
 Factory-only builds encode and validate their compiled slot records at startup;
@@ -95,15 +99,31 @@ accumulator) are firmware safety policy, not per-slot settings.
 
 ## Domain and record encoding
 
-Domain ID `0x50`, version `1`. All multibyte integers are unsigned,
-little-endian. The payload is exactly 776 bytes: the eight-byte header
-`01 08 60 00 00 00 00 00`, then eight 96-byte records in ID order `0..7`.
-The surrounding profile domain envelope adds four bytes. RGB remains in its
-own domain; schema 2 contains eight corresponding ID/HSV/locality rows.
+Domain ID `0x50`, version `2` (D-F09). All multibyte integers are unsigned,
+little-endian. The payload is the eight-byte header `02 20 60 nn 00 00 00 00`
+(version 2, slot capacity 32, record size 96, record count `nn` = 0..32, four
+zero bytes), then exactly `nn` 96-byte records in strictly ascending slot ID,
+each ID below 32: `8 + 96 × nn` bytes, at most 3,080. A slot's record is
+present exactly when the slot is configured (kind ≠ 0) or disabled with a
+non-empty name; an omitted slot is disabled with an empty name. A present
+record that is disabled with an empty name is noncanonical and rejected
+(`NONCANONICAL`), as are a count above 32 or a wrong version, capacity or
+record size (`INVALID_HEADER`), nonzero header bytes 4..7 (`RESERVED`), a
+length other than `8 + 96 × nn` (`INVALID_LENGTH`), and a repeated,
+out-of-order or out-of-range ID (`INVALID_ID`). Every record-level rule below
+is version 1's, unchanged. The surrounding profile domain envelope adds four
+bytes. RGB remains in its own domain; RGB v3 holds 32 ID/HSV/locality rows,
+one per slot whether or not the slot is stored here.
+
+Retired version 1 was fixed: 776 bytes, the header `01 08 60 00 00 00 00 00`
+then eight records in ID order `0..7`, disabled slots included. No schema-2
+firmware with 32 slots accepts it. An importer converts it by dropping each
+disabled record without a name and writing the version-2 header; record bytes
+are unchanged.
 
 | Record offset | Bytes | Meaning |
 | --- | --- | --- |
-| 0 | 1 | Slot ID, equal to record index |
+| 0 | 1 | Slot ID (version 1: equal to record index) |
 | 1 | 1 | Kind: disabled `0`, directional `1`, scrolling `2` |
 | 2 | 1 | Pointer-layer policy: keep available `0`, prefer typing `1` |
 | 3 | 1 | Directional axis: vertical `0`, horizontal `1`, dominant `2`, eight directions `3`. Scrolling axes: both `0`, horizontal only `1`, vertical only `2` |
@@ -254,11 +274,22 @@ and `INVALID_PARAMETER`, with a byte offset. Record-validator offsets are
 record-relative; whole-domain offsets are payload-relative. Object-encoding
 errors without a corresponding byte position use zero. C success is `OK`.
 
+Validation errors add `NONCANONICAL` for version 2's disabled record without a
+name; the incremental validator and the cache read the header, then one record
+at a time.
+
 `tests/fixtures/pd_mode_domain_v1.json` records six repository presets and two
-disabled slots, with independently packed golden bytes. It is test evidence,
-**never a fallback migration source**. C/JS differential validation covers
-7,765 cases, including byte mutations, all truncated lengths and Unicode;
-the C runner also uses ASan/UBSan. Tests freeze existing native action values
+disabled slots in version 1, with independently packed golden bytes.
+`tests/fixtures/pd_mode_domain_v2.json` holds version-2 vectors: an empty
+domain, the presets (the firmware's compiled domain, checked against the
+golden compiled profile), a gap with a named disabled slot 31, all 32 slots
+(3,080 bytes), and rejections with their codes and payload offsets
+(noncanonical record, unordered, repeated and out-of-range IDs, count/length
+mismatches, header and reserved bytes, a version-1 payload). Both are test
+evidence, **never a fallback migration source**. The frozen C/JS differential
+corpus (8,635 version-1 cases, including byte mutations, all truncated lengths
+and Unicode) still checks every record rule through the version-1 validator;
+the C runners also use ASan/UBSan. Tests freeze existing native action values
 and prove that legacy schema-1 readers/writers reject domain `0x50`.
 
 ## Capacity gate
@@ -277,6 +308,12 @@ document. With unchanged settings length, growth is 776 payload + 4 envelope
 | Same, full 1,024-byte IR macro payload | 3,380 | 4,170 | No, 106 bytes over |
 
 These are valid complete profiles, not sums of independent theoretical maxima.
+(This gate measured the schema-1 → eight-slot upgrade. The eight → 32 slot
+translation adds 120 bytes of RGB rows and removes 96 bytes per disabled,
+unnamed slot it drops; a stored eight-slot profile with all eight records
+present and within 120 bytes of the 5,088-byte ceiling cannot be translated
+as is, and the importer must say so rather than trim it. A schema-1 payload
+still fits: 4,064 + 790 + 120 = 4,974 bytes.)
 Thus unchanged geometry plus this encoding **cannot migrate every valid old
 profile**. Compacting only this new domain cannot guarantee room in an already
 full old payload. The selected path is a deliberate storage migration, preserving
@@ -326,8 +363,9 @@ Header CRC, VIA binding, prepared/committed markers and bounded I/O are unchange
 Admission rejects incompatible schema/format pairs before invalidating a slot.
 
 Synchronous validation, bounded boot scanning and commit shape validation all
-use the same domain-version rules: `NR` accepts RGB v2, key behaviors v1,
-combos v1, settings v2 and PD v1; `NP`/`NQ` retain the old four-domain v1 rules.
+use the same domain-version rules: `NR` accepts RGB v3, key behaviors v1,
+combos v1–v2, settings v2–v5 and PD v2 (`profile_versions.h` is the one list);
+`NP`/`NQ` retain the old four-domain v1 rules.
 The blob framing magic remains `NLP1`; its explicit schema bytes distinguish
 schema 2.0. Domain bodies still require semantic validation upstream; store
 shape checks alone do not make a candidate publishable.
@@ -340,9 +378,11 @@ select one whole generation with its matching origin, flags and VIA binding.
 This tests the header protocol in the existing fake EEPROM geometry; it does
 not prove physical flash-geometry migration.
 
-The integrated contract is blob schema 2.0, RGB v2 with eight rows, settings v2
-with retired DPI scalars 10–14 encoded as zero, portable document v2 and PD v1.
-The action ABI is `0x61072732`, generated from the compiled vocabulary. The
+The integrated contract is blob schema 2.0, RGB v3 with 32 rows, settings v2
+with retired DPI scalars 10–14 encoded as zero, portable document v2 and PD v2.
+The action ABI is `0xf79c6151`, generated from the compiled vocabulary: 32
+slots, each mode flag digested at 32 bits (D-F09). Eight slots with the
+userspace keycode blocks digested `0x1d3fcacc`; before the blocks, `0x61072732`. The
 legacy eight-layer ABI remains `0xeb80829c`; the five-layer bridge remains
 `0xdcb00959`. The HID envelope stays version 1. Candidate metadata uses format 3
 with VIA generation/digest binding; owner, peer store and split admission all
@@ -363,24 +403,27 @@ missing or incompatible evidence. The app saves both original and migrated
 files and verifies their contents before recommending the geometry upgrade.
 
 The effective PD cache reads only on initialization/publication, in chunks of
-at most 20 bytes, then validates all eight records before becoming ready. A
+at most 20 bytes: the header, then each stored record into its slot's row,
+validating each; omitted slots are materialized disabled with an empty name,
+so the cache always holds 32 rows (3,072 bytes) before becoming ready. A
 failed read or validation leaves it unavailable; the owner fails closed and
 status does not advertise an active compiled fallback. Motion performs no
 profile storage reads. Activation waits for held/locked modes and intercepted
 button releases, using the existing persistent-intent reason bit.
 
-The compiled reader must service PD-only reads directly from the final fixed-size
-PD payload, using the same encoder and validators as full serialization. A
+The compiled reader must service PD-only reads directly from the final PD
+payload, whose compiled size the authored slots fix, using the same encoder and validators as full serialization. A
 20-byte read limit alone does not bound CPU work: replaying the preceding RGB
 and cubic behavior canonicalization for all 39 cache reads caused 1,443 row
 sorts in one startup scan on the authored profile. The compiled-cache integration
 test requires zero behavior-row sorts during warming and checks every PD byte
-boundary against the full golden serialization. No watchdog timeout is relaxed.
+boundary against the full golden serialization. The fix does not rely on the
+watchdog timeout.
 
 Native IDs are fixed by executable assertions:
 
 The canonical keycode vocabulary is `PD_SLOT_n` for a momentary hold and
-`PD_SLOT_n_LOCK` for its persistent toggle, for `n = 0..7`. Each userspace
+`PD_SLOT_n_LOCK` for its persistent toggle, for `n = 0..31`. Each userspace
 family owns one fixed, aligned block (`users/noah/noah_keymap_ids.h`), reserved
 beyond what is supported, so adding pointing slots or layers renumbers nothing:
 slot `n` holds at `0x7e80 + n` and toggles at `0x7ea0 + n`. A slot keycode
@@ -392,8 +435,8 @@ expressions. They are not firmware keycode symbols.
 | Native action | Block | Supported |
 | --- | --- | --- |
 | Custom key 0–63 | `0x7e40..0x7e7f` | 64 |
-| PD hold | `0x7e80..0x7e9f` | 8 (`0x7e80..0x7e87`) |
-| PD lock | `0x7ea0..0x7ebf` | 8 (`0x7ea0..0x7ea7`) |
+| PD hold | `0x7e80..0x7e9f` | 32, the whole block |
+| PD lock | `0x7ea0..0x7ebf` | 32, the whole block |
 | Layer lock | `0x7ec0..0x7edf` | 8 (`0x7ec0..0x7ec7`) |
 | Unassigned | `0x7ee0..0x7fff` | — |
 
@@ -421,10 +464,11 @@ Hardware acceptance remains distinct from codec and runtime parity tests.
 | Old app, new firmware or profile | Incompatibility handling refuses destructive writes |
 | New firmware, old stored record | Recognized version or identity migration, or explicit recovery; never silent default replacement |
 | New app, old export | Migrates only with verified source PD data; otherwise keeps the file and names what is missing |
-| New app and firmware, new export | Exact eight-slot round trip including disabled slots, RGB and references |
+| New app and firmware, new export | Exact 32-slot round trip including named disabled slots, RGB and references |
+| 32-slot firmware, eight-slot backup (`0x1d3fcacc`) | Imported through the key-by-key action translation plus PD v1 → v2 and RGB v2 → v3 ([portable profiles](portable-profile-v1.md)) |
 | Mismatched halves or unknown ABI | Apply refused before mutation; draft and recovery file kept |
 
-Never restore an eight-slot document into old firmware by dropping slots;
+Never restore a 32-slot document into eight-slot firmware by dropping slots;
 downgrade restores the old backup.
 
 ## Hardware acceptance
@@ -434,8 +478,9 @@ profile digest and both-half state for each case:
 
 1. The six migrated presets keep their movement feel, buttons, modifiers,
    activation gestures, pointer-layer behavior and RGB locality.
-2. Both empty slots can be configured, bound, locked, unlocked and coloured;
-   slot 7 proves the upper-bound identity path.
+2. Empty slots can be configured, bound, locked, unlocked and coloured;
+   slot 31 proves the upper-bound identity path (the mask's top bit and the
+   last keycode of each block).
 3. Complete backup and restore survive reboot, including restore onto firmware
    with empty authored behaviors and combos.
 4. Held or locked modes make Apply wait with a useful reason; no modifier or

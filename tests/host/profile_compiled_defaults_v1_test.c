@@ -115,7 +115,7 @@ static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_a
     noah_profile_validator_v1_compatibility_t value = noah_profile_validator_v1_default_compatibility(action_abi_digest);
     value.required_domain_mask                      = (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
     value.logical_layer_count                       = LAYER_COUNT;
-    value.supported_pd_mode_mask                    = (uint8_t)((1u << PD_MODE_COUNT) - 1u);
+    value.supported_pd_mode_mask                    = UINT32_MAX >> (32u - PD_MODE_COUNT);
     value.via_macro_slot_count                      = VIA_MACRO_SLOT_COUNT;
     value.custom_key_count                = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     value.rgb_limits.logical_layer_count            = LAYER_COUNT;
@@ -248,7 +248,7 @@ static void test_real_authored_profile(void) {
     assert(runtime_compatibility.allowed_domain_mask == allowed_domains);
     assert(runtime_compatibility.action_abi_digest == profile.metadata.action_abi_digest);
     assert(runtime_compatibility.logical_layer_count == LAYER_COUNT);
-    assert(runtime_compatibility.supported_pd_mode_mask == (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u));
+    assert(PD_MODE_COUNT == 32 && runtime_compatibility.supported_pd_mode_mask == UINT32_MAX);
     assert(runtime_compatibility.via_macro_slot_count == VIA_MACRO_SLOT_COUNT);
     assert(runtime_compatibility.custom_key_count == NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS);
     assert(runtime_compatibility.rgb_limits.logical_layer_count == LAYER_COUNT);
@@ -264,7 +264,7 @@ static void test_real_authored_profile(void) {
     assert(output_length == profile.metadata.byte_length);
     assert(largest_write <= NOAH_PROFILE_RGB_V1_HEADER_SIZE);
     assert(noah_profile_blob_v1_decode(output, output_length, &decoded, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
-    assert(decoded.domain_count == (NOAH_PROFILE_PD_COUNT == 8 ? 3u : 2u));
+    assert(decoded.domain_count == (NOAH_PROFILE_PD_COUNT == 32 ? 3u : 2u));
     assert(decoded.domains[0].id == NOAH_PROFILE_DOMAIN_V1_RGB);
     assert(decoded.domains[1].id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS);
     assert(decoded.crc32 == profile.metadata.crc32);
@@ -278,6 +278,9 @@ static void test_real_authored_profile(void) {
     assert((unsigned)NOAH_PROFILE_COMPILED_V1_READER_REPLAY_MAX == (unsigned)NOAH_PROFILE_BLOB_V1_MAX_SIZE);
     assert(noah_profile_reader_read(&copied_reader, 0u, slice, sizeof(slice)));
     assert(memcmp(slice, output, sizeof(slice)) == 0);
+    // The profile is open, so its canonical behaviour order is known: reading
+    // every chunk, as a host does, sorts no behaviour row again.
+    behavior_visits = 0;
     for (size_t offset = 0u; offset < output_length; offset += sizeof(slice)) {
         size_t length = output_length - offset;
         if (length > sizeof(slice)) length = sizeof(slice);
@@ -285,6 +288,7 @@ static void test_real_authored_profile(void) {
         assert(noah_profile_reader_read(&reader, offset, slice, length));
         assert(memcmp(slice, &output[offset], length) == 0);
     }
+    assert(behavior_visits == 0);
     assert(!noah_profile_reader_read(&reader, output_length - 1u, slice, 2u));
 #ifdef NOAH_PD_PROFILE_ENABLE
     // Boot and compiled fallback must warm the real PD cache without replaying
@@ -296,8 +300,25 @@ static void test_real_authored_profile(void) {
     behavior_visits = 0;
     noah_effective_pd_invalidate(NULL, 0, snapshot.identity, snapshot.identity, &snapshot);
     assert(noah_effective_pd_ready());
-    for (uint8_t slot = 0; slot < 8; slot++)
-        assert(memcmp(noah_effective_pd_record(slot), decoded.domains[2].payload + 8 + slot * 96, 96) == 0);
+    // The sparse domain stores the authored slots that say something; the
+    // cache holds all 32, omitted ones disabled with an empty name.
+    const uint8_t *pd_payload = decoded.domains[2].payload;
+    assert(decoded.domains[2].version == NOAH_PROFILE_PD_V1_VERSION);
+    assert(pd_payload[0] == 2 && pd_payload[1] == 32 && pd_payload[2] == 96 && decoded.domains[2].payload_length == 8u + 96u * pd_payload[3]);
+    uint8_t stored = 0;
+    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
+        const uint8_t *record = noah_effective_pd_record(slot);
+        assert(record && record[0] == slot);
+        if (stored < pd_payload[3] && pd_payload[8 + stored * 96] == slot) {
+            assert(memcmp(record, pd_payload + 8 + stored * 96, 96) == 0);
+            stored++;
+        } else {
+            for (size_t i = 1; i < 96; i++) assert(record[i] == 0);
+        }
+    }
+    assert(stored == pd_payload[3]);
+    // Slots 0..6 carry the authored presets; slot 7 and slots 8..31 are empty.
+    assert(pd_payload[3] == 7 && noah_effective_pd_record(6)[1] == 1 && noah_effective_pd_record(7)[1] == 0);
     fprintf(stderr, "compiled PD cache warmup: %zu behavior-row sorts\n", behavior_visits);
     assert(behavior_visits == 0);
     // Exercise every PD byte and record boundary against the full golden stream.
@@ -336,13 +357,23 @@ static void test_semantic_action_translation(void) {
         assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
         assert(native == round_trip_actions[index]);
     }
+    // Every slot's hold and lock keycode reaches that slot and comes back, and
+    // the codes either side of both blocks are not pointing keys.
+    for (uint8_t slot = 0u; slot < PD_MODE_COUNT; slot++) {
+        assert(noah_profile_action_runtime_v1_from_native(pd_modes[slot].keycode, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && action.operand == slot);
+        assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && native == pd_modes[slot].keycode);
+        assert(noah_profile_action_runtime_v1_from_native(pd_modes[slot].lock_action, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK && action.operand == slot);
+        assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && native == pd_modes[slot].lock_action);
+    }
+    assert(noah_profile_action_runtime_v1_from_native(CUSTOM_KEY_63, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_CUSTOM_KEY);
+    assert(noah_profile_action_runtime_v1_from_native(LOCK_LAYER(0), &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK && action.operand == 0u);
     action = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_LAYER_LOCK, .operand = LAYER_COUNT};
     assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_UNSUPPORTED && native == KC_NO);
     action = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .flags = 1u, .operand = KC_A};
     assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_INVALID_ARGUMENT);
 }
 
-static void validate_portable_import(const noah_profile_compiled_v1_t *compiled, const char *path) {
+static void validate_portable_import(const noah_profile_compiled_v1_t *compiled, const char *path, bool expect_valid) {
     FILE *file = fopen(path, "rb");
     assert(file);
     size_t length = fread(output, 1, sizeof(output), file);
@@ -373,13 +404,19 @@ static void validate_portable_import(const noah_profile_compiled_v1_t *compiled,
     noah_profile_validator_v1_result_t result = noah_profile_validator_v1_begin(&validator, &reader, 0, &declaration, &compatible, &error);
     for (size_t step = 0; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && step < 5000; step++)
         result = noah_profile_validator_v1_step(&validator, 20, &error);
+    if (!expect_valid) {
+        // An eight-slot backup (RGB v2, PD v1) is refused at the first of
+        // those domains; Ark translates it before it reaches the keyboard.
+        assert(result == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN && error.domain_id == NOAH_PROFILE_DOMAIN_V1_RGB);
+        return;
+    }
     if (result != NOAH_PROFILE_VALIDATOR_V1_VALID) fprintf(stderr, "portable import failed: %u domain=%u field=%u byte=%zu\n", result, error.domain_id, error.field_id, error.byte_offset);
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
     assert(placement_log.refused == 0u);
     assert(validator.profile.domain_mask == NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
     assert(validator.profile.settings.length >= 344);
 #ifdef NOAH_PD_PROFILE_ENABLE
-    assert(validator.profile.pd.length == NOAH_PROFILE_PD_V1_SIZE);
+    assert(validator.profile.pd.length >= NOAH_PROFILE_PD_V1_HEADER_SIZE && (validator.profile.pd.length - NOAH_PROFILE_PD_V1_HEADER_SIZE) % NOAH_PROFILE_PD_V1_RECORD_SIZE == 0u);
 #endif
 }
 
@@ -398,13 +435,18 @@ int main(int argc, char **argv) {
         fclose(file);
         return 0;
     }
-    if (argc == 4 && (strcmp(argv[2], "--empty-profile") == 0 || strcmp(argv[2], "--import-profile") == 0)) {
+    if (argc == 4 && (strcmp(argv[2], "--empty-profile") == 0 || strcmp(argv[2], "--import-profile") == 0 || strcmp(argv[2], "--reject-profile") == 0)) {
         noah_profile_compiled_v1_t profile;
         fixture_path = argv[1];
         if (strcmp(argv[2], "--empty-profile") == 0) assert(key_behavior_count == 0 && noah_combo_count == 0);
         assert(noah_profile_compiled_v1_open(&profile, NULL) == NOAH_PROFILE_COMPILED_V1_OK);
         assert(profile.metadata.action_abi_digest == fixture_u32("profile.action_abi", 16));
-        validate_portable_import(&profile, argv[3]);
+        if (strcmp(argv[2], "--reject-profile") == 0) {
+            validate_portable_import(&profile, argv[3], false);
+            puts("firmware refuses an untranslated eight-slot profile");
+            return 0;
+        }
+        validate_portable_import(&profile, argv[3], true);
         puts("firmware accepts the app's complete populated profile and preserves its action ABI");
         return 0;
     }
