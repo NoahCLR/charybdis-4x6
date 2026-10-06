@@ -1,8 +1,9 @@
 # Profile Wire V1
 
 > Schema-2 PD extension: side-specific PD-enabled builds keep the v1 HID/split
-> envelope and add domain `0x50` (mask bit 4), profile schema 2.0, RGB/settings
-> v2, eight PD slots, and a 5,088-byte custom payload ceiling. Logical storage
+> envelope and add domain `0x50` (mask bit 4), profile schema 2.0, RGB v3,
+> settings v2–v5, 32 PD slots stored sparsely (PD v2, D-F09), and a 5,088-byte
+> custom payload ceiling. Logical storage
 > is format 3 (`NR`) with the same VIA generation/digest binding; portable
 > documents are version 2. Existing schema-1/format-2 bridge behavior below
 > remains supported by the app. The exact version/geometry/ABI and legacy GET 9
@@ -46,7 +47,10 @@ Unknown required domains reject the candidate. Unknown optional domains are
 allowed only after a future schema-minor rule explicitly defines skippability;
 v1.0 rejects every unknown domain.
 
-Initial domain ids:
+Initial domain ids (schema 1; the schema-2 versions the 32-slot firmware
+accepts are RGB `0x10` v3, key behaviors v1, combos v1–v2, settings v2–v5 and
+PD `0x50` v2, one list in `users/noah/lib/profile/schema/profile_versions.h`,
+D-F09):
 
 | Id | Domain | Version |
 | ---: | --- | ---: |
@@ -54,7 +58,7 @@ Initial domain ids:
 | `0x20` | Milestone A key behaviors | 1 |
 | `0x30` | Combo overrides | 1 |
 | `0x40` | Portable settings, layer names, and user macros (v1/v2) or VIA macro names (v3; see [portable profile](portable-profile-v1.md)) | 1 |
-| `0x50` | Later live defaults | reserved |
+| `0x50` | Pointing-mode slots ([PD-mode domain](pd-mode-domain-v1.md)), schema 2 only | 2 (32 slots, sparse) |
 
 ## Action Encoding
 
@@ -74,8 +78,8 @@ Initial action kinds:
 | 1 | 16-bit standard QMK keycode under the advertised action-ABI digest |
 | 2 | logical layer id, momentary |
 | 3 | logical layer id, lock |
-| 4 | stable PD-mode id, momentary |
-| 5 | stable PD-mode id, lock |
+| 4 | stable PD-mode id, momentary: `0..31` on 32-slot firmware (native `PD_SLOT_n` = `0x7e80 + n`) |
+| 5 | stable PD-mode id, lock: `0..31` on 32-slot firmware (native `PD_SLOT_n_LOCK` = `0x7ea0 + n`) |
 | 6 | VIA macro slot |
 | 7 | custom key `0..63` (`CUSTOM_KEY_n`, native `0x7e40 + n`); under earlier action vocabularies this kind named the retired user macros, and a digest mismatch keeps the two apart |
 
@@ -149,7 +153,9 @@ must be unique.
 
 ## RGB Domain
 
-Domain `0x10` version `1` begins with this exact 16-byte header:
+Domain `0x10` version `1` begins with this exact 16-byte header (version 3,
+for 32 pointing slots, differs only in its format byte `3` and 32 PD-color
+rows; see [RGB domain](rgb-domain-v1.md)):
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
@@ -847,6 +853,7 @@ Domain `0x40` v1 and GET values `0x07`/`0x08` are specified in
 [portable-profile-v1.md](portable-profile-v1.md). The canonical envelope now
 permits four known domains; an unknown domain still rejects the candidate.
 The settings validator uses the existing bounded reader and safe publication
-boundary. Validator/provider state policies are 360/784 bytes respectively.
+boundary. Validator/provider state policies are 368/784 bytes respectively
+(368 since D-F09: the 32-bit PD slot mask in the compatibility limits).
 The compiled payload continues to contain RGB and behaviours; full export
 materializes effective combos and settings from their device readback commands.

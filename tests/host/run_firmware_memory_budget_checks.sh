@@ -24,14 +24,16 @@ if find "$ROOT/users/noah" "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah
 fi
 
 # The PD geometry adds 2 KiB of wear-level cache plus the bounded mode cache.
-# Keep the old artifact policy intact; select the reviewed 3 KiB increment
-# only from this artifact's recorded compiler flags (never its target name).
-# See docs/architecture/memory-budgets.md for linked accounting and the
+# Keep the old artifact policy intact; select the reviewed increments only from
+# this artifact's recorded compiler flags (never its target name): 3 KiB for
+# the eight-slot PD profile, then 4 KiB for 32 slots (the 32-slot mode cache and
+# 32-bit mode masks). Both are policy, not capacity. See
+# docs/architecture/memory-budgets.md for linked accounting and the
 # outstanding physical high-water release gate.
 STATIC_RAM_POLICY=57344
 CFLAGS_FILE="$QMK_ROOT/.build/obj_$TARGET/cflags.txt"
 if [ -f "$CFLAGS_FILE" ] && grep -Eq '(^|[[:space:]])-DNOAH_PD_PROFILE_ENABLE([[:space:]]|$)' "$CFLAGS_FILE"; then
-    STATIC_RAM_POLICY=60416
+    STATIC_RAM_POLICY=$((60416 + 4096))
 fi
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \

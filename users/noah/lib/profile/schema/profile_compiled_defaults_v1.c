@@ -233,6 +233,26 @@ static const key_behavior_t *behavior_row_in_canonical_order(uint8_t wanted, noa
     return NULL;
 }
 
+// The authored rows in canonical order, worked out once. Finding the order is
+// cubic in the row count, the table is compiled data, so the order never
+// changes, and every serialization emits it: open, a full write, and each
+// chunk a host or the validator reads through the compiled reader, which
+// replays the stream up to that chunk. A failure is not remembered, so every
+// later serialization reports it again, as before.
+static uint8_t canonical_behavior_rows[NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS];
+static bool    canonical_behavior_rows_ready;
+
+static noah_profile_compiled_v1_result_t canonical_behavior_order(noah_profile_compiled_v1_error_t *error) {
+    if (canonical_behavior_rows_ready) return NOAH_PROFILE_COMPILED_V1_OK;
+    for (uint8_t order = 0u; order < key_behavior_count; order++) {
+        const key_behavior_t *row = behavior_row_in_canonical_order(order, error);
+        if (!row) return error ? error->code : NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR;
+        canonical_behavior_rows[order] = (uint8_t)(row - key_behaviors);
+    }
+    canonical_behavior_rows_ready = true;
+    return NOAH_PROFILE_COMPILED_V1_OK;
+}
+
 static noah_profile_compiled_v1_result_t map_hold(const hold_behavior_t *source, noah_key_behavior_hold_v1_t *target, uint8_t row, uint8_t step, noah_profile_compiled_v1_error_t *error) {
     noah_profile_compiled_v1_result_t result;
     if (!source->present || !target) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, step);
@@ -294,12 +314,13 @@ static noah_profile_compiled_v1_result_t write_behavior_payload(compiled_writer_
     (void)payload_length;
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
     if (!(emit_u8(writer, key_behavior_count) && emit_u8(writer, populated_steps) && emit_u16(writer, 0u))) return writer->result;
+    result = canonical_behavior_order(error);
+    if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
 
     for (uint8_t order = 0u; order < key_behavior_count; order++) {
-        const key_behavior_t    *row = behavior_row_in_canonical_order(order, error);
+        uint8_t                  source_row = canonical_behavior_rows[order];
+        const key_behavior_t    *row        = &key_behaviors[source_row];
         noah_profile_action_v1_t target;
-        uint8_t                  source_row = row ? (uint8_t)(row - key_behaviors) : UINT8_MAX;
-        if (!row) return error ? error->code : NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR;
         result = noah_profile_compiled_v1_action(row->keycode, &target);
         if (result != NOAH_PROFILE_COMPILED_V1_OK || target.kind == NOAH_PROFILE_ACTION_V1_NONE) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, source_row, UINT8_MAX);
         if (!(emit_u16(writer, (uint16_t)behavior_row_body_length(row)) && emit_action(writer, &target) && emit_u16(writer, row->tap_hold_term) && emit_u16(writer, row->longer_hold_term) && emit_u16(writer, row->multi_tap_term) && emit_u8(writer, row->keeps_auto_mouse_anchored ? NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE : 0u) && emit_u8(writer, behavior_step_count(row)))) return writer->result;
@@ -639,7 +660,8 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
     }
     for (uint8_t id = 0u; id < PD_MODE_COUNT; id++) {
         emit_u8(&writer, id);
-        emit_u16(&writer, pd_modes[id].mode_flag);
+        // The whole 32-bit flag: slots 16..31 have no bits in a u16.
+        emit_u32(&writer, pd_modes[id].mode_flag);
         emit_u16(&writer, pd_modes[id].keycode);
         emit_u16(&writer, pd_modes[id].lock_action);
     }
@@ -656,14 +678,32 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
 }
 
 #ifdef NOAH_PD_PROFILE_ENABLE
+// The sparse version-2 domain stores only the slots a profile uses.
+static uint8_t pd_record_count(void) {
+    uint8_t count = 0;
+    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
+        if (noah_pd_defaults[slot].kind != 0u || noah_pd_defaults[slot].name[0] != '\0') count++;
+    }
+    return count;
+}
+
+static uint16_t pd_payload_size(void) {
+    return (uint16_t)(NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)pd_record_count() * NOAH_PROFILE_PD_V1_RECORD_SIZE);
+}
+
 static noah_profile_compiled_v1_result_t write_pd_payload(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
-    static const uint8_t pd_header[8] = {1, 8, 96, 0, 0, 0, 0, 0};
+    const uint8_t pd_header[8] = {NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, pd_record_count(), 0, 0, 0, 0};
+    uint8_t       minimum      = 0;
     if (!emit(writer, pd_header, sizeof(pd_header))) return writer->result;
-    for (uint8_t slot = 0; slot < 8; slot++) {
+    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
         uint8_t record[96];
         noah_profile_pd_v1_encode_record(&noah_pd_defaults[slot], record);
         if (noah_profile_pd_v1_validate_record(record, sizeof(record), slot, NULL) != NOAH_PROFILE_PD_V1_OK)
             return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, slot, UINT8_MAX);
+        if (!noah_profile_pd_v1_record_present(record)) continue;
+        if (noah_profile_pd_v1_validate_entry(record, sizeof(record), minimum, NULL) != NOAH_PROFILE_PD_V1_OK)
+            return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, slot, UINT8_MAX);
+        minimum = (uint8_t)(slot + 1u);
         for (uint8_t offset = 0; offset < sizeof(record); offset++)
             if (!emit_u8(writer, record[offset])) return writer->result;
     }
@@ -715,7 +755,7 @@ static noah_profile_compiled_v1_result_t write_blob(compiled_writer_t *writer, n
     result = write_behavior_payload(writer, error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK || writer->stopped) return result;
 #ifdef NOAH_PD_PROFILE_ENABLE
-    if (!(emit_u8(writer, NOAH_PROFILE_DOMAIN_V1_PD) && emit_u8(writer, 1) && emit_u16(writer, NOAH_PROFILE_PD_V1_SIZE))) return writer->result;
+    if (!(emit_u8(writer, NOAH_PROFILE_DOMAIN_V1_PD) && emit_u8(writer, NOAH_PROFILE_PD_V1_VERSION) && emit_u16(writer, pd_payload_size()))) return writer->result;
     return write_pd_payload(writer, error);
 #endif
     return writer->result;
@@ -772,13 +812,15 @@ static bool compiled_reader_read(void *context, size_t offset, uint8_t *target, 
     compiled_writer_t                 writer = {.write = range_write, .context = &sink, .result = NOAH_PROFILE_COMPILED_V1_OK, .allow_early_stop = true};
     if (!profile) return false;
 #ifdef NOAH_PD_PROFILE_ENABLE
-    // PD is the final, fixed-size domain in write_blob. Boot/fallback warms its
-    // cache synchronously in 20-byte reads. Replaying preceding RGB and cubic
-    // behavior canonicalization for each read can starve the scan watchdog.
-    // Seek directly to the PD payload; keep the same encoder and validation.
-    if (profile->metadata.byte_length >= NOAH_PROFILE_PD_V1_SIZE &&
+    // PD is the final domain in write_blob, and its compiled size is fixed by
+    // the authored slots. Boot/fallback warms its cache synchronously in
+    // 20-byte reads. Replaying the preceding RGB and behaviour domains for
+    // each read can starve the scan watchdog (the canonical behaviour order is
+    // worked out once, but the rows are still emitted). Seek directly to the PD
+    // payload; keep the same encoder and validation.
+    if (profile->metadata.byte_length >= pd_payload_size() &&
         (profile->metadata.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD) != 0u) {
-        size_t pd_start = profile->metadata.byte_length - NOAH_PROFILE_PD_V1_SIZE;
+        size_t pd_start = profile->metadata.byte_length - pd_payload_size();
         if (offset >= pd_start) {
             sink.stream_offset = pd_start;
             return write_pd_payload(&writer, &error) == NOAH_PROFILE_COMPILED_V1_OK && sink.copied == length;
@@ -820,7 +862,7 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
 #endif
     result.required_domain_mask              = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
     result.logical_layer_count               = LAYER_COUNT;
-    result.supported_pd_mode_mask            = (uint8_t)((UINT32_C(1) << PD_MODE_COUNT) - 1u);
+    result.supported_pd_mode_mask            = UINT32_MAX >> (32u - PD_MODE_COUNT);
     result.via_macro_slot_count              = VIA_MACRO_SLOT_COUNT;
     result.custom_key_count        = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     result.rgb_limits.logical_layer_count    = LAYER_COUNT;

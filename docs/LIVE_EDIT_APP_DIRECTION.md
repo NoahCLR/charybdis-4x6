@@ -74,6 +74,11 @@ Firmware work remaining before the product is complete:
   Window on custom keys 0–3. Confirm that on both halves, that the halves
   converge, and that the pre-migration backup imports through the key-by-key
   translation, before relying on it.
+- **The 32-slot upgrade has not run on hardware** (D-F09). Flashing it should
+  make each half refuse its eight-slot stored profile by action ABI digest
+  and run the compiled defaults; confirm that, that an eight-slot backup
+  imports through the translation, and that slot 31 holds, locks and colours
+  on both halves.
 
 ## Remaining Load-Bearing Contracts
 
@@ -469,11 +474,11 @@ staging keeps its 15-second lease while status polls alone do not. After the
 decision nothing cancels, whatever the host saw. See
 [Logical Profile Transaction V1](architecture/logical-profile-transaction-v1.md#cancellation-and-lease-ownership).
 
-### D-L40 — Firmware builds use only the eight-slot pointing engine
+### D-L40 — Firmware builds use only the slot-based pointing engine
 
 The per-preset Volume, Brightness, Zoom, Arrow and Pinch C handlers and the
 old-geometry firmware bridge builds are retired. Every firmware build uses the
-schema-2 eight-slot engine. The ordinary side-specific pair owns a live profile;
+schema-2 slot engine (eight slots then; 32 since D-F09). The ordinary side-specific pair owns a live profile;
 an owner-free generic or comparison image warms the same engine from validated
 compiled slot records. The mode registry keeps deployed hold and lock keycode
 identities, but no per-preset callbacks. `NOAH_PD_PROFILE=no` and the five-layer
@@ -689,3 +694,58 @@ against this firmware, against Ark `main` (Ark `dev` when the release marker say
 the release is joint), so `main` cannot move to a contract the released app does
 not speak, not even through a merge on the GitHub page. The independence test
 exempts that one workflow and nothing else.
+
+## D-F07 — A directional mode can send once per movement
+
+A directional mode either sends once per threshold step, as before, or once per
+movement, so an imprecise movement does not send a burst of the same shortcut.
+A movement ends after a 150 ms pause (the engine's existing idle boundary) or
+the mode ending. Within one, only motion back against the direction that sent,
+a whole threshold of it, sends again, so a back-and-forth sends once per leg
+while a turn, or a single stray report in a long move, sends nothing more;
+leftover motion is dropped. It is byte 87 of the unchanged
+96-byte directional record, zero (once per step) in every existing profile, so
+the domain version stays `1` and older firmware and apps reject a nonzero value
+as reserved, as with axis `3` (D-L24). See
+[PD-mode domain v1](architecture/pd-mode-domain-v1.md).
+
+## D-F08 — A scrolling mode can scroll one axis only
+
+A scrolling mode scrolls both axes, as before, horizontally only or vertically
+only. The engine still chooses and holds an axis per gesture exactly as for
+both axes; a gesture held on the excluded axis sends nothing, and its steps are
+consumed and still decay the other axis. So a sideways swipe in a vertical-only
+mode is dropped whole rather than having its slight vertical drift scroll, and
+excluded motion is never remapped onto the allowed axis. It is byte 3 of the
+scrolling record, which was zero, so every existing profile scrolls both axes;
+the domain version stays `1`, and older firmware and apps reject a nonzero
+value, as with D-F07. See [PD-mode domain v1](architecture/pd-mode-domain-v1.md).
+
+## D-F09 — Thirty-two pointing slots, stored sparsely
+
+The keyboard has 32 pointing slots, `0..31`, filling the reserved keycode
+blocks: `PD_SLOT_n` holds at `0x7e80 + n`, `PD_SLOT_n_LOCK` toggles at
+`0x7ea0 + n`, and action kinds 4 and 5 take operands `0..31`. Slots 0–6 keep
+their identities and presets; 7–31 start disabled. Storing 32 fixed records
+would take 3,080 of the profile's 5,088 bytes whether or not a slot is used,
+so PD domain `0x50` version 2 stores only the slots that say something: a
+header `[2, 32, 96, n, 0, 0, 0, 0]`, then `n` unchanged 96-byte records in
+ascending slot ID, a record present exactly when its slot is configured or
+disabled with a name. An omitted slot is disabled and unnamed; storing one
+that way is noncanonical and refused, so every profile has one encoding. RGB
+keeps one colour row per slot (domain `0x10` version 3, 32 rows, 120 bytes
+more than version 2) because a disabled slot keeps its colour. The firmware
+accepts only RGB v3 and PD v2 in schema 2.0, with unchanged storage geometry;
+the effective cache still holds all 32 slots (3,072 bytes), filled at
+publication, so pointing never reads storage.
+
+`pd_mode_mask_t` is 32 bits. The split runtime sync carries mode ids, not
+masks, and is unchanged. The action ABI digest, which now digests each mode
+flag at 32 bits, is `0xf79c6151`; firmware therefore refuses a stored eight-slot
+profile by digest and falls back to its compiled defaults, and the app imports
+an eight-slot backup (`0x1d3fcacc`) by the key-by-key identity translation plus
+PD v1 → v2 and RGB v2 → v3 ([portable profile](architecture/portable-profile-v1.md)).
+The static RAM tripwire gains a 4 KiB feature increment
+([memory budgets](architecture/memory-budgets.md)). See
+[PD-mode domain](architecture/pd-mode-domain-v1.md) and
+[RGB domain](architecture/rgb-domain-v1.md).

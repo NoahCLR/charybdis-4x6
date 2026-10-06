@@ -79,6 +79,7 @@ static void dragscroll_accumulate(int32_t *buffer, int32_t delta) {
 
 // The configured engine supplies an immutable, validated slot for one poll.
 #ifdef NOAH_PD_PROFILE_ENABLE
+#    include "../../profile/schema/profile_pd_v1.h"
 static const uint8_t *configured_scroll;
 static uint16_t scroll_u16(uint8_t offset, uint16_t fallback) {
     return configured_scroll ? (uint16_t)configured_scroll[offset] | (uint16_t)configured_scroll[offset + 1u] << 8u : fallback;
@@ -86,9 +87,16 @@ static uint16_t scroll_u16(uint8_t offset, uint16_t fallback) {
 static uint8_t scroll_u8(uint8_t offset, uint8_t fallback) {
     return configured_scroll ? configured_scroll[offset] : fallback;
 }
+// Whether the slot scrolls this axis (byte 3: both, horizontal only or
+// vertical only).
+static bool dragscroll_axis_scrolls(dragscroll_axis_t axis) {
+    uint8_t axes = scroll_u8(3, NOAH_PD_SCROLL_BOTH);
+    return axes == NOAH_PD_SCROLL_BOTH || (axes == NOAH_PD_SCROLL_HORIZONTAL) == (axis == DRAGSCROLL_AXIS_X);
+}
 #else
 #    define scroll_u16(offset, fallback) (fallback)
 #    define scroll_u8(offset, fallback) (fallback)
+#    define dragscroll_axis_scrolls(axis) true
 #endif
 
 static int32_t dragscroll_axis_threshold(dragscroll_axis_t axis) {
@@ -225,26 +233,30 @@ static bool dragscroll_refresh_axis_lock(bool had_motion, uint32_t motion_age) {
     return true;
 }
 
+// A gesture locked to an axis the slot does not scroll runs as usual, consuming
+// its steps and decaying the other axis, but sends nothing: a sideways swipe in
+// a vertical-only mode is dropped, not leaked into the vertical drift.
 static bool dragscroll_emit_locked_axis(report_mouse_t *mouse_report) {
     dragscroll_axis_t locked_axis = dragscroll_state.locked_axis;
     int32_t          *buffer      = locked_axis == DRAGSCROLL_AXIS_X ? &dragscroll_state.buffer_x : &dragscroll_state.buffer_y;
     int32_t           step        = dragscroll_consume(buffer, locked_axis);
+    bool              scrolls     = dragscroll_axis_scrolls(locked_axis);
 
     if (step == 0) {
         return false;
     }
 
     if (locked_axis == DRAGSCROLL_AXIS_X) {
-        mouse_report->h = dragscroll_clamp_hv((int32_t)mouse_report->h + step);
+        if (scrolls) mouse_report->h = dragscroll_clamp_hv((int32_t)mouse_report->h + step);
         dragscroll_decay_cross_axis(&dragscroll_state.buffer_y, DRAGSCROLL_AXIS_Y);
     } else if (locked_axis == DRAGSCROLL_AXIS_Y) {
-        mouse_report->v = dragscroll_clamp_hv((int32_t)mouse_report->v + step);
+        if (scrolls) mouse_report->v = dragscroll_clamp_hv((int32_t)mouse_report->v + step);
         dragscroll_decay_cross_axis(&dragscroll_state.buffer_x, DRAGSCROLL_AXIS_X);
     } else {
         return false;
     }
 
-    return true;
+    return scrolls;
 }
 
 static void dragscroll_expire_prior_state(uint32_t prior_motion_age) {

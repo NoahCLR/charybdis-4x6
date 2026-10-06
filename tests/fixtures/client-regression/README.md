@@ -21,6 +21,19 @@ then exercises the existing C tests in their normal and sanitizer variants.
 No Ark checkout, npm installation or regeneration is required for these tests.
 The provenance is a source reference, not an executable dependency.
 
+Byte 87 of a directional PD record became the output setting (D-F07): the six
+corpus cases that set it to `1` in an otherwise valid directional record are
+now expected to be accepted, and only those six expectations changed. Byte 3
+of a scrolling record became its scroll axes (D-F08): the four cases that set
+it to `1` or `2` in an otherwise valid scrolling record are likewise accepted.
+
+Thirty-two sparse pointing slots (D-F09) made PD domain version 2 and RGB
+version 3 the only ones the firmware accepts. The PD corpus is unchanged: it is
+version 1, and its runner checks it with the retired version-1 validator, whose
+record rules version 2 shares. The populated `.pd*` profiles are unchanged too:
+their runner checks that the firmware refuses them as they are, and accepts
+their documented translation (`tests/host/translate_eight_slot_profile.py`).
+
 Do not regenerate expected results just to make a changed validator pass.
 Review intentional contract changes and extend firmware-owned vectors alongside
 the C tests. Ark can independently propose vectors from its integration corpus;

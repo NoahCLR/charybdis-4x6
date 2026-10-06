@@ -10,6 +10,7 @@
 #include "../../pointing/defs/pd_modes.h"
 
 _Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS, "custom key identities drifted from the action ABI");
+_Static_assert(PD_SLOT_31 == PD_SLOT_0 + PD_MODE_COUNT - 1 && PD_SLOT_31_LOCK == PD_SLOT_0_LOCK + PD_MODE_COUNT - 1, "pointing slot keycodes are their block's first plus the slot ID");
 
 noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_from_native(uint16_t native_action, noah_profile_action_v1_t *action) {
     if (!action) {
@@ -39,17 +40,19 @@ noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_from_nati
         action->operand = QK_MOMENTARY_GET_LAYER(native_action);
         return action->operand < LAYER_COUNT ? NOAH_PROFILE_ACTION_RUNTIME_V1_OK : NOAH_PROFILE_ACTION_RUNTIME_V1_UNSUPPORTED;
     }
-    for (uint8_t index = 0u; index < PD_MODE_COUNT; index++) {
-        if (native_action == pd_modes[index].keycode) {
-            action->kind    = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY;
-            action->operand = index;
-            return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
-        }
-        if (native_action == pd_modes[index].lock_action) {
-            action->kind    = NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK;
-            action->operand = index;
-            return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
-        }
+    // The hold and lock blocks hold the slots in ID order, so a slot's keycode
+    // is its block's first plus its ID. Behaviour canonicalization converts
+    // every action many times over; scanning 32 slots for each one starved
+    // the restart watchdog while a host read the compiled profile.
+    if (native_action >= PD_SLOT_0 && native_action < PD_SLOT_0 + PD_MODE_COUNT) {
+        action->kind    = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY;
+        action->operand = (uint16_t)(native_action - PD_SLOT_0);
+        return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
+    }
+    if (native_action >= PD_SLOT_0_LOCK && native_action < PD_SLOT_0_LOCK + PD_MODE_COUNT) {
+        action->kind    = NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK;
+        action->operand = (uint16_t)(native_action - PD_SLOT_0_LOCK);
+        return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
     }
     action->kind    = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE;
     action->operand = native_action;

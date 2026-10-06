@@ -4,7 +4,7 @@
 //
 // Optional structured trace sink for cross-subsystem runtime debugging. Keep
 // this intentionally small: one shared ring buffer with subsystem/event ids
-// plus two 16-bit payload slots.
+// plus two 32-bit payload slots (a pd-mode mask needs all 32 bits).
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -90,8 +90,8 @@ typedef enum {
 typedef struct {
     uint8_t  kind;
     uint8_t  event;
-    uint16_t a;
-    uint16_t b;
+    uint32_t a;
+    uint32_t b;
 } noah_runtime_trace_entry_t;
 
 #ifndef NOAH_RUNTIME_TRACE_CAPACITY
@@ -106,7 +106,7 @@ typedef struct {
 
 #if defined(NOAH_RUNTIME_TRACE_ENABLE)
 
-void noah_runtime_trace_emit(noah_trace_kind_t kind, uint8_t event, uint16_t a, uint16_t b);
+void noah_runtime_trace_emit(noah_trace_kind_t kind, uint8_t event, uint32_t a, uint32_t b);
 void noah_runtime_trace_snapshot(noah_runtime_trace_snapshot_t *out);
 void noah_runtime_trace_reset(void);
 #    if defined(CONSOLE_ENABLE)
@@ -115,7 +115,7 @@ void noah_runtime_trace_dump_snapshot_to_console(const noah_runtime_trace_snapsh
 
 #else
 
-static inline void noah_runtime_trace_emit(noah_trace_kind_t kind, uint8_t event, uint16_t a, uint16_t b) {
+static inline void noah_runtime_trace_emit(noah_trace_kind_t kind, uint8_t event, uint32_t a, uint32_t b) {
     (void)kind;
     (void)event;
     (void)a;

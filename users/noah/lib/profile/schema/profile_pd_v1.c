@@ -1,7 +1,7 @@
 #include "profile_pd_v1.h"
 #include <string.h>
 
-_Static_assert(sizeof(noah_pd_config_t) == 96 && offsetof(noah_pd_config_t, scroll) == 70 && offsetof(noah_pd_config_t, directions) == 36 && offsetof(noah_pd_config_t, diagonals) == 70 && offsetof(noah_pd_config_t, empty_direction) == 86, "PD native structure layout drift");
+_Static_assert(sizeof(noah_pd_config_t) == 96 && offsetof(noah_pd_config_t, scroll) == 70 && offsetof(noah_pd_config_t, directions) == 36 && offsetof(noah_pd_config_t, diagonals) == 70 && offsetof(noah_pd_config_t, empty_direction) == 86 && offsetof(noah_pd_config_t, direction_output) == 87, "PD native structure layout drift");
 
 static void write_u16(uint8_t *p, uint16_t value) { p[0] = (uint8_t)value; p[1] = (uint8_t)(value >> 8); }
 void noah_profile_pd_v1_encode_record(const noah_pd_config_t *config, uint8_t output[96]) {
@@ -104,25 +104,30 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *p,
         }
     }
     if (p[1] == 1 && p[3] == NOAH_PD_AXIS_EIGHT) {
-        // Both axes are read, so both need a threshold; bytes 70..86 carry
-        // the diagonals and byte 86 what an empty one does.
+        // Both axes are read, so both need a threshold; bytes 70..85 carry
+        // the diagonals, byte 86 what an empty direction does and byte 87 how
+        // often a direction sends.
         if (p[6]) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 6);
         if (!u16(p + 32) || !u16(p + 34)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 32);
         for (size_t i = 70; i < 86; i += 4) {
             if (!tap_valid(p + i)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ACTION, i);
         }
         if (p[86] > NOAH_PD_EMPTY_DIRECTION_NOTHING) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 86);
-        if (!zero(p + 87, 3)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 87);
+        if (p[87] > NOAH_PD_DIRECTION_OUTPUT_ONCE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 87);
+        if (!zero(p + 88, 2)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 88);
     } else if (p[1] == 1) {
-        // No diagonals; byte 86 is what an empty direction does.
+        // No diagonals; byte 86 is what an empty direction does, byte 87 how
+        // often a direction sends.
         if (p[6] || !zero(p + 70, 16)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 6);
         if (p[86] > NOAH_PD_EMPTY_DIRECTION_NOTHING) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 86);
-        if (!zero(p + 87, 3)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 87);
+        if (p[87] > NOAH_PD_DIRECTION_OUTPUT_ONCE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, 87);
+        if (!zero(p + 88, 2)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, 88);
         if ((p[3] != 0 && !u16(p + 32)) || (p[3] != 1 && !u16(p + 34))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 32);
         if ((p[3] == 0 && (u16(p + 32) || !zero(p + 36, 8))) ||
             (p[3] == 1 && (u16(p + 34) || !zero(p + 44, 8)))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 32);
     } else {
-        if (p[3] || !zero(p + 32, 20)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 3);
+        // Byte 3 is which axes it scrolls.
+        if (p[3] > NOAH_PD_SCROLL_VERTICAL || !zero(p + 32, 20)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, 3);
         if (!u16(p + 70) || !u16(p + 72) || !u16(p + 74) || !u16(p + 76) ||
             !u16(p + 82) || u16(p + 80) < u16(p + 82) || !p[84] || !p[85] || !p[86] || !p[87] ||
             p[84] < p[85] || p[86] < p[87] || (uint32_t)p[86] * p[85] > (uint32_t)p[84] * p[87] ||
@@ -131,14 +136,62 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *p,
     return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
 }
 
+bool noah_profile_pd_v1_record_present(const uint8_t *record) {
+    return record && (record[1] != 0u || record[8] != 0u);
+}
+
+noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_header(const uint8_t header[8], size_t payload_length, uint8_t *record_count, noah_profile_pd_v1_error_t *error) {
+    static const uint8_t expected[3] = {NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE};
+    if (!header) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
+    for (size_t i = 0; i < sizeof(expected); i++) {
+        if (header[i] != expected[i]) return fail(error, NOAH_PROFILE_PD_V1_INVALID_HEADER, i);
+    }
+    if (header[3] > NOAH_PROFILE_PD_V1_SLOT_COUNT) return fail(error, NOAH_PROFILE_PD_V1_INVALID_HEADER, 3);
+    for (size_t i = 4; i < NOAH_PROFILE_PD_V1_HEADER_SIZE; i++) {
+        if (header[i]) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, i);
+    }
+    if (payload_length != NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)header[3] * NOAH_PROFILE_PD_V1_RECORD_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
+    if (record_count) *record_count = header[3];
+    return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
+}
+
+noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_entry(const uint8_t *p, size_t length, uint8_t minimum_slot, noah_profile_pd_v1_error_t *error) {
+    if (!p) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
+    if (length != NOAH_PROFILE_PD_V1_RECORD_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
+    if (p[0] >= NOAH_PROFILE_PD_V1_SLOT_COUNT || p[0] < minimum_slot) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ID, 0);
+    noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_record(p, length, p[0], error);
+    if (result != NOAH_PROFILE_PD_V1_OK) return result;
+    if (!noah_profile_pd_v1_record_present(p)) return fail(error, NOAH_PROFILE_PD_V1_NONCANONICAL, 1);
+    return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
+}
+
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error) {
-    static const uint8_t header[8] = {1, 8, 96, 0, 0, 0, 0, 0};
+    uint8_t count;
     if (!bytes) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
-    if (length != NOAH_PROFILE_PD_V1_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
+    if (length < NOAH_PROFILE_PD_V1_HEADER_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
+    noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_header(bytes, length, &count, error);
+    if (result != NOAH_PROFILE_PD_V1_OK) return result;
+    uint8_t minimum = 0;
+    for (uint8_t index = 0; index < count; index++) {
+        size_t offset = NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE;
+        result = noah_profile_pd_v1_validate_entry(bytes + offset, NOAH_PROFILE_PD_V1_RECORD_SIZE, minimum, error);
+        if (result != NOAH_PROFILE_PD_V1_OK) {
+            if (error) error->offset += offset;
+            return result;
+        }
+        minimum = (uint8_t)(bytes[offset] + 1u);
+    }
+    return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
+}
+
+noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_legacy(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error) {
+    static const uint8_t header[8] = {NOAH_PROFILE_PD_V1_LEGACY_VERSION, NOAH_PROFILE_PD_V1_LEGACY_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0, 0, 0, 0, 0};
+    if (!bytes) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
+    if (length != NOAH_PROFILE_PD_V1_LEGACY_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
     for (size_t i = 0; i < sizeof(header); i++) {
         if (bytes[i] != header[i]) return fail(error, NOAH_PROFILE_PD_V1_INVALID_HEADER, i);
     }
-    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
+    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_LEGACY_SLOT_COUNT; slot++) {
         size_t offset = NOAH_PROFILE_PD_V1_HEADER_SIZE + slot * NOAH_PROFILE_PD_V1_RECORD_SIZE;
         noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_record(bytes + offset, NOAH_PROFILE_PD_V1_RECORD_SIZE, slot, error);
         if (result != NOAH_PROFILE_PD_V1_OK) {

@@ -228,10 +228,18 @@ bool rgb_effective_config_pd_color(const noah_effective_rgb_frame_t *frame, pd_m
         return false;
     }
     if (status == NOAH_EFFECTIVE_RGB_OK && (frame->view.stage_enable_mask & NOAH_PROFILE_RGB_V1_STAGE_PD_MODE) != 0u) {
-        for (uint8_t index = 0u; index < frame->view.pd_color_count; index++) {
-            noah_profile_rgb_v1_pd_color_t row;
-            noah_profile_rgb_v1_error_t    error;
+        noah_profile_rgb_v1_pd_color_t row;
+        noah_profile_rgb_v1_error_t    error;
 
+        // Rows are in ID order and the firmware's domain has one per slot, so
+        // the row at the slot's index is normally its own: one record read per
+        // frame however many slots exist. Otherwise scan, as rows may skip IDs
+        // a narrower supported mask leaves out.
+        if (mode_id < frame->view.pd_color_count && noah_profile_rgb_v1_pd_color_at(&frame->view, mode_id, &row, &error) == NOAH_PROFILE_RGB_V1_OK && row.pd_mode_id == mode_id) {
+            *color = (pd_mode_color_t){.pointing_mode = pd_mode_mask_from_id(mode_id), .color = native_hsv(row.color), .locality = (rgb_locality_t)row.locality};
+            return true;
+        }
+        for (uint8_t index = 0u; index < frame->view.pd_color_count; index++) {
             if (noah_profile_rgb_v1_pd_color_at(&frame->view, index, &row, &error) != NOAH_PROFILE_RGB_V1_OK) {
                 return false;
             }

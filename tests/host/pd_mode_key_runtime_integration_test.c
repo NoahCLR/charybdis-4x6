@@ -294,26 +294,37 @@ static void test_configure_pinch_transparent_profile_path(keypos_t key_pos) {
 }
 
 #ifdef NOAH_PD_PROFILE_ENABLE
-static uint8_t configured_pd_bytes[NOAH_PROFILE_PD_V1_SIZE];
+// Every slot's record, edited in place; publication stores the sparse
+// version-2 domain the profile would carry.
+static uint8_t configured_pd_records[NOAH_PROFILE_PD_V1_SLOT_COUNT][NOAH_PROFILE_PD_V1_RECORD_SIZE];
+static uint8_t configured_pd_bytes[NOAH_PROFILE_PD_V1_MAX_SIZE];
+static size_t  configured_pd_length;
 static bool configured_pd_read(void *context, size_t offset, uint8_t *target, size_t length) {
     (void)context;
-    if (offset > sizeof(configured_pd_bytes) || length > sizeof(configured_pd_bytes) - offset) return false;
+    if (offset > configured_pd_length || length > configured_pd_length - offset) return false;
     memcpy(target, configured_pd_bytes + offset, length);
     return true;
 }
 static void publish_configured_pd(void) {
+    uint8_t count = 0;
+    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
+        if (!noah_profile_pd_v1_record_present(configured_pd_records[slot])) continue;
+        memcpy(configured_pd_bytes + 8 + (size_t)count * 96, configured_pd_records[slot], 96);
+        count++;
+    }
+    memcpy(configured_pd_bytes, (const uint8_t[]){2, 32, 96, count, 0, 0, 0, 0}, 8);
+    configured_pd_length = 8 + (size_t)count * 96;
+    CHECK(noah_profile_pd_v1_validate(configured_pd_bytes, configured_pd_length, NULL) == NOAH_PROFILE_PD_V1_OK);
     noah_effective_profile_snapshot_t view = {0};
-    view.reader = (noah_profile_reader_t){.read = configured_pd_read, .length = sizeof(configured_pd_bytes)};
+    view.reader = (noah_profile_reader_t){.read = configured_pd_read, .length = configured_pd_length};
     view.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
-    view.profile.pd.length = sizeof(configured_pd_bytes);
+    view.profile.pd.length = configured_pd_length;
     noah_effective_pd_invalidate(NULL, 0, view.identity, view.identity, &view);
     CHECK(noah_effective_pd_ready());
 }
 static void load_configured_pd(void) {
     noah_pd_engine_exit();
-    memset(configured_pd_bytes, 0, sizeof(configured_pd_bytes));
-    configured_pd_bytes[0] = 1; configured_pd_bytes[1] = 8; configured_pd_bytes[2] = 96;
-    for (uint8_t i = 0; i < 8; i++) noah_profile_pd_v1_encode_record(&noah_pd_defaults[i], configured_pd_bytes + 8 + i * 96);
+    for (uint8_t i = 0; i < NOAH_PROFILE_PD_V1_SLOT_COUNT; i++) noah_profile_pd_v1_encode_record(&noah_pd_defaults[i], configured_pd_records[i]);
     publish_configured_pd();
 }
 report_mouse_t noah_pd_configured_scroll(const uint8_t *record, report_mouse_t report) {
@@ -2103,33 +2114,43 @@ static void test_gui_double_tap_hold_with_authored_pd_hold_keeps_processed_child
 }
 
 #ifdef NOAH_PD_PROFILE_ENABLE
-static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
-    keypos_t pos = test_keypos(0, 0);
+static void test_upper_slot_hold_lock_dpi_and_disabled_slot(uint8_t slot) {
+    keypos_t       pos  = test_keypos(0, 0);
+    pd_mode_mask_t mode = pd_mode_mask_from_id(slot);
     test_reset_state();
-    // The last slot starts disabled: its lock leaves the current one alone.
-    CHECK(noah_pd_defaults[7].kind == 0);
+    // The slot starts disabled: its lock leaves the current one alone.
+    CHECK(noah_pd_defaults[slot].kind == 0);
     action_dispatch(PD_SLOT_1_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
-    action_dispatch(PD_SLOT_7_LOCK);
+    action_dispatch((uint16_t)(PD_SLOT_0_LOCK + slot));
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
     action_dispatch(PD_SLOT_1_LOCK);
     CHECK(pd_mode_local_active_snapshot() == 0);
     noah_pd_config_t last = noah_pd_defaults[1];
-    last.id = 7; last.dpi = 1200;
-    noah_profile_pd_v1_encode_record(&last, configured_pd_bytes + 8 + 7 * 96);
+    last.id = slot; last.dpi = 1200;
+    noah_profile_pd_v1_encode_record(&last, configured_pd_records[slot]);
     publish_configured_pd();
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, pos, true));
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_SLOT_7);
+    CHECK(!key_runtime_integration_process_record((uint16_t)(PD_SLOT_0 + slot), pos, true));
+    CHECK(pd_mode_local_active_snapshot() == mode);
     key_runtime_integration_scan(); // CPI synchronization is scan-owned.
     CHECK(current_cpi == 1200);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, pos, false));
+    CHECK(!key_runtime_integration_process_record((uint16_t)(PD_SLOT_0 + slot), pos, false));
     key_runtime_integration_scan();
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(current_cpi == default_dpi);
-    action_dispatch(PD_SLOT_7_LOCK);
-    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_SLOT_7);
-    action_dispatch(PD_SLOT_7_LOCK);
+    action_dispatch((uint16_t)(PD_SLOT_0_LOCK + slot));
+    CHECK(pd_mode_local_locked_snapshot() == mode);
+    action_dispatch((uint16_t)(PD_SLOT_0_LOCK + slot));
     CHECK(pd_mode_local_locked_snapshot() == 0);
+}
+
+static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
+    CHECK(PD_SLOT_7 == PD_SLOT_0 + 7 && PD_SLOT_31 == PD_SLOT_0 + 31 && PD_SLOT_31_LOCK == PD_SLOT_0_LOCK + 31);
+    test_upper_slot_hold_lock_dpi_and_disabled_slot(7);
+    // Slot 31 proves the upper-bound identity path: the mask's top bit, the
+    // last keycodes of both blocks and the last cache row.
+    test_upper_slot_hold_lock_dpi_and_disabled_slot(31);
+    CHECK(pd_mode_mask_from_id(31) == (pd_mode_mask_t)PD_MODE_SLOT_31);
 }
 #endif
 
@@ -2288,7 +2309,7 @@ static void test_configured_consume_button_runs_nothing(void) {
     keypos_t pos = test_keypos(4, 0);
 
     test_reset_state();
-    configured_pd_bytes[8 + 96 + 52] = 1u; // Volume consumes button 1.
+    configured_pd_records[1][52] = 1u; // Volume consumes button 1.
     publish_configured_pd();
     action_dispatch(PD_SLOT_1_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);

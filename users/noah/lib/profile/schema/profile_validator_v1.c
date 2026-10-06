@@ -90,11 +90,11 @@ static bool behavior_limits_are_valid(const noah_key_behavior_limits_v1_t *limit
 static bool rgb_limits_are_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
     const noah_profile_rgb_v1_limits_t *limits = &compatibility->rgb_limits;
 
-    return (limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) == 0u && limits->max_payload_size != 0u && limits->max_payload_size <= NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE && limits->max_logical_layers <= NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS && limits->logical_layer_count == compatibility->logical_layer_count && limits->logical_layer_count <= limits->max_logical_layers && limits->tap_branch_color_count != 0u && limits->tap_branch_color_count <= NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS && limits->supported_pd_mode_mask == compatibility->supported_pd_mode_mask && (limits->supported_pd_mode_mask & (uint8_t)~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) == 0u;
+    return (limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) == 0u && limits->max_payload_size != 0u && limits->max_payload_size <= NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE && limits->max_logical_layers <= NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS && limits->logical_layer_count == compatibility->logical_layer_count && limits->logical_layer_count <= limits->max_logical_layers && limits->tap_branch_color_count != 0u && limits->tap_branch_color_count <= NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS && limits->supported_pd_mode_mask == compatibility->supported_pd_mode_mask && (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) == 0u;
 }
 
 static bool compatibility_is_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
-    if (!compatibility || (compatibility->allowed_domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u || (compatibility->required_domain_mask & (uint8_t)~compatibility->allowed_domain_mask) != 0u || compatibility->max_blob_size < NOAH_PROFILE_BLOB_V1_HEADER_SIZE || compatibility->max_blob_size > NOAH_PROFILE_BLOB_V1_MAX_SIZE || compatibility->logical_layer_count > NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS || (compatibility->supported_pd_mode_mask & (uint8_t)~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u || compatibility->via_macro_slot_count > NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS || compatibility->custom_key_count > NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS) {
+    if (!compatibility || (compatibility->allowed_domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u || (compatibility->required_domain_mask & (uint8_t)~compatibility->allowed_domain_mask) != 0u || compatibility->max_blob_size < NOAH_PROFILE_BLOB_V1_HEADER_SIZE || compatibility->max_blob_size > NOAH_PROFILE_BLOB_V1_MAX_SIZE || compatibility->logical_layer_count > NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS || (compatibility->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u || compatibility->via_macro_slot_count > NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS || compatibility->custom_key_count > NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS) {
         return false;
     }
     return behavior_limits_are_valid(&compatibility->behavior_limits) && rgb_limits_are_valid(compatibility);
@@ -262,7 +262,7 @@ static noah_profile_validator_v1_result_t domain_header_step(noah_profile_valida
     if (domain_mask == 0u || (domain_mask & validator->compatibility.allowed_domain_mask) == 0u) {
         return reject(validator, NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN, validator->blob_offset, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN, error);
     }
-    if ((header[0] == NOAH_PROFILE_DOMAIN_V1_PD && header[1] != 1u) || (header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS && !NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(header[1])) || (header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS && !NOAH_PROFILE_COMBO_VERSION_ACCEPTED(header[1])) || (header[0] == NOAH_PROFILE_DOMAIN_V1_RGB && header[1] != NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && header[1] != NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION)) {
+    if ((header[0] == NOAH_PROFILE_DOMAIN_V1_PD && header[1] != NOAH_PROFILE_PD_V1_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS && !NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(header[1])) || (header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS && !NOAH_PROFILE_COMBO_VERSION_ACCEPTED(header[1])) || (header[0] == NOAH_PROFILE_DOMAIN_V1_RGB && header[1] != NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && header[1] != NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION)) {
         return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, validator->blob_offset + 1u, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION, error);
     }
     if (validator->domain_index != 0u && header[0] == validator->previous_domain_id) {
@@ -406,26 +406,28 @@ static noah_profile_validator_v1_result_t settings_decode_step(noah_profile_vali
 #ifdef NOAH_PD_PROFILE_ENABLE
 static noah_profile_validator_v1_result_t pd_decode_step(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
     size_t offset = v->domain_payload_offset;
-    if (v->domain_payload_length != NOAH_PROFILE_PD_V1_SIZE)
+    noah_profile_pd_v1_error_t detail;
+    if (v->domain_payload_length < NOAH_PROFILE_PD_V1_HEADER_SIZE || v->domain_payload_length > NOAH_PROFILE_PD_V1_MAX_SIZE)
         return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, error);
     if (!v->domain_validation.pd.header) {
-        static const uint8_t header[8] = {1, 8, 96, 0, 0, 0, 0, 0};
-        if (read_blob(v, offset, v->domain_validation.pd.bytes, 8, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
-        if (memcmp(v->domain_validation.pd.bytes, header, 8)) return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, error);
+        if (read_blob(v, offset, v->domain_validation.pd.bytes, NOAH_PROFILE_PD_V1_HEADER_SIZE, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
+        if (noah_profile_pd_v1_validate_header(v->domain_validation.pd.bytes, v->domain_payload_length, &v->domain_validation.pd.count, &detail) != NOAH_PROFILE_PD_V1_OK)
+            return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset + detail.offset, error);
         v->domain_validation.pd.header = true;
-        return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+        if (v->domain_validation.pd.count) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+    } else {
+        uint8_t index = v->domain_validation.pd.index, used = v->domain_validation.pd.used;
+        uint8_t count = NOAH_PROFILE_PD_V1_RECORD_SIZE - used > NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX ? NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX : NOAH_PROFILE_PD_V1_RECORD_SIZE - used;
+        offset += NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE;
+        if (read_blob(v, offset + used, v->domain_validation.pd.bytes + used, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
+        v->domain_validation.pd.used += count;
+        if (v->domain_validation.pd.used != NOAH_PROFILE_PD_V1_RECORD_SIZE) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+        if (noah_profile_pd_v1_validate_entry(v->domain_validation.pd.bytes, NOAH_PROFILE_PD_V1_RECORD_SIZE, v->domain_validation.pd.minimum, &detail) != NOAH_PROFILE_PD_V1_OK)
+            return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset + detail.offset, error);
+        v->domain_validation.pd.minimum = (uint8_t)(v->domain_validation.pd.bytes[0] + 1u);
+        v->domain_validation.pd.used = 0;
+        if (++v->domain_validation.pd.index != v->domain_validation.pd.count) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     }
-    uint8_t slot = v->domain_validation.pd.slot, used = v->domain_validation.pd.used;
-    uint8_t count = 96 - used > NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX ? NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX : 96 - used;
-    offset += 8 + (size_t)slot * 96;
-    if (read_blob(v, offset + used, v->domain_validation.pd.bytes + used, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
-    v->domain_validation.pd.used += count;
-    if (v->domain_validation.pd.used != 96) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
-    noah_profile_pd_v1_error_t detail;
-    if (noah_profile_pd_v1_validate_record(v->domain_validation.pd.bytes, 96, slot, &detail) != NOAH_PROFILE_PD_V1_OK)
-        return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset + detail.offset, error);
-    v->domain_validation.pd.used = 0;
-    if (++v->domain_validation.pd.slot != 8) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     v->profile.pd = (noah_profile_settings_v1_view_t){v->domain_payload_offset, v->domain_payload_length};
     v->blob_offset = v->domain_payload_offset + v->domain_payload_length;
     v->domain_index++;
@@ -499,7 +501,7 @@ static bool action_reference_is_valid(const noah_profile_validator_v1_t *validat
             return action->operand < validator->compatibility.logical_layer_count;
         case NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY:
         case NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK:
-            return action->operand < NOAH_PROFILE_RGB_V1_MAX_PD_MODES && (validator->compatibility.supported_pd_mode_mask & (1u << action->operand)) != 0u;
+            return action->operand < NOAH_PROFILE_RGB_V1_MAX_PD_MODES && (validator->compatibility.supported_pd_mode_mask & (UINT32_C(1) << action->operand)) != 0u;
         case NOAH_PROFILE_ACTION_V1_VIA_MACRO:
             return action->operand < validator->compatibility.via_macro_slot_count;
         case NOAH_PROFILE_ACTION_V1_CUSTOM_KEY:
