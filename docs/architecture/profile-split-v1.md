@@ -185,6 +185,14 @@ callback validates one exact frame, copies at most one mailbox frame, and
 returns metadata, a correlated busy response, or the cached result of a prior
 scan step. It never reads or writes EEPROM and never runs validation or commit.
 
+The local descriptor callback is still queried on every scan, including during
+retry backoff. The owner validates committed descriptors when publishing them;
+the reconciler compares every descriptor field with its last normalized value
+and validates changed values before accepting them. A failed callback or invalid
+value becomes an unreadable descriptor. Changes publish metadata and authority
+before any deadline return; unchanged values need neither revalidation nor a
+replacement copy. This does not cache payload bytes or defer local changes.
+
 Matrix scan performs at most one transport exchange, one bounded payload
 read/write, or one validator/marker-last commit step. It supports newer-local
 push, newer-peer pull, staged-source prepare/pause/commit/abort,

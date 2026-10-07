@@ -18,6 +18,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DNOAH_ATOMIC_TEST_HOOKS \
     -DVIA_ENABLE \
     -DVIA_EEPROM_ALLOW_RESET \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
@@ -37,6 +38,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -fsanitize=address,undefined \
     -fno-omit-frame-pointer \
+    -DNOAH_ATOMIC_TEST_HOOKS \
     -DVIA_ENABLE \
     -DVIA_EEPROM_ALLOW_RESET \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
@@ -54,6 +56,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 "$SANITIZED_BIN"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DNOAH_ATOMIC_TEST_HOOKS \
     -DVIA_ENABLE \
     -DVIA_EEPROM_ALLOW_RESET \
     -DENCODER_MAP_ENABLE \

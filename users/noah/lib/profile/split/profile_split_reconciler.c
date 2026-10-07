@@ -74,19 +74,31 @@ static noah_profile_split_descriptor_t unreadable_descriptor(void) {
     return descriptor;
 }
 
+// Return whether the normalized descriptor changed. Keep querying the owner
+// every scan so local authority changes are visible even during link backoff.
 static bool refresh_local(noah_profile_split_reconciler_t *reconciler) {
     noah_profile_split_descriptor_t descriptor = unreadable_descriptor();
-    bool                            readable;
 
     if (!reconciler) {
         return false;
     }
-    readable = reconciler->config.local_descriptor && reconciler->config.local_descriptor(reconciler->config.local_context, &descriptor) && noah_profile_split_descriptor_valid(&descriptor);
-    if (!readable) {
+    if (!reconciler->config.local_descriptor || !reconciler->config.local_descriptor(reconciler->config.local_context, &descriptor)) {
         descriptor = unreadable_descriptor();
     }
+    if (descriptor_equal(&descriptor, &reconciler->local_descriptor)) {
+        return false;
+    }
+#ifdef NOAH_PROFILE_SPLIT_TEST_HOOKS
+    noah_profile_split_test_local_validation();
+#endif
+    if (!noah_profile_split_descriptor_valid(&descriptor)) {
+        descriptor = unreadable_descriptor();
+        if (descriptor_equal(&descriptor, &reconciler->local_descriptor)) {
+            return false;
+        }
+    }
     reconciler->local_descriptor = descriptor;
-    return readable;
+    return true;
 }
 
 static void refresh_metadata_response(noah_profile_split_reconciler_t *reconciler) {
@@ -1397,16 +1409,13 @@ void noah_profile_split_reconciler_init(noah_profile_split_reconciler_t *reconci
 }
 
 bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *reconciler, bool master, uint32_t now_ms, noah_profile_split_reconcile_mode_t mode) {
-    noah_profile_split_descriptor_t previous_local;
-    bool                            losing_master;
-    bool                            role_changed;
+    bool losing_master;
+    bool role_changed;
 
     if (!(reconciler && reconciler->initialized) || (mode != NOAH_PROFILE_SPLIT_RECONCILE_FULL && mode != NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY)) {
         return false;
     }
-    previous_local = reconciler->local_descriptor;
-    refresh_local(reconciler);
-    if (!descriptor_equal(&previous_local, &reconciler->local_descriptor)) {
+    if (refresh_local(reconciler)) {
         refresh_metadata_response(reconciler);
         // Publish the durable local change before any retry/backoff return so
         // activation cannot observe an older converged authority snapshot.
