@@ -659,8 +659,8 @@ every `main` has a tag, both halves, the BK pin and the agreement table
 The firmware Noah flashes and the firmware users download are built by the same
 compiler: `tools/build-firmware-pair.sh` always compiles in the image
 `tools/build-image` names, which CI also builds in, running itself there with
-Docker when it is started outside it, and never falling back to the host's
-compiler. The build is reproducible: QMK's version stamps are fixed
+Docker when it is started outside it, without network access, and never falling
+back to the host's compiler. The build is reproducible: QMK's version stamps are fixed
 (`SKIP_VERSION`, so the `QK_VERSION` keycode prints placeholders) and source
 paths are mapped, so one userspace commit and BK pin give the same bytes on any
 machine. Each pair has a note with its inputs, compiler and SHA-256, so a
@@ -668,15 +668,33 @@ published pair can be matched to a local one. Before this, local pairs used
 Homebrew GCC 8.5.0 and releases GCC 14.2.1; the memory effect is recorded in
 [memory budgets](architecture/memory-budgets.md#release-compiler-gcc-1421--2026-10-01).
 
+The image is QMK's official `qmk_cli` image, copied byte for byte into our own
+package, `ghcr.io/noahclr/charybdis-build`, so nothing upstream can move or
+delete the compiler our releases were built with, and we change it only when we
+choose to. The copy keeps the official multi-arch index digest, which proves it
+is unmodified. The first copy is `qmk_cli` with QMK CLI 1.2.0 and QMK's
+`arm-none-eabi-gcc` 15.2.0 (toolchain release `v15.2.0-1`) on Debian 13, digest
+`sha256:b7d7fa8f…`. Earlier pairs, including every release before it, were
+built in `ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8`, a modified
+base image with Debian's GCC 14.2.1. That package and its archived fork remain
+the record of those builds. We keep no fork of QMK's container sources:
+rebuilding them downloads packages and toolchains that move, so only the
+copied image is fixed.
+
 `tools/build-image` names the image by its multi-arch index digest
 (`name:tag@sha256:…`; the tag is only for reading), so a tag pushed again
 cannot change the compiler. The index, not one platform's manifest, keeps the
 Mac building in the image's `linux/arm64` variant and CI in its `linux/amd64`
-one. To move to a new image, read its index digest with
-`docker buildx imagetools inspect <name:tag>` (the top-level `Digest`), put the
-new reference in `tools/build-image` and every workflow's `image:` (a host test
-keeps them equal and pinned), and compare a pair built before and after for the
+one. To move to a newer official image, read its index digest with
+`docker buildx imagetools inspect ghcr.io/qmk/qmk_cli:latest` (the top-level
+`Digest`) and copy it with `sh tools/copy-build-image.sh <image>@<digest> <tag>`,
+which refuses a source named only by tag, never moves an existing tag, and
+checks that the copy has the source's digest. Put the reference it prints in
+`tools/build-image` and every workflow's `image:` (a host test keeps them equal,
+pinned and in our package). Then compare a pair built before and after for the
 same firmware commit and BK pin: different bytes mean the compiler changed.
+Record the memory effect in
+[memory budgets](architecture/memory-budgets.md).
 
 ## D-F06 — CI runs for releases; the release gate may run Ark's agreement check
 

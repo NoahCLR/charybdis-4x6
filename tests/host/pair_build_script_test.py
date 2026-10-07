@@ -127,6 +127,8 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
             args = json.loads((base / 'docker.json').read_text())
             image = (REPO / 'tools/build-image').read_text().strip()
             self.assertEqual(args[0], 'run')
+            # The build cannot download anything (D-F05).
+            self.assertEqual(args[args.index('--network') + 1], 'none')
             self.assertEqual(args[args.index(image) + 1:],
                              ['sh', str(source / 'tools/build-firmware-pair.sh'), '--no-owner'])
             mounts = {args[i + 1] for i, arg in enumerate(args) if arg == '-v'}
@@ -152,8 +154,9 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
 
     def test_every_workflow_builds_in_the_build_image(self):
         image = (REPO / 'tools/build-image').read_text().strip()
-        # Pinned by its multi-arch index digest (D-F05): a tag can be pushed again.
-        self.assertRegex(image, r'^[a-z0-9./_-]+:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$')
+        # Our own copy, pinned by its multi-arch index digest (D-F05): a tag can
+        # be pushed again, and an image we do not own can be moved or deleted.
+        self.assertRegex(image, r'^ghcr\.io/noahclr/charybdis-build:[A-Za-z0-9._-]+@sha256:[0-9a-f]{64}$')
         found = []
         for workflow in (REPO / '.github/workflows').glob('*.y*ml'):
             for line in workflow.read_text().splitlines():
@@ -162,6 +165,83 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
         self.assertTrue(found)
         for name, used in found:
             self.assertEqual(used, image, f'{name} uses {used}, but tools/build-image names {image}')
+
+
+FAKE_DOCKER = """#!/usr/bin/env python3
+import json, os, re, sys
+from pathlib import Path
+state = Path(os.environ['FAKE_REGISTRY'])
+tags = json.loads(state.read_text()) if state.exists() else {}
+args = sys.argv[1:]
+assert args[:2] == ['buildx', 'imagetools'], args
+if args[2] == 'inspect':
+    ref = args[3]
+    digest = ref.split('@', 1)[1] if '@' in ref else tags.get(ref)
+    if not digest:
+        sys.exit(1)
+    print(f'Name:      {ref}')
+    print('MediaType: application/vnd.oci.image.index.v1+json')
+    print(f'Digest:    {digest}')
+elif args[2] == 'create':
+    assert args[3] == '--tag', args
+    target, source = args[4], args[5]
+    with open(os.environ['FAKE_DOCKER_LOG'], 'a') as log:
+        log.write(' '.join(args) + '\\n')
+    tags[target] = os.environ.get('FAKE_COPIED_DIGEST') or source.split('@', 1)[1]
+    state.write_text(json.dumps(tags))
+else:
+    sys.exit(f'unexpected docker call: {args}')
+"""
+
+OFFICIAL = 'ghcr.io/qmk/qmk_cli@sha256:' + 'b' * 64
+OTHER = 'sha256:' + 'c' * 64
+
+
+class CopyBuildImage(unittest.TestCase):
+    def run_copy(self, tmp, *args, **env):
+        fakebin = Path(tmp) / 'bin'
+        fakebin.mkdir(exist_ok=True)
+        docker = fakebin / 'docker'
+        docker.write_text(FAKE_DOCKER)
+        docker.chmod(0o755)
+        return subprocess.run(['sh', str(REPO / 'tools/copy-build-image.sh'), *args],
+                              env=dict(os.environ, PATH=f'{fakebin}:{os.environ["PATH"]}',
+                                       FAKE_REGISTRY=str(Path(tmp) / 'registry.json'),
+                                       FAKE_DOCKER_LOG=str(Path(tmp) / 'docker.log'), **env),
+                              capture_output=True, text=True)
+
+    def test_copies_by_digest_and_prints_the_pin(self):
+        with tempfile.TemporaryDirectory(prefix='copy-image-') as tmp:
+            done = self.run_copy(tmp, OFFICIAL, 'qmk-cli-1.2.0')
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertEqual(done.stdout.strip(),
+                             'ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0@sha256:' + 'b' * 64)
+            again = self.run_copy(tmp, OFFICIAL, 'qmk-cli-1.2.0')
+            self.assertEqual(again.returncode, 0, again.stderr)
+            self.assertEqual(len((Path(tmp) / 'docker.log').read_text().splitlines()), 1,
+                             'an existing identical copy is not pushed again')
+
+    def test_refuses_a_source_named_only_by_tag(self):
+        with tempfile.TemporaryDirectory(prefix='copy-image-') as tmp:
+            refused = self.run_copy(tmp, 'ghcr.io/qmk/qmk_cli:latest', 'qmk-cli-1.2.0')
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn('not a tag', refused.stderr)
+            self.assertFalse((Path(tmp) / 'docker.log').exists())
+
+    def test_never_moves_an_existing_tag(self):
+        with tempfile.TemporaryDirectory(prefix='copy-image-') as tmp:
+            (Path(tmp) / 'registry.json').write_text(json.dumps({'ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0': OTHER}))
+            refused = self.run_copy(tmp, OFFICIAL, 'qmk-cli-1.2.0')
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn('never move a tag', refused.stderr)
+            self.assertFalse((Path(tmp) / 'docker.log').exists())
+
+    def test_fails_when_the_copy_is_not_the_source(self):
+        with tempfile.TemporaryDirectory(prefix='copy-image-') as tmp:
+            failed = self.run_copy(tmp, OFFICIAL, 'qmk-cli-1.2.0', FAKE_COPIED_DIGEST=OTHER)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertIn('not the source image', failed.stderr)
+            self.assertEqual(failed.stdout, '')
 
 
 if __name__ == '__main__':

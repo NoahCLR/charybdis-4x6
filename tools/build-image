@@ -1,1 +1,1 @@
-ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8@sha256:c21e0fc2229613f7e9d633a6b879f7e1f5aacaa18330fbe2593ddba26f030245
+ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0@sha256:b7d7fa8fb4432b569931de5ad59098cb788f440ed61a62c5126746b71aee0f4a
