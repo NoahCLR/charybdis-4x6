@@ -129,6 +129,9 @@ static noah_profile_split_descriptor_t committed_descriptor(const half_t *half, 
     return descriptor;
 }
 
+static uint32_t local_validations;
+void noah_profile_split_test_local_validation(void) { local_validations++; }
+
 static bool local_descriptor(void *context, noah_profile_split_descriptor_t *descriptor) {
     half_t *half = context;
 
@@ -1740,7 +1743,7 @@ static void test_refresh_publishes_new_local_authority_during_backoff(void) {
 // at a realistic 450 Hz main-loop rate. A converged reconciler should only
 // wake on its NOAH_PROFILE_SPLIT_POLL_MS deadline, so the split RPC and
 // EEPROM budgets must scale with elapsed seconds, not with scan count.
-static void test_converged_steady_state_cost_is_bounded_by_poll_deadline(void) {
+static void test_converged_steady_state_cost_is_bounded_by_poll_deadline(bool committed) {
     half_t   left;
     half_t   right;
     uint32_t reads;
@@ -1753,6 +1756,9 @@ static void test_converged_steady_state_cost_is_bounded_by_poll_deadline(void) {
 
     half_storage_init(&left);
     half_storage_init(&right);
+    if (committed) {
+        install_profile(&right, 5u, 1u);
+    }
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
 
@@ -1760,6 +1766,7 @@ static void test_converged_steady_state_cost_is_bounded_by_poll_deadline(void) {
     reads     = left.memory.reads + right.memory.reads;
     writes    = left.memory.writes + right.memory.writes;
     exchanges = left.link.exchanges + right.link.exchanges;
+    local_validations = 0u;
 
     for (uint32_t scan = 0u; scan < scans; scan++) {
         uint32_t now = start_ms + (scan * elapsed_ms) / scans;
@@ -1776,6 +1783,7 @@ static void test_converged_steady_state_cost_is_bounded_by_poll_deadline(void) {
     printf("steady state: %u scans over %u ms -> %u exchanges, %u reads, %u writes (expected <= %u exchanges)\n", (unsigned)scans, (unsigned)elapsed_ms, (unsigned)exchanges, (unsigned)reads, (unsigned)writes, (unsigned)(expected_polls + 1u));
 
     assert(writes == 0u);
+    assert(local_validations == 0u);
     assert(exchanges <= expected_polls + 1u);
 }
 
@@ -1824,7 +1832,62 @@ static void test_idle_scans_do_not_republish_unchanged_metadata(void) {
     assert(left.link.exchanges == left_exchanges && right.link.exchanges == right_exchanges);
 }
 
+typedef struct {
+    noah_profile_split_descriptor_t value;
+    bool available;
+} descriptor_fixture_t;
+
+static bool fixture_descriptor(void *context, noah_profile_split_descriptor_t *out) {
+    descriptor_fixture_t *fixture = context;
+    *out = fixture->value; // A failing provider may leave nonzero output.
+    return fixture->available;
+}
+
+static void test_descriptor_changes_are_validated_before_backoff(void) {
+    half_t left;
+    half_t right;
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor_fixture_t fixture = {.value = right.reconciler.local_descriptor, .available = true};
+    right.reconciler.config.local_descriptor = fixture_descriptor;
+    right.reconciler.config.local_context = &fixture;
+    uint32_t now = right.reconciler.next_attempt_at - 1u;
+    uint32_t exchanges = right.link.exchanges;
+    local_validations = 0u;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(local_validations == 0u);
+
+    // A compatibility change with the same generation still refreshes authority.
+    fixture.value.compiled_default_digest++;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(local_validations == 1u);
+    assert(right.reconciler.authority.status.local.compiled_default_digest == fixture.value.compiled_default_digest);
+    uint8_t valid_schema = fixture.value.schema_major;
+    fixture.value.schema_major = UINT8_MAX;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(local_validations == 2u);
+    assert(!right.reconciler.authority.status.local.readable);
+
+    fixture.value.schema_major = valid_schema;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(right.reconciler.authority.status.local.readable);
+    fixture.available = false;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(!right.reconciler.authority.status.local.readable);
+    local_validations = 0u;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(local_validations == 0u);
+    fixture.available = true;
+    assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, now));
+    assert(local_validations == 1u);
+    assert(right.reconciler.authority.status.local.readable);
+    assert(right.link.exchanges == exchanges);
+}
+
 int main(void) {
+    test_descriptor_changes_are_validated_before_backoff();
     test_compiled_convergence();
     test_newer_master_pushes_exact_record();
     test_newer_slave_is_pulled_without_role_authority();
@@ -1865,7 +1928,8 @@ int main(void) {
     test_receiver_recovers_when_its_abort_write_fails();
     test_refresh_publishes_new_local_authority_during_backoff();
     test_idle_scans_do_not_republish_unchanged_metadata();
-    test_converged_steady_state_cost_is_bounded_by_poll_deadline();
+    test_converged_steady_state_cost_is_bounded_by_poll_deadline(false);
+    test_converged_steady_state_cost_is_bounded_by_poll_deadline(true);
     puts("profile split reconciler host tests passed");
     return 0;
 }

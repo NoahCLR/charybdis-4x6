@@ -197,8 +197,10 @@ static bool local_descriptor(void *context, noah_profile_split_descriptor_t *des
     if (!owner || !descriptor || !owner->descriptor_readable) {
         return false;
     }
+    // Publication establishes validity; the readable descriptor is immutable
+    // until the next publication. The reconciler validates changed contents.
     *descriptor = owner->committed_descriptor;
-    return noah_profile_split_descriptor_valid(descriptor);
+    return true;
 }
 
 static void publish_compiled_descriptor(noah_profile_owner_t *owner) {

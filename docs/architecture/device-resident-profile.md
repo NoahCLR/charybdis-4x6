@@ -123,6 +123,15 @@ Device ownership does not justify permanent scan-loop cost. In steady state:
 - pointing-device cadence is measured on hardware and protected by a regression
   threshold.
 
+VIA scan admission samples receiver verification, local digest, mailbox and boot
+recovery work flags together under one atomic section. They are hints: selected
+workers retain their own protected snapshots and epoch checks, in the existing
+priority order. Work arriving after admission is observed on the next scan.
+Admission is checked every scan, independently of ordinary metadata polling;
+role changes, pending mutations and logical roll-forward still follow their
+existing checks and deadlines. The roll-forward clock is read only while an
+accepted transaction is waiting for host writes.
+
 Small materialized runtime caches are valid engineering choices. Each keyboard
 half has 270,336 bytes of physical SRAM; static regression policies and runtime
 high-water evidence must guide the tradeoff without presenting policy margin as

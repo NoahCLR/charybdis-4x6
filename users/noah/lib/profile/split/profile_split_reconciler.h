@@ -232,3 +232,7 @@ bool noah_profile_split_reconciler_refresh_authority(noah_profile_split_reconcil
 
 const noah_profile_split_authority_t *noah_profile_split_reconciler_authority(const noah_profile_split_reconciler_t *reconciler);
 bool                                  noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_reconciler_status_t *status);
+
+#ifdef NOAH_PROFILE_SPLIT_TEST_HOOKS
+void noah_profile_split_test_local_validation(void);
+#endif

@@ -26,6 +26,18 @@ typedef enum {
     TEST_RPC_DISCONNECTED,
 } test_rpc_mode_t;
 
+static uint32_t atomic_entries;
+static uint32_t clock_reads;
+unsigned int noah_atomic_test_enter(void) { atomic_entries++; return 1u; }
+static void (*after_atomic)(void);
+void noah_atomic_test_leave(void) {
+    if (after_atomic) {
+        void (*hook)(void) = after_atomic;
+        after_atomic = NULL;
+        hook();
+    }
+}
+
 static bool     fake_master;
 static uint32_t fake_now;
 static uint32_t user_eeconfig_word;
@@ -100,6 +112,7 @@ static uint32_t peer_digest(void) {
 }
 
 static void test_reset(void) {
+    after_atomic        = NULL;
     fake_master         = true;
     fake_now            = 0u;
     user_eeconfig_word  = noah_qmk_via_sync_metadata_encode((noah_qmk_via_sync_metadata_t){.generation = 5u});
@@ -140,6 +153,7 @@ bool is_keyboard_master(void) {
 }
 
 uint32_t timer_read32(void) {
+    clock_reads++;
     return fake_now;
 }
 
@@ -1294,7 +1308,52 @@ static void test_logical_cancel_never_touches_an_accepted_identity(void) {
     CHECK(status.state == NOAH_QMK_VIA_LOGICAL_ACCEPTED && !status.pending && peer_abort_count == 0u);
 }
 
+static void queue_request_after_admission(void) {
+    noah_qmk_via_sync_frame_t request = {.kind = NOAH_QMK_VIA_SYNC_MESSAGE_SNAPSHOT_BEGIN, .generation = 7u, .digest = peer_digest()};
+    noah_qmk_via_sync_frame_t response;
+    uint8_t request_wire[NOAH_QMK_VIA_SYNC_FRAME_SIZE];
+    uint8_t response_wire[NOAH_QMK_VIA_SYNC_FRAME_SIZE] = {0};
+    CHECK(noah_qmk_via_sync_frame_encode(&request, request_wire));
+    registered_callback(sizeof(request_wire), request_wire, sizeof(response_wire), response_wire);
+    CHECK(noah_qmk_via_sync_frame_decode(response_wire, sizeof(response_wire), &response));
+    CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_BUSY);
+}
+
+static void test_work_arriving_after_admission_runs_on_next_scan(void) {
+    test_reset();
+    fake_master = false;
+    test_init_ready();
+    scan_many(0u, 4u);
+    uint32_t before_effects = durable_effect_count;
+    after_atomic = queue_request_after_admission;
+    (void)noah_qmk_via_split_sync_matrix_scan_step();
+    CHECK(after_atomic == NULL);
+    CHECK(durable_effect_count == before_effects);
+    CHECK(noah_qmk_via_split_sync_matrix_scan_step());
+    CHECK(noah_qmk_via_split_sync_debug_snapshot().receiver_active);
+    CHECK(durable_effect_count > before_effects);
+}
+
+static void test_settled_scan_has_bounded_admission_work(void) {
+    test_reset();
+    test_init_ready();
+    scan_many(0u, 4u);
+    uint16_t before_rpc = rpc_count;
+    uint32_t before_effects = durable_effect_count;
+    for (uint32_t scan = 0u; scan < 100u; scan++) {
+        atomic_entries = 0u;
+        clock_reads = 0u;
+        CHECK(!noah_qmk_via_split_sync_matrix_scan_step());
+        CHECK(atomic_entries <= 2u);
+        CHECK(clock_reads == 1u);
+    }
+    CHECK(rpc_count == before_rpc);
+    CHECK(durable_effect_count == before_effects);
+}
+
 int main(void) {
+    test_settled_scan_has_bounded_admission_work();
+    test_work_arriving_after_admission_runs_on_next_scan();
     test_receiver_returns_structured_error_for_corrupt_frame();
     test_equal_boot_handshake_and_periodic_refresh();
     test_disconnect_uses_bounded_exponential_retry();

@@ -1274,10 +1274,10 @@ static bool noah_qmk_via_logical_boot_recovery_tick(bool master) {
 // and ordinary reconciliation pulls the peer's copy over it. Discarding the
 // pending mutation is safe because that pull replaces every byte it covers.
 static bool noah_qmk_via_logical_roll_forward_tick(void) {
-    uint32_t now = timer_read32();
-
-    if (noah_qmk_via_logical.status.state != NOAH_QMK_VIA_LOGICAL_ACCEPTED || noah_qmk_via_logical.status.pending ||
-        !noah_qmk_via_time_reached(now, noah_qmk_via_logical_roll_forward_at + VIA_SPLIT_SYNC_LOGICAL_ROLL_FORWARD_IDLE_MS)) {
+    if (noah_qmk_via_logical.status.state != NOAH_QMK_VIA_LOGICAL_ACCEPTED || noah_qmk_via_logical.status.pending) {
+        return false;
+    }
+    if (!noah_qmk_via_time_reached(timer_read32(), noah_qmk_via_logical_roll_forward_at + VIA_SPLIT_SYNC_LOGICAL_ROLL_FORWARD_IDLE_MS)) {
         return false;
     }
     ATOMIC_BLOCK_RESTORESTATE {
@@ -1295,8 +1295,24 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
     bool                        master = is_keyboard_master();
     noah_qmk_via_shared_state_t shared;
     uint32_t                    now;
+    bool                        verify_pending;
+    bool                        digest_pending;
+    bool                        mailbox_pending;
+    bool                        recovery_pending;
 
-    if (noah_qmk_via_receiver_verify_tick() || noah_qmk_via_local_digest_tick() || noah_qmk_via_slave_mailbox_tick()) {
+    // Admission hints only: each selected worker still takes its own coherent
+    // snapshot. Work arriving after this check is observed on the next scan;
+    // no metadata deadline gates receiver, digest or mailbox progress.
+    ATOMIC_BLOCK_RESTORESTATE {
+        verify_pending   = noah_qmk_via_receiver.verifying && !noah_qmk_via_receiver.finalizing && !noah_qmk_via_receiver.committed;
+        digest_pending   = noah_qmk_via_shared_state.digest_active;
+        mailbox_pending  = noah_qmk_via_slave_mailbox.pending && !noah_qmk_via_slave_mailbox.processing;
+        recovery_pending = noah_qmk_via_boot_recovery_active;
+    }
+    if (!verify_pending) {
+        noah_qmk_via_receiver_verify_active = false;
+    }
+    if ((verify_pending && noah_qmk_via_receiver_verify_tick()) || (digest_pending && noah_qmk_via_local_digest_tick()) || (mailbox_pending && noah_qmk_via_slave_mailbox_tick())) {
         return true;
     }
     if (noah_qmk_via_boot_bank_suspect && noah_qmk_via_local_state_is_clean(noah_qmk_via_sync_state_snapshot(), noah_qmk_via_shared_snapshot())) {
@@ -1319,7 +1335,7 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
         noah_qmk_via_next_attempt_at = 0u;
         noah_qmk_via_retry_ms        = VIA_SPLIT_SYNC_RETRY_INITIAL_MS;
     }
-    if (noah_qmk_via_logical_boot_recovery_tick(master)) {
+    if (recovery_pending && noah_qmk_via_logical_boot_recovery_tick(master)) {
         return true;
     }
     if (!noah_qmk_via_boot_authority_known) {
