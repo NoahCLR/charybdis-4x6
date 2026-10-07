@@ -29,6 +29,7 @@ fi
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DNOAH_RUNTIME_TRACE_ENABLE \
+    -DKEY_FEEDBACK_TEST_INSTRUMENTATION \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
@@ -45,6 +46,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-function -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DNOAH_RUNTIME_TRACE_ENABLE \
+    -DKEY_FEEDBACK_TEST_INSTRUMENTATION \
     -DKEY_RUNTIME_CORE_TOKEN_ID_MAX=3u \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

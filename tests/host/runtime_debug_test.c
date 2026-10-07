@@ -3368,7 +3368,97 @@ static void test_key_runtime_activity_snapshot_uses_authoritative_counts(void) {
     noah_runtime_reset_for_test();
 }
 
+static void test_key_feedback_empty_queries_keep_pulses(void) {
+    uint8_t semantic[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t branches[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+    uint8_t owners[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
+    keypos_t key_pos = test_keypos(MATRIX_ROWS - 1u, MATRIX_COLS - 1u);
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    memset(semantic, 0xff, sizeof(semantic));
+    memset(branches, 0xff, sizeof(branches));
+    memset(owners, 0, sizeof(owners));
+    key_feedback_test_slot_visits_reset();
+    key_feedback_semantic_map(semantic);
+    key_feedback_tap_branch_map(branches);
+    key_feedback_broad_owner_map(owners);
+    CHECK(key_feedback_test_slot_visits() == 0u);
+    CHECK(!key_feedback_semantic_map_has_any(semantic));
+    CHECK(key_feedback_tap_branch_map_get(branches, key_pos) == 0u);
+    CHECK(!key_origin_keypos_valid(key_feedback_broad_owner_map_get(owners, KEY_FEEDBACK_BROAD_OWNER_GLOBAL)));
+
+    // A released key can still own a pulse with both active indexes empty.
+    test_arm_feedback_pulse(key_pos, KEY_FEEDBACK_PULSE_HOLD);
+    key_feedback_semantic_map(semantic);
+    key_feedback_broad_owner_map(owners);
+    CHECK(key_feedback_test_slot_visits() == 0u);
+    CHECK(key_feedback_semantic_map_get(semantic, key_pos) == KEY_FEEDBACK_SEMANTIC_HOLD_PENDING);
+    CHECK(test_keypos_equal(key_feedback_broad_owner_map_get(owners, KEY_FEEDBACK_BROAD_OWNER_GLOBAL), key_pos));
+
+    fake_time = (uint16_t)(fake_time + KEY_FEEDBACK_FLASH_HALF_PERIOD_MS);
+    key_feedback_semantic_map(semantic);
+    key_feedback_broad_owner_map(owners);
+    CHECK(key_feedback_test_slot_visits() == 0u);
+    CHECK(!key_feedback_semantic_map_has_any(semantic));
+    CHECK(!key_origin_keypos_valid(key_feedback_broad_owner_map_get(owners, KEY_FEEDBACK_BROAD_OWNER_GLOBAL)));
+}
+
+static void test_key_feedback_sparse_slots_and_pending_series(void) {
+    uint8_t semantic[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+    uint8_t branches[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+    uint8_t owners[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
+    const uint16_t slots[] = {31u, 32u, KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY - 1u};
+    keypos_t newest;
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    for (uint8_t i = 0u; i < 3u; i++) {
+        newest = test_keypos(slots[i] / MATRIX_COLS, slots[i] % MATRIX_COLS);
+        test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_HELD_ACTION_KEY, newest, fake_time);
+        key_runtime_core_observe_held_action_register(newest, TEST_ACTION);
+    }
+    key_feedback_test_slot_visits_reset();
+    key_feedback_semantic_map(semantic);
+    key_feedback_tap_branch_map(branches);
+    key_feedback_broad_owner_map(owners);
+    CHECK(key_feedback_test_slot_visits() == 6u); // Three presses in two maps.
+    for (uint8_t i = 0u; i < 3u; i++) {
+        keypos_t pos = test_keypos(slots[i] / MATRIX_COLS, slots[i] % MATRIX_COLS);
+        CHECK(key_feedback_semantic_map_get(semantic, pos) == KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING);
+    }
+    CHECK(test_keypos_equal(key_feedback_broad_owner_map_get(owners, KEY_FEEDBACK_BROAD_OWNER_GLOBAL), newest));
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    newest = test_keypos(32u / MATRIX_COLS, 32u % MATRIX_COLS);
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, newest, true));
+    fake_time += 10u;
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, newest, false));
+    fake_time += 20u;
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, newest, true));
+    key_feedback_test_slot_visits_reset();
+    key_feedback_semantic_map(semantic);
+    key_feedback_tap_branch_map(branches);
+    key_feedback_broad_owner_map(owners);
+    CHECK(key_feedback_test_slot_visits() == 5u); // One press twice, one series three times.
+    CHECK(key_feedback_semantic_map_get(semantic, newest) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
+    CHECK(key_feedback_tap_branch_map_get(branches, newest) == 2u);
+    CHECK(test_keypos_equal(key_feedback_broad_owner_map_get(owners, KEY_FEEDBACK_BROAD_OWNER_GLOBAL), newest));
+
+    fake_time += 10u;
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, newest, false));
+    key_feedback_test_slot_visits_reset();
+    key_feedback_semantic_map(semantic);
+    key_feedback_tap_branch_map(branches);
+    key_feedback_broad_owner_map(owners);
+    CHECK(key_feedback_test_slot_visits() == 3u); // Released series remains independently visible.
+    CHECK(key_feedback_tap_branch_map_get(branches, newest) == 2u);
+}
+
 int main(void) {
+    test_key_feedback_empty_queries_keep_pulses();
+    test_key_feedback_sparse_slots_and_pending_series();
 #if KEY_RUNTIME_CORE_TOKEN_ID_MAX == UINT16_MAX
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
