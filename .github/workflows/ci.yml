@@ -22,7 +22,7 @@ jobs:
     name: Host suite (GCC)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0@sha256:b7d7fa8fb4432b569931de5ad59098cb788f440ed61a62c5126746b71aee0f4a
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r1@sha256:b62c41e6f75f74158bfc35727864847c4f5f80797724832e97017de8dadbf02e
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
@@ -73,7 +73,7 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0@sha256:b7d7fa8fb4432b569931de5ad59098cb788f440ed61a62c5126746b71aee0f4a
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r1@sha256:b62c41e6f75f74158bfc35727864847c4f5f80797724832e97017de8dadbf02e
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
@@ -196,7 +196,7 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0@sha256:b7d7fa8fb4432b569931de5ad59098cb788f440ed61a62c5126746b71aee0f4a
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r1@sha256:b62c41e6f75f74158bfc35727864847c4f5f80797724832e97017de8dadbf02e
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
