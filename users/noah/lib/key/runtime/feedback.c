@@ -18,7 +18,38 @@
 #    include "../../pointing/defs/pd_modes.h"
 #endif
 
-static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token_t *token);
+#ifdef KEY_FEEDBACK_TEST_INSTRUMENTATION
+static uint16_t key_feedback_slot_visits;
+void key_feedback_test_slot_visits_reset(void) { key_feedback_slot_visits = 0u; }
+uint16_t key_feedback_test_slot_visits(void) { return key_feedback_slot_visits; }
+#    define KEY_FEEDBACK_RECORD_SLOT_VISIT() (key_feedback_slot_visits++)
+#else
+#    define KEY_FEEDBACK_RECORD_SLOT_VISIT() ((void)0)
+#endif
+
+static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token_t *token, keypos_t key_pos);
+
+// Each cursor is the next matrix slot to consider. Reading the existing
+// reducer bitmap avoids inactive-slot work and preserves ascending slot order.
+static bool key_feedback_next_active_slot(const uint32_t *bitmap, uint16_t *cursor) {
+    uint16_t word = *cursor / 32u;
+    uint8_t  bit  = *cursor % 32u;
+
+    while (word < KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT) {
+        uint32_t active = bitmap[word] & (UINT32_MAX << bit);
+        if (active != 0u) {
+            *cursor = (uint16_t)(word * 32u + (uint16_t)__builtin_ctz(active) + 1u);
+            return true;
+        }
+        word++;
+        bit = 0u;
+    }
+    return false;
+}
+
+static keypos_t key_feedback_slot_key_pos(uint16_t index) {
+    return (keypos_t){.row = index / MATRIX_COLS, .col = index % MATRIX_COLS};
+}
 
 typedef struct {
     uint8_t  owners[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
@@ -370,19 +401,14 @@ uint8_t key_feedback_preview_layer(void) {
     return UINT8_MAX;
 }
 
-static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token_t *token) {
+static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token_t *token, keypos_t key_pos) {
     uint16_t held_action;
-    keypos_t key_pos;
 
     if (!(token && token->active && token->handled_key)) {
         return KEY_FEEDBACK_SEMANTIC_NONE;
     }
 
     if (key_feedback_token_uses_implicit_hold(token) || key_feedback_token_uses_fallback_hold(token)) {
-        return KEY_FEEDBACK_SEMANTIC_NONE;
-    }
-
-    if (!key_runtime_core_press_token_key_pos(token, &key_pos)) {
         return KEY_FEEDBACK_SEMANTIC_NONE;
     }
 
@@ -503,20 +529,24 @@ void key_feedback_broad_owner_map(uint8_t *out_map) {
         key_feedback_broad_owner_builder_consider(&builder, state->feedback_pulse_key_pos, key_feedback_semantic_for_pulse(state->feedback_pulse_kind), state->feedback_pulse_sequence);
     }
 
-    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
-        keypos_t key_pos;
+    for (uint16_t cursor = 0u; state && key_feedback_next_active_slot(state->tap_series_active_bitmap, &cursor);) {
+        uint16_t index = cursor - 1u;
+        KEY_FEEDBACK_RECORD_SLOT_VISIT();
+        keypos_t key_pos = key_feedback_slot_key_pos(index);
 
-        if (key_feedback_tap_series_shows_tap_branch(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
+        if (key_feedback_tap_series_shows_tap_branch(&state->tap_series[index])) {
             key_feedback_broad_owner_builder_consider(&builder, key_pos, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING, state->tap_series[index].feedback_sequence);
         }
     }
 
-    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
+    for (uint16_t cursor = 0u; state && key_feedback_next_active_slot(state->press_token_active_bitmap, &cursor);) {
+        uint16_t index = cursor - 1u;
+        KEY_FEEDBACK_RECORD_SLOT_VISIT();
         press_token_t          *token    = &state->press_tokens[index];
-        key_feedback_semantic_t semantic = key_feedback_semantic_for_token(token);
-        keypos_t                key_pos;
+        keypos_t                key_pos  = key_feedback_slot_key_pos(index);
+        key_feedback_semantic_t semantic = key_feedback_semantic_for_token(token, key_pos);
 
-        if (semantic == KEY_FEEDBACK_SEMANTIC_NONE || !key_runtime_core_press_token_key_pos(token, &key_pos)) {
+        if (semantic == KEY_FEEDBACK_SEMANTIC_NONE) {
             continue;
         }
 
@@ -539,19 +569,23 @@ void key_feedback_semantic_map(uint8_t *out_map) {
         key_feedback_apply_semantic_for_owner(out_map, state->feedback_pulse_key_pos, key_feedback_semantic_for_pulse(state->feedback_pulse_kind));
     }
 
-    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
-        keypos_t key_pos;
+    for (uint16_t cursor = 0u; state && key_feedback_next_active_slot(state->tap_series_active_bitmap, &cursor);) {
+        uint16_t index = cursor - 1u;
+        KEY_FEEDBACK_RECORD_SLOT_VISIT();
+        keypos_t key_pos = key_feedback_slot_key_pos(index);
 
-        if (key_feedback_tap_series_shows_tap_branch(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
+        if (key_feedback_tap_series_shows_tap_branch(&state->tap_series[index])) {
             key_feedback_apply_semantic_for_owner(out_map, key_pos, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
         }
     }
 
-    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
-        key_feedback_semantic_t semantic = key_feedback_semantic_for_token(&state->press_tokens[index]);
-        keypos_t                key_pos;
+    for (uint16_t cursor = 0u; state && key_feedback_next_active_slot(state->press_token_active_bitmap, &cursor);) {
+        uint16_t index = cursor - 1u;
+        KEY_FEEDBACK_RECORD_SLOT_VISIT();
+        keypos_t                key_pos  = key_feedback_slot_key_pos(index);
+        key_feedback_semantic_t semantic = key_feedback_semantic_for_token(&state->press_tokens[index], key_pos);
 
-        if (semantic == KEY_FEEDBACK_SEMANTIC_NONE || !key_runtime_core_press_token_key_pos(&state->press_tokens[index], &key_pos)) {
+        if (semantic == KEY_FEEDBACK_SEMANTIC_NONE) {
             continue;
         }
 
@@ -568,10 +602,12 @@ void key_feedback_tap_branch_map(uint8_t *out_map) {
 
     key_feedback_tap_branch_map_clear(out_map);
 
-    for (uint16_t index = 0; state && index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
-        keypos_t key_pos;
+    for (uint16_t cursor = 0u; state && key_feedback_next_active_slot(state->tap_series_active_bitmap, &cursor);) {
+        uint16_t index = cursor - 1u;
+        KEY_FEEDBACK_RECORD_SLOT_VISIT();
+        keypos_t key_pos = key_feedback_slot_key_pos(index);
 
-        if (key_feedback_tap_series_shows_tap_branch(&state->tap_series[index]) && key_runtime_core_tap_series_key_pos(&state->tap_series[index], &key_pos)) {
+        if (key_feedback_tap_series_shows_tap_branch(&state->tap_series[index])) {
             key_feedback_apply_tap_branch_for_owner(out_map, key_pos, state->tap_series[index].tap_count);
         }
     }

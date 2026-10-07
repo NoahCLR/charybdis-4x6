@@ -100,6 +100,14 @@ flowchart TD
     style SLAVE fill:#D6EAFF,stroke:#00539E,color:#00305C
 ```
 
+The semantic, tap-branch and broad-owner maps visit only the reducer's active
+press-token and tap-series slots, using its existing active bitmaps. Slots stay
+in ascending matrix order, with the pulse considered before tap series and
+press tokens, preserving semantic priority and owner tie-breaking. Pulse
+expiry and queued-pulse promotion run even when both active bitmaps are empty:
+a released key can still own visible feedback. RGB and split update cadence
+remain unchanged.
+
 A single `mark_key_feedback_dirty()` marks both packets, so the owner map cannot
 lag the semantic map. It fires when a transition plan is non-empty, or when a
 plan was empty but `next_feedback_sequence` moved, checked on the press, release
