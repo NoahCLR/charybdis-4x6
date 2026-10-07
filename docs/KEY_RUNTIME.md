@@ -147,6 +147,17 @@ while pending multi-tap release decisions are owned by
 Do not add a second state machine for multi-tap sequencing; new behavior should
 extend the core reducer and its release/scan planning tests.
 
+Preview-owner queries use the reducer's active press count and bitmap, visiting
+active slots in ascending matrix order so the lowest eligible position still
+wins. An empty press set visits no slots, even when a released multi-tap series
+remains. Resolve coordinates only for eligible active candidates, directly from
+the slot index. This query runs for both base and combo split feedback on every
+tick. Keep the display-preview bridge and immediate combo polling outside this
+shortcut: their state can change without an active preview owner or a dirty
+notification. Real-profile integration tests cover sparse traversal and owner
+order; runtime-debug and split-sync tests cover bridge timing and idle combo
+activation.
+
 ## Ownership Authority Map
 
 Runtime ownership is intentionally split between reducer-owned intent and

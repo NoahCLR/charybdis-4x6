@@ -20,6 +20,7 @@
 #include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/key/runtime/projection/projection.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
+#include "users/noah/lib/key/runtime/reducer/state_query.h"
 #include "users/noah/lib/key/runtime/trace/core_trace.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
@@ -3045,6 +3046,91 @@ static void test_normal_press_and_matched_release_use_bounded_authored_lookups(v
     CHECK(counters.row_comparison_count == 0u);
 }
 
+static void test_preview_query_visits_only_active_presses(void) {
+    key_runtime_hot_path_test_counters_t counters;
+    keypos_t owner = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
+    keypos_t thumb = test_right_thumb_pos();
+
+    test_reset_state();
+    key_runtime_hot_path_test_counters_reset();
+    CHECK(!key_runtime_core_preview_owner_key_pos(NULL));
+    CHECK(!key_runtime_core_preview_owner_key_pos(&owner));
+    CHECK(test_keypos_equal(owner, (keypos_t){0}));
+    key_runtime_hot_path_test_counters_snapshot(&counters);
+    CHECK(counters.preview_slot_visit_count == 0u);
+
+    // Real press/release flow must keep the sparse index current, including a
+    // thumb in the second bitmap word and the tap series left after release.
+    test_press_resolved(thumb);
+    key_runtime_hot_path_test_counters_reset();
+    CHECK(key_runtime_core_preview_owner_key_pos(&owner));
+    CHECK(test_keypos_equal(owner, thumb));
+    key_runtime_hot_path_test_counters_snapshot(&counters);
+    CHECK(counters.preview_slot_visit_count == 1u);
+    test_release_resolved(thumb);
+    CHECK(key_runtime_core_pending_multi_tap_count() != 0u);
+    key_runtime_hot_path_test_counters_reset();
+    CHECK(!key_runtime_core_preview_owner_key_pos(&owner));
+    CHECK(test_keypos_equal(owner, (keypos_t){0}));
+    key_runtime_hot_path_test_counters_snapshot(&counters);
+    CHECK(counters.preview_slot_visit_count == 0u);
+    CHECK(key_runtime_hot_path_test_active_indexes_consistent());
+
+    test_reset_state();
+    test_press_resolved(test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI));
+    key_runtime_hot_path_test_counters_reset();
+    CHECK(!key_runtime_core_preview_owner_key_pos(&owner));
+    CHECK(test_keypos_equal(owner, (keypos_t){0}));
+    key_runtime_hot_path_test_counters_snapshot(&counters);
+    CHECK(counters.preview_slot_visit_count == 1u);
+}
+
+static void test_preview_query_preserves_slot_order_across_bitmap_words(void) {
+    // Feed reducer events directly so multiple eligible previews coexist
+    // without the process adapter interrupting the previous gesture.
+    const uint16_t slots[] = {0u, 31u, 32u, KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY - 1u};
+    key_runtime_hot_path_test_counters_t counters;
+    runtime_event_t event = {.kind = RUNTIME_EVENT_KIND_KEY_DOWN};
+    keypos_t owner;
+
+    test_reset_state();
+    event.data.key_event.keycode = CUSTOM_KEY_0;
+    for (uint8_t i = 4u; i > 0u; i--) {
+        uint16_t index = slots[i - 1u];
+        event.data.key_event.key_pos = (keypos_t){.row = index / MATRIX_COLS, .col = index % MATRIX_COLS};
+        key_runtime_core_apply_event(&event, fake_time);
+    }
+    CHECK(key_runtime_hot_path_test_active_indexes_consistent());
+
+    // An active but completed hold cannot hide a later eligible preview.
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    key_runtime_slot_phase_t first_phase = state->press_tokens[0].slot_phase;
+    state->press_tokens[0].slot_phase = KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE;
+    key_runtime_hot_path_test_counters_reset();
+    CHECK(key_runtime_core_preview_owner_key_pos(&owner));
+    CHECK(test_keypos_equal(owner, ((keypos_t){.row = 31u / MATRIX_COLS, .col = 31u % MATRIX_COLS})));
+    key_runtime_hot_path_test_counters_snapshot(&counters);
+    CHECK(counters.preview_slot_visit_count == 2u);
+    state->press_tokens[0].slot_phase = first_phase;
+
+    // Lowest matrix position wins even when it was pressed last. Releasing
+    // it exposes the next eligible owner, including across bit 31 / bit 32.
+    event.kind = RUNTIME_EVENT_KIND_KEY_UP;
+    for (uint8_t i = 0u; i < 4u; i++) {
+        uint16_t index = slots[i];
+        event.data.key_event.key_pos = (keypos_t){.row = index / MATRIX_COLS, .col = index % MATRIX_COLS};
+        key_runtime_hot_path_test_counters_reset();
+        CHECK(key_runtime_core_preview_owner_key_pos(&owner));
+        CHECK(test_keypos_equal(owner, event.data.key_event.key_pos));
+        key_runtime_hot_path_test_counters_snapshot(&counters);
+        CHECK(counters.preview_slot_visit_count == 1u);
+        key_runtime_core_apply_event(&event, fake_time);
+        CHECK(key_runtime_hot_path_test_active_indexes_consistent());
+    }
+    CHECK(!key_runtime_core_preview_owner_key_pos(&owner));
+    CHECK(test_keypos_equal(owner, (keypos_t){0}));
+}
+
 static void test_active_scan_visit_baseline_is_measured(void) {
     key_runtime_hot_path_test_counters_t counters;
     keypos_t                             gui_pos = test_find_keypos_on_layer(LAYER_BASE, KC_LEFT_GUI);
@@ -3646,6 +3732,8 @@ int main(void) {
     test_tap_toggle_taps_lock_and_holds_are_momentary();
     test_normal_press_and_matched_release_use_bounded_authored_lookups();
     test_active_scan_visit_baseline_is_measured();
+    test_preview_query_visits_only_active_presses();
+    test_preview_query_preserves_slot_order_across_bitmap_words();
     test_feedback_dirty_tracks_visible_deadline_change_once();
     test_feedback_dirty_tracks_pending_tap_window();
     test_left_thumb_layer_branches();

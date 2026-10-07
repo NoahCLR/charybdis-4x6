@@ -360,10 +360,12 @@ typedef struct {
     uint16_t refresh_slot_visit_count;
     uint16_t scan_press_slot_visit_count;
     uint16_t scan_tap_series_slot_visit_count;
+    uint16_t preview_slot_visit_count;
 } key_runtime_hot_path_test_counters_t;
 
 void key_runtime_hot_path_test_counters_reset(void);
 void key_runtime_hot_path_test_counters_snapshot(key_runtime_hot_path_test_counters_t *out);
+void key_runtime_hot_path_test_record_preview_slot_visit(void);
 bool key_runtime_hot_path_test_active_indexes_consistent(void);
 #endif
 
