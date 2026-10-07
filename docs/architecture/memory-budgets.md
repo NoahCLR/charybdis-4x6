@@ -375,3 +375,37 @@ are not new. Under host GCC 8.5.0, which no longer builds the flashed pair
 budget (1,800 before), and two press-observation paths gain adjacency
 failures where that compiler now inlines `handled_key_materialize_hold` and
 `key_runtime_core_allocate_token_id`; both manifests need a GCC 14 review.
+
+## Official QMK image (GCC 15.2.0) — 2026-10-07
+
+The pair is now built in QMK's official `qmk_cli` image, copied unchanged into
+`ghcr.io/noahclr/charybdis-build` (D-F05): QMK's `arm-none-eabi-gcc` 15.2.0
+replaces Debian's 14.2.1. Same source (userspace `d13c0456`, BK `b8f5e32c`),
+`SKIP_VERSION=yes`, `sh tests/host/run_firmware_memory_budget_checks.sh`, per
+half; both halves link the same SRAM figures:
+
+| Measurement | GCC 14.2.1 | GCC 15.2.0 |
+| --- | ---: | ---: |
+| SRAM0–3 `.data` | 4,172 | 4,168 |
+| SRAM0–3 `.bss` | 59,560 | 59,560 |
+| `.data + .bss` | 63,732 (780 below the 64,512 tripwire) | 63,728 (784 below) |
+| SRAM0–3 fixed linked prefix | 63,744 | 63,736 |
+| SRAM0–3 linker/core-memory span at boot | 198,400 | 198,408 |
+| SRAM4 fixed linked prefix | 3,872 | 3,872 |
+
+Static RAM is effectively unchanged. Flash image sections (`.vectors`,
+`.text`, `.rodata`, `.data`) shrink from 218,324 to 213,852 bytes on the right
+and from 218,340 to 213,860 on the left, about 4.5 KB per half, across code
+generation broadly. Separately, the official toolchain links byte-at-a-time
+`memcpy` and `memset` (18 and 16 bytes) in place of newlib's word-wise ones (140
+and 166 bytes), so larger aligned copies may be slower. These are linked
+measurements, not runtime high-water or timing.
+The reviewed stack manifests report the same unresolved findings under both
+compilers, so this change neither adds nor resolves a stack-coverage gap.
+
+Those figures came from the official image's `linux/arm64` variant. Pairs now
+link the `linux/amd64` variant's newlib on every platform (D-F05), which
+differs slightly. At userspace `bdd2b5a3` and BK `e8e2a57f` (QMK 0.34.6), the
+left half links 4,164 B of `.data` and 59,560 B of `.bss` (63,724 B, 788 below
+the tripwire), a 63,736 B fixed linked prefix, a 198,408 B core-memory span at
+boot and 213,880 B of flash image sections.

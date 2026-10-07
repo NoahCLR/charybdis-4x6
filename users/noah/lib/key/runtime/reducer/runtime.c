@@ -28,6 +28,10 @@ void key_runtime_hot_path_test_counters_reset(void) {
     key_runtime_hot_path_test_counters = (key_runtime_hot_path_test_counters_t){0};
 }
 
+void key_runtime_hot_path_test_record_preview_slot_visit(void) {
+    key_runtime_hot_path_test_counters.preview_slot_visit_count++;
+}
+
 void key_runtime_hot_path_test_counters_snapshot(key_runtime_hot_path_test_counters_t *out) {
     if (out) {
         *out = key_runtime_hot_path_test_counters;

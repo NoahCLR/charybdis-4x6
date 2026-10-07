@@ -76,7 +76,10 @@ if [ "$in_image" = 0 ]; then
     mkdir -p "$BUILD_ROOT"
     BUILD_ROOT="$(CDPATH= cd -- "$BUILD_ROOT" && pwd)"
     first="${1:-}"
-    set -- run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e NOAH_IN_BUILD_IMAGE=1 \
+    # No network: everything the build reads is in the image and the mounted
+    # checkouts, so an attempt to download anything fails instead of changing
+    # the pair. Docker fetches the pinned image itself before the container runs.
+    set -- run --rm --network none --user "$(id -u):$(id -g)" -e HOME=/tmp -e NOAH_IN_BUILD_IMAGE=1 \
         -e "QMK_ROOT=$QMK_ROOT" -e "BUILD_ROOT=$BUILD_ROOT" \
         -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e "GIT_CONFIG_VALUE_0=*"
     for var in $(env | sed -n 's/^\(NOAH_[A-Z0-9_]*\)=.*/\1/p'); do
@@ -171,7 +174,8 @@ build_half() {
     # A successful command must produce this half's UF2, not leave the previous
     # half's artifact at the shared QMK output path.
     rm -f "$ARTIFACT"
-    ( cd "$QMK_ROOT" && qmk --config-file /dev/null compile -kb bastardkb/charybdis/4x6 -km noah \
+    # -j 0 compiles on every core; the pair's bytes do not depend on job order.
+    ( cd "$QMK_ROOT" && qmk --config-file /dev/null compile -j 0 -kb bastardkb/charybdis/4x6 -km noah \
         -e "QMK_BIN=qmk --config-file /dev/null" \
         -e "MAIN_KEYMAP_PATH_1=$KEYMAP_ROOT" -e "MAIN_KEYMAP_PATH_2=$KEYMAP_ROOT" \
         -e "MAIN_KEYMAP_PATH_3=$KEYMAP_ROOT" -e "MAIN_KEYMAP_PATH_4=$KEYMAP_ROOT" \

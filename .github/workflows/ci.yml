@@ -22,7 +22,7 @@ jobs:
     name: Host suite (GCC)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8@sha256:c21e0fc2229613f7e9d633a6b879f7e1f5aacaa18330fbe2593ddba26f030245
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r1@sha256:b62c41e6f75f74158bfc35727864847c4f5f80797724832e97017de8dadbf02e
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
@@ -52,7 +52,11 @@ jobs:
           qmk config user.overlay_dir="$GITHUB_WORKSPACE"
 
       - name: Install ripgrep for host-suite guard checks
-        run: apt-get update -qq && apt-get install -y -qq ripgrep
+        # The official image lists GitHub CLI's apt source, whose signing key has
+        # since rotated, so apt-get update fails with it. CI does not use gh.
+        run: |
+          rm -f /etc/apt/sources.list.d/github-cli.list
+          apt-get update -qq && apt-get install -y -qq ripgrep
 
       - name: Install Node for diagnostics host tests
         uses: actions/setup-node@v6
@@ -69,7 +73,7 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8@sha256:c21e0fc2229613f7e9d633a6b879f7e1f5aacaa18330fbe2593ddba26f030245
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r1@sha256:b62c41e6f75f74158bfc35727864847c4f5f80797724832e97017de8dadbf02e
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
@@ -192,7 +196,7 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8@sha256:c21e0fc2229613f7e9d633a6b879f7e1f5aacaa18330fbe2593ddba26f030245
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r1@sha256:b62c41e6f75f74158bfc35727864847c4f5f80797724832e97017de8dadbf02e
     steps:
       - name: Checkout userspace
         uses: actions/checkout@v6
@@ -225,7 +229,11 @@ jobs:
           echo "BK dev head is $ahead commit(s) ahead of the pin $pin." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Install ripgrep for host-suite guard checks
-        run: apt-get update -qq && apt-get install -y -qq ripgrep
+        # The official image lists GitHub CLI's apt source, whose signing key has
+        # since rotated, so apt-get update fails with it. CI does not use gh.
+        run: |
+          rm -f /etc/apt/sources.list.d/github-cli.list
+          apt-get update -qq && apt-get install -y -qq ripgrep
 
       - name: Install Node for diagnostics host tests
         uses: actions/setup-node@v6

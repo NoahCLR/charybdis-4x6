@@ -20,6 +20,7 @@ build_and_run() {
     cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        -DNOAH_PROFILE_SPLIT_TEST_HOOKS \
         -DVIA_ENABLE \
         -DTOTAL_EEPROM_BYTE_COUNT=0x4000u \
         -I"$ROOT" \
