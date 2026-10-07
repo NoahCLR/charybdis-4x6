@@ -40,6 +40,7 @@ import json, os, sys
 from pathlib import Path
 # Simulate the installed CLI: saved config would win without this isolation.
 assert sys.argv[1:4] == ['--config-file', '/dev/null', 'compile'], sys.argv
+assert sys.argv[4:6] == ['-j', '0'], 'compile on every core'
 assert 'QMK_BIN=qmk --config-file /dev/null' in sys.argv, 'make generators must also ignore saved config'
 keymap = Path(os.environ['QMK_USERSPACE']) / 'keyboards/bastardkb/charybdis/4x6/keymaps/noah'
 for number in range(1, 6):
@@ -168,81 +169,86 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
 
 
 FAKE_DOCKER = """#!/usr/bin/env python3
-import json, os, re, sys
+import json, os, sys
 from pathlib import Path
 state = Path(os.environ['FAKE_REGISTRY'])
-tags = json.loads(state.read_text()) if state.exists() else {}
+pushed = json.loads(state.read_text()) if state.exists() else {}
 args = sys.argv[1:]
-assert args[:2] == ['buildx', 'imagetools'], args
-if args[2] == 'inspect':
-    ref = args[3]
-    digest = ref.split('@', 1)[1] if '@' in ref else tags.get(ref)
+log = open(os.environ['FAKE_DOCKER_LOG'], 'a')
+log.write(' '.join(args) + '\\n')
+if args[:3] == ['buildx', 'imagetools', 'inspect']:
+    digest = pushed.get(args[3])
     if not digest:
         sys.exit(1)
-    print(f'Name:      {ref}')
-    print('MediaType: application/vnd.oci.image.index.v1+json')
+    print(f'Name:      {args[3]}')
     print(f'Digest:    {digest}')
-elif args[2] == 'create':
-    assert args[3] == '--tag', args
-    target, source = args[4], args[5]
-    with open(os.environ['FAKE_DOCKER_LOG'], 'a') as log:
-        log.write(' '.join(args) + '\\n')
-    tags[target] = os.environ.get('FAKE_COPIED_DIGEST') or source.split('@', 1)[1]
-    state.write_text(json.dumps(tags))
+elif args[:2] == ['buildx', 'build']:
+    assert args[args.index('--platform') + 1] == 'linux/amd64,linux/arm64', args
+    assert '--load' in args and '--push' not in args, 'nothing is pushed before the check'
+    assert args[args.index('-f') + 1].endswith('tools/build-image.dockerfile'), args
+elif args[0] == 'run':
+    platform = args[args.index('--platform') + 1]
+    print(os.environ.get('FAKE_TARGET_' + platform.split('/')[1].upper(), 'same') + '  -')
+elif args[0] == 'push':
+    pushed[args[1]] = 'sha256:' + 'd' * 64
+    state.write_text(json.dumps(pushed))
 else:
     sys.exit(f'unexpected docker call: {args}')
 """
 
-OFFICIAL = 'ghcr.io/qmk/qmk_cli@sha256:' + 'b' * 64
-OTHER = 'sha256:' + 'c' * 64
+TAG = 'ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r1'
 
 
-class CopyBuildImage(unittest.TestCase):
-    def run_copy(self, tmp, *args, **env):
+class MakeBuildImage(unittest.TestCase):
+    def run_make(self, tmp, *args, **env):
         fakebin = Path(tmp) / 'bin'
         fakebin.mkdir(exist_ok=True)
         docker = fakebin / 'docker'
         docker.write_text(FAKE_DOCKER)
         docker.chmod(0o755)
-        return subprocess.run(['sh', str(REPO / 'tools/copy-build-image.sh'), *args],
+        return subprocess.run(['sh', str(REPO / 'tools/make-build-image.sh'), *args],
                               env=dict(os.environ, PATH=f'{fakebin}:{os.environ["PATH"]}',
                                        FAKE_REGISTRY=str(Path(tmp) / 'registry.json'),
                                        FAKE_DOCKER_LOG=str(Path(tmp) / 'docker.log'), **env),
                               capture_output=True, text=True)
 
-    def test_copies_by_digest_and_prints_the_pin(self):
-        with tempfile.TemporaryDirectory(prefix='copy-image-') as tmp:
-            done = self.run_copy(tmp, OFFICIAL, 'qmk-cli-1.2.0')
+    def calls(self, tmp):
+        return (Path(tmp) / 'docker.log').read_text().splitlines()
+
+    def test_builds_checks_then_pushes_and_prints_the_pin(self):
+        with tempfile.TemporaryDirectory(prefix='make-image-') as tmp:
+            done = self.run_make(tmp, 'qmk-cli-1.2.0-gcc15.2.0-r1')
             self.assertEqual(done.returncode, 0, done.stderr)
-            self.assertEqual(done.stdout.strip(),
-                             'ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0@sha256:' + 'b' * 64)
-            again = self.run_copy(tmp, OFFICIAL, 'qmk-cli-1.2.0')
-            self.assertEqual(again.returncode, 0, again.stderr)
-            self.assertEqual(len((Path(tmp) / 'docker.log').read_text().splitlines()), 1,
-                             'an existing identical copy is not pushed again')
+            self.assertEqual(done.stdout.strip().splitlines()[-1], f'{TAG}@sha256:' + 'd' * 64)
+            order = [call.split()[0] if call.split()[0] != 'buildx' else ' '.join(call.split()[:2])
+                     for call in self.calls(tmp)]
+            self.assertEqual(order[1:], ['buildx build', 'run', 'run', 'push', 'buildx imagetools'],
+                             'both platforms are checked before anything is pushed')
 
-    def test_refuses_a_source_named_only_by_tag(self):
-        with tempfile.TemporaryDirectory(prefix='copy-image-') as tmp:
-            refused = self.run_copy(tmp, 'ghcr.io/qmk/qmk_cli:latest', 'qmk-cli-1.2.0')
+    def test_never_reuses_a_tag(self):
+        with tempfile.TemporaryDirectory(prefix='make-image-') as tmp:
+            (Path(tmp) / 'registry.json').write_text(json.dumps({TAG: 'sha256:' + 'c' * 64}))
+            refused = self.run_make(tmp, 'qmk-cli-1.2.0-gcc15.2.0-r1')
             self.assertNotEqual(refused.returncode, 0)
-            self.assertIn('not a tag', refused.stderr)
-            self.assertFalse((Path(tmp) / 'docker.log').exists())
+            self.assertIn('never reuse a tag', refused.stderr)
+            self.assertFalse(any(call.startswith('buildx build') for call in self.calls(tmp)))
 
-    def test_never_moves_an_existing_tag(self):
-        with tempfile.TemporaryDirectory(prefix='copy-image-') as tmp:
-            (Path(tmp) / 'registry.json').write_text(json.dumps({'ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0': OTHER}))
-            refused = self.run_copy(tmp, OFFICIAL, 'qmk-cli-1.2.0')
-            self.assertNotEqual(refused.returncode, 0)
-            self.assertIn('never move a tag', refused.stderr)
-            self.assertFalse((Path(tmp) / 'docker.log').exists())
-
-    def test_fails_when_the_copy_is_not_the_source(self):
-        with tempfile.TemporaryDirectory(prefix='copy-image-') as tmp:
-            failed = self.run_copy(tmp, OFFICIAL, 'qmk-cli-1.2.0', FAKE_COPIED_DIGEST=OTHER)
+    def test_pushes_nothing_when_the_platforms_differ(self):
+        with tempfile.TemporaryDirectory(prefix='make-image-') as tmp:
+            failed = self.run_make(tmp, 'qmk-cli-1.2.0-gcc15.2.0-r1', FAKE_TARGET_ARM64='other')
             self.assertNotEqual(failed.returncode, 0)
-            self.assertIn('not the source image', failed.stderr)
-            self.assertEqual(failed.stdout, '')
+            self.assertIn('nothing was pushed', failed.stderr)
+            self.assertFalse(any(call.startswith('push') for call in self.calls(tmp)))
 
+    def test_the_dockerfile_takes_target_files_from_the_official_amd64_variant(self):
+        dockerfile = (REPO / 'tools/build-image.dockerfile').read_text()
+        source = dockerfile.split('ARG QMK_CLI=', 1)[1].split()[0]
+        self.assertRegex(source, r'^ghcr\.io/qmk/qmk_cli@sha256:[0-9a-f]{64}$')
+        self.assertIn('FROM --platform=linux/amd64 ${QMK_CLI} AS target', dockerfile)
+        script = (REPO / 'tools/make-build-image.sh').read_text()
+        copied = sorted(line.split()[2] for line in dockerfile.splitlines() if line.startswith('COPY --from=target'))
+        checked = sorted('/opt/qmk/' + d for d in script.split('TARGET_DIRS="', 1)[1].split('"', 1)[0].split())
+        self.assertEqual(copied, checked, 'the script checks exactly the directories the image replaces')
 
 if __name__ == '__main__':
     unittest.main()

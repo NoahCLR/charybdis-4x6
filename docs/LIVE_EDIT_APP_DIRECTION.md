@@ -668,33 +668,37 @@ published pair can be matched to a local one. Before this, local pairs used
 Homebrew GCC 8.5.0 and releases GCC 14.2.1; the memory effect is recorded in
 [memory budgets](architecture/memory-budgets.md#release-compiler-gcc-1421--2026-10-01).
 
-The image is QMK's official `qmk_cli` image, copied byte for byte into our own
-package, `ghcr.io/noahclr/charybdis-build`, so nothing upstream can move or
-delete the compiler our releases were built with, and we change it only when we
-choose to. The copy keeps the official multi-arch index digest, which proves it
-is unmodified. The first copy is `qmk_cli` with QMK CLI 1.2.0 and QMK's
-`arm-none-eabi-gcc` 15.2.0 (toolchain release `v15.2.0-1`) on Debian 13, digest
-`sha256:b7d7fa8f…`. Earlier pairs, including every release before it, were
-built in `ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8`, a modified
-base image with Debian's GCC 14.2.1. That package and its archived fork remain
-the record of those builds. We keep no fork of QMK's container sources:
-rebuilding them downloads packages and toolchains that move, so only the
-copied image is fixed.
+The image is our own, `ghcr.io/noahclr/charybdis-build`, built from QMK's
+official `qmk_cli` image (QMK CLI 1.2.0 and QMK's `arm-none-eabi-gcc` 15.2.0,
+toolchain release `v15.2.0-1`, on Debian 13; index `sha256:b7d7fa8f…`) by
+[`tools/build-image.dockerfile`](../tools/build-image.dockerfile). It changes
+one thing. QMK builds its toolchain separately for each host, and the official
+image's `linux/arm64` variant links different ARM target code (newlib, libgcc,
+startup files) from its `linux/amd64` variant, so a Mac building natively and
+CI built different pairs from the same inputs. Our image gives both platforms
+the amd64 variant's target files and keeps each platform's native compiler
+programs, which generate the same code: a Mac builds at native speed and CI's
+pair equals it byte for byte. Nothing upstream can move or delete the image, and
+it changes only when we choose. Earlier pairs, including every release before
+it, were built in `ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8`, a
+modified base image with Debian's GCC 14.2.1. That package and its archived fork
+remain the record of those builds.
 
 `tools/build-image` names the image by its multi-arch index digest
 (`name:tag@sha256:…`; the tag is only for reading), so a tag pushed again
-cannot change the compiler. The index, not one platform's manifest, keeps the
-Mac building in the image's `linux/arm64` variant and CI in its `linux/amd64`
-one. To move to a newer official image, read its index digest with
-`docker buildx imagetools inspect ghcr.io/qmk/qmk_cli:latest` (the top-level
-`Digest`) and copy it with `sh tools/copy-build-image.sh <image>@<digest> <tag>`,
-which refuses a source named only by tag, never moves an existing tag, and
-checks that the copy has the source's digest. Put the reference it prints in
+cannot change the compiler. Each machine builds in its own platform's variant.
+`sh tools/make-build-image.sh <tag>` builds both platforms from the Dockerfile,
+refuses a tag that already exists, checks that their target files are
+byte-identical, pushes only then, and prints the reference to put in
 `tools/build-image` and every workflow's `image:` (a host test keeps them equal,
-pinned and in our package). Then compare a pair built before and after for the
-same firmware commit and BK pin: different bytes mean the compiler changed.
-Record the memory effect in
-[memory budgets](architecture/memory-budgets.md).
+pinned and in our package). To move to a newer official image, read its index
+digest with `docker buildx imagetools inspect ghcr.io/qmk/qmk_cli:latest` (the
+top-level `Digest`), put it in the Dockerfile's `QMK_CLI`, and run the script
+with a new tag. Then build a pair on the Mac and compare it with CI's pair for
+the same firmware commit and BK pin, which every release does: different bytes
+mean the platforms diverged. Compare it too with a pair from the previous
+image: different bytes there mean the compiler changed, so record the memory
+effect in [memory budgets](architecture/memory-budgets.md).
 
 ## D-F06 — CI runs for releases; the release gate may run Ark's agreement check
 

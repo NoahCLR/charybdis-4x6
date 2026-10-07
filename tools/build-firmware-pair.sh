@@ -174,7 +174,8 @@ build_half() {
     # A successful command must produce this half's UF2, not leave the previous
     # half's artifact at the shared QMK output path.
     rm -f "$ARTIFACT"
-    ( cd "$QMK_ROOT" && qmk --config-file /dev/null compile -kb bastardkb/charybdis/4x6 -km noah \
+    # -j 0 compiles on every core; the pair's bytes do not depend on job order.
+    ( cd "$QMK_ROOT" && qmk --config-file /dev/null compile -j 0 -kb bastardkb/charybdis/4x6 -km noah \
         -e "QMK_BIN=qmk --config-file /dev/null" \
         -e "MAIN_KEYMAP_PATH_1=$KEYMAP_ROOT" -e "MAIN_KEYMAP_PATH_2=$KEYMAP_ROOT" \
         -e "MAIN_KEYMAP_PATH_3=$KEYMAP_ROOT" -e "MAIN_KEYMAP_PATH_4=$KEYMAP_ROOT" \
