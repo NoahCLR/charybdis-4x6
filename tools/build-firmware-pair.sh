@@ -76,7 +76,10 @@ if [ "$in_image" = 0 ]; then
     mkdir -p "$BUILD_ROOT"
     BUILD_ROOT="$(CDPATH= cd -- "$BUILD_ROOT" && pwd)"
     first="${1:-}"
-    set -- run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e NOAH_IN_BUILD_IMAGE=1 \
+    # No network: everything the build reads is in the image and the mounted
+    # checkouts, so an attempt to download anything fails instead of changing
+    # the pair. Docker fetches the pinned image itself before the container runs.
+    set -- run --rm --network none --user "$(id -u):$(id -g)" -e HOME=/tmp -e NOAH_IN_BUILD_IMAGE=1 \
         -e "QMK_ROOT=$QMK_ROOT" -e "BUILD_ROOT=$BUILD_ROOT" \
         -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e "GIT_CONFIG_VALUE_0=*"
     for var in $(env | sed -n 's/^\(NOAH_[A-Z0-9_]*\)=.*/\1/p'); do
