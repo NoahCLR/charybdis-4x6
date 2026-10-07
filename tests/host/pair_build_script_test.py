@@ -127,8 +127,9 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
             args = json.loads((base / 'docker.json').read_text())
             image = (REPO / 'tools/build-image').read_text().strip()
             self.assertEqual(args[0], 'run')
-            # The build cannot download anything (D-F05).
+            # The build cannot download anything, and uses CI's variant (D-F05).
             self.assertEqual(args[args.index('--network') + 1], 'none')
+            self.assertEqual(args[args.index('--platform') + 1], 'linux/amd64')
             self.assertEqual(args[args.index(image) + 1:],
                              ['sh', str(source / 'tools/build-firmware-pair.sh'), '--no-owner'])
             mounts = {args[i + 1] for i, arg in enumerate(args) if arg == '-v'}

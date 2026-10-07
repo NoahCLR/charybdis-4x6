@@ -402,3 +402,10 @@ and 166 bytes), so larger aligned copies may be slower. These are linked
 measurements, not runtime high-water or timing.
 The reviewed stack manifests report the same unresolved findings under both
 compilers, so this change neither adds nor resolves a stack-coverage gap.
+
+Those figures came from the image's `linux/arm64` variant. Pairs are built in
+its `linux/amd64` variant, CI's (D-F05), whose separately built newlib differs.
+At userspace `bdd2b5a3` and BK `e8e2a57f` (QMK 0.34.6), the left half built
+there links 4,164 B of `.data` and 59,560 B of `.bss` (63,724 B, 788 below the
+tripwire), a 63,736 B fixed linked prefix, a 198,408 B core-memory span at boot
+and 213,880 B of flash image sections.

@@ -683,9 +683,11 @@ copied image is fixed.
 
 `tools/build-image` names the image by its multi-arch index digest
 (`name:tag@sha256:…`; the tag is only for reading), so a tag pushed again
-cannot change the compiler. The index, not one platform's manifest, keeps the
-Mac building in the image's `linux/arm64` variant and CI in its `linux/amd64`
-one. To move to a newer official image, read its index digest with
+cannot change the compiler. Every pair is built in the index's `linux/amd64`
+variant, the one CI runs; on Apple silicon Docker emulates it. QMK builds its
+toolchain separately for each host, and the `linux/arm64` variant links
+different newlib code, so a Mac building natively produced a different pair
+from CI's for the same commit, BK pin and digest. To move to a newer official image, read its index digest with
 `docker buildx imagetools inspect ghcr.io/qmk/qmk_cli:latest` (the top-level
 `Digest`) and copy it with `sh tools/copy-build-image.sh <image>@<digest> <tag>`,
 which refuses a source named only by tag, never moves an existing tag, and
