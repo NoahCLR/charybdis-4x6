@@ -126,7 +126,11 @@ Device ownership does not justify permanent scan-loop cost. In steady state:
 VIA scan admission samples receiver verification, local digest, mailbox and boot
 recovery work flags together under one atomic section. They are hints: selected
 workers retain their own protected snapshots and epoch checks, in the existing
-priority order. Work arriving after admission is observed on the next scan.
+priority order. Receiver verification and the mailbox each define their start
+condition once, shared by admission and worker, so a hint cannot drift narrower
+than its worker and silently stall it; digest and boot recovery are each a
+single flag their worker checks first. Work arriving after admission is
+observed on the next scan.
 Admission is checked every scan, independently of ordinary metadata polling;
 role changes, pending mutations and logical roll-forward still follow their
 existing checks and deadlines. The roll-forward clock is read only while an

@@ -667,6 +667,12 @@ static void noah_qmk_via_split_sync_rpc(uint8_t request_size, const void *reques
     }
 }
 
+// Whether the mailbox holds a request to process. Call inside an atomic
+// section; the scan step's admission check and the worker share it.
+static bool noah_qmk_via_slave_mailbox_wanted(void) {
+    return noah_qmk_via_slave_mailbox.pending && !noah_qmk_via_slave_mailbox.processing;
+}
+
 static bool noah_qmk_via_slave_mailbox_tick(void) {
     uint8_t                   request_wire[NOAH_QMK_VIA_SYNC_FRAME_SIZE];
     uint8_t                   response_wire[NOAH_QMK_VIA_SYNC_FRAME_SIZE] = {0};
@@ -676,7 +682,7 @@ static bool noah_qmk_via_slave_mailbox_tick(void) {
     bool                      terminal;
 
     ATOMIC_BLOCK_RESTORESTATE {
-        if (noah_qmk_via_slave_mailbox.pending && !noah_qmk_via_slave_mailbox.processing) {
+        if (noah_qmk_via_slave_mailbox_wanted()) {
             memcpy(request_wire, noah_qmk_via_slave_mailbox.request, sizeof(request_wire));
             noah_qmk_via_slave_mailbox.pending    = false;
             noah_qmk_via_slave_mailbox.processing = true;
@@ -954,25 +960,28 @@ static void noah_qmk_via_master_pull_chunk_tick(uint32_t now) {
     noah_qmk_via_schedule_progress(now);
 }
 
+// Whether a received transfer awaits digest verification. Call inside an
+// atomic section; the scan step's admission check and the worker share it.
+static bool noah_qmk_via_receiver_verify_wanted(void) {
+    return noah_qmk_via_receiver.verifying && !noah_qmk_via_receiver.finalizing && !noah_qmk_via_receiver.committed;
+}
+
 static bool noah_qmk_via_receiver_verify_tick(void) {
+    bool     wanted;
     bool     verifying;
-    bool     finalizing;
-    bool     committed;
     uint8_t  epoch;
     uint32_t expected_digest;
     uint32_t generation;
     bool     logical_staging;
 
     ATOMIC_BLOCK_RESTORESTATE {
-        verifying       = noah_qmk_via_receiver.verifying;
-        finalizing      = noah_qmk_via_receiver.finalizing;
-        committed       = noah_qmk_via_receiver.committed;
+        wanted          = noah_qmk_via_receiver_verify_wanted();
         epoch           = noah_qmk_via_receiver_epoch;
         expected_digest = noah_qmk_via_receiver.digest;
         generation      = noah_qmk_via_receiver.generation;
         logical_staging = noah_qmk_via_receiver.logical_staging;
     }
-    if (!verifying || finalizing || committed) {
+    if (!wanted) {
         noah_qmk_via_receiver_verify_active = false;
         return false;
     }
@@ -1304,12 +1313,14 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
     // snapshot. Work arriving after this check is observed on the next scan;
     // no metadata deadline gates receiver, digest or mailbox progress.
     ATOMIC_BLOCK_RESTORESTATE {
-        verify_pending   = noah_qmk_via_receiver.verifying && !noah_qmk_via_receiver.finalizing && !noah_qmk_via_receiver.committed;
+        verify_pending   = noah_qmk_via_receiver_verify_wanted();
         digest_pending   = noah_qmk_via_shared_state.digest_active;
-        mailbox_pending  = noah_qmk_via_slave_mailbox.pending && !noah_qmk_via_slave_mailbox.processing;
+        mailbox_pending  = noah_qmk_via_slave_mailbox_wanted();
         recovery_pending = noah_qmk_via_boot_recovery_active;
     }
     if (!verify_pending) {
+        // A skipped worker cannot clear its own cursor; the next transfer
+        // must restart verification from the beginning.
         noah_qmk_via_receiver_verify_active = false;
     }
     if ((verify_pending && noah_qmk_via_receiver_verify_tick()) || (digest_pending && noah_qmk_via_local_digest_tick()) || (mailbox_pending && noah_qmk_via_slave_mailbox_tick())) {
