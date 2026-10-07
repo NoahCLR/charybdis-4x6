@@ -14,8 +14,7 @@ uint32_t noah_setting(uint8_t id, uint32_t fallback) {
     const uint8_t *p = &settings[8 + id * 4];
     return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
 }
-// The whole stored domain stays cached so readback can return its macro
-// names (v3) or retired user macros (v2) as stored.
+// The whole current settings domain stays cached for name readback.
 uint16_t noah_effective_settings_length(void) {
     return settings_length;
 }

@@ -37,16 +37,12 @@ void noah_effective_combo_runtime_invalidate(void *context, uint32_t publication
     if (combos->row_count > 32u || !noah_profile_combo_v1_read_header(&view->reader, view->base_offset, combos, &header)) return;
     // Version 1 has no stored default and repeats the hold threshold on each
     // row; its windows are all explicit.
-    runtime->default_term = combos->version >= 2u ? header.default_term_ms : COMBO_TERM;
-    runtime->hold_term    = combos->version >= 2u ? header.hold_term_ms : TAPPING_TERM;
+    runtime->default_term = header.default_term_ms;
+    runtime->hold_term    = header.hold_term_ms;
     for (uint8_t index = 0; index < combos->row_count; index++) {
         noah_profile_combo_v1_row_t row;
         if (!noah_profile_combo_v1_read_row(&view->reader, view->base_offset, combos, index, &row)) return;
-        if (combos->version == 1u) {
-            if (index && row.hold_term_ms != runtime->hold_term) return;
-            runtime->hold_term = row.hold_term_ms;
-        }
-        bool follows = combos->version >= 2u && row.term_ms == 0u;
+        bool follows = row.term_ms == 0u;
         if (follows) runtime->follows_default |= (uint32_t)1u << index;
         runtime->terms[index]     = follows ? runtime->default_term : row.term_ms;
         runtime->flags[index]     = row.flags;
@@ -86,7 +82,7 @@ bool noah_effective_combo_follows_default(uint16_t index) {
     if (installed && installed->valid && installed->live) return index < installed->count && (installed->follows_default >> index & 1u);
     return index < noah_effective_combo_count() && !noah_combo_terms[index];
 }
-// A version 2 table stores the threshold even with no rows; a version 1 table
+// A current table stores the threshold even with no rows.
 // without rows has none, and QMK's own default stands.
 uint16_t noah_effective_combo_hold_term(void) {
     return installed && installed->valid && installed->live ? installed->hold_term : TAPPING_TERM;

@@ -32,7 +32,7 @@ enum {
     MACRO_SIZE  = 2,
 };
 
-static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
 
 typedef struct {
     uint8_t bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
@@ -503,12 +503,12 @@ static void candidate_frame(uint8_t frame[32], uint8_t value, uint16_t transacti
     frame[2] = value;
     write_u16(&frame[3], transaction_id);
     if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN) {
-        frame[5] = 1u;
+        frame[5] = NOAH_PROFILE_SCHEMA_MAJOR;
         write_u16(&frame[9], sizeof(compiled_blob));
         write_u32(&frame[11], crc_of(compiled_blob, sizeof(compiled_blob)));
         write_u32(&frame[15], fnv_of(compiled_blob, sizeof(compiled_blob)));
         write_u32(&frame[19], UINT32_C(0x12345678));
-        frame[23] = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL;
+        frame[23] = NOAH_PROFILE_STORE_FORMAT_VERSION;
         write_u32(&frame[24], 6u);
         write_u32(&frame[28], target_digest());
     } else if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK) {

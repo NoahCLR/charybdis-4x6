@@ -278,6 +278,8 @@ static void test_live_layer_profile_and_stale_frame(const char *fixture_path) {
     noah_effective_profile_snapshot_t snapshot = {0};
     rgb_runtime_frame_t               frame;
 
+    // This rendering fixture models six supported slots with current RGB v3.
+    limits.supported_pd_mode_mask = 0x3fu;
     limits.logical_layer_count    = LAYER_COUNT;
     limits.maximum_brightness     = 200u;
     limits.tap_branch_color_count = 4u;
@@ -353,6 +355,8 @@ static void test_live_automouse_profile_and_stale_frame(const char *fixture_path
     check_output_led(2u, compiled_base);
     check_output_led(3u, rgb_from_hsv(layer_led_groups[0].color));
 
+    // This rendering fixture models six supported slots with current RGB v3.
+    limits.supported_pd_mode_mask = 0x3fu;
     limits.logical_layer_count    = LAYER_COUNT;
     limits.maximum_brightness     = 200u;
     limits.tap_branch_color_count = 4u;
@@ -417,6 +421,8 @@ static void test_live_automouse_policy_modes(const char *fixture_path) {
     // A pass-through base and mapped-only lower layer distinguish all policies.
     payload[layer_offset + 1] = payload[layer_offset + 2] = payload[layer_offset + 3] = 0;
     noah_profile_rgb_v1_limits_t limits                                               = noah_profile_rgb_v1_default_limits();
+    // This rendering fixture models six supported slots with current RGB v3.
+    limits.supported_pd_mode_mask = 0x3fu;
     limits.logical_layer_count                                                        = LAYER_COUNT;
     limits.maximum_brightness                                                         = 200;
     limits.tap_branch_color_count                                                     = 4;

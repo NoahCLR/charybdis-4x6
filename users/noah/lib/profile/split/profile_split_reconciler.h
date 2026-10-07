@@ -190,7 +190,6 @@ typedef struct {
     // A released push's ABORT is still unacknowledged. `transfer_descriptor`
     // keeps naming it: no other transfer starts until the peer confirms.
     bool                                   orphan_pending;
-    bool                                   prepared_logical;
     bool                                   incoming_logical_binding;
     bool                                   attempt_immediate;
 } noah_profile_split_reconciler_t;
@@ -211,7 +210,6 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
 // Starts a provisional outbound transfer from caller-owned staged storage.
 // The reconciler transfers and ACKs every payload byte, then pauses in
 // PUSH_PREPARED until the owner explicitly authorizes the peer commit.
-bool noah_profile_split_reconciler_prepared_push_begin(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read);
 bool noah_profile_split_reconciler_prepared_push_begin_logical(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read, uint32_t via_generation, uint32_t via_digest);
 bool noah_profile_split_reconciler_prepared_push_ready(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_descriptor_t *descriptor);
 bool noah_profile_split_reconciler_prepared_push_authorize_commit(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor);

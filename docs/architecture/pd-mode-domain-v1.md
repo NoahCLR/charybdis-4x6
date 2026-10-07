@@ -288,119 +288,53 @@ golden compiled profile), a gap with a named disabled slot 31, all 32 slots
 mismatches, header and reserved bytes, a version-1 payload). Both are test
 evidence, **never a fallback migration source**. The frozen C/JS differential
 corpus (8,635 version-1 cases, including byte mutations, all truncated lengths
-and Unicode) still checks every record rule through the version-1 validator;
+and Unicode) still checks every record rule by extracting the frozen records and using the
+current record validator; the legacy envelope validator is removed;
 the C runners also use ASan/UBSan. Tests freeze existing native action values
-and prove that legacy schema-1 readers/writers reject domain `0x50`.
+and prove that current readers reject legacy envelopes.
 
-## Capacity gate
+## Storage geometry
 
-`measurePdProfileUpgrade` validates a complete current portable profile and
-explicitly supplied slot definitions before measuring this candidate upgrade.
-It neither supplies missing legacy settings nor produces a writable migrated
-document. With unchanged settings length, growth is 776 payload + 4 envelope
-+ 10 for the two additional RGB rows = **790 bytes**.
+Current firmware uses one geometry:
 
-| Complete fixture | Old bytes | Candidate bytes | Fits 4,064? |
-| --- | ---: | ---: | --- |
-| Existing portable test profile | 1,488 | 2,278 | Yes |
-| 32 combos, 918 bytes of IR macro payload | 3,274 | 4,064 | Exactly |
-| Same, 919 bytes of IR macro payload | 3,275 | 4,065 | No |
-| Same, full 1,024-byte IR macro payload | 3,380 | 4,170 | No, 106 bytes over |
-
-These are valid complete profiles, not sums of independent theoretical maxima.
-(This gate measured the schema-1 → eight-slot upgrade. The eight → 32 slot
-translation adds 120 bytes of RGB rows and removes 96 bytes per disabled,
-unnamed slot it drops; a stored eight-slot profile with all eight records
-present and within 120 bytes of the 5,088-byte ceiling cannot be translated
-as is, and the importer must say so rather than trim it. A schema-1 payload
-still fits: 4,064 + 790 + 120 = 4,974 bytes.)
-Thus unchanged geometry plus this encoding **cannot migrate every valid old
-profile**. Compacting only this new domain cannot guarantee room in an already
-full old payload. The selected path is a deliberate storage migration, preserving
-the whole VIA bank and providing two 5 KiB profile slots:
-
-| Schema-2 range | Bytes | Owner |
+| Range | Bytes | Owner |
 | --- | ---: | --- |
-| `0x0000..0x1fff` | 8,192 | Existing QMK/VIA allocation, unchanged |
+| `0x0000..0x1fff` | 8,192 | QMK/VIA allocation |
 | `0x2000..0x33ff` | 5,120 | Profile slot A, 32-byte header + 5,088-byte payload |
 | `0x3400..0x47ff` | 5,120 | Profile slot B, same layout |
 
-Logical EEPROM becomes 18,432 bytes; RP2040 wear-level backing becomes 36,864
-bytes. The fork requires backing at least twice logical, an integral logical
-multiple, and 4 KiB flash erase sectors: these sizes meet all three constraints.
-All addresses still fit uint16 and the existing 25-byte readback pages fit the
-one-byte page index. No sibling source change is required for those limits.
-
-The maximum old payload, 4,064 bytes, plus 790 is 4,854 bytes, leaving 234 bytes
-in the schema-2 slot. This proves aggregate capacity for every valid old payload
-under the specified unchanged-length migration, without truncating macros,
-combos, names or slots. Further migration growth must re-run this proof.
-`measurePdProfileUpgrade` reports both current capacity and `plannedStorage`,
-leaving its input intact. Negotiated schema-1 capacity stays 4,064 bytes;
-schema-2 devices accept up to 5,088. `upgradePdSnapshot` materializes the
-validated migrated document from device-reported source definitions.
-
-PD-enabled firmware selects the expanded geometry. The larger wear-level cache
-adds 2,048 bytes in SRAM0–3 per half; fresh linked accounting and the deliberate
-feature-specific policy are in [memory budgets](memory-budgets.md). Physical
-high-water acceptance remains outstanding. The backing region's physical base
-and write-log layout change, so interpreting old flash in place is unsafe.
-Require a verified complete old backup, source PD readback, saved old firmware
-pair, and materialized migrated document **before flashing either half**. Restore
-through the new logical Apply after both halves have compatible firmware.
-Downgrade likewise restores the old backup; never reinterpret the new bank.
+Logical EEPROM is 18,432 bytes; RP2040 wear-level backing is 36,864 bytes.
+The old schema-1 layout is not interpreted in place. Keep a complete backup and
+its matching old firmware pair before an upgrade; restore a client-translated
+current profile through logical Apply after both halves run compatible firmware.
+Physical geometry migration acceptance remains outstanding. Resource accounting
+belongs to [memory budgets](memory-budgets.md).
 
 ## Integration and identity gates
 
-Schema 2 adds domain `0x50`, advertised by supported-domain bit 4.
-The legacy logical storage header format 2 (`NQ`) cannot encode that mask:
-its identity byte packs domain bits 0–3, origin in bit 4 and flags in bit 5.
-Naively extending the mask corrupts origin. PD-enabled owners select
-format 3 (`NR`) with the same offsets, five domain bits, origin in bit 5,
-flags in bit 6, and reserved bit 7. It binds schema **2.0**; `NQ` binds schema
-**1.0**. Neither takes its schema identity from the reader's expectation.
-Header CRC, VIA binding, prepared/committed markers and bounded I/O are unchanged.
-Admission rejects incompatible schema/format pairs before invalidating a slot.
+Schema 2.0 includes domain `0x50`, advertised by domain-mask bit 4. Format 3
+(`NR`) stores five domain bits, origin in bit 5, flags in bit 6 and reserved
+bit 7. It binds schema 2.0 and nonzero VIA identity. `NP` and `NQ` headers are
+rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
 
-Synchronous validation, bounded boot scanning and commit shape validation all
-use the same domain-version rules: `NR` accepts RGB v3, key behaviors v1,
-combos v1–v2, settings v2–v5 and PD v2 (`profile_versions.h` is the one list);
-`NP`/`NQ` retain the old four-domain v1 rules.
-The blob framing magic remains `NLP1`; its explicit schema bytes distinguish
-schema 2.0. Domain bodies still require semantic validation upstream; store
-shape checks alone do not make a candidate publishable.
+Synchronous validation, bounded boot scanning and commit shape validation
+share the current version rules in `profile_versions.h`: RGB v3, key behaviors
+v1, combos v2, settings v5 and sparse PD v2. Blob magic remains `NLP1`; schema
+bytes must be 2.0. Domain bodies also require semantic validation. Store tests
+cover all mask/origin/flag combinations, both boot paths, old-header rejection,
+reserved bits with repaired CRCs, incompatible versions, one-byte commit steps,
+durable prepare/abort and interrupted writes. These do not prove physical flash
+acceptance.
 
-Store tests cover all 128 mask/origin/flag combinations, both validation paths,
-reserved bits with repaired CRCs, domain-mask disagreement, wrong domain
-versions, rejection by the schema-1 reader, one-byte commit steps, durable
-prepare/abort, and every write cut with all partial lengths 0..32. Reboot must
-select one whole generation with its matching origin, flags and VIA binding.
-This tests the header protocol in the existing fake EEPROM geometry; it does
-not prove physical flash-geometry migration.
+The current action ABI is `0xf79c6151`. Older action vocabularies require
+client translation before a current-format Apply. Candidate metadata, owner,
+peer storage and background stale-peer repair all use format 3 and require a
+correlated VIA bind before PREPARE_BEGIN. Retry preserves the bind for that exact
+generation/digest. Incompatible peers cannot Apply.
 
-The integrated contract is blob schema 2.0, RGB v3 with 32 rows, settings v2
-with retired DPI scalars 10–14 encoded as zero, portable document v2 and PD v2.
-The action ABI is `0xf79c6151`, generated from the compiled vocabulary: 32
-slots, each mode flag digested at 32 bits (D-F09). Eight slots with the
-userspace keycode blocks digested `0x1d3fcacc`; before the blocks, `0x61072732`. The
-legacy eight-layer ABI remains `0xeb80829c`; the five-layer bridge remains
-`0xdcb00959`. The HID envelope stays version 1. Candidate metadata uses format 3
-with VIA generation/digest binding; owner, peer store and split admission all
-select that same format. Incompatible peers cannot Apply.
-
-The settings body's first byte must use the same selected settings version as
-its enclosing domain header. Complete app-generated schema-2 profiles are tested
-through the compiled firmware compatibility and incremental validator, including
-the settings domain; compiled factory defaults alone do not exercise that domain.
-Settings-v2 tests reject legacy body headers and nonzero retired DPI scalars.
-
-Legacy GET subcommand 9, advertised by feature bit 13, returns a versioned,
-CRC/FNV-checked 776-byte source domain in 25-byte pages. These are source
-compiled definitions, independent of current DPI edits. Legacy live DPI comes
-from settings during upgrade (dragscroll zero normalizes to 100). Complete
-schema-1 documents may carry this evidence as `pdModeSource`; upgrade refuses
-missing or incompatible evidence. The app saves both original and migrated
-files and verifies their contents before recommending the geometry upgrade.
+GET subcommand 9 and feature bit 13 are retired. Firmware neither advertises nor
+serves legacy source definitions, and has no version-1 PD envelope validator.
+Current sparse PD and its record rules remain the readback/validation contract.
 
 The effective PD cache reads only on initialization/publication, in chunks of
 at most 20 bytes: the header, then each stored record into its slot's row,

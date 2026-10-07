@@ -75,3 +75,13 @@ it is when it merges. The release publishes that pull request's pair and
 tags the BK fork's released line at the pin. Firmware's own build and host
 runners remain independent of the client. These gates do not substitute for
 the interruption and keyboard acceptance procedures.
+
+## Current-format cut (D-F10)
+
+Firmware accepts schema 2.0, RGB v3, key behaviors v1, combo v2, settings v5,
+sparse PD v2 and `NR` store format 3 only. BEGIN requires a nonzero VIA binding.
+The legacy GET 9 page and its feature bit are removed. Ark must require binding
+in `candidateMetadataForBlob`, update codec/rejection expectations and its
+integration probe recipes, refresh imported fixtures/specs and repin after the
+firmware lands. Frozen legacy inputs in `client-regression/` remain rejection
+and record-rule evidence; they are not accepted firmware formats.

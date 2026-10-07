@@ -1,14 +1,11 @@
 # Profile Split Protocol V1
 
-> Schema-2 PD extension: side-specific PD-enabled builds keep the v1 HID/split
-> envelope and add domain `0x50` (mask bit 4), profile schema 2.0, RGB v3,
-> settings v2–v5, 32 PD slots stored sparsely (PD v2, D-F09), and a 5,088-byte
-> custom payload ceiling. Logical storage
-> is format 3 (`NR`) with the same VIA generation/digest binding; portable
-> documents are version 2. Existing schema-1/format-2 bridge behavior below
-> remains supported by the app. The exact version/geometry/ABI and legacy GET 9
-> migration contract is in [PD-mode domain v1](pd-mode-domain-v1.md).
-
+> Current firmware accepts only the formats it writes (D-F10): profile schema
+> 2.0; RGB v3, key behaviors v1, combos v2, settings v5 and sparse PD v2;
+> a 5,088-byte custom payload; and logical store format 3 (`NR`). Every save
+> binds a nonzero VIA generation and digest. HID and split framing remain v1.
+> Older profile/store formats and the legacy GET 9 source page are rejected.
+> Backup translation belongs to the client, before a current-format Apply.
 
 Status: accepted internal split foundation and distributed commit barrier with
 gated owner registration; normal mutation exposure and hardware acceptance
@@ -58,7 +55,7 @@ Metadata, prepare begin, prepare commit, and abort use this layout:
 | 0 | 1 | protocol version, `1` |
 | 1 | 1 | frame kind |
 | 2 | 1 | status |
-| 3 | 1 | bit 0 has committed profile; bit 1 metadata readable |
+| 3 | 1 | bit 0 has committed profile; bit 1 metadata readable; bit 2 logical record (required for a committed profile) |
 | 4 | 1 | schema major, exactly Profile Wire v1 major |
 | 5 | 1 | schema minor, exactly Profile Wire v1 minor |
 | 6 | 1 | persistent profile flags |
@@ -78,7 +75,7 @@ are all zero, while schema and firmware compatibility digests remain present.
 An unreadable descriptor is entirely zero apart from the frame header. A
 committed descriptor requires a nonzero generation, a blob-sized payload, a
 valid physical origin, and only known persistent flags. Its domain mask may
-contain only the RGB and key-behavior bits and must match the domains found by
+contain only advertised RGB, key-behavior, combo, settings and PD bits and must match the domains found by
 whole-profile validation before commit.
 
 ## Transfer, Acknowledgement, And Error Frame
@@ -264,3 +261,16 @@ plus `NOAH_PHYSICAL_HALF=right`. The physical setting overrides handedness in
 Until those pieces pass, mutation, activation, and peer-reconciliation
 capability bits remain disabled in ordinary firmware. The engineering mutation
 pair advertises them together for the two-half acceptance matrix.
+
+## Mandatory logical binding
+
+A transfer sends LOGICAL_BIND (kind 9) before PREPARE_BEGIN, with the exact
+custom generation/digest and nonzero VIA generation/digest in format 3.
+PREPARE_BEGIN without that correlated bind is invalid metadata. The receiver
+retains the bind across repeated BEGINs after BUSY or a lost ACK, replacing it
+when a new bind arrives. Convergence-only mode admits this metadata for crossed
+host arbitration while keeping payload mutation fenced.
+
+Background repair follows the same rule. A newer local committed record pushes
+its stored binding; pulling a newer peer first requests its binding with
+LOGICAL_BIND_REQUEST (kind 11). There is no unbound prepared-push path.

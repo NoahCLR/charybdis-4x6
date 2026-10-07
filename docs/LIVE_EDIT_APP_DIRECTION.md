@@ -32,7 +32,8 @@ The firmware serves the keyboard's complete configuration, compiled defaults
 included, over Profile Wire, and publishes a complete profile to both halves as
 one atomic logical generation that recovers from interruption and a lost peer
 (D-L21, D-L22, D-L27, D-L39). The app's surface-by-surface status is in Ark's
-direction.
+direction. Firmware accepts only current formats and every save binds VIA
+(D-F10); old backups require client translation before restore.
 
 Firmware work remaining before the product is complete:
 
@@ -258,7 +259,7 @@ decision is ignored at boot, so the previous generation remains authority;
 boot starts with VIA reconciliation fenced and recovers a decided target from
 the local stage or the peer.
 
-Storage format 2 keeps the 32-byte header and 4,064-byte payload; a distinct
+Historical decision, superseded for accepted formats by D-F10: storage format 2 keeps the 32-byte header and 4,064-byte payload; a distinct
 `NQ` header stores the VIA binding and still carries the compiled-default and
 action-ABI digests. Format-1 `NP` records stay readable and migrate on the next
 Apply. Schema 2 (PD slots) uses format 3 `NR`; see
@@ -771,3 +772,26 @@ The static RAM tripwire gains a 4 KiB feature increment
 ([memory budgets](architecture/memory-budgets.md)). See
 [PD-mode domain](architecture/pd-mode-domain-v1.md) and
 [RGB domain](architecture/rgb-domain-v1.md).
+
+## D-F10 — Firmware accepts only what it writes today
+
+The running firmware has one accepted profile/storage contract: schema 2.0,
+RGB v3, key behaviors v1, combos v2, settings v5, sparse PD v2 and logical
+store format 3 (`NR`). Settings v2–4, combo v1, schema 1, custom-only `NP`
+format 1 and logical `NQ` format 2 are refused. There is no firmware migration
+path, legacy GET 9 source page, feature bit 13 or legacy PD envelope validator.
+Old backup translation belongs to the client before Apply.
+
+Every save is a logical generation, including edits that change only custom
+domains. Profile Wire BEGIN requires format 3 and nonzero VIA generation and
+digest. The owner always stages, prepares, accepts and converges the bound VIA
+identity before publishing. Prepared peer pushes require a correlated bind;
+background stale-peer repair fetches or sends the committed VIA identity too.
+A repeated BEGIN retains its generation/digest-correlated bind after BUSY or
+a lost reply. Convergence-only scans admit binding metadata so simultaneous
+hosts can arbitrate while payload mutation remains fenced.
+
+Client follow-up: require binding in `candidateMetadataForBlob`, refresh tests
+and imported fixtures/specs, and repin the landed firmware revision. Firmware's
+required checks stay independent of the client checkout. This cut does not
+perform the later domain-registry deepening or claim hardware acceptance.

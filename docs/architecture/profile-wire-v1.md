@@ -1,14 +1,11 @@
 # Profile Wire V1
 
-> Schema-2 PD extension: side-specific PD-enabled builds keep the v1 HID/split
-> envelope and add domain `0x50` (mask bit 4), profile schema 2.0, RGB v3,
-> settings v2–v5, 32 PD slots stored sparsely (PD v2, D-F09), and a 5,088-byte
-> custom payload ceiling. Logical storage
-> is format 3 (`NR`) with the same VIA generation/digest binding; portable
-> documents are version 2. Existing schema-1/format-2 bridge behavior below
-> remains supported by the app. The exact version/geometry/ABI and legacy GET 9
-> migration contract is in [PD-mode domain v1](pd-mode-domain-v1.md).
-
+> Current firmware accepts only the formats it writes (D-F10): profile schema
+> 2.0; RGB v3, key behaviors v1, combos v2, settings v5 and sparse PD v2;
+> a 5,088-byte custom payload; and logical store format 3 (`NR`). Every save
+> binds a nonzero VIA generation and digest. HID and split framing remain v1.
+> Older profile/store formats and the legacy GET 9 source page are rejected.
+> Backup translation belongs to the client, before a current-format Apply.
 
 Status: accepted Stage 00 wire contract
 
@@ -25,13 +22,13 @@ The blob is independent of Raw HID framing and EEPROM slot metadata.
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 4 | ASCII magic `NLP1` |
-| 4 | 1 | schema major, `1` |
+| 4 | 1 | schema major, `2` |
 | 5 | 1 | schema minor, initially `0` |
 | 6 | 1 | domain count |
 | 7 | 1 | flags; bit 0 means canonical encoding, all others reserved |
 
 The transport candidate length or storage header supplies total blob length.
-Schema 1 is capped at 4,064 bytes; schema 2 is capped at 5,088 bytes.
+Schema 2.0 is capped at 5,088 bytes; schema 1 is refused.
 
 ### Domain Envelope — 4 Bytes Plus Payload
 
@@ -47,18 +44,15 @@ Unknown required domains reject the candidate. Unknown optional domains are
 allowed only after a future schema-minor rule explicitly defines skippability;
 v1.0 rejects every unknown domain.
 
-Initial domain ids (schema 1; the schema-2 versions the 32-slot firmware
-accepts are RGB `0x10` v3, key behaviors v1, combos v1–v2, settings v2–v5 and
-PD `0x50` v2, one list in `users/noah/lib/profile/schema/profile_versions.h`,
-D-F09):
+Accepted domains (`users/noah/lib/profile/schema/profile_versions.h`):
 
 | Id | Domain | Version |
 | ---: | --- | ---: |
-| `0x10` | Milestone A RGB | 1 |
-| `0x20` | Milestone A key behaviors | 1 |
-| `0x30` | Combo overrides | 1 |
-| `0x40` | Portable settings, layer names, and user macros (v1/v2) or VIA macro names (v3; see [portable profile](portable-profile-v1.md)) | 1 |
-| `0x50` | Pointing-mode slots ([PD-mode domain](pd-mode-domain-v1.md)), schema 2 only | 2 (32 slots, sparse) |
+| `0x10` | RGB | 3 |
+| `0x20` | Key behaviors | 1 |
+| `0x30` | Combo overrides | 2 |
+| `0x40` | Settings, layer names, VIA macro names and custom-key names | 5 |
+| `0x50` | Sparse pointing-mode slots | 2 |
 
 ## Action Encoding
 
@@ -153,19 +147,18 @@ must be unique.
 
 ## RGB Domain
 
-Domain `0x10` version `1` begins with this exact 16-byte header (version 3,
-for 32 pointing slots, differs only in its format byte `3` and 32 PD-color
-rows; see [RGB domain](rgb-domain-v1.md)):
+Domain `0x10` version `3` begins with this exact 16-byte header
+(see [RGB domain](rgb-domain-v1.md)):
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | RGB payload format, `1` |
+| 0 | 1 | RGB payload format, `3` |
 | 1 | 1 | reserved, zero |
 | 2 | 2 | stage-enable mask |
 | 4 | 1 | reusable-group count, maximum 16 |
 | 5 | 1 | layer-color count, maximum 8 |
 | 6 | 1 | layer-group row count |
-| 7 | 1 | PD-color count, maximum 6 |
+| 7 | 1 | PD-color count, exactly 32 when compiled |
 | 8 | 1 | PD-group row count |
 | 9 | 1 | combo-group row count |
 | 10 | 1 | tap-branch color count, maximum 4 |
@@ -286,16 +279,11 @@ Page `n+1` contains row `n`:
 | 9 | 8 | up to four native input keycodes in declared order; unused entries zero |
 | 17 | 8 | reserved, zero |
 
-Version 1 has no default window: metadata bytes 18..24 are reserved, the
-digest covers bytes 0..13 and the rows, row bytes 6..7 repeat the hold
-threshold on every row, and flag bit 3 is reserved. A row that follows the
-default reports the default as its window. With the live owner, a row follows
-the default exactly when its stored window is zero (domain `0x30` version 2);
-a compiled combo follows `COMBO_TERM` unless its keymap row is a
-`COMBO_WINDOW` with a window of its own. Without the owner a per-combo term hook
-is the user's own, so its rows never report following. Firmware built without
-combos reports zero for both values. Firmware whose readout is version 2
-accepts combo domain `0x30` version 2; the client writes version 2 only then.
+Combo readout and domain `0x30` use version 2 only. A live row follows the
+header's default window when its stored window is zero. A compiled combo
+follows `COMBO_TERM` unless its authored `COMBO_WINDOW` supplies a window.
+Without the owner, a per-combo term hook is the user's own and rows never
+report following. Firmware built without combos reports zero for both values.
 
 Inputs are distinct nonzero keycodes. Timing zero is preserved verbatim. Input
 order matters when the order flag is set. Native codes use the connected
@@ -370,7 +358,7 @@ Capability feature bits are:
 | 10 | action-ABI digest available |
 | 11 | compiled-profile digest available |
 | 12 | atomic logical apply |
-| 13 | legacy pointing-mode source (see [pd-mode-domain-v1.md](./pd-mode-domain-v1.md)) |
+| 13 | retired, never advertised |
 | 14 | owned layer keys: `TG()`, `TO()`, `TT()` and `OSL()` act through userspace layer ownership, so a host may offer them in behaviours and combos where the placement rules allow (`TT()` and `OSL()` joined the bit on the same unreleased branch; every flashed build that sets it has all four) |
 | 15 | behaviour QMK functions: a behaviour sends QMK and keyboard keycodes past the layer keycodes and below the user range (the Charybdis DPI and sniping keys, RGB Matrix, Magic, `QK_BOOT`…) as a synthetic QMK record, so they run as they do on a key, and a key whose own keycode is one keeps a plain key's fallback hold; a host may offer them in a behaviour's target, tap and hold. Without it, the engine sends them as report keys, keeping only the low byte, and a host must refuse them there |
 | 16 | custom keys and keycode blocks: userspace keycodes sit in fixed blocks (custom keys `0x7e40`, pointing holds `0x7e80`, pointing locks `0x7ea0`, layer locks `0x7ec0`, each reserved beyond what is supported), action kind 7 is a custom key, and settings version 5 names the 64 custom keys. It comes with its own action ABI digest; a host knowing that digest may offer custom keys as keys and combo outputs, never as behaviour steps |
@@ -481,11 +469,13 @@ Begin candidate uses this complete layout:
 | 6 | 1 | schema minor |
 | 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings, and schema-2 bit 4 PD |
 | 8 | 1 | flags, initially zero |
-| 9 | 2 | canonical blob length, `8..4064` for schema 1 or `8..5088` for schema 2 |
+| 9 | 2 | canonical blob length, `8..5088`, schema 2.0 only |
 | 11 | 4 | CRC32 of the exact canonical blob |
 | 15 | 4 | FNV-1a digest of the exact canonical blob |
 | 19 | 4 | action-ABI digest used to encode actions |
-| 23 | 9 | reserved, all zero |
+| 23 | 1 | store format, exactly `3` |
+| 24 | 4 | nonzero bound VIA generation |
+| 28 | 4 | nonzero bound VIA digest |
 
 The requested-domain mask may be zero for the canonical empty profile and may
 contain only the domains advertised by that firmware. Compatibility with the build's advertised
@@ -712,7 +702,7 @@ unhandled reply.
 | custom get | `0x06` | native combo readback | this document |
 | custom get | `0x07` | effective settings readback | [Portable Profile V1](portable-profile-v1.md) |
 | custom get | `0x08` | VIA storage status and editor pages | [Portable Profile V1](portable-profile-v1.md) |
-| custom get | `0x09` | legacy PD source, readback bridge only | [PD-mode domain v1](pd-mode-domain-v1.md) |
+| custom get | `0x09` | retired; unsupported | — |
 | custom get/set | `0x0A` | bounded split transaction capture, diagnostic builds only | [Split activity sync](split-activity-sync.md) |
 | custom set | `0x10` | candidate begin | this document |
 | custom set | `0x11` | candidate chunk | this document |
@@ -792,13 +782,11 @@ loads and still syncs between the halves.
 - invalid action ABI and invalid cross-reference;
 - canonical C/JavaScript byte-for-byte round trips.
 
-
-## Combo Domain `0x30`, Versions 1 And 2
+## Combo Domain `0x30`, Version 2
 
 Capability `supported_domain_mask` bit 2 advertises combo overrides. Profiles
 without this domain use compiled combos. Zero rows explicitly disable all
-definitions. Firmware accepts both versions; clients write version 2 to
-firmware whose combo readout is version 2, and keep version 1 otherwise.
+definitions. Firmware accepts only version 2.
 
 QMK keeps two values for every combo: `COMBO_TERM`, the window a combo without
 its own uses, and `COMBO_HOLD_TERM`, the one hold/tap wait. Version 2 stores
@@ -811,20 +799,14 @@ both once, in an eight-byte header, so they exist with or without rows:
 | 4 | 2 | default combo window in ms, `1..65535`, little endian |
 | 6 | 2 | combo hold threshold in ms, little endian |
 
-Version 1 has a four-byte header — row count and three zero bytes — no
-default window, and repeats the hold threshold on every row; every row must
-carry the same threshold. Firmware running a version 1 table uses the compiled
-`COMBO_TERM` as its default, which no row follows, and `TAPPING_TERM` as its
-threshold while it has no rows.
-
 Each row is exactly 28 bytes, in priority/index order:
 
 | Offset | Bytes | Field |
 | ---: | ---: | --- |
 | 0 | 1 | input count, 2..4 |
 | 1 | 1 | flags: bit 0 must hold, bit 1 tap only, bit 2 ordered |
-| 2 | 2 | combo window in ms, little endian; version 2: `0` follows the default window |
-| 4 | 2 | version 1: shared hold threshold in ms, little endian; version 2: reserved, zero |
+| 2 | 2 | combo window in ms, little endian; `0` follows the default window |
+| 4 | 2 | reserved, zero |
 | 6 | 2 | reserved, zero |
 | 8 | 4 | output semantic action |
 | 12 | 16 | four semantic input slots; unused slots zero |
@@ -849,9 +831,9 @@ unavailable and exposes zero definitions rather than a partially decoded table.
 
 ## Portable Settings And Complete Readback
 
-Domain `0x40` v1 and GET values `0x07`/`0x08` are specified in
+Domain `0x40` v5 and GET values `0x07`/`0x08` are specified in
 [portable-profile-v1.md](portable-profile-v1.md). The canonical envelope now
-permits four known domains; an unknown domain still rejects the candidate.
+permits five known domains; an unknown domain still rejects the candidate.
 The settings validator uses the existing bounded reader and safe publication
 boundary. Validator/provider state policies are 368/784 bytes respectively
 (368 since D-F09: the 32-bit PD slot mask in the compatibility limits).

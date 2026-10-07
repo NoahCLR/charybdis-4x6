@@ -149,6 +149,16 @@ int main(int argc, char **argv) {
     uint8_t  bytes[NOAH_SETTINGS_MAX_SIZE], stored[NOAH_SETTINGS_MAX_SIZE] = {0};
     uint16_t length;
 
+    // Retired source readback must not be served or mutate the request.
+    memset(frame, 0, sizeof(frame));
+    frame[0] = 8;
+    frame[2] = 9;
+    frame[3] = 1;
+    uint8_t retired[32];
+    memcpy(retired, frame, sizeof(frame));
+    assert(!noah_qmk_portable_profile_get(frame, sizeof(frame)));
+    assert(!memcmp(retired, frame, sizeof(frame)));
+
     // A malformed request is answered, not read.
     memset(frame, 0, sizeof(frame));
     frame[0] = 8;

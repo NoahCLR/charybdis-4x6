@@ -19,8 +19,8 @@ static uint32_t qmk_read_calls;
 static uint32_t qmk_write_calls;
 static uint32_t current_compiled_digest = TEST_COMPILED_DIGEST;
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
-static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 1u, 0u, 1u, 1u, 0x10u, 1u, 1u, 0u, 0xA5u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 2u, 0u, 1u, 1u, 0x10u, 3u, 1u, 0u, 0xA5u};
 
 noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_compiled_v1_t *profile, noah_profile_compiled_v1_error_t *error) {
     (void)error;
@@ -84,6 +84,9 @@ static noah_profile_store_candidate_t candidate_for(const uint8_t *payload, uint
     uint32_t crc = noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, payload, length);
 
     return (noah_profile_store_candidate_t){
+        .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
+        .via_generation          = 6u,
+        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
         .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
         .domain_mask             = payload[6] == 0u ? 0u : 1u,

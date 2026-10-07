@@ -158,3 +158,12 @@ The device-first goal is complete only when a user can connect a keyboard whose
 repository profile is unavailable or stale, read its complete supported
 configuration into Ark, edit it, commit it to both halves, reboot, reconnect,
 and recover the same editable values without consulting the C files.
+
+## Current-format admission
+
+Firmware accepts only its current schema 2.0 domain versions and `NR` format-3
+storage (D-F10). Every save binds VIA generation/digest, including custom-only
+edits. Legacy storage is refused at boot; older backup translation belongs to
+the client. See [Profile Wire](profile-wire-v1.md) and
+[logical transactions](logical-profile-transaction-v1.md) for admission and
+recovery rules.

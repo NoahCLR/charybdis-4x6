@@ -13,7 +13,7 @@ static noah_profile_split_descriptor_t compiled_descriptor(void) {
     return (noah_profile_split_descriptor_t){
         .compiled_default_digest = UINT32_C(0x11223344),
         .action_abi_digest       = UINT32_C(0x55667788),
-        .schema_major            = 1u,
+        .schema_major            = 2u,
         .schema_minor            = 0u,
         .readable                = true,
     };
@@ -30,6 +30,7 @@ static noah_profile_split_descriptor_t committed_descriptor(uint32_t generation,
     descriptor.profile_flags  = 1u;
     descriptor.origin_half    = origin;
     descriptor.has_profile    = true;
+    descriptor.logical        = true;
     return descriptor;
 }
 
@@ -109,10 +110,14 @@ static void test_authority_decision_table(void) {
     assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
 
     peer               = local;
-    local.schema_major = 2u;
-    peer.schema_major  = 2u;
+    local.schema_major = 1u;
+    peer.schema_major  = 1u;
     assert(!noah_profile_split_descriptor_valid(&local));
     assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
+
+    local         = committed_descriptor(7u, 0u, UINT32_C(0x10203040));
+    local.logical = false;
+    assert(!noah_profile_split_descriptor_valid(&local));
 
     local            = committed_descriptor(7u, 0u, UINT32_C(0x10203040));
     peer             = local;
@@ -184,10 +189,10 @@ static void assert_round_trip(const noah_profile_split_v1_frame_t *expected) {
 
 static void test_protocol_golden_frames(void) {
     static const uint8_t metadata_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x01, 0x00, 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x00, 0xFC,
+        0x01, 0x01, 0x00, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x00, 0xBE,
     };
     static const uint8_t begin_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x02, 0x00, 0x03, 0x01, 0x00, 0x01, 0x01, 0x41, 0x04, 0x07, 0x00, 0x00, 0x00, 0xD4, 0xC3, 0xB2, 0xA1, 0x40, 0x30, 0x20, 0x10, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x03, 0xFD,
+        0x01, 0x02, 0x00, 0x07, 0x02, 0x00, 0x01, 0x01, 0x41, 0x04, 0x07, 0x00, 0x00, 0x00, 0xD4, 0xC3, 0xB2, 0xA1, 0x40, 0x30, 0x20, 0x10, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x03, 0x59,
     };
     static const uint8_t chunk_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
         0x01, 0x03, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x41, 0x04, 0x0E, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x45,
@@ -233,7 +238,7 @@ static void test_protocol_golden_frames(void) {
     assert_round_trip(&begin);
     assert_round_trip(&chunk);
     assert_round_trip(&request);
-    assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .store_format_version = NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL, .via_generation = 9u, .via_digest = UINT32_C(0x55667788)});
+    assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .store_format_version = NOAH_PROFILE_STORE_FORMAT_VERSION, .via_generation = 9u, .via_digest = UINT32_C(0x55667788)});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040)});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = begin.descriptor});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 28u, .payload_length = 1089u});

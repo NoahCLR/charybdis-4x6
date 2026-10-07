@@ -13,7 +13,7 @@ enum {
     MAX_PREPARE_TIME_MS = 60000u,
 };
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
 static const uint8_t max_profile[NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE];
 
 typedef struct {
@@ -126,6 +126,7 @@ static noah_profile_split_descriptor_t committed_descriptor(const half_t *half, 
     descriptor.profile_flags  = NOAH_PROFILE_STORE_FLAG_OVERRIDE;
     descriptor.origin_half    = origin;
     descriptor.has_profile    = true;
+    descriptor.logical        = true;
     return descriptor;
 }
 
@@ -154,7 +155,7 @@ static bool local_descriptor(void *context, noah_profile_split_descriptor_t *des
         descriptor->profile_flags           = record->flags;
         descriptor->origin_half             = record->origin_half;
         descriptor->has_profile             = true;
-        descriptor->logical                 = record->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL;
+        descriptor->logical                 = record->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION;
     }
     return true;
 }
@@ -162,7 +163,7 @@ static bool local_descriptor(void *context, noah_profile_split_descriptor_t *des
 static bool local_binding(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t *via_generation, uint32_t *via_digest) {
     half_t *half = context;
 
-    if (!half || !descriptor || !descriptor->logical || !via_generation || !via_digest || half->store.committed.slot == NOAH_PROFILE_SLOT_NONE || half->store.committed.generation != descriptor->generation || half->store.committed.payload_digest != descriptor->payload_digest || half->store.committed.format_version != NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL) {
+    if (!half || !descriptor || !descriptor->logical || !via_generation || !via_digest || half->store.committed.slot == NOAH_PROFILE_SLOT_NONE || half->store.committed.generation != descriptor->generation || half->store.committed.payload_digest != descriptor->payload_digest || half->store.committed.format_version != NOAH_PROFILE_STORE_FORMAT_VERSION) {
         return false;
     }
     *via_generation = half->store.committed.via_generation;
@@ -273,7 +274,7 @@ static void install_profile_with_flags(half_t *half, uint32_t generation, uint8_
     noah_profile_peer_store_result_t result;
 
     descriptor.profile_flags = flags;
-    assert(noah_profile_peer_store_backend_begin(&half->peer_store, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_begin_logical(&half->peer_store, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
     assert(noah_profile_peer_store_backend_write(&half->peer_store, descriptor.generation, descriptor.payload_digest, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_PEER_STORE_OK);
     result = noah_profile_peer_store_backend_commit_begin(&half->peer_store, &descriptor);
     while (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
@@ -432,7 +433,7 @@ static void test_logical_binding_survives_master_push(void) {
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
     assert_records_match(&left, &right);
-    assert(left.store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL);
+    assert(left.store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
     assert(left.store.committed.via_generation == 12u);
     assert(left.store.committed.via_digest == UINT32_C(0x91a2b3c4));
 }
@@ -447,7 +448,7 @@ static void test_logical_binding_survives_slave_pull(void) {
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
     assert_records_match(&left, &right);
-    assert(right.store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL);
+    assert(right.store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
     assert(right.store.committed.via_generation == 13u);
     assert(right.store.committed.via_digest == UINT32_C(0xa1b2c3d4));
 }
@@ -691,11 +692,53 @@ static void test_convergence_only_answers_inbound_prepare_busy_without_storage(v
     assert(noah_profile_candidate_store_backend_admission_owner(&right.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
 
+static void test_inbound_prepare_requires_correlated_binding(void) {
+    half_t left, right;
+    half_storage_init(&left);
+    half_storage_init(&right);
+    install_profile(&left, 16u, 0u);
+    pair_init(&left, &right);
+    uint32_t                      writes = right.memory.writes;
+    noah_profile_split_v1_frame_t request =
+                                      {
+                                          .kind       = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN,
+                                          .status     = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+                                          .descriptor = committed_descriptor(&left, 16u, 0u),
+                                      },
+                                  response;
+    uint8_t                       wire[32], reply[32];
+    for (uint8_t wrong_bind = 0u; wrong_bind < 2u; wrong_bind++) {
+        if (wrong_bind) {
+            // A valid binding for another custom generation is insufficient.
+            noah_profile_split_v1_frame_t bind = {
+                .kind                 = NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND,
+                .status               = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+                .generation           = request.descriptor.generation + 1u,
+                .payload_digest       = request.descriptor.payload_digest,
+                .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
+                .via_generation       = 6u,
+                .via_digest           = UINT32_C(0xabcdef01),
+            };
+            assert(noah_profile_split_v1_frame_encode(&bind, wire));
+            assert(noah_profile_split_reconciler_receive(&right.reconciler, wire, sizeof(wire), reply, sizeof(reply)));
+            assert_one_scan_budget(&right, false, 10u);
+        }
+        assert(noah_profile_split_v1_frame_encode(&request, wire));
+        assert(noah_profile_split_reconciler_receive(&right.reconciler, wire, sizeof(wire), reply, sizeof(reply)));
+        assert_one_scan_budget(&right, false, 20u + wrong_bind);
+        assert(noah_profile_split_reconciler_receive(&right.reconciler, wire, sizeof(wire), reply, sizeof(reply)));
+        assert(noah_profile_split_v1_frame_decode(reply, sizeof(reply), &response));
+        assert(response.kind == NOAH_PROFILE_SPLIT_V1_ERROR);
+        assert(right.memory.writes == writes);
+        assert(noah_profile_candidate_store_backend_admission_owner(&right.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+    }
+}
+
 static uint32_t run_prepared_push_until_ready_at(half_t *sender, half_t *receiver, const noah_profile_split_descriptor_t *descriptor, staged_source_t *source, uint32_t start_at) {
     noah_profile_split_descriptor_t prepared;
 
-    assert(noah_profile_split_reconciler_prepared_push_begin(&sender->reconciler, descriptor, source, staged_read));
-    assert(noah_profile_split_reconciler_prepared_push_begin(&sender->reconciler, descriptor, source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&sender->reconciler, descriptor, source, staged_read, 6u, UINT32_C(0xabcdef01)));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&sender->reconciler, descriptor, source, staged_read, 6u, UINT32_C(0xabcdef01)));
     for (uint32_t scan = 0u; scan < MAX_SCANS; scan++) {
         uint32_t now = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
 
@@ -728,7 +771,7 @@ static void test_prepared_push_collects_expected_mailbox_ack_without_failure_bac
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
     descriptor = committed_descriptor(&right, 19u, 1u);
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
 
     exchanges = right.link.exchanges;
     assert_one_scan_budget(&right, true, started_at);
@@ -740,6 +783,12 @@ static void test_prepared_push_collects_expected_mailbox_ack_without_failure_bac
 
     assert_one_scan_budget(&left, false, started_at);
     assert_one_scan_budget(&right, true, started_at + NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS);
+    assert(right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN);
+    assert(right.reconciler.retry_ms == NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS);
+    // The correlated bind precedes PREPARE_BEGIN on every current copy.
+    assert_one_scan_budget(&right, true, started_at + 2u * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS);
+    assert_one_scan_budget(&left, false, started_at + 2u * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS);
+    assert_one_scan_budget(&right, true, started_at + 3u * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS);
     assert(right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_READ);
     assert(right.reconciler.retry_ms == NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS);
 }
@@ -906,7 +955,7 @@ static void test_prepared_abort_is_bounded_when_peer_goes_silent(void) {
     assert(peer_cleanup_pending(&right));
     assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
     next = committed_descriptor(&right, 24u, 1u);
-    assert(!noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &next, &source, staged_read));
+    assert(!noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &next, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
 
     // Once the peer answers again, the remembered ABORT releases its lease.
     right.link.connected = true;
@@ -921,7 +970,7 @@ static void test_prepared_abort_is_bounded_when_peer_goes_silent(void) {
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
     assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
     run_pair_until_converged(&left, &right, false);
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &next, &source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &next, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
 }
 
 // A peer store in RECONCILE_REQUIRED (durability unknown) answers every ABORT
@@ -991,9 +1040,9 @@ static void test_maximum_candidate_resolves_within_owner_no_progress_window(void
     descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
     descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
 
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
     for (uint32_t scan = 0u; scan < MAX_SCANS; scan++) {
-        resolved_at = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+        resolved_at = start_at + scan * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS;
         assert_one_scan_budget(&right, true, resolved_at);
         assert_one_scan_budget(&left, false, resolved_at);
         if (right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED || noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL)) {
@@ -1039,7 +1088,7 @@ static void test_prepared_push_survives_one_lost_exchange_anywhere(void) {
                 right.link.drop_after_delivery_exchange = base + drop;
             else
                 right.link.drop_before_delivery_exchange = base + drop;
-            assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+            assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
             for (uint32_t scan = 0u; scan < MAX_SCANS * 2u && !done; scan++) {
                 uint32_t now = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
                 assert_one_scan_budget(&right, true, now);
@@ -1085,7 +1134,7 @@ static void test_prepared_push_survives_one_garbled_request_anywhere(void) {
         descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
         descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
         right.link.garble_request_exchange = right.link.exchanges + garble;
-        assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+        assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
         for (uint32_t scan = 0u; scan < MAX_SCANS * 2u && !done; scan++) {
             uint32_t now = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
             assert_one_scan_budget(&right, true, now);
@@ -1135,7 +1184,7 @@ static bool run_prepared_push_with_fault(uint32_t fault, bool replay, const noah
         right.link.inject_response_exchange = right.link.exchanges + fault;
         right.link.injected                 = *injected;
     }
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
     for (uint32_t scan = 0u; scan < MAX_SCANS * 2u && !done; scan++) {
         uint32_t now = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
         assert_one_scan_budget(&right, true, now);
@@ -1200,7 +1249,7 @@ static void run_stale_receive_lease(bool same_length) {
     stale.payload_length = sizeof(max_profile);
     stale.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
     stale.payload_digest = payload_digest(max_profile, sizeof(max_profile));
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &stale, &stale_source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &stale, &stale_source, staged_read, 6u, UINT32_C(0xabcdef01)));
     for (uint32_t scan = 0u; scan < 64u; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
         assert_one_scan_budget(&right, true, now);
         assert_one_scan_budget(&left, false, now);
@@ -1220,13 +1269,13 @@ static void run_stale_receive_lease(bool same_length) {
         next.payload_digest = stale.payload_digest ^ 1u;
         next_source.bytes   = max_profile;
     }
-    for (uint32_t scan = 0u; scan < 64u && !noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &next, &next_source, staged_read); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+    for (uint32_t scan = 0u; scan < 64u && !noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &next, &next_source, staged_read, 6u, UINT32_C(0xabcdef01)); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
         assert_one_scan_budget(&right, true, now);
         assert_one_scan_budget(&left, false, now);
     }
     assert(right.reconciler.prepared_push_active);
     // While the stale lease holds, the sender can say why it waits.
-    for (uint32_t scan = 0u; scan < 20u; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+    for (uint32_t scan = 0u; scan < 40u; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
         assert_one_scan_budget(&right, true, now);
         assert_one_scan_budget(&left, false, now);
     }
@@ -1277,7 +1326,7 @@ static void test_prepared_push_restarts_when_the_receiver_drops_its_lease(void) 
     descriptor.payload_length = sizeof(max_profile);
     descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
     descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
     for (uint32_t scan = 0u; scan < 64u; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
         assert_one_scan_budget(&right, true, now);
         assert_one_scan_budget(&left, false, now);
@@ -1315,7 +1364,7 @@ static void run_receiver_storage_failures(noah_profile_peer_store_state_t failin
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
     descriptor = committed_descriptor(&right, 60u, 1u);
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
     for (uint32_t scan = 0u; scan < MAX_SCANS && !ready && !stopped; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
         assert_one_scan_budget(&right, true, now);
         bool entering = noah_profile_peer_store_backend_state(&left.peer_store) == failing_phase;
@@ -1349,7 +1398,7 @@ static void run_receiver_storage_failures(noah_profile_peer_store_state_t failin
         assert_one_scan_budget(&left, false, now);
     }
     assert(!right.reconciler.prepared_push_active);
-    for (uint32_t scan = 0u; scan < 64u && !noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+    for (uint32_t scan = 0u; scan < 64u && !noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
         assert_one_scan_budget(&right, true, now);
         assert_one_scan_budget(&left, false, now);
     }
@@ -1389,7 +1438,7 @@ static void test_receiver_recovers_when_its_abort_write_fails(void) {
     }
     left.memory.fail_writes = 0u;
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
-    for (uint32_t scan = 0u; scan < 400u && !noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+    for (uint32_t scan = 0u; scan < 400u && !noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
         assert_one_scan_budget(&right, true, now);
         assert_one_scan_budget(&left, false, now);
     }
@@ -1450,7 +1499,7 @@ static void test_prepared_push_restarts_across_both_half_role_changes(void) {
     // payload completion therefore proceeds directly back to PUSH_COMMIT.
     assert(!noah_profile_split_reconciler_scan(&right.reconciler, false, 50000u));
     assert(noah_profile_split_reconciler_scan(&left.reconciler, true, 50000u));
-    assert(right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN);
+    assert(right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND);
     assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
 
     for (uint32_t scan = 0u; scan < MAX_SCANS && left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; scan++) {
@@ -1517,7 +1566,7 @@ static void test_prepare_authorize_and_cancel_are_immediate_after_timer_high_bit
 
     now       = UINT32_C(0x80000020);
     exchanges = right.link.exchanges;
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &cancel_descriptor, &source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &cancel_descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
     assert_one_scan_budget(&right, true, now);
     assert(right.link.exchanges == exchanges + 1u);
     assert_one_scan_budget(&left, false, now);
@@ -1561,7 +1610,7 @@ static void test_cancel_after_prepare_rejection_is_idempotent(void) {
     run_pair_until_converged(&left, &right, false);
     descriptor = committed_descriptor(&right, 27u, 1u);
     descriptor.compiled_default_digest ^= 1u;
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
     for (uint32_t scan = 0u; scan < 8u && right.reconciler.state != NOAH_PROFILE_SPLIT_RECONCILER_STOPPED; scan++) {
         uint32_t now = 60000u + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
 
@@ -1601,9 +1650,9 @@ static void test_cancel_after_dropped_prepare_begin_releases_or_noops(void) {
         } else {
             right.link.drop_after_delivery_exchange = right.link.exchanges + 1u;
         }
-        assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+        assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
         assert_one_scan_budget(&right, true, 70000u);
-        assert(right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN);
+        assert(right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND);
         assert_one_scan_budget(&left, false, 70000u);
 
         assert(noah_profile_split_reconciler_prepared_push_cancel(&right.reconciler, &descriptor));
@@ -1631,7 +1680,7 @@ static void test_cancel_refuses_matching_durable_peer(void) {
     descriptor = committed_descriptor(&left, 31u, 0u);
     install_profile(&left, descriptor.generation, descriptor.origin_half);
 
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
     for (uint32_t scan = 0u; scan < MAX_SCANS && !noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL); scan++) {
         uint32_t now = 80000u + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
 
@@ -1672,8 +1721,8 @@ static void run_crossed_begin_loser_abort(bool left_sends_first) {
     right.link.connected = true;
     left_descriptor      = committed_descriptor(&left, 32u, 0u);
     right_descriptor     = committed_descriptor(&right, 32u, 1u);
-    assert(noah_profile_split_reconciler_prepared_push_begin(&left.reconciler, &left_descriptor, &left_source, staged_read));
-    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &right_descriptor, &right_source, staged_read));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&left.reconciler, &left_descriptor, &left_source, staged_read, 6u, UINT32_C(0xabcdef01)));
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &right_descriptor, &right_source, staged_read, 6u, UINT32_C(0xabcdef01)));
 
     if (left_sends_first) {
         (void)noah_profile_split_reconciler_scan_mode(&left.reconciler, true, 90100u, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY);
@@ -1685,6 +1734,12 @@ static void run_crossed_begin_loser_abort(bool left_sends_first) {
         (void)noah_profile_split_reconciler_scan_mode(&left.reconciler, true, 90100u, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY);
         (void)noah_profile_split_reconciler_scan_mode(&left.reconciler, true, 90150u, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY);
         (void)noah_profile_split_reconciler_scan_mode(&right.reconciler, true, 90150u, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY);
+    }
+    // Both initial exchanges bind VIA. Cross PREPARE_BEGIN as well before
+    // checking the provisional descriptors used to arbitrate host copies.
+    for (uint32_t t = 90160u; t <= 90190u; t += 5u) {
+        (void)noah_profile_split_reconciler_scan_mode(left_sends_first ? &left.reconciler : &right.reconciler, true, t, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY);
+        (void)noah_profile_split_reconciler_scan_mode(left_sends_first ? &right.reconciler : &left.reconciler, true, t, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY);
     }
     assert(noah_profile_split_reconciler_provisional_peer_descriptor(&left.reconciler, &observed));
     assert(observed.origin_half == 1u);
@@ -1887,6 +1942,7 @@ static void test_descriptor_changes_are_validated_before_backoff(void) {
 }
 
 int main(void) {
+    test_inbound_prepare_requires_correlated_binding();
     test_descriptor_changes_are_validated_before_backoff();
     test_compiled_convergence();
     test_newer_master_pushes_exact_record();

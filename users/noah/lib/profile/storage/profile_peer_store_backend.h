@@ -62,7 +62,6 @@ void noah_profile_peer_store_backend_init(noah_profile_peer_store_backend_t *pee
 
 // Opens exact sender-owned staging. Generation, physical origin, persistent
 // flags, and all payload identities are preserved unchanged.
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor);
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor, uint32_t via_generation, uint32_t via_digest);
 
 // Accepts only sequential chunks. A fully repeated chunk is idempotent when

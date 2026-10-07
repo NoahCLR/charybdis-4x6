@@ -25,7 +25,7 @@ static bool validated_profile_matches_record(const noah_profile_validator_v1_pro
 }
 
 static bool metadata_matches_candidate(const noah_profile_candidate_v1_metadata_t *metadata, const noah_profile_store_candidate_t *candidate) {
-    return metadata && candidate && metadata->schema_major == candidate->schema_major && metadata->schema_minor == candidate->schema_minor && metadata->requested_domains == candidate->domain_mask && metadata->flags == 0u && metadata->payload_length == candidate->payload_length && metadata->crc32 == candidate->payload_crc32 && metadata->digest == candidate->payload_digest && metadata->action_abi_digest == candidate->action_abi_digest && (metadata->store_format_version == 0u ? (candidate->format_version == 0u || candidate->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY) : metadata->store_format_version == candidate->format_version) && metadata->via_generation == candidate->via_generation && metadata->via_digest == candidate->via_digest;
+    return metadata && candidate && metadata->schema_major == candidate->schema_major && metadata->schema_minor == candidate->schema_minor && metadata->requested_domains == candidate->domain_mask && metadata->flags == 0u && metadata->payload_length == candidate->payload_length && metadata->crc32 == candidate->payload_crc32 && metadata->digest == candidate->payload_digest && metadata->action_abi_digest == candidate->action_abi_digest && (metadata->store_format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && metadata->store_format_version == candidate->format_version) && metadata->via_generation == candidate->via_generation && metadata->via_digest == candidate->via_digest;
 }
 
 static bool store_candidate_equal(const noah_profile_store_candidate_t *left, const noah_profile_store_candidate_t *right) {
@@ -164,7 +164,7 @@ static noah_profile_candidate_backend_result_t begin_candidate(void *context, co
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
     }
     candidate = (noah_profile_store_candidate_t){
-        .format_version          = metadata->store_format_version == 0u ? NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY : metadata->store_format_version,
+        .format_version          = metadata->store_format_version,
         .schema_major            = metadata->schema_major,
         .schema_minor            = metadata->schema_minor,
         .domain_mask             = metadata->requested_domains,

@@ -52,10 +52,10 @@ enum {
     NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST     = 1u << 10,
     NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH = 1u << 11,
     NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY  = 1u << 12,
-    NOAH_PROFILE_FEATURE_LEGACY_PD_SOURCE      = 1u << 13,
+    // Bit 13 is retired; the legacy PD readback page is unsupported.
     // TG(), TO(), TT() and OSL() act through userspace layer ownership, so a
     // host may offer them in behaviours and combos where they can run.
-    NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES   = 1u << 14,
+    NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES = 1u << 14,
     // Behaviours send QMK and keyboard functions (DPI_MOD, RGB Matrix, Magic,
     // QK_BOOT…) through QMK's key processing, so a host may offer them in a
     // behaviour's target, tap and hold.
@@ -66,7 +66,7 @@ enum {
     NOAH_PROFILE_FEATURE_CUSTOM_KEYS = 1u << 16,
     // Physical key timestamps survive QMK buffering; authored LT rows own tapping.
     NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING = 1u << 17,
-    NOAH_PROFILE_FEATURE_OWNED_TAPPING = 1u << 18,
+    NOAH_PROFILE_FEATURE_OWNED_TAPPING           = 1u << 18,
 };
 
 enum {

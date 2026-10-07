@@ -12,9 +12,7 @@
 
 static const uint8_t profile_magic[4]      = {'N', 'L', 'P', '1'};
 static const uint8_t ordered_domain_ids[] = {NOAH_PROFILE_DOMAIN_V1_RGB, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, NOAH_PROFILE_DOMAIN_V1_COMBOS, NOAH_PROFILE_DOMAIN_V1_SETTINGS
-#ifdef NOAH_PD_PROFILE_ENABLE
 , NOAH_PROFILE_DOMAIN_V1_PD
-#endif
 };
 
 static void write_u16(uint8_t *target, uint16_t value) {
@@ -50,17 +48,13 @@ static noah_profile_codec_v1_result_t fail(noah_profile_codec_v1_error_t *error,
 
 static bool domain_version_is_known(uint8_t id, uint8_t version) {
     return
-#ifdef NOAH_PD_PROFILE_ENABLE
         (id == NOAH_PROFILE_DOMAIN_V1_PD && NOAH_PROFILE_PD_DOMAIN_VERSION_ACCEPTED(version)) ||
-#endif
         (id == NOAH_PROFILE_DOMAIN_V1_SETTINGS && NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(version)) || (id == NOAH_PROFILE_DOMAIN_V1_COMBOS && NOAH_PROFILE_COMBO_VERSION_ACCEPTED(version)) || (id == NOAH_PROFILE_DOMAIN_V1_RGB && version == NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && version == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION);
 }
 
 static bool domain_id_is_known(uint8_t id) {
     return
-#ifdef NOAH_PD_PROFILE_ENABLE
         id == NOAH_PROFILE_DOMAIN_V1_PD ||
-#endif
         id == NOAH_PROFILE_DOMAIN_V1_SETTINGS || id == NOAH_PROFILE_DOMAIN_V1_COMBOS || id == NOAH_PROFILE_DOMAIN_V1_RGB || id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS;
 }
 

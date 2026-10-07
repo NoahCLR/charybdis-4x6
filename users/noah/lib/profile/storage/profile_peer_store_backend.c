@@ -144,21 +144,23 @@ void noah_profile_peer_store_backend_init(noah_profile_peer_store_backend_t *pee
     peer->validation_error = noah_profile_candidate_v1_no_error();
 }
 
-static noah_profile_peer_store_result_t begin_with_binding(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor, uint8_t format_version, uint32_t via_generation, uint32_t via_digest) {
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor, uint32_t via_generation, uint32_t via_digest) {
     noah_profile_store_t          *store;
     noah_profile_store_candidate_t candidate;
     noah_profile_store_result_t    store_result;
 
-    if (!peer || !peer->backend || !peer->backend->store) {
+    if (!peer || !peer->backend || !peer->backend->store || !descriptor || !descriptor->logical || via_generation == 0u || via_digest == 0u) {
         return NOAH_PROFILE_PEER_STORE_INVALID_METADATA;
     }
     if (peer->state == NOAH_PROFILE_PEER_STORE_RECEIVING || peer->state == NOAH_PROFILE_PEER_STORE_VALIDATING || peer->state == NOAH_PROFILE_PEER_STORE_PREPARING || peer->state == NOAH_PROFILE_PEER_STORE_PREPARED || peer->state == NOAH_PROFILE_PEER_STORE_COMMITTING || peer->state == NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED) {
-        return descriptor && descriptor_equal(&peer->descriptor, descriptor) ? state_result(peer) : NOAH_PROFILE_PEER_STORE_BUSY;
+        if (!descriptor_equal(&peer->descriptor, descriptor)) return NOAH_PROFILE_PEER_STORE_BUSY;
+        if (peer->metadata.via_generation != via_generation || peer->metadata.via_digest != via_digest) return NOAH_PROFILE_PEER_STORE_CONFLICT;
+        return state_result(peer);
     }
     if (peer->state == NOAH_PROFILE_PEER_STORE_COMMITTED && descriptor && descriptor_equal(&peer->descriptor, descriptor)) {
-        return NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED;
+        return peer->metadata.via_generation == via_generation && peer->metadata.via_digest == via_digest ? NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED : NOAH_PROFILE_PEER_STORE_CONFLICT;
     }
-    if (!descriptor || !descriptor->readable || !descriptor->has_profile || !noah_profile_split_descriptor_valid(descriptor)) {
+    if (!descriptor || !descriptor->logical || !descriptor->readable || !descriptor->has_profile || !noah_profile_split_descriptor_valid(descriptor)) {
         return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, NOAH_PROFILE_PEER_STORE_INVALID_METADATA);
     }
 
@@ -168,8 +170,12 @@ static noah_profile_peer_store_result_t begin_with_binding(noah_profile_peer_sto
     }
     if (store->committed.slot != NOAH_PROFILE_SLOT_NONE) {
         if (record_matches_descriptor(&store->committed, descriptor)) {
+            if (store->committed.via_generation != via_generation || store->committed.via_digest != via_digest) return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, NOAH_PROFILE_PEER_STORE_CONFLICT);
             if (peer->backend->validation_complete && peer->backend->committed_available && record_matches_descriptor(&peer->backend->committed_record, descriptor) && validated_profile_matches_descriptor(&peer->backend->validated_profile, descriptor)) {
-                peer->descriptor  = *descriptor;
+                peer->descriptor = *descriptor;
+                peer->metadata.store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION;
+                peer->metadata.via_generation = via_generation;
+                peer->metadata.via_digest = via_digest;
                 peer->next_offset = descriptor->payload_length;
                 return set_terminal(peer, NOAH_PROFILE_PEER_STORE_COMMITTED, NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED);
             }
@@ -192,12 +198,12 @@ static noah_profile_peer_store_result_t begin_with_binding(noah_profile_peer_sto
         .crc32                = descriptor->payload_crc32,
         .digest               = descriptor->payload_digest,
         .action_abi_digest    = descriptor->action_abi_digest,
-        .store_format_version = format_version,
+        .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
         .via_generation       = via_generation,
         .via_digest           = via_digest,
     };
     candidate = (noah_profile_store_candidate_t){
-        .format_version          = format_version,
+        .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
         .schema_major            = descriptor->schema_major,
         .schema_minor            = descriptor->schema_minor,
         .domain_mask             = descriptor->domain_mask,
@@ -224,17 +230,6 @@ static noah_profile_peer_store_result_t begin_with_binding(noah_profile_peer_sto
     peer->state            = NOAH_PROFILE_PEER_STORE_RECEIVING;
     peer->result           = NOAH_PROFILE_PEER_STORE_IN_PROGRESS;
     return NOAH_PROFILE_PEER_STORE_OK;
-}
-
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor) {
-    return begin_with_binding(peer, descriptor, NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY, 0u, 0u);
-}
-
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor, uint32_t via_generation, uint32_t via_digest) {
-    if (via_generation == 0u || via_digest == 0u) {
-        return NOAH_PROFILE_PEER_STORE_INVALID_METADATA;
-    }
-    return begin_with_binding(peer, descriptor, NOAH_PROFILE_LOGICAL_STORE_VERSION, via_generation, via_digest);
 }
 
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const uint8_t *bytes, uint8_t length) {

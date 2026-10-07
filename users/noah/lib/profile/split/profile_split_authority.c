@@ -28,7 +28,7 @@ bool noah_profile_split_descriptor_valid(const noah_profile_split_descriptor_t *
     if (!descriptor->has_profile) {
         return !descriptor->logical && descriptor_empty_profile_fields(descriptor);
     }
-    return descriptor->generation != 0u && descriptor->origin_half <= 1u && descriptor->payload_length >= NOAH_PROFILE_BLOB_V1_HEADER_SIZE && descriptor->payload_length <= NOAH_PROFILE_BLOB_V1_MAX_SIZE && (descriptor->domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) == 0u && (descriptor->profile_flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) == 0u;
+    return descriptor->logical && descriptor->generation != 0u && descriptor->origin_half <= 1u && descriptor->payload_length >= NOAH_PROFILE_BLOB_V1_HEADER_SIZE && descriptor->payload_length <= NOAH_PROFILE_BLOB_V1_MAX_SIZE && (descriptor->domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) == 0u && (descriptor->profile_flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) == 0u;
 }
 
 static bool compatible(const noah_profile_split_descriptor_t *local, const noah_profile_split_descriptor_t *peer) {

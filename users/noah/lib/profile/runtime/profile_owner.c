@@ -257,7 +257,7 @@ static bool resolve_boot_via_authority(noah_profile_owner_t *owner) {
     }
     via    = owner->config.logical_via;
     record = owner->store.committed.slot == NOAH_PROFILE_SLOT_NONE ? NULL : &owner->store.committed;
-    if (record && record->format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION) {
+    if (record) {
         if (owner->boot_via_resolution_known) {
             return true;
         }
@@ -546,7 +546,7 @@ static bool scan_boot_reconciliation(noah_profile_owner_t *owner, bool master, u
         return scan_running(owner, master, now_ms, false);
     }
     if (boot_peer_converged(owner)) {
-        if (owner->store.committed.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && (!owner->config.logical_via || !owner->config.logical_via->converged || !owner->config.logical_via->converged(owner->config.logical_via->context, owner->store.committed.via_generation, owner->store.committed.via_digest))) {
+        if (!owner->config.logical_via || !owner->config.logical_via->converged || !owner->config.logical_via->converged(owner->config.logical_via->context, owner->store.committed.via_generation, owner->store.committed.via_digest)) {
             return false;
         }
         owner->boot_activation_started = false;
@@ -695,7 +695,7 @@ static bool request_host_precommit_cancel(noah_profile_owner_t *owner, noah_prof
     // VIA staging is released just the same. Its peer ABORT may wait for the
     // link; the custom candidate is released meanwhile, and the old VIA bank
     // on this half was never touched.
-    if (owner->store.prepare_active && owner->store.candidate.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && !owner->host_via_abort_requested) {
+    if (owner->store.prepare_active && !owner->host_via_abort_requested) {
         if (!owner->config.logical_via || !owner->config.logical_via->abort || !owner->config.logical_via->abort(owner->config.logical_via->context, owner->host_transaction.status.transaction_id, owner->store.candidate.via_generation, owner->store.candidate.via_digest)) {
             return false;
         }
@@ -754,15 +754,14 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
         return false;
     }
     descriptor = descriptor_from_candidate(&candidate);
-    if (candidate.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION) {
-        if (!owner->config.logical_via || !owner->config.logical_via->ready || !owner->config.logical_via->accept || !owner->config.logical_via->abort || !owner->config.logical_via->converged) {
-            fail_integration(owner);
-            return true;
-        }
-        if (!owner->config.logical_via->ready(owner->config.logical_via->context, owner->host_transaction.status.transaction_id, candidate.via_generation, candidate.via_digest)) {
-            return false;
-        }
+    if (!owner->config.logical_via || !owner->config.logical_via->ready || !owner->config.logical_via->accept || !owner->config.logical_via->abort || !owner->config.logical_via->converged) {
+        fail_integration(owner);
+        return true;
     }
+    if (!owner->config.logical_via->ready(owner->config.logical_via->context, owner->host_transaction.status.transaction_id, candidate.via_generation, candidate.via_digest)) {
+        return false;
+    }
+
     if (!noah_profile_split_descriptor_valid(&descriptor)) {
         fail_integration(owner);
         return true;
@@ -785,7 +784,7 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
         }
     }
     if (!owner->host_barrier_started) {
-        bool began = candidate.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION ? noah_profile_split_reconciler_prepared_push_begin_logical(&owner->reconciler, &owner->host_barrier_descriptor, owner, host_staged_read, candidate.via_generation, candidate.via_digest) : noah_profile_split_reconciler_prepared_push_begin(&owner->reconciler, &owner->host_barrier_descriptor, owner, host_staged_read);
+        bool began = noah_profile_split_reconciler_prepared_push_begin_logical(&owner->reconciler, &owner->host_barrier_descriptor, owner, host_staged_read, candidate.via_generation, candidate.via_digest);
         if (!began) {
             return false;
         }
@@ -899,33 +898,32 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
     } else {
         owner->host_barrier_peer_confirmed = true;
     }
-    if (owner->store.committed.format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION) {
-        if (!owner->host_via_accept_requested) {
-            // ACCEPT lets the host start rewriting this half's VIA bank, and
-            // that starts the input fence. Until then this half still runs the
-            // complete old generation and keeps typing, even if the link to the
-            // peer is down, so ACCEPT is requested only while the peer is in
-            // sight and its acknowledgement can arrive. Enter the fence at a
-            // safe boundary so activation, which needs the same boundary, is
-            // never waiting on fenced keys.
-            if (!live_convergence) {
-                return false;
-            }
-            if ((noah_profile_activation_policy_safe_boundary(&owner->activation_policy) & ~NOAH_PROFILE_ACTIVATION_REASON_PEER) != 0u) {
-                owner->host_barrier_waiting_boundary = true;
-                return false;
-            }
-            owner->host_barrier_waiting_boundary = false;
-            if (!owner->config.logical_via || !owner->config.logical_via->accept || !owner->config.logical_via->accept(owner->config.logical_via->context, owner->host_transaction.status.transaction_id, owner->store.committed.via_generation, owner->store.committed.via_digest)) {
-                return false;
-            }
-            owner->host_via_accept_requested = true;
-            return true;
-        }
-        if (!owner->config.logical_via || !owner->config.logical_via->converged || !owner->config.logical_via->converged(owner->config.logical_via->context, owner->store.committed.via_generation, owner->store.committed.via_digest)) {
+    if (!owner->host_via_accept_requested) {
+        // ACCEPT lets the host start rewriting this half's VIA bank, and
+        // that starts the input fence. Until then this half still runs the
+        // complete old generation and keeps typing, even if the link to the
+        // peer is down, so ACCEPT is requested only while the peer is in
+        // sight and its acknowledgement can arrive. Enter the fence at a
+        // safe boundary so activation, which needs the same boundary, is
+        // never waiting on fenced keys.
+        if (!live_convergence) {
             return false;
         }
+        if ((noah_profile_activation_policy_safe_boundary(&owner->activation_policy) & ~NOAH_PROFILE_ACTIVATION_REASON_PEER) != 0u) {
+            owner->host_barrier_waiting_boundary = true;
+            return false;
+        }
+        owner->host_barrier_waiting_boundary = false;
+        if (!owner->config.logical_via || !owner->config.logical_via->accept || !owner->config.logical_via->accept(owner->config.logical_via->context, owner->host_transaction.status.transaction_id, owner->store.committed.via_generation, owner->store.committed.via_digest)) {
+            return false;
+        }
+        owner->host_via_accept_requested = true;
+        return true;
     }
+    if (!owner->config.logical_via || !owner->config.logical_via->converged || !owner->config.logical_via->converged(owner->config.logical_via->context, owner->store.committed.via_generation, owner->store.committed.via_digest)) {
+        return false;
+    }
+
     if (!noah_profile_candidate_transaction_authorize_activation(&owner->host_transaction)) {
         fail_integration(owner);
     }
