@@ -516,21 +516,36 @@ bool key_runtime_core_preview_owner_key_pos(keypos_t *out) {
         *out = (keypos_t){0};
     }
 
-    if (!(state && out)) {
+    if (!(state && out) || state->press_token_count == 0u) {
         return false;
     }
 
-    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
-        const press_token_t *token = &state->press_tokens[index];
-        keypos_t             token_key_pos;
+    // Preserve the first eligible matrix slot while skipping inactive keys.
+    // Mouse-only scans reach this query through both base and combo feedback.
+    for (uint16_t word_index = 0; word_index < KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT; word_index++) {
+        uint32_t active_bits = state->press_token_active_bitmap[word_index];
 
-        token_key_pos = key_runtime_core_query_press_token_resolve_key_pos(state, token);
-        if (!(token->active && token->handled_key) || key_runtime_core_query_press_token_uses_implicit_hold(token) || key_runtime_core_query_press_token_uses_fallback_hold(token) || key_runtime_core_key_pos_held_action_keycode(state, token_key_pos) != KC_NO || key_runtime_core_key_pos_repeat_active(state, token_key_pos) || !key_runtime_core_query_press_token_allows_tap_release(token) || key_runtime_core_query_press_token_preview_layer_hint(token) == UINT8_MAX) {
-            continue;
+        while (active_bits != 0u) {
+            uint16_t             index = (uint16_t)(word_index * 32u + (uint16_t)__builtin_ctz(active_bits));
+            const press_token_t *token = &state->press_tokens[index];
+            keypos_t             token_key_pos;
+
+            active_bits &= active_bits - 1u;
+#ifdef KEY_RUNTIME_HOT_PATH_TEST_INSTRUMENTATION
+            key_runtime_hot_path_test_record_preview_slot_visit();
+#endif
+            if (!(token->active && token->handled_key) || key_runtime_core_query_press_token_uses_implicit_hold(token) || key_runtime_core_query_press_token_uses_fallback_hold(token) || !key_runtime_core_query_press_token_allows_tap_release(token) || key_runtime_core_query_press_token_preview_layer_hint(token) == UINT8_MAX) {
+                continue;
+            }
+
+            token_key_pos = key_runtime_core_query_keypos_from_slot_index(index);
+            if (key_runtime_core_key_pos_held_action_keycode(state, token_key_pos) != KC_NO || key_runtime_core_key_pos_repeat_active(state, token_key_pos)) {
+                continue;
+            }
+
+            *out = token_key_pos;
+            return true;
         }
-
-        *out = token_key_pos;
-        return true;
     }
 
     return false;
