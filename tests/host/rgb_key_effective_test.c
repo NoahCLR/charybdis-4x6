@@ -241,6 +241,8 @@ static void test_compiled_and_live_key_rendering(const char *fixture_path) {
         if (led != 4u && led != 7u) check_unpainted(&frame, led);
     }
 
+    // This rendering fixture models six supported slots with current RGB v3.
+    limits.supported_pd_mode_mask = 0x3fu;
     limits.logical_layer_count    = LAYER_COUNT;
     limits.maximum_brightness     = 200u;
     limits.tap_branch_color_count = 4u;
@@ -311,6 +313,8 @@ static void test_tap_commit_policy_fails_closed_on_stale_read(const char *fixtur
         .invalidate_on_call = 1u,
     };
 
+    // This rendering fixture models six supported slots with current RGB v3.
+    limits.supported_pd_mode_mask = 0x3fu;
     limits.logical_layer_count    = LAYER_COUNT;
     limits.maximum_brightness     = 200u;
     limits.tap_branch_color_count = 4u;

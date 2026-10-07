@@ -1,14 +1,11 @@
 # Portable keyboard profile v1
 
-> Schema-2 PD extension: side-specific PD-enabled builds keep the v1 HID/split
-> envelope and add domain `0x50` (mask bit 4), profile schema 2.0, RGB v3,
-> settings v2–v5, 32 PD slots stored sparsely (PD v2, D-F09), and a 5,088-byte
-> custom payload ceiling. Logical storage
-> is format 3 (`NR`) with the same VIA generation/digest binding; portable
-> documents are version 2. Existing schema-1/format-2 bridge behavior below
-> remains supported by the app. The exact version/geometry/ABI and legacy GET 9
-> migration contract is in [PD-mode domain v1](pd-mode-domain-v1.md).
-
+> Current firmware accepts only the formats it writes (D-F10): profile schema
+> 2.0; RGB v3, key behaviors v1, combos v2, settings v5 and sparse PD v2;
+> a 5,088-byte custom payload; and logical store format 3 (`NR`). Every save
+> binds a nonzero VIA generation and digest. HID and split framing remain v1.
+> Older profile/store formats and the legacy GET 9 source page are rejected.
+> Backup translation belongs to the client, before a current-format Apply.
 
 A profile export is the effective configuration read from the keyboard. Flashed
 and committed data have the same representation. An absent live domain is
@@ -85,98 +82,36 @@ the target bank, which it has just proved both halves hold. A reviewed snapshot
 without those bytes is not reused: Apply reads the keyboard again. The
 interrupted-capture path already carries the raw bank it read.
 
-## Settings domain `0x40`, version 1
+## Settings domain `0x40`, version 5
 
-Capability domain-mask bit 3 advertises this domain and the full readback
-commands below. The portable image includes the pointing, combo and RGB engines.
-An ordinary profile may omit the domain; a complete portable file must include
-it. An explicit empty macro slot overrides its flashed default.
+Capability domain-mask bit 3 advertises this domain. An ordinary profile may
+omit it; a complete portable file includes it. Firmware accepts only version
+5, with the envelope version equal to the payload's first byte. Older settings
+must be translated by the client before Apply; firmware never preserves or
+executes retired user-macro instruction records.
 
-All multibyte fields below are little-endian:
+All multibyte fields are little-endian:
 
 | Offset | Bytes | Contents |
 | ---: | ---: | --- |
-| 0 | 8 | `[1, 8, 28, 16, 0, 0, 0, 0]`: version, name count, scalar count, macro count, reserved zeros |
+| 0 | 8 | `[5, 8, 28, 64, 64, 0, 0, 0]`: version, layer-name count, scalar count, macro-name count, custom-key name count, reserved zeros |
 | 8 | 112 | 28 uint32 scalar values |
-| 120 | 192 | Eight UTF-8 names, each 24 bytes: at most 23 bytes of text, then a zero and zero padding |
-| 312 | variable | Sixteen records: uint16 instruction length followed by instruction bytes |
+| 120 | 192 | Eight UTF-8 layer names, each 24 bytes: at most 23 bytes of text, then zero termination and padding |
+| 312 | variable | 64 VIA macro names followed by 64 custom-key names: uint8 length (0–20), then printable ASCII bytes (`0x20`–`0x7e`) |
 
-The minimum domain size is 344 bytes; the maximum is 1,368. Each user macro
-has at most 512 instruction bytes and their combined content at most 1,024.
-Instructions are `1` + uint8 text length + ASCII bytes, `2` + uint16 delay,
-`3` + uint8 key down, `4` + uint8 key up, or `5` + uint8 key count + simultaneous
-tap keys. Key lists and concurrently held sets are bounded to 16 and must not
-duplicate keys or leave them pressed. Controls and malformed UTF-8 are rejected
-in names. Firmware validation reads at most one byte per settings step.
-
-### Version 3: VIA macro names instead of user macros
-
-Schema-2 firmware from 2026-09-23 writes settings version 3 and still reads
-version 2, so a keyboard's stored profile survives the update. The 16 user
-macros are retired; version 3 names the 64 VIA macros in their place:
-
-| Offset | Bytes | Contents |
-| ---: | ---: | --- |
-| 0 | 8 | `[3, 8, 28, 64, 0, 0, 0, 0]`: version, layer-name count, scalar count, macro-name count, reserved zeros |
-| 8 | 112 | 28 uint32 scalar values, as in version 2 |
-| 120 | 192 | Eight layer names, as in version 2 |
-| 312 | variable | 64 records: uint8 length (0–23), then that many bytes of UTF-8 |
-
-The ceiling stays 1,368 bytes, so the 64 names share 992 bytes of text: each
-can be 23 bytes, but not all of them at once. Names contain no NUL, C0
-controls, DEL, overlong or surrogate encodings. The envelope version and the
-payload's first byte must agree. The minimum is 376 bytes, all names empty.
-
-The firmware never reads a name; they are profile data for the app, saved and
-copied to the other half with everything else. The firmware no longer plays
-user macros at all: a version-2 domain's macro records are kept and read back
-as stored, but never run. Their keycodes are gone: `0x7e40..0x7e4f` are now
-custom keys 0–15 (version 5). The app upgrades a profile to version 3 only when a macro is named; any other
-edit keeps the version it read, and a schema-1 profile cannot carry names.
-
-### Version 4: every macro name gets 20 characters
-
-Version 3's names share 992 bytes, so a name's real limit depended on the
-others. Version 4 keeps version 3's layout and makes the limit fixed: each of
-the 64 names is 0–20 bytes of printable ASCII (`0x20`–`0x7e`), and the ceiling
-rises to 1,656 bytes (312 + 64 × 21), so all 64 can be full length at once.
-Accents and emoji are not accepted; a guarantee for them would cost up to four
-bytes a character. Each version keeps its own ceiling: firmware refuses a
-version-3 domain over 1,368 bytes, since that ceiling is what bounds version 3's
-names.
-
-Firmware from 2026-09-23 writes version 4 and still reads versions 2 and 3. The accepted set is defined once, as `NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED`, for both the validator and the store's shape check.
-The app upgrades to version 4 when a macro is named. A stored version-3 name
-keeps its printable ASCII characters, trimmed and cut to 20, and review shows
-any name that changed. The effective settings cache grows to 1,656 bytes, 288
-bytes more static RAM per half; see
-[memory budgets](memory-budgets.md#retired-user-macros-and-streamed-settings-readback--2026-09-23).
-
-### Version 5: custom-key names
-
-The 64 custom keys (`CUSTOM_KEY_n`, action kind 7) are named here, the way the
-macros are: version 5 keeps version 4's layout and follows the 64 macro-name
-records with 64 custom-key name records in the same form, 0–20 bytes of
-printable ASCII each. Header byte 4, zero before, counts them (`64`). The
-ceiling is 3,000 bytes (312 + 128 × 21), so every name fits the domain at full
-length. The whole profile still shares the 5,088-byte ceiling: a profile with 37
-behaviours, 10 combos and eight stored pointing slots leaves room for about 120
-full-length names, and a name edit that meets the ceiling is refused as "the
-profile is full" rather than shortened. A custom key does only what its behaviour row says; its name is profile
-data for the app, which the firmware never reads.
-
-Firmware with the userspace keycode blocks (Profile Wire feature bit 16)
-writes version 5 and still reads versions 2–4. The app upgrades to version 5
-only when a custom key is named; a macro name alone still upgrades to 4. The
-effective settings cache grows to 3,000 bytes, 1,344 bytes more static RAM per
-half.
+The minimum is 440 bytes and the maximum 3,000 bytes. All 128 names fit at
+full length within this domain; the complete profile still shares the 5,088-byte
+ceiling and rejects excess without trimming. Names are profile data for the
+client. Macro content belongs to the bound VIA bank; custom keys execute their
+behavior rows. Validation reads at most one settings byte per step. Retired
+per-mode DPI scalars 10–14 must be zero; mode tuning is in domain `0x50`.
 
 | Scalar ID | Meaning |
 | ---: | --- |
 | 0–3 | Tapping, tap/hold, long-hold and multi-tap timing (ms) |
 | 4–7 | Auto-mouse enabled, layer, timeout (ms), debounce (ms) |
 | 8–9 | Auto-sniping enabled and layer |
-| 10–14 | Dragscroll, volume, brightness, zoom and arrow-mode DPI |
+| 10–14 | Retired per-mode DPI fields, must be zero |
 | 15–16 | Key-feedback flash half-period and auto-mouse fade dead time (ms) |
 | 17 | RGB idle timeout (ms); zero disables it |
 | 18–19 | Actual normal and sniping DPI |
@@ -317,26 +252,23 @@ Physical power-loss acceptance at each durable boundary remains required.
 
 ## Upgrade and acceptance
 
-The bridge retains five-layer VIA geometry and schema-1 reconciliation metadata,
-and the exact deployed compiled-profile digest/action identity. Recognized VIA
-storage survives the firmware build-date change; dirty metadata remains dirty
-for recovery. The eight-layer image uses metadata schema 2 and deliberately
-resets incompatible five-layer geometry. Export on the bridge **before** flashing
-the eight-layer pair, then import the resulting file. The app does not flash.
+Current firmware has eight-layer VIA geometry and synchronization metadata
+schema 3. Older geometry or action vocabulary is incompatible. The old bridge
+is not built or served here: export with matching old firmware, then translate
+the complete backup in the client before restoring through current logical
+Apply. Firmware does not interpret old storage in place.
 
 Host tests validate the app-generated populated payload using the compatibility
 rules of firmware compiled with no behaviours or combos. Tests also cover
 empty overrides, migration, reference rewrites, macro invalidation/retry,
 review conflicts, recovery-file failures and readback mismatches. Browser
-checks exercise naming, moving, saving and reviewing an import. Both standard
-and bridge pairs build. The user reports that the new workflow appears to work
+checks exercise naming, moving, saving and reviewing an import. The current side-specific pair is the supported build. The user reports that the new workflow appears to work
 on their keyboard. Physical bridge/export/upgrade/import, restoration onto
 firmware without authored behaviours or combos, reboot, power loss and USB-role
 changes still require a recorded acceptance matrix. Ark's macro
 builder now reads and edits both device banks through this complete-profile
 restore path. Defaults controls use that path too. Physical acceptance remains
 separate product work.
-
 
 ## Defaults editor
 
@@ -360,7 +292,6 @@ it synchronously applies all lighting values, then restores and saves the final
 enabled state. The renderer cannot run between these operations. This permits
 editing saved colours/effects while lighting stays off and restoring a profile
 whose lighting state differs from the current state.
-
 
 ## Shared editor draft
 

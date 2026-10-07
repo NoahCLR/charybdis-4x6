@@ -54,7 +54,6 @@ static void clear_prepared_push(noah_profile_split_reconciler_t *reconciler) {
     reconciler->prepared_remote_started    = false;
     reconciler->prepared_commit_authorized = false;
     reconciler->prepared_cancel_refused    = false;
-    reconciler->prepared_logical           = false;
     reconciler->prepared_via_generation    = 0u;
     reconciler->prepared_via_digest        = 0u;
     reconciler->abort_deadline             = 0u;
@@ -411,13 +410,11 @@ static void process_prepare_begin(noah_profile_split_reconciler_t *reconciler, c
     if (reconciler->incoming_logical_binding && reconciler->incoming_profile_generation == request->descriptor.generation && reconciler->incoming_profile_digest == request->descriptor.payload_digest) {
         result = noah_profile_peer_store_backend_begin_logical(reconciler->config.peer_store, &request->descriptor, reconciler->incoming_via_generation, reconciler->incoming_via_digest);
     } else {
-        result = noah_profile_peer_store_backend_begin(reconciler->config.peer_store, &request->descriptor);
+        result = NOAH_PROFILE_PEER_STORE_INVALID_METADATA;
     }
-    reconciler->incoming_logical_binding    = false;
-    reconciler->incoming_profile_generation = 0u;
-    reconciler->incoming_profile_digest     = 0u;
-    reconciler->incoming_via_generation     = 0u;
-    reconciler->incoming_via_digest         = 0u;
+    // Retain the correlated bind for repeated BEGINs after a lost ACK or
+    // BUSY. It is replaced by the next bind and can describe only this exact
+    // generation/digest; clearing it would turn a retry into an unbound save.
     store_state                             = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
     if (result == NOAH_PROFILE_PEER_STORE_OK || result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED || (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS && store_state == NOAH_PROFILE_PEER_STORE_RECEIVING)) {
         uint16_t next_offset       = noah_profile_peer_store_backend_next_offset(reconciler->config.peer_store);
@@ -600,7 +597,7 @@ static void process_mailbox(noah_profile_split_reconciler_t *reconciler, noah_pr
     } else if (request.kind == NOAH_PROFILE_SPLIT_V1_ABORT) {
         clear_provisional_peer(reconciler, &request.descriptor);
     }
-    if (mode == NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY && request.kind != NOAH_PROFILE_SPLIT_V1_METADATA && request.kind != NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST && request.kind != NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST && request.kind != NOAH_PROFILE_SPLIT_V1_ABORT) {
+    if (mode == NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY && request.kind != NOAH_PROFILE_SPLIT_V1_METADATA && request.kind != NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST && request.kind != NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST && request.kind != NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND && request.kind != NOAH_PROFILE_SPLIT_V1_ABORT) {
         cache_response(reconciler, request_wire,
                        &(noah_profile_split_v1_frame_t){
                            .kind           = NOAH_PROFILE_SPLIT_V1_ACK,
@@ -842,7 +839,7 @@ static void handle_protocol_error(noah_profile_split_reconciler_t *reconciler, c
         reconciler->prepared_storage_retries++;
         reconciler->transfer_offset       = 0u;
         reconciler->outbound_chunk_length = 0u;
-        reconciler->state                 = reconciler->prepared_logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
+        reconciler->state                 = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND;
         retry_later(reconciler, now);
         publish_authority(reconciler);
         return;
@@ -883,7 +880,7 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
                 // unable to finish or cancel. Resume at the receiver's offset.
                 reconciler->transfer_offset       = 0u;
                 reconciler->outbound_chunk_length = 0u;
-                reconciler->state                 = reconciler->prepared_logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
+                reconciler->state                 = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND;
                 publish_authority(reconciler);
                 break;
             }
@@ -897,12 +894,11 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
             }
             reconciler->transfer_descriptor = reconciler->local_descriptor;
             reconciler->transfer_offset     = 0u;
-            reconciler->prepared_logical    = reconciler->local_descriptor.logical && reconciler->config.local_binding && reconciler->config.local_binding(reconciler->config.local_context, &reconciler->local_descriptor, &reconciler->prepared_via_generation, &reconciler->prepared_via_digest);
-            if (reconciler->local_descriptor.logical && !reconciler->prepared_logical) {
+            if (!reconciler->config.local_binding || !reconciler->config.local_binding(reconciler->config.local_context, &reconciler->local_descriptor, &reconciler->prepared_via_generation, &reconciler->prepared_via_digest)) {
                 stop_with_status(reconciler, NOAH_PROFILE_SPLIT_V1_STATUS_STORAGE_ERROR);
                 break;
             }
-            reconciler->state = reconciler->prepared_logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
+            reconciler->state = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND;
             publish_authority(reconciler);
             break;
         case NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER:
@@ -918,10 +914,9 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
             }
             reconciler->transfer_descriptor     = reconciler->peer_descriptor;
             reconciler->transfer_offset         = 0u;
-            reconciler->prepared_logical        = reconciler->peer_descriptor.logical;
             reconciler->prepared_via_generation = 0u;
             reconciler->prepared_via_digest     = 0u;
-            reconciler->state                   = reconciler->prepared_logical ? NOAH_PROFILE_SPLIT_RECONCILER_PULL_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PULL_BEGIN;
+            reconciler->state                   = NOAH_PROFILE_SPLIT_RECONCILER_PULL_BIND;
             publish_authority(reconciler);
             break;
         case NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE:
@@ -1138,7 +1133,7 @@ static void push_commit(noah_profile_split_reconciler_t *reconciler, uint32_t no
             // already-authorized marker-last commit.
             reconciler->transfer_offset       = 0u;
             reconciler->outbound_chunk_length = 0u;
-            reconciler->state                 = reconciler->prepared_logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
+            reconciler->state                 = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND;
             note_progress(reconciler, now);
             publish_authority(reconciler);
             return;
@@ -1280,7 +1275,7 @@ static void pull_begin(noah_profile_split_reconciler_t *reconciler, uint32_t now
         return;
     }
 
-    result = reconciler->prepared_logical ? noah_profile_peer_store_backend_begin_logical(reconciler->config.peer_store, &reconciler->transfer_descriptor, reconciler->prepared_via_generation, reconciler->prepared_via_digest) : noah_profile_peer_store_backend_begin(reconciler->config.peer_store, &reconciler->transfer_descriptor);
+    result = noah_profile_peer_store_backend_begin_logical(reconciler->config.peer_store, &reconciler->transfer_descriptor, reconciler->prepared_via_generation, reconciler->prepared_via_digest);
     state  = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
 
     if (result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED) {
@@ -1439,7 +1434,7 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
             // when this physical sender becomes master again.
             reconciler->transfer_offset       = 0u;
             reconciler->outbound_chunk_length = 0u;
-            reconciler->state                 = reconciler->prepared_logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
+            reconciler->state                 = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND;
         }
         reconciler->role_known = true;
         reconciler->master     = master;
@@ -1560,15 +1555,15 @@ bool noah_profile_split_reconciler_scan(noah_profile_split_reconciler_t *reconci
     return noah_profile_split_reconciler_scan_mode(reconciler, master, now_ms, NOAH_PROFILE_SPLIT_RECONCILE_FULL);
 }
 
-static bool prepared_push_begin(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read, bool logical, uint32_t via_generation, uint32_t via_digest) {
+bool noah_profile_split_reconciler_prepared_push_begin_logical(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read, uint32_t via_generation, uint32_t via_digest) {
     if (!(reconciler && reconciler->initialized && descriptor && noah_profile_split_descriptor_valid(descriptor) && descriptor->readable && descriptor->has_profile && source_read)) {
         return false;
     }
-    if (logical && (via_generation == 0u || via_digest == 0u)) {
+    if (!descriptor->logical || via_generation == 0u || via_digest == 0u) {
         return false;
     }
     if (reconciler->prepared_push_active) {
-        return descriptor_equal(&reconciler->transfer_descriptor, descriptor) && reconciler->prepared_logical == logical && reconciler->prepared_via_generation == via_generation && reconciler->prepared_via_digest == via_digest;
+        return descriptor_equal(&reconciler->transfer_descriptor, descriptor) && reconciler->prepared_via_generation == via_generation && reconciler->prepared_via_digest == via_digest;
     }
     // The peer may still hold a released push's lease; a second provisional
     // transfer would only meet BUSY. Wait for its cleanup to be confirmed.
@@ -1586,7 +1581,6 @@ static bool prepared_push_begin(noah_profile_split_reconciler_t *reconciler, con
     reconciler->prepared_remote_started    = false;
     reconciler->prepared_commit_authorized = false;
     reconciler->prepared_cancel_refused    = false;
-    reconciler->prepared_logical           = logical;
     reconciler->prepared_via_generation    = via_generation;
     reconciler->prepared_via_digest        = via_digest;
     reconciler->last_status                = NOAH_PROFILE_SPLIT_V1_STATUS_OK;
@@ -1599,17 +1593,9 @@ static bool prepared_push_begin(noah_profile_split_reconciler_t *reconciler, con
     reconciler->last_busy_owner            = 0u;
     reconciler->last_busy_admission        = 0u;
     reconciler->prepared_storage_retries   = 0u;
-    reconciler->state                      = logical ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
+    reconciler->state                      = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND;
     publish_authority(reconciler);
     return true;
-}
-
-bool noah_profile_split_reconciler_prepared_push_begin(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read) {
-    return prepared_push_begin(reconciler, descriptor, source_context, source_read, false, 0u, 0u);
-}
-
-bool noah_profile_split_reconciler_prepared_push_begin_logical(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read, uint32_t via_generation, uint32_t via_digest) {
-    return prepared_push_begin(reconciler, descriptor, source_context, source_read, true, via_generation, via_digest);
 }
 
 bool noah_profile_split_reconciler_prepared_push_ready(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_descriptor_t *descriptor) {

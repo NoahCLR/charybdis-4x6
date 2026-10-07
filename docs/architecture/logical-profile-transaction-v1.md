@@ -1,14 +1,11 @@
 # Logical Profile Transaction V1
 
-> Schema-2 PD extension: side-specific PD-enabled builds keep the v1 HID/split
-> envelope and add domain `0x50` (mask bit 4), profile schema 2.0, RGB v3,
-> settings v2–v5, 32 PD slots stored sparsely (PD v2, D-F09), and a 5,088-byte
-> custom payload ceiling. Logical storage
-> is format 3 (`NR`) with the same VIA generation/digest binding; portable
-> documents are version 2. Existing schema-1/format-2 bridge behavior below
-> remains supported by the app. The exact version/geometry/ABI and legacy GET 9
-> migration contract is in [PD-mode domain v1](pd-mode-domain-v1.md).
-
+> Current firmware accepts only the formats it writes (D-F10): profile schema
+> 2.0; RGB v3, key behaviors v1, combos v2, settings v5 and sparse PD v2;
+> a 5,088-byte custom payload; and logical store format 3 (`NR`). Every save
+> binds a nonzero VIA generation and digest. HID and split framing remain v1.
+> Older profile/store formats and the legacy GET 9 source page are rejected.
+> Backup translation belongs to the client, before a current-format Apply.
 
 ## Purpose
 
@@ -30,15 +27,15 @@ VIA digest; action ABI digest; and storage schema.
 The custom slot header advances to a format that carries the bound VIA identity
 and two marker states: `prepared` and `committed`. The prepared marker is durable
 transaction intent but is never active authority. The committed marker is the
-logical decision record. Existing format-1 records remain readable as unbound
-migration input; the first logical Apply replaces them.
+logical decision record. Format-1 `NP` and format-2 `NQ` records are rejected
+at boot and admission; firmware does not migrate old storage.
 
-Format 2 keeps the 32-byte header and 4,064-byte payload capacity. Its `NQ`
-magic distinguishes it from the legacy `NP` header. It packs domain, origin and
-profile flags into one byte; retains payload CRC32, compiled-default digest and
-action-ABI digest; stores the bound VIA generation and digest; derives the
-canonical payload digest again during validation; protects bytes 0–28 with
-CRC16; and uses byte 31 as the one-byte prepared/committed marker. This preserves
+Format 3 keeps a 32-byte header and 5,088-byte payload capacity. Its `NR`
+magic binds schema 2.0. Byte 2 packs five domain bits (0–4), origin (5),
+profile flags (6), and a reserved zero bit (7). The header retains payload
+CRC32, compiled-default digest and action-ABI digest, and stores the bound VIA
+generation and digest. Validation derives the canonical payload digest again.
+CRC16 protects bytes 0–28; byte 31 is the one-byte prepared/committed marker. This preserves
 firmware-update compatibility checks instead of treating the current firmware's
 identities as if they had been stored with the profile.
 
@@ -55,7 +52,7 @@ progress, and owner error states do not fence output.
 
 ## Why The Peer Is The VIA Staging Copy
 
-The 16 KiB logical EEPROM is fully partitioned. Adding an 8 KiB inactive VIA
+The 18 KiB logical EEPROM is fully partitioned. Adding an 8 KiB inactive VIA
 bank by doubling the RP2040 wear-level backing would also add a 16 KiB RAM cache
 on every half. The physical SRAM can hold that increase, but the current linked
 `.data + .bss` regression policy cannot, and no runtime allocator high-water

@@ -19,7 +19,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DVIA_ENABLE \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x4000u \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x4800u \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \

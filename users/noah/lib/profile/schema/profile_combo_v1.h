@@ -4,20 +4,16 @@
 #include "profile_reader.h"
 #include "profile_versions.h"
 
-// Domain 0x30. Version 1 repeats QMK's one hold threshold on every row and
-// stores every combo window explicitly. Version 2 keeps both combo-wide
-// values once in an eight-byte header: the default window, which a row with
-// window zero follows, and the hold threshold.
+// Domain 0x30 version 2 stores the default window and hold threshold once.
 enum {
-    NOAH_PROFILE_COMBO_V1_HEADER_SIZE = 4u,
     NOAH_PROFILE_COMBO_V2_HEADER_SIZE = 8u,
     NOAH_PROFILE_COMBO_V1_ROW_SIZE    = 28u,
     NOAH_PROFILE_COMBO_V1_MAX_ROWS    = 32u,
     NOAH_PROFILE_COMBO_V1_MAX_INPUTS  = 4u,
     NOAH_PROFILE_COMBO_VERSION        = 2u,
 };
-#define NOAH_PROFILE_COMBO_HEADER_SIZE(version) ((version) >= 2u ? NOAH_PROFILE_COMBO_V2_HEADER_SIZE : NOAH_PROFILE_COMBO_V1_HEADER_SIZE)
-// Payload offset is relative to the enclosing bounded 4,064-byte blob.
+#define NOAH_PROFILE_COMBO_HEADER_SIZE(version) NOAH_PROFILE_COMBO_V2_HEADER_SIZE
+// Payload offset is relative to the enclosing bounded 5,088-byte blob.
 typedef struct {
     uint16_t payload_offset;
     uint8_t  row_count;
@@ -25,19 +21,17 @@ typedef struct {
 } noah_profile_combo_v1_view_t;
 typedef struct {
     uint8_t  row_count;
-    uint16_t default_term_ms; // version 2; zero in version 1, which has none
-    uint16_t hold_term_ms;    // version 2; version 1 carries it on each row
+    uint16_t default_term_ms;
+    uint16_t hold_term_ms;
 } noah_profile_combo_v1_header_t;
 typedef struct {
     uint16_t                 term_ms; // version 2: zero follows the default window
-    uint16_t                 hold_term_ms; // version 1 only
     uint8_t                  input_count;
     uint8_t                  flags;
     noah_profile_action_v1_t output;
     noah_profile_action_v1_t inputs[4];
 } noah_profile_combo_v1_row_t;
 typedef struct {
-    uint16_t hold_term_ms;
     uint8_t  phase, row_index, version;
     uint8_t  bytes[28];
 } noah_profile_combo_v1_validation_t;

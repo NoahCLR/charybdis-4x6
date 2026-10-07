@@ -23,16 +23,10 @@ static void defaults_as(uint8_t version) {
     for (uint8_t i = 0; i < 28; i++)
         for (uint8_t j = 0; j < 4; j++)
             bytes[8 + i * 4 + j] = values[i] >> (j * 8);
-#ifdef NOAH_PD_PROFILE_ENABLE
     memset(bytes + 8 + NOAH_SETTING_DRAGSCROLL_DPI * 4, 0, 5 * 4);
-#endif
 }
 static void defaults(void) {
-#ifdef NOAH_PD_PROFILE_ENABLE
-    defaults_as(2);
-#else
-    defaults_as(1);
-#endif
+    defaults_as(5);
 }
 static bool valid_as(uint8_t envelope) {
     noah_profile_settings_v1_validation_t state = {0};
@@ -44,34 +38,6 @@ static bool valid_as(uint8_t envelope) {
 static bool valid(void) {
     return valid_as(0);
 }
-#ifdef NOAH_PD_PROFILE_ENABLE
-// v3: 64 length-prefixed names after the fixed part, each 0..23 bytes of
-// printable UTF-8, in the same ceiling the user macros had.
-static void test_macro_names(void) {
-    static const char name[] = "Zoom mute";
-    defaults_as(3);
-    assert(valid() && valid_as(3));
-    assert(!valid_as(2)); // the payload must repeat the envelope's version
-    bytes[3] = 16;
-    assert(!valid());
-    defaults_as(3);
-    bytes[NOAH_SETTINGS_FIXED_SIZE] = sizeof(name) - 1;
-    memmove(bytes + NOAH_SETTINGS_FIXED_SIZE + 1 + sizeof(name) - 1, bytes + NOAH_SETTINGS_FIXED_SIZE + 1, 63);
-    memcpy(bytes + NOAH_SETTINGS_FIXED_SIZE + 1, name, sizeof(name) - 1);
-    length = NOAH_SETTINGS_FIXED_SIZE + 64 + sizeof(name) - 1;
-    assert(valid());
-    bytes[NOAH_SETTINGS_FIXED_SIZE + 2] = 0x07; // a control character
-    assert(!valid());
-    bytes[NOAH_SETTINGS_FIXED_SIZE + 2] = 0xc3; // truncated two-byte sequence ...
-    bytes[NOAH_SETTINGS_FIXED_SIZE + 3] = 0x41; // ... followed by ASCII
-    assert(!valid());
-    defaults_as(3);
-    bytes[NOAH_SETTINGS_FIXED_SIZE] = 24; // longer than 23 bytes
-    assert(!valid());
-    defaults_as(3);
-    length--; // only 63 names
-    assert(!valid());
-}
 // Every name (64, or 128 with v5's custom keys) at `size` bytes of `fill`.
 static void names_of(uint8_t version, uint8_t size, char fill) {
     defaults_as(version);
@@ -82,35 +48,29 @@ static void names_of(uint8_t version, uint8_t size, char fill) {
         length += size;
     }
 }
-// v4 guarantees every name 20 printable ASCII characters, all 64 at once.
-static void test_macro_names_v4(void) {
-    defaults_as(4);
-    assert(valid() && valid_as(4) && !valid_as(3));
-    names_of(4, 20, 'A');
-    assert(length == NOAH_SETTINGS_V4_MAX_SIZE && length == 1656);
+static void test_rejects_retired_versions(void) {
+    for (uint8_t version = 0; version <= 6; version++) {
+        defaults_as(version);
+        assert(valid() == (version == NOAH_SETTINGS_VERSION));
+    }
+}
+static void test_macro_name_limits(void) {
+    names_of(5, 20, 'A');
     assert(valid());
     bytes[NOAH_SETTINGS_FIXED_SIZE + 1] = '~';
     bytes[NOAH_SETTINGS_FIXED_SIZE + 2] = ' ';
     assert(valid());
-    bytes[NOAH_SETTINGS_FIXED_SIZE + 1] = 0x7f;
+    const uint8_t rejected[] = {0, 0x1f, 0x7f, 0xc3, 0xff};
+    for (size_t i = 0; i < sizeof(rejected); i++) {
+        bytes[NOAH_SETTINGS_FIXED_SIZE + 1] = rejected[i];
+        assert(!valid());
+    }
+    names_of(5, 20, 'A');
+    bytes[NOAH_SETTINGS_FIXED_SIZE] = 21;
     assert(!valid());
-    bytes[NOAH_SETTINGS_FIXED_SIZE + 1] = 0x1f;
+    defaults_as(5);
+    length--;
     assert(!valid());
-    // Text v3 accepts is not plain ASCII, so v4 refuses it.
-    names_of(4, 2, 'A');
-    bytes[NOAH_SETTINGS_FIXED_SIZE + 1] = 0xc3;
-    bytes[NOAH_SETTINGS_FIXED_SIZE + 2] = 0xa9;
-    assert(!valid());
-    bytes[0] = 3;
-    assert(valid());
-    names_of(4, 20, 'A');
-    bytes[NOAH_SETTINGS_FIXED_SIZE] = 21; // one name past 20
-    assert(!valid());
-    // v3 keeps its own 1,368-byte ceiling, which is also what bounds its names.
-    names_of(3, 20, 'A');
-    assert(!valid());
-    names_of(3, 15, 'A');
-    assert(length <= NOAH_SETTINGS_V3_MAX_SIZE && valid());
 }
 // v5 adds 64 custom-key names after the macro names, each under the v4 rule,
 // so the domain's worst case is 128 names of 20 characters.
@@ -152,20 +112,17 @@ static void test_custom_key_names_v5(void) {
     assert(noah_effective_settings_length() == length);
     assert(noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 64) == 2 && noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 66) == 'K');
 }
-#endif
 int main(void) {
     defaults();
     assert(valid());
     bytes[0] = NOAH_SETTINGS_VERSION == 1 ? 2 : 1;
     assert(!valid());
     defaults();
-#ifdef NOAH_PD_PROFILE_ENABLE
     for (uint8_t id = NOAH_SETTING_DRAGSCROLL_DPI; id <= NOAH_SETTING_ARROW_DPI; id++) {
         bytes[8 + id * 4] = 1;
         assert(!valid());
         bytes[8 + id * 4] = 0;
     }
-#endif
     bytes[8 + 4 * 4] = 2;
     assert(!valid());
     defaults();
@@ -203,12 +160,11 @@ int main(void) {
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 99);
     assert(!noah_effective_settings_length() && !noah_effective_settings_byte(0));
     assert(applied == 1);
-#ifdef NOAH_PD_PROFILE_ENABLE
-    test_macro_names();
-    test_macro_names_v4();
+    test_rejects_retired_versions();
+    test_macro_name_limits();
     test_custom_key_names_v5();
-    // A v3 domain's names read back as stored.
-    defaults_as(3);
+    // Current names read back as stored.
+    defaults_as(5);
     bytes[NOAH_SETTINGS_FIXED_SIZE + 5]  = 2;
     bytes[NOAH_SETTINGS_FIXED_SIZE + 6]  = 'O';
     bytes[NOAH_SETTINGS_FIXED_SIZE + 7]  = 'K';
@@ -220,6 +176,5 @@ int main(void) {
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 200);
     assert(noah_effective_settings_length() == length);
     assert(noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 5) == 2 && noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 7) == 'K');
-#endif
     puts("portable settings validation and publication tests passed");
 }

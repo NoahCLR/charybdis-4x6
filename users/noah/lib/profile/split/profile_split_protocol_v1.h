@@ -26,7 +26,7 @@ typedef enum {
     // pull a newer durable profile from the sibling without making USB role
     // part of authority. The response is a correlated PAYLOAD_CHUNK.
     NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST = 8u,
-    // Carries the VIA identity bound to a format-2 custom record. It is sent
+    // Carries the VIA identity bound to a format-3 custom record. It is sent
     // before PREPARE_BEGIN so the peer can write the exact same slot header.
     NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND = 9u,
     // Validates the received payload and persists only the prepared marker.

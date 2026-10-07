@@ -199,22 +199,11 @@
 // layout contract validates these exact inclusive address ranges without
 // reading or writing them.
 #    if defined(MCU_RP)
-#        ifdef NOAH_PD_PROFILE_ENABLE
-#            define WEAR_LEVELING_BACKING_SIZE 36864
-#        else
-// Host schema-1 compatibility fixtures only; rules.mk rejects old firmware.
-#            define WEAR_LEVELING_BACKING_SIZE 32768
-#        endif
+#        define WEAR_LEVELING_BACKING_SIZE 36864
 #    endif
 #    define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR 0x1FFFu
 #    define NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR 0x2000u
-#    ifdef NOAH_PD_PROFILE_ENABLE
-#        define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x33FFu
-#        define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x3400u
-#        define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x47FFu
-#    else
-#        define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x2FFFu
-#        define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x3000u
-#        define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x3FFFu
-#    endif
+#    define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x33FFu
+#    define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x3400u
+#    define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x47FFu
 #endif

@@ -8,6 +8,9 @@
 
 static void test_candidate_capacity(void) {
     uint8_t frame[32] = {NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET, NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, 1, 0, 2, 0, 31};
+    frame[23]         = NOAH_PROFILE_LOGICAL_STORE_VERSION;
+    frame[24]         = 6;
+    frame[28]         = 42;
     noah_profile_candidate_v1_command_t command;
     noah_profile_candidate_v1_frame_error_t error;
     // Schema 2 advertises 5,088 bytes: admission must accept the whole range,

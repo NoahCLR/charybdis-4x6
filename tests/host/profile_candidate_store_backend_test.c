@@ -17,8 +17,8 @@ static uint32_t      eeprom_write_calls;
 static uint16_t      eeprom_last_read_length;
 static uint16_t      eeprom_last_write_length;
 static uint32_t      safe_boundary_reasons;
-static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 1u, 0u, 0u, 1u};
-static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x01\x00\x01\x01\x20\x01\x3a\x00\x02\x03\x00\x00"
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x02\x00\x01\x01\x20\x01\x3a\x00\x02\x03\x00\x00"
                                           "\x20\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02\x00\x02"
                                           "\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00\x0a\x00\x02\x00\x03\x00"
                                           "\x03\x00\x12\x00\x04\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x01"
@@ -57,14 +57,17 @@ static noah_profile_candidate_v1_metadata_t metadata_for(const uint8_t *payload,
     uint32_t crc = noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, payload, length);
 
     return (noah_profile_candidate_v1_metadata_t){
-        .schema_major      = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
-        .schema_minor      = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR,
-        .requested_domains = 0u,
-        .flags             = 0u,
-        .payload_length    = length,
-        .crc32             = noah_profile_crc32_finish(crc),
-        .digest            = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, payload, length),
-        .action_abi_digest = ACTION_ABI_DIGEST,
+        .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
+        .via_generation       = 6u,
+        .via_digest           = UINT32_C(0xabcdef01),
+        .schema_major         = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
+        .schema_minor         = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR,
+        .requested_domains    = 0u,
+        .flags                = 0u,
+        .payload_length       = length,
+        .crc32                = noah_profile_crc32_finish(crc),
+        .digest               = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, payload, length),
+        .action_abi_digest    = ACTION_ABI_DIGEST,
     };
 }
 
@@ -95,6 +98,9 @@ static void transaction_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], u
         store_u32(&frame[11], metadata->crc32);
         store_u32(&frame[15], metadata->digest);
         store_u32(&frame[19], metadata->action_abi_digest);
+        frame[23] = metadata->store_format_version;
+        store_u32(&frame[24], metadata->via_generation);
+        store_u32(&frame[28], metadata->via_digest);
     } else if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK) {
         store_u16(&frame[5], 0u);
         frame[7] = metadata->payload_length;
@@ -437,7 +443,7 @@ static void test_scan_owner_composes_bounded_commit_and_safe_activation(void) {
     init_backend(&backend, &store, &provider, init_provider(&provider));
     interface     = noah_profile_candidate_store_backend_interface(&backend);
     compatibility = (noah_profile_candidate_compatibility_t){
-        .schema_major          = 1u,
+        .schema_major          = 2u,
         .schema_minor          = 0u,
         .supported_domain_mask = 0u,
         .max_payload_length    = NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE,
@@ -582,6 +588,9 @@ static void test_only_staged_candidates_are_held_to_the_candidate_runtime(void) 
     // The other half's committed record, arriving as a peer candidate, keeps
     // the compatibility's own runtime.
     noah_profile_store_candidate_t peer = {
+        .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
+        .via_generation          = 6u,
+        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -636,6 +645,9 @@ static void test_override_disabled_commit_activates_compiled_fallback(void) {
     assert(status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
 
     reset = (noah_profile_store_candidate_t){
+        .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
+        .via_generation          = 6u,
+        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -675,6 +687,9 @@ static void test_host_and_peer_share_one_explicit_admission_lease(void) {
     init_backend(&backend, &store, &provider, compiled_digest);
     interface = noah_profile_candidate_store_backend_interface(&backend);
     exact     = (noah_profile_store_candidate_t){
+        .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
+        .via_generation          = 6u,
+        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -719,6 +734,9 @@ static void test_owner_activation_api_checks_lease_and_exposes_exact_commit(void
     init_backend(&backend, &store, &provider, compiled_digest);
     interface = noah_profile_candidate_store_backend_interface(&backend);
     exact     = (noah_profile_store_candidate_t){
+        .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
+        .via_generation          = 6u,
+        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,

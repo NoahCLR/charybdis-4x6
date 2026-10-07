@@ -127,6 +127,7 @@ static void initialize_live_owner_status(void) {
     live_owner_status.has_pending               = true;
     live_owner_status.safe_boundary_reason_mask = 1u;
     live_owner_status.committed                 = (noah_profile_split_descriptor_t){
+        .logical        = true,
         .generation     = 7u,
         .payload_digest = UINT32_C(0x31323334),
         .origin_half    = 1u,
@@ -141,6 +142,7 @@ static void initialize_live_owner_status(void) {
     live_owner_status.candidate_pending             = true;
     live_owner_status.last_committed_transaction_id = UINT16_C(0x5152);
     live_owner_status.peer                          = (noah_profile_split_descriptor_t){
+        .logical     = true,
         .generation  = 9u,
         .origin_half = 0u,
         .readable    = true,

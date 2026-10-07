@@ -13,7 +13,6 @@
 #    include "../profile/runtime/effective_settings_runtime.h"
 #    include "../profile/storage/profile_checksum.h"
 #    include "../profile/storage/profile_store_runtime.h"
-#    include "../profile/schema/profile_pd_v1.h"
 
 // Cold readback workspace, never used by key events or RGB rendering.
 void noah_qmk_portable_storage_init(void) {
@@ -41,9 +40,7 @@ static void u32(uint8_t *p, uint32_t v) {
         p[i] = v >> (8 * i);
 }
 static uint32_t setting_default(uint8_t id) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     if (id >= NOAH_SETTING_DRAGSCROLL_DPI && id <= NOAH_SETTING_ARROW_DPI) return 0;
-#endif
     switch (id) {
         case NOAH_SETTING_TAPPING_TERM:
             return TAPPING_TERM;
@@ -65,16 +62,6 @@ static uint32_t setting_default(uint8_t id) {
             return 1;
         case NOAH_SETTING_AUTO_SNIPING_LAYER:
             return CHARYBDIS_AUTO_SNIPING_LAYER;
-        case NOAH_SETTING_DRAGSCROLL_DPI:
-            return CHARYBDIS_DRAGSCROLL_DPI;
-        case NOAH_SETTING_VOLUME_DPI:
-            return PD_MODE_VOLUME_DPI;
-        case NOAH_SETTING_BRIGHTNESS_DPI:
-            return PD_MODE_BRIGHTNESS_DPI;
-        case NOAH_SETTING_ZOOM_DPI:
-            return PD_MODE_ZOOM_DPI;
-        case NOAH_SETTING_ARROW_DPI:
-            return PD_MODE_ARROW_DPI;
         case NOAH_SETTING_FEEDBACK_PERIOD:
             return RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS;
         case NOAH_SETTING_AUTO_MOUSE_DEAD_TIME:
@@ -116,11 +103,7 @@ _Static_assert(NOAH_MACRO_NAME_SIZE == NOAH_SETTINGS_MACRO_NAME_ASCII_MAX + 1u, 
 _Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_SETTINGS_CUSTOM_KEY_NAMES, "Settings name every custom key");
 enum { LAYER_NAMES_OFFSET = 8u + NOAH_SETTINGS_COUNT * 4u };
 // Name records after the fixed part: the macros' (v3), then the custom keys' (v5).
-#if NOAH_PROFILE_SETTINGS_VERSION >= 5u
 enum { NAME_RECORDS = NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES, CUSTOM_KEY_NAME_HEADER = NOAH_SETTINGS_CUSTOM_KEY_NAMES };
-#else
-enum { NAME_RECORDS = NOAH_SETTINGS_MACRO_NAMES, CUSTOM_KEY_NAME_HEADER = 0 };
-#endif
 static uint8_t name_length(const char *name, uint8_t max) {
     uint8_t length = 0;
     while (length < max && name[length])
@@ -128,9 +111,7 @@ static uint8_t name_length(const char *name, uint8_t max) {
     return length;
 }
 static const char *record_name(uint8_t record) {
-#if NOAH_PROFILE_SETTINGS_VERSION >= 5u
     if (record >= NOAH_SETTINGS_MACRO_NAMES) return custom_key_names[record - NOAH_SETTINGS_MACRO_NAMES];
-#endif
     return via_macro_names[record];
 }
 static uint8_t record_name_length(uint8_t record) {
@@ -142,14 +123,10 @@ static uint8_t record_name_length(uint8_t record) {
 static uint16_t settings_length(void) {
     uint16_t length = noah_effective_settings_length();
     if (length) return length;
-#if NOAH_PROFILE_SETTINGS_VERSION >= 3u
     length = NOAH_SETTINGS_FIXED_SIZE + NAME_RECORDS;
     for (uint8_t record = 0; record < NAME_RECORDS; record++)
         length += record_name_length(record);
     return length;
-#else
-    return NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACROS * 2u;
-#endif
 }
 static uint8_t settings_byte(uint16_t offset) {
     if (offset >= 8u && offset < LAYER_NAMES_OFFSET) {
@@ -160,13 +137,8 @@ static uint8_t settings_byte(uint16_t offset) {
     }
     if (noah_effective_settings_length()) return noah_effective_settings_byte(offset);
     // No profile settings are live: the current version with the keymap's
-    // layer, macro (v3) and custom-key (v5) names, or its layer names and
-    // every user macro empty (v1).
-#if NOAH_PROFILE_SETTINGS_VERSION >= 3u
+    // layer, macro and custom-key names.
     const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, CUSTOM_KEY_NAME_HEADER, 0, 0, 0};
-#else
-    const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACROS, 0, 0, 0, 0};
-#endif
     if (offset < 8u) return header[offset];
     if (offset < NOAH_SETTINGS_FIXED_SIZE) {
         offset -= LAYER_NAMES_OFFSET;
@@ -175,7 +147,6 @@ static uint8_t settings_byte(uint16_t offset) {
         // Zero padded after the name, whatever the array holds there.
         return byte < name_length(name, NOAH_SETTINGS_NAME_BYTES - 1u) ? (uint8_t)name[byte] : 0u;
     }
-#if NOAH_PROFILE_SETTINGS_VERSION >= 3u
     offset -= NOAH_SETTINGS_FIXED_SIZE;
     // Reads run forward, so resume from the record the last byte was in; the
     // authored names never change, so the cursor stays valid across reads.
@@ -191,43 +162,17 @@ static uint8_t settings_byte(uint16_t offset) {
         cursor_start += length + 1u;
     }
     cursor_record = NAME_RECORDS;
-#endif
     return 0u;
 }
-#ifndef NOAH_PD_PROFILE_ENABLE
-// The bridge's legacy pointing source is encoded once, at page 0, in the
-// retired fixed eight-slot version 1 that schema-1 clients read.
-static uint8_t  snapshot[NOAH_PROFILE_PD_V1_LEGACY_SIZE];
-static uint16_t snapshot_length;
-static bool     capture_legacy_pd(void) {
-    const uint8_t header[8] = {NOAH_PROFILE_PD_V1_LEGACY_VERSION, NOAH_PROFILE_PD_V1_LEGACY_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0, 0, 0, 0, 0};
-    memcpy(snapshot, header, 8);
-    snapshot_length = NOAH_PROFILE_PD_V1_LEGACY_SIZE;
-    for (uint8_t id = 0; id < NOAH_PROFILE_PD_V1_LEGACY_SLOT_COUNT; id++) {
-        uint8_t *record = snapshot + 8 + (size_t)id * 96;
-        noah_profile_pd_v1_encode_record(&noah_pd_defaults[id], record);
-
-    }
-    return noah_profile_pd_v1_validate_legacy(snapshot, snapshot_length, NULL) == NOAH_PROFILE_PD_V1_OK;
-}
-#endif
 // Up to 25 readback bytes of `kind` from `offset`; 0 past the end.
 static uint8_t readback_fill(uint8_t kind, uint16_t offset, uint8_t *target) {
-#ifndef NOAH_PD_PROFILE_ENABLE
-    uint16_t length = kind == 7 ? settings_length() : snapshot_length;
-#else
     uint16_t length = settings_length();
     (void)kind;
-#endif
     if (offset >= length) return 0;
     uint16_t remaining = (uint16_t)(length - offset);
     uint8_t  count     = remaining < 25u ? (uint8_t)remaining : 25u;
     for (uint8_t i = 0; i < count; i++)
-#ifndef NOAH_PD_PROFILE_ENABLE
-        target[i] = kind == 7 ? settings_byte(offset + i) : snapshot[offset + i];
-#else
         target[i] = settings_byte(offset + i);
-#endif
     return count;
 }
 void noah_qmk_portable_apply(void) {
@@ -256,11 +201,7 @@ void noah_qmk_portable_apply(void) {
     eeconfig_update_keymap(&keymap_config);
 }
 bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
-    if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8
-#ifndef NOAH_PD_PROFILE_ENABLE
-        && frame[2] != 9
-#endif
-        )) return false;
+    if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8)) return false;
     bool malformed = !frame[3];
     for (uint8_t i = 5; i < 32; i++)
         malformed |= frame[i] != 0;
@@ -288,13 +229,6 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
         u16(p + 23, s.conflict_count);
         frame[6] = 25;
     } else if (!frame[4]) {
-#ifndef NOAH_PD_PROFILE_ENABLE
-        if (frame[2] == 9 && !capture_legacy_pd()) {
-            snapshot_length = 0;
-            frame[5]        = 3;
-            return true;
-        }
-#endif
         uint16_t length = 0;
         uint32_t crc = NOAH_PROFILE_CRC32_INITIAL, fnv = NOAH_PROFILE_FNV1A_INITIAL;
         uint8_t  chunk[25];

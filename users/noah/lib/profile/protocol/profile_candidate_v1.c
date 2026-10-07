@@ -138,9 +138,6 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
         if (metadata->payload_length < NOAH_PROFILE_CANDIDATE_V1_MIN_BLOB_SIZE || metadata->payload_length > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 9u);
         }
-        if (metadata->store_format_version == 0u) {
-            return require_zero(frame, 24u, NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);
-        }
         if (metadata->store_format_version != NOAH_PROFILE_LOGICAL_STORE_VERSION) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 23u);
         }

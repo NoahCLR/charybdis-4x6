@@ -2,9 +2,7 @@
 #include <string.h>
 
 bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     if (id >= NOAH_SETTING_DRAGSCROLL_DPI && id <= NOAH_SETTING_ARROW_DPI) return v == 0;
-#endif
     switch (id) {
         case NOAH_SETTING_FEEDBACK_PERIOD:
             return v > 0 && v <= 65535;
@@ -37,103 +35,19 @@ bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
             return id < NOAH_SETTINGS_COUNT && v <= 65535;
     }
 }
-static bool key(uint8_t v) {
-    return (v >= 4 && v <= 0xa4) || (v >= 0xe0 && v <= 0xe7);
-}
-static bool ir_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
-    if (!s->opcode) {
-        if (b < 1 || b > 5) return false;
-        s->opcode    = b;
-        s->remaining = b == 2 ? 2 : 0;
-        s->tap_count = 0;
-        return true;
-    }
-    if (s->opcode == 2) {
-        if (!--s->remaining) s->opcode = 0;
-        return true;
-    }
-    if (s->opcode == 3 || s->opcode == 4) {
-        if (!key(b)) return false;
-        uint8_t i = 0;
-        while (i < s->held_count && s->held[i] != b)
-            i++;
-        if (s->opcode == 3) {
-            if (i != s->held_count || s->held_count == 16) return false;
-            s->held[s->held_count++] = b;
-        } else {
-            if (i == s->held_count) return false;
-            memmove(&s->held[i], &s->held[i + 1], s->held_count - i - 1);
-            s->held_count--;
-        }
-        s->opcode = 0;
-        return true;
-    }
-    if (!s->remaining) {
-        if (!b || (s->opcode == 5 && b > 16)) return false;
-        s->remaining = b;
-        return true;
-    }
-    if (s->opcode == 1) {
-        if (!(b == 9 || b == 10 || (b >= 32 && b <= 126))) return false;
-    } else {
-        if (!key(b)) return false;
-        for (uint8_t i = 0; i < s->tap_count; i++)
-            if (s->tap[i] == b) return false;
-        for (uint8_t i = 0; i < s->held_count; i++)
-            if (s->held[i] == b) return false;
-        s->tap[s->tap_count++] = b;
-    }
-    if (!--s->remaining) s->opcode = 0;
-    return true;
-}
-// One byte of printable UTF-8: no NUL, controls or DEL, no overlong or
-// surrogate encodings.
-static bool utf8_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
-    if (s->utf8_remaining) {
-        if (b < s->utf8_min || b > s->utf8_max) return false;
-        s->utf8_remaining--;
-        s->utf8_min = 0x80;
-        s->utf8_max = 0xbf;
-        return true;
-    }
-    if (b < 0x20 || b == 0x7f) return false;
-    if (b < 0x80) return true;
-    s->utf8_min = 0x80;
-    s->utf8_max = 0xbf;
-    if (b >= 0xc2 && b <= 0xdf)
-        s->utf8_remaining = 1;
-    else if (b >= 0xe0 && b <= 0xef) {
-        s->utf8_remaining = 2;
-        if (b == 0xe0) s->utf8_min = 0xa0;
-        if (b == 0xed) s->utf8_max = 0x9f;
-    } else if (b >= 0xf0 && b <= 0xf4) {
-        s->utf8_remaining = 3;
-        if (b == 0xf0) s->utf8_min = 0x90;
-        if (b == 0xf4) s->utf8_max = 0x8f;
-    } else
-        return false;
-    return true;
-}
-// v3: one byte of the 64 length-prefixed VIA macro names; v5 continues with
-// the 64 custom-key names, one slot count past them.
-static uint8_t name_slots(uint8_t version) {
-    return version >= 5u ? NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES : version >= 3u ? NOAH_SETTINGS_MACRO_NAMES : NOAH_SETTINGS_MACROS;
-}
 static bool macro_name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
-    if (s->slot >= name_slots(s->version)) return false;
+    if (s->slot >= NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES) return false;
     if (!s->macro_offset) {
-        if (b > (s->version >= 4u ? NOAH_SETTINGS_MACRO_NAME_ASCII_MAX : NOAH_SETTINGS_MACRO_NAME_MAX)) return false;
-        s->macro_length   = b;
-        s->utf8_remaining = 0;
+        if (b > NOAH_SETTINGS_MACRO_NAME_ASCII_MAX) return false;
+        s->macro_length = b;
         if (b)
             s->macro_offset = 1;
         else
             s->slot++;
         return true;
     }
-    if (s->version >= 4u ? b < 0x20 || b > 0x7e : !utf8_byte(s, b)) return false;
+    if (b < 0x20 || b > 0x7e) return false;
     if (s->macro_offset++ == s->macro_length) {
-        if (s->utf8_remaining) return false;
         s->slot++;
         s->macro_offset = 0;
     }
@@ -173,19 +87,17 @@ static bool name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b, uint8
     return column != 23 || s->name_ended;
 }
 bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, uint8_t b, uint16_t length, uint8_t layers) {
-    if (!s || length < NOAH_SETTINGS_FIXED_SIZE + 32 || length > NOAH_SETTINGS_MAX_SIZE || s->offset >= length) return false;
+    if (!s || length < NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES || length > NOAH_SETTINGS_MAX_SIZE || s->offset >= length) return false;
     uint16_t offset = s->offset++;
     if (offset < 8) {
         static const uint8_t header[8] = {0, 8, 28, 0, 0, 0, 0, 0};
         if (!offset) {
             if (!NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(b) || (s->expected_version && b != s->expected_version)) return false;
-            // Each version keeps its own ceiling: v3's also bounds its names.
-            if (length > (b >= 5u ? NOAH_SETTINGS_V5_MAX_SIZE : b >= 4u ? NOAH_SETTINGS_V4_MAX_SIZE : NOAH_SETTINGS_V3_MAX_SIZE)) return false;
             s->version = b;
             return true;
         }
-        if (offset == 3) return b == (s->version >= 3u ? NOAH_SETTINGS_MACRO_NAMES : NOAH_SETTINGS_MACROS);
-        if (offset == 4) return b == (s->version >= 5u ? NOAH_SETTINGS_CUSTOM_KEY_NAMES : 0u);
+        if (offset == 3) return b == NOAH_SETTINGS_MACRO_NAMES;
+        if (offset == 4) return b == NOAH_SETTINGS_CUSTOM_KEY_NAMES;
         return b == header[offset];
     }
     if (offset < 8 + 28 * 4) {
@@ -202,28 +114,8 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
         return true;
     }
     if (offset < NOAH_SETTINGS_FIXED_SIZE) return name_byte(s, b, (offset - 120) % 24);
-    if (s->version >= 3u) return macro_name_byte(s, b);
-    if (s->slot >= 16) return false;
-    if (s->macro_offset < 2) {
-        if (!s->macro_offset)
-            s->macro_length = b;
-        else {
-            s->macro_length |= (uint16_t)b << 8;
-            s->macro_total += s->macro_length;
-            if (s->macro_length > 512 || s->macro_total > 1024) return false;
-        }
-        s->macro_offset++;
-    } else {
-        if (!ir_byte(s, b)) return false;
-        s->macro_offset++;
-    }
-    if (s->macro_offset == s->macro_length + 2) {
-        if (s->opcode || s->held_count) return false;
-        s->slot++;
-        s->macro_offset = 0;
-    }
-    return true;
+    return macro_name_byte(s, b);
 }
 bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *s, uint16_t length) {
-    return s && s->offset == length && s->slot == name_slots(s->version) && !s->macro_offset;
+    return s && s->offset == length && s->slot == NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES && !s->macro_offset;
 }

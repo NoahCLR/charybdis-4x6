@@ -5,7 +5,9 @@ The documented import translation (docs/architecture/portable-profile-v1.md):
 PD domain 0x50 version 1 becomes sparse version 2 by dropping each disabled
 record without a name, and RGB domain 0x10 version 2 becomes version 3 by
 adding an uncoloured PD row (h=0, s=0, v=0, right half) for slots 8..31.
-Every other byte is kept. Test tooling: the firmware never translates.
+Combo v1 becomes v2 using a 60 ms default window and its shared hold
+threshold; row hold fields become reserved zero. Settings must already be
+v5. Test tooling: the firmware never translates.
 """
 import struct
 import sys
@@ -38,6 +40,19 @@ def translate_pd(payload: bytes) -> bytes:
     return bytes([2, 32, 96, len(kept), 0, 0, 0, 0]) + b"".join(kept)
 
 
+def translate_combos(payload: bytes) -> bytes:
+    count = payload[0]
+    if payload[1:4] != b"\0\0\0" or len(payload) != 4 + count * 28:
+        raise ValueError("expected a combo v1 domain")
+    rows = [bytearray(payload[4 + 28 * i:4 + 28 * (i + 1)]) for i in range(count)]
+    hold = struct.unpack_from("<H", rows[0], 4)[0] if rows else 200
+    for row in rows:
+        if struct.unpack_from("<H", row, 4)[0] != hold:
+            raise ValueError("inconsistent combo hold thresholds")
+        row[4:6] = b"\0\0"
+    return payload[:4] + struct.pack("<HH", 60, hold) + b"".join(rows)
+
+
 def translate(blob: bytes) -> bytes:
     if blob[:4] != b"NLP1" or blob[4] != 2:
         raise ValueError("expected a schema-2 profile blob")
@@ -49,6 +64,10 @@ def translate(blob: bytes) -> bytes:
             payload, version = translate_rgb(payload), 3
         elif domain == PD_DOMAIN and version == 1:
             payload, version = translate_pd(payload), 2
+        elif domain == 0x30 and version == 1:
+            payload, version = translate_combos(payload), 2
+        elif domain == 0x40 and version != 5:
+            raise ValueError("current fixture requires settings v5")
         out += bytes([domain, version]) + struct.pack("<H", len(payload)) + payload
         offset += 4 + length
     if offset != len(blob):

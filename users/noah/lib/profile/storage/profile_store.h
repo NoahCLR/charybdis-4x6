@@ -10,10 +10,6 @@
 #include "../schema/profile_versions.h"
 
 enum {
-    NOAH_PROFILE_STORE_FORMAT_VERSION_LEGACY  = 1u,
-    NOAH_PROFILE_STORE_FORMAT_VERSION_LOGICAL = 2u,
-    // Schema-2 PD owners and their host/split writers select format 3.
-    NOAH_PROFILE_STORE_FORMAT_VERSION_PD      = 3u,
     NOAH_PROFILE_STORE_FORMAT_VERSION         = NOAH_PROFILE_LOGICAL_STORE_VERSION,
     NOAH_PROFILE_STORE_SCHEMA_MAJOR           = NOAH_PROFILE_SCHEMA_MAJOR,
     NOAH_PROFILE_STORE_SCHEMA_MINOR           = 0u,
@@ -135,9 +131,7 @@ typedef struct {
 } noah_profile_store_record_t;
 
 typedef struct {
-    // Zero keeps legacy format 1 for old callers. Logical transactions select
-    // format 2 (schema 1) or format 3 (schema 2), both with a nonzero VIA
-    // generation and digest. Format 3 is not yet enabled by runtime writers.
+    // Format 3 is required, with a nonzero VIA generation and digest.
     uint8_t format_version;
     uint8_t schema_major;
     uint8_t schema_minor;

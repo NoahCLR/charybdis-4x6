@@ -27,8 +27,9 @@ cp "$ROOT/tests/fixtures/client-regression/portable.bin.fixture" "$BUILD_DIR/por
 # 32-slot translation (RGB v3, sparse PD v2).
 for suffix in .pd .pd3 .pd4 .pd5; do
     cp "$ROOT/tests/fixtures/client-regression/portable.bin$suffix" "$BUILD_DIR/portable.bin$suffix"
-    python3 "$ROOT/tests/host/translate_eight_slot_profile.py" "$BUILD_DIR/portable.bin$suffix" "$BUILD_DIR/portable32.bin$suffix"
 done
+# Keep the integrated populated fixture on the one accepted settings version.
+python3 "$ROOT/tests/host/translate_eight_slot_profile.py" "$BUILD_DIR/portable.bin.pd5" "$BUILD_DIR/portable32.bin.pd5"
 
 build_and_run() {
     name="$1"
@@ -72,13 +73,13 @@ build_and_run() {
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" ${NOAH_WRITE_PD_FIXTURE:+--write-fixture}
         for suffix in .pd .pd3 .pd4 .pd5; do
             "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --reject-profile "$BUILD_DIR/portable.bin$suffix"
-            "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable32.bin$suffix"
         done
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable32.bin.pd5"
         if [ -n "${NOAH_TEST_PD_IMPORT:-}" ]; then
             "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$NOAH_TEST_PD_IMPORT"
         fi
     elif [ "$name" = empty ]; then
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --empty-profile "$BUILD_DIR/portable32.bin.pd"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --empty-profile "$BUILD_DIR/portable32.bin.pd5"
     fi
 }
 

@@ -255,7 +255,9 @@ int main(void) {
         assert(++total_steps < MAX_VALIDATION_STEPS);
     }
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
-    assert(profile_length * 4u >= NOAH_PROFILE_BLOB_V1_MAX_SIZE * 3u);
+    // Maximum behavior workload stays 64 rows / 128 steps (3,216 bytes),
+    // even though current storage has grown to 5,088 bytes.
+    assert(profile_length == 3216u && profile_length <= NOAH_PROFILE_BLOB_V1_MAX_SIZE);
     assert(validator.profile.key_behaviors.row_count == TEST_ROW_COUNT);
     assert(validator.profile.key_behaviors.populated_step_count == TEST_STEP_COUNT);
 

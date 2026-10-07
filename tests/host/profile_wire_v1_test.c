@@ -11,7 +11,7 @@ static const noah_profile_wire_v1_read_service_t service = {
     .capabilities =
         {
             .protocol_major               = 1u,
-            .schema_major                 = 1u,
+            .schema_major                 = 2u,
             .candidate_chunk_max          = 0u,
             .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH,
             .action_abi_digest            = UINT32_C(0x12345678),
@@ -30,10 +30,10 @@ static const noah_profile_wire_v1_read_service_t service = {
             .led_bitmap_size              = 8u,
             .custom_key_slots             = 64u,
             .via_macro_slots              = 64u,
-            .max_profile_payload          = 4064u,
-            .profile_slot_payload         = 4064u,
-            .profile_slot_size            = 4096u,
-            .via_macro_bytes              = 7551u,
+            .max_profile_payload          = 5088u,
+            .profile_slot_payload         = 5088u,
+            .profile_slot_size            = 5120u,
+            .via_macro_bytes              = 7191u,
             .supported_domain_mask        = 3u,
         },
     .status =
@@ -129,7 +129,7 @@ static void test_capability_pages(void) {
     assert_golden("capabilities-page-0-response", frame);
     assert_success(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x41u, 0u);
     assert(frame[7] == 1u && frame[8] == 2u);
-    assert(frame[9] == 1u && frame[11] == 1u);
+    assert(frame[9] == 1u && frame[11] == 2u);
     assert(frame[13] == 32u && frame[14] == 0u && frame[15] == 2u);
     assert(frame[16] == 0x1Fu && frame[17] == 0x0Cu && frame[18] == 0u && frame[19] == 0u);
 
@@ -139,9 +139,9 @@ static void test_capability_pages(void) {
     assert_golden("capabilities-page-1-response", frame);
     assert_success(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x42u, 1u);
     assert(frame[7] == 5u && frame[8] == 8u && frame[9] == 64u && frame[10] == 5u);
-    assert(frame[20] == 0xE0u && frame[21] == 0x0Fu);
-    assert(frame[24] == 0x00u && frame[25] == 0x10u);
-    assert(frame[26] == 0x7Fu && frame[27] == 0x1Du);
+    assert(frame[20] == 0xE0u && frame[21] == 0x13u);
+    assert(frame[24] == 0x00u && frame[25] == 0x14u);
+    assert(frame[26] == 0x17u && frame[27] == 0x1Cu);
     assert(frame[28] == 3u && frame[29] == 0u && frame[30] == 0u && frame[31] == 0u);
 }
 

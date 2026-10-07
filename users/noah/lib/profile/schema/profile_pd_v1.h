@@ -15,12 +15,6 @@ enum {
     NOAH_PROFILE_PD_V1_NAME_SIZE   = 24,
     // Every slot present: the largest payload a version-2 domain can have.
     NOAH_PROFILE_PD_V1_MAX_SIZE = NOAH_PROFILE_PD_V1_HEADER_SIZE + NOAH_PROFILE_PD_V1_SLOT_COUNT * NOAH_PROFILE_PD_V1_RECORD_SIZE,
-    // The retired fixed eight-slot version 1 (776 bytes, every slot present).
-    // No schema-2 store accepts it; it remains the shape of the frozen
-    // cross-language corpus and of the schema-1 legacy source readback.
-    NOAH_PROFILE_PD_V1_LEGACY_VERSION    = 1,
-    NOAH_PROFILE_PD_V1_LEGACY_SLOT_COUNT = 8,
-    NOAH_PROFILE_PD_V1_LEGACY_SIZE       = 776,
 };
 
 // Directional axis policies (record byte 3): which directions exist. Vertical
@@ -121,4 +115,3 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_entry(const uint8_t *rec
 // A whole version-2 payload.
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error);
 // A whole retired version-1 payload: header 01 08 60 00.., eight records.
-noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_legacy(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error);

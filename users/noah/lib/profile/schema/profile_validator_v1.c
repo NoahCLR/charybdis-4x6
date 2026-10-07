@@ -378,8 +378,6 @@ static noah_profile_validator_v1_result_t combo_decode_step(noah_profile_validat
         }
     }
     // Version 1 repeats QMK's one hold threshold: a later row cannot store another.
-    if (state->version == 1u && state->row_index && row.hold_term_ms != state->hold_term_ms) goto invalid;
-    state->hold_term_ms = row.hold_term_ms;
     state->row_index++;
     state->phase = 1u;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;

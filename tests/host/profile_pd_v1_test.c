@@ -36,7 +36,7 @@ static size_t check_v2_vectors(const char *path) {
         }
         assert(error.code == result);
         // A version-2 payload is never a version-1 one, and the reverse.
-        assert(noah_profile_pd_v1_validate_legacy(payload, length, NULL) != NOAH_PROFILE_PD_V1_OK || strcmp(name, "version-1-payload") == 0);
+        if (strcmp(name, "version-1-payload") == 0) assert(result != NOAH_PROFILE_PD_V1_OK);
         cases++;
     }
     assert(feof(file));
@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
     // its records are version 2's, so it keeps checking every record rule.
     FILE *file = fopen(argv[1], "rb");
     assert(file);
-    uint8_t bytes[NOAH_PROFILE_PD_V1_LEGACY_SIZE + 1];
+    uint8_t                    bytes[777];
     size_t count = 0, accepted = 0, rejected = 0;
     noah_profile_pd_v1_error_t error;
     for (;;) {
@@ -103,7 +103,19 @@ int main(int argc, char **argv) {
         size_t length = (size_t)low | ((size_t)high << 8);
         assert(length <= sizeof(bytes));
         assert(fread(bytes, 1, length, file) == length);
-        noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_legacy(bytes, length, &error);
+        // Frozen vectors exercise the unchanged 96-byte record rules. The
+        // retired envelope is test input only; production has no decoder.
+        noah_profile_pd_v1_result_t result = NOAH_PROFILE_PD_V1_INVALID_HEADER;
+        error.code                         = result;
+        error.offset                       = 0;
+        const uint8_t frozen_header[8]     = {1, 8, 96, 0, 0, 0, 0, 0};
+        if (length == 776 && memcmp(bytes, frozen_header, 8) == 0) {
+            result = NOAH_PROFILE_PD_V1_OK;
+            for (uint8_t slot = 0; slot < 8; slot++) {
+                result = noah_profile_pd_v1_validate_record(bytes + 8 + slot * 96, 96, slot, &error);
+                if (result != NOAH_PROFILE_PD_V1_OK) break;
+            }
+        }
         if ((result == NOAH_PROFILE_PD_V1_OK) != (expected != 0)) {
             fprintf(stderr, "PD corpus case %zu: expected valid=%d, code=%u offset=%zu\n", count, expected, result, error.offset);
             return 1;
@@ -116,7 +128,6 @@ int main(int argc, char **argv) {
     fclose(file);
     assert(accepted > 100 && rejected > 1000);
     assert(noah_profile_pd_v1_validate(NULL, 0, &error) == NOAH_PROFILE_PD_V1_INVALID_ARGUMENT);
-    assert(noah_profile_pd_v1_validate_legacy(NULL, 0, &error) == NOAH_PROFILE_PD_V1_INVALID_ARGUMENT);
     assert(noah_profile_pd_v1_validate_record(bytes, 96, 32, NULL) == NOAH_PROFILE_PD_V1_INVALID_ARGUMENT);
     assert(noah_profile_pd_v1_validate_record(bytes, 95, 0, NULL) == NOAH_PROFILE_PD_V1_INVALID_LENGTH);
     // Byte 87 of a directional record: repeat 0 or once per movement 1; 88
