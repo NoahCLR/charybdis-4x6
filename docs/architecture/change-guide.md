@@ -49,7 +49,9 @@ directory and the existing domain docs.
   `TG()` and `TO()` are owned (`TT(n)` is `MO(n)` plus a built-in
   `LOCK_LAYER(n)` on the `TAPPING_TOGGLE`-th tap; `OSL(n)` holds like `MO(n)`
   and its tap arms `layer_ownership_oneshot_tap(n)`, used up in the finalize
-  hook; `LM(n, mods)` holds like `MO(n)` plus a built-in immediate hold of its
+  hook for ordinary/native presses or by the owning release planner's TAP
+  effect for runtime-owned MTs; delayed and synthetic output never consume it
+  again. `LM(n, mods)` holds like `MO(n)` plus a built-in immediate hold of its
   mods-only keycode; `TG(n)` is `LOCK_LAYER(n)`; `TO(n)` is
   `layer_ownership_goto(n)`). `DF()` and `PDF()` stay refused: layer 0 is the
   base throughout the firmware and the app. A plain `LT()` with no authored row keeps QMK's tap/hold decision;

@@ -49,7 +49,14 @@ layer on.
 A one-shot layer follows QMK's rule for what uses it up: any key press except a
 modifier, a one-shot modifier, a mod-tap still held, or `OSL()` itself. The
 layer turns off once that press has been processed, so the press itself still
-resolves on the one-shot layer. As with QMK's `OSL()`, a long press on its own
+resolves on the one-shot layer. A runtime-owned `MT()` uses its owner's resolved
+tap on release instead of QMK's tap count: a qualifying tap consumes the layer
+then, even if its output waits for the multi-tap window. Its already selected
+action (including a transparent tap) keeps the layer it resolved on. Each
+repeated tap follows its selected branch; holds, empty taps, modifier-only taps,
+`OSM()` and `OSL()` tap output leave the one-shot armed. Delayed or synthetic
+output does not consume it again, so it cannot use up a newly armed one-shot.
+As with QMK's `OSL()`, a long press on its own
 still arms it, a second tap within `TAPPING_TERM` cancels it, a slower second
 tap keeps it on, and a hold that another key used is only a hold. `TO()`
 releases it with the locks. `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOGGLE` apply to

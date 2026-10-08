@@ -17,6 +17,7 @@
 #include "../../action/synthetic_record.h"
 #include "../../action/owned_keycode.h"
 #include "../../compat/qmk_combo_origin.h"
+#include "../../compat/qmk_oneshot_contract.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/ownership/layer_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
@@ -422,7 +423,12 @@ static bool key_runtime_process_press_uses_oneshot_layer(uint16_t keycode, const
         return false;
     }
 
-    return !(IS_QK_MOD_TAP(keycode) && record->tap.count == 0u);
+    if (IS_QK_MOD_TAP(keycode)) {
+        // Runtime-owned MT taps are settled by their planner, including a
+        // delayed multi-tap. Native MTs arrive with QMK's tap/hold decision.
+        return !key_behavior_lookup(keycode).handled && record->tap.count != 0u && noah_qmk_contract_tap_uses_oneshot_layer(keycode);
+    }
+    return true;
 }
 
 static void key_runtime_process_settle_oneshot_layer(uint16_t keycode, const keyrecord_t *record) {

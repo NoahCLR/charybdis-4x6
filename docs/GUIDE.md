@@ -198,7 +198,11 @@ state. `TT(layer)` holds its layer like `MO(layer)`, and its
 authored row on a `TT()` key replaces those taps. `OSL(layer)` holds its layer
 while down, and a tap turns it on for exactly the next key press (modifiers and
 `OSM()` do not use it up; as with QMK, a long press on its own also arms it
-and a quick second tap cancels it; with one-shot keys off it is only a hold). A plain `LT(layer, kc)` without an authored row keeps
+and a quick second tap cancels it; with one-shot keys off it is only a hold).
+A runtime-owned `MT()` consumes it on a qualifying tap release, even when the
+tap output waits for repeated taps; its selected action keeps the press layer.
+Holds and modifier-only taps leave it armed, and synthetic output never uses
+it up again. A plain `LT(layer, kc)` without an authored row keeps
 QMK's own tap/hold timing; only its hold goes through the userspace layer
 ownership, so releasing it no longer turns off a locked layer. `LM(layer,
 mods)` holds its layer and its modifiers from press to release. `DF()` and
