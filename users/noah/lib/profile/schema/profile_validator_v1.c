@@ -13,12 +13,6 @@ enum {
     KEY_BEHAVIOR_TABLE_ROWS = 1u,
 };
 
-static const uint8_t profile_magic[4] = {'N', 'L', 'P', '1'};
-
-static uint16_t read_u16(const uint8_t bytes[2]) {
-    return (uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8u);
-}
-
 noah_profile_validator_v1_error_t noah_profile_validator_v1_no_error(void) {
     noah_profile_validator_v1_error_t error;
 
@@ -178,62 +172,42 @@ static noah_profile_validator_v1_result_t checksum_step(noah_profile_validator_v
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }
 
+static noah_profile_validator_v1_result_t reject_envelope(noah_profile_validator_v1_t *validator, const noah_profile_codec_v1_error_t *source, noah_profile_validator_v1_error_t *error) {
+    noah_profile_validator_v1_result_t code = NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB;
+    if (source->code == NOAH_PROFILE_CODEC_V1_INCOMPATIBLE_SCHEMA) code = NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA;
+    if (source->code == NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED) code = NOAH_PROFILE_VALIDATOR_V1_CAPACITY_EXCEEDED;
+    if (source->code == NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN) code = NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN;
+    if (source->code == NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION) code = NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN;
+    return reject(validator, code, source->offset, source->domain_index, source->domain_index == UINT8_MAX ? NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8 : source->domain_id, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, source->code, error);
+}
+
 static noah_profile_validator_v1_result_t blob_header_step(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
     uint8_t header[NOAH_PROFILE_BLOB_V1_HEADER_SIZE];
-
-    if (read_blob(validator, 0u, header, sizeof(header), error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) {
-        return validator->terminal_result;
-    }
-    if (memcmp(header, profile_magic, sizeof(profile_magic)) != 0) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB, 0u, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_INVALID_MAGIC, error);
-    }
-    if (header[4] != validator->declaration.schema_major || header[5] != validator->declaration.schema_minor) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA, 4u, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_INCOMPATIBLE_SCHEMA, error);
-    }
-    if (header[7] != NOAH_PROFILE_BLOB_V1_CANONICAL_FLAG) {
-        uint16_t detail = (header[7] & (uint8_t)~NOAH_PROFILE_BLOB_V1_KNOWN_FLAGS) != 0u ? NOAH_PROFILE_CODEC_V1_RESERVED_FLAGS : NOAH_PROFILE_CODEC_V1_NONCANONICAL;
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB, 7u, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, detail, error);
-    }
-    if (header[6] > NOAH_PROFILE_BLOB_V1_MAX_DOMAINS) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_CAPACITY_EXCEEDED, 6u, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, error);
-    }
-
-    validator->declared_domain_count = header[6];
-    validator->blob_offset           = NOAH_PROFILE_BLOB_V1_HEADER_SIZE;
-    validator->phase                 = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER;
+    noah_profile_codec_v1_error_t detail;
+    if (read_blob(validator, 0u, header, sizeof(header), error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return validator->terminal_result;
+    if (noah_profile_envelope_begin(&validator->envelope, header, validator->declaration.byte_length, &detail) != NOAH_PROFILE_CODEC_V1_OK) return reject_envelope(validator, &detail, error);
+    validator->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }
 
-static uint8_t domain_mask_for_id(uint8_t domain_id) {
-#ifdef NOAH_PD_PROFILE_ENABLE
-    if (domain_id == NOAH_PROFILE_DOMAIN_V1_PD) return NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
-#endif
-    if (domain_id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) return NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
-    if (domain_id == NOAH_PROFILE_DOMAIN_V1_COMBOS) return NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS;
-    if (domain_id == NOAH_PROFILE_DOMAIN_V1_RGB) return NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
-    if (domain_id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS) return NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
-    return 0u;
-}
-
 static noah_profile_validator_v1_result_t finish_domains(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
-    if (validator->blob_offset != validator->declaration.byte_length) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB, validator->blob_offset, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_TRAILING_BYTES, error);
+    noah_profile_codec_v1_error_t detail;
+    if (noah_profile_envelope_finish(&validator->envelope, &detail) != NOAH_PROFILE_CODEC_V1_OK) return reject_envelope(validator, &detail, error);
+    if ((validator->compatibility.required_domain_mask & (uint8_t)~validator->envelope.mask) != 0u) {
+        return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_MISSING_DOMAIN, validator->envelope.offset, error);
     }
-    if ((validator->compatibility.required_domain_mask & (uint8_t)~validator->seen_domain_mask) != 0u) {
-        return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_MISSING_DOMAIN, validator->blob_offset, error);
-    }
-    if (validator->seen_domain_mask != validator->declaration.domain_mask) {
-        return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MASK_MISMATCH, validator->blob_offset, error);
+    if (validator->envelope.mask != validator->declaration.domain_mask) {
+        return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MASK_MISMATCH, validator->envelope.offset, error);
     }
 
-    validator->profile.domain_mask       = validator->seen_domain_mask;
-    validator->profile.domain_count      = validator->declared_domain_count;
+    validator->profile.domain_mask       = validator->envelope.mask;
+    validator->profile.domain_count      = validator->envelope.count;
     validator->profile.byte_length       = validator->declaration.byte_length;
     validator->profile.crc32             = validator->crc32_state;
     validator->profile.digest            = validator->digest_state;
     validator->profile.action_abi_digest = validator->declaration.action_abi_digest;
     if (validator->has_reference_error) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_REFERENCE, validator->reference_error_offset, (validator->seen_domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB) ? 1u : 0u, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, KEY_BEHAVIOR_TABLE_ROWS, validator->reference_error_row, validator->reference_error_step, validator->reference_error_field, NOAH_PROFILE_VALIDATOR_V1_DETAIL_NONE, 0u, error);
+        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_REFERENCE, validator->reference_error_offset, (validator->envelope.mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB) ? 1u : 0u, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, KEY_BEHAVIOR_TABLE_ROWS, validator->reference_error_row, validator->reference_error_step, validator->reference_error_field, NOAH_PROFILE_VALIDATOR_V1_DETAIL_NONE, 0u, error);
     }
     validator->phase           = NOAH_PROFILE_VALIDATOR_V1_PHASE_VALID;
     validator->terminal_result = NOAH_PROFILE_VALIDATOR_V1_VALID;
@@ -242,44 +216,25 @@ static noah_profile_validator_v1_result_t finish_domains(noah_profile_validator_
 
 static noah_profile_validator_v1_result_t domain_header_step(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
     uint8_t header[NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE];
-    uint8_t domain_mask;
-    size_t  remaining;
-
-    if (validator->domain_index == validator->declared_domain_count) {
-        return finish_domains(validator, error);
+    noah_profile_domain_record_t record;
+    noah_profile_codec_v1_error_t detail;
+    if (validator->envelope.index == validator->envelope.count) return finish_domains(validator, error);
+    if ((size_t)(validator->envelope.byte_length - validator->envelope.offset) < sizeof(header)) {
+        detail = (noah_profile_codec_v1_error_t){.code = NOAH_PROFILE_CODEC_V1_TRUNCATED, .offset = validator->envelope.offset, .domain_index = validator->envelope.index};
+        return reject_envelope(validator, &detail, error);
     }
-    remaining = validator->declaration.byte_length - validator->blob_offset;
-    if (remaining < sizeof(header)) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB, validator->blob_offset, validator->domain_index, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_TRUNCATED, error);
+    if (read_blob(validator, validator->envelope.offset, header, sizeof(header), error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return validator->terminal_result;
+    const noah_profile_domain_shape_t *shape = noah_profile_domain_find(header[0]);
+    if (shape && !(shape->mask & validator->compatibility.allowed_domain_mask)) {
+        detail = (noah_profile_codec_v1_error_t){.code = NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN, .offset = validator->envelope.offset, .domain_index = validator->envelope.index, .domain_id = header[0]};
+        return reject_envelope(validator, &detail, error);
     }
-    if (read_blob(validator, validator->blob_offset, header, sizeof(header), error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) {
-        return validator->terminal_result;
-    }
-    validator->current_domain_id     = header[0];
-    validator->domain_payload_length = read_u16(&header[2]);
-    validator->domain_payload_offset = validator->blob_offset + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE;
-    domain_mask                      = domain_mask_for_id(header[0]);
-    if (domain_mask == 0u || (domain_mask & validator->compatibility.allowed_domain_mask) == 0u) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN, validator->blob_offset, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN, error);
-    }
-    if ((header[0] == NOAH_PROFILE_DOMAIN_V1_PD && header[1] != NOAH_PROFILE_PD_V1_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS && !NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(header[1])) || (header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS && !NOAH_PROFILE_COMBO_VERSION_ACCEPTED(header[1])) || (header[0] == NOAH_PROFILE_DOMAIN_V1_RGB && header[1] != NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) || (header[0] == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS && header[1] != NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION)) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, validator->blob_offset + 1u, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION, error);
-    }
-    if (validator->domain_index != 0u && header[0] == validator->previous_domain_id) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB, validator->blob_offset, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_DUPLICATE_DOMAIN, error);
-    }
-    if (validator->domain_index != 0u && header[0] < validator->previous_domain_id) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB, validator->blob_offset, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_DOMAIN_ORDER, error);
-    }
-    if (validator->domain_payload_length > remaining - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE) {
-        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB, validator->domain_payload_offset, validator->domain_index, header[0], NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_TRUNCATED, error);
-    }
-    validator->previous_domain_id = header[0];
-    validator->seen_domain_mask   = (uint8_t)(validator->seen_domain_mask | domain_mask);
+    if (noah_profile_envelope_next(&validator->envelope, header, &record, &detail) != NOAH_PROFILE_CODEC_V1_OK) return reject_envelope(validator, &detail, error);
+    validator->domain_payload_offset = record.offset;
+    validator->domain_payload_length = record.length;
     memset(&validator->domain_validation, 0, sizeof(validator->domain_validation));
-    // The payload's own version byte must repeat the envelope's.
-    if (header[0] == NOAH_PROFILE_DOMAIN_V1_SETTINGS) validator->domain_validation.settings.expected_version = header[1];
-    if (header[0] == NOAH_PROFILE_DOMAIN_V1_COMBOS) validator->domain_validation.combos.version = header[1];
+    if (record.shape->id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) validator->domain_validation.settings.expected_version = record.shape->version;
+    if (record.shape->id == NOAH_PROFILE_DOMAIN_V1_COMBOS) validator->domain_validation.combos.version = record.shape->version;
     validator->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }
@@ -290,7 +245,7 @@ static noah_profile_validator_v1_result_t map_behavior_error(noah_profile_valida
 
     if (source->code == NOAH_PROFILE_CODEC_V1_READ_ERROR) result = NOAH_PROFILE_VALIDATOR_V1_READ_ERROR;
     if (source->code == NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED) result = NOAH_PROFILE_VALIDATOR_V1_CAPACITY_EXCEEDED;
-    return reject(validator, result, validator->domain_payload_offset + source->offset, validator->domain_index, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, source->table_id, row_index, source->step_index, source->field_id, NOAH_PROFILE_VALIDATOR_V1_DETAIL_KEY_BEHAVIOR, source->code, error);
+    return reject(validator, result, validator->domain_payload_offset + source->offset, (uint8_t)(validator->envelope.index - 1u), NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, source->table_id, row_index, source->step_index, source->field_id, NOAH_PROFILE_VALIDATOR_V1_DETAIL_KEY_BEHAVIOR, source->code, error);
 }
 
 static noah_profile_validator_v1_result_t map_rgb_error(noah_profile_validator_v1_t *validator, const noah_profile_rgb_v1_error_t *source, noah_profile_validator_v1_error_t *error) {
@@ -299,7 +254,7 @@ static noah_profile_validator_v1_result_t map_rgb_error(noah_profile_validator_v
 
     if (source->code == NOAH_PROFILE_RGB_V1_READ_ERROR) result = NOAH_PROFILE_VALIDATOR_V1_READ_ERROR;
     if (source->code == NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED) result = NOAH_PROFILE_VALIDATOR_V1_CAPACITY_EXCEEDED;
-    return reject(validator, result, validator->domain_payload_offset + source->offset, validator->domain_index, NOAH_PROFILE_DOMAIN_V1_RGB, source->table, row_index, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, source->field, NOAH_PROFILE_VALIDATOR_V1_DETAIL_RGB, source->code, error);
+    return reject(validator, result, validator->domain_payload_offset + source->offset, (uint8_t)(validator->envelope.index - 1u), NOAH_PROFILE_DOMAIN_V1_RGB, source->table, row_index, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, source->field, NOAH_PROFILE_VALIDATOR_V1_DETAIL_RGB, source->code, error);
 }
 
 static bool action_reference_is_valid(const noah_profile_validator_v1_t *validator, const noah_profile_action_v1_t *action);
@@ -338,34 +293,31 @@ static noah_profile_validator_v1_result_t combo_decode_step(noah_profile_validat
     noah_profile_combo_v1_validation_t *state  = &validator->domain_validation.combos;
     noah_profile_combo_v1_view_t       *view   = &validator->profile.combos;
     size_t                              offset = validator->domain_payload_offset;
-    uint8_t                             header = NOAH_PROFILE_COMBO_HEADER_SIZE(state->version);
-    if (state->phase == 0u) {
-        noah_profile_combo_v1_header_t decoded;
-        if (validator->domain_payload_length < header || read_blob(validator, offset, state->bytes, header, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) goto invalid;
-        if (noah_profile_combo_v1_decode_header(state->bytes, state->version, validator->domain_payload_length, &decoded) != NOAH_PROFILE_CODEC_V1_OK) goto invalid;
-        view->row_count      = decoded.row_count;
+    noah_profile_combo_v1_header_t header;
+    noah_profile_combo_v1_row_t row;
+    noah_profile_codec_v1_result_t detail;
+    noah_profile_action_v1_limits_t limits = noah_profile_action_v1_default_limits();
+    uint8_t row_index = state->row_index;
+    uint8_t phase = state->phase;
+    noah_profile_combo_v1_iteration_t result = noah_profile_combo_v1_iteration_step(state, &validator->reader, validator->base_offset + offset, validator->domain_payload_length, &limits, &header, &row, &detail);
+    if (result == NOAH_PROFILE_COMBO_V1_HEADER) {
+        view->row_count = header.row_count;
         view->payload_offset = (uint16_t)offset;
-        view->version        = state->version;
-        state->phase         = 1u;
+        view->version = state->version;
         return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     }
-    if (state->row_index == view->row_count) {
-        validator->blob_offset = offset + validator->domain_payload_length;
-        validator->domain_index++;
+    if (result == NOAH_PROFILE_COMBO_V1_COMPLETE) {
         validator->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER;
         return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     }
-    offset += header + (size_t)state->row_index * 28u;
-    if (state->phase == 1u) {
-        if (read_blob(validator, offset, state->bytes, 12u, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return validator->terminal_result;
-        state->phase = 2u;
-        return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+    if (phase) offset += NOAH_PROFILE_COMBO_V2_HEADER_SIZE + (size_t)row_index * NOAH_PROFILE_COMBO_V1_ROW_SIZE;
+    if (result == NOAH_PROFILE_COMBO_V1_REJECTED) {
+        if (detail == NOAH_PROFILE_CODEC_V1_READ_ERROR) return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_READ_ERROR, offset + (phase == 2u ? 12u : 0u), error);
+        goto invalid;
     }
-    if (read_blob(validator, offset + 12u, &state->bytes[12], 16u, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return validator->terminal_result;
-    noah_profile_combo_v1_row_t     row;
-    noah_profile_action_v1_limits_t limits = noah_profile_action_v1_default_limits();
-    if (noah_profile_combo_v1_decode_row(state->bytes, state->version, &limits, &row) != NOAH_PROFILE_CODEC_V1_OK || !action_reference_is_valid(validator, &row.output) || !placement_is_supported(validator, &row.output, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT)) goto invalid;
-    for (uint8_t input = 0u; input < row.input_count; input++)
+    if (result == NOAH_PROFILE_COMBO_V1_ITERATING) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+    if (!action_reference_is_valid(validator, &row.output) || !placement_is_supported(validator, &row.output, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT)) goto invalid;
+    for (uint8_t input = 0; input < row.input_count; input++)
         if (!action_reference_is_valid(validator, &row.inputs[input])) goto invalid;
     if (validator->compatibility.runtime && validator->compatibility.runtime->combo_to_native) {
         bool (*to_native)(const noah_profile_action_v1_t *, uint16_t *) = validator->compatibility.runtime->combo_to_native;
@@ -377,13 +329,10 @@ static noah_profile_validator_v1_result_t combo_decode_step(noah_profile_validat
                 if (native[prior] == native[input]) goto invalid;
         }
     }
-    // Version 1 repeats QMK's one hold threshold: a later row cannot store another.
-    state->row_index++;
-    state->phase = 1u;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 invalid:
     if (validator->phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_REJECTED) return validator->terminal_result;
-    return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, validator->domain_index, NOAH_PROFILE_DOMAIN_V1_COMBOS, 0u, state->row_index, 0u, 0u, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_INVALID_ACTION, error);
+    return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, (uint8_t)(validator->envelope.index - 1u), NOAH_PROFILE_DOMAIN_V1_COMBOS, 0u, row_index, 0u, 0u, NOAH_PROFILE_VALIDATOR_V1_DETAIL_BLOB, NOAH_PROFILE_CODEC_V1_INVALID_ACTION, error);
 }
 
 static noah_profile_validator_v1_result_t settings_decode_step(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
@@ -395,40 +344,17 @@ static noah_profile_validator_v1_result_t settings_decode_step(noah_profile_vali
     if (state->offset < v->domain_payload_length) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     if (!noah_profile_settings_v1_complete(state, v->domain_payload_length)) return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, error);
     v->profile.settings = (noah_profile_settings_v1_view_t){v->domain_payload_offset, v->domain_payload_length};
-    v->blob_offset      = v->domain_payload_offset + v->domain_payload_length;
-    v->domain_index++;
     v->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }
 
 #ifdef NOAH_PD_PROFILE_ENABLE
 static noah_profile_validator_v1_result_t pd_decode_step(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
-    size_t offset = v->domain_payload_offset;
     noah_profile_pd_v1_error_t detail;
-    if (v->domain_payload_length < NOAH_PROFILE_PD_V1_HEADER_SIZE || v->domain_payload_length > NOAH_PROFILE_PD_V1_MAX_SIZE)
-        return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, error);
-    if (!v->domain_validation.pd.header) {
-        if (read_blob(v, offset, v->domain_validation.pd.bytes, NOAH_PROFILE_PD_V1_HEADER_SIZE, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
-        if (noah_profile_pd_v1_validate_header(v->domain_validation.pd.bytes, v->domain_payload_length, &v->domain_validation.pd.count, &detail) != NOAH_PROFILE_PD_V1_OK)
-            return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset + detail.offset, error);
-        v->domain_validation.pd.header = true;
-        if (v->domain_validation.pd.count) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
-    } else {
-        uint8_t index = v->domain_validation.pd.index, used = v->domain_validation.pd.used;
-        uint8_t count = NOAH_PROFILE_PD_V1_RECORD_SIZE - used > NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX ? NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX : NOAH_PROFILE_PD_V1_RECORD_SIZE - used;
-        offset += NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE;
-        if (read_blob(v, offset + used, v->domain_validation.pd.bytes + used, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
-        v->domain_validation.pd.used += count;
-        if (v->domain_validation.pd.used != NOAH_PROFILE_PD_V1_RECORD_SIZE) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
-        if (noah_profile_pd_v1_validate_entry(v->domain_validation.pd.bytes, NOAH_PROFILE_PD_V1_RECORD_SIZE, v->domain_validation.pd.minimum, &detail) != NOAH_PROFILE_PD_V1_OK)
-            return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset + detail.offset, error);
-        v->domain_validation.pd.minimum = (uint8_t)(v->domain_validation.pd.bytes[0] + 1u);
-        v->domain_validation.pd.used = 0;
-        if (++v->domain_validation.pd.index != v->domain_validation.pd.count) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
-    }
+    noah_profile_pd_v1_iteration_t result = noah_profile_pd_v1_iterator_step(&v->domain_validation.pd, &v->reader, v->base_offset + v->domain_payload_offset, v->domain_payload_length, &detail);
+    if (result == NOAH_PROFILE_PD_V1_REJECTED) return reject_simple(v, detail.code == NOAH_PROFILE_PD_V1_READ_ERROR ? NOAH_PROFILE_VALIDATOR_V1_READ_ERROR : NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, v->domain_payload_offset + detail.offset, error);
+    if (!noah_profile_pd_v1_iterator_complete(&v->domain_validation.pd)) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     v->profile.pd = (noah_profile_settings_v1_view_t){v->domain_payload_offset, v->domain_payload_length};
-    v->blob_offset = v->domain_payload_offset + v->domain_payload_length;
-    v->domain_index++;
     v->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }
@@ -436,11 +362,11 @@ static noah_profile_validator_v1_result_t pd_decode_step(noah_profile_validator_
 
 static noah_profile_validator_v1_result_t domain_decode_step(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
 #ifdef NOAH_PD_PROFILE_ENABLE
-    if (validator->current_domain_id == NOAH_PROFILE_DOMAIN_V1_PD) return pd_decode_step(validator, error);
+    if (validator->envelope.prior_id == NOAH_PROFILE_DOMAIN_V1_PD) return pd_decode_step(validator, error);
 #endif
-    if (validator->current_domain_id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) return settings_decode_step(validator, error);
-    if (validator->current_domain_id == NOAH_PROFILE_DOMAIN_V1_COMBOS) return combo_decode_step(validator, error);
-    if (validator->current_domain_id == NOAH_PROFILE_DOMAIN_V1_RGB) {
+    if (validator->envelope.prior_id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) return settings_decode_step(validator, error);
+    if (validator->envelope.prior_id == NOAH_PROFILE_DOMAIN_V1_COMBOS) return combo_decode_step(validator, error);
+    if (validator->envelope.prior_id == NOAH_PROFILE_DOMAIN_V1_RGB) {
         noah_profile_rgb_v1_error_t             error_rgb;
         noah_profile_rgb_v1_validation_result_t result;
 
@@ -484,8 +410,6 @@ static noah_profile_validator_v1_result_t domain_decode_step(noah_profile_valida
         }
     }
 
-    validator->blob_offset = validator->domain_payload_offset + validator->domain_payload_length;
-    validator->domain_index++;
     validator->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }
@@ -560,3 +484,5 @@ noah_profile_validator_v1_result_t noah_profile_validator_v1_profile(const noah_
 #if UINTPTR_MAX == UINT32_MAX
 _Static_assert(sizeof(noah_profile_validator_v1_t) <= NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET, "whole-profile validator state exceeded its payload-independent firmware regression policy");
 #endif
+
+_Static_assert((unsigned)NOAH_PROFILE_PD_V1_STEP_READ_MAX <= (unsigned)NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX, "PD iterator exceeds the scan read budget");

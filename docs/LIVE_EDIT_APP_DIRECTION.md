@@ -795,3 +795,20 @@ Client follow-up: require binding in `candidateMetadataForBlob`, refresh tests
 and imported fixtures/specs, and repin the landed firmware revision. Firmware's
 required checks stay independent of the client checkout. This cut does not
 perform the later domain-registry deepening or claim hardware acceptance.
+
+## D-F11 — One current shape and traversal per profile domain
+
+The profile-domain registry defines canonical IDs, mask bits, current versions
+and ordering once. Blob, candidate, validator, compiled-envelope, store and
+provider modules consume that definition. One envelope walker serves blob
+readback/decoding, whole-profile validation and synchronous/stepped storage
+checks without owning their I/O scheduling. Domain modules retain semantic
+record policy; combos and sparse pointing share bounded record iteration
+between validation and publication. See [domain ownership](architecture/profile-wire-v1.md#firmware-domain-ownership).
+
+Wire bytes and storage geometry are unchanged. Compiled settings/combos and
+compiled-domain seeking remain subsequent work. Client integration recipes
+that compile the firmware codecs must link `profile_domain_registry.c`, and
+standalone pointing codec recipes must link `profile_reader.c`; refresh the
+imported governing spec and repin after landing. The earlier D-F10 binding
+follow-up still applies.

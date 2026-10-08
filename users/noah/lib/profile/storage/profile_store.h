@@ -5,6 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include "../schema/profile_blob_v1.h"
 
 #include "profile_storage_layout.h"
 #include "../schema/profile_versions.h"
@@ -169,10 +170,7 @@ typedef struct {
     uint16_t                          commit_offset;
     uint32_t                          commit_crc32_state;
     uint32_t                          commit_digest_state;
-    uint8_t                           commit_domain_count;
-    uint8_t                           commit_domain_index;
-    uint8_t                           commit_prior_domain;
-    uint8_t                           commit_domain_mask;
+    noah_profile_envelope_t           commit_envelope;
     uint8_t                           commit_record_offset;
     bool                              boot_scanned;
     bool                              conflict;
@@ -190,10 +188,7 @@ typedef struct {
     uint16_t                          boot_offset;
     uint32_t                          boot_crc32_state;
     uint32_t                          boot_digest_state;
-    uint8_t                           boot_domain_count;
-    uint8_t                           boot_domain_index;
-    uint8_t                           boot_prior_domain;
-    uint8_t                           boot_expected_domain_mask;
+    noah_profile_envelope_t           boot_envelope;
 } noah_profile_store_t;
 
 void                        noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility);

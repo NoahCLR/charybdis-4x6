@@ -25,6 +25,8 @@ build_and_run() {
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/profile_store_test.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_store.c" \
         "$@" \
         -o "$BUILD_DIR/profile_store_test_$name"

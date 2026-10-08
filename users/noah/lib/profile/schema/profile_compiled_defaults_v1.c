@@ -46,18 +46,6 @@ extern const uint8_t                                  key_behavior_feedback_led_
 #    endif
 #endif
 
-enum {
-    RGB_GROUP_RECORD_SIZE       = 9u,
-    RGB_LAYER_COLOR_RECORD_SIZE = 5u,
-    RGB_GROUP_ROW_RECORD_SIZE   = 5u,
-    RGB_AUTOMOUSE_RECORD_SIZE   = 4u,
-    RGB_PD_COLOR_RECORD_SIZE    = 5u,
-    RGB_COMBO_RECORD_SIZE       = 4u,
-    RGB_COMBO_GROUP_RECORD_SIZE = 4u,
-    RGB_COLOR_RECORD_SIZE       = 3u,
-    RGB_KEY_FEEDBACK_SIZE       = 11u,
-    RGB_FIXED_PAYLOAD_SIZE      = NOAH_PROFILE_RGB_V1_HEADER_SIZE + RGB_AUTOMOUSE_RECORD_SIZE + RGB_COMBO_RECORD_SIZE + RGB_KEY_FEEDBACK_SIZE,
-};
 
 typedef struct {
     noah_profile_compiled_v1_write_fn write;
@@ -505,17 +493,17 @@ static noah_profile_compiled_v1_result_t rgb_payload_size(size_t *length, uint8_
     if (!length || !groups || (uint32_t)LAYER_COUNT > (uint32_t)NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS || group_rows > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
     result = rgb_group_count(groups, error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
-    total = RGB_FIXED_PAYLOAD_SIZE + (size_t)*groups * RGB_GROUP_RECORD_SIZE + (size_t)LAYER_COUNT * RGB_LAYER_COLOR_RECORD_SIZE + (size_t)layer_led_group_count * RGB_GROUP_ROW_RECORD_SIZE;
+    total = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + (size_t)*groups * NOAH_PROFILE_RGB_V1_GROUP_RECORD_SIZE + (size_t)LAYER_COUNT * NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE + (size_t)layer_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
     if (pd_mode_color_count != PD_MODE_COUNT) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
-    total += (size_t)pd_mode_color_count * RGB_PD_COLOR_RECORD_SIZE + (size_t)pd_mode_led_group_count * RGB_GROUP_ROW_RECORD_SIZE;
+    total += (size_t)pd_mode_color_count * NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE + (size_t)pd_mode_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
 #    endif
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
-    total += (size_t)combo_feedback_led_group_count * RGB_COMBO_GROUP_RECORD_SIZE;
+    total += (size_t)combo_feedback_led_group_count * NOAH_PROFILE_RGB_V1_COMBO_GROUP_RECORD_SIZE;
 #    endif
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     if (key_behavior_feedback_colors.tap_branch_color_count != KEY_BEHAVIOR_MAX_TAP_COUNT - 1u) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
-    total += (size_t)key_behavior_feedback_colors.tap_branch_color_count * RGB_COLOR_RECORD_SIZE + (size_t)key_behavior_feedback_led_group_count * RGB_GROUP_ROW_RECORD_SIZE;
+    total += (size_t)key_behavior_feedback_colors.tap_branch_color_count * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE + (size_t)key_behavior_feedback_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
 #    endif
     if (total > NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
     *length = total;
@@ -609,7 +597,7 @@ static noah_profile_compiled_v1_result_t write_rgb_payload(compiled_writer_t *wr
         if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
     }
 #    else
-    for (uint8_t index = 0u; index < RGB_KEY_FEEDBACK_SIZE; index++) {
+    for (uint8_t index = 0u; index < NOAH_PROFILE_RGB_V1_KEY_FEEDBACK_SIZE; index++) {
         if (!emit_u8(writer, 0u)) return writer->result;
     }
 #    endif
@@ -679,21 +667,14 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
 
 #ifdef NOAH_PD_PROFILE_ENABLE
 // The sparse version-2 domain stores only the slots a profile uses.
-static uint8_t pd_record_count(void) {
-    uint8_t count = 0;
-    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
-        if (noah_pd_defaults[slot].kind != 0u || noah_pd_defaults[slot].name[0] != '\0') count++;
-    }
-    return count;
-}
-
 static uint16_t pd_payload_size(void) {
-    return (uint16_t)(NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)pd_record_count() * NOAH_PROFILE_PD_V1_RECORD_SIZE);
+    return (uint16_t)(NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)noah_profile_pd_v1_default_record_count(noah_pd_defaults) * NOAH_PROFILE_PD_V1_RECORD_SIZE);
 }
 
 static noah_profile_compiled_v1_result_t write_pd_payload(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
-    const uint8_t pd_header[8] = {NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, pd_record_count(), 0, 0, 0, 0};
-    uint8_t       minimum      = 0;
+    const uint8_t pd_header[8] = {NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, noah_profile_pd_v1_default_record_count(noah_pd_defaults), 0, 0, 0, 0};
+    noah_profile_pd_v1_cursor_t cursor;
+    if (noah_profile_pd_v1_cursor_begin(&cursor, pd_header, pd_payload_size(), NULL) != NOAH_PROFILE_PD_V1_OK) return NOAH_PROFILE_COMPILED_V1_INVALID_ACTION;
     if (!emit(writer, pd_header, sizeof(pd_header))) return writer->result;
     for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
         uint8_t record[96];
@@ -701,15 +682,19 @@ static noah_profile_compiled_v1_result_t write_pd_payload(compiled_writer_t *wri
         if (noah_profile_pd_v1_validate_record(record, sizeof(record), slot, NULL) != NOAH_PROFILE_PD_V1_OK)
             return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, slot, UINT8_MAX);
         if (!noah_profile_pd_v1_record_present(record)) continue;
-        if (noah_profile_pd_v1_validate_entry(record, sizeof(record), minimum, NULL) != NOAH_PROFILE_PD_V1_OK)
+        if (noah_profile_pd_v1_cursor_next(&cursor, record, NULL) != NOAH_PROFILE_PD_V1_OK)
             return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, slot, UINT8_MAX);
-        minimum = (uint8_t)(slot + 1u);
         for (uint8_t offset = 0; offset < sizeof(record); offset++)
             if (!emit_u8(writer, record[offset])) return writer->result;
     }
     return writer->result;
 }
 #endif
+
+static bool emit_domain_header(compiled_writer_t *writer, uint8_t id, uint16_t length) {
+    const noah_profile_domain_shape_t *shape = noah_profile_domain_find(id);
+    return shape && emit_u8(writer, shape->id) && emit_u8(writer, shape->version) && emit_u16(writer, length);
+}
 
 static noah_profile_compiled_v1_result_t write_blob(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
     static const uint8_t              magic[4] = {'N', 'L', 'P', '1'};
@@ -747,15 +732,15 @@ static noah_profile_compiled_v1_result_t write_blob(compiled_writer_t *writer, n
           && emit_u8(writer, NOAH_PROFILE_BLOB_V1_CANONICAL_FLAG)))
         return writer->result;
 #if defined(RGB_MATRIX_ENABLE)
-    if (!(emit_u8(writer, NOAH_PROFILE_DOMAIN_V1_RGB) && emit_u8(writer, NOAH_PROFILE_DOMAIN_V1_RGB_VERSION) && emit_u16(writer, (uint16_t)rgb_length))) return writer->result;
+    if (!(emit_domain_header(writer, NOAH_PROFILE_DOMAIN_V1_RGB, (uint16_t)rgb_length))) return writer->result;
     result = write_rgb_payload(writer, error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
 #endif
-    if (!(emit_u8(writer, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS) && emit_u8(writer, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION) && emit_u16(writer, (uint16_t)behavior_length))) return writer->result;
+    if (!(emit_domain_header(writer, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, (uint16_t)behavior_length))) return writer->result;
     result = write_behavior_payload(writer, error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK || writer->stopped) return result;
 #ifdef NOAH_PD_PROFILE_ENABLE
-    if (!(emit_u8(writer, NOAH_PROFILE_DOMAIN_V1_PD) && emit_u8(writer, NOAH_PROFILE_PD_V1_VERSION) && emit_u16(writer, pd_payload_size()))) return writer->result;
+    if (!(emit_domain_header(writer, NOAH_PROFILE_DOMAIN_V1_PD, pd_payload_size()))) return writer->result;
     return write_pd_payload(writer, error);
 #endif
     return writer->result;

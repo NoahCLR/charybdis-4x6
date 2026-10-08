@@ -17,14 +17,9 @@ enum {
     NOAH_PROFILE_BLOB_V1_KNOWN_FLAGS            = 1u,
     NOAH_PROFILE_BLOB_V1_MAX_SIZE               = NOAH_PROFILE_PAYLOAD_MAX,
     NOAH_PROFILE_BLOB_V1_MAX_DOMAINS            = NOAH_PROFILE_DOMAIN_COUNT,
-    NOAH_PROFILE_DOMAIN_V1_PD                   = 0x50u,
-    NOAH_PROFILE_DOMAIN_V1_SETTINGS             = 0x40u,
-    NOAH_PROFILE_DOMAIN_V1_COMBOS               = 0x30u,
-    NOAH_PROFILE_DOMAIN_V1_COMBOS_VERSION       = 1u,
-    NOAH_PROFILE_DOMAIN_V1_RGB                  = 0x10u,
-    NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS        = 0x20u,
-    NOAH_PROFILE_DOMAIN_V1_RGB_VERSION          = NOAH_PROFILE_RGB_VERSION,
-    NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION = 1u,
+    NOAH_PROFILE_DOMAIN_V1_COMBOS_VERSION       = NOAH_PROFILE_DOMAIN_VERSION_COMBOS,
+    NOAH_PROFILE_DOMAIN_V1_RGB_VERSION          = NOAH_PROFILE_DOMAIN_VERSION_RGB,
+    NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION = NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS,
     NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS   = 8u,
     NOAH_PROFILE_ACTION_V1_MAX_PD_MODES         = NOAH_PROFILE_PD_COUNT,
     NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS  = 64u,
@@ -107,6 +102,22 @@ typedef struct {
     uint32_t                 crc32;
     noah_profile_domain_v1_t domains[NOAH_PROFILE_BLOB_V1_MAX_DOMAINS];
 } noah_profile_blob_v1_t;
+
+// Bounded envelope traversal; callers supply one complete 8-byte blob header
+// or 4-byte domain header. No payload reads or semantic decoding happen here.
+typedef struct {
+    uint16_t offset, byte_length;
+    uint8_t count, index, prior_id, mask;
+} noah_profile_envelope_t;
+
+typedef struct {
+    const noah_profile_domain_shape_t *shape;
+    uint16_t offset, length;
+} noah_profile_domain_record_t;
+
+noah_profile_codec_v1_result_t noah_profile_envelope_begin(noah_profile_envelope_t *walk, const uint8_t header[8], size_t length, noah_profile_codec_v1_error_t *error);
+noah_profile_codec_v1_result_t noah_profile_envelope_next(noah_profile_envelope_t *walk, const uint8_t header[4], noah_profile_domain_record_t *record, noah_profile_codec_v1_error_t *error);
+noah_profile_codec_v1_result_t noah_profile_envelope_finish(const noah_profile_envelope_t *walk, noah_profile_codec_v1_error_t *error);
 
 typedef struct {
     uint8_t  kind;

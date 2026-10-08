@@ -375,10 +375,34 @@ static void test_deterministic_malformed_corpus(void) {
     }
 }
 
+static void test_current_domain_registry(void) {
+    // Frozen wire identities: changing the registry cannot silently renumber
+    // a domain/mask or broaden current-format admission.
+    const noah_profile_domain_shape_t expected[] = {
+        {0x10, 1, 3}, {0x20, 2, 1}, {0x30, 4, 2}, {0x40, 8, 5}, {0x50, 16, 2},
+    };
+    assert(NOAH_PROFILE_DOMAIN_REGISTRY_COUNT == sizeof(expected) / sizeof(expected[0]));
+    uint8_t mask = 0;
+    for (size_t i = 0; i < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; i++) {
+        const noah_profile_domain_shape_t *shape = noah_profile_domain_at(i);
+        assert(shape && shape->id == expected[i].id && shape->mask == expected[i].mask && shape->version == expected[i].version);
+        assert(noah_profile_domain_find(expected[i].id) == shape);
+        mask |= shape->mask;
+        assert(noah_profile_domain_count(mask) == i + 1u);
+        for (unsigned version = 0; version <= UINT8_MAX; version++) {
+            uint8_t encoded[4]; size_t written;
+            noah_profile_domain_v1_t domain = {.id = expected[i].id, .version = (uint8_t)version};
+            expect_result(noah_profile_domain_v1_encode(&domain, encoded, sizeof(encoded), &written, NULL), version == expected[i].version ? NOAH_PROFILE_CODEC_V1_OK : NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
+        }
+    }
+    assert(mask == NOAH_PROFILE_DOMAIN_MASK_ALL && !noah_profile_domain_at(NOAH_PROFILE_DOMAIN_REGISTRY_COUNT) && !noah_profile_domain_find(0x60));
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     test_shared_blob_vectors(argv[1]);
     test_domain_envelopes();
+    test_current_domain_registry();
     test_blob_rejections(argv[1]);
     test_blob_encoder_bounds();
     test_shared_action_vectors(argv[1]);

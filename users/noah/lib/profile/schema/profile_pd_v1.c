@@ -165,21 +165,79 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_entry(const uint8_t *p, 
     return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
 }
 
-noah_profile_pd_v1_result_t noah_profile_pd_v1_validate(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error) {
-    uint8_t count;
-    if (!bytes) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
-    if (length < NOAH_PROFILE_PD_V1_HEADER_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
-    noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_header(bytes, length, &count, error);
+noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_begin(noah_profile_pd_v1_cursor_t *cursor, const uint8_t header[8], size_t length, noah_profile_pd_v1_error_t *error) {
+    if (!cursor) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
+    memset(cursor, 0, sizeof(*cursor));
+    return noah_profile_pd_v1_validate_header(header, length, &cursor->count, error);
+}
+
+noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_next(noah_profile_pd_v1_cursor_t *cursor, const uint8_t record[96], noah_profile_pd_v1_error_t *error) {
+    if (!cursor || cursor->index >= cursor->count) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
+    noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_entry(record, NOAH_PROFILE_PD_V1_RECORD_SIZE, cursor->minimum, error);
     if (result != NOAH_PROFILE_PD_V1_OK) return result;
-    uint8_t minimum = 0;
-    for (uint8_t index = 0; index < count; index++) {
-        size_t offset = NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE;
-        result = noah_profile_pd_v1_validate_entry(bytes + offset, NOAH_PROFILE_PD_V1_RECORD_SIZE, minimum, error);
-        if (result != NOAH_PROFILE_PD_V1_OK) {
-            if (error) error->offset += offset;
-            return result;
-        }
-        minimum = (uint8_t)(bytes[offset] + 1u);
+    cursor->minimum = (uint8_t)(record[0] + 1u);
+    cursor->index++;
+    return result;
+}
+
+uint8_t noah_profile_pd_v1_default_record_count(const noah_pd_config_t defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT]) {
+    uint8_t count = 0;
+    if (defaults) for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
+        if (defaults[slot].kind || defaults[slot].name[0]) count++;
     }
+    return count;
+}
+
+bool noah_profile_pd_v1_iterator_complete(const noah_profile_pd_v1_iterator_t *it) {
+    return it && it->header && it->cursor.index == it->cursor.count;
+}
+
+noah_profile_pd_v1_iteration_t noah_profile_pd_v1_iterator_step(noah_profile_pd_v1_iterator_t *it, const noah_profile_reader_t *reader, size_t base, size_t length, noah_profile_pd_v1_error_t *error) {
+    noah_profile_pd_v1_error_t detail = {NOAH_PROFILE_PD_V1_OK, 0};
+    if (!it || !reader || base > SIZE_MAX - length) {
+        fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
+        return NOAH_PROFILE_PD_V1_REJECTED;
+    }
+    if (length < NOAH_PROFILE_PD_V1_HEADER_SIZE) {
+        fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
+        return NOAH_PROFILE_PD_V1_REJECTED;
+    }
+    if (noah_profile_pd_v1_iterator_complete(it)) return NOAH_PROFILE_PD_V1_COMPLETE;
+    size_t offset = it->header ? NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)it->cursor.index * NOAH_PROFILE_PD_V1_RECORD_SIZE : 0;
+    size_t count = it->header ? NOAH_PROFILE_PD_V1_RECORD_SIZE - it->used : NOAH_PROFILE_PD_V1_HEADER_SIZE;
+    if (count > NOAH_PROFILE_PD_V1_STEP_READ_MAX) count = NOAH_PROFILE_PD_V1_STEP_READ_MAX;
+    if (!noah_profile_reader_read(reader, base + offset + it->used, it->bytes + it->used, count)) {
+        fail(error, NOAH_PROFILE_PD_V1_READ_ERROR, offset + it->used);
+        return NOAH_PROFILE_PD_V1_REJECTED;
+    }
+    if (!it->header) {
+        if (noah_profile_pd_v1_cursor_begin(&it->cursor, it->bytes, length, &detail) == NOAH_PROFILE_PD_V1_OK) {
+            it->header = true;
+            return noah_profile_pd_v1_iterator_complete(it) ? NOAH_PROFILE_PD_V1_COMPLETE : NOAH_PROFILE_PD_V1_ITERATING;
+        }
+    } else {
+        it->used += (uint8_t)count;
+        if (it->used != NOAH_PROFILE_PD_V1_RECORD_SIZE) return NOAH_PROFILE_PD_V1_ITERATING;
+        if (noah_profile_pd_v1_cursor_next(&it->cursor, it->bytes, &detail) == NOAH_PROFILE_PD_V1_OK) {
+            it->used = 0;
+            return NOAH_PROFILE_PD_V1_RECORD;
+        }
+        detail.offset += offset;
+    }
+    if (error) *error = detail;
+    return NOAH_PROFILE_PD_V1_REJECTED;
+}
+
+noah_profile_pd_v1_result_t noah_profile_pd_v1_validate(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error) {
+    if (!bytes) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
+    noah_profile_reader_t reader = noah_profile_reader_from_memory(bytes, length);
+    noah_profile_pd_v1_iterator_t iterator = {0};
+    noah_profile_pd_v1_error_t detail;
+    do {
+        if (noah_profile_pd_v1_iterator_step(&iterator, &reader, 0, length, &detail) == NOAH_PROFILE_PD_V1_REJECTED) {
+            if (error) *error = detail;
+            return detail.code;
+        }
+    } while (!noah_profile_pd_v1_iterator_complete(&iterator));
     return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
 }

@@ -21,6 +21,7 @@ build_and_run() {
     cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" -I"$ROOT" \
         "$ROOT/tests/host/profile_pd_v1_test.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         -o "$BUILD_DIR/$name"
     "$BUILD_DIR/$name" "$BUILD_DIR/corpus.bin" "$BUILD_DIR/v2.txt"
 }

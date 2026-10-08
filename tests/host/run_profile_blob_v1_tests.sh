@@ -18,6 +18,7 @@ build_and_run() {
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/profile_blob_v1_test.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/profile_blob_v1_test_$name"

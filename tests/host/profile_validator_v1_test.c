@@ -193,7 +193,7 @@ static void test_golden_incremental_phases(const char *fixture_path) {
             assert(validator.checksum_offset > prior_checksum_offset);
         } else if (prior_phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_BLOB_HEADER) {
             assert(state.step_calls == 1u && state.step_max_read == NOAH_PROFILE_BLOB_V1_HEADER_SIZE);
-        } else if (prior_phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER && validator.domain_index < validator.declared_domain_count) {
+        } else if (prior_phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER && validator.envelope.index < validator.envelope.count) {
             assert(state.step_calls == 1u && state.step_max_read == NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE);
         }
     }

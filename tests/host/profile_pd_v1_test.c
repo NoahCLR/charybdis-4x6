@@ -83,7 +83,47 @@ static void check_sparse_rules(void) {
     assert(noah_profile_pd_v1_validate_record(record, 96, 32, &error) == NOAH_PROFILE_PD_V1_INVALID_ARGUMENT);
 }
 
+static size_t iterator_reads, iterator_fail_at;
+static bool iterator_read(void *context, size_t offset, uint8_t *out, size_t length) {
+    assert(length <= 20u);
+    iterator_reads++;
+    if (iterator_reads == iterator_fail_at) return false;
+    memcpy(out, (const uint8_t *)context + offset, length);
+    return true;
+}
+static void test_bounded_iterator(void) {
+    uint8_t payload[8 + 2 * 96] = {2, 32, 96, 2};
+    noah_pd_config_t config = {.id = 0, .name = "First"};
+    noah_profile_pd_v1_encode_record(&config, payload + 8);
+    config.id = 31; strcpy(config.name, "Last");
+    noah_profile_pd_v1_encode_record(&config, payload + 8 + 96);
+    noah_profile_reader_t reader = {.read = iterator_read, .context = payload, .length = sizeof(payload)};
+    noah_profile_pd_v1_iterator_t iterator = {0};
+    noah_profile_pd_v1_error_t error;
+    iterator_reads = iterator_fail_at = 0;
+    unsigned records = 0;
+    while (!noah_profile_pd_v1_iterator_complete(&iterator)) {
+        size_t before = iterator_reads;
+        noah_profile_pd_v1_iteration_t result = noah_profile_pd_v1_iterator_step(&iterator, &reader, 0, sizeof(payload), &error);
+        assert(iterator_reads == before + 1u && result != NOAH_PROFILE_PD_V1_REJECTED);
+        if (result == NOAH_PROFILE_PD_V1_RECORD) {
+            assert(iterator.bytes[0] == (records ? 31 : 0));
+            assert(memcmp(iterator.bytes, payload + 8 + records * 96, 96) == 0);
+            records++;
+        }
+    }
+    assert(records == 2 && iterator_reads == 11);
+    size_t before = iterator_reads;
+    assert(noah_profile_pd_v1_iterator_step(&iterator, &reader, 0, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_COMPLETE && iterator_reads == before);
+    iterator = (noah_profile_pd_v1_iterator_t){0}; iterator_reads = 0; iterator_fail_at = 3;
+    assert(noah_profile_pd_v1_iterator_step(&iterator, &reader, 0, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_ITERATING);
+    assert(noah_profile_pd_v1_iterator_step(&iterator, &reader, 0, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_ITERATING);
+    assert(noah_profile_pd_v1_iterator_step(&iterator, &reader, 0, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_REJECTED);
+    assert(error.code == NOAH_PROFILE_PD_V1_READ_ERROR && error.offset == 28 && iterator.cursor.index == 0);
+}
+
 int main(int argc, char **argv) {
+    test_bounded_iterator();
     assert(argc == 3);
     check_sparse_rules();
     size_t v2_cases = check_v2_vectors(argv[2]);
