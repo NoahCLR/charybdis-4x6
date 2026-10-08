@@ -437,6 +437,7 @@ static void test_pending_combo_press_uses_exact_pending_footprint(void) {
 
     test_observe_physical_key(test_key(0, 1), true);
     test_observe_physical_key(test_key(4, 0), true);
+    test_set_combo_active(1, true); // Pinned QMK activates before emission.
 
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &combo_record);
 
@@ -457,12 +458,14 @@ static void test_pending_combo_release_uses_cached_exact_footprint(void) {
 
     test_observe_physical_key(test_key(0, 1), true);
     test_observe_physical_key(test_key(4, 0), true);
+    test_set_combo_active(1, true);
 
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &combo_press);
 
     test_observe_physical_key(test_key(4, 0), false);
     test_observe_physical_key(test_key(0, 1), false);
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &combo_release);
+    test_set_combo_active(1, false); // QMK deactivates after emitting release.
 
     CHECK(combo_release.event.key.row == 4);
     CHECK(combo_release.event.key.col == 0);
@@ -470,6 +473,25 @@ static void test_pending_combo_release_uses_cached_exact_footprint(void) {
     CHECK(test_bitmap_has(bitmap, 0, 1));
     CHECK(test_bitmap_has(bitmap, 4, 0));
     CHECK(noah_qmk_combo_origin_event_side_mask(&combo_release) == SPLIT_SIDE_MASK_BOTH);
+}
+
+static void test_inactive_combo_output_does_not_promote_an_exact_candidate(void) {
+    keyrecord_t combo_record = test_combo_record(true);
+    noah_qmk_combo_origin_debug_snapshot_t snapshot;
+    uint8_t bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+    test_observe_physical_key(test_key(0, 1), true);
+    test_observe_physical_key(test_key(4, 0), true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &combo_record);
+    noah_qmk_combo_origin_debug_snapshot(&snapshot);
+
+    CHECK(snapshot.pending_count == 1u);
+    CHECK(snapshot.unmatched_delayed_output_count == 1u);
+    CHECK(noah_qmk_combo_origin_event_bitmap(&combo_record, bitmap));
+    CHECK(test_bitmap_has(bitmap, 0, 1));
+    CHECK(test_bitmap_has(bitmap, 4, 0));
+    CHECK(test_bitmap_has(bitmap, 2, 2)); // Unproven origin stays conservative.
 }
 
 static void test_reset_clears_cached_combo_origin_state(void) {
@@ -775,6 +797,7 @@ int main(void) {
     test_duplicate_output_active_combos_keep_exact_origins();
     test_pending_combo_press_uses_exact_pending_footprint();
     test_pending_combo_release_uses_cached_exact_footprint();
+    test_inactive_combo_output_does_not_promote_an_exact_candidate();
     test_reset_clears_cached_combo_origin_state();
     test_active_combo_partition_routes_preview_owner_to_underlay();
     test_active_combo_partition_routes_preview_and_pd_owners_to_underlay();
