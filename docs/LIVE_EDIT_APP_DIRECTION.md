@@ -60,12 +60,6 @@ Firmware work remaining before the product is complete:
 - **Physical gesture acceptance (D-F01).** The buffered-repeat defect is
   reproduced and fixed through the real QMK combo/tapping path. Acceptance on
   both halves, pointing-mode routing and host Button 7 bindings remains open.
-- **One-half power-cycle recovery transition.** On 2026-09-12, after one half
-  lost power while the other stayed powered, the first complete read failed
-  with VIA storage flags 7 (dirty, recovery required) before settling to clean
-  flags about 20 seconds later with the exact original profile. A full
-  two-half power cycle was clean. The dirty transition is unexplained; do not
-  suppress the readiness error without establishing its cause.
 - **Why a peer stops acknowledging a push** (D-L22) and **why a peer flash
   write failed mid-copy** (D-L27) are both unknown. Both are now bounded and
   reported; the status fields D-L27 added should identify the cause next time.
