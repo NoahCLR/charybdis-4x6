@@ -131,8 +131,11 @@ of 100. The default-layer mask is nonzero and contains no out-of-bank bits.
 
 At publication the settings invalidator copies the bounded domain into a cold
 runtime cache using reads of at most 20 bytes. Key, RGB, pointer and macro
-execution use the cache, without EEPROM reads. The invalidator refreshes macro
-validation metadata and applies QMK-owned settings at the safe boundary.
+execution use the cache, without EEPROM reads. The settings module owns immutable factory scalars and authored names, also
+included in the complete compiled profile. Compat injects the QMK apply hook;
+the settings runtime has no reverse call into compat. Explicit stored settings
+apply at the safe boundary. A missing settings domain warms the compiled
+fallback cache without applying factory values to native owners.
 Native RGB/DPI/default-layer/keymap settings retain their EEPROM ownership:
 boot preserves newer native values, and export reads their current values.
 Ordinary domain edits refresh these values before writing an existing settings

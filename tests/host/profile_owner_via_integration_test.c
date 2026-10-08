@@ -353,6 +353,7 @@ void noah_effective_key_behavior_runtime_invalidate(void *context, uint32_t publ
 
 void noah_effective_rgb_runtime_init(noah_effective_rgb_runtime_t *runtime) {
     memset(runtime, 0, sizeof(*runtime));
+    runtime->banks[0].valid = runtime->banks[1].valid = true;
     runtime->initialized = true;
 }
 

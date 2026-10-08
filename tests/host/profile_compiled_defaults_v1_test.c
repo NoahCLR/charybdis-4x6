@@ -7,6 +7,8 @@
 
 #include "users/noah/lib/profile/schema/profile_compiled_defaults_v1.h"
 #include "users/noah/lib/profile/schema/profile_validator_v1.h"
+#include "users/noah/lib/profile/schema/profile_rgb_compiled_v1.h"
+#include "users/noah/lib/profile/schema/profile_settings_defaults.h"
 #include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 #include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
@@ -30,6 +32,10 @@ static size_t      output_length;
 static size_t      largest_write;
 static const char *fixture_path;
 static size_t behavior_visits;
+static size_t domain_writes[NOAH_PROFILE_DOMAIN_REGISTRY_COUNT];
+void noah_compiled_defaults_test_domain_write(uint8_t id) {
+    for (size_t i = 0; i < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; i++) if (noah_profile_domain_at(i)->id == id) domain_writes[i]++;
+}
 
 void noah_compiled_defaults_test_behavior_visit(void) { behavior_visits++; }
 
@@ -181,7 +187,7 @@ static void validate_whole_profile(const noah_profile_compiled_v1_t *profile) {
     noah_profile_validator_v1_result_t        result = noah_profile_validator_v1_begin(&validator, &copied_reader, 0u, &declaration, &compatible, &error);
 
     assert(result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS);
-    for (size_t steps = 0u; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && steps < 1000u; steps++) {
+    for (size_t steps = 0u; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && steps < 2u * NOAH_PROFILE_BLOB_V1_MAX_SIZE; steps++) {
         result = noah_profile_validator_v1_step(&validator, NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX, &error);
     }
     if (result != NOAH_PROFILE_VALIDATOR_V1_VALID) {
@@ -201,7 +207,7 @@ static void validate_whole_profile(const noah_profile_compiled_v1_t *profile) {
     memset(&placement_log, 0, sizeof(placement_log));
     copied_reader = reader;
     result        = noah_profile_validator_v1_begin(&validator, &copied_reader, 0u, &declaration, &compatible, &error);
-    for (size_t steps = 0u; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && steps < 1000u; steps++) {
+    for (size_t steps = 0u; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && steps < 2u * NOAH_PROFILE_BLOB_V1_MAX_SIZE; steps++) {
         result = noah_profile_validator_v1_step(&validator, NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX, &error);
     }
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
@@ -224,7 +230,7 @@ static void test_real_authored_profile(void) {
 
     assert(noah_profile_compiled_v1_open(NULL, &error) == NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT);
     assert(noah_profile_compiled_v1_open(&profile, &error) == NOAH_PROFILE_COMPILED_V1_OK);
-    assert(profile.metadata.domain_mask == NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_ALL);
+    assert(profile.metadata.domain_mask == NOAH_PROFILE_DOMAIN_MASK_ALL);
     assert(profile.metadata.byte_length > NOAH_PROFILE_BLOB_V1_HEADER_SIZE);
     assert(profile.metadata.byte_length <= NOAH_PROFILE_BLOB_V1_MAX_SIZE);
     assert(profile.metadata.crc32 != 0u);
@@ -232,7 +238,7 @@ static void test_real_authored_profile(void) {
     assert(profile.metadata.action_abi_digest != 0u);
     assert(profile.metadata.action_abi_row_visits == 0);
     assert(profile.metadata.action_abi_row_visits <= NOAH_PROFILE_COMPILED_V1_ACTION_ABI_ROW_VISITS_MAX);
-    assert(sizeof(profile) <= 20u);
+    assert(sizeof(profile) <= 40u);
     assert(!noah_profile_compiled_v1_compatibility(NULL, &runtime_compatibility));
     assert(!noah_profile_compiled_v1_compatibility(&profile, NULL));
     assert(noah_profile_compiled_v1_compatibility(&profile, &runtime_compatibility));
@@ -264,7 +270,7 @@ static void test_real_authored_profile(void) {
     assert(output_length == profile.metadata.byte_length);
     assert(largest_write <= NOAH_PROFILE_RGB_V1_HEADER_SIZE);
     assert(noah_profile_blob_v1_decode(output, output_length, &decoded, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
-    assert(decoded.domain_count == (NOAH_PROFILE_PD_COUNT == 32 ? 3u : 2u));
+    assert(decoded.domain_count == NOAH_PROFILE_DOMAIN_REGISTRY_COUNT);
     assert(decoded.domains[0].id == NOAH_PROFILE_DOMAIN_V1_RGB);
     assert(decoded.domains[1].id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS);
     assert(decoded.crc32 == profile.metadata.crc32);
@@ -289,22 +295,36 @@ static void test_real_authored_profile(void) {
         assert(memcmp(slice, &output[offset], length) == 0);
     }
     assert(behavior_visits == 0);
+    for (size_t i = 0; i < decoded.domain_count; i++) {
+        const noah_profile_domain_v1_t *domain = &decoded.domains[i];
+        memset(domain_writes, 0, sizeof(domain_writes));
+        size_t length = domain->payload_length < sizeof(slice) ? domain->payload_length : sizeof(slice);
+        assert(noah_profile_reader_read(&reader, (size_t)(domain->payload - output), slice, length));
+        assert(!memcmp(slice, domain->payload, length));
+        for (size_t j = 0; j < decoded.domain_count; j++) assert(domain_writes[j] == (i == j ? 1u : 0u));
+    }
+    // Exercise every envelope and payload seam with byte-granular windows.
+    for (size_t offset = 0; offset < output_length; offset++) {
+        size_t length = output_length - offset < sizeof(slice) ? output_length - offset : sizeof(slice);
+        assert(noah_profile_reader_read(&reader, offset, slice, length));
+        assert(!memcmp(slice, output + offset, length));
+    }
     assert(!noah_profile_reader_read(&reader, output_length - 1u, slice, 2u));
 #ifdef NOAH_PD_PROFILE_ENABLE
     // Boot and compiled fallback must warm the real PD cache without replaying
     // canonical behavior sorting for every 20-byte read in the same scan.
     noah_effective_profile_snapshot_t snapshot = {.reader = reader};
     snapshot.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
-    snapshot.profile.pd.offset = (size_t)(decoded.domains[2].payload - output);
-    snapshot.profile.pd.length = decoded.domains[2].payload_length;
+    snapshot.profile.pd.offset = (size_t)(decoded.domains[4].payload - output);
+    snapshot.profile.pd.length = decoded.domains[4].payload_length;
     behavior_visits = 0;
     noah_effective_pd_invalidate(NULL, 0, snapshot.identity, snapshot.identity, &snapshot);
     assert(noah_effective_pd_ready());
     // The sparse domain stores the authored slots that say something; the
     // cache holds all 32, omitted ones disabled with an empty name.
-    const uint8_t *pd_payload = decoded.domains[2].payload;
-    assert(decoded.domains[2].version == NOAH_PROFILE_PD_V1_VERSION);
-    assert(pd_payload[0] == 2 && pd_payload[1] == 32 && pd_payload[2] == 96 && decoded.domains[2].payload_length == 8u + 96u * pd_payload[3]);
+    const uint8_t *pd_payload = decoded.domains[4].payload;
+    assert(decoded.domains[4].version == NOAH_PROFILE_PD_V1_VERSION);
+    assert(pd_payload[0] == 2 && pd_payload[1] == 32 && pd_payload[2] == 96 && decoded.domains[4].payload_length == 8u + 96u * pd_payload[3]);
     uint8_t stored = 0;
     for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
         const uint8_t *record = noah_effective_pd_record(slot);
@@ -330,6 +350,28 @@ static void test_real_authored_profile(void) {
     }
     assert(behavior_visits == 0);
 #endif
+    noah_profile_rgb_v1_view_t cached_rgb;
+    memset(domain_writes, 0, sizeof(domain_writes));
+    assert(noah_profile_rgb_compiled_v1_view());
+    cached_rgb = *noah_profile_rgb_compiled_v1_view();
+    assert(domain_writes[0] == 1);
+    assert(cached_rgb.byte_length == decoded.domains[0].payload_length);
+    for (size_t offset = 0; offset < cached_rgb.byte_length; offset += sizeof(slice)) {
+        size_t length = cached_rgb.byte_length - offset < sizeof(slice) ? cached_rgb.byte_length - offset : sizeof(slice);
+        assert(noah_profile_reader_read(&cached_rgb.reader, cached_rgb.base_offset + offset, slice, length));
+        assert(!memcmp(slice, decoded.domains[0].payload + offset, length));
+    }
+    memset(domain_writes, 0, sizeof(domain_writes));
+    for (size_t i = 0; i < 100; i++) {
+        noah_profile_rgb_v1_layer_color_t color;
+        assert(noah_profile_rgb_compiled_v1_view());
+    cached_rgb = *noah_profile_rgb_compiled_v1_view();
+        assert(noah_profile_rgb_v1_layer_color_at(&cached_rgb, 0, &color, NULL) == NOAH_PROFILE_RGB_V1_OK);
+    }
+    for (size_t i = 0; i < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; i++) assert(domain_writes[i] == 0);
+    assert(noah_profile_settings_default(NOAH_SETTING_DEFAULT_DPI) == CHARYBDIS_MINIMUM_DEFAULT_DPI);
+    assert(noah_profile_settings_default(NOAH_SETTING_SNIPING_DPI) == CHARYBDIS_MINIMUM_SNIPING_DPI);
+    assert(noah_profile_settings_default(NOAH_SETTING_KEYMAP_OPTIONS) == 0x1400);
     validate_whole_profile(&profile);
 
     printf("compiled profile v1: %u bytes crc32=%08x fnv1a=%08x action_abi=%08x\n", profile.metadata.byte_length, (unsigned)profile.metadata.crc32, (unsigned)profile.metadata.digest, (unsigned)profile.metadata.action_abi_digest);

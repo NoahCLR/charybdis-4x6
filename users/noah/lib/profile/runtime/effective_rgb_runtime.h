@@ -48,15 +48,15 @@ void noah_effective_rgb_runtime_init(noah_effective_rgb_runtime_t *runtime);
 bool noah_effective_rgb_runtime_install(noah_effective_rgb_runtime_t *runtime);
 void noah_effective_rgb_runtime_uninstall(noah_effective_rgb_runtime_t *runtime);
 
-// Provider invalidator: copies only the already-validated RGB view and swaps a
-// double bank. It performs no payload traversal or color-cache construction
-// inside the provider publication interval.
+// Initial compiled invalidation warms the immutable RGB cache on the cold
+// owner boot path. Later publications copy the validated stored or cached
+// factory view and swap a double bank, without constructing a color cache.
 void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_count, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *callback_view);
 
 noah_effective_rgb_result_t noah_effective_rgb_runtime_capture_frame(const noah_effective_rgb_runtime_t *runtime, noah_effective_rgb_frame_t *frame);
 noah_effective_rgb_result_t noah_effective_rgb_runtime_frame_status(const noah_effective_rgb_runtime_t *runtime, const noah_effective_rgb_frame_t *frame);
 
-// Installed-runtime wrappers for the future RGB renderer migration. With no
-// installed owner they explicitly select the compiled authored configuration.
+// Installed-runtime wrappers. With no owner the effective RGB adapter uses
+// the same immutable compiled-domain cache.
 noah_effective_rgb_result_t noah_effective_rgb_capture_frame(noah_effective_rgb_frame_t *frame);
 noah_effective_rgb_result_t noah_effective_rgb_frame_status(const noah_effective_rgb_frame_t *frame);

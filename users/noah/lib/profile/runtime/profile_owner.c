@@ -356,7 +356,7 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
     invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){.callback = noah_effective_combo_runtime_invalidate, .context = &owner->combos};
 #endif
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
-    invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){.callback = noah_effective_settings_invalidate, .context = NULL};
+    invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){.callback = noah_effective_settings_invalidate, .context = &owner->compiled_snapshot};
 #endif
 #ifdef NOAH_PD_PROFILE_ENABLE
     invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){.callback = noah_effective_pd_invalidate, .context = NULL};
@@ -370,6 +370,18 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
     }
     noah_effective_key_behavior_runtime_invalidate(&owner->key_behaviors, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     noah_effective_rgb_runtime_invalidate(&owner->rgb, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
+    if (!owner->rgb.banks[owner->rgb.active_index].valid) return false;
+#ifdef COMBO_ENABLE
+    owner->combos.compiled_defaults = &owner->compiled_snapshot;
+    noah_effective_combo_runtime_invalidate(&owner->combos, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
+    if (!owner->combos.valid) return false;
+#endif
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    noah_effective_settings_boot(true);
+    noah_effective_settings_invalidate(&owner->compiled_snapshot, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
+    noah_effective_settings_boot(false);
+    if (!noah_effective_settings_length()) return false;
+#endif
 #ifdef NOAH_PD_PROFILE_ENABLE
     noah_effective_pd_invalidate(NULL, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     if (!noah_effective_pd_ready()) return false;
@@ -459,8 +471,9 @@ bool noah_profile_owner_init(noah_profile_owner_t *owner, const noah_profile_own
         owner->state = NOAH_PROFILE_OWNER_COMPILED_ERROR;
         return false;
     }
-    owner->compiled_reader      = noah_profile_compiled_v1_reader(&owner->compiled);
-    owner->compiled_declaration = (noah_profile_validator_v1_declaration_t){
+    owner->compiled_reader = noah_profile_compiled_v1_reader(&owner->compiled);
+    // begin copies this declaration; no second lifetime-long copy is needed.
+    const noah_profile_validator_v1_declaration_t declaration = {
         .schema_major      = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
         .schema_minor      = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR,
         .domain_mask       = owner->compiled.metadata.domain_mask,
@@ -470,7 +483,7 @@ bool noah_profile_owner_init(noah_profile_owner_t *owner, const noah_profile_own
         .digest            = owner->compiled.metadata.digest,
         .action_abi_digest = owner->compiled.metadata.action_abi_digest,
     };
-    result = noah_profile_validator_v1_begin(&owner->staging.compiled_validator, &owner->compiled_reader, 0u, &owner->compiled_declaration, &owner->compatibility, NULL);
+    result = noah_profile_validator_v1_begin(&owner->staging.compiled_validator, &owner->compiled_reader, 0u, &declaration, &owner->compatibility, NULL);
     if (result != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) {
         owner->state = NOAH_PROFILE_OWNER_COMPILED_ERROR;
         return false;

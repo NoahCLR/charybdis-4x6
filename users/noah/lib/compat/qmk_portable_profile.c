@@ -11,11 +11,13 @@
 #    include "noah_keymap_ids.h"
 #    include "qmk_via_split_sync.h"
 #    include "../profile/runtime/effective_settings_runtime.h"
+#    include "../profile/schema/profile_settings_defaults.h"
 #    include "../profile/storage/profile_checksum.h"
 #    include "../profile/storage/profile_store_runtime.h"
 
 // Cold readback workspace, never used by key events or RGB rendering.
 void noah_qmk_portable_storage_init(void) {
+    noah_effective_settings_set_apply(noah_qmk_portable_apply);
     uint32_t word = eeconfig_read_user();
     // An older bank's layout uses another keycode numbering or geometry. Never
     // interpret it, even when both builds happen on the same date.
@@ -39,17 +41,8 @@ static void u32(uint8_t *p, uint32_t v) {
     for (uint8_t i = 0; i < 4; i++)
         p[i] = v >> (8 * i);
 }
-static uint32_t setting_default(uint8_t id) {
-    if (id >= NOAH_SETTING_DRAGSCROLL_DPI && id <= NOAH_SETTING_ARROW_DPI) return 0;
+static uint32_t current_setting(uint8_t id) {
     switch (id) {
-        case NOAH_SETTING_TAPPING_TERM:
-            return TAPPING_TERM;
-        case NOAH_SETTING_TAP_HOLD_TERM:
-            return CUSTOM_TAP_HOLD_TERM;
-        case NOAH_SETTING_LONG_HOLD_TERM:
-            return CUSTOM_LONGER_HOLD_TERM;
-        case NOAH_SETTING_MULTI_TAP_TERM:
-            return CUSTOM_MULTI_TAP_TERM;
         case NOAH_SETTING_AUTO_MOUSE_ENABLED:
             return get_auto_mouse_enable();
         case NOAH_SETTING_AUTO_MOUSE_LAYER:
@@ -58,16 +51,6 @@ static uint32_t setting_default(uint8_t id) {
             return get_auto_mouse_timeout();
         case NOAH_SETTING_AUTO_MOUSE_DEBOUNCE:
             return get_auto_mouse_debounce();
-        case NOAH_SETTING_AUTO_SNIPING_ENABLED:
-            return 1;
-        case NOAH_SETTING_AUTO_SNIPING_LAYER:
-            return CHARYBDIS_AUTO_SNIPING_LAYER;
-        case NOAH_SETTING_FEEDBACK_PERIOD:
-            return RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS;
-        case NOAH_SETTING_AUTO_MOUSE_DEAD_TIME:
-            return AUTOMOUSE_RGB_DEAD_TIME;
-        case NOAH_SETTING_RGB_TIMEOUT:
-            return 900000;
         case NOAH_SETTING_DEFAULT_DPI:
             return charybdis_get_pointer_default_dpi();
         case NOAH_SETTING_SNIPING_DPI:
@@ -82,87 +65,26 @@ static uint32_t setting_default(uint8_t id) {
             return default_layer_state;
         case NOAH_SETTING_KEYMAP_OPTIONS:
             return keymap_config.raw;
-        case NOAH_SETTING_AUTO_MOUSE_DELAY:
-            return 200;
-        case NOAH_SETTING_AUTO_MOUSE_THRESHOLD:
-            return 10;
-        case NOAH_SETTING_COMBO_REFERENCES:
-            return 0x76543210u;
         default:
-            return 0;
+            return noah_profile_settings_default(id);
     }
 }
 static bool external_setting(uint8_t id) {
     return (id >= NOAH_SETTING_AUTO_MOUSE_ENABLED && id <= NOAH_SETTING_AUTO_MOUSE_DEBOUNCE) || (id >= NOAH_SETTING_DEFAULT_DPI && id <= NOAH_SETTING_KEYMAP_OPTIONS);
 }
-// The keymap's names fill a settings domain that no profile has stored.
-_Static_assert((int)LAYER_COUNT == (int)NOAH_SETTINGS_LAYERS, "Settings name every one of the eight layers");
-_Static_assert(NOAH_LAYER_NAME_SIZE == NOAH_SETTINGS_NAME_BYTES, "A layer name fills one settings name field");
-_Static_assert(VIA_MACRO_SLOT_COUNT == NOAH_SETTINGS_MACRO_NAMES, "Settings name every VIA macro");
-_Static_assert(NOAH_MACRO_NAME_SIZE == NOAH_SETTINGS_MACRO_NAME_ASCII_MAX + 1u, "A macro name is at most 20 characters");
-_Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_SETTINGS_CUSTOM_KEY_NAMES, "Settings name every custom key");
 enum { LAYER_NAMES_OFFSET = 8u + NOAH_SETTINGS_COUNT * 4u };
-// Name records after the fixed part: the macros' (v3), then the custom keys' (v5).
-enum { NAME_RECORDS = NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES, CUSTOM_KEY_NAME_HEADER = NOAH_SETTINGS_CUSTOM_KEY_NAMES };
-static uint8_t name_length(const char *name, uint8_t max) {
-    uint8_t length = 0;
-    while (length < max && name[length])
-        length++;
-    return length;
-}
-static const char *record_name(uint8_t record) {
-    if (record >= NOAH_SETTINGS_MACRO_NAMES) return custom_key_names[record - NOAH_SETTINGS_MACRO_NAMES];
-    return via_macro_names[record];
-}
-static uint8_t record_name_length(uint8_t record) {
-    return name_length(record_name(record), NOAH_SETTINGS_MACRO_NAME_ASCII_MAX);
-}
-// Settings readback streams from the effective settings rather than keeping
-// a second copy. Page 0 describes the bytes as they are now; a change between
-// pages shows up as the digest mismatch the reader already checks for.
 static uint16_t settings_length(void) {
     uint16_t length = noah_effective_settings_length();
-    if (length) return length;
-    length = NOAH_SETTINGS_FIXED_SIZE + NAME_RECORDS;
-    for (uint8_t record = 0; record < NAME_RECORDS; record++)
-        length += record_name_length(record);
-    return length;
+    return length ? length : noah_profile_settings_defaults_length();
 }
 static uint8_t settings_byte(uint16_t offset) {
     if (offset >= 8u && offset < LAYER_NAMES_OFFSET) {
         uint8_t  id    = (offset - 8u) / 4u;
-        uint32_t value = setting_default(id);
+        uint32_t value = current_setting(id);
         if (!external_setting(id)) value = noah_setting(id, value);
         return value >> (8u * ((offset - 8u) % 4u));
     }
-    if (noah_effective_settings_length()) return noah_effective_settings_byte(offset);
-    // No profile settings are live: the current version with the keymap's
-    // layer, macro and custom-key names.
-    const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, CUSTOM_KEY_NAME_HEADER, 0, 0, 0};
-    if (offset < 8u) return header[offset];
-    if (offset < NOAH_SETTINGS_FIXED_SIZE) {
-        offset -= LAYER_NAMES_OFFSET;
-        const char *name = layer_names[offset / NOAH_SETTINGS_NAME_BYTES];
-        uint8_t     byte = offset % NOAH_SETTINGS_NAME_BYTES;
-        // Zero padded after the name, whatever the array holds there.
-        return byte < name_length(name, NOAH_SETTINGS_NAME_BYTES - 1u) ? (uint8_t)name[byte] : 0u;
-    }
-    offset -= NOAH_SETTINGS_FIXED_SIZE;
-    // Reads run forward, so resume from the record the last byte was in; the
-    // authored names never change, so the cursor stays valid across reads.
-    static uint8_t  cursor_record;
-    static uint16_t cursor_start;
-    if (offset < cursor_start) cursor_record = 0u, cursor_start = 0u;
-    for (uint8_t record = cursor_record; record < NAME_RECORDS; record++) {
-        uint8_t length = record_name_length(record);
-        if (offset - cursor_start <= length) {
-            cursor_record = record;
-            return offset == cursor_start ? length : (uint8_t)record_name(record)[offset - cursor_start - 1u];
-        }
-        cursor_start += length + 1u;
-    }
-    cursor_record = NAME_RECORDS;
-    return 0u;
+    return noah_effective_settings_length() ? noah_effective_settings_byte(offset) : noah_profile_settings_defaults_byte(offset);
 }
 // Up to 25 readback bytes of `kind` from `offset`; 0 past the end.
 static uint8_t readback_fill(uint8_t kind, uint16_t offset, uint8_t *target) {
@@ -193,7 +115,7 @@ void noah_qmk_portable_apply(void) {
     dpi = noah_setting(NOAH_SETTING_SNIPING_DPI, charybdis_get_pointer_sniping_dpi());
     for (uint8_t i = 0; i < 4 && charybdis_get_pointer_sniping_dpi() != dpi; i++)
         charybdis_cycle_pointer_sniping_dpi(true);
-    noah_qmk_portable_apply_lighting(noah_setting(NOAH_SETTING_RGB_MODE, setting_default(NOAH_SETTING_RGB_MODE)), noah_setting(NOAH_SETTING_RGB_COLOR, setting_default(NOAH_SETTING_RGB_COLOR)));
+    noah_qmk_portable_apply_lighting(noah_setting(NOAH_SETTING_RGB_MODE, current_setting(NOAH_SETTING_RGB_MODE)), noah_setting(NOAH_SETTING_RGB_COLOR, current_setting(NOAH_SETTING_RGB_COLOR)));
     uint8_t layers = noah_setting(NOAH_SETTING_DEFAULT_LAYERS, default_layer_state);
     default_layer_set(layers);
     eeconfig_update_default_layer(layers);

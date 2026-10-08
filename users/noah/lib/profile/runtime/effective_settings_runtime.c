@@ -1,9 +1,13 @@
 #include "effective_settings_runtime.h"
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
-static uint8_t  settings[NOAH_SETTINGS_MAX_SIZE];
-static uint16_t settings_length;
-static bool     booting;
-void            noah_effective_settings_boot(bool value) {
+static uint8_t                          settings[NOAH_SETTINGS_MAX_SIZE];
+static uint16_t                         settings_length;
+static bool                             booting;
+static noah_effective_settings_apply_fn apply_settings;
+void                                    noah_effective_settings_set_apply(noah_effective_settings_apply_fn apply) {
+    apply_settings = apply;
+}
+void noah_effective_settings_boot(bool value) {
     booting = value;
 }
 bool noah_effective_settings_is_booting(void) {
@@ -22,7 +26,8 @@ uint8_t noah_effective_settings_byte(uint16_t offset) {
     return offset < settings_length ? settings[offset] : 0u;
 }
 void noah_effective_settings_invalidate(void *context, uint32_t publication, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *view) {
-    (void)context;
+    bool apply = view && (view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS) && active.kind != NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
+    if (view && !(view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS) && context) view = context;
     (void)publication;
     (void)previous;
     (void)active;
@@ -41,6 +46,6 @@ void noah_effective_settings_invalidate(void *context, uint32_t publication, noa
             if (ok) settings_length = length;
         }
     }
-    if (settings_length) noah_qmk_portable_apply();
+    if (apply && settings_length && apply_settings) apply_settings();
 }
 #endif

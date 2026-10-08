@@ -147,8 +147,9 @@ reaches `housekeeping_task()`. `noah_suspend_power_down_user()` keeps the
 2 s after the host sleeps and shows the white boot indicator. The watchdog is
 fed on every eighth heartbeat, so its timeout bounds eight main-loop passes:
 2 s allows 250 ms a pass on average. The earlier 750 ms (94 ms a pass) reset
-the master while a host read the 32-slot firmware's compiled profile, whose
-reader replays the serialization for each chunk.
+the master while a host read the 32-slot firmware's compiled profile. Its
+reader now seeks by domain (D-F12), emitting only intersecting domain payloads
+for each chunk; effective caches warm through that same representation.
 
 Split RPC callbacks for the VIA mirror and durable VIA reconciliation only
 validate, queue, and return bounded responses. They never access EEPROM. The

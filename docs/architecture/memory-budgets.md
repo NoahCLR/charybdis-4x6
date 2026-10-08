@@ -409,3 +409,23 @@ differs slightly. At userspace `bdd2b5a3` and BK `e8e2a57f` (QMK 0.34.6), the
 left half links 4,164 B of `.data` and 59,560 B of `.bss` (63,724 B, 788 below
 the tripwire), a 63,736 B fixed linked prefix, a 198,408 B core-memory span at
 boot and 213,880 B of flash image sections.
+
+## Complete compiled defaults representation
+
+D-F12 retains a 40-byte compiled-profile handle: metadata and five domain
+offset/length pairs. Factory RGB adds one 551-byte encoded cache, a 40-byte
+reader view and readiness state in SRAM0–3. It shares the stored RGB decoder;
+ordinary frames do no serialization. Compiled combos and settings warm the
+existing effective caches instead of allocating another profile buffer.
+
+The owner keeps a borrowed compiled snapshot for absent-domain fallback. The
+validator copies its boot declaration at begin, so the owner does not retain a
+second declaration. Its 4,096-byte state policy and the 64,512-byte schema-2
+static-data policy remain unchanged. Neither is a physical SRAM limit.
+
+The live-owner stack manifest covers initial serialization, cold factory RGB
+writing and validation, compiled combo/settings cache publication, and the
+injected native settings apply callback. These are reviewed linked paths only.
+The ordinary manifest's previously documented compiler-inlining gaps remain
+open; a passing owner manifest does not resolve those or establish runtime
+stack high-water.

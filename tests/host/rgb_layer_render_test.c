@@ -133,6 +133,35 @@ EXPORT_LAYER_LED_GROUP_TABLE(layer_led_groups_data);
 
 const pd_mode_color_t pd_mode_colors[] = {
     {.pointing_mode = PD_MODE_ARROW, .color = HSV(210, 211, 212), .locality = RGB_RIGHT_HALF}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(220, 221, 222), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(223, 224, 225), .locality = RGB_BOTH_HALVES}, {.pointing_mode = PD_MODE_ZOOM, .color = HSV(226, 227, 228), .locality = RGB_KEY_HALF}, {.pointing_mode = PD_MODE_PINCH, .color = HSV(233, 234, 235), .locality = RGB_KEYS_ONLY},
+    // Current RGB geometry includes an explicit color row for every slot.
+    {.pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_6, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_7, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_8, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_9, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_10, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_11, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_12, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_13, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_14, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_15, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_16, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_17, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_18, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_19, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_20, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_21, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_22, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_23, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_24, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_25, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_26, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_27, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_28, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_29, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_30, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_31, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+
 };
 const uint8_t                    pd_mode_color_count       = (uint8_t)(sizeof(pd_mode_colors) / sizeof(pd_mode_colors[0]));
 static const pd_mode_led_group_t pd_mode_led_groups_data[] = RGB_LED_GROUP_TABLE({.pointing_mode = PD_MODE_VOLUME, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(1, 6)}, {.pointing_mode = RGB_PD_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(6)}, );
@@ -156,7 +185,7 @@ static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_L
 EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 #endif
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    RGB_TAP_BRANCH_COLORS(HSV(13, 14, 15), HSV(16, 17, 18), HSV(19, 20, 21)),
+    RGB_TAP_BRANCH_COLORS(HSV(13, 14, 15), HSV(16, 17, 18), HSV(19, 20, 21), HSV(19, 20, 21)),
     .tap_committed_color    = HSV(4, 5, 6),
     .hold_active_color      = HSV(7, 8, 9),
     .long_hold_active_color = HSV(10, 11, 12),

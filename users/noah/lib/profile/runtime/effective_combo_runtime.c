@@ -25,7 +25,10 @@ void noah_effective_combo_runtime_invalidate(void *context, uint32_t publication
     (void)previous;
     (void)active;
     if (!runtime) return;
+    const noah_effective_profile_snapshot_t *compiled = runtime->compiled_defaults;
     memset(runtime, 0, sizeof(*runtime));
+    runtime->compiled_defaults = compiled;
+    if (view && !(view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS) && compiled) view = compiled;
     if (!view) return;
     if (!(view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS)) {
         runtime->valid = true;

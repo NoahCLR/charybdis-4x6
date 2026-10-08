@@ -27,6 +27,7 @@ static uint32_t compiled_reads;
 static bool     key_installed;
 static bool     rgb_installed;
 static bool     rgb_install_allowed = true;
+static bool     rgb_cache_valid = true;
 static bool     logical_via_ready     = true;
 static bool     logical_via_converged = true;
 static uint32_t activation_block_reason;
@@ -167,6 +168,7 @@ void noah_effective_key_behavior_runtime_invalidate(void *context, uint32_t publ
 
 void noah_effective_rgb_runtime_init(noah_effective_rgb_runtime_t *runtime) {
     memset(runtime, 0, sizeof(*runtime));
+    runtime->banks[0].valid = runtime->banks[1].valid = true;
     runtime->initialized = true;
 }
 
@@ -181,7 +183,8 @@ void noah_effective_rgb_runtime_uninstall(noah_effective_rgb_runtime_t *runtime)
 }
 
 void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_count, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *callback_view) {
-    (void)context;
+    noah_effective_rgb_runtime_t *runtime = context;
+    runtime->banks[runtime->active_index].valid = rgb_cache_valid;
     (void)publication_count;
     (void)previous;
     (void)active;
@@ -1170,6 +1173,21 @@ static void test_partial_runtime_install_rolls_back(void) {
     rgb_install_allowed = true;
 }
 
+static void test_failed_factory_rgb_cache_refuses_graph_install(void) {
+    noah_profile_owner_t owner;
+    memory_t memory;
+    memset(&memory, 0, sizeof(memory));
+    memset(memory.bytes, 0xff, sizeof(memory.bytes));
+    rgb_cache_valid = false;
+    assert(noah_profile_owner_init(&owner, &(noah_profile_owner_config_t){.store_io = {.read = memory_read, .write = memory_write, .context = &memory}, .logical_via = &test_logical_via_ops}));
+    for (uint32_t guard = 0; guard < 32 && owner.state == NOAH_PROFILE_OWNER_VALIDATING_COMPILED; guard++) noah_profile_owner_scan(&owner, true, guard);
+    assert(owner.state == NOAH_PROFILE_OWNER_INTEGRATION_ERROR);
+    assert(!key_installed && !rgb_installed);
+    // Boot errors retain typing on the loaded keymap; only decided Apply gates output.
+    assert(noah_profile_owner_output_ready(&owner));
+    rgb_cache_valid = true;
+}
+
 static void test_clean_idle_scans_do_not_repeat_host_session_cleanup(void) {
     noah_profile_owner_t owner;
     memory_t             memory;
@@ -1736,6 +1754,7 @@ static void test_decided_logical_commit_never_cancels_its_via_staging(void) {
 int main(void) {
     test_output_fence_covers_only_the_accepted_roll_forward();
     test_partial_runtime_install_rolls_back();
+    test_failed_factory_rgb_cache_refuses_graph_install();
     test_clean_idle_scans_do_not_repeat_host_session_cleanup();
     test_logical_commit_waits_for_via_stage_and_convergence();
     test_lost_link_after_decision_keeps_typing_and_resumes();
