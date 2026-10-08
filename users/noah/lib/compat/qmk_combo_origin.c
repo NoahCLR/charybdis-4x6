@@ -9,6 +9,7 @@
 #    include "qmk_effective_combos.h"
 #    include "../profile/storage/profile_storage_layout.h"
 #    include "../split/runtime_sync.h"
+#    include "../profile/runtime/effective_settings_runtime.h"
 
 #    ifndef COMBO_ONLY_FROM_LAYER
 uint8_t combo_ref_from_layer(uint8_t layer);
@@ -39,9 +40,13 @@ typedef struct {
     uint16_t combo_index;
     uint16_t keycode;
     uint16_t complete_at;
+    uint16_t applied_at;
     keypos_t owner_key_pos;
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
     bool     active;
+    // QMK fired this completion: its output press is delivered now or queued
+    // behind an undecided tap-hold key, possibly after the chord is released.
+    bool     applied;
     bool     deadline_crossed;
 } combo_origin_pending_output_entry_t;
 
@@ -372,6 +377,7 @@ static bool combo_origin_pending_output_store(uint16_t combo_index, uint32_t gen
     }
 
     entry->active           = true;
+    entry->applied          = false;
     entry->deadline_crossed = false;
     entry->generation       = generation;
     entry->combo_index      = combo_index;
@@ -414,6 +420,17 @@ static uint16_t combo_origin_latest_legal_wait_ms(void) {
 #        endif
     return wait_ms;
 }
+
+// A fired combo's output waits only behind tap-hold decisions queued before it
+// fired, and each of those resolves within its own tapping term. Every key
+// shares the live dual-role term (get_tapping_term), so this bounds delivery.
+static uint16_t combo_origin_applied_wait_ms(void) {
+#        ifdef NO_ACTION_TAPPING
+    return 0;
+#        else
+    return noah_setting(NOAH_SETTING_TAPPING_TERM, TAPPING_TERM);
+#        endif
+}
 #    endif
 
 static void combo_origin_pending_output_reconcile(bool observe_deadline) {
@@ -428,19 +445,29 @@ static void combo_origin_pending_output_reconcile(bool observe_deadline) {
     for (uint8_t index = 0; index < ARRAY_SIZE(combo_pending_output_cache); index++) {
         combo_origin_pending_output_entry_t *entry = &combo_pending_output_cache[index];
         combo_t                             *combo;
+        bool                                 active;
 
         if (!entry->active) {
             continue;
         }
-        combo = combo_origin_combo_get(entry->combo_index);
-        if (!combo || combo_origin_combo_is_disabled(combo)) {
+        combo  = combo_origin_combo_get(entry->combo_index);
+        active = combo_origin_combo_is_active(combo);
+        // QMK marks a fired combo both active and disabled (apply_combo, then
+        // drop_combo_from_buffer). Only a disabled combo that never fired was
+        // suppressed; a fired one keeps its footprint until its output arrives.
+        if (combo && active && !entry->applied) {
+            entry->applied          = true;
+            entry->applied_at       = timer_read();
+            entry->deadline_crossed = false;
+        }
+        if (!combo || (!entry->applied && combo_origin_combo_is_disabled(combo))) {
             combo_origin_pending_output_entry_clear(entry);
             combo_origin_increment_counter(&combo_origin_diagnostics.suppressed_retirement_count);
             changed = true;
             continue;
         }
 #    ifndef COMBO_NO_TIMER
-        if (observe_deadline && !combo_origin_combo_is_active(combo) && (uint16_t)(now - entry->complete_at) > combo_origin_latest_legal_wait_ms()) {
+        if (observe_deadline && !active && (entry->applied ? (uint16_t)(now - entry->applied_at) > combo_origin_applied_wait_ms() : (uint16_t)(now - entry->complete_at) > combo_origin_latest_legal_wait_ms())) {
             if (!entry->deadline_crossed) {
                 entry->deadline_crossed = true;
             } else {
@@ -564,6 +591,21 @@ static combo_origin_pending_output_entry_t *combo_origin_pending_entry_for_press
         candidate = combo_origin_pending_newest_for_combo(combo_index, keycode);
         if (candidate && (!selected || combo_origin_generation_before(candidate->generation, selected->generation))) {
             selected = candidate;
+        }
+    }
+    if (selected) {
+        return selected;
+    }
+
+    // A fired output queued behind a tap-hold decision can arrive after its
+    // chord was released and QMK deactivated the combo. Fired outputs leave
+    // QMK's queue in firing order, so the oldest fired completion with this
+    // keycode is the one being delivered.
+    for (uint8_t index = 0; index < ARRAY_SIZE(combo_pending_output_cache); index++) {
+        combo_origin_pending_output_entry_t *entry = &combo_pending_output_cache[index];
+
+        if (entry->active && entry->applied && entry->keycode == keycode && (!selected || combo_origin_generation_before(entry->generation, selected->generation))) {
+            selected = entry;
         }
     }
     return selected;
@@ -697,9 +739,8 @@ void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *recor
                 combo_origin_increment_counter(&combo_origin_diagnostics.unmatched_delayed_output_count);
             }
         } else if (combo_origin_fallback_owner_keypos(&owner_key_pos)) {
-            // Current QMK can deliver a tapping-buffered combo after it has
-            // become inactive. Preserve an owner conservatively; no pending
-            // candidate is an exact match without QMK's active combo index.
+            // No completion was seen firing (for example, it fired and was
+            // released within one record). Preserve an owner conservatively.
             combo_origin_bitmap_fill_all_keys(bitmap);
             record->event.key = owner_key_pos;
             key_origin_registry_set_bitmap(owner_key_pos, bitmap);
