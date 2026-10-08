@@ -44,7 +44,7 @@ Unknown required domains reject the candidate. Unknown optional domains are
 allowed only after a future schema-minor rule explicitly defines skippability;
 v1.0 rejects every unknown domain.
 
-Accepted domains (`users/noah/lib/profile/schema/profile_versions.h`):
+Accepted domains (`users/noah/lib/profile/schema/profile_domain_registry.h`):
 
 | Id | Domain | Version |
 | ---: | --- | ---: |
@@ -53,6 +53,44 @@ Accepted domains (`users/noah/lib/profile/schema/profile_versions.h`):
 | `0x30` | Combo overrides | 2 |
 | `0x40` | Settings, layer names, VIA macro names and custom-key names | 5 |
 | `0x50` | Sparse pointing-mode slots | 2 |
+
+### Firmware domain ownership
+
+The domain registry owns each current domain's ID, mask bit, version and
+canonical order. Blob encoding/decoding, candidate masks, whole-profile
+validation, compiled domain envelopes, storage and provider mask accounting
+use it. Build feature admission is separate: knowing a wire domain does not
+require every feature-gate build to enable its runtime.
+
+One envelope walker checks magic, schema, flags, domain count, current
+versions, ordering, payload extents and completion. Its interface consumes
+one already-read blob/domain header; it performs no reader I/O or semantic
+validation. The synchronous store check, stepped boot scan, prepared commit
+check and whole-profile validator therefore share shape policy while keeping
+their own read budgets and transaction scheduling. Storage still checks
+checksums and declared masks; the validator still owns semantic references
+and runtime placement admission.
+
+Each domain module owns its record shape. RGB record geometry is shared by
+the decoder and compiled writer. RGB and key behaviors retain their
+incremental decoders; settings retains its byte consumer. Combo row iteration
+is shared by stepped validation and cache publication, reading a row in 12-
+and 16-byte grants. Sparse pointing iteration is shared by whole-buffer
+validation, stepped validation and cache publication, with at most one read
+of 20 bytes per step. Compiled pointing output uses the same sparse cursor's
+ordering/presence checks. An iterator exposes a record only after validating
+it; an omitted pointing slot remains disabled and unnamed.
+
+These changes preserve current wire bytes, digests, slot geometry and feature
+admission. Compiled settings/combos and general compiled-domain seeking remain
+separate work. The owner round-trip harness uses real authored RGB, key
+behaviors and pointing defaults together with populated current combo/settings
+fixtures, saving and rebooting through the owner and checking every published
+domain and runtime view. Hardware eligibility and the independent VIA adapter
+are injected; this host harness does not establish physical acceptance. The
+reviewed stack manifest follows the shared iterators through PD publication,
+combo cache EEPROM reads and host PD record validation; compiler-inlined
+settings readback/publication paths are represented by their linked callers.
 
 ## Action Encoding
 

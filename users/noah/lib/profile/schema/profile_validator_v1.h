@@ -14,16 +14,12 @@
 #include "profile_pd_v1.h"
 
 enum {
-    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB           = 1u << 0,
-    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS = 1u << 1,
-    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS      = 1u << 3,
-    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS        = 1u << 2,
-#ifdef NOAH_PD_PROFILE_ENABLE
-    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD = 1u << 4,
-#else
-    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD = 0u,
-#endif
-    NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS        = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB           = NOAH_PROFILE_DOMAIN_MASK_RGB,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS = NOAH_PROFILE_DOMAIN_MASK_KEY_BEHAVIORS,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS      = NOAH_PROFILE_DOMAIN_MASK_SETTINGS,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS        = NOAH_PROFILE_DOMAIN_MASK_COMBOS,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD = NOAH_PROFILE_ENABLED_PD_MASK,
+    NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS = NOAH_PROFILE_ENABLED_DOMAIN_MASK,
     NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX        = 20u,
     NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX   = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
     // Regression policy for the payload-independent 32-bit scan state. This
@@ -155,7 +151,7 @@ typedef union {
 #ifdef NOAH_PD_PROFILE_ENABLE
     // A sparse PD domain record by record: index counts records read, count
     // is the header's record count and minimum the lowest ID the next may use.
-    struct { uint8_t bytes[96]; uint8_t index, used, count, minimum; bool header; } pd;
+    noah_profile_pd_v1_iterator_t pd;
 #endif
     noah_profile_settings_v1_validation_t    settings;
     noah_profile_combo_v1_validation_t       combos;
@@ -177,14 +173,9 @@ typedef struct {
     size_t                                        checksum_offset;
     uint32_t                                      crc32_state;
     uint32_t                                      digest_state;
-    size_t                                        blob_offset;
+    noah_profile_envelope_t                       envelope;
     size_t                                        domain_payload_offset;
     uint16_t                                      domain_payload_length;
-    uint8_t                                       declared_domain_count;
-    uint8_t                                       domain_index;
-    uint8_t                                       current_domain_id;
-    uint8_t                                       previous_domain_id;
-    uint8_t                                       seen_domain_mask;
     bool                                          has_reference_error;
     noah_profile_validator_v1_domain_validation_t domain_validation;
     size_t                                        reference_error_offset;

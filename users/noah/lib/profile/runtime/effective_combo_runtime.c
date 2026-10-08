@@ -34,9 +34,7 @@ void noah_effective_combo_runtime_invalidate(void *context, uint32_t publication
     runtime->live = true;
     const noah_profile_combo_v1_view_t *combos = &view->profile.combos;
     noah_profile_combo_v1_header_t      header;
-    if (combos->row_count > 32u || !noah_profile_combo_v1_read_header(&view->reader, view->base_offset, combos, &header)) return;
-    // Version 1 has no stored default and repeats the hold threshold on each
-    // row; its windows are all explicit.
+    if (combos->row_count > NOAH_PROFILE_COMBO_V1_MAX_ROWS || !noah_profile_combo_v1_read_header(&view->reader, view->base_offset, combos, &header)) return;
     runtime->default_term = header.default_term_ms;
     runtime->hold_term    = header.hold_term_ms;
     for (uint8_t index = 0; index < combos->row_count; index++) {
@@ -83,7 +81,6 @@ bool noah_effective_combo_follows_default(uint16_t index) {
     return index < noah_effective_combo_count() && !noah_combo_terms[index];
 }
 // A current table stores the threshold even with no rows.
-// without rows has none, and QMK's own default stands.
 uint16_t noah_effective_combo_hold_term(void) {
     return installed && installed->valid && installed->live ? installed->hold_term : TAPPING_TERM;
 }

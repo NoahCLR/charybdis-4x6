@@ -23,18 +23,8 @@ static bool ranges_overlap(size_t left_offset, size_t left_length, size_t right_
     return left_length != 0u && right_length != 0u && left_offset < right_offset + right_length && right_offset < left_offset + left_length;
 }
 
-static uint8_t domain_count(uint8_t mask) {
-    uint8_t count = 0u;
-
-    while (mask != 0u) {
-        count = (uint8_t)(count + (mask & 1u));
-        mask >>= 1u;
-    }
-    return count;
-}
-
 static bool profile_view_valid(const noah_profile_validator_v1_profile_t *profile, const noah_profile_reader_t *reader, size_t base_offset) {
-    if (!profile || !reader_range_valid(reader, base_offset, profile ? profile->byte_length : 0u) || profile->byte_length < NOAH_PROFILE_BLOB_V1_HEADER_SIZE || profile->byte_length > NOAH_PROFILE_BLOB_V1_MAX_SIZE || (profile->domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u || profile->domain_count != domain_count(profile->domain_mask)) {
+    if (!profile || !reader_range_valid(reader, base_offset, profile ? profile->byte_length : 0u) || profile->byte_length < NOAH_PROFILE_BLOB_V1_HEADER_SIZE || profile->byte_length > NOAH_PROFILE_BLOB_V1_MAX_SIZE || (profile->domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u || profile->domain_count != noah_profile_domain_count(profile->domain_mask)) {
         return false;
     }
     if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB) != 0u && (!reader_equal(reader, &profile->rgb.reader) || !reader_range_valid(reader, profile->rgb.base_offset, profile->rgb.byte_length) || !range_contained(base_offset, profile->byte_length, profile->rgb.base_offset, profile->rgb.byte_length))) {
@@ -46,7 +36,7 @@ static bool profile_view_valid(const noah_profile_validator_v1_profile_t *profil
 #ifdef NOAH_PD_PROFILE_ENABLE
     if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD) && (profile->pd.length < NOAH_PROFILE_PD_V1_HEADER_SIZE || profile->pd.length > NOAH_PROFILE_PD_V1_MAX_SIZE || (profile->pd.length - NOAH_PROFILE_PD_V1_HEADER_SIZE) % NOAH_PROFILE_PD_V1_RECORD_SIZE != 0u || !range_contained(base_offset, profile->byte_length, base_offset + profile->pd.offset, profile->pd.length))) return false;
 #endif
-    if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS) && (profile->combos.row_count > 32u || !NOAH_PROFILE_COMBO_VERSION_ACCEPTED(profile->combos.version) || !range_contained(base_offset, profile->byte_length, base_offset + profile->combos.payload_offset, NOAH_PROFILE_COMBO_HEADER_SIZE(profile->combos.version) + (size_t)profile->combos.row_count * 28u))) return false;
+    if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS) && (profile->combos.row_count > NOAH_PROFILE_COMBO_V1_MAX_ROWS || !NOAH_PROFILE_COMBO_VERSION_ACCEPTED(profile->combos.version) || !range_contained(base_offset, profile->byte_length, base_offset + profile->combos.payload_offset, NOAH_PROFILE_COMBO_HEADER_SIZE(profile->combos.version) + (size_t)profile->combos.row_count * NOAH_PROFILE_COMBO_V1_ROW_SIZE))) return false;
     return true;
 }
 

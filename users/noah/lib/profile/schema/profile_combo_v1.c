@@ -54,9 +54,49 @@ bool noah_profile_combo_v1_read_header(const noah_profile_reader_t *reader, size
     return noah_profile_combo_v1_decode_header(bytes, view->version, (uint16_t)(size + (uint16_t)view->row_count * NOAH_PROFILE_COMBO_V1_ROW_SIZE), header) == NOAH_PROFILE_CODEC_V1_OK && header->row_count == view->row_count;
 }
 
+noah_profile_combo_v1_iteration_t noah_profile_combo_v1_iteration_step(noah_profile_combo_v1_validation_t *state, const noah_profile_reader_t *reader, size_t base, uint16_t length, const noah_profile_action_v1_limits_t *limits, noah_profile_combo_v1_header_t *header, noah_profile_combo_v1_row_t *row, noah_profile_codec_v1_result_t *detail) {
+    noah_profile_codec_v1_result_t result = NOAH_PROFILE_CODEC_V1_READ_ERROR;
+    if (!state || !reader || !header || !row || base > SIZE_MAX - length) {
+        result = NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT;
+    } else if (state->phase == 0u) {
+        if (length < NOAH_PROFILE_COMBO_V2_HEADER_SIZE) result = NOAH_PROFILE_CODEC_V1_TRUNCATED;
+        else if (noah_profile_reader_read(reader, base, state->bytes, NOAH_PROFILE_COMBO_V2_HEADER_SIZE)) {
+            result = noah_profile_combo_v1_decode_header(state->bytes, state->version, length, header);
+            if (result == NOAH_PROFILE_CODEC_V1_OK) {
+                state->row_count = header->row_count;
+                state->phase = 1u;
+                return NOAH_PROFILE_COMBO_V1_HEADER;
+            }
+        }
+    } else if (state->row_index == state->row_count) {
+        return NOAH_PROFILE_COMBO_V1_COMPLETE;
+    } else {
+        size_t offset = NOAH_PROFILE_COMBO_V2_HEADER_SIZE + (size_t)state->row_index * NOAH_PROFILE_COMBO_V1_ROW_SIZE;
+        if (state->phase == 1u) {
+            if (noah_profile_reader_read(reader, base + offset, state->bytes, 12u)) {
+                state->phase = 2u;
+                return NOAH_PROFILE_COMBO_V1_ITERATING;
+            }
+        } else if (noah_profile_reader_read(reader, base + offset + 12u, state->bytes + 12, 16u)) {
+            result = noah_profile_combo_v1_decode_row(state->bytes, state->version, limits, row);
+            if (result == NOAH_PROFILE_CODEC_V1_OK) {
+                state->row_index++;
+                state->phase = 1u;
+                return NOAH_PROFILE_COMBO_V1_ROW;
+            }
+        }
+    }
+    if (detail) *detail = result;
+    return NOAH_PROFILE_COMBO_V1_REJECTED;
+}
+
 bool noah_profile_combo_v1_read_row(const noah_profile_reader_t *reader, size_t blob_base_offset, const noah_profile_combo_v1_view_t *view, uint8_t index, noah_profile_combo_v1_row_t *row) {
-    uint8_t bytes[28];
-    if (!view || index >= view->row_count || !NOAH_PROFILE_COMBO_VERSION_ACCEPTED(view->version) || !noah_profile_reader_read(reader, blob_base_offset + view->payload_offset + NOAH_PROFILE_COMBO_HEADER_SIZE(view->version) + (size_t)index * 28u, bytes, sizeof(bytes))) return false;
+    if (!view || index >= view->row_count || !NOAH_PROFILE_COMBO_VERSION_ACCEPTED(view->version) || blob_base_offset > SIZE_MAX - view->payload_offset) return false;
+    noah_profile_combo_v1_validation_t state = {.phase = 1u, .row_index = index, .version = view->version, .row_count = view->row_count};
+    noah_profile_combo_v1_header_t header;
     noah_profile_action_v1_limits_t limits = noah_profile_action_v1_default_limits();
-    return noah_profile_combo_v1_decode_row(bytes, view->version, &limits, row) == NOAH_PROFILE_CODEC_V1_OK;
+    uint16_t length = NOAH_PROFILE_COMBO_V2_HEADER_SIZE + (uint16_t)view->row_count * NOAH_PROFILE_COMBO_V1_ROW_SIZE;
+    size_t base = blob_base_offset + view->payload_offset;
+    if (noah_profile_combo_v1_iteration_step(&state, reader, base, length, &limits, &header, row, NULL) != NOAH_PROFILE_COMBO_V1_ITERATING) return false;
+    return noah_profile_combo_v1_iteration_step(&state, reader, base, length, &limits, &header, row, NULL) == NOAH_PROFILE_COMBO_V1_ROW;
 }

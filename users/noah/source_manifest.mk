@@ -7,6 +7,7 @@ NOAH_COMMON_SOURCES := \
     runtime_init.c \
     hooks.c \
     lib/profile/protocol/profile_candidate_v1.c \
+    lib/profile/schema/profile_domain_registry.c \
     lib/profile/schema/profile_blob_v1.c \
     lib/profile/schema/profile_combo_v1.c \
     lib/profile/schema/profile_settings_v1.c \

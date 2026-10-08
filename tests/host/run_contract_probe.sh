@@ -64,7 +64,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_placement_v1.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
-    "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \

@@ -66,6 +66,11 @@
         },
         {
           "caller": "noah_profile_candidate_store_backend_activation_step",
+          "callee": "noah_effective_combo_runtime_invalidate",
+          "reason": "Provider publication invokes the installed combo cache invalidator through its listener table."
+        },
+        {
+          "caller": "noah_profile_candidate_store_backend_activation_step",
           "callee": "noah_effective_pd_invalidate",
           "reason": "Provider publication invokes the validated immutable PD cache invalidator."
         },
@@ -93,11 +98,11 @@
       "paths": [
         {
           "name": "portable profile globals and macro-name readback",
-          "functions": ["main", "via_custom_value_command_kb", "noah_setting"]
+          "functions": ["main", "via_custom_value_command_kb", "readback_fill", "noah_setting"]
         },
         {
           "name": "portable profile settings publication",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_settings_invalidate", "nvm_eeconfig_update_keymap", "eeprom_update_word", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_settings_invalidate", "eeprom_update_word", "wear_leveling_write"]
         },
         {
           "name": "engineering owner compiled-profile validation",
@@ -144,16 +149,24 @@
           "functions": ["main", "via_custom_value_command_kb"]
         },
         {
+          "name": "Combo published cache EEPROM read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_combo_runtime_invalidate", "noah_profile_combo_v1_iteration_step", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "PD host record validation",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step", "noah_profile_pd_v1_iterator_step", "noah_profile_pd_v1_validate_record", "tap_valid"]
+        },
+        {
           "name": "PD compiled cache initialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_reader_read", "compiled_reader_read", "write_pd_payload", "noah_profile_pd_v1_validate_record.part.2"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "compiled_reader_read", "write_pd_payload", "noah_profile_pd_v1_validate_record", "tap_valid"]
         },
         {
           "name": "PD published cache EEPROM read",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "PD published record validation",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_validate_entry", "noah_profile_pd_v1_validate_record.part.2"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_pd_v1_validate_record", "tap_valid"]
         }
       ]
     },

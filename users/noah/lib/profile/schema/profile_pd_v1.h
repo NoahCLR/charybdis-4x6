@@ -5,14 +5,17 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "profile_versions.h"
+#include "profile_reader.h"
 
 enum {
-    NOAH_PROFILE_PD_V1_DOMAIN_ID   = 0x50,
-    NOAH_PROFILE_PD_V1_VERSION     = 2,
-    NOAH_PROFILE_PD_V1_SLOT_COUNT  = 32,
+    NOAH_PROFILE_PD_V1_DOMAIN_ID   = NOAH_PROFILE_DOMAIN_V1_PD,
+    NOAH_PROFILE_PD_V1_VERSION     = NOAH_PROFILE_PD_VERSION,
+    NOAH_PROFILE_PD_V1_SLOT_COUNT  = NOAH_PROFILE_PD_COUNT,
     NOAH_PROFILE_PD_V1_HEADER_SIZE = 8,
     NOAH_PROFILE_PD_V1_RECORD_SIZE = 96,
     NOAH_PROFILE_PD_V1_NAME_SIZE   = 24,
+    NOAH_PROFILE_PD_V1_STEP_READ_MAX = 20,
     // Every slot present: the largest payload a version-2 domain can have.
     NOAH_PROFILE_PD_V1_MAX_SIZE = NOAH_PROFILE_PD_V1_HEADER_SIZE + NOAH_PROFILE_PD_V1_SLOT_COUNT * NOAH_PROFILE_PD_V1_RECORD_SIZE,
 };
@@ -60,6 +63,7 @@ typedef enum {
     // A present version-2 record that says nothing: disabled with no name.
     // Such a slot is stored by leaving it out.
     NOAH_PROFILE_PD_V1_NONCANONICAL,
+    NOAH_PROFILE_PD_V1_READ_ERROR,
 } noah_profile_pd_v1_result_t;
 
 typedef struct {
@@ -114,4 +118,30 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_header(const uint8_t hea
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_entry(const uint8_t *record, size_t length, uint8_t minimum_slot, noah_profile_pd_v1_error_t *error);
 // A whole version-2 payload.
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error);
-// A whole retired version-1 payload: header 01 08 60 00.., eight records.
+
+// Shared sparse-record traversal. The cursor also accepts encoded authored
+// records, so compiled output follows the same ordering/presence contract.
+typedef struct { uint8_t count, index, minimum; } noah_profile_pd_v1_cursor_t;
+noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_begin(noah_profile_pd_v1_cursor_t *cursor, const uint8_t header[8], size_t length, noah_profile_pd_v1_error_t *error);
+noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_next(noah_profile_pd_v1_cursor_t *cursor, const uint8_t record[96], noah_profile_pd_v1_error_t *error);
+uint8_t noah_profile_pd_v1_default_record_count(const noah_pd_config_t defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT]);
+
+typedef struct {
+    uint8_t bytes[NOAH_PROFILE_PD_V1_RECORD_SIZE];
+    noah_profile_pd_v1_cursor_t cursor;
+    uint8_t used;
+    bool header;
+} noah_profile_pd_v1_iterator_t;
+
+typedef enum {
+    NOAH_PROFILE_PD_V1_ITERATING = 0,
+    NOAH_PROFILE_PD_V1_RECORD,
+    NOAH_PROFILE_PD_V1_COMPLETE,
+    NOAH_PROFILE_PD_V1_REJECTED,
+} noah_profile_pd_v1_iteration_t;
+
+// Zero-initialize before use. Each step does at most one read, at most 20
+// bytes. RECORD exposes one validated record in bytes (including the last);
+// complete reports that no further record remains. Errors are payload-relative.
+bool noah_profile_pd_v1_iterator_complete(const noah_profile_pd_v1_iterator_t *iterator);
+noah_profile_pd_v1_iteration_t noah_profile_pd_v1_iterator_step(noah_profile_pd_v1_iterator_t *iterator, const noah_profile_reader_t *reader, size_t base, size_t length, noah_profile_pd_v1_error_t *error);
