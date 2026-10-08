@@ -118,6 +118,16 @@ const key_behavior_t key_behaviors[] = {
     {.keycode = TT(2), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
     {.keycode = OSL(2), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
     {.keycode = OSM(MOD_LSFT), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
+    // Sparse authored MT rows preserve the source's intrinsic hold.
+#define TEST_MT_SUBSETS(X, side) \
+    X(side | 1) X(side | 2) X(side | 3) X(side | 4) X(side | 5) \
+    X(side | 6) X(side | 7) X(side | 8) X(side | 9) X(side | 10) \
+    X(side | 11) X(side | 12) X(side | 13) X(side | 14) X(side | 15)
+#define TEST_MT_ROW(mods) {.keycode = MT(mods, KC_W), .tap_hold_term = 100, .tap_counts[1] = {.tap = TAP_SENDS(KC_X)}},
+    TEST_MT_SUBSETS(TEST_MT_ROW, 0)
+    TEST_MT_SUBSETS(TEST_MT_ROW, 0x10)
+#undef TEST_MT_ROW
+#undef TEST_MT_SUBSETS
     // An authored LT() outside every combo, so QMK delivers its press at once.
     {.keycode = LT(TEST_LAYER_NAV, KC_B), .tap_hold_term = 100, .tap_counts[1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(TEST_LAYER_NAV))}},
     // Sparse rows: only a repeated tap is authored.
@@ -2713,6 +2723,68 @@ static void test_qmk_keys_wait_for_undecided_dual_role(void) {
     CHECK(gesture_out_is("KT", (const uint16_t[]){KC_E, KC_B}));
 }
 
+// Exercise the shadow decoder after real pinned QMK tapping delivery. The
+// applied-ledger comparison lives in the physical-ownership integration runner;
+// this harness deliberately stubs that ledger.
+static void test_qmk_native_mod_tap_shadow_report_masks(void) {
+    for (uint8_t side = 0; side < 2u; side++) {
+        for (uint8_t subset = 1u; subset < 16u; subset++) {
+            uint8_t encoded = (uint8_t)(subset | (side ? 0x10u : 0u));
+            uint8_t expected = (uint8_t)(side ? subset << 4u : subset);
+            test_reset_state();
+            fake_time = 49000;
+            gesture_test_code = MT(encoded, KC_Q); // No authored row or combo.
+            gesture_delivered_press = KC_NO;
+            gesture_at(3, 0, true);
+            gesture_advance(100);
+            CHECK(gesture_delivered_press == KC_NO);
+            CHECK(key_runtime_core_state()->shadow_projection.keyboard_managed_mod_mask == 0u);
+            gesture_advance(150);
+            CHECK(gesture_delivered_press == gesture_test_code);
+            CHECK(key_runtime_core_state()->shadow_projection.keyboard_managed_mod_mask == expected);
+            CHECK(key_runtime_core_state()->shadow_projection.keyboard_mod_state.real == expected);
+            gesture_at(3, 0, false);
+            gesture_advance(400);
+            CHECK(key_runtime_core_state()->shadow_projection.keyboard_managed_mod_mask == 0u);
+            CHECK(key_runtime_core_state()->shadow_projection.keyboard_mod_state.real == 0u);
+            CHECK(key_runtime_core_state()->press_token_count == 0u);
+            CHECK(key_runtime_core_state()->lease_count == 0u);
+            CHECK(noah_record_admission_held_count() == 0u);
+            test_assert_button_quiescent(test_keypos(3, 0));
+        }
+    }
+}
+
+static void test_qmk_authored_mod_tap_shadow_report_masks(void) {
+    for (uint8_t side = 0; side < 2u; side++) {
+        for (uint8_t subset = 1u; subset < 16u; subset++) {
+            uint8_t encoded = (uint8_t)(subset | (side ? 0x10u : 0u));
+            uint8_t expected = (uint8_t)(side ? subset << 4u : subset);
+            test_reset_state();
+            fake_time = 50000;
+            gesture_test_code = MT(encoded, KC_W);
+            gesture_registered = gesture_unregistered = KC_NO;
+            gesture_qmk_tap_count = 0u;
+            gesture_at(3, 0, true);
+            gesture_advance(99);
+            CHECK(gesture_registered == KC_NO);
+            CHECK(key_runtime_core_state()->shadow_projection.keyboard_managed_mod_mask == 0u);
+            gesture_advance(1);
+            CHECK(gesture_registered == (uint16_t)(encoded << 8u));
+            CHECK(key_runtime_core_state()->shadow_projection.keyboard_managed_mod_mask == expected);
+            CHECK(key_runtime_core_state()->shadow_projection.keyboard_mod_state.real == expected);
+            gesture_at(3, 0, false);
+            gesture_advance(400);
+            CHECK(gesture_unregistered == (uint16_t)(encoded << 8u));
+            CHECK(gesture_qmk_tap_count == 0u);
+            CHECK(key_runtime_core_state()->shadow_projection.keyboard_managed_mod_mask == 0u);
+            CHECK(key_runtime_core_state()->press_token_count == 0u);
+            CHECK(key_runtime_core_state()->lease_count == 0u);
+            test_assert_button_quiescent(test_keypos(3, 0));
+        }
+    }
+}
+
 static void gesture_assert_admission_quiescent(void) {
     // Every release follows its own press, including successive taps of one key.
     for (uint8_t i = 0; i < gesture_admitted_count; i++) {
@@ -3181,6 +3253,8 @@ int main(int argc, char **argv) {
     test_qmk_owned_mod_tap_oneshot_hold_and_repeats();
     test_qmk_owned_mod_tap_oneshot_transparency_and_synthetic();
     test_qmk_owned_mod_tap_oneshot_tap_only_release();
+    test_qmk_native_mod_tap_shadow_report_masks();
+    test_qmk_authored_mod_tap_shadow_report_masks();
     test_qmk_buffered_second_press();
     test_qmk_combo_consumes_second_press();
     test_qmk_member_hold_uses_physical_duration();

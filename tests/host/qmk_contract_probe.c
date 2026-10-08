@@ -3,11 +3,13 @@
 
 #ifdef QMK_CONTRACT_USE_STUB
 #    include "qmk_stub.h"
+#    define QMK_KEYBOARD_H "qmk_stub.h"
 #    include "send_string.h"
 #else
 #    include "quantum_keycodes.h"
 #    include "send_string.h"
 #    include "action.h"
+#    define QMK_KEYBOARD_H "action.h"
 #    include "report.h"
 #    include "keycode.h"
 #    include "process_keycode/process_combo.h"
@@ -16,6 +18,7 @@
 
 #include "via.h"
 #include "../../users/noah/lib/compat/qmk_factory_settings.h"
+#include "../../users/noah/lib/compat/qmk_mod_contract.h"
 
 _Static_assert(offsetof(keyrecord_t, event) == 0, "keyrecord_t.event must remain the first field");
 
@@ -53,6 +56,24 @@ int main(void) {
     keymap_config_t factory = {.oneshot_enable = true, .autocorrect_enable = true, .nkro = NKRO_DEFAULT_ON};
     printf("FACTORY_KEYMAP_OPTIONS=0x%04X\n", (unsigned)factory.raw);
 #endif
+
+    // Pin both the MT field and its interpretation to QMK's action encoding.
+    // Includes the empty field and right selector alone, which hold nothing.
+    for (uint8_t encoded = 0u; encoded < 32u; encoded++) {
+        uint16_t code = MT(encoded, KC_Q);
+        uint8_t report = noah_qmk_mods_to_report_mask(QK_MOD_TAP_GET_MODS(code));
+#ifndef QMK_CONTRACT_USE_STUB
+        action_t action = {.code = ACTION_MODS_TAP_KEY(QK_MOD_TAP_GET_MODS(code), QK_MOD_TAP_GET_TAP_KEYCODE(code))};
+        // This is the ACT_LMODS_TAP/ACT_RMODS_TAP choice in pinned action.c.
+        uint8_t qmk_report = action.kind.id == ACT_LMODS_TAP ? action.key.mods : action.key.mods << 4u;
+        if (report != qmk_report) {
+            fprintf(stderr, "MT modifier contract drift: encoded=0x%02x userspace=0x%02x QMK=0x%02x\n", encoded, report, qmk_report);
+            return 1;
+        }
+#endif
+        printf("MT_%02X_KC_Q=0x%04X field=0x%02X report=0x%02X\n", encoded, code, (unsigned)QK_MOD_TAP_GET_MODS(code), report);
+    }
+    printf("MOD_RCTL=0x%02X MOD_RSFT=0x%02X MOD_RALT=0x%02X MOD_RGUI=0x%02X\n", MOD_RCTL, MOD_RSFT, MOD_RALT, MOD_RGUI);
 
     printf("SAFE_RANGE=0x%04X\n", (unsigned)SAFE_RANGE);
     printf("COMBO_EVENT=%u\n", (unsigned)COMBO_EVENT);
