@@ -201,11 +201,13 @@ static void assert_published(const noah_profile_blob_v1_t *expected) {
     noah_effective_key_behavior_snapshot_t behaviors;
     assert(noah_effective_key_behavior_runtime_status(&owner.key_behaviors, &behaviors) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && behaviors.live && behaviors.valid);
     assert(behaviors.identity.payload_digest == expected->digest && behaviors.domain.row_count == key_behavior_count);
-    assert(noah_effective_combo_valid() && owner.combos.live && owner.combos.count == active.profile.combos.row_count);
+    noah_profile_domain_range_t combos;
+    assert(noah_profile_blob_v1_find_domain(&active.reader, active.base_offset, active.profile.byte_length, NOAH_PROFILE_DOMAIN_V1_COMBOS, &combos));
+    assert(noah_effective_combo_valid() && owner.combos.live && owner.combos.count == noah_profile_combo_v1_row_count(combos));
     for (uint8_t i = 0; i < owner.combos.count; i++) {
         noah_profile_combo_v1_row_t row;
         uint16_t                    output;
-        assert(noah_profile_combo_v1_read_row(&active.reader, active.base_offset, &active.profile.combos, i, &row));
+        assert(noah_profile_combo_v1_read_row(&active.reader, active.base_offset, combos, i, &row));
         assert(noah_profile_action_runtime_v1_to_native(&row.output, &output) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
         assert(noah_effective_combo_get(i)->keycode == output);
     }

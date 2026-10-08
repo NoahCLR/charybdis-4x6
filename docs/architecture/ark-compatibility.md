@@ -85,3 +85,18 @@ in `candidateMetadataForBlob`, update codec/rejection expectations and its
 integration probe recipes, refresh imported fixtures/specs and repin after the
 firmware lands. Frozen legacy inputs in `client-regression/` remain rejection
 and record-rule evidence; they are not accepted firmware formats.
+
+## Domain modules (D-F13)
+
+Wire bytes, digests and fixtures' profile bytes are unchanged. Probe recipes
+that compile `profile_compiled_defaults_v1.c` also compile
+`key_behavior_compiled_v1.c`, `profile_combo_compiled_v1.c` and
+`profile_pd_compiled_v1.c`; any recipe compiling `profile_blob_v1.c` compiles
+`profile_reader.c` and `profile_checksum.c`; recipes compiling the settings, pointing or combo runtimes
+compile the blob codec and registry. Code using the combo codec passes a
+payload range (`noah_profile_combo_v1_read_header/read_row`, no version
+argument) instead of the removed view; the validated profile no longer carries
+`combos`, `settings` or `pd` members, and the `*_VERSION_ACCEPTED` macros are
+removed. `tests/fixtures/compiled_profile_pd_v2.fixture` no longer has the
+always-zero `profile.action_abi_row_visits` key. `tests/host/run_contract_probe.sh`
+remains the concrete recipe.

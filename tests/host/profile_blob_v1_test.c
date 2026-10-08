@@ -379,13 +379,13 @@ static void test_current_domain_registry(void) {
     // Frozen wire identities: changing the registry cannot silently renumber
     // a domain/mask or broaden current-format admission.
     const noah_profile_domain_shape_t expected[] = {
-        {0x10, 1, 3}, {0x20, 2, 1}, {0x30, 4, 2}, {0x40, 8, 5}, {0x50, 16, 2},
+        {0x10, 0, 1, 3}, {0x20, 1, 2, 1}, {0x30, 2, 4, 2}, {0x40, 3, 8, 5}, {0x50, 4, 16, 2},
     };
     assert(NOAH_PROFILE_DOMAIN_REGISTRY_COUNT == sizeof(expected) / sizeof(expected[0]));
     uint8_t mask = 0;
     for (size_t i = 0; i < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; i++) {
         const noah_profile_domain_shape_t *shape = noah_profile_domain_at(i);
-        assert(shape && shape->id == expected[i].id && shape->mask == expected[i].mask && shape->version == expected[i].version);
+        assert(shape && shape->id == expected[i].id && shape->index == i && shape->mask == expected[i].mask && shape->version == expected[i].version);
         assert(noah_profile_domain_find(expected[i].id) == shape);
         mask |= shape->mask;
         assert(noah_profile_domain_count(mask) == i + 1u);
@@ -398,11 +398,42 @@ static void test_current_domain_registry(void) {
     assert(mask == NOAH_PROFILE_DOMAIN_MASK_ALL && !noah_profile_domain_at(NOAH_PROFILE_DOMAIN_REGISTRY_COUNT) && !noah_profile_domain_find(0x60));
 }
 
+// Publication finds a domain by walking the envelope, so a validated profile
+// need not carry each domain's range: every present payload is found exactly,
+// an absent domain or an unreadable envelope is not.
+static void test_find_domain_walks_the_envelope(void) {
+    static const uint8_t           rgb[3] = {1, 2, 3}, combos[2] = {4, 5}, pd[1] = {6};
+    const noah_profile_domain_v1_t domains[] = {
+        {NOAH_PROFILE_DOMAIN_V1_RGB, NOAH_PROFILE_DOMAIN_VERSION_RGB, rgb, sizeof(rgb)},
+        {NOAH_PROFILE_DOMAIN_V1_COMBOS, NOAH_PROFILE_DOMAIN_VERSION_COMBOS, combos, sizeof(combos)},
+        {NOAH_PROFILE_DOMAIN_V1_PD, NOAH_PROFILE_DOMAIN_VERSION_PD, pd, sizeof(pd)},
+    };
+    uint8_t                     blob[64], shifted[sizeof(blob) + 5] = {0};
+    size_t                      written;
+    noah_profile_domain_range_t range;
+    expect_result(noah_profile_blob_v1_encode(domains, 3u, blob, sizeof(blob), &written, NULL), NOAH_PROFILE_CODEC_V1_OK);
+    noah_profile_reader_t reader = noah_profile_reader_from_memory(blob, written);
+    for (size_t index = 0; index < 3u; index++) {
+        assert(noah_profile_blob_v1_find_domain(&reader, 0, written, domains[index].id, &range));
+        assert(range.length == domains[index].payload_length && !memcmp(&blob[range.offset], domains[index].payload, range.length));
+    }
+    assert(!noah_profile_blob_v1_find_domain(&reader, 0, written, NOAH_PROFILE_DOMAIN_V1_SETTINGS, &range) && range.offset == 0 && range.length == 0);
+    // Offsets stay relative to the blob when it sits inside a larger backing.
+    memcpy(&shifted[5], blob, written);
+    noah_profile_reader_t backing = noah_profile_reader_from_memory(shifted, sizeof(shifted));
+    assert(noah_profile_blob_v1_find_domain(&backing, 5, written, NOAH_PROFILE_DOMAIN_V1_PD, &range) && shifted[5 + range.offset] == 6);
+    // A blob cut short of its last envelope finds nothing past the cut.
+    assert(!noah_profile_blob_v1_find_domain(&reader, 0, written - 1u, NOAH_PROFILE_DOMAIN_V1_PD, &range));
+    noah_profile_reader_t short_reader = noah_profile_reader_from_memory(blob, NOAH_PROFILE_BLOB_V1_HEADER_SIZE - 1u);
+    assert(!noah_profile_blob_v1_find_domain(&short_reader, 0, written, NOAH_PROFILE_DOMAIN_V1_RGB, &range));
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     test_shared_blob_vectors(argv[1]);
     test_domain_envelopes();
     test_current_domain_registry();
+    test_find_domain_walks_the_envelope();
     test_blob_rejections(argv[1]);
     test_blob_encoder_bounds();
     test_shared_action_vectors(argv[1]);

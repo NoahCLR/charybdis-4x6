@@ -92,9 +92,7 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
     if (offset < 8) {
         static const uint8_t header[8] = {0, 8, 28, 0, 0, 0, 0, 0};
         if (!offset) {
-            if (!NOAH_PROFILE_SETTINGS_VERSION_ACCEPTED(b) || (s->expected_version && b != s->expected_version)) return false;
-            s->version = b;
-            return true;
+            return b == NOAH_SETTINGS_VERSION;
         }
         if (offset == 3) return b == NOAH_SETTINGS_MACRO_NAMES;
         if (offset == 4) return b == NOAH_SETTINGS_CUSTOM_KEY_NAMES;

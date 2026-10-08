@@ -5,6 +5,7 @@
 #include <string.h>
 #ifdef NOAH_PD_PROFILE_ENABLE
 #include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
+#include "profile_test_blob.h"
 #include "users/noah/lib/pointing/modes/pd_mode_configured.h"
 #endif
 
@@ -299,10 +300,11 @@ static void test_configure_pinch_transparent_profile_path(keypos_t key_pos) {
 static uint8_t configured_pd_records[NOAH_PROFILE_PD_V1_SLOT_COUNT][NOAH_PROFILE_PD_V1_RECORD_SIZE];
 static uint8_t configured_pd_bytes[NOAH_PROFILE_PD_V1_MAX_SIZE];
 static size_t  configured_pd_length;
+// The configured records as a validated profile's PD domain.
 static bool configured_pd_read(void *context, size_t offset, uint8_t *target, size_t length) {
     (void)context;
-    if (offset > configured_pd_length || length > configured_pd_length - offset) return false;
-    memcpy(target, configured_pd_bytes + offset, length);
+    for (size_t index = 0; index < length; index++)
+        target[index] = noah_profile_test_blob_byte(NOAH_PROFILE_DOMAIN_V1_PD, configured_pd_bytes, (uint16_t)configured_pd_length, offset + index);
     return true;
 }
 static void publish_configured_pd(void) {
@@ -316,9 +318,10 @@ static void publish_configured_pd(void) {
     configured_pd_length = 8 + (size_t)count * 96;
     CHECK(noah_profile_pd_v1_validate(configured_pd_bytes, configured_pd_length, NULL) == NOAH_PROFILE_PD_V1_OK);
     noah_effective_profile_snapshot_t view = {0};
-    view.reader = (noah_profile_reader_t){.read = configured_pd_read, .length = configured_pd_length};
-    view.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
-    view.profile.pd.length = configured_pd_length;
+    view.reader = (noah_profile_reader_t){.read = configured_pd_read, .length = NOAH_PROFILE_TEST_BLOB_PAYLOAD_OFFSET + configured_pd_length};
+    view.profile.domain_mask  = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
+    view.profile.domain_count = 1;
+    view.profile.byte_length  = (uint16_t)(NOAH_PROFILE_TEST_BLOB_PAYLOAD_OFFSET + configured_pd_length);
     noah_effective_pd_invalidate(NULL, 0, view.identity, view.identity, &view);
     CHECK(noah_effective_pd_ready());
 }

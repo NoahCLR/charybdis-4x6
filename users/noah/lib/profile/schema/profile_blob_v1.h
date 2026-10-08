@@ -5,6 +5,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "profile_reader.h"
 #include "profile_versions.h"
 
 enum {
@@ -118,6 +119,11 @@ typedef struct {
 noah_profile_codec_v1_result_t noah_profile_envelope_begin(noah_profile_envelope_t *walk, const uint8_t header[8], size_t length, noah_profile_codec_v1_error_t *error);
 noah_profile_codec_v1_result_t noah_profile_envelope_next(noah_profile_envelope_t *walk, const uint8_t header[4], noah_profile_domain_record_t *record, noah_profile_codec_v1_error_t *error);
 noah_profile_codec_v1_result_t noah_profile_envelope_finish(const noah_profile_envelope_t *walk, noah_profile_codec_v1_error_t *error);
+// Finds domain_id's payload in the blob of byte_length bytes at base_offset by
+// walking its envelope through the reader. A cold-path lookup for publication,
+// so a validated profile need not carry every domain's range; false when the
+// domain is absent or the envelope cannot be read.
+bool noah_profile_blob_v1_find_domain(const noah_profile_reader_t *reader, size_t base_offset, size_t byte_length, uint8_t domain_id, noah_profile_domain_range_t *range);
 
 typedef struct {
     uint8_t  kind;

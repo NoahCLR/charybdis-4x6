@@ -6,6 +6,7 @@
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 #include "users/noah/lib/compat/qmk_combo_readback.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
+#include "profile_test_blob.h"
 
 static const uint16_t compiled_keys[]  = {7, 9, COMBO_END};
 combo_t               key_combos[]     = {{.keys = compiled_keys, .keycode = 41}};
@@ -18,6 +19,7 @@ const uint16_t  noah_combo_terms[] = {COMPILED_WINDOW};
 static unsigned       reads;
 static bool           fail_read;
 static uint8_t        bytes[912];
+static uint16_t       payload_length; // the combo domain's, inside a one-domain blob
 bool                  is_combo_enabled(void) {
     return true;
 }
@@ -41,10 +43,17 @@ noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_to_native
 static bool read_bytes(void *context, size_t offset, uint8_t *out, size_t length) {
     (void)context;
     reads++;
-    assert(length <= 20u && offset + length <= sizeof(bytes));
+    assert(length <= 20u && offset + length <= NOAH_PROFILE_TEST_BLOB_PAYLOAD_OFFSET + sizeof(bytes));
     if (fail_read) return false;
-    memcpy(out, &bytes[offset], length);
+    for (size_t index = 0; index < length; index++)
+        out[index] = noah_profile_test_blob_byte(NOAH_PROFILE_DOMAIN_V1_COMBOS, bytes, payload_length, offset + index);
     return true;
+}
+// A view of the combo domain as the validator leaves it: the payload inside
+// its blob, found by walking the envelope (two reads per publication).
+static noah_effective_profile_snapshot_t combo_view(uint16_t length) {
+    payload_length = length;
+    return (noah_effective_profile_snapshot_t){.reader = {.read = read_bytes, .length = NOAH_PROFILE_TEST_BLOB_PAYLOAD_OFFSET + sizeof(bytes)}, .profile = {.domain_mask = 4, .domain_count = 1, .byte_length = (uint16_t)(NOAH_PROFILE_TEST_BLOB_PAYLOAD_OFFSET + length)}};
 }
 static uint32_t boundary(void *context) {
     return *(uint32_t *)context;
@@ -68,9 +77,9 @@ int main(int argc, char **argv) {
     assert(get_combo_term(0, combo_get(0)) == (COMPILED_WINDOW ? COMPILED_WINDOW : COMBO_TERM));
     // A compiled combo follows QMK's COMBO_TERM unless the keymap gave it a window.
     assert(noah_effective_combo_default_term() == COMBO_TERM && noah_effective_combo_follows_default(0) == !COMPILED_WINDOW && !noah_effective_combo_follows_default(1));
-    noah_effective_profile_snapshot_t view = {.reader = {.read = read_bytes, .length = sizeof(bytes)}, .profile = {.domain_mask = 4, .combos = {.row_count = 2, .version = 2}}};
+    noah_effective_profile_snapshot_t view = combo_view(8 + 2 * 28);
     noah_effective_combo_runtime_invalidate(&runtime, 1, view.identity, view.identity, &view);
-    assert(reads == 5 && combo_count() == 2 && noah_effective_combo_valid());
+    assert(reads == 7 && combo_count() == 2 && noah_effective_combo_valid());
     // These fixture rows store explicit windows beside the current default.
     assert(noah_effective_combo_default_term() == 60 && !noah_effective_combo_follows_default(0) && !noah_effective_combo_follows_default(1));
     combo_t *second = combo_get(1);
@@ -82,19 +91,19 @@ int main(int argc, char **argv) {
         assert(combo_get(1) == second && combo_get(1)->state == 1);
         assert(get_combo_term(1, second) == 45 && combo_count() == 2);
     }
-    assert(reads == 5); // Typing never goes back to profile storage.
+    assert(reads == 7); // Typing never goes back to profile storage.
     uint8_t report[32] = {8, 0, 6, 1, 2};
     assert(noah_qmk_combo_readback_get(report, 32));
     assert(report[5] == 0 && report[7] == 1 && report[11] == 45 && report[15] == 6 && report[16] == 0x21 && report[17] == 0x52);
-    assert(reads == 5); // Readback observes the identical effective table.
+    assert(reads == 7); // Readback observes the identical effective table.
     // The full cache is bounded and swaps only after the provider's idle gate.
     for (unsigned index = 1; index < 32; index++)
         memcpy(&bytes[8 + 28 * index], &bytes[8], 28);
     bytes[0]                      = 32;
-    view.profile.combos.row_count = 32;
-    reads                         = 0;
+    view  = combo_view(8 + 32 * 28);
+    reads = 0;
     noah_effective_combo_runtime_invalidate(&runtime, 2, view.identity, view.identity, &view);
-    assert(reads == 65 && combo_count() == 32);
+    assert(reads == 67 && combo_count() == 32);
     fail_read = true;
     noah_effective_combo_runtime_invalidate(&runtime, 3, view.identity, view.identity, &view);
     assert(!noah_effective_combo_valid() && combo_count() == 0 && combo_get(0) == NULL);
@@ -113,10 +122,7 @@ int main(int argc, char **argv) {
     assert(noah_effective_profile_snapshot_make_compiled(&compiled_profile, &compiled_reader, 0, &compiled) == NOAH_EFFECTIVE_PROFILE_OK);
     noah_effective_profile_invalidator_t invalidator = {.callback = noah_effective_combo_runtime_invalidate, .context = &runtime};
     assert(noah_effective_profile_provider_init(&provider, &compiled, boundary, &blockers, &invalidator, 1) == NOAH_EFFECTIVE_PROFILE_OK);
-    view.profile.domain_mask      = 4;
-    view.profile.domain_count     = 1;
-    view.profile.byte_length      = 64;
-    view.profile.combos.row_count = 2;
+    view = combo_view(8 + 2 * 28);
     assert(noah_effective_profile_snapshot_make_validated(&view.profile, &view.reader, 0, 1, 0, 0, &candidate) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(noah_effective_profile_provider_request_validated(&provider, &candidate) == NOAH_EFFECTIVE_PROFILE_OK);
     unsigned before = reads;
@@ -124,7 +130,7 @@ int main(int argc, char **argv) {
     assert(combo_count() == 1 && combo_get(0) == &key_combos[0] && reads == before);
     blockers = 0;
     assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
-    assert(combo_count() == 2 && reads == before + 5);
+    assert(combo_count() == 2 && reads == before + 7);
     assert(noah_effective_profile_provider_request_compiled_fallback(&provider) == NOAH_EFFECTIVE_PROFILE_OK);
     blockers = 1;
     assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_WAITING && combo_count() == 2);
@@ -138,7 +144,7 @@ int main(int argc, char **argv) {
         2, 6, 45, 0, 0, 0, 0, 0, 1, 0, 41, 0, 2, 0, 1, 0, 1, 0, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     };
     memcpy(bytes, v2, sizeof(v2));
-    noah_effective_profile_snapshot_t second_view = {.reader = {.read = read_bytes, .length = sizeof(bytes)}, .profile = {.domain_mask = 4, .combos = {.row_count = 2, .version = 2}}};
+    noah_effective_profile_snapshot_t second_view = combo_view(8 + 2 * 28);
     noah_effective_combo_runtime_invalidate(&runtime, 5, second_view.identity, second_view.identity, &second_view);
     assert(noah_effective_combo_valid() && combo_count() == 2);
     assert(get_combo_term(0, combo_get(0)) == 60 && get_combo_term(1, combo_get(1)) == 45);
@@ -155,7 +161,7 @@ int main(int argc, char **argv) {
     assert(noah_qmk_combo_readback_get(v2_report, 32) && v2_report[11] == 45 && v2_report[15] == 6);
     // An empty version 2 table still carries both combo-wide values.
     bytes[0]                          = 0;
-    second_view.profile.combos.row_count = 0;
+    second_view = combo_view(8);
     noah_effective_combo_runtime_invalidate(&runtime, 6, second_view.identity, second_view.identity, &second_view);
     assert(noah_effective_combo_valid() && combo_count() == 0 && noah_effective_combo_default_term() == 60 && COMBO_HOLD_TERM == 150);
     // A zero default would silently stop every combo that follows it.

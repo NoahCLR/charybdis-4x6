@@ -1,4 +1,5 @@
 #include "profile_settings_defaults.h"
+#include "profile_compiled_writer.h"
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
 #    include "noah_keymap_ids.h"
 #    include "../../compat/qmk_factory_settings.h"
@@ -117,3 +118,18 @@ uint8_t noah_profile_settings_defaults_byte(uint16_t offset) {
     return 0u;
 }
 #endif
+
+// The factory settings domain: the bytes above, in order. A build without
+// portable profiles has no settings domain.
+noah_profile_compiled_v1_result_t noah_profile_settings_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
+    (void)error;
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    uint16_t length = noah_profile_settings_defaults_length();
+    for (uint16_t offset = 0; offset < length; offset++)
+        if (!emit_u8(writer, noah_profile_settings_defaults_byte(offset))) return writer->result;
+    return writer->result;
+#else
+    (void)writer;
+    return NOAH_PROFILE_COMPILED_V1_OK;
+#endif
+}

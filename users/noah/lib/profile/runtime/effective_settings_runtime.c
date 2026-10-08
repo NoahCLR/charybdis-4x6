@@ -32,13 +32,14 @@ void noah_effective_settings_invalidate(void *context, uint32_t publication, noa
     (void)previous;
     (void)active;
     settings_length = 0;
-    if (view && (view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS)) {
-        uint16_t length = view->profile.settings.length;
+    noah_profile_domain_range_t payload;
+    if (view && (view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS) && noah_profile_blob_v1_find_domain(&view->reader, view->base_offset, view->profile.byte_length, NOAH_PROFILE_DOMAIN_V1_SETTINGS, &payload)) {
+        uint16_t length = payload.length;
         if (length <= sizeof(settings)) {
             bool ok = true;
             for (uint16_t offset = 0; offset < length; offset += 20) {
                 uint16_t count = length - offset < 20 ? length - offset : 20;
-                if (!noah_profile_reader_read(&view->reader, view->base_offset + view->profile.settings.offset + offset, settings + offset, count)) {
+                if (!noah_profile_reader_read(&view->reader, view->base_offset + payload.offset + offset, settings + offset, count)) {
                     ok = false;
                     break;
                 }

@@ -853,8 +853,8 @@ static void test_pd_store_accepts_every_settings_version_the_validator_does(void
         reset_eeprom(&eeprom);
         initialize_pd_store(&store);
         noah_profile_store_result_t result = commit_pd(&store, payload, &candidate);
-        CHECK((result == NOAH_PROFILE_STORE_OK) == NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED(version));
-        CHECK(NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED(version) == (version == 5u));
+        CHECK((result == NOAH_PROFILE_STORE_OK) == (version == NOAH_PROFILE_DOMAIN_VERSION_SETTINGS));
+        CHECK(NOAH_PROFILE_DOMAIN_VERSION_SETTINGS == 5u);
     }
 }
 
@@ -875,8 +875,8 @@ static void test_pd_store_accepts_every_combo_version_the_validator_does(void) {
         reset_eeprom(&eeprom);
         initialize_pd_store(&store);
         noah_profile_store_result_t result = commit_pd(&store, payload, &candidate);
-        CHECK((result == NOAH_PROFILE_STORE_OK) == NOAH_PROFILE_COMBO_VERSION_ACCEPTED(version));
-        CHECK(NOAH_PROFILE_COMBO_VERSION_ACCEPTED(version) == (version == 2u));
+        CHECK((result == NOAH_PROFILE_STORE_OK) == (version == NOAH_PROFILE_DOMAIN_VERSION_COMBOS));
+        CHECK(NOAH_PROFILE_DOMAIN_VERSION_COMBOS == 2u);
         if (result != NOAH_PROFILE_STORE_OK) continue;
         // ...and a stored v2 table is selected again at boot.
         noah_profile_store_init(&store, io_for(&eeprom), pd_compatibility());
@@ -894,7 +894,7 @@ static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
             uint16_t                       length = pd_payload(payload, domains[d].mask);
             noah_profile_store_t           store;
             noah_profile_store_candidate_t candidate;
-            bool accepted = domains[d].id == 0x10u ? NOAH_PROFILE_PD_RGB_VERSION_ACCEPTED(version) : NOAH_PROFILE_PD_DOMAIN_VERSION_ACCEPTED(version);
+            bool accepted = version == (domains[d].id == 0x10u ? NOAH_PROFILE_DOMAIN_VERSION_RGB : NOAH_PROFILE_DOMAIN_VERSION_PD);
 
             CHECK(payload[8] == domains[d].id);
             payload[9] = version;

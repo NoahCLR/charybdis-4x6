@@ -56,11 +56,15 @@ Accepted domains (`users/noah/lib/profile/schema/profile_domain_registry.h`):
 
 ### Firmware domain ownership
 
-The domain registry owns each current domain's ID, mask bit, version and
-canonical order. Blob encoding/decoding, candidate masks, whole-profile
-validation, compiled domain envelopes, storage and provider mask accounting
-use it. Build feature admission is separate: knowing a wire domain does not
-require every feature-gate build to enable its runtime.
+The domain registry owns each current domain's ID, version, canonical order
+and module name; a domain's index is its row position and its mask bit is
+`1 << index`. Blob encoding/decoding, candidate masks,
+whole-profile validation, compiled domain envelopes, storage and provider mask
+accounting use it. The validator and compiled defaults reach each domain only
+through a switch generated from the rows, calling `validate_<module>` and
+`noah_profile_<module>_compiled_v1_write` directly (D-F13). Build feature
+admission is separate: knowing a wire domain does not require every
+feature-gate build to enable its runtime.
 
 One envelope walker checks magic, schema, flags, domain count, current
 versions, ordering, payload extents and completion. Its interface consumes
@@ -71,8 +75,8 @@ their own read budgets and transaction scheduling. Storage still checks
 checksums and declared masks; the validator still owns semantic references
 and runtime placement admission.
 
-Each domain module owns its record shape. RGB record geometry is shared by
-the decoder and compiled writer. RGB and key behaviors retain their
+Each domain module owns its record shape and its compiled encoder. RGB record
+geometry is shared by the decoder and compiled writer. RGB and key behaviors retain their
 incremental decoders; settings retains its byte consumer. Combo row iteration
 is shared by stepped validation and cache publication, reading a row in 12-
 and 16-byte grants. Sparse pointing iteration is shared by whole-buffer
@@ -80,6 +84,13 @@ validation, stepped validation and cache publication, with at most one read
 of 20 bytes per step. Compiled pointing output uses the same sparse cursor's
 ordering/presence checks. An iterator exposes a record only after validating
 it; an omitted pointing slot remains disabled and unnamed.
+
+A validated profile keeps decoded views for RGB and key behaviours only.
+Combo, settings and pointing publication find their payload with
+`noah_profile_blob_v1_find_domain`, which walks the envelope through the
+snapshot's reader on the cold path, after checking the snapshot's domain mask.
+The combo codec reads from that payload range; its row count is fixed by the
+range length.
 
 The registry/traversal change (D-F11) preserves wire bytes, digests, slot
 geometry and feature admission. The subsequent complete compiled profile
@@ -882,7 +893,9 @@ Compiled combo rows preserve authored order, default-window inheritance and
 native actions through semantic encoding. No domain version changes.
 
 Opening compiled defaults records five bounded offset/length pairs alongside
-its metadata (a 40-byte handle policy). An arbitrary read emits the blob header,
+its metadata (a 40-byte handle policy). A domain's length is the byte count
+its module's encoder emits; an encoder that emits nothing leaves the domain out
+of that build's compiled profile. An arbitrary read emits the blob header,
 intersecting domain headers and only intersecting domain payloads; it never
 replays preceding domains. Reads may cross any header or domain seam. Effective
 caches warm on cold paths, so key events and RGB frames never invoke the virtual

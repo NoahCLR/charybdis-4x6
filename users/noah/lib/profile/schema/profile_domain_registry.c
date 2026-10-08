@@ -1,7 +1,7 @@
 #include "profile_domain_registry.h"
 
 static const noah_profile_domain_shape_t domains[] = {
-#define NOAH_DOMAIN_ROW(name, id, bit, version) {id, 1u << bit, version},
+#define NOAH_DOMAIN_ROW(NAME, module, id, version) {id, NOAH_PROFILE_DOMAIN_INDEX_##NAME, NOAH_PROFILE_DOMAIN_MASK_##NAME, version},
     NOAH_PROFILE_DOMAIN_ROWS(NOAH_DOMAIN_ROW)
 #undef NOAH_DOMAIN_ROW
 };

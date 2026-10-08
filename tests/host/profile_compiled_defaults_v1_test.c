@@ -114,7 +114,6 @@ static void assert_golden(const noah_profile_compiled_v1_t *profile) {
     assert(profile->metadata.crc32 == fixture_u32("profile.crc32", 16));
     assert(profile->metadata.digest == fixture_u32("profile.fnv1a32", 16));
     assert(profile->metadata.action_abi_digest == fixture_u32("profile.action_abi", 16));
-    assert(profile->metadata.action_abi_row_visits == fixture_u32("profile.action_abi_row_visits", 10));
 }
 
 static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_abi_digest) {
@@ -236,8 +235,6 @@ static void test_real_authored_profile(void) {
     assert(profile.metadata.crc32 != 0u);
     assert(profile.metadata.digest != 0u);
     assert(profile.metadata.action_abi_digest != 0u);
-    assert(profile.metadata.action_abi_row_visits == 0);
-    assert(profile.metadata.action_abi_row_visits <= NOAH_PROFILE_COMPILED_V1_ACTION_ABI_ROW_VISITS_MAX);
     assert(sizeof(profile) <= 40u);
     assert(!noah_profile_compiled_v1_compatibility(NULL, &runtime_compatibility));
     assert(!noah_profile_compiled_v1_compatibility(&profile, NULL));
@@ -281,7 +278,6 @@ static void test_real_authored_profile(void) {
 
     reader        = noah_profile_compiled_v1_reader(&profile);
     copied_reader = reader;
-    assert((unsigned)NOAH_PROFILE_COMPILED_V1_READER_REPLAY_MAX == (unsigned)NOAH_PROFILE_BLOB_V1_MAX_SIZE);
     assert(noah_profile_reader_read(&copied_reader, 0u, slice, sizeof(slice)));
     assert(memcmp(slice, output, sizeof(slice)) == 0);
     // The profile is open, so its canonical behaviour order is known: reading
@@ -315,8 +311,7 @@ static void test_real_authored_profile(void) {
     // canonical behavior sorting for every 20-byte read in the same scan.
     noah_effective_profile_snapshot_t snapshot = {.reader = reader};
     snapshot.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
-    snapshot.profile.pd.offset = (size_t)(decoded.domains[4].payload - output);
-    snapshot.profile.pd.length = decoded.domains[4].payload_length;
+    snapshot.profile.byte_length = (uint16_t)output_length;
     behavior_visits = 0;
     noah_effective_pd_invalidate(NULL, 0, snapshot.identity, snapshot.identity, &snapshot);
     assert(noah_effective_pd_ready());
@@ -342,7 +337,7 @@ static void test_real_authored_profile(void) {
     fprintf(stderr, "compiled PD cache warmup: %zu behavior-row sorts\n", behavior_visits);
     assert(behavior_visits == 0);
     // Exercise every PD byte and record boundary against the full golden stream.
-    for (size_t offset = snapshot.profile.pd.offset; offset < output_length; offset++) {
+    for (size_t offset = (size_t)(decoded.domains[4].payload - output); offset < output_length; offset++) {
         size_t length = output_length - offset;
         if (length > sizeof(slice)) length = sizeof(slice);
         assert(noah_profile_reader_read(&reader, offset, slice, length));
@@ -456,9 +451,11 @@ static void validate_portable_import(const noah_profile_compiled_v1_t *compiled,
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
     assert(placement_log.refused == 0u);
     assert(validator.profile.domain_mask == NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
-    assert(validator.profile.settings.length >= 344);
+    noah_profile_domain_range_t settings, pd;
+    assert(noah_profile_blob_v1_find_domain(&validator.reader, 0, validator.profile.byte_length, NOAH_PROFILE_DOMAIN_V1_SETTINGS, &settings) && settings.length >= 344);
 #ifdef NOAH_PD_PROFILE_ENABLE
-    assert(validator.profile.pd.length >= NOAH_PROFILE_PD_V1_HEADER_SIZE && (validator.profile.pd.length - NOAH_PROFILE_PD_V1_HEADER_SIZE) % NOAH_PROFILE_PD_V1_RECORD_SIZE == 0u);
+    assert(noah_profile_blob_v1_find_domain(&validator.reader, 0, validator.profile.byte_length, NOAH_PROFILE_DOMAIN_V1_PD, &pd));
+    assert(pd.length >= NOAH_PROFILE_PD_V1_HEADER_SIZE && (pd.length - NOAH_PROFILE_PD_V1_HEADER_SIZE) % NOAH_PROFILE_PD_V1_RECORD_SIZE == 0u);
 #endif
 }
 
@@ -470,7 +467,7 @@ int main(int argc, char **argv) {
         assert(noah_profile_compiled_v1_write(&profile, collect, NULL, NULL) == NOAH_PROFILE_COMPILED_V1_OK);
         FILE *file = fopen(argv[1], "w");
         assert(file);
-        fprintf(file, "profile.byte_length=%u\nprofile.crc32=%08x\nprofile.fnv1a32=%08x\nprofile.action_abi=%08x\nprofile.action_abi_row_visits=%u\nprofile.full.hex=", profile.metadata.byte_length, (unsigned)profile.metadata.crc32, (unsigned)profile.metadata.digest, (unsigned)profile.metadata.action_abi_digest, profile.metadata.action_abi_row_visits);
+        fprintf(file, "profile.byte_length=%u\nprofile.crc32=%08x\nprofile.fnv1a32=%08x\nprofile.action_abi=%08x\nprofile.full.hex=", profile.metadata.byte_length, (unsigned)profile.metadata.crc32, (unsigned)profile.metadata.digest, (unsigned)profile.metadata.action_abi_digest);
         for (size_t i = 0; i < output_length; i++)
             fprintf(file, "%02x", output[i]);
         fputc('\n', file);

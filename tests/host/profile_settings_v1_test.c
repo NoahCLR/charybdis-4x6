@@ -3,12 +3,25 @@
 #include <string.h>
 #include "users/noah/lib/profile/schema/profile_settings_v1.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "profile_test_blob.h"
 static unsigned applied;
 void            noah_qmk_portable_apply(void) {
     applied++;
 }
 static uint8_t  bytes[NOAH_SETTINGS_V5_MAX_SIZE + 1];
 static uint16_t length;
+static uint8_t  blob[NOAH_PROFILE_TEST_BLOB_PAYLOAD_OFFSET + sizeof(bytes)];
+// The current bytes as a validated profile's settings domain.
+static noah_effective_profile_snapshot_t settings_view(void) {
+    noah_effective_profile_snapshot_t view  = {0};
+    size_t                            total = noah_profile_test_blob_wrap(blob, sizeof(blob), NOAH_PROFILE_DOMAIN_V1_SETTINGS, bytes, length);
+    assert(total);
+    view.reader               = noah_profile_reader_from_memory(blob, total);
+    view.profile.domain_mask  = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
+    view.profile.domain_count = 1;
+    view.profile.byte_length  = (uint16_t)total;
+    return view;
+}
 // A legacy domain carries 16 empty user-macro records; v3 carries 64 empty
 // VIA macro names in their place, and v5 64 empty custom-key names after them.
 static void defaults_as(uint8_t version) {
@@ -28,15 +41,11 @@ static void defaults_as(uint8_t version) {
 static void defaults(void) {
     defaults_as(5);
 }
-static bool valid_as(uint8_t envelope) {
+static bool valid(void) {
     noah_profile_settings_v1_validation_t state = {0};
-    state.expected_version                      = envelope;
     for (size_t i = 0; i < length; i++)
         if (!noah_profile_settings_v1_consume(&state, bytes[i], length, 8)) return false;
     return noah_profile_settings_v1_complete(&state, length);
-}
-static bool valid(void) {
-    return valid_as(0);
 }
 // Every name (64, or 128 with v5's custom keys) at `size` bytes of `fill`.
 static void names_of(uint8_t version, uint8_t size, char fill) {
@@ -76,7 +85,7 @@ static void test_macro_name_limits(void) {
 // so the domain's worst case is 128 names of 20 characters.
 static void test_custom_key_names_v5(void) {
     defaults_as(5);
-    assert(valid() && valid_as(5) && !valid_as(4));
+    assert(valid());
     bytes[4] = 0; // v5 names its custom-key count
     assert(!valid());
     defaults_as(4);
@@ -104,10 +113,7 @@ static void test_custom_key_names_v5(void) {
     bytes[NOAH_SETTINGS_FIXED_SIZE + 66] = 'K';
     length += 2;
     assert(valid());
-    noah_effective_profile_snapshot_t view = {0};
-    view.reader                            = noah_profile_reader_from_memory(bytes, length);
-    view.profile.domain_mask               = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
-    view.profile.settings                  = (noah_profile_settings_v1_view_t){0, length};
+    noah_effective_profile_snapshot_t view = settings_view();
     noah_effective_settings_invalidate(NULL, 4, view.identity, view.identity, &view);
     assert(noah_effective_settings_length() == length);
     assert(noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 64) == 2 && noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 66) == 'K');
@@ -144,10 +150,7 @@ int main(void) {
     defaults();
     assert(!noah_profile_setting_v1_valid(NOAH_SETTING_DEFAULT_DPI, 401, 8));
     assert(!noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_MOUSE_LAYER, 8, 8));
-    noah_effective_profile_snapshot_t view = {0};
-    view.reader                            = noah_profile_reader_from_memory(bytes, length);
-    view.profile.domain_mask               = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
-    view.profile.settings                  = (noah_profile_settings_v1_view_t){0, length};
+    noah_effective_profile_snapshot_t view = settings_view();
     noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 200);
     // The whole stored domain stays readable, retired user macros included.
@@ -178,9 +181,7 @@ int main(void) {
     bytes[NOAH_SETTINGS_FIXED_SIZE + 6]  = 'O';
     bytes[NOAH_SETTINGS_FIXED_SIZE + 7]  = 'K';
     length                              += 2;
-    view.reader              = noah_profile_reader_from_memory(bytes, length);
-    view.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
-    view.profile.settings    = (noah_profile_settings_v1_view_t){0, length};
+    view = settings_view();
     noah_effective_settings_invalidate(NULL, 3, view.identity, view.identity, &view);
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 200);
     assert(noah_effective_settings_length() == length);

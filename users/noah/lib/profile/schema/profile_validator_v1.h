@@ -138,13 +138,10 @@ typedef struct {
     uint32_t                        crc32;
     uint32_t                        digest;
     uint32_t                        action_abi_digest;
+    // Decoded views for the domains read through record accessors. Other
+    // domains are found by walking the blob's envelope when published.
     noah_profile_rgb_v1_view_t      rgb;
     noah_key_behavior_domain_v1_t   key_behaviors;
-    noah_profile_combo_v1_view_t    combos;
-    noah_profile_settings_v1_view_t settings;
-#ifdef NOAH_PD_PROFILE_ENABLE
-    noah_profile_settings_v1_view_t pd;
-#endif
 } noah_profile_validator_v1_profile_t;
 
 typedef union {
@@ -170,12 +167,12 @@ typedef struct {
     noah_profile_validator_v1_declaration_t       declaration;
     noah_profile_validator_v1_compatibility_t     compatibility;
     noah_profile_validator_v1_profile_t           profile;
-    size_t                                        checksum_offset;
     uint32_t                                      crc32_state;
     uint32_t                                      digest_state;
     noah_profile_envelope_t                       envelope;
-    size_t                                        domain_payload_offset;
-    uint16_t                                      domain_payload_length;
+    noah_profile_domain_range_t                   payload;         // the domain being decoded
+    uint16_t                                      checksum_offset; // a blob is at most 5,088 bytes
+    uint8_t                                       domain;          // its registry index
     bool                                          has_reference_error;
     noah_profile_validator_v1_domain_validation_t domain_validation;
     size_t                                        reference_error_offset;

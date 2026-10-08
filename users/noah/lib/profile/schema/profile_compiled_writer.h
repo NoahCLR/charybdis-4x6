@@ -61,8 +61,13 @@ static inline bool emit_action(compiled_writer_t *writer, const noah_profile_act
     return emit(writer, bytes, sizeof(bytes));
 }
 
+// Each registry row's module encodes that domain from authored data, named
+// noah_profile_<module>_compiled_v1_write. A build without the domain writes
+// nothing, and the compiled profile omits it.
+#define NOAH_DOMAIN_COMPILED_WRITER(NAME, module, id, version) noah_profile_compiled_v1_result_t noah_profile_##module##_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error);
+NOAH_PROFILE_DOMAIN_ROWS(NOAH_DOMAIN_COMPILED_WRITER)
+#undef NOAH_DOMAIN_COMPILED_WRITER
+
 #if defined(RGB_MATRIX_ENABLE)
-uint16_t                          noah_profile_rgb_compiled_v1_stage_mask(void);
-noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_length(size_t *length, uint8_t *groups, noah_profile_compiled_v1_error_t *error);
-noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error);
+uint16_t noah_profile_rgb_compiled_v1_stage_mask(void);
 #endif

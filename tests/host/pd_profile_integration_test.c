@@ -139,7 +139,8 @@ int main(int argc, char **argv) {
     size_t presets_length = load_domain(argv[1]);
     assert(presets_length == 8 + 7 * 96);
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_VALID);
-    assert(profile.pd.offset == 12 && profile.pd.length == presets_length && profile.domain_mask == 16);
+    noah_profile_domain_range_t pd;
+    assert(noah_profile_blob_v1_find_domain(&reader, 0, reader.length, NOAH_PROFILE_DOMAIN_V1_PD, &pd) && pd.offset == 12 && pd.length == presets_length && profile.domain_mask == 16);
     publish(&snapshot);
     assert(noah_effective_pd_ready());
     assert(noah_effective_pd_for_mask(1)[1] == 2);

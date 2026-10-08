@@ -345,7 +345,8 @@ nothing copied until a power cycle. The faults, each now fixed and tested:
 - The trigger behind every stall: the store's shape check kept its own list of
   settings versions and refused every stored copy carrying v4 after both
   validators had passed it. There is now one list,
-  `NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED` in `profile_versions.h`.
+  `NOAH_PROFILE_PD_SETTINGS_VERSION_ACCEPTED` in `profile_versions.h`, since
+  replaced by the domain registry's one version per domain (D-F11, D-F13).
 
 A failed store on the other half is now retried from the start up to two
 times, safe because nothing is durable before the commit is authorized; then
@@ -843,3 +844,35 @@ firmware does no migration. A client restores a complete current profile bound
 to the connected firmware. Client probes must link the new compiled RGB and
 settings modules, refresh the complete compiled-profile fixture and affected
 spec imports, and pin a published firmware revision after landing.
+
+## D-F13 — A registry row names its domain module
+
+Each registry row names its domain's module beside its ID and version; its
+index is its position and its mask bit follows from that, so neither can drift
+from the row order. The validator, compiled defaults and the compiled writer
+declarations bind each row's operations by that name in switches generated
+from the rows: a row without its module's validator or compiled encoder does
+not compile, and every call stays a direct edge for the reviewed stack
+contexts (no function-pointer tables). Neither the validator's dispatch nor
+compiled defaults names a domain otherwise.
+
+Every domain's compiled encoder lives in its own module (`key_behavior_compiled_v1.c`,
+`profile_combo_compiled_v1.c`, `profile_pd_compiled_v1.c`, beside the RGB and
+settings ones); a build without the domain writes nothing and the compiled
+profile omits it. A domain's compiled length is what its encoder emits.
+
+A validated profile stores decoded views only for RGB and key behaviours, the
+domains read through record accessors. Publication finds the combo, settings
+and pointing payloads by walking the snapshot's envelope
+(`noah_profile_blob_v1_find_domain`), so no profile copy carries payload
+ranges; the provider checks the two remaining views. Each domain has exactly one
+accepted version, so no codec takes a version and the version-acceptance
+macros are gone.
+
+Wire bytes, digests, store geometry and validation error details are unchanged.
+Client probes compiling compiled defaults link the three new encoder modules;
+the blob codec needs `profile_reader.c` and `profile_checksum.c`; the combo
+codec reads a payload range
+instead of a view; the compiled fixture drops the unused
+`profile.action_abi_row_visits` key. See
+[domain ownership](architecture/profile-wire-v1.md#firmware-domain-ownership).
