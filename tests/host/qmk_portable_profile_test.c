@@ -4,6 +4,7 @@
 #include "portable_profile_keyboard.h"
 #include "users/noah/lib/compat/qmk_portable_profile.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "profile_test_blob.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/noah_keymap_ids.h"
 
@@ -230,10 +231,14 @@ int main(int argc, char **argv) {
     }
     memset(stored + names, 0, NOAH_SETTINGS_CUSTOM_KEY_NAMES);
     names += NOAH_SETTINGS_CUSTOM_KEY_NAMES;
-    noah_effective_profile_snapshot_t view = {0};
-    view.reader                            = noah_profile_reader_from_memory(stored, names);
-    view.profile.domain_mask               = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
-    view.profile.settings                  = (noah_profile_settings_v1_view_t){0, names};
+    static uint8_t                    blob[NOAH_PROFILE_TEST_BLOB_PAYLOAD_OFFSET + sizeof(stored)];
+    size_t                            total = noah_profile_test_blob_wrap(blob, sizeof(blob), NOAH_PROFILE_DOMAIN_V1_SETTINGS, stored, names);
+    noah_effective_profile_snapshot_t view  = {0};
+    assert(total);
+    view.reader               = noah_profile_reader_from_memory(blob, total);
+    view.profile.domain_mask  = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
+    view.profile.domain_count = 1;
+    view.profile.byte_length  = (uint16_t)total;
     noah_qmk_portable_storage_init(); // installs the real native apply hook
     view.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
     am_timeout = 777;

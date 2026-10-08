@@ -8,10 +8,7 @@
 
 #include "key_behavior_domain_v1.h"
 #include "profile_rgb_v1.h"
-#include "profile_rgb_compiled_v1.h"
 #include "profile_compiled_writer.h"
-#include "profile_settings_defaults.h"
-#include "profile_combo_v1.h"
 #include "../runtime/profile_action_runtime_v1.h"
 #include "../storage/profile_checksum.h"
 #include "noah_keymap_ids.h"
@@ -64,209 +61,18 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_action(uint16_t nativ
     return result == NOAH_PROFILE_ACTION_RUNTIME_V1_INVALID_ARGUMENT ? NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT : NOAH_PROFILE_COMPILED_V1_INVALID_ACTION;
 }
 
-static int action_compare(noah_profile_action_v1_t left, noah_profile_action_v1_t right) {
-    uint8_t left_bytes[4]  = {left.kind, left.flags, (uint8_t)left.operand, (uint8_t)(left.operand >> 8u)};
-    uint8_t right_bytes[4] = {right.kind, right.flags, (uint8_t)right.operand, (uint8_t)(right.operand >> 8u)};
-    return memcmp(left_bytes, right_bytes, sizeof(left_bytes));
-}
-
-static bool step_present(const key_behavior_step_t *step) {
-    return step->tap.present || step->hold.present || step->long_hold.present;
-}
-
-static uint8_t behavior_step_count(const key_behavior_t *row) {
-    uint8_t count = 0u;
-    for (uint8_t index = 0u; index < KEY_BEHAVIOR_MAX_TAP_COUNT; index++) {
-        if (step_present(&row->tap_counts[index])) count++;
-    }
-    return count;
-}
-
-static uint8_t behavior_step_mask(const key_behavior_step_t *step) {
-    return (uint8_t)((step->tap.present ? NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP : 0u) | (step->hold.present ? NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD : 0u) | (step->long_hold.present ? NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_LONG_HOLD : 0u));
-}
-
-static size_t behavior_row_body_length(const key_behavior_t *row) {
-    size_t length = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE;
-    for (uint8_t index = 0u; index < KEY_BEHAVIOR_MAX_TAP_COUNT; index++) {
-        uint8_t mask;
-        if (!step_present(&row->tap_counts[index])) continue;
-        mask = behavior_step_mask(&row->tap_counts[index]);
-        length += NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HEADER_SIZE;
-        if ((mask & NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP) != 0u) length += NOAH_PROFILE_BLOB_V1_ACTION_SIZE;
-        if ((mask & NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD) != 0u) length += NOAH_KEY_BEHAVIOR_DOMAIN_V1_HOLD_SIZE;
-        if ((mask & NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_LONG_HOLD) != 0u) length += NOAH_KEY_BEHAVIOR_DOMAIN_V1_HOLD_SIZE;
-    }
-    return length;
-}
-
-static const key_behavior_t *behavior_row_in_canonical_order(uint8_t wanted, noah_profile_compiled_v1_error_t *error) {
-#ifdef NOAH_COMPILED_DEFAULTS_TEST
-    extern void noah_compiled_defaults_test_behavior_visit(void);
-    noah_compiled_defaults_test_behavior_visit();
-#endif
-    for (uint8_t candidate = 0u; candidate < key_behavior_count; candidate++) {
-        noah_profile_action_v1_t candidate_action;
-        uint8_t                  rank = 0u;
-
-        if (noah_profile_compiled_v1_action(key_behaviors[candidate].keycode, &candidate_action) != NOAH_PROFILE_COMPILED_V1_OK || candidate_action.kind == NOAH_PROFILE_ACTION_V1_NONE) {
-            fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, candidate, UINT8_MAX);
-            return NULL;
-        }
-        for (uint8_t other = 0u; other < key_behavior_count; other++) {
-            noah_profile_action_v1_t other_action;
-            int                      order;
-            if (noah_profile_compiled_v1_action(key_behaviors[other].keycode, &other_action) != NOAH_PROFILE_COMPILED_V1_OK) {
-                fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, other, UINT8_MAX);
-                return NULL;
-            }
-            order = action_compare(other_action, candidate_action);
-            if (order < 0) rank++;
-            if (order == 0 && other != candidate) {
-                fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, candidate, UINT8_MAX);
-                return NULL;
-            }
-        }
-        if (rank == wanted) return &key_behaviors[candidate];
-    }
-    fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, wanted, UINT8_MAX);
-    return NULL;
-}
-
-// The authored rows in canonical order, worked out once. Finding the order is
-// cubic in the row count, the table is compiled data, so the order never
-// changes, and every serialization emits it: open, a full write, and each
-// chunk a host or the validator reads through the compiled reader, which
-// replays the stream up to that chunk. A failure is not remembered, so every
-// later serialization reports it again, as before.
-static uint8_t canonical_behavior_rows[NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS];
-static bool    canonical_behavior_rows_ready;
-
-static noah_profile_compiled_v1_result_t canonical_behavior_order(noah_profile_compiled_v1_error_t *error) {
-    if (canonical_behavior_rows_ready) return NOAH_PROFILE_COMPILED_V1_OK;
-    for (uint8_t order = 0u; order < key_behavior_count; order++) {
-        const key_behavior_t *row = behavior_row_in_canonical_order(order, error);
-        if (!row) return error ? error->code : NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR;
-        canonical_behavior_rows[order] = (uint8_t)(row - key_behaviors);
-    }
-    canonical_behavior_rows_ready = true;
-    return NOAH_PROFILE_COMPILED_V1_OK;
-}
-
-static noah_profile_compiled_v1_result_t map_hold(const hold_behavior_t *source, noah_key_behavior_hold_v1_t *target, uint8_t row, uint8_t step, noah_profile_compiled_v1_error_t *error) {
-    noah_profile_compiled_v1_result_t result;
-    if (!source->present || !target) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, step);
-    switch (source->mode) {
-        case HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE:
-            target->mode = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE;
-            break;
-        case HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD:
-            target->mode = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD;
-            break;
-        case HOLD_BEHAVIOR_REPEAT_WHILE_HELD:
-            target->mode = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD;
-            break;
-        case HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD:
-            target->mode = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD;
-            break;
-        default:
-            return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, step);
-    }
-    if (source->repeat_hz > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ || (target->mode == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD ? source->repeat_hz == 0u : source->repeat_hz != 0u)) {
-        return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, step);
-    }
-    target->repeat_hz = (uint8_t)source->repeat_hz;
-    result            = noah_profile_compiled_v1_action(source->action, &target->action);
-    if (result != NOAH_PROFILE_COMPILED_V1_OK || target->action.kind == NOAH_PROFILE_ACTION_V1_NONE) {
-        return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, step);
-    }
-    return NOAH_PROFILE_COMPILED_V1_OK;
-}
-
-static bool emit_hold(compiled_writer_t *writer, const noah_key_behavior_hold_v1_t *hold) {
-    return emit_u8(writer, hold->mode) && emit_u8(writer, hold->repeat_hz) && emit_action(writer, &hold->action);
-}
-
-static noah_profile_compiled_v1_result_t behavior_payload_size(size_t *length, uint8_t *populated_steps, noah_profile_compiled_v1_error_t *error) {
-    size_t  total = NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE;
-    uint8_t steps = 0u;
-    if (!length || !populated_steps || key_behavior_count > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS) {
-        return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, UINT8_MAX, UINT8_MAX);
-    }
-    for (uint8_t row = 0u; row < key_behavior_count; row++) {
-        size_t  body      = behavior_row_body_length(&key_behaviors[row]);
-        uint8_t row_steps = behavior_step_count(&key_behaviors[row]);
-        if ((uint16_t)steps + row_steps > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS || total > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE - NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE - body) {
-            return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, UINT8_MAX);
-        }
-        steps = (uint8_t)(steps + row_steps);
-        total += NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE + body;
-    }
-    *length          = total;
-    *populated_steps = steps;
-    return NOAH_PROFILE_COMPILED_V1_OK;
-}
-
-static noah_profile_compiled_v1_result_t write_behavior_payload(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
-    size_t                            payload_length;
-    uint8_t                           populated_steps;
-    noah_profile_compiled_v1_result_t result = behavior_payload_size(&payload_length, &populated_steps, error);
-    (void)payload_length;
-    if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
-    if (!(emit_u8(writer, key_behavior_count) && emit_u8(writer, populated_steps) && emit_u16(writer, 0u))) return writer->result;
-    result = canonical_behavior_order(error);
-    if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
-
-    for (uint8_t order = 0u; order < key_behavior_count; order++) {
-        uint8_t                  source_row = canonical_behavior_rows[order];
-        const key_behavior_t    *row        = &key_behaviors[source_row];
-        noah_profile_action_v1_t target;
-        result = noah_profile_compiled_v1_action(row->keycode, &target);
-        if (result != NOAH_PROFILE_COMPILED_V1_OK || target.kind == NOAH_PROFILE_ACTION_V1_NONE) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, source_row, UINT8_MAX);
-        if (!(emit_u16(writer, (uint16_t)behavior_row_body_length(row)) && emit_action(writer, &target) && emit_u16(writer, row->tap_hold_term) && emit_u16(writer, row->longer_hold_term) && emit_u16(writer, row->multi_tap_term) && emit_u8(writer, row->keeps_auto_mouse_anchored ? NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE : 0u) && emit_u8(writer, behavior_step_count(row)))) return writer->result;
-
-        for (uint8_t step_index = 0u; step_index < KEY_BEHAVIOR_MAX_TAP_COUNT; step_index++) {
-            const key_behavior_step_t *step = &row->tap_counts[step_index];
-            uint8_t                    mask;
-            if (!step_present(step)) continue;
-            mask = behavior_step_mask(step);
-            if (!(emit_u8(writer, step_index) && emit_u8(writer, mask))) return writer->result;
-            if (step->tap.present) {
-                noah_profile_action_v1_t action;
-                result = noah_profile_compiled_v1_action(step->tap.action, &action);
-                if (result != NOAH_PROFILE_COMPILED_V1_OK || action.kind == NOAH_PROFILE_ACTION_V1_NONE) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, source_row, step_index);
-                if (!emit_action(writer, &action)) return writer->result;
-            }
-            if (step->hold.present) {
-                noah_key_behavior_hold_v1_t hold;
-                result = map_hold(&step->hold, &hold, source_row, step_index, error);
-                if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
-                if (!emit_hold(writer, &hold)) return writer->result;
-            }
-            if (step->long_hold.present) {
-                noah_key_behavior_hold_v1_t hold;
-                result = map_hold(&step->long_hold, &hold, source_row, step_index, error);
-                if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
-                if (!emit_hold(writer, &hold)) return writer->result;
-            }
-        }
-    }
-    return writer->result;
-}
-
-static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uint16_t *row_visits, noah_profile_compiled_v1_error_t *error) {
+static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, noah_profile_compiled_v1_error_t *error) {
     checksum_sink_t      sink     = {.crc32 = NOAH_PROFILE_CRC32_INITIAL, .digest = NOAH_PROFILE_FNV1A_INITIAL};
     compiled_writer_t    writer   = {.write = checksum_write, .context = &sink, .result = NOAH_PROFILE_COMPILED_V1_OK};
     static const uint8_t magic[4] = {'N', 'L', 'A', '1'};
 
-    if (!digest || !row_visits) {
+    if (!digest) {
         return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT, NOAH_PROFILE_COMPILED_V1_SURFACE_ACTION_ABI, UINT8_MAX, UINT8_MAX);
     }
     if (key_behavior_count > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS) {
         return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_ACTION_ABI, UINT8_MAX, UINT8_MAX);
     }
-    *digest     = 0u;
-    *row_visits = 0u;
+    *digest = 0u;
 
     emit(&writer, magic, sizeof(magic));
     emit_u8(&writer, NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR);
@@ -307,154 +113,57 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, uin
     if (writer.result != NOAH_PROFILE_COMPILED_V1_OK) {
         return fail(error, writer.result, NOAH_PROFILE_COMPILED_V1_SURFACE_ACTION_ABI, UINT8_MAX, UINT8_MAX);
     }
-    if (*row_visits > NOAH_PROFILE_COMPILED_V1_ACTION_ABI_ROW_VISITS_MAX) {
-        return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_ACTION_ABI, UINT8_MAX, UINT8_MAX);
-    }
     *digest = sink.digest;
     return NOAH_PROFILE_COMPILED_V1_OK;
 }
-
-#ifdef NOAH_PD_PROFILE_ENABLE
-// The sparse version-2 domain stores only the slots a profile uses.
-static uint16_t pd_payload_size(void) {
-    return (uint16_t)(NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)noah_profile_pd_v1_default_record_count(noah_pd_defaults) * NOAH_PROFILE_PD_V1_RECORD_SIZE);
-}
-
-static noah_profile_compiled_v1_result_t write_pd_payload(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
-    const uint8_t               pd_header[8] = {NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, noah_profile_pd_v1_default_record_count(noah_pd_defaults), 0, 0, 0, 0};
-    noah_profile_pd_v1_cursor_t cursor;
-    if (noah_profile_pd_v1_cursor_begin(&cursor, pd_header, pd_payload_size(), NULL) != NOAH_PROFILE_PD_V1_OK) return NOAH_PROFILE_COMPILED_V1_INVALID_ACTION;
-    if (!emit(writer, pd_header, sizeof(pd_header))) return writer->result;
-    for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
-        uint8_t record[96];
-        noah_profile_pd_v1_encode_record(&noah_pd_defaults[slot], record);
-        if (noah_profile_pd_v1_validate_record(record, sizeof(record), slot, NULL) != NOAH_PROFILE_PD_V1_OK) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, slot, UINT8_MAX);
-        if (!noah_profile_pd_v1_record_present(record)) continue;
-        if (noah_profile_pd_v1_cursor_next(&cursor, record, NULL) != NOAH_PROFILE_PD_V1_OK) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, slot, UINT8_MAX);
-        for (uint8_t offset = 0; offset < sizeof(record); offset++)
-            if (!emit_u8(writer, record[offset])) return writer->result;
-    }
-    return writer->result;
-}
-#endif
 
 static bool emit_domain_header(compiled_writer_t *writer, uint8_t id, uint16_t length) {
     const noah_profile_domain_shape_t *shape = noah_profile_domain_find(id);
     return shape && emit_u8(writer, shape->id) && emit_u8(writer, shape->version) && emit_u16(writer, length);
 }
 
-#ifdef COMBO_ENABLE
-static noah_profile_compiled_v1_result_t write_combo_payload(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
-    if (noah_combo_count > NOAH_PROFILE_COMBO_V1_MAX_ROWS) return NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED;
-    if (!(emit_u8(writer, noah_combo_count) && emit_u8(writer, 0) && emit_u16(writer, 0) && emit_u16(writer, COMBO_TERM) && emit_u16(writer, TAPPING_TERM))) return writer->result;
-    for (uint16_t row = 0; row < noah_combo_count; row++) {
-        const combo_t *combo = &key_combos[row];
-        uint8_t        count = 0, flags = 0;
-        while (count <= NOAH_PROFILE_COMBO_V1_MAX_INPUTS && pgm_read_word(&combo->keys[count]) != COMBO_END)
-            count++;
-        if (count < 2 || count > NOAH_PROFILE_COMBO_V1_MAX_INPUTS) return NOAH_PROFILE_COMPILED_V1_INVALID_ACTION;
-#    ifdef COMBO_MUST_PRESS_IN_ORDER
-        flags |= 4u;
-#    endif
-#    ifdef COMBO_MUST_HOLD_MODS
-        uint16_t key = combo->keycode;
-        if ((key >= 0xe0u && key <= 0xe7u) || (key >= 0x100u && key <= 0x1fffu && (key & 0xffu) == 0u) || (key >= 0x5220u && key <= 0x523fu)) flags |= 1u;
-#    endif
-        if (!(emit_u8(writer, count) && emit_u8(writer, flags) && emit_u16(writer, noah_combo_terms[row]) && emit_u32(writer, 0))) return writer->result;
-        for (uint8_t member = 0; member <= NOAH_PROFILE_COMBO_V1_MAX_INPUTS; member++) {
-            noah_profile_action_v1_t action = {0};
-            if (member == 0 || member <= count) {
-                uint16_t native = member == 0 ? combo->keycode : pgm_read_word(&combo->keys[member - 1]);
-                if (noah_profile_compiled_v1_action(native, &action) != NOAH_PROFILE_COMPILED_V1_OK || action.kind == NOAH_PROFILE_ACTION_V1_NONE) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, row, member);
-            }
-            if (!emit_action(writer, &action)) return writer->result;
-        }
-    }
-    return writer->result;
-}
-#endif
-
-static noah_profile_compiled_v1_result_t write_domain(uint8_t id, compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
+// Each registry row's encoder, called directly so the linked stack contexts
+// keep a direct edge to every domain.
+static noah_profile_compiled_v1_result_t write_domain(size_t index, compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
 #ifdef NOAH_COMPILED_DEFAULTS_TEST
     extern void noah_compiled_defaults_test_domain_write(uint8_t id);
-    if (id != NOAH_PROFILE_DOMAIN_V1_RGB) noah_compiled_defaults_test_domain_write(id);
+    noah_compiled_defaults_test_domain_write(noah_profile_domain_at(index)->id);
 #endif
-    switch (id) {
-#if defined(RGB_MATRIX_ENABLE)
-        case NOAH_PROFILE_DOMAIN_V1_RGB:
-            return noah_profile_rgb_compiled_v1_write(writer, error);
-#endif
-        case NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS:
-            return write_behavior_payload(writer, error);
-#ifdef COMBO_ENABLE
-        case NOAH_PROFILE_DOMAIN_V1_COMBOS:
-            return write_combo_payload(writer, error);
-#endif
-#ifdef NOAH_PORTABLE_PROFILE_ENABLE
-        case NOAH_PROFILE_DOMAIN_V1_SETTINGS: {
-            uint16_t length = noah_profile_settings_defaults_length();
-            for (uint16_t offset = 0; offset < length; offset++)
-                if (!emit_u8(writer, noah_profile_settings_defaults_byte(offset))) return writer->result;
-            return writer->result;
-        }
-#endif
-#ifdef NOAH_PD_PROFILE_ENABLE
-        case NOAH_PROFILE_DOMAIN_V1_PD:
-            return write_pd_payload(writer, error);
-#endif
+    switch (index) {
+#define NOAH_DOMAIN_WRITE(NAME, module, id, version) \
+    case NOAH_PROFILE_DOMAIN_INDEX_##NAME:           \
+        return noah_profile_##module##_compiled_v1_write(writer, error);
+        NOAH_PROFILE_DOMAIN_ROWS(NOAH_DOMAIN_WRITE)
+#undef NOAH_DOMAIN_WRITE
         default:
-            return NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT;
+            return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, UINT8_MAX, UINT8_MAX);
     }
 }
 
+static bool count_write(void *context, const uint8_t *bytes, size_t length) {
+    (void)bytes;
+    *(size_t *)context += length;
+    return true;
+}
+
+// A domain's length is what its encoder emits; one that emits nothing is
+// absent from this build's compiled profile.
 static noah_profile_compiled_v1_result_t layout(noah_profile_compiled_v1_t *profile, noah_profile_compiled_v1_error_t *error) {
     size_t offset = NOAH_PROFILE_BLOB_V1_HEADER_SIZE;
     for (size_t i = 0; i < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; i++) {
-        const noah_profile_domain_shape_t *shape  = noah_profile_domain_at(i);
-        size_t                             length = 0;
-        noah_profile_compiled_v1_result_t  result = NOAH_PROFILE_COMPILED_V1_OK;
-        switch (shape->id) {
-#if defined(RGB_MATRIX_ENABLE)
-            case NOAH_PROFILE_DOMAIN_V1_RGB: {
-                uint8_t groups;
-                result = noah_profile_rgb_compiled_v1_length(&length, &groups, error);
-                break;
-            }
-#endif
-            case NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS: {
-                uint8_t steps;
-                result = behavior_payload_size(&length, &steps, error);
-                break;
-            }
-#ifdef COMBO_ENABLE
-            case NOAH_PROFILE_DOMAIN_V1_COMBOS:
-                if (noah_combo_count > NOAH_PROFILE_COMBO_V1_MAX_ROWS) return NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED;
-                length = NOAH_PROFILE_COMBO_V2_HEADER_SIZE + (size_t)noah_combo_count * NOAH_PROFILE_COMBO_V1_ROW_SIZE;
-                break;
-#endif
-#ifdef NOAH_PORTABLE_PROFILE_ENABLE
-            case NOAH_PROFILE_DOMAIN_V1_SETTINGS:
-                length = noah_profile_settings_defaults_length();
-                break;
-#endif
-#ifdef NOAH_PD_PROFILE_ENABLE
-            case NOAH_PROFILE_DOMAIN_V1_PD:
-                length = pd_payload_size();
-                break;
-#endif
-            default:
-                break;
-        }
+        size_t                            length = 0;
+        compiled_writer_t                 counter = {.write = count_write, .context = &length, .result = NOAH_PROFILE_COMPILED_V1_OK};
+        noah_profile_compiled_v1_result_t result  = write_domain(i, &counter, error);
         if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
         if (!length) continue;
         offset += NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE;
-        if (offset > NOAH_PROFILE_BLOB_V1_MAX_SIZE || length > NOAH_PROFILE_BLOB_V1_MAX_SIZE - offset) return NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED;
-        profile->domains[i].offset = offset;
-        profile->domains[i].length = length;
-        profile->metadata.domain_mask |= shape->mask;
+        if (offset > NOAH_PROFILE_BLOB_V1_MAX_SIZE || length > NOAH_PROFILE_BLOB_V1_MAX_SIZE - offset) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, UINT8_MAX, UINT8_MAX);
+        profile->domains[i].offset = (uint16_t)offset;
+        profile->domains[i].length = (uint16_t)length;
+        profile->metadata.domain_mask |= noah_profile_domain_at(i)->mask;
         offset += length;
     }
-    profile->metadata.byte_length = offset;
+    profile->metadata.byte_length = (uint16_t)offset;
     return NOAH_PROFILE_COMPILED_V1_OK;
 }
 
@@ -469,7 +178,7 @@ static noah_profile_compiled_v1_result_t write_blob(const noah_profile_compiled_
         if (!profile->domains[i].length) continue;
         const noah_profile_domain_shape_t *shape = noah_profile_domain_at(i);
         if (!emit_domain_header(writer, shape->id, profile->domains[i].length)) return writer->result;
-        noah_profile_compiled_v1_result_t result = write_domain(shape->id, writer, error);
+        noah_profile_compiled_v1_result_t result = write_domain(i, writer, error);
         if (result != NOAH_PROFILE_COMPILED_V1_OK || writer->stopped) return result;
     }
     return writer->result;
@@ -480,12 +189,11 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_com
     compiled_writer_t                 writer = {.write = checksum_write, .context = &sink, .result = NOAH_PROFILE_COMPILED_V1_OK};
     noah_profile_compiled_v1_result_t result;
     uint32_t                          action_abi;
-    uint16_t                          action_abi_row_visits;
 
     if (error) *error = no_error();
     if (!profile) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, UINT8_MAX, UINT8_MAX);
     memset(profile, 0, sizeof(*profile));
-    result = action_abi_digest(&action_abi, &action_abi_row_visits, error);
+    result = action_abi_digest(&action_abi, error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
     result = layout(profile, error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
@@ -493,12 +201,11 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_com
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
     if (writer.offset > UINT16_MAX || writer.offset > NOAH_PROFILE_BLOB_V1_MAX_SIZE) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, UINT8_MAX, UINT8_MAX);
     profile->metadata = (noah_profile_compiled_v1_metadata_t){
-        .byte_length           = (uint16_t)writer.offset,
-        .crc32                 = noah_profile_crc32_finish(sink.crc32),
-        .digest                = sink.digest,
-        .action_abi_digest     = action_abi,
-        .action_abi_row_visits = action_abi_row_visits,
-        .domain_mask           = profile->metadata.domain_mask,
+        .byte_length       = (uint16_t)writer.offset,
+        .crc32             = noah_profile_crc32_finish(sink.crc32),
+        .digest            = sink.digest,
+        .action_abi_digest = action_abi,
+        .domain_mask       = profile->metadata.domain_mask,
     };
     return NOAH_PROFILE_COMPILED_V1_OK;
 }
@@ -531,7 +238,7 @@ static bool compiled_reader_read(void *context, size_t offset, uint8_t *target, 
         if (offset < start && !emit_domain_header(&writer, shape->id, size)) return writer.result == NOAH_PROFILE_COMPILED_V1_OK && sink.copied == length;
         if (sink.copied == length) break;
         sink.stream_offset = start;
-        if (write_domain(shape->id, &writer, &error) != NOAH_PROFILE_COMPILED_V1_OK) return false;
+        if (write_domain(i, &writer, &error) != NOAH_PROFILE_COMPILED_V1_OK) return false;
         if (writer.stopped) break;
     }
     return writer.result == NOAH_PROFILE_COMPILED_V1_OK && sink.copied == length;

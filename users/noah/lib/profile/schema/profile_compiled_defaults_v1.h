@@ -12,17 +12,6 @@
 #include "profile_reader.h"
 #include "profile_validator_v1.h"
 
-enum {
-    NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_RGB           = NOAH_PROFILE_DOMAIN_MASK_RGB,
-    NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_KEY_BEHAVIORS = NOAH_PROFILE_DOMAIN_MASK_KEY_BEHAVIORS,
-    NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_ALL           = NOAH_PROFILE_ENABLED_DOMAIN_MASK,
-    // A read visits only payloads intersecting its requested range.
-    NOAH_PROFILE_COMPILED_V1_READER_REPLAY_MAX = NOAH_PROFILE_BLOB_V1_MAX_SIZE,
-    // ABI vocabulary canonicalization scans at most the 64 compiled behavior
-    // targets once to count and once per possible stable custom target.
-    NOAH_PROFILE_COMPILED_V1_ACTION_ABI_ROW_VISITS_MAX = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS * (NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS + 1u),
-};
-
 typedef enum {
     NOAH_PROFILE_COMPILED_V1_OK = 0u,
     NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT,
@@ -52,7 +41,6 @@ typedef struct {
     uint32_t digest;
     uint32_t action_abi_digest;
     uint16_t byte_length;
-    uint16_t action_abi_row_visits;
     uint8_t  domain_mask;
 } noah_profile_compiled_v1_metadata_t;
 

@@ -35,12 +35,12 @@ void noah_effective_combo_runtime_invalidate(void *context, uint32_t publication
         return;
     }
     runtime->live = true;
-    const noah_profile_combo_v1_view_t *combos = &view->profile.combos;
-    noah_profile_combo_v1_header_t      header;
-    if (combos->row_count > NOAH_PROFILE_COMBO_V1_MAX_ROWS || !noah_profile_combo_v1_read_header(&view->reader, view->base_offset, combos, &header)) return;
+    noah_profile_domain_range_t    combos;
+    noah_profile_combo_v1_header_t header;
+    if (!noah_profile_blob_v1_find_domain(&view->reader, view->base_offset, view->profile.byte_length, NOAH_PROFILE_DOMAIN_V1_COMBOS, &combos) || !noah_profile_combo_v1_read_header(&view->reader, view->base_offset, combos, &header)) return;
     runtime->default_term = header.default_term_ms;
     runtime->hold_term    = header.hold_term_ms;
-    for (uint8_t index = 0; index < combos->row_count; index++) {
+    for (uint8_t index = 0; index < header.row_count; index++) {
         noah_profile_combo_v1_row_t row;
         if (!noah_profile_combo_v1_read_row(&view->reader, view->base_offset, combos, index, &row)) return;
         bool follows = row.term_ms == 0u;
@@ -56,7 +56,7 @@ void noah_effective_combo_runtime_invalidate(void *context, uint32_t publication
                 if (runtime->inputs[index][prior] == *key) return;
         }
     }
-    runtime->count = view->profile.combos.row_count;
+    runtime->count = header.row_count;
     runtime->valid = true;
 }
 bool noah_effective_combo_valid(void) {

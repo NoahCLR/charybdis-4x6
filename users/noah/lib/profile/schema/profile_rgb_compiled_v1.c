@@ -168,7 +168,7 @@ static bool emit_hsv(compiled_writer_t *writer, hsv_t color) {
     return emit(writer, bytes, sizeof(bytes));
 }
 
-noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_length(size_t *length, uint8_t *groups, noah_profile_compiled_v1_error_t *error) {
+static noah_profile_compiled_v1_result_t rgb_compiled_length(size_t *length, uint8_t *groups, noah_profile_compiled_v1_error_t *error) {
     uint16_t                          group_rows = layer_led_group_count;
     size_t                            total;
     noah_profile_compiled_v1_result_t result;
@@ -210,13 +210,9 @@ static noah_profile_compiled_v1_result_t emit_group_row(compiled_writer_t *write
 }
 
 noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
-#    ifdef NOAH_COMPILED_DEFAULTS_TEST
-    extern void noah_compiled_defaults_test_domain_write(uint8_t id);
-    noah_compiled_defaults_test_domain_write(NOAH_PROFILE_DOMAIN_V1_RGB);
-#    endif
     size_t                            payload_length;
     uint8_t                           group_count;
-    noah_profile_compiled_v1_result_t result = noah_profile_rgb_compiled_v1_length(&payload_length, &group_count, error);
+    noah_profile_compiled_v1_result_t result = rgb_compiled_length(&payload_length, &group_count, error);
     (void)payload_length;
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
     if (!(emit_u8(writer, NOAH_PROFILE_RGB_V1_FORMAT_VERSION) && emit_u8(writer, 0u) && emit_u16(writer, noah_profile_rgb_compiled_v1_stage_mask()) && emit_u8(writer, group_count) && emit_u8(writer, LAYER_COUNT) && emit_u8(writer, layer_led_group_count)
@@ -298,6 +294,13 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
 #    endif
     return writer->result;
 }
+#else
+// Without RGB Matrix the compiled profile has no RGB domain.
+noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
+    (void)writer;
+    (void)error;
+    return NOAH_PROFILE_COMPILED_V1_OK;
+}
 #endif
 
 #if defined(RGB_MATRIX_ENABLE)
@@ -330,6 +333,10 @@ const noah_profile_rgb_v1_view_t *noah_profile_rgb_compiled_v1_view(void) {
 #    endif
         limits.tap_branch_color_count = KEY_BEHAVIOR_MAX_TAP_COUNT - 1u;
         limits.compiled_stage_mask    = noah_profile_rgb_compiled_v1_stage_mask();
+#    ifdef NOAH_COMPILED_DEFAULTS_TEST
+        extern void noah_compiled_defaults_test_domain_write(uint8_t id);
+        noah_compiled_defaults_test_domain_write(NOAH_PROFILE_DOMAIN_V1_RGB);
+#    endif
         if (noah_profile_rgb_compiled_v1_write(&writer, NULL) != NOAH_PROFILE_COMPILED_V1_OK || noah_profile_rgb_v1_decode(cached_bytes, sink.length, &limits, &cached_view, NULL) != NOAH_PROFILE_RGB_V1_OK) return NULL;
         cached = true;
     }

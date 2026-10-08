@@ -28,6 +28,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_store.c" \
     "$ROOT/users/noah/lib/profile/storage/profile_store_runtime.c" \
     "$ROOT/users/noah/lib/compat/qmk_profile_eeprom.c" \

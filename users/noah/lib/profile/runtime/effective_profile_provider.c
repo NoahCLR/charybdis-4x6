@@ -33,10 +33,6 @@ static bool profile_view_valid(const noah_profile_validator_v1_profile_t *profil
     if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) != 0u && (!reader_equal(reader, &profile->key_behaviors.reader) || !reader_range_valid(reader, profile->key_behaviors.base_offset, profile->key_behaviors.byte_length) || !range_contained(base_offset, profile->byte_length, profile->key_behaviors.base_offset, profile->key_behaviors.byte_length))) {
         return false;
     }
-#ifdef NOAH_PD_PROFILE_ENABLE
-    if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD) && (profile->pd.length < NOAH_PROFILE_PD_V1_HEADER_SIZE || profile->pd.length > NOAH_PROFILE_PD_V1_MAX_SIZE || (profile->pd.length - NOAH_PROFILE_PD_V1_HEADER_SIZE) % NOAH_PROFILE_PD_V1_RECORD_SIZE != 0u || !range_contained(base_offset, profile->byte_length, base_offset + profile->pd.offset, profile->pd.length))) return false;
-#endif
-    if ((profile->domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS) && (profile->combos.row_count > NOAH_PROFILE_COMBO_V1_MAX_ROWS || !NOAH_PROFILE_COMBO_VERSION_ACCEPTED(profile->combos.version) || !range_contained(base_offset, profile->byte_length, base_offset + profile->combos.payload_offset, NOAH_PROFILE_COMBO_HEADER_SIZE(profile->combos.version) + (size_t)profile->combos.row_count * NOAH_PROFILE_COMBO_V1_ROW_SIZE))) return false;
     return true;
 }
 

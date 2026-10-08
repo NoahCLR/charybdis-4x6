@@ -51,15 +51,10 @@ typedef enum {
 } noah_setting_id_t;
 
 typedef struct {
-    uint16_t offset;
-    uint16_t length;
-} noah_profile_settings_v1_view_t;
-typedef struct {
     uint16_t offset, macro_length, macro_offset;
     uint32_t value, timeout, dead_time;
     uint8_t  slot;
     uint8_t  utf8_remaining, utf8_min, utf8_max;
-    uint8_t  version, expected_version; // expected_version: the envelope's, 0 when unknown
     bool     name_ended;
 } noah_profile_settings_v1_validation_t;
 // One byte per call, permitting the whole-profile owner to retain its 20-byte

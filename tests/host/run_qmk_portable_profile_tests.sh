@@ -15,6 +15,8 @@ for variant in normal sanitized; do
         "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_settings_runtime.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/test"
     "$BUILD_DIR/test" "$BUILD_DIR/responses.fixture" "$BUILD_DIR/named.fixture"

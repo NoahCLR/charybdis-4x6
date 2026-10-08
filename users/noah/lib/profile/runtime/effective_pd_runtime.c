@@ -41,11 +41,12 @@ const uint8_t *noah_effective_pd_for_mask(uint32_t mode) {
 
 static bool publish_pd_cache(const noah_effective_profile_snapshot_t *view) {
     noah_profile_pd_v1_iterator_t iterator = {0};
-    size_t base = view->base_offset + view->profile.pd.offset;
-    if (!(view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD)) return false;
+    noah_profile_domain_range_t payload;
+    if (!(view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD) || !noah_profile_blob_v1_find_domain(&view->reader, view->base_offset, view->profile.byte_length, NOAH_PROFILE_DOMAIN_V1_PD, &payload)) return false;
+    size_t base = view->base_offset + payload.offset;
     clear_records();
     do {
-        noah_profile_pd_v1_iteration_t result = noah_profile_pd_v1_iterator_step(&iterator, &view->reader, base, view->profile.pd.length, NULL);
+        noah_profile_pd_v1_iteration_t result = noah_profile_pd_v1_iterator_step(&iterator, &view->reader, base, payload.length, NULL);
         if (result == NOAH_PROFILE_PD_V1_REJECTED) return false;
         if (result == NOAH_PROFILE_PD_V1_RECORD) memcpy(records[iterator.bytes[0]], iterator.bytes, NOAH_PROFILE_PD_V1_RECORD_SIZE);
     } while (!noah_profile_pd_v1_iterator_complete(&iterator));

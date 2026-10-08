@@ -94,6 +94,27 @@ noah_profile_codec_v1_result_t noah_profile_envelope_finish(const noah_profile_e
     return walk->offset == walk->byte_length ? NOAH_PROFILE_CODEC_V1_OK : fail(error, NOAH_PROFILE_CODEC_V1_TRAILING_BYTES, walk->offset, UINT8_MAX, 0);
 }
 
+bool noah_profile_blob_v1_find_domain(const noah_profile_reader_t *reader, size_t base_offset, size_t byte_length, uint8_t domain_id, noah_profile_domain_range_t *range) {
+    uint8_t                 header[NOAH_PROFILE_BLOB_V1_HEADER_SIZE];
+    noah_profile_envelope_t walk;
+
+    if (range) *range = (noah_profile_domain_range_t){0u, 0u};
+    if (!range || base_offset > SIZE_MAX - byte_length || !noah_profile_reader_read(reader, base_offset, header, sizeof(header)) || noah_profile_envelope_begin(&walk, header, byte_length, NULL) != NOAH_PROFILE_CODEC_V1_OK) {
+        return false;
+    }
+    while (walk.index < walk.count) {
+        noah_profile_domain_record_t record;
+        if (walk.byte_length - walk.offset < NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE || !noah_profile_reader_read(reader, base_offset + walk.offset, header, NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE) || noah_profile_envelope_next(&walk, header, &record, NULL) != NOAH_PROFILE_CODEC_V1_OK) {
+            return false;
+        }
+        if (record.shape->id == domain_id) {
+            *range = (noah_profile_domain_range_t){record.offset, record.length};
+            return true;
+        }
+    }
+    return false;
+}
+
 static noah_profile_codec_v1_result_t validate_domain(const noah_profile_domain_v1_t *domain, uint8_t domain_index, noah_profile_codec_v1_error_t *error) {
     if (!domain || (!domain->payload && domain->payload_length != 0u)) {
         return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, domain_index, domain ? domain->id : 0u);

@@ -459,7 +459,9 @@ static void test_combo_domain(void) {
         assert(state.step_calls <= 1 && state.step_bytes <= 20);
     }
     expect_result(result, NOAH_PROFILE_VALIDATOR_V1_VALID);
-    assert(validator.profile.combos.row_count == 32 && validator.profile.combos.payload_offset == 12);
+    noah_profile_domain_range_t combos;
+    assert(noah_profile_blob_v1_find_domain(&reader, 0, sizeof(bytes), NOAH_PROFILE_DOMAIN_V1_COMBOS, &combos) && combos.offset == 12);
+    assert(noah_profile_combo_v1_row_count(combos) == 32);
     const unsigned bad_offsets[] = {13, 14, 15, 24, 25, 26, 27, 44};
     for (unsigned index = 0; index < sizeof(bad_offsets) / sizeof(bad_offsets[0]); index++) {
         unsigned offset = bad_offsets[index];
@@ -527,7 +529,9 @@ static void test_combo_domain_v2(void) {
         assert(state.step_calls <= 1 && state.step_bytes <= 20);
     }
     expect_result(result, NOAH_PROFILE_VALIDATOR_V1_VALID);
-    assert(validator.profile.combos.row_count == 2 && validator.profile.combos.payload_offset == 12 && validator.profile.combos.version == 2);
+    noah_profile_domain_range_t combos;
+    assert(noah_profile_blob_v1_find_domain(&reader, 0, sizeof(bytes), NOAH_PROFILE_DOMAIN_V1_COMBOS, &combos) && combos.offset == 12);
+    assert(noah_profile_combo_v1_row_count(combos) == 2);
     // A zero default, a header or row hold field, and reserved header bytes
     // are all refused.
     const unsigned bad_offsets[] = {13, 16, 24, 25, 52, 53};

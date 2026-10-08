@@ -108,6 +108,9 @@ compile_test "$BUILD_DIR/configured" -DNOAH_PD_PROFILE_ENABLE \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
+    "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
     "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_configured.c"
 "$BUILD_DIR/configured"
