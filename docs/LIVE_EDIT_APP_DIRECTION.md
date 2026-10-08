@@ -33,7 +33,8 @@ included, over Profile Wire, and publishes a complete profile to both halves as
 one atomic logical generation that recovers from interruption and a lost peer
 (D-L21, D-L22, D-L27, D-L39). The app's surface-by-surface status is in Ark's
 direction. Firmware accepts only current formats and every save binds VIA
-(D-F10); old backups require client translation before restore.
+(D-F10); old backups require client translation before restore. Compiled defaults
+contain every enabled domain and use domain-seeking reads (D-F12).
 
 Firmware work remaining before the product is complete:
 
@@ -806,9 +807,39 @@ checks without owning their I/O scheduling. Domain modules retain semantic
 record policy; combos and sparse pointing share bounded record iteration
 between validation and publication. See [domain ownership](architecture/profile-wire-v1.md#firmware-domain-ownership).
 
-Wire bytes and storage geometry are unchanged. Compiled settings/combos and
-compiled-domain seeking remain subsequent work. Client integration recipes
+Wire bytes and storage geometry are unchanged by D-F11. D-F12 subsequently
+adds compiled settings/combos and compiled-domain seeking. Client integration recipes
 that compile the firmware codecs must link `profile_domain_registry.c`, and
 standalone pointing codec recipes must link `profile_reader.c`; refresh the
 imported governing spec and repin after landing. The earlier D-F10 binding
 follow-up still applies.
+
+## D-F12 — One complete compiled profile, with reads that seek by domain
+
+Opening compiled defaults retains each enabled domain's payload offset and
+length in registry order. Reads emit only intersecting envelopes and payloads,
+including reads across their seams; no domain depends on being last. The
+complete standard profile contains RGB 3, key behaviours 1, combos 2, settings
+5 and sparse PD 2. The same stream defines its checksums and its readback.
+
+The settings module owns authored names and immutable factory scalars. A
+compat adapter supplies pinned QMK factory constants and injects the settings
+apply hook. Effective settings cache publication does not call up into compat.
+Current native DPI, lighting, default layers and keymap options remain QMK
+owners: boot preserves their EEPROM values and settings readback overlays their
+current values. A profile without settings warms its factory fallback cache
+without applying factory values to those owners.
+
+RGB has one authored domain writer. Its immutable encoded cache warms once on
+a cold path and supplies the same decoded view used for stored RGB; accessors
+have no second authored interpretation, and frames never replay a writer.
+The cache bound follows current RGB geometry. Compiled combos and settings
+warm the existing effective caches before the owner opens output admission.
+
+Domain versions, action ABI, accepted store format and storage geometry are
+unchanged. Adding the two domains changes the compiled-default digest, so
+stored profiles tied to the preceding digest fall back to compiled defaults;
+firmware does no migration. A client restores a complete current profile bound
+to the connected firmware. Client probes must link the new compiled RGB and
+settings modules, refresh the complete compiled-profile fixture and affected
+spec imports, and pin a published firmware revision after landing.

@@ -7,6 +7,7 @@
 // QMK mutates combo state in place and retains its input pointer. The native
 // table must therefore live as long as the owner, independent of EEPROM reads.
 typedef struct {
+    const noah_effective_profile_snapshot_t *compiled_defaults;
     combo_t  rows[32];
     uint16_t inputs[32][5];
     uint16_t terms[32]; // resolved: a row that follows the default holds it

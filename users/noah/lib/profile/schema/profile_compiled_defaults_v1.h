@@ -15,10 +15,8 @@
 enum {
     NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_RGB           = NOAH_PROFILE_DOMAIN_MASK_RGB,
     NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_KEY_BEHAVIORS = NOAH_PROFILE_DOMAIN_MASK_KEY_BEHAVIORS,
-    NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_ALL           = NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_RGB | NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_KEY_BEHAVIORS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD,
-    // The virtual reader may replay canonical records from byte zero through
-    // the requested slice. This is a cold identity/export path, never the
-    // effective-profile lookup path used by RGB frames or key events.
+    NOAH_PROFILE_COMPILED_V1_DOMAIN_MASK_ALL           = NOAH_PROFILE_ENABLED_DOMAIN_MASK,
+    // A read visits only payloads intersecting its requested range.
     NOAH_PROFILE_COMPILED_V1_READER_REPLAY_MAX = NOAH_PROFILE_BLOB_V1_MAX_SIZE,
     // ABI vocabulary canonicalization scans at most the 64 compiled behavior
     // targets once to count and once per possible stable custom target.
@@ -63,12 +61,14 @@ typedef struct {
 // is retained.
 typedef struct {
     noah_profile_compiled_v1_metadata_t metadata;
+    // Payload ranges indexed by the current domain registry, absent = zero.
+    struct { uint16_t offset, length; } domains[NOAH_PROFILE_DOMAIN_REGISTRY_COUNT];
 } noah_profile_compiled_v1_t;
 
 typedef bool (*noah_profile_compiled_v1_write_fn)(void *context, const uint8_t *bytes, size_t length);
 
 // Validates/materializes authored metadata and streams CRC32/FNV-1a over the
-// exact canonical blob. This performs no writes and retains only metadata.
+// exact canonical blob. This performs no writes and retains metadata plus bounded domain ranges.
 noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_compiled_v1_t *profile, noah_profile_compiled_v1_error_t *error);
 
 // Replays the canonical blob in small records. Useful for bounded persistence
@@ -76,13 +76,10 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_com
 noah_profile_compiled_v1_result_t noah_profile_compiled_v1_write(const noah_profile_compiled_v1_t *profile, noah_profile_compiled_v1_write_fn write, void *context, noah_profile_compiled_v1_error_t *error);
 
 // Cold-path reader for validation, identity, export, and reset persistence.
-// An arbitrary read regenerates preceding records and stops after the record
-// containing the requested end. PD-only reads start at the final PD payload,
-// so synchronous cache warming never replays RGB/behavior canonicalization.
-// The worst-case replay is the selected schema's blob ceiling above.
-// The reader borrows profile for its lifetime.
-// Runtime providers must read compiled defaults directly from authored tables,
-// not call this virtual reader from key-event or RGB-frame hot paths.
+// Reads seek to intersecting domain envelopes/payloads, including ranges that
+// cross an envelope or domain. The reader borrows the immutable open handle.
+// Effective caches warm on cold paths; key events/RGB frames never regenerate
+// this profile.
 noah_profile_reader_t noah_profile_compiled_v1_reader(const noah_profile_compiled_v1_t *profile);
 
 // Builds the exact validator/runtime ceilings represented by this firmware

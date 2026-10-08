@@ -113,6 +113,7 @@ static void test_custom_key_names_v5(void) {
     assert(noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 64) == 2 && noah_effective_settings_byte(NOAH_SETTINGS_FIXED_SIZE + 66) == 'K');
 }
 int main(void) {
+    noah_effective_settings_set_apply(noah_qmk_portable_apply);
     defaults();
     assert(valid());
     bytes[0] = NOAH_SETTINGS_VERSION == 1 ? 2 : 1;
@@ -150,6 +151,14 @@ int main(void) {
     noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 200);
     // The whole stored domain stays readable, retired user macros included.
+    assert(applied == 1 && noah_effective_settings_length() == length);
+    noah_effective_profile_snapshot_t compiled = view;
+    compiled.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
+    noah_effective_profile_snapshot_t partial = {0};
+    partial.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE;
+    noah_effective_settings_invalidate(&compiled, 1, partial.identity, partial.identity, &partial);
+    assert(applied == 1 && noah_effective_settings_length() == length && noah_setting(NOAH_SETTING_TAPPING_TERM, 0) == 200);
+    noah_effective_settings_invalidate(&compiled, 1, compiled.identity, compiled.identity, &compiled);
     assert(applied == 1 && noah_effective_settings_length() == length);
     for (uint16_t i = 0; i < length; i++)
         assert(noah_effective_settings_byte(i) == bytes[i]);

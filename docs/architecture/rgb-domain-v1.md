@@ -146,3 +146,18 @@ the payload, dictionary, or renderer tables in RAM.
 This document governs the byte format. Transport and activation are specified
 by [Profile Wire](profile-wire-v1.md) and the
 [logical transaction contract](logical-profile-transaction-v1.md).
+
+## Compiled RGB and effective frames
+
+`profile_rgb_compiled_v1.c` is the sole authored RGB encoder. Both the complete
+compiled profile and factory RGB fallback use its canonical bytes. On a cold
+path it fills one immutable encoded cache and validates a memory-backed view;
+frame access uses the same decoded domain interface as stored RGB. Effective
+accessors never reinterpret authored tables or replay the profile writer.
+
+The cache bound is 551 bytes: 35 fixed bytes, sixteen 9-byte bitmap groups,
+eight 5-byte layer colors, 32 5-byte PD colors, at most 32 5-byte stage rows in
+total, and four 3-byte tap colors. Combo rows are smaller, so this covers every
+current shape without reserving a profile-sized buffer. A copied view retains
+publication/epoch checks for stored frames; factory bytes never change during
+a firmware run. This is a representation bound, not a hardware RAM claim.

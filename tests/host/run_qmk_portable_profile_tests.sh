@@ -12,6 +12,7 @@ for variant in normal sanitized; do
         -I"$ROOT/tests/host/include/portable_profile" -I"$ROOT/tests/host/include" -I"$ROOT" -I"$ROOT/users/noah" \
         "$ROOT/tests/host/qmk_portable_profile_test.c" \
         "$ROOT/users/noah/lib/compat/qmk_portable_profile.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_settings_runtime.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \

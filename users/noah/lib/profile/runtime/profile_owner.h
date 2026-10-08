@@ -89,7 +89,6 @@ typedef struct {
     noah_profile_reader_t                     compiled_reader;
     noah_profile_validator_v1_compatibility_t compatibility;
     noah_profile_validator_v1_runtime_t       candidate_runtime;
-    noah_profile_validator_v1_declaration_t   compiled_declaration;
     noah_effective_profile_snapshot_t         compiled_snapshot;
     noah_profile_owner_staging_t              staging;
     noah_profile_store_t                      store;

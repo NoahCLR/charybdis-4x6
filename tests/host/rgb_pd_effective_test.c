@@ -18,6 +18,34 @@ const uint8_t                  layer_led_group_count     = 0u;
 
 const pd_mode_color_t pd_mode_colors[] = {
     {.pointing_mode = PD_MODE_DRAGSCROLL, .color = HSV(101, 102, 103), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_VOLUME, .color = HSV(111, 112, 113), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_BRIGHTNESS, .color = HSV(121, 122, 123), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_ZOOM, .color = HSV(131, 132, 133), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_ARROW, .color = HSV(141, 142, 143), .locality = RGB_LEFT_HALF}, {.pointing_mode = PD_MODE_PINCH, .color = HSV(151, 152, 153), .locality = RGB_LEFT_HALF},
+    // Current RGB geometry includes an explicit color row for every slot.
+    {.pointing_mode = PD_MODE_SLOT_6, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_7, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_8, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_9, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_10, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_11, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_12, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_13, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_14, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_15, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_16, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_17, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_18, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_19, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_20, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_21, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_22, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_23, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_24, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_25, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_26, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_27, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_28, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_29, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_30, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+    {.pointing_mode = PD_MODE_SLOT_31, .color = HSV(0, 0, 0), .locality = RGB_BOTH_HALVES},
+
 };
 const uint8_t pd_mode_color_count = (uint8_t)ARRAY_SIZE(pd_mode_colors);
 

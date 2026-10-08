@@ -1,6 +1,9 @@
 #pragma once
 
 #include "qmk_stub.h"
+#ifndef RGB_MATRIX_SOLID_COLOR
+#    define RGB_MATRIX_SOLID_COLOR 1
+#endif
 
 #ifndef NO_LED
 #    define NO_LED 255u

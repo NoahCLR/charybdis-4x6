@@ -11,9 +11,11 @@
 #    include "report.h"
 #    include "keycode.h"
 #    include "process_keycode/process_combo.h"
+#    include "keycode_config.h"
 #endif
 
 #include "via.h"
+#include "../../users/noah/lib/compat/qmk_factory_settings.h"
 
 _Static_assert(offsetof(keyrecord_t, event) == 0, "keyrecord_t.event must remain the first field");
 
@@ -44,6 +46,13 @@ static void qmk_contract_field_smoke(void) {
 
 int main(void) {
     qmk_contract_field_smoke();
+#ifdef QMK_CONTRACT_USE_STUB
+    printf("FACTORY_KEYMAP_OPTIONS=0x%04X\n", (unsigned)NOAH_QMK_FACTORY_KEYMAP_OPTIONS);
+#else
+    // Match the pinned quantum/eeconfig.c initializer using QMK's real layout.
+    keymap_config_t factory = {.oneshot_enable = true, .autocorrect_enable = true, .nkro = NKRO_DEFAULT_ON};
+    printf("FACTORY_KEYMAP_OPTIONS=0x%04X\n", (unsigned)factory.raw);
+#endif
 
     printf("SAFE_RANGE=0x%04X\n", (unsigned)SAFE_RANGE);
     printf("COMBO_EVENT=%u\n", (unsigned)COMBO_EVENT);

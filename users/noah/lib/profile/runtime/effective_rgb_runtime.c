@@ -6,6 +6,9 @@
 
 #include <limits.h>
 #include <string.h>
+#ifdef RGB_MATRIX_ENABLE
+#    include "../schema/profile_rgb_compiled_v1.h"
+#endif
 
 static noah_effective_rgb_runtime_t *installed_runtime;
 
@@ -61,9 +64,14 @@ void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_c
         next.view = callback_view->profile.rgb;
         next.live = true;
     } else if (next.valid && (active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS || active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE)) {
-        // Compiled identities and validated behavior-only profiles continue to
-        // use the direct authored RGB configuration.
+#ifdef RGB_MATRIX_ENABLE
+        const noah_profile_rgb_v1_view_t *compiled = noah_profile_rgb_compiled_v1_view();
+        next.valid                                 = compiled != NULL;
+        next.live                                  = next.valid;
+        if (compiled) next.view = *compiled;
+#else
         next.live = false;
+#endif
     }
 
     next_index = (uint8_t)(runtime->active_index ^ 1u);

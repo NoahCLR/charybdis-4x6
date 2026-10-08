@@ -11,12 +11,14 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_blob_v1.c \
     lib/profile/schema/profile_combo_v1.c \
     lib/profile/schema/profile_settings_v1.c \
+    lib/profile/schema/profile_settings_defaults.c \
     lib/profile/schema/profile_pd_v1.c \
     lib/profile/schema/profile_reader.c \
     lib/profile/schema/key_behavior_domain_v1.c \
     lib/profile/schema/profile_rgb_v1.c \
     lib/profile/schema/profile_validator_v1.c \
     lib/profile/schema/profile_compiled_defaults_v1.c \
+    lib/profile/schema/profile_rgb_compiled_v1.c \
     lib/profile/runtime/profile_action_runtime_v1.c \
     lib/profile/runtime/effective_profile_provider.c \
     lib/profile/runtime/effective_key_behavior_runtime.c \

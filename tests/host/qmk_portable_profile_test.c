@@ -14,6 +14,7 @@ static uint8_t  am_layer = 4, am_debounce = 25;
 static uint16_t am_timeout = 1200, default_dpi = 1200, sniping_dpi = 200;
 uint32_t        default_layer_state = 1;
 keymap_config_t keymap_config;
+static unsigned durable_writes;
 bool            get_auto_mouse_enable(void) {
     return am_enabled;
 }
@@ -76,18 +77,22 @@ uint16_t charybdis_get_pointer_sniping_dpi(void) {
 }
 void charybdis_cycle_pointer_default_dpi(bool forward) {
     (void)forward;
+    durable_writes++;
 }
 void charybdis_cycle_pointer_sniping_dpi(bool forward) {
     (void)forward;
+    durable_writes++;
 }
 void default_layer_set(uint32_t state) {
     default_layer_state = state;
 }
 void eeconfig_update_default_layer(uint8_t layers) {
     (void)layers;
+    durable_writes++;
 }
 void eeconfig_update_keymap(const keymap_config_t *config) {
     (void)config;
+    durable_writes++;
 }
 uint32_t eeconfig_read_user(void) {
     return 0;
@@ -103,6 +108,7 @@ uint8_t noah_qmk_portable_editor_page(uint8_t page, uint8_t *payload) {
 void noah_qmk_portable_apply_lighting(uint32_t mode, uint32_t color) {
     (void)mode;
     (void)color;
+    durable_writes++;
 }
 
 // The keymap's names, at both length limits.
@@ -206,12 +212,12 @@ int main(int argc, char **argv) {
     get(3);
     assert(!memcmp(frame + 7, bytes + 2 * 25, frame[6]));
 
-    // A live v4 domain reads back as stored, with its values overlaid by the
+    // A live current domain reads back as stored, with its values overlaid by the
     // live QMK owners, and without a second copy held for the read.
     const uint32_t values[28] = {180, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0x76543210};
-    // Stored by an app that wrote v4: no custom-key names, streamed as stored.
-    const uint8_t v4_header[8] = {4, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, 0, 0, 0, 0};
-    memcpy(stored, v4_header, 8);
+    // Current settings include both macro and custom-key name records.
+    const uint8_t current_header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
+    memcpy(stored, current_header, 8);
     for (uint8_t id = 0; id < 28; id++)
         for (uint8_t j = 0; j < 4; j++)
             stored[8 + id * 4 + j] = values[id] >> (j * 8);
@@ -222,11 +228,26 @@ int main(int argc, char **argv) {
         memcpy(stored + names, name, strlen(name));
         names += strlen(name);
     }
+    memset(stored + names, 0, NOAH_SETTINGS_CUSTOM_KEY_NAMES);
+    names += NOAH_SETTINGS_CUSTOM_KEY_NAMES;
     noah_effective_profile_snapshot_t view = {0};
     view.reader                            = noah_profile_reader_from_memory(stored, names);
     view.profile.domain_mask               = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
     view.profile.settings                  = (noah_profile_settings_v1_view_t){0, names};
+    noah_qmk_portable_storage_init(); // installs the real native apply hook
+    view.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
+    am_timeout = 777;
     noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
+    assert(am_timeout == 777 && durable_writes == 0);
+    // Stored boot settings may restore runtime controls, but native EEPROM
+    // values remain owned by QMK. An explicit publication writes them.
+    view.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE;
+    noah_effective_settings_boot(true);
+    noah_effective_settings_invalidate(NULL, 2, view.identity, view.identity, &view);
+    assert(am_timeout == 1200 && durable_writes == 0);
+    noah_effective_settings_boot(false);
+    noah_effective_settings_invalidate(NULL, 3, view.identity, view.identity, &view);
+    assert(durable_writes == 3); // lighting, default layers, keymap options
     am_timeout = 900; // a live change after publication wins in readback
     FILE *responses = argc > 1 ? fopen(argv[1], "wb") : NULL;
     assert(argc < 2 || responses);

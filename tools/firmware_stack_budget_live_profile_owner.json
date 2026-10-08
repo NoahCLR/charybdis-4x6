@@ -11,13 +11,16 @@
         "kind": "elf_map_symbol",
         "symbol": "__process_stack_size__",
         "minimum_bytes": 2560,
-        "reserve": {"fraction": 0.25, "minimum_bytes": 512}
+        "reserve": {
+          "fraction": 0.25,
+          "minimum_bytes": 512
+        }
       },
       "indirect_edges": [
         {
           "caller": "noah_profile_candidate_store_backend_activation_step",
           "callee": "noah_effective_settings_invalidate",
-          "reason": "provider publication invokes the portable settings invalidator, including the inlined QMK apply helper"
+          "reason": "Provider publication invokes the portable settings invalidator; its injected native apply callback is accounted separately."
         },
         {
           "caller": "noah_qmk_durable_io_matrix_scan",
@@ -93,6 +96,16 @@
           "caller": "staged_reader_read",
           "callee": "noah_qmk_profile_eeprom_read",
           "reason": "The staged profile reader invokes the installed bounded EEPROM adapter."
+        },
+        {
+          "caller": "noah_effective_settings_invalidate",
+          "callee": "noah_qmk_portable_apply",
+          "reason": "Compat registers the native settings apply callback at storage initialization; validated publication invokes it through apply_settings."
+        },
+        {
+          "caller": "main",
+          "callee": "noah_profile_store_runtime_init",
+          "reason": "The post-init stage table dispatch is inlined into main by the pinned release compiler; its profile stage invokes the owner initializer."
         }
       ],
       "paths": [
@@ -102,7 +115,7 @@
         },
         {
           "name": "portable profile settings publication",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_settings_invalidate", "eeprom_update_word", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_settings_invalidate", "noah_qmk_portable_apply", "eeprom_update_word", "wear_leveling_write"]
         },
         {
           "name": "engineering owner compiled-profile validation",
@@ -158,7 +171,7 @@
         },
         {
           "name": "PD compiled cache initialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "compiled_reader_read", "write_pd_payload", "noah_profile_pd_v1_validate_record", "tap_valid"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_pd_v1_validate_record", "tap_valid"]
         },
         {
           "name": "PD published cache EEPROM read",
@@ -167,6 +180,46 @@
         {
           "name": "PD published record validation",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_pd_v1_validate_record", "tap_valid"]
+        },
+        {
+          "name": "Compiled profile initial RGB materialization",
+          "functions": ["main", "noah_profile_store_runtime_init", "noah_profile_compiled_v1_open", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "Compiled RGB boot cache materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "Compiled RGB boot cache validation",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_v1_validation_step", "read_bytes", "noah_profile_reader_read"]
+        },
+        {
+          "name": "Compiled RGB published fallback materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "Compiled RGB published fallback validation",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_v1_validation_step", "read_bytes", "noah_profile_reader_read"]
+        },
+        {
+          "name": "Compiled RGB first frame materialization",
+          "functions": ["main", "rgb_matrix_task", "rgb_effective_config_frame_current", "frame_status", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "Compiled settings boot cache materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_settings_invalidate", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte", "record_name_length"]
+        },
+        {
+          "name": "Compiled settings published fallback materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_settings_invalidate", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte", "record_name_length"]
+        },
+        {
+          "name": "Compiled combo boot cache materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_combo_runtime_invalidate", "noah_profile_combo_v1_iteration_step", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
+        },
+        {
+          "name": "Compiled combo published fallback materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_combo_runtime_invalidate", "noah_profile_combo_v1_iteration_step", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
         }
       ]
     },
@@ -180,7 +233,10 @@
         "working_area_fixed_overhead_bytes": 172,
         "working_area_alignment_bytes": 8,
         "expected_working_area_bytes": 1200,
-        "reserve": {"fraction": 0.25, "minimum_bytes": 256}
+        "reserve": {
+          "fraction": 0.25,
+          "minimum_bytes": 256
+        }
       },
       "indirect_edges": [
         {

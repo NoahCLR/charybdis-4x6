@@ -81,12 +81,12 @@ of 20 bytes per step. Compiled pointing output uses the same sparse cursor's
 ordering/presence checks. An iterator exposes a record only after validating
 it; an omitted pointing slot remains disabled and unnamed.
 
-These changes preserve current wire bytes, digests, slot geometry and feature
-admission. Compiled settings/combos and general compiled-domain seeking remain
-separate work. The owner round-trip harness uses real authored RGB, key
-behaviors and pointing defaults together with populated current combo/settings
-fixtures, saving and rebooting through the owner and checking every published
-domain and runtime view. Hardware eligibility and the independent VIA adapter
+The registry/traversal change (D-F11) preserves wire bytes, digests, slot
+geometry and feature admission. The subsequent complete compiled profile
+(D-F12, below) deliberately changes compiled-default identity. The owner
+round-trip harness saves and reboots both the complete authored five-domain
+profile and a profile with populated imported combo/settings overrides,
+checking every published domain and runtime view. Hardware eligibility and the independent VIA adapter
 are injected; this host harness does not establish physical acceptance. The
 reviewed stack manifest follows the shared iterators through PD publication,
 combo cache EEPROM reads and host PD record validation; compiler-inlined
@@ -875,5 +875,24 @@ permits five known domains; an unknown domain still rejects the candidate.
 The settings validator uses the existing bounded reader and safe publication
 boundary. Validator/provider state policies are 368/784 bytes respectively
 (368 since D-F09: the 32-bit PD slot mask in the compatibility limits).
-The compiled payload continues to contain RGB and behaviours; full export
-materializes effective combos and settings from their device readback commands.
+The standard compiled payload contains all five enabled domains in registry
+order: RGB, key behaviours, combos, settings and pointing. Its immutable
+factory settings and authored names share the settings domain's encoder.
+Compiled combo rows preserve authored order, default-window inheritance and
+native actions through semantic encoding. No domain version changes.
+
+Opening compiled defaults records five bounded offset/length pairs alongside
+its metadata (a 40-byte handle policy). An arbitrary read emits the blob header,
+intersecting domain headers and only intersecting domain payloads; it never
+replays preceding domains. Reads may cross any header or domain seam. Effective
+caches warm on cold paths, so key events and RGB frames never invoke the virtual
+profile reader. The one compiled RGB writer also produces its immutable
+memory-backed RGB view for factory fallback; stored and factory frames use the
+same domain accessors.
+
+The complete compiled bytes change its compiled-default digest, while its
+action-ABI digest stays the same. Store admission still requires the current
+compiled-default digest; earlier records therefore fall back to factory
+configuration and require a client restore. Full export continues to read
+current combo enable state and QMK-owned settings through device readback;
+immutable factory values never substitute for those live values.
