@@ -11,6 +11,7 @@
 #include "users/noah/lib/state/modifiers/keyboard_mod_policy.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/key/runtime/projection/projection.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/lib/state/shared/runtime_reset.h"
@@ -42,6 +43,9 @@ static const test_behavior_row_t test_behavior_rows[] = {
     {.keycode = TEST_SHIFTED_SYMBOL_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_1))}}, {.keycode = TEST_SHIFT_ENTER_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}, {.keycode = TEST_HANDLED_SHIFT_KEY, .single = {.tap = TAP_SENDS(KC_CAPS)}}, {.keycode = TEST_MANAGED_SHIFT_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_SHIFT)}}, {.keycode = TEST_SHIFTED_PLAIN_KEY, .single = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_A))}},
 };
 
+// A row with an authored tap and the MT source's intrinsic modifier hold.
+static test_behavior_row_t test_authored_mod_tap;
+
 static uint16_t fake_time;
 static uint8_t  fake_mods;
 static uint8_t  fake_weak_mods;
@@ -72,6 +76,9 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 }
 
 static const test_behavior_row_t *test_behavior_row(uint16_t keycode) {
+    if (test_authored_mod_tap.keycode != KC_NO && keycode == test_authored_mod_tap.keycode) {
+        return &test_authored_mod_tap;
+    }
     for (uint8_t index = 0; index < ARRAY_SIZE(test_behavior_rows); index++) {
         if (test_behavior_rows[index].keycode == keycode) {
             return &test_behavior_rows[index];
@@ -595,7 +602,95 @@ static void test_mod_tap_hold_counts_each_modifier_it_holds(void) {
     test_assert_mods_balanced();
 }
 
+// Compare report masks from the reducer with the real applied ownership ledger,
+// not with a second expected-value decoder. All 15 subsets on each side are
+// supported by QMK; its five-bit encoding cannot express mixed-side holds.
+static void test_assert_mod_tap_projection(uint8_t expected, bool native_hold) {
+    projection_snapshot_t applied = key_runtime_core_projection_snapshot_capture();
+    const key_runtime_core_shadow_projection_t *shadow = &key_runtime_core_state()->shadow_projection;
+
+    CHECK(applied.keyboard_mod_state.real == expected);
+    CHECK(applied.keyboard_managed_mod_mask == expected);
+    CHECK(applied.keyboard_physical_mod_mask == (native_hold ? expected : 0u));
+    if (shadow->keyboard_mod_state.real != applied.keyboard_mod_state.real) {
+        fprintf(stderr, "MT shadow/applied disagreement: shadow=0x%02x applied=0x%02x expected=0x%02x native=%u\n",
+                shadow->keyboard_mod_state.real, applied.keyboard_mod_state.real, expected, native_hold);
+    }
+    CHECK(shadow->keyboard_mod_state.real == applied.keyboard_mod_state.real);
+    CHECK(shadow->keyboard_managed_mod_mask == applied.keyboard_managed_mod_mask);
+}
+
+static void test_assert_mod_tap_quiescent(void) {
+    test_assert_mod_tap_projection(0u, false);
+    test_assert_mods_balanced();
+    CHECK(key_runtime_core_state()->press_token_count == 0u);
+    CHECK(key_runtime_core_state()->lease_count == 0u);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
+    CHECK(key_runtime_core_state()->shadow_projection.keyboard_physical_mod_mask == 0u);
+}
+
+static void test_mod_tap_shadow_matches_applied_ownership(void) {
+    const keypos_t pos = {4, 3};
+
+    for (uint8_t side = 0; side < 2u; side++) {
+        for (uint8_t subset = 1u; subset < 16u; subset++) {
+            const uint8_t encoded = (uint8_t)(subset | (side ? 0x10u : 0u));
+            const uint8_t expected = (uint8_t)(side ? subset << 4u : subset);
+            const uint16_t code = MT(encoded, KC_Q);
+
+            // Native hold: QMK has resolved tap.count=0 before delivery.
+            test_reset_state();
+            test_assert_mod_tap_projection(0u, false);
+            test_mod_tap_hold(code, pos, true);
+            test_qmk_mod_tap_default(code, true);
+            // This synchronous harness timestamps delivery as the press; scan
+            // advances the shadow to held. The gesture runner preserves the
+            // real physical timestamp through QMK's delayed delivery.
+            key_runtime_integration_advance(&fake_time, 250u);
+            key_runtime_integration_scan();
+            test_assert_mod_tap_projection(expected, true);
+            test_mod_tap_hold(code, pos, false);
+            test_qmk_mod_tap_default(code, false);
+            test_assert_mod_tap_quiescent();
+
+            // Native tap owns no modifiers, on either edge.
+            test_reset_state();
+            CHECK(key_runtime_integration_process_tap_record(code, pos, true, 1u));
+            test_assert_mod_tap_projection(0u, false);
+            CHECK(key_runtime_integration_process_tap_record(code, pos, false, 1u));
+            test_assert_mod_tap_quiescent();
+
+            // Authored hold is applied through the real literal action ledger.
+            test_authored_mod_tap = (test_behavior_row_t){
+                .keycode = code,
+                .single = {.tap = TAP_SENDS(KC_Q), .hold = PRESS_AND_HOLD_UNTIL_RELEASE((uint16_t)(encoded << 8u))},
+            };
+            test_reset_state();
+            CHECK(!key_runtime_integration_process_record(code, pos, true));
+            test_assert_mod_tap_projection(0u, false);
+            key_runtime_integration_advance(&fake_time, TEST_HOLD_TERM + 1u);
+            key_runtime_integration_scan();
+            test_assert_mod_tap_projection(expected, false);
+            CHECK(!key_runtime_integration_process_record(code, pos, false));
+            key_runtime_integration_advance(&fake_time, 400u);
+            key_runtime_integration_scan();
+            test_assert_mod_tap_quiescent();
+
+            test_reset_state();
+            CHECK(!key_runtime_integration_process_record(code, pos, true));
+            test_assert_mod_tap_projection(0u, false);
+            CHECK(!key_runtime_integration_process_record(code, pos, false));
+            key_runtime_integration_advance(&fake_time, 400u);
+            key_runtime_integration_scan();
+            test_assert_mod_tap_quiescent();
+            test_authored_mod_tap = (test_behavior_row_t){0};
+        }
+    }
+}
+
 int main(void) {
+    test_mod_tap_shadow_matches_applied_ownership();
     test_handled_same_basic_hold_registers_base_key(TEST_SHIFTED_SYMBOL_KEY, KC_1);
     test_handled_same_basic_hold_registers_base_key(TEST_SHIFT_ENTER_KEY, KC_ENT);
     test_default_processed_key_still_blocks_managed_double_register();

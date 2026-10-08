@@ -362,6 +362,29 @@ The reducer scan path owns:
 - pending multi-tap expiry and delayed action flush through `planning/scan_planner.c`
 - scan-time release blocker clearing
 
+## Mod-tap modifier representation
+
+Modifier masks in reducer leases and shadow projections are eight-bit keyboard
+report masks. QMK's MT modifier field is a five-bit encoding: the low nibble
+names Ctrl/Shift/Alt/GUI and bit 4 selects the right-hand bank. Thus
+`MT(MOD_RCTL, KC_Q)` encodes `0x11` but holds report bit `0x10`.
+The existing `compat/qmk_mod_contract.h` owns that conversion through
+`noah_qmk_mods_to_report_mask()`, shared by the shadow lease path and applied
+mod-tap physical tracking. It interprets encoding only; QMK still owns Magic
+remapping and native tapping policy.
+
+`run_key_runtime_physical_ownership_integration_tests.sh` compares shadow
+report/managed masks with the real applied modifier ledger for every nonempty
+left/right modifier subset, native taps/holds and authored holds, through
+release and quiescence. Its synchronous delivery timestamps require scan-time
+hold promotion. `run_qmk_gesture_pipeline_tests.sh` covers native delayed
+QMK tapping delivery and sparse authored rows that retain their intrinsic MT
+hold. That gesture harness stubs the applied ledger; it proves delivery and
+shadow state, while the physical-ownership runner proves ledger agreement.
+`run_qmk_contract_checks.sh` compares all 32 MT fields with the pinned QMK
+action representation, including empty fields. These checks establish shadow
+consistency, not a prior host modifier output fault.
+
 ## Debugging Expectations
 
 When you inspect runtime state, prefer the core debug surface:

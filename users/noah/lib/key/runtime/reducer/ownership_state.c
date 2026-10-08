@@ -8,6 +8,7 @@
 #include "../../../pointing/policy/pd_mode_policy.h"
 #include "../feedback.h"
 #include "../../../action/action_dispatch.h"
+#include "../../../compat/qmk_mod_contract.h"
 
 static bool key_runtime_core_ownership_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
@@ -88,7 +89,7 @@ static uint8_t key_runtime_core_modifier_mask_for_keycode(uint16_t keycode) {
     }
 
     if (IS_QK_MOD_TAP(keycode)) {
-        return QK_MOD_TAP_GET_MODS(keycode);
+        return noah_qmk_mods_to_report_mask(QK_MOD_TAP_GET_MODS(keycode));
     }
 
     return 0u;

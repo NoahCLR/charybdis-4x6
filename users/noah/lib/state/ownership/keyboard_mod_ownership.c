@@ -7,6 +7,7 @@
 #endif
 
 #include "keyboard_mod_ownership.h"
+#include "../../compat/qmk_mod_contract.h"
 #include "../shared/runtime_context_internal.h"
 
 static const uint8_t keyboard_mod_ownership_mod_masks[8] = {
@@ -127,9 +128,7 @@ void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord
     if (!IS_QK_MOD_TAP(keycode) || !record || IS_NOEVENT(record->event) || record->tap.count != 0u) {
         return;
     }
-    // QMK's five-bit mod-tap mods: bit 4 selects the right-hand modifiers.
-    mods = (uint8_t)QK_MOD_TAP_GET_MODS(keycode);
-    mods = (mods & 0x10u) ? (uint8_t)((mods & 0x0Fu) << 4u) : (uint8_t)(mods & 0x0Fu);
+    mods = noah_qmk_mods_to_report_mask(QK_MOD_TAP_GET_MODS(keycode));
     for (uint8_t i = 0; i < ARRAY_SIZE(keyboard_mod_ownership_mod_masks); i++) {
         if (!(mods & keyboard_mod_ownership_mod_masks[i])) {
             continue;
