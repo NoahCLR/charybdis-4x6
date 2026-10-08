@@ -37,8 +37,18 @@ static bool record_admission_press_is_held(const keyrecord_t *release) {
 
 static bool record_admission_capture(const keyrecord_t *record) {
     if (record_admission_held_count >= NOAH_RECORD_ADMISSION_CAPACITY) {
-        // Out of room: deliver now rather than drop the key.
-        return true;
+        keyrecord_t oldest = record_admission_held[0];
+
+        // Overload trades waiting for progress, never causal order. Make room
+        // by replaying only the oldest record, even if a key is undecided.
+        // Remove it before delivery so re-entry cannot see it as held back.
+        for (uint8_t index = 1u; index < record_admission_held_count; index++) {
+            record_admission_held[index - 1u] = record_admission_held[index];
+        }
+        record_admission_held_count--;
+        record_admission_replaying = true;
+        process_record(&oldest);
+        record_admission_replaying = false;
     }
     record_admission_held[record_admission_held_count++] = *record;
     return false;

@@ -166,6 +166,15 @@ key pressed before the tap/hold key is not held back, as in QMK. The wait is at
 most the tap-hold term; a fast roll gains no delay beyond the tap/hold key's
 release. `MO()`, `TT()`, `OSL()`, `LM()` and plain keys do not hold keys back.
 
+The waiting queue is bounded (eight records by default). If a record that must
+wait arrives at capacity, the oldest waiting record runs immediately and the
+new record takes its place at the tail. Only one record replays for that
+arrival. Under this overload, that oldest key may run before the deciding
+key's tap or hold, using the layer and modifiers active at delivery. The rest
+still wait; records retain their timestamps and no release overtakes its own
+press. Releases of keys already delivered, including the deciding key, continue
+to pass through. Normal rolls and hold timing below capacity keep the rules above.
+
 ### Physical gestures and buffered delivery
 
 For a handled physical key, hold time starts at its physical press. Repeated

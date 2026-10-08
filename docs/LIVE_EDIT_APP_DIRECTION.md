@@ -637,6 +637,17 @@ through the fork's `process_record_admit_user()` hook, and replayed through
 It joins unreleased bit 18. Optional QMK modes (permissive hold, hold on other
 key press) are not reproduced.
 
+The admission queue has a bounded overload policy: when a record needs to wait
+and the queue is full, replay exactly its oldest record, then append the new
+one. This preserves FIFO and causal press/release delivery without dropping
+records or increasing capacity. The oldest record may run before the tap/hold
+decision, on the layer and modifiers active then; all remaining records keep
+the normal waiting rule. Physical timestamps and record metadata remain intact.
+Releases whose presses were already delivered still pass through. This is an
+overload exception to the tap-first/hold-first ordering above, local to record
+admission; gesture ownership and native QMK tapping stay with their existing
+engines.
+
 ## D-F04 — Firmware pins its BK commit; `main` is a released, agreeing stack
 
 The UF2 is this userspace and the BK fork compiled together, so firmware names

@@ -17,6 +17,7 @@
 #include "users/noah/lib/key/behavior/key_behavior.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
+#include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/key/runtime/projection/projection.h"
 #include "users/noah/lib/key/runtime/reducer/ownership_state.h"
@@ -87,6 +88,13 @@ typedef struct {
 } gesture_out_t;
 static gesture_out_t gesture_out[32];
 static uint8_t       gesture_out_count;
+// Records delivered across the admission seam, before runtime normalization.
+static bool          gesture_track_admission;
+static keyrecord_t   gesture_admitted[128];
+static uint8_t       gesture_admitted_count;
+#ifndef NOAH_RECORD_ADMISSION_CAPACITY
+#    define NOAH_RECORD_ADMISSION_CAPACITY 8u
+#endif
 static uint16_t      fake_time;
 static void          gesture_out_add(char kind, uint16_t code) {
     if (gesture_out_count < ARRAY_SIZE(gesture_out)) gesture_out[gesture_out_count++] = (gesture_out_t){kind, code, fake_time};
@@ -348,6 +356,8 @@ static void test_reset_state(void) {
 #ifdef NOAH_TEST_QMK_GESTURES
     noah_qmk_combo_origin_reset();
     noah_record_admission_reset();
+    gesture_track_admission = false;
+    gesture_admitted_count = 0;
 #endif
     test_reset_keymap();
 
@@ -441,7 +451,7 @@ uint16_t gesture_keycode(uint8_t row, uint8_t col);
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
 #ifdef NOAH_TEST_QMK_GESTURES
     // Userspace combo origin must see the same members QMK's combo engine does.
-    if (row == 3 || (row >= 4 && row < 6)) return gesture_keycode(row, column);
+    if (row == 2 || row == 3 || (row >= 4 && row < 6)) return gesture_keycode(row, column);
 #endif
     return test_keymap[layer_num][row][column];
 }
@@ -595,6 +605,12 @@ bool process_record(keyrecord_t *record) {
     if (!noah_record_admission_admit(record)) {
         return false;
     }
+#ifdef NOAH_TEST_QMK_GESTURES
+    if (gesture_track_admission) {
+        CHECK(gesture_admitted_count < ARRAY_SIZE(gesture_admitted));
+        gesture_admitted[gesture_admitted_count++] = *record;
+    }
+#endif
     code = record->keycode ? record->keycode : get_record_keycode(record, true);
     pass = noah_process_record_user(code, record);
     noah_process_record_user_finalize(code, record, pass);
@@ -2373,10 +2389,13 @@ static void gesture_sync_combos(void) {
     }
 }
 static uint16_t gesture_test_code;
+static uint16_t gesture_second_code;
 static uint16_t gesture_delivered_press;
 uint16_t gesture_keycode(uint8_t row, uint8_t col) {
+    if (row == 2 && col < 8) return KC_E + col; // overload keys outside combos
     if (row == 3 && col == 0) return gesture_test_code;
     if (row == 3 && col == 1) return KC_E; // outside every combo
+    if (row == 3 && col == 3) return gesture_second_code;
     if (row == 3 && col == 2) return KC_LEFT_GUI; // handled row, outside every combo
     static const uint16_t keys[2][8] = {
         {PD_SLOT_5, MS_BTN1, MS_BTN3, LT(3,KC_SLSH), LT(2,KC_A), KC_COMM, PD_SLOT_0, MS_BTN2},
@@ -2673,6 +2692,204 @@ static void test_qmk_keys_wait_for_undecided_dual_role(void) {
     CHECK(gesture_out_is("KT", (const uint16_t[]){KC_E, KC_B}));
 }
 
+static void gesture_assert_admission_quiescent(void) {
+    // Every release follows its own press, including successive taps of one key.
+    for (uint8_t i = 0; i < gesture_admitted_count; i++) {
+        const keyrecord_t *record = &gesture_admitted[i];
+        bool down = false;
+        for (uint8_t j = 0; j < i; j++) {
+            const keyrecord_t *previous = &gesture_admitted[j];
+            if (previous->event.type == record->event.type && previous->keycode == record->keycode &&
+                previous->event.key.row == record->event.key.row && previous->event.key.col == record->event.key.col)
+                down = previous->event.pressed;
+        }
+        CHECK(down != record->event.pressed);
+    }
+    noah_key_runtime_activity_snapshot_t activity;
+    noah_key_runtime_activity_snapshot(&activity);
+    CHECK(noah_record_admission_held_count() == 0);
+    CHECK(activity.press_token_count == 0);
+    CHECK(activity.tap_series_count == 0);
+    CHECK(activity.lease_count == 0);
+    CHECK(activity.pending_release_count == 0);
+    CHECK(activity.persistent_intent_count == 0);
+    CHECK(layer_state == test_layer_mask(TEST_LAYER_BASE));
+    test_assert_button_quiescent(test_keypos(2, 0));
+}
+
+// A release delivered at saturation must never precede its buffered press.
+static void test_qmk_admission_overload_retires_released_keys(void) {
+    const uint16_t codes[] = {LT(TEST_LAYER_NAV, KC_B), MT(MOD_LSFT | MOD_LGUI, KC_S), OSM(MOD_LALT)};
+    const uint16_t starts[] = {48000, 65520};
+    for (uint8_t family = 0; family < ARRAY_SIZE(codes); family++) {
+        for (uint8_t start = 0; start < ARRAY_SIZE(starts); start++) {
+            for (uint8_t released = 0; released < NOAH_RECORD_ADMISSION_CAPACITY; released++) {
+                test_reset_state(); fake_time = starts[start]; gesture_test_code = codes[family];
+                gesture_track_admission = true;
+                gesture_at(3, 0, true); gesture_advance(10);
+                CHECK(key_runtime_core_undecided_dual_role_key_pos(NULL));
+                for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY; col++) {
+                    gesture_at(2, col, true); gesture_advance(1);
+                }
+                CHECK(noah_record_admission_held_count() == NOAH_RECORD_ADMISSION_CAPACITY);
+                CHECK(gesture_admitted_count == 1); // Only the deciding key reached runtime.
+                gesture_at(2, released, false);
+                CHECK(gesture_admitted_count == 2); // Overload replays exactly one oldest record.
+                CHECK(gesture_admitted[1].event.pressed && gesture_admitted[1].keycode == KC_E);
+                CHECK(gesture_admitted[1].event.time == (uint16_t)(starts[start] + 10));
+                gesture_advance(20); gesture_at(3, 0, false); gesture_advance(400);
+                for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY; col++)
+                    if (col != released) gesture_at(2, col, false);
+                gesture_advance(400);
+                CHECK(gesture_admitted_count == 2 + 2 * NOAH_RECORD_ADMISSION_CAPACITY);
+                gesture_assert_admission_quiescent();
+                // Ordinary typing still works after the overloaded gesture retires.
+                gesture_out_count = 0;
+                gesture_at(3, 1, true); gesture_advance(10); gesture_at(3, 1, false); gesture_advance(400);
+                CHECK(gesture_out_is("K", (const uint16_t[]){KC_E}));
+                gesture_assert_admission_quiescent();
+            }
+        }
+    }
+}
+
+static void test_qmk_admission_overload_new_press_preserves_fifo(void) {
+    test_reset_state(); fake_time = 48000; gesture_test_code = LT(TEST_LAYER_NAV, KC_B);
+    gesture_track_admission = true;
+    gesture_at(3, 0, true); gesture_advance(10);
+    for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY; col++) {
+        gesture_at(2, col, true); gesture_advance(1);
+    }
+    gesture_at(3, 1, true); // The new E must wait behind the entire older backlog.
+    CHECK(gesture_admitted_count == 2);
+    CHECK(gesture_admitted[1].event.key.row == 2 && gesture_admitted[1].event.key.col == 0);
+    gesture_at(3, 0, false); gesture_advance(1);
+    CHECK(gesture_admitted_count == NOAH_RECORD_ADMISSION_CAPACITY + 3);
+    for (uint8_t col = 1; col < NOAH_RECORD_ADMISSION_CAPACITY; col++) {
+        const keyrecord_t *r = &gesture_admitted[col + 2]; // Original LT release precedes scan replay.
+        CHECK(r->event.pressed && r->event.key.row == 2 && r->event.key.col == col);
+        CHECK(r->event.time == (uint16_t)(48010 + col));
+    }
+    const keyrecord_t *last = &gesture_admitted[gesture_admitted_count - 1];
+    CHECK(last->event.pressed && last->event.key.row == 3 && last->event.key.col == 1);
+    for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY; col++) gesture_at(2, col, false);
+    gesture_at(3, 1, false); gesture_advance(500);
+    gesture_assert_admission_quiescent();
+}
+
+static void test_qmk_admission_overload_repeated_taps(void) {
+    test_reset_state(); fake_time = 48000; gesture_test_code = LT(TEST_LAYER_NAV, KC_B);
+    gesture_track_admission = true;
+    gesture_at(3, 0, true);
+    // Repeated taps saturate even a tiny queue without needing more keys.
+    for (uint8_t tap = 0; tap < 10; tap++) {
+        gesture_at(2, 0, true); gesture_advance(1);
+        gesture_at(2, 0, false); gesture_advance(1);
+        CHECK(noah_record_admission_held_count() <= NOAH_RECORD_ADMISSION_CAPACITY);
+    }
+    gesture_at(3, 0, false); gesture_advance(500);
+    CHECK(gesture_admitted_count == 22);
+    for (uint8_t i = 0; i < gesture_admitted_count; i++) {
+        const keyrecord_t *r = &gesture_admitted[i];
+        if (r->event.key.row == 2) {
+            CHECK(r->event.time >= 48000 && r->event.time < 48020);
+            CHECK(r->tap.count == 0);
+        }
+    }
+    gesture_assert_admission_quiescent();
+}
+
+static void test_qmk_admission_buffered_authored_repeat_keeps_physical_gap(void) {
+    const uint16_t codes[] = {MT(MOD_LSFT | MOD_LGUI, KC_S), OSM(MOD_LALT)};
+    const uint16_t taps[] = {KC_X, KC_Y};
+    for (uint8_t family = 0; family < ARRAY_SIZE(codes); family++) {
+        test_reset_state(); fake_time = 48000; gesture_test_code = LT(TEST_LAYER_NAV, KC_B);
+        gesture_second_code = codes[family]; gesture_track_admission = true; gesture_out_count = 0;
+        gesture_at(3, 0, true);
+        for (uint8_t tap = 0; tap < 2; tap++) {
+            gesture_at(3, 3, true); gesture_advance(10);
+            gesture_at(3, 3, false); gesture_advance(10);
+        }
+        gesture_at(3, 0, false); gesture_advance(500);
+        uint8_t authored_taps = 0;
+        for (uint8_t i = 0; i < gesture_out_count; i++)
+            if (gesture_out[i].kind == 'T' && gesture_out[i].code == taps[family]) authored_taps++;
+        CHECK(authored_taps == 1);
+        gesture_assert_admission_quiescent();
+    }
+}
+
+static void test_qmk_admission_nested_undecided_keys(void) {
+    for (uint8_t overload = 0; overload < 2; overload++) {
+        test_reset_state(); fake_time = 48000; gesture_test_code = LT(TEST_LAYER_NAV, KC_B);
+        gesture_second_code = MT(MOD_LSFT | MOD_LGUI, KC_S);
+        gesture_track_admission = true;
+        gesture_at(3, 0, true); gesture_advance(10);
+        gesture_at(3, 3, true); gesture_advance(1);
+        uint8_t keys = overload ? NOAH_RECORD_ADMISSION_CAPACITY : 0;
+        for (uint8_t col = 0; col < keys; col++) { gesture_at(2, col, true); gesture_advance(1); }
+        // Release the nested undecided key before replay, then the original.
+        gesture_at(3, 3, false); gesture_at(3, 0, false);
+        for (uint8_t col = 0; col < keys; col++) gesture_at(2, col, false);
+        gesture_advance(500);
+        CHECK(gesture_admitted_count == 4 + 2 * keys);
+        gesture_assert_admission_quiescent();
+    }
+}
+
+static void test_qmk_admission_overload_combo_release(void) {
+    test_reset_state(); fake_time = 48000; gesture_test_code = LT(TEST_LAYER_NAV, KC_B);
+    gesture_combo_output_count = 0; gesture_track_admission = true;
+    gesture_at(3, 0, true);
+    // Copy + Paste wins GUI+A before the deciding key's 100 ms term.
+    gesture_at(5, 3, true); gesture_advance(1); gesture_at(5, 4, true); gesture_advance(55);
+    CHECK(gesture_combo_output_count == 1 && gesture_combo_outputs[0] == G(KC_A));
+    CHECK(noah_record_admission_held_count() == 1);
+    for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY - 1; col++) gesture_at(2, col, true);
+    CHECK(noah_record_admission_held_count() == NOAH_RECORD_ADMISSION_CAPACITY);
+    gesture_at(5, 3, false); gesture_at(5, 4, false);
+    gesture_at(3, 0, false);
+    for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY - 1; col++) gesture_at(2, col, false);
+    gesture_advance(500);
+    uint8_t combo_records = 0;
+    for (uint8_t i = 0; i < gesture_admitted_count; i++) {
+        if (gesture_admitted[i].event.type == COMBO_EVENT) {
+            CHECK(gesture_admitted[i].keycode == G(KC_A));
+            CHECK(gesture_admitted[i].event.pressed == (combo_records == 0));
+            combo_records++;
+        }
+    }
+    CHECK(combo_records == 2);
+    gesture_assert_admission_quiescent();
+}
+
+static void test_qmk_admission_overload(void) {
+    test_qmk_admission_overload_retires_released_keys();
+    test_qmk_admission_overload_new_press_preserves_fifo();
+    test_qmk_admission_overload_repeated_taps();
+    test_qmk_admission_buffered_authored_repeat_keeps_physical_gap();
+    test_qmk_admission_nested_undecided_keys();
+    test_qmk_admission_overload_combo_release();
+}
+
+static void test_qmk_admission_replay_waits_for_nested_decision(void) {
+    test_reset_state(); fake_time = 48000; gesture_test_code = LT(TEST_LAYER_NAV, KC_B);
+    gesture_second_code = MT(MOD_LSFT | MOD_LGUI, KC_S);
+    gesture_track_admission = true; gesture_out_count = 0; gesture_registered = KC_NO;
+    gesture_at(3, 0, true); gesture_advance(10);
+    gesture_at(3, 3, true); gesture_advance(10);
+    gesture_at(2, 0, true); gesture_advance(10);
+    gesture_at(3, 0, false); gesture_advance(1);
+    CHECK(noah_record_admission_held_count() == 1);
+    CHECK(gesture_admitted_count == 3); // Replay stops at the new undecided MT.
+    CHECK(key_runtime_core_undecided_dual_role_key_pos(NULL));
+    gesture_advance(19); gesture_at(3, 3, false); gesture_advance(1);
+    CHECK(gesture_out_is("TTK", (const uint16_t[]){KC_B, gesture_second_code, KC_E}));
+    CHECK(gesture_registered == KC_NO);
+    gesture_at(2, 0, false); gesture_advance(500);
+    gesture_assert_admission_quiescent();
+}
+
 static void test_qmk_dual_role_ownership(void) {
     const uint16_t authored[] = {MT(MOD_LCTL, KC_A), TT(2), OSL(2), OSM(MOD_LSFT)};
     for (unsigned i = 0; i < ARRAY_SIZE(authored); i++) {
@@ -2729,8 +2946,13 @@ static void test_qmk_nested_chords_choose_only_largest(void) {
 }
 #endif
 
-int main(void) {
+int main(int argc, char **argv) {
 #ifdef NOAH_TEST_QMK_GESTURES
+    if (argc == 2 && strcmp(argv[1], "--admission-overload") == 0) {
+        test_qmk_admission_overload();
+        puts("QMK admission overload tests passed");
+        return 0;
+    }
     test_qmk_buffered_second_press();
     test_qmk_combo_consumes_second_press();
     test_qmk_member_hold_uses_physical_duration();
@@ -2743,6 +2965,8 @@ int main(void) {
     test_qmk_sparse_dual_role_rows_keep_intrinsic_hold();
     test_qmk_authored_layer_tap_layer_waits_for_hold();
     test_qmk_keys_wait_for_undecided_dual_role();
+    test_qmk_admission_overload();
+    test_qmk_admission_replay_waits_for_nested_decision();
     test_qmk_combo_output_gui_behaviour();
     puts("QMK gesture pipeline tests passed");
     return 0;

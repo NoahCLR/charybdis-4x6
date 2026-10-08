@@ -13,6 +13,11 @@
 // and native tapping, before every QMK feature. A release whose press was not
 // held back (including the deciding key's own release) passes straight
 // through, as it does in QMK.
+//
+// At capacity, replay exactly the oldest held record before appending the new
+// one. That record may run before the tap/hold decision; later records still
+// wait in FIFO order. No record is dropped or allowed to bypass its own press,
+// and replay keeps the original timestamp, event type, keycode and tap data.
 bool noah_record_admission_admit(keyrecord_t *record);
 
 // Replays held records once no tap/hold key is undecided. Runs each matrix

@@ -419,7 +419,15 @@ The fork's `process_record_admit_user()` offers every record at the top of
 so a held record is processed once, on replay. `noah_matrix_scan_user` runs the
 replay after the key runtime scan, so a hold reached that scan applies first;
 `key_runtime_core_undecided_dual_role_key_pos()` is the only decision it reads.
-The eight-record buffer passes a record through rather than drop it when full.
+At capacity (eight records by default), capture removes and replays exactly the
+oldest held record through `process_record()` before appending the incoming
+record. This bounded overload path may deliver that oldest record before an
+undecided key resolves; it never drops a record or lets a release bypass its
+buffered press. A replay guard prevents recapture, and the record's physical
+timestamp, keycode, event type and tap metadata survive unchanged. The remaining
+queue follows normal scan replay, including pausing for a newly undecided key.
+The real QMK pipeline covers saturation, smaller capacities, nested decisions,
+combo outputs, repeated taps, timer wrap and final runtime quiescence.
 
 The fork's `is_tap_keycode_user` hook exempts all runtime-handled keys from native
 tapping. Lookup includes authored MT/OSM rows and intrinsic TT/OSL ownership.
