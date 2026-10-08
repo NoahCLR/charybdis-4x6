@@ -95,6 +95,8 @@ static const char *key_runtime_trace_effect_name(key_runtime_effect_kind_t kind)
             return "pd_mode_lock_state";
         case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
             return "delayed_action";
+        case KEY_RUNTIME_EFFECT_LAYER_ONESHOT_CONSUME:
+            return "layer_oneshot_consume";
         case KEY_RUNTIME_EFFECT_NONE:
         default:
             return "none";

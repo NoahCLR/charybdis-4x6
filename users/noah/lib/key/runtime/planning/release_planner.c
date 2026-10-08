@@ -5,6 +5,7 @@
 #include "../reducer/state_query.h"
 
 #include "../../../action/action_dispatch.h"
+#include "../../../compat/qmk_oneshot_contract.h"
 #include "../../../pointing/defs/pd_modes.h"
 
 static void key_runtime_core_release_effect_plan_push(key_runtime_core_release_effect_plan_t *plan, key_runtime_effect_t effect) {
@@ -286,6 +287,11 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
 
     switch (resolution->decision.outcome) {
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP:
+            // The owner has selected a tap. Its action is already materialized
+            // on the press layer, even if emission waits for a multi-tap window.
+            if (IS_QK_MOD_TAP(resolution->interaction->selection.keycode) && noah_qmk_contract_tap_uses_oneshot_layer(contract.tap.action)) {
+                key_runtime_core_release_effect_plan_push(out, (key_runtime_effect_t){.kind = KEY_RUNTIME_EFFECT_LAYER_ONESHOT_CONSUME});
+            }
             switch (contract.tap.outcome) {
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP:
                     out->pending_multi_tap_seed = (key_runtime_core_pending_multi_tap_seed_t){
@@ -384,8 +390,8 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     switch (decision.outcome) {
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION: {
             uint16_t                  held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, decision.action, elapsed);
-            key_feedback_pulse_kind_t action_feedback_kind = KEY_FEEDBACK_PULSE_HOLD;
-            bool                      action_feedback = series_tap_count > 1u && key_runtime_core_release_hold_action_feedback_kind(token, decision.action, elapsed, &action_feedback_kind);
+            key_feedback_pulse_kind_t action_feedback_kind  = KEY_FEEDBACK_PULSE_HOLD;
+            bool                      action_feedback       = series_tap_count > 1u && key_runtime_core_release_hold_action_feedback_kind(token, decision.action, elapsed, &action_feedback_kind);
 
             if (held_lifecycle_action != KC_NO) {
                 key_runtime_core_tap_series_clear(state, series);
@@ -410,6 +416,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
         }
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_TAP: {
             uint16_t held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, tap_action, elapsed);
+            bool     consumes_oneshot      = IS_QK_MOD_TAP(token->resolved_keycode) && noah_qmk_contract_tap_uses_oneshot_layer(tap_action);
 
             if (held_lifecycle_action != KC_NO) {
                 key_runtime_core_tap_series_clear(state, series);
@@ -422,7 +429,8 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
 
             if (preserve_chain) {
                 *out = (key_runtime_core_pending_multi_tap_release_resolution_t){
-                    .outcome = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN,
+                    .outcome          = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_PRESERVE_CHAIN,
+                    .consumes_oneshot = consumes_oneshot,
                 };
                 return true;
             }
@@ -432,6 +440,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .action              = tap_action,
                 .repeat_count        = tap_repeat_count,
                 .keeps_own_layer     = key_runtime_release_tap_keeps_own_layer(&token->interaction, tap_action),
+                .consumes_oneshot    = consumes_oneshot,
                 .tap_branch_feedback = authored_branch,
                 .tap_commit_feedback = authored_tap_branch,
                 .tap_count           = series_tap_count,
@@ -487,6 +496,9 @@ bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, b
 
     if (is_momentary_layer && !release_layer_after) {
         key_runtime_core_release_effect_plan_push_layer_release(out, key_pos);
+    }
+    if (resolution->consumes_oneshot) {
+        key_runtime_core_release_effect_plan_push(out, (key_runtime_effect_t){.kind = KEY_RUNTIME_EFFECT_LAYER_ONESHOT_CONSUME});
     }
 
     switch (resolution->outcome) {

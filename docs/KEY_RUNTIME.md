@@ -325,6 +325,20 @@ Non-handled releases still pass through the shared process flow, but
 those keys too. That keeps raw ownership keys such as `MO()`/modifier/pd-mode
 keys from leaving stale core leases behind.
 
+For runtime-owned MT keys, the release planner's resolved TAP outcome also
+plans `KEY_RUNTIME_EFFECT_LAYER_ONESHOT_CONSUME` when its selected tap action
+qualifies. Projection applies that effect through `layer_ownership_oneshot_consume()`
+and the existing `key_runtime_core_layer_oneshot_set()` bridge. This occurs on
+release, including a release preserving a pending multi-tap chain, before any
+tap dispatch. The press-layer action is already materialized and stays fixed.
+Hold outcomes never plan consumption; scan, deferred and synthetic emission
+never repeat it. `process.c` settles native MT presses from QMK's tap count and
+leaves runtime-owned MTs to their planner. The compatibility helper in
+`compat/qmk_oneshot_contract.h` qualifies selected output, not gesture timing.
+The layer-lock integration regression and real QMK gesture pipeline cover
+consumption, transparency, repeats, modifier-only output and new one-shots
+surviving later emission.
+
 ### 5. Scan
 
 [`scan.c`](../users/noah/lib/key/runtime/scan.c) asks

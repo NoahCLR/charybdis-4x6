@@ -96,6 +96,10 @@ static uint8_t       gesture_admitted_count;
 #    define NOAH_RECORD_ADMISSION_CAPACITY 8u
 #endif
 static uint16_t      fake_time;
+static uint8_t       gesture_momentary_layer;
+static bool          gesture_layer_resolution;
+static uint16_t      gesture_qmk_tap;
+static unsigned      gesture_qmk_tap_count;
 static void          gesture_out_add(char kind, uint16_t code) {
     if (gesture_out_count < ARRAY_SIZE(gesture_out)) gesture_out[gesture_out_count++] = (gesture_out_t){kind, code, fake_time};
 }
@@ -104,6 +108,13 @@ static uint16_t      test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 const key_behavior_t key_behaviors[] = {
 #ifdef NOAH_TEST_QMK_GESTURES
     {.keycode = MT(MOD_LCTL, KC_A), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
+    {.keycode = MT(MOD_LCTL, KC_D), .tap_hold_term = 100, .tap_counts = {{.tap = TAP_SENDS(KC_LCTL)}, {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(C(KC_NO))}}},
+    {.keycode = MT(MOD_LCTL, KC_F), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(C(KC_NO))}},
+    {.keycode = MT(MOD_LCTL, KC_G), .tap_hold_term = 100, .tap_counts = {{.tap = TAP_SENDS(KC_B)}, {.tap = TAP_SENDS(OSL(3))}}},
+    {.keycode = MT(MOD_LCTL, KC_H), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_TRNS)}},
+    {.keycode = MT(MOD_LCTL, KC_I), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_NO)}},
+    {.keycode = MT(MOD_LCTL, KC_J), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(OSM(MOD_LSFT))}},
+    {.keycode = MT(MOD_LCTL, KC_K), .tap_hold_term = 100, .tap_counts = {{.tap = TAP_SENDS(KC_LCTL)}, {.tap = TAP_SENDS(KC_B)}}},
     {.keycode = TT(2), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
     {.keycode = OSL(2), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
     {.keycode = OSM(MOD_LSFT), .tap_hold_term = 100, .tap_counts[0] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}},
@@ -358,6 +369,7 @@ static void test_reset_state(void) {
     noah_record_admission_reset();
     gesture_track_admission = false;
     gesture_admitted_count = 0;
+    gesture_layer_resolution = false;
 #endif
     test_reset_keymap();
 
@@ -437,6 +449,10 @@ static void test_apply_layer_state(layer_state_t next_state) {
 }
 
 void layer_on(uint8_t layer) {
+#ifdef NOAH_TEST_QMK_GESTURES
+    gesture_momentary_layer = layer;
+    gesture_out_add('L', layer);
+#endif
     test_apply_layer_state(layer_state | ((layer_state_t)1u << layer));
 }
 
@@ -451,6 +467,7 @@ uint16_t gesture_keycode(uint8_t row, uint8_t col);
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
 #ifdef NOAH_TEST_QMK_GESTURES
     // Userspace combo origin must see the same members QMK's combo engine does.
+    if (gesture_layer_resolution && row == 3 && column == 0) return layer_num == 2 ? gesture_keycode(row, column) : KC_Z;
     if (row == 2 || row == 3 || (row >= 4 && row < 6)) return gesture_keycode(row, column);
 #endif
     return test_keymap[layer_num][row][column];
@@ -550,9 +567,11 @@ void wait_ms(uint16_t ms) {
     (void)ms;
 }
 
+#ifndef NOAH_TEST_QMK_GESTURES
 bool noah_synthetic_record_active(void) {
     return false;
 }
+#endif
 
 bool owned_keycode_register(uint16_t keycode) {
     (void)keycode;
@@ -606,7 +625,9 @@ bool process_record(keyrecord_t *record) {
         return false;
     }
 #ifdef NOAH_TEST_QMK_GESTURES
-    if (gesture_track_admission) {
+    // Trace causal input records; synthetic tap output re-enters process_record
+    // but does not originate in the admission queue.
+    if (gesture_track_admission && !noah_synthetic_record_active()) {
         CHECK(gesture_admitted_count < ARRAY_SIZE(gesture_admitted));
         gesture_admitted[gesture_admitted_count++] = *record;
     }
@@ -615,25 +636,31 @@ bool process_record(keyrecord_t *record) {
     pass = noah_process_record_user(code, record);
     noah_process_record_user_finalize(code, record, pass);
 #ifdef NOAH_TEST_QMK_GESTURES
-    if (pass && record->event.pressed) gesture_out_add('K', code);
+    if (pass && record->event.pressed) {
+        if (noah_synthetic_record_active() && record->tap.count != 0u) {
+            gesture_out_add('T', code);
+            gesture_qmk_tap = code;
+            gesture_qmk_tap_count++;
+        } else {
+            gesture_out_add('K', code);
+        }
+    }
 #endif
     return pass;
 }
 
+#ifdef NOAH_TEST_QMK_GESTURES
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    bool pass = noah_process_record_user(keycode, record);
+    noah_process_record_user_finalize(keycode, record, pass);
+    return pass;
+}
+#else
 void noah_dispatch_synthetic_tap(uint16_t keycode) {
     (void)keycode;
 }
 
-#ifdef NOAH_TEST_QMK_GESTURES
-static uint16_t gesture_qmk_tap;
-static unsigned gesture_qmk_tap_count;
-#endif
 void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
-#ifdef NOAH_TEST_QMK_GESTURES
-    gesture_out_add('T', keycode);
-    gesture_qmk_tap = keycode;
-    gesture_qmk_tap_count++;
-#endif
     (void)keycode;
 }
 
@@ -648,6 +675,7 @@ void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t 
     (void)pressed;
     (void)tap_count;
 }
+#endif
 
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
@@ -727,14 +755,8 @@ uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
     return (uint8_t)(mods & fake_managed_mods & (uint8_t)~fake_physical_mods);
 }
 
-#ifdef NOAH_TEST_QMK_GESTURES
-static uint8_t gesture_momentary_layer;
-#endif
+#ifndef NOAH_TEST_QMK_GESTURES
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
-#ifdef NOAH_TEST_QMK_GESTURES
-    gesture_momentary_layer = layer;
-    gesture_out_add('L', layer);
-#endif
     (void)key_pos;
     (void)layer;
 }
@@ -749,13 +771,7 @@ bool layer_ownership_is_held(uint8_t layer) {
     return false;
 }
 
-#ifdef NOAH_TEST_QMK_GESTURES
-static layer_state_t gesture_locks;
-#endif
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
-#ifdef NOAH_TEST_QMK_GESTURES
-    gesture_locks ^= (layer_state_t)1u << layer;
-#endif
     (void)layer;
     return true;
 }
@@ -765,10 +781,13 @@ bool layer_ownership_goto(uint8_t layer) {
     return true;
 }
 
+#endif
+
 bool is_oneshot_enabled(void) {
     return true;
 }
 
+#ifndef NOAH_TEST_QMK_GESTURES
 bool layer_ownership_oneshot_tap(uint8_t layer, uint16_t now, uint16_t double_tap_ms) {
     (void)now;
     (void)double_tap_ms;
@@ -788,6 +807,7 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     (void)key_pos;
     return true;
 }
+#endif
 
 keyboard_mod_state_t keyboard_mod_state_suspend(void) {
     keyboard_mod_state_t saved = {
@@ -2391,9 +2411,10 @@ static void gesture_sync_combos(void) {
 static uint16_t gesture_test_code;
 static uint16_t gesture_second_code;
 static uint16_t gesture_delivered_press;
+static uint8_t gesture_delivered_taps;
 uint16_t gesture_keycode(uint8_t row, uint8_t col) {
     if (row == 2 && col < 8) return KC_E + col; // overload keys outside combos
-    if (row == 3 && col == 0) return gesture_test_code;
+    if (row == 3 && col == 0) return gesture_layer_resolution && !layer_state_cmp(layer_state, 2) ? KC_Z : gesture_test_code;
     if (row == 3 && col == 1) return KC_E; // outside every combo
     if (row == 3 && col == 3) return gesture_second_code;
     if (row == 3 && col == 2) return KC_LEFT_GUI; // handled row, outside every combo
@@ -2408,7 +2429,7 @@ static uint8_t gesture_combo_output_count;
 static uint8_t gesture_last_combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 void gesture_deliver(uint16_t code, uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t taps, bool combo) {
     gesture_sync_combos();
-    if (down) gesture_delivered_press = code;
+    if (down) { gesture_delivered_press = code; gesture_delivered_taps = taps; }
     if (combo && down) { CHECK(gesture_combo_output_count < ARRAY_SIZE(gesture_combo_outputs)); gesture_combo_outputs[gesture_combo_output_count++] = code; }
     keyrecord_t r = {.event = {.key={row,col}, .pressed=down, .type=combo ? COMBO_EVENT : KEY_EVENT, .time=time}, .tap={.count=taps}, .keycode=code};
     process_record(&r);
@@ -2464,15 +2485,15 @@ static void test_qmk_member_hold_uses_physical_duration(void) {
     test_assert_button_quiescent(test_keypos(4,2));
 }
 static void test_qmk_authored_layer_tap_has_one_clock(void) {
-    test_reset_state(); fake_time = 4000; gesture_locks = 0;
+    test_reset_state(); fake_time = 4000;
     gesture_at(4,3,true); gesture_advance(40); gesture_at(4,3,false);
     gesture_advance(70); gesture_at(4,3,true);
     // The 100 ms chord window must not be followed by QMK's 200 ms
     // tapping window before the authored 100 ms double hold can lock Nav.
     gesture_advance(102);
-    CHECK(layer_state_cmp(gesture_locks, TEST_LAYER_NAV));
+    CHECK(layer_ownership_is_locked(TEST_LAYER_NAV));
     gesture_at(4,3,false); gesture_advance(500);
-    CHECK(layer_state_cmp(gesture_locks, TEST_LAYER_NAV));
+    CHECK(layer_ownership_is_locked(TEST_LAYER_NAV));
 }
 static void test_qmk_tapping_queue_preserves_member_series(void) {
     test_reset_state(); fake_time = 5000;
@@ -2944,6 +2965,208 @@ static void test_qmk_nested_chords_choose_only_largest(void) {
         }
     }
 }
+
+static void gesture_start_oneshot(uint16_t code, uint16_t now) {
+    test_reset_state();
+    fake_time = now;
+    gesture_test_code = code;
+    gesture_out_count = 0;
+    gesture_qmk_tap_count = 0;
+    gesture_delivered_press = KC_NO;
+    gesture_registered = gesture_unregistered = KC_NO;
+    CHECK(layer_ownership_oneshot_tap(2, fake_time, 200));
+    CHECK(layer_state_cmp(layer_state, 2));
+    gesture_out_count = 0;
+}
+
+static void gesture_check_quiescent(void) {
+    projection_snapshot_t snapshot = key_runtime_core_projection_snapshot_capture();
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0);
+    CHECK(noah_record_admission_held_count() == 0);
+    CHECK(snapshot.core_persistent_intent_count == (layer_ownership_oneshot_layer() == UINT8_MAX ? 0 : 1));
+    CHECK((snapshot.core_shadow_layer_state & ((1u << 2) | (1u << 3))) == (snapshot.layer_state & ((1u << 2) | (1u << 3))));
+}
+
+static void test_qmk_owned_mod_tap_oneshot_release(void) {
+    // The authored B is selected on layer 2, even though the same position
+    // resolves to Z once the one-shot is consumed. Include 16-bit timer wrap.
+    const uint16_t times[] = {30000, 65525};
+    for (unsigned i = 0; i < ARRAY_SIZE(times); i++) {
+        gesture_start_oneshot(MT(MOD_LCTL, KC_A), times[i]);
+        gesture_layer_resolution = true;
+        gesture_at(3, 0, true);
+        CHECK(gesture_delivered_taps == 0);
+        CHECK(layer_ownership_oneshot_layer() == 2);
+        gesture_advance(20);
+        gesture_at(3, 0, false);
+        CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+        CHECK(!layer_state_cmp(layer_state, 2));
+        CHECK(gesture_out_is("T", (const uint16_t[]){KC_B}));
+        // A new tap at that position uses the base layer, not the old MT row.
+        gesture_at(3, 0, true); gesture_at(3, 0, false);
+        CHECK(gesture_delivered_press == KC_Z);
+        gesture_advance(400);
+        gesture_check_quiescent();
+    }
+}
+
+static void test_qmk_native_mod_tap_oneshot(void) {
+    const uint16_t native = MT(MOD_LCTL, KC_B);
+    gesture_start_oneshot(native, 32000);
+    CHECK(!key_behavior_lookup(native).handled);
+    gesture_at(3, 0, true); gesture_advance(20);
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_at(3, 0, false);
+    CHECK(gesture_delivered_press == native && gesture_delivered_taps == 1);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    // Native repeated taps retain QMK's classification and consume once per tap.
+    CHECK(layer_ownership_oneshot_tap(2, fake_time, 200));
+    gesture_advance(20); gesture_at(3, 0, true); gesture_at(3, 0, false);
+    CHECK(gesture_delivered_taps == 2);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    gesture_advance(400); gesture_check_quiescent();
+
+    gesture_start_oneshot(native, 34000);
+    gesture_at(3, 0, true); gesture_advance(250);
+    CHECK(gesture_delivered_press == native && gesture_delivered_taps == 0);
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_at(3, 0, false); gesture_advance(400);
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_check_quiescent();
+
+    // QMK's modifier-only MT tap is also excluded from consumption.
+    gesture_start_oneshot(MT(MOD_LCTL, KC_LSFT), 36000);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    CHECK(gesture_delivered_taps == 1);
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_advance(400); gesture_check_quiescent();
+}
+
+static void test_qmk_owned_mod_tap_oneshot_hold_and_repeats(void) {
+    const uint16_t sparse = MT(MOD_LSFT | MOD_LGUI, KC_S);
+    gesture_start_oneshot(sparse, 38000);
+    gesture_at(3, 0, true); gesture_advance(100);
+    CHECK(gesture_registered == LSG(KC_NO));
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_at(3, 0, false); gesture_advance(400);
+    CHECK(gesture_unregistered == LSG(KC_NO) && gesture_qmk_tap_count == 0);
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_check_quiescent();
+
+    // An explicitly authored non-modifier hold is still a hold, not a tap.
+    gesture_start_oneshot(MT(MOD_LCTL, KC_A), 39000);
+    gesture_at(3, 0, true); gesture_advance(100);
+    CHECK(gesture_registered == MS_BTN7 && layer_ownership_oneshot_layer() == 2);
+    gesture_at(3, 0, false); gesture_advance(400);
+    CHECK(gesture_unregistered == MS_BTN7 && tap_code16_count == 0);
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_check_quiescent();
+
+    gesture_start_oneshot(sparse, 40000);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(gesture_out_count == 0); // Tap output still waits for its window.
+    CHECK(layer_ownership_oneshot_tap(2, fake_time, 200));
+    gesture_advance(400);
+    CHECK(gesture_qmk_tap_count == 1 && gesture_qmk_tap == sparse);
+    CHECK(layer_ownership_oneshot_layer() == 2); // Synthetic MT did not consume again.
+    gesture_check_quiescent();
+
+    gesture_start_oneshot(sparse, 42000);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    gesture_advance(20); gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    gesture_advance(400);
+    CHECK(gesture_out_is("T", (const uint16_t[]){KC_X}));
+    CHECK(gesture_qmk_tap_count == 0);
+    gesture_check_quiescent();
+
+    // First tap is a modifier; the second selected branch sends B and uses
+    // the one-shot on its release, before its pending series emits B.
+    gesture_start_oneshot(MT(MOD_LCTL, KC_D), 44000);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_advance(20); gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    gesture_advance(400);
+    CHECK(gesture_out_is("T", (const uint16_t[]){KC_B}));
+    gesture_check_quiescent();
+
+    gesture_start_oneshot(MT(MOD_LCTL, KC_D), 45000);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    gesture_advance(400);
+    CHECK(gesture_out_is("T", (const uint16_t[]){KC_LCTL}));
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_check_quiescent();
+
+    // A repeated hold after that modifier-only first tap retains the layer.
+    gesture_start_oneshot(MT(MOD_LCTL, KC_D), 45500);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    gesture_advance(20); gesture_at(3, 0, true); gesture_advance(100);
+    CHECK(gesture_registered == C(KC_NO));
+    gesture_at(3, 0, false); gesture_advance(400);
+    CHECK(gesture_unregistered == C(KC_NO) && tap_code16_count == 0);
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_check_quiescent();
+}
+
+static void test_qmk_owned_mod_tap_oneshot_transparency_and_synthetic(void) {
+    gesture_start_oneshot(MT(MOD_LCTL, KC_H), 46000);
+    gesture_layer_resolution = true;
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    CHECK(gesture_out_is("T", (const uint16_t[]){KC_Z}));
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    gesture_advance(400); gesture_check_quiescent();
+
+    gesture_start_oneshot(MT(MOD_LCTL, KC_I), 47000);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    gesture_advance(400);
+    CHECK(gesture_out_count == 0 && layer_ownership_oneshot_layer() == 2);
+    gesture_check_quiescent();
+
+    gesture_start_oneshot(MT(MOD_LCTL, KC_J), 47500);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    CHECK(gesture_qmk_tap_count == 1 && gesture_qmk_tap == OSM(MOD_LSFT));
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_advance(400); gesture_check_quiescent();
+
+    gesture_start_oneshot(MT(MOD_LCTL, KC_F), 48000);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    CHECK(gesture_out_is("T", (const uint16_t[]){C(KC_NO)}));
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    // Drive the real synthetic dispatch boundary with a qualifying key and MT.
+    noah_dispatch_synthetic_qmk_tap(KC_C);
+    noah_dispatch_synthetic_qmk_tap(MT(MOD_LCTL, KC_B));
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_advance(400); gesture_check_quiescent();
+
+    // Release consumes the old one-shot; the final authored OSL arms a new
+    // one, which scan output and physical finalization must leave intact.
+    gesture_start_oneshot(MT(MOD_LCTL, KC_G), 50000);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    gesture_advance(20); gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    gesture_advance(400);
+    CHECK(layer_ownership_oneshot_layer() == 3);
+    CHECK(layer_state_cmp(layer_state, 3) && !layer_state_cmp(layer_state, 2));
+    gesture_check_quiescent();
+}
+
+static void test_qmk_owned_mod_tap_oneshot_tap_only_release(void) {
+    // This repeated branch has no hold tier. A long press still emits its
+    // selected tap on release, through the planner's tap-only fallback.
+    gesture_start_oneshot(MT(MOD_LCTL, KC_K), 52000);
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false);
+    CHECK(layer_ownership_oneshot_layer() == 2);
+    gesture_advance(20); gesture_at(3, 0, true); gesture_advance(150);
+    CHECK(gesture_registered == KC_NO && layer_ownership_oneshot_layer() == 2);
+    gesture_at(3, 0, false);
+    CHECK(gesture_out_is("T", (const uint16_t[]){KC_B}));
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    gesture_advance(400); gesture_check_quiescent();
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -2953,6 +3176,11 @@ int main(int argc, char **argv) {
         puts("QMK admission overload tests passed");
         return 0;
     }
+    test_qmk_owned_mod_tap_oneshot_release();
+    test_qmk_native_mod_tap_oneshot();
+    test_qmk_owned_mod_tap_oneshot_hold_and_repeats();
+    test_qmk_owned_mod_tap_oneshot_transparency_and_synthetic();
+    test_qmk_owned_mod_tap_oneshot_tap_only_release();
     test_qmk_buffered_second_press();
     test_qmk_combo_consumes_second_press();
     test_qmk_member_hold_uses_physical_duration();

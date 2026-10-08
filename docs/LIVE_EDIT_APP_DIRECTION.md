@@ -619,6 +619,14 @@ delivery into intrinsic layer ownership, and preservation of native tapping.
 The release matrix also pins the empty release-interval rule consumed by Ark's
 timing analysis. Physical acceptance remains open under D-F01.
 
+Runtime-owned MT one-shot consumption follows the owner's release TAP decision,
+including a tap whose output waits for multi-tap disambiguation. The selected
+press-layer action remains fixed. Native MTs use QMK's resolved tap count;
+holds and modifier-only tap output leave the one-shot armed. Output dispatch
+does not consume again. See the [one-shot interaction rule](INTERACTION_MODEL.md)
+and [release authority](KEY_RUNTIME.md#4-release-routing). This uses the existing
+layer-ownership bridge and changes no physical timestamps or admission timing.
+
 ## D-F03 — Keys wait for an undecided tap/hold key
 
 Keys pressed while a runtime-owned tap/hold key (authored LT/MT/OSM row) is down

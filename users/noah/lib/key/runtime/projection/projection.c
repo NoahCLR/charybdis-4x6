@@ -50,6 +50,9 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
         case KEY_RUNTIME_EFFECT_LAYER_RELEASE:
             layer_ownership_momentary_release(effect->data.key_pos);
             return;
+        case KEY_RUNTIME_EFFECT_LAYER_ONESHOT_CONSUME:
+            (void)layer_ownership_oneshot_consume();
+            return;
         case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
             key_runtime_core_feedback_projection_project_pulse(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch);
             return;

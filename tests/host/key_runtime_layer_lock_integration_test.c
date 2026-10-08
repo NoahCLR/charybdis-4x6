@@ -30,6 +30,8 @@ layer_state_t layer_state;
 extern bool key_runtime_integration_output_ready;
 
 static uint16_t fake_time;
+static uint16_t last_tap;
+static uint16_t tap_count;
 
 // The one layer action a press-and-hold branch holds (see held_action_register).
 static struct {
@@ -73,6 +75,8 @@ static void test_reset_state(void) {
     fake_time   = 1000;
     layer_state = 0;
     test_held_layer.active = false;
+    last_tap              = KC_NO;
+    tap_count             = 0;
     noah_runtime_reset_for_test();
 }
 
@@ -164,7 +168,8 @@ void del_mods(uint8_t mods) {
 void send_keyboard_report(void) {}
 
 void tap_code16(uint16_t keycode) {
-    (void)keycode;
+    last_tap = keycode;
+    tap_count++;
 }
 
 void register_code16(uint16_t keycode) {
@@ -190,6 +195,15 @@ void layer_off(uint8_t layer) {
 }
 
 key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
+    if (keycode == MT(MOD_LCTL, KC_A)) {
+        return (key_behavior_view_t){
+            .keycode            = keycode,
+            .handled            = true,
+            .authored_tap_depth = 1u,
+            .tap_hold_term      = 150,
+            .single             = {.tap = TAP_SENDS(KC_B)},
+        };
+    }
     if (keycode == TEST_MULTI_TAP_KEY) {
         return (key_behavior_view_t){
             .keycode            = keycode,
@@ -680,7 +694,38 @@ static void test_profile_output_fence_drops_whole_key_presses(void) {
     CHECK(noah_pre_process_record_user(KC_A, &release));
 }
 
+// A runtime-owned MT has no native tap.count. Its owning release decision
+// must consume the real one-shot, while still sending the authored tap.
+static void test_owned_mod_tap_consumes_oneshot(void) {
+    test_reset_state();
+    CHECK(layer_ownership_oneshot_tap(TEST_OTHER_LAYER, fake_time, 150));
+    const key_runtime_integration_step_t steps[] = {
+        KEY_RUNTIME_INTEGRATION_PRESS(MT(MOD_LCTL, KC_A), 0, 0),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(20),
+        KEY_RUNTIME_INTEGRATION_RELEASE(MT(MOD_LCTL, KC_A), 0, 0),
+        KEY_RUNTIME_INTEGRATION_ADVANCE(200),
+        KEY_RUNTIME_INTEGRATION_SCAN(),
+    };
+    key_runtime_integration_run(&fake_time, steps, ARRAY_SIZE(steps));
+    CHECK(tap_count == 1 && last_tap == KC_B);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(!test_layer_active(TEST_OTHER_LAYER));
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+
+    // Consuming a one-shot retires only that owner, not the layer's lock.
+    test_reset_state();
+    CHECK(layer_ownership_set_lock_state(TEST_OTHER_LAYER, true));
+    CHECK(layer_ownership_oneshot_tap(TEST_OTHER_LAYER, fake_time, 150));
+    key_runtime_integration_run(&fake_time, steps, ARRAY_SIZE(steps));
+    CHECK(tap_count == 1 && last_tap == KC_B);
+    CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
+    CHECK(test_layer_locked(TEST_OTHER_LAYER) && test_layer_active(TEST_OTHER_LAYER));
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+}
+
 int main(void) {
+    test_owned_mod_tap_consumes_oneshot();
     test_profile_output_fence_drops_whole_key_presses();
     test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle();
     test_thumb_cycle_release_still_clears_slot_when_layer_change_resolves_to_other_keycode();
