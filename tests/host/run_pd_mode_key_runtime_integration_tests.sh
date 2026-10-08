@@ -101,6 +101,13 @@ if [ "${NOAH_TEST_QMK_GESTURES:-0}" = 1 ]; then
         -o "$BUILD_DIR/gesture_engine.o"
     compile_test "$BUILD_DIR/gestures" -DNOAH_TEST_QMK_GESTURES -DCOMBO_ENABLE -DCOMBO_TERM_PER_COMBO -DCOMBO_TERM=50 "$BUILD_DIR/gesture_engine.o"
     "$BUILD_DIR/gestures"
+    # Saturation policy must hold at the configured bound, not only at eight.
+    for capacity in 1 2; do
+        compile_test "$BUILD_DIR/gestures_$capacity" -DNOAH_TEST_QMK_GESTURES \
+            -DNOAH_RECORD_ADMISSION_CAPACITY="$capacity" \
+            -DCOMBO_ENABLE -DCOMBO_TERM_PER_COMBO -DCOMBO_TERM=50 "$BUILD_DIR/gesture_engine.o"
+        "$BUILD_DIR/gestures_$capacity" --admission-overload
+    done
     exit
 fi
 
