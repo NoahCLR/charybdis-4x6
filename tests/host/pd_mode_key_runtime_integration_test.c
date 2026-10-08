@@ -2482,7 +2482,7 @@ static void test_qmk_queued_release_cannot_become_hold(void) {
 }
 // The pinned combo engine emits GUI while a native LT is undecided. Tapping
 // queues that press; QMK releases and deactivates the combo before delivery.
-// Current origin recovery must still cover both chord members and release GUI.
+// The fired completion keeps its exact footprint until the output arrives.
 static void test_qmk_combo_origin_survives_delivery_after_deactivation(void) {
     test_reset_state(); fake_time = 14000; gesture_combo_output_count = 0;
     memset(gesture_last_combo_bitmap, 0, sizeof(gesture_last_combo_bitmap));
@@ -2499,6 +2499,11 @@ static void test_qmk_combo_origin_survives_delivery_after_deactivation(void) {
     CHECK(gesture_combo_outputs[0] == KC_LEFT_GUI);
     CHECK(key_origin_bitmap_has_keypos(gesture_last_combo_bitmap, test_keypos(5,0)));
     CHECK(key_origin_bitmap_has_keypos(gesture_last_combo_bitmap, test_keypos(5,2)));
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++)
+        for (uint8_t col = 0; col < MATRIX_COLS; col++)
+            if (!((row == 5 && col == 0) || (row == 5 && col == 2))) CHECK(!key_origin_bitmap_has_keypos(gesture_last_combo_bitmap, test_keypos(row,col)));
+    { noah_qmk_combo_origin_debug_snapshot_t d; noah_qmk_combo_origin_debug_snapshot(&d);
+      CHECK(d.unmatched_delayed_output_count == 0); CHECK(d.suppressed_retirement_count == 0); CHECK(d.pending_count == 0); }
     CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0);
     gesture_at(4,4,false); gesture_advance(500);
 }

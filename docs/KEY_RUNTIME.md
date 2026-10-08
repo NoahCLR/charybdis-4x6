@@ -209,7 +209,9 @@ origin:
   completion generation rather than output keycode alone
 - scan-boundary reconciliation of QMK active/disabled state, with immediate
   suppression retirement and a two-observation deadline rule that leaves
-  `combo_task()` one final legal emission opportunity
+  `combo_task()` one final legal emission opportunity. QMK marks a fired combo
+  both active and disabled, so only a disabled completion that was never seen
+  active counts as suppressed
 - conservative capacity refusal and snapshot diagnostics; a full cache never
   overwrites a still-awaiting origin
 - fallback owner recovery from the latest or last physical combo member, using a
@@ -217,9 +219,15 @@ origin:
 
 The adapter targets the BK revision pinned in `qmk-pin.json`. That QMK activates
 a combo before emitting its press; pending candidates are selected through
-those active indices only. It does not support forks that emit before exposing
-active state. Current QMK's tapping queue can still deliver a combo after its
-release has deactivated it, so conservative owner recovery remains necessary.
+those active indices. It does not support forks that emit before exposing
+active state. QMK's tapping queue can deliver a fired combo's press after its
+release has deactivated it (the chord was tapped while a native LT/MT was
+undecided). A completion seen firing therefore keeps its exact footprint until
+its press arrives: a press with no active candidate pairs with the oldest fired
+completion for that keycode, since queued outputs leave QMK in firing order.
+A fired completion that never arrives retires one tapping term after it was
+seen firing, the longest a tap-hold decision queued ahead of it can take.
+Conservative owner recovery remains only for a completion never seen firing.
 
 It must not create or mutate key-runtime press tokens, tap series, release
 decisions, leases, layer locks, modifier ownership, or PD mode ownership. Its
@@ -230,11 +238,16 @@ Coverage for this contract lives in `run_qmk_combo_origin_tests.sh`: reference
 layer lookup, stable combo owner selection, active and pending combo bitmaps,
 pending output after member release, suppressed overlap, deadline boundaries
 and timer wrap, capacity refusal/recovery, exact same-output generations,
-cached release footprints, cross-half and three-key combos, reset diagnostics,
+cached release footprints, fired outputs delivered after deactivation (in
+firing order, retired after one tapping term), cross-half and three-key combos,
+reset diagnostics,
 and preview/PD owner partitioning for RGB underlay/overlay feedback. The runner
 executes normal and `EXTRA_SHORT_COMBOS` layouts and compile-checks the timerless
 branch. `run_qmk_contract_checks.sh` compares both combo layouts with the pinned
 fork and enforces the upstream pre-hook, matrix-scan, and `combo_task()` order.
+`run_qmk_gesture_pipeline_tests.sh` drives the real QMK combo and tapping
+engines through a chord tapped behind an undecided native LT and requires the
+exact two-key footprint.
 
 ## End-To-End Flow
 
