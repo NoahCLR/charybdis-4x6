@@ -215,6 +215,12 @@ origin:
 - fallback owner recovery from the latest or last physical combo member, using a
   full-keyboard bitmap when no exact footprint can be proven
 
+The adapter targets the BK revision pinned in `qmk-pin.json`. That QMK activates
+a combo before emitting its press; pending candidates are selected through
+those active indices only. It does not support forks that emit before exposing
+active state. Current QMK's tapping queue can still deliver a combo after its
+release has deactivated it, so conservative owner recovery remains necessary.
+
 It must not create or mutate key-runtime press tokens, tap series, release
 decisions, leases, layer locks, modifier ownership, or PD mode ownership. Its
 only handoff into the runtime ownership model is the normalized event key and

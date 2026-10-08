@@ -2383,12 +2383,14 @@ uint16_t gesture_keycode(uint8_t row, uint8_t col) {
 }
 static uint16_t gesture_combo_outputs[32];
 static uint8_t gesture_combo_output_count;
+static uint8_t gesture_last_combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 void gesture_deliver(uint16_t code, uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t taps, bool combo) {
     gesture_sync_combos();
     if (down) gesture_delivered_press = code;
     if (combo && down) { CHECK(gesture_combo_output_count < ARRAY_SIZE(gesture_combo_outputs)); gesture_combo_outputs[gesture_combo_output_count++] = code; }
     keyrecord_t r = {.event = {.key={row,col}, .pressed=down, .type=combo ? COMBO_EVENT : KEY_EVENT, .time=time}, .tap={.count=taps}, .keycode=code};
     process_record(&r);
+    if (combo && down) CHECK(noah_qmk_combo_origin_event_bitmap(&r, gesture_last_combo_bitmap));
 }
 static void gesture_advance(uint16_t ms) {
     // Mirrors noah_matrix_scan_user: combo-origin housekeeping, then key runtime.
@@ -2477,6 +2479,28 @@ static void test_qmk_queued_release_cannot_become_hold(void) {
     gesture_at(4,4,false); gesture_advance(500);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0);
     test_assert_button_quiescent(test_keypos(3,0));
+}
+// The pinned combo engine emits GUI while a native LT is undecided. Tapping
+// queues that press; QMK releases and deactivates the combo before delivery.
+// Current origin recovery must still cover both chord members and release GUI.
+static void test_qmk_combo_origin_survives_delivery_after_deactivation(void) {
+    test_reset_state(); fake_time = 14000; gesture_combo_output_count = 0;
+    memset(gesture_last_combo_bitmap, 0, sizeof(gesture_last_combo_bitmap));
+    gesture_at(4,4,true); gesture_advance(10); // Native LT(2, A).
+    gesture_at(5,2,true); gesture_advance(10); // N.
+    // M also participates in a 100 ms chord, extending QMK's shared wait.
+    gesture_at(5,0,true); gesture_advance(110);
+    CHECK(gesture_combo_output_count == 0); // Press is in the tapping queue.
+    CHECK(gesture_engine_combo_active(7));
+    gesture_at(5,0,false); gesture_at(5,2,false);
+    CHECK(!gesture_engine_combo_active(7));
+    gesture_advance(200);
+    CHECK(gesture_combo_output_count == 1);
+    CHECK(gesture_combo_outputs[0] == KC_LEFT_GUI);
+    CHECK(key_origin_bitmap_has_keypos(gesture_last_combo_bitmap, test_keypos(5,0)));
+    CHECK(key_origin_bitmap_has_keypos(gesture_last_combo_bitmap, test_keypos(5,2)));
+    CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0);
+    gesture_at(4,4,false); gesture_advance(500);
 }
 // Screenshot C5: Button 1 + Volume -> GUI; GUI double hold -> Alt,
 // triple tap -> OSM(Shift), inherited hold/repeat terms both 150 ms.
@@ -2705,6 +2729,7 @@ int main(void) {
     test_qmk_authored_layer_tap_has_one_clock();
     test_qmk_tapping_queue_preserves_member_series();
     test_qmk_queued_release_cannot_become_hold();
+    test_qmk_combo_origin_survives_delivery_after_deactivation();
     test_qmk_nested_chords_choose_only_largest();
     test_qmk_dual_role_ownership();
     test_qmk_sparse_dual_role_rows_keep_intrinsic_hold();

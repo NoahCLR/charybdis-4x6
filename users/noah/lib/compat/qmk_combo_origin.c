@@ -566,22 +566,6 @@ static combo_origin_pending_output_entry_t *combo_origin_pending_entry_for_press
             selected = candidate;
         }
     }
-    if (selected) {
-        return selected;
-    }
-
-    // Compatibility fallback for tests/forks that emit before exposing active
-    // state: prefer the newest candidate and never union same-keycode origins.
-    for (uint8_t index = 0; index < ARRAY_SIZE(combo_pending_output_cache); index++) {
-        combo_origin_pending_output_entry_t *entry = &combo_pending_output_cache[index];
-
-        if (!(entry->active && entry->keycode == keycode)) {
-            continue;
-        }
-        if (!selected || combo_origin_generation_before(selected->generation, entry->generation)) {
-            selected = entry;
-        }
-    }
     return selected;
 }
 
@@ -713,6 +697,9 @@ void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *recor
                 combo_origin_increment_counter(&combo_origin_diagnostics.unmatched_delayed_output_count);
             }
         } else if (combo_origin_fallback_owner_keypos(&owner_key_pos)) {
+            // Current QMK can deliver a tapping-buffered combo after it has
+            // become inactive. Preserve an owner conservatively; no pending
+            // candidate is an exact match without QMK's active combo index.
             combo_origin_bitmap_fill_all_keys(bitmap);
             record->event.key = owner_key_pos;
             key_origin_registry_set_bitmap(owner_key_pos, bitmap);
