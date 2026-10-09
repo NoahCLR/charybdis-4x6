@@ -106,8 +106,8 @@ static void test_shared_blob_vectors(const char *fixture_path) {
     static const uint8_t           rgb_payload[]      = {0xDEu, 0xADu, 0xBEu, 0xEFu};
     static const uint8_t           behavior_payload[] = {0x00u, 0x01u, 0x02u};
     const noah_profile_domain_v1_t unsorted[]         = {
-        {.id = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, .version = 1u, .payload = behavior_payload, .payload_length = sizeof(behavior_payload)},
-        {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = 3u, .payload = rgb_payload, .payload_length = sizeof(rgb_payload)},
+        {.id = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, .version = NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, .payload = behavior_payload, .payload_length = sizeof(behavior_payload)},
+        {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = NOAH_PROFILE_DOMAIN_VERSION_RGB, .payload = rgb_payload, .payload_length = sizeof(rgb_payload)},
     };
 
     expected_length = fixture_hex(fixture_path, "blob.empty.hex", expected, sizeof(expected));
@@ -138,7 +138,7 @@ static void test_shared_blob_vectors(const char *fixture_path) {
 
 static void test_domain_envelopes(void) {
     static const uint8_t          payload[] = {0xAAu, 0xBBu};
-    noah_profile_domain_v1_t      input     = {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = 3u, .payload = payload, .payload_length = sizeof(payload)};
+    noah_profile_domain_v1_t      input     = {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = NOAH_PROFILE_DOMAIN_VERSION_RGB, .payload = payload, .payload_length = sizeof(payload)};
     noah_profile_domain_v1_t      decoded;
     noah_profile_codec_v1_error_t error;
     uint8_t                       encoded[16];
@@ -148,7 +148,7 @@ static void test_domain_envelopes(void) {
 
     expect_result(noah_profile_domain_v1_encode(&input, encoded, sizeof(encoded), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(written == 6u);
-    assert(memcmp(encoded, (const uint8_t[]){0x10u, 0x03u, 0x02u, 0x00u, 0xAAu, 0xBBu}, 6u) == 0);
+    assert(memcmp(encoded, (const uint8_t[]){0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 0x02u, 0x00u, 0xAAu, 0xBBu}, 6u) == 0);
     expect_result(noah_profile_domain_v1_decode(encoded, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(decoded.id == input.id && decoded.version == input.version);
     assert(decoded.payload_length == input.payload_length && memcmp(decoded.payload, input.payload, input.payload_length) == 0);
@@ -166,9 +166,9 @@ static void test_domain_envelopes(void) {
     encoded[0] = 0x60u;
     expect_result(noah_profile_domain_v1_decode(encoded, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN);
     encoded[0] = NOAH_PROFILE_DOMAIN_V1_RGB;
-    encoded[1] = 2u;
+    encoded[1] = NOAH_PROFILE_DOMAIN_VERSION_RGB - 1u;
     expect_result(noah_profile_domain_v1_decode(encoded, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
-    encoded[1] = 3u;
+    encoded[1] = NOAH_PROFILE_DOMAIN_VERSION_RGB;
     encoded[2] = 0xFFu;
     encoded[3] = 0xFFu;
     expect_result(noah_profile_domain_v1_decode(encoded, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_TRUNCATED);
@@ -248,9 +248,9 @@ static void test_blob_encoder_bounds(void) {
     size_t                        written;
     noah_profile_codec_v1_error_t error;
     noah_profile_domain_v1_t      domains[3] = {
-        {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = 3u, .payload = NULL, .payload_length = 0u},
-        {.id = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, .version = 1u, .payload = NULL, .payload_length = 0u},
-        {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = 3u, .payload = NULL, .payload_length = 0u},
+        {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = NOAH_PROFILE_DOMAIN_VERSION_RGB, .payload = NULL, .payload_length = 0u},
+        {.id = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, .version = NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, .payload = NULL, .payload_length = 0u},
+        {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = NOAH_PROFILE_DOMAIN_VERSION_RGB, .payload = NULL, .payload_length = 0u},
     };
 
     expect_result(noah_profile_blob_v1_encode(domains, 2u, output, 15u, &written, &error), NOAH_PROFILE_CODEC_V1_OUTPUT_TOO_SMALL);
@@ -258,9 +258,11 @@ static void test_blob_encoder_bounds(void) {
     domains[1].id = 0x60u;
     expect_result(noah_profile_blob_v1_encode(domains, 2u, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN);
     domains[1].id      = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS;
-    domains[1].version = 2u;
+    domains[1].version = NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS + 1u;
     expect_result(noah_profile_blob_v1_encode(domains, 2u, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
-    domains[1].version        = 1u;
+    domains[1].version = NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS - 1u; // version 1 is retired
+    expect_result(noah_profile_blob_v1_encode(domains, 2u, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
+    domains[1].version        = NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS;
     domains[0].payload        = &byte;
     domains[0].payload_length = NOAH_PROFILE_BLOB_V1_MAX_SIZE;
     expect_result(noah_profile_blob_v1_encode(domains, 2u, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
@@ -323,12 +325,21 @@ static void test_action_rejections_and_streams(void) {
     bytes[2] = 1u;
     expect_result(noah_profile_action_v1_decode(bytes, 4u, NULL, &action, &error), NOAH_PROFILE_CODEC_V1_INVALID_OPERAND);
 
-    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, 8u, NULL);
-    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_LAYER_LOCK, 8u, NULL);
+    // Layer IDs 0..15 (D-F14): 15 encodes, 16 is refused.
+    action = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, .operand = 15u};
+    expect_result(noah_profile_action_v1_encode(&action, NULL, bytes, &error), NOAH_PROFILE_CODEC_V1_OK);
+    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, 16u, NULL);
+    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_LAYER_LOCK, 16u, NULL);
     expect_invalid_operand(NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, 32u, NULL);
     expect_invalid_operand(NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK, 32u, NULL);
-    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_VIA_MACRO, 64u, NULL);
-    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_CUSTOM_KEY, 64u, NULL);
+    // VIA macros 0..127: 127 encodes, 128 is refused.
+    action = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_VIA_MACRO, .operand = 127u};
+    expect_result(noah_profile_action_v1_encode(&action, NULL, bytes, &error), NOAH_PROFILE_CODEC_V1_OK);
+    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_VIA_MACRO, 128u, NULL);
+    // Custom keys 0..127: 127 encodes, 128 is refused.
+    action = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_CUSTOM_KEY, .operand = 127u};
+    expect_result(noah_profile_action_v1_encode(&action, NULL, bytes, &error), NOAH_PROFILE_CODEC_V1_OK);
+    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_CUSTOM_KEY, 128u, NULL);
 
     limits.max_logical_layers = 0u;
     expect_invalid_operand(NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, 0u, &limits);
@@ -379,7 +390,7 @@ static void test_current_domain_registry(void) {
     // Frozen wire identities: changing the registry cannot silently renumber
     // a domain/mask or broaden current-format admission.
     const noah_profile_domain_shape_t expected[] = {
-        {0x10, 0, 1, 3}, {0x20, 1, 2, 1}, {0x30, 2, 4, 2}, {0x40, 3, 8, 5}, {0x50, 4, 16, 2},
+        {0x10, 0, 1, 4}, {0x20, 1, 2, 2}, {0x30, 2, 4, 3}, {0x40, 3, 8, 6}, {0x50, 4, 16, 3},
     };
     assert(NOAH_PROFILE_DOMAIN_REGISTRY_COUNT == sizeof(expected) / sizeof(expected[0]));
     uint8_t mask = 0;

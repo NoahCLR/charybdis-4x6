@@ -22,12 +22,13 @@
 enum {
     // Engineering-state regression policy for one 32-bit keyboard half. This
     // is not an RP2040 physical-SRAM limit; linked target gates remain the
-    // authority for the concrete firmware artifact.
-    NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT = 4096u,
+    // authority for the concrete firmware artifact. D-F14's native combo
+    // table (128 rows of sixteen inputs) links the owner at 10,552 bytes.
+    NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT = 11264u,
     // Ordinary host staging expires after 15 seconds without host-owned work.
-    // Split preparation has a separate no-progress window: a maximum 4,064-byte
-    // profile needs at least 292 request/retry intervals at the 50 ms split
-    // floor, before scan overhead or a transient retry is included.
+    // Split preparation has a separate no-progress window: it bounds the
+    // longest stretch without transfer progress, not the whole copy, which for
+    // a maximum 65,504-byte profile spans thousands of request intervals.
     NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS             = 15000u,
     NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS = 60000u,
 };

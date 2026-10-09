@@ -25,7 +25,7 @@ any C and you don't reflash.
   committed. They also fade to show when the auto-mouse layer is about to drop.
 - **Two halves that act like one keyboard.** Layers, modes, combos, lighting
   and saved edits stay in sync across the cable.
-- **Room to grow.** It has 8 layers, 64 named macros and 64 custom keys you
+- **Room to grow.** It has 16 layers, 128 named macros and 128 custom keys you
   can name and give behaviours to.
 
 > **Heads-up:** this is an opinionated firmware, not a copy-paste QMK keymap.

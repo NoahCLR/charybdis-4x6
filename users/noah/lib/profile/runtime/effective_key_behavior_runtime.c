@@ -71,6 +71,13 @@ void noah_effective_key_behavior_runtime_invalidate(void *context, uint32_t publ
     }
 
     next_index = (uint8_t)(runtime->active_index ^ 1u);
+    next.bank  = next_index;
+    if (next.live) {
+        noah_profile_codec_v1_error_t error;
+
+        // The inactive bank's index is not read until the swap below.
+        next.indexed = noah_key_behavior_domain_v1_row_offsets(&next.domain, runtime->row_offsets[next_index], NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS, &error) == NOAH_PROFILE_CODEC_V1_OK;
+    }
     noah_runtime_publication_begin(&runtime->publication_sequence);
     runtime->banks[next_index] = next;
     runtime->active_index      = next_index;
@@ -178,7 +185,11 @@ noah_effective_key_behavior_result_t noah_effective_key_behavior_runtime_lookup(
     if (noah_profile_action_runtime_v1_from_native(keycode, &target) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK || target.kind == NOAH_PROFILE_ACTION_V1_NONE) {
         return NOAH_EFFECTIVE_KEY_BEHAVIOR_NOT_FOUND;
     }
-    result = codec_result(noah_key_behavior_domain_v1_find_target(&snapshot.domain, &target, &encoded_row, &found, &error));
+    if (snapshot.indexed) {
+        result = codec_result(noah_key_behavior_domain_v1_find_target_indexed(&snapshot.domain, runtime->row_offsets[snapshot.bank], &target, &encoded_row, &found, &error));
+    } else {
+        result = codec_result(noah_key_behavior_domain_v1_find_target(&snapshot.domain, &target, &encoded_row, &found, &error));
+    }
     if (result != NOAH_EFFECTIVE_KEY_BEHAVIOR_OK || !found) {
         return result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? NOAH_EFFECTIVE_KEY_BEHAVIOR_NOT_FOUND : result;
     }
@@ -190,6 +201,7 @@ noah_effective_key_behavior_result_t noah_effective_key_behavior_runtime_lookup(
     row->tap_hold_term    = encoded_row.tap_hold_term;
     row->longer_hold_term = encoded_row.longer_hold_term;
     row->multi_tap_term   = encoded_row.multi_tap_term;
+    row->allowed_layers   = encoded_row.allowed_layers;
     for (uint8_t index = 0u; index < encoded_row.step_count; index++) {
         noah_key_behavior_step_v1_t encoded_step;
         key_behavior_step_t         native_step;
@@ -225,7 +237,14 @@ noah_effective_key_behavior_result_t noah_effective_key_behavior_runtime_step(co
     if (snapshot.epoch != epoch) {
         return NOAH_EFFECTIVE_KEY_BEHAVIOR_STALE;
     }
-    result = codec_result(noah_key_behavior_domain_v1_row_at(&snapshot.domain, row_index, &row, &error));
+    if (row_index >= snapshot.domain.row_count) {
+        return NOAH_EFFECTIVE_KEY_BEHAVIOR_INVALID_ARGUMENT;
+    }
+    if (snapshot.indexed) {
+        result = codec_result(noah_key_behavior_domain_v1_row_at_offset(&snapshot.domain, row_index, runtime->row_offsets[snapshot.bank][row_index], &row, &error));
+    } else {
+        result = codec_result(noah_key_behavior_domain_v1_row_at(&snapshot.domain, row_index, &row, &error));
+    }
     if (result != NOAH_EFFECTIVE_KEY_BEHAVIOR_OK) {
         return result;
     }

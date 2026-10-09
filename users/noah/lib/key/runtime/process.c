@@ -4,6 +4,7 @@
 
 #include "../behavior/handled_key.h"
 #include "../behavior/key_behavior_lookup.h"
+#include "../behavior/participation.h"
 #include "deferred_release.h"
 #include "process_internal.h"
 #include "trace.h"
@@ -18,6 +19,7 @@
 #include "../../action/owned_keycode.h"
 #include "../../compat/qmk_combo_origin.h"
 #include "../../compat/qmk_oneshot_contract.h"
+#include "../../compat/qmk_source_layer_contract.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/ownership/layer_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
@@ -50,6 +52,7 @@ struct key_runtime_process_ctx_t {
     keyrecord_t             *record;
     handled_key_resolution_t resolution;
     bool                     resolution_loaded;
+    bool                     use_row; // participation: whether this record uses the keycode's behaviour row
 };
 
 static void key_runtime_process_end_keyboard_event_mod_mask(void) {
@@ -83,7 +86,7 @@ static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
 
 static const handled_key_resolution_t *key_runtime_process_resolution(key_runtime_process_ctx_t *ctx) {
     if (!ctx->resolution_loaded) {
-        handled_key_lookup_into(ctx->runtime_keycode, &ctx->resolution);
+        handled_key_lookup_row_tap_count_into(ctx->runtime_keycode, 1u, ctx->use_row, &ctx->resolution);
         ctx->resolution_loaded = true;
     }
 
@@ -342,6 +345,43 @@ static bool key_runtime_process_output_fenced(const keyrecord_t *record) {
     return true;
 }
 
+// Whether a record uses its keycode's behaviour row (participation-policy.md).
+// A physical key answers with the decision its press stored; a combo's output
+// with the master, its row's enable and the combo's origin layer; anything
+// else uses the row.
+static bool key_runtime_process_record_uses_row(uint16_t keycode, const keyrecord_t *record) {
+    if (!record) {
+        return true;
+    }
+    if (record->event.type == KEY_EVENT) {
+        return noah_participation_record_behavior(record);
+    }
+    if (noah_participation_record_generated_captured(record)) return noah_participation_record_behavior(record);
+    if (record->event.type == COMBO_EVENT) {
+        return noah_participation_behavior_generated(keycode, noah_qmk_combo_origin_record_source_layer(keycode, record));
+    }
+    return true;
+}
+
+// QMK's tapping engine gives this the last word on every record (BK's
+// is_tap_record_user), after is_tap_keycode_user below has answered for the
+// keycode. A key whose press bypassed its row is a native key again here: only
+// intrinsic TT/OSL ownership keeps it from QMK, so a bypassed LT() or MT()
+// keeps QMK's own tap/hold timing.
+bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) {
+    uint16_t keycode = get_record_keycode(record, false);
+    if (record->event.type == COMBO_EVENT && !noah_participation_record_generated_captured(record)) {
+        // Capture before native tapping can queue it, without consuming the
+        // pending origin that will be normalized at actual dispatch.
+        noah_participation_record_generated(record, keycode, noah_qmk_combo_origin_record_source_layer(keycode, record));
+    }
+
+    if (key_runtime_process_record_uses_row(keycode, record)) {
+        return default_tap;
+    }
+    return native_tap && !key_behavior_lookup_without_row(keycode).handled;
+}
+
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (key_runtime_process_output_fenced(record)) {
         return false;
@@ -351,6 +391,17 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.type == KEY_EVENT && key_origin_keypos_valid(record->event.key)) {
+        // The press's participation, decided once against the layer QMK just
+        // resolved its keycode from, before tapping or combos see it.
+        if (record->event.pressed) {
+            uint8_t source_layer = noah_qmk_contract_source_layer(record->event.key);
+            noah_participation_press_store(record->event.key, noah_participation_behavior(keycode, source_layer, record->event.key), noah_participation_combo_press(source_layer, record->event.key));
+        }
+        noah_participation_record_capture(record, noah_qmk_contract_source_layer(record->event.key));
+#if defined(COMBO_ENABLE) || defined(REPEAT_KEY_ENABLE)
+        // Freeze the resolved keycode as well as its source before queues.
+        record->keycode = keycode;
+#endif
         key_origin_registry_set_single(record->event.key);
         noah_qmk_combo_origin_observe_physical_key_event(keycode, record);
         keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
@@ -377,9 +428,10 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     pointer_layer_policy_sync_layer_ownership_anchor();
 
     noah_qmk_combo_origin_normalize_record(keycode, record);
+    ctx.use_row = key_runtime_process_record_uses_row(keycode, record);
 
     if (!noah_synthetic_record_active()) {
-        key_runtime_core_observe_process_record_event(keycode, record);
+        key_runtime_core_observe_process_record_event_with_row(keycode, record, ctx.use_row);
     }
 
     key_runtime_trace_record("process:entry", keycode, record);
@@ -426,7 +478,7 @@ static bool key_runtime_process_press_uses_oneshot_layer(uint16_t keycode, const
     if (IS_QK_MOD_TAP(keycode)) {
         // Runtime-owned MT taps are settled by their planner, including a
         // delayed multi-tap. Native MTs arrive with QMK's tap/hold decision.
-        return !key_behavior_lookup(keycode).handled && record->tap.count != 0u && noah_qmk_contract_tap_uses_oneshot_layer(keycode);
+        return !(key_runtime_process_record_uses_row(keycode, record) ? key_behavior_lookup(keycode) : key_behavior_lookup_without_row(keycode)).handled && record->tap.count != 0u && noah_qmk_contract_tap_uses_oneshot_layer(keycode);
     }
     return true;
 }
@@ -459,9 +511,8 @@ void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {
     noah_process_record_user_finalize(keycode, record, true);
 }
 
-// Runtime-owned keys already own tap, hold and repeated-tap decisions. This
-// includes authored dual-role rows and intrinsic TT/OSL layer ownership. Native
-// keys without a runtime owner still use QMK tapping.
+// The keycode-only form, for QMK builds without the record hook: it cannot see
+// a press's placement, so it answers as if every press used its row.
 bool is_tap_keycode_user(uint16_t keycode, bool default_tap) {
     return default_tap && !key_behavior_lookup(keycode).handled;
 }

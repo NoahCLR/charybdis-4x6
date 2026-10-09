@@ -52,7 +52,7 @@ LAYER_NAMES = DEFAULT_LAYER_NAMES[:]
 
 # VIA dynamic MACRO(n) slots are separate from this repo's hardcoded
 # custom MACRO_n keycodes.
-VIA_MACRO_COUNT = 64
+VIA_MACRO_COUNT = 128
 HARDCODED_MACRO_COUNT = 16
 VIA_LAYER_WIDTH = 60
 VIA_TRANSPARENT_LAYER = ["KC_TRNS"] * VIA_LAYER_WIDTH

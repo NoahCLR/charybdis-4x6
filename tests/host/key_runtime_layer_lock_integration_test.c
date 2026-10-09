@@ -739,3 +739,9 @@ int main(void) {
     puts("key_runtime layer-lock integration tests passed");
     return 0;
 }
+
+// Participation allows every press in this harness (no stored policy), so a
+// row-less view is never asked for beyond linking.
+key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode) {
+    return key_behavior_lookup(keycode);
+}

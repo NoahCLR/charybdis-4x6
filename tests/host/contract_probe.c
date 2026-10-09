@@ -101,6 +101,10 @@ int main(void) {
     if (print_page(&service, 1u) != 0) {
         return 1;
     }
+    printf(",");
+    if (print_page(&service, 2u) != 0) {
+        return 1;
+    }
     printf("]}\n");
     return 0;
 }

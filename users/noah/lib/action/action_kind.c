@@ -217,7 +217,7 @@ bool noah_action_kind_match_layer_goto(uint16_t action, pd_mode_mask_t pd_mode, 
 bool noah_action_kind_match_layer_hold(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
     (void)pd_mode;
 
-    if (!(out && (IS_QK_MOMENTARY(action) || noah_action_keycode_is_layer_tap_toggle(action)))) {
+    if (!(out && (noah_action_keycode_is_momentary(action) || noah_action_keycode_is_layer_tap_toggle(action)))) {
         return false;
     }
 

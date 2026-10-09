@@ -42,7 +42,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DVIA_ENABLE \
     -DSPLIT_KEYBOARD \
     -DMCU_RP \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x4800u \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
     -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DNOAH_LIVE_PROFILE_OWNER_ENABLE \
     -DNOAH_LIVE_PROFILE_MUTATION_ENABLE \
@@ -88,6 +88,9 @@ from pathlib import Path
 
 root, pages, output = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
 report = json.loads(pages.read_text())
+capability_pages = [bytes.fromhex(page) for page in report["capabilityPages"]]
+assert len(capability_pages) == capability_pages[0][1], "Contract probe must report every advertised capability page"
+assert all(len(page) == 25 for page in capability_pages), "Capability pages must be complete Raw HID payloads"
 report["firmwareCommit"] = subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"],
                                           capture_output=True, text=True).stdout.strip() or None
 report["qmkPin"] = json.loads((root / "qmk-pin.json").read_text())

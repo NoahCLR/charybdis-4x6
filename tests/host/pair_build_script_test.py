@@ -60,17 +60,46 @@ with open(os.environ['PAIR_TEST_LOG'], 'a') as log:
     log.write(json.dumps(sys.argv) + '\\n')
 half = next(arg.split('=', 1)[1] for arg in sys.argv if arg.startswith('NOAH_PHYSICAL_HALF='))
 Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
+if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
+    for extension in ('elf', 'map'):
+        Path('.build/bastardkb_charybdis_4x6_noah.' + extension).write_text(half)
+    for flags in ('cflags', 'ldflags'):
+        Path('.build/obj_bastardkb_charybdis_4x6_noah/' + flags + '.txt').write_text(half)
 ''')
             driver.chmod(0o755)
             stale = qmk / '.build/obj_bastardkb_charybdis_4x6_noah'
             stale.mkdir(parents=True)
             (stale / 'runtime_init.d').write_text('runtime_init.o: /removed/worktree/runtime_init.c\n')
             (stale / 'runtime_init.o').write_bytes(b'stale')
-            env = dict(os.environ, PATH=str(fakebin) + os.pathsep + os.environ['PATH'], QMK_ROOT=str(qmk),
+            env = dict(os.environ, NOAH_RESOURCE_CHECKS="no", PATH=str(fakebin) + os.pathsep + os.environ['PATH'], QMK_ROOT=str(qmk),
                        QMK_HOME='/wrong/qmk', QMK_USERSPACE='/wrong/userspace', EXPECTED_USERSPACE=str(source),
                        BUILD_ROOT=str(base / 'builds'), PAIR_TEST_LOG=str(base / 'calls'), NOAH_IN_BUILD_IMAGE='1')
             subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base, env=env, check=True)
             calls = [json.loads(line) for line in (base / 'calls').read_text().splitlines()]
+            # Resource gates must check and preserve EACH half before QMK's
+            # shared output is overwritten. A gate failure stops the pair.
+            (source / 'tests/host').mkdir(parents=True)
+            (source / 'tests/host/run_firmware_memory_budget_checks.sh').write_text(
+                '#!/bin/sh\ncat "$QMK_ROOT/.build/bastardkb_charybdis_4x6_noah.elf"\n')
+            (source / 'tools/check_firmware_stack_budget.py').write_text(
+                "import argparse, os\nfrom pathlib import Path\n"
+                "p=argparse.ArgumentParser();p.add_argument('--manifest');p.add_argument('--elf');p.add_argument('--map');a=p.parse_args()\n"
+                "half=Path(a.elf).read_text();assert Path(a.map).read_text()==half\n"
+                "print(half)\n"
+                "raise SystemExit(1 if os.environ.get('PAIR_TEST_RESOURCE_FAIL')==half else 0)\n")
+            resource_env = dict(env, NOAH_RESOURCE_CHECKS='yes')
+            subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base, env=resource_env,
+                           capture_output=True, text=True, check=True)
+            for half in ('right', 'left'):
+                for extension in ('elf', 'map', 'cflags.txt', 'ldflags.txt', 'memory.txt',
+                                  'firmware_stack_budget.txt', 'firmware_stack_budget_live_profile_owner.txt'):
+                    content = (base / 'builds/test-pair' / f'1_charybdis_{half}_resources.{extension}').read_text()
+                    self.assertEqual(content.strip(), half)
+            failed = subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base,
+                                    env=dict(resource_env, PAIR_TEST_RESOURCE_FAIL='right'),
+                                    capture_output=True, text=True)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertFalse((base / 'builds/test-pair/2_charybdis_left_resources.uf2').exists())
             # A BK that is not the pin (moved, or locally changed) is refused,
             # unless explicitly allowed for a trial.
             (qmk / 'hook.c').write_text('void hook(void) {}\n')
@@ -120,7 +149,7 @@ Path('bastardkb_charybdis_4x6_noah.uf2').write_bytes(half.encode())
             docker.write_text('#!/bin/sh\n[ "$1" = info ] && exit "${DOCKER_INFO_STATUS:-0}"\n'
                               'python3 -c \'import json, sys; print(json.dumps(sys.argv[1:]))\' "$@" > "$DOCKER_LOG"\n')
             docker.chmod(0o755)
-            env = dict(os.environ, PATH=str(fakebin) + os.pathsep + os.environ['PATH'], QMK_ROOT=str(qmk),
+            env = dict(os.environ, NOAH_RESOURCE_CHECKS="no", PATH=str(fakebin) + os.pathsep + os.environ['PATH'], QMK_ROOT=str(qmk),
                        BUILD_ROOT=str(builds), DOCKER_LOG=str(base / 'docker.json'), NOAH_IN_BUILD_IMAGE='0',
                        NOAH_SPLIT_CRC='no')
             subprocess.run(['sh', source / 'tools/build-firmware-pair.sh', '--no-owner'], cwd=base, env=env, check=True,
@@ -207,7 +236,7 @@ class MakeBuildImage(unittest.TestCase):
         docker.write_text(FAKE_DOCKER)
         docker.chmod(0o755)
         return subprocess.run(['sh', str(REPO / 'tools/make-build-image.sh'), *args],
-                              env=dict(os.environ, PATH=f'{fakebin}:{os.environ["PATH"]}',
+                              env=dict(os.environ, NOAH_RESOURCE_CHECKS="no", PATH=f'{fakebin}:{os.environ["PATH"]}',
                                        FAKE_REGISTRY=str(Path(tmp) / 'registry.json'),
                                        FAKE_DOCKER_LOG=str(Path(tmp) / 'docker.log'), **env),
                               capture_output=True, text=True)

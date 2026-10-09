@@ -172,16 +172,16 @@ static bool supersede_host_precommit(noah_profile_owner_t *owner) {
     return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
 }
 
-static bool record_payload_start(noah_profile_slot_t slot, uint16_t *address) {
+static bool record_payload_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
     if (!address) {
         return false;
     }
     if (slot == NOAH_PROFILE_SLOT_A) {
-        *address = (uint16_t)(NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+        *address = (NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
         return true;
     }
     if (slot == NOAH_PROFILE_SLOT_B) {
-        *address = (uint16_t)(NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+        *address = (NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
         return true;
     }
     return false;
@@ -279,7 +279,7 @@ static bool resolve_boot_via_authority(noah_profile_owner_t *owner) {
 static bool local_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length) {
     noah_profile_owner_t              *owner = context;
     const noah_profile_store_record_t *record;
-    uint16_t                           payload_start;
+    noah_profile_storage_address_t  payload_start;
 
     if (!owner || !descriptor || !bytes || length == 0u || !owner->store.io.read) {
         return false;
@@ -288,7 +288,7 @@ static bool local_read(void *context, const noah_profile_split_descriptor_t *des
     if (!record_matches_descriptor(record, descriptor) || !record_payload_start(record->slot, &payload_start) || (uint32_t)offset + length > record->payload_length) {
         return false;
     }
-    return owner->store.io.read(owner->store.io.context, (uint16_t)(payload_start + offset), bytes, length);
+    return owner->store.io.read(owner->store.io.context, (payload_start + offset), bytes, length);
 }
 
 static bool local_binding(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t *via_generation, uint32_t *via_digest) {

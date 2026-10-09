@@ -25,7 +25,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/test_$name"
-    "$BUILD_DIR/test_$name" "$ROOT/tests/fixtures/combo_domain_v1.fixture"
+    "$BUILD_DIR/test_$name" "$ROOT/tests/fixtures/combo_domain_v3.fixture"
 }
 build_and_run normal
 build_and_run windowed -DCOMPILED_WINDOW=80

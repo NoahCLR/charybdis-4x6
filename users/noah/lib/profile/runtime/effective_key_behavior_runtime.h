@@ -11,9 +11,9 @@
 
 enum {
     // Caller-owned derived state policy on a 32-bit target. This is not an
-    // RP2040 capacity statement. The instance is allocated only by the
-    // explicit engineering profile-owner artifact, not ordinary firmware.
-    NOAH_EFFECTIVE_KEY_BEHAVIOR_RUNTIME_STATE_BUDGET_32BIT = 256u,
+    // RP2040 capacity statement. Most of it is the two banks' row indexes,
+    // 2 × 128 offsets of two bytes.
+    NOAH_EFFECTIVE_KEY_BEHAVIOR_RUNTIME_STATE_BUDGET_32BIT = 768u,
 };
 
 typedef enum {
@@ -34,11 +34,17 @@ typedef struct {
     uint32_t                          epoch;
     bool                              live;
     bool                              valid;
+    // The bank's row index is usable; otherwise lookups scan the rows.
+    bool                              indexed;
+    uint8_t                           bank;
 } noah_effective_key_behavior_snapshot_t;
 
 typedef struct {
     noah_runtime_publication_generation_t  publication_sequence;
     noah_effective_key_behavior_snapshot_t banks[2];
+    // Each bank's row offsets, built at publication. They stay here rather
+    // than in the snapshot, so a lookup's stack copy carries none of them.
+    uint16_t                               row_offsets[2][NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS];
     uint32_t                               next_epoch;
     uint8_t                                active_index;
     bool                                   initialized;
@@ -55,6 +61,7 @@ typedef struct {
     uint16_t            tap_hold_term;
     uint16_t            longer_hold_term;
     uint16_t            multi_tap_term;
+    uint32_t            allowed_layers; // participation: the layers the row may act on
     key_behavior_step_t single;
 } noah_effective_key_behavior_row_t;
 
@@ -62,9 +69,9 @@ void noah_effective_key_behavior_runtime_init(noah_effective_key_behavior_runtim
 bool noah_effective_key_behavior_runtime_install(noah_effective_key_behavior_runtime_t *runtime);
 void noah_effective_key_behavior_runtime_uninstall(noah_effective_key_behavior_runtime_t *runtime);
 
-// Provider invalidator: copies only the already-validated reader-backed view
-// and swaps a double bank. It performs no payload traversal or EEPROM-heavy
-// cache construction inside the provider publication interval.
+// Provider invalidator: copies the already-validated reader-backed view, walks
+// the row lengths once into the incoming bank's index (one two-byte read per
+// row, at most 128), and swaps the double bank.
 void noah_effective_key_behavior_runtime_invalidate(void *context, uint32_t publication_count, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *callback_view);
 
 noah_effective_key_behavior_result_t noah_effective_key_behavior_runtime_lookup(const noah_effective_key_behavior_runtime_t *runtime, uint16_t keycode, noah_effective_key_behavior_row_t *row);

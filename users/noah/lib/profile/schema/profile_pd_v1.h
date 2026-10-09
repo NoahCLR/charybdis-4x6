@@ -1,5 +1,6 @@
-// PD domain contract, advertised by schema-2 owner firmware: 32 slots, stored
-// sparsely (version 2). The record layout is version 1's, unchanged.
+// PD domain contract (D-F14): 32 slots, stored sparsely, in 128-byte records.
+// Version 3 keeps version 2's mode bytes where they were and moves the name to
+// the shared counted rule: its length in byte 8, its UTF-8 in bytes 96..127.
 #pragma once
 
 #include <stdbool.h>
@@ -7,14 +8,19 @@
 #include <stdint.h>
 #include "profile_versions.h"
 #include "profile_reader.h"
+#include "profile_name_v1.h"
 
 enum {
     NOAH_PROFILE_PD_V1_DOMAIN_ID   = NOAH_PROFILE_DOMAIN_V1_PD,
     NOAH_PROFILE_PD_V1_VERSION     = NOAH_PROFILE_PD_VERSION,
     NOAH_PROFILE_PD_V1_SLOT_COUNT  = NOAH_PROFILE_PD_COUNT,
     NOAH_PROFILE_PD_V1_HEADER_SIZE = 8,
-    NOAH_PROFILE_PD_V1_RECORD_SIZE = 96,
-    NOAH_PROFILE_PD_V1_NAME_SIZE   = 24,
+    NOAH_PROFILE_PD_V1_RECORD_SIZE = 128,
+    // What the pointing engine reads; the name follows it.
+    NOAH_PROFILE_PD_V1_MODE_SIZE   = 96,
+    NOAH_PROFILE_PD_V1_NAME_LENGTH = 8,
+    NOAH_PROFILE_PD_V1_NAME_OFFSET = NOAH_PROFILE_PD_V1_MODE_SIZE,
+    NOAH_PROFILE_PD_V1_NAME_MAX    = NOAH_PROFILE_NAME_MAX,
     NOAH_PROFILE_PD_V1_STEP_READ_MAX = 20,
     // Every slot present: the largest payload a version-2 domain can have.
     NOAH_PROFILE_PD_V1_MAX_SIZE = NOAH_PROFILE_PD_V1_HEADER_SIZE + NOAH_PROFILE_PD_V1_SLOT_COUNT * NOAH_PROFILE_PD_V1_RECORD_SIZE,
@@ -78,7 +84,9 @@ typedef struct {
     uint8_t id, kind, pointer_layer, axis;
     uint16_t dpi;
     uint8_t held_modifiers, reserved;
-    char name[24];
+    // The encoder writes the name's length here; authored data leaves it zero.
+    uint8_t name_length;
+    uint8_t name_reserved[23];
     uint16_t threshold_x, threshold_y;
     noah_pd_tap_t directions[4]; // left, right, up, down
     noah_pd_button_t buttons[3];
@@ -95,9 +103,11 @@ typedef struct {
         };
     };
     uint8_t tail_reserved[6];
+    // At most 32 bytes of UTF-8; the rest zero. A full name has no terminator.
+    char name[NOAH_PROFILE_PD_V1_NAME_MAX];
 } noah_pd_config_t;
 extern const noah_pd_config_t noah_pd_defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT];
-void noah_profile_pd_v1_encode_record(const noah_pd_config_t *config, uint8_t output[96]);
+void noah_profile_pd_v1_encode_record(const noah_pd_config_t *config, uint8_t output[NOAH_PROFILE_PD_V1_RECORD_SIZE]);
 // Whether a version-2 domain stores the slot: it is configured, or disabled
 // with a name. Record bytes 1 (kind) and 8 (first name byte) decide it.
 bool noah_profile_pd_v1_record_present(const uint8_t *record);
@@ -123,7 +133,7 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate(const uint8_t *bytes, si
 // records, so compiled output follows the same ordering/presence contract.
 typedef struct { uint8_t count, index, minimum; } noah_profile_pd_v1_cursor_t;
 noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_begin(noah_profile_pd_v1_cursor_t *cursor, const uint8_t header[8], size_t length, noah_profile_pd_v1_error_t *error);
-noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_next(noah_profile_pd_v1_cursor_t *cursor, const uint8_t record[96], noah_profile_pd_v1_error_t *error);
+noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_next(noah_profile_pd_v1_cursor_t *cursor, const uint8_t record[NOAH_PROFILE_PD_V1_RECORD_SIZE], noah_profile_pd_v1_error_t *error);
 uint8_t noah_profile_pd_v1_default_record_count(const noah_pd_config_t defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT]);
 
 typedef struct {

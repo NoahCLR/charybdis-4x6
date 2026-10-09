@@ -142,6 +142,19 @@ case "${NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS:-}" in
     *) echo "NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS must be yes or no" >&2; exit 1 ;;
 esac
 
+# Resource acceptance uses an instrumented pair in the same pinned compiler.
+# Keep its artifacts separate from the ordinary flashable pair.
+RESOURCE_ARGS=""
+case "${NOAH_RESOURCE_CHECKS:-}" in
+    ""|no) ;;
+    yes)
+        [ -z "$OWNER_ARGS" ] || { echo "resource checks require the profile owner" >&2; exit 1; }
+        RESOURCE_ARGS="-e NOAH_STACK_BUDGET_ENABLE=yes"
+        SUFFIX="${SUFFIX}_resources"
+        ;;
+    *) echo "NOAH_RESOURCE_CHECKS must be yes or no" >&2; exit 1 ;;
+esac
+
 branch=$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD)
 destdir="$BUILD_ROOT/$branch"
 mkdir -p "$destdir"
@@ -182,13 +195,36 @@ build_half() {
         -e "MAIN_KEYMAP_PATH_5=$KEYMAP_ROOT" \
         -e SKIP_VERSION=yes \
         -e "EXTRAFLAGS=-ffile-prefix-map=$REPO_ROOT=/userspace -ffile-prefix-map=$QMK_ROOT=/qmk" \
-        -e "$role=yes" -e "NOAH_PHYSICAL_HALF=$half" $OWNER_ARGS $TRANSPORT_ARGS )
+        -e "$role=yes" -e "NOAH_PHYSICAL_HALF=$half" $OWNER_ARGS $TRANSPORT_ARGS $RESOURCE_ARGS )
     if [ ! -f "$ARTIFACT" ]; then
         echo "Expected firmware not found: $ARTIFACT" >&2
         exit 1
     fi
     cp "$ARTIFACT" "$destdir/$name.uf2"
     echo "  -> $destdir/$name.uf2"
+    if [ -n "$RESOURCE_ARGS" ]; then
+        target=bastardkb_charybdis_4x6_noah
+        # Preserve this half before the next compile replaces QMK's output.
+        for extension in elf map; do
+            cp "$QMK_ROOT/.build/$target.$extension" "$destdir/$name.$extension"
+        done
+        for flags in cflags ldflags; do
+            cp "$QMK_ROOT/.build/obj_$target/$flags.txt" "$destdir/$name.$flags.txt"
+        done
+        if ! sh "$REPO_ROOT/tests/host/run_firmware_memory_budget_checks.sh" >"$destdir/$name.memory.txt" 2>&1; then
+            cat "$destdir/$name.memory.txt"; return 1
+        fi
+        cat "$destdir/$name.memory.txt"
+        for manifest in firmware_stack_budget firmware_stack_budget_live_profile_owner; do
+            if ! python3 "$REPO_ROOT/tools/check_firmware_stack_budget.py" \
+                --manifest "$REPO_ROOT/tools/$manifest.json" \
+                --elf "$destdir/$name.elf" --map "$destdir/$name.map" \
+                >"$destdir/$name.$manifest.txt" 2>&1; then
+                cat "$destdir/$name.$manifest.txt"; return 1
+            fi
+            cat "$destdir/$name.$manifest.txt"
+        done
+    fi
 }
 
 build_half FORCE_MASTER right "${n}_charybdis_right${SUFFIX}"

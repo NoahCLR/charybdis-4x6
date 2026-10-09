@@ -75,7 +75,7 @@ logical profile.
 ## Current Implementation Gap
 
 Ark now reads the complete supported configuration from the keyboard,
-edits all current domains, exports/imports a materialized eight-layer snapshot,
+edits all current domains, exports/imports a materialized snapshot of the whole layer bank,
 and applies one custom/VIA logical generation without consulting repository
 sources. Both custom halves are durably prepared before the decision marker;
 activation and reboot recovery require the bound VIA identity to converge.
@@ -161,8 +161,8 @@ and recover the same editable values without consulting the C files.
 
 ## Current-format admission
 
-Firmware accepts only its current schema 2.0 domain versions and `NR` format-3
-storage (D-F10). Every save binds VIA generation/digest, including custom-only
+Firmware accepts only its current schema 3.0 domain versions and `NS` format-4
+storage (D-F10, D-F14). Every save binds VIA generation/digest, including custom-only
 edits. Legacy storage is refused at boot; older backup translation belongs to
 the client. See [Profile Wire](profile-wire-v1.md) and
 [logical transactions](logical-profile-transaction-v1.md) for admission and

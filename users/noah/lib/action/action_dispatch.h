@@ -51,6 +51,10 @@ static inline uint8_t noah_action_keycode_layer_lock_layer(uint16_t action) {
     return noah_action_keycode_is_layer_toggle(action) ? (uint8_t)QK_TOGGLE_LAYER_GET_LAYER(action) : (uint8_t)(action - LAYER_LOCK_BASE);
 }
 
+static inline bool noah_action_keycode_is_momentary(uint16_t action) {
+    return IS_QK_MOMENTARY(action) && QK_MOMENTARY_GET_LAYER(action) < LAYER_COUNT;
+}
+
 static inline bool noah_action_keycode_is_layer_goto(uint16_t action) {
     return IS_QK_TO(action) && QK_TO_GET_LAYER(action) < LAYER_COUNT;
 }
@@ -92,7 +96,7 @@ static inline uint16_t noah_action_keycode_dual_role_hold(uint16_t action) {
 
 // Keys that hold their layer while they are down: MO(), TT(), OSL() and LM().
 static inline bool noah_action_keycode_is_owned_momentary_layer(uint16_t action) {
-    return IS_QK_MOMENTARY(action) || noah_action_keycode_is_layer_tap_toggle(action) || noah_action_keycode_is_layer_oneshot(action) || noah_action_keycode_is_layer_mod(action);
+    return noah_action_keycode_is_momentary(action) || noah_action_keycode_is_layer_tap_toggle(action) || noah_action_keycode_is_layer_oneshot(action) || noah_action_keycode_is_layer_mod(action);
 }
 
 static inline uint8_t noah_action_keycode_momentary_layer(uint16_t action) {

@@ -212,8 +212,9 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
     const noah_profile_store_record_t  *record = NULL;
     noah_profile_compiled_v1_metadata_t compiled_metadata;
     uint16_t                            payload_length;
-    uint16_t                            offset;
-    uint16_t                            remaining;
+    uint32_t                            offset;
+    uint32_t                            remaining;
+    uint16_t                            page;
     uint8_t                             chunk;
     bool                                compiled;
 
@@ -224,7 +225,8 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
         return false;
     }
     compiled = data[2] == NOAH_PROFILE_WIRE_V1_VALUE_COMPILED;
-    for (uint8_t index = 5u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
+    page     = noah_profile_wire_v1_wide_page(data);
+    for (uint8_t index = NOAH_PROFILE_WIRE_V1_WIDE_REQUEST_FIXED; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
         if (data[index] != 0u) {
             memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
             data[5] = NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED;
@@ -255,7 +257,7 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
     }
 
     memset(&data[6], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 6u);
-    if (data[4] == NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE) {
+    if (page == NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE) {
         data[5] = NOAH_PROFILE_WIRE_V1_STATUS_OK;
         data[6] = NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
         data[7] = 1u; // layout version
@@ -283,16 +285,16 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
         return true;
     }
 
-    offset = (uint16_t)((data[4] - 1u) * NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
+    offset = (uint32_t)(page - 1u) * NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
     if (offset >= payload_length) {
         memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
         data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE;
         return true;
     }
-    remaining = (uint16_t)(payload_length - offset);
+    remaining = payload_length - offset;
     chunk     = remaining < NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE ? (uint8_t)remaining : NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
 
-    if (!(compiled ? noah_profile_store_runtime_read_compiled(offset, &data[7], chunk) : noah_profile_store_runtime_read_committed(offset, &data[7], chunk))) {
+    if (!(compiled ? noah_profile_store_runtime_read_compiled((uint16_t)offset, &data[7], chunk) : noah_profile_store_runtime_read_committed((uint16_t)offset, &data[7], chunk))) {
         memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
         data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
         return true;
@@ -359,7 +361,6 @@ _Static_assert(DYNAMIC_KEYMAP_LAYER_COUNT <= UINT8_MAX, "compiled layer count mu
 _Static_assert(DYNAMIC_KEYMAP_LAYER_COUNT <= NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS, "compiled layer count must fit the declared Profile Wire ceiling");
 _Static_assert(DYNAMIC_KEYMAP_MACRO_COUNT <= UINT8_MAX, "VIA macro count must fit the capability frame");
 _Static_assert(NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX <= UINT16_MAX, "profile payload capacity must fit the capability frame");
-_Static_assert(NOAH_PROFILE_STORAGE_SLOT_A_SIZE <= UINT16_MAX, "profile slot size must fit the capability frame");
 _Static_assert(NOAH_PROFILE_STORAGE_VIA_MACRO_SIZE <= UINT16_MAX, "VIA macro capacity must fit the capability frame");
 _Static_assert(VIA_FIRMWARE_VERSION != 0u, "Profile Wire firmware must advertise a meaningful VIA firmware version");
 _Static_assert((uint8_t)NOAH_PROFILE_WIRE_V1_COMMAND_GET == (uint8_t)id_custom_get_value, "Profile Wire custom-get routing drifted from QMK VIA");

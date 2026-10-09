@@ -12,8 +12,9 @@
 
 // ─── Layers ────────────────────────────────────────────────────────────────
 //
-// Every image reserves eight logical layers.
-#define NOAH_LAYER_BANK_COUNT 8
+// Every image reserves sixteen logical layers (D-F14). Layers 8..15 start
+// transparent, unnamed and inactive.
+#define NOAH_LAYER_BANK_COUNT 16
 #ifndef __ASSEMBLER__
 enum charybdis_keymap_layers {
     LAYER_BASE = 0, // Default QWERTY typing layer
@@ -24,6 +25,14 @@ enum charybdis_keymap_layers {
     LAYER_EXTRA_1,
     LAYER_EXTRA_2,
     LAYER_EXTRA_3,
+    LAYER_EXTRA_4,
+    LAYER_EXTRA_5,
+    LAYER_EXTRA_6,
+    LAYER_EXTRA_7,
+    LAYER_EXTRA_8,
+    LAYER_EXTRA_9,
+    LAYER_EXTRA_10,
+    LAYER_EXTRA_11,
     // ─── Add new layers above this line. ───────────────────────────────────
     LAYER_COUNT = NOAH_LAYER_BANK_COUNT, // sentinel — used for VIA Dynamic layer count
 };

@@ -1,4 +1,5 @@
-// RGB domain version 3: the 32-slot golden vectors shared with the app.
+// RGB domain version 4: sixteen layer colours and 32 PD rows, the golden
+// vectors shared with the app.
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -30,7 +31,7 @@ int main(int argc, char **argv) {
     size_t         offset, cases = 0, rejected = 0;
 
     assert(argc == 2);
-    assert(NOAH_PROFILE_RGB_V1_FORMAT_VERSION == 3 && NOAH_PROFILE_RGB_V1_MAX_PD_MODES == 32);
+    assert(NOAH_PROFILE_RGB_V1_FORMAT_VERSION == 4 && NOAH_PROFILE_RGB_V1_MAX_PD_MODES == 32);
     assert(NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL == UINT32_MAX);
     FILE *file = fopen(argv[1], "r");
     assert(file);
@@ -49,7 +50,7 @@ int main(int argc, char **argv) {
         noah_profile_rgb_v1_error_t  error;
         noah_profile_rgb_v1_result_t result = noah_profile_rgb_v1_decode(payload, length, &limits, &view, &error);
         if (strcmp(result_names[result], code) != 0 || (result != NOAH_PROFILE_RGB_V1_OK && error.offset != offset)) {
-            fprintf(stderr, "RGB v3 vector %s: expected %s at %zu, got %s at %zu\n", name, code, offset, result_names[result], error.offset);
+            fprintf(stderr, "RGB v4 vector %s: expected %s at %zu, got %s at %zu\n", name, code, offset, result_names[result], error.offset);
             return 1;
         }
         if (result == NOAH_PROFILE_RGB_V1_OK) {

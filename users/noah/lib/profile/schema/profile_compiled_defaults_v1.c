@@ -276,6 +276,7 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
 #endif
     result.required_domain_mask              = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
     result.logical_layer_count               = LAYER_COUNT;
+    result.placement_positions               = MATRIX_ROWS * MATRIX_COLS;
     result.supported_pd_mode_mask            = UINT32_MAX >> (32u - PD_MODE_COUNT);
     result.via_macro_slot_count              = VIA_MACRO_SLOT_COUNT;
     result.custom_key_count                  = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;

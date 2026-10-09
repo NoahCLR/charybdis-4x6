@@ -10,22 +10,27 @@
 #include "profile_blob_v1.h"
 #include "profile_reader.h"
 
+// Version 2 (D-F14): a 16-bit populated-step count, and each row carries an
+// enable flag and the layers it may act on. Ceilings follow the shared tap
+// depth: rows × depth steps in all, depth steps in a row.
 enum {
-    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VERSION               = 1u,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_VERSION               = 2u,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE           = 4u,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE       = 2u,
-    NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE        = 12u,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE        = 16u,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HEADER_SIZE      = 2u,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_HOLD_SIZE             = 6u,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE   = 1u << 0,
-    NOAH_KEY_BEHAVIOR_DOMAIN_V1_KNOWN_ROW_FLAGS       = 1u << 0,
+    // A disabled row keeps its steps; its presses take the normal action.
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_DISABLED     = 1u << 1,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_KNOWN_ROW_FLAGS       = 0x03u,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP          = 1u << 0,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD         = 1u << 1,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_LONG_HOLD    = 1u << 2,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_KNOWN_STEP_MASK       = 0x07u,
-    NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS              = 64u,
-    NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS   = 128u,
-    NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW = 5u,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS              = NOAH_PROFILE_BEHAVIOR_ROWS,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS   = NOAH_PROFILE_BEHAVIOR_ROWS * NOAH_PROFILE_TAP_DEPTH,
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW = NOAH_PROFILE_TAP_DEPTH,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ         = 100u,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE      = NOAH_PROFILE_BLOB_V1_MAX_SIZE - NOAH_PROFILE_BLOB_V1_HEADER_SIZE - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE,
     // An incremental validation step performs at most one reader call. The
@@ -33,8 +38,9 @@ enum {
     // the public budget remains 20 bytes to match the scan owner contract.
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_READ_MAX = 20u,
     // Payload-independent 32-bit representation regression policy. This is
-    // not a statement of RP2040 hardware capacity.
-    NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET = 120u,
+    // not a statement of RP2040 hardware capacity. Version 2's 16-bit step
+    // counts link at 124 bytes on Cortex-M0+.
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET = 128u,
 };
 
 typedef enum {
@@ -62,14 +68,15 @@ typedef enum {
     NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_MODE,
     NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_REPEAT,
     NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION,
+    NOAH_KEY_BEHAVIOR_FIELD_V1_ALLOWED_LAYERS,
 } noah_key_behavior_field_v1_t;
 
 typedef struct {
+    uint16_t max_populated_steps;
+    uint16_t max_payload_size;
     uint8_t  max_rows;
-    uint8_t  max_populated_steps;
     uint8_t  max_tap_steps_per_row;
     uint8_t  max_repeat_hz;
-    uint16_t max_payload_size;
 } noah_key_behavior_limits_v1_t;
 
 typedef struct {
@@ -92,6 +99,8 @@ typedef struct {
     uint16_t                           longer_hold_term;
     uint16_t                           multi_tap_term;
     uint8_t                            flags;
+    // One bit per layer it may act on; bits past the bank are zero.
+    uint32_t                           allowed_layers;
     const noah_key_behavior_step_v1_t *steps;
     size_t                             step_count;
 } noah_key_behavior_row_v1_t;
@@ -103,8 +112,8 @@ typedef struct {
     noah_profile_reader_t           reader;
     size_t                          base_offset;
     size_t                          byte_length;
+    uint16_t                        populated_step_count;
     uint8_t                         row_count;
-    uint8_t                         populated_step_count;
     noah_key_behavior_limits_v1_t   limits;
     noah_profile_action_v1_limits_t action_limits;
 } noah_key_behavior_domain_v1_t;
@@ -118,6 +127,7 @@ typedef struct {
     uint16_t                 multi_tap_term;
     uint8_t                  flags;
     uint8_t                  step_count;
+    uint32_t                 allowed_layers;
     size_t                   row_offset;
     size_t                   steps_offset;
     size_t                   row_end;
@@ -206,6 +216,15 @@ noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_decode_reader(const n
 noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_decode(const uint8_t *bytes, size_t length, const noah_key_behavior_limits_v1_t *limits, const noah_profile_action_v1_limits_t *action_limits, noah_key_behavior_domain_v1_t *domain, noah_profile_codec_v1_error_t *error);
 
 noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_row_at(const noah_key_behavior_domain_v1_t *domain, uint8_t row_index, noah_key_behavior_row_v1_view_t *row, noah_profile_codec_v1_error_t *error);
+// The lookup index: each row's offset in the payload, found by walking row
+// lengths only. capacity must hold domain->row_count entries.
+noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_row_offsets(const noah_key_behavior_domain_v1_t *domain, uint16_t *offsets, size_t capacity, noah_profile_codec_v1_error_t *error);
+// Resolves one row from its index entry: the length, the fixed fields and the
+// bounds, without decoding any step.
+noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_row_at_offset(const noah_key_behavior_domain_v1_t *domain, uint8_t row_index, uint16_t offset, noah_key_behavior_row_v1_view_t *row, noah_profile_codec_v1_error_t *error);
+// Binary search over the index by canonical target bytes: one 4-byte read
+// per probe, then the matching row's fixed fields.
+noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_find_target_indexed(const noah_key_behavior_domain_v1_t *domain, const uint16_t *offsets, const noah_profile_action_v1_t *target, noah_key_behavior_row_v1_view_t *row, bool *found, noah_profile_codec_v1_error_t *error);
 // Finds one canonical semantic target in a single ordered row pass. A missing
 // target is a successful query with *found == false; reader/shape failures are
 // still reported as codec errors.

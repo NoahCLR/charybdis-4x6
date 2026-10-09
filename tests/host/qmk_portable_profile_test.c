@@ -87,7 +87,7 @@ void charybdis_cycle_pointer_sniping_dpi(bool forward) {
 void default_layer_set(uint32_t state) {
     default_layer_state = state;
 }
-void eeconfig_update_default_layer(uint8_t layers) {
+void eeconfig_update_default_layer(uint32_t layers) {
     (void)layers;
     durable_writes++;
 }
@@ -112,18 +112,21 @@ void noah_qmk_portable_apply_lighting(uint32_t mode, uint32_t color) {
     durable_writes++;
 }
 
-// The keymap's names, at both length limits.
-const char via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {[5] = "Drag Screenshot", [63] = "Twenty characters!!!"};
-const char layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE]              = {"Base", [7] = "Twenty-three bytes long"};
+// The keymap's names, up to the 32-byte limit and in multibyte UTF-8.
+#define NAME_32 "Thirty-two bytes of name, exact!"
+_Static_assert(sizeof(NAME_32) == 33, "NAME_32 is the longest name");
+const char via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {[5] = "Drag Screenshot", [63] = NAME_32};
+const char layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE]              = {"Base", [7] = "\xc3\x89t\xc3\xa9", [15] = NAME_32};
 const char custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {[0] = "Right Thumb", [63] = "Last"};
 
 static uint8_t frame[32];
-static void    get(uint8_t page) {
+static void    get(uint16_t page) {
     memset(frame, 0, sizeof(frame));
     frame[0] = 8;
     frame[2] = 7;
     frame[3] = 0x21;
-    frame[4] = page;
+    frame[4] = (uint8_t)page;
+    frame[5] = (uint8_t)(page >> 8);
     assert(noah_qmk_portable_profile_get(frame, sizeof(frame)));
 }
 static uint32_t u32(const uint8_t *p) {
@@ -138,14 +141,14 @@ static uint16_t read_all(uint8_t *out, FILE *responses) {
     uint16_t length = frame[9] | frame[10] << 8;
     uint32_t crc = u32(frame + 11), fnv = u32(frame + 15);
     uint16_t offset = 0;
-    for (uint8_t page = 1; offset < length; page++) {
+    for (uint16_t page = 1; offset < length; page++) {
         get(page);
         assert(frame[5] == 0 && frame[6] == (length - offset < 25 ? length - offset : 25));
         if (responses) assert(fwrite(frame, 1, sizeof(frame), responses) == sizeof(frame));
         memcpy(out + offset, frame + 7, frame[6]);
         offset += frame[6];
     }
-    get((uint8_t)(length / 25 + 2));
+    get((uint16_t)(length / 25 + 2));
     assert(frame[5] == 2 && frame[6] == 0);
     assert(noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, out, length)) == crc);
     assert(noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, out, length) == fnv);
@@ -179,32 +182,38 @@ int main(int argc, char **argv) {
     assert(argc < 3 || named);
     length = read_all(bytes, named);
     if (named) assert(fclose(named) == 0);
-    assert(length == NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_MACRO_NAMES + 15 + 20 + NOAH_SETTINGS_CUSTOM_KEY_NAMES + 11 + 4);
-    const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
-    assert(NOAH_SETTINGS_VERSION == 5u && !memcmp(bytes, header, 8));
-    assert(u32(bytes + 8 + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
+    assert(length == NOAH_SETTINGS_MIN_SIZE + 4 + 5 + 32 + 15 + 32 + 11 + 4);
+    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
+    assert(NOAH_SETTINGS_VERSION == 6u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
     keyrecord_t record = {0};
     assert(get_tapping_term(0, &record) == TAPPING_TERM && get_quick_tap_term(0, &record) == TAPPING_TERM);
-    assert(u32(bytes + 8 + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 1200);
-    assert(u32(bytes + 8 + NOAH_SETTING_DRAGSCROLL_DPI * 4) == 0);
-    // Each layer name is zero padded to its field; the longest keeps its terminator.
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 1200);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_DRAGSCROLL_DPI * 4) == 0);
+    // Every layer allows its behaviours and combos.
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_BEHAVIORS_ENABLED * 4) == 1);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LAYER_BEHAVIORS * 4) == 0xffff);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LAYER_COMBOS * 4) == 0xffff);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_RETIRED_COMBO_REFERENCES * 4) == 0);
+    // Each layer refers combos to itself and bypasses or excludes nothing.
     uint8_t expected[NOAH_SETTINGS_MAX_SIZE] = {0};
-    uint8_t *names_at = expected + 8 + NOAH_SETTINGS_COUNT * 4;
-    memcpy(names_at, "Base", 4);
-    memcpy(names_at + 7 * NOAH_SETTINGS_NAME_BYTES, "Twenty-three bytes long", 23);
-    uint8_t *macro = expected + NOAH_SETTINGS_FIXED_SIZE;
-    // Then each macro's name, and each custom key's.
-    for (uint8_t record = 0; record < NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES; record++) {
-        const char *name        = record < NOAH_SETTINGS_MACRO_NAMES ? via_macro_names[record] : custom_key_names[record - NOAH_SETTINGS_MACRO_NAMES];
-        uint8_t     name_length = (uint8_t)strlen(name);
-        *macro++                = name_length;
-        memcpy(macro, name, name_length);
-        macro += name_length;
+    for (uint8_t layer = 0; layer < NOAH_SETTINGS_LAYERS; layer++) {
+        expected[NOAH_SETTINGS_LAYER_RECORDS_OFFSET + layer * NOAH_SETTINGS_LAYER_RECORD_SIZE + NOAH_SETTINGS_LAYER_REFERENCE] = layer;
+        assert(combo_ref_from_layer(layer) == layer);
     }
-    assert(macro - expected == length);
-    assert(!memcmp(bytes + 8 + NOAH_SETTINGS_COUNT * 4, names_at, length - (8 + NOAH_SETTINGS_COUNT * 4)));
+    // Then every name counted: the layers', each macro's, and each custom key's.
+    uint8_t *name = expected + NOAH_SETTINGS_FIXED_SIZE;
+    for (uint16_t index = 0; index < NOAH_SETTINGS_NAME_COUNT; index++) {
+        const char *text        = index < NOAH_SETTINGS_LAYERS ? layer_names[index] : index < NOAH_SETTINGS_LAYERS + NOAH_SETTINGS_MACRO_NAMES ? via_macro_names[index - NOAH_SETTINGS_LAYERS] : custom_key_names[index - NOAH_SETTINGS_LAYERS - NOAH_SETTINGS_MACRO_NAMES];
+        uint8_t     name_length = (uint8_t)strlen(text);
+        *name++                 = name_length;
+        memcpy(name, text, name_length);
+        name += name_length;
+    }
+    assert(name - expected == length);
+    assert(!memcmp(bytes + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, expected + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, length - NOAH_SETTINGS_LAYER_RECORDS_OFFSET));
     // Pages read backwards, and one twice, give the same names as a forward read.
-    for (uint8_t page = (uint8_t)((length + 24) / 25); page >= 1; page--) {
+    for (uint16_t page = (uint16_t)((length + 24) / 25); page >= 1; page--) {
         get(page);
         assert(!memcmp(frame + 7, bytes + (page - 1) * 25, frame[6]));
     }
@@ -215,22 +224,23 @@ int main(int argc, char **argv) {
 
     // A live current domain reads back as stored, with its values overlaid by the
     // live QMK owners, and without a second copy held for the read.
-    const uint32_t values[28] = {180, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0x76543210};
-    // Current settings include both macro and custom-key name records.
-    const uint8_t current_header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
-    memcpy(stored, current_header, 8);
-    for (uint8_t id = 0; id < 28; id++)
+    const uint32_t values[NOAH_SETTINGS_COUNT] = {180, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0x7fff};
+    const uint8_t  current_header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
+    memcpy(stored, current_header, sizeof(current_header));
+    for (uint8_t id = 0; id < NOAH_SETTINGS_COUNT; id++)
         for (uint8_t j = 0; j < 4; j++)
-            stored[8 + id * 4 + j] = values[id] >> (j * 8);
+            stored[NOAH_SETTINGS_SCALARS_OFFSET + id * 4 + j] = values[id] >> (j * 8);
+    // Layer 15 refers its combos to layer 2 and bypasses position 59.
+    for (uint8_t layer = 0; layer < NOAH_SETTINGS_LAYERS; layer++)
+        stored[NOAH_SETTINGS_LAYER_RECORDS_OFFSET + layer * NOAH_SETTINGS_LAYER_RECORD_SIZE + NOAH_SETTINGS_LAYER_REFERENCE] = layer == 15 ? 2 : layer;
+    stored[NOAH_SETTINGS_LAYER_RECORDS_OFFSET + 15 * NOAH_SETTINGS_LAYER_RECORD_SIZE + NOAH_SETTINGS_LAYER_BYPASS + 7] = 0x08;
     uint16_t names = NOAH_SETTINGS_FIXED_SIZE;
-    for (uint8_t slot = 0; slot < NOAH_SETTINGS_MACRO_NAMES; slot++) {
-        const char *name = slot == 5 ? "Screenshot" : "";
-        stored[names++]  = (uint8_t)strlen(name);
-        memcpy(stored + names, name, strlen(name));
-        names += strlen(name);
+    for (uint16_t index = 0; index < NOAH_SETTINGS_NAME_COUNT; index++) {
+        const char *text = index == NOAH_SETTINGS_LAYERS + 5 ? "Screenshot" : "";
+        stored[names++]  = (uint8_t)strlen(text);
+        memcpy(stored + names, text, strlen(text));
+        names += strlen(text);
     }
-    memset(stored + names, 0, NOAH_SETTINGS_CUSTOM_KEY_NAMES);
-    names += NOAH_SETTINGS_CUSTOM_KEY_NAMES;
     static uint8_t                    blob[NOAH_PROFILE_TEST_BLOB_PAYLOAD_OFFSET + sizeof(stored)];
     size_t                            total = noah_profile_test_blob_wrap(blob, sizeof(blob), NOAH_PROFILE_DOMAIN_V1_SETTINGS, stored, names);
     noah_effective_profile_snapshot_t view  = {0};
@@ -259,12 +269,13 @@ int main(int argc, char **argv) {
     length = read_all(bytes, responses);
     if (responses) assert(fclose(responses) == 0);
     assert(length == names);
-    assert(u32(bytes + 8 + NOAH_SETTING_TAPPING_TERM * 4) == 180);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_TAPPING_TERM * 4) == 180);
     // QMK's own dual-role keys resolve on the live term.
     assert(get_tapping_term(0, &record) == 180 && get_quick_tap_term(0, &record) == 180);
-    assert(u32(bytes + 8 + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 900);
-    assert(!memcmp(bytes + NOAH_SETTINGS_FIXED_SIZE, stored + NOAH_SETTINGS_FIXED_SIZE, names - NOAH_SETTINGS_FIXED_SIZE));
-    assert(!memcmp(bytes + 8 + NOAH_SETTINGS_COUNT * 4, stored + 8 + NOAH_SETTINGS_COUNT * 4, NOAH_SETTINGS_FIXED_SIZE - 8 - NOAH_SETTINGS_COUNT * 4));
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 900);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LAYER_COMBOS * 4) == 0x7fff);
+    assert(!memcmp(bytes + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, stored + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, names - NOAH_SETTINGS_LAYER_RECORDS_OFFSET));
+    assert(combo_ref_from_layer(15) == 2 && combo_ref_from_layer(14) == 14 && combo_ref_from_layer(16) == 16);
     puts("portable settings readback streams the live domain");
     return 0;
 }

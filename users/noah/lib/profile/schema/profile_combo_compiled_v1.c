@@ -24,13 +24,13 @@ noah_profile_compiled_v1_result_t noah_profile_combos_compiled_v1_write(compiled
         uint16_t key = combo->keycode;
         if ((key >= 0xe0u && key <= 0xe7u) || (key >= 0x100u && key <= 0x1fffu && (key & 0xffu) == 0u) || (key >= 0x5220u && key <= 0x523fu)) flags |= 1u;
 #    endif
-        if (!(emit_u8(writer, count) && emit_u8(writer, flags) && emit_u16(writer, noah_combo_terms[row]) && emit_u32(writer, 0))) return writer->result;
-        for (uint8_t member = 0; member <= NOAH_PROFILE_COMBO_V1_MAX_INPUTS; member++) {
+        // An authored combo is enabled on every layer of the bank.
+        if (!(emit_u8(writer, count) && emit_u8(writer, flags) && emit_u16(writer, noah_combo_terms[row]) && emit_u32(writer, (uint32_t)((UINT64_C(1) << LAYER_COUNT) - 1u)))) return writer->result;
+        // The output, then only the inputs the combo has.
+        for (uint8_t member = 0; member <= count; member++) {
             noah_profile_action_v1_t action = {0};
-            if (member == 0 || member <= count) {
-                uint16_t native = member == 0 ? combo->keycode : pgm_read_word(&combo->keys[member - 1]);
-                if (noah_profile_compiled_v1_action(native, &action) != NOAH_PROFILE_COMPILED_V1_OK || action.kind == NOAH_PROFILE_ACTION_V1_NONE) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, row, member);
-            }
+            uint16_t                 native = member == 0 ? combo->keycode : pgm_read_word(&combo->keys[member - 1]);
+            if (noah_profile_compiled_v1_action(native, &action) != NOAH_PROFILE_COMPILED_V1_OK || action.kind == NOAH_PROFILE_ACTION_V1_NONE) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, (uint8_t)row, member);
             if (!emit_action(writer, &action)) return writer->result;
         }
     }

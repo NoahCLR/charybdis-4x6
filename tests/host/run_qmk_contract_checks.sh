@@ -118,8 +118,11 @@ def body(source: str, signature: str) -> str:
     raise SystemExit(f"unterminated function: {signature}")
 
 action = (qmk / "quantum/action.c").read_text()
-if "is_tap_keycode_user(get_record_keycode(record, false), is_tap_action(action))" not in body(action, "bool is_tap_record(keyrecord_t *record)"):
-    raise SystemExit("QMK must offer authored dual-role keys to the userspace tapping classifier")
+if "is_tap_record_user(record, is_tap_action(action), is_tap_keycode_user(get_record_keycode(record, false), is_tap_action(action)))" not in body(action, "bool is_tap_record(keyrecord_t *record)"):
+    raise SystemExit("QMK must offer authored dual-role keys, with their record, to the userspace tapping classifier")
+# Its default keeps the keycode hook's answer for builds that define only that.
+if "return default_tap;" not in body(action, "__attribute__((weak)) bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap)"):
+    raise SystemExit("QMK's record tapping hook must default to the keycode hook's answer")
 for source, signature in [("quantum/action_tapping.c", "bool tapping_key_event_pending("),
                           ("quantum/process_keycode/process_combo.c", "bool combo_key_event_pending(")]:
     if signature not in (qmk / source).read_text():

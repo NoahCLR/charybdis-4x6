@@ -84,6 +84,21 @@ while those inputs match, merges the task's pull request for exactly the
 verified commit, and files the pair with the build note beside it. The installed pre-push hook refuses direct pushes to `dev`
 and `main`, and accepts only annotated release tags on the released line.
 
+### Per-half resource acceptance
+
+After the required host checks pass, run the vault's `verify` with
+`NOAH_RESOURCE_CHECKS=yes` to build an instrumented pair in the pinned Docker
+image. The pair builder checks each half's linked SRAM accounting and both
+reviewed-path stack manifests before compiling the other half. It preserves
+that half's ELF, map, compiler/linker flags and gate reports beside the
+`_resources` pair, so shared QMK output cannot substitute one half's evidence
+for the other's. A failing resource gate stops the build.
+
+Build the ordinary pair with `verify` again without that option before handing
+firmware over. Stack instrumentation changes code generation; its evidence
+covers the named reviewed paths, and neither resource pair nor host checks
+establish allocator/stack high-water or timing on the keyboard.
+
 ## The BK pin
 
 The UF2 is this userspace and the BK fork compiled together, so this repository

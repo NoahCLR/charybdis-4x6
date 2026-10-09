@@ -99,20 +99,24 @@ accumulator) are firmware safety policy, not per-slot settings.
 
 ## Domain and record encoding
 
-Domain ID `0x50`, version `2` (D-F09). All multibyte integers are unsigned,
-little-endian. The payload is the eight-byte header `02 20 60 nn 00 00 00 00`
-(version 2, slot capacity 32, record size 96, record count `nn` = 0..32, four
-zero bytes), then exactly `nn` 96-byte records in strictly ascending slot ID,
-each ID below 32: `8 + 96 × nn` bytes, at most 3,080. A slot's record is
+Domain ID `0x50`, version `3` (D-F14). All multibyte integers are unsigned,
+little-endian. The payload is the eight-byte header `03 20 80 nn 00 00 00 00`
+(version 3, slot capacity 32, record size 128, record count `nn` = 0..32, four
+zero bytes), then exactly `nn` 128-byte records in strictly ascending slot ID,
+each ID below 32: `8 + 128 × nn` bytes, at most 4,104. A slot's record is
 present exactly when the slot is configured (kind ≠ 0) or disabled with a
 non-empty name; an omitted slot is disabled with an empty name. A present
 record that is disabled with an empty name is noncanonical and rejected
 (`NONCANONICAL`), as are a count above 32 or a wrong version, capacity or
 record size (`INVALID_HEADER`), nonzero header bytes 4..7 (`RESERVED`), a
 length other than `8 + 96 × nn` (`INVALID_LENGTH`), and a repeated,
-out-of-order or out-of-range ID (`INVALID_ID`). Every record-level rule below
-is version 1's, unchanged. The surrounding profile domain envelope adds four
-bytes. RGB remains in its own domain; RGB v3 holds 32 ID/HSV/locality rows,
+out-of-order or out-of-range ID (`INVALID_ID`). Version 3 is version 2 with
+the name moved to the shared counted rule: bytes 0..7 and 32..95 keep their
+meaning, so the pointing engine reads the same 96 bytes it always has.
+Translation from version 2 moves the 24-byte name field's text (up to its
+terminator) to bytes 96..127, writes its length to byte 8 and zeroes bytes
+9..31. The surrounding profile domain envelope adds four
+bytes. RGB remains in its own domain; RGB v4 holds 32 ID/HSV/locality rows,
 one per slot whether or not the slot is stored here.
 
 Retired version 1 was fixed: 776 bytes, the header `01 08 60 00 00 00 00 00`
@@ -130,7 +134,8 @@ are unchanged.
 | 4 | 2 | DPI: zero inherits; otherwise explicit value |
 | 6 | 1 | Owned scrolling modifiers; directional modes use zero |
 | 7 | 1 | Reserved, zero |
-| 8 | 24 | UTF-8 name, NUL terminated and zero padded |
+| 8 | 1 | Name length in bytes, 0..32 |
+| 9 | 23 | Reserved, zero (version 2's name field) |
 | 32, 34 | 2 each | Directional X/Y thresholds |
 | 36, 40, 44, 48 | 4 each | Left/right/up/down tap records |
 | 52, 58, 64 | 6 each | Mouse button 1/2/3 override records |
@@ -142,6 +147,7 @@ are unchanged.
 | 88 | 1 | Cross-axis decay divisor |
 | 89 | 1 | Invert flags: bit 0 horizontal, bit 1 vertical |
 | 90 | 6 | Reserved, zero |
+| 96 | 32 | UTF-8 name, `length` bytes, the rest zero |
 
 Eight-direction records (kind `1`, axis `3`, added 2026-09-23) reuse bytes
 70..90, which every other directional record leaves zero:
@@ -158,8 +164,10 @@ so the domain version stays `1`: an older reader refuses such a profile rather
 than misreading it. Byte 87 (added 2026-10-05) follows the same rule: older
 readers reject a nonzero value as reserved.
 
-Names contain at most 23 UTF-8 bytes, no embedded NUL, ASCII C0 controls or DEL,
-and no malformed, overlong or surrogate encodings. Configured modes require a
+Names follow the one rule every domain shares (D-F14): at most 32 bytes of
+well-formed UTF-8 (no overlong or surrogate encodings, nothing past U+10FFFF),
+no ASCII C0 controls or DEL, the length not cutting a sequence, and zero after
+it. Configured modes require a
 nonempty name. Disabled modes may retain their name; everything except ID and
 name is zero. Disabled RGB rows are separately retained by the RGB domain.
 
@@ -280,16 +288,20 @@ at a time.
 
 `tests/fixtures/pd_mode_domain_v1.json` records six repository presets and two
 disabled slots in version 1, with independently packed golden bytes.
-`tests/fixtures/pd_mode_domain_v2.json` holds version-2 vectors: an empty
+`tests/fixtures/pd_mode_domain_v3.json` holds version-3 vectors: an empty
 domain, the presets (the firmware's compiled domain, checked against the
 golden compiled profile), a gap with a named disabled slot 31, all 32 slots
-(3,080 bytes), and rejections with their codes and payload offsets
-(noncanonical record, unordered, repeated and out-of-range IDs, count/length
-mismatches, header and reserved bytes, a version-1 payload). Both are test
+(4,104 bytes), a 32-byte multibyte name, and rejections with their codes and
+payload offsets (noncanonical record, unordered, repeated and out-of-range IDs,
+count/length mismatches, header and reserved bytes including version 2's name
+field, a version-2 payload, and over-long, malformed, control-character,
+cut-sequence and unpadded names). Both are test
 evidence, **never a fallback migration source**. The frozen C/JS differential
 corpus (8,635 version-1 cases, including byte mutations, all truncated lengths
-and Unicode) still checks every record rule by extracting the frozen records and using the
-current record validator; the legacy envelope validator is removed;
+and Unicode) still checks every record rule by extracting the frozen records,
+moving each one's 24-byte name field verbatim into a version-3 record (its
+length the first zero, or past the limit when there is none) and using the
+current record validator, with every verdict unchanged; the legacy envelope validator is removed;
 the C runners also use ASan/UBSan. Tests freeze existing native action values
 and prove that current readers reject legacy envelopes.
 
@@ -299,12 +311,12 @@ Current firmware uses one geometry:
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
-| `0x0000..0x1fff` | 8,192 | QMK/VIA allocation |
-| `0x2000..0x33ff` | 5,120 | Profile slot A, 32-byte header + 5,088-byte payload |
-| `0x3400..0x47ff` | 5,120 | Profile slot B, same layout |
+| `0x00000..0x02fff` | 12,288 | QMK/VIA allocation |
+| `0x03000..0x12fff` | 65,536 | Profile slot A, 32-byte header + 65,504-byte payload |
+| `0x13000..0x22fff` | 65,536 | Profile slot B, same layout |
 
-Logical EEPROM is 18,432 bytes; RP2040 wear-level backing is 36,864 bytes.
-The old schema-1 layout is not interpreted in place. Keep a complete backup and
+Logical EEPROM is 143,360 bytes; RP2040 wear-level backing is 286,720 bytes
+(D-F14). Older layouts are not interpreted in place. Keep a complete backup and
 its matching old firmware pair before an upgrade; restore a client-translated
 current profile through logical Apply after both halves run compatible firmware.
 Physical geometry migration acceptance remains outstanding. Resource accounting
@@ -312,23 +324,25 @@ belongs to [memory budgets](memory-budgets.md).
 
 ## Integration and identity gates
 
-Schema 2.0 includes domain `0x50`, advertised by domain-mask bit 4. Format 3
-(`NR`) stores five domain bits, origin in bit 5, flags in bit 6 and reserved
-bit 7. It binds schema 2.0 and nonzero VIA identity. `NP` and `NQ` headers are
-rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
+Schema 3.0 includes domain `0x50`, advertised by domain-mask bit 4. Format 4
+(`NS`) stores five domain bits, origin in bit 5, flags in bit 6 and reserved
+bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ` and `NR`
+headers are rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
 
 Synchronous validation, bounded boot scanning and commit shape validation
-share the current version rules in `profile_versions.h`: RGB v3, key behaviors
-v1, combos v2, settings v5 and sparse PD v2. Blob magic remains `NLP1`; schema
-bytes must be 2.0. Domain bodies also require semantic validation. Store tests
+share the current version rules in `profile_versions.h`: RGB v4, key behaviors
+v2, combos v3, settings v6 and sparse PD v3. Blob magic remains `NLP1`; schema
+bytes must be 3.0. Domain bodies also require semantic validation. Store tests
 cover all mask/origin/flag combinations, both boot paths, old-header rejection,
 reserved bits with repaired CRCs, incompatible versions, one-byte commit steps,
 durable prepare/abort and interrupted writes. These do not prove physical flash
 acceptance.
 
-The current action ABI is `0xf79c6151`. Older action vocabularies require
-client translation before a current-format Apply. Candidate metadata, owner,
-peer storage and background stale-peer repair all use format 3 and require a
+The current action-ABI digest is the one capability page 0 reports; it covers
+the layer count, so the sixteen-layer bank changed it (D-F14). Older action
+vocabularies require client translation before a current-format Apply.
+Candidate metadata, owner, peer storage and background stale-peer repair all
+use format 4 and require a
 correlated VIA bind before PREPARE_BEGIN. Retry preserves the bind for that exact
 generation/digest. Incompatible peers cannot Apply.
 
@@ -368,11 +382,13 @@ expressions. They are not firmware keycode symbols.
 
 | Native action | Block | Supported |
 | --- | --- | --- |
-| Custom key 0–63 | `0x7e40..0x7e7f` | 64 |
+| Retired custom keys (before D-F14) | `0x7e40..0x7e7f` | — (inert) |
 | PD hold | `0x7e80..0x7e9f` | 32, the whole block |
 | PD lock | `0x7ea0..0x7ebf` | 32, the whole block |
-| Layer lock | `0x7ec0..0x7edf` | 8 (`0x7ec0..0x7ec7`) |
-| Unassigned | `0x7ee0..0x7fff` | — |
+| Layer lock | `0x7ec0..0x7edf` | 16 (`0x7ec0..0x7ecf`) |
+| Unassigned | `0x7ee0..0x7eff` | — |
+| Custom key 0–127 | `0x7f00..0x7f7f` | 128 (D-F14) |
+| Unassigned | `0x7f80..0x7fff` | — |
 
 Profiles store pointing and layer-lock actions by slot (action kinds 2–5), so
 the blocks change only raw keycodes: VIA layouts and custom keys. The blocks

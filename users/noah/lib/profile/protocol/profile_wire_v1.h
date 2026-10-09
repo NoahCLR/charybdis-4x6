@@ -24,7 +24,9 @@ enum {
     // Page 0 of a payload read is metadata; pages 1..N carry raw payload
     // bytes, a full report payload each.
     NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE = 0u,
-    NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES      = 2u,
+    // Capability layout 2 (D-F14) adds page 2 for fields wider than a byte.
+    NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT     = 2u,
+    NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES      = 3u,
     NOAH_PROFILE_WIRE_V1_STATUS_PAGES          = 2u,
 };
 
@@ -60,14 +62,27 @@ enum {
     // QK_BOOT…) through QMK's key processing, so a host may offer them in a
     // behaviour's target, tap and hold.
     NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS = 1u << 15,
-    // Userspace keycodes sit in fixed blocks (custom keys 0x7e40, pointing
-    // holds 0x7e80, locks 0x7ea0, layer locks 0x7ec0); action kind 7 is a
-    // custom key and settings v5 names the custom keys.
+    // Userspace keycodes sit in fixed blocks (pointing holds 0x7e80, locks
+    // 0x7ea0, layer locks 0x7ec0, custom keys 0x7f00 since D-F14); action
+    // kind 7 is a custom key and the settings domain names the custom keys.
     NOAH_PROFILE_FEATURE_CUSTOM_KEYS = 1u << 16,
     // Physical key timestamps survive QMK buffering; authored LT rows own tapping.
     NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING = 1u << 17,
     NOAH_PROFILE_FEATURE_OWNED_TAPPING           = 1u << 18,
+    // Payload, compiled and settings readbacks (GET 0x04, 0x05, 0x07) take a
+    // 16-bit page: request byte 4 is its low byte and byte 5 its high byte.
+    NOAH_PROFILE_FEATURE_WIDE_PAGES = 1u << 19,
+    // Behaviour and combo participation controls (participation-policy.md).
+    NOAH_PROFILE_FEATURE_PARTICIPATION = 1u << 20,
 };
+
+// A wide-page request: [command, channel, value, request id, page low, page
+// high], then 26 reserved zero bytes. The response echoes bytes 0..4 only,
+// since byte 5 carries its status; the request id correlates it.
+enum { NOAH_PROFILE_WIRE_V1_WIDE_REQUEST_FIXED = 6u };
+static inline uint16_t noah_profile_wire_v1_wide_page(const uint8_t *frame) {
+    return (uint16_t)(frame[4] | ((uint16_t)frame[5] << 8u));
+}
 
 enum {
     NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT = 1u << 0,
@@ -105,7 +120,7 @@ typedef struct {
     uint8_t  max_logical_layers;
     uint8_t  max_behavior_rows;
     uint8_t  max_tap_steps_per_behavior;
-    uint8_t  max_populated_behavior_steps;
+    uint16_t max_populated_behavior_steps;
     uint8_t  max_combos;
     uint8_t  max_keys_per_combo;
     uint8_t  max_reusable_rgb_groups;
@@ -116,9 +131,12 @@ typedef struct {
     uint8_t  via_macro_slots;
     uint16_t max_profile_payload;
     uint16_t profile_slot_payload;
-    uint16_t profile_slot_size;
+    uint32_t profile_slot_size;
     uint16_t via_macro_bytes;
     uint8_t  supported_domain_mask;
+    uint8_t  max_name_bytes;
+    uint8_t  layer_mask_bits;
+    uint8_t  placement_positions;
 } noah_profile_wire_v1_capabilities_t;
 
 typedef struct {

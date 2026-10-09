@@ -35,6 +35,7 @@ noah_profile_validator_v1_compatibility_t noah_profile_validator_v1_default_comp
     compatibility.max_blob_size                     = NOAH_PROFILE_BLOB_V1_MAX_SIZE;
     compatibility.action_abi_digest                 = action_abi_digest;
     compatibility.logical_layer_count               = NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS;
+    compatibility.placement_positions               = NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS;
     compatibility.supported_pd_mode_mask            = NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL;
     compatibility.via_macro_slot_count              = NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS;
     compatibility.custom_key_count        = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
@@ -88,7 +89,7 @@ static bool rgb_limits_are_valid(const noah_profile_validator_v1_compatibility_t
 }
 
 static bool compatibility_is_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
-    if (!compatibility || (compatibility->allowed_domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u || (compatibility->required_domain_mask & (uint8_t)~compatibility->allowed_domain_mask) != 0u || compatibility->max_blob_size < NOAH_PROFILE_BLOB_V1_HEADER_SIZE || compatibility->max_blob_size > NOAH_PROFILE_BLOB_V1_MAX_SIZE || compatibility->logical_layer_count > NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS || (compatibility->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u || compatibility->via_macro_slot_count > NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS || compatibility->custom_key_count > NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS) {
+    if (!compatibility || (compatibility->allowed_domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u || (compatibility->required_domain_mask & (uint8_t)~compatibility->allowed_domain_mask) != 0u || compatibility->max_blob_size < NOAH_PROFILE_BLOB_V1_HEADER_SIZE || compatibility->max_blob_size > NOAH_PROFILE_BLOB_V1_MAX_SIZE || compatibility->logical_layer_count > NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS || compatibility->placement_positions > NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS || (compatibility->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u || compatibility->via_macro_slot_count > NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS || compatibility->custom_key_count > NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS) {
         return false;
     }
     return behavior_limits_are_valid(&compatibility->behavior_limits) && rgb_limits_are_valid(compatibility);
@@ -331,20 +332,22 @@ static noah_profile_validator_v1_result_t validate_combos(noah_profile_validator
     noah_profile_action_v1_limits_t limits = noah_profile_action_v1_default_limits();
     uint8_t row_index = state->row_index;
     uint8_t phase = state->phase;
+    uint16_t read_offset = state->offset;
     noah_profile_combo_v1_iteration_t result = noah_profile_combo_v1_iteration_step(state, &validator->reader, validator->base_offset + offset, validator->payload.length, &limits, &header, &row, &detail);
     if (result == NOAH_PROFILE_COMBO_V1_HEADER || result == NOAH_PROFILE_COMBO_V1_ITERATING) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     if (result == NOAH_PROFILE_COMBO_V1_COMPLETE) return NOAH_PROFILE_VALIDATOR_V1_VALID;
-    if (phase) offset += NOAH_PROFILE_COMBO_V2_HEADER_SIZE + (size_t)row_index * NOAH_PROFILE_COMBO_V1_ROW_SIZE;
     if (result == NOAH_PROFILE_COMBO_V1_REJECTED) {
-        if (detail == NOAH_PROFILE_CODEC_V1_READ_ERROR) return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_READ_ERROR, offset + (phase == 2u ? 12u : 0u), error);
+        if (detail == NOAH_PROFILE_CODEC_V1_READ_ERROR) return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_READ_ERROR, offset + read_offset, error);
+        offset += phase ? state->row_offset : 0u;
         goto invalid;
     }
+    offset += state->row_offset;
     if (!action_reference_is_valid(validator, &row.output) || !placement_is_supported(validator, &row.output, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT)) goto invalid;
     for (uint8_t input = 0; input < row.input_count; input++)
         if (!action_reference_is_valid(validator, &row.inputs[input])) goto invalid;
     if (validator->compatibility.runtime && validator->compatibility.runtime->combo_to_native) {
         bool (*to_native)(const noah_profile_action_v1_t *, uint16_t *) = validator->compatibility.runtime->combo_to_native;
-        uint16_t native[4], output;
+        uint16_t native[NOAH_PROFILE_COMBO_V1_MAX_INPUTS], output;
         if (!to_native(&row.output, &output) || !output) goto invalid;
         for (uint8_t input = 0; input < row.input_count; input++) {
             if (!to_native(&row.inputs[input], &native[input]) || native[input] <= 1u) goto invalid;
@@ -360,10 +363,16 @@ invalid:
 
 static noah_profile_validator_v1_result_t validate_settings(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
     noah_profile_settings_v1_validation_t *state = &v->domain_validation.settings;
-    uint8_t                                byte;
+    uint8_t                                bytes[NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX];
     size_t                                 offset = v->payload.offset + state->offset;
-    if (read_blob(v, offset, &byte, 1, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
-    if (!noah_profile_settings_v1_consume(state, byte, v->payload.length, v->compatibility.logical_layer_count)) return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, error);
+    uint16_t                               count  = v->payload.length - state->offset;
+    // One read of up to a step's bytes, consumed one at a time: a maximum
+    // settings domain takes about 470 steps rather than 9,380.
+    if (count > sizeof(bytes)) count = sizeof(bytes);
+    if (read_blob(v, offset, bytes, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
+    for (uint16_t i = 0; i < count; i++)
+        if (!noah_profile_settings_v1_consume(state, bytes[i], v->payload.length, v->compatibility.logical_layer_count, v->compatibility.placement_positions)) return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset + i, error);
+    offset += count - 1u;
     if (state->offset < v->payload.length) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     if (!noah_profile_settings_v1_complete(state, v->payload.length)) return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, error);
     return NOAH_PROFILE_VALIDATOR_V1_VALID;

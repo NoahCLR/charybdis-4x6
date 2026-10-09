@@ -22,7 +22,8 @@ build_and_run() {
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DNOAH_PROFILE_SPLIT_TEST_HOOKS \
         -DVIA_ENABLE \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x4800u \
+        -DNOAH_PD_PROFILE_ENABLE \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \
@@ -38,6 +39,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_authority.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_protocol_v1.c" \
@@ -48,7 +50,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_peer_store_backend.c" \
         -o "$BUILD_DIR/profile_split_reconciler_test_$name"
-    "$BUILD_DIR/profile_split_reconciler_test_$name"
+    "$BUILD_DIR/profile_split_reconciler_test_$name" "$ROOT/tests/fixtures/maximum_profile_v3.fixture"
 }
 
 build_and_run normal

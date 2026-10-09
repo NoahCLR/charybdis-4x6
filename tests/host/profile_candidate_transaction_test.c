@@ -104,7 +104,7 @@ static noah_profile_candidate_v1_metadata_t metadata_for(const uint8_t *bytes, u
         .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
         .via_generation       = 6u,
         .via_digest           = UINT32_C(0xabcdef01),
-        .schema_major         = 2u,
+        .schema_major         = NOAH_PROFILE_SCHEMA_MAJOR,
         .schema_minor         = 0u,
         .requested_domains    = 0u,
         .flags                = 0u,
@@ -307,7 +307,7 @@ static noah_profile_candidate_backend_t backend_for(fake_backend_t *fake) {
 
 static noah_profile_candidate_compatibility_t compatibility(void) {
     noah_profile_candidate_compatibility_t compatibility = {
-        .schema_major          = 2u,
+        .schema_major          = NOAH_PROFILE_SCHEMA_MAJOR,
         .schema_minor          = 0u,
         .supported_domain_mask = NOAH_PROFILE_CANDIDATE_V1_KNOWN_DOMAINS,
         .max_payload_length    = NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE,
@@ -360,7 +360,7 @@ static void test_exact_frame_codecs(void) {
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
     assert(command.operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK);
     assert(command.payload.chunk.offset == 0u && command.payload.chunk.length == 8u);
-    assert(memcmp(command.payload.chunk.bytes, "NLP1\x02\x00\x00\x01", 8u) == 0);
+    assert(memcmp(command.payload.chunk.bytes, "NLP1\x03\x00\x00\x01", 8u) == 0);
 
     load_fixture("validate-request", frame);
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
@@ -418,11 +418,11 @@ static void test_malformed_frame_matrix(void) {
     metadata.payload_length = 8u;
     // Retired store formats and missing VIA identities are rejected before
     // any candidate lease or persistent writes can begin.
-    for (uint8_t format = 0u; format <= 4u; format++) {
+    for (uint8_t format = 0u; format <= 5u; format++) {
         begin_frame(frame, 1u, &metadata);
         frame[23] = format;
-        assert((noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK) == (format == 3u));
-        if (format != 3u) assert(error.frame_offset == 23u);
+        assert((noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK) == (format == 4u));
+        if (format != 4u) assert(error.frame_offset == 23u);
     }
     for (uint8_t offset = 24u; offset <= 28u; offset += 4u) {
         begin_frame(frame, 1u, &metadata);
@@ -561,7 +561,7 @@ static void test_peer_status_page(void) {
 }
 
 static void test_mailbox_and_begin_retries(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -787,7 +787,7 @@ static void test_bounded_validation_and_error_locations(void) {
 }
 
 static void test_commit_activation_and_idempotent_retry(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -846,7 +846,7 @@ static void test_commit_activation_and_idempotent_retry(void) {
 }
 
 static void test_split_authorization_barriers(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -976,7 +976,7 @@ static void test_split_authorization_barriers(void) {
 }
 
 static void test_postcommit_authority_failure_is_terminal_and_retains_candidate(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1009,7 +1009,7 @@ static void test_postcommit_authority_failure_is_terminal_and_retains_candidate(
 }
 
 static void test_split_commit_failure_reports_and_cleans_known_precommit_failure(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1054,7 +1054,7 @@ static void test_split_commit_failure_reports_and_cleans_known_precommit_failure
 }
 
 static void test_activation_failure_is_durable_and_requires_status_clear(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1095,7 +1095,7 @@ static void test_activation_failure_is_durable_and_requires_status_clear(void) {
 }
 
 static void test_unknown_marker_durability_is_not_reported_as_safe_failure(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1120,7 +1120,7 @@ static void test_unknown_marker_durability_is_not_reported_as_safe_failure(void)
 }
 
 static void test_abort_reset_and_no_timeout(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1184,7 +1184,7 @@ static void test_abort_reset_and_no_timeout(void) {
 }
 
 static void test_begin_compatibility_rejections(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1222,7 +1222,7 @@ static void test_begin_compatibility_rejections(void) {
 }
 
 static void test_busy_begin_remains_queued_without_poisoning(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();
@@ -1258,7 +1258,7 @@ static void test_busy_begin_remains_queued_without_poisoning(void) {
 }
 
 static void test_explicit_precommit_expiry_never_crosses_durable_boundary(void) {
-    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
     noah_profile_candidate_backend_t       backend;
     noah_profile_candidate_compatibility_t compatible = compatibility();

@@ -19,8 +19,8 @@ static uint32_t qmk_read_calls;
 static uint32_t qmk_write_calls;
 static uint32_t current_compiled_digest = TEST_COMPILED_DIGEST;
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
-static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 2u, 0u, 1u, 1u, 0x10u, 3u, 1u, 0u, 0xA5u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
+static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 3u, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 1u, 0u, 0xA5u};
 
 noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_compiled_v1_t *profile, noah_profile_compiled_v1_error_t *error) {
     (void)error;
@@ -59,7 +59,7 @@ void eeprom_write_block(const void *source, void *target, size_t length) {
     memcpy(&eeprom_bytes[address], source, length);
 }
 
-static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
+static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
     uint8_t *bytes = context;
 
     if (!target || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
@@ -69,7 +69,7 @@ static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16
     return true;
 }
 
-static bool memory_write(void *context, uint16_t address, const uint8_t *source, uint16_t length) {
+static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
     uint8_t *bytes = context;
 
     if (!source || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {

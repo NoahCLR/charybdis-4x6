@@ -6,7 +6,7 @@ trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 python3 - "$ROOT" "$BUILD_DIR" <<'PY'
 import json, sys
 from pathlib import Path
-cases = {case['name']: case for case in json.loads(Path(sys.argv[1], 'tests/fixtures/pd_mode_domain_v2.json').read_text())['valid']}
+cases = {case['name']: case for case in json.loads(Path(sys.argv[1], 'tests/fixtures/pd_mode_domain_v3.json').read_text())['valid']}
 for name in ('presets', 'full'):
     Path(sys.argv[2], name + '.bin').write_bytes(bytes.fromhex(cases[name]['hex']))
 PY

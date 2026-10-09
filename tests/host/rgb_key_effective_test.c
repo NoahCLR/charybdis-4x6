@@ -16,8 +16,14 @@ const layer_color_config_t     layer_colors[LAYER_COUNT] = {0};
 const layer_led_group_t *const layer_led_groups          = NULL;
 const uint8_t                  layer_led_group_count     = 0u;
 
+// One colour per tap past the first: four at depth five, seven at depth eight.
+#if KEY_BEHAVIOR_MAX_TAP_COUNT == 8u
+#    define TEST_TAP_BRANCH_COLORS RGB_TAP_BRANCH_COLORS(HSV(11, 12, 13), HSV(21, 22, 23), HSV(31, 32, 33), HSV(41, 42, 43), HSV(81, 82, 83), HSV(91, 92, 93), HSV(101, 102, 103))
+#else
+#    define TEST_TAP_BRANCH_COLORS RGB_TAP_BRANCH_COLORS(HSV(11, 12, 13), HSV(21, 22, 23), HSV(31, 32, 33), HSV(41, 42, 43))
+#endif
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    RGB_TAP_BRANCH_COLORS(HSV(11, 12, 13), HSV(21, 22, 23), HSV(31, 32, 33), HSV(41, 42, 43)), .tap_committed_color = HSV(51, 52, 53), .hold_active_color = HSV(61, 62, 63), .long_hold_active_color = HSV(71, 72, 73), .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_OFF, .locality = RGB_KEYS_ONLY,
+    TEST_TAP_BRANCH_COLORS, .tap_committed_color = HSV(51, 52, 53), .hold_active_color = HSV(61, 62, 63), .long_hold_active_color = HSV(71, 72, 73), .tap_commit_mode = KEY_FEEDBACK_TAP_COMMIT_OFF, .locality = RGB_KEYS_ONLY,
 };
 
 static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_data[] = {

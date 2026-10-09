@@ -67,6 +67,7 @@ __attribute__((weak)) uint16_t get_record_keycode(keyrecord_t *record, bool upda
     if (!record) {
         return KC_NO;
     }
+    if (record->keycode) return record->keycode;
 
     layer = get_highest_layer(layer_state | default_layer_state);
     return keymap_key_to_keycode(layer, record->event.key);
@@ -335,4 +336,10 @@ void key_runtime_integration_run(uint16_t *time, const key_runtime_integration_s
                 break;
         }
     }
+}
+
+// QMK's source-layer cache: these harnesses author every key on layer 0.
+__attribute__((weak)) uint8_t read_source_layers_cache(keypos_t key) {
+    (void)key;
+    return 0;
 }

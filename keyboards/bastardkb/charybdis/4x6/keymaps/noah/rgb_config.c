@@ -101,6 +101,14 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
     [LAYER_EXTRA_1] = {.color = HSV(96, 255, 200), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
     [LAYER_EXTRA_2] = {.color = HSV(140, 255, 200), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
     [LAYER_EXTRA_3] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_4] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_5] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_6] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_7] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_8] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_9] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_10] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_11] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
 
 };
 

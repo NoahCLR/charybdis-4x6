@@ -130,6 +130,8 @@ static inline bool handled_key_hold_contract_fires_at_threshold(handled_key_hold
 
 void                           handled_key_lookup_into(uint16_t keycode, handled_key_resolution_t *out);
 void                           handled_key_lookup_tap_count_into(uint16_t keycode, uint8_t tap_count, handled_key_resolution_t *out);
+// use_row false: the key as if it had no authored row (a bypassed press).
+void                           handled_key_lookup_row_tap_count_into(uint16_t keycode, uint8_t tap_count, bool use_row, handled_key_resolution_t *out);
 handled_key_resolution_t       handled_key_lookup(uint16_t keycode);
 handled_key_resolution_t       handled_key_lookup_tap_count(uint16_t keycode, uint8_t tap_count);
 handled_key_resolution_ctx_t   handled_key_resolution_ctx_live(keypos_t key_pos);

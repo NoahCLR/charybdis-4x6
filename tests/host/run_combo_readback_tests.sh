@@ -18,7 +18,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/test_$name"
     if [ "$name" = normal ] || [ "$name" = sanitized ]; then
-        "$BUILD_DIR/test_$name" "$ROOT/tests/fixtures/combo_readback_eight_v2.fixture"
+        # NOAH_WRITE_COMBO_FIXTURE=1 regenerates the fixture after a deliberate format change.
+        "$BUILD_DIR/test_$name" "$ROOT/tests/fixtures/combo_readback_v3.fixture" ${NOAH_WRITE_COMBO_FIXTURE:+--write-fixture}
     else
         "$BUILD_DIR/test_$name"
     fi

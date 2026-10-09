@@ -25,6 +25,9 @@ noah_host_export_qmk_cpath "$ROOT"
 # RGB, key behaviors and pointing content come from the real authored writer.
 python3 "$ROOT/tests/host/translate_eight_slot_profile.py" "$ROOT/tests/fixtures/client-regression/portable.bin.pd5" "$BUILD_DIR/portable32.bin.pd5"
 
+# The maximum profile fixture must match its generator.
+python3 "$ROOT/tests/host/make_maximum_profile.py" --check
+
 build_and_run() {
     name="$1"
     shift
@@ -36,7 +39,7 @@ build_and_run() {
         -DRGB_MATRIX_WS2812 \
         -DVIA_ENABLE \
         -DMCU_RP \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x4800u \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
         -I"$ROOT" \
@@ -83,7 +86,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_peer_store_backend.c" \
         -o "$bin"
-    "$bin" "$BUILD_DIR/portable32.bin.pd5"
+    "$bin" "$BUILD_DIR/portable32.bin.pd5" "$ROOT/tests/fixtures/maximum_profile_v3.fixture"
 }
 build_and_run normal -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
 build_and_run sanitized -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer

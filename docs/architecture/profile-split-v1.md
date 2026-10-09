@@ -1,8 +1,8 @@
 # Profile Split Protocol V1
 
-> Current firmware accepts only the formats it writes (D-F10): profile schema
-> 2.0; RGB v3, key behaviors v1, combos v2, settings v5 and sparse PD v2;
-> a 5,088-byte custom payload; and logical store format 3 (`NR`). Every save
+> Current firmware accepts only the formats it writes (D-F10, D-F14): profile
+> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v6 and sparse PD v3;
+> a 65,504-byte custom payload; and logical store format 4 (`NS`). Every save
 > binds a nonzero VIA generation and digest. HID and split framing remain v1.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > Backup translation belongs to the client, before a current-format Apply.
@@ -265,7 +265,7 @@ pair advertises them together for the two-half acceptance matrix.
 ## Mandatory logical binding
 
 A transfer sends LOGICAL_BIND (kind 9) before PREPARE_BEGIN, with the exact
-custom generation/digest and nonzero VIA generation/digest in format 3.
+custom generation/digest and nonzero VIA generation/digest in format 4.
 PREPARE_BEGIN without that correlated bind is invalid metadata. The receiver
 retains the bind across repeated BEGINs after BUSY or a lost ACK, replacing it
 when a new bind arrives. Convergence-only mode admits this metadata for crossed

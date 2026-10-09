@@ -791,3 +791,21 @@ uint16_t key_runtime_scenario_register_code_count(void) {
 uint16_t key_runtime_scenario_unregister_code_count(void) {
     return key_runtime_scenario_unregister_code_count_value;
 }
+
+// QMK's source-layer cache: these harnesses author every key on layer 0.
+__attribute__((weak)) uint8_t read_source_layers_cache(keypos_t key) {
+    (void)key;
+    return 0;
+}
+
+// QMK's record keycode, for the tapping hook; these harnesses run no keymap.
+__attribute__((weak)) uint16_t get_record_keycode(keyrecord_t *record, bool update_layer_cache) {
+    (void)update_layer_cache;
+    return record ? record->keycode : KC_NO;
+}
+
+// Participation allows every press in this harness (no stored policy), so a
+// row-less view is never asked for beyond linking.
+key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode) {
+    return key_behavior_lookup(keycode);
+}

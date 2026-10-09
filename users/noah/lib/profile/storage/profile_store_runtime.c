@@ -231,7 +231,7 @@ bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target,
 #if defined(VIA_ENABLE)
     const noah_profile_store_record_t *record = noah_profile_store_runtime_committed();
     const noah_profile_store_t        *store;
-    uint16_t                           payload_start;
+    noah_profile_storage_address_t  payload_start;
 
 #    if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
     store = noah_profile_owner_store(&runtime_owner);
@@ -248,13 +248,13 @@ bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target,
         return false;
     }
     if (record->slot == NOAH_PROFILE_SLOT_A) {
-        payload_start = (uint16_t)(NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+        payload_start = (NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
     } else if (record->slot == NOAH_PROFILE_SLOT_B) {
-        payload_start = (uint16_t)(NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+        payload_start = (NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
     } else {
         return false;
     }
-    return store->io.read(store->io.context, (uint16_t)(payload_start + offset), target, length);
+    return store->io.read(store->io.context, (payload_start + offset), target, length);
 #else
     (void)offset;
     (void)target;

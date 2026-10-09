@@ -75,6 +75,7 @@ NOAH_COMMON_SOURCES := \
     lib/key/behavior/handled_key_transparency.c \
     lib/key/behavior/handled_key_materialize.c \
     lib/key/behavior/key_behavior_lookup.c \
+    lib/key/behavior/participation.c \
     lib/key/behavior/keymap_validation.c \
     lib/key/runtime/api.c \
     lib/key/runtime/preflight.c \

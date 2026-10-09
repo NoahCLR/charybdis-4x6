@@ -513,7 +513,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
         tap_count = key_runtime_core_tap_series_next_tap_count(series);
     }
 
-    handled_key_lookup_tap_count_into(event->keycode, tap_count, &resolution);
+    handled_key_lookup_row_tap_count_into(event->keycode, tap_count, !event->bypass_row, &resolution);
     handled = handled_key_resolution_is_handled(resolution);
     handled_key_materialized_default_into(&resolution, &materialized);
     hold_term_ms        = key_runtime_core_default_hold_term(event->keycode);
@@ -777,7 +777,7 @@ void key_runtime_core_apply_event(const runtime_event_t *event, uint16_t event_t
     }
 }
 
-static __attribute__((noinline)) void key_runtime_core_observe_process_record_press(uint16_t keycode, const keyrecord_t *record, uint16_t now) {
+static __attribute__((noinline)) void key_runtime_core_observe_process_record_press(uint16_t keycode, const keyrecord_t *record, bool use_row, uint16_t now) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     runtime_key_event_t       event;
 
@@ -788,6 +788,7 @@ static __attribute__((noinline)) void key_runtime_core_observe_process_record_pr
     event = (runtime_key_event_t){
         .keycode = keycode,
         .key_pos = record->event.key,
+        .bypass_row = !use_row,
     };
     key_runtime_core_refresh_for_time(state, now);
     key_runtime_core_press_token_begin(state, &event, noah_qmk_gesture_event_time(record));
@@ -810,6 +811,10 @@ static __attribute__((noinline)) void key_runtime_core_observe_process_record_re
 }
 
 void key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t *record) {
+    key_runtime_core_observe_process_record_event_with_row(keycode, record, true);
+}
+
+void key_runtime_core_observe_process_record_event_with_row(uint16_t keycode, keyrecord_t *record, bool use_row) {
     uint16_t now;
 
     if (!record) {
@@ -818,7 +823,7 @@ void key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t
 
     now = timer_read();
     if (record->event.pressed) {
-        key_runtime_core_observe_process_record_press(keycode, record, now);
+        key_runtime_core_observe_process_record_press(keycode, record, use_row, now);
     } else {
         key_runtime_core_observe_process_record_release(keycode, record, now);
     }

@@ -22,7 +22,7 @@ build_and_run() {
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DVIA_ENABLE \
         -DNOAH_PROFILE_OWNER_TEST_DIAGNOSTICS \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x4800u \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \

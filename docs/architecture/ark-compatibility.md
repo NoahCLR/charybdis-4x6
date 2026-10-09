@@ -78,8 +78,9 @@ the interruption and keyboard acceptance procedures.
 
 ## Current-format cut (D-F10)
 
-Firmware accepts schema 2.0, RGB v3, key behaviors v1, combo v2, settings v5,
-sparse PD v2 and `NR` store format 3 only. BEGIN requires a nonzero VIA binding.
+Firmware accepts schema 3.0, RGB v4, key behaviors v2, combo v3, settings v6,
+sparse PD v3 and `NS` store format 4 only (D-F14). BEGIN requires a nonzero VIA
+binding.
 The legacy GET 9 page and its feature bit are removed. Ark must require binding
 in `candidateMetadataForBlob`, update codec/rejection expectations and its
 integration probe recipes, refresh imported fixtures/specs and repin after the

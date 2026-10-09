@@ -13,8 +13,12 @@ enum {
     MAX_PREPARE_TIME_MS = 60000u,
 };
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
 static const uint8_t max_profile[NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE];
+// Fault sweeps plant one fault at every exchange of a copy, so their cost
+// grows with the square of its length. The protocol does not depend on
+// length, so they copy 5,088 bytes; a full copy is sampled separately.
+#define FAULT_SWEEP_LENGTH 5088u
 
 typedef struct {
     uint8_t  bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
@@ -68,7 +72,7 @@ static uint32_t always_safe(void *context) {
     return 0u;
 }
 
-static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
+static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
     memory_t *memory = context;
 
     memory->reads++;
@@ -83,7 +87,7 @@ static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16
     return true;
 }
 
-static bool memory_write(void *context, uint16_t address, const uint8_t *source, uint16_t length) {
+static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
     memory_t *memory = context;
 
     memory->writes++;
@@ -1027,9 +1031,12 @@ static void test_maximum_candidate_resolves_within_owner_no_progress_window(void
     half_t                          left;
     half_t                          right;
     noah_profile_split_descriptor_t descriptor;
-    staged_source_t                 source      = {.bytes = max_profile, .length = sizeof(max_profile)};
-    uint32_t                        start_at    = 100000u;
-    uint32_t                        resolved_at = start_at;
+    staged_source_t                 source       = {.bytes = max_profile, .length = sizeof(max_profile)};
+    uint32_t                        start_at     = 100000u;
+    uint32_t                        resolved_at  = start_at;
+    uint32_t                        progress_at  = start_at;
+    uint32_t                        longest_gap  = 0u;
+    size_t                          last_reads   = 0u;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -1041,73 +1048,180 @@ static void test_maximum_candidate_resolves_within_owner_no_progress_window(void
     descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
 
     assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
-    for (uint32_t scan = 0u; scan < MAX_SCANS; scan++) {
+    // A full 65,504-byte payload is 4,679 split chunks, then the peer's
+    // validation; the loop bound is generous, the timing assertion is not.
+    for (uint32_t scan = 0u; scan < 16u * MAX_SCANS; scan++) {
         resolved_at = start_at + scan * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS;
         assert_one_scan_budget(&right, true, resolved_at);
         assert_one_scan_budget(&left, false, resolved_at);
+        if (source.reads != last_reads) {
+            last_reads  = source.reads;
+            progress_at = resolved_at;
+        }
+        if (resolved_at - progress_at > longest_gap) longest_gap = resolved_at - progress_at;
         if (right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED || noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL)) {
             break;
         }
     }
     // This deliberately maximal all-zero payload is semantically invalid,
     // but transfer plus whole-payload validation must still reach a terminal
-    // result before the owner's no-progress guard can fire.
+    // result before the owner's no-progress guard can fire. That guard is
+    // refreshed by acknowledged transfer progress, so the bound is the longest
+    // stretch without it (the peer's validation), not the whole transfer.
     assert(right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED);
     assert(right.reconciler.last_status == NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR);
-    assert((uint32_t)(resolved_at - start_at) < MAX_PREPARE_TIME_MS);
+    assert(longest_gap < MAX_PREPARE_TIME_MS);
     assert(source.reads == (sizeof(max_profile) + NOAH_PROFILE_SPLIT_V1_CHUNK_MAX - 1u) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX);
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
 
-// One lost exchange anywhere in a full-size copy, whether the request never
-// arrived or its reply was lost after the peer acted on it, must still let the
-// transfer finish. A copy that retries one chunk forever wedges Apply.
+// The maximum profile fixture (D-F14), every table at its maximum: the peer
+// receives it, validates it, holds it prepared, and commits it once authorized.
+static uint8_t maximum_profile[NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE];
+static size_t  maximum_profile_length;
+static void    load_maximum_profile(const char *path) {
+    static char line[2u * NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE + 64u];
+    FILE       *file = fopen(path, "r");
+    assert(file);
+    while (fgets(line, sizeof(line), file)) {
+        if (strncmp(line, "profile.hex=", 12) != 0) continue;
+        for (const char *hex = line + 12; hex[0] && hex[0] != '\n'; hex += 2) {
+            unsigned byte;
+            assert(maximum_profile_length < sizeof(maximum_profile) && sscanf(hex, "%2x", &byte) == 1);
+            maximum_profile[maximum_profile_length++] = (uint8_t)byte;
+        }
+    }
+    fclose(file);
+    assert(maximum_profile_length > 32768u);
+}
+
+static void test_maximum_profile_prepares_and_commits_on_the_peer(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source      = {.bytes = maximum_profile, .length = (uint16_t)maximum_profile_length};
+    uint32_t                        start_at    = 100000u;
+    uint32_t                        now         = start_at;
+    uint32_t                        progress_at = start_at;
+    uint32_t                        longest_gap = 0u;
+    size_t                          last_reads  = 0u;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor                = committed_descriptor(&right, 32u, 1u);
+    descriptor.payload_length = (uint16_t)maximum_profile_length;
+    descriptor.domain_mask    = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS;
+    descriptor.payload_crc32  = payload_crc(maximum_profile, maximum_profile_length);
+    descriptor.payload_digest = payload_digest(maximum_profile, maximum_profile_length);
+
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
+    for (uint32_t scan = 0u; scan < 16u * MAX_SCANS && right.reconciler.state != NOAH_PROFILE_SPLIT_RECONCILER_STOPPED && !noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL); scan++) {
+        now = start_at + scan * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS;
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        if (source.reads != last_reads) {
+            last_reads  = source.reads;
+            progress_at = now;
+        }
+        if (now - progress_at > longest_gap) longest_gap = now - progress_at;
+    }
+    if (!noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL))
+        fprintf(stderr, "maximum push: state %u status %u offset %u reads %u; peer validator code %u offset %u domain %02x row %u field %u detail %u/%u\n", (unsigned)right.reconciler.state, (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.transfer_offset, (unsigned)source.reads, left.candidate_backend.validator.terminal_error.code, (unsigned)left.candidate_backend.validator.terminal_error.byte_offset, left.candidate_backend.validator.terminal_error.domain_id, left.candidate_backend.validator.terminal_error.row_index, left.candidate_backend.validator.terminal_error.field_id, left.candidate_backend.validator.terminal_error.detail_kind, left.candidate_backend.validator.terminal_error.detail_code);
+    assert(noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL));
+    fprintf(stderr, "maximum push: longest gap %u ms = %u scans; total %u ms\n", (unsigned)longest_gap, (unsigned)(longest_gap / NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS), (unsigned)(now - start_at));
+    assert(longest_gap < MAX_PREPARE_TIME_MS);
+    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED && left.store.prepared_durable);
+    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+
+    assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; scan++) {
+        now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(left.store.committed.generation == descriptor.generation);
+    assert(left.store.committed.payload_length == maximum_profile_length && left.store.committed.payload_digest == descriptor.payload_digest);
+}
+
+// Runs one prepared copy of `length` bytes of max_profile with exchange
+// `drop` lost before or after delivery. Returns false when the fault never
+// fired, which means `drop` is past the last exchange of a clean copy.
+static bool run_copy_with_lost_exchange(uint16_t length, bool after, uint32_t drop) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source   = {.bytes = max_profile, .length = length};
+    uint32_t                        start_at = 100000u;
+    uint32_t                        base;
+    bool                            done = false;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor                = committed_descriptor(&right, 32u, 1u);
+    descriptor.payload_length = length;
+    descriptor.payload_crc32  = payload_crc(max_profile, length);
+    descriptor.payload_digest = payload_digest(max_profile, length);
+    base                      = right.link.exchanges;
+    if (after)
+        right.link.drop_after_delivery_exchange = base + drop;
+    else
+        right.link.drop_before_delivery_exchange = base + drop;
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
+    for (uint32_t scan = 0u; scan < 32u * MAX_SCANS && !done; scan++) {
+        uint32_t now = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        done = right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED || noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL);
+    }
+    if (!done) {
+        fprintf(stderr, "copy wedged: exchange %u lost %s delivery; sender state %u, offset %u of %u, peer store state %u, retries %u\n", (unsigned)drop, after ? "after" : "before",
+                (unsigned)right.reconciler.state, (unsigned)right.reconciler.transfer_offset, (unsigned)descriptor.payload_length, (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)right.reconciler.retry_count);
+        assert(!"a single lost exchange wedged the copy");
+    }
+    return (after ? right.link.drop_after_delivery_exchange : right.link.drop_before_delivery_exchange) == 0u;
+}
+
+// One lost exchange anywhere in a copy, whether the request never arrived or
+// its reply was lost after the peer acted on it, must still let the transfer
+// finish. A copy that retries one chunk forever wedges Apply. Every exchange
+// of a 5,088-byte copy is covered (the protocol does not depend on size);
+// a full 65,504-byte copy is sampled at its start, middle and end, including
+// the offsets whose 16-bit sums are largest.
 static void test_prepared_push_survives_one_lost_exchange_anywhere(void) {
+    enum { EXHAUSTIVE_LENGTH = 5088u };
     uint32_t exchanges_clean = 0u;
 
     for (uint8_t after = 0u; after <= 1u; after++) {
         for (uint32_t drop = 1u;; drop++) {
-            half_t                          left;
-            half_t                          right;
-            noah_profile_split_descriptor_t descriptor;
-            staged_source_t                 source   = {.bytes = max_profile, .length = sizeof(max_profile)};
-            uint32_t                        start_at = 100000u;
-            uint32_t                        base;
-            bool                            done = false;
-
-            half_storage_init(&left);
-            half_storage_init(&right);
-            pair_init(&left, &right);
-            run_pair_until_converged(&left, &right, false);
-            descriptor                = committed_descriptor(&right, 32u, 1u);
-            descriptor.payload_length = sizeof(max_profile);
-            descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
-            descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
-            base                      = right.link.exchanges;
-            if (after)
-                right.link.drop_after_delivery_exchange = base + drop;
-            else
-                right.link.drop_before_delivery_exchange = base + drop;
-            assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
-            for (uint32_t scan = 0u; scan < MAX_SCANS * 2u && !done; scan++) {
-                uint32_t now = start_at + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
-                assert_one_scan_budget(&right, true, now);
-                assert_one_scan_budget(&left, false, now);
-                done = right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED || noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL);
-            }
-            if (!done) {
-                fprintf(stderr, "copy wedged: exchange %u lost %s delivery; sender state %u, offset %u of %u, peer store state %u, retries %u\n", (unsigned)drop, after ? "after" : "before",
-                        (unsigned)right.reconciler.state, (unsigned)right.reconciler.transfer_offset, (unsigned)descriptor.payload_length, (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)right.reconciler.retry_count);
-                assert(!"a single lost exchange wedged the copy");
-            }
-            // The fault never fired: every exchange of a clean copy is covered.
-            if ((after ? right.link.drop_after_delivery_exchange : right.link.drop_before_delivery_exchange) != 0u) {
+            if (!run_copy_with_lost_exchange(EXHAUSTIVE_LENGTH, after, drop)) {
                 if (!exchanges_clean) exchanges_clean = drop;
                 break;
             }
         }
     }
-    assert(exchanges_clean > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
+    assert(exchanges_clean > 2u * (EXHAUSTIVE_LENGTH / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
+
+    uint32_t full_exchanges = 0u;
+    while (run_copy_with_lost_exchange(sizeof(max_profile), false, full_exchanges + 1u)) {
+        full_exchanges += 2048u;
+    }
+    assert(full_exchanges > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) - 2048u);
+    for (uint8_t after = 0u; after <= 1u; after++) {
+        static const uint32_t near_start[] = {1u, 2u, 3u, 4u, 5u};
+        for (size_t index = 0u; index < sizeof(near_start) / sizeof(near_start[0]); index++) {
+            assert(run_copy_with_lost_exchange(sizeof(max_profile), after, near_start[index]));
+        }
+        for (uint32_t drop = 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) / 2u; drop < 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) / 2u + 4u; drop++) {
+            assert(run_copy_with_lost_exchange(sizeof(max_profile), after, drop));
+        }
+        for (uint32_t drop = 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) - 4u; drop < 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) + 2u; drop++) {
+            assert(run_copy_with_lost_exchange(sizeof(max_profile), after, drop));
+        }
+    }
 }
 
 // The wire garbles a request: the peer cannot decode it, answers
@@ -1121,7 +1235,7 @@ static void test_prepared_push_survives_one_garbled_request_anywhere(void) {
         half_t                          left;
         half_t                          right;
         noah_profile_split_descriptor_t descriptor;
-        staged_source_t                 source   = {.bytes = max_profile, .length = sizeof(max_profile)};
+        staged_source_t                 source   = {.bytes = max_profile, .length = FAULT_SWEEP_LENGTH};
         uint32_t                        start_at = 100000u;
         bool                            done     = false;
 
@@ -1130,9 +1244,9 @@ static void test_prepared_push_survives_one_garbled_request_anywhere(void) {
         pair_init(&left, &right);
         run_pair_until_converged(&left, &right, false);
         descriptor                = committed_descriptor(&right, 32u, 1u);
-        descriptor.payload_length = sizeof(max_profile);
-        descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
-        descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
+        descriptor.payload_length = FAULT_SWEEP_LENGTH;
+        descriptor.payload_crc32  = payload_crc(max_profile, FAULT_SWEEP_LENGTH);
+        descriptor.payload_digest = payload_digest(max_profile, FAULT_SWEEP_LENGTH);
         right.link.garble_request_exchange = right.link.exchanges + garble;
         assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
         for (uint32_t scan = 0u; scan < MAX_SCANS * 2u && !done; scan++) {
@@ -1153,7 +1267,7 @@ static void test_prepared_push_survives_one_garbled_request_anywhere(void) {
             break;
         }
     }
-    assert(exchanges_clean > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
+    assert(exchanges_clean > 2u * (FAULT_SWEEP_LENGTH / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
 }
 
 // Sends a full-size prepared copy with one fault planted at exchange `fault`
@@ -1165,7 +1279,7 @@ static bool run_prepared_push_with_fault(uint32_t fault, bool replay, const noah
     half_t                          left;
     half_t                          right;
     noah_profile_split_descriptor_t descriptor;
-    staged_source_t                 source   = {.bytes = max_profile, .length = sizeof(max_profile)};
+    staged_source_t                 source   = {.bytes = max_profile, .length = FAULT_SWEEP_LENGTH};
     uint32_t                        start_at = 100000u;
     bool                            done     = false;
     bool                            fired;
@@ -1175,9 +1289,9 @@ static bool run_prepared_push_with_fault(uint32_t fault, bool replay, const noah
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
     descriptor                = committed_descriptor(&right, 32u, 1u);
-    descriptor.payload_length = sizeof(max_profile);
-    descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
-    descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
+    descriptor.payload_length = FAULT_SWEEP_LENGTH;
+    descriptor.payload_crc32  = payload_crc(max_profile, FAULT_SWEEP_LENGTH);
+    descriptor.payload_digest = payload_digest(max_profile, FAULT_SWEEP_LENGTH);
     if (replay) {
         right.link.replay_previous_response_exchange = right.link.exchanges + fault;
     } else {
@@ -1210,7 +1324,7 @@ static void test_prepared_push_survives_one_replayed_reply_anywhere(void) {
     while (run_prepared_push_with_fault(fault, true, NULL)) {
         fault++;
     }
-    assert(fault > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
+    assert(fault > 2u * (FAULT_SWEEP_LENGTH / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
 }
 
 // Whatever sends an active push back to the metadata poll, here a stray
@@ -1235,8 +1349,8 @@ static void run_stale_receive_lease(bool same_length) {
     half_t                                 right;
     noah_profile_split_descriptor_t        stale;
     noah_profile_split_descriptor_t        next;
-    staged_source_t                        stale_source = {.bytes = max_profile, .length = sizeof(max_profile)};
-    staged_source_t                        next_source  = {.bytes = same_length ? max_profile : empty_profile, .length = same_length ? sizeof(max_profile) : sizeof(empty_profile)};
+    staged_source_t                        stale_source = {.bytes = max_profile, .length = FAULT_SWEEP_LENGTH};
+    staged_source_t                        next_source  = {.bytes = same_length ? max_profile : empty_profile, .length = same_length ? FAULT_SWEEP_LENGTH : sizeof(empty_profile)};
     noah_profile_split_reconciler_config_t config;
     uint32_t                               now  = 100000u;
     bool                                   done = false;
@@ -1246,9 +1360,9 @@ static void run_stale_receive_lease(bool same_length) {
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
     stale                = committed_descriptor(&right, 40u, 1u);
-    stale.payload_length = sizeof(max_profile);
-    stale.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
-    stale.payload_digest = payload_digest(max_profile, sizeof(max_profile));
+    stale.payload_length = FAULT_SWEEP_LENGTH;
+    stale.payload_crc32  = payload_crc(max_profile, FAULT_SWEEP_LENGTH);
+    stale.payload_digest = payload_digest(max_profile, FAULT_SWEEP_LENGTH);
     assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &stale, &stale_source, staged_read, 6u, UINT32_C(0xabcdef01)));
     for (uint32_t scan = 0u; scan < 64u; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
         assert_one_scan_budget(&right, true, now);
@@ -1314,7 +1428,7 @@ static void test_prepared_push_restarts_when_the_receiver_drops_its_lease(void) 
     half_t                          left;
     half_t                          right;
     noah_profile_split_descriptor_t descriptor;
-    staged_source_t                 source = {.bytes = max_profile, .length = sizeof(max_profile)};
+    staged_source_t                 source = {.bytes = max_profile, .length = FAULT_SWEEP_LENGTH};
     uint32_t                        now    = 100000u;
     bool                            done   = false;
 
@@ -1323,9 +1437,9 @@ static void test_prepared_push_restarts_when_the_receiver_drops_its_lease(void) 
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
     descriptor                = committed_descriptor(&right, 50u, 1u);
-    descriptor.payload_length = sizeof(max_profile);
-    descriptor.payload_crc32  = payload_crc(max_profile, sizeof(max_profile));
-    descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
+    descriptor.payload_length = FAULT_SWEEP_LENGTH;
+    descriptor.payload_crc32  = payload_crc(max_profile, FAULT_SWEEP_LENGTH);
+    descriptor.payload_digest = payload_digest(max_profile, FAULT_SWEEP_LENGTH);
     assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
     for (uint32_t scan = 0u; scan < 64u; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
         assert_one_scan_budget(&right, true, now);
@@ -1941,7 +2055,10 @@ static void test_descriptor_changes_are_validated_before_backoff(void) {
     assert(right.link.exchanges == exchanges);
 }
 
-int main(void) {
+int main(int argc, char **argv) {
+    assert(argc == 2);
+    load_maximum_profile(argv[1]);
+    test_maximum_profile_prepares_and_commits_on_the_peer();
     test_inbound_prepare_requires_correlated_binding();
     test_descriptor_changes_are_validated_before_backoff();
     test_compiled_convergence();

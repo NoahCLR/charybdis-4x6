@@ -304,6 +304,49 @@ static void test_tap_index_wraps_past_the_deepest_authored_branch(void) {
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
 }
 
+// A row at the shared depth (five, or eight in the second configuration):
+// every tap count up to the depth selects its own branch, the deepest one
+// resolves at the flush, and one tap more wraps to the base branch.
+static void test_full_depth_row_selects_its_deepest_branch_and_wraps(void) {
+    static const key_runtime_scenario_step_t one_tap[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 4),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 4),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+    };
+    static const key_runtime_scenario_step_t flush[] = {
+        KEY_RUNTIME_SCENARIO_ADVANCE(121),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+    key_runtime_scenario_multi_tap_entry_t entries[KEY_BEHAVIOR_MAX_TAP_COUNT - 1u];
+    const keypos_t                         key_pos = test_keypos(2, 4);
+
+    for (uint8_t index = 0u; index < ARRAY_SIZE(entries); index++) {
+        entries[index] = (key_runtime_scenario_multi_tap_entry_t){.tap_count = (uint8_t)(index + 2u), .step = {.tap = TAP_SENDS(KC_A + index)}};
+    }
+    for (uint8_t extra = 0u; extra <= 1u; extra++) {
+        key_behavior_view_t behavior = test_pressable_handled_key(TEST_MULTI_TAP_KEY);
+
+        behavior.has_multi_tap      = true;
+        behavior.authored_tap_depth = KEY_BEHAVIOR_MAX_TAP_COUNT;
+        behavior.single.tap         = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION);
+        key_runtime_scenario_reset();
+        key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
+        for (uint8_t tap = 1u; tap <= KEY_BEHAVIOR_MAX_TAP_COUNT + extra; tap++) {
+            key_runtime_scenario_run(one_tap, ARRAY_SIZE(one_tap));
+            CHECK(key_runtime_scenario_effect_count() == 0);
+            CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == (tap - 1u) % KEY_BEHAVIOR_MAX_TAP_COUNT + 1u);
+        }
+        key_runtime_scenario_run(flush, ARRAY_SIZE(flush));
+        CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(key_pos));
+        if (!extra) {
+            // The deepest branch fires once.
+            CHECK(key_runtime_scenario_effect_count() >= 1);
+            CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
+            CHECK(key_runtime_scenario_effect_at(0)->data.delayed_action.action == KC_A + KEY_BEHAVIOR_MAX_TAP_COUNT - 2u);
+        }
+    }
+}
+
 // There is no interruption to defer any more: a third press on a two-branch row
 // wraps the index rather than ending the gesture, so nothing is held over.
 static void test_same_key_wrapped_tap_does_not_defer_a_previous_branch_action(void) {
@@ -937,6 +980,7 @@ int main(void) {
     test_non_base_tap_commit_feedback_still_pulses();
     test_non_base_release_resolved_tap_commit_feedback_still_pulses();
     test_tap_index_wraps_past_the_deepest_authored_branch();
+    test_full_depth_row_selects_its_deepest_branch_and_wraps();
     test_same_key_wrapped_tap_does_not_defer_a_previous_branch_action();
     test_momentary_layer_key_tracks_press_and_release_events();
     test_threshold_hold_registers_and_releases_owned_state();

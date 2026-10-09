@@ -52,6 +52,7 @@ compile_test() {
     "$ROOT/users/noah/lib/key/runtime/preflight.c" \
     "$ROOT/users/noah/lib/key/runtime/press.c" \
     "$ROOT/users/noah/lib/key/runtime/process.c" \
+    "$ROOT/users/noah/lib/key/behavior/participation.c" \
     "$ROOT/users/noah/lib/key/runtime/release.c" \
     "$ROOT/users/noah/lib/key/runtime/deferred_release.c" \
     "$ROOT/users/noah/lib/key/runtime/scan.c" \
@@ -88,7 +89,7 @@ compile_test() {
 
 if [ "${NOAH_TEST_QMK_GESTURES:-0}" = 1 ]; then
     cc -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter \
-        -DCOMBO_ENABLE -DCOMBO_TERM_PER_COMBO -DCOMBO_TERM=50 -DTAPPING_TERM=200 -DTAP_CODE_DELAY=0 \
+        -DCOMBO_ENABLE -DEXTRA_LONG_COMBOS -DCOMBO_MUST_HOLD_PER_COMBO -DCOMBO_MUST_TAP_PER_COMBO -DCOMBO_MUST_PRESS_IN_ORDER_PER_COMBO -DKEYRECORD_USER_DATA -DCOMBO_KEY_RECORD_FILTER -Dcombo_key_record_allowed=engine_combo_key_record_allowed -DCOMBO_TERM_PER_COMBO -DCOMBO_TERM=50 -DTAPPING_TERM=200 -DTAP_CODE_DELAY=0 \
         -DMATRIX_ROWS=8 -DMATRIX_COLS=8 -DNO_DEBUG \
         -Dget_record_keycode=engine_get_record_keycode -Dget_event_keycode=engine_get_event_keycode \
         -Dkeymap_key_to_keycode=engine_keymap_key_to_keycode -Dprocess_record=engine_process_record \
@@ -99,13 +100,13 @@ if [ "${NOAH_TEST_QMK_GESTURES:-0}" = 1 ]; then
         -r "$ROOT/tests/host/qmk_gesture_engine.c" \
         "$QMK_ROOT/quantum/process_keycode/process_combo.c" "$QMK_ROOT/quantum/action_tapping.c" \
         -o "$BUILD_DIR/gesture_engine.o"
-    compile_test "$BUILD_DIR/gestures" -DNOAH_TEST_QMK_GESTURES -DCOMBO_ENABLE -DCOMBO_TERM_PER_COMBO -DCOMBO_TERM=50 "$BUILD_DIR/gesture_engine.o" \
+    compile_test "$BUILD_DIR/gestures" -DNOAH_TEST_QMK_GESTURES -DNOAH_PORTABLE_PROFILE_ENABLE -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DCOMBO_KEY_RECORD_FILTER -DNOAH_COMBO_PARTICIPATION_HOOK -DCOMBO_ENABLE -DCOMBO_TERM_PER_COMBO -DCOMBO_TERM=50 "$BUILD_DIR/gesture_engine.o" \
         "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
         "$ROOT/users/noah/lib/action/synthetic_record.c"
     "$BUILD_DIR/gestures"
     # Saturation policy must hold at the configured bound, not only at eight.
     for capacity in 1 2; do
-        compile_test "$BUILD_DIR/gestures_$capacity" -DNOAH_TEST_QMK_GESTURES \
+        compile_test "$BUILD_DIR/gestures_$capacity" -DNOAH_TEST_QMK_GESTURES -DNOAH_PORTABLE_PROFILE_ENABLE -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DCOMBO_KEY_RECORD_FILTER -DNOAH_COMBO_PARTICIPATION_HOOK \
             -DNOAH_RECORD_ADMISSION_CAPACITY="$capacity" \
             -DCOMBO_ENABLE -DCOMBO_TERM_PER_COMBO -DCOMBO_TERM=50 "$BUILD_DIR/gesture_engine.o" \
             "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \

@@ -298,22 +298,24 @@ If you change hook wiring or override behavior, run:
 
 A key of your own is a custom key, not a new keycode or a
 `process_record_user()` handler. The userspace reserves `CUSTOM_KEY_0` through
-`CUSTOM_KEY_63` (`0x7e40`–`0x7e7f`) in
+`CUSTOM_KEY_127` (`0x7f00`–`0x7f7f`) in
 [`users/noah/noah_keymap_ids.h`](../users/noah/noah_keymap_ids.h). It gives
 each userspace family one fixed, aligned block, so adding pointing modes or
 layers never moves another keycode:
 
 | Keycodes | Range | Reserved |
 | --- | --- | --- |
-| `CUSTOM_KEY_0`–`63` | `0x7e40`–`0x7e7f` | 64 |
-| `PD_SLOT_n` (pointing hold) | `0x7e80`–`0x7e9f` | 32 (8 used) |
+| retired (custom keys before D-F14) | `0x7e40`–`0x7e7f` | inert |
+| `PD_SLOT_n` (pointing hold) | `0x7e80`–`0x7e9f` | 32 |
 | `PD_SLOT_n_LOCK` | `0x7ea0`–`0x7ebf` | 32 |
-| `LOCK_LAYER(n)` | `0x7ec0`–`0x7edf` | 32 (8 used) |
+| `LOCK_LAYER(n)` | `0x7ec0`–`0x7edf` | 32 (16 used) |
 | unassigned | `0x7ee0`–`0x7eff` | |
+| `CUSTOM_KEY_0`–`127` | `0x7f00`–`0x7f7f` | 128 |
+| unassigned | `0x7f80`–`0x7fff` | |
 
 Name the key in the `CUSTOM_KEYS(KEY)` table in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c),
-one row per slot (at most 20 printable ASCII characters, `""` for an unused
+one row per slot (at most 32 bytes of UTF-8, `""` for an unused
 slot), then give it what it does as a `key_behaviors[]` row:
 
 ```c
