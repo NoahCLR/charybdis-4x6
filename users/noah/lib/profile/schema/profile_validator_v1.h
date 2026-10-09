@@ -24,8 +24,9 @@ enum {
     NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX   = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
     // Regression policy for the payload-independent 32-bit scan state. This
     // is not a hardware SRAM-capacity claim; target resource gates account
-    // for the linked instance separately.
-    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 368u,
+    // for the linked instance separately. D-F14's 128-byte pointing records
+    // make the PD iterator the largest domain state: 372 bytes on Cortex-M0+.
+    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 384u,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8      = 0xffu,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16     = 0xffffu,
 };
@@ -121,6 +122,8 @@ typedef struct {
     // One bit per PD slot; kept beside the other word so it adds no padding.
     uint32_t supported_pd_mode_mask;
     uint8_t  logical_layer_count;
+    // Matrix positions each settings placement bitmap covers (rows × columns).
+    uint8_t  placement_positions;
     uint8_t  via_macro_slot_count;
     uint8_t  custom_key_count;
 
@@ -171,7 +174,7 @@ typedef struct {
     uint32_t                                      digest_state;
     noah_profile_envelope_t                       envelope;
     noah_profile_domain_range_t                   payload;         // the domain being decoded
-    uint16_t                                      checksum_offset; // a blob is at most 5,088 bytes
+    uint16_t                                      checksum_offset; // a blob is at most 65,504 bytes
     uint8_t                                       domain;          // its registry index
     bool                                          has_reference_error;
     noah_profile_validator_v1_domain_validation_t domain_validation;

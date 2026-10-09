@@ -1,8 +1,8 @@
 # Logical Profile Transaction V1
 
-> Current firmware accepts only the formats it writes (D-F10): profile schema
-> 2.0; RGB v3, key behaviors v1, combos v2, settings v5 and sparse PD v2;
-> a 5,088-byte custom payload; and logical store format 3 (`NR`). Every save
+> Current firmware accepts only the formats it writes (D-F10, D-F14): profile
+> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v6 and sparse PD v3;
+> a 65,504-byte custom payload; and logical store format 4 (`NS`). Every save
 > binds a nonzero VIA generation and digest. HID and split framing remain v1.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > Backup translation belongs to the client, before a current-format Apply.
@@ -27,11 +27,12 @@ VIA digest; action ABI digest; and storage schema.
 The custom slot header advances to a format that carries the bound VIA identity
 and two marker states: `prepared` and `committed`. The prepared marker is durable
 transaction intent but is never active authority. The committed marker is the
-logical decision record. Format-1 `NP` and format-2 `NQ` records are rejected
-at boot and admission; firmware does not migrate old storage.
+logical decision record. Format-1 `NP`, format-2 `NQ` and format-3 `NR`
+records are rejected at boot and admission; firmware does not migrate old
+storage.
 
-Format 3 keeps a 32-byte header and 5,088-byte payload capacity. Its `NR`
-magic binds schema 2.0. Byte 2 packs five domain bits (0–4), origin (5),
+Format 4 keeps a 32-byte header with a 65,504-byte payload capacity (D-F14).
+Its `NS` magic binds schema 3.0. Byte 2 packs five domain bits (0–4), origin (5),
 profile flags (6), and a reserved zero bit (7). The header retains payload
 CRC32, compiled-default digest and action-ABI digest, and stores the bound VIA
 generation and digest. Validation derives the canonical payload digest again.

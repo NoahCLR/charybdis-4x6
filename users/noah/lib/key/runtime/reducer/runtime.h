@@ -58,6 +58,10 @@ typedef enum {
 typedef struct {
     uint16_t keycode;
     keypos_t key_pos;
+    // Set when participation bypasses the keycode's behaviour row for this
+    // press: it resolves as if the key had no row (participation-policy.md).
+    // Zero, the default, uses the row.
+    bool bypass_row;
 } runtime_key_event_t;
 
 typedef struct {
@@ -392,6 +396,9 @@ static inline uint32_t key_runtime_core_state_next_feedback_sequence(key_runtime
 key_runtime_core_state_t      *key_runtime_core_state(void);
 void                           key_runtime_core_apply_event(const runtime_event_t *event, uint16_t event_time);
 __attribute__((noinline)) void key_runtime_core_observe_process_record_event(uint16_t keycode, keyrecord_t *record);
+// The same, with the press's participation: use_row false resolves a press as
+// if its keycode had no behaviour row.
+void key_runtime_core_observe_process_record_event_with_row(uint16_t keycode, keyrecord_t *record, bool use_row);
 void                           key_runtime_core_observe_scan_cycle(uint16_t now);
 // A physical press is offered to the active pointing mode before the key's
 // behavior sees it. While offered it is not a behavior press yet: an output

@@ -11,7 +11,7 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-python3 - "$ROOT/tests/fixtures/rgb_domain_v3.json" "$BUILD_DIR/vectors.txt" <<'PY'
+python3 - "$ROOT/tests/fixtures/rgb_domain_v4.json" "$BUILD_DIR/vectors.txt" <<'PY'
 import json, pathlib, sys
 fixture = json.loads(pathlib.Path(sys.argv[1]).read_text())
 limits = fixture["limits"]
@@ -27,11 +27,11 @@ build_and_run() {
     cc -std=c11 -Wall -Wextra -Werror -pedantic -DNOAH_PD_PROFILE_ENABLE "$@" \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
-        "$ROOT/tests/host/profile_rgb_v3_test.c" \
+        "$ROOT/tests/host/profile_rgb_v4_test.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
-        -o "$BUILD_DIR/profile_rgb_v3_test_$name"
-    "$BUILD_DIR/profile_rgb_v3_test_$name" "$BUILD_DIR/vectors.txt"
+        -o "$BUILD_DIR/profile_rgb_v4_test_$name"
+    "$BUILD_DIR/profile_rgb_v4_test_$name" "$BUILD_DIR/vectors.txt"
 }
 
 build_and_run normal
@@ -43,4 +43,4 @@ ARM_CC="${ARM_CC:-arm-none-eabi-gcc}"
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -c "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
-    -o "$BUILD_DIR/profile_rgb_v3_cortex_m0plus.o"
+    -o "$BUILD_DIR/profile_rgb_v4_cortex_m0plus.o"

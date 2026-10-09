@@ -1,11 +1,11 @@
 # Profile Wire V1
 
-> Current firmware accepts only the formats it writes (D-F10): profile schema
-> 2.0; RGB v3, key behaviors v1, combos v2, settings v5 and sparse PD v2;
-> a 5,088-byte custom payload; and logical store format 3 (`NR`). Every save
-> binds a nonzero VIA generation and digest. HID and split framing remain v1.
-> Older profile/store formats and the legacy GET 9 source page are rejected.
-> Backup translation belongs to the client, before a current-format Apply.
+> Current firmware accepts only the formats it writes (D-F10, D-F14): profile
+> schema 3.0; a 65,504-byte custom payload; and logical store format 4
+> (`NS`). Every save binds a nonzero VIA generation and digest. HID and split
+> framing remain v1. Older profile/store formats and the legacy GET 9 source
+> page are rejected. Backup translation belongs to the client, before a
+> current-format Apply.
 
 Status: accepted Stage 00 wire contract
 
@@ -22,13 +22,14 @@ The blob is independent of Raw HID framing and EEPROM slot metadata.
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 4 | ASCII magic `NLP1` |
-| 4 | 1 | schema major, `2` |
+| 4 | 1 | schema major, `3` |
 | 5 | 1 | schema minor, initially `0` |
 | 6 | 1 | domain count |
 | 7 | 1 | flags; bit 0 means canonical encoding, all others reserved |
 
 The transport candidate length or storage header supplies total blob length.
-Schema 2.0 is capped at 5,088 bytes; schema 1 is refused.
+Schema 3.0 is capped at 65,504 bytes, one 64 KiB slot less its 32-byte header
+(D-F14); schemas 1 and 2 are refused.
 
 ### Domain Envelope — 4 Bytes Plus Payload
 
@@ -48,11 +49,11 @@ Accepted domains (`users/noah/lib/profile/schema/profile_domain_registry.h`):
 
 | Id | Domain | Version |
 | ---: | --- | ---: |
-| `0x10` | RGB | 3 |
-| `0x20` | Key behaviors | 1 |
-| `0x30` | Combo overrides | 2 |
-| `0x40` | Settings, layer names, VIA macro names and custom-key names | 5 |
-| `0x50` | Sparse pointing-mode slots | 2 |
+| `0x10` | RGB | 4 |
+| `0x20` | Key behaviors | 2 |
+| `0x30` | Combo overrides | 3 |
+| `0x40` | Settings, layer records, layer names, VIA macro names and custom-key names | 6 |
+| `0x50` | Sparse pointing-mode slots | 3 |
 
 ### Firmware domain ownership
 
@@ -124,27 +125,36 @@ Initial action kinds:
 | 4 | stable PD-mode id, momentary: `0..31` on 32-slot firmware (native `PD_SLOT_n` = `0x7e80 + n`) |
 | 5 | stable PD-mode id, lock: `0..31` on 32-slot firmware (native `PD_SLOT_n_LOCK` = `0x7ea0 + n`) |
 | 6 | VIA macro slot |
-| 7 | custom key `0..63` (`CUSTOM_KEY_n`, native `0x7e40 + n`); under earlier action vocabularies this kind named the retired user macros, and a digest mismatch keeps the two apart |
+| 7 | custom key `0..127` (`CUSTOM_KEY_n`, native `0x7f00 + n` since D-F14; before it `0..63` at `0x7e40 + n`, now inert); under earlier action vocabularies this kind named the retired user macros, and a digest mismatch keeps the two apart |
 
 Userspace-owned actions are never encoded as raw custom-keycode enum values.
 Unsupported action kinds or operands reject the complete candidate.
 
+Layer operands and native layer keycodes name the sixteen-layer bank, `0..15`.
+`LT()` and `LM()` encode their layer in four bits, so every value they can
+express is a bank layer. The five-bit layer actions (`MO()`, `TG()`, `TT()`,
+`OSL()`, `TO()` and the layer locks) refuse layers 16 and above.
+
 ## Key-Behavior Domain
 
-The payload begins with:
+Version 2 (D-F14). Its ceilings follow the firmware's one supported tap
+depth `d` (five; capability pages 1 and 2 report it): at most 128 rows, at most
+`d` steps in a row, and at most `128 × d` populated steps in all (640 at
+depth five). The payload begins with:
 
 | Size | Field |
 | ---: | --- |
-| 1 | row count, maximum 64 |
-| 1 | populated step count, maximum 128 |
-| 2 | reserved |
+| 1 | row count, maximum 128 |
+| 1 | reserved, zero |
+| 2 | populated step count, `u16`, maximum `128 × d` |
 
 Each row is length-delimited and contains:
 
 - target action identity;
 - `tap_hold_term`, `longer_hold_term`, and `multi_tap_term` as `u16`;
-- row flags, currently bit 0 `keeps_auto_mouse_anchored`;
+- row flags: bit 0 `keeps_auto_mouse_anchored`, bit 1 disabled;
 - populated-step count;
+- the layers the row may act on;
 - populated step records in strictly ascending tap index.
 
 The exact row encoding is:
@@ -156,8 +166,16 @@ The exact row encoding is:
 | 2 | `tap_hold_term`; zero selects the compiled default |
 | 2 | `longer_hold_term`; zero selects the compiled default |
 | 2 | `multi_tap_term`; zero selects the compiled default |
-| 1 | flags; bit 0 keeps auto mouse anchored |
-| 1 | populated-step count for this row |
+| 1 | flags; bit 0 keeps auto mouse anchored, bit 1 disabled; other bits zero |
+| 1 | populated-step count for this row, at most `d` |
+| 4 | allowed layers, `u32`, one bit per layer; bits at or above the layer count zero, an empty mask allowed |
+
+A disabled row keeps its steps, timing and allowed layers; a press takes the
+key's normal action while it is disabled or its source layer is not allowed
+([participation policy](participation-policy.md)). Compiled defaults and
+translated version-1 rows are enabled and allowed on every bank layer.
+Translation from version 1 moves the step count to bytes 2–3 and inserts
+`ff ff 00 00` after each row's step count, growing its body length by four.
 
 Rows are sorted lexicographically by the target action's four canonical bytes.
 Duplicate targets reject the domain.
@@ -170,7 +188,7 @@ The exact step encoding is:
 
 | Size | Field |
 | ---: | --- |
-| 1 | zero-based tap index |
+| 1 | zero-based tap index, below `d` |
 | 1 | presence mask: bit 0 tap, bit 1 hold, bit 2 long hold |
 | 4 | tap action, only when bit 0 is set |
 | 6 | hold branch, only when bit 1 is set |
@@ -194,18 +212,25 @@ wire. Repeat rate must be zero for non-repeat modes and `1..100` for repeat.
 Rows are sorted by their canonical target-action bytes and target identities
 must be unique.
 
+The firmware finds a key's row through an index: at publication it walks the
+row lengths once (one two-byte read per row) into the row offsets, then a key
+press binary-searches them, reading one four-byte target per probe, and decodes
+only the matching row's fixed fields and the step it needs. Steps before it are
+skipped by their presence masks. The index lives beside each runtime bank, not
+in the snapshot a lookup copies.
+
 ## RGB Domain
 
-Domain `0x10` version `3` begins with this exact 16-byte header
+Domain `0x10` version `4` begins with this exact 16-byte header
 (see [RGB domain](rgb-domain-v1.md)):
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | RGB payload format, `3` |
+| 0 | 1 | RGB payload format, `4` |
 | 1 | 1 | reserved, zero |
 | 2 | 2 | stage-enable mask |
 | 4 | 1 | reusable-group count, maximum 16 |
-| 5 | 1 | layer-color count, maximum 8 |
+| 5 | 1 | layer-color count, maximum 16 |
 | 6 | 1 | layer-group row count |
 | 7 | 1 | PD-color count, exactly 32 when compiled |
 | 8 | 1 | PD-group row count |
@@ -246,7 +271,8 @@ wire representation.
 Rows reference dictionary ids rather than embedding native
 `rgb_led_group_t`. Row order is preserved because later overlapping rows can
 repaint earlier rows. HSV uses three bytes. Selectors and enums use explicit
-one-byte ids. Layer and PD selectors use `0xff` for all. Key group semantics
+one-byte ids. Layer and PD selectors use `0xff` for all; otherwise a layer
+selector is below 16 and a PD selector below 32. Key group semantics
 are pending `0`, committed `1`, hold `2`, long hold `3`, and all `0xff`.
 
 Layer modes are all keys `0` and mapped keys only `1`. Locality is both `0`,
@@ -277,9 +303,11 @@ contract is mirrored in
 - Compiled-default digest is the canonical blob digest materialized into the
   firmware.
 - Action-ABI digest covers supported standard QMK values, stable userspace
-  action ids, layer ids, PD ids, macro capacities, and relevant schema ceilings.
-  It is independent of authored rows; an empty profile uses the same vocabulary
-  as a populated one.
+  action ids, layer ids and the layer count, PD ids, macro capacities, and
+  relevant schema ceilings. It is independent of authored rows; an empty
+  profile uses the same vocabulary as a populated one. The sixteen-layer bank
+  (D-F14) therefore has its own digest, and stored profiles from earlier
+  firmware are refused by it.
 
 Digest collisions are acceptable for drift display but never replace CRC,
 length, schema, capacity, and semantic validation before activation.
@@ -299,40 +327,57 @@ Older firmware returns VIA unhandled (`0xff`); clients must show unsupported
 rather than infer an empty table. Firmware built without combos reports a
 valid disabled empty table. No SET or SAVE operation exists for this value.
 
-Every successful page has exactly 25 payload bytes. Metadata is page 0:
+The request takes a 16-bit page, its low byte at request byte 4 and its high
+byte at byte 5 (feature bit 19). Every successful page has exactly 25 payload
+bytes. Metadata is page 0:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | readout version, `2` (older firmware: `1`) |
-| 1 | 1 | row count, `0..32` |
-| 2 | 1 | maximum inputs per row, `4` |
-| 3 | 1 | layer count, `1..8` |
+| 0 | 1 | readout version, `3` |
+| 1 | 1 | row count, `0..128` |
+| 2 | 1 | maximum inputs per row, `16` |
+| 3 | 1 | layer count, `1..16` |
 | 4 | 1 | current global combo enable state, `0` or `1` |
 | 5 | 1 | flags: bit 0 no timer, 1 strict timer, 2 custom trigger hook, 3 custom release hook, 4 custom repress hook, 5 fixed reference layer |
-| 6 | 8 | input reference layer for each layer; unused entries zero |
-| 14 | 4 | FNV-1a 32-bit digest of metadata bytes 0..13, then 18..24, then all complete row payloads in order |
-| 18 | 2 | default combo window in milliseconds: the window of every row that follows it |
-| 20 | 2 | combo hold threshold in milliseconds |
-| 22 | 3 | reserved, zero |
+| 6 | 4 | FNV-1a 32-bit digest of page-0 bytes 0..5 and 10..24, then page 1, then every row's two pages in order |
+| 10 | 2 | default combo window in milliseconds: the window of every row that follows it |
+| 12 | 2 | combo hold threshold in milliseconds |
+| 14 | 1 | pages per row, `2` |
+| 15 | 10 | reserved, zero |
 
-Page `n+1` contains row `n`:
+Page 1 holds the combo reference layer of each layer, one byte per layer for
+`layer count` layers, the rest zero. With a fixed reference layer every entry
+is that layer.
 
-| Offset | Size | Field |
-| ---: | ---: | --- |
-| 0 | 1 | zero-based row index |
-| 1 | 1 | input count, `2..4` |
-| 2 | 2 | native output keycode; zero means a firmware callback |
-| 4 | 2 | combo window in milliseconds, including per-combo hook result |
-| 6 | 2 | reserved, zero |
-| 8 | 1 | flags: bit 0 must hold, 1 must tap, 2 press in order, 3 follows the default window |
-| 9 | 8 | up to four native input keycodes in declared order; unused entries zero |
-| 17 | 8 | reserved, zero |
+Row `n` occupies pages `2 + 2n` (page A) and `3 + 2n` (page B):
 
-Combo readout and domain `0x30` use version 2 only. A live row follows the
-header's default window when its stored window is zero. A compiled combo
+| Page | Offset | Size | Field |
+| --- | ---: | ---: | --- |
+| A | 0 | 1 | zero-based row index |
+| A | 1 | 1 | input count, `2..16` |
+| A | 2 | 2 | native output keycode; zero means a firmware callback |
+| A | 4 | 2 | combo window in milliseconds, including per-combo hook result |
+| A | 6 | 1 | flags: bit 0 must hold, 1 must tap, 2 press in order, 3 follows the default window, 4 disabled |
+| A | 7 | 4 | allowed-layer mask, uint32, one bit per layer; bits at or above the layer count zero |
+| A | 11 | 14 | native inputs 0..6 in declared order, uint16 each; unused entries zero |
+| B | 0 | 18 | native inputs 7..15, uint16 each; unused entries zero |
+| B | 18 | 7 | reserved, zero |
+
+A table has `2 + 2 × row count` pages; later pages return status 2. A
+compiled table reports every combo enabled with every bank layer allowed.
+Version 2's eight-entry reference list in the metadata is gone; references are
+the counted page 1.
+
+Combo readout uses version 3 only (D-F14; it replaces version 2) and domain
+`0x30` version 3 only. A live row follows the header's default window when its
+stored window is zero. A compiled combo
 follows `COMBO_TERM` unless its authored `COMBO_WINDOW` supplies a window.
 Without the owner, a per-combo term hook is the user's own and rows never
 report following. Firmware built without combos reports zero for both values.
+
+Flag bit 2 means a user's own trigger hook, which a client cannot see into.
+The firmware's participation hook (D-F14) does not set it: its decisions are
+the profile's own controls, read back with the rest.
 
 Inputs are distinct nonzero keycodes. Timing zero is preserved verbatim. Input
 order matters when the order flag is set. Native codes use the connected
@@ -344,12 +389,12 @@ Fixed-reference mode reads the reference layer directly even when it equals
 the selected layer; transparent keys do not inherit in this lookup. Without
 this flag, an identity reference uses the effective key from the active stack.
 
-Clients read metadata, every row, then metadata again. Accept only equal
-metadata and a matching digest, with at most two complete attempts (68 GETs at
-the maximum capacity). This detects ordinary changes, not an atomic snapshot
-or an active layer stack. Failure clears prior combo rows without discarding
+Clients read metadata, the reference page, both pages of every row, then
+metadata again. Accept only equal metadata and a matching digest, with at most
+two complete attempts (134 GETs at this firmware's 32 rows). This detects
+ordinary changes, not an atomic snapshot or an active layer stack. Failure clears prior combo rows without discarding
 independent profile or base-lighting reads. Firmware uses a bounded cold-path
-table scan and a 25-byte row scratch buffer; it allocates no persistent cache.
+table scan and a 50-byte row scratch buffer; it allocates no persistent cache.
 Malformed requests use status 1, unknown pages status 2, and tables that cannot
 be represented within these limits status 3. Error payloads are empty and zero.
 
@@ -380,15 +425,49 @@ A successful v1 capability or status page has exactly 25 payload bytes. The
 desktop correlates all five echoed bytes; a broad command-only match is not
 valid for this channel.
 
-Capabilities use two pages. Page 0 contains the response-layout version, page
-count, protocol/schema versions, report and chunk sizes, status-page count,
-feature flags, action-ABI digest, firmware version, and compiled-default
-digest. Page 1 contains compiled and maximum layer/behavior/combo/RGB/macro
-capacities, the custom-key slot count (payload byte 11, `64`; it carried the
-retired user-macro count, 16, before feature bit 16) plus the selected schema's payload/slot capacities and advertised VIA
-macro bound (7,191 bytes on eight-layer firmware; 7,551 on the five-layer bridge). Feature bits distinguish schema/storage knowledge from candidate
+Capabilities use three pages (response layout `2`, D-F14). Page 0 contains
+the response-layout version, page count, protocol/schema versions, report and
+chunk sizes, status-page count, feature flags, action-ABI digest, firmware
+version, and compiled-default digest. Page 1 contains compiled and maximum
+layer/behavior/combo/RGB/macro capacities, the custom-key slot count (payload
+byte 11), the selected schema's payload capacities and the advertised VIA
+macro bound. Feature bits distinguish schema/storage knowledge from candidate
 write, commit, preview, activation, and peer support, so read-only firmware
 does not advertise write operations prematurely.
+
+| Page 1 byte | Field |
+| ---: | --- |
+| 0 | compiled layer count |
+| 1 | maximum logical layers |
+| 2 | maximum behaviour rows |
+| 3 | supported tap depth (maximum tap steps per behaviour) |
+| 4 | zero; the populated-step ceiling is on page 2 |
+| 5 | maximum combos |
+| 6 | maximum inputs per combo |
+| 7 | maximum reusable RGB groups |
+| 8 | maximum RGB stage-group rows |
+| 9 | physical LED count |
+| 10 | LED bitmap bytes |
+| 11 | custom-key slots |
+| 12 | VIA macro slots |
+| 13–14 | maximum profile payload |
+| 15–16 | slot payload capacity |
+| 17–18 | zero; the slot size is on page 2 |
+| 19–20 | VIA macro bank bytes |
+| 21 | supported domain mask |
+| 22–24 | zero |
+
+Page 2 carries the fields wider than a byte:
+
+| Page 2 byte | Field |
+| ---: | --- |
+| 0–1 | maximum populated behaviour steps |
+| 2 | supported tap depth (equal to page 1 byte 3) |
+| 3–6 | profile slot size in bytes |
+| 7 | maximum encoded bytes per name |
+| 8 | layer-mask width in bits, `32` |
+| 9 | placement positions per layer (matrix rows × columns) |
+| 10–24 | zero |
 
 Capability feature bits are:
 
@@ -410,11 +489,15 @@ Capability feature bits are:
 | 13 | retired, never advertised |
 | 14 | owned layer keys: `TG()`, `TO()`, `TT()` and `OSL()` act through userspace layer ownership, so a host may offer them in behaviours and combos where the placement rules allow (`TT()` and `OSL()` joined the bit on the same unreleased branch; every flashed build that sets it has all four) |
 | 15 | behaviour QMK functions: a behaviour sends QMK and keyboard keycodes past the layer keycodes and below the user range (the Charybdis DPI and sniping keys, RGB Matrix, Magic, `QK_BOOT`…) as a synthetic QMK record, so they run as they do on a key, and a key whose own keycode is one keeps a plain key's fallback hold; a host may offer them in a behaviour's target, tap and hold. Without it, the engine sends them as report keys, keeping only the low byte, and a host must refuse them there |
-| 16 | custom keys and keycode blocks: userspace keycodes sit in fixed blocks (custom keys `0x7e40`, pointing holds `0x7e80`, pointing locks `0x7ea0`, layer locks `0x7ec0`, each reserved beyond what is supported), action kind 7 is a custom key, and settings version 5 names the 64 custom keys. It comes with its own action ABI digest; a host knowing that digest may offer custom keys as keys and combo outputs, never as behaviour steps |
+| 16 | custom keys and keycode blocks: userspace keycodes sit in fixed blocks (pointing holds `0x7e80`, pointing locks `0x7ea0`, layer locks `0x7ec0`, custom keys `0x7f00` since D-F14, each reserved beyond what is supported), action kind 7 is a custom key, and the settings domain names the 128 custom keys. It comes with its own action ABI digest; a host knowing that digest may offer custom keys as keys and combo outputs, never as behaviour steps |
 
 | 17 | physical gesture timing: handled physical keys measure holds from physical press and repeats from physical release to next press; eligible records buffered by combo/tapping retain their series. Authored `LT()` rows bypass native QMK tapping; plain `LT()` keys retain it. An authored `LT()` row's layer is its hold: without an authored first hold it holds `MO()` from the tap-hold term, never from the press (joined the bit on the same unreleased branch). Combo outputs retain their delivery/origin timing contract. This is a runtime capability, not a profile format change |
 
 | 18 | runtime-owned tapping: every key handled by userspace bypasses native QMK tapping, including authored MT/OSM rows and intrinsic TT/OSL ownership. An authored MT/OSM row without a first hold keeps the key's modifier hold past the tap-hold term, and keys pressed while such a runtime-owned LT/MT/OSM key is undecided wait for its tap or hold (both joined the bit on the same unreleased branch). Unhandled LT/MT/OSM keep native QMK tapping. Extends bit 17 without changing its physical timestamp contract or profile bytes |
+
+| 19 | wide pages: the payload, compiled, combo and settings readbacks (GET `0x04`, `0x05`, `0x06`, `0x07`) take a 16-bit page, request byte 4 its low byte and byte 5 its high byte, with bytes 6–31 reserved; their responses echo bytes 0–4 and the request id correlates them |
+
+| 20 | participation controls: behaviour and combo participation at the master, layer, definition and placement scopes ([participation policy](participation-policy.md)) |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with
@@ -458,7 +541,8 @@ bit rejects the status while it is set, as it rejects any unknown flag.
 ### Payload Readback — GET Values `0x04` And `0x05`
 
 GET `0x04` reads the committed payload and `0x05` the compiled defaults the
-firmware was built with, through the envelope above. Page 0 is metadata; page
+firmware was built with, through the envelope above with a wide page (feature
+bit 19): a 65,504-byte payload needs 2,621 pages. Page 0 is metadata; page
 `n` from 1 carries payload bytes `(n - 1) × 25` onward, at most 25, with the
 payload length byte giving the count. A page past the end answers status `2`;
 status `3` means nothing is committed, or the compiled defaults cannot be
@@ -518,11 +602,11 @@ Begin candidate uses this complete layout:
 | 6 | 1 | schema minor |
 | 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings, and schema-2 bit 4 PD |
 | 8 | 1 | flags, initially zero |
-| 9 | 2 | canonical blob length, `8..5088`, schema 2.0 only |
+| 9 | 2 | canonical blob length, `8..65504`, schema 3.0 only |
 | 11 | 4 | CRC32 of the exact canonical blob |
 | 15 | 4 | FNV-1a digest of the exact canonical blob |
 | 19 | 4 | action-ABI digest used to encode actions |
-| 23 | 1 | store format, exactly `3` |
+| 23 | 1 | store format, exactly `4` |
 | 24 | 4 | nonzero bound VIA generation |
 | 28 | 4 | nonzero bound VIA digest |
 
@@ -831,61 +915,73 @@ loads and still syncs between the halves.
 - invalid action ABI and invalid cross-reference;
 - canonical C/JavaScript byte-for-byte round trips.
 
-## Combo Domain `0x30`, Version 2
+## Combo Domain `0x30`, Version 3
 
 Capability `supported_domain_mask` bit 2 advertises combo overrides. Profiles
 without this domain use compiled combos. Zero rows explicitly disable all
-definitions. Firmware accepts only version 2.
+definitions. Firmware accepts only version 3 (D-F14): up to 128 combos of 2–16
+inputs, the inputs counted so a smaller combo takes fewer bytes.
 
 QMK keeps two values for every combo: `COMBO_TERM`, the window a combo without
-its own uses, and `COMBO_HOLD_TERM`, the one hold/tap wait. Version 2 stores
+its own uses, and `COMBO_HOLD_TERM`, the one hold/tap wait. The domain stores
 both once, in an eight-byte header, so they exist with or without rows:
 
 | Offset | Bytes | Field |
 | ---: | ---: | --- |
-| 0 | 1 | row count, 0..32 |
+| 0 | 1 | row count, 0..128 |
 | 1 | 3 | reserved, zero |
 | 4 | 2 | default combo window in ms, `1..65535`, little endian |
 | 6 | 2 | combo hold threshold in ms, little endian |
 
-Each row is exactly 28 bytes, in priority/index order:
+Each row is `12 + 4 × inputs` bytes (20 to 76), in priority/index order:
 
 | Offset | Bytes | Field |
 | ---: | ---: | --- |
-| 0 | 1 | input count, 2..4 |
-| 1 | 1 | flags: bit 0 must hold, bit 1 tap only, bit 2 ordered |
+| 0 | 1 | input count, 2..16 |
+| 1 | 1 | flags: bit 0 must hold, bit 1 tap only, bit 2 ordered, bit 3 disabled; others zero |
 | 2 | 2 | combo window in ms, little endian; `0` follows the default window |
-| 4 | 2 | reserved, zero |
-| 6 | 2 | reserved, zero |
+| 4 | 4 | allowed layers, `u32`, one bit per layer; bits at or above the bank (16) zero, an empty mask allowed |
 | 8 | 4 | output semantic action |
-| 12 | 16 | four semantic input slots; unused slots zero |
+| 12 | 4 × inputs | the input actions, in declared order |
 
-A row that follows the default changes with it; a row with its own window keeps
-it, even when it equals the default. A zero default is rejected because every
-row following it would never fire. Hold and tap-only flags are mutually
-exclusive. Input actions must be distinct, including after native translation;
+The rows end exactly at the domain's end. A row that follows the default
+changes with it; a row with its own window keeps it, even when it equals the
+default. A zero default is rejected because every row following it would
+never fire. Hold and tap-only flags are mutually exclusive. A disabled combo
+keeps its inputs, output, window and layers; whether it and its layers let a
+press join a chord is the [participation policy](participation-policy.md).
+Input actions must be distinct, including after native translation;
 no-action/transparent inputs and callback/no-action outputs are rejected.
 Semantic references must exist in the compiled action ABI. Unknown versions,
-unknown flags, trailing bytes and nonzero reserved fields are rejected.
-Incremental validation reads the header in one step and each row in 12- and
-16-byte steps, preserving the one-read / 20-byte scan bound.
+unknown flags, a short or overlong row and trailing bytes are rejected.
+Incremental validation reads the header in one step, a row's fixed part in
+one, then its inputs four at a time (16 bytes), preserving the one-read /
+20-byte scan bound. Translation from version 2 keeps each 28-byte row's count,
+flags, window and output, drops its four reserved bytes and unused input slots,
+and allows every layer (`ff ff 00 00`).
+
+QMK runs these through its long-combo representation (`EXTRA_LONG_COMBOS`): a
+16-bit member state, sixteen-member combos and a sixteen-key press buffer. Its
+queue of completed combos (`COMBO_BUFFER_LENGTH`, four) is a separate limit.
 
 The existing candidate/commit/split protocol carries this domain with the rest
 of the profile. There is no new mutation on GET value `0x06`. The owner publishes
 the native table at the strict idle boundary, resolving every window that
 follows the default then; QMK, origin tracking and readback use that same table.
-A cold publication reads the header and copies at most 896 bytes of rows; key
-processing and combo readback use RAM only. A failed copy makes combo readback
+A cold publication walks the header and rows once (at most 128 rows of 76
+bytes, two to five reads a row) into a native table of 128 rows of up to
+seventeen keycodes with the terminator; key processing and combo readback use
+RAM only. A failed copy makes combo readback
 unavailable and exposes zero definitions rather than a partially decoded table.
 
 ## Portable Settings And Complete Readback
 
-Domain `0x40` v5 and GET values `0x07`/`0x08` are specified in
+Domain `0x40` v6 and GET values `0x07`/`0x08` are specified in
 [portable-profile-v1.md](portable-profile-v1.md). The canonical envelope now
 permits five known domains; an unknown domain still rejects the candidate.
 The settings validator uses the existing bounded reader and safe publication
-boundary. Validator/provider state policies are 368/784 bytes respectively
-(368 since D-F09: the 32-bit PD slot mask in the compatibility limits).
+boundary. Validator/provider state policies are 384/784 bytes respectively
+(384 since D-F14: the 128-byte pointing records make the PD iterator the largest domain state).
 The standard compiled payload contains all five enabled domains in registry
 order: RGB, key behaviours, combos, settings and pointing. Its immutable
 factory settings and authored names share the settings domain's encoder.

@@ -22,10 +22,11 @@ enum {
 
 // Migration tripwire: each userspace family keeps its block, so adding
 // pointing slots or layers renumbers nothing.
-_Static_assert(CUSTOM_KEY_0 == 0x7e40 && CUSTOM_KEY_63 == 0x7e7f, "preserve custom key identities");
+// Custom keys moved once, to their own block (D-F14); the others did not.
+_Static_assert(CUSTOM_KEY_0 == 0x7f00 && CUSTOM_KEY_63 == 0x7f3f && CUSTOM_KEY_64 == 0x7f40 && CUSTOM_KEY_127 == 0x7f7f, "preserve custom key identities");
 _Static_assert(PD_SLOT_0 == 0x7e80 && PD_SLOT_5 == 0x7e85 && PD_SLOT_6 == 0x7e86 && PD_SLOT_7 == 0x7e87, "preserve PD hold identities");
 _Static_assert(PD_SLOT_0_LOCK == 0x7ea0 && PD_SLOT_5_LOCK == 0x7ea5 && PD_SLOT_6_LOCK == 0x7ea6 && PD_SLOT_7_LOCK == 0x7ea7, "preserve PD lock identities");
-_Static_assert(LAYER_LOCK_BASE == 0x7ec0 && LOCK_LAYER(7) == 0x7ec7, "preserve layer lock identities");
+_Static_assert(LAYER_LOCK_BASE == 0x7ec0 && LOCK_LAYER(7) == 0x7ec7 && LOCK_LAYER(15) == 0x7ecf, "preserve layer lock identities");
 
 static uint8_t     output[OUTPUT_CAPACITY];
 static size_t      output_length;
@@ -319,16 +320,16 @@ static void test_real_authored_profile(void) {
     // cache holds all 32, omitted ones disabled with an empty name.
     const uint8_t *pd_payload = decoded.domains[4].payload;
     assert(decoded.domains[4].version == NOAH_PROFILE_PD_V1_VERSION);
-    assert(pd_payload[0] == 2 && pd_payload[1] == 32 && pd_payload[2] == 96 && decoded.domains[4].payload_length == 8u + 96u * pd_payload[3]);
+    assert(pd_payload[0] == NOAH_PROFILE_PD_V1_VERSION && pd_payload[1] == 32 && pd_payload[2] == NOAH_PROFILE_PD_V1_RECORD_SIZE && decoded.domains[4].payload_length == 8u + (size_t)NOAH_PROFILE_PD_V1_RECORD_SIZE * pd_payload[3]);
     uint8_t stored = 0;
     for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
         const uint8_t *record = noah_effective_pd_record(slot);
         assert(record && record[0] == slot);
-        if (stored < pd_payload[3] && pd_payload[8 + stored * 96] == slot) {
-            assert(memcmp(record, pd_payload + 8 + stored * 96, 96) == 0);
+        if (stored < pd_payload[3] && pd_payload[8 + stored * NOAH_PROFILE_PD_V1_RECORD_SIZE] == slot) {
+            assert(memcmp(record, pd_payload + 8 + stored * NOAH_PROFILE_PD_V1_RECORD_SIZE, NOAH_PROFILE_PD_V1_RECORD_SIZE) == 0);
             stored++;
         } else {
-            for (size_t i = 1; i < 96; i++) assert(record[i] == 0);
+            for (size_t i = 1; i < NOAH_PROFILE_PD_V1_RECORD_SIZE; i++) assert(record[i] == 0);
         }
     }
     assert(stored == pd_payload[3]);
@@ -439,16 +440,22 @@ static void validate_portable_import(const noah_profile_compiled_v1_t *compiled,
     noah_profile_validator_v1_t        validator;
     noah_profile_validator_v1_error_t  error;
     noah_profile_validator_v1_result_t result = noah_profile_validator_v1_begin(&validator, &reader, 0, &declaration, &compatible, &error);
-    for (size_t step = 0; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && step < 5000; step++)
+    // The schema-3 maximum has 640 three-branch behaviour steps plus checksum,
+    // combo and settings scans. Give the bounded validator room to finish;
+    // this is a termination guard, not a hardware latency assertion.
+    size_t validation_steps = 0;
+    for (; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && validation_steps < 20000; validation_steps++)
         result = noah_profile_validator_v1_step(&validator, 20, &error);
     if (!expect_valid) {
-        // An eight-slot backup (RGB v2, PD v1) is refused at the first of
-        // those domains; Ark translates it before it reaches the keyboard.
-        assert(result == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN && error.domain_id == NOAH_PROFILE_DOMAIN_V1_RGB);
+        // An older backup (schema 2) is refused at its header, before any
+        // domain; Ark translates it before it reaches the keyboard.
+        if (result != NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA) fprintf(stderr, "legacy import result %u domain=%u\n", result, error.domain_id);
+        assert(result == NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA);
         return;
     }
     if (result != NOAH_PROFILE_VALIDATOR_V1_VALID) fprintf(stderr, "portable import failed: %u domain=%u field=%u byte=%zu\n", result, error.domain_id, error.field_id, error.byte_offset);
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
+    printf("portable import validated %zu bytes in %zu bounded steps\n", length, validation_steps);
     assert(placement_log.refused == 0u);
     assert(validator.profile.domain_mask == NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
     noah_profile_domain_range_t settings, pd;

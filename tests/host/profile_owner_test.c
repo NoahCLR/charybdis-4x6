@@ -8,7 +8,7 @@
 #include "users/noah/lib/profile/runtime/profile_owner.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 
-static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
 
 typedef struct {
     uint8_t  bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
@@ -204,7 +204,7 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
     return activation_block_reason | (policy && policy->initialized && policy->peer_observer && policy->peer_observer(policy->peer_context, &unresolved) && unresolved == 0u ? 0u : NOAH_PROFILE_ACTIVATION_REASON_PEER);
 }
 
-static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
+static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
     memory_t *memory = context;
     memory->reads++;
     if (length > memory->largest_read) memory->largest_read = length;
@@ -213,7 +213,7 @@ static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16
     return true;
 }
 
-static bool memory_write(void *context, uint16_t address, const uint8_t *source, uint16_t length) {
+static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
     memory_t *memory = context;
     memory->writes++;
     if (length > memory->largest_write) memory->largest_write = length;
@@ -253,7 +253,7 @@ static noah_profile_candidate_v1_metadata_t metadata(void) {
         .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
         .via_generation       = 6u,
         .via_digest           = UINT32_C(0xabcdef01),
-        .schema_major         = 2u,
+        .schema_major         = NOAH_PROFILE_SCHEMA_MAJOR,
         .schema_minor         = 0u,
         .payload_length       = sizeof(compiled_blob),
         .crc32                = crc_of(compiled_blob, sizeof(compiled_blob)),

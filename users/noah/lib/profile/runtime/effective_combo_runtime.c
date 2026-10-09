@@ -35,19 +35,29 @@ void noah_effective_combo_runtime_invalidate(void *context, uint32_t publication
         return;
     }
     runtime->live = true;
-    noah_profile_domain_range_t    combos;
-    noah_profile_combo_v1_header_t header;
-    if (!noah_profile_blob_v1_find_domain(&view->reader, view->base_offset, view->profile.byte_length, NOAH_PROFILE_DOMAIN_V1_COMBOS, &combos) || !noah_profile_combo_v1_read_header(&view->reader, view->base_offset, combos, &header)) return;
-    runtime->default_term = header.default_term_ms;
-    runtime->hold_term    = header.hold_term_ms;
-    for (uint8_t index = 0; index < header.row_count; index++) {
-        noah_profile_combo_v1_row_t row;
-        if (!noah_profile_combo_v1_read_row(&view->reader, view->base_offset, combos, index, &row)) return;
+    noah_profile_domain_range_t        combos;
+    noah_profile_combo_v1_header_t     header = {0};
+    noah_profile_combo_v1_validation_t walk   = {0};
+    noah_profile_action_v1_limits_t    limits = noah_profile_action_v1_default_limits();
+    noah_profile_combo_v1_row_t        row;
+    if (!noah_profile_blob_v1_find_domain(&view->reader, view->base_offset, view->profile.byte_length, NOAH_PROFILE_DOMAIN_V1_COMBOS, &combos) || view->base_offset > SIZE_MAX - combos.offset) return;
+    for (;;) {
+        noah_profile_combo_v1_iteration_t step  = noah_profile_combo_v1_iteration_step(&walk, &view->reader, view->base_offset + combos.offset, combos.length, &limits, &header, &row, NULL);
+        uint8_t                           index = (uint8_t)(walk.row_index - 1u);
+        if (step == NOAH_PROFILE_COMBO_V1_HEADER) {
+            runtime->default_term = header.default_term_ms;
+            runtime->hold_term    = header.hold_term_ms;
+            continue;
+        }
+        if (step == NOAH_PROFILE_COMBO_V1_ITERATING) continue;
+        if (step == NOAH_PROFILE_COMBO_V1_COMPLETE) break;
+        if (step != NOAH_PROFILE_COMBO_V1_ROW) return;
         bool follows = row.term_ms == 0u;
-        if (follows) runtime->follows_default |= (uint32_t)1u << index;
-        runtime->terms[index]     = follows ? runtime->default_term : row.term_ms;
-        runtime->flags[index]     = row.flags;
-        runtime->rows[index].keys = runtime->inputs[index];
+        if (follows) runtime->follows_default[index / 8u] |= (uint8_t)(1u << (index % 8u));
+        runtime->terms[index]          = follows ? runtime->default_term : row.term_ms;
+        runtime->flags[index]          = row.flags;
+        runtime->allowed_layers[index] = row.allowed_layers;
+        runtime->rows[index].keys      = runtime->inputs[index];
         if (noah_profile_action_runtime_v1_to_native(&row.output, &runtime->rows[index].keycode) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK || !runtime->rows[index].keycode) return;
         for (uint8_t member = 0; member < row.input_count; member++) {
             uint16_t *key = &runtime->inputs[index][member];
@@ -80,12 +90,20 @@ uint16_t noah_effective_combo_default_term(void) {
     return installed && installed->valid && installed->live ? installed->default_term : COMBO_TERM;
 }
 bool noah_effective_combo_follows_default(uint16_t index) {
-    if (installed && installed->valid && installed->live) return index < installed->count && (installed->follows_default >> index & 1u);
+    if (installed && installed->valid && installed->live) return index < installed->count && (installed->follows_default[index / 8u] >> (index % 8u) & 1u);
     return index < noah_effective_combo_count() && !noah_combo_terms[index];
 }
 // A current table stores the threshold even with no rows.
 uint16_t noah_effective_combo_hold_term(void) {
     return installed && installed->valid && installed->live ? installed->hold_term : TAPPING_TERM;
+}
+uint32_t noah_effective_combo_allowed_layers(uint16_t index) {
+    if (installed && installed->valid && installed->live) return index < installed->count ? installed->allowed_layers[index] : 0u;
+    return (uint32_t)((UINT64_C(1) << LAYER_COUNT) - 1u);
+}
+bool noah_effective_combo_enabled(uint16_t index) {
+    if (installed && installed->valid && installed->live) return index < installed->count && !(installed->flags[index] & NOAH_PROFILE_COMBO_V3_FLAG_DISABLED);
+    return index < noah_effective_combo_count();
 }
 uint8_t noah_effective_combo_flags(uint16_t index) {
     if (installed && installed->valid && installed->live && index < installed->count) return installed->flags[index];

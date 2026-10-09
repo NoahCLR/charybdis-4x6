@@ -81,6 +81,16 @@ Firmware work remaining before the product is complete:
   and run the compiled defaults; confirm that, that an eight-slot backup
   imports through the translation, and that slot 31 holds, locks and colours
   on both halves.
+- **The bigger profiles have not run on hardware** (D-F14). Flashing them
+  resets each half's storage (the flash base moves), and the stored profile
+  is refused by action ABI digest. Before relying on them, measure on both
+  halves: allocator and stack high-water with the 140 KiB EEPROM mirror; how
+  long the maximum profile's validation (7,429 owner scans), boot (9,912)
+  and the peer's prepare take in real time against the 60-second no-progress
+  window; how long a 140 KiB wear-leveling consolidation pauses; and how long
+  macro 127 takes to start on a full 10,327-byte macro bank. Also check
+  typing, pointing and lighting with a maximum profile, a sixteen-key chord
+  across both halves, and every participation control.
 
 ## Remaining Load-Bearing Contracts
 
@@ -164,9 +174,12 @@ App decision; its text is in Ark's direction.
 Profile Wire GET `0x06` exposes the native combo table the connected half runs,
 with effective per-combo timing and rules, global enable and layer-reference
 mapping: up to 32 rows of four inputs, with a metadata digest to detect
-mid-read changes. Readout version 2 also reports the default window, the hold
-threshold and which combos follow the default. Old firmware returns VIA unhandled and the app shows an
-update message without losing its other readback. Combo names are stable
+mid-read changes. The default window, the hold threshold and which combos
+follow the default came with readout version 2; readout version 3 (D-F14)
+adds each combo's enable and allowed layers, a counted reference page for the
+sixteen-layer bank, and two wide pages per row for up to sixteen inputs. Old
+firmware returns VIA unhandled and the app shows an update message without
+losing its other readback. Combo names are stable
 generated labels; firmware callback outputs and custom trigger/release hooks are
 shown as opaque. Board badges show where the selected layer over layer 0
 supplies all inputs; they do not evaluate the active layer stack or arbitrary
@@ -527,7 +540,8 @@ the retired user macros, now names a custom key; the change came with a new
 action ABI digest (`0x1d3fcacc`), so nothing decodes an old kind 7 as a
 custom key.
 
-Names live on the keyboard in settings version 5, beside the macro names, and
+Names live on the keyboard in the settings domain (version 5 then, version 6
+since D-F14), beside the macro names, and
 the keymap authors the defaults inline (`CUSTOM_KEYS`). The app offers custom
 keys only on the known digest (Profile Wire feature bit 16), in their own
 screen and picker section. Renumbering was a deliberate migration: firmware
@@ -535,8 +549,8 @@ refuses an older stored profile by digest and resets its VIA layout bank
 (sync metadata schema 3), falling back to compiled defaults that reproduce
 the profile; the app translates an older backup key by key on import. See
 [PD-mode domain](architecture/pd-mode-domain-v1.md) for the blocks and
-[portable profile](architecture/portable-profile-v1.md) for version 5 and the
-translation.
+[portable profile](architecture/portable-profile-v1.md) for the settings
+domain and the translation.
 
 ### D-L43 — Split activity optimization, at QMK's default baud
 
@@ -796,16 +810,18 @@ The static RAM tripwire gains a 4 KiB feature increment
 
 ## D-F10 — Firmware accepts only what it writes today
 
-The running firmware has one accepted profile/storage contract: schema 2.0,
-RGB v3, key behaviors v1, combos v2, settings v5, sparse PD v2 and logical
-store format 3 (`NR`). Settings v2–4, combo v1, schema 1, custom-only `NP`
-format 1 and logical `NQ` format 2 are refused. There is no firmware migration
-path, legacy GET 9 source page, feature bit 13 or legacy PD envelope validator.
+The running firmware has one accepted profile/storage contract. At this cut it
+was schema 2.0, RGB v3, key behaviors v1, combos v2, settings v5, sparse PD v2
+and logical store format 3 (`NR`); D-F14 moved it to schema 3.0, RGB v4,
+settings v6 and format 4 (`NS`), refusing the earlier ones the same way.
+Settings v2–4, combo v1, schema 1, custom-only `NP` format 1 and logical `NQ`
+format 2 are refused. There is no firmware migration path, legacy GET 9 source
+page, feature bit 13 or legacy PD envelope validator.
 Old backup translation belongs to the client before Apply.
 
 Every save is a logical generation, including edits that change only custom
-domains. Profile Wire BEGIN requires format 3 and nonzero VIA generation and
-digest. The owner always stages, prepares, accepts and converges the bound VIA
+domains. Profile Wire BEGIN requires the current format and nonzero VIA
+generation and digest. The owner always stages, prepares, accepts and converges the bound VIA
 identity before publishing. Prepared peer pushes require a correlated bind;
 background stale-peer repair fetches or sends the committed VIA identity too.
 A repeated BEGIN retains its generation/digest-correlated bind after BUSY or
@@ -895,3 +911,77 @@ codec reads a payload range
 instead of a view; the compiled fixture drops the unused
 `profile.action_abi_row_visits` key. See
 [domain ownership](architecture/profile-wire-v1.md#firmware-domain-ownership).
+
+## D-F14 — Bigger profiles: sixteen layers, 128 of everything, 64 KiB slots
+
+The profile grows in one version transition, so a user upgrades once:
+
+| Table | Before | Now |
+| --- | ---: | ---: |
+| Layers | 8 | 16 (IDs 0–15) |
+| Shared behaviour rows / populated steps | 64 / 128 | 128 / 640 |
+| Combos / inputs per combo | 32 / 4 | 128 / 2–16 |
+| Custom keys | 64 | 128 |
+| VIA macros | 64 | 128 |
+| Name | ASCII, 20 or 23 bytes | counted UTF-8, 32 bytes, everywhere |
+| Custom-profile slot | 5,120 bytes | 65,536 bytes (65,504 payload) |
+| VIA region (keymap and macros) | 8 KiB | 12 KiB |
+
+Each half's logical EEPROM is 140 KiB: VIA owns `0x0000–0x2FFF`, slot A
+`0x3000–0x12FFF`, slot B `0x13000–0x22FFF`. Wear-leveling backing is 280 KiB.
+QMK mirrors logical EEPROM in SRAM0–3, so this adds 124,928 bytes of fixed RAM
+per half; the static-data regression policy moves with it, from fresh linked
+accounting ([memory budgets](architecture/memory-budgets.md)). It is a policy
+for the new representation, not a hardware limit, and allocator, stack and
+timing evidence on the keyboard remains open. Pinned QMK's wear-leveling log
+addresses 19 bits, so 140 KiB needs no QMK change; consolidation now rewrites
+140 KiB of flash, a pause the hardware acceptance times.
+
+The VIA keymap grows from 960 to 1,920 bytes; the 12 KiB region keeps the
+macro bank at 10,327 bytes (it was 7,191), shared by all 128 macros, with
+the per-macro playback budget unchanged.
+
+Formats: profile schema 3.0 with RGB v4, key behaviours v2, combos v3,
+settings v6 and pointing v3; logical store format 4 (`NS`); VIA sync metadata
+schema 4. Wire masks of layers are 32 bits with every bit above the advertised
+bank refused; counts and member lists are counted, so a smaller combo sends
+fewer bytes. Readback pages, capability fields and storage addresses are wide
+where the new sizes need it (capability layout 2, feature bit 19). Older
+firmware refuses the new formats and the new firmware refuses the old ones;
+geometry moves the flash base, so old storage is reset, never reinterpreted.
+Backup translation (eight layers to sixteen, 64-slot banks to 128, old custom
+keys by stable slot) belongs to the client, as before (D-F10).
+
+Custom keys leave `0x7e40–0x7e7f`, which pointing holds box in, for an aligned
+block `0x7f00–0x7f7f`; the old block is retired and inert. Pointing holds,
+locks and layer locks keep their values. VIA macros fill QMK's own
+`QK_MACRO` range, `0x7700–0x777f`. The action ABI digest changes, so stored
+profiles from earlier firmware are refused by digest.
+
+Behaviours and combos gain participation controls at four scopes (master,
+layer, definition, placement), decided once per press against the press's
+source layer; see [participation policy](architecture/participation-policy.md).
+A bypassed `LT()` or `MT()` placement must return to native tap-hold timing,
+which needs QMK to ask per record rather than per keycode, so BK gains a weak
+`is_tap_record_user()` hook beside `is_tap_keycode_user()`. BK also preserves
+an optional opaque byte of press context through its queues and synthesized
+tapping releases, and provides a combo member-record gate before state updates.
+The context keeps repeated buffered presses independent; the gate makes an
+excluded duplicate inert to an eligible chord's member state.
+Defaults allow everything, so a profile that never uses them is unchanged.
+
+`tests/fixtures/maximum_profile_v3.fixture` holds every table at its maximum
+at once: 37,667 bytes, leaving 27,837 bytes of the slot. It validates, commits,
+boots and publishes whole on one half and prepares and commits on the peer;
+settings validation reads 20 bytes per step, like the other domains, so the
+whole profile validates in 7,429 owner scans
+([storage baseline](architecture/storage-and-resource-baseline.md#schema-3-ceilings-and-the-maximum-profile)).
+
+The authored layout keeps its eight layers; layers 8–15 are transparent,
+unnamed and inactive. One supported tap depth (five) bounds behaviour steps,
+step capacity and the extra tap-branch colours; formats are counted so a
+later firmware can raise it.
+
+Client follow-up: Ark adopts every format above, derives its limits from the
+capability pages instead of constants, adds the controls, and translates older
+backups; pin the landed firmware.

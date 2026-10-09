@@ -103,6 +103,7 @@ lib/key/runtime/debug.c
 lib/key/runtime/preflight.c
 lib/key/runtime/press.c
 lib/key/runtime/process.c
+lib/key/behavior/participation.c
 lib/key/runtime/slot/origin_registry.c
 lib/key/runtime/release.c
 lib/key/runtime/deferred_release.c

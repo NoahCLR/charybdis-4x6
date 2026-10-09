@@ -32,8 +32,8 @@ static bool store_candidate_equal(const noah_profile_store_candidate_t *left, co
     return left && right && left->format_version == right->format_version && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->via_generation == right->via_generation && left->via_digest == right->via_digest;
 }
 
-static bool candidate_payload_start(const noah_profile_candidate_store_backend_t *backend, uint16_t *address) {
-    uint16_t slot_start;
+static bool candidate_payload_start(const noah_profile_candidate_store_backend_t *backend, noah_profile_storage_address_t *address) {
+    noah_profile_storage_address_t slot_start;
 
     if (!backend || !backend->store || !address) {
         return false;
@@ -45,20 +45,20 @@ static bool candidate_payload_start(const noah_profile_candidate_store_backend_t
     } else {
         return false;
     }
-    *address = (uint16_t)(slot_start + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+    *address = (slot_start + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
     return true;
 }
 
-static bool slot_payload_start(noah_profile_slot_t slot, uint16_t *address) {
+static bool slot_payload_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
     if (!address) {
         return false;
     }
     if (slot == NOAH_PROFILE_SLOT_A) {
-        *address = (uint16_t)(NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+        *address = (NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
         return true;
     }
     if (slot == NOAH_PROFILE_SLOT_B) {
-        *address = (uint16_t)(NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
+        *address = (NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
         return true;
     }
     return false;
@@ -67,16 +67,16 @@ static bool slot_payload_start(noah_profile_slot_t slot, uint16_t *address) {
 static bool staged_reader_read(void *context, size_t offset, uint8_t *target, size_t length) {
     noah_profile_store_t *store = context;
 
-    if (!store || !store->io.read || !target || length == 0u || offset > UINT16_MAX || length > UINT16_MAX || offset + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
+    if (!store || !store->io.read || !target || length == 0u || length > UINT16_MAX || offset >= NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE || length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - offset) {
         return false;
     }
-    return store->io.read(store->io.context, (uint16_t)offset, target, (uint16_t)length);
+    return store->io.read(store->io.context, (noah_profile_storage_address_t)offset, target, (uint16_t)length);
 }
 
 static bool begin_slot_reuse(void *context, noah_profile_slot_t slot) {
     noah_profile_candidate_store_backend_t *backend = context;
     noah_effective_profile_backing_t        backing;
-    uint16_t                                payload_start;
+    noah_profile_storage_address_t  payload_start;
 
     if (!backend || !backend->provider || !slot_payload_start(slot, &payload_start)) {
         return false;
@@ -193,7 +193,7 @@ static noah_profile_candidate_backend_result_t write_candidate(void *context, ui
 
 static noah_profile_candidate_backend_result_t read_candidate(void *context, uint16_t offset, uint8_t *bytes, uint8_t length) {
     noah_profile_candidate_store_backend_t *backend = context;
-    uint16_t                                payload_start;
+    noah_profile_storage_address_t  payload_start;
 
     return candidate_payload_start(backend, &payload_start) && staged_reader_read(backend->store, (size_t)payload_start + offset, bytes, length) ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
 }
@@ -204,7 +204,7 @@ static noah_profile_candidate_backend_result_t validation_begin(void *context, c
     noah_profile_validator_v1_declaration_t   declaration;
     noah_profile_validator_v1_error_t       validator_error = noah_profile_validator_v1_no_error();
     noah_profile_validator_v1_result_t      result;
-    uint16_t                                payload_start;
+    noah_profile_storage_address_t  payload_start;
 
     if (!backend || !backend->store || !metadata || !backend->store->prepare_active || backend->store->candidate_written != metadata->payload_length || !metadata_equal(metadata, &backend->metadata) || !candidate_payload_start(backend, &payload_start)) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
@@ -313,7 +313,7 @@ bool noah_profile_candidate_store_backend_staged_candidate(const noah_profile_ca
 bool noah_profile_candidate_store_backend_staged_read(void *context, const noah_profile_store_candidate_t *candidate, uint16_t offset, uint8_t *bytes, uint8_t length) {
     noah_profile_candidate_store_backend_t *backend = context;
     noah_profile_store_candidate_t          staged;
-    uint16_t                                payload_start;
+    noah_profile_storage_address_t  payload_start;
 
     if (!candidate || !bytes || length == 0u || !noah_profile_candidate_store_backend_staged_candidate(backend, &staged) || !store_candidate_equal(&staged, candidate) || !candidate_payload_start(backend, &payload_start) || (uint32_t)offset + length > staged.payload_length) {
         return false;
@@ -325,7 +325,7 @@ noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_ado
     noah_profile_validator_v1_declaration_t declaration;
     noah_profile_validator_v1_error_t       validator_error = noah_profile_validator_v1_no_error();
     noah_profile_validator_v1_result_t      result;
-    uint16_t                                payload_start;
+    noah_profile_storage_address_t  payload_start;
 
     if (!backend || !backend->store || !backend->provider || !record || record->slot == NOAH_PROFILE_SLOT_NONE || backend->store->prepare_active || backend->store->reuse_active || !committed_record_equal(&backend->store->committed, record) || !slot_payload_start(record->slot, &payload_start)) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
@@ -609,7 +609,7 @@ noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_com
 
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_request_activation(noah_profile_candidate_store_backend_t *backend) {
     noah_effective_profile_result_t result;
-    uint16_t                        payload_start;
+    noah_profile_storage_address_t  payload_start;
 
     if (!backend || !backend->store || !backend->provider || !backend->validation_complete || !backend->committed_available || backend->store->prepare_active || backend->store->reuse_active || !committed_record_equal(&backend->store->committed, &backend->committed_record) || backend->validated_profile.domain_mask != backend->committed_record.domain_mask || backend->validated_profile.byte_length != backend->committed_record.payload_length || backend->validated_profile.crc32 != backend->committed_record.payload_crc32 || backend->validated_profile.digest != backend->committed_record.payload_digest || backend->validated_profile.action_abi_digest != backend->committed_record.action_abi_digest || !slot_payload_start(backend->committed_record.slot, &payload_start)) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;

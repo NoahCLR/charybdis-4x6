@@ -1,11 +1,11 @@
 # Shared Profile Wire v1.0 blob/action golden vectors.
 # Consumed by both the firmware C host suite and the Charybdis Ark JavaScript suite.
-blob.empty.hex=4e4c503102000001
-blob.empty.fnv1a32=727e32e1
-blob.empty.crc32=975f7167
-blob.ordered.hex=4e4c50310200020110030400deadbeef20010300000102
-blob.ordered.fnv1a32=b10b6197
-blob.ordered.crc32=0c3a7ca5
+blob.empty.hex=4e4c503103000001
+blob.empty.fnv1a32=c0aa6ecc
+blob.empty.crc32=2fe31602
+blob.ordered.hex=4e4c50310300020110040400deadbeef20020300000102
+blob.ordered.fnv1a32=411bccb8
+blob.ordered.crc32=38812493
 action.NONE.operand=0
 action.NONE.hex=00000000
 action.QMK_KEYCODE.operand=4660

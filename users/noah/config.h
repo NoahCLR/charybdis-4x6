@@ -192,18 +192,22 @@
 // the same uint32 value little-endian; clients compare the decoded values.
 #    define VIA_FIRMWARE_VERSION 0x00010000u
 #    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
-#    define DYNAMIC_KEYMAP_MACRO_COUNT 64
+#    define DYNAMIC_KEYMAP_MACRO_COUNT 128
 // RP2040 wear-leveling exposes half of this backing region as logical EEPROM.
-// Firmware uses 18 KiB of logical EEPROM. VIA owns the lower 8 KiB; the upper
-// 10 KiB holds two last-known-good live-profile slots. The storage
-// layout contract validates these exact inclusive address ranges without
-// reading or writing them.
+// Firmware uses 140 KiB of logical EEPROM (D-F14). VIA owns the lower 12 KiB;
+// the upper 128 KiB holds two last-known-good live-profile slots of 64 KiB.
+// QMK mirrors logical EEPROM in RAM, so this sizes a 140 KiB cache per half.
+// The storage layout contract validates these exact inclusive address ranges
+// without reading or writing them.
 #    if defined(MCU_RP)
-#        define WEAR_LEVELING_BACKING_SIZE 36864
+#        define WEAR_LEVELING_BACKING_SIZE 286720
 #    endif
-#    define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR 0x1FFFu
-#    define NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR 0x2000u
-#    define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x33FFu
-#    define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x3400u
-#    define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x47FFu
+#    define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR 0x2FFFu
+#    define NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR 0x3000u
+#    define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x12FFFu
+#    define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x13000u
+#    define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x22FFFu
 #endif
+
+// Preserve participation through native tapping/combo and userspace queues.
+#define KEYRECORD_USER_DATA

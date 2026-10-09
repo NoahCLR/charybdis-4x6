@@ -36,23 +36,27 @@
 #define KEY_FEEDBACK_SEMANTIC_MAP_SIZE ((((MATRIX_ROWS * MATRIX_COLS) * KEY_FEEDBACK_SEMANTIC_BITS) + 7u) / 8u)
 #define KEY_FEEDBACK_SEMANTIC_MASK ((uint16_t)((1u << KEY_FEEDBACK_SEMANTIC_BITS) - 1u))
 
+// A pending tap branch is stored as its tap count minus one, so branch 1 and
+// no branch share zero: the semantic map says whether a branch is pending, and
+// branches 1 and 2 render the same first tap-branch colour. Depth eight then
+// fits three bits a key, and the split branch packet one RPC payload.
 #if KEY_BEHAVIOR_MAX_TAP_COUNT == 0u
 #    error "KEY_BEHAVIOR_MAX_TAP_COUNT must be greater than zero"
 #elif KEY_BEHAVIOR_MAX_TAP_COUNT > 255u
 #    error "KEY_BEHAVIOR_MAX_TAP_COUNT must fit in uint8_t"
-#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 1u
+#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 2u
 #    define KEY_FEEDBACK_TAP_BRANCH_BITS 1u
-#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 3u
+#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 4u
 #    define KEY_FEEDBACK_TAP_BRANCH_BITS 2u
-#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 7u
+#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 8u
 #    define KEY_FEEDBACK_TAP_BRANCH_BITS 3u
-#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 15u
+#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 16u
 #    define KEY_FEEDBACK_TAP_BRANCH_BITS 4u
-#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 31u
+#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 32u
 #    define KEY_FEEDBACK_TAP_BRANCH_BITS 5u
-#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 63u
+#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 64u
 #    define KEY_FEEDBACK_TAP_BRANCH_BITS 6u
-#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 127u
+#elif KEY_BEHAVIOR_MAX_TAP_COUNT <= 128u
 #    define KEY_FEEDBACK_TAP_BRANCH_BITS 7u
 #else
 #    define KEY_FEEDBACK_TAP_BRANCH_BITS 8u
@@ -76,7 +80,7 @@ typedef enum {
 #define KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT {KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE, KEY_RUNTIME_PACKED_KEYPOS_NONE}
 
 _Static_assert(KEY_FEEDBACK_TAP_BRANCH_BITS <= 8u, "key feedback tap branch values must fit in one byte");
-_Static_assert(KEY_BEHAVIOR_MAX_TAP_COUNT <= KEY_FEEDBACK_TAP_BRANCH_MASK, "key feedback tap branch map must represent every authored tap count");
+_Static_assert(KEY_BEHAVIOR_MAX_TAP_COUNT - 1u <= KEY_FEEDBACK_TAP_BRANCH_MASK, "key feedback tap branch map must represent every authored tap count");
 
 typedef enum {
     KEY_FEEDBACK_SEMANTIC_NONE = 0,
@@ -180,7 +184,8 @@ static inline uint8_t key_feedback_tap_branch_map_get(const uint8_t *map, keypos
         packed |= (uint16_t)((uint16_t)map[byte_index + 1u] << 8u);
     }
 
-    return (uint8_t)((packed >> shift) & KEY_FEEDBACK_TAP_BRANCH_MASK);
+    packed = (uint16_t)((packed >> shift) & KEY_FEEDBACK_TAP_BRANCH_MASK);
+    return packed ? (uint8_t)(packed + 1u) : 0u;
 }
 
 static inline void key_feedback_tap_branch_map_set(uint8_t *map, keypos_t key_pos, uint8_t tap_branch) {
@@ -196,6 +201,7 @@ static inline void key_feedback_tap_branch_map_set(uint8_t *map, keypos_t key_po
     if (tap_branch > KEY_BEHAVIOR_MAX_TAP_COUNT) {
         tap_branch = KEY_BEHAVIOR_MAX_TAP_COUNT;
     }
+    tap_branch = tap_branch > 1u ? (uint8_t)(tap_branch - 1u) : 0u;
 
     bit_index  = (uint16_t)(key_origin_keypos_index(key_pos) * KEY_FEEDBACK_TAP_BRANCH_BITS);
     byte_index = (uint16_t)(bit_index / 8u);

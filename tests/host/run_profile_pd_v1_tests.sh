@@ -7,7 +7,7 @@ python3 - "$ROOT/tests/fixtures/client-regression/pd-corpus.bin.gz" "$BUILD_DIR/
 import gzip, pathlib, sys
 pathlib.Path(sys.argv[2]).write_bytes(gzip.decompress(pathlib.Path(sys.argv[1]).read_bytes()))
 PYCODE
-python3 - "$ROOT/tests/fixtures/pd_mode_domain_v2.json" "$BUILD_DIR/v2.txt" <<'PYCODE'
+python3 - "$ROOT/tests/fixtures/pd_mode_domain_v3.json" "$BUILD_DIR/v2.txt" <<'PYCODE'
 import json, pathlib, sys
 fixture = json.loads(pathlib.Path(sys.argv[1]).read_text())
 lines = [f"OK 0 {case['name']} {case['hex']}" for case in fixture['valid']]

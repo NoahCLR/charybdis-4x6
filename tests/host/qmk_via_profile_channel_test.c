@@ -232,7 +232,7 @@ static void make_request(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint8_
 static uint32_t expected_feature_flags(void) {
     // TG()/TO() ownership, behaviour QMK functions and the custom-key keycode
     // blocks are runtime facts, advertised in every build.
-    uint32_t flags = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS | NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING | NOAH_PROFILE_FEATURE_OWNED_TAPPING;
+    uint32_t flags = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS | NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING | NOAH_PROFILE_FEATURE_OWNED_TAPPING | NOAH_PROFILE_FEATURE_WIDE_PAGES;
 #ifdef SPLIT_KEYBOARD
     flags |= NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD;
 #endif
@@ -293,6 +293,14 @@ static void test_capability_hook(void) {
 #else
     assert(frame[WIRE_PAYLOAD + 21u] == 0u);
 #endif
+    assert(read_u16(&frame[WIRE_PAYLOAD + 13u]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x33u, 2u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(read_u16(&frame[WIRE_PAYLOAD]) == NOAH_PROFILE_WIRE_V1_MAX_POPULATED_BEHAVIOR_STEPS);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 3u]) == NOAH_PROFILE_STORAGE_SLOT_A_SIZE);
+    assert(frame[WIRE_PAYLOAD + 7u] == NOAH_PROFILE_WIRE_V1_MAX_NAME_BYTES && frame[WIRE_PAYLOAD + 8u] == 32u && frame[WIRE_PAYLOAD + 9u] == MATRIX_ROWS * MATRIX_COLS);
 }
 
 #ifndef NOAH_LIVE_PROFILE_OWNER_ENABLE
@@ -507,6 +515,51 @@ static void test_payload_read_refuses_pages_past_the_payload(void) {
     assert(frame[6] == 0u);
 }
 
+// A full slot needs 2,621 pages, so payload pages are 16 bits wide: byte 4
+// is the low byte and byte 5 the high byte.
+static void test_payload_read_takes_wide_pages(void) {
+    uint8_t  frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+    uint16_t last_page = (uint16_t)((NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX + NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE - 1u) / NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
+
+    store_runtime_has_committed         = true;
+    store_runtime_record.slot           = NOAH_PROFILE_SLOT_A;
+    store_runtime_record.payload_length = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX;
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && read_u16(&frame[9]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 2u, 0x2Cu);
+    frame[5] = 0x01u; // page 300
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[3] == 2u && frame[4] == 0x2Cu);
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
+    assert(frame[7] == store_payload_byte(299u * NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE));
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 3u, (uint8_t)last_page);
+    frame[5] = (uint8_t)(last_page >> 8u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(frame[6] == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX - (last_page - 1u) * NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 4u, (uint8_t)(last_page + 1u));
+    frame[5] = (uint8_t)((last_page + 1u) >> 8u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
+
+    // The highest page never wraps onto an early offset.
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 5u, 0xFFu);
+    frame[5] = 0xFFu;
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
+
+    // Byte 6 onward stays reserved.
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 6u, 1u);
+    frame[6] = 1u;
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
+}
+
 static void test_payload_read_reports_unavailable_without_a_commit(void) {
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
 
@@ -592,8 +645,12 @@ static void test_combo_read_route_without_combo_feature(void) {
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[0] == id_custom_get_value && frame[3] == 17u);
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
-    assert(frame[7] == 2u && frame[8] == 0u && frame[9] == 4u && frame[11] == 0u);
+    assert(frame[7] == 3u && frame[8] == 0u && frame[9] == 16u && frame[10] == LAYER_COUNT && frame[11] == 0u);
+    // An empty table still reports each layer as its own reference layer.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 18u, 1u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u && frame[7] == 0u && frame[7u + LAYER_COUNT - 1u] == LAYER_COUNT - 1u);
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 18u, 2u);
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE && frame[6] == 0u);
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 19u, 0u);
@@ -618,6 +675,7 @@ int main(void) {
 #endif
     test_payload_read_reports_metadata_then_chunks();
     test_payload_read_refuses_pages_past_the_payload();
+    test_payload_read_takes_wide_pages();
     test_payload_read_reports_unavailable_without_a_commit();
     test_payload_read_rejects_malformed_requests();
     test_payload_read_surfaces_storage_failure();

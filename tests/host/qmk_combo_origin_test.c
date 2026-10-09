@@ -6,6 +6,7 @@
 
 #include "noah_real_profile_keyboard.h"
 #include "users/noah/lib/compat/qmk_combo_origin.h"
+#include "users/noah/lib/key/behavior/participation.h"
 
 enum {
     TEST_BURST_COMBOS     = 5,
@@ -890,7 +891,68 @@ static void test_reset_clears_candidate_diagnostics(void) {
     CHECK(snapshot.unmatched_delayed_output_count == 0u);
 }
 
+bool           combo_key_record_allowed(uint16_t combo_index, combo_t *combo, uint16_t keycode, keyrecord_t *record);
+static uint8_t test_source_layer;
+uint8_t        read_source_layers_cache(keypos_t key) {
+    (void)key;
+    return test_source_layer;
+}
+
+// combo_key_record_allowed answers with the press's stored decision and the
+// combo's own: a member pressed outside combos, or from a layer the combo does
+// not allow, does not count; a press from another source layer does.
+static void test_combo_participation_hook(void) {
+    keyrecord_t record = {.event = {.key = {.row = 1, .col = 2}, .pressed = true, .type = KEY_EVENT}};
+    keyrecord_t combo  = {.event = {.type = COMBO_EVENT, .pressed = true}};
+
+    noah_participation_press_store(record.event.key, true, true);
+    test_source_layer = 3;
+    CHECK(combo_key_record_allowed(0, NULL, KC_A, &record));
+    record.event.pressed = false; // the release reuses the press's answer
+    CHECK(combo_key_record_allowed(0, NULL, KC_A, &record));
+    noah_participation_press_store(record.event.key, true, false);
+    CHECK(!combo_key_record_allowed(0, NULL, KC_A, &record));
+    record.event.pressed = true;
+    CHECK(!combo_key_record_allowed(0, NULL, KC_A, &record));
+    // Another position keeps its own decision.
+    record.event.key = (keypos_t){.row = 2, .col = 2};
+    noah_participation_press_store(record.event.key, false, true);
+    CHECK(combo_key_record_allowed(0, NULL, KC_A, &record));
+    // Only physical member presses are asked.
+    CHECK(combo_key_record_allowed(0, NULL, KC_A, &combo));
+    noah_participation_press_store((keypos_t){.row = 1, .col = 2}, true, true);
+}
+
+static void test_origin_mirror_keeps_captured_duplicate_exclusion(void) {
+    keypos_t duplicate = test_key(2, 3);
+    uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+    test_set_key(LAYER_BASE, duplicate.row, duplicate.col, KC_B);
+    noah_participation_press_store(duplicate, true, false);
+    test_observe_physical_key(duplicate, true);
+    // Later policy/position bookkeeping cannot rewrite the observed press.
+    noah_participation_press_store(duplicate, true, true);
+    test_observe_physical_key(test_key(1, 0), true); // declared owner first
+    test_observe_physical_key(test_key(0, 0), true);
+    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
+    CHECK(test_bitmap_has(bitmap, 0, 0));
+    CHECK(test_bitmap_has(bitmap, 1, 0));
+    CHECK(!test_bitmap_has(bitmap, duplicate.row, duplicate.col));
+
+    // Two genuinely eligible occurrences remain ambiguous.
+    test_reset();
+    test_set_key(LAYER_BASE, duplicate.row, duplicate.col, KC_B);
+    test_observe_physical_key(duplicate, true);
+    test_observe_physical_key(test_key(1, 0), true);
+    test_observe_physical_key(test_key(0, 0), true);
+    noah_qmk_combo_origin_pressed_combo_bitmap(bitmap);
+    CHECK(!key_origin_bitmap_has_any(bitmap));
+}
+
 int main(void) {
+    test_combo_participation_hook();
+    test_origin_mirror_keeps_captured_duplicate_exclusion();
     test_single_half_combo_uses_last_key_from_combo_ref_layer();
     test_combo_owner_is_stable_when_member_press_order_changes();
     test_pressed_combo_bitmap_reports_complete_physical_combo();

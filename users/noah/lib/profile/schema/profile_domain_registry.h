@@ -10,11 +10,11 @@
 // X(NAME, module, id, version). A row's index is its position, numbered by
 // the enum below, and its mask bit is 1 << index.
 #define NOAH_PROFILE_DOMAIN_ROWS(X) \
-    X(RGB,           rgb,           0x10u, 3u) \
-    X(KEY_BEHAVIORS, key_behaviors, 0x20u, 1u) \
-    X(COMBOS,        combos,        0x30u, 2u) \
-    X(SETTINGS,      settings,      0x40u, 5u) \
-    X(PD,            pd,            0x50u, 2u)
+    X(RGB,           rgb,           0x10u, 4u) \
+    X(KEY_BEHAVIORS, key_behaviors, 0x20u, 2u) \
+    X(COMBOS,        combos,        0x30u, 3u) \
+    X(SETTINGS,      settings,      0x40u, 6u) \
+    X(PD,            pd,            0x50u, 3u)
 
 enum {
 #define NOAH_DOMAIN_INDEX(NAME, module, id, version) NOAH_PROFILE_DOMAIN_INDEX_##NAME,

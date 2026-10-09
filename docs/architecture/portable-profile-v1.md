@@ -1,8 +1,8 @@
 # Portable keyboard profile v1
 
-> Current firmware accepts only the formats it writes (D-F10): profile schema
-> 2.0; RGB v3, key behaviors v1, combos v2, settings v5 and sparse PD v2;
-> a 5,088-byte custom payload; and logical store format 3 (`NR`). Every save
+> Current firmware accepts only the formats it writes (D-F10, D-F14): profile
+> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v6 and sparse PD v3;
+> a 65,504-byte custom payload; and logical store format 4 (`NS`). Every save
 > binds a nonzero VIA generation and digest. HID and split framing remain v1.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > Backup translation belongs to the client, before a current-format Apply.
@@ -24,9 +24,9 @@ versions fail validation. Files are limited to 100,000 bytes.
 | `version` | `1` |
 | `keyboard` | `charybdis-4x6` |
 | `actionAbiDigest` | Nonzero uint32 engine vocabulary identity |
-| `layers` | Eight arrays of 60 uint16 native keycodes, in matrix row/column order, including unused physical matrix positions |
+| `layers` | Sixteen arrays of 60 uint16 native keycodes, in matrix row/column order, including unused physical matrix positions |
 | `profile` | Canonical base64 NLP1 payload, at most 4,064 bytes; domains `0x10`, `0x20`, `0x30`, `0x40`, in that order |
-| `macros` | Exactly 64 canonical base64 VIA macro streams, excluding their zero terminators |
+| `macros` | Exactly 128 canonical base64 VIA macro streams, excluding their zero terminators |
 
 The temporary bridge also exports five-layer documents. Import into the
 standard image recognizes the deployed `0xdcb00959` action vocabulary, adds
@@ -57,6 +57,20 @@ if it does not, the import is refused with that reason, never trimmed. A
 Other legacy vocabularies are rejected. Large legacy macro banks must fit the new
 7,191-byte capacity, including 64 terminators and the final validity byte.
 
+Firmware after D-F14 has a new action-ABI digest (it covers the layer, macro
+and custom-key counts and the custom-key block). Import of a document from the
+preceding eight-layer firmware translates key by key: every native keycode
+keeps its value except a custom key, which moves from `0x7e40 + n` to
+`0x7f00 + n` (its slot is kept); layers 8–15 are added as 60 `KC_TRNS` each;
+and the 64 macro streams are followed by 64 empty ones. Action operands in the
+profile keep their values. The NLP1 schema byte becomes 3 and each domain
+moves one version: RGB 3 → 4 ([RGB domain](rgb-domain-v1.md)), key behaviours
+1 → 2, combos 2 → 3 ([Profile Wire](profile-wire-v1.md)), settings 5 → 6
+(below) and pointing 2 → 3 ([PD-mode domain](pd-mode-domain-v1.md)). The
+result must fit the 65,504-byte ceiling. `tests/host/translate_eight_slot_profile.py`
+is the firmware's executable reference for these domain steps; the firmware
+itself never translates.
+
 RGB and behaviour domains come from the effective committed domain or the
 keyboard's compiled readback. Combo rows come from effective native readback;
 the exported override is explicit even when empty. Custom trigger/release/
@@ -82,11 +96,11 @@ the target bank, which it has just proved both halves hold. A reviewed snapshot
 without those bytes is not reused: Apply reads the keyboard again. The
 interrupted-capture path already carries the raw bank it read.
 
-## Settings domain `0x40`, version 5
+## Settings domain `0x40`, version 6
 
 Capability domain-mask bit 3 advertises this domain. An ordinary profile may
 omit it; a complete portable file includes it. Firmware accepts only version
-5, with the envelope version equal to the payload's first byte. Older settings
+6, with the envelope version equal to the payload's first byte. Older settings
 must be translated by the client before Apply; firmware never preserves or
 executes retired user-macro instruction records.
 
@@ -94,17 +108,32 @@ All multibyte fields are little-endian:
 
 | Offset | Bytes | Contents |
 | ---: | ---: | --- |
-| 0 | 8 | `[5, 8, 28, 64, 64, 0, 0, 0]`: version, layer-name count, scalar count, macro-name count, custom-key name count, reserved zeros |
-| 8 | 112 | 28 uint32 scalar values |
-| 120 | 192 | Eight UTF-8 layer names, each 24 bytes: at most 23 bytes of text, then zero termination and padding |
-| 312 | variable | 64 VIA macro names followed by 64 custom-key names: uint8 length (0–20), then printable ASCII bytes (`0x20`–`0x7e`) |
+| 0 | 8 | `[6, 16, 31, 128, 128, 0, 0, 0]`: version, layer count, scalar count, macro-name count, custom-key-name count, reserved zeros |
+| 8 | 124 | 31 uint32 scalar values |
+| 132 | 272 | 16 layer records of 17 bytes, layer 0 first: byte 0 the layer's combo reference layer (below 16); bytes 1–8 its behaviour-bypass placement bitmap; bytes 9–16 its combo-exclusion placement bitmap |
+| 404 | variable | 272 counted names: 16 layer names, then 128 VIA macro names, then 128 custom-key names; each a uint8 length `0..32`, then that many bytes of UTF-8 |
 
-The minimum is 440 bytes and the maximum 3,000 bytes. All 128 names fit at
-full length within this domain; the complete profile still shares the 5,088-byte
-ceiling and rejects excess without trimming. Names are profile data for the
-client. Macro content belongs to the bound VIA bank; custom keys execute their
-behavior rows. Validation reads at most one settings byte per step. Retired
-per-mode DPI scalars 10–14 must be zero; mode tuning is in domain `0x50`.
+The minimum is 676 bytes (every name empty) and the maximum 9,380 bytes (every
+name 32 bytes). The complete profile shares the 65,504-byte ceiling and
+rejects excess without trimming. Names are profile data for the client. Macro
+content belongs to the bound VIA bank; custom keys execute their behavior rows.
+Validation reads at most 20 settings bytes per step, in one read. Retired per-mode DPI
+scalars 10–14 must be zero; mode tuning is in domain `0x50`.
+
+Every name in this domain follows one rule: at most 32 encoded bytes of
+well-formed UTF-8 (no overlong forms, no surrogates, nothing past U+10FFFF), no
+C0 control character (`0x00`–`0x1f`) and no DEL (`0x7f`), and no multibyte
+sequence cut by the length. Limits count bytes, not characters. Names are
+counted, not NUL-terminated. Pointing-slot names in domain `0x50` keep their
+own rule.
+
+A placement bitmap's bit `n` (byte `n / 8`, bit `n % 8`) is matrix position
+`n = row × MATRIX_COLS + column`. A bitmap holds up to 64 positions; this
+keyboard has 60 (10 × 6), and bits at or past the advertised position count
+(capability page 2, byte 9) must be zero. A set bypass bit sends the key at
+that layer and position to its normal action instead of its shared behaviour;
+a set exclusion bit keeps it out of combos. The
+[participation policy](participation-policy.md) defines both.
 
 | Scalar ID | Meaning |
 | ---: | --- |
@@ -121,13 +150,32 @@ per-mode DPI scalars 10–14 must be zero; mode tuning is in domain `0x50`.
 | 23 | Persistent default-layer bitmask |
 | 24 | QMK keymap options |
 | 25–26 | Auto-mouse activation delay (ms) and movement threshold |
-| 27 | Eight four-bit combo reference-layer IDs, lowest layer first |
+| 27 | Retired, must be zero (version 5's combo reference layers; now in the layer records) |
+| 28 | Behaviour master enable |
+| 29 | Layer behaviours mask, one bit per layer |
+| 30 | Layer combos mask, one bit per layer |
 
-Boolean values are 0/1; layer IDs must fit the bank. Timing/DPI policy scalars
-are uint16 except the RGB idle timeout (maximum one day). Debounce is uint8.
-Flash half-period must be nonzero and fade dead time less than auto-mouse
-timeout. Normal DPI is 400–3,400 in steps of 200; sniping DPI is 100–400 in steps
-of 100. The default-layer mask is nonzero and contains no out-of-bank bits.
+Boolean values are 0/1. The auto-mouse layer (5) and auto-sniping layer (9)
+are below 16. Timing/DPI policy scalars are uint16 except the RGB idle timeout
+(maximum one day). Debounce is uint8. Flash half-period must be nonzero and
+fade dead time less than auto-mouse timeout. Normal DPI is 400–3,400 in steps
+of 200; sniping DPI is 100–400 in steps of 100. The default-layer mask (23) is
+nonzero with bits only in 0–15. The layer masks (29, 30) reject bits 16 and
+above; an empty mask is allowed.
+
+Compiled defaults set scalar 28 to 1 and scalars 29 and 30 to `0xffff`; every
+layer refers combos to itself, every bitmap is zero and layers 8–15 are
+unnamed. So a profile that never sets the participation controls behaves as
+version 5 did.
+
+Version 5 translates in the client, never in firmware: scalars 0–26 are
+copied; scalar 27's eight nibbles become the reference layers of layers 0–7
+(layer `n` from bits `4n..4n+3`) and layers 8–15 refer to themselves; scalar
+27 becomes 0, 28 becomes 1, and 29 and 30 become `0xffff`; bitmaps are zero;
+layer names 0–7 are version 5's 24-byte fields up to their first zero byte and
+8–15 are empty; the 64 macro names copy unchanged followed by 64 empty ones,
+and the 64 custom-key names likewise, since version 5's printable-ASCII names
+of at most 20 bytes are valid here.
 
 At publication the settings invalidator copies the bounded domain into a cold
 runtime cache using reads of at most 20 bytes. Key, RGB, pointer and macro
@@ -148,10 +196,12 @@ These use the existing Profile Wire custom GET envelope and request ID.
 GET value `0x07` reads the effective settings domain with its scalars overlaid
 by their live QMK owners. With no profile settings live it returns the current
 version named by the keymap: `layer_names[]`, the name in each `VIA_MACROS`
-row and, in version 5, in each `CUSTOM_KEYS` row. Page 0's 12-byte payload is version `1`,
-chunk size `25`, uint16 length, CRC32, and FNV-1a digest of the bytes as they
-are at that moment. Pages 1 onward return successive 25-byte chunks with an
-exact short final chunk, streamed from the live domain rather than a snapshot.
+row and in each `CUSTOM_KEYS` row. The request takes a 16-bit page, its low
+byte at request byte 4 and its high byte at byte 5 (feature bit 19). Page 0's
+12-byte payload is version `1`, chunk size `25`, uint16 length, CRC32, and
+FNV-1a digest of the bytes as they are at that moment. Pages 1 onward return
+successive 25-byte chunks with an exact short final chunk, streamed from the
+live domain rather than a snapshot; the largest domain needs 376 chunk pages.
 The host reads page 0 again after the chunks and requires identity and both
 checksums to match, so a change during the read fails it. The complete export also
 rechecks settings after reading the VIA banks, so changing RGB or DPI during a
@@ -226,12 +276,16 @@ different firmware builds.
 
 ## Layer order and restoration
 
-The standard image reserves eight layers. Base stays at index zero. The app
+The standard image reserves sixteen layers, IDs 0–15. `LT()` and `LM()`
+encode their layer in four bits, so every value they can express names a bank
+layer; the five-bit layer actions (`MO`, `TG`, `TT`, `OSL`, `TO` and layer
+locks) refuse layers 16 and above. Base stays at index zero. The app
 shows highest priority first and rewrites references when overlays move:
 matrix LT/LM/MO/TO/TG/DF/PDF/OSL/TT and userspace lock actions, behaviour targets
 and branches, combo inputs/outputs/reference mapping, RGB rows/groups,
-auto-mouse/auto-sniping targets and the persistent default-layer bitmask. Names
-move with their layers. Save/discard other pending edits before reordering or
+auto-mouse/auto-sniping targets, the persistent default-layer bitmask and the
+layer behaviour and combo masks. Names and layer records (combo reference and
+placement bitmaps) move with their layers. Save/discard other pending edits before reordering or
 importing; stale layout drafts must not be applied to a new layer order.
 
 Restore validates the file, captures a coherent current state, shows a review,
@@ -255,8 +309,8 @@ Physical power-loss acceptance at each durable boundary remains required.
 
 ## Upgrade and acceptance
 
-Current firmware has eight-layer VIA geometry and synchronization metadata
-schema 3. Older geometry or action vocabulary is incompatible. The old bridge
+Current firmware has sixteen-layer VIA geometry (a 1,920-byte keymap) and
+synchronization metadata schema 4; an older bank is reset, not misread. Older geometry or action vocabulary is incompatible. The old bridge
 is not built or served here: export with matching old firmware, then translate
 the complete backup in the client before restoring through current logical
 Apply. Firmware does not interpret old storage in place.
@@ -298,7 +352,7 @@ whose lighting state differs from the current state.
 
 ## Shared editor draft
 
-For a complete eight-layer snapshot, the session owns a base fingerprint and a
+For a complete profile snapshot, the session owns a base fingerprint and a
 validated target document. All editor messages stage through the existing pure
 editors; layer moves and imports stage whole documents. Undo/redo retains up to
 100 transitions. Messages carry both a unique draft instance ID and revision;

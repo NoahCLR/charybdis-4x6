@@ -20,9 +20,10 @@ typedef struct {
     size_t         fail_at;
 } instrumented_reader_t;
 
-static void expect_result(noah_profile_codec_v1_result_t actual, noah_profile_codec_v1_result_t expected) {
+#define expect_result(actual, expected) expect_result_at(actual, expected, __LINE__)
+static void expect_result_at(noah_profile_codec_v1_result_t actual, noah_profile_codec_v1_result_t expected, unsigned line) {
     if (actual != expected) {
-        fprintf(stderr, "behavior codec result mismatch: got %u expected %u\n", (unsigned)actual, (unsigned)expected);
+        fprintf(stderr, "behavior codec result mismatch at %u: got %u expected %u\n", line, (unsigned)actual, (unsigned)expected);
         abort();
     }
 }
@@ -127,13 +128,15 @@ static size_t encode_representative(uint8_t *output, size_t capacity, noah_profi
         {.tap_index = 1u, .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP, .tap = {.kind = NOAH_PROFILE_ACTION_V1_CUSTOM_KEY, .operand = 2u}},
     };
     static const noah_key_behavior_row_v1_t rows[] = {
-        {.target = {.kind = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, .operand = 2u}, .steps = pd_steps, .step_count = 1u},
+        // Disabled, and allowed on layers 0 and 2 only: both kept as stored.
+        {.target = {.kind = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, .operand = 2u}, .flags = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_DISABLED, .allowed_layers = 0x0005u, .steps = pd_steps, .step_count = 1u},
         {
             .target           = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x1234u},
             .tap_hold_term    = 150u,
             .longer_hold_term = 400u,
             .multi_tap_term   = 175u,
             .flags            = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE,
+            .allowed_layers   = 0xffffu,
             .steps            = qmk_steps,
             .step_count       = 2u,
         },
@@ -176,7 +179,7 @@ static size_t run_incremental_budget(instrumented_reader_t *state, size_t base_o
             assert(state->read_count - prior_reads == 1u);
             event_count++;
         }
-        assert(++iterations < 2048u);
+        assert(++iterations < 4096u);
     }
     assert(result == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_VALID);
     reads_before = state->read_count;
@@ -190,7 +193,7 @@ static size_t run_incremental_budget(instrumented_reader_t *state, size_t base_o
 }
 
 static void test_incremental_validation(const char *fixture_path) {
-    static const size_t  expected_offsets[] = {6u, 22u, 28u, 34u, 40u, 54u};
+    static const size_t  expected_offsets[] = {6u, 26u, 32u, 38u, 44u, 62u};
     static const uint8_t expected_rows[]    = {0u, 0u, 0u, 0u, 1u, 1u};
     static const uint8_t expected_steps[]   = {UINT8_MAX, 0u, 1u, 1u, UINT8_MAX, 0u};
     static const uint8_t expected_fields[]  = {
@@ -296,14 +299,14 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     instrumented_reader_t state  = {.bytes = prefixed, .length = written + 14u};
     noah_profile_reader_t reader = {.read = instrumented_read, .context = &state, .length = state.length};
     expect_result(noah_key_behavior_domain_v1_decode_reader(&reader, 7u, written, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_OK);
-    assert(domain.row_count == 2u && domain.populated_step_count == 3u && domain.byte_length == 58u);
+    assert(domain.row_count == 2u && domain.populated_step_count == 3u && domain.byte_length == 66u);
     assert(sizeof(domain) <= 128u);
     assert(state.max_read <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE);
 
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 0u, &row, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(row.target.kind == NOAH_PROFILE_ACTION_V1_QMK_KEYCODE && row.target.operand == 0x1234u);
     assert(row.tap_hold_term == 150u && row.longer_hold_term == 400u && row.multi_tap_term == 175u);
-    assert(row.flags == NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE && row.step_count == 2u);
+    assert(row.flags == NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE && row.step_count == 2u && row.allowed_layers == 0xffffu);
     noah_profile_action_v1_t target = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x1234u};
     expect_result(noah_key_behavior_domain_v1_find_target(&domain, &target, &found_row, &found, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(found && found_row.row_index == 0u && found_row.row_offset == row.row_offset);
@@ -323,6 +326,7 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     assert(step.long_hold.mode == NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD && step.long_hold.action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK);
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 1u, &row, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(row.target.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && row.target.operand == 2u && row.step_count == 1u);
+    assert(row.flags == NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_DISABLED && row.allowed_layers == 0x0005u);
     target = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, .operand = 2u};
     expect_result(noah_key_behavior_domain_v1_find_target(&domain, &target, &found_row, &found, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(found && found_row.row_index == 1u);
@@ -335,12 +339,12 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     assert(step.tap.kind == NOAH_PROFILE_ACTION_V1_CUSTOM_KEY && step.tap.operand == 2u);
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 2u, &row, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     expect_result(noah_key_behavior_domain_v1_step_at(&domain, 0u, 2u, &step, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
-    assert(state.max_read <= 12u);
+    assert(state.max_read <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE);
     instrumented_reader_t incremental_state = {.bytes = prefixed, .length = written + 14u};
     assert(run_incremental_budget(&incremental_state, 7u, written, &domain) == 6u);
     assert(incremental_state.total_bytes == written);
 
-    noah_profile_domain_v1_t envelope_domain = {.id = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, .version = 1u, .payload = encoded, .payload_length = written};
+    noah_profile_domain_v1_t envelope_domain = {.id = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, .version = NOAH_KEY_BEHAVIOR_DOMAIN_V1_VERSION, .payload = encoded, .payload_length = written};
     size_t                   envelope_length;
     expect_result(noah_profile_domain_v1_encode(&envelope_domain, prefixed, sizeof(prefixed), &envelope_length, &error), NOAH_PROFILE_CODEC_V1_OK);
     expected_length = fixture_hex(fixture_path, "envelope.representative.hex", expected, sizeof(expected));
@@ -361,7 +365,7 @@ static void test_reader_failures(const char *fixture_path) {
 
     expect_result(noah_key_behavior_domain_v1_decode_reader(&reader, 0u, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_OK);
     size_t successful_reads = state.read_count;
-    assert(successful_reads != 0u && state.max_read <= 12u);
+    assert(successful_reads != 0u && state.max_read <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE);
     for (size_t fail_at = 1u; fail_at <= successful_reads; fail_at++) {
         state.read_count = 0u;
         state.max_read   = 0u;
@@ -386,64 +390,84 @@ static void test_decode_rejections(const char *fixture_path) {
         assert(noah_key_behavior_domain_v1_decode(valid, prefix, NULL, NULL, &domain, &error) != NOAH_PROFILE_CODEC_V1_OK);
     }
     memcpy(bytes, valid, length);
-    bytes[2] = 1u;
+    // Version 2's header: row count, a reserved byte, then a u16 step count.
+    bytes[1] = 1u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_RESERVED_FIELDS);
+    expect_error_location(&error, 1u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
+    memcpy(bytes, valid, length);
+    bytes[2]--;
+    expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_COUNT_MISMATCH);
     expect_error_location(&error, 2u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
     memcpy(bytes, valid, length);
-    bytes[1]--;
+    bytes[3] = 1u; // 259 steps declared
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_COUNT_MISMATCH);
-    expect_error_location(&error, 1u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
     memcpy(bytes, valid, length);
     bytes[16] = 0x80u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_RESERVED_FLAGS);
     memcpy(bytes, valid, length);
-    bytes[19] = 0u;
-    expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_EMPTY_STEP);
+    bytes[16] = 0x04u; // bits 0 and 1 are known
+    expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_RESERVED_FLAGS);
+    // The allowed layers name only bank layers: bit 15 is the last.
     memcpy(bytes, valid, length);
     bytes[19] = 0x80u;
+    expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_OK);
+    bytes[20] = 0x01u;
+    expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_OPERAND);
+    expect_error_location(&error, 18u, 0u, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ALLOWED_LAYERS);
+    memcpy(bytes, valid, length);
+    bytes[21] = 0x80u;
+    expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_OPERAND);
+    memcpy(bytes, valid, length);
+    memset(&bytes[18], 0, 4u); // no layer at all is allowed
+    expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_OK);
+    memcpy(bytes, valid, length);
+    bytes[23] = 0u;
+    expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_EMPTY_STEP);
+    memcpy(bytes, valid, length);
+    bytes[23] = 0x80u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_RESERVED_FLAGS);
     memcpy(bytes, valid, length);
-    bytes[26] = 0u;
+    bytes[30] = 0u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_DUPLICATE_STEP);
-    expect_error_location(&error, 26u, 0u, 1u, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
+    expect_error_location(&error, 30u, 0u, 1u, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
     memcpy(bytes, valid, length);
-    bytes[18] = 3u;
+    bytes[22] = 3u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_STEP_ORDER);
-    expect_error_location(&error, 26u, 0u, 1u, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
+    expect_error_location(&error, 30u, 0u, 1u, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX);
     memcpy(bytes, valid, length);
-    bytes[18] = 5u;
+    bytes[22] = NOAH_PROFILE_TAP_DEPTH;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_TAP_INDEX);
     memcpy(bytes, valid, length);
-    bytes[20] = 0u;
+    bytes[24] = 0u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE);
     memcpy(bytes, valid, length);
-    bytes[20] = 5u;
+    bytes[24] = 5u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE);
     memcpy(bytes, valid, length);
-    bytes[21] = 0u;
+    bytes[25] = 0u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE);
-    expect_error_location(&error, 21u, 0u, 0u, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_REPEAT);
+    expect_error_location(&error, 25u, 0u, 0u, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_REPEAT);
     memcpy(bytes, valid, length);
-    bytes[21] = 101u;
+    bytes[25] = 101u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE);
     memcpy(bytes, valid, length);
-    bytes[20] = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD;
-    bytes[21] = 1u;
+    bytes[24] = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD;
+    bytes[25] = 1u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE);
 
     memcpy(bytes, valid, length);
     memset(&bytes[6], 0, 4u);
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_TARGET);
     memcpy(bytes, valid, length);
-    memset(&bytes[22], 0, 4u);
+    memset(&bytes[26], 0, 4u);
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_ACTION);
     memcpy(bytes, valid, length);
-    memset(&bytes[28], 0, 4u);
+    memset(&bytes[32], 0, 4u);
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_ACTION);
     memcpy(bytes, valid, length);
-    memset(&bytes[34], 0, 4u);
+    memset(&bytes[38], 0, 4u);
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_ACTION);
-    expect_error_location(&error, 34u, 0u, 1u, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION);
+    expect_error_location(&error, 38u, 0u, 1u, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION);
 
     uint16_t first_size = (uint16_t)(read_u16(&valid[4]) + 2u);
     memcpy(bytes, valid, 4u);
@@ -453,7 +477,7 @@ static void test_decode_rejections(const char *fixture_path) {
     memcpy(bytes, valid, length);
     memcpy(&bytes[4u + first_size + 2u], &valid[6], 4u);
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_DUPLICATE_TARGET);
-    expect_error_location(&error, 40u, 1u, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
+    expect_error_location(&error, 44u, 1u, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
 
     memcpy(bytes, valid, length);
     bytes[length] = 0u;
@@ -463,10 +487,10 @@ static void test_decode_rejections(const char *fixture_path) {
     write_u16(&bytes[4], (uint16_t)(read_u16(&bytes[4]) - 1u));
     assert(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error) == NOAH_PROFILE_CODEC_V1_TRUNCATED || error.code == NOAH_PROFILE_CODEC_V1_ROW_LENGTH);
     memcpy(bytes, valid, length);
-    bytes[0] = 65u;
+    bytes[0] = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS + 1u;
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
     memcpy(bytes, valid, length);
-    bytes[1] = 129u;
+    write_u16(&bytes[2], NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS + 1u);
     expect_result(noah_key_behavior_domain_v1_decode(bytes, length, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
 
     noah_key_behavior_limits_v1_t limits = noah_key_behavior_domain_v1_default_limits();
@@ -564,45 +588,94 @@ static void test_hold_modes_and_timing(void) {
     expect_result(noah_key_behavior_domain_v1_encode(&row, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_INVALID_ACTION);
 }
 
+// Every row at the shared depth: 128 rows and rows × depth steps in all.
 static void test_maximum_counts(void) {
-    static noah_key_behavior_row_v1_t  rows[NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS];
-    static noah_key_behavior_step_v1_t steps[NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS][3];
+    enum { ROWS = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS, DEPTH = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW };
+    static noah_key_behavior_row_v1_t  rows[ROWS + 1u];
+    static noah_key_behavior_step_v1_t steps[ROWS + 1u][DEPTH + 1u];
     static uint8_t                     output[NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE];
     size_t                             written;
     noah_profile_codec_v1_error_t      error;
     noah_key_behavior_domain_v1_t      domain;
 
-    for (size_t row_index = 0u; row_index < NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS; row_index++) {
-        rows[row_index].target     = action(NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, (uint16_t)row_index);
-        rows[row_index].steps      = steps[row_index];
-        rows[row_index].step_count = 2u;
-        for (size_t step_index = 0u; step_index < 3u; step_index++) {
+    assert(ROWS == 128u && NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS == ROWS * DEPTH);
+    for (size_t row_index = 0u; row_index <= ROWS; row_index++) {
+        rows[row_index].target         = action(NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, (uint16_t)(ROWS - row_index)); // authored in reverse
+        rows[row_index].allowed_layers = 0xffffu;
+        rows[row_index].steps          = steps[row_index];
+        rows[row_index].step_count     = DEPTH;
+        for (size_t step_index = 0u; step_index <= DEPTH; step_index++) {
             steps[row_index][step_index].tap_index     = (uint8_t)step_index;
             steps[row_index][step_index].presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP;
-            steps[row_index][step_index].tap           = action(NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, (uint16_t)(100u + step_index));
+            steps[row_index][step_index].tap           = action(NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, (uint16_t)(1000u + row_index * 16u + step_index));
         }
     }
-    expect_result(noah_key_behavior_domain_v1_encode(rows, NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
+    expect_result(noah_key_behavior_domain_v1_encode(rows, ROWS, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
     expect_result(noah_key_behavior_domain_v1_decode(output, written, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_OK);
-    assert(domain.row_count == 64u && domain.populated_step_count == 128u);
+    assert(domain.row_count == ROWS && domain.populated_step_count == ROWS * DEPTH);
     instrumented_reader_t state = {.bytes = output, .length = written};
-    assert(run_incremental_budget(&state, 0u, written, &domain) == 192u);
-    assert(domain.row_count == 64u && domain.populated_step_count == 128u);
+    assert(run_incremental_budget(&state, 0u, written, &domain) == ROWS * (1u + DEPTH));
+    assert(domain.row_count == ROWS && domain.populated_step_count == ROWS * DEPTH);
     assert(state.max_read == NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE);
     assert(state.total_bytes == written);
-    rows[0].step_count = 3u;
-    expect_result(noah_key_behavior_domain_v1_encode(rows, NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
-    rows[0].step_count = 2u;
-    expect_result(noah_key_behavior_domain_v1_encode(rows, NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS + 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
 
-    noah_key_behavior_step_v1_t five_steps[6];
-    noah_key_behavior_row_v1_t  one_row = {.target = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 1u}, .steps = five_steps, .step_count = 5u};
-    for (size_t index = 0u; index < 6u; index++) {
-        five_steps[index] = (noah_key_behavior_step_v1_t){.tap_index = (uint8_t)index, .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP, .tap = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 2u}};
+    // The lookup index: a row's offset from lengths alone, then a binary
+    // search that reads one target per probe and the matching row's fields.
+    static uint16_t offsets[ROWS];
+    noah_profile_reader_t reader = {.read = instrumented_read, .context = &state, .length = written};
+    domain.reader                = reader;
+    state.read_count             = 0u;
+    expect_result(noah_key_behavior_domain_v1_row_offsets(&domain, offsets, ROWS - 1u, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
+    expect_result(noah_key_behavior_domain_v1_row_offsets(&domain, offsets, ROWS, &error), NOAH_PROFILE_CODEC_V1_OK);
+    assert(state.read_count == ROWS && offsets[0] == NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE);
+    for (uint8_t row_index = 0u; row_index < ROWS; row_index++) {
+        noah_key_behavior_row_v1_view_t indexed, scanned;
+        noah_key_behavior_step_v1_t     step;
+        noah_profile_action_v1_t        target = action(NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, (uint16_t)(row_index + 1u));
+        bool                            found  = false;
+
+        expect_result(noah_key_behavior_domain_v1_row_at(&domain, row_index, &scanned, &error), NOAH_PROFILE_CODEC_V1_OK);
+        expect_result(noah_key_behavior_domain_v1_row_at_offset(&domain, row_index, offsets[row_index], &indexed, &error), NOAH_PROFILE_CODEC_V1_OK);
+        assert(indexed.row_offset == scanned.row_offset && indexed.target.operand == row_index + 1u && indexed.row_end == scanned.row_end);
+        state.read_count = 0u;
+        expect_result(noah_key_behavior_domain_v1_find_target_indexed(&domain, offsets, &target, &indexed, &found, &error), NOAH_PROFILE_CODEC_V1_OK);
+        assert(found && indexed.row_index == row_index && indexed.row_offset == scanned.row_offset);
+        assert(state.read_count <= 8u + 2u); // at most eight probes of 128, then the row
+        // The last step reads only the steps' headers before it.
+        state.read_count = 0u;
+        expect_result(noah_key_behavior_domain_v1_step_in_row(&domain, &indexed, DEPTH - 1u, &step, &error), NOAH_PROFILE_CODEC_V1_OK);
+        assert(step.tap_index == DEPTH - 1u && step.tap.operand == 1000u + (ROWS - 1u - row_index) * 16u + DEPTH - 1u);
+        assert(state.read_count == 2u + (DEPTH - 1u) + 2u);
     }
-    expect_result(noah_key_behavior_domain_v1_encode(&one_row, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
-    one_row.step_count = 6u;
-    expect_result(noah_key_behavior_domain_v1_encode(&one_row, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
+    noah_key_behavior_row_v1_view_t missing;
+    bool                            found;
+    noah_profile_action_v1_t        absent[] = {action(NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, 0u), action(NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, ROWS + 1u), action(NOAH_PROFILE_ACTION_V1_LAYER_LOCK, 1u)};
+    for (size_t index = 0u; index < sizeof(absent) / sizeof(absent[0]); index++) {
+        expect_result(noah_key_behavior_domain_v1_find_target_indexed(&domain, offsets, &absent[index], &missing, &found, &error), NOAH_PROFILE_CODEC_V1_OK);
+        assert(!found);
+    }
+    expect_result(noah_key_behavior_domain_v1_row_at_offset(&domain, ROWS, offsets[0], &missing, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
+    expect_result(noah_key_behavior_domain_v1_row_at_offset(&domain, 0u, 0u, &missing, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
+
+    // The 128 rows are one budget, whatever their targets: every custom key's
+    // row fills it, and an ordinary key's row is then one too many.
+    for (size_t row_index = 0u; row_index < ROWS; row_index++) {
+        rows[row_index].target     = action(NOAH_PROFILE_ACTION_V1_CUSTOM_KEY, (uint16_t)row_index);
+        rows[row_index].step_count = 1u;
+    }
+    rows[ROWS].target     = action(NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, 4u);
+    rows[ROWS].step_count = 1u;
+    expect_result(noah_key_behavior_domain_v1_encode(rows, ROWS, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
+    expect_result(noah_key_behavior_domain_v1_encode(rows, ROWS + 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
+    for (size_t row_index = 0u; row_index <= ROWS; row_index++) rows[row_index].step_count = DEPTH;
+
+    // One more row, or one more step in a row, is past the ceiling.
+    expect_result(noah_key_behavior_domain_v1_encode(rows, ROWS + 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
+    rows[0].step_count = DEPTH + 1u;
+    expect_result(noah_key_behavior_domain_v1_encode(rows, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
+    rows[0].step_count = DEPTH;
+    rows[0].allowed_layers = 0x10000u;
+    expect_result(noah_key_behavior_domain_v1_encode(rows, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_INVALID_OPERAND);
 }
 
 static void test_malformed_corpus(void) {

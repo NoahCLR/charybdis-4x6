@@ -50,71 +50,71 @@ uint32_t noah_profile_settings_default(uint8_t id) {
             return 200;
         case NOAH_SETTING_AUTO_MOUSE_THRESHOLD:
             return 10;
-        case NOAH_SETTING_COMBO_REFERENCES:
-            return 0x76543210u;
+        case NOAH_SETTING_BEHAVIORS_ENABLED:
+            return 1u;
+        case NOAH_SETTING_LAYER_BEHAVIORS:
+        case NOAH_SETTING_LAYER_COMBOS:
+            // Every layer allows its behaviours and combos.
+            return (UINT32_C(1) << NOAH_SETTINGS_LAYERS) - 1u;
         default:
             return 0;
     }
 }
 // The keymap's names fill a settings domain that no profile has stored.
-_Static_assert((int)LAYER_COUNT == (int)NOAH_SETTINGS_LAYERS, "Settings name every one of the eight layers");
-_Static_assert(NOAH_LAYER_NAME_SIZE == NOAH_SETTINGS_NAME_BYTES, "A layer name fills one settings name field");
+_Static_assert((int)LAYER_COUNT == (int)NOAH_SETTINGS_LAYERS, "Settings name every layer of the bank");
+_Static_assert(NOAH_LAYER_NAME_SIZE == NOAH_SETTINGS_NAME_MAX + 1u, "A layer name is at most 32 bytes");
 _Static_assert(VIA_MACRO_SLOT_COUNT == NOAH_SETTINGS_MACRO_NAMES, "Settings name every VIA macro");
-_Static_assert(NOAH_MACRO_NAME_SIZE == NOAH_SETTINGS_MACRO_NAME_ASCII_MAX + 1u, "A macro name is at most 20 characters");
+_Static_assert(NOAH_MACRO_NAME_SIZE == NOAH_SETTINGS_NAME_MAX + 1u, "A macro or custom-key name is at most 32 bytes");
 _Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_SETTINGS_CUSTOM_KEY_NAMES, "Settings name every custom key");
-enum { LAYER_NAMES_OFFSET = 8u + NOAH_SETTINGS_COUNT * 4u };
-// Name records after the fixed part: the macros' (v3), then the custom keys' (v5).
-enum { NAME_RECORDS = NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES, CUSTOM_KEY_NAME_HEADER = NOAH_SETTINGS_CUSTOM_KEY_NAMES };
-static uint8_t name_length(const char *name, uint8_t max) {
+_Static_assert(MATRIX_ROWS * MATRIX_COLS <= NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS, "A placement bitmap covers the whole matrix");
+static uint8_t name_length(const char *name) {
     uint8_t length = 0;
-    while (length < max && name[length])
+    while (length < NOAH_SETTINGS_NAME_MAX && name[length])
         length++;
     return length;
 }
-static const char *record_name(uint8_t record) {
-    if (record >= NOAH_SETTINGS_MACRO_NAMES) return custom_key_names[record - NOAH_SETTINGS_MACRO_NAMES];
-    return via_macro_names[record];
-}
-static uint8_t record_name_length(uint8_t record) {
-    return name_length(record_name(record), NOAH_SETTINGS_MACRO_NAME_ASCII_MAX);
+// Name records in order: the layers', the macros', then the custom keys'.
+static const char *record_name(uint16_t record) {
+    if (record < NOAH_SETTINGS_LAYERS) return layer_names[record];
+    record -= NOAH_SETTINGS_LAYERS;
+    if (record < NOAH_SETTINGS_MACRO_NAMES) return via_macro_names[record];
+    return custom_key_names[record - NOAH_SETTINGS_MACRO_NAMES];
 }
 uint16_t noah_profile_settings_defaults_length(void) {
-    uint16_t length = NOAH_SETTINGS_FIXED_SIZE + NAME_RECORDS;
-    for (uint8_t record = 0; record < NAME_RECORDS; record++)
-        length += record_name_length(record);
+    uint16_t length = NOAH_SETTINGS_MIN_SIZE;
+    for (uint16_t record = 0; record < NOAH_SETTINGS_NAME_COUNT; record++)
+        length += name_length(record_name(record));
     return length;
 }
 uint8_t noah_profile_settings_defaults_byte(uint16_t offset) {
-    if (offset >= 8u && offset < LAYER_NAMES_OFFSET) {
-        uint8_t id = (offset - 8u) / 4u;
-        return noah_profile_settings_default(id) >> (8u * ((offset - 8u) % 4u));
+    if (offset >= NOAH_SETTINGS_SCALARS_OFFSET && offset < NOAH_SETTINGS_LAYER_RECORDS_OFFSET) {
+        uint8_t id = (offset - NOAH_SETTINGS_SCALARS_OFFSET) / 4u;
+        return noah_profile_settings_default(id) >> (8u * ((offset - NOAH_SETTINGS_SCALARS_OFFSET) % 4u));
     }
     // No profile settings are live: the current version with the keymap's
     // layer, macro and custom-key names.
-    const uint8_t header[8] = {NOAH_SETTINGS_VERSION, 8, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, CUSTOM_KEY_NAME_HEADER, 0, 0, 0};
-    if (offset < 8u) return header[offset];
+    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
+    if (offset < NOAH_SETTINGS_HEADER_SIZE) return header[offset];
     if (offset < NOAH_SETTINGS_FIXED_SIZE) {
-        offset -= LAYER_NAMES_OFFSET;
-        const char *name = layer_names[offset / NOAH_SETTINGS_NAME_BYTES];
-        uint8_t     byte = offset % NOAH_SETTINGS_NAME_BYTES;
-        // Zero padded after the name, whatever the array holds there.
-        return byte < name_length(name, NOAH_SETTINGS_NAME_BYTES - 1u) ? (uint8_t)name[byte] : 0u;
+        // Each layer refers combos to itself and bypasses or excludes nothing.
+        uint16_t record = offset - NOAH_SETTINGS_LAYER_RECORDS_OFFSET;
+        return record % NOAH_SETTINGS_LAYER_RECORD_SIZE == NOAH_SETTINGS_LAYER_REFERENCE ? (uint8_t)(record / NOAH_SETTINGS_LAYER_RECORD_SIZE) : 0u;
     }
     offset -= NOAH_SETTINGS_FIXED_SIZE;
     // Reads run forward, so resume from the record the last byte was in; the
     // authored names never change, so the cursor stays valid across reads.
-    static uint8_t  cursor_record;
+    static uint16_t cursor_record;
     static uint16_t cursor_start;
     if (offset < cursor_start) cursor_record = 0u, cursor_start = 0u;
-    for (uint8_t record = cursor_record; record < NAME_RECORDS; record++) {
-        uint8_t length = record_name_length(record);
+    for (uint16_t record = cursor_record; record < NOAH_SETTINGS_NAME_COUNT; record++) {
+        uint8_t length = name_length(record_name(record));
         if (offset - cursor_start <= length) {
             cursor_record = record;
             return offset == cursor_start ? length : (uint8_t)record_name(record)[offset - cursor_start - 1u];
         }
         cursor_start += length + 1u;
     }
-    cursor_record = NAME_RECORDS;
+    cursor_record = NOAH_SETTINGS_NAME_COUNT;
     return 0u;
 }
 #endif

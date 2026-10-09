@@ -18,7 +18,7 @@ noah_profile_compiled_v1_result_t noah_profile_pd_compiled_v1_write(compiled_wri
     if (noah_profile_pd_v1_cursor_begin(&cursor, pd_header, pd_payload_size(), NULL) != NOAH_PROFILE_PD_V1_OK) return NOAH_PROFILE_COMPILED_V1_INVALID_ACTION;
     if (!emit(writer, pd_header, sizeof(pd_header))) return writer->result;
     for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
-        uint8_t record[96];
+        uint8_t record[NOAH_PROFILE_PD_V1_RECORD_SIZE];
         noah_profile_pd_v1_encode_record(&noah_pd_defaults[slot], record);
         if (noah_profile_pd_v1_validate_record(record, sizeof(record), slot, NULL) != NOAH_PROFILE_PD_V1_OK) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, slot, UINT8_MAX);
         if (!noah_profile_pd_v1_record_present(record)) continue;

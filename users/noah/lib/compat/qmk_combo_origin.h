@@ -38,3 +38,6 @@ bool              noah_qmk_combo_origin_event_owner_keypos(const keyrecord_t *re
 bool              noah_qmk_combo_origin_event_bitmap(const keyrecord_t *record, uint8_t *out_bitmap);
 split_side_mask_t noah_qmk_combo_origin_event_side_mask(const keyrecord_t *record);
 void              noah_qmk_combo_origin_debug_snapshot(noah_qmk_combo_origin_debug_snapshot_t *out);
+
+// Read-only generated-output layer context, before tapping/admission queues.
+uint8_t noah_qmk_combo_origin_record_source_layer(uint16_t keycode, const keyrecord_t *record);

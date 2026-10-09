@@ -16,11 +16,11 @@ build_and_run() {
     shift
     cc -std=c11 -Wall -Wextra -Werror -pedantic \
         -DVIA_ENABLE \
-        -DDYNAMIC_KEYMAP_EEPROM_MAX_ADDR=0x1FFFu \
-        -DNOAH_PROFILE_STORAGE_SLOT_A_START_ADDR=0x2000u \
-        -DNOAH_PROFILE_STORAGE_SLOT_A_END_ADDR=0x33FFu \
-        -DNOAH_PROFILE_STORAGE_SLOT_B_START_ADDR=0x3400u \
-        -DNOAH_PROFILE_STORAGE_SLOT_B_END_ADDR=0x47FFu \
+        -DDYNAMIC_KEYMAP_EEPROM_MAX_ADDR=0x2FFFu \
+        -DNOAH_PROFILE_STORAGE_SLOT_A_START_ADDR=0x3000u \
+        -DNOAH_PROFILE_STORAGE_SLOT_A_END_ADDR=0x12FFFu \
+        -DNOAH_PROFILE_STORAGE_SLOT_B_START_ADDR=0x13000u \
+        -DNOAH_PROFILE_STORAGE_SLOT_B_END_ADDR=0x22FFFu \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/profile_store_test.c" \

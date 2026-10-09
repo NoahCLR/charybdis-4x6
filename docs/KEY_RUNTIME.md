@@ -469,9 +469,25 @@ combo outputs, repeated taps, timer wrap and final runtime quiescence.
 The fork's `is_tap_keycode_user` hook exempts all runtime-handled keys from native
 tapping. Lookup includes authored MT/OSM rows and intrinsic TT/OSL ownership.
 Unhandled keys retain QMK policy; the pipeline tests each family and native
-controls. Feature bit 18 distinguishes this broader ownership rule from bit 17. Queue queries and
+controls. QMK then gives `is_tap_record_user` the last word per record, with
+its own answer and the keycode hook's; its default keeps the keycode hook's.
+Userspace answers from the press's participation decision, so a placement that bypasses its behaviour row is
+native QMK tap-hold again
+([participation policy](architecture/participation-policy.md)). Feature bit 18 distinguishes this broader ownership rule from bit 17. Queue queries and
 the hook are fork contracts pinned by `run_qmk_contract_checks.sh`;
 `run_qmk_gesture_pipeline_tests.sh` runs the actual selected QMK combo/tapping
 engines with userspace, including delayed records and timer wrap. The ordinary
 synchronous host harness intentionally keeps delivery-time records; it does not
 prove this boundary. Neither harness substitutes for physical acceptance.
+
+Participation is captured per physical record before either QMK queue. Its
+opaque context holds the source layer and behavior/combo decisions; its native
+keycode is frozen with it. Admission retains the complete record, so a repeated
+press at the same position cannot change an earlier queued owner's decision.
+Generated combo outputs capture their permission against the retained origin
+layer before admission, and normalize their origin only when dispatched.
+
+Origin normalization keeps a separate compiled call boundary: its reconstruction
+workspace retires before process stages can recursively project held actions.
+The reviewed-path stack manifests follow the pinned compiler's linked callers
+for inlined helpers and cover this boundary without raising stack policies.

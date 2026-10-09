@@ -42,6 +42,9 @@ bool                key_behavior_has_more_taps(uint16_t keycode, uint8_t count);
 bool                key_behavior_keeps_auto_mouse_anchored(uint16_t keycode);
 bool                key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode);
 key_behavior_view_t key_behavior_lookup(uint16_t keycode);
+// The key as if it had no authored row: its normal action, for a press its
+// participation bypasses (participation.h).
+key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode);
 key_behavior_step_t key_behavior_view_step(const key_behavior_view_t *behavior, uint8_t tap_count);
 bool                key_behavior_view_has_more_taps(const key_behavior_view_t *behavior, uint8_t count);
 uint8_t             key_behavior_validate_all(void);

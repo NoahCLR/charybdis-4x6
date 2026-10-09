@@ -10,6 +10,7 @@
 #include "quantum_keycodes.h"
 
 #define NOAH_HOST_TEST_ENV 1
+#define KEYRECORD_USER_DATA
 
 #define PROGMEM
 static inline uint8_t pgm_read_byte(const void *addr_) {
@@ -29,7 +30,7 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #endif
 
 #ifndef QMK_STUB_SUPPRESS_LAYER_COUNT
-#    define LAYER_COUNT 8
+#    define LAYER_COUNT 16
 #endif
 
 #ifndef CUSTOM_TAP_HOLD_TERM
@@ -57,7 +58,7 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
 #endif
 #ifndef DYNAMIC_KEYMAP_MACRO_COUNT
-#    define DYNAMIC_KEYMAP_MACRO_COUNT 64u
+#    define DYNAMIC_KEYMAP_MACRO_COUNT 128u
 #endif
 
 #ifndef MOD_BIT
@@ -157,6 +158,7 @@ typedef struct {
 
 typedef struct {
     keyevent_t event;
+    uint8_t    user_data;
     tap_t      tap;
     uint16_t   keycode;
 } keyrecord_t;
@@ -242,6 +244,7 @@ bool                       is_keyboard_left(void);
 struct rgb_matrix_limits_t rgb_matrix_get_limits(uint8_t iter);
 uint32_t                   eeconfig_read_user(void);
 void                       eeconfig_update_user(uint32_t value);
+bool                       is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap);
 bool                       process_record_user(uint16_t keycode, keyrecord_t *record);
 uint16_t                   get_tapping_term(uint16_t keycode, keyrecord_t *record);
 uint16_t                   get_quick_tap_term(uint16_t keycode, keyrecord_t *record);

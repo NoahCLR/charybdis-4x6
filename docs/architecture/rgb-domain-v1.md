@@ -1,7 +1,7 @@
 # RGB Domain V1
 
 This document freezes the canonical encoding for Profile Wire domain `0x10`,
-version `3`: every RGB surface, as the keyboard stores it and the
+version `4`: every RGB surface, as the keyboard stores it and the
 live app decodes, edits and re-encodes it for the candidate mailbox.
 
 All integers are unsigned. Multi-byte integers are little-endian. Every HSV is
@@ -15,24 +15,24 @@ The payload starts with this fixed 16-byte header:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | payload format version, equal to the domain version: `3` in schema 2.0 |
+| 0 | 1 | payload format version, equal to the domain version: `4` in schema 3.0 |
 | 1 | 1 | reserved, zero |
 | 2 | 2 | stage-enable mask |
 | 4 | 1 | reusable group count, `0..16` |
-| 5 | 1 | layer-color count, `1..8` when compiled |
+| 5 | 1 | layer-color count, `1..16`; when the layer stage is compiled, exactly the firmware's layer count (`16`) |
 | 6 | 1 | layer-group row count |
-| 7 | 1 | PD-color count: the firmware's slot count when its PD stage is compiled (`32` in version 3), else `0` |
+| 7 | 1 | PD-color count: the firmware's slot count when its PD stage is compiled (`32` since version 3), else `0` |
 | 8 | 1 | PD-group row count |
 | 9 | 1 | combo-group row count |
-| 10 | 1 | tap-branch color count, exactly the compiled count and at most `4` |
+| 10 | 1 | tap-branch color count: exactly the shared tap depth minus one (`4` at depth five; D-F14) |
 | 11 | 1 | key-feedback group row count |
 | 12 | 1 | physical LED count, exactly `58` |
 | 13 | 1 | LED bitmap size, exactly `8` |
 | 14 | 2 | reserved, zero |
 
 The aggregate of the four group-row counts at offsets 6, 8, 9, and 11 is at
-most 32. The maximum RGB payload is 4,052 bytes so its envelope can still fit
-inside the current 5,088-byte canonical profile blob.
+most 32. The maximum RGB payload is 65,492 bytes, so its envelope still fits
+the 65,504-byte canonical profile blob with the blob header.
 
 Stage-enable bits are:
 
@@ -92,9 +92,19 @@ group-row selectors are a slot below 32 or `0xff`. Every other byte is
 version 2's. Schema-2 firmware with 32 slots accepts only version 3: an
 importer turns a version-2 domain into version 3 by adding, after slot 7's
 row, rows `n 00 00 00 02` (black, right half) for slots 8..31, as the 6 → 8
-upgrade added rows for slots 6 and 7. `tests/fixtures/rgb_domain_v3.json`
-holds the compiled domain and rejection vectors (version 2, a missing PD row,
-33 rows, an id of 32, out-of-order rows, a group selector of 32).
+upgrade added rows for slots 6 and 7.
+
+Version 4 (D-F14) is version 3 with up to sixteen layer colours: the version
+byte (payload byte 0 and envelope) is 4, and layer-group selectors are a layer
+below 16 or `0xff`. Every other byte is version 3's. Schema-3 firmware accepts
+only version 4: an importer turns a version-3 domain into version 4 by setting
+the version to 4, adding after the last layer-colour row the rows
+`n 00 00 00 01` (black, keys mapped on this layer only) for each missing layer
+`n` up to 15, and setting header byte 5 to 16. A domain without layer colours
+keeps a count of zero. `tests/fixtures/rgb_domain_v4.json` holds the compiled
+domain and rejection vectors (versions 3 and 2, a missing PD row, 33 rows, an
+id of 32, out-of-order rows, a group selector of 32); version 3's vector file
+is retired.
 
 Layer and PD group selectors use `0xff` for all; other values are validated
 layer or stable PD ids. Key-feedback group semantics are `0` tap branch
@@ -155,8 +165,8 @@ path it fills one immutable encoded cache and validates a memory-backed view;
 frame access uses the same decoded domain interface as stored RGB. Effective
 accessors never reinterpret authored tables or replay the profile writer.
 
-The cache bound is 551 bytes: 35 fixed bytes, sixteen 9-byte bitmap groups,
-eight 5-byte layer colors, 32 5-byte PD colors, at most 32 5-byte stage rows in
+The cache bound is 591 bytes: 35 fixed bytes, sixteen 9-byte bitmap groups,
+sixteen 5-byte layer colors, 32 5-byte PD colors, at most 32 5-byte stage rows in
 total, and four 3-byte tap colors. Combo rows are smaller, so this covers every
 current shape without reserving a profile-sized buffer. A copied view retains
 publication/epoch checks for stored frames; factory bytes never change during

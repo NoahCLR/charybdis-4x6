@@ -27,14 +27,14 @@ typedef struct {
     uint32_t                               compiled_digest;
 } fixture_t;
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
 
 static uint32_t always_safe(void *context) {
     (void)context;
     return 0u;
 }
 
-static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
+static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
     memory_t *memory = context;
 
     memory->reads++;
@@ -45,7 +45,7 @@ static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16
     return true;
 }
 
-static bool memory_write(void *context, uint16_t address, const uint8_t *source, uint16_t length) {
+static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
     memory_t *memory = context;
 
     memory->writes++;

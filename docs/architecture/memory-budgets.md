@@ -426,6 +426,70 @@ static-data policy remain unchanged. Neither is a physical SRAM limit.
 The live-owner stack manifest covers initial serialization, cold factory RGB
 writing and validation, compiled combo/settings cache publication, and the
 injected native settings apply callback. These are reviewed linked paths only.
-The ordinary manifest's previously documented compiler-inlining gaps remain
-open; a passing owner manifest does not resolve those or establish runtime
-stack high-water.
+At that checkpoint the ordinary manifest's compiler-inlining gaps remained
+open; D-F14's resource acceptance below re-reviews both manifests against
+the pinned compiler. Neither establishes runtime stack high-water.
+
+## Bigger-profile storage — D-F14
+
+Logical EEPROM grows from 18 KiB to 140 KiB per half (a 12 KiB VIA region and
+two 64 KiB custom-profile slots). Pinned QMK's wear-leveling driver mirrors the
+whole logical EEPROM in SRAM0–3, so the cache grows by 124,928 bytes. The
+schema-3 static-data tripwire therefore becomes 64,512 + 124,928 = 189,440
+bytes; it is the old policy plus this one reviewed increment, not a statement
+of capacity, and later D-F14 slices add their own measured increments.
+
+A fresh left pair ELF with only the storage change linked 4,168 bytes of
+`.data` and 185,144 bytes of `.bss`: 189,312 bytes of `.data + .bss`, 128
+below the tripwire, and a 189,320-byte SRAM0–3 fixed prefix. The boot
+linker/core-memory span is 72,824 bytes; the plan projected 189,288 and
+72,848. The span is still the allocator's boot range, not runtime-free memory:
+allocator and stack high-water on both halves remain hardware acceptance
+evidence. Flash backing grows to 280 KiB at the top of flash, separate from
+the image; a wear-leveling consolidation now rewrites 140 KiB, a pause the
+hardware acceptance times.
+
+The capacity slices (sixteen layers, 128 behaviour rows with a per-bank row
+index, 128 combos of up to sixteen inputs, 128 VIA macros and custom keys, 272
+counted names, 128-byte pointing records) then linked, in a fresh left ELF,
+206,712 bytes of `.data + .bss` (4,168 `.data`): 17,400 bytes more. The largest
+contributors are the owner's native combo table (the owner, `runtime_owner`,
+links at 10,552 bytes against a new 11,264-byte engineering policy, up from
+4,096), the settings cache at its 9,380-byte maximum (`settings`) and the
+pointing cache's 4,096 bytes of 128-byte records (`records`). The static-data
+tripwire gains one reviewed 20,480-byte D-F14 capacity increment to 209,920
+bytes, 3,208 above this measurement. The SRAM0–3 boot linker/core-memory span
+is 55,424 bytes and the true static headroom (SRAM0–3 minus the linked prefix
+and the 4,096-byte arena floor) 51,328 bytes; neither is runtime-free memory.
+That capacity-only left measurement predates participation. The current
+D-F14 instrumented resource pair uses the pinned GCC 15.2.0 image, BK
+`cb6719b55e143b76e6611418b90245106062bb23`, and records
+each half before QMK's shared output is replaced. Right and left each link
+4,164 bytes of `.data` and 202,640 bytes of `.bss` in SRAM0–3: 206,804 combined,
+with 3,116 bytes of margin to the unchanged 209,920-byte regression policy.
+The fixed SRAM0–3 prefix is 206,816 bytes, and the linker/core-memory span at
+boot is 55,328 bytes. Fixed linked occupancy across unique SRAM banks is
+214,272 bytes per half. These are instrumented linked figures, not runtime
+free-memory or high-water measurements.
+
+`NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh` (with explicit
+`QMK_ROOT` and `BUILD_ROOT` from this worktree) enables stack instrumentation
+and checks static accounting and both reviewed-path manifests on each half,
+preserving the ELF, map, compiler/linker flags and reports beside the pair.
+The ordinary manifest retains every functional path while naming GCC 15's
+linked callers for inlined helpers. It also covers participation/indexed row
+reads, generated-output permission and origin reconstruction. The owner
+manifest covers indexed publication and sixteen-member combo validation reads.
+A failed gate stops the pair; build the ordinary pair separately for use.
+
+Both halves pass the unchanged 1,920-byte main-process and 768-byte split-slave
+reviewed-path policies. The ordinary manifest's largest named main-process
+path is 1,912 bytes: 8 bytes of policy margin, separately 648 bytes to the
+physical 2,560-byte process-stack boundary. Its largest split-slave path is
+328 bytes. The owner manifest reaches 1,608 bytes in the main process and
+344 bytes in the split-slave thread. Origin reconstruction remains a separate
+compiled call so its workspace retires before recursive action projection;
+inlining it had kept that workspace in the process frame and crossed the
+main-process policy by 40 bytes. Neither a PASS nor these margins establish
+a global or interrupt-stack maximum. Allocator/stack high-water and timing
+on both physical halves remain hardware acceptance evidence.

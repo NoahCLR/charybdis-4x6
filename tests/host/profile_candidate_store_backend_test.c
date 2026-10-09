@@ -17,19 +17,19 @@ static uint32_t      eeprom_write_calls;
 static uint16_t      eeprom_last_read_length;
 static uint16_t      eeprom_last_write_length;
 static uint32_t      safe_boundary_reasons;
-static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
-static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x02\x00\x01\x01\x20\x01\x3a\x00\x02\x03\x00\x00"
-                                          "\x20\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02\x00\x02"
-                                          "\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00\x0a\x00\x02\x00\x03\x00"
-                                          "\x03\x00\x12\x00\x04\x00\x02\x00\x00\x00\x00\x00\x00\x00\x00\x01"
-                                          "\x01\x01\x07\x00\x02\x00";
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
+static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x03\x00\x01\x01\x20\x02\x42\x00\x02\x00\x03\x00"
+                                          "\x24\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02\xff\xff"
+                                          "\x00\x00\x00\x02\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00\x0a\x00"
+                                          "\x02\x00\x03\x00\x03\x00\x16\x00\x04\x00\x02\x00\x00\x00\x00\x00"
+                                          "\x00\x00\x02\x01\x05\x00\x00\x00\x01\x01\x07\x00\x02\x00";
 
 static uint32_t always_safe(void *context) {
     (void)context;
     return safe_boundary_reasons;
 }
 
-static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
+static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
     uint8_t *bytes = context;
 
     if (!target || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
@@ -41,7 +41,7 @@ static bool memory_read(void *context, uint16_t address, uint8_t *target, uint16
     return true;
 }
 
-static bool memory_write(void *context, uint16_t address, const uint8_t *source, uint16_t length) {
+static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
     uint8_t *bytes = context;
 
     if (!source || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
@@ -443,7 +443,7 @@ static void test_scan_owner_composes_bounded_commit_and_safe_activation(void) {
     init_backend(&backend, &store, &provider, init_provider(&provider));
     interface     = noah_profile_candidate_store_backend_interface(&backend);
     compatibility = (noah_profile_candidate_compatibility_t){
-        .schema_major          = 2u,
+        .schema_major          = NOAH_PROFILE_SCHEMA_MAJOR,
         .schema_minor          = 0u,
         .supported_domain_mask = 0u,
         .max_payload_length    = NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE,

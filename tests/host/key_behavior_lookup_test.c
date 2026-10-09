@@ -851,6 +851,56 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
     noah_effective_key_behavior_runtime_uninstall(&runtime);
 }
 
+// The whole table at the shared depth, through the live runtime's row index:
+// the first, middle and last rows, every step of each, and a missing key.
+static void test_live_profile_full_table_through_the_row_index(void) {
+    enum { ROWS = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS, DEPTH = KEY_BEHAVIOR_MAX_TAP_COUNT };
+    static uint8_t                     payload[NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE];
+    static noah_key_behavior_step_v1_t steps[ROWS][DEPTH];
+    static noah_key_behavior_row_v1_t  rows[ROWS];
+    size_t                             written;
+    noah_profile_codec_v1_error_t      codec_error;
+    noah_key_behavior_domain_v1_t      domain;
+    noah_effective_key_behavior_runtime_t runtime;
+    noah_effective_profile_snapshot_t  callback_view = {0};
+    noah_effective_profile_identity_t  active        = {.generation = 11u, .payload_digest = 0x2222u, .kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE};
+    noah_effective_key_behavior_snapshot_t status;
+
+    for (uint8_t row = 0u; row < ROWS; row++) {
+        for (uint8_t step = 0u; step < DEPTH; step++) {
+            steps[row][step] = (noah_key_behavior_step_v1_t){.tap_index = step, .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP};
+            CHECK(noah_profile_action_runtime_v1_from_native((uint16_t)(KC_A + step), &steps[row][step].tap) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+        }
+        rows[row] = (noah_key_behavior_row_v1_t){.allowed_layers = 0xffffu, .steps = steps[row], .step_count = DEPTH};
+        CHECK(noah_profile_action_runtime_v1_from_native((uint16_t)(0x0100u + row), &rows[row].target) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+    }
+    CHECK(noah_key_behavior_domain_v1_encode(rows, ROWS, NULL, NULL, payload, sizeof(payload), &written, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
+    CHECK(noah_key_behavior_domain_v1_decode(payload, written, NULL, NULL, &domain, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
+    CHECK(domain.row_count == ROWS && domain.populated_step_count == ROWS * DEPTH);
+
+    noah_effective_key_behavior_runtime_init(&runtime);
+    CHECK(noah_effective_key_behavior_runtime_install(&runtime));
+    callback_view.identity              = active;
+    callback_view.profile.domain_mask   = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
+    callback_view.profile.key_behaviors = domain;
+    noah_effective_key_behavior_runtime_invalidate(&runtime, 1u, (noah_effective_profile_identity_t){0}, active, &callback_view);
+    CHECK(noah_effective_key_behavior_runtime_status(&runtime, &status) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && status.indexed);
+
+    static const uint8_t probes[] = {0u, ROWS / 2u, ROWS - 1u};
+    for (uint8_t probe = 0u; probe < ARRAY_SIZE(probes); probe++) {
+        key_behavior_view_t behavior = key_behavior_lookup((uint16_t)(0x0100u + probes[probe]));
+        CHECK(behavior.source_is_live && behavior.handled && behavior.source_row == probes[probe]);
+        CHECK(behavior.authored_tap_depth == DEPTH && behavior.single.tap.action == KC_A);
+        for (uint8_t tap = 1u; tap <= DEPTH; tap++) {
+            key_behavior_step_t step = key_behavior_view_step(&behavior, tap);
+            CHECK(step.tap.present && step.tap.action == KC_A + tap - 1u);
+        }
+        CHECK(!key_behavior_view_has_more_taps(&behavior, DEPTH));
+    }
+    CHECK(!key_behavior_lookup((uint16_t)(0x0100u + ROWS)).source_is_live);
+    noah_effective_key_behavior_runtime_uninstall(&runtime);
+}
+
 int main(void) {
     test_bare_lt_falls_back_to_qmk();
     test_authored_lt_uses_custom_runtime();
@@ -879,6 +929,7 @@ int main(void) {
     test_transparent_long_hold_uses_lower_explicit_long_hold_action();
     test_momentary_layer_query_matches_hold_materialization();
     test_live_profile_behavior_replaces_compiled_rows_atomically();
+    test_live_profile_full_table_through_the_row_index();
 
     puts("key_behavior_lookup host tests passed");
     return 0;

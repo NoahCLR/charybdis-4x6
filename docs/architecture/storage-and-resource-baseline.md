@@ -97,7 +97,7 @@ half of that as 16,384 bytes of logical EEPROM.
 Current authored VIA macro defaults use approximately 258 bytes including
 slot terminators.
 
-### Current Eight-Layer Profile Partition
+### Original Eight-Layer Profile Partition
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
@@ -167,11 +167,11 @@ profile data.
 
 ### Schema-2 PD geometry
 
-Side-specific PD-enabled owner builds select schema 2, format-3 `NR` and a
-5,088-byte payload ceiling. Identity byte 2 uses domain bits 0–4, origin bit 5,
-override bit 6 and reserved bit 7; CRC and markers retain `NQ` offsets. Format 3
-accepts RGB v3, settings v2–v5, key-behavior v1, sparse PD v2 and combo v1–v2
-(32 pointing slots, D-F09). Host candidate and split
+Before D-F14, side-specific PD-enabled owner builds selected schema 2,
+format-3 `NR` and a 5,088-byte payload ceiling. Identity byte 2 uses domain
+bits 0–4, origin bit 5, override bit 6 and reserved bit 7; CRC and markers
+retain `NQ` offsets. Format 3 accepted RGB v3, settings v2–v5, key-behavior
+v1, sparse PD v2 and combo v1–v2 (32 pointing slots, D-F09). Host candidate and split
 writers bind it to the same logical VIA generation as format 2.
 
 The lower 8 KiB VIA allocation is unchanged. Slot A is `0x2000..0x33ff`, slot B
@@ -247,7 +247,62 @@ main-process path and 328/768 bytes for the largest named split-slave path. The
 memory figures are linked values per half; the stack figures cover the manifest
 paths only and are not runtime high-water evidence.
 
-All current builds use eight-layer VIA geometry, schema-2 reconciliation
+### Schema-3 geometry (D-F14)
+
+Format-4 `NS` keeps the `NR` header layout: identity byte 2 holds domain bits
+0–4, origin bit 5 and override bit 6; payload length stays a 16-bit field
+because a slot payload is at most 65,504 bytes. Storage addresses are 32 bits
+(`noah_profile_storage_address_t`), since slot B ends at `0x22FFF`. Format 4
+binds schema 3.0 and accepts only RGB v4, key-behavior v2, combo v3, settings
+v6 and sparse PD v3.
+
+| Range | Bytes | Owner |
+| --- | ---: | --- |
+| `0x00000–0x02FFF` | 12,288 | QMK EECONFIG, VIA config, dynamic keymap, VIA macros |
+| `0x03000–0x12FFF` | 65,536 | Live-profile slot A |
+| `0x13000–0x22FFF` | 65,536 | Live-profile slot B |
+
+Logical EEPROM is 140 KiB and wear-level backing 280 KiB at the top of flash.
+QMK mirrors the logical EEPROM in SRAM0–3; see
+[memory budgets](memory-budgets.md#bigger-profile-storage--d-f14). Geometry
+moves the flash base, so the previous 18 KiB contents are never read.
+
+### Schema-3 ceilings and the maximum profile
+
+| Surface | Ceiling |
+| --- | ---: |
+| Logical layers | 16 |
+| Key-behavior rows | 128 |
+| Tap steps per behavior / populated steps | 5 / 640 aggregate |
+| Combos / inputs per combo | 128 / 2–16 |
+| VIA macros / custom keys | 128 / 128 |
+| Names | 32 bytes of UTF-8 each |
+| Reusable RGB groups / stage-group rows | 16 / 32 aggregate |
+| Pointing slots | 32 |
+| Canonical profile payload | 65,504 bytes |
+
+Unlike the V1 ceilings above, every one of these is reachable at once.
+`tests/fixtures/maximum_profile_v3.fixture`, written by
+`tests/host/make_maximum_profile.py` from the byte specs, holds every table at
+its maximum and every name at 32 bytes: 37,667 bytes (RGB 591, behaviours
+13,828, combos 9,736, settings 9,380, pointing 4,104, plus 28 bytes of
+header and envelopes). That leaves 27,837 bytes of the slot, more than the
+12 KiB reserved for future payload. The fixture is the maximum for the
+encodings, not a limit the firmware checks: a larger profile is refused only
+by a table's own ceiling or the slot.
+
+The owner validates one step a matrix scan, each step one read of at most 20
+bytes. The maximum profile validates in 7,429 scans, a boot that adopts it
+publishes after 9,912, and a peer's prepared copy spends 11,104 scans
+validating without transfer progress, which the split harness's conservative
+5 ms scan keeps inside the owner's 60-second no-progress window. Real
+durations depend on the scan rate and are hardware acceptance evidence.
+`run_profile_domain_owner_round_trip_tests.sh` saves, boots, publishes,
+refuses over-limit and truncated copies of, and cuts power through a save of
+this profile; `run_profile_split_reconciler_tests.sh` prepares and commits it
+on the peer.
+
+Earlier builds used eight-layer VIA geometry, schema-2 reconciliation
 metadata, and an 18 KiB logical EEPROM with two 5 KiB profile slots. The old
 five-layer snapshot bridge is retired. Existing portable files remain subject
 to the source-evidence rules in [portable-profile-v1.md](portable-profile-v1.md).

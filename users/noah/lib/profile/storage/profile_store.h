@@ -80,8 +80,8 @@ typedef enum {
     NOAH_PROFILE_STORE_BOOT_DONE,
 } noah_profile_store_boot_phase_t;
 
-typedef bool (*noah_profile_store_read_fn)(void *context, uint16_t address, uint8_t *target, uint16_t length);
-typedef bool (*noah_profile_store_write_fn)(void *context, uint16_t address, const uint8_t *source, uint16_t length);
+typedef bool (*noah_profile_store_read_fn)(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length);
+typedef bool (*noah_profile_store_write_fn)(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length);
 
 typedef struct {
     noah_profile_store_read_fn  read;
@@ -184,7 +184,7 @@ typedef struct {
     noah_profile_store_result_t       boot_slot_b_result;
     noah_profile_store_result_t       boot_result;
     noah_profile_store_boot_phase_t   boot_phase;
-    uint16_t                          boot_payload_start;
+    noah_profile_storage_address_t    boot_payload_start;
     uint16_t                          boot_offset;
     uint32_t                          boot_crc32_state;
     uint32_t                          boot_digest_state;

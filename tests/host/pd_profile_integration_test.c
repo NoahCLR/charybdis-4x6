@@ -7,15 +7,15 @@
 #include "lib/profile/protocol/profile_candidate_v1.h"
 
 static void test_candidate_capacity(void) {
-    uint8_t frame[32] = {NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET, NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, 1, 0, 2, 0, 31};
+    uint8_t frame[32] = {NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET, NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, 1, 0, NOAH_PROFILE_SCHEMA_MAJOR, 0, 31};
     frame[23]         = NOAH_PROFILE_LOGICAL_STORE_VERSION;
     frame[24]         = 6;
     frame[28]         = 42;
     noah_profile_candidate_v1_command_t command;
     noah_profile_candidate_v1_frame_error_t error;
-    // Schema 2 advertises 5,088 bytes: admission must accept the whole range,
-    // including profiles above the old 4,064-byte ceiling.
-    const uint16_t lengths[] = {4064, 4065, 5088, 5089};
+    // Schema 3 advertises 65,504 bytes: admission must accept the whole range,
+    // including profiles above the old 5,088-byte ceiling (D-F14).
+    const uint16_t lengths[] = {5088, 5089, 65504, 65505, 65535};
     for (size_t i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
         frame[9] = (uint8_t)lengths[i];
         frame[10] = lengths[i] >> 8;
@@ -24,8 +24,8 @@ static void test_candidate_capacity(void) {
     }
     memset(frame + 5, 0, sizeof(frame) - 5);
     frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK;
-    frame[5] = (uint8_t)5087;
-    frame[6] = 5087 >> 8;
+    frame[5] = (uint8_t)65503u;
+    frame[6] = 65503u >> 8;
     frame[7] = 1;
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
     frame[7] = 2;
@@ -49,7 +49,7 @@ static noah_profile_validator_v1_profile_t profile;
 static noah_profile_validator_v1_result_t validate(void) {
     noah_profile_validator_v1_t validator;
     noah_profile_validator_v1_declaration_t declaration = {
-        .schema_major = 2, .domain_mask = 16, .byte_length = blob_length, .action_abi_digest = 42,
+        .schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .domain_mask = 16, .byte_length = blob_length, .action_abi_digest = 42,
         .crc32 = noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, blob, blob_length)),
         .digest = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, blob, blob_length),
     };
@@ -62,7 +62,7 @@ static noah_profile_validator_v1_result_t validate(void) {
         result = noah_profile_validator_v1_step(&validator, 20, NULL);
         assert(calls - before <= 1);
         assert(largest <= 20);
-        assert(++steps < 400);
+        assert(++steps < 1000);
     }
     if (result == NOAH_PROFILE_VALIDATOR_V1_VALID)
         assert(noah_profile_validator_v1_profile(&validator, &profile, NULL) == result);
@@ -76,7 +76,7 @@ static size_t load_domain(const char *path) {
     size_t length = fread(blob + 12, 1, sizeof(blob) - 12, file);
     assert(feof(file));
     fclose(file);
-    memcpy(blob, (uint8_t[]){'N', 'L', 'P', '1', 2, 0, 1, 1, 0x50, NOAH_PROFILE_PD_V1_VERSION, (uint8_t)length, (uint8_t)(length >> 8)}, 12);
+    memcpy(blob, (uint8_t[]){'N', 'L', 'P', '1', 3, 0, 1, 1, 0x50, NOAH_PROFILE_PD_V1_VERSION, (uint8_t)length, (uint8_t)(length >> 8)}, 12);
     blob_length   = 12 + length;
     reader.length = blob_length;
     return length;
@@ -95,15 +95,15 @@ static void assert_cache_matches_domain(void) {
     uint8_t count = blob[12 + 3];
     uint8_t next  = 0;
     for (uint8_t index = 0; index <= count; index++) {
-        uint8_t stored = index < count ? blob[12 + 8 + (size_t)index * 96] : NOAH_PROFILE_PD_V1_SLOT_COUNT;
+        uint8_t stored = index < count ? blob[12 + 8 + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE] : NOAH_PROFILE_PD_V1_SLOT_COUNT;
         for (; next < stored; next++) {
             const uint8_t *record = noah_effective_pd_record(next);
             assert(record && record[0] == next);
-            for (size_t i = 1; i < 96; i++) assert(record[i] == 0);
+            for (size_t i = 1; i < NOAH_PROFILE_PD_V1_RECORD_SIZE; i++) assert(record[i] == 0);
             assert(!noah_effective_pd_for_mask(UINT32_C(1) << next));
         }
         if (index < count) {
-            assert(memcmp(noah_effective_pd_record(stored), blob + 12 + 8 + (size_t)index * 96, 96) == 0);
+            assert(memcmp(noah_effective_pd_record(stored), blob + 12 + 8 + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE, NOAH_PROFILE_PD_V1_RECORD_SIZE) == 0);
             next = (uint8_t)(stored + 1u);
         }
     }
@@ -137,7 +137,7 @@ int main(int argc, char **argv) {
     noah_effective_profile_identity_t identity = {0};
     // The presets: seven stored records, slots 7..31 omitted.
     size_t presets_length = load_domain(argv[1]);
-    assert(presets_length == 8 + 7 * 96);
+    assert(presets_length == 8 + 7 * NOAH_PROFILE_PD_V1_RECORD_SIZE);
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_VALID);
     noah_profile_domain_range_t pd;
     assert(noah_profile_blob_v1_find_domain(&reader, 0, reader.length, NOAH_PROFILE_DOMAIN_V1_PD, &pd) && pd.offset == 12 && pd.length == presets_length && profile.domain_mask == 16);
@@ -159,7 +159,7 @@ int main(int argc, char **argv) {
     noah_effective_pd_invalidate(NULL, 2, identity, identity, &snapshot);
     assert(noah_effective_pd_ready());
     for (uint8_t slot = 0; slot < 7; slot++) {
-        size_t offset = 20 + (size_t)slot * 96 + 90;
+        size_t offset = 20 + (size_t)slot * NOAH_PROFILE_PD_V1_RECORD_SIZE + 90;
         blob[offset] = 1;
         assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
         noah_effective_pd_invalidate(NULL, 3, identity, identity, &snapshot);
@@ -170,15 +170,15 @@ int main(int argc, char **argv) {
     // out-of-order or repeated IDs, an ID past 31, and a stored record that is
     // disabled with no name.
     const struct { size_t offset; uint8_t value; } mutations[] = {
-        {20 + 96, 0},          // slot 1's record names slot 0 again
-        {20 + 2 * 96, 1},      // slot 2's record repeats slot 1
-        {20 + 6 * 96, 32},     // past the last slot
-        {20 + 6 * 96 + 1, 0},  // slot 6 disabled ...
+        {20 + 128, 0},          // slot 1's record names slot 0 again
+        {20 + 2 * 128, 1},      // slot 2's record repeats slot 1
+        {20 + 6 * 128, 32},     // past the last slot
+        {20 + 6 * 128 + 1, 0},  // slot 6 disabled ...
     };
     for (size_t i = 0; i < sizeof(mutations) / sizeof(mutations[0]); i++) {
         uint8_t saved = blob[mutations[i].offset];
         blob[mutations[i].offset] = mutations[i].value;
-        if (i == 3) memset(blob + 20 + 6 * 96 + 2, 0, 94); // ... with no name
+        if (i == 3) memset(blob + 20 + 6 * 128 + 2, 0, 126); // ... with no name
         assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
         noah_effective_pd_invalidate(NULL, 4, identity, identity, &snapshot);
         assert(!noah_effective_pd_ready());
@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
     assert(noah_effective_pd_record(31)[8] != 0);
 
     // No slot stored: all 32 disabled, none activatable.
-    memcpy(blob + 12, (uint8_t[]){2, 32, 96, 0, 0, 0, 0, 0}, 8);
+    memcpy(blob + 12, (uint8_t[]){NOAH_PROFILE_PD_V1_VERSION, 32, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0, 0, 0, 0, 0}, 8);
     blob[10] = 8;
     blob[11] = 0;
     blob_length = reader.length = 20;

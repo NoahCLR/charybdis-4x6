@@ -46,11 +46,11 @@ typedef struct {
     bool                saw_pristine_marker;
 } reuse_guard_state_t;
 
-static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
-static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 2u, 0u, 1u, 1u, 0x10u, 3u, 3u, 0u, 1u, 2u, 3u};
-static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 2u, 0u, 1u, 1u, 0x20u, 1u, 2u, 0u, 4u, 5u};
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
+static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 3u, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 3u, 0u, 1u, 2u, 3u};
+static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 3u, 0u, 1u, 1u, 0x20u, NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, 2u, 0u, 4u, 5u};
 
-static bool fake_read(void *context, uint16_t address, uint8_t *target, uint16_t length) {
+static bool fake_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
     fake_eeprom_t *memory = context;
 
     memory->read_calls++;
@@ -76,7 +76,7 @@ static uint16_t partial_limit_for_commit_write(uint32_t write_call, uint16_t pay
     return write_call == payload_calls + 2u ? 20u : 10u;
 }
 
-static bool fake_write(void *context, uint16_t address, const uint8_t *source, uint16_t length) {
+static bool fake_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
     fake_eeprom_t *memory  = context;
     uint16_t       written = length;
 
@@ -100,12 +100,12 @@ static noah_profile_store_io_t io_for(fake_eeprom_t *memory) {
 }
 
 static noah_profile_store_compatibility_t compatibility(void) {
-    return (noah_profile_store_compatibility_t){.schema_major = 2u, .schema_minor = 0u, .compiled_default_digest = COMPILED_DIGEST, .action_abi_digest = ACTION_ABI_DIGEST};
+    return (noah_profile_store_compatibility_t){.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = 0u, .compiled_default_digest = COMPILED_DIGEST, .action_abi_digest = ACTION_ABI_DIGEST};
 }
 
 static bool reuse_begin(void *context, noah_profile_slot_t slot) {
     reuse_guard_state_t *state = context;
-    uint16_t             start = slot == NOAH_PROFILE_SLOT_A ? NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR : NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR;
+    noah_profile_storage_address_t start = slot == NOAH_PROFILE_SLOT_A ? NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR : NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR;
 
     state->begin_calls++;
     state->slot                = slot;
@@ -154,7 +154,7 @@ static noah_profile_store_candidate_t candidate_for(const uint8_t *payload, uint
         .format_version          = NOAH_PROFILE_STORE_FORMAT_VERSION,
         .via_generation          = 17u,
         .via_digest              = UINT32_C(0x89ABCDEF),
-        .schema_major            = 2u,
+        .schema_major            = NOAH_PROFILE_SCHEMA_MAJOR,
         .schema_minor            = 0u,
         .domain_mask             = domain_mask,
         .flags                   = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
@@ -244,7 +244,7 @@ static void test_commit_and_boot_selection(void) {
     CHECK(eeprom.last_write_length == NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE);
     first_candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
     header          = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
-    CHECK(header[0] == 'N' && header[1] == 'R' && header[2] == 0x40u);
+    CHECK(header[0] == 'N' && header[1] == 'S' && header[2] == 0x40u);
     CHECK(load_u16(&header[3]) == sizeof(empty_profile));
     CHECK(load_u32(&header[5]) == 1u);
     CHECK(load_u32(&header[9]) == first_candidate.payload_crc32);
@@ -285,7 +285,7 @@ static void test_logical_header_binds_via_identity(void) {
     CHECK(record.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
     CHECK(record.via_generation == candidate.via_generation && record.via_digest == candidate.via_digest);
     header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
-    CHECK(header[0] == 'N' && header[1] == 'R');
+    CHECK(header[0] == 'N' && header[1] == 'S');
     CHECK(load_u16(&header[3]) == candidate.payload_length);
     CHECK(load_u32(&header[5]) == candidate.generation);
     CHECK(load_u32(&header[9]) == candidate.payload_crc32);
@@ -336,7 +336,7 @@ static void test_chunk_and_candidate_guards(void) {
 
     candidate.schema_major = 1u;
     CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA);
-    candidate.schema_major      = 2u;
+    candidate.schema_major      = NOAH_PROFILE_SCHEMA_MAJOR;
     candidate.action_abi_digest = 0u;
     CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_INCOMPATIBLE_ACTION_ABI);
     candidate.action_abi_digest       = ACTION_ABI_DIGEST;
@@ -779,15 +779,15 @@ static void test_boot_selection_state_machine_is_scan_bounded(void) {
 // These are storage-envelope fixtures: domain bodies are opaque to this layer.
 // The schema validator remains responsible for semantic payload validation.
 static uint16_t pd_payload(uint8_t *payload, uint8_t mask) {
-    const uint8_t header[] = {'N', 'L', 'P', '1', 2u, 0u, 0u, 1u};
+    const uint8_t header[] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     uint16_t length = sizeof(header);
     memcpy(payload, header, sizeof(header));
     for (uint8_t domain = 0u; domain < 5u; domain++) {
         if (!(mask & (1u << domain))) continue;
         payload[6]++;
         payload[length++] = (uint8_t)((domain + 1u) * 0x10u);
-        // RGB v3, settings v5 and sparse PD v2: the 32-slot schema 2.0.
-        payload[length++] = domain == 0u ? 3u : domain == 3u ? 5u : domain == 2u || domain == 4u ? 2u : 1u;
+        // Every domain at the one version the current schema accepts.
+        payload[length++] = noah_profile_domain_at(domain)->version;
         payload[length++] = 1u;
         payload[length++] = 0u;
         payload[length++] = (uint8_t)(0x80u + domain);
@@ -797,7 +797,7 @@ static uint16_t pd_payload(uint8_t *payload, uint8_t mask) {
 
 static noah_profile_store_compatibility_t pd_compatibility(void) {
     noah_profile_store_compatibility_t value = compatibility();
-    value.schema_major = 2u;
+    value.schema_major = NOAH_PROFILE_SCHEMA_MAJOR;
     return value;
 }
 
@@ -810,7 +810,7 @@ static void initialize_pd_store(noah_profile_store_t *store) {
 
 static noah_profile_store_candidate_t pd_candidate(const uint8_t *payload, uint16_t length, uint8_t mask, uint32_t generation, uint8_t origin, uint8_t flags) {
     noah_profile_store_candidate_t value = candidate_for(payload, length, generation, origin);
-    value.schema_major = 2u;
+    value.schema_major = NOAH_PROFILE_SCHEMA_MAJOR;
     value.format_version                 = NOAH_PROFILE_STORE_FORMAT_VERSION;
     value.domain_mask = mask;
     value.flags = flags;
@@ -854,7 +854,7 @@ static void test_pd_store_accepts_every_settings_version_the_validator_does(void
         initialize_pd_store(&store);
         noah_profile_store_result_t result = commit_pd(&store, payload, &candidate);
         CHECK((result == NOAH_PROFILE_STORE_OK) == (version == NOAH_PROFILE_DOMAIN_VERSION_SETTINGS));
-        CHECK(NOAH_PROFILE_DOMAIN_VERSION_SETTINGS == 5u);
+        CHECK(NOAH_PROFILE_DOMAIN_VERSION_SETTINGS == 6u);
     }
 }
 
@@ -862,7 +862,7 @@ static void test_pd_store_accepts_every_settings_version_the_validator_does(void
 // window), the validator passed it, and this check refused every copy to the
 // other half until it used the validator's rule.
 static void test_pd_store_accepts_every_combo_version_the_validator_does(void) {
-    for (uint8_t version = 0u; version <= 3u; version++) {
+    for (uint8_t version = 0u; version <= 4u; version++) {
         uint8_t                        payload[33];
         uint16_t                       length = pd_payload(payload, 1u << 2u);
         noah_profile_store_t           store;
@@ -876,9 +876,9 @@ static void test_pd_store_accepts_every_combo_version_the_validator_does(void) {
         initialize_pd_store(&store);
         noah_profile_store_result_t result = commit_pd(&store, payload, &candidate);
         CHECK((result == NOAH_PROFILE_STORE_OK) == (version == NOAH_PROFILE_DOMAIN_VERSION_COMBOS));
-        CHECK(NOAH_PROFILE_DOMAIN_VERSION_COMBOS == 2u);
+        CHECK(NOAH_PROFILE_DOMAIN_VERSION_COMBOS == 3u);
         if (result != NOAH_PROFILE_STORE_OK) continue;
-        // ...and a stored v2 table is selected again at boot.
+        // ...and a stored current table is selected again at boot.
         noah_profile_store_init(&store, io_for(&eeprom), pd_compatibility());
         CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_OK && record.generation == 1u);
     }
@@ -889,7 +889,7 @@ static void test_pd_store_accepts_every_combo_version_the_validator_does(void) {
 static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
     const struct { uint8_t mask, id; } domains[] = {{1u << 0u, 0x10u}, {1u << 4u, 0x50u}};
     for (size_t d = 0u; d < sizeof(domains) / sizeof(domains[0]); d++) {
-        for (uint8_t version = 0u; version <= 4u; version++) {
+        for (uint8_t version = 0u; version <= 5u; version++) {
             uint8_t                        payload[33];
             uint16_t                       length = pd_payload(payload, domains[d].mask);
             noah_profile_store_t           store;
@@ -902,7 +902,7 @@ static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
             reset_eeprom(&eeprom);
             initialize_pd_store(&store);
             CHECK((commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_OK) == accepted);
-            CHECK(accepted == (version == (domains[d].id == 0x10u ? 3u : 2u)));
+            CHECK(accepted == (version == (domains[d].id == 0x10u ? 4u : 3u)));
         }
     }
 }
@@ -920,13 +920,13 @@ static void test_pd_header_all_identity_bits_and_boot_paths(void) {
                 initialize_pd_store(&store);
                 CHECK(commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_OK);
                 const uint8_t *header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
-                CHECK(header[0] == 'N' && header[1] == 'R');
+                CHECK(header[0] == 'N' && header[1] == 'S');
                 CHECK(header[2] == (uint8_t)(mask | (origin << 5u) | (flags << 6u)));
                 CHECK(load_u16(&header[29]) == noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, header, 29u));
                 CHECK(header[31] == 0xA5u);
                 CHECK(noah_profile_store_validate_slot(&store, NOAH_PROFILE_SLOT_A, true, &record) == NOAH_PROFILE_STORE_OK);
                 CHECK(record.domain_mask == mask && record.origin_half == origin && record.flags == flags);
-                CHECK(record.payload_digest == candidate.payload_digest && record.schema_major == 2u);
+                CHECK(record.payload_digest == candidate.payload_digest && record.schema_major == NOAH_PROFILE_SCHEMA_MAJOR);
                 CHECK(record.via_generation == candidate.via_generation && record.via_digest == candidate.via_digest);
                 noah_profile_store_init(&rebooted, io_for(&eeprom), pd_compatibility());
                 CHECK(noah_profile_store_boot_select_begin(&rebooted) == NOAH_PROFILE_STORE_IN_PROGRESS);
@@ -997,9 +997,8 @@ static void test_pd_header_rejects_bad_contracts_before_writing(void) {
         reset_eeprom(&eeprom);
         initialize_pd_store(&store);
         length = pd_payload(payload, 31u);
-        // A retired or unknown version for each domain; for RGB
-        // and PD it is the eight-slot one (RGB v2, PD v1).
-        payload[9u + 5u * domain] = domain == 3u || domain == 4u ? 1u : domain == 2u ? 3u : 2u;
+        // The version before each domain's current one is retired.
+        payload[9u + 5u * domain] = (uint8_t)(noah_profile_domain_at(domain)->version - 1u);
         candidate = pd_candidate(payload, length, 31u, 1u, 0u, 1u);
         CHECK(commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_INVALID_PAYLOAD);
         CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
@@ -1070,7 +1069,7 @@ static void test_pd_header_power_loss_keeps_complete_generation(void) {
 // Old magic is rejected before payload decoding in synchronous and bounded
 // discovery. It must never displace a current committed generation.
 static void test_retired_store_headers_never_become_authority(void) {
-    for (uint8_t old_magic = 'P'; old_magic <= 'Q'; old_magic++) {
+    for (uint8_t old_magic = 'P'; old_magic <= 'R'; old_magic++) {
         noah_profile_store_t        store, rebooted;
         noah_profile_store_record_t selected;
         reset_eeprom(&eeprom);

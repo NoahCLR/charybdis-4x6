@@ -184,8 +184,14 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 static const combo_feedback_led_group_t combo_feedback_led_groups_data[] = RGB_LED_GROUP_TABLE({.color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP(3)}, );
 EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(combo_feedback_led_groups_data);
 #endif
+// One colour per tap past the first: four at depth five, seven at depth eight.
+#if KEY_BEHAVIOR_MAX_TAP_COUNT == 8u
+#    define TEST_TAP_BRANCH_COLORS RGB_TAP_BRANCH_COLORS(HSV(13, 14, 15), HSV(16, 17, 18), HSV(19, 20, 21), HSV(19, 20, 21), HSV(22, 23, 24), HSV(25, 26, 27), HSV(28, 29, 30))
+#else
+#    define TEST_TAP_BRANCH_COLORS RGB_TAP_BRANCH_COLORS(HSV(13, 14, 15), HSV(16, 17, 18), HSV(19, 20, 21), HSV(19, 20, 21))
+#endif
 const key_behavior_feedback_color_config_t key_behavior_feedback_colors = {
-    RGB_TAP_BRANCH_COLORS(HSV(13, 14, 15), HSV(16, 17, 18), HSV(19, 20, 21), HSV(19, 20, 21)),
+    TEST_TAP_BRANCH_COLORS,
     .tap_committed_color    = HSV(4, 5, 6),
     .hold_active_color      = HSV(7, 8, 9),
     .long_hold_active_color = HSV(10, 11, 12),
@@ -1217,7 +1223,8 @@ static void test_tap_branch_pending_color_clamps_to_last_configured_color(void) 
 
     CHECK(render_output());
 
-    check_pending_feedback_from_left_source(rgb_from_tap_branch_color(2));
+    // The deepest branch takes the last of the depth - 1 colours.
+    check_pending_feedback_from_left_source(rgb_from_tap_branch_color(KEY_BEHAVIOR_MAX_TAP_COUNT - 2u));
 }
 
 static void test_slave_tap_branch_pending_uses_remote_branch_color(void) {

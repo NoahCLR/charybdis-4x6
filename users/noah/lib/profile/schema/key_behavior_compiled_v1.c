@@ -16,6 +16,9 @@ static int action_compare(noah_profile_action_v1_t left, noah_profile_action_v1_
     return memcmp(left_bytes, right_bytes, sizeof(left_bytes));
 }
 
+// An authored row is enabled and allowed on every layer of the bank.
+#define NOAH_COMPILED_BEHAVIOR_ALLOWED_LAYERS ((uint32_t)((UINT64_C(1) << LAYER_COUNT) - 1u))
+
 static bool step_present(const key_behavior_step_t *step) {
     return step->tap.present || step->hold.present || step->long_hold.present;
 }
@@ -46,54 +49,44 @@ static size_t behavior_row_body_length(const key_behavior_t *row) {
     return length;
 }
 
-static const key_behavior_t *behavior_row_in_canonical_order(uint8_t wanted, noah_profile_compiled_v1_error_t *error) {
-#ifdef NOAH_COMPILED_DEFAULTS_TEST
-    extern void noah_compiled_defaults_test_behavior_visit(void);
-    noah_compiled_defaults_test_behavior_visit();
-#endif
-    for (uint8_t candidate = 0u; candidate < key_behavior_count; candidate++) {
-        noah_profile_action_v1_t candidate_action;
-        uint8_t                  rank = 0u;
-
-        if (noah_profile_compiled_v1_action(key_behaviors[candidate].keycode, &candidate_action) != NOAH_PROFILE_COMPILED_V1_OK || candidate_action.kind == NOAH_PROFILE_ACTION_V1_NONE) {
-            fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, candidate, UINT8_MAX);
-            return NULL;
-        }
-        for (uint8_t other = 0u; other < key_behavior_count; other++) {
-            noah_profile_action_v1_t other_action;
-            int                      order;
-            if (noah_profile_compiled_v1_action(key_behaviors[other].keycode, &other_action) != NOAH_PROFILE_COMPILED_V1_OK) {
-                fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, other, UINT8_MAX);
-                return NULL;
-            }
-            order = action_compare(other_action, candidate_action);
-            if (order < 0) rank++;
-            if (order == 0 && other != candidate) {
-                fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, candidate, UINT8_MAX);
-                return NULL;
-            }
-        }
-        if (rank == wanted) return &key_behaviors[candidate];
-    }
-    fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, wanted, UINT8_MAX);
-    return NULL;
-}
-
-// The authored rows in canonical order, worked out once. Finding the order is
-// cubic in the row count, the table is compiled data, so the order never
+// The authored rows in canonical order, worked out once by insertion sort
+// over the row indexes: quadratic in the row count, each comparison converting
+// two authored keycodes. The table is compiled data, so the order never
 // changes, and every serialization emits it: open, a full write, and each
 // chunk a host or the validator reads through the compiled reader, which
 // replays the stream up to that chunk. A failure is not remembered, so every
-// later serialization reports it again, as before.
+// later serialization reports it again.
 static uint8_t canonical_behavior_rows[NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS];
 static bool    canonical_behavior_rows_ready;
 
+static noah_profile_compiled_v1_result_t behavior_target(uint8_t row, noah_profile_action_v1_t *target, noah_profile_compiled_v1_error_t *error) {
+    if (noah_profile_compiled_v1_action(key_behaviors[row].keycode, target) != NOAH_PROFILE_COMPILED_V1_OK || target->kind == NOAH_PROFILE_ACTION_V1_NONE) {
+        return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, UINT8_MAX);
+    }
+    return NOAH_PROFILE_COMPILED_V1_OK;
+}
+
 static noah_profile_compiled_v1_result_t canonical_behavior_order(noah_profile_compiled_v1_error_t *error) {
     if (canonical_behavior_rows_ready) return NOAH_PROFILE_COMPILED_V1_OK;
-    for (uint8_t order = 0u; order < key_behavior_count; order++) {
-        const key_behavior_t *row = behavior_row_in_canonical_order(order, error);
-        if (!row) return error ? error->code : NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR;
-        canonical_behavior_rows[order] = (uint8_t)(row - key_behaviors);
+    for (uint8_t row = 0u; row < key_behavior_count; row++) {
+        noah_profile_action_v1_t target;
+        uint8_t                  position = row;
+        if (behavior_target(row, &target, error) != NOAH_PROFILE_COMPILED_V1_OK) return error ? error->code : NOAH_PROFILE_COMPILED_V1_INVALID_ACTION;
+#ifdef NOAH_COMPILED_DEFAULTS_TEST
+        extern void noah_compiled_defaults_test_behavior_visit(void);
+        noah_compiled_defaults_test_behavior_visit();
+#endif
+        while (position != 0u) {
+            noah_profile_action_v1_t earlier;
+            int                      order;
+            if (behavior_target(canonical_behavior_rows[position - 1u], &earlier, error) != NOAH_PROFILE_COMPILED_V1_OK) return error ? error->code : NOAH_PROFILE_COMPILED_V1_INVALID_ACTION;
+            order = action_compare(earlier, target);
+            if (order == 0) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, UINT8_MAX);
+            if (order < 0) break;
+            canonical_behavior_rows[position] = canonical_behavior_rows[position - 1u];
+            position--;
+        }
+        canonical_behavior_rows[position] = row;
     }
     canonical_behavior_rows_ready = true;
     return NOAH_PROFILE_COMPILED_V1_OK;
@@ -133,9 +126,9 @@ static bool emit_hold(compiled_writer_t *writer, const noah_key_behavior_hold_v1
     return emit_u8(writer, hold->mode) && emit_u8(writer, hold->repeat_hz) && emit_action(writer, &hold->action);
 }
 
-static noah_profile_compiled_v1_result_t behavior_payload_size(size_t *length, uint8_t *populated_steps, noah_profile_compiled_v1_error_t *error) {
-    size_t  total = NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE;
-    uint8_t steps = 0u;
+static noah_profile_compiled_v1_result_t behavior_payload_size(size_t *length, uint16_t *populated_steps, noah_profile_compiled_v1_error_t *error) {
+    size_t   total = NOAH_KEY_BEHAVIOR_DOMAIN_V1_HEADER_SIZE;
+    uint16_t steps = 0u;
     if (!length || !populated_steps || key_behavior_count > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS) {
         return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, UINT8_MAX, UINT8_MAX);
     }
@@ -145,7 +138,7 @@ static noah_profile_compiled_v1_result_t behavior_payload_size(size_t *length, u
         if ((uint16_t)steps + row_steps > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS || total > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE - NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE - body) {
             return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, UINT8_MAX);
         }
-        steps = (uint8_t)(steps + row_steps);
+        steps = (uint16_t)(steps + row_steps);
         total += NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE + body;
     }
     *length          = total;
@@ -155,11 +148,11 @@ static noah_profile_compiled_v1_result_t behavior_payload_size(size_t *length, u
 
 noah_profile_compiled_v1_result_t noah_profile_key_behaviors_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
     size_t                            payload_length;
-    uint8_t                           populated_steps;
+    uint16_t                          populated_steps;
     noah_profile_compiled_v1_result_t result = behavior_payload_size(&payload_length, &populated_steps, error);
     (void)payload_length;
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
-    if (!(emit_u8(writer, key_behavior_count) && emit_u8(writer, populated_steps) && emit_u16(writer, 0u))) return writer->result;
+    if (!(emit_u8(writer, key_behavior_count) && emit_u8(writer, 0u) && emit_u16(writer, populated_steps))) return writer->result;
     result = canonical_behavior_order(error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
 
@@ -169,7 +162,7 @@ noah_profile_compiled_v1_result_t noah_profile_key_behaviors_compiled_v1_write(c
         noah_profile_action_v1_t target;
         result = noah_profile_compiled_v1_action(row->keycode, &target);
         if (result != NOAH_PROFILE_COMPILED_V1_OK || target.kind == NOAH_PROFILE_ACTION_V1_NONE) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ACTION, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, source_row, UINT8_MAX);
-        if (!(emit_u16(writer, (uint16_t)behavior_row_body_length(row)) && emit_action(writer, &target) && emit_u16(writer, row->tap_hold_term) && emit_u16(writer, row->longer_hold_term) && emit_u16(writer, row->multi_tap_term) && emit_u8(writer, row->keeps_auto_mouse_anchored ? NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE : 0u) && emit_u8(writer, behavior_step_count(row)))) return writer->result;
+        if (!(emit_u16(writer, (uint16_t)behavior_row_body_length(row)) && emit_action(writer, &target) && emit_u16(writer, row->tap_hold_term) && emit_u16(writer, row->longer_hold_term) && emit_u16(writer, row->multi_tap_term) && emit_u8(writer, row->keeps_auto_mouse_anchored ? NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE : 0u) && emit_u8(writer, behavior_step_count(row)) && emit_u32(writer, NOAH_COMPILED_BEHAVIOR_ALLOWED_LAYERS))) return writer->result;
 
         for (uint8_t step_index = 0u; step_index < KEY_BEHAVIOR_MAX_TAP_COUNT; step_index++) {
             const key_behavior_step_t *step = &row->tap_counts[step_index];

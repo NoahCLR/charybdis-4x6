@@ -3540,3 +3540,26 @@ int main(void) {
     puts("runtime_debug host tests passed");
     return 0;
 }
+
+// Participation allows every press in this harness (no stored policy), so a
+// row-less view is never asked for beyond linking.
+key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode) {
+    return key_behavior_lookup(keycode);
+}
+
+// Every key here uses its row: the debug harness stores no participation.
+void handled_key_lookup_row_tap_count_into(uint16_t keycode, uint8_t tap_count, bool use_row, handled_key_resolution_t *out) {
+    (void)use_row;
+    handled_key_lookup_tap_count_into(keycode, tap_count, out);
+}
+
+uint8_t read_source_layers_cache(keypos_t key) {
+    (void)key;
+    return 0;
+}
+
+// QMK's record keycode, for the tapping hook: this test authors no keymap.
+uint16_t get_record_keycode(keyrecord_t *record, bool update_layer_cache) {
+    (void)update_layer_cache;
+    return record ? record->keycode : KC_NO;
+}

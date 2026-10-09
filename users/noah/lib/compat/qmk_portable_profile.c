@@ -72,17 +72,17 @@ static uint32_t current_setting(uint8_t id) {
 static bool external_setting(uint8_t id) {
     return (id >= NOAH_SETTING_AUTO_MOUSE_ENABLED && id <= NOAH_SETTING_AUTO_MOUSE_DEBOUNCE) || (id >= NOAH_SETTING_DEFAULT_DPI && id <= NOAH_SETTING_KEYMAP_OPTIONS);
 }
-enum { LAYER_NAMES_OFFSET = 8u + NOAH_SETTINGS_COUNT * 4u };
+
 static uint16_t settings_length(void) {
     uint16_t length = noah_effective_settings_length();
     return length ? length : noah_profile_settings_defaults_length();
 }
 static uint8_t settings_byte(uint16_t offset) {
-    if (offset >= 8u && offset < LAYER_NAMES_OFFSET) {
-        uint8_t  id    = (offset - 8u) / 4u;
+    if (offset >= NOAH_SETTINGS_SCALARS_OFFSET && offset < NOAH_SETTINGS_LAYER_RECORDS_OFFSET) {
+        uint8_t  id    = (offset - NOAH_SETTINGS_SCALARS_OFFSET) / 4u;
         uint32_t value = current_setting(id);
         if (!external_setting(id)) value = noah_setting(id, value);
-        return value >> (8u * ((offset - 8u) % 4u));
+        return value >> (8u * ((offset - NOAH_SETTINGS_SCALARS_OFFSET) % 4u));
     }
     return noah_effective_settings_length() ? noah_effective_settings_byte(offset) : noah_profile_settings_defaults_byte(offset);
 }
@@ -116,7 +116,7 @@ void noah_qmk_portable_apply(void) {
     for (uint8_t i = 0; i < 4 && charybdis_get_pointer_sniping_dpi() != dpi; i++)
         charybdis_cycle_pointer_sniping_dpi(true);
     noah_qmk_portable_apply_lighting(noah_setting(NOAH_SETTING_RGB_MODE, current_setting(NOAH_SETTING_RGB_MODE)), noah_setting(NOAH_SETTING_RGB_COLOR, current_setting(NOAH_SETTING_RGB_COLOR)));
-    uint8_t layers = noah_setting(NOAH_SETTING_DEFAULT_LAYERS, default_layer_state);
+    layer_state_t layers = noah_setting(NOAH_SETTING_DEFAULT_LAYERS, default_layer_state);
     default_layer_set(layers);
     eeconfig_update_default_layer(layers);
     keymap_config.raw = noah_setting(NOAH_SETTING_KEYMAP_OPTIONS, keymap_config.raw);
@@ -124,8 +124,10 @@ void noah_qmk_portable_apply(void) {
 }
 bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
     if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8)) return false;
-    bool malformed = !frame[3];
-    for (uint8_t i = 5; i < 32; i++)
+    // Settings readback (GET 7) takes a wide page: byte 5 is its high byte.
+    uint16_t page      = frame[2] == 7 ? (uint16_t)(frame[4] | frame[5] << 8) : frame[4];
+    bool     malformed = !frame[3];
+    for (uint8_t i = frame[2] == 7 ? 6 : 5; i < 32; i++)
         malformed |= frame[i] != 0;
     memset(frame + 5, 0, 27);
     if (malformed) {
@@ -150,7 +152,7 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
         p[22] = s.last_error;
         u16(p + 23, s.conflict_count);
         frame[6] = 25;
-    } else if (!frame[4]) {
+    } else if (!page) {
         uint16_t length = 0;
         uint32_t crc = NOAH_PROFILE_CRC32_INITIAL, fnv = NOAH_PROFILE_FNV1A_INITIAL;
         uint8_t  chunk[25];
@@ -165,7 +167,8 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
         u32(p + 8, fnv);
         frame[6] = 12;
     } else {
-        frame[6] = readback_fill(frame[2], (frame[4] - 1) * 25u, p);
+        uint32_t offset = (uint32_t)(page - 1u) * 25u;
+        frame[6]        = offset <= UINT16_MAX ? readback_fill(frame[2], (uint16_t)offset, p) : 0u;
         if (!frame[6]) frame[5] = 2;
     }
     return true;
@@ -173,7 +176,8 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
 #endif
 
 #if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(COMBO_ONLY_FROM_LAYER)
+// Settings v6 keeps each layer's combo reference layer in its layer record.
 uint8_t combo_ref_from_layer(uint8_t layer) {
-    return layer < 8 ? (noah_setting(NOAH_SETTING_COMBO_REFERENCES, 0x76543210u) >> (layer * 4)) & 15 : layer;
+    return layer < NOAH_SETTINGS_LAYERS ? noah_setting_layer_record(layer, NOAH_SETTINGS_LAYER_REFERENCE) : layer;
 }
 #endif

@@ -31,6 +31,7 @@ run_variant() {
         "$ROOT/tests/host/qmk_combo_origin_test.c" \
         "$ROOT/users/noah/lib/key/runtime/slot/origin_registry.c" \
         "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
+        "$ROOT/users/noah/lib/key/behavior/participation.c" \
         -o "$bin"
 
     "$bin"

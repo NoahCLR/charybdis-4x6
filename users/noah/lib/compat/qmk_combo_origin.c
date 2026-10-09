@@ -3,6 +3,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "qmk_combo_origin.h"
+#include "qmk_source_layer_contract.h"
+#include "../key/behavior/participation.h"
 
 #if defined(COMBO_ENABLE)
 
@@ -20,6 +22,8 @@ uint16_t get_combo_term(uint16_t combo_index, combo_t *combo);
 
 typedef struct {
     bool     pressed;
+    bool     combo_allowed;
+    uint8_t  source_layer;
     uint16_t combo_keycode;
     uint16_t pressed_at;
     uint32_t press_sequence;
@@ -31,6 +35,7 @@ typedef struct {
     uint16_t keycode;
     uint16_t complete_at;
     keypos_t owner_key_pos;
+    uint8_t  origin_layer;
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
     bool     active;
 } combo_origin_active_cache_entry_t;
@@ -42,6 +47,7 @@ typedef struct {
     uint16_t complete_at;
     uint16_t applied_at;
     keypos_t owner_key_pos;
+    uint8_t  origin_layer;
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
     bool     active;
     // QMK fired this completion: its output press is delivered now or queued
@@ -225,7 +231,11 @@ static bool combo_origin_combo_build_from_pressed_keys(uint16_t combo_index, uin
                 keypos_t                           key_pos      = {.row = row, .col = col};
                 combo_origin_physical_key_state_t *physical_key = &physical_key_states[key_origin_keypos_index(key_pos)];
 
-                if (!(physical_key->pressed && physical_key->combo_keycode == member_keycode)) {
+                // Mirror the member-record gate: excluded occurrences never
+                // joined this combo and cannot make its eligible origin
+                // ambiguous. Keep the physical decision frozen at the press.
+                if (!(physical_key->pressed && physical_key->combo_allowed && physical_key->combo_keycode == member_keycode)
+                    || !noah_participation_combo_row(combo_index, physical_key->source_layer)) {
                     continue;
                 }
 
@@ -305,7 +315,7 @@ static combo_origin_active_cache_entry_t *combo_origin_cache_entry_for_store(uin
     return NULL;
 }
 
-static bool combo_origin_cache_store(uint16_t combo_index, uint32_t generation, uint16_t keycode, keypos_t owner_key_pos, uint16_t complete_at, const uint8_t *bitmap) {
+static bool combo_origin_cache_store(uint16_t combo_index, uint32_t generation, uint16_t keycode, keypos_t owner_key_pos, uint16_t complete_at, uint8_t origin_layer, const uint8_t *bitmap) {
     combo_origin_active_cache_entry_t *entry = combo_origin_cache_entry_for_store(combo_index, generation, keycode);
 
     if (!entry) {
@@ -318,6 +328,7 @@ static bool combo_origin_cache_store(uint16_t combo_index, uint32_t generation, 
     entry->keycode       = keycode;
     entry->complete_at   = complete_at;
     entry->owner_key_pos = owner_key_pos;
+    entry->origin_layer  = origin_layer;
     key_origin_bitmap_copy(entry->bitmap, bitmap);
     return true;
 }
@@ -383,6 +394,7 @@ static bool combo_origin_pending_output_store(uint16_t combo_index, uint32_t gen
     entry->combo_index      = combo_index;
     entry->keycode          = keycode;
     entry->owner_key_pos    = owner_key_pos;
+    entry->origin_layer     = physical_key_states[key_origin_keypos_index(owner_key_pos)].source_layer;
     entry->complete_at      = complete_at;
     key_origin_bitmap_copy(entry->bitmap, bitmap);
     pending_count = combo_origin_pending_count();
@@ -689,6 +701,8 @@ void noah_qmk_combo_origin_observe_physical_key_event(uint16_t keycode, keyrecor
     entry = &physical_key_states[key_origin_keypos_index(record->event.key)];
     if (record->event.pressed) {
         entry->pressed                     = true;
+        entry->combo_allowed               = noah_participation_record_combo(record);
+        entry->source_layer                = noah_participation_record_source(record);
         entry->combo_keycode               = combo_origin_combo_keycode_for_record(record);
         entry->pressed_at                  = timer_read();
         entry->press_sequence              = combo_origin_allocate_press_sequence();
@@ -704,15 +718,29 @@ void noah_qmk_combo_origin_observe_physical_key_event(uint16_t keycode, keyrecor
     combo_origin_last_released_key_pos = record->event.key;
 }
 
-void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *record) {
+uint8_t noah_qmk_combo_origin_record_source_layer(uint16_t keycode, const keyrecord_t *record) {
+    if (record && record->event.pressed) {
+        combo_origin_pending_output_entry_t *pending = combo_origin_pending_entry_for_press(keycode);
+        if (pending) return pending->origin_layer;
+    } else {
+        combo_origin_active_cache_entry_t *active = combo_origin_cache_entry_for_release(keycode);
+        if (active) return active->origin_layer;
+    }
+    return record && key_origin_keypos_valid(record->event.key) ? noah_qmk_contract_source_layer(record->event.key) : 0;
+}
+
+// Retire origin reconstruction's bitmap/workspace before the process stage
+// can recursively project held actions. Keep this boundary in ordinary builds.
+__attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *record) {
     uint16_t combo_index   = UINT16_MAX;
     uint16_t complete_at   = 0;
     uint32_t generation    = 0;
     keypos_t owner_key_pos = {0};
+    uint8_t  origin_layer  = 0;
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
     bool     matched = false;
 
-    if (!(record && record->event.type == COMBO_EVENT)) {
+    if (!(record && record->event.type == COMBO_EVENT) || noah_participation_record_generated_normalized(record)) {
         return;
     }
 
@@ -724,6 +752,7 @@ void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *recor
             generation    = pending->generation;
             complete_at   = pending->complete_at;
             owner_key_pos = pending->owner_key_pos;
+            origin_layer  = pending->origin_layer;
             key_origin_bitmap_copy(bitmap, pending->bitmap);
             combo_origin_pending_output_entry_clear(pending);
             matched = true;
@@ -731,11 +760,12 @@ void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *recor
         } else {
             combo_origin_increment_counter(&combo_origin_diagnostics.unmatched_delayed_output_count);
             matched = combo_origin_collect_untracked_active_combo(keycode, &combo_index, &generation, &owner_key_pos, &complete_at, bitmap);
+            if (matched) origin_layer = physical_key_states[key_origin_keypos_index(owner_key_pos)].source_layer;
         }
         if (matched && key_origin_keypos_valid(owner_key_pos)) {
             record->event.key = owner_key_pos;
             key_origin_registry_set_bitmap(owner_key_pos, key_origin_bitmap_has_any(bitmap) ? bitmap : NULL);
-            if (combo_index != UINT16_MAX && !combo_origin_cache_store(combo_index, generation, keycode, owner_key_pos, complete_at, bitmap)) {
+            if (combo_index != UINT16_MAX && !combo_origin_cache_store(combo_index, generation, keycode, owner_key_pos, complete_at, origin_layer, bitmap)) {
                 combo_origin_increment_counter(&combo_origin_diagnostics.unmatched_delayed_output_count);
             }
         } else if (combo_origin_fallback_owner_keypos(&owner_key_pos)) {
@@ -744,18 +774,22 @@ void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *recor
             combo_origin_bitmap_fill_all_keys(bitmap);
             record->event.key = owner_key_pos;
             key_origin_registry_set_bitmap(owner_key_pos, bitmap);
-            (void)combo_origin_cache_store(UINT16_MAX, 0, keycode, owner_key_pos, timer_read(), bitmap);
+            origin_layer = physical_key_states[key_origin_keypos_index(owner_key_pos)].source_layer;
+            (void)combo_origin_cache_store(UINT16_MAX, 0, keycode, owner_key_pos, timer_read(), origin_layer, bitmap);
         }
+        noah_participation_record_generated_normalize(record, keycode, origin_layer);
         return;
     }
 
     combo_origin_active_cache_entry_t *active = combo_origin_cache_entry_for_release(keycode);
     if (active) {
         record->event.key = active->owner_key_pos;
+        origin_layer = active->origin_layer;
         key_origin_registry_set_bitmap(active->owner_key_pos, key_origin_bitmap_has_any(active->bitmap) ? active->bitmap : NULL);
         combo_origin_cache_entry_clear(active);
         split_runtime_sync_notify_combo_dirty();
     }
+    noah_participation_record_generated_normalize(record, keycode, origin_layer);
     combo_origin_last_released_key_pos = (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
 }
 
@@ -905,7 +939,26 @@ void noah_qmk_combo_origin_debug_snapshot(noah_qmk_combo_origin_debug_snapshot_t
     out->active_count  = combo_origin_active_count();
 }
 
+
+#    ifdef NOAH_COMBO_PARTICIPATION_HOOK
+// A member record can mutate combo state only if its press allowed combos (its
+// source layer's switch and its placement, stored at the press and reused for
+// the release) and the combo allows that source layer (participation-
+// policy.md). Members may come from different layers; each passes on its own,
+// so one that does not keeps its chord from forming. A press no combo accepts
+// is not buffered.
+bool combo_key_record_allowed(uint16_t combo_index, combo_t *combo, uint16_t keycode, keyrecord_t *record) {
+    (void)combo;
+    (void)keycode;
+    if (!record || record->event.type != KEY_EVENT) {
+        return true;
+    }
+    return noah_participation_record_combo(record) && noah_participation_combo_row(combo_index, noah_participation_record_source(record));
+}
+#    endif
 #else
+
+uint8_t noah_qmk_combo_origin_record_source_layer(uint16_t keycode, const keyrecord_t *record) { (void)keycode; (void)record; return 0; }
 
 void noah_qmk_combo_origin_init(void) {}
 void noah_qmk_combo_origin_reset(void) {}

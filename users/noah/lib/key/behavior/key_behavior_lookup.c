@@ -248,10 +248,12 @@ bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t 
     return false;
 }
 
-key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
+// use_row false resolves the key as if it had no authored row: the normal
+// action a participation bypass gives a press (participation-policy.md).
+static key_behavior_view_t key_behavior_view_build(uint16_t keycode, bool use_row) {
     noah_effective_key_behavior_row_t    live         = {0};
-    noah_effective_key_behavior_result_t live_result  = noah_effective_key_behavior_lookup(keycode, &live);
-    const key_behavior_t                *config       = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK ? key_behavior_config_lookup(keycode) : NULL;
+    noah_effective_key_behavior_result_t live_result  = use_row ? noah_effective_key_behavior_lookup(keycode, &live) : NOAH_EFFECTIVE_KEY_BEHAVIOR_NOT_FOUND;
+    const key_behavior_t                *config       = use_row && live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK ? key_behavior_config_lookup(keycode) : NULL;
     bool                                 has_authored = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK || config;
     noah_action_desc_t                   desc         = noah_action_describe(keycode);
     bool                                 custom_lt    = has_authored && noah_action_desc_uses_authored_layer_tap_contract(desc);
@@ -284,6 +286,14 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         .multi_tap_term     = multi_term,
         .single             = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.single : (config ? config->tap_counts[0] : key_behavior_tap_toggle_step(keycode, 1u)),
     };
+}
+
+key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
+    return key_behavior_view_build(keycode, true);
+}
+
+key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode) {
+    return key_behavior_view_build(keycode, false);
 }
 
 key_behavior_step_t key_behavior_view_step(const key_behavior_view_t *behavior, uint8_t tap_count) {

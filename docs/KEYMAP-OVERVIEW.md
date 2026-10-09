@@ -287,6 +287,166 @@ No pd modes are directly placed or reachable through key behaviors on this layer
 
 No authored combos resolve entirely from keys on this layer.
 
+### `LAYER_EXTRA_4`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_4](media/profile-introspection/profile-layer-LAYER_EXTRA_4.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
+### `LAYER_EXTRA_5`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_5](media/profile-introspection/profile-layer-LAYER_EXTRA_5.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
+### `LAYER_EXTRA_6`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_6](media/profile-introspection/profile-layer-LAYER_EXTRA_6.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
+### `LAYER_EXTRA_7`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_7](media/profile-introspection/profile-layer-LAYER_EXTRA_7.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
+### `LAYER_EXTRA_8`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_8](media/profile-introspection/profile-layer-LAYER_EXTRA_8.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
+### `LAYER_EXTRA_9`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_9](media/profile-introspection/profile-layer-LAYER_EXTRA_9.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
+### `LAYER_EXTRA_10`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_10](media/profile-introspection/profile-layer-LAYER_EXTRA_10.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
+### `LAYER_EXTRA_11`
+
+- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
+- Authored layer color: `HSV(0, 0, 0)`
+- Preview color: no override
+
+![LAYER_EXTRA_11](media/profile-introspection/profile-layer-LAYER_EXTRA_11.svg)
+
+#### Key Behaviors On This Layer
+
+No authored key-behavior rows are present on this layer.
+
+#### PD Modes Reachable On This Layer
+
+No pd modes are directly placed or reachable through key behaviors on this layer.
+
+#### Combos Available On This Layer
+
+No authored combos resolve entirely from keys on this layer.
+
 ## PD Mode Colors
 
 These overlays come from `pd_mode_colors[]` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). Each row chooses its own locality and color for the matching pointing mode.
@@ -456,7 +616,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 
 ### Shared Keycode Surfaces
 
-- Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`, `LAYER_EXTRA_1`, `LAYER_EXTRA_2`, `LAYER_EXTRA_3`
+- Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`, `LAYER_EXTRA_1`, `LAYER_EXTRA_2`, `LAYER_EXTRA_3`, `LAYER_EXTRA_4`, `LAYER_EXTRA_5`, `LAYER_EXTRA_6`, `LAYER_EXTRA_7`, `LAYER_EXTRA_8`, `LAYER_EXTRA_9`, `LAYER_EXTRA_10`, `LAYER_EXTRA_11`
 - Named custom keys: `CUSTOM_KEY_0` (Right Thumb), `CUSTOM_KEY_1` (Left Thumb), `CUSTOM_KEY_2` (Click Spam), `CUSTOM_KEY_3` (Drag Window)
 - PD color overlays: `PD_MODE_SLOT_6`, `PD_MODE_SLOT_7`, `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`, `PD_MODE_SLOT_8`, `PD_MODE_SLOT_9`, `PD_MODE_SLOT_10`, `PD_MODE_SLOT_11`, `PD_MODE_SLOT_12`, `PD_MODE_SLOT_13`, `PD_MODE_SLOT_14`, `PD_MODE_SLOT_15`, `PD_MODE_SLOT_16`, `PD_MODE_SLOT_17`, `PD_MODE_SLOT_18`, `PD_MODE_SLOT_19`, `PD_MODE_SLOT_20`, `PD_MODE_SLOT_21`, `PD_MODE_SLOT_22`, `PD_MODE_SLOT_23`, `PD_MODE_SLOT_24`, `PD_MODE_SLOT_25`, `PD_MODE_SLOT_26`, `PD_MODE_SLOT_27`, `PD_MODE_SLOT_28`, `PD_MODE_SLOT_29`, `PD_MODE_SLOT_30`, `PD_MODE_SLOT_31`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
@@ -476,6 +636,14 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `LAYER_EXTRA_1` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(96, 255, 200)` | <img alt="LAYER_EXTRA_1 preview color" src="media/profile-introspection/profile-color-swatch-00ff42.svg" width="96" height="28" /> |
 | `LAYER_EXTRA_2` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(140, 255, 200)` | <img alt="LAYER_EXTRA_2 preview color" src="media/profile-introspection/profile-color-swatch-00b4ff.svg" width="96" height="28" /> |
 | `LAYER_EXTRA_3` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_4` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_5` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_6` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_7` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_8` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_9` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_10` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_11` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
 
 ### Layer LED Groups
 
@@ -496,12 +664,12 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 
 | Field | Value |
 | --- | --- |
-| `layer_count` | `8` |
+| `layer_count` | `16` |
 | `layout_key_count` | `56` |
 | `key_behavior_count` | `37` |
 | `key_behavior_step_count` | `49` |
 | `combo_count` | `10` |
-| `via_macro_count` | `64` |
+| `via_macro_count` | `128` |
 | `via_macro_non_empty_count` | `11` |
 | `named_custom_key_count` | `4` |
 | `pd_mode_count` | `32` |
@@ -557,14 +725,15 @@ These values come from the keymap config and the shared userspace config. When t
 | `NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR` | `4` | [users/noah/config.h](../users/noah/config.h) |
 | `VIA_FIRMWARE_VERSION` | `0x00010000u` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_LAYER_COUNT` | `LAYER_COUNT` | [users/noah/config.h](../users/noah/config.h) |
-| `DYNAMIC_KEYMAP_MACRO_COUNT` | `64` | [users/noah/config.h](../users/noah/config.h) |
-| `WEAR_LEVELING_BACKING_SIZE` | `36864` | [users/noah/config.h](../users/noah/config.h) |
-| `DYNAMIC_KEYMAP_EEPROM_MAX_ADDR` | `0x1FFFu` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR` | `0x2000u` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR` | `0x33FFu` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR` | `0x3400u` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR` | `0x47FFu` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_LAYER_BANK_COUNT` | `8` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `DYNAMIC_KEYMAP_MACRO_COUNT` | `128` | [users/noah/config.h](../users/noah/config.h) |
+| `WEAR_LEVELING_BACKING_SIZE` | `286720` | [users/noah/config.h](../users/noah/config.h) |
+| `DYNAMIC_KEYMAP_EEPROM_MAX_ADDR` | `0x2FFFu` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR` | `0x3000u` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR` | `0x12FFFu` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR` | `0x13000u` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR` | `0x22FFFu` | [users/noah/config.h](../users/noah/config.h) |
+| `KEYRECORD_USER_DATA` | `defined` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_LAYER_BANK_COUNT` | `16` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `TAPPING_TERM` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `COMBO_TERM` | `50` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `KEY_BEHAVIOR_MAX_TAP_COUNT` | `5` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |

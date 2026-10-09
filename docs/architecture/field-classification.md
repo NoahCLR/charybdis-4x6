@@ -22,11 +22,11 @@ behavior. The UI must explain every intentional non-live boundary.
 | Hold mode and repeat rate | Milestone A behavior policy | 04 | behavior validator and lifecycle runtime |
 | `keymaps[][]` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic keymap/VIA reconciliation |
 | `VIA_MACROS` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic macro storage |
-| Macro names | Portable settings domain `0x40` v4 onward, 64 names of up to 20 ASCII characters each; replaces the retired user macros (v2's 16 instruction streams and v3's shared 23-byte names are still read) | 06 | profile schema |
-| Custom-key names | Portable settings domain `0x40` v5, 64 names of up to 20 ASCII characters each after the macro names; `CUSTOM_KEYS` in C is the compiled default | 06 | profile schema |
+| Macro names | Portable settings domain `0x40` v6, 64 counted UTF-8 names of at most 32 bytes each; replaces the retired user macros | 06 | profile schema |
+| Custom-key names | Portable settings domain `0x40` v6, 64 counted UTF-8 names of at most 32 bytes each after the macro names; `CUSTOM_KEYS` in C is the compiled default | 06 | profile schema |
 | `COMBOS` | GET `0x06` readout; optional live domain `0x30` for rows, timing and matching flags | 07 | combo validator/provider |
-| Logical layer names/order | Eight-layer bank; portable names and reference-preserving order | 07 | whole-profile cross-reference validator |
-| Userspace keycode blocks and the 64 custom-key slots | Executable firmware/action ABI; what a custom key does is its `key_behaviors[]` row | flash required | firmware build |
+| Logical layer names/order | Sixteen-layer bank (IDs 0–15; the authored keymap fills 0–7, and 8–15 are transparent, unnamed and inactive); counted UTF-8 names in settings v6 and reference-preserving order | 07 | whole-profile cross-reference validator |
+| Userspace keycode blocks and the 128 custom-key slots | Executable firmware/action ABI; what a custom key does is its `key_behaviors[]` row | flash required | firmware build |
 
 ## `rgb_config.c`
 
@@ -72,10 +72,11 @@ the following settings:
 
 The [portable settings contract](portable-profile-v1.md) supplies a bounded
 runtime cache and QMK setters. It also includes debounce, activation delay,
-movement threshold, combo enable/reference policy, RGB speed/flags, persistent
-default-layer state and QMK keymap options. Combo timing is materialized in the
-combo domain. The 64 VIA macros with their names and eight user-facing layer
-names are portable.
+movement threshold, combo enable/reference policy, behaviour and combo
+participation (master, per-layer masks and placement bitmaps), RGB
+speed/flags, persistent default-layer state and QMK keymap options. Combo
+timing is materialized in the combo domain. The 128 VIA macros with their names
+and sixteen user-facing layer names are portable.
 
 ### Compiled Capability Or Feature Inclusion
 

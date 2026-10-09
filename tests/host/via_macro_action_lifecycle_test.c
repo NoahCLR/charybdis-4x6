@@ -29,7 +29,8 @@ typedef struct {
 
 #define TEST_KC_8 0x0025u
 #define TEST_MAX_CALLS 512
-#define TEST_MACRO_BUFFER_SIZE 512
+// The keyboard's whole shared pool (D-F14: a 12 KiB VIA region).
+#define TEST_MACRO_BUFFER_SIZE 10327
 
 static const char *const test_long_delay_heavy_payload = "h{829}e{627}y{665} {249}h{158}a{167}l{424}o{386} {448}h{144}o{111}e{103} {118}i{123}s{118} {125}h{132}e{134}t{158} {133}m{118}e{493}t{156} {503}y{503}u{10}o{695} {382}h{113}e{212}b{149}b{83}e{155}n{60} {102}e{65}w{164} {79} {152}h{109}i{79}e{129}r{146} {143}e{176}e{104}n{98} {148}p{124}r{119}o{165}b{126}l{130}e{172}e{104}m{1032}{+KC_LSFT}{189};{140}{-KC_LSFT}";
 
@@ -660,12 +661,41 @@ static void test_busy_via_trigger_is_consumed_without_restarting(void) {
     CHECK(test_calls[1].value == KC_A);
 }
 
+// A full pool: macros 0..126 fill it and macro 127, the last slot, ends at the
+// pool's last bytes. Starting it walks the pool once to find it; the read
+// count is that cost, which the hardware acceptance times.
+static void test_last_slot_starts_on_a_full_pool(void) {
+    const uint16_t filler = (uint16_t)((TEST_MACRO_BUFFER_SIZE - 3u - 127u) / 127u);
+    uint16_t       offset = 0;
+
+    test_reset_state();
+    for (uint8_t slot = 0; slot < 127; slot++) {
+        for (uint16_t i = 0; i < filler; i++) macro_buffer[offset + i] = 'a';
+        offset = (uint16_t)(offset + filler);
+        macro_buffer[offset++] = 0;
+    }
+    macro_buffer[offset++] = SS_QMK_PREFIX;
+    macro_buffer[offset++] = SS_TAP_CODE;
+    macro_buffer[offset++] = KC_Z;
+    CHECK(offset <= TEST_MACRO_BUFFER_SIZE - 1u && macro_buffer[TEST_MACRO_BUFFER_SIZE - 1u] == 0);
+
+    macro_buffer_read_count = 0;
+    noah_action_tap(QK_MACRO_0 + 127);
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 2);
+    CHECK(test_calls[0].kind == TEST_CALL_OWNED_REGISTER && test_calls[0].value == KC_Z);
+    CHECK(test_calls[1].kind == TEST_CALL_OWNED_UNREGISTER && test_calls[1].value == KC_Z);
+    printf("macro 127 on a full %u-byte pool: %u pool reads to find and play it\n", (unsigned)TEST_MACRO_BUFFER_SIZE, (unsigned)macro_buffer_read_count);
+    CHECK(macro_buffer_read_count <= TEST_MACRO_BUFFER_SIZE + 16u);
+}
+
 int main(void) {
     test_qmk_tap_command_uses_scan_driven_owned_lease();
     test_qmk_down_and_up_commands_use_owned_register_and_unregister();
     test_delay_command_matches_upstream_parsing();
     test_plain_text_uses_scan_driven_ascii_leases();
     test_macro_slot_lookup_skips_null_terminated_entries();
+    test_last_slot_starts_on_a_full_pool();
     test_slot_six_authored_alt_gui_8_chord_uses_owned_keycode_lifecycle();
     test_slot_six_long_delay_heavy_payload_replays_from_via_buffer();
     test_out_of_range_macro_slot_is_ignored();

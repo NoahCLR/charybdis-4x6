@@ -1,5 +1,6 @@
 #include "effective_settings_runtime.h"
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
+#    include "../schema/profile_settings_defaults.h"
 static uint8_t                          settings[NOAH_SETTINGS_MAX_SIZE];
 static uint16_t                         settings_length;
 static bool                             booting;
@@ -17,6 +18,13 @@ uint32_t noah_setting(uint8_t id, uint32_t fallback) {
     if (!settings_length || id >= NOAH_SETTINGS_COUNT) return fallback;
     const uint8_t *p = &settings[8 + id * 4];
     return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
+}
+// One byte of a layer's fixed record (its combo reference layer or one of its
+// placement bitmaps). Before any settings are live, the compiled defaults.
+uint8_t noah_setting_layer_record(uint8_t layer, uint8_t field) {
+    if (layer >= NOAH_SETTINGS_LAYERS || field >= NOAH_SETTINGS_LAYER_RECORD_SIZE) return 0u;
+    uint16_t offset = (uint16_t)(NOAH_SETTINGS_LAYER_RECORDS_OFFSET + layer * NOAH_SETTINGS_LAYER_RECORD_SIZE + field);
+    return settings_length ? settings[offset] : noah_profile_settings_defaults_byte(offset);
 }
 // The whole current settings domain stays cached for name readback.
 uint16_t noah_effective_settings_length(void) {

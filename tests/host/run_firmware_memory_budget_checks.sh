@@ -27,13 +27,17 @@ fi
 # Keep the old artifact policy intact; select the reviewed increments only from
 # this artifact's recorded compiler flags (never its target name): 3 KiB for
 # the eight-slot PD profile, then 4 KiB for 32 slots (the 32-slot mode cache and
-# 32-bit mode masks). Both are policy, not capacity. See
+# 32-bit mode masks). D-F14 then mirrors 140 KiB of logical EEPROM instead
+# of 18 KiB, 124,928 more cache bytes, and its capacities (128 combos of
+# sixteen inputs, the behaviour row index, 272 names, 128-byte pointing
+# records) another 20 KiB over the 17,400 bytes they linked at. All are
+# policy, not capacity. See
 # docs/architecture/memory-budgets.md for linked accounting and the
 # outstanding physical high-water release gate.
 STATIC_RAM_POLICY=57344
 CFLAGS_FILE="$QMK_ROOT/.build/obj_$TARGET/cflags.txt"
 if [ -f "$CFLAGS_FILE" ] && grep -Eq '(^|[[:space:]])-DNOAH_PD_PROFILE_ENABLE([[:space:]]|$)' "$CFLAGS_FILE"; then
-    STATIC_RAM_POLICY=$((60416 + 4096))
+    STATIC_RAM_POLICY=$((60416 + 4096 + 124928 + 20480))
 fi
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \

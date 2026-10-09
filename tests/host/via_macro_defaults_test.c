@@ -15,7 +15,7 @@ void via_init_kb(void);
 bool via_command_kb(uint8_t *data, uint8_t length);
 
 enum {
-    TEST_MACRO_BUFFER_CAPACITY = 128,
+    TEST_MACRO_BUFFER_CAPACITY = 256,
 };
 
 static uint8_t  macro_buffer[TEST_MACRO_BUFFER_CAPACITY];
@@ -247,6 +247,29 @@ static void test_eeprom_init_seeds_defaults_immediately(void) {
     CHECK(noah_via_macro_defaults_last_seed_succeeded());
 }
 
+// The shared pool holds every slot's terminator: "AB", the encoded {KC_C} and
+// 128 terminators fit exactly, and one byte less does not.
+static void test_seed_needs_every_terminator(void) {
+    uint16_t needed = 0;
+
+    test_reset_state();
+    noah_via_macro_defaults_eeconfig_init();
+    CHECK(noah_via_macro_defaults_last_seed_succeeded());
+    for (uint16_t slot = 0, offset = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
+        while (macro_buffer[offset]) offset++;
+        needed = (uint16_t)++offset;
+    }
+    CHECK(needed >= VIA_MACRO_SLOT_COUNT + 2u);
+    test_reset_state();
+    fake_macro_buffer_capacity = needed;
+    noah_via_macro_defaults_eeconfig_init();
+    CHECK(noah_via_macro_defaults_last_seed_succeeded());
+    test_reset_state();
+    fake_macro_buffer_capacity = (uint16_t)(needed - 1u);
+    noah_via_macro_defaults_eeconfig_init();
+    CHECK(!noah_via_macro_defaults_last_seed_succeeded());
+}
+
 static void test_eeprom_init_reports_seed_failure(void) {
     test_reset_state();
     fake_macro_buffer_capacity = 0u;
@@ -422,6 +445,7 @@ static void test_provider_encode_write_reloads_after_invalidate(void) {
 int main(void) {
     test_post_init_seeds_defaults_when_via_eeprom_is_invalid();
     test_eeprom_init_seeds_defaults_immediately();
+    test_seed_needs_every_terminator();
     test_eeprom_init_reports_seed_failure();
     test_recovery_reseed_reports_completion_without_rgb_side_effect();
     test_macro_reset_command_defers_reseed_to_matrix_scan();
