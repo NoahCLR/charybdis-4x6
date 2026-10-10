@@ -5,6 +5,7 @@
 #include "../behavior/handled_key.h"
 #include "../behavior/key_behavior_lookup.h"
 #include "../behavior/participation.h"
+#include "api.h"
 #include "deferred_release.h"
 #include "process_internal.h"
 #include "trace.h"
@@ -396,6 +397,12 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.type == KEY_EVENT && key_origin_keypos_valid(record->event.key)) {
+        if (noah_key_runtime_settle_layer_taps_before_press(record)) {
+            // This press ended a released key's pending layer tap, which has
+            // just changed the layers: resolve it again, as QMK's later
+            // lookups (combos, tapping, processing) will.
+            keycode = get_record_keycode(record, true);
+        }
         // The press's participation, captured against the layer QMK just
         // resolved its keycode from, before tapping or combos see it. A press
         // that waits is settled again when it is delivered.

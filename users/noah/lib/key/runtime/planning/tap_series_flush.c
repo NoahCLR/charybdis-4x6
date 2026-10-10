@@ -166,6 +166,48 @@ void key_runtime_core_flush_foreign_dual_role_multi_tap(uint16_t keycode, keypos
     key_runtime_core_flush_foreign_series(keycode, key_pos, true, plan);
 }
 
+// The next physical press ends a released key's multi-tap window. A pending
+// tap that changes layers (a layer lock) is settled before that press is
+// resolved, so the press lands on the layers the tap leaves on. A series whose
+// key is down again, or whose next press is still queued, keeps waiting.
+// With no plan it only answers whether such a tap is pending, without looking
+// any behaviour up.
+bool key_runtime_core_flush_foreign_layer_multi_tap(keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
+    key_runtime_core_state_t *state   = key_runtime_core_state();
+    bool                      flushed = false;
+
+    if (!(state && state->tap_series_count)) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_TAP_SERIES_CAPACITY; index++) {
+        tap_series_t        *series = &state->tap_series[index];
+        const press_token_t *owner;
+        keypos_t             series_key_pos;
+        uint16_t             action;
+
+        series_key_pos = key_runtime_core_tap_series_flush_keypos_from_index(index);
+        if (!(series->active && !key_runtime_core_tap_series_flush_keypos_equal(series_key_pos, key_pos))) {
+            continue;
+        }
+        if (!(key_runtime_core_pending_multi_tap_flush_resolution(series, &action, NULL) && noah_action_desc_is_layer_action(noah_action_describe(action)))) {
+            continue;
+        }
+
+        owner = key_runtime_core_press_token_at(series_key_pos);
+        if ((owner && owner->active) || key_runtime_core_tap_series_pending_gesture(state, series)) {
+            continue;
+        }
+
+        if (!plan) {
+            return true;
+        }
+        key_runtime_core_tap_series_flush_plan_series(state, series, series_key_pos, plan);
+        flushed = true;
+    }
+    return flushed;
+}
+
 void key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 

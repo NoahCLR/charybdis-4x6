@@ -156,12 +156,18 @@ keys can keep independent series alive. An unhandled key can settle pending
 taps to preserve typing order, but cannot discard an on-time continuation
 already buffered in QMK. A tap/hold key's series (an authored `LT()`, `MT()` or
 `OSM()` row) is settled by any other key's press, so its tap is typed first.
+A pending tap that changes layers, such as a thumb key's tap that locks a
+layer, is settled by the press of a key without a behaviour before that key is
+resolved: tap the thumb, press `J` at once, and the lock comes first and `J`
+types on the locked layer, without waiting for the multi-tap window to close.
 
 ### Keys pressed while a tap/hold key is undecided
 
-While a runtime-owned tap/hold key (an authored `LT()`, `MT()` or `OSM()` row) is
-down and has not reached its hold, keys pressed after it wait, as QMK's tapping
-engine holds keys behind a tapping key:
+While a runtime-owned tap/hold key is down and has not reached its hold, keys
+pressed after it wait, as QMK's tapping engine holds keys behind a tapping key.
+That is an authored `LT()`, `MT()` or `OSM()` row, or an authored key whose
+hold is a layer held until release (`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`, the
+hold whose layer preview lights while it decides), at the tap count it is on:
 
 - released before the tap-hold term, it is a tap: its tap is typed, then the
   waiting keys, so rolling `/` into `,` types `/,`;
@@ -173,7 +179,8 @@ engine holds keys behind a tapping key:
 Waiting keys replay in order with their physical timestamps. The release of a
 key pressed before the tap/hold key is not held back, as in QMK. The wait is at
 most the tap-hold term; a fast roll gains no delay beyond the tap/hold key's
-release. `MO()`, `TT()`, `OSL()`, `LM()` and plain keys do not hold keys back.
+release. Plain `MO()`, `TT()`, `OSL()`, `LM()` keys and plain keys do not hold
+keys back; they act on their press.
 
 The waiting queue is bounded (eight records by default). If a record that must
 wait arrives at capacity, the oldest waiting record runs immediately and the

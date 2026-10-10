@@ -416,6 +416,10 @@ bool                           key_runtime_core_take_intercepted_release(keypos_
 void                           key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_foreign_dual_role_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
+// Settles other keys' pending layer-changing taps before key_pos's press is
+// resolved; true if any was settled. A NULL plan only asks whether one is
+// pending.
+bool                           key_runtime_core_flush_foreign_layer_multi_tap(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_multi_tap(key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 bool                           key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);

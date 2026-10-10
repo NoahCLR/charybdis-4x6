@@ -456,6 +456,11 @@ The fork's `process_record_admit_user()` offers every record at the top of
 so a held record is processed once, on replay. `noah_matrix_scan_user` runs the
 replay after the key runtime scan, so a hold reached that scan applies first;
 `key_runtime_core_undecided_dual_role_key_pos()` is the only decision it reads.
+It counts LT/MT/OSM rows and keys whose hold is a layer held until release
+(the token's hold preview layer). Before a press is resolved, physically or
+on replay, `noah_key_runtime_settle_layer_taps_before_press()` settles other
+keys' pending layer-changing taps when the press is of a key without a
+behaviour; it costs no lookup unless such a tap is pending.
 At capacity (eight records by default), capture removes and replays exactly the
 oldest held record through `process_record()` before appending the incoming
 record. This bounded overload path may deliver that oldest record before an
