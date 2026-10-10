@@ -1044,7 +1044,7 @@ Client follow-up: Ark vendors the fixture, offers the layout in Settings →
 Host behind bit 22, checks macro text against the chosen layout, and labels
 keys as that layout prints them; pin the landed firmware.
 
-## D-F17 — Per-macro protection ignores new physical presses
+## D-F17 — Per-macro protection isolates keyboard output
 
 VIA macros may override automatic input protection through an optional prefix,
 advertised by feature bit 23. Automatic protects a macro needing Unicode entry
@@ -1052,9 +1052,14 @@ under the layout latched at playback start; native accents remain interruptible.
 Explicit On and Off travel with the macro bank, independently of its text/name.
 Ignored matrix presses remain ignored until released, including after playback
 ends. Earlier releases and synthetic macro output are admitted. Cancellation,
-failure and reset still clean up owned keys. Protection is a physical-key
-admission policy, not a host input lock or delayed typing queue. The canonical
-encoding and scope are governed by [runtime flow](architecture/runtime-flow.md).
+failure and reset still clean up owned keys. Feature bit 26 extends protection
+to immediate keyboard-output isolation: a disposable report contains only macro
+keyboard output, while live ownership processes releases. Already-held ordinary
+keys stop repeating and remain suppressed until release; current held modifiers
+resume after cleanup. There is no waiting for the user and no replay of ignored
+presses. Pointing, consumer/system reports and other keyboards remain outside
+this scope. The canonical encoding and lifecycle are governed by
+[runtime flow](architecture/runtime-flow.md).
 
 Client follow-up: expose Automatic/On/Off per macro, explain ignored typing,
 preserve policies in edits and backups, show stored and layout-derived changes

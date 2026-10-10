@@ -8,8 +8,8 @@
 #include "../profile/runtime/effective_settings_runtime.h"
 #include "../compat/qmk_host.h"
 
-#if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(NOAH_HOST_QMK_STUB) && !defined(QMK_REPORT_MODS_OVERRIDE)
-#    error "Unicode macro playback requires the QMK report modifier override contract"
+#if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(NOAH_HOST_QMK_STUB) && (!defined(QMK_REPORT_MODS_OVERRIDE) || !defined(QMK_REPORT_KEYS_FILTER))
+#    error "Unicode macro playback requires the QMK report modifier override and key filter contracts"
 #endif
 
 typedef struct {
@@ -84,12 +84,101 @@ typedef struct {
 static macro_payload_engine_t         macro_payload_engine;
 static macro_payload_debug_snapshot_t macro_payload_diagnostics;
 
-// QMK applies this only to outgoing reports: live physical/managed/one-shot
-// ownership continues updating while a Unicode scalar is being entered.
+// Suppressed ordinary usages stay suppressed until their live owners release
+// them. They never acquire a new host press edge just because playback ended.
+static uint8_t macro_suppressed_keys[32];
+static bool    macro_capture_suppressed;
+
+static void macro_payload_lease_keys(const owned_keycode_lease_t *lease, uint8_t keys[32]) {
+    if (lease->active && lease->has_basic && IS_BASIC_KEYCODE(lease->basic)) keys[lease->basic / 8u] |= (uint8_t)(1u << (lease->basic % 8u));
+}
+
+static void macro_payload_output_keys(uint8_t keys[32]) {
+    for (uint8_t i = 0u; i < macro_payload_engine.holds.balance.count; i++)
+        macro_payload_lease_keys(&macro_payload_engine.holds.leases[i], keys);
+    for (uint8_t i = 0u; i < macro_payload_engine.transient_count; i++)
+        macro_payload_lease_keys(&macro_payload_engine.transient_leases[i], keys);
+}
+
+// QMK filters a copy: physical and managed ownership keeps processing releases.
+static void macro_payload_project_keys(uint8_t keys[32]) {
+    if (macro_capture_suppressed)
+        for (uint8_t i = 0u; i < 32u; i++)
+            macro_suppressed_keys[i] = keys[i];
+    if (macro_payload_engine_protected()) {
+        for (uint8_t i = 0u; i < 32u; i++)
+            keys[i] = 0u;
+        macro_payload_output_keys(keys);
+    } else {
+        for (uint8_t i = 0u; i < 32u; i++) {
+            macro_suppressed_keys[i] &= keys[i];
+            keys[i] &= (uint8_t)~macro_suppressed_keys[i];
+        }
+        // A later macro may reuse a usage whose physical owner is still
+        // suppressed. Its explicit output still gets an independent edge.
+        macro_payload_output_keys(keys);
+    }
+}
+
+static bool macro_payload_filter_needed(void) {
+    if (macro_payload_engine_protected() || macro_capture_suppressed) return true;
+    for (uint8_t i = 0u; i < sizeof(macro_suppressed_keys); i++)
+        if (macro_suppressed_keys[i]) return true;
+    return false;
+}
+
+void keyboard_report_keys_filter_user(report_keyboard_t *report) {
+    if (!macro_payload_filter_needed()) return;
+    uint8_t keys[32] = {0};
+    for (uint8_t i = 0u; i < sizeof(report->keys); i++)
+        keys[report->keys[i] / 8u] |= (uint8_t)(1u << (report->keys[i] % 8u));
+    keys[0] &= (uint8_t)~1u;
+    macro_payload_project_keys(keys);
+    uint8_t index = 0u;
+    for (uint16_t key = 1u; key < 256u && index < sizeof(report->keys); key++)
+        if (keys[key / 8u] & (1u << (key % 8u))) report->keys[index++] = (uint8_t)key;
+    while (index < sizeof(report->keys))
+        report->keys[index++] = 0u;
+}
+
+#ifdef NKRO_ENABLE
+void nkro_report_keys_filter_user(report_nkro_t *report) {
+    if (!macro_payload_filter_needed()) return;
+    uint8_t keys[32] = {0};
+    for (uint8_t i = 0u; i < sizeof(report->bits); i++)
+        keys[i] = report->bits[i];
+    macro_payload_project_keys(keys);
+    for (uint8_t i = 0u; i < sizeof(report->bits); i++)
+        report->bits[i] = keys[i];
+}
+#endif
+
 bool keyboard_report_mods_override_user(uint8_t *mods) {
-    if (!macro_payload_engine.unicode_active) return false;
-    *mods = macro_payload_engine.unicode_mods;
+    if (macro_payload_engine.unicode_active) {
+        *mods = macro_payload_engine.unicode_mods;
+        return true;
+    }
+    if (!macro_payload_engine_protected()) return false;
+    *mods = 0u;
+    for (uint8_t i = 0u; i < macro_payload_engine.holds.balance.count; i++)
+        *mods |= macro_payload_engine.holds.leases[i].mods;
+    for (uint8_t i = 0u; i < macro_payload_engine.transient_count; i++)
+        *mods |= macro_payload_engine.transient_leases[i].mods;
     return true;
+}
+
+static bool macro_payload_key_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
+    bool ok = owned_keycode_acquire(keycode, lease);
+    // A colliding live usage may not change the ledger's aggregate report.
+    // The macro's own lease still changes its projected output.
+    if (macro_payload_filter_needed()) send_keyboard_report();
+    return ok;
+}
+
+static bool macro_payload_key_release(owned_keycode_lease_t *lease) {
+    bool ok = owned_keycode_release(lease);
+    if (macro_payload_filter_needed()) send_keyboard_report();
+    return ok;
 }
 
 __attribute__((weak)) uint32_t macro_payload_host_setting(void) {
@@ -258,14 +347,16 @@ static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, const macro
         }
         uint16_t strokes[2];
         if (step.opcode == MACRO_PAYLOAD_IR_OP_TEXT) {
-            for (uint8_t i = 0u; i < step.length; i++) if (!host_layout_lookup(host->layout, step.bytes[i], strokes)) return false;
+            for (uint8_t i = 0u; i < step.length; i++)
+                if (!host_layout_lookup(host->layout, step.bytes[i], strokes)) return false;
         }
         // A scalar the layout cannot type needs Unicode entry, which an
         // ordinary key held across it would corrupt.
         if (step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE && !host_layout_lookup(host->layout, step.value, strokes)) {
             *needs_unicode = true;
             if (host->unicode_mode < 1u || host->unicode_mode > 3u) return false;
-            for (uint8_t i = 0u; i < balance.count; i++) if (balance.keycodes[i] < KC_LEFT_CTRL) return false;
+            for (uint8_t i = 0u; i < balance.count; i++)
+                if (balance.keycodes[i] < KC_LEFT_CTRL) return false;
         }
         if (step.opcode == MACRO_PAYLOAD_IR_OP_KEY_DOWN && !macro_payload_hold_balance_note_down(&balance, (uint8_t)step.value)) {
             return false;
@@ -284,7 +375,7 @@ static bool macro_payload_owned_holds_acquire(macro_payload_owned_holds_t *holds
         return false;
     }
     index = (uint8_t)(holds->balance.count - 1u);
-    if (!owned_keycode_acquire(keycode, &holds->leases[index])) {
+    if (!macro_payload_key_acquire(keycode, &holds->leases[index])) {
         holds->balance.count--;
         return false;
     }
@@ -299,7 +390,7 @@ static bool macro_payload_owned_holds_release(macro_payload_owned_holds_t *holds
     if (!holds || (index = macro_payload_hold_balance_find(&holds->balance, keycode)) < 0) {
         return false;
     }
-    released = owned_keycode_release(&holds->leases[index]);
+    released = macro_payload_key_release(&holds->leases[index]);
     for (uint8_t i = (uint8_t)index; i + 1u < holds->balance.count; i++) {
         holds->balance.keycodes[i] = holds->balance.keycodes[i + 1u];
         holds->leases[i]           = holds->leases[i + 1u];
@@ -347,7 +438,16 @@ static void macro_payload_finish(macro_payload_finish_result_t result) {
             break;
     }
 
-    macro_payload_engine = (macro_payload_engine_t){0};
+    if (macro_payload_engine_protected()) {
+        // Cleanup has released every macro lease. Capture only remaining live
+        // ordinary usages, send the final neutral output, then restore live mods.
+        macro_capture_suppressed = true;
+        send_keyboard_report();
+        macro_capture_suppressed = false;
+        macro_payload_engine     = (macro_payload_engine_t){0};
+        send_keyboard_report();
+    } else
+        macro_payload_engine = (macro_payload_engine_t){0};
     if (finish) {
         finish(result, finish_context);
     }
@@ -359,11 +459,11 @@ static bool macro_payload_transient_acquire(const uint8_t *keycodes, uint8_t cou
     }
 
     for (uint8_t index = 0; index < count; index++) {
-        if (!owned_keycode_acquire(keycodes[index], &macro_payload_engine.transient_leases[index])) {
+        macro_payload_engine.transient_count = (uint8_t)(index + 1u);
+        if (!macro_payload_key_acquire(keycodes[index], &macro_payload_engine.transient_leases[index])) {
             macro_payload_engine.transient_count = index;
             return false;
         }
-        macro_payload_engine.transient_count++;
     }
     macro_payload_note_hold_high_water();
     return true;
@@ -399,7 +499,7 @@ static uint8_t macro_payload_stroke_keys(uint16_t stroke, uint8_t keys[3]) {
 // second stroke.
 static void macro_payload_start_strokes(const uint16_t strokes[2], uint32_t now, macro_payload_phase_t next) {
     uint8_t keys[3];
-    uint8_t count = macro_payload_stroke_keys(strokes[0], keys);
+    uint8_t count                      = macro_payload_stroke_keys(strokes[0], keys);
     macro_payload_engine.second_stroke = strokes[1];
     macro_payload_engine.stroke_next   = next;
     macro_payload_start_transient(keys, count, now, macro_payload_engine.text_interval, macro_payload_engine.text_interval, strokes[1] ? MACRO_PAYLOAD_PHASE_SECOND_STROKE : next);
@@ -407,7 +507,7 @@ static void macro_payload_start_strokes(const uint16_t strokes[2], uint32_t now,
 
 static void macro_payload_start_second_stroke(uint32_t now) {
     uint8_t keys[3];
-    uint8_t count = macro_payload_stroke_keys(macro_payload_engine.second_stroke, keys);
+    uint8_t count                      = macro_payload_stroke_keys(macro_payload_engine.second_stroke, keys);
     macro_payload_engine.second_stroke = 0u;
     macro_payload_start_transient(keys, count, now, TAP_CODE_DELAY, macro_payload_engine.text_interval, macro_payload_engine.stroke_next);
 }
@@ -416,7 +516,7 @@ static void macro_payload_start_second_stroke(uint32_t now) {
 
 static void macro_payload_unicode_add_tap(uint8_t key, uint8_t mods) {
     macro_payload_unicode_tap_t *tap = &macro_payload_engine.unicode_taps[macro_payload_engine.unicode_count++];
-    *tap = (macro_payload_unicode_tap_t){.keys = {key}, .count = 1u, .mods = mods};
+    *tap                             = (macro_payload_unicode_tap_t){.keys = {key}, .count = 1u, .mods = mods};
 }
 
 // An entry character typed through the layout; its Shift or AltGr joins the
@@ -431,25 +531,30 @@ static void macro_payload_unicode_add_char(char c, uint8_t mods) {
 
 static void macro_payload_unicode_add_hex(uint32_t value, uint8_t digits, uint8_t mods) {
     static const char hex[] = "0123456789abcdef";
-    for (uint8_t i = digits; i > 0u; i--) macro_payload_unicode_add_char(hex[(value >> ((i - 1u) * 4u)) & 15u], mods);
+    for (uint8_t i = digits; i > 0u; i--)
+        macro_payload_unicode_add_char(hex[(value >> ((i - 1u) * 4u)) & 15u], mods);
 }
 
 static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_payload_phase_t next) {
     uint8_t mode = macro_payload_engine.unicode_mode;
-    if (mode < 1u || mode > 3u) {macro_payload_begin_runtime_error(); return;}
-    macro_payload_engine.unicode_count = 0u;
-    macro_payload_engine.unicode_index = 0u;
-    macro_payload_engine.unicode_next = next;
-    macro_payload_engine.unicode_cancel_sent = false;
+    if (mode < 1u || mode > 3u) {
+        macro_payload_begin_runtime_error();
+        return;
+    }
+    macro_payload_engine.unicode_count        = 0u;
+    macro_payload_engine.unicode_index        = 0u;
+    macro_payload_engine.unicode_next         = next;
+    macro_payload_engine.unicode_cancel_sent  = false;
     macro_payload_engine.unicode_neutral_sent = false;
-    bool caps = mode == 3u && macro_payload_unicode_caps_lock();
+    bool caps                                 = mode == 3u && macro_payload_unicode_caps_lock();
     if (caps) macro_payload_unicode_add_tap(KC_CAPS_LOCK, 0u);
     if (mode == 1u) {
         if (scalar > 0xFFFFu) {
             scalar -= 0x10000u;
             macro_payload_unicode_add_hex(0xD800u | (scalar >> 10u), 4u, MOD_BIT(KC_LEFT_ALT));
             macro_payload_unicode_add_hex(0xDC00u | (scalar & 0x3FFu), 4u, MOD_BIT(KC_LEFT_ALT));
-        } else macro_payload_unicode_add_hex(scalar, 4u, MOD_BIT(KC_LEFT_ALT));
+        } else
+            macro_payload_unicode_add_hex(scalar, 4u, MOD_BIT(KC_LEFT_ALT));
     } else {
         if (mode == 2u) {
             macro_payload_unicode_add_tap(KC_RIGHT_ALT, MOD_BIT(KC_RIGHT_ALT));
@@ -458,7 +563,7 @@ static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_pay
             uint16_t strokes[2] = {0u, 0u};
             (void)host_layout_lookup(macro_payload_engine.layout, 'u', strokes);
             macro_payload_unicode_tap_t *tap = &macro_payload_engine.unicode_taps[macro_payload_engine.unicode_count++];
-            *tap = (macro_payload_unicode_tap_t){.keys = {KC_LEFT_CTRL, KC_LEFT_SHIFT, macro_payload_stroke_key(strokes[0])}, .count = 3u, .mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT)};
+            *tap                             = (macro_payload_unicode_tap_t){.keys = {KC_LEFT_CTRL, KC_LEFT_SHIFT, macro_payload_stroke_key(strokes[0])}, .count = 3u, .mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT)};
         }
         uint8_t digits = scalar > 0xFFFFFu ? 6u : scalar > 0xFFFFu ? 5u : 4u;
         // WinCompose treats an initial hex letter as a compose sequence.
@@ -468,11 +573,14 @@ static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_pay
     }
     if (caps) macro_payload_unicode_add_tap(KC_CAPS_LOCK, 0u);
     macro_payload_engine.unicode_active = true;
-    macro_payload_engine.unicode_mods = 0u;
+    macro_payload_engine.unicode_mods   = 0u;
     send_keyboard_report();
     if (mode == 1u) {
         macro_payload_engine.unicode_mods = MOD_BIT(KC_LEFT_ALT);
-        if (!owned_keycode_acquire(KC_LEFT_ALT, &macro_payload_engine.unicode_alt)) {macro_payload_begin_runtime_error(); return;}
+        if (!macro_payload_key_acquire(KC_LEFT_ALT, &macro_payload_engine.unicode_alt)) {
+            macro_payload_begin_runtime_error();
+            return;
+        }
         send_keyboard_report();
     }
     macro_payload_schedule_wait(now, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_UNICODE_PRESS);
@@ -483,7 +591,7 @@ static void macro_payload_unicode_press(uint32_t now) {
         macro_payload_engine.phase = MACRO_PAYLOAD_PHASE_UNICODE_FINISH;
         return;
     }
-    macro_payload_unicode_tap_t *tap = &macro_payload_engine.unicode_taps[macro_payload_engine.unicode_index++];
+    macro_payload_unicode_tap_t *tap  = &macro_payload_engine.unicode_taps[macro_payload_engine.unicode_index++];
     macro_payload_engine.unicode_mods = tap->mods;
     send_keyboard_report();
     macro_payload_start_transient(tap->keys, tap->count, now, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_UNICODE_PRESS);
@@ -491,9 +599,9 @@ static void macro_payload_unicode_press(uint32_t now) {
 }
 
 static void macro_payload_unicode_finish(uint32_t now) {
-    macro_payload_engine.unicode_mods = 0u;
+    macro_payload_engine.unicode_mods         = 0u;
     macro_payload_engine.unicode_neutral_sent = true;
-    if (macro_payload_engine.unicode_alt.active) (void)owned_keycode_release(&macro_payload_engine.unicode_alt);
+    if (macro_payload_engine.unicode_alt.active) (void)macro_payload_key_release(&macro_payload_engine.unicode_alt);
     send_keyboard_report();
     // A held physical Option must not hide the release committing macOS input.
     macro_payload_schedule_wait(now, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_UNICODE_RESTORE);
@@ -527,7 +635,7 @@ static void macro_payload_release_transients(uint32_t now) {
 
     while (macro_payload_engine.transient_count > 0u) {
         macro_payload_engine.transient_count--;
-        if (!owned_keycode_release(&macro_payload_engine.transient_leases[macro_payload_engine.transient_count])) {
+        if (!macro_payload_key_release(&macro_payload_engine.transient_leases[macro_payload_engine.transient_count])) {
             ok = false;
         }
     }
@@ -576,8 +684,10 @@ static void macro_payload_execute_ready(uint32_t now) {
             break;
         case MACRO_PAYLOAD_IR_OP_UNICODE: {
             uint16_t strokes[2];
-            if (host_layout_lookup(macro_payload_engine.layout, step.value, strokes)) macro_payload_start_strokes(strokes, now, MACRO_PAYLOAD_PHASE_READY);
-            else macro_payload_start_unicode(step.value, now, MACRO_PAYLOAD_PHASE_READY);
+            if (host_layout_lookup(macro_payload_engine.layout, step.value, strokes))
+                macro_payload_start_strokes(strokes, now, MACRO_PAYLOAD_PHASE_READY);
+            else
+                macro_payload_start_unicode(step.value, now, MACRO_PAYLOAD_PHASE_READY);
             break;
         }
         case MACRO_PAYLOAD_IR_OP_DELAY:
@@ -611,30 +721,30 @@ static void macro_payload_execute_ready(uint32_t now) {
 static void macro_payload_cleanup_one(void) {
     if (macro_payload_engine.transient_count > 0u) {
         macro_payload_engine.transient_count--;
-        (void)owned_keycode_release(&macro_payload_engine.transient_leases[macro_payload_engine.transient_count]);
+        (void)macro_payload_key_release(&macro_payload_engine.transient_leases[macro_payload_engine.transient_count]);
         return;
     }
     if (macro_payload_engine.unicode_active) {
         if (!macro_payload_engine.unicode_cancel_sent && macro_payload_engine.unicode_mode != 1u) {
-            static const uint8_t escape[] = {KC_ESCAPE};
+            static const uint8_t escape[]            = {KC_ESCAPE};
             macro_payload_engine.unicode_cancel_sent = true;
-            macro_payload_engine.unicode_mods = 0u;
+            macro_payload_engine.unicode_mods        = 0u;
             send_keyboard_report();
             macro_payload_start_transient(escape, 1u, timer_read32(), MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_CLEANUP);
             return;
         }
         if (macro_payload_engine.unicode_caps_toggled) {
-            static const uint8_t caps[] = {KC_CAPS_LOCK};
+            static const uint8_t caps[]               = {KC_CAPS_LOCK};
             macro_payload_engine.unicode_caps_toggled = false;
-            macro_payload_engine.unicode_mods = 0u;
+            macro_payload_engine.unicode_mods         = 0u;
             send_keyboard_report();
             macro_payload_start_transient(caps, 1u, timer_read32(), MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_CLEANUP);
             return;
         }
         if (!macro_payload_engine.unicode_neutral_sent) {
             macro_payload_engine.unicode_neutral_sent = true;
-            macro_payload_engine.unicode_mods = 0u;
-            if (macro_payload_engine.unicode_alt.active) (void)owned_keycode_release(&macro_payload_engine.unicode_alt);
+            macro_payload_engine.unicode_mods         = 0u;
+            if (macro_payload_engine.unicode_alt.active) (void)macro_payload_key_release(&macro_payload_engine.unicode_alt);
             send_keyboard_report();
             macro_payload_schedule_wait(timer_read32(), MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_CLEANUP);
             return;
@@ -645,7 +755,7 @@ static void macro_payload_cleanup_one(void) {
     }
     if (macro_payload_engine.holds.balance.count > 0u) {
         macro_payload_engine.holds.balance.count--;
-        (void)owned_keycode_release(&macro_payload_engine.holds.leases[macro_payload_engine.holds.balance.count]);
+        (void)macro_payload_key_release(&macro_payload_engine.holds.leases[macro_payload_engine.holds.balance.count]);
         return;
     }
     macro_payload_finish(macro_payload_engine.terminal_result == MACRO_PAYLOAD_FINISH_NONE ? MACRO_PAYLOAD_FINISH_RUNTIME_ERROR : macro_payload_engine.terminal_result);
@@ -656,8 +766,8 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
         macro_payload_increment_u16(&macro_payload_diagnostics.busy_rejection_count);
         return MACRO_PAYLOAD_START_BUSY;
     }
-    const macro_payload_host_t host = macro_payload_host_resolve();
-    bool needs_unicode = false;
+    const macro_payload_host_t host          = macro_payload_host_resolve();
+    bool                       needs_unicode = false;
     if (!macro_payload_ir_preflight(ir, &host, &needs_unicode)) {
         return MACRO_PAYLOAD_START_INVALID;
     }
@@ -678,6 +788,10 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
         .finish         = finish,
         .finish_context = context,
     };
+    if (macro_payload_engine_protected()) {
+        send_keyboard_report();
+        macro_payload_schedule_wait(timer_read32(), MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_READY);
+    }
     macro_payload_diagnostics.last_finish   = MACRO_PAYLOAD_FINISH_NONE;
     macro_payload_diagnostics.active_source = source;
     macro_payload_diagnostics.active_slot   = slot;
@@ -756,6 +870,9 @@ void macro_payload_engine_init(void) {
     }
     macro_payload_engine      = (macro_payload_engine_t){0};
     macro_payload_diagnostics = (macro_payload_debug_snapshot_t){0};
+    for (uint8_t i = 0u; i < sizeof(macro_suppressed_keys); i++)
+        macro_suppressed_keys[i] = 0u;
+    macro_capture_suppressed = false;
 }
 
 void macro_payload_debug_snapshot(macro_payload_debug_snapshot_t *out) {

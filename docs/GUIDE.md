@@ -454,7 +454,15 @@ A macro with a character neither the layout nor Unicode entry can type does not
 play. Auto uses QMK's USB OS guess, which may be wrong through a KVM or switch;
 Unicode entry stays off until the OS is known or chosen. Unicode entry is slower
 than ordinary key taps, and the 512-byte compiled program limit still applies.
-Avoid typing or holding ordinary keys during playback. Cancellation can leave
-text already typed, including a partial macOS entry.
+Uninterruptible playback defaults on when Unicode entry is needed, and you can
+force it On or Off per macro in Ark. Protected playback starts immediately:
+already-held ordinary keys stop repeating, and only the macro's keyboard output
+reaches the computer until cleanup finishes. New presses are ignored, releases
+still update internal state, and modifiers still held resume afterward. Ordinary
+keys remaining held stay inactive until released and pressed again. Ignored
+presses are never replayed. Pointing, consumer/media actions and other keyboards
+remain outside this protection. With protection Off, avoid typing or holding
+ordinary keys during playback. Cancellation can leave text already typed,
+including a partial macOS entry.
 [QMK's Unicode guide](https://docs.qmk.fm/features/unicode) describes host
 setup. Physical acceptance of each layout on its own OS is still pending.

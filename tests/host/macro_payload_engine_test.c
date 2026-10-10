@@ -26,6 +26,8 @@ static uint8_t unicode_mode;
 static bool unicode_caps;
 static uint8_t live_mods, last_report_mods;
 static unsigned neutral_reports;
+static uint8_t external_keys[32], report_keys[32], managed_count[256];
+static unsigned host_presses[256];
 bool keyboard_report_mods_override_user(uint8_t *mods);
 // The host: unicode_mode names an OS with Unicode on and the US layout unless
 // layout_bits or host_os say otherwise.
@@ -72,6 +74,10 @@ static void test_reset(void) {
 
     macro_payload_debug_snapshot(&snapshot);
     CHECK(snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE);
+    memset(external_keys, 0, sizeof(external_keys));
+    memset(report_keys, 0, sizeof(report_keys));
+    memset(managed_count, 0, sizeof(managed_count));
+    memset(host_presses, 0, sizeof(host_presses));
     macro_payload_engine_init();
     unicode_mode = 0u;
     unicode_caps = false;
@@ -125,7 +131,9 @@ bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
     }
     CHECK(keycode <= UINT8_MAX);
     test_log_op(TEST_OP_ACQUIRE, (uint8_t)keycode);
-    *lease = (owned_keycode_lease_t){.active = true, .has_basic = true, .basic = (uint8_t)keycode};
+    bool modifier = keycode >= KC_LEFT_CTRL && keycode <= KC_RIGHT_GUI;
+    *lease = (owned_keycode_lease_t){.active = true, .has_basic = !modifier, .basic = (uint8_t)keycode, .mods = modifier ? MOD_BIT(keycode) : 0u};
+    if (++managed_count[keycode] == 1u && !(external_keys[keycode / 8u] & (1u << (keycode % 8u)))) send_keyboard_report();
     return true;
 }
 
@@ -133,7 +141,11 @@ bool owned_keycode_release(owned_keycode_lease_t *lease) {
     CHECK(lease != NULL);
     CHECK(lease->active);
     test_log_op(TEST_OP_RELEASE, lease->basic);
+    uint8_t keycode = lease->basic;
+    CHECK(managed_count[keycode] != 0u);
+    managed_count[keycode]--;
     *lease = (owned_keycode_lease_t){0};
+    if (managed_count[keycode] == 0u && !(external_keys[keycode / 8u] & (1u << (keycode % 8u)))) send_keyboard_report();
     return true;
 }
 
@@ -466,13 +478,85 @@ static void test_protection_is_latched_and_released(void) {
     CHECK(!macro_payload_engine_protected() && callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
 }
 
+static bool host_key_down(uint8_t key) { return (report_keys[key / 8u] & (1u << (key % 8u))) != 0u; }
+static void external_key(uint8_t key, bool pressed) {
+    if (pressed) external_keys[key / 8u] |= (uint8_t)(1u << (key % 8u));
+    else external_keys[key / 8u] &= (uint8_t)~(1u << (key % 8u));
+    send_keyboard_report();
+}
+
+static void test_protected_output_isolates_existing_keys_and_modifiers(void) {
+    const macro_payload_ir_t ir = {.protection = 1u, .length = 3u, .bytes = {MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'a'}};
+    for (unsigned release = 0u; release < 2u; release++) {
+        test_reset();
+        live_mods = MOD_BIT(KC_LEFT_SHIFT);
+        external_key(KC_A, true);
+        unsigned before = host_presses[KC_A];
+        CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+        CHECK(!host_key_down(KC_A) && last_report_mods == 0u);
+        CHECK(live_mods == MOD_BIT(KC_LEFT_SHIFT));
+        // A separate pending synthetic output must not leak into the report.
+        external_key(KC_B, true);
+        CHECK(!host_key_down(KC_B));
+        if (release) { external_key(KC_A, false); live_mods = 0u; send_keyboard_report(); }
+        test_unicode_drain();
+        CHECK(host_presses[KC_A] == before + 1u); // A real macro edge despite collision.
+        CHECK(!host_key_down(KC_A) && !host_key_down(KC_B));
+        CHECK(last_report_mods == (release ? 0u : MOD_BIT(KC_LEFT_SHIFT)));
+        send_keyboard_report(); CHECK(!host_key_down(KC_A) && !host_key_down(KC_B));
+        macro_payload_ir_t later = ir; later.protection = 2u;
+        CHECK(macro_payload_start_ir(&later, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+        test_unicode_drain();
+        CHECK(host_presses[KC_A] == before + 2u && !host_key_down(KC_A));
+        external_key(KC_A, false); external_key(KC_B, false);
+        external_key(KC_A, true); CHECK(host_key_down(KC_A));
+    }
+    // Macro modifiers still qualify macro text while external modifiers do not.
+    test_reset(); live_mods = MOD_BIT(KC_LEFT_CTRL);
+    const macro_payload_ir_t shifted = {.protection = 1u, .length = 7u, .bytes = {MACRO_PAYLOAD_IR_OP_KEY_DOWN, KC_LEFT_SHIFT, MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'a', MACRO_PAYLOAD_IR_OP_KEY_UP, KC_LEFT_SHIFT}};
+    CHECK(macro_payload_start_ir(&shifted, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+    for (unsigned i = 0; i < 40u && !host_key_down(KC_A); i++) test_scan_after(10u);
+    CHECK(host_key_down(KC_A) && last_report_mods == MOD_BIT(KC_LEFT_SHIFT));
+    test_unicode_drain(); CHECK(last_report_mods == MOD_BIT(KC_LEFT_CTRL));
+}
+
+static void test_protected_unicode_cancellation_never_replays_existing_keys(void) {
+    const macro_payload_ir_t ir = {.length = 4u, .bytes = {MACRO_PAYLOAD_IR_OP_UNICODE, 0x42, 0xF6, 1}};
+    for (uint8_t mode = 1u; mode <= 3u; mode++) for (unsigned cutoff = 0u; cutoff < 100u; cutoff++) {
+        test_reset(); unicode_mode = mode;
+        live_mods = MOD_BIT(KC_LEFT_SHIFT);
+        external_key(KC_A, true);
+        CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, NULL, NULL) == MACRO_PAYLOAD_START_STARTED);
+        CHECK(!host_key_down(KC_A));
+        for (unsigned i = 0u; i < cutoff; i++) test_scan_after(10u);
+        if (cutoff % 2u) { live_mods = 0u; external_key(KC_A, false); }
+        macro_payload_engine_cancel(); test_unicode_drain();
+        CHECK(!host_key_down(KC_A));
+        CHECK(last_report_mods == (cutoff % 2u ? 0u : MOD_BIT(KC_LEFT_SHIFT)));
+        for (uint16_t key = 0u; key < 256u; key++) CHECK(managed_count[key] == 0u);
+    }
+    test_reset();
+    const macro_payload_ir_t fail = {.protection = 1u, .length = 3u, .bytes = {MACRO_PAYLOAD_IR_OP_TAP_LIST, 1u, KC_B}};
+    external_key(KC_A, true); fail_acquire_keycode = KC_B;
+    CHECK(macro_payload_start_ir(&fail, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
+    test_unicode_drain();
+    CHECK(callback_result == MACRO_PAYLOAD_FINISH_RUNTIME_ERROR && !host_key_down(KC_A));
+    external_key(KC_A, false); external_key(KC_A, true); CHECK(host_key_down(KC_A));
+}
+
 int main(void) {
+    test_protected_output_isolates_existing_keys_and_modifiers();
+    test_protected_unicode_cancellation_never_replays_existing_keys();
     test_protection_is_latched_and_released();
     test_unicode_restores_current_modifiers_after_neutral_commit();
     test_unicode_sequences_and_cancellation();
     test_ascii_text_uses_keys_in_every_unicode_mode();
     test_text_types_through_the_host_layout();
     test_untypeable_text_is_refused_before_output();
+    memset(external_keys, 0, sizeof(external_keys));
+    memset(report_keys, 0, sizeof(report_keys));
+    memset(managed_count, 0, sizeof(managed_count));
+    memset(host_presses, 0, sizeof(host_presses));
     macro_payload_engine_init();
     test_long_delay_start_is_nonblocking_and_wrap_safe();
     test_text_uses_lease_backed_press_and_release_scans();
@@ -487,7 +571,23 @@ int main(void) {
 
 void send_keyboard_report(void) {
     uint8_t mods = live_mods;
+    for (uint16_t key = KC_LEFT_CTRL; key <= KC_RIGHT_GUI; key++) if (managed_count[key]) mods |= MOD_BIT(key);
     bool overridden = keyboard_report_mods_override_user(&mods);
     if (overridden && mods == 0u) neutral_reports++;
     last_report_mods = mods;
+    report_keyboard_t report = {0};
+    report_nkro_t nkro = {0};
+    uint8_t index = 0u;
+    for (uint16_t key = 1u; key < KC_LEFT_CTRL; key++) if (managed_count[key] || (external_keys[key / 8u] & (1u << (key % 8u)))) {
+        if (index < sizeof(report.keys)) report.keys[index++] = (uint8_t)key;
+        nkro.bits[key / 8u] |= (uint8_t)(1u << (key % 8u));
+    }
+    keyboard_report_keys_filter_user(&report);
+    nkro_report_keys_filter_user(&nkro);
+    uint8_t keys[32] = {0};
+    for (uint8_t i = 0u; i < sizeof(report.keys); i++) if (report.keys[i]) keys[report.keys[i] / 8u] |= (uint8_t)(1u << (report.keys[i] % 8u));
+    // Fixtures use <=6 simultaneous usages: both projections must agree.
+    CHECK(memcmp(keys, nkro.bits, sizeof(nkro.bits)) == 0);
+    for (uint16_t key = 1u; key < 256u; key++) if ((keys[key / 8u] & (1u << (key % 8u))) && !(report_keys[key / 8u] & (1u << (key % 8u)))) host_presses[key]++;
+    memcpy(report_keys, keys, sizeof(keys));
 }

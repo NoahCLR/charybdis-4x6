@@ -389,10 +389,10 @@ stale modifier snapshot. Every synthetic key retains an owner-scoped lease.
 Cancellation releases the retained leases; Linux/WinCompose send Escape and
 restore a toggled Caps Lock. macOS releases Option: a partial entry may already
 have produced text and cannot be rolled back. Cancelling cannot erase text
-already inserted. Release ordinary keys before playback and avoid concurrent
-typing or other synthetic actions: HID cannot interleave arbitrary input with
-an in-progress host Unicode entry. A usage already held by another owner
-cannot gain a new press edge; ownership never releases it to force one.
+already inserted. Unprotected playback can be affected by ordinary keys held
+before starting and concurrent input. In that mode a usage already held by
+another owner cannot gain a fresh press edge; ownership never releases it to
+force one. Protected playback isolates keyboard output as specified below.
 
 The selected layout must be the computer's active layout (on macOS, its
 active input source); the keyboard cannot check. For Unicode entry, host setup
@@ -421,8 +421,30 @@ whose presses preceded playback remain admitted; macro synthetic output remains
 admitted too. Reset clears the bitmap. Protection remains active through cleanup
 and ends on completion, cancellation or failure. It does not disable cleanup or
 reset, freeze pointing, or protect against input from another host device.
-Ordinary keys already held and pending synthetic actions can still affect host
-input; release ordinary keys before playback. There is no deferred typing queue.
+Feature bit 26 additionally advertises immediate keyboard-output isolation.
+At protected start an outgoing neutral report releases previously reported
+ordinary keys and masks live modifiers, followed by a nonblocking 10 ms settle.
+Playback reports contain only the macro's own leased keyboard usages and
+modifiers. Unicode entry still supplies its exact modifier byte. Both 6KRO and
+NKRO use disposable report copies before QMK change detection; live physical,
+managed, weak and one-shot ownership is unchanged. Hidden keys do not consume
+one-shot modifiers. A macro lease produces its own report transition even when
+the aggregate ledger already contains that usage, including when a physical
+release occurs during the macro's hold. Unrelated synthetic keyboard reports
+cannot leak into protected output.
+
+Releases continue updating live ownership during playback. After all macro
+leases are released, the engine captures the remaining live ordinary usages,
+sends neutral output, leaves protection and sends the current live modifiers.
+Remaining ordinary usages stay suppressed until their live owners release
+them; they are not reasserted at completion, cancellation or failure. A fresh
+press after release works normally. Subsequent macro output can reuse a
+suppressed usage without releasing another owner's state. Reset clears this
+suppression with the ordinary runtime reset. Pointing, consumer/system reports
+and another keyboard remain outside this keyboard-report protection; future
+scheduled actions after playback are not a deferred typing queue. Without bit
+26, bit 23 denotes the earlier press-admission protection only: ordinary keys
+already held can interfere and should be released before playback.
 
 Playback is scan-driven and single-active. Each logical slot stores one byte of
 unchecked/valid/invalid metadata. A valid slot is decoded into one shared IR

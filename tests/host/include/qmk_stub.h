@@ -297,3 +297,13 @@ uint16_t charybdis_get_pointer_sniping_dpi(void);
 void     charybdis_set_pointer_dragscroll_enabled(bool enabled);
 void     charybdis_set_pointer_sniping_enabled(bool enabled);
 void     pointing_device_set_cpi(uint16_t cpi);
+
+#ifndef QMK_REPORT_KEYS_FILTER
+#define QMK_REPORT_KEYS_FILTER 1
+#define KEYBOARD_REPORT_KEYS 6
+#define NKRO_REPORT_BITS 30
+typedef struct { uint8_t mods; uint8_t reserved; uint8_t keys[KEYBOARD_REPORT_KEYS]; } report_keyboard_t;
+typedef struct { uint8_t report_id; uint8_t mods; uint8_t bits[NKRO_REPORT_BITS]; } report_nkro_t;
+void keyboard_report_keys_filter_user(report_keyboard_t *report);
+void nkro_report_keys_filter_user(report_nkro_t *report);
+#endif

@@ -18,6 +18,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DNKRO_ENABLE \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$QMK_ROOT/platforms" \
     -I"$QMK_ROOT/quantum/send_string" \
@@ -35,6 +36,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -fsanitize=address,undefined \
     -fno-omit-frame-pointer \
+    -DNKRO_ENABLE \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$QMK_ROOT/platforms" \
     -I"$QMK_ROOT/quantum/send_string" \
