@@ -166,8 +166,8 @@ types on the locked layer, without waiting for the multi-tap window to close.
 While a runtime-owned tap/hold key is down and has not reached its hold, keys
 pressed after it wait, as QMK's tapping engine holds keys behind a tapping key.
 That is an authored `LT()`, `MT()` or `OSM()` row, or an authored key whose
-hold is a layer held until release (`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`, the
-hold whose layer preview lights while it decides), at the tap count it is on:
+hold is a layer held until release (`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`,
+previewed or not), at the tap count it is on:
 
 - released before the tap-hold term, it is a tap: its tap is typed, then the
   waiting keys, so rolling `/` into `,` types `/,`;
@@ -395,7 +395,9 @@ Shared semantics:
   resolves; the authored RGB config can disable those pulses or limit them to
   double-tap and higher branches
 - pending momentary-layer holds can preview the target layer's authored color
-  and LED groups before that layer actually commits
+  and LED groups before that layer actually commits, when every outcome of the
+  press lands on that layer (a thumb key whose tap locks the layer its hold
+  turns on); an authored `LT()` row, whose tap types a key, previews nothing
 - unresolved hold windows can show the hold color while the action is still
   pending
 - threshold-fired hold or longer-hold actions can pulse once when they fire

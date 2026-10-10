@@ -50,6 +50,7 @@ enum {
     TEST_TRANSPARENT_HOLD_KEY  = CUSTOM_KEY_0 + 0x1A,
     TEST_LONG_HOLD_ONLY_KEY    = CUSTOM_KEY_0 + 0x1B,
     TEST_SPLIT_TERM_TAP_KEY    = CUSTOM_KEY_0 + 0x1C,
+    TEST_LAYER_LOCK_HOLD_KEY   = CUSTOM_KEY_0 + 0x1D,
 };
 
 #define TEST_PROJECTION_FEEDBACK_MARKER UINT16_MAX
@@ -311,6 +312,14 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER | HANDLED_KEY_FLAG_LAYER_TAP;
         step = (key_behavior_step_t){
             .tap  = TAP_SENDS(KC_V),
+            .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(2)),
+        };
+        layer = 2;
+    } else if (keycode == TEST_LAYER_LOCK_HOLD_KEY) {
+        // A thumb-style key: its tap locks the layer its hold turns on.
+        flags |= HANDLED_KEY_FLAG_MOMENTARY_LAYER;
+        step = (key_behavior_step_t){
+            .tap  = TAP_SENDS(LOCK_LAYER(2)),
             .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(2)),
         };
         layer = 2;
@@ -1230,7 +1239,7 @@ static void test_display_preview_bridges_momentary_layer_handoff_briefly(void) {
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, true));
+    CHECK(!test_process_record(TEST_LAYER_LOCK_HOLD_KEY, key_pos, true));
     CHECK(noah_runtime_debug_preview_owner_slot_key_pos(&preview_pos));
     CHECK(test_keypos_equal(preview_pos, key_pos));
     CHECK(key_feedback_preview_layer() == 2u);
@@ -1256,7 +1265,7 @@ static void test_display_preview_bridge_clears_immediately_when_layer_releases(v
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, true));
+    CHECK(!test_process_record(TEST_LAYER_LOCK_HOLD_KEY, key_pos, true));
     CHECK(noah_runtime_debug_preview_owner_slot_key_pos(&preview_pos));
     CHECK(key_feedback_preview_layer() == 2u);
 
@@ -1266,10 +1275,39 @@ static void test_display_preview_bridge_clears_immediately_when_layer_releases(v
     CHECK(layer_state_cmp(layer_state, 2u));
     CHECK(key_feedback_preview_layer() == 2u);
 
-    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, false));
+    CHECK(!test_process_record(TEST_LAYER_LOCK_HOLD_KEY, key_pos, false));
     CHECK(!layer_state_cmp(layer_state, 2u));
     CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&preview_pos));
     CHECK(key_feedback_preview_layer() == UINT8_MAX);
+}
+
+// An LT-shaped key (tap V, hold MO(2)) previews nothing: its tap lands on no
+// layer, so its layer lights only when it turns on. Keys still wait for it.
+static void test_layer_tap_shaped_hold_shows_no_preview(void) {
+    keypos_t key_pos     = test_keypos(0, 0);
+    keypos_t preview_pos = (keypos_t){0};
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+
+    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, true));
+    CHECK(!noah_runtime_debug_preview_owner_slot_key_pos(&preview_pos));
+    CHECK(key_feedback_preview_layer() == UINT8_MAX);
+    CHECK(key_runtime_core_undecided_dual_role_key_pos(NULL));
+
+    fake_time = (uint16_t)(fake_time + CUSTOM_TAP_HOLD_TERM + 1u);
+    noah_key_runtime_scan();
+    CHECK(layer_state_cmp(layer_state, 2u));
+    CHECK(key_feedback_preview_layer() == UINT8_MAX);
+
+    CHECK(!test_process_record(TEST_INTERRUPTED_LAYER_KEY, key_pos, false));
+    CHECK(!layer_state_cmp(layer_state, 2u));
+
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    CHECK(!test_process_record(TEST_LAYER_LOCK_HOLD_KEY, key_pos, true));
+    CHECK(key_feedback_preview_layer() == 2u);
+    CHECK(key_runtime_core_undecided_dual_role_key_pos(NULL));
 }
 
 static void test_key_runtime_core_release_tracks_press_by_position_despite_keycode_mismatch(void) {
@@ -3473,6 +3511,7 @@ int main(void) {
     test_release_only_momentary_key_recovers_orphaned_layer_binding();
     test_display_preview_bridges_momentary_layer_handoff_briefly();
     test_display_preview_bridge_clears_immediately_when_layer_releases();
+    test_layer_tap_shaped_hold_shows_no_preview();
     test_key_runtime_core_release_tracks_press_by_position_despite_keycode_mismatch();
     test_key_runtime_core_timer_and_scan_do_not_rewrite_press_identity();
     test_key_runtime_core_active_release_resolution_preserves_tap_window_without_scan();

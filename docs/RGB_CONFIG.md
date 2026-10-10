@@ -457,6 +457,15 @@ selected layer through the normal layer base/group contract—including
 universal groups, inheritance, and later-row overrides—instead of using these
 feedback colors.
 
+A hold previews its layer only when every outcome of the press lands on that
+layer: the same tier's tap locks or goes to it, and any `.long_hold` does too.
+The thumb-style keys (tap `LOCK_LAYER(n)`, hold
+`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`) preview on every tier, so the preview
+also shows which tier a hold would give. An authored `LT()` row, or any key
+whose tap does something else, previews nothing: a quick tap would otherwise
+flash a layer that never turns on. Its layer lights when it actually turns
+on.
+
 The helper decides the RGB behavior shape:
 
 - `TAP_AT_HOLD_THRESHOLD(...)`: pulse once when that tier commits
@@ -473,8 +482,9 @@ not continue showing the lower-tier state after the runtime has already
 committed the higher-tier behavior.
 
 Held layer-switch actions are intentionally a special case: they get the short
-preview color before activation and the real layer color after activation, but
-they do not use the feedback overlay colors or trigger pulse. Once the layer
+preview color before activation where the preview applies (above) and the real
+layer color after activation, but they do not use the feedback overlay colors
+or trigger pulse. Once the layer
 is on, the layer color itself is the main feedback.
 
 The overlay is enabled by `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` in the active keymap
