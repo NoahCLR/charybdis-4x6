@@ -103,6 +103,8 @@ run_validation_variant() {
         "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
         "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+        "$ROOT/users/noah/lib/macro/host_layout.c" \
+        "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
         "$ROOT/users/noah/lib/macro/macro_slot_provider.c" \
         "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
         "$ROOT/users/noah/lib/rgb/core/rgb_validation.c" \

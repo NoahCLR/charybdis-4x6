@@ -267,6 +267,14 @@ int main(void) {
     }
     assert(!noah_profile_setting_v1_valid(27, 4, 16));
     assert(!noah_profile_setting_v1_valid(27, 0x200, 16));
+    // Bits 16..23 name a host layout and bit 24 marks a macOS ISO keyboard.
+    for (uint32_t layout = 0; layout < NOAH_HOST_LAYOUT_LIMIT; layout++)
+        assert(noah_profile_setting_v1_valid(27, NOAH_HOST_MACOS | NOAH_HOST_UNICODE_ENABLED | NOAH_HOST_MACOS_ISO | (layout << NOAH_HOST_LAYOUT_SHIFT), 16));
+    assert(!noah_profile_setting_v1_valid(27, (uint32_t)NOAH_HOST_LAYOUT_LIMIT << NOAH_HOST_LAYOUT_SHIFT, 16));
+    assert(!noah_profile_setting_v1_valid(27, UINT32_C(0xFF) << NOAH_HOST_LAYOUT_SHIFT, 16));
+    assert(!noah_profile_setting_v1_valid(27, UINT32_C(0x02000000), 16));
+    assert(!noah_profile_setting_v1_valid(27, UINT32_C(0x00008000), 16));
+    assert(noah_host_layout_id(UINT32_C(0x01090103)) == 9u);
     test_layer_records();
     test_names();
     test_publication();

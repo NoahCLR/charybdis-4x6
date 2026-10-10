@@ -13,8 +13,10 @@ any C and you don't reflash.
   Your changes go into a draft that you review before anything is saved, and
   Apply writes both halves and reads them back. You can export a whole profile
   to one file and import it again.
-- **Unicode text macros.** Accents, punctuation and emoji with a saved macOS,
-  Windows or Linux host setup; see the [guide](docs/GUIDE.md#unicode-text-macros).
+- **Text macros in your layout.** Macros type through your computer's keyboard
+  layout (US, Dutch, German, French, UK and more on macOS, Windows and Linux),
+  accents included, with Unicode entry for emoji; see the
+  [guide](docs/GUIDE.md#text-macros-and-your-keyboard-layout).
 - **Keys that do more than one thing.** Each key can do something different on
   tap, hold and longer hold, and again on double, triple or up to quintuple
   tap, each with its own timing. Combos can use the same behaviours.

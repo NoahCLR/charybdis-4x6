@@ -255,7 +255,7 @@ def render_tables(fixture: dict) -> str:
         lines.append("")
     lines.append("const host_layout_t host_layouts[] = {")
     for layout in fixture["layouts"]:
-        flags = "HOST_LAYOUT_FLAG_UNICODE_HEX_INPUT" if layout.get("unicodeHexInput") else "0u"
+        flags = " | ".join(name for name, on in (("HOST_LAYOUT_FLAG_UNICODE_HEX_INPUT", layout.get("unicodeHexInput")), ("HOST_LAYOUT_FLAG_MACOS", layout["os"] == "macos")) if on) or "0u"
         count = len(layout["chars"])
         lines.append(f"    {{.id = {layout['id']}u, .flags = {flags}, .count = {count}u, .chars = host_layout_{layout['id']}_chars}},")
     lines.append("};")

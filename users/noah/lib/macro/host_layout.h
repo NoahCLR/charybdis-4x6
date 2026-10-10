@@ -15,6 +15,8 @@
 
 // On this layout, Option enters hexadecimal Unicode; it types no characters.
 #define HOST_LAYOUT_FLAG_UNICODE_HEX_INPUT 0x01u
+// A macOS layout: an ISO-classified keyboard exchanges KC_GRV and KC_NUBS.
+#define HOST_LAYOUT_FLAG_MACOS 0x02u
 
 #define HOST_LAYOUT_US 0u
 
