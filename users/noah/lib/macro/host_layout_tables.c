@@ -4085,12 +4085,12 @@ static const host_layout_char_t host_layout_14_chars[] = {
 
 const host_layout_t host_layouts[] = {
     {.id = 0u, .flags = 0u, .count = 97u, .chars = host_layout_0_chars},
-    {.id = 1u, .flags = 0u, .count = 225u, .chars = host_layout_1_chars},
-    {.id = 2u, .flags = 0u, .count = 221u, .chars = host_layout_2_chars},
-    {.id = 3u, .flags = HOST_LAYOUT_FLAG_UNICODE_HEX_INPUT, .count = 99u, .chars = host_layout_3_chars},
-    {.id = 4u, .flags = 0u, .count = 221u, .chars = host_layout_4_chars},
-    {.id = 5u, .flags = 0u, .count = 225u, .chars = host_layout_5_chars},
-    {.id = 6u, .flags = 0u, .count = 215u, .chars = host_layout_6_chars},
+    {.id = 1u, .flags = HOST_LAYOUT_FLAG_MACOS, .count = 225u, .chars = host_layout_1_chars},
+    {.id = 2u, .flags = HOST_LAYOUT_FLAG_MACOS, .count = 221u, .chars = host_layout_2_chars},
+    {.id = 3u, .flags = HOST_LAYOUT_FLAG_UNICODE_HEX_INPUT | HOST_LAYOUT_FLAG_MACOS, .count = 99u, .chars = host_layout_3_chars},
+    {.id = 4u, .flags = HOST_LAYOUT_FLAG_MACOS, .count = 221u, .chars = host_layout_4_chars},
+    {.id = 5u, .flags = HOST_LAYOUT_FLAG_MACOS, .count = 225u, .chars = host_layout_5_chars},
+    {.id = 6u, .flags = HOST_LAYOUT_FLAG_MACOS, .count = 215u, .chars = host_layout_6_chars},
     {.id = 7u, .flags = 0u, .count = 188u, .chars = host_layout_7_chars},
     {.id = 8u, .flags = 0u, .count = 111u, .chars = host_layout_8_chars},
     {.id = 9u, .flags = 0u, .count = 143u, .chars = host_layout_9_chars},

@@ -422,24 +422,39 @@ producing an incomplete file. The
 [portable profile contract](architecture/portable-profile-v1.md) records format
 limits, compatibility, restore ordering and remaining hardware checks.
 
-## Unicode text macros
+## Text macros and your keyboard layout
 
-Text macros can type accents, curly quotes, symbols, combining characters and
-emoji. Choose Auto or an OS override and enable Unicode playback in the
-editor’s Settings → Host section: macOS requires
-Unicode Hex Input enabled and active; Windows requires WinCompose running
-with Right Alt as Compose; Linux requires IBus-style Ctrl+Shift+U entry in the
-target application. Linux applications without that input path are unsupported.
-The keyboard cannot detect whether the host is configured. Plain ASCII text
-is always typed with ordinary keys, so macros without accents, symbols or
-emoji play on your usual input source; only the other characters need the
-host set up for Unicode entry. Off keeps ordinary ASCII playback. The OS choice and Unicode switch are independent and saved
-with the profile.
-Auto uses QMK’s USB OS guess; detection may be wrong through a KVM or switch.
-Unknown disables non-ASCII playback until detection succeeds or an override
-is selected. Neither detection nor selection confirms the host input setup.
-Unicode entry is slower than ordinary key taps; the 512-byte compiled
-program limit still applies. Avoid typing or holding ordinary keys during
-playback. Cancellation can leave text already typed, including a partial macOS
-entry. [QMK's Unicode guide](https://docs.qmk.fm/features/unicode) describes host
-setup. Physical acceptance on all three hosts is still pending.
+The keyboard sends key positions; your computer's keyboard layout decides which
+character each one types. So that macros type the right text, pick the layout
+your computer uses in the editor's Settings → Host section. The first set is:
+
+- US (the default; what macros have always assumed);
+- macOS ABC, Dutch, Unicode Hex Input, British, German and French;
+- Windows US International, United Kingdom, German and French;
+- Linux US International, United Kingdom, German and French.
+
+Each character is then typed with that layout's own keys, including accented
+letters, curly quotes and € through Option, AltGr or dead keys. The layout you
+pick must be the one the computer is using; the keyboard cannot check. On a Mac
+that set the keyboard up as ISO, turn on the ISO option there too, or `<` and
+`` ` `` swap.
+
+Characters the layout cannot type, such as emoji, need Unicode entry:
+
+- **macOS:** choose the Unicode Hex Input layout and make it the active input
+  source. A Mac layout with Option characters, such as Dutch, cannot also take
+  Unicode entry, because Option types characters there.
+- **Windows:** enable Unicode playback and run WinCompose with Right Alt as
+  Compose.
+- **Linux:** enable Unicode playback and use an input method or application
+  that accepts Ctrl+Shift+U entry, such as IBus. Applications without it are
+  unsupported.
+
+A macro with a character neither the layout nor Unicode entry can type does not
+play. Auto uses QMK's USB OS guess, which may be wrong through a KVM or switch;
+Unicode entry stays off until the OS is known or chosen. Unicode entry is slower
+than ordinary key taps, and the 512-byte compiled program limit still applies.
+Avoid typing or holding ordinary keys during playback. Cancellation can leave
+text already typed, including a partial macOS entry.
+[QMK's Unicode guide](https://docs.qmk.fm/features/unicode) describes host
+setup. Physical acceptance of each layout on its own OS is still pending.

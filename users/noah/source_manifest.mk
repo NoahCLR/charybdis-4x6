@@ -100,6 +100,8 @@ NOAH_COMMON_SOURCES := \
     lib/macro/macro_payload_keycodes.c \
     lib/macro/macro_payload_parse.c \
     lib/macro/macro_payload_run.c \
+    lib/macro/host_layout.c \
+    lib/macro/host_layout_tables.c \
     lib/macro/macro_payload_encode.c \
     lib/macro/via_macro_provider.c \
     lib/macro/via_macro_defaults.c \

@@ -1,12 +1,14 @@
 #include "profile_settings_v1.h"
 #include <string.h>
 
+#include "../../compat/qmk_host_setting.h"
+
 bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
     if (id >= NOAH_SETTING_DRAGSCROLL_DPI && id <= NOAH_SETTING_ARROW_DPI) return v == 0;
     uint32_t bank = layers >= 32u ? UINT32_MAX : (UINT32_C(1) << layers) - 1u;
     switch (id) {
         case NOAH_SETTING_UNICODE_HOST_MODE:
-            return (v & ~UINT32_C(0x103)) == 0u;
+            return (v & ~NOAH_HOST_SETTING_BITS) == 0u && noah_host_layout_id(v) < NOAH_HOST_LAYOUT_LIMIT;
         case NOAH_SETTING_FEEDBACK_PERIOD:
             return v > 0 && v <= 65535;
         case NOAH_SETTING_AUTO_MOUSE_ENABLED:

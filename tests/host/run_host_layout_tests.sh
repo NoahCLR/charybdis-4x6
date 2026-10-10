@@ -48,6 +48,7 @@ for flags in "" "-fsanitize=address,undefined -fno-omit-frame-pointer"; do
         -I"$QMK_ROOT/quantum" \
         -I"$QMK_ROOT/quantum/keymap_extras" \
         -I"$ROOT/users/noah/lib/macro" \
+        -I"$ROOT" \
         "$ROOT/tests/host/host_layout_test.c" \
         "$ROOT/users/noah/lib/macro/host_layout.c" \
         "$ROOT/users/noah/lib/macro/host_layout_tables.c" \

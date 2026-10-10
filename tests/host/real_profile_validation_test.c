@@ -190,11 +190,6 @@ void send_char_with_delay(char ascii_code, uint8_t interval) {
     (void)interval;
 }
 
-const uint8_t ascii_to_shift_lut[16];
-const uint8_t ascii_to_altgr_lut[16];
-const uint8_t ascii_to_dead_lut[16];
-const uint8_t ascii_to_keycode_lut[128];
-
 uint32_t timer_read32(void) {
     return 0u;
 }

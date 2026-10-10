@@ -36,9 +36,10 @@ direction. Firmware accepts only current formats and every save binds VIA
 (D-F10); old backups require client translation before restore. Compiled defaults
 contain every enabled domain and use domain-seeking reads (D-F12).
 
-Unicode text macro entry supports macOS, Windows and Linux host modes; its
-encoding, ownership and setup contract is in [runtime flow](architecture/runtime-flow.md).
-Physical host acceptance is pending.
+Macro text is typed through a selected host layout (D-F16), with Unicode
+entry for macOS, Windows and Linux as the fallback; the encoding, ownership
+and setup contract is in [runtime flow](architecture/runtime-flow.md).
+Physical host acceptance of each layout and entry method is pending.
 
 Firmware work remaining before the product is complete:
 
@@ -1013,3 +1014,27 @@ ordinary keys in every mode; only non-ASCII scalars use host Unicode entry, so
 enabling Unicode never makes ASCII macros depend on the host input source. Host methods, limits, cancellation
 and exact byte encoding are governed by [runtime flow](architecture/runtime-flow.md).
 No native helper or automatic host-input-source detection is implied.
+
+## D-F16 — Macro text is typed through the host's layout
+
+The keyboard sends key positions and the computer's layout makes them
+characters, so a macro types text through a host layout chosen in settings
+scalar 27 (feature bit 22): bits 16–23 name a layout from the
+[host layout catalogue](architecture/host-layouts-v1.md), and bit 24 marks a
+Mac that classified the keyboard as ISO. Each character, accented letters
+included, is typed with the keys that layout uses, dead keys too. Unicode entry
+is only the fallback for characters the layout cannot type, with its digits
+typed through the layout; a character neither can type is refused before
+output. On macOS, hex entry needs Unicode Hex Input as the input source, so it
+is a layout of its own and no Option layout takes hex entry.
+
+The catalogue is data, not code: one versioned fixture generated from macOS's
+and Linux's own layout definitions and QMK's Windows data, from which the C
+tables are generated. Clients read the same fixture, so labels and typing
+cannot disagree. Layout 0 (US) is the default and types exactly what earlier
+firmware typed. The keyboard cannot see the computer's layout; the user picks
+it. Typing rules are in [runtime flow](architecture/runtime-flow.md).
+
+Client follow-up: Ark vendors the fixture, offers the layout in Settings →
+Host behind bit 22, checks macro text against the chosen layout, and labels
+keys as that layout prints them; pin the landed firmware.

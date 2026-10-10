@@ -7,8 +7,8 @@ text on that layout, and clients use the same data to label keys and to judge
 which characters a macro can type.
 
 This document defines the catalogue, the fixture that carries it, the stroke
-encoding and how the data is derived. Selecting a layout and typing through it
-are separate contracts.
+encoding and how the data is derived. Settings scalar 27 selects a layout
+(feature bit 22); [runtime flow](runtime-flow.md) defines typing through it.
 
 ## Catalogue
 
@@ -115,7 +115,9 @@ exchanges the keys QMK calls `KC_GRV` and `KC_NUBS`, and nothing else; the
 layouts' own data does not differ between the two types. The macOS layouts are
 read for ANSI. For an ISO-classified keyboard, the same tables apply with
 `KC_GRV` and `KC_NUBS` exchanged in every stroke and legend. QMK's
-`*_mac_iso` layout data shows that exchanged form.
+`*_mac_iso` layout data shows that exchanged form. Settings scalar 27 bit 24
+selects the exchange; it applies to macOS layouts only, which the C tables flag
+with `HOST_LAYOUT_FLAG_MACOS`.
 
 ## C tables
 
@@ -124,11 +126,10 @@ the fixture: per layout, an array of `host_layout_char_t` (code point and two
 strokes, 8 bytes each) sorted by code point, and the `host_layouts[]`
 catalogue. `host_layout.h` and `host_layout.c` give `host_layout_get(id)` and
 a binary-search `host_layout_lookup()`. The first set is about 4,000
-characters, roughly 32 KB of flash once linked. The host test keeps it under
-40 KB as a tripwire. This is a regression check, not a resource budget.
-
-Version 1 defines the data only. No firmware image links these tables until
-playback selects a layout.
+characters, roughly 32 KB of flash. The host test keeps it under 40 KB as a
+tripwire. This is a regression check, not a resource budget.
+`NOAH_HOST_LAYOUT_LIMIT` in `qmk_host.h` bounds the IDs the settings validator
+accepts; the host test ties it to the tables.
 
 ## Changing the data
 

@@ -26,6 +26,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/macro_payload_engine_test.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+    "$ROOT/users/noah/lib/macro/host_layout.c" \
+    "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
     -o "$BIN"
 
 "$BIN"
@@ -41,6 +43,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/macro_payload_engine_test.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+    "$ROOT/users/noah/lib/macro/host_layout.c" \
+    "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
     -o "$SANITIZED_BIN"
 
 "$SANITIZED_BIN"

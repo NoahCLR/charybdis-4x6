@@ -180,8 +180,7 @@ semantics without taking another platform timer sample.
   `macro_payload_encode.c`, `macro_payload_keycodes.c`,
   `macro_payload_parse.c`, `macro_payload_run.c`
 - Host layouts: `host_layout.c/h` and the generated `host_layout_tables.c`
-  ([host-layouts-v1](./host-layouts-v1.md)); not linked until playback
-  selects a layout
+  ([host-layouts-v1](./host-layouts-v1.md)), which playback types text through
 
 ### `pointing/`
 

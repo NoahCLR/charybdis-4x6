@@ -6,6 +6,7 @@
 
 #include "qmk_stub.h"
 #include "users/noah/lib/action/owned_keycode.h"
+#include "users/noah/lib/compat/qmk_host.h"
 #include "users/noah/lib/macro/macro_payload.h"
 
 typedef enum {
@@ -26,7 +27,12 @@ static bool unicode_caps;
 static uint8_t live_mods, last_report_mods;
 static unsigned neutral_reports;
 bool keyboard_report_mods_override_user(uint8_t *mods);
-uint8_t macro_payload_unicode_host_mode(void) {return unicode_mode;}
+// The host: unicode_mode names an OS with Unicode on and the US layout unless
+// layout_bits or host_os say otherwise.
+static uint32_t layout_bits;
+static uint8_t host_os;
+uint32_t macro_payload_host_setting(void) {return (unicode_mode ? NOAH_HOST_UNICODE_ENABLED : 0u) | layout_bits;}
+uint8_t macro_payload_host_os(void) {return unicode_mode ? unicode_mode : host_os;}
 bool macro_payload_unicode_caps_lock(void) {return unicode_caps;}
 static uint32_t                      fake_time;
 static uint16_t                      wait_call_count;
@@ -35,15 +41,6 @@ static uint16_t                      test_op_count;
 static int16_t                       fail_acquire_keycode;
 static macro_payload_finish_result_t callback_result;
 static uint16_t                      callback_count;
-
-const uint8_t ascii_to_shift_lut[16];
-const uint8_t ascii_to_altgr_lut[16];
-const uint8_t ascii_to_dead_lut[16];
-const uint8_t ascii_to_keycode_lut[128] = {
-    ['\n'] = KC_ENTER,
-    ['a'] = KC_A,
-    ['b'] = KC_B,
-};
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -78,6 +75,8 @@ static void test_reset(void) {
     macro_payload_engine_init();
     unicode_mode = 0u;
     unicode_caps = false;
+    layout_bits = 0u;
+    host_os = 0u;
     live_mods = last_report_mods = 0u; neutral_reports = 0u;
     fake_time            = 1000u;
     wait_call_count      = 0u;
@@ -363,6 +362,75 @@ static void test_ascii_text_uses_keys_in_every_unicode_mode(void) {
     }
 }
 
+// Plays an IR on a host and returns the keys pressed, in order, with the
+// report modifiers each press carried.
+static uint8_t play_on_host(const macro_payload_ir_t *ir, uint8_t layout, uint8_t os, uint32_t extra_bits, uint8_t keys[], uint8_t mods[]) {
+    test_reset();
+    layout_bits = ((uint32_t)layout << NOAH_HOST_LAYOUT_SHIFT) | extra_bits;
+    host_os = os;
+    CHECK(macro_payload_start_ir(ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
+    test_unicode_drain();
+    CHECK(callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
+    uint8_t count = 0u;
+    for (unsigned i = 0; i < test_op_count; i++) if (test_ops[i].kind == TEST_OP_ACQUIRE) {keys[count] = test_ops[i].keycode; mods[count++] = test_ops[i].mods;}
+    return count;
+}
+
+static macro_payload_start_result_t start_on_host(const macro_payload_ir_t *ir, uint8_t layout, uint8_t os, uint32_t extra_bits) {
+    test_reset();
+    layout_bits = ((uint32_t)layout << NOAH_HOST_LAYOUT_SHIFT) | extra_bits;
+    host_os = os;
+    return macro_payload_start_ir(ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count);
+}
+
+enum { LAYOUT_MACOS_DUTCH = 2, LAYOUT_MACOS_UNICODE_HEX_INPUT = 3, LAYOUT_MACOS_GERMAN = 5, LAYOUT_WINDOWS_GERMAN = 9, LAYOUT_WINDOWS_FRENCH = 10 };
+
+static void test_text_types_through_the_host_layout(void) {
+    uint8_t keys[TEST_MAX_OPS], mods[TEST_MAX_OPS];
+    // German QWERTZ: z and y swap, @ is AltGr+Q, ^ is a dead key then Space.
+    const macro_payload_ir_t german = {.length = 6u, .bytes = {MACRO_PAYLOAD_IR_OP_TEXT, 4u, 'z', 'y', '@', '^'}};
+    const uint8_t german_keys[] = {KC_Y, KC_Z, KC_RIGHT_ALT, KC_Q, KC_GRAVE, KC_SPACE};
+    CHECK(play_on_host(&german, LAYOUT_WINDOWS_GERMAN, NOAH_HOST_WINDOWS, 0u, keys, mods) == sizeof(german_keys));
+    CHECK(memcmp(keys, german_keys, sizeof(german_keys)) == 0);
+    // macOS Dutch types é and € with its own Option keys, without Unicode entry.
+    const macro_payload_ir_t dutch = {.length = 8u, .bytes = {MACRO_PAYLOAD_IR_OP_UNICODE, 0xE9, 0, 0, MACRO_PAYLOAD_IR_OP_UNICODE, 0xAC, 0x20, 0}};
+    const uint8_t dutch_keys[] = {KC_RIGHT_ALT, KC_E, KC_E, KC_RIGHT_ALT, KC_2};
+    CHECK(play_on_host(&dutch, LAYOUT_MACOS_DUTCH, NOAH_HOST_MACOS, 0u, keys, mods) == sizeof(dutch_keys));
+    CHECK(memcmp(keys, dutch_keys, sizeof(dutch_keys)) == 0);
+    for (unsigned i = 0; i < sizeof(dutch_keys); i++) CHECK(mods[i] == 0u);
+    // An ISO-classified Mac exchanges KC_GRV and KC_NUBS.
+    const macro_payload_ir_t less = {.length = 3u, .bytes = {MACRO_PAYLOAD_IR_OP_TEXT, 1u, '<'}};
+    CHECK(play_on_host(&less, LAYOUT_MACOS_GERMAN, NOAH_HOST_MACOS, 0u, keys, mods) == 1u && keys[0] == KC_GRAVE);
+    CHECK(play_on_host(&less, LAYOUT_MACOS_GERMAN, NOAH_HOST_MACOS, NOAH_HOST_MACOS_ISO, keys, mods) == 1u && keys[0] == KC_NONUS_BACKSLASH);
+    CHECK(play_on_host(&less, LAYOUT_WINDOWS_GERMAN, NOAH_HOST_WINDOWS, NOAH_HOST_MACOS_ISO, keys, mods) == 1u && keys[0] == KC_NONUS_BACKSLASH);
+    // French AZERTY with WinCompose: the hex digits of U+1F642 need Shift there.
+    const macro_payload_ir_t emoji = {.length = 4u, .bytes = {MACRO_PAYLOAD_IR_OP_UNICODE, 0x42, 0xF6, 1}};
+    const uint8_t azerty_keys[] = {KC_RIGHT_ALT, KC_U, KC_1, KC_F, KC_6, KC_4, KC_2, KC_ENTER};
+    const uint8_t shift = MOD_BIT(KC_LEFT_SHIFT);
+    const uint8_t azerty_mods[] = {MOD_BIT(KC_RIGHT_ALT), 0u, shift, 0u, shift, shift, shift, 0u};
+    CHECK(play_on_host(&emoji, LAYOUT_WINDOWS_FRENCH, NOAH_HOST_WINDOWS, NOAH_HOST_UNICODE_ENABLED, keys, mods) == sizeof(azerty_keys));
+    CHECK(memcmp(keys, azerty_keys, sizeof(azerty_keys)) == 0 && memcmp(mods, azerty_mods, sizeof(azerty_mods)) == 0);
+    // On macOS the Unicode Hex Input layout enables hex entry by itself.
+    CHECK(play_on_host(&emoji, LAYOUT_MACOS_UNICODE_HEX_INPUT, NOAH_HOST_MACOS, 0u, keys, mods) == 9u && keys[0] == KC_LEFT_ALT && keys[1] == KC_D && mods[1] == MOD_BIT(KC_LEFT_ALT));
+}
+
+static void test_untypeable_text_is_refused_before_output(void) {
+    const macro_payload_ir_t emoji = {.length = 4u, .bytes = {MACRO_PAYLOAD_IR_OP_UNICODE, 0x42, 0xF6, 1}};
+    // No Unicode entry on Windows German without the switch.
+    CHECK(start_on_host(&emoji, LAYOUT_WINDOWS_GERMAN, NOAH_HOST_WINDOWS, 0u) == MACRO_PAYLOAD_START_INVALID);
+    // A Mac layout with Option characters cannot take hex entry, switch or not.
+    CHECK(start_on_host(&emoji, LAYOUT_MACOS_DUTCH, NOAH_HOST_MACOS, NOAH_HOST_UNICODE_ENABLED) == MACRO_PAYLOAD_START_INVALID);
+    // An unknown OS has no entry method, whatever the layout.
+    CHECK(start_on_host(&emoji, LAYOUT_WINDOWS_GERMAN, NOAH_HOST_AUTO, NOAH_HOST_UNICODE_ENABLED) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(test_op_count == 0u);
+    // A held ordinary key may span a natively typed character, not Unicode entry.
+    const macro_payload_ir_t held_native = {.length = 8u, .bytes = {MACRO_PAYLOAD_IR_OP_KEY_DOWN, KC_B, MACRO_PAYLOAD_IR_OP_UNICODE, 0xE9, 0, 0, MACRO_PAYLOAD_IR_OP_KEY_UP, KC_B}};
+    CHECK(start_on_host(&held_native, LAYOUT_MACOS_DUTCH, NOAH_HOST_MACOS, 0u) == MACRO_PAYLOAD_START_STARTED);
+    test_unicode_drain();
+    const macro_payload_ir_t held_entry = {.length = 8u, .bytes = {MACRO_PAYLOAD_IR_OP_KEY_DOWN, KC_B, MACRO_PAYLOAD_IR_OP_UNICODE, 0x42, 0xF6, 1, MACRO_PAYLOAD_IR_OP_KEY_UP, KC_B}};
+    CHECK(start_on_host(&held_entry, LAYOUT_WINDOWS_GERMAN, NOAH_HOST_WINDOWS, NOAH_HOST_UNICODE_ENABLED) == MACRO_PAYLOAD_START_INVALID);
+}
+
 static void test_unicode_restores_current_modifiers_after_neutral_commit(void) {
     test_reset(); unicode_mode = 1u;
     live_mods = MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_LEFT_SHIFT);
@@ -380,6 +448,8 @@ int main(void) {
     test_unicode_restores_current_modifiers_after_neutral_commit();
     test_unicode_sequences_and_cancellation();
     test_ascii_text_uses_keys_in_every_unicode_mode();
+    test_text_types_through_the_host_layout();
+    test_untypeable_text_is_refused_before_output();
     macro_payload_engine_init();
     test_long_delay_start_is_nonblocking_and_wrap_safe();
     test_text_uses_lease_backed_press_and_release_scans();

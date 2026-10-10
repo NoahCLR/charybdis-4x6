@@ -3,6 +3,7 @@
 
 #include "keycodes.h"
 #include "host_layout.h"
+#include "users/noah/lib/compat/qmk_host_setting.h"
 
 extern const uint8_t qmk_us_shift_lut[16];
 extern const uint8_t qmk_us_altgr_lut[16];
@@ -39,13 +40,14 @@ static void check_types(uint8_t layout_id, uint32_t codepoint, uint16_t first, u
 }
 
 static void test_catalogue_is_complete_and_well_formed(void) {
-    CHECK(host_layout_table_count == LAYOUT_COUNT);
+    CHECK(host_layout_table_count == LAYOUT_COUNT && NOAH_HOST_LAYOUT_LIMIT == LAYOUT_COUNT);
     CHECK(sizeof(host_layout_char_t) == 8u);
     CHECK(host_layout_get(LAYOUT_COUNT) == NULL && host_layout_get(0xFFu) == NULL);
     unsigned entries = 0u;
     for (uint8_t id = 0u; id < LAYOUT_COUNT; id++) {
         const host_layout_t *layout = host_layout_get(id);
         CHECK(layout && layout->id == id && layout->count > 0u);
+        CHECK(!!(layout->flags & HOST_LAYOUT_FLAG_MACOS) == (id >= 1u && id <= 6u));
         entries += layout->count;
         for (uint16_t i = 0u; i < layout->count; i++) {
             const host_layout_char_t *entry = &layout->chars[i];
@@ -66,11 +68,13 @@ static void test_catalogue_is_complete_and_well_formed(void) {
         CHECK(host_layout_lookup(layout, '\t', strokes) && strokes[0] == KC_TAB && strokes[1] == 0u);
         CHECK(host_layout_lookup(layout, '\n', strokes) && strokes[0] == KC_ENTER && strokes[1] == 0u);
         CHECK(!host_layout_lookup(layout, 0x1F642u, strokes));
+        // Unicode entry types its hex digits and U through the layout in one stroke each.
+        for (const char *c = "0123456789abcdefu"; *c; c++) CHECK(host_layout_lookup(layout, (uint8_t)*c, strokes) && strokes[1] == 0u);
         CHECK(!host_layout_lookup(layout, 0x7Fu, strokes) && !host_layout_lookup(layout, 0x0Du, strokes));
     }
     // Flash cost of the first set: a regression tripwire, not a budget.
     CHECK(entries * sizeof(host_layout_char_t) <= 40u * 1024u);
-    CHECK(host_layout_get(MACOS_UNICODE_HEX_INPUT)->flags == HOST_LAYOUT_FLAG_UNICODE_HEX_INPUT);
+    CHECK(host_layout_get(MACOS_UNICODE_HEX_INPUT)->flags == (HOST_LAYOUT_FLAG_UNICODE_HEX_INPUT | HOST_LAYOUT_FLAG_MACOS));
     CHECK(!host_layout_lookup(NULL, 'a', (uint16_t[2]){0}));
 }
 

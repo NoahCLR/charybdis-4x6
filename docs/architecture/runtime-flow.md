@@ -330,32 +330,50 @@ non-ASCII scalar uses opcode 6 and three little-endian scalar bytes (four IR
 bytes total). Scalars never cross an IR text-chunk boundary. The program
 ceiling remains 512 bytes. VIA may store a larger or invalid slot; it remains
 unplayable and negatively cached until a mutation invalidates it. A structurally
-valid slot rejected because the host is unknown or Unicode is off remains
-retryable without a macro mutation.
+valid slot rejected because the host is unknown, Unicode is off or the layout
+cannot type it remains retryable without a macro mutation.
 
 Profile Wire feature bit 21 advertises UTF-8 text and Host settings in scalar
 27: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables
 Unicode playback. All other bits must be zero. The settings-v6 shape and zero
 defaults are unchanged: Auto with Unicode off. Clients require bit 21 before
 writing non-ASCII bytes or nonzero scalar 27. Older firmware rejects them.
+Feature bit 22 adds the host layout to scalar 27: bits 16–23 name a layout
+from the [host layout catalogue](host-layouts-v1.md), 0 (US) by default, and
+bit 24 says macOS classified the keyboard as ISO. An ID past the catalogue and
+any other bit are rejected. Clients require bit 22 before writing bits 16–24.
 
 Auto translates QMK’s USB OS guess; unknown and iOS resolve to unknown rather
 than choosing an entry method. A manual override always wins. Unicode playback
-uses the effective OS when enabled; non-ASCII programs are refused before
-output if that OS is unknown. The method is latched at playback start, so a
-later detection change cannot switch an entry sequence mid-macro. Detection
+uses the effective OS when enabled; a program needing Unicode entry is refused
+before output if that OS is unknown. The layout, ISO flag and entry method are
+latched at playback start, so a later setting or detection change cannot
+switch them mid-macro. Detection
 cannot establish active input sources or installed helpers. Host readback is
 specified in [Profile Wire](profile-wire-v1.md#host-os-readback).
 
-ASCII text, tab and newline are always typed with ordinary keys, as with
-Unicode off, so they never depend on the host's Unicode input setup and an
-ASCII-only macro plays the same whether the host input source is set up for
-Unicode entry or not. Only non-ASCII scalars use Unicode entry. ASCII therefore
-follows the host's keyboard layout and any modifier the macro holds, exactly
-as without Unicode. Command steps keep their key semantics. A macro holding a
-basic (non-modifier) key across a non-ASCII scalar is rejected in preflight;
-holding one across ASCII text is allowed. Modifier holds are preserved through
-the report override during Unicode entry. macOS holds left Option
+Text is typed through the selected host layout. Each character, ASCII or not,
+is looked up in that layout's table ([host layouts](host-layouts-v1.md)) and
+typed with the strokes listed there. A stroke is one key with optional Shift
+and AltGr (Right Alt; Option on macOS); a character takes one stroke, or a
+dead key then Space or a letter. Tab and newline are Tab and Enter. Layout 0
+types ASCII exactly as QMK's US send_string tables do. On a macOS layout with
+bit 24 set, `KC_GRV` and `KC_NUBS` are exchanged in every stroke. Text typed
+this way follows any modifier the macro holds, as ordinary keys do, and never
+depends on the host's Unicode setup.
+
+A scalar the layout cannot type uses Unicode entry when it is available;
+otherwise the macro is refused before output. Unicode entry is available when
+the effective OS is known and, on macOS, the layout is Unicode Hex Input (3) or
+US (0) with bit 8 set; on Windows and Linux, bit 8 is set. A macOS layout with
+Option characters never takes hex entry, since Option types characters there.
+Entry types its hex digits, and U on Windows and Linux, through the layout, so
+they carry Shift where the layout needs it (AZERTY's number row); every
+catalogued layout types them in one stroke each. Command steps keep their key
+semantics. A macro holding a basic (non-modifier) key across a scalar that
+needs Unicode entry is rejected in preflight; holding one across text the
+layout types is allowed. Modifier holds are preserved through the report
+override during Unicode entry. macOS holds left Option
 and emits four hex digits per UTF-16 code unit, including a surrogate pair
 for supplementary scalars. WinCompose taps Right Alt then U, sends at least
 four hex digits (an extra leading zero before an initial A–F), then Enter.
@@ -376,7 +394,9 @@ typing or other synthetic actions: HID cannot interleave arbitrary input with
 an in-progress host Unicode entry. A usage already held by another owner
 cannot gain a new press edge; ownership never releases it to force one.
 
-Host setup is mandatory: macOS Unicode Hex Input must be enabled and active;
+The selected layout must be the computer's active layout (on macOS, its
+active input source); the keyboard cannot check. For Unicode entry, host setup
+is mandatory: macOS Unicode Hex Input must be enabled and active;
 Windows needs WinCompose running with Right Alt as Compose; Linux needs an
 input method/application accepting Ctrl+Shift+U (IBus or a compatible GTK
 entry path). Linux support does not mean every application accepts this

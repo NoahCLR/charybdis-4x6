@@ -3,6 +3,7 @@
 #include "send_string.h"
 
 #include "../action/owned_keycode.h"
+#include "host_layout.h"
 #include "macro_payload_internal.h"
 #include "../profile/runtime/effective_settings_runtime.h"
 #include "../compat/qmk_host.h"
@@ -29,7 +30,7 @@ typedef enum {
     MACRO_PAYLOAD_PHASE_WAITING,
     MACRO_PAYLOAD_PHASE_TEXT_PRESS,
     MACRO_PAYLOAD_PHASE_TRANSIENT_RELEASE,
-    MACRO_PAYLOAD_PHASE_DEAD_PRESS,
+    MACRO_PAYLOAD_PHASE_SECOND_STROKE,
     MACRO_PAYLOAD_PHASE_CLEANUP,
     MACRO_PAYLOAD_PHASE_UNICODE_PRESS,
     MACRO_PAYLOAD_PHASE_UNICODE_FINISH,
@@ -54,6 +55,10 @@ typedef struct {
     macro_payload_phase_t         unicode_next;
     macro_payload_unicode_tap_t   unicode_taps[12];
     owned_keycode_lease_t         unicode_alt;
+    const host_layout_t          *layout;
+    bool                          layout_iso;
+    uint16_t                      second_stroke;
+    macro_payload_phase_t         stroke_next;
     const macro_payload_ir_t     *ir;
     uint16_t                      cursor;
     uint16_t                      text_cursor;
@@ -86,9 +91,53 @@ bool keyboard_report_mods_override_user(uint8_t *mods) {
     return true;
 }
 
-__attribute__((weak)) uint8_t macro_payload_unicode_host_mode(void) {
-    uint32_t setting = noah_setting(NOAH_SETTING_UNICODE_HOST_MODE, 0u);
-    return setting & NOAH_HOST_UNICODE_ENABLED ? noah_host_effective(setting, noah_host_detected()) : 0u;
+__attribute__((weak)) uint32_t macro_payload_host_setting(void) {
+    return noah_setting(NOAH_SETTING_UNICODE_HOST_MODE, 0u);
+}
+
+__attribute__((weak)) uint8_t macro_payload_host_os(void) {
+    return noah_host_effective(macro_payload_host_setting(), noah_host_detected());
+}
+
+typedef struct {
+    const host_layout_t *layout;
+    uint8_t              unicode_mode; // 0, or the effective OS whose entry method types scalars.
+    bool                 iso;
+} macro_payload_host_t;
+
+// Unicode entry types its digits, and U on Windows and Linux, through the
+// layout, so each must be one stroke there.
+static bool macro_payload_unicode_entry_typeable(const host_layout_t *layout, uint8_t mode) {
+    static const char entry_chars[] = "0123456789abcdefu";
+    for (uint8_t i = 0u; i < (mode == NOAH_HOST_MACOS ? 16u : 17u); i++) {
+        uint16_t strokes[2];
+        if (!host_layout_lookup(layout, (uint8_t)entry_chars[i], strokes) || strokes[1]) return false;
+    }
+    return true;
+}
+
+// The host is latched at playback start, so a later setting or detection
+// change cannot switch layout or entry method mid-macro.
+static macro_payload_host_t macro_payload_host_resolve(void) {
+    uint32_t             setting = macro_payload_host_setting();
+    uint8_t              os      = macro_payload_host_os();
+    const host_layout_t *layout  = host_layout_get(noah_host_layout_id(setting));
+    bool                 unicode = false;
+
+    if (!layout) layout = host_layout_get(HOST_LAYOUT_US);
+    if (os == NOAH_HOST_MACOS) {
+        // macOS hexadecimal entry needs the Unicode Hex Input source: the
+        // layout naming it, or US with the Unicode switch on.
+        unicode = (layout->flags & HOST_LAYOUT_FLAG_UNICODE_HEX_INPUT) || (layout->id == HOST_LAYOUT_US && (setting & NOAH_HOST_UNICODE_ENABLED));
+    } else if (os == NOAH_HOST_WINDOWS || os == NOAH_HOST_LINUX) {
+        unicode = (setting & NOAH_HOST_UNICODE_ENABLED) != 0u;
+    }
+    if (unicode && !macro_payload_unicode_entry_typeable(layout, os)) unicode = false;
+    return (macro_payload_host_t){
+        .layout       = layout,
+        .unicode_mode = unicode ? os : 0u,
+        .iso          = (setting & NOAH_HOST_MACOS_ISO) && (layout->flags & HOST_LAYOUT_FLAG_MACOS),
+    };
 }
 
 __attribute__((weak)) bool macro_payload_unicode_caps_lock(void) {
@@ -189,7 +238,7 @@ static bool macro_payload_ir_next(const uint8_t **cursor, const uint8_t *end, ma
     return true;
 }
 
-static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, uint8_t unicode_mode) {
+static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, const macro_payload_host_t *host) {
     const uint8_t               *cursor;
     const uint8_t               *end;
     macro_payload_hold_balance_t balance = {0};
@@ -206,10 +255,16 @@ static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, uint8_t uni
         if (!macro_payload_ir_next(&cursor, end, &step)) {
             return false;
         }
-        if (step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE && balance.count) {
+        uint16_t strokes[2];
+        if (step.opcode == MACRO_PAYLOAD_IR_OP_TEXT) {
+            for (uint8_t i = 0u; i < step.length; i++) if (!host_layout_lookup(host->layout, step.bytes[i], strokes)) return false;
+        }
+        // A scalar the layout cannot type needs Unicode entry, which an
+        // ordinary key held across it would corrupt.
+        if (step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE && !host_layout_lookup(host->layout, step.value, strokes)) {
+            if (host->unicode_mode < 1u || host->unicode_mode > 3u) return false;
             for (uint8_t i = 0u; i < balance.count; i++) if (balance.keycodes[i] < KC_LEFT_CTRL) return false;
         }
-        if (step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE && (unicode_mode < 1u || unicode_mode > 3u)) return false;
         if (step.opcode == MACRO_PAYLOAD_IR_OP_KEY_DOWN && !macro_payload_hold_balance_note_down(&balance, (uint8_t)step.value)) {
             return false;
         }
@@ -322,8 +377,37 @@ static void macro_payload_start_transient(const uint8_t *keycodes, uint8_t count
     macro_payload_schedule_wait(now, hold_ms, MACRO_PAYLOAD_PHASE_TRANSIENT_RELEASE);
 }
 
-static bool macro_payload_ascii_lut_bit(const uint8_t *lut, uint8_t ascii_code) {
-    return ((pgm_read_byte(&lut[ascii_code / 8u]) >> (ascii_code % 8u)) & 0x01u) != 0u;
+// An ISO-classified Mac exchanges these two keys (host-layouts-v1).
+static uint8_t macro_payload_stroke_key(uint16_t stroke) {
+    uint8_t key = HOST_LAYOUT_STROKE_KEYCODE(stroke);
+    if (macro_payload_engine.layout_iso && key == KC_GRAVE) return KC_NONUS_BACKSLASH;
+    if (macro_payload_engine.layout_iso && key == KC_NONUS_BACKSLASH) return KC_GRAVE;
+    return key;
+}
+
+static uint8_t macro_payload_stroke_keys(uint16_t stroke, uint8_t keys[3]) {
+    uint8_t count = 0u;
+    if (stroke & HOST_LAYOUT_STROKE_SHIFT) keys[count++] = KC_LEFT_SHIFT;
+    if (stroke & HOST_LAYOUT_STROKE_ALTGR) keys[count++] = KC_RIGHT_ALT;
+    keys[count++] = macro_payload_stroke_key(stroke);
+    return count;
+}
+
+// Types one character as the layout does: one stroke, or a dead key then a
+// second stroke.
+static void macro_payload_start_strokes(const uint16_t strokes[2], uint32_t now, macro_payload_phase_t next) {
+    uint8_t keys[3];
+    uint8_t count = macro_payload_stroke_keys(strokes[0], keys);
+    macro_payload_engine.second_stroke = strokes[1];
+    macro_payload_engine.stroke_next   = next;
+    macro_payload_start_transient(keys, count, now, macro_payload_engine.text_interval, macro_payload_engine.text_interval, strokes[1] ? MACRO_PAYLOAD_PHASE_SECOND_STROKE : next);
+}
+
+static void macro_payload_start_second_stroke(uint32_t now) {
+    uint8_t keys[3];
+    uint8_t count = macro_payload_stroke_keys(macro_payload_engine.second_stroke, keys);
+    macro_payload_engine.second_stroke = 0u;
+    macro_payload_start_transient(keys, count, now, TAP_CODE_DELAY, macro_payload_engine.text_interval, macro_payload_engine.stroke_next);
 }
 
 #define MACRO_PAYLOAD_UNICODE_PACE_MS 10u
@@ -333,9 +417,19 @@ static void macro_payload_unicode_add_tap(uint8_t key, uint8_t mods) {
     *tap = (macro_payload_unicode_tap_t){.keys = {key}, .count = 1u, .mods = mods};
 }
 
+// An entry character typed through the layout; its Shift or AltGr joins the
+// tap's report modifiers, which the override otherwise masks.
+static void macro_payload_unicode_add_char(char c, uint8_t mods) {
+    uint16_t strokes[2] = {0u, 0u};
+    (void)host_layout_lookup(macro_payload_engine.layout, (uint8_t)c, strokes);
+    if (strokes[0] & HOST_LAYOUT_STROKE_SHIFT) mods |= MOD_BIT(KC_LEFT_SHIFT);
+    if (strokes[0] & HOST_LAYOUT_STROKE_ALTGR) mods |= MOD_BIT(KC_RIGHT_ALT);
+    macro_payload_unicode_add_tap(macro_payload_stroke_key(strokes[0]), mods);
+}
+
 static void macro_payload_unicode_add_hex(uint32_t value, uint8_t digits, uint8_t mods) {
-    static const uint8_t keys[16] = {KC_0, KC_1, KC_2, KC_3, KC_4, KC_5, KC_6, KC_7, KC_8, KC_9, KC_A, KC_B, KC_C, KC_D, KC_E, KC_F};
-    for (uint8_t i = digits; i > 0u; i--) macro_payload_unicode_add_tap(keys[(value >> ((i - 1u) * 4u)) & 15u], mods);
+    static const char hex[] = "0123456789abcdef";
+    for (uint8_t i = digits; i > 0u; i--) macro_payload_unicode_add_char(hex[(value >> ((i - 1u) * 4u)) & 15u], mods);
 }
 
 static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_payload_phase_t next) {
@@ -357,14 +451,16 @@ static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_pay
     } else {
         if (mode == 2u) {
             macro_payload_unicode_add_tap(KC_RIGHT_ALT, MOD_BIT(KC_RIGHT_ALT));
-            macro_payload_unicode_add_tap(KC_U, 0u);
+            macro_payload_unicode_add_char('u', 0u);
         } else {
+            uint16_t strokes[2] = {0u, 0u};
+            (void)host_layout_lookup(macro_payload_engine.layout, 'u', strokes);
             macro_payload_unicode_tap_t *tap = &macro_payload_engine.unicode_taps[macro_payload_engine.unicode_count++];
-            *tap = (macro_payload_unicode_tap_t){.keys = {KC_LEFT_CTRL, KC_LEFT_SHIFT, KC_U}, .count = 3u, .mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT)};
+            *tap = (macro_payload_unicode_tap_t){.keys = {KC_LEFT_CTRL, KC_LEFT_SHIFT, macro_payload_stroke_key(strokes[0])}, .count = 3u, .mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT)};
         }
         uint8_t digits = scalar > 0xFFFFFu ? 6u : scalar > 0xFFFFu ? 5u : 4u;
         // WinCompose treats an initial hex letter as a compose sequence.
-        if (mode == 2u && ((scalar >> ((digits - 1u) * 4u)) & 15u) > 9u) macro_payload_unicode_add_tap(KC_0, 0u);
+        if (mode == 2u && ((scalar >> ((digits - 1u) * 4u)) & 15u) > 9u) macro_payload_unicode_add_char('0', 0u);
         macro_payload_unicode_add_hex(scalar, digits, 0u);
         macro_payload_unicode_add_tap(mode == 2u ? KC_ENTER : KC_SPACE, 0u);
     }
@@ -408,36 +504,20 @@ static void macro_payload_unicode_restore(uint32_t now) {
 }
 
 static void macro_payload_start_text_char(uint32_t now) {
-    uint8_t               ascii_code;
-    uint8_t               keycodes[3];
-    uint8_t               keycode_count = 0u;
-    bool                  dead;
-    macro_payload_phase_t next_phase;
+    uint16_t strokes[2];
 
     if (!macro_payload_engine.ir || macro_payload_engine.text_remaining == 0u) {
         macro_payload_begin_runtime_error();
         return;
     }
 
-    ascii_code = macro_payload_engine.ir->bytes[macro_payload_engine.text_cursor++];
+    uint8_t ascii_code = macro_payload_engine.ir->bytes[macro_payload_engine.text_cursor++];
     macro_payload_engine.text_remaining--;
-    if (macro_payload_ascii_lut_bit(ascii_to_shift_lut, ascii_code)) {
-        keycodes[keycode_count++] = KC_LEFT_SHIFT;
+    if (!host_layout_lookup(macro_payload_engine.layout, ascii_code, strokes)) {
+        macro_payload_begin_runtime_error();
+        return;
     }
-    if (macro_payload_ascii_lut_bit(ascii_to_altgr_lut, ascii_code)) {
-        keycodes[keycode_count++] = KC_RIGHT_ALT;
-    }
-    keycodes[keycode_count++] = pgm_read_byte(&ascii_to_keycode_lut[ascii_code]);
-    dead                      = macro_payload_ascii_lut_bit(ascii_to_dead_lut, ascii_code);
-    next_phase                = dead ? MACRO_PAYLOAD_PHASE_DEAD_PRESS : (macro_payload_engine.text_remaining ? MACRO_PAYLOAD_PHASE_TEXT_PRESS : MACRO_PAYLOAD_PHASE_READY);
-    macro_payload_start_transient(keycodes, keycode_count, now, macro_payload_engine.text_interval, macro_payload_engine.text_interval, next_phase);
-}
-
-static void macro_payload_start_dead_space(uint32_t now) {
-    static const uint8_t  space_keycode[] = {KC_SPACE};
-    macro_payload_phase_t next_phase      = macro_payload_engine.text_remaining ? MACRO_PAYLOAD_PHASE_TEXT_PRESS : MACRO_PAYLOAD_PHASE_READY;
-
-    macro_payload_start_transient(space_keycode, 1u, now, TAP_CODE_DELAY, macro_payload_engine.text_interval, next_phase);
+    macro_payload_start_strokes(strokes, now, macro_payload_engine.text_remaining ? MACRO_PAYLOAD_PHASE_TEXT_PRESS : MACRO_PAYLOAD_PHASE_READY);
 }
 
 static void macro_payload_release_transients(uint32_t now) {
@@ -492,9 +572,12 @@ static void macro_payload_execute_ready(uint32_t now) {
             macro_payload_engine.text_remaining = step.length;
             macro_payload_start_text_char(now);
             break;
-        case MACRO_PAYLOAD_IR_OP_UNICODE:
-            macro_payload_start_unicode(step.value, now, MACRO_PAYLOAD_PHASE_READY);
+        case MACRO_PAYLOAD_IR_OP_UNICODE: {
+            uint16_t strokes[2];
+            if (host_layout_lookup(macro_payload_engine.layout, step.value, strokes)) macro_payload_start_strokes(strokes, now, MACRO_PAYLOAD_PHASE_READY);
+            else macro_payload_start_unicode(step.value, now, MACRO_PAYLOAD_PHASE_READY);
             break;
+        }
         case MACRO_PAYLOAD_IR_OP_DELAY:
             macro_payload_schedule_wait(now, (uint32_t)step.value + TAP_CODE_DELAY, MACRO_PAYLOAD_PHASE_READY);
             break;
@@ -571,8 +654,8 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
         macro_payload_increment_u16(&macro_payload_diagnostics.busy_rejection_count);
         return MACRO_PAYLOAD_START_BUSY;
     }
-    const uint8_t unicode_mode = macro_payload_unicode_host_mode();
-    if (!macro_payload_ir_preflight(ir, unicode_mode)) {
+    const macro_payload_host_t host = macro_payload_host_resolve();
+    if (!macro_payload_ir_preflight(ir, &host)) {
         return MACRO_PAYLOAD_START_INVALID;
     }
     if (ir->length == 0u) {
@@ -580,7 +663,9 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
     }
 
     macro_payload_engine = (macro_payload_engine_t){
-        .unicode_mode   = unicode_mode,
+        .unicode_mode   = host.unicode_mode,
+        .layout         = host.layout,
+        .layout_iso     = host.iso,
         .ir             = ir,
         .phase          = MACRO_PAYLOAD_PHASE_READY,
         .text_interval  = text_output == MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED ? interval : TAP_CODE_DELAY,
@@ -626,8 +711,8 @@ void macro_payload_engine_scan(void) {
         case MACRO_PAYLOAD_PHASE_TRANSIENT_RELEASE:
             macro_payload_release_transients(now);
             break;
-        case MACRO_PAYLOAD_PHASE_DEAD_PRESS:
-            macro_payload_start_dead_space(now);
+        case MACRO_PAYLOAD_PHASE_SECOND_STROKE:
+            macro_payload_start_second_stroke(now);
             break;
         case MACRO_PAYLOAD_PHASE_UNICODE_PRESS:
             macro_payload_unicode_press(now);

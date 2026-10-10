@@ -32,6 +32,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_run.c" \
+    "$ROOT/users/noah/lib/macro/host_layout.c" \
+    "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
     "$ROOT/users/noah/lib/macro/via_macro_provider.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
     -o "$BIN"

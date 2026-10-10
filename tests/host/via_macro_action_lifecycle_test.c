@@ -43,13 +43,6 @@ static uint16_t    runtime_diag_heartbeat_count;
 static uint16_t    macro_buffer_read_count;
 static uint32_t    fake_time;
 
-const uint8_t ascii_to_shift_lut[16];
-const uint8_t ascii_to_altgr_lut[16];
-const uint8_t ascii_to_dead_lut[16];
-const uint8_t ascii_to_keycode_lut[128] = {
-    ['A'] = KC_A, ['B'] = KC_B, ['C'] = KC_C, ['D'] = KC_D, ['E'] = KC_E, ['F'] = KC_F, ['H'] = KC_H, ['X'] = KC_X, ['i'] = KC_I,
-};
-
 uint32_t timer_read32(void) {
     return fake_time;
 }
@@ -369,7 +362,7 @@ static void test_delay_command_matches_upstream_parsing(void) {
     macro_buffer[3] = '5';
     macro_buffer[4] = '0';
     macro_buffer[5] = '|';
-    macro_buffer[6] = 'X';
+    macro_buffer[6] = 'x';
 
     noah_action_tap(QK_MACRO_0);
 
@@ -384,7 +377,7 @@ static void test_delay_command_matches_upstream_parsing(void) {
 
 static void test_plain_text_uses_scan_driven_ascii_leases(void) {
     test_reset_state();
-    macro_buffer[0] = 'H';
+    macro_buffer[0] = 'h';
     macro_buffer[1] = 'i';
 
     noah_action_tap(QK_MACRO_0);
@@ -400,7 +393,7 @@ static void test_plain_text_uses_scan_driven_ascii_leases(void) {
 
 static void test_macro_slot_lookup_skips_null_terminated_entries(void) {
     test_reset_state();
-    macro_buffer[0] = 'A';
+    macro_buffer[0] = 'a';
     macro_buffer[1] = 0;
     macro_buffer[2] = SS_QMK_PREFIX;
     macro_buffer[3] = SS_TAP_CODE;
@@ -429,7 +422,7 @@ static void test_slot_six_authored_alt_gui_8_chord_uses_owned_keycode_lifecycle(
     macro_buffer[7]  = 0;
     macro_buffer[8]  = 'E';
     macro_buffer[9]  = 0;
-    macro_buffer[10] = 'F';
+    macro_buffer[10] = 'f';
     macro_buffer[11] = 0;
     macro_buffer[12] = SS_QMK_PREFIX;
     macro_buffer[13] = SS_DOWN_CODE;
@@ -565,7 +558,7 @@ static void test_invalid_high_text_is_cached_until_explicit_invalidation(void) {
     CHECK(test_call_count == 0u);
     CHECK(macro_buffer_read_count == reads_after_rejection);
 
-    macro_buffer[0] = 'A';
+    macro_buffer[0] = 'a';
     noah_action_tap(QK_MACRO_0);
 
     CHECK(test_call_count == 0u);
@@ -586,7 +579,7 @@ static void test_valid_slot_redecodes_once_per_playback(void) {
     uint16_t first_play_reads;
 
     test_reset_state();
-    macro_buffer[0] = 'A';
+    macro_buffer[0] = 'a';
 
     noah_action_tap(QK_MACRO_0);
     first_play_reads = macro_buffer_read_count;
@@ -611,7 +604,7 @@ static void test_invalidation_keeps_active_ir_immutable_then_reloads(void) {
     macro_buffer[4] = '0';
     macro_buffer[5] = '0';
     macro_buffer[6] = '|';
-    macro_buffer[7] = 'A';
+    macro_buffer[7] = 'a';
 
     noah_action_tap(QK_MACRO_0);
     macro_payload_engine_scan();
@@ -619,7 +612,7 @@ static void test_invalidation_keeps_active_ir_immutable_then_reloads(void) {
     CHECK(snapshot.state == MACRO_PAYLOAD_ENGINE_WAITING);
 
     memset(macro_buffer, 0, sizeof(macro_buffer));
-    macro_buffer[0] = 'B';
+    macro_buffer[0] = 'b';
     via_macro_provider_invalidate_all();
     test_run_macro_to_idle();
     CHECK(test_call_count == 2u);
@@ -645,9 +638,9 @@ static void test_busy_via_trigger_is_consumed_without_restarting(void) {
     macro_buffer[4] = '0';
     macro_buffer[5] = '0';
     macro_buffer[6] = '|';
-    macro_buffer[7] = 'A';
+    macro_buffer[7] = 'a';
     macro_buffer[8] = 0u;
-    macro_buffer[9] = 'B';
+    macro_buffer[9] = 'b';
 
     noah_action_tap(QK_MACRO_0);
     noah_action_tap(QK_MACRO_0 + 1u);
