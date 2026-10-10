@@ -13,7 +13,11 @@ static uint64_t pressed_bypassed;
 static uint64_t pressed_excluded;
 #ifdef KEYRECORD_USER_DATA
 static uint8_t pressed_context[MATRIX_ROWS * MATRIX_COLS];
-enum { CONTEXT_VALID = 0x80, CONTEXT_GENERATED = 0x40, CONTEXT_COMBO = 0x20, CONTEXT_BEHAVIOR = 0x10, CONTEXT_LAYER = 0x0f };
+// The context each position's last delivered press settled on, for its release.
+static uint8_t delivered_context[MATRIX_ROWS * MATRIX_COLS];
+// Bit 6 means generated on combo records and settled at delivery on physical
+// ones; nothing else reads it on a physical record.
+enum { CONTEXT_VALID = 0x80, CONTEXT_GENERATED = 0x40, CONTEXT_SETTLED = 0x40, CONTEXT_COMBO = 0x20, CONTEXT_BEHAVIOR = 0x10, CONTEXT_LAYER = 0x0f };
 #endif
 
 static bool position_of(keypos_t key_pos, uint8_t *position) {
@@ -133,6 +137,40 @@ void noah_participation_record_capture(keyrecord_t *record, uint8_t source_layer
 #else
     (void)record;
     (void)source_layer;
+#endif
+}
+void noah_participation_record_deliver(keyrecord_t *record, uint16_t keycode, uint8_t source_layer) {
+#ifdef KEYRECORD_USER_DATA
+    uint8_t position;
+    if (!record || record->event.type != KEY_EVENT || !position_of(record->event.key, &position)) return;
+    if (!record->event.pressed) {
+        // Asked again later (QMK asks before it processes), the record keeps
+        // what it took the first time.
+        if (delivered_context[position] & CONTEXT_VALID) record->user_data = delivered_context[position];
+        delivered_context[position] = 0;
+        return;
+    }
+    if ((record->user_data & (CONTEXT_VALID | CONTEXT_SETTLED)) == (CONTEXT_VALID | CONTEXT_SETTLED)) return;
+    if (!(record->user_data & CONTEXT_VALID) || (record->user_data & CONTEXT_LAYER) != (source_layer & CONTEXT_LAYER)) {
+        // It waited while a hold changed the layers: decide its behaviour on
+        // the layer it resolves from now. Combo permission stays the press's.
+        uint8_t combo = (record->user_data & CONTEXT_VALID) ? record->user_data & CONTEXT_COMBO : (noah_participation_press_combo(record->event.key) ? CONTEXT_COMBO : 0);
+        record->user_data = CONTEXT_VALID | (source_layer & CONTEXT_LAYER) | combo
+            | (noah_participation_behavior(keycode, source_layer, record->event.key) ? CONTEXT_BEHAVIOR : 0);
+    }
+    record->user_data |= CONTEXT_SETTLED;
+    delivered_context[position] = record->user_data;
+#else
+    (void)record;
+    (void)keycode;
+    (void)source_layer;
+#endif
+}
+void noah_participation_record_defer(keyrecord_t *record) {
+#ifdef KEYRECORD_USER_DATA
+    if (record && record->event.type == KEY_EVENT && record->event.pressed) record->user_data &= (uint8_t)~CONTEXT_SETTLED;
+#else
+    (void)record;
 #endif
 }
 bool noah_participation_record_behavior(const keyrecord_t *record) {

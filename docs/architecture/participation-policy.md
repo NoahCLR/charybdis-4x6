@@ -1,7 +1,9 @@
 # Behaviour and combo participation
 
 Whether a key press uses its keycode's shared behaviour, and whether it can
-join a combo, is decided once, at the press, by one firmware policy module.
+join a combo, is decided once per press by one firmware policy module: the
+combo decision at the physical press, the behaviour decision when the press
+takes effect.
 This document is the contract for that decision (D-F14). The stored fields
 live in the settings, key-behaviour and combo domains; their bytes are in
 [Portable Profile V1](portable-profile-v1.md#settings-domain-0x40-version-6)
@@ -39,7 +41,10 @@ QMK's `layer_switch_get_layer()` for that key position, which falls through
 `KC_TRNS` entries to the highest active layer with a non-transparent key. It
 is captured with the press (`read_source_layers_cache()` in the userspace hook,
 the same cache QMK uses to release the key) and never inferred from keycode
-identity, because one keycode can sit on several layers.
+identity, because one keycode can sit on several layers. A press that waits
+behind an undecided tap/hold key is resolved again when it is delivered, as
+QMK resolves it: its source layer is then the layer the hold turned on (see
+[A press that waited](#a-press-that-waited)).
 
 The **placement** is the pair (source layer, matrix position). Transparent
 entries above the source layer are not placements and veto nothing.
@@ -78,9 +83,31 @@ fallback-action field.
 One `KC_W` row is shared by every `KC_W` placement. Bypassing W on one layer
 leaves every other W placement eligible.
 
-The decision is made at the press and held by the press's owner through its
-release and any pending gesture completion. A layer change while the key is
-held cannot move the press to another owner or lose its release.
+The decision is made once per press, when the press is delivered, and held by
+the press's owner through its release and any pending gesture completion. A
+layer change while the key is held cannot move the press to another owner or
+lose its release.
+
+### A press that waited
+
+A press can wait in QMK's tapping queue, its combo buffer or userspace record
+admission while a tap/hold key decides. QMK does not freeze the keycode it
+resolved at the physical press: it resolves the press again when it delivers
+it, on the layers active then, and stores that source layer for the release.
+Participation follows that delivery. If the press now resolves from another
+layer than at its physical press, its behaviour decision is made again against
+that layer, with the same four scopes; its combo decision stays the physical
+press's, because combos matched it when it was pressed.
+
+Holding `LT(Nav, F)` past its term with `J` pressed meanwhile types Nav's key
+at J's position under Nav's behaviour settings, exactly as if J had been
+pressed after the hold began. Released before its term, the LT is a tap and J
+resolves from the base layer, under the base layer's settings.
+
+Each press is settled once, the first time it is delivered, and its release
+takes that decision, even if the same position is pressed again before the
+release is delivered. Record admission holds back presses QMK has already
+delivered; a press it holds back settles again when it is replayed.
 
 ## Combo decision
 
@@ -147,11 +174,19 @@ storage, and costs one masked bit test per scope on an ordinary press.
   (`users/noah/lib/compat/qmk_source_layer_contract.h`), asks for both
   decisions, retaining the physical press's context for its release. The
   source layer and both decisions are copied into BK's optional opaque
-  `keyrecord_t.user_data` byte (`KEYRECORD_USER_DATA`), along with the resolved
-  native keycode. Native tapping, combo buffering and userspace admission copy
-  that context with each record. A later press at the same position cannot
-  rewrite earlier queued records. QMK's synthesized tapping releases preserve
-  the tapping press's context too.
+  `keyrecord_t.user_data` byte (`KEYRECORD_USER_DATA`). The keycode is not
+  frozen in the record. Native tapping, combo buffering and userspace
+  admission copy that context with each record. A later press at the same
+  position cannot rewrite earlier queued records. QMK's synthesized tapping
+  releases preserve the tapping press's context too.
+- **At delivery.** `noah_participation_record_deliver()` settles a physical
+  press the first time it leaves the queues: in `is_tap_record_user()`, which
+  QMK asks with the keycode it resolves now and whose layer
+  `layer_switch_get_layer()` gives, or in the process hook, after QMK has
+  stored the press's source layer, whichever comes first. A source layer that
+  changed re-decides the behaviour; a settled press is marked in its context
+  (bit 6, unused on physical records otherwise) and kept per position for its
+  release. Record admission clears that mark on a press it holds back.
 - **Behaviour lookup.** The key runtime admits a press through its keycode's
   behaviour row only when the stored decision says so; otherwise it looks the
   keycode up without the row and takes the normal action. A combo's generated

@@ -264,6 +264,7 @@ uint8_t              combo_ref_from_layer(uint8_t layer);
 uint16_t             keymap_key_to_keycode(uint8_t layer, keypos_t key);
 uint16_t             get_record_keycode(keyrecord_t *record, bool update_layer_cache);
 uint8_t              read_source_layers_cache(keypos_t key);
+uint8_t              layer_switch_get_layer(keypos_t key);
 
 uint8_t get_mods(void);
 uint8_t get_weak_mods(void);

@@ -167,6 +167,8 @@ engine holds keys behind a tapping key:
   waiting keys, so rolling `/` into `,` types `/,`;
 - held past the term, its hold starts (layer or modifiers), then the waiting
   keys run on it, so `/` held with an arrow tapped meanwhile sends the Nav arrow.
+  A waiting key types the key the hold's layer gives it and follows that
+  layer's behaviour settings, as if it had been pressed after the hold began.
 
 Waiting keys replay in order with their physical timestamps. The release of a
 key pressed before the tap/hold key is not held back, as in QMK. The wait is at
