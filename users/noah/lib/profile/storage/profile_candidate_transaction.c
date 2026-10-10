@@ -90,6 +90,26 @@ bool noah_profile_candidate_transaction_receive(noah_profile_candidate_transacti
         return true;
     }
 
+    // Streaming clients may omit status reads between admitted chunks. Admit
+    // only the exact next write; an admitted storage failure poisons the
+    // candidate, so later writes cannot erase it before the batch is checked.
+    if (frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK) {
+        noah_profile_candidate_v1_error_id_t rejection = NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE;
+        if (!transaction->has_candidate || transaction->status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING || transaction->poisoned) {
+            rejection = NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE;
+        } else if (command.transaction_id != transaction->status.transaction_id) {
+            rejection = NOAH_PROFILE_CANDIDATE_V1_ERROR_WRONG_TRANSACTION;
+        } else if (command.payload.chunk.offset != transaction->status.next_offset) {
+            rejection = NOAH_PROFILE_CANDIDATE_V1_ERROR_OUT_OF_ORDER;
+        } else if ((uint32_t)command.payload.chunk.offset + command.payload.chunk.length > transaction->metadata.payload_length) {
+            rejection = NOAH_PROFILE_CANDIDATE_V1_ERROR_CAPACITY_EXCEEDED;
+        }
+        if (rejection != NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE) {
+            noah_profile_candidate_v1_encode_ack(frame, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_REJECTED, rejection, 5u);
+            return true;
+        }
+    }
+
     transaction->mailbox.command = command;
     transaction->mailbox.pending = true;
     noah_profile_candidate_v1_encode_ack(frame, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_QUEUED, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U8);
@@ -449,7 +469,48 @@ static void process_commit(noah_profile_candidate_transaction_t *transaction, co
     (void)begin_commit(transaction);
 }
 
-static bool process_mailbox(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_v1_command_t *command) {
+static bool process_reuse(noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_command_t *command) {
+    uint16_t copied = command->payload.reuse.copied;
+    uint16_t remaining = command->payload.reuse.length - copied;
+    uint8_t length = remaining > NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX ? NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX : (uint8_t)remaining;
+    uint16_t offset = command->payload.reuse.offset + copied;
+    noah_profile_candidate_backend_result_t result;
+
+    if (!transaction->has_candidate || transaction->poisoned || transaction->status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING || command->transaction_id != transaction->status.transaction_id || offset != transaction->status.next_offset || (uint32_t)command->payload.reuse.offset + command->payload.reuse.length > transaction->metadata.payload_length || !transaction->backend.read_source || !transaction->backend.write) {
+        set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE, offset);
+        transaction->reuse_read = false;
+        return false;
+    }
+    if (!transaction->reuse_read) {
+        result = transaction->backend.read_source(transaction->backend.context, &command->payload.reuse.source, command->payload.reuse.source_offset + copied, transaction->reuse_bytes, length);
+        if (backend_complete(result)) {
+            transaction->reuse_read = true;
+            return true;
+        }
+    } else {
+        result = transaction->backend.write(transaction->backend.context, offset, transaction->reuse_bytes, length);
+        transaction->reuse_read = false;
+        if (backend_complete(result)) {
+            command->payload.reuse.copied += length;
+            transaction->status.next_offset += length;
+            clear_error(transaction);
+            if (command->payload.reuse.copied < command->payload.reuse.length) return true;
+            transaction->status.state = transaction->status.next_offset == transaction->metadata.payload_length ? NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE : NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING;
+            return false;
+        }
+    }
+    poison(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE, offset);
+    transaction->reuse_read = false;
+    return false;
+}
+
+static bool process_mailbox(noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_command_t *command) {
+    if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_REUSE) {
+        if (process_reuse(transaction, command)) return true;
+        transaction->status.last_operation = command->operation;
+        transaction->status.operation_sequence++;
+        return false;
+    }
     transaction->status.last_operation = command->operation;
     transaction->status.operation_sequence++;
 
@@ -571,6 +632,7 @@ static noah_profile_candidate_expire_result_t cancel_precommit(noah_profile_cand
         }
         transaction->status.last_operation = transaction->mailbox.command.operation;
         transaction->mailbox.pending       = false;
+        transaction->reuse_read            = false;
         memset(&transaction->mailbox.command, 0, sizeof(transaction->mailbox.command));
     }
     if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED || reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED || reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED) {

@@ -505,11 +505,15 @@ Capability feature bits are:
 
 | 20 | participation controls: behaviour and combo participation at the master, layer, definition and placement scopes ([participation policy](participation-policy.md)) |
 
+| 24 | candidate reuse: copy bounded ranges from an identified active profile into the inactive candidate (`SET 0x1B`, below) |
+
+| 25 | candidate streaming chunks: admit sequential chunks and prove bounded batches through status (`SET 0x1C`, below) |
+
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with
 their schema feature bits. Candidate chunk capacity is
 zero exactly when candidate writes are absent and otherwise is `1..20`.
-Commit and runtime activation require candidate writes. RGB preview also
+Commit, runtime activation, candidate reuse and streaming chunks require candidate writes. RGB preview also
 requires the RGB domain. Peer reconciliation requires both split-keyboard and
 persistent-commit support. The live client rejects inconsistent combinations
 before it offers a live operation.
@@ -582,6 +586,8 @@ uses VIA custom save command `0x09`. Both use custom channel `0x00` and an exact
 | `0x12` | validate candidate |
 | `0x13` | durably commit and request safe activation |
 | `0x14` | abort candidate |
+| `0x1B` | reuse active candidate bytes, feature bit 24 |
+| `0x1C` | write streaming candidate chunk, feature bit 25 |
 
 Custom set values `0x15`, `0x16`, `0x17` and `0x1A` belong to the logical VIA
 staging channel, specified in
@@ -635,6 +641,59 @@ length, bytes}` tuple is accepted after the scan owner reads and compares the
 staged bytes. A retry with different bytes rejects and poisons that candidate.
 Partial overlaps, gaps, writes beyond the declared length or selected schema bound,
 and nonzero padding are rejected.
+
+#### Differential candidate transfer
+
+Feature bit 24 advertises REUSE (`SET 0x1B`); bit 25 advertises STREAM_CHUNK
+(`SET 0x1C`). Both require candidate writes. The capability layout, schema,
+stored record format and existing operations retain their meanings. A client
+without these features uses ordinary complete uploads.
+
+REUSE uses the same transaction header as CHUNK:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 5 | 2 | destination offset in the new candidate |
+| 7 | 2 | source offset in the active canonical blob |
+| 9 | 2 | copy length, `1..1024` |
+| 11 | 4 | source generation |
+| 15 | 4 | source FNV-1a digest |
+| 19 | 4 | source CRC32 |
+| 23 | 1 | source active kind: compiled `0`, committed `1` |
+| 24 | 1 | source origin: compiled `255`, committed `0..1` |
+| 25 | 7 | reserved, all zero |
+
+Compiled sources require generation zero; committed sources require a nonzero
+generation. Destination ranges must start at the exact next staged offset.
+Ranges cannot exceed the source or declared target. Each read checks the active
+source's kind, origin, generation and both checksums, plus the build's compiled
+default and action ABI identities. The source stays active; only the inactive
+candidate is written. Read and write alternate in scan context, each accessing
+at most 20 bytes. Progress advances `next_offset` after each write, and the
+mailbox remains pending until the range finishes. REUSE increments the operation
+sequence once, at completion; its operation ID is `6`. Source/read/write failure
+poisons the candidate. There is no implicit retry of a partially copied range.
+The range ceiling bounds one occupied mailbox and the wait before an abort can
+be admitted. Owner supersession can discard it earlier, including its scratch
+read. The transaction remains within the existing 256-byte state ceiling and
+holds only a 20-byte copy buffer, never a profile-sized RAM buffer.
+
+STREAM_CHUNK has CHUNK's layout and status operation ID (`2`), but admission
+checks transaction, receiving state, exact next offset and declared capacity.
+Admission `4` (`REJECTED`) names the failed check in its error byte and gives a
+frame offset or `255`. The existing `QUEUED`, `BUSY`, `MALFORMED` and `UNSUPPORTED`
+admissions retain their meanings. The mailbox still admits one command; no queue
+or work in the HID callback is added. Storage failure is sticky: later streaming
+writes cannot erase it. A host can send a bounded batch of admitted chunks, then
+prove the exact next offset, transaction, candidate identity and operation-sequence
+advance before continuing. On BUSY it drains the admitted prefix and retries
+only the definitely unadmitted suffix. A lost reply is ambiguous, never permission
+to resend a batch blindly.
+
+These operations only reconstruct the candidate. Full checksum and semantic
+validation, peer preparation, marker-last durability, activation, cancellation
+and recovery remain the same. Split transfer still sends the complete custom
+candidate; differential split preparation is not part of this extension.
 
 Validate and abort contain only the five-byte common header; bytes 5 through
 31 are reserved and zero. Commit uses the same body-free shape but byte 0 is
@@ -690,7 +749,7 @@ preserves bytes 0 through 4 and replaces bytes 5 through 31 with:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 5 | 1 | admission: `0` queued, `1` malformed, `2` busy, `3` unsupported |
+| 5 | 1 | admission: `0` queued, `1` malformed, `2` busy, `3` unsupported, `4` rejected |
 | 6 | 1 | stable candidate error id |
 | 7 | 1 | malformed-frame byte offset, or `0xFF` |
 | 8 | 24 | reserved, all zero |
@@ -784,7 +843,7 @@ the peer before local durability, `9` converging the peer after local
 durability but before provider activation, and `10` authority-failed after a
 durable local commit that was deliberately not activated.
 Last-operation ids are `0` none, `1` begin, `2` chunk, `3` validate, `4`
-abort, and `5` commit. Error ids are stable:
+abort, `5` commit, and `6` reuse. Error ids are stable:
 
 | Id | Error |
 | ---: | --- |
@@ -855,6 +914,8 @@ unhandled reply.
 | custom get | `0x18` | candidate operation status | this document |
 | custom get | `0x19` | logical VIA staging status | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
 | custom set | `0x1A` | logical VIA staging abort: always refused, unsupported | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
+| custom set | `0x1B` | candidate reuse, feature bit 24 | Differential candidate transfer, above |
+| custom set | `0x1C` | candidate streaming chunk, feature bit 25 | Differential candidate transfer, above |
 
 Every mutating operation includes a nonzero transaction id. Candidate begin
 declares schema, length, CRC, digest, and requested domain mask. Chunks include

@@ -28,6 +28,7 @@ typedef struct {
     unsigned                                activation_begin_calls;
     unsigned                                activation_step_calls;
     unsigned                                abort_calls;
+    unsigned                                source_read_calls;
     noah_profile_candidate_backend_result_t begin_result;
     noah_profile_candidate_backend_result_t write_result;
     noah_profile_candidate_backend_result_t read_result;
@@ -43,6 +44,16 @@ typedef struct {
     bool                                    validation_step_returns_ok;
     noah_profile_candidate_v1_metadata_t    metadata;
 } fake_backend_t;
+
+static const uint8_t reuse_source[64] = "A source profile that remains immutable until activation.";
+static noah_profile_candidate_backend_result_t fake_read_source(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint8_t *bytes, uint8_t length) {
+    fake_backend_t *fake = context;
+    fake->source_read_calls++;
+    assert(length <= 20u);
+    if (source->generation != 7u || source->digest != 123u || source->crc32 != 456u || source->kind != 1u || source->origin != 0u || (uint32_t)offset + length > sizeof(reuse_source)) return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+    memcpy(bytes, reuse_source + offset, length);
+    return NOAH_PROFILE_CANDIDATE_BACKEND_OK;
+}
 
 static uint8_t hex_nibble(char value) {
     if (value >= '0' && value <= '9') {
@@ -294,6 +305,7 @@ static noah_profile_candidate_backend_t backend_for(fake_backend_t *fake) {
         .begin            = fake_begin,
         .write            = fake_write,
         .read             = fake_read,
+        .read_source      = fake_read_source,
         .validation_begin = fake_validation_begin,
         .validation_step  = fake_validation_step,
         .commit_begin     = fake_commit_begin,
@@ -1316,10 +1328,139 @@ static void test_explicit_precommit_expiry_never_crosses_durable_boundary(void) 
     assert(fake.abort_calls == 3u);
 }
 
+static void reuse_frame(uint8_t frame[32], uint16_t transaction_id, uint16_t offset, uint16_t source_offset, uint16_t length) {
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE, transaction_id);
+    write_u16(frame + 5, offset);
+    write_u16(frame + 7, source_offset);
+    write_u16(frame + 9, length);
+    write_u32(frame + 11, 7u);
+    write_u32(frame + 15, 123u);
+    write_u32(frame + 19, 456u);
+    frame[23] = 1;
+}
+
+static void test_reuse_is_bounded_and_validated(void) {
+    uint8_t frame[32], target[48];
+    fake_backend_t fake;
+    memset(&fake, 0, sizeof(fake));
+    memcpy(target, reuse_source + 3, sizeof(target));
+    noah_profile_candidate_backend_t backend = backend_for(&fake);
+    noah_profile_candidate_compatibility_t compat = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(target, sizeof(target));
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compat);
+    begin_transaction(&transaction, &fake, 77, &metadata);
+    reuse_frame(frame, 77, 0, 3, sizeof(target));
+    queue(&transaction, &fake, frame);
+    assert(fake.source_read_calls == 0u);
+    unsigned steps = 0;
+    while (transaction.mailbox.pending) {
+        unsigned before = fake.write_calls + fake.source_read_calls;
+        assert(noah_profile_candidate_transaction_scan(&transaction));
+        assert(fake.write_calls + fake.source_read_calls == before + 1u);
+        assert(++steps <= 6u);
+    }
+    assert(steps == 6u);
+    assert(memcmp(fake.staged, target, sizeof(target)) == 0);
+    assert(status_of(&transaction).next_offset == sizeof(target));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE);
+    assert(fake.validation_begin_calls == 0u);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 77);
+    queue_and_scan(&transaction, &fake, frame);
+    while (status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING) assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+    assert(fake.validation_step_calls > 0u);
+    assert(fake.commit_begin_calls == 0u);
+}
+
+static void test_supersession_discards_pending_reuse_read(void) {
+    uint8_t frame[32], target[48];
+    fake_backend_t fake;
+    fake_init(&fake);
+    memcpy(target, reuse_source, sizeof(target));
+    noah_profile_candidate_backend_t backend = backend_for(&fake);
+    noah_profile_candidate_compatibility_t compat = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(target, sizeof(target));
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compat);
+    begin_transaction(&transaction, &fake, 79, &metadata);
+    reuse_frame(frame, 79, 0, 0, sizeof(target));
+    queue_and_scan(&transaction, &fake, frame);
+    assert(transaction.reuse_read && transaction.mailbox.pending);
+    assert(fake.source_read_calls == 1u && fake.write_calls == 0u);
+    assert(noah_profile_candidate_transaction_supersede_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
+    assert(!transaction.reuse_read && !transaction.mailbox.pending);
+    assert(!noah_profile_candidate_transaction_scan(&transaction));
+    assert(fake.write_calls == 0u && fake.commit_begin_calls == 0u);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    // A later candidate reads its own source rather than writing old scratch.
+    begin_transaction(&transaction, &fake, 80, &metadata);
+    reuse_frame(frame, 80, 0, 1, sizeof(target));
+    queue_and_scan(&transaction, &fake, frame);
+    assert(fake.source_read_calls == 2u && fake.write_calls == 0u);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(memcmp(fake.staged, reuse_source + 1, 20) == 0);
+}
+
+static void test_streaming_admission_and_reuse_failure(void) {
+    uint8_t frame[32], target[48] = {0};
+    fake_backend_t fake;
+    memset(&fake, 0, sizeof(fake));
+    noah_profile_candidate_backend_t backend = backend_for(&fake);
+    noah_profile_candidate_compatibility_t compat = compatibility();
+    noah_profile_candidate_transaction_t transaction;
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(target, sizeof(target));
+    noah_profile_candidate_transaction_init(&transaction, &backend, &compat);
+    begin_transaction(&transaction, &fake, 78, &metadata);
+    chunk_frame(frame, 78, 1, target, 20); frame[2] = 0x1c;
+    assert(noah_profile_candidate_transaction_receive(&transaction, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_REJECTED);
+    assert(!transaction.mailbox.pending && fake.write_calls == 0u);
+    chunk_frame(frame, 78, 0, target, 20); frame[2] = 0x1c;
+    queue(&transaction, &fake, frame);
+    chunk_frame(frame, 78, 20, target, 20); frame[2] = 0x1c;
+    assert(noah_profile_candidate_transaction_receive(&transaction, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
+    assert(noah_profile_candidate_transaction_scan(&transaction));
+    assert(status_of(&transaction).next_offset == 20);
+    reuse_frame(frame, 78, 20, 0, 28); frame[15]++;
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
+    chunk_frame(frame, 78, 20, target, 20); frame[2] = 0x1c;
+    assert(noah_profile_candidate_transaction_receive(&transaction, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_REJECTED);
+    assert(fake.write_calls == 1u);
+    assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 78);
+    queue_and_scan(&transaction, &fake, frame);
+    assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+}
+
+static void test_differential_transfer_frames(void) {
+    uint8_t frame[32] = {0x07, 0, 0x1b, 1, 0};
+    noah_profile_candidate_v1_command_t command;
+    noah_profile_candidate_v1_frame_error_t error;
+    write_u16(frame + 9, 1024u);
+    frame[24] = 0xffu; // Compiled source, generation zero.
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
+    frame[31] = 1;
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED);
+    frame[31] = 0;
+    write_u16(frame + 9, 0);
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED);
+    chunk_frame(frame, 1, 0, (const uint8_t *)"abcdefgh", 8);
+    frame[2] = 0x1c;
+    assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     fixture_path = argv[1];
     assert(sizeof(noah_profile_candidate_transaction_t) <= 256u);
+    test_differential_transfer_frames();
+    test_reuse_is_bounded_and_validated();
+    test_supersession_discards_pending_reuse_read();
+    test_streaming_admission_and_reuse_failure();
     test_exact_frame_codecs();
     test_malformed_frame_matrix();
     test_operation_status_codec();

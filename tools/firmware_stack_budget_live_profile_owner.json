@@ -29,6 +29,11 @@
         },
         {
           "caller": "noah_profile_candidate_transaction_scan",
+          "callee": "read_source",
+          "reason": "The scan-owned reuse operation invokes the candidate backend active-source reader; source identity and the copied snapshot stay on this call path."
+        },
+        {
+          "caller": "noah_profile_candidate_transaction_scan",
           "callee": "write_candidate",
           "reason": "the host transaction invokes the shared candidate backend write callback"
         },
@@ -132,6 +137,22 @@
         {
           "name": "engineering owner host payload write",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "write_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+        },
+        {
+          "name": "candidate reuse committed EEPROM read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "candidate reuse compiled RGB materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "candidate reuse compiled settings materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
+        },
+        {
+          "name": "candidate reuse compiled combo materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
         },
         {
           "name": "engineering owner host validation step",

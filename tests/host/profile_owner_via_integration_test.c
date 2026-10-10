@@ -71,7 +71,8 @@ static uint32_t              user_eeconfig_word;
 static uint8_t               local_config[CONFIG_SIZE];
 static uint8_t               local_keymap[KEYMAP_SIZE];
 static uint8_t               local_macro[MACRO_SIZE];
-static const uint8_t         target_keymap[KEYMAP_SIZE] = {0x91u, 0x92u, 0x93u};
+static uint8_t               target_keymap[KEYMAP_SIZE] = {0x91u, 0x92u, 0x93u};
+static uint32_t              target_via_generation = 6u;
 static noah_profile_owner_t *admitting_owner;
 
 static uint32_t digest_parts(const uint8_t *config, const uint8_t *keymap, const uint8_t *macro) {
@@ -510,7 +511,7 @@ static void candidate_frame(uint8_t frame[32], uint8_t value, uint16_t transacti
         write_u32(&frame[15], fnv_of(compiled_blob, sizeof(compiled_blob)));
         write_u32(&frame[19], UINT32_C(0x12345678));
         frame[23] = NOAH_PROFILE_STORE_FORMAT_VERSION;
-        write_u32(&frame[24], 6u);
+        write_u32(&frame[24], target_via_generation);
         write_u32(&frame[28], target_digest());
     } else if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK) {
         frame[7] = sizeof(compiled_blob);
@@ -532,10 +533,10 @@ static uint8_t host_via(uint8_t value, uint16_t transaction_id, noah_qmk_via_syn
         write_u16(&frame[8], noah_qmk_via_storage_region_size(region));
         frame[10] = length;
         memcpy(&frame[11], bytes, length);
-        write_u32(&frame[23], 6u);
+        write_u32(&frame[23], target_via_generation);
         write_u32(&frame[27], target_digest());
     } else {
-        write_u32(&frame[5], 6u);
+        write_u32(&frame[5], target_via_generation);
         write_u32(&frame[9], target_digest());
     }
     assert(noah_qmk_via_logical_profile_handle(frame, sizeof(frame)));
@@ -579,6 +580,12 @@ static void host_staged(uint8_t value, uint16_t transaction_id, noah_qmk_via_syn
     assert(!via_status().pending);
 }
 
+static void initialize_pair(void) {
+    noah_qmk_via_split_sync_init();
+    assert(noah_profile_owner_init(&usb, &(noah_profile_owner_config_t){.store_io = {.read = memory_read, .write = memory_write, .context = &usb_memory}, .split_exchange = split_exchange, .split_transport_context = &usb_link, .origin_half = 0u, .peer_required = true, .logical_via = &usb_via_ops}));
+    assert(noah_profile_owner_init(&other, &(noah_profile_owner_config_t){.store_io = {.read = memory_read, .write = memory_write, .context = &other_memory}, .split_exchange = split_exchange, .split_transport_context = &other_link, .origin_half = 1u, .peer_required = true, .logical_via = &other_via_ops}));
+}
+
 static void boot_pair(uint32_t *now) {
     memset(&usb_memory, 0xff, sizeof(usb_memory));
     memset(&other_memory, 0xff, sizeof(other_memory));
@@ -597,9 +604,7 @@ static void boot_pair(uint32_t *now) {
     link_up            = true;
     admitting_owner    = &usb;
     fake_now           = *now;
-    noah_qmk_via_split_sync_init();
-    assert(noah_profile_owner_init(&usb, &(noah_profile_owner_config_t){.store_io = {.read = memory_read, .write = memory_write, .context = &usb_memory}, .split_exchange = split_exchange, .split_transport_context = &usb_link, .origin_half = 0u, .peer_required = true, .logical_via = &usb_via_ops}));
-    assert(noah_profile_owner_init(&other, &(noah_profile_owner_config_t){.store_io = {.read = memory_read, .write = memory_write, .context = &other_memory}, .split_exchange = split_exchange, .split_transport_context = &other_link, .origin_half = 1u, .peer_required = true, .logical_via = &other_via_ops}));
+    initialize_pair();
     for (uint32_t guard = 0u; guard < 4096u && (usb.state != NOAH_PROFILE_OWNER_READY_COMPILED || other.state != NOAH_PROFILE_OWNER_READY_COMPILED); guard++)
         tick(now);
     assert(usb.state == NOAH_PROFILE_OWNER_READY_COMPILED && other.state == NOAH_PROFILE_OWNER_READY_COMPILED);
@@ -647,7 +652,7 @@ static void commit_staged(uint16_t transaction_id, bool roll_forward, uint32_t *
     for (uint32_t guard = 0u; guard < 8192u && via_status().state != NOAH_QMK_VIA_LOGICAL_ACCEPTED; guard++)
         tick(now);
     assert(via_status().state == NOAH_QMK_VIA_LOGICAL_ACCEPTED);
-    assert(peer.generation == 6u && !peer.dirty);
+    assert(peer.generation == target_via_generation && !peer.dirty);
     if (roll_forward) {
         memcpy(local_keymap, target_keymap, KEYMAP_SIZE);
         noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
@@ -656,7 +661,7 @@ static void commit_staged(uint16_t transaction_id, bool roll_forward, uint32_t *
         tick(now);
     assert(usb.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && usb.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
     assert(memcmp(local_keymap, target_keymap, KEYMAP_SIZE) == 0);
-    assert(noah_qmk_via_sync_state_snapshot().metadata.generation == 6u && !noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    assert(noah_qmk_via_sync_state_snapshot().metadata.generation == target_via_generation && !noah_qmk_via_sync_state_snapshot().metadata.dirty);
     assert(noah_profile_owner_output_ready(&usb));
 }
 
@@ -792,12 +797,78 @@ static void test_cleanup_waits_for_an_absent_peer_and_resumes(void) {
     commit_staged(310u, true, &now);
 }
 
+static void assert_pair_profile(uint32_t generation) {
+    noah_profile_owner_t *halves[] = {&usb, &other};
+    for (unsigned half = 0; half < 2; half++) {
+        noah_effective_profile_snapshot_t active;
+        uint8_t bytes[sizeof(compiled_blob)];
+        assert(noah_effective_profile_provider_copy_active(&halves[half]->provider, &active) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(active.identity.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
+        assert(active.identity.generation == generation && active.identity.payload_digest == fnv_of(compiled_blob, sizeof(compiled_blob)));
+        assert(noah_effective_profile_snapshot_read(&active, 0, bytes, sizeof(bytes)));
+        assert(memcmp(bytes, compiled_blob, sizeof(bytes)) == 0);
+    }
+}
+
+static void reboot_saved_pair(uint32_t *now, uint32_t generation) {
+    // Preserve both custom stores, both VIA banks and their durable metadata;
+    // only the owners and volatile VIA synchronization state restart.
+    initialize_pair();
+    for (uint32_t guard = 0; guard < 32768u && (usb.state != NOAH_PROFILE_OWNER_READY_VALIDATED || other.state != NOAH_PROFILE_OWNER_READY_VALIDATED); guard++) tick(now);
+    assert(usb.state == NOAH_PROFILE_OWNER_READY_VALIDATED && other.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
+    assert_pair_profile(generation);
+}
+
+static void test_committed_reuse_saves_both_halves_and_reboots(void) {
+    uint32_t now = 0;
+    boot_pair(&now);
+    stage(311u, true, &now);
+    commit_staged(311u, true, &now);
+    for (uint32_t guard = 0; guard < 8192u && other.state != NOAH_PROFILE_OWNER_READY_VALIDATED; guard++) tick(&now);
+    assert_pair_profile(1);
+    reboot_saved_pair(&now, 1);
+
+    // A later key edit reuses its unchanged custom profile from committed
+    // EEPROM, rather than uploading it from the host or using compiled bytes.
+    noah_effective_profile_snapshot_t source;
+    assert(noah_effective_profile_provider_copy_active(&usb.provider, &source) == NOAH_EFFECTIVE_PROFILE_OK);
+    target_via_generation = 7;
+    memcpy(target_keymap, (const uint8_t[]){0xa1, 0xa2, 0xa3}, KEYMAP_SIZE);
+    host_candidate(NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, 312u, &now);
+    uint8_t frame[32];
+    candidate_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE, 312u);
+    write_u16(frame + 9, sizeof(compiled_blob));
+    write_u32(frame + 11, source.identity.generation);
+    write_u32(frame + 15, source.identity.payload_digest);
+    write_u32(frame + 19, source.identity.payload_crc32);
+    frame[23] = 1;
+    frame[24] = source.identity.origin;
+    assert(noah_profile_owner_receive(&usb, frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_QUEUED);
+    for (uint32_t guard = 0; guard < 64u && usb.host_transaction.mailbox.pending; guard++) tick(&now);
+    assert(!usb.host_transaction.mailbox.pending && usb.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE);
+    assert_pair_profile(1); // Reconstruction cannot publish either half.
+    host_candidate(NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 312u, &now);
+    for (uint32_t guard = 0; guard < 64u && usb.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++) tick(&now);
+    assert(usb.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+    host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_BEGIN, 312u, NOAH_QMK_VIA_SYNC_REGION_NONE, NULL, 0u, &now);
+    host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_CHUNK, 312u, NOAH_QMK_VIA_SYNC_REGION_KEYMAP, target_keymap, KEYMAP_SIZE, &now);
+    host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_VERIFY, 312u, NOAH_QMK_VIA_SYNC_REGION_NONE, NULL, 0u, &now);
+    commit_staged(312u, true, &now);
+    for (uint32_t guard = 0; guard < 8192u && other.committed_descriptor.generation != 2; guard++) tick(&now);
+    assert_pair_profile(2);
+    reboot_saved_pair(&now, 2);
+    assert(memcmp(local_keymap, target_keymap, KEYMAP_SIZE) == 0 && memcmp(peer.keymap, target_keymap, KEYMAP_SIZE) == 0);
+    assert(peer.generation == 7 && noah_qmk_via_sync_state_snapshot().metadata.generation == 7);
+    puts("committed-source reuse: real owners, logical VIA staging, both-half publication and reboot passed");
+}
+
 int main(void) {
     test_a_decision_the_host_did_not_see_rolls_forward();
     test_a_cancel_before_the_decision_releases_both_stores();
     test_an_abandoned_staging_expires_with_its_candidate();
     test_staging_progress_is_the_candidates_lease();
     test_cleanup_waits_for_an_absent_peer_and_resumes();
+    test_committed_reuse_saves_both_halves_and_reboots();
     puts("profile owner and logical VIA integration tests passed");
     return 0;
 }
