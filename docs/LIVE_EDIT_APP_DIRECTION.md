@@ -656,6 +656,16 @@ over emitting the next key at once (swapped order in rolls) and over settling a
 tap on the next press (breaks quick chords under a held layer); the cost is a
 wait of at most the tap-hold term for keys pressed during an undecided key.
 
+Extended 2026-10-10 to authored keys whose hold is a layer held until release
+(`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`, such as the thumb keys whose tap
+locks a layer): they are undecided in the same sense, so what is pressed under
+their layer preview lands on that layer. A pending tap that changes layers is
+settled by the next press of a key without a behaviour before that press is
+resolved, so a key typed right after a lock tap lands on the locked layer.
+Other handled keys keep independent series alive, as before. Chosen over
+turning the layer on at the press when every outcome agrees (a per-key special
+case, dropped).
+
 Records are held after combos and native tapping, before every QMK feature,
 through the fork's `process_record_admit_user()` hook, and replayed through
 `process_record()` like QMK's own tapping queue

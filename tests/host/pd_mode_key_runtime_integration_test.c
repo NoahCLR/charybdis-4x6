@@ -3656,6 +3656,48 @@ static void test_qmk_waiting_key_participates_on_hold_layer(void) {
     }
     gesture_live_row = false; gesture_test_code = KC_NO;
 }
+// A key whose hold is a layer (tap locks Nav, hold is Nav) makes keys wait as
+// LT does, so what is pressed under its layer preview lands on that layer.
+static void gesture_unlock_nav(void) {
+    // A lone tap toggles the lock back off once its multi-tap window closes.
+    gesture_at(3,3,true); gesture_advance(20); gesture_at(3,3,false); gesture_advance(TEST_PD_MULTI_TAP_TERM + 50);
+    CHECK(!layer_ownership_is_locked(TEST_LAYER_NAV));
+}
+static void test_qmk_layer_hold_key_makes_keys_wait(void) {
+    // Held past its hold term: the waiting key types on the held layer.
+    gesture_start_resolution(30000, TEST_LAYER_NAV); gesture_second_code = TEST_LAYER_HOLD_KEY;
+    gesture_at(3,3,true); gesture_advance(30); gesture_at(3,0,true); gesture_advance(10);
+    CHECK(gesture_press_count(KC_Z) == 0 && gesture_press_count(KC_X) == 0); // waiting
+    gesture_advance(200);
+    CHECK(layer_state_cmp(layer_state, TEST_LAYER_NAV));
+    CHECK(gesture_processed_press == KC_X && gesture_press_count(KC_Z) == 0);
+    gesture_at(3,0,false); gesture_at(3,3,false); gesture_advance(500);
+    CHECK(!layer_state_cmp(layer_state, TEST_LAYER_NAV) && !layer_ownership_is_locked(TEST_LAYER_NAV));
+    gesture_check_quiescent();
+
+    // Released before it: a tap, so the lock comes first and the key lands on it.
+    gesture_start_resolution(31000, TEST_LAYER_NAV); gesture_second_code = TEST_LAYER_HOLD_KEY;
+    gesture_at(3,3,true); gesture_advance(30); gesture_at(3,0,true); gesture_advance(30);
+    gesture_at(3,3,false); gesture_advance(5);
+    CHECK(layer_ownership_is_locked(TEST_LAYER_NAV));
+    CHECK(gesture_processed_press == KC_X && gesture_press_count(KC_Z) == 0);
+    gesture_at(3,0,false); gesture_advance(TEST_PD_MULTI_TAP_TERM + 50);
+    gesture_unlock_nav(); gesture_check_quiescent();
+    gesture_second_code = KC_NO;
+}
+// A key pressed inside a released lock tap's multi-tap window ends it: the
+// lock settles first, at once, and the key types on the locked layer.
+static void test_qmk_key_after_lock_tap_lands_on_locked_layer(void) {
+    gesture_start_resolution(33000, TEST_LAYER_NAV); gesture_second_code = TEST_LAYER_HOLD_KEY;
+    gesture_at(3,3,true); gesture_advance(20); gesture_at(3,3,false); gesture_advance(30);
+    CHECK(!layer_ownership_is_locked(TEST_LAYER_NAV)); // a second tap could still follow
+    gesture_at(3,0,true); gesture_advance(1);
+    CHECK(layer_ownership_is_locked(TEST_LAYER_NAV));
+    CHECK(gesture_processed_press == KC_X && gesture_press_count(KC_Z) == 0);
+    gesture_at(3,0,false); gesture_advance(TEST_PD_MULTI_TAP_TERM + 50);
+    gesture_unlock_nav(); gesture_check_quiescent();
+    gesture_second_code = KC_NO;
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -3672,6 +3714,8 @@ int main(int argc, char **argv) {
         else if (strcmp(regression, "nested") == 0) test_qmk_waiting_key_behind_nested_holds();
         else if (strcmp(regression, "member") == 0) test_qmk_buffered_member_uses_hold_layer();
         else if (strcmp(regression, "participates") == 0) test_qmk_waiting_key_participates_on_hold_layer();
+        else if (strcmp(regression, "layer-hold") == 0) test_qmk_layer_hold_key_makes_keys_wait();
+        else if (strcmp(regression, "lock-tap") == 0) test_qmk_key_after_lock_tap_lands_on_locked_layer();
         else CHECK(false);
         return 0;
     }
@@ -3714,6 +3758,8 @@ int main(int argc, char **argv) {
     test_qmk_waiting_key_behind_nested_holds();
     test_qmk_buffered_member_uses_hold_layer();
     test_qmk_waiting_key_participates_on_hold_layer();
+    test_qmk_layer_hold_key_makes_keys_wait();
+    test_qmk_key_after_lock_tap_lands_on_locked_layer();
     test_qmk_combo_output_gui_behaviour();
     puts("QMK gesture pipeline tests passed");
     return 0;

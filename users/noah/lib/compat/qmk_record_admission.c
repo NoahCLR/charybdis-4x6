@@ -7,6 +7,7 @@
 #include "../action/synthetic_record.h"
 #include "qmk_combo_origin.h"
 #include "../key/behavior/participation.h"
+#include "../key/runtime/api.h"
 #include "../key/runtime/reducer/state_query.h"
 
 #ifndef NOAH_RECORD_ADMISSION_CAPACITY
@@ -37,6 +38,14 @@ static bool record_admission_press_is_held(const keyrecord_t *release) {
     return held;
 }
 
+// Replays a held record through process_record. A press ends other keys'
+// pending layer taps first, as its physical press would have had it not been
+// held back, so it resolves on the layers they leave on.
+static void record_admission_replay(keyrecord_t *record) {
+    (void)noah_key_runtime_settle_layer_taps_before_press(record);
+    process_record(record);
+}
+
 static bool record_admission_capture(const keyrecord_t *record) {
     if (record_admission_held_count >= NOAH_RECORD_ADMISSION_CAPACITY) {
         keyrecord_t oldest = record_admission_held[0];
@@ -49,7 +58,7 @@ static bool record_admission_capture(const keyrecord_t *record) {
         }
         record_admission_held_count--;
         record_admission_replaying = true;
-        process_record(&oldest);
+        record_admission_replay(&oldest);
         record_admission_replaying = false;
     }
     record_admission_held[record_admission_held_count] = *record;
@@ -102,7 +111,7 @@ void noah_record_admission_task(void) {
             break;
         }
         replayed++;
-        process_record(&record);
+        record_admission_replay(&record);
     }
     record_admission_replaying = false;
 

@@ -5,6 +5,9 @@
 #include "api.h"
 #include "transition.h"
 #include "reducer/runtime.h"
+#include "../behavior/key_behavior_lookup.h"
+#include "../behavior/participation.h"
+#include "../../compat/qmk_source_layer_contract.h"
 
 bool noah_key_runtime_settle_pending_fallback_hold(void) {
     key_runtime_transition_plan_t plan;
@@ -12,6 +15,28 @@ bool noah_key_runtime_settle_pending_fallback_hold(void) {
 
     key_runtime_transition_plan_init(&plan);
     settled_any = key_runtime_transition_settle_pending_fallback_hold(&plan);
+    key_runtime_transition_execute_plan(&plan);
+    return settled_any;
+}
+
+bool noah_key_runtime_settle_layer_taps_before_press(keyrecord_t *record) {
+    key_runtime_transition_plan_t plan;
+    bool                          settled_any;
+    uint16_t                      keycode;
+
+    // Without another key's pending layer tap an ordinary press costs no lookup.
+    if (!(record && record->event.type == KEY_EVENT && record->event.pressed && key_runtime_core_flush_foreign_layer_multi_tap(record->event.key, NULL))) {
+        return false;
+    }
+    // Handled keys keep independent series alive (INTERACTION_MODEL.md): only a
+    // press that settles pending taps anyway settles these before it resolves.
+    keycode = get_record_keycode(record, false);
+    if ((noah_participation_behavior(keycode, noah_qmk_contract_resolve_source_layer(record->event.key), record->event.key) ? key_behavior_lookup(keycode) : key_behavior_lookup_without_row(keycode)).handled) {
+        return false;
+    }
+
+    key_runtime_transition_plan_init(&plan);
+    settled_any = key_runtime_transition_flush_foreign_layer_multi_tap(record->event.key, &plan);
     key_runtime_transition_execute_plan(&plan);
     return settled_any;
 }
