@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "users/noah/lib/compat/qmk_host.h"
 #include "users/noah/lib/profile/schema/profile_settings_v1.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
 #include "profile_test_blob.h"
@@ -258,6 +259,14 @@ int main(void) {
     noah_effective_settings_set_apply(noah_qmk_portable_apply);
     test_header_and_versions();
     test_scalars();
+    for (uint8_t selected = 0; selected <= 3; selected++) {
+        assert(noah_profile_setting_v1_valid(27, selected, 16));
+        assert(noah_profile_setting_v1_valid(27, selected | NOAH_HOST_UNICODE_ENABLED, 16));
+        for (uint8_t detected = 0; detected <= 4; detected++)
+            assert(noah_host_effective(selected, detected) == (selected ? selected : detected <= 3 ? detected : 0));
+    }
+    assert(!noah_profile_setting_v1_valid(27, 4, 16));
+    assert(!noah_profile_setting_v1_valid(27, 0x200, 16));
     test_layer_records();
     test_names();
     test_publication();

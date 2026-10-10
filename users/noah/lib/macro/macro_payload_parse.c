@@ -20,18 +20,20 @@ static bool macro_payload_ir_write_byte(macro_payload_ir_t *ir, uint8_t byte) {
 
 static bool macro_payload_ir_write_text(macro_payload_ir_t *ir, const char *text, size_t length) {
     while (length > 0) {
-        uint8_t chunk = length > UINT8_MAX ? UINT8_MAX : (uint8_t)length;
-
-        if (!macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_TEXT) || !macro_payload_ir_write_byte(ir, chunk)) {
-            return false;
+        if ((uint8_t)*text >= 0x80u) {
+            uint32_t scalar;
+            uint8_t width;
+            if (!macro_payload_utf8_scalar((const uint8_t *)text, length, &scalar, &width) || !macro_payload_ir_append_unicode(ir, scalar)) return false;
+            text += width;
+            length -= width;
+            continue;
         }
-
+        uint8_t chunk = 0;
+        while (chunk < UINT8_MAX && chunk < length && (uint8_t)text[chunk] < 0x80u) chunk++;
+        if (!chunk || !macro_payload_ir_write_byte(ir, MACRO_PAYLOAD_IR_OP_TEXT) || !macro_payload_ir_write_byte(ir, chunk)) return false;
         for (uint8_t i = 0; i < chunk; i++) {
-            if (!macro_payload_ir_write_byte(ir, (uint8_t)text[i])) {
-                return false;
-            }
+            if (!macro_payload_text_byte_is_supported((uint8_t)text[i]) || !macro_payload_ir_write_byte(ir, (uint8_t)text[i])) return false;
         }
-
         text += chunk;
         length -= chunk;
     }
@@ -226,7 +228,7 @@ bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
             continue;
         }
 
-        if (*cursor == '}' || !macro_payload_text_byte_is_supported((uint8_t)*cursor)) {
+        if (*cursor == '}' || ((uint8_t)*cursor < 0x80u && !macro_payload_text_byte_is_supported((uint8_t)*cursor))) {
             macro_payload_ir_reset(ir);
             return false;
         }

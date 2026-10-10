@@ -281,3 +281,5 @@ int main(void) {
     puts("real profile validation host tests passed");
     return 0;
 }
+
+void send_keyboard_report(void) {}

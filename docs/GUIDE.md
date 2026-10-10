@@ -420,3 +420,23 @@ represented as profile data; export reports these explicitly instead of
 producing an incomplete file. The
 [portable profile contract](architecture/portable-profile-v1.md) records format
 limits, compatibility, restore ordering and remaining hardware checks.
+
+## Unicode text macros
+
+Text macros can type accents, curly quotes, symbols, combining characters and
+emoji. Choose Auto or an OS override and enable Unicode playback in the
+editor’s Settings → Host section: macOS requires
+Unicode Hex Input enabled and active; Windows requires WinCompose running
+with Right Alt as Compose; Linux requires IBus-style Ctrl+Shift+U entry in the
+target application. Linux applications without that input path are unsupported.
+The keyboard cannot detect whether the host is configured. Off keeps ordinary
+ASCII playback. The OS choice and Unicode switch are independent and saved
+with the profile.
+Auto uses QMK’s USB OS guess; detection may be wrong through a KVM or switch.
+Unknown disables non-ASCII playback until detection succeeds or an override
+is selected. Neither detection nor selection confirms the host input setup.
+Unicode entry is slower than ordinary key taps; the 512-byte compiled
+program limit still applies. Avoid typing or holding ordinary keys during
+playback. Cancellation can leave text already typed, including a partial macOS
+entry. [QMK's Unicode guide](https://docs.qmk.fm/features/unicode) describes host
+setup. Physical acceptance on all three hosts is still pending.

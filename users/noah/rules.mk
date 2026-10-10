@@ -16,6 +16,7 @@ include $(USER_PATH)/lib/compat/qmk_split_transport.mk
 
 # VIA support: enables runtime key remapping via the VIA desktop app.
 VIA_ENABLE = yes
+OS_DETECTION_ENABLE = yes
 
 # Key combos: press multiple keys simultaneously to trigger an action.
 COMBO_ENABLE = yes

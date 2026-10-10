@@ -64,8 +64,8 @@ typedef enum {
     NOAH_SETTING_KEYMAP_OPTIONS,
     NOAH_SETTING_AUTO_MOUSE_DELAY,
     NOAH_SETTING_AUTO_MOUSE_THRESHOLD,
-    // Retired in v6: the combo reference layers moved to the layer records.
-    NOAH_SETTING_RETIRED_COMBO_REFERENCES,
+    // Scalar 27 was reserved zero in v6; feature bit 21 adds Host settings.
+    NOAH_SETTING_UNICODE_HOST_MODE,
     // Participation (participation-policy.md): the behaviour master, then one
     // bit per layer for its behaviours and for its combos.
     NOAH_SETTING_BEHAVIORS_ENABLED,
@@ -86,3 +86,8 @@ typedef struct {
 bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *state, uint8_t byte, uint16_t length, uint8_t layers, uint8_t positions);
 bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *state, uint16_t length);
 bool noah_profile_setting_v1_valid(uint8_t id, uint32_t value, uint8_t layers);
+
+// Scalar 27 was reserved zero after combo references moved into layer records.
+// Bits 0..1 select Auto/macOS/Windows/Linux; bit 8 enables Unicode entry.
+// Zero remains Auto with Unicode off.
+#define NOAH_SETTING_RETIRED_COMBO_REFERENCES NOAH_SETTING_UNICODE_HOST_MODE

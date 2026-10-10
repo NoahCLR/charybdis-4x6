@@ -491,11 +491,12 @@ same key, duplicate key-downs are invalid, and no key may remain held at the
 end. Invalid balance is rejected before playback, so a macro cannot release
 another producer's key or leave its own key registered.
 
-VIA macro text follows QMK's single-byte ASCII domain. Zero terminates a macro
-slot, bytes `0x01..0x7F` are valid text, and `0x80..0xFF` are rejected in text
-positions. QMK prefix command operands keep their separate 8-bit keycode
-grammar. A malformed slot produces no partial typing, wait, or key action and
-stays rejected until the next VIA macro mutation invalidates the cache.
+VIA text supports canonical UTF-8 with Profile Wire feature bit 21. Select the
+host setup in the saved profile before playing non-ASCII text; ASCII-only mode
+remains the default. See [runtime flow](architecture/runtime-flow.md) for the
+encoding, program limit, ownership and host-entry requirements. Malformed
+slots produce no partial typing and remain cached invalid until a mutation.
+
 
 So the current profile uses both:
 

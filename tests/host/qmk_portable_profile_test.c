@@ -169,6 +169,13 @@ int main(int argc, char **argv) {
     assert(!noah_qmk_portable_profile_get(frame, sizeof(frame)));
     assert(!memcmp(retired, frame, sizeof(frame)));
 
+    // Host telemetry is distinct from retired source readback and diagnostics.
+    frame[2] = 0x0b;
+    assert(noah_qmk_portable_profile_get(frame, sizeof(frame)));
+    assert(frame[5] == 0 && frame[6] == 2 && frame[7] == 1 && frame[8] == 0);
+    memset(frame, 0, sizeof(frame)); frame[0] = 8; frame[2] = 0x0b; frame[3] = 1; frame[4] = 1;
+    assert(noah_qmk_portable_profile_get(frame, sizeof(frame)) && frame[5] == 2);
+
     // A malformed request is answered, not read.
     memset(frame, 0, sizeof(frame));
     frame[0] = 8;

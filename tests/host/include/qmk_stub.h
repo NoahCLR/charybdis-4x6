@@ -1,4 +1,5 @@
 #pragma once
+#define NOAH_HOST_QMK_STUB 1
 
 #include <stdbool.h>
 #include <stddef.h>
