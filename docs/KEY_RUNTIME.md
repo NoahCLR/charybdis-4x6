@@ -481,9 +481,13 @@ synchronous host harness intentionally keeps delivery-time records; it does not
 prove this boundary. Neither harness substitutes for physical acceptance.
 
 Participation is captured per physical record before either QMK queue. Its
-opaque context holds the source layer and behavior/combo decisions; its native
-keycode is frozen with it. Admission retains the complete record, so a repeated
-press at the same position cannot change an earlier queued owner's decision.
+opaque context holds the source layer and behavior/combo decisions; the
+keycode is not frozen, so QMK resolves a waiting press again on delivery, on
+the layer a hold turned on. Delivery settles the press once: a press whose
+source layer changed while it waited is re-decided against the new one, and
+its release takes that decision. Admission retains the complete record and
+re-opens settlement for a press it holds back, so a repeated press at the same
+position cannot change an earlier queued owner's decision.
 Generated combo outputs capture their permission against the retained origin
 layer before admission, and normalize their origin only when dispatched.
 

@@ -52,7 +52,9 @@ static bool record_admission_capture(const keyrecord_t *record) {
         process_record(&oldest);
         record_admission_replaying = false;
     }
-    record_admission_held[record_admission_held_count++] = *record;
+    record_admission_held[record_admission_held_count] = *record;
+    // QMK has delivered it; held back here, it settles when it is replayed.
+    noah_participation_record_defer(&record_admission_held[record_admission_held_count++]);
     return false;
 }
 

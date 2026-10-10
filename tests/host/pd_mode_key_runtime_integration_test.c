@@ -101,9 +101,21 @@ static uint8_t       gesture_admitted_count;
 #endif
 static uint16_t      fake_time;
 static uint8_t       gesture_momentary_layer;
+// With gesture_layer_resolution, one position resolves to gesture_test_code
+// on gesture_resolution_layer and to gesture_resolution_base below it.
 static bool          gesture_layer_resolution;
+static uint16_t      gesture_test_code;
+static uint8_t       gesture_resolution_layer;
+static keypos_t      gesture_resolution_pos;
+static uint16_t      gesture_resolution_base;
+// The keycode of the last physical press the record path processed.
+static uint16_t      gesture_processed_press;
+// The layer each position's press resolves from (QMK's layer_switch_get_layer())
+// and QMK's source-layer cache, stored by pre-process and by processing.
 static uint8_t       gesture_source_layers[MATRIX_ROWS][MATRIX_COLS];
+static uint8_t       gesture_layer_cache[MATRIX_ROWS][MATRIX_COLS];
 static bool          gesture_live_row;
+static uint32_t      gesture_live_row_layers;
 // Effective policy views used by the production pre-process/member gates.
 // This harness models published settings and rows without EEPROM I/O.
 static uint32_t      gesture_combo_layers = UINT32_MAX;
@@ -404,8 +416,13 @@ static void test_reset_state(void) {
     gesture_track_admission = false;
     gesture_admitted_count = 0;
     gesture_layer_resolution = false;
+    gesture_resolution_layer = 2;
+    gesture_resolution_pos   = (keypos_t){.row = 3, .col = 0};
+    gesture_resolution_base  = KC_Z;
     memset(gesture_source_layers, 0, sizeof(gesture_source_layers));
-    gesture_live_row = false;
+    memset(gesture_layer_cache, 0, sizeof(gesture_layer_cache));
+    gesture_live_row        = false;
+    gesture_live_row_layers = 1u << 3;
     gesture_combo_layers = UINT32_MAX;
     for (uint8_t i = 0; i < ARRAY_SIZE(gesture_row_layers); i++) gesture_row_layers[i] = UINT32_MAX;
     memset(gesture_excluded, 0, sizeof(gesture_excluded));
@@ -506,7 +523,7 @@ uint16_t gesture_keycode(uint8_t row, uint8_t col);
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
 #ifdef NOAH_TEST_QMK_GESTURES
     // Userspace combo origin must see the same members QMK's combo engine does.
-    if (gesture_layer_resolution && row == 3 && column == 0) return layer_num == 2 ? gesture_keycode(row, column) : KC_Z;
+    if (gesture_layer_resolution && row == gesture_resolution_pos.row && column == gesture_resolution_pos.col) return layer_num == gesture_resolution_layer ? gesture_keycode(row, column) : gesture_resolution_base;
     if (row == 2 || row == 3 || (row >= 4 && row < 6)) return gesture_keycode(row, column);
 #endif
     return test_keymap[layer_num][row][column];
@@ -683,6 +700,7 @@ bool process_record(keyrecord_t *record) {
         } else {
             gesture_out_add('K', code);
         }
+        if (!noah_synthetic_record_active() && record->event.type == KEY_EVENT) gesture_processed_press = code;
     }
 #endif
     return pass;
@@ -951,12 +969,39 @@ void auto_mouse_reset_trigger(bool pressed) {
 
 uint8_t read_source_layers_cache(keypos_t key) {
 #ifdef NOAH_TEST_QMK_GESTURES
-    return gesture_source_layers[key.row][key.col];
+    return gesture_layer_cache[key.row][key.col];
 #else
     (void)key;
     return 0;
 #endif
 }
+
+#ifdef NOAH_TEST_QMK_GESTURES
+// QMK's layer_switch_get_layer(): the resolution position falls through to
+// its layer while that layer is on; every other press resolves from the
+// layer the test configured for it.
+uint8_t layer_switch_get_layer(keypos_t key) {
+    if (gesture_layer_resolution && key.row == gesture_resolution_pos.row && key.col == gesture_resolution_pos.col && layer_state_cmp(layer_state, gesture_resolution_layer)) return gesture_resolution_layer;
+    return gesture_source_layers[key.row][key.col];
+}
+
+// QMK's get_record_keycode(): a press resolves now, and stores its layer when
+// asked to; a release reads the layer its press stored. Gesture rows resolve
+// as the combo and tapping engines see them.
+uint16_t get_record_keycode(keyrecord_t *record, bool update_layer_cache) {
+    keypos_t key;
+    uint8_t  layer;
+
+    if (!record) return KC_NO;
+    if (record->keycode) return record->keycode;
+    key   = record->event.key;
+    layer = record->event.pressed ? layer_switch_get_layer(key) : gesture_layer_cache[key.row][key.col];
+    if (record->event.pressed && update_layer_cache) gesture_layer_cache[key.row][key.col] = layer;
+    if (gesture_layer_resolution && key.row == gesture_resolution_pos.row && key.col == gesture_resolution_pos.col) return layer == gesture_resolution_layer ? gesture_test_code : gesture_resolution_base;
+    if (key.row >= 2 && key.row < 8) return gesture_keycode(key.row, key.col);
+    return keymap_key_to_keycode(get_highest_layer(layer_state | default_layer_state), key);
+}
+#endif
 
 bool charybdis_get_pointer_dragscroll_enabled(void) {
     return dragscroll_enabled;
@@ -2437,7 +2482,7 @@ static void test_ordinary_mouse_button_double_tap_hold(void) {
 
 #ifdef NOAH_TEST_QMK_GESTURES
 bool combo_key_event_pending(uint8_t row, uint8_t col, bool pressed, uint16_t since, uint16_t term);
-void gesture_engine_event(uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t context);
+void gesture_engine_event(uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t context, uint16_t keycode);
 void gesture_engine_scan(uint16_t time);
 const uint8_t noah_combo_count = 12;
 combo_t key_combos[12];
@@ -2454,13 +2499,13 @@ static void gesture_sync_combos(void) {
             .active = gesture_engine_combo_active(i), .disabled = gesture_engine_combo_disabled(i)};
     }
 }
-static uint16_t gesture_test_code;
 static uint16_t gesture_second_code;
 static uint16_t gesture_delivered_press;
 static uint8_t gesture_delivered_taps;
 uint16_t gesture_keycode(uint8_t row, uint8_t col) {
+    if (gesture_layer_resolution && row == gesture_resolution_pos.row && col == gesture_resolution_pos.col) return layer_state_cmp(layer_state, gesture_resolution_layer) ? gesture_test_code : gesture_resolution_base;
     if (row == 2 && col < 8) return KC_E + col; // overload keys outside combos
-    if (row == 3 && col == 0) return gesture_layer_resolution && !layer_state_cmp(layer_state, 2) ? KC_Z : gesture_test_code;
+    if (row == 3 && col == 0) return gesture_test_code;
     if (row == 3 && col == 1) return KC_E; // outside every combo
     if (row == 3 && col == 3) return gesture_second_code;
     if (row == 3 && col == 2) return KC_LEFT_GUI; // handled row, outside every combo
@@ -2476,11 +2521,11 @@ uint16_t gesture_keycode(uint8_t row, uint8_t col) {
 static uint16_t gesture_combo_outputs[32];
 static uint8_t gesture_combo_output_count;
 static uint8_t gesture_last_combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-void gesture_deliver(uint16_t code, uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t taps, bool combo, uint8_t context) {
+void gesture_deliver(uint16_t code, uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t taps, bool combo, uint8_t context, uint16_t record_keycode) {
     gesture_sync_combos();
     if (down) { gesture_delivered_press = code; gesture_delivered_taps = taps; }
     if (combo && down) { CHECK(gesture_combo_output_count < ARRAY_SIZE(gesture_combo_outputs)); gesture_combo_outputs[gesture_combo_output_count++] = code; }
-    keyrecord_t r = {.user_data = context, .event = {.key={row,col}, .pressed=down, .type=combo ? COMBO_EVENT : KEY_EVENT, .time=time}, .tap={.count=taps}, .keycode=code};
+    keyrecord_t r = {.user_data = context, .event = {.key={row,col}, .pressed=down, .type=combo ? COMBO_EVENT : KEY_EVENT, .time=time}, .tap={.count=taps}, .keycode=record_keycode};
     process_record(&r);
     if (combo && down) CHECK(noah_qmk_combo_origin_event_bitmap(&r, gesture_last_combo_bitmap));
 }
@@ -2491,8 +2536,9 @@ static void gesture_advance(uint16_t ms) {
 static void gesture_at(uint8_t row, uint8_t col, bool down) {
     gesture_sync_combos();
     keyrecord_t r = {.event={.key={row,col}, .pressed=down, .type=KEY_EVENT, .time=fake_time}};
-    CHECK(noah_pre_process_record_user(gesture_keycode(row,col), &r));
-    gesture_engine_event(row,col,down,fake_time,r.user_data);
+    // pre_process_record_quantum() resolves the record, storing a press's layer.
+    CHECK(noah_pre_process_record_user(get_record_keycode(&r, true), &r));
+    gesture_engine_event(row,col,down,fake_time,r.user_data,r.keycode);
 }
 static void gesture_event(bool down) { gesture_at(4,2,down); }
 static void test_qmk_buffered_second_press(void) {
@@ -2566,16 +2612,16 @@ bool gesture_combo_should_trigger(uint16_t index, uint8_t row, uint8_t col, bool
 static void gesture_at_participating(uint8_t row, uint8_t col, bool down, bool behavior, bool combo) {
     gesture_sync_combos();
     keyrecord_t r = {.event={.key={row,col}, .pressed=down, .type=KEY_EVENT, .time=fake_time}};
-    CHECK(noah_pre_process_record_user(gesture_keycode(row,col), &r));
+    CHECK(noah_pre_process_record_user(get_record_keycode(&r, true), &r));
     if (down) noah_participation_press_store(r.event.key, behavior, combo);
     noah_participation_record_capture(&r, read_source_layers_cache(r.event.key));
-    gesture_engine_event(row,col,down,fake_time,r.user_data);
+    gesture_engine_event(row,col,down,fake_time,r.user_data,r.keycode);
 }
 // Model a published row without coupling the gesture harness to EEPROM.
 noah_effective_key_behavior_result_t noah_effective_key_behavior_lookup(uint16_t keycode, noah_effective_key_behavior_row_t *row) {
     if (!gesture_live_row || keycode != TEST_HANDLED_TAP_KEY) return NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK;
     memset(row, 0, sizeof(*row));
-    row->allowed_layers = 1u << 3;
+    row->allowed_layers = gesture_live_row_layers;
     row->authored_tap_depth = 1;
     row->single = (key_behavior_step_t){.tap = TAP_SENDS(KC_J)};
     return NOAH_EFFECTIVE_KEY_BEHAVIOR_OK;
@@ -2645,22 +2691,30 @@ static void test_qmk_excluded_duplicate_preserves_chord(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0);
     gesture_second_code = KC_NO;
 }
+// Queued presses are each decided when they are delivered, on the layer they
+// resolve from then, not on the layer at their physical press: two taps of
+// the custom key, pressed from layers 3 and 0 while a tap/hold key decides,
+// both follow the delivery layer, and each release pairs with its press.
 static void test_qmk_queued_participation_is_per_press(void) {
-    for (unsigned native = 0; native < 2; native++) for (unsigned first = 0; first < 2; first++) {
+    // Admission holding fewer than these four records delivers the oldest
+    // early, on the layer then (the overload tests); QMK's queue always waits.
+    for (unsigned native = NOAH_RECORD_ADMISSION_CAPACITY >= 4u ? 0u : 1u; native < 2; native++) for (unsigned delivery = 0; delivery < 2; delivery++) {
         test_reset_state(); fake_time = 10000; gesture_out_count = 0;
         gesture_test_code = LT(TEST_LAYER_NAV, KC_B); gesture_second_code = TEST_HANDLED_TAP_KEY;
+        gesture_live_row = true; // its row is allowed on layer 3 only
         gesture_at(native ? 4 : 3, native ? 4 : 0, true); gesture_advance(1);
-        gesture_source_layers[3][3] = first ? 3 : 0;
-        gesture_at_participating(3, 3, true, first != 0, true); gesture_advance(1);
-        gesture_at_participating(3, 3, false, first != 0, true); gesture_advance(1);
-        gesture_source_layers[3][3] = first ? 0 : 3;
-        gesture_at_participating(3, 3, true, first == 0, true); gesture_advance(1);
-        gesture_at_participating(3, 3, false, first == 0, true); gesture_advance(20);
+        gesture_source_layers[3][3] = 3;
+        gesture_at(3, 3, true); gesture_advance(1); gesture_at(3, 3, false); gesture_advance(1);
+        gesture_source_layers[3][3] = 0;
+        gesture_at(3, 3, true); gesture_advance(1); gesture_at(3, 3, false); gesture_advance(1);
+        gesture_source_layers[3][3] = delivery ? 3 : 0;
+        gesture_advance(20);
         gesture_at(native ? 4 : 3, native ? 4 : 0, false); gesture_advance(500);
-        CHECK(gesture_tap_count(KC_J) == 1);
+        CHECK(gesture_tap_count(KC_J) == (delivery ? 2u : 0u));
         CHECK(noah_record_admission_held_count() == 0);
         CHECK(noah_runtime_debug_active_slot_count() == 0);
     }
+    gesture_live_row = false;
     gesture_test_code = gesture_second_code = KC_NO;
 }
 // Its behaviour bypassed at this placement, the authored LT row is a native
@@ -3041,7 +3095,7 @@ static void test_qmk_admission_overload_retires_released_keys(void) {
                 CHECK(gesture_admitted_count == 1); // Only the deciding key reached runtime.
                 gesture_at(2, released, false);
                 CHECK(gesture_admitted_count == 2); // Overload replays exactly one oldest record.
-                CHECK(gesture_admitted[1].event.pressed && gesture_admitted[1].keycode == KC_E);
+                CHECK(gesture_admitted[1].event.pressed && get_record_keycode(&gesture_admitted[1], false) == KC_E);
                 CHECK(gesture_admitted[1].event.time == (uint16_t)(starts[start] + 10));
                 gesture_advance(20); gesture_at(3, 0, false); gesture_advance(400);
                 for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY; col++)
@@ -3516,6 +3570,92 @@ static void test_qmk_owned_mod_tap_oneshot_tap_only_release(void) {
     CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
     gesture_advance(400); gesture_check_quiescent();
 }
+// A key pressed while a tap/hold key is undecided waits, and is delivered on
+// the layer its hold turned on: that layer's key, with that layer's
+// participation, kept through its release (participation-policy.md).
+static unsigned gesture_press_count(uint16_t code) {
+    unsigned count = 0;
+    for (uint8_t i = 0; i < gesture_out_count; i++)
+        if (gesture_out[i].kind == 'K' && gesture_out[i].code == code) count++;
+    return count;
+}
+static void gesture_start_resolution(uint16_t start, uint8_t layer) {
+    test_reset_state(); fake_time = start; gesture_out_count = 0;
+    gesture_test_code = KC_X; gesture_layer_resolution = true; gesture_resolution_layer = layer;
+}
+static void test_qmk_waiting_key_uses_hold_layer(void) {
+    // Native LT(2, A) held past QMK's tapping term: (3, 0) types X on layer 2.
+    gesture_start_resolution(52000, 2);
+    gesture_at(4,4,true); gesture_advance(30); gesture_at(3,0,true); gesture_advance(250);
+    CHECK(layer_state_cmp(layer_state, 2));
+    CHECK(gesture_processed_press == KC_X && gesture_press_count(KC_Z) == 0);
+    gesture_at(3,0,false); gesture_at(4,4,false); gesture_advance(500);
+    CHECK(!layer_state_cmp(layer_state, 2)); gesture_check_quiescent();
+
+    // Released before the term it is a tap: its tap, then the base-layer key.
+    gesture_start_resolution(53000, 2);
+    gesture_at(4,4,true); gesture_advance(30); gesture_at(3,0,true); gesture_advance(30);
+    gesture_at(4,4,false); gesture_advance(20);
+    CHECK(gesture_processed_press == KC_Z && !layer_state_cmp(layer_state, 2));
+    gesture_at(3,0,false); gesture_advance(500); gesture_check_quiescent();
+
+    // An authored LT(Nav, B) row holds the key back in record admission.
+    gesture_start_resolution(54000, TEST_LAYER_NAV); gesture_second_code = LT(TEST_LAYER_NAV, KC_B);
+    gesture_at(3,3,true); gesture_advance(30); gesture_at(3,0,true); gesture_advance(150);
+    CHECK(layer_state_cmp(layer_state, TEST_LAYER_NAV) || gesture_momentary_layer == TEST_LAYER_NAV);
+    CHECK(gesture_processed_press == KC_X && gesture_press_count(KC_Z) == 0);
+    gesture_at(3,0,false); gesture_at(3,3,false); gesture_advance(500); gesture_check_quiescent();
+    gesture_second_code = KC_NO;
+}
+// Two taps of the same key while it waits: each press and release pair on the
+// hold layer, and nothing stays held.
+static void test_qmk_waiting_repeats_pair_on_hold_layer(void) {
+    gesture_start_resolution(56000, 2);
+    gesture_at(4,4,true); gesture_advance(30);
+    gesture_at(3,0,true); gesture_advance(10); gesture_at(3,0,false); gesture_advance(10);
+    gesture_at(3,0,true); gesture_advance(10); gesture_at(3,0,false); gesture_advance(250);
+    CHECK(gesture_press_count(KC_X) == 2 && gesture_press_count(KC_Z) == 0);
+    gesture_at(4,4,false); gesture_advance(500);
+    CHECK(!layer_state_cmp(layer_state, 2)); gesture_check_quiescent();
+}
+// Behind two undecided keys: QMK holds both back for the native LT(2, A);
+// the authored LT(Nav, B) it then delivers holds the key back again, which
+// resolves on Nav once that hold starts.
+static void test_qmk_waiting_key_behind_nested_holds(void) {
+    gesture_start_resolution(58000, TEST_LAYER_NAV); gesture_second_code = LT(TEST_LAYER_NAV, KC_B);
+    gesture_at(4,4,true); gesture_advance(10); gesture_at(3,3,true); gesture_advance(10);
+    gesture_at(3,0,true); gesture_advance(400);
+    CHECK(layer_state_cmp(layer_state, TEST_LAYER_NAV) || gesture_momentary_layer == TEST_LAYER_NAV);
+    CHECK(gesture_processed_press == KC_X && gesture_press_count(KC_Z) == 0);
+    gesture_at(3,0,false); gesture_at(3,3,false); gesture_at(4,4,false); gesture_advance(500);
+    gesture_check_quiescent();
+    gesture_second_code = KC_NO;
+}
+// A combo member waits in QMK's combo buffer, then behind the native LT: it
+// joins the chord as its base-layer N, but is delivered as layer 2's key.
+static void test_qmk_buffered_member_uses_hold_layer(void) {
+    gesture_start_resolution(60000, 2);
+    gesture_resolution_pos = (keypos_t){.row = 5, .col = 2}; gesture_resolution_base = KC_N;
+    gesture_at(4,4,true); gesture_advance(30); gesture_at(5,2,true); gesture_advance(250);
+    CHECK(layer_state_cmp(layer_state, 2));
+    CHECK(gesture_processed_press == KC_X && gesture_press_count(KC_N) == 0);
+    gesture_at(5,2,false); gesture_at(4,4,false); gesture_advance(500); gesture_check_quiescent();
+}
+// Participation follows the layer the waiting key resolves from: the custom
+// key's row allowed only on layer 2 sends its tap; allowed only on the base
+// layer, the press on layer 2 bypasses it and a custom key does nothing.
+static void test_qmk_waiting_key_participates_on_hold_layer(void) {
+    for (unsigned base_only = 0; base_only < 2; base_only++) {
+        gesture_start_resolution((uint16_t)(62000 + 2000 * base_only), 2);
+        gesture_test_code = TEST_HANDLED_TAP_KEY; gesture_live_row = true;
+        gesture_live_row_layers = base_only ? 1u << 0 : 1u << 2;
+        gesture_at(4,4,true); gesture_advance(30); gesture_at(3,0,true); gesture_advance(10);
+        gesture_at(3,0,false); gesture_advance(250);
+        CHECK(gesture_tap_count(KC_J) == (base_only ? 0u : 1u));
+        gesture_at(4,4,false); gesture_advance(500); gesture_check_quiescent();
+    }
+    gesture_live_row = false; gesture_test_code = KC_NO;
+}
 #endif
 
 int main(int argc, char **argv) {
@@ -3527,6 +3667,11 @@ int main(int argc, char **argv) {
         else if (strcmp(regression, "queued") == 0) test_qmk_queued_participation_is_per_press();
         else if (strcmp(regression, "rules") == 0) test_qmk_sixteen_member_matching_rules();
         else if (strcmp(regression, "native") == 0) test_qmk_bypassed_authored_layer_tap_is_native();
+        else if (strcmp(regression, "layer") == 0) test_qmk_waiting_key_uses_hold_layer();
+        else if (strcmp(regression, "repeats") == 0) test_qmk_waiting_repeats_pair_on_hold_layer();
+        else if (strcmp(regression, "nested") == 0) test_qmk_waiting_key_behind_nested_holds();
+        else if (strcmp(regression, "member") == 0) test_qmk_buffered_member_uses_hold_layer();
+        else if (strcmp(regression, "participates") == 0) test_qmk_waiting_key_participates_on_hold_layer();
         else CHECK(false);
         return 0;
     }
@@ -3564,6 +3709,11 @@ int main(int argc, char **argv) {
     test_qmk_keys_wait_for_undecided_dual_role();
     test_qmk_admission_overload();
     test_qmk_admission_replay_waits_for_nested_decision();
+    test_qmk_waiting_key_uses_hold_layer();
+    test_qmk_waiting_repeats_pair_on_hold_layer();
+    test_qmk_waiting_key_behind_nested_holds();
+    test_qmk_buffered_member_uses_hold_layer();
+    test_qmk_waiting_key_participates_on_hold_layer();
     test_qmk_combo_output_gui_behaviour();
     puts("QMK gesture pipeline tests passed");
     return 0;

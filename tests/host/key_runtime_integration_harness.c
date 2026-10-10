@@ -343,3 +343,8 @@ __attribute__((weak)) uint8_t read_source_layers_cache(keypos_t key) {
     (void)key;
     return 0;
 }
+
+// The layer a press resolves from now: the cache's, as nothing here changes it.
+__attribute__((weak)) uint8_t layer_switch_get_layer(keypos_t key) {
+    return read_source_layers_cache(key);
+}

@@ -9,7 +9,7 @@
 #include "debug.h"
 #include "keymap_introspection.h"
 
-extern void     gesture_deliver(uint16_t code, uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t taps, bool combo, uint8_t context);
+extern void     gesture_deliver(uint16_t code, uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t taps, bool combo, uint8_t context, uint16_t record_keycode);
 extern uint16_t gesture_keycode(uint8_t row, uint8_t col);
 
 static uint8_t sixteen_rules;
@@ -59,7 +59,7 @@ bool is_tap_record(keyrecord_t *r) {
     return gesture_is_tap_record(code, &r->event.key.row, &r->event.key.col, r->event.pressed, r->event.time, r->tap.count, r->event.type, &r->user_data, native, is_tap_keycode_user(code, native));
 }
 void engine_process_record(keyrecord_t *r) {
-    if (IS_EVENT(r->event)) gesture_deliver(engine_get_record_keycode(r, false), r->event.key.row, r->event.key.col, r->event.pressed, r->event.time, r->tap.count, r->event.type == COMBO_EVENT, r->user_data);
+    if (IS_EVENT(r->event)) gesture_deliver(engine_get_record_keycode(r, false), r->event.key.row, r->event.key.col, r->event.pressed, r->event.time, r->tap.count, r->event.type == COMBO_EVENT, r->user_data, r->keycode);
 }
 void    debug_record(keyrecord_t r) {}
 void    clear_keyboard(void) {}
@@ -72,9 +72,11 @@ uint8_t engine_get_mods(void) {
 void           engine_set_mods(uint8_t mods) {}
 debug_config_t debug_config;
 
-void gesture_engine_event(uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t context) {
-    keyrecord_t r = {.user_data = context, .event = {.key = {.row = row, .col = col}, .pressed = down, .time = time, .type = KEY_EVENT}};
-    if (process_combo(gesture_keycode(row, col), &r)) action_tapping_process(r);
+void gesture_engine_event(uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t context, uint16_t keycode) {
+    // keycode is what pre_process_record left in record->keycode; real QMK
+    // carries it through both queues and resolves with it.
+    keyrecord_t r = {.user_data = context, .keycode = keycode, .event = {.key = {.row = row, .col = col}, .pressed = down, .time = time, .type = KEY_EVENT}};
+    if (process_combo(keycode ? keycode : gesture_keycode(row, col), &r)) action_tapping_process(r);
 }
 void gesture_engine_scan(uint16_t time) {
     keyrecord_t tick = {.event = {.type = TICK_EVENT, .time = time}};

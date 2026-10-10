@@ -3558,6 +3558,11 @@ uint8_t read_source_layers_cache(keypos_t key) {
     return 0;
 }
 
+uint8_t layer_switch_get_layer(keypos_t key) {
+    (void)key;
+    return 0;
+}
+
 // QMK's record keycode, for the tapping hook: this test authors no keymap.
 uint16_t get_record_keycode(keyrecord_t *record, bool update_layer_cache) {
     (void)update_layer_cache;

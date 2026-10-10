@@ -40,6 +40,15 @@ bool noah_participation_press_combo(keypos_t key_pos);
 // Opaque QMK record context carries the captured source and decisions through
 // every record copy. Releases copy their physical press's context.
 void noah_participation_record_capture(keyrecord_t *record, uint8_t source_layer);
+// A physical record leaving the queues, with its keycode and the layer QMK
+// resolves that keycode from now. A press is settled once, the first time it
+// is delivered: re-decided if it waited while the layers changed, so it
+// resolves from another layer than at its press, and kept until its release,
+// which takes that decision. Combo permission stays the physical press's.
+void noah_participation_record_deliver(keyrecord_t *record, uint16_t keycode, uint8_t source_layer);
+// A delivered press held back again (record admission): it settles anew when
+// it is replayed.
+void noah_participation_record_defer(keyrecord_t *record);
 bool noah_participation_record_behavior(const keyrecord_t *record);
 bool noah_participation_record_combo(const keyrecord_t *record);
 uint8_t noah_participation_record_source(const keyrecord_t *record);

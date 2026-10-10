@@ -370,6 +370,11 @@ static bool key_runtime_process_record_uses_row(uint16_t keycode, const keyrecor
 // keeps QMK's own tap/hold timing.
 bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) {
     uint16_t keycode = get_record_keycode(record, false);
+    if (record->event.type == KEY_EVENT && !noah_synthetic_record_active()) {
+        // QMK asks as a press leaves its queue, with the keycode it resolves
+        // now: settle the press on that layer, as process_record will see it.
+        noah_participation_record_deliver(record, keycode, noah_qmk_contract_resolve_source_layer(record->event.key));
+    }
     if (record->event.type == COMBO_EVENT && !noah_participation_record_generated_captured(record)) {
         // Capture before native tapping can queue it, without consuming the
         // pending origin that will be normalized at actual dispatch.
@@ -391,17 +396,17 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (record->event.type == KEY_EVENT && key_origin_keypos_valid(record->event.key)) {
-        // The press's participation, decided once against the layer QMK just
-        // resolved its keycode from, before tapping or combos see it.
+        // The press's participation, captured against the layer QMK just
+        // resolved its keycode from, before tapping or combos see it. A press
+        // that waits is settled again when it is delivered.
         if (record->event.pressed) {
             uint8_t source_layer = noah_qmk_contract_source_layer(record->event.key);
             noah_participation_press_store(record->event.key, noah_participation_behavior(keycode, source_layer, record->event.key), noah_participation_combo_press(source_layer, record->event.key));
         }
+        // The keycode is not frozen: QMK resolves a press that waits behind a
+        // tap/hold key again when it processes it, on the layer its hold turned
+        // on, and that delivery settles participation (participation-policy.md).
         noah_participation_record_capture(record, noah_qmk_contract_source_layer(record->event.key));
-#if defined(COMBO_ENABLE) || defined(REPEAT_KEY_ENABLE)
-        // Freeze the resolved keycode as well as its source before queues.
-        record->keycode = keycode;
-#endif
         key_origin_registry_set_single(record->event.key);
         noah_qmk_combo_origin_observe_physical_key_event(keycode, record);
         keyboard_mod_ownership_track_physical_keycode_event(keycode, record);
@@ -428,6 +433,11 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     pointer_layer_policy_sync_layer_ownership_anchor();
 
     noah_qmk_combo_origin_normalize_record(keycode, record);
+    if (!noah_synthetic_record_active()) {
+        // process_record_quantum() has just resolved a press's keycode and
+        // stored its source layer, so the cache names the layer it came from.
+        noah_participation_record_deliver(record, keycode, noah_qmk_contract_source_layer(record->event.key));
+    }
     ctx.use_row = key_runtime_process_record_uses_row(keycode, record);
 
     if (!noah_synthetic_record_active()) {
