@@ -14,6 +14,7 @@ static bool macro_slot_provider_compile(const macro_slot_provider_t *provider, m
     }
 
     macro_slot_active_ir.length = 0u;
+    macro_slot_active_ir.protection = 0u;
     if (provider->load_ir(slot, &macro_slot_active_ir, provider->context)) {
         metadata[slot].state = MACRO_SLOT_CACHE_VALID;
         return true;
@@ -46,7 +47,7 @@ bool macro_slot_provider_encode_write(const macro_slot_provider_t *provider, mac
         return false;
     }
 
-    if (macro_slot_active_ir.length == 0u) {
+    if (macro_slot_active_ir.length == 0u && macro_slot_active_ir.protection == 0u) {
         return true;
     }
 

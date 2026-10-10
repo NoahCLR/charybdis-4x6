@@ -1,6 +1,7 @@
 #pragma once
 
 #include QMK_KEYBOARD_H
+#include "../macro/macro_input_guard.h"
 
 // Holds key records back while a runtime-owned tap/hold key (an authored LT,
 // MT or OSM row) is down and undecided, as QMK's tapping engine holds keys
@@ -19,6 +20,7 @@
 // wait in FIFO order. No record is dropped or allowed to bypass its own press,
 // and replay keeps the original timestamp, event type, keycode and tap data.
 bool noah_record_admission_admit(keyrecord_t *record);
+
 
 // Replays held records once no tap/hold key is undecided. Runs each matrix
 // scan after the key runtime scan, so a hold reached this scan is applied

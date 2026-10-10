@@ -501,6 +501,8 @@ Capability feature bits are:
 
 | 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](runtime-flow.md) |
 
+| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](runtime-flow.md) |
+
 | 20 | participation controls: behaviour and combo participation at the master, layer, definition and placement scopes ([participation policy](participation-policy.md)) |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable

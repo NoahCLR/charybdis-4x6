@@ -19,6 +19,8 @@
 #include "../../action/synthetic_record.h"
 #include "../../action/owned_keycode.h"
 #include "../../compat/qmk_combo_origin.h"
+#include "../../macro/macro_input_guard.h"
+#include "../../macro/macro_payload.h"
 #include "../../compat/qmk_oneshot_contract.h"
 #include "../../compat/qmk_source_layer_contract.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
@@ -389,6 +391,7 @@ bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) 
 }
 
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (!noah_record_admission_macro_admit(record, macro_payload_engine_protected(), noah_synthetic_record_active())) return false;
     if (key_runtime_process_output_fenced(record)) {
         return false;
     }

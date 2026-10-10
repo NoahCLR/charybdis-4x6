@@ -444,7 +444,30 @@ static void test_unicode_restores_current_modifiers_after_neutral_commit(void) {
     CHECK(last_report_mods == MOD_BIT(KC_LEFT_ALT)); // No stale Shift snapshot.
 }
 
+static void test_protection_is_latched_and_released(void) {
+    for (uint8_t policy = 0u; policy <= 2u; policy++) {
+        for (uint8_t layout = 2u; layout <= 3u; layout++) {
+            test_reset(); host_os = 1u; layout_bits = (uint32_t)layout << 16u;
+            const macro_payload_ir_t ir = {.length=4u, .protection=policy, .bytes={MACRO_PAYLOAD_IR_OP_UNICODE,0xe9,0,0}};
+            CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
+            CHECK(macro_payload_engine_protected() == (policy == 1u || (policy == 0u && layout == 3u)));
+            layout_bits = 0u; // A setting change cannot change an active policy.
+            CHECK(macro_payload_engine_protected() == (policy == 1u || (policy == 0u && layout == 3u)));
+            CHECK(macro_payload_engine_cancel());
+            test_drain_cleanup();
+            CHECK(!macro_payload_engine_protected());
+        }
+    }
+    test_reset();
+    const macro_payload_ir_t ascii = {.length=3u, .protection=1u, .bytes={MACRO_PAYLOAD_IR_OP_TEXT,1,'a'}};
+    CHECK(macro_payload_start_ir(&ascii, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_payload_engine_protected());
+    test_unicode_drain();
+    CHECK(!macro_payload_engine_protected() && callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
+}
+
 int main(void) {
+    test_protection_is_latched_and_released();
     test_unicode_restores_current_modifiers_after_neutral_commit();
     test_unicode_sequences_and_cancellation();
     test_ascii_text_uses_keys_in_every_unicode_mode();

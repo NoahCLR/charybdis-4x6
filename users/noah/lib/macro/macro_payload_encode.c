@@ -107,9 +107,12 @@ bool macro_payload_encode_ir_write(const macro_payload_ir_t *ir, macro_payload_w
         *written = 0;
     }
 
-    if (!ir || !write_byte) {
+    if (!ir || !write_byte || ir->length > sizeof(ir->bytes) || ir->protection > 2u) {
         return false;
     }
+
+    if (ir->protection && (!macro_payload_writer_write_byte(&state, SS_QMK_PREFIX) ||
+        !macro_payload_writer_write_byte(&state, 5u) || !macro_payload_writer_write_byte(&state, ir->protection))) return false;
 
     cursor = ir->bytes;
     end    = ir->bytes + ir->length;

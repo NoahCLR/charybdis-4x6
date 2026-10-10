@@ -37,7 +37,8 @@ direction. Firmware accepts only current formats and every save binds VIA
 contain every enabled domain and use domain-seeking reads (D-F12).
 
 Macro text is typed through a selected host layout (D-F16), with Unicode
-entry for macOS, Windows and Linux as the fallback; the encoding, ownership
+entry for macOS, Windows and Linux as the fallback, protected automatically
+from new physical presses with a per-macro override (D-F17); the encoding, ownership
 and setup contract is in [runtime flow](architecture/runtime-flow.md).
 Physical host acceptance of each layout and entry method is pending.
 
@@ -1038,3 +1039,19 @@ it. Typing rules are in [runtime flow](architecture/runtime-flow.md).
 Client follow-up: Ark vendors the fixture, offers the layout in Settings →
 Host behind bit 22, checks macro text against the chosen layout, and labels
 keys as that layout prints them; pin the landed firmware.
+
+## D-F17 — Per-macro protection ignores new physical presses
+
+VIA macros may override automatic input protection through an optional prefix,
+advertised by feature bit 23. Automatic protects a macro needing Unicode entry
+under the layout latched at playback start; native accents remain interruptible.
+Explicit On and Off travel with the macro bank, independently of its text/name.
+Ignored matrix presses remain ignored until released, including after playback
+ends. Earlier releases and synthetic macro output are admitted. Cancellation,
+failure and reset still clean up owned keys. Protection is a physical-key
+admission policy, not a host input lock or delayed typing queue. The canonical
+encoding and scope are governed by [runtime flow](architecture/runtime-flow.md).
+
+Client follow-up: expose Automatic/On/Off per macro, explain ignored typing,
+preserve policies in edits and backups, show stored and layout-derived changes
+in Review, and gate overrides on bit 23.
