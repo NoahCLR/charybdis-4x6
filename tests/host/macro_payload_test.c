@@ -253,7 +253,30 @@ static void test_unicode_round_trip_and_rejection(void) {
     CHECK(!macro_payload_compile(overflow, &ir)); CHECK(ir.length == 0u);
 }
 
+static void test_protection_prefix_round_trip(void) {
+    for (uint8_t policy = 1u; policy <= 2u; policy++) {
+        macro_payload_ir_t original = {0}, decoded = {0};
+        uint8_t bytes[32] = {0}; uint16_t written = 0u;
+        CHECK(macro_payload_compile("é{KC_A}", &original));
+        original.protection = policy;
+        CHECK(macro_payload_encode_ir(&original, bytes, sizeof(bytes), &written));
+        CHECK(bytes[0] == 1u && bytes[1] == 5u && bytes[2] == policy);
+        test_qmk_reader_t reader = {.buffer = bytes};
+        CHECK(macro_payload_decode_qmk_stream(&decoded, written + 1u, test_qmk_reader_read_byte, &reader));
+        CHECK(decoded.protection == policy && decoded.length == original.length);
+        CHECK(memcmp(decoded.bytes, original.bytes, original.length) == 0);
+    }
+    const uint8_t bad[][7] = {{1,5,0,0}, {1,5,3,0}, {'a',1,5,1,0}, {1,5,1,1,5,2,0}};
+    for (uint8_t i = 0u; i < sizeof(bad)/sizeof(bad[0]); i++) {
+        macro_payload_ir_t decoded = {0}; test_qmk_reader_t reader = {.buffer = bad[i]};
+        CHECK(!macro_payload_decode_qmk_stream(&decoded, sizeof(bad[i]), test_qmk_reader_read_byte, &reader));
+    }
+    macro_payload_ir_t decoded = {0}; const uint8_t truncated[] = {1,5}; test_qmk_reader_t reader = {.buffer = truncated};
+    CHECK(!macro_payload_decode_qmk_stream(&decoded, sizeof(truncated), test_qmk_reader_read_byte, &reader));
+}
+
 int main(void) {
+    test_protection_prefix_round_trip();
     test_unicode_round_trip_and_rejection();
     test_validate_accepts_mixed_payload();
     test_validate_rejects_invalid_payloads();

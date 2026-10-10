@@ -3700,7 +3700,27 @@ static void test_qmk_key_after_lock_tap_lands_on_locked_layer(void) {
 }
 #endif
 
+extern bool key_runtime_test_macro_protected;
+static void test_macro_protection_drops_presses_keeps_releases(void) {
+    noah_record_admission_reset();
+    keyrecord_t press = {.event={.type=KEY_EVENT,.pressed=true,.key={1,1}}};
+    keyrecord_t release = press; release.event.pressed = false;
+    key_runtime_test_macro_protected = true;
+    CHECK(!noah_pre_process_record_user(KC_A, &press));
+    CHECK(!noah_record_admission_macro_admit(&release, true, false));
+    // Releases whose presses preceded playback are admitted.
+    CHECK(noah_record_admission_macro_admit(&release, true, false));
+    CHECK(!noah_record_admission_macro_admit(&press, true, false));
+    key_runtime_test_macro_protected = false;
+    CHECK(!noah_pre_process_record_user(KC_A, &release));
+    CHECK(noah_record_admission_macro_admit(&press, false, false));
+    CHECK(noah_record_admission_macro_admit(&press, true, true));
+    noah_record_admission_reset();
+    CHECK(noah_record_admission_macro_admit(&release, false, false));
+}
+
 int main(int argc, char **argv) {
+    test_macro_protection_drops_presses_keeps_releases();
 #ifdef NOAH_TEST_QMK_GESTURES
     const char *regression = getenv("NOAH_GESTURE_REGRESSION");
     if (regression) {

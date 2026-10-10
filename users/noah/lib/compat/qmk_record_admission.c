@@ -122,6 +122,7 @@ void noah_record_admission_task(void) {
 }
 
 void noah_record_admission_reset(void) {
+    noah_macro_input_guard_reset();
     record_admission_held_count = 0u;
     record_admission_replaying  = false;
 }

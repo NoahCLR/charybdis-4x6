@@ -45,6 +45,7 @@ typedef struct {
 
 typedef struct {
     bool                          unicode_active;
+    bool                          protected;
     bool                          unicode_cancel_sent;
     bool                          unicode_neutral_sent;
     bool                          unicode_caps_toggled;
@@ -238,12 +239,12 @@ static bool macro_payload_ir_next(const uint8_t **cursor, const uint8_t *end, ma
     return true;
 }
 
-static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, const macro_payload_host_t *host) {
+static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, const macro_payload_host_t *host, bool *needs_unicode) {
     const uint8_t               *cursor;
     const uint8_t               *end;
     macro_payload_hold_balance_t balance = {0};
 
-    if (!ir || ir->length > sizeof(ir->bytes)) {
+    if (!ir || ir->length > sizeof(ir->bytes) || ir->protection > 2u) {
         return false;
     }
 
@@ -262,6 +263,7 @@ static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, const macro
         // A scalar the layout cannot type needs Unicode entry, which an
         // ordinary key held across it would corrupt.
         if (step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE && !host_layout_lookup(host->layout, step.value, strokes)) {
+            *needs_unicode = true;
             if (host->unicode_mode < 1u || host->unicode_mode > 3u) return false;
             for (uint8_t i = 0u; i < balance.count; i++) if (balance.keycodes[i] < KC_LEFT_CTRL) return false;
         }
@@ -655,7 +657,8 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
         return MACRO_PAYLOAD_START_BUSY;
     }
     const macro_payload_host_t host = macro_payload_host_resolve();
-    if (!macro_payload_ir_preflight(ir, &host)) {
+    bool needs_unicode = false;
+    if (!macro_payload_ir_preflight(ir, &host, &needs_unicode)) {
         return MACRO_PAYLOAD_START_INVALID;
     }
     if (ir->length == 0u) {
@@ -663,6 +666,7 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
     }
 
     macro_payload_engine = (macro_payload_engine_t){
+        .protected      = ir->protection == 1u || (ir->protection == 0u && needs_unicode),
         .unicode_mode   = host.unicode_mode,
         .layout         = host.layout,
         .layout_iso     = host.iso,
@@ -739,6 +743,10 @@ bool macro_payload_engine_cancel(void) {
     }
     macro_payload_begin_cleanup(MACRO_PAYLOAD_FINISH_CANCELLED);
     return true;
+}
+
+bool macro_payload_engine_protected(void) {
+    return macro_payload_engine.phase != MACRO_PAYLOAD_PHASE_IDLE && macro_payload_engine.protected;
 }
 
 void macro_payload_engine_init(void) {

@@ -24,6 +24,7 @@ typedef enum {
 
 typedef struct {
     uint16_t length;
+    uint8_t  protection; // 0 automatic, 1 on, 2 off; VIA prefix 1,5,value.
     uint8_t  bytes[MACRO_PAYLOAD_IR_MAX_BYTES];
 } macro_payload_ir_t;
 
@@ -76,6 +77,7 @@ bool                         macro_payload_compile(const char *payload, macro_pa
 macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context);
 void                         macro_payload_engine_scan(void);
 bool                         macro_payload_engine_cancel(void);
+bool                         macro_payload_engine_protected(void);
 void                         macro_payload_engine_init(void);
 void                         macro_payload_debug_snapshot(macro_payload_debug_snapshot_t *out);
 bool                         macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, macro_payload_read_byte_fn read_byte, void *context);

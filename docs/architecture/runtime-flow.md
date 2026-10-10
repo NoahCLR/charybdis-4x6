@@ -405,6 +405,25 @@ an application inserted the text. Exact scalar emission does not promise a
 font contains its glyph or an application preserves it. Physical acceptance
 on each configured host remains required.
 
+Feature bit 23 advertises per-macro input protection. An optional canonical VIA
+prefix `01 05 01` forces protection on, and `01 05 02` forces it off. It must
+occur once at the beginning; zero, unknown policies, a truncated prefix or a
+prefix after executable content are rejected. Without a prefix, protection is
+automatic: preflight enables it when any scalar needs host Unicode entry under
+the latched layout. The policy is metadata outside the 512-byte executable IR;
+its three stored bytes count against macro-bank memory. Empty macros can retain
+an explicit policy without producing output. Encoders preserve the policy.
+
+Protected playback ignores new physical matrix key presses before combos and
+tapping see them. A matrix bitmap retains each ignored press until its release,
+even after playback finishes, so it cannot reappear as a held key. Releases
+whose presses preceded playback remain admitted; macro synthetic output remains
+admitted too. Reset clears the bitmap. Protection remains active through cleanup
+and ends on completion, cancellation or failure. It does not disable cleanup or
+reset, freeze pointing, or protect against input from another host device.
+Ordinary keys already held and pending synthetic actions can still affect host
+input; release ordinary keys before playback. There is no deferred typing queue.
+
 Playback is scan-driven and single-active. Each logical slot stores one byte of
 unchecked/valid/invalid metadata. A valid slot is decoded into one shared IR
 when invoked; invalid slots do not reparse until invalidated. Busy triggers are

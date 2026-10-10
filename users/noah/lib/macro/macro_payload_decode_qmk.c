@@ -114,6 +114,7 @@ bool macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, ma
     }
 
     ir->length = 0;
+    ir->protection = 0u;
     macro_payload_hold_balance_reset(&balance);
 
     for (uint16_t offset = 0; offset < length;) {
@@ -173,6 +174,15 @@ bool macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, ma
         }
 
         switch (byte) {
+            case 5u:
+                // A single optional policy prefix, before any executable
+                // content. Zero is represented by no prefix, canonically.
+                if (offset != 2u || offset >= length || !read_byte(offset++, &byte, context) || byte < 1u || byte > 2u) {
+                    ir->length = 0u;
+                    return false;
+                }
+                ir->protection = byte;
+                break;
             case SS_TAP_CODE: {
                 uint8_t keycode = 0;
 

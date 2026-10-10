@@ -6,6 +6,7 @@
 static void macro_payload_ir_reset(macro_payload_ir_t *ir) {
     if (ir) {
         ir->length = 0;
+        ir->protection = 0u;
     }
 }
 
