@@ -206,7 +206,7 @@ static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, uint8_t uni
         if (!macro_payload_ir_next(&cursor, end, &step)) {
             return false;
         }
-        if ((step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE || (step.opcode == MACRO_PAYLOAD_IR_OP_TEXT && unicode_mode)) && balance.count) {
+        if (step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE && balance.count) {
             for (uint8_t i = 0u; i < balance.count; i++) if (balance.keycodes[i] < KC_LEFT_CTRL) return false;
         }
         if (step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE && (unicode_mode < 1u || unicode_mode > 3u)) return false;
@@ -347,16 +347,14 @@ static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_pay
     macro_payload_engine.unicode_cancel_sent = false;
     macro_payload_engine.unicode_neutral_sent = false;
     bool caps = mode == 3u && macro_payload_unicode_caps_lock();
-    bool control = scalar == 9u || scalar == 10u;
-    if (control) macro_payload_unicode_add_tap(scalar == 9u ? KC_TAB : KC_ENTER, 0u);
-    else if (caps) macro_payload_unicode_add_tap(KC_CAPS_LOCK, 0u);
-    if (!control && mode == 1u) {
+    if (caps) macro_payload_unicode_add_tap(KC_CAPS_LOCK, 0u);
+    if (mode == 1u) {
         if (scalar > 0xFFFFu) {
             scalar -= 0x10000u;
             macro_payload_unicode_add_hex(0xD800u | (scalar >> 10u), 4u, MOD_BIT(KC_LEFT_ALT));
             macro_payload_unicode_add_hex(0xDC00u | (scalar & 0x3FFu), 4u, MOD_BIT(KC_LEFT_ALT));
         } else macro_payload_unicode_add_hex(scalar, 4u, MOD_BIT(KC_LEFT_ALT));
-    } else if (!control) {
+    } else {
         if (mode == 2u) {
             macro_payload_unicode_add_tap(KC_RIGHT_ALT, MOD_BIT(KC_RIGHT_ALT));
             macro_payload_unicode_add_tap(KC_U, 0u);
@@ -370,11 +368,11 @@ static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_pay
         macro_payload_unicode_add_hex(scalar, digits, 0u);
         macro_payload_unicode_add_tap(mode == 2u ? KC_ENTER : KC_SPACE, 0u);
     }
-    if (caps && !control) macro_payload_unicode_add_tap(KC_CAPS_LOCK, 0u);
+    if (caps) macro_payload_unicode_add_tap(KC_CAPS_LOCK, 0u);
     macro_payload_engine.unicode_active = true;
     macro_payload_engine.unicode_mods = 0u;
     send_keyboard_report();
-    if (mode == 1u && !control) {
+    if (mode == 1u) {
         macro_payload_engine.unicode_mods = MOD_BIT(KC_LEFT_ALT);
         if (!owned_keycode_acquire(KC_LEFT_ALT, &macro_payload_engine.unicode_alt)) {macro_payload_begin_runtime_error(); return;}
         send_keyboard_report();
@@ -423,10 +421,6 @@ static void macro_payload_start_text_char(uint32_t now) {
 
     ascii_code = macro_payload_engine.ir->bytes[macro_payload_engine.text_cursor++];
     macro_payload_engine.text_remaining--;
-    if (macro_payload_engine.unicode_mode && (ascii_code == 9u || ascii_code == 10u || (ascii_code >= 32u && ascii_code < 127u))) {
-        macro_payload_start_unicode(ascii_code, now, macro_payload_engine.text_remaining ? MACRO_PAYLOAD_PHASE_TEXT_PRESS : MACRO_PAYLOAD_PHASE_READY);
-        return;
-    }
     if (macro_payload_ascii_lut_bit(ascii_to_shift_lut, ascii_code)) {
         keycodes[keycode_count++] = KC_LEFT_SHIFT;
     }

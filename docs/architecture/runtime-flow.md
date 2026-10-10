@@ -347,11 +347,15 @@ later detection change cannot switch an entry sequence mid-macro. Detection
 cannot establish active input sources or installed helpers. Host readback is
 specified in [Profile Wire](profile-wire-v1.md#host-os-readback).
 
-With Unicode enabled and a known effective OS, printable ASCII also uses Unicode entry, avoiding text
-layout and held-modifier substitutions; tab and newline use isolated Tab and
-Enter taps. Command steps keep their key semantics. A macro holding a basic (non-modifier)
-key across a Unicode-entry text step is rejected in preflight; modifier holds
-are preserved through the report override. macOS holds left Option
+ASCII text, tab and newline are always typed with ordinary keys, as with
+Unicode off, so they never depend on the host's Unicode input setup and an
+ASCII-only macro plays the same whether the host input source is set up for
+Unicode entry or not. Only non-ASCII scalars use Unicode entry. ASCII therefore
+follows the host's keyboard layout and any modifier the macro holds, exactly
+as without Unicode. Command steps keep their key semantics. A macro holding a
+basic (non-modifier) key across a non-ASCII scalar is rejected in preflight;
+holding one across ASCII text is allowed. Modifier holds are preserved through
+the report override during Unicode entry. macOS holds left Option
 and emits four hex digits per UTF-16 code unit, including a surrogate pair
 for supplementary scalars. WinCompose taps Right Alt then U, sends at least
 four hex digits (an extra leading zero before an initial A–F), then Enter.

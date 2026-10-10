@@ -430,8 +430,10 @@ editor’s Settings → Host section: macOS requires
 Unicode Hex Input enabled and active; Windows requires WinCompose running
 with Right Alt as Compose; Linux requires IBus-style Ctrl+Shift+U entry in the
 target application. Linux applications without that input path are unsupported.
-The keyboard cannot detect whether the host is configured. Off keeps ordinary
-ASCII playback. The OS choice and Unicode switch are independent and saved
+The keyboard cannot detect whether the host is configured. Plain ASCII text
+is always typed with ordinary keys, so macros without accents, symbols or
+emoji play on your usual input source; only the other characters need the
+host set up for Unicode entry. Off keeps ordinary ASCII playback. The OS choice and Unicode switch are independent and saved
 with the profile.
 Auto uses QMK’s USB OS guess; detection may be wrong through a KVM or switch.
 Unknown disables non-ASCII playback until detection succeeds or an override

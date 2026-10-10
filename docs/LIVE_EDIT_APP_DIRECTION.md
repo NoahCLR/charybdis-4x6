@@ -1008,6 +1008,8 @@ remaining inert for non-ASCII playback; host detection never confirms input
 configuration. The
 settings-v6 zero defaults and current profiles stay valid. Unicode emission is
 scan-driven and uses the fork's report-only modifier override, so the current
-live modifier owners are revealed afterward. Host methods, limits, cancellation
+live modifier owners are revealed afterward. ASCII text is typed with
+ordinary keys in every mode; only non-ASCII scalars use host Unicode entry, so
+enabling Unicode never makes ASCII macros depend on the host input source. Host methods, limits, cancellation
 and exact byte encoding are governed by [runtime flow](architecture/runtime-flow.md).
 No native helper or automatic host-input-source detection is implied.

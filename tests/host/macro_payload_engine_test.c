@@ -40,6 +40,7 @@ const uint8_t ascii_to_shift_lut[16];
 const uint8_t ascii_to_altgr_lut[16];
 const uint8_t ascii_to_dead_lut[16];
 const uint8_t ascii_to_keycode_lut[128] = {
+    ['\n'] = KC_ENTER,
     ['a'] = KC_A,
     ['b'] = KC_B,
 };
@@ -339,6 +340,29 @@ static void test_unicode_sequences_and_cancellation(void) {
     }
 }
 
+// ASCII never depends on the host's Unicode input setup: it is typed with
+// ordinary keys in every mode, and only non-ASCII scalars use Unicode entry.
+static void test_ascii_text_uses_keys_in_every_unicode_mode(void) {
+    const macro_payload_ir_t ir = {.length = 11u, .bytes = {MACRO_PAYLOAD_IR_OP_TEXT, 2u, 'a', '\n', MACRO_PAYLOAD_IR_OP_UNICODE, 0xE9, 0, 0, MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'b'}};
+    const uint8_t entry_keys[] = {5u, 7u, 8u}; // U+00E9: Option+00E9, Right Alt U 00E9 Enter, Ctrl+Shift+U 00E9 Space.
+    const macro_payload_ir_t held_basic = {.length = 7u, .bytes = {MACRO_PAYLOAD_IR_OP_KEY_DOWN, KC_B, MACRO_PAYLOAD_IR_OP_TEXT, 1u, 'a', MACRO_PAYLOAD_IR_OP_KEY_UP, KC_B}};
+    for (uint8_t mode = 1u; mode <= 3u; mode++) {
+        test_reset(); unicode_mode = mode;
+        CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
+        test_unicode_drain(); CHECK(callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
+        uint8_t acquired[TEST_MAX_OPS], mods[TEST_MAX_OPS], count = 0u;
+        for (unsigned i = 0; i < test_op_count; i++) if (test_ops[i].kind == TEST_OP_ACQUIRE) {acquired[count] = test_ops[i].keycode; mods[count++] = test_ops[i].mods;}
+        CHECK(count == 3u + entry_keys[mode - 1u]);
+        CHECK(acquired[0] == KC_A && mods[0] == 0u);
+        CHECK(acquired[1] == KC_ENTER && mods[1] == 0u);
+        CHECK(acquired[count - 1u] == KC_B && mods[count - 1u] == 0u);
+        // A held ordinary key no longer blocks ASCII text; it still blocks Unicode entry.
+        test_reset(); unicode_mode = mode;
+        CHECK(macro_payload_start_ir(&held_basic, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
+        test_unicode_drain(); CHECK(callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
+    }
+}
+
 static void test_unicode_restores_current_modifiers_after_neutral_commit(void) {
     test_reset(); unicode_mode = 1u;
     live_mods = MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_LEFT_SHIFT);
@@ -355,6 +379,7 @@ static void test_unicode_restores_current_modifiers_after_neutral_commit(void) {
 int main(void) {
     test_unicode_restores_current_modifiers_after_neutral_commit();
     test_unicode_sequences_and_cancellation();
+    test_ascii_text_uses_keys_in_every_unicode_mode();
     macro_payload_engine_init();
     test_long_delay_start_is_nonblocking_and_wrap_safe();
     test_text_uses_lease_backed_press_and_release_scans();
