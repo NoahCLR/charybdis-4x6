@@ -18,10 +18,12 @@ typedef struct {
     test_op_kind_t kind;
     uint8_t        keycode;
     uint8_t        mods;
+    uint32_t       at;
 } test_op_t;
 
 #define TEST_MAX_OPS 128
 
+static uint32_t fake_time;
 static uint8_t unicode_mode;
 static bool unicode_caps;
 static uint8_t live_mods, last_report_mods;
@@ -36,7 +38,6 @@ static uint8_t host_os;
 uint32_t macro_payload_host_setting(void) {return (unicode_mode ? NOAH_HOST_UNICODE_ENABLED : 0u) | layout_bits;}
 uint8_t macro_payload_host_os(void) {return unicode_mode ? unicode_mode : host_os;}
 bool macro_payload_unicode_caps_lock(void) {return unicode_caps;}
-static uint32_t                      fake_time;
 static uint16_t                      wait_call_count;
 static test_op_t                     test_ops[TEST_MAX_OPS];
 static uint16_t                      test_op_count;
@@ -60,7 +61,7 @@ static void test_log_op(test_op_kind_t kind, uint8_t keycode) {
     CHECK(test_op_count < TEST_MAX_OPS);
     uint8_t mods = 0u;
     (void)keyboard_report_mods_override_user(&mods);
-    test_ops[test_op_count++] = (test_op_t){.kind = kind, .keycode = keycode, .mods = mods};
+    test_ops[test_op_count++] = (test_op_t){.kind = kind, .keycode = keycode, .mods = mods, .at = fake_time};
 }
 
 static void test_finish_callback(macro_payload_finish_result_t result, void *context) {
@@ -351,6 +352,40 @@ static void test_unicode_sequences_and_cancellation(void) {
     }
 }
 
+// Entry settles once it has started, as QMK's Unicode does; every other tap
+// goes at the macro's text pace. Scans run each millisecond here.
+static uint32_t test_unicode_play(uint8_t mode, macro_payload_text_output_t output, uint8_t interval) {
+    const macro_payload_ir_t ir = {.length = 4u, .bytes = {MACRO_PAYLOAD_IR_OP_UNICODE, 0xE9, 0, 0}};
+    test_reset(); unicode_mode = mode;
+    uint32_t started = fake_time;
+    CHECK(macro_payload_start_ir(&ir, output, interval, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
+    for (unsigned i = 0; i < 1000u && callback_count == 0u; i++) test_scan_after(1u);
+    CHECK(callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
+    return fake_time - started;
+}
+
+static void test_unicode_settles_after_entry_starts_then_types_at_text_pace(void) {
+    // U+00E9: Option+00E9, Right Alt U 00E9 Enter, Ctrl+Shift+U 00E9 Space.
+    const uint8_t starts[] = {KC_LEFT_ALT, KC_U, KC_U};
+    for (uint8_t mode = 1u; mode <= 3u; mode++) {
+        uint32_t elapsed = test_unicode_play(mode, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0u);
+        // One character, including the protected macro's own 10 ms settle.
+        CHECK(elapsed <= 60u);
+        uint32_t entry = 0u, previous = 0u; unsigned digits = 0u;
+        for (unsigned i = 0; i < test_op_count; i++) {
+            if (test_ops[i].kind != TEST_OP_ACQUIRE) continue;
+            if (test_ops[i].keycode == starts[mode - 1u]) entry = test_ops[i].at;
+            if (test_ops[i].keycode != KC_0 && test_ops[i].keycode != KC_E && test_ops[i].keycode != KC_9) continue;
+            if (digits++ == 0u) CHECK(entry && test_ops[i].at - entry >= 10u);
+            else CHECK(test_ops[i].at - previous <= 4u); // press, wait, release, wait
+            previous = test_ops[i].at;
+        }
+        CHECK(digits == 4u);
+        // Delayed text output paces entry too: each tap holds and then rests.
+        CHECK(test_unicode_play(mode, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 20u) >= elapsed + 4u * 40u);
+    }
+}
+
 // ASCII never depends on the host's Unicode input setup: it is typed with
 // ordinary keys in every mode, and only non-ASCII scalars use Unicode entry.
 static void test_ascii_text_uses_keys_in_every_unicode_mode(void) {
@@ -550,6 +585,7 @@ int main(void) {
     test_protection_is_latched_and_released();
     test_unicode_restores_current_modifiers_after_neutral_commit();
     test_unicode_sequences_and_cancellation();
+    test_unicode_settles_after_entry_starts_then_types_at_text_pace();
     test_ascii_text_uses_keys_in_every_unicode_mode();
     test_text_types_through_the_host_layout();
     test_untypeable_text_is_refused_before_output();
