@@ -53,6 +53,7 @@ typedef struct {
     uint8_t                       unicode_mods;
     uint8_t                       unicode_index;
     uint8_t                       unicode_count;
+    uint8_t                       unicode_settle_after; // Taps that start entry; the host settles after them.
     macro_payload_phase_t         unicode_next;
     macro_payload_unicode_tap_t   unicode_taps[12];
     owned_keycode_lease_t         unicode_alt;
@@ -512,6 +513,8 @@ static void macro_payload_start_second_stroke(uint32_t now) {
     macro_payload_start_transient(keys, count, now, TAP_CODE_DELAY, macro_payload_engine.text_interval, macro_payload_engine.stroke_next);
 }
 
+// The host's entry method needs a moment once entry starts, as QMK's
+// UNICODE_TYPE_DELAY allows; the taps after it go at the macro's text pace.
 #define MACRO_PAYLOAD_UNICODE_PACE_MS 10u
 
 static void macro_payload_unicode_add_tap(uint8_t key, uint8_t mods) {
@@ -546,6 +549,7 @@ static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_pay
     macro_payload_engine.unicode_next         = next;
     macro_payload_engine.unicode_cancel_sent  = false;
     macro_payload_engine.unicode_neutral_sent = false;
+    macro_payload_engine.unicode_settle_after = 0u;
     bool caps                                 = mode == 3u && macro_payload_unicode_caps_lock();
     if (caps) macro_payload_unicode_add_tap(KC_CAPS_LOCK, 0u);
     if (mode == 1u) {
@@ -565,6 +569,7 @@ static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_pay
             macro_payload_unicode_tap_t *tap = &macro_payload_engine.unicode_taps[macro_payload_engine.unicode_count++];
             *tap                             = (macro_payload_unicode_tap_t){.keys = {KC_LEFT_CTRL, KC_LEFT_SHIFT, macro_payload_stroke_key(strokes[0])}, .count = 3u, .mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT)};
         }
+        macro_payload_engine.unicode_settle_after = macro_payload_engine.unicode_count;
         uint8_t digits = scalar > 0xFFFFFu ? 6u : scalar > 0xFFFFu ? 5u : 4u;
         // WinCompose treats an initial hex letter as a compose sequence.
         if (mode == 2u && ((scalar >> ((digits - 1u) * 4u)) & 15u) > 9u) macro_payload_unicode_add_char('0', 0u);
@@ -583,7 +588,8 @@ static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_pay
         }
         send_keyboard_report();
     }
-    macro_payload_schedule_wait(now, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_UNICODE_PRESS);
+    // Holding Option starts macOS entry; Windows and Linux start it with taps.
+    macro_payload_schedule_wait(now, mode == 1u ? MACRO_PAYLOAD_UNICODE_PACE_MS : macro_payload_engine.text_interval, MACRO_PAYLOAD_PHASE_UNICODE_PRESS);
 }
 
 static void macro_payload_unicode_press(uint32_t now) {
@@ -594,7 +600,8 @@ static void macro_payload_unicode_press(uint32_t now) {
     macro_payload_unicode_tap_t *tap  = &macro_payload_engine.unicode_taps[macro_payload_engine.unicode_index++];
     macro_payload_engine.unicode_mods = tap->mods;
     send_keyboard_report();
-    macro_payload_start_transient(tap->keys, tap->count, now, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_UNICODE_PRESS);
+    uint32_t after = macro_payload_engine.unicode_index == macro_payload_engine.unicode_settle_after ? MACRO_PAYLOAD_UNICODE_PACE_MS : macro_payload_engine.text_interval;
+    macro_payload_start_transient(tap->keys, tap->count, now, macro_payload_engine.text_interval, after, MACRO_PAYLOAD_PHASE_UNICODE_PRESS);
     if (tap->keys[0] == KC_CAPS_LOCK && macro_payload_engine.phase != MACRO_PAYLOAD_PHASE_CLEANUP) macro_payload_engine.unicode_caps_toggled = !macro_payload_engine.unicode_caps_toggled;
 }
 
@@ -603,14 +610,15 @@ static void macro_payload_unicode_finish(uint32_t now) {
     macro_payload_engine.unicode_neutral_sent = true;
     if (macro_payload_engine.unicode_alt.active) (void)macro_payload_key_release(&macro_payload_engine.unicode_alt);
     send_keyboard_report();
-    // A held physical Option must not hide the release committing macOS input.
-    macro_payload_schedule_wait(now, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_UNICODE_RESTORE);
+    // A held physical Option must not hide the release committing macOS input:
+    // the neutral report goes out on its own before live modifiers return.
+    macro_payload_schedule_wait(now, macro_payload_engine.text_interval, MACRO_PAYLOAD_PHASE_UNICODE_RESTORE);
 }
 
 static void macro_payload_unicode_restore(uint32_t now) {
     macro_payload_engine.unicode_active = false;
     send_keyboard_report();
-    macro_payload_schedule_wait(now, MACRO_PAYLOAD_UNICODE_PACE_MS, macro_payload_engine.unicode_next);
+    macro_payload_schedule_wait(now, macro_payload_engine.text_interval, macro_payload_engine.unicode_next);
 }
 
 static void macro_payload_start_text_char(uint32_t now) {

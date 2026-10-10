@@ -17,8 +17,10 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+# TAP_CODE_DELAY is QMK's default, which the firmware keeps, so timing checks
+# match the keyboard rather than the stub's slower fallback.
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
-    -DNKRO_ENABLE \
+    -DNKRO_ENABLE -DTAP_CODE_DELAY=0u \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$QMK_ROOT/platforms" \
     -I"$QMK_ROOT/quantum/send_string" \
@@ -36,7 +38,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -fsanitize=address,undefined \
     -fno-omit-frame-pointer \
-    -DNKRO_ENABLE \
+    -DNKRO_ENABLE -DTAP_CODE_DELAY=0u \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$QMK_ROOT/platforms" \
     -I"$QMK_ROOT/quantum/send_string" \

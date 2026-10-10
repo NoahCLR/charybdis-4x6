@@ -380,8 +380,14 @@ four hex digits (an extra leading zero before an initial A–F), then Enter.
 Linux taps Ctrl+Shift+U, sends at least four hex digits, then Space. Linux Caps
 Lock is toggled off and restored with owned, paced taps when it was on.
 
-Each tap has a 10 ms minimum press and release gap; entry and exit settle for
-10 ms. One bounded transition runs per scan, with no blocking waits. The QMK
+Entry settles for 10 ms once it has started, as QMK's `UNICODE_TYPE_DELAY`
+does: after Option goes down on macOS, after Right Alt then U on WinCompose,
+and after Ctrl+Shift+U on Linux. Every other entry tap, the neutral report that
+commits entry and the report restoring live modifiers go at the macro's text
+pace: `TAP_CODE_DELAY` for a plain program, `DYNAMIC_KEYMAP_MACRO_DELAY` for a
+VIA slot, both 0 unless the build sets them. Each press and release is still a
+report of its own. Cancellation's Escape, Caps Lock and neutral steps keep a
+10 ms pace. One bounded transition runs per scan, with no blocking waits. The QMK
 report-only modifier override masks outgoing modifiers without changing live
 physical, managed, weak or one-shot state, and skips one-shot consumption.
 Leaving the override sends the then-current live state; it never restores a
