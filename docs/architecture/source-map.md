@@ -37,6 +37,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `tools/profile_introspect.py` | Parse selected authored profile inputs and render generated visual profile reports | default `docs/KEYMAP-OVERVIEW.md` plus optional `docs/profiles/<name>/KEYMAP-OVERVIEW.md` and matching SVG assets | `python3 tools/profile_introspect.py --check`, `python3 tools/profile_introspect.py --keymap <name> --check`, `run_profile_introspection_checks.sh`, full host suite |
 | `tools/via_to_qmk_layout.py` | Convert VIA export JSON back into selected source-owned keymap blocks | optionally selected profile `keymap.c` `VIA_MACROS(MACRO)` and `keymaps[][]` | script preview/write review, real-profile validation, full host suite when source changes |
 | `tools/check_firmware_stack_budget.py` and `tools/firmware_stack_budget.json` | Reconcile target stack symbols/artifacts and enforce reviewed stack contexts, call edges, indirect edges, and reserves | read-only report; no source output | `run_firmware_stack_budget_tool_tests.sh`; fresh instrumented target build plus `run_firmware_stack_budget_checks.sh` |
+| `tools/host_layouts/build.py` | Derive each host layout's character table from the raw sources in `tools/host_layouts/sources/` (read by `extract_macos.swift`, `extract_xkb.sh` and `--import-qmk`) and generate the C tables | `tests/fixtures/host_layouts_v1.json`, `users/noah/lib/macro/host_layout_tables.c` | `run_host_layout_tests.sh` (`--check`) |
 | `tools/check_firmware_memory_budget.py` | Report RP2040 per-bank linked accounting and enforce compact macro symbols plus explicit SRAM0–3 `.bss`, `.data + .bss`, and boot core-memory-span regression policies defined in [memory-budgets.md](./memory-budgets.md) against a fresh ordinary target ELF | read-only report; no source output | `run_firmware_memory_budget_tool_tests.sh`; fresh ordinary target build plus `run_firmware_memory_budget_checks.sh` |
 
 ## Source-To-Doc Matrix
@@ -54,7 +55,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `key/runtime/queue/` | Pending release dispatch queue | Authoritative queue inside key runtime | Deferred dispatch effects, release blockers | Ordered pending release snapshots and drains | release matrix, runtime debug, scenario tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/slot/` | Per-key-position helpers | Helper data, not independent authority | Key positions, combo origins, materialized behavior | Packed key positions, origin bitmaps, slot interaction contracts | combo origin, PD, RGB, split, key-runtime tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/trace/` and top-level `trace.*` | Runtime tracing | Diagnostic only | Runtime events, transition plans, projection snapshots | Trace entries and optional console output | `run_runtime_trace_tests.sh`, key-runtime trace variants | [KEY_RUNTIME](../KEY_RUNTIME.md) |
-| `macro/` | VIA macro defaults, payload parser, compact slot metadata, one pinned shared IR, and scan-driven playback | Macro payload validation and one-active execution lifecycle | `VIA_MACRO_n`, payload strings, VIA EEPROM, matrix scans | Lease-backed macro output, bounded cleanup, VIA default seeding | macro payload/engine/provider/defaults/VIA lifecycle tests | [KEYMAP](../KEYMAP.md), [runtime-flow](./runtime-flow.md), [VIA_TO_QMK](../tooling/VIA_TO_QMK.md) |
+| `macro/` | VIA macro defaults, payload parser, compact slot metadata, one pinned shared IR, scan-driven playback, and host layout tables ([host-layouts-v1](./host-layouts-v1.md)) | Macro payload validation and one-active execution lifecycle | `VIA_MACRO_n`, payload strings, VIA EEPROM, matrix scans | Lease-backed macro output, bounded cleanup, VIA default seeding | macro payload/engine/provider/defaults/VIA lifecycle tests | [KEYMAP](../KEYMAP.md), [runtime-flow](./runtime-flow.md), [VIA_TO_QMK](../tooling/VIA_TO_QMK.md) |
 | `pointing/defs/` | PD mode manifest and generated keycodes | Authored PD identity | PD mode manifest macros | Mode ids, flags, keycodes, lock keycodes | PD mode and profile validation tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/modes/` | Configured directional engine and shared dragscroll algorithm | Validated effective slot records | Mouse reports and mode lifecycle transitions | Transformed reports and bounded synthetic actions | `run_pd_mode_handlers_tests.sh`, `run_pd_mode_tests.sh` | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/policy/` | Pointer layer and PD policy rules | Policy helper | Layer state, keycodes, PD traits | Pointer layer activation, mouse-record classification | `run_pointer_layer_policy_tests.sh`, PD/key-runtime integration tests | [POINTER_MODES](../POINTER_MODES.md) |
@@ -178,6 +179,9 @@ semantics without taking another platform timer sample.
   `macro_payload_internal.h`, `macro_payload_decode_qmk.c`,
   `macro_payload_encode.c`, `macro_payload_keycodes.c`,
   `macro_payload_parse.c`, `macro_payload_run.c`
+- Host layouts: `host_layout.c/h` and the generated `host_layout_tables.c`
+  ([host-layouts-v1](./host-layouts-v1.md)); not linked until playback
+  selects a layout
 
 ### `pointing/`
 

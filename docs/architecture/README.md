@@ -22,6 +22,8 @@ default activity policy and opt-in diagnostics; recorded captures live under
   to change and need the edit point plus checks.
 - Use [runtime-flow.md](./runtime-flow.md) when a bug crosses press/release,
   scan, RGB, pointing-device, split, or macro boundaries.
+- Use [host-layouts-v1.md](./host-layouts-v1.md) for the host keyboard layout
+  catalogue: which keys type each character on each computer layout.
 - Use [memory-budgets.md](./memory-budgets.md) before interpreting target RAM,
   allocator, EEPROM-cache, or stack numbers.
 - Use [profile-wire-v1.md](./profile-wire-v1.md) and
