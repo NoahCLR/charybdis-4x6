@@ -159,7 +159,7 @@
         },
         {
           "name": "matrix scan macro text press",
-          "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_strokes", "macro_payload_start_transient", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan macro transient chord press",
@@ -235,7 +235,7 @@
         },
         {
           "name": "physical press participation indexed behavior lookup",
-          "functions": ["main", "action_exec", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "action_exec", "noah_participation_behavior", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "native tapping indexed behavior lookup",

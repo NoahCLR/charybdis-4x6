@@ -56,7 +56,7 @@ static bool operation_is_supported(uint8_t command, uint8_t value) {
     if (command == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SAVE) {
         return value == NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT;
     }
-    return command == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT);
+    return command == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE || value == NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT);
 }
 
 static noah_profile_candidate_v1_operation_t decode_operation(uint8_t value) {
@@ -64,7 +64,10 @@ static noah_profile_candidate_v1_operation_t decode_operation(uint8_t value) {
         case NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN:
             return NOAH_PROFILE_CANDIDATE_V1_OPERATION_BEGIN;
         case NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK:
+        case NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK:
             return NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK;
+        case NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE:
+            return NOAH_PROFILE_CANDIDATE_V1_OPERATION_REUSE;
         case NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE:
             return NOAH_PROFILE_CANDIDATE_V1_OPERATION_VALIDATE;
         case NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT:
@@ -147,6 +150,24 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, metadata->via_generation == 0u ? 24u : 28u);
         }
         return NOAH_PROFILE_CANDIDATE_V1_DECODE_OK;
+    }
+
+    if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_REUSE) {
+        command->payload.reuse.offset = read_u16(&frame[5]);
+        command->payload.reuse.source_offset = read_u16(&frame[7]);
+        command->payload.reuse.length = read_u16(&frame[9]);
+        command->payload.reuse.source.generation = read_u32(&frame[11]);
+        command->payload.reuse.source.digest = read_u32(&frame[15]);
+        command->payload.reuse.source.crc32 = read_u32(&frame[19]);
+        command->payload.reuse.source.kind = frame[23];
+        command->payload.reuse.source.origin = frame[24];
+        if (command->payload.reuse.length == 0u || command->payload.reuse.length > NOAH_PROFILE_CANDIDATE_V1_REUSE_MAX || (uint32_t)command->payload.reuse.offset + command->payload.reuse.length > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE || (uint32_t)command->payload.reuse.source_offset + command->payload.reuse.length > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE) {
+            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 5u);
+        }
+        if (frame[23] > 1u || (frame[23] == 0u && (command->payload.reuse.source.generation != 0u || frame[24] != UINT8_MAX)) || (frame[23] == 1u && (command->payload.reuse.source.generation == 0u || frame[24] > 1u))) {
+            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 23u);
+        }
+        return require_zero(frame, 25u, NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);
     }
 
     if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_CHUNK) {

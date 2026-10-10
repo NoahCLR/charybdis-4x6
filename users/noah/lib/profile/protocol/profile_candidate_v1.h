@@ -19,7 +19,10 @@ enum {
     NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT        = 0x13u,
     NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT         = 0x14u,
     NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS        = 0x18u,
+    NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE         = 0x1Bu,
+    NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK  = 0x1Cu,
     NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX           = 20u,
+    NOAH_PROFILE_CANDIDATE_V1_REUSE_MAX           = 1024u,
     NOAH_PROFILE_CANDIDATE_V1_MIN_BLOB_SIZE       = 8u,
     NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE       = NOAH_PROFILE_PAYLOAD_MAX,
     NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB          = NOAH_PROFILE_DOMAIN_MASK_RGB,
@@ -76,6 +79,7 @@ typedef enum {
     NOAH_PROFILE_CANDIDATE_V1_ADMISSION_MALFORMED,
     NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY,
     NOAH_PROFILE_CANDIDATE_V1_ADMISSION_UNSUPPORTED,
+    NOAH_PROFILE_CANDIDATE_V1_ADMISSION_REJECTED,
 } noah_profile_candidate_v1_admission_t;
 
 typedef enum {
@@ -99,6 +103,7 @@ typedef enum {
     NOAH_PROFILE_CANDIDATE_V1_OPERATION_VALIDATE,
     NOAH_PROFILE_CANDIDATE_V1_OPERATION_ABORT,
     NOAH_PROFILE_CANDIDATE_V1_OPERATION_COMMIT,
+    NOAH_PROFILE_CANDIDATE_V1_OPERATION_REUSE,
 } noah_profile_candidate_v1_operation_t;
 
 enum {
@@ -138,6 +143,14 @@ typedef struct {
 } noah_profile_candidate_v1_error_t;
 
 typedef struct {
+    uint32_t generation;
+    uint32_t digest;
+    uint32_t crc32;
+    uint8_t  kind; // Profile Wire active kind: compiled (0) or committed (1).
+    uint8_t  origin;
+} noah_profile_candidate_v1_source_t;
+
+typedef struct {
     noah_profile_candidate_v1_operation_t operation;
     uint16_t                              transaction_id;
     union {
@@ -147,6 +160,13 @@ typedef struct {
             uint8_t  length;
             uint8_t  bytes[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];
         } chunk;
+        struct {
+            noah_profile_candidate_v1_source_t source;
+            uint16_t offset;
+            uint16_t source_offset;
+            uint16_t length;
+            uint16_t copied; // Scan-owned progress, never supplied by the host.
+        } reuse;
     } payload;
 } noah_profile_candidate_v1_command_t;
 

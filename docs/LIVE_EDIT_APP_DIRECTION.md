@@ -55,6 +55,10 @@ Firmware work remaining before the product is complete:
   keeping its own list (an app open issue);
 - the open issues below.
 
+Differential host uploads can reuse identified active bytes and stream bounded
+batches (D-F18), while full validation and both-half publication remain in place.
+Transfer timing and interruption acceptance for this path have not run on hardware.
+
 ## Open Issues
 
 - **Unified gesture ownership.** Native LT/MT/OSM remain a compatibility
@@ -1055,3 +1059,21 @@ encoding and scope are governed by [runtime flow](architecture/runtime-flow.md).
 Client follow-up: expose Automatic/On/Off per macro, explain ignored typing,
 preserve policies in edits and backups, show stored and layout-derived changes
 in Review, and gate overrides on bit 23.
+
+## D-F18 — A differential upload still produces a complete validated candidate
+
+Profile Wire bits 24 and 25 add bounded copies from an identified active
+profile and streaming chunk admission, specified in
+[Profile Wire V1](architecture/profile-wire-v1.md#differential-candidate-transfer).
+The inactive slot holds the complete reconstructed target. The active source
+and saved generation remain untouched until the ordinary full validator and
+both-half logical transaction permit publication. Storage format and reboot
+selection are unchanged; an interrupted reconstruction is only an uncommitted
+candidate. Validation, durable publication and split preparation retain their
+per-scan work ceilings. A client lacking either feature keeps its existing path.
+
+Ark follow-up: negotiate the bits, retain the exact raw source bytes beside
+the coherent capture, compare domains across offset changes, and verify bounded
+stream batches before validation. Refresh its pinned contract from this
+firmware's published landing before the app change lands. Hardware timing and
+interruption acceptance remain outstanding.

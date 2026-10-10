@@ -77,6 +77,8 @@ enum {
     NOAH_PROFILE_FEATURE_UNICODE_MACROS = 1u << 21,
     NOAH_PROFILE_FEATURE_HOST_LAYOUTS = 1u << 22,
     NOAH_PROFILE_FEATURE_MACRO_PROTECTION = 1u << 23,
+    NOAH_PROFILE_FEATURE_CANDIDATE_REUSE = 1u << 24,
+    NOAH_PROFILE_FEATURE_CANDIDATE_STREAM = 1u << 25,
 };
 
 // A wide-page request: [command, channel, value, request id, page low, page

@@ -198,6 +198,18 @@ static noah_profile_candidate_backend_result_t read_candidate(void *context, uin
     return candidate_payload_start(backend, &payload_start) && staged_reader_read(backend->store, (size_t)payload_start + offset, bytes, length) ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
 }
 
+static noah_profile_candidate_backend_result_t read_source(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint8_t *bytes, uint8_t length) {
+    noah_profile_candidate_store_backend_t *backend = context;
+    noah_effective_profile_snapshot_t active;
+    if (!backend || !source || !bytes || length == 0u || length > NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX || backend->admission_owner != NOAH_PROFILE_STORAGE_ADMISSION_HOST || noah_effective_profile_provider_copy_active(backend->provider, &active) != NOAH_EFFECTIVE_PROFILE_OK) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+    }
+    if (active.identity.kind != source->kind + 1u || active.identity.origin != source->origin || active.identity.generation != source->generation || active.identity.payload_digest != source->digest || active.identity.payload_crc32 != source->crc32 || active.identity.compiled_default_digest != backend->compiled_default_digest || active.identity.action_abi_digest != backend->metadata.action_abi_digest || (uint32_t)offset + length > active.profile.byte_length) {
+        return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+    }
+    return noah_profile_reader_read(&active.reader, active.base_offset + offset, bytes, length) ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+}
+
 static noah_profile_candidate_backend_result_t validation_begin(void *context, const noah_profile_candidate_v1_metadata_t *metadata, noah_profile_candidate_v1_error_t *error) {
     noah_profile_candidate_store_backend_t   *backend = context;
     noah_profile_validator_v1_compatibility_t compatibility;
@@ -585,6 +597,7 @@ noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(
         .begin            = begin_candidate,
         .write            = write_candidate,
         .read             = read_candidate,
+        .read_source      = read_source,
         .validation_begin = validation_begin,
         .validation_step  = validation_step,
         .commit_begin     = commit_begin_candidate,

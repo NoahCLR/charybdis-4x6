@@ -215,6 +215,9 @@ static void test_malformed_requests(void) {
 }
 
 int main(int argc, char **argv) {
+    assert(NOAH_PROFILE_FEATURE_MACRO_PROTECTION == (1u << 23));
+    assert(NOAH_PROFILE_FEATURE_CANDIDATE_REUSE == (1u << 24));
+    assert(NOAH_PROFILE_FEATURE_CANDIDATE_STREAM == (1u << 25));
     assert(argc == 2);
     fixture_path = argv[1];
     test_capability_pages();

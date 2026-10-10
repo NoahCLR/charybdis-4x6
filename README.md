@@ -12,7 +12,8 @@ any C and you don't reflash.
 - **Live editing with Ark.** Ark reads everything straight from the keyboard.
   Your changes go into a draft that you review before anything is saved, and
   Apply writes both halves and reads them back. You can export a whole profile
-  to one file and import it again.
+  to one file and import it again. Small edits can reuse unchanged profile data
+  while the keyboard still validates and saves the complete result.
 - **Text macros in your layout.** Macros type through your computer's keyboard
   layout (US, Dutch, German, French, UK and more on macOS, Windows and Linux),
   accents included, with Unicode entry for emoji; see the

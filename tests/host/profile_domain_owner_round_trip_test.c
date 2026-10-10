@@ -141,14 +141,20 @@ static void frame_header(uint8_t *frame, uint8_t value) {
 }
 static void send(uint8_t frame[32]) {
     assert(noah_profile_owner_receive(&owner, frame, 32));
-    for (unsigned i = 0; i < 100 && owner.host_transaction.mailbox.pending; i++)
+    // A 1,024-byte reuse needs 52 reads and 52 writes; leave room for the
+    // owner's other scheduling grants while keeping a bounded test wait.
+    for (unsigned i = 0; i < 512 && owner.host_transaction.mailbox.pending; i++)
         tick();
     assert(!owner.host_transaction.mailbox.pending);
 }
 // Sends the candidate and asks for validation; returns its final state.
 static uint32_t validation_scans;
-static uint8_t submit(size_t length) {
+static size_t reused_bytes;
+static uint8_t submit_transfer(size_t length, bool reuse) {
     uint8_t frame[32];
+    noah_effective_profile_snapshot_t source;
+    if (reuse) assert(noah_effective_profile_provider_copy_active(&owner.provider, &source) == NOAH_EFFECTIVE_PROFILE_OK);
+    reused_bytes = 0;
     frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN);
     frame[5] = NOAH_PROFILE_SCHEMA_MAJOR;
     frame[7] = NOAH_PROFILE_DOMAIN_MASK_ALL;
@@ -161,6 +167,37 @@ static uint8_t submit(size_t length) {
     u32(frame + 28, 0xabcdef01u);
     send(frame);
     for (size_t offset = 0; offset < length;) {
+        if (reuse) {
+            uint8_t bytes[20];
+            size_t equal = 0;
+            while (equal < NOAH_PROFILE_CANDIDATE_V1_REUSE_MAX && offset + equal < length && offset + equal < source.profile.byte_length) {
+                size_t count = length - offset - equal;
+                if (count > sizeof(bytes)) count = sizeof(bytes);
+                if (count > NOAH_PROFILE_CANDIDATE_V1_REUSE_MAX - equal) count = NOAH_PROFILE_CANDIDATE_V1_REUSE_MAX - equal;
+                if (count > source.profile.byte_length - offset - equal) count = source.profile.byte_length - offset - equal;
+                assert(noah_effective_profile_snapshot_read(&source, offset + equal, bytes, count));
+                size_t same = 0;
+                while (same < count && bytes[same] == candidate[offset + equal + same]) same++;
+                equal += same;
+                if (same != count) break;
+            }
+            if (equal >= 80) {
+                frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE);
+                u16(frame + 5, (uint16_t)offset);
+                u16(frame + 7, (uint16_t)offset);
+                u16(frame + 9, (uint16_t)equal);
+                u32(frame + 11, source.identity.generation);
+                u32(frame + 15, source.identity.payload_digest);
+                u32(frame + 19, source.identity.payload_crc32);
+                frame[23] = source.identity.kind - 1u;
+                frame[24] = source.identity.origin;
+                send(frame);
+                assert(!owner.host_transaction.poisoned);
+                offset += equal;
+                reused_bytes += equal;
+                continue;
+            }
+        }
         frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK);
         uint8_t count = length - offset < 20 ? (uint8_t)(length - offset) : 20;
         u16(frame + 5, (uint16_t)offset);
@@ -178,6 +215,9 @@ static uint8_t submit(size_t length) {
     }
     return owner.host_transaction.status.state;
 }
+static uint8_t submit(size_t length) {
+    return submit_transfer(length, false);
+}
 // Commits a validated candidate. Returns false if power was lost first; the
 // owner is then abandoned mid-commit, as a keyboard losing power would be.
 static bool commit(void) {
@@ -185,10 +225,11 @@ static bool commit(void) {
     uint32_t prior = owner.store.committed.generation;
     frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT);
     assert(noah_profile_owner_receive(&owner, frame, 32));
-    for (unsigned i = 0; i < 1000000u && !(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && owner.store.committed.generation != prior && !owner.host_transaction.mailbox.pending) && !power_lost(); i++)
+    for (unsigned i = 0; i < 1000000u && !(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && owner.store.committed.generation != prior && !owner.host_transaction.mailbox.pending) && !power_lost(); i++)
         tick();
     if (power_lost()) return false;
     assert(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && owner.store.committed.generation == prior + 1u);
+    assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     return true;
 }
 static void save(size_t length) {
@@ -426,7 +467,7 @@ static void test_maximum_profile(void) {
 // at every write of its commit, and just after its last: the next boot
 // publishes the prior generation or the new one, whole, and the new one only
 // once its commit has begun.
-static void test_maximum_save_interrupted(void) {
+static void test_maximum_save_interrupted(bool reuse) {
     static uint8_t         prior_eeprom[sizeof(eeprom)];
     noah_profile_blob_v1_t expected;
     uint32_t               total;
@@ -451,9 +492,11 @@ static void test_maximum_save_interrupted(void) {
     initialize();
     until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);
     writes = 0;
-    assert(submit(maximum_length) == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+    assert(submit_transfer(maximum_length, reuse) == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+    if (reuse) assert(reused_bytes > maximum_length * 99u / 100u);
     uint32_t staged = writes;
     assert(commit());
+    assert_published(edited_bytes, &edited, 2);
     total = writes;
     uninstall();
     assert(total > staged);
@@ -467,7 +510,7 @@ static void test_maximum_save_interrupted(void) {
         until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);
         writes = 0;
         cut_at = cut;
-        if (submit(maximum_length) == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED) commit();
+        if (submit_transfer(maximum_length, reuse) == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED) commit();
         cut_at = UINT32_MAX;
         reboot();
         until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);
@@ -483,7 +526,7 @@ static void test_maximum_save_interrupted(void) {
         uninstall();
     }
     assert(prior_boots > 0 && new_boots > 0);
-    printf("maximum profile: power lost at %u points of a %u-write save booted the prior generation %u times and the new one %u times\n", prior_boots + new_boots, (unsigned)total, prior_boots, new_boots);
+    printf("maximum profile%s: power lost at %u points of a %u-write save booted the prior generation %u times and the new one %u times\n", reuse ? " reused from committed source" : "", prior_boots + new_boots, (unsigned)total, prior_boots, new_boots);
 }
 
 int main(int argc, char **argv) {
@@ -491,7 +534,8 @@ int main(int argc, char **argv) {
     assert(argc == 3);
     load_maximum(argv[2]);
     test_maximum_profile();
-    test_maximum_save_interrupted();
+    test_maximum_save_interrupted(false);
+    test_maximum_save_interrupted(true);
     for (unsigned use_imported = 0; use_imported < 2; use_imported++) {
         settings_applies = via_accepts = via_boots = collected = 0;
         memset(eeprom, 0xff, sizeof(eeprom));

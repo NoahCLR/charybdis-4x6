@@ -763,7 +763,41 @@ static void test_owner_activation_api_checks_lease_and_exposes_exact_commit(void
     assert(noah_profile_candidate_store_backend_committed(&backend, &committed));
 }
 
+static void test_reuse_source_checks_active_identity_and_lease(void) {
+    noah_profile_store_t store;
+    noah_profile_candidate_store_backend_t backend;
+    noah_effective_profile_provider_t provider;
+    noah_effective_profile_snapshot_t active;
+    uint8_t bytes[sizeof(empty_profile)];
+    noah_profile_candidate_v1_metadata_t metadata = metadata_for(empty_profile, sizeof(empty_profile));
+    memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
+    init_store(&store);
+    uint32_t compiled = init_provider(&provider);
+    init_backend(&backend, &store, &provider, compiled);
+    noah_profile_candidate_backend_t interface = noah_profile_candidate_store_backend_interface(&backend);
+    assert(noah_effective_profile_provider_copy_active(&provider, &active) == NOAH_EFFECTIVE_PROFILE_OK);
+    noah_profile_candidate_v1_source_t source = {.generation = active.identity.generation, .digest = active.identity.payload_digest, .crc32 = active.identity.payload_crc32, .kind = active.identity.kind - 1u, .origin = active.identity.origin};
+    assert(interface.read_source(interface.context, &source, 0, bytes, sizeof(bytes)) == NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR);
+    assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(interface.read_source(interface.context, &source, 0, bytes, sizeof(bytes)) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(memcmp(bytes, empty_profile, sizeof(bytes)) == 0);
+    source.crc32++;
+    assert(interface.read_source(interface.context, &source, 0, bytes, sizeof(bytes)) == NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR);
+    source.crc32--;
+    assert(interface.read_source(interface.context, &source, 1, bytes, sizeof(bytes)) == NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR);
+    assert(interface.abort(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    deploy_empty(&backend, &interface, &provider, &metadata);
+    assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(interface.read_source(interface.context, &source, 0, bytes, sizeof(bytes)) == NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR);
+    assert(noah_effective_profile_provider_copy_active(&provider, &active) == NOAH_EFFECTIVE_PROFILE_OK);
+    source = (noah_profile_candidate_v1_source_t){.generation = active.identity.generation, .digest = active.identity.payload_digest, .crc32 = active.identity.payload_crc32, .kind = active.identity.kind - 1u, .origin = active.identity.origin};
+    assert(interface.read_source(interface.context, &source, 0, bytes, sizeof(bytes)) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    assert(memcmp(bytes, empty_profile, sizeof(bytes)) == 0);
+    assert(interface.abort(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+}
+
 int main(void) {
+    test_reuse_source_checks_active_identity_and_lease();
     test_stage_validate_and_commit();
     test_validated_host_candidate_is_a_provisional_split_source();
     test_activation_request_retries_after_transient_provider_reuse();
