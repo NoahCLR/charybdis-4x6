@@ -299,7 +299,8 @@ lets you author the visible language of the board:
   states
 - preview overlays that show a pending momentary-layer hold with the same
   authored base color, inherited accents, universal groups, and override order
-  used after the layer becomes active
+  used after the layer becomes active, on keys where tap and hold both land on
+  that layer (an `LT()` key's tap types a letter, so it shows none)
 - auto-mouse timeout feedback that fades as the temporary pointer layer is
   about to clear
 

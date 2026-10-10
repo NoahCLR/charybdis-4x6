@@ -3046,6 +3046,43 @@ static void test_normal_press_and_matched_release_use_bounded_authored_lookups(v
     CHECK(counters.row_comparison_count == 0u);
 }
 
+// The real thumbs preview the layer every outcome lands on, on each tap tier;
+// the authored `/` LT row previews nothing, because its tap types a key.
+static void test_preview_shows_only_where_every_outcome_lands(void) {
+    keypos_t left  = test_left_thumb_pos();
+    keypos_t right = test_right_thumb_pos();
+    keypos_t slash = test_find_keypos_on_layer(LAYER_BASE, LT(LAYER_NAV, KC_SLSH));
+
+    test_reset_state();
+    test_press_resolved(left);
+    CHECK(key_feedback_preview_layer() == LAYER_SYM);
+    test_release_resolved(left);
+    test_advance_thumb_multi_tap_gap();
+    test_press_resolved(left); // second tier: tap locks Num, hold is Num
+    CHECK(key_feedback_preview_layer() == LAYER_NUM);
+    test_release_resolved(left);
+    key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
+    key_runtime_integration_scan();
+
+    test_reset_state();
+    test_press_resolved(right);
+    CHECK(key_feedback_preview_layer() == LAYER_NAV);
+    test_release_resolved(right);
+
+    test_reset_state();
+    CHECK(test_keypos_valid(slash));
+    test_press_resolved(slash);
+    CHECK(key_feedback_preview_layer() == UINT8_MAX);
+    CHECK(key_runtime_core_undecided_dual_role_key_pos(NULL));
+    // No key-local hold colour replaces it: the layer's own light is the cue.
+    CHECK(test_feedback_semantic_for_key(slash) == KEY_FEEDBACK_SEMANTIC_NONE);
+    key_runtime_integration_advance(&fake_time, 120); key_runtime_integration_scan();
+    CHECK(test_layer_active(LAYER_NAV));
+    CHECK(key_feedback_preview_layer() == UINT8_MAX);
+    CHECK(test_feedback_semantic_for_key(slash) == KEY_FEEDBACK_SEMANTIC_NONE);
+    test_release_resolved(slash);
+}
+
 static void test_preview_query_visits_only_active_presses(void) {
     key_runtime_hot_path_test_counters_t counters;
     keypos_t owner = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
@@ -3733,6 +3770,7 @@ int main(void) {
     test_normal_press_and_matched_release_use_bounded_authored_lookups();
     test_active_scan_visit_baseline_is_measured();
     test_preview_query_visits_only_active_presses();
+    test_preview_shows_only_where_every_outcome_lands();
     test_preview_query_preserves_slot_order_across_bitmap_words();
     test_feedback_dirty_tracks_visible_deadline_change_once();
     test_feedback_dirty_tracks_pending_tap_window();

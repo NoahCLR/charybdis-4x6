@@ -51,6 +51,10 @@ typedef struct {
     bool                         keeps_registered_feedback;
     bool                         keeps_pending_feedback;
     bool                         release_layer_before_action;
+    // A layer held until release: keys pressed while it decides wait for it.
+    bool                         hold_is_layer;
+    // The layer its preview lights while it decides, UINT8_MAX for none: only
+    // when every outcome of the press lands on that layer.
     uint8_t                      preview_layer;
 } handled_key_hold_semantics_t;
 
