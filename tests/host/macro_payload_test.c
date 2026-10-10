@@ -219,7 +219,42 @@ static void test_decode_qmk_stream_keeps_high_command_operands(void) {
     }
 }
 
+static void test_unicode_round_trip_and_rejection(void) {
+    static const char *texts[] = {"café", "“hello” € 🙂", "e\xCC\x81", "👩‍💻"};
+    for (size_t i = 0; i < ARRAY_SIZE(texts); i++) {
+        macro_payload_ir_t authored = {0}, decoded = {0};
+        uint8_t bytes[512] = {0};
+        uint16_t written = 0;
+        CHECK(macro_payload_compile(texts[i], &authored));
+        CHECK(macro_payload_encode_ir(&authored, bytes, sizeof(bytes), &written));
+        CHECK(written == strlen(texts[i]));
+        CHECK(memcmp(bytes, texts[i], written) == 0);
+        test_qmk_reader_t reader = {.buffer = bytes};
+        CHECK(macro_payload_decode_qmk_stream(&decoded, written + 1u, test_qmk_reader_read_byte, &reader));
+        CHECK(decoded.length == authored.length);
+        CHECK(memcmp(decoded.bytes, authored.bytes, authored.length) == 0);
+    }
+    static const uint8_t bad[][6] = {{0xC0,0xAF,0}, {0xE0,0x80,0xAF,0}, {0xF0,0x80,0x80,0xAF,0}, {0xED,0xA0,0x80,0}, {0xF4,0x90,0x80,0x80,0}, {0xC3,0}, {0xE2,0x82,1,1,4,0}, {0xF0,0x9F,0x99,0}, {0x80,0}, {0xFF,0}};
+    for (size_t i = 0; i < ARRAY_SIZE(bad); i++) {
+        macro_payload_ir_t ir = {0};
+        test_qmk_reader_t reader = {.buffer = bad[i]};
+        CHECK(!macro_payload_decode_qmk_stream(&ir, sizeof(bad[i]), test_qmk_reader_read_byte, &reader));
+        CHECK(ir.length == 0u);
+        CHECK(!macro_payload_compile((const char *)bad[i], &ir));
+        CHECK(ir.length == 0u);
+    }
+    char boundary[260]; memset(boundary, 'a', 254); memcpy(boundary + 254, "🙂", 5);
+    macro_payload_ir_t ir = {0}; CHECK(macro_payload_compile(boundary, &ir));
+    CHECK(ir.length == 260u && ir.bytes[256] == MACRO_PAYLOAD_IR_OP_UNICODE);
+    // Non-ASCII scalars cost four IR bytes, including supplementary scalars.
+    char maximum[257]; for (size_t i = 0; i < 128; i++) memcpy(maximum + 2*i, "é", 2); maximum[256] = 0;
+    CHECK(macro_payload_compile(maximum, &ir)); CHECK(ir.length == 512u);
+    char overflow[259]; memcpy(overflow, maximum, 256); memcpy(overflow + 256, "é", 3);
+    CHECK(!macro_payload_compile(overflow, &ir)); CHECK(ir.length == 0u);
+}
+
 int main(void) {
+    test_unicode_round_trip_and_rejection();
     test_validate_accepts_mixed_payload();
     test_validate_rejects_invalid_payloads();
     test_compile_rejects_invalid_payloads();

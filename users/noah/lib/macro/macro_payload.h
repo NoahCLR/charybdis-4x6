@@ -14,6 +14,7 @@ typedef enum {
     MACRO_PAYLOAD_IR_OP_KEY_DOWN,
     MACRO_PAYLOAD_IR_OP_KEY_UP,
     MACRO_PAYLOAD_IR_OP_TAP_LIST,
+    MACRO_PAYLOAD_IR_OP_UNICODE, // Three little-endian bytes, one Unicode scalar.
 } macro_payload_ir_opcode_t;
 
 typedef enum {

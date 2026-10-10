@@ -92,9 +92,9 @@ macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider
         macro_slot_active_stale    = false;
         return result;
     }
-    if (result == MACRO_PAYLOAD_START_INVALID) {
-        metadata[slot].state = MACRO_SLOT_CACHE_INVALID;
-    }
+    // A successfully decoded slot remains structurally valid. Playback
+    // preflight also depends on volatile host detection and current settings;
+    // rejecting it must not poison the decoder cache until the bytes change.
     return result;
 }
 

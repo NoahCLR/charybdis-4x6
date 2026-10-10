@@ -710,3 +710,5 @@ int main(void) {
     puts("via macro action_lifecycle host tests passed");
     return 0;
 }
+
+void send_keyboard_report(void) {}

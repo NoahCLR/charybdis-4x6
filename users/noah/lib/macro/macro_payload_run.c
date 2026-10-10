@@ -4,6 +4,12 @@
 
 #include "../action/owned_keycode.h"
 #include "macro_payload_internal.h"
+#include "../profile/runtime/effective_settings_runtime.h"
+#include "../compat/qmk_host.h"
+
+#if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(NOAH_HOST_QMK_STUB) && !defined(QMK_REPORT_MODS_OVERRIDE)
+#    error "Unicode macro playback requires the QMK report modifier override contract"
+#endif
 
 typedef struct {
     macro_payload_hold_balance_t balance;
@@ -13,7 +19,7 @@ typedef struct {
 typedef struct {
     macro_payload_ir_opcode_t opcode;
     const uint8_t            *bytes;
-    uint16_t                  value;
+    uint32_t                  value;
     uint8_t                   length;
 } macro_payload_ir_step_t;
 
@@ -25,9 +31,29 @@ typedef enum {
     MACRO_PAYLOAD_PHASE_TRANSIENT_RELEASE,
     MACRO_PAYLOAD_PHASE_DEAD_PRESS,
     MACRO_PAYLOAD_PHASE_CLEANUP,
+    MACRO_PAYLOAD_PHASE_UNICODE_PRESS,
+    MACRO_PAYLOAD_PHASE_UNICODE_FINISH,
+    MACRO_PAYLOAD_PHASE_UNICODE_RESTORE,
 } macro_payload_phase_t;
 
 typedef struct {
+    uint8_t keys[3];
+    uint8_t count;
+    uint8_t mods;
+} macro_payload_unicode_tap_t;
+
+typedef struct {
+    bool                          unicode_active;
+    bool                          unicode_cancel_sent;
+    bool                          unicode_neutral_sent;
+    bool                          unicode_caps_toggled;
+    uint8_t                       unicode_mode;
+    uint8_t                       unicode_mods;
+    uint8_t                       unicode_index;
+    uint8_t                       unicode_count;
+    macro_payload_phase_t         unicode_next;
+    macro_payload_unicode_tap_t   unicode_taps[12];
+    owned_keycode_lease_t         unicode_alt;
     const macro_payload_ir_t     *ir;
     uint16_t                      cursor;
     uint16_t                      text_cursor;
@@ -52,6 +78,27 @@ typedef struct {
 static macro_payload_engine_t         macro_payload_engine;
 static macro_payload_debug_snapshot_t macro_payload_diagnostics;
 
+// QMK applies this only to outgoing reports: live physical/managed/one-shot
+// ownership continues updating while a Unicode scalar is being entered.
+bool keyboard_report_mods_override_user(uint8_t *mods) {
+    if (!macro_payload_engine.unicode_active) return false;
+    *mods = macro_payload_engine.unicode_mods;
+    return true;
+}
+
+__attribute__((weak)) uint8_t macro_payload_unicode_host_mode(void) {
+    uint32_t setting = noah_setting(NOAH_SETTING_UNICODE_HOST_MODE, 0u);
+    return setting & NOAH_HOST_UNICODE_ENABLED ? noah_host_effective(setting, noah_host_detected()) : 0u;
+}
+
+__attribute__((weak)) bool macro_payload_unicode_caps_lock(void) {
+#ifdef QMK_REPORT_MODS_OVERRIDE
+    return host_keyboard_led_state().caps_lock;
+#else
+    return false;
+#endif
+}
+
 static void macro_payload_increment_u16(uint16_t *value) {
     if (value && *value != UINT16_MAX) {
         (*value)++;
@@ -65,7 +112,7 @@ static void macro_payload_increment_operations(void) {
 }
 
 static uint8_t macro_payload_active_hold_count(void) {
-    return (uint8_t)(macro_payload_engine.holds.balance.count + macro_payload_engine.transient_count);
+    return (uint8_t)(macro_payload_engine.holds.balance.count + macro_payload_engine.transient_count + (macro_payload_engine.unicode_alt.active ? 1u : 0u));
 }
 
 static void macro_payload_note_hold_high_water(void) {
@@ -103,6 +150,12 @@ static bool macro_payload_ir_next(const uint8_t **cursor, const uint8_t *end, ma
             step->bytes = current;
             current += step->length;
             break;
+        case MACRO_PAYLOAD_IR_OP_UNICODE:
+            if ((size_t)(end - current) < 3u) return false;
+            step->value = (uint32_t)current[0] | ((uint32_t)current[1] << 8u) | ((uint32_t)current[2] << 16u);
+            current += 3;
+            if (step->value < 0xA0u || step->value > 0x10FFFFu || (step->value >= 0xD800u && step->value <= 0xDFFFu)) return false;
+            break;
         case MACRO_PAYLOAD_IR_OP_DELAY:
             if ((size_t)(end - current) < 2u) {
                 return false;
@@ -136,7 +189,7 @@ static bool macro_payload_ir_next(const uint8_t **cursor, const uint8_t *end, ma
     return true;
 }
 
-static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir) {
+static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, uint8_t unicode_mode) {
     const uint8_t               *cursor;
     const uint8_t               *end;
     macro_payload_hold_balance_t balance = {0};
@@ -153,6 +206,10 @@ static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir) {
         if (!macro_payload_ir_next(&cursor, end, &step)) {
             return false;
         }
+        if ((step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE || (step.opcode == MACRO_PAYLOAD_IR_OP_TEXT && unicode_mode)) && balance.count) {
+            for (uint8_t i = 0u; i < balance.count; i++) if (balance.keycodes[i] < KC_LEFT_CTRL) return false;
+        }
+        if (step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE && (unicode_mode < 1u || unicode_mode > 3u)) return false;
         if (step.opcode == MACRO_PAYLOAD_IR_OP_KEY_DOWN && !macro_payload_hold_balance_note_down(&balance, (uint8_t)step.value)) {
             return false;
         }
@@ -269,6 +326,89 @@ static bool macro_payload_ascii_lut_bit(const uint8_t *lut, uint8_t ascii_code) 
     return ((pgm_read_byte(&lut[ascii_code / 8u]) >> (ascii_code % 8u)) & 0x01u) != 0u;
 }
 
+#define MACRO_PAYLOAD_UNICODE_PACE_MS 10u
+
+static void macro_payload_unicode_add_tap(uint8_t key, uint8_t mods) {
+    macro_payload_unicode_tap_t *tap = &macro_payload_engine.unicode_taps[macro_payload_engine.unicode_count++];
+    *tap = (macro_payload_unicode_tap_t){.keys = {key}, .count = 1u, .mods = mods};
+}
+
+static void macro_payload_unicode_add_hex(uint32_t value, uint8_t digits, uint8_t mods) {
+    static const uint8_t keys[16] = {KC_0, KC_1, KC_2, KC_3, KC_4, KC_5, KC_6, KC_7, KC_8, KC_9, KC_A, KC_B, KC_C, KC_D, KC_E, KC_F};
+    for (uint8_t i = digits; i > 0u; i--) macro_payload_unicode_add_tap(keys[(value >> ((i - 1u) * 4u)) & 15u], mods);
+}
+
+static void macro_payload_start_unicode(uint32_t scalar, uint32_t now, macro_payload_phase_t next) {
+    uint8_t mode = macro_payload_engine.unicode_mode;
+    if (mode < 1u || mode > 3u) {macro_payload_begin_runtime_error(); return;}
+    macro_payload_engine.unicode_count = 0u;
+    macro_payload_engine.unicode_index = 0u;
+    macro_payload_engine.unicode_next = next;
+    macro_payload_engine.unicode_cancel_sent = false;
+    macro_payload_engine.unicode_neutral_sent = false;
+    bool caps = mode == 3u && macro_payload_unicode_caps_lock();
+    bool control = scalar == 9u || scalar == 10u;
+    if (control) macro_payload_unicode_add_tap(scalar == 9u ? KC_TAB : KC_ENTER, 0u);
+    else if (caps) macro_payload_unicode_add_tap(KC_CAPS_LOCK, 0u);
+    if (!control && mode == 1u) {
+        if (scalar > 0xFFFFu) {
+            scalar -= 0x10000u;
+            macro_payload_unicode_add_hex(0xD800u | (scalar >> 10u), 4u, MOD_BIT(KC_LEFT_ALT));
+            macro_payload_unicode_add_hex(0xDC00u | (scalar & 0x3FFu), 4u, MOD_BIT(KC_LEFT_ALT));
+        } else macro_payload_unicode_add_hex(scalar, 4u, MOD_BIT(KC_LEFT_ALT));
+    } else if (!control) {
+        if (mode == 2u) {
+            macro_payload_unicode_add_tap(KC_RIGHT_ALT, MOD_BIT(KC_RIGHT_ALT));
+            macro_payload_unicode_add_tap(KC_U, 0u);
+        } else {
+            macro_payload_unicode_tap_t *tap = &macro_payload_engine.unicode_taps[macro_payload_engine.unicode_count++];
+            *tap = (macro_payload_unicode_tap_t){.keys = {KC_LEFT_CTRL, KC_LEFT_SHIFT, KC_U}, .count = 3u, .mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT)};
+        }
+        uint8_t digits = scalar > 0xFFFFFu ? 6u : scalar > 0xFFFFu ? 5u : 4u;
+        // WinCompose treats an initial hex letter as a compose sequence.
+        if (mode == 2u && ((scalar >> ((digits - 1u) * 4u)) & 15u) > 9u) macro_payload_unicode_add_tap(KC_0, 0u);
+        macro_payload_unicode_add_hex(scalar, digits, 0u);
+        macro_payload_unicode_add_tap(mode == 2u ? KC_ENTER : KC_SPACE, 0u);
+    }
+    if (caps && !control) macro_payload_unicode_add_tap(KC_CAPS_LOCK, 0u);
+    macro_payload_engine.unicode_active = true;
+    macro_payload_engine.unicode_mods = 0u;
+    send_keyboard_report();
+    if (mode == 1u && !control) {
+        macro_payload_engine.unicode_mods = MOD_BIT(KC_LEFT_ALT);
+        if (!owned_keycode_acquire(KC_LEFT_ALT, &macro_payload_engine.unicode_alt)) {macro_payload_begin_runtime_error(); return;}
+        send_keyboard_report();
+    }
+    macro_payload_schedule_wait(now, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_UNICODE_PRESS);
+}
+
+static void macro_payload_unicode_press(uint32_t now) {
+    if (macro_payload_engine.unicode_index == macro_payload_engine.unicode_count) {
+        macro_payload_engine.phase = MACRO_PAYLOAD_PHASE_UNICODE_FINISH;
+        return;
+    }
+    macro_payload_unicode_tap_t *tap = &macro_payload_engine.unicode_taps[macro_payload_engine.unicode_index++];
+    macro_payload_engine.unicode_mods = tap->mods;
+    send_keyboard_report();
+    macro_payload_start_transient(tap->keys, tap->count, now, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_UNICODE_PRESS);
+    if (tap->keys[0] == KC_CAPS_LOCK && macro_payload_engine.phase != MACRO_PAYLOAD_PHASE_CLEANUP) macro_payload_engine.unicode_caps_toggled = !macro_payload_engine.unicode_caps_toggled;
+}
+
+static void macro_payload_unicode_finish(uint32_t now) {
+    macro_payload_engine.unicode_mods = 0u;
+    macro_payload_engine.unicode_neutral_sent = true;
+    if (macro_payload_engine.unicode_alt.active) (void)owned_keycode_release(&macro_payload_engine.unicode_alt);
+    send_keyboard_report();
+    // A held physical Option must not hide the release committing macOS input.
+    macro_payload_schedule_wait(now, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_UNICODE_RESTORE);
+}
+
+static void macro_payload_unicode_restore(uint32_t now) {
+    macro_payload_engine.unicode_active = false;
+    send_keyboard_report();
+    macro_payload_schedule_wait(now, MACRO_PAYLOAD_UNICODE_PACE_MS, macro_payload_engine.unicode_next);
+}
+
 static void macro_payload_start_text_char(uint32_t now) {
     uint8_t               ascii_code;
     uint8_t               keycodes[3];
@@ -283,6 +423,10 @@ static void macro_payload_start_text_char(uint32_t now) {
 
     ascii_code = macro_payload_engine.ir->bytes[macro_payload_engine.text_cursor++];
     macro_payload_engine.text_remaining--;
+    if (macro_payload_engine.unicode_mode && (ascii_code == 9u || ascii_code == 10u || (ascii_code >= 32u && ascii_code < 127u))) {
+        macro_payload_start_unicode(ascii_code, now, macro_payload_engine.text_remaining ? MACRO_PAYLOAD_PHASE_TEXT_PRESS : MACRO_PAYLOAD_PHASE_READY);
+        return;
+    }
     if (macro_payload_ascii_lut_bit(ascii_to_shift_lut, ascii_code)) {
         keycodes[keycode_count++] = KC_LEFT_SHIFT;
     }
@@ -310,6 +454,10 @@ static void macro_payload_release_transients(uint32_t now) {
         if (!owned_keycode_release(&macro_payload_engine.transient_leases[macro_payload_engine.transient_count])) {
             ok = false;
         }
+    }
+    if (macro_payload_engine.unicode_active && macro_payload_engine.unicode_mode != 1u) {
+        macro_payload_engine.unicode_mods = 0u;
+        send_keyboard_report();
     }
     if (!ok) {
         macro_payload_begin_runtime_error();
@@ -350,6 +498,9 @@ static void macro_payload_execute_ready(uint32_t now) {
             macro_payload_engine.text_remaining = step.length;
             macro_payload_start_text_char(now);
             break;
+        case MACRO_PAYLOAD_IR_OP_UNICODE:
+            macro_payload_start_unicode(step.value, now, MACRO_PAYLOAD_PHASE_READY);
+            break;
         case MACRO_PAYLOAD_IR_OP_DELAY:
             macro_payload_schedule_wait(now, (uint32_t)step.value + TAP_CODE_DELAY, MACRO_PAYLOAD_PHASE_READY);
             break;
@@ -384,6 +535,35 @@ static void macro_payload_cleanup_one(void) {
         (void)owned_keycode_release(&macro_payload_engine.transient_leases[macro_payload_engine.transient_count]);
         return;
     }
+    if (macro_payload_engine.unicode_active) {
+        if (!macro_payload_engine.unicode_cancel_sent && macro_payload_engine.unicode_mode != 1u) {
+            static const uint8_t escape[] = {KC_ESCAPE};
+            macro_payload_engine.unicode_cancel_sent = true;
+            macro_payload_engine.unicode_mods = 0u;
+            send_keyboard_report();
+            macro_payload_start_transient(escape, 1u, timer_read32(), MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_CLEANUP);
+            return;
+        }
+        if (macro_payload_engine.unicode_caps_toggled) {
+            static const uint8_t caps[] = {KC_CAPS_LOCK};
+            macro_payload_engine.unicode_caps_toggled = false;
+            macro_payload_engine.unicode_mods = 0u;
+            send_keyboard_report();
+            macro_payload_start_transient(caps, 1u, timer_read32(), MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_CLEANUP);
+            return;
+        }
+        if (!macro_payload_engine.unicode_neutral_sent) {
+            macro_payload_engine.unicode_neutral_sent = true;
+            macro_payload_engine.unicode_mods = 0u;
+            if (macro_payload_engine.unicode_alt.active) (void)owned_keycode_release(&macro_payload_engine.unicode_alt);
+            send_keyboard_report();
+            macro_payload_schedule_wait(timer_read32(), MACRO_PAYLOAD_UNICODE_PACE_MS, MACRO_PAYLOAD_PHASE_CLEANUP);
+            return;
+        }
+        macro_payload_engine.unicode_active = false;
+        send_keyboard_report();
+        return;
+    }
     if (macro_payload_engine.holds.balance.count > 0u) {
         macro_payload_engine.holds.balance.count--;
         (void)owned_keycode_release(&macro_payload_engine.holds.leases[macro_payload_engine.holds.balance.count]);
@@ -397,7 +577,8 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
         macro_payload_increment_u16(&macro_payload_diagnostics.busy_rejection_count);
         return MACRO_PAYLOAD_START_BUSY;
     }
-    if (!macro_payload_ir_preflight(ir)) {
+    const uint8_t unicode_mode = macro_payload_unicode_host_mode();
+    if (!macro_payload_ir_preflight(ir, unicode_mode)) {
         return MACRO_PAYLOAD_START_INVALID;
     }
     if (ir->length == 0u) {
@@ -405,6 +586,7 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
     }
 
     macro_payload_engine = (macro_payload_engine_t){
+        .unicode_mode   = unicode_mode,
         .ir             = ir,
         .phase          = MACRO_PAYLOAD_PHASE_READY,
         .text_interval  = text_output == MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED ? interval : TAP_CODE_DELAY,
@@ -452,6 +634,15 @@ void macro_payload_engine_scan(void) {
             break;
         case MACRO_PAYLOAD_PHASE_DEAD_PRESS:
             macro_payload_start_dead_space(now);
+            break;
+        case MACRO_PAYLOAD_PHASE_UNICODE_PRESS:
+            macro_payload_unicode_press(now);
+            break;
+        case MACRO_PAYLOAD_PHASE_UNICODE_FINISH:
+            macro_payload_unicode_finish(now);
+            break;
+        case MACRO_PAYLOAD_PHASE_UNICODE_RESTORE:
+            macro_payload_unicode_restore(now);
             break;
         case MACRO_PAYLOAD_PHASE_CLEANUP:
             macro_payload_cleanup_one();

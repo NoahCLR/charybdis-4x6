@@ -134,6 +134,19 @@ static void test_engine_busy_start_keeps_valid_metadata_without_pinning(void) {
     CHECK(load_call_count == 1u);
 }
 
+static void test_playback_preflight_rejection_is_retried(void) {
+    const macro_slot_provider_t provider = {.slot_count = 1u, .load_ir = test_load_ir};
+    macro_slot_metadata_t metadata[1] = {0};
+    source_byte = 'A'; load_succeeds = true; load_call_count = 0; engine_active = false;
+    start_result = MACRO_PAYLOAD_START_INVALID;
+    CHECK(macro_slot_provider_start(&provider, metadata, 0, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(metadata[0].state == MACRO_SLOT_CACHE_VALID);
+    start_result = MACRO_PAYLOAD_START_STARTED;
+    CHECK(macro_slot_provider_start(&provider, metadata, 0, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(load_call_count == 2);
+    test_finish_active();
+}
+
 static void test_invalid_result_is_cached_until_invalidation(void) {
     const macro_slot_provider_t provider    = {.slot_count = 1u, .load_ir = test_load_ir};
     macro_slot_metadata_t       metadata[1] = {0};
@@ -157,6 +170,7 @@ int main(void) {
     test_active_invalidation_and_busy_start_preserve_shared_ir();
     test_engine_busy_start_keeps_valid_metadata_without_pinning();
     test_invalid_result_is_cached_until_invalidation();
+    test_playback_preflight_rejection_is_retried();
     puts("macro_slot_provider host tests passed");
     return 0;
 }

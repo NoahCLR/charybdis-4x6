@@ -5,6 +5,8 @@ bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
     if (id >= NOAH_SETTING_DRAGSCROLL_DPI && id <= NOAH_SETTING_ARROW_DPI) return v == 0;
     uint32_t bank = layers >= 32u ? UINT32_MAX : (UINT32_C(1) << layers) - 1u;
     switch (id) {
+        case NOAH_SETTING_UNICODE_HOST_MODE:
+            return (v & ~UINT32_C(0x103)) == 0u;
         case NOAH_SETTING_FEEDBACK_PERIOD:
             return v > 0 && v <= 65535;
         case NOAH_SETTING_AUTO_MOUSE_ENABLED:
@@ -28,8 +30,7 @@ bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
         case NOAH_SETTING_LAYER_BEHAVIORS:
         case NOAH_SETTING_LAYER_COMBOS:
             return !(v & ~bank);
-        case NOAH_SETTING_RETIRED_COMBO_REFERENCES:
-            return v == 0;
+
         case NOAH_SETTING_DEFAULT_DPI:
             return v >= 400 && v <= 3400 && v % 200 == 0;
         case NOAH_SETTING_SNIPING_DPI:

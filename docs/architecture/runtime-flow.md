@@ -320,12 +320,66 @@ copies at most one frame, and scan context performs the QMK dynamic-keymap or
 macro storage mutation. A full mailbox may drop a mirror frame because durable
 reconciliation remains the repair path.
 
-Macro text is QMK ASCII, not arbitrary bytes: text positions accept
-`0x01..0x7F`, while zero terminates a VIA slot. Bytes above `0x7F` remain valid
-only where a complete QMK prefix command defines them as keycode operands. Both
-authored and VIA decoders use the same predicate, and playback validates the
-entire IR before its first text, wait, or key-ownership side effect. Invalid VIA
-slots stay negatively cached until a VIA mutation invalidates the macro cache.
+Macro text uses canonical UTF-8 for non-ASCII characters, without normalization.
+Zero terminates a VIA slot and byte 1 starts the existing QMK command grammar;
+command operands remain unsigned bytes. Malformed, truncated, overlong,
+surrogate and out-of-range UTF-8, including C1 controls, is rejected before
+playback. Legacy nonzero ASCII bytes retain their existing contract. Text IR
+runs contain ASCII bytes, at most 255 per run with a two-byte header; each
+non-ASCII scalar uses opcode 6 and three little-endian scalar bytes (four IR
+bytes total). Scalars never cross an IR text-chunk boundary. The program
+ceiling remains 512 bytes. VIA may store a larger or invalid slot; it remains
+unplayable and negatively cached until a mutation invalidates it. A structurally
+valid slot rejected because the host is unknown or Unicode is off remains
+retryable without a macro mutation.
+
+Profile Wire feature bit 21 advertises UTF-8 text and Host settings in scalar
+27: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables
+Unicode playback. All other bits must be zero. The settings-v6 shape and zero
+defaults are unchanged: Auto with Unicode off. Clients require bit 21 before
+writing non-ASCII bytes or nonzero scalar 27. Older firmware rejects them.
+
+Auto translates QMK’s USB OS guess; unknown and iOS resolve to unknown rather
+than choosing an entry method. A manual override always wins. Unicode playback
+uses the effective OS when enabled; non-ASCII programs are refused before
+output if that OS is unknown. The method is latched at playback start, so a
+later detection change cannot switch an entry sequence mid-macro. Detection
+cannot establish active input sources or installed helpers. Host readback is
+specified in [Profile Wire](profile-wire-v1.md#host-os-readback).
+
+With Unicode enabled and a known effective OS, printable ASCII also uses Unicode entry, avoiding text
+layout and held-modifier substitutions; tab and newline use isolated Tab and
+Enter taps. Command steps keep their key semantics. A macro holding a basic (non-modifier)
+key across a Unicode-entry text step is rejected in preflight; modifier holds
+are preserved through the report override. macOS holds left Option
+and emits four hex digits per UTF-16 code unit, including a surrogate pair
+for supplementary scalars. WinCompose taps Right Alt then U, sends at least
+four hex digits (an extra leading zero before an initial A–F), then Enter.
+Linux taps Ctrl+Shift+U, sends at least four hex digits, then Space. Linux Caps
+Lock is toggled off and restored with owned, paced taps when it was on.
+
+Each tap has a 10 ms minimum press and release gap; entry and exit settle for
+10 ms. One bounded transition runs per scan, with no blocking waits. The QMK
+report-only modifier override masks outgoing modifiers without changing live
+physical, managed, weak or one-shot state, and skips one-shot consumption.
+Leaving the override sends the then-current live state; it never restores a
+stale modifier snapshot. Every synthetic key retains an owner-scoped lease.
+Cancellation releases the retained leases; Linux/WinCompose send Escape and
+restore a toggled Caps Lock. macOS releases Option: a partial entry may already
+have produced text and cannot be rolled back. Cancelling cannot erase text
+already inserted. Release ordinary keys before playback and avoid concurrent
+typing or other synthetic actions: HID cannot interleave arbitrary input with
+an in-progress host Unicode entry. A usage already held by another owner
+cannot gain a new press edge; ownership never releases it to force one.
+
+Host setup is mandatory: macOS Unicode Hex Input must be enabled and active;
+Windows needs WinCompose running with Right Alt as Compose; Linux needs an
+input method/application accepting Ctrl+Shift+U (IBus or a compatible GTK
+entry path). Linux support does not mean every application accepts this
+sequence. The keyboard cannot detect the active input source or verify that
+an application inserted the text. Exact scalar emission does not promise a
+font contains its glyph or an application preserves it. Physical acceptance
+on each configured host remains required.
 
 Playback is scan-driven and single-active. Each logical slot stores one byte of
 unchecked/valid/invalid metadata. A valid slot is decoded into one shared IR

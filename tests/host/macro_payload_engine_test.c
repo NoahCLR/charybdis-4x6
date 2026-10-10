@@ -16,10 +16,18 @@ typedef enum {
 typedef struct {
     test_op_kind_t kind;
     uint8_t        keycode;
+    uint8_t        mods;
 } test_op_t;
 
 #define TEST_MAX_OPS 128
 
+static uint8_t unicode_mode;
+static bool unicode_caps;
+static uint8_t live_mods, last_report_mods;
+static unsigned neutral_reports;
+bool keyboard_report_mods_override_user(uint8_t *mods);
+uint8_t macro_payload_unicode_host_mode(void) {return unicode_mode;}
+bool macro_payload_unicode_caps_lock(void) {return unicode_caps;}
 static uint32_t                      fake_time;
 static uint16_t                      wait_call_count;
 static test_op_t                     test_ops[TEST_MAX_OPS];
@@ -50,7 +58,9 @@ static void test_fail(const char *expr, const char *file, int line) {
 
 static void test_log_op(test_op_kind_t kind, uint8_t keycode) {
     CHECK(test_op_count < TEST_MAX_OPS);
-    test_ops[test_op_count++] = (test_op_t){.kind = kind, .keycode = keycode};
+    uint8_t mods = 0u;
+    (void)keyboard_report_mods_override_user(&mods);
+    test_ops[test_op_count++] = (test_op_t){.kind = kind, .keycode = keycode, .mods = mods};
 }
 
 static void test_finish_callback(macro_payload_finish_result_t result, void *context) {
@@ -65,6 +75,9 @@ static void test_reset(void) {
     macro_payload_debug_snapshot(&snapshot);
     CHECK(snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE);
     macro_payload_engine_init();
+    unicode_mode = 0u;
+    unicode_caps = false;
+    live_mods = last_report_mods = 0u; neutral_reports = 0u;
     fake_time            = 1000u;
     wait_call_count      = 0u;
     test_op_count        = 0u;
@@ -214,6 +227,11 @@ static void test_cancel_releases_one_persistent_hold_per_scan(void) {
     };
 
     test_reset();
+    unicode_mode = 1;
+    const macro_payload_ir_t held_basic = {.length = 8u, .bytes = {MACRO_PAYLOAD_IR_OP_KEY_DOWN, KC_A, MACRO_PAYLOAD_IR_OP_UNICODE, 0x42, 0xF6, 1, MACRO_PAYLOAD_IR_OP_KEY_UP, KC_A}};
+    CHECK(macro_payload_start_ir(&held_basic, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(test_op_count == 0u);
+    unicode_mode = 0;
     CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0u, MACRO_PAYLOAD_SOURCE_DIRECT, 0u, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
     macro_payload_engine_scan();
     test_scan_after(TAP_CODE_DELAY);
@@ -267,7 +285,76 @@ static void test_preflight_rejects_malformed_ir_without_side_effects(void) {
     CHECK(wait_call_count == 0u);
 }
 
+static void test_unicode_drain(void) {
+    for (unsigned i = 0; i < 400u; i++) {
+        macro_payload_debug_snapshot_t snapshot;
+        macro_payload_debug_snapshot(&snapshot);
+        if (snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE) return;
+        test_scan_after(10u);
+    }
+    CHECK(false);
+}
+
+static void test_unicode_sequences_and_cancellation(void) {
+    // U+1F642 -> macOS D83D DE42, WinCompose/Linux 1F642.
+    const macro_payload_ir_t ir = {.length = 4u, .bytes = {MACRO_PAYLOAD_IR_OP_UNICODE, 0x42, 0xF6, 1}};
+    const uint8_t expected[][12] = {
+        {KC_LEFT_ALT, KC_D, KC_8, KC_3, KC_D, KC_D, KC_E, KC_4, KC_2},
+        {KC_RIGHT_ALT, KC_U, KC_1, KC_F, KC_6, KC_4, KC_2, KC_ENTER},
+        {KC_LEFT_CTRL, KC_LEFT_SHIFT, KC_U, KC_1, KC_F, KC_6, KC_4, KC_2, KC_SPACE},
+    };
+    const uint8_t counts[] = {9, 8, 9};
+    test_reset();
+    CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_INVALID);
+    for (uint8_t mode = 1u; mode <= 3u; mode++) {
+        test_reset(); unicode_mode = mode;
+        CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
+        test_unicode_drain(); CHECK(callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
+        uint8_t press = 0;
+        for (unsigned i = 0; i < test_op_count; i++) if (test_ops[i].kind == TEST_OP_ACQUIRE) {
+            CHECK(press < counts[mode - 1u]);
+            CHECK(test_ops[i].keycode == expected[mode - 1u][press++]);
+            if (mode == 1u) CHECK(test_ops[i].mods == MOD_BIT(KC_LEFT_ALT));
+        }
+        CHECK(press == counts[mode - 1u]); CHECK(wait_call_count == 0u);
+        uint8_t mods; CHECK(!keyboard_report_mods_override_user(&mods));
+        // Cancel at every scan boundary, including key-down, key-up and waits.
+        for (unsigned cutoff = 0; cutoff < 110u; cutoff++) {
+            test_reset(); unicode_mode = mode; unicode_caps = mode == 3u;
+            CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
+            for (unsigned i = 0; i < cutoff; i++) test_scan_after(10u);
+            bool cancelled = macro_payload_engine_cancel();
+            test_unicode_drain();
+            CHECK(callback_count == 1u);
+            CHECK(callback_result == (cancelled ? MACRO_PAYLOAD_FINISH_CANCELLED : MACRO_PAYLOAD_FINISH_SUCCESS));
+            CHECK(!keyboard_report_mods_override_user(&mods));
+            int balance[256] = {0}; unsigned caps = 0;
+            for (unsigned i = 0; i < test_op_count; i++) {
+                balance[test_ops[i].keycode] += test_ops[i].kind == TEST_OP_ACQUIRE ? 1 : -1;
+                if (test_ops[i].kind == TEST_OP_ACQUIRE && test_ops[i].keycode == KC_CAPS_LOCK) caps++;
+            }
+            for (unsigned i = 0; i < 256u; i++) CHECK(balance[i] == 0);
+            CHECK(caps % 2u == 0u); CHECK(wait_call_count == 0u);
+        }
+    }
+}
+
+static void test_unicode_restores_current_modifiers_after_neutral_commit(void) {
+    test_reset(); unicode_mode = 1u;
+    live_mods = MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_LEFT_SHIFT);
+    const macro_payload_ir_t ir = {.length = 4u, .bytes = {MACRO_PAYLOAD_IR_OP_UNICODE, 0x1C, 0x20, 0}};
+    CHECK(macro_payload_start_ir(&ir, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0, MACRO_PAYLOAD_SOURCE_DIRECT, 0, test_finish_callback, &callback_count) == MACRO_PAYLOAD_START_STARTED);
+    test_scan_after(10u);
+    live_mods = MOD_BIT(KC_LEFT_ALT); // Shift physically releases during entry.
+    test_unicode_drain();
+    CHECK(callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
+    CHECK(neutral_reports >= 2u); // Entry neutral, then Option-up commits text.
+    CHECK(last_report_mods == MOD_BIT(KC_LEFT_ALT)); // No stale Shift snapshot.
+}
+
 int main(void) {
+    test_unicode_restores_current_modifiers_after_neutral_commit();
+    test_unicode_sequences_and_cancellation();
     macro_payload_engine_init();
     test_long_delay_start_is_nonblocking_and_wrap_safe();
     test_text_uses_lease_backed_press_and_release_scans();
@@ -278,4 +365,11 @@ int main(void) {
 
     puts("macro_payload_engine host tests passed");
     return 0;
+}
+
+void send_keyboard_report(void) {
+    uint8_t mods = live_mods;
+    bool overridden = keyboard_report_mods_override_user(&mods);
+    if (overridden && mods == 0u) neutral_reports++;
+    last_report_mods = mods;
 }

@@ -132,7 +132,18 @@ bool macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, ma
         }
 
         if (byte != SS_QMK_PREFIX) {
-            if (!macro_payload_text_byte_is_supported(byte)) {
+            uint8_t utf8[4] = {byte};
+            uint8_t width = 1u;
+            uint32_t scalar = byte;
+            if (byte >= 0x80u) {
+                uint8_t expected = byte >= 0xC2u && byte <= 0xDFu ? 2u : byte >= 0xE0u && byte <= 0xEFu ? 3u : byte >= 0xF0u && byte <= 0xF4u ? 4u : 0u;
+                if (!expected || offset + expected - 1u > length) {ir->length = 0; return false;}
+                for (uint8_t i = 1u; i < expected; i++) {
+                    if (!read_byte(offset++, &utf8[i], context)) {ir->length = 0; return false;}
+                }
+                if (!macro_payload_utf8_scalar(utf8, expected, &scalar, &width)) {ir->length = 0; return false;}
+            }
+            if (width == 1u && !macro_payload_text_byte_is_supported(byte)) {
                 ir->length = 0;
                 return false;
             }
@@ -146,7 +157,8 @@ bool macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, ma
             pending_tap_key    = 0;
             matched_up_count   = 0;
 
-            if (!macro_payload_ir_append_text_byte(ir, &text_chunk, byte)) {
+            if (width > 1u) text_chunk.active = false;
+            if (!(width > 1u ? macro_payload_ir_append_unicode(ir, scalar) : macro_payload_ir_append_text_byte(ir, &text_chunk, byte))) {
                 ir->length = 0;
                 return false;
             }

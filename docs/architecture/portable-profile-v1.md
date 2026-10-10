@@ -80,10 +80,12 @@ user-selectable VIA layout options; EEPROM padding and validity metadata are
 not profile content. Executable hooks, hardware geometry, engine inclusion and
 safety ceilings remain firmware capabilities.
 
-VIA streams support ASCII text, tap/down/up instructions and decimal delay
+VIA streams support capability-gated canonical UTF-8 text (feature bit 21), tap/down/up instructions and decimal delay
 instructions. Held keys must balance. The bank is reconstructed with zero
 padding and a final zero validity byte. Both macro banks are independent:
 64 VIA slots and 16 user macro slots retain their existing key identities.
+
+See [Unicode macro playback](runtime-flow.md) for encoding, compiled size, host setup and cancellation.
 
 The reconstructed bank is the document's, not necessarily the keyboard's. A
 valid bank may hold nonzero bytes after its 64th terminator, for instance after
@@ -150,7 +152,7 @@ a set exclusion bit keeps it out of combos. The
 | 23 | Persistent default-layer bitmask |
 | 24 | QMK keymap options |
 | 25–26 | Auto-mouse activation delay (ms) and movement threshold |
-| 27 | Retired, must be zero (version 5's combo reference layers; now in the layer records) |
+| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback, other bits zero. Nonzero requires feature bit 21. Previously reserved zero after version 5 combo references moved to layer records |
 | 28 | Behaviour master enable |
 | 29 | Layer behaviours mask, one bit per layer |
 | 30 | Layer combos mask, one bit per layer |

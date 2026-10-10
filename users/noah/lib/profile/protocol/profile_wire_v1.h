@@ -74,6 +74,7 @@ enum {
     NOAH_PROFILE_FEATURE_WIDE_PAGES = 1u << 19,
     // Behaviour and combo participation controls (participation-policy.md).
     NOAH_PROFILE_FEATURE_PARTICIPATION = 1u << 20,
+    NOAH_PROFILE_FEATURE_UNICODE_MACROS = 1u << 21,
 };
 
 // A wide-page request: [command, channel, value, request id, page low, page

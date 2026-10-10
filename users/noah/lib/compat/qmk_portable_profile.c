@@ -2,6 +2,7 @@
 #include "qmk_portable_profile.h"
 #include "qmk_portable_editor.h"
 #include "qmk_live_tapping_config.h"
+#include "qmk_host.h"
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
 #    include <string.h>
 #    include "eeconfig.h"
@@ -123,7 +124,7 @@ void noah_qmk_portable_apply(void) {
     eeconfig_update_keymap(&keymap_config);
 }
 bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
-    if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8)) return false;
+    if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8 && frame[2] != 0x0b)) return false;
     // Settings readback (GET 7) takes a wide page: byte 5 is its high byte.
     uint16_t page      = frame[2] == 7 ? (uint16_t)(frame[4] | frame[5] << 8) : frame[4];
     bool     malformed = !frame[3];
@@ -135,6 +136,13 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
         return true;
     }
     uint8_t *p = frame + 7;
+    if (frame[2] == 0x0b) {
+        if (frame[4]) { frame[5] = 2; return true; }
+        p[0] = 1;
+        p[1] = noah_host_detected();
+        frame[6] = 2;
+        return true;
+    }
     if (frame[2] == 8) {
         if (frame[4]) {
             frame[6] = noah_qmk_portable_editor_page(frame[4], p);

@@ -36,6 +36,10 @@ direction. Firmware accepts only current formats and every save binds VIA
 (D-F10); old backups require client translation before restore. Compiled defaults
 contain every enabled domain and use domain-seeking reads (D-F12).
 
+Unicode text macro entry supports macOS, Windows and Linux host modes; its
+encoding, ownership and setup contract is in [runtime flow](architecture/runtime-flow.md).
+Physical host acceptance is pending.
+
 Firmware work remaining before the product is complete:
 
 - physical interruption acceptance at every durable boundary;
@@ -985,3 +989,15 @@ later firmware can raise it.
 Client follow-up: Ark adopts every format above, derives its limits from the
 capability pages instead of constants, adds the controls, and translates older
 backups; pin the landed firmware.
+
+## D-F15 — Unicode macro entry preserves live ownership
+
+Text uses canonical UTF-8 and capability-gated Host settings (OS override
+and independent Unicode enablement). Auto uses QMK USB detection, with unknown
+remaining inert for non-ASCII playback; host detection never confirms input
+configuration. The
+settings-v6 zero defaults and current profiles stay valid. Unicode emission is
+scan-driven and uses the fork's report-only modifier override, so the current
+live modifier owners are revealed afterward. Host methods, limits, cancellation
+and exact byte encoding are governed by [runtime flow](architecture/runtime-flow.md).
+No native helper or automatic host-input-source detection is implied.

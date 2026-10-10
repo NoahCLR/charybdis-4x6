@@ -497,6 +497,8 @@ Capability feature bits are:
 
 | 19 | wide pages: the payload, compiled, combo and settings readbacks (GET `0x04`, `0x05`, `0x06`, `0x07`) take a 16-bit page, request byte 4 its low byte and byte 5 its high byte, with bytes 6–31 reserved; their responses echo bytes 0–4 and the request id correlates them |
 
+| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](runtime-flow.md) |
+
 | 20 | participation controls: behaviour and combo participation at the master, layer, definition and placement scopes ([participation policy](participation-policy.md)) |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
@@ -837,6 +839,7 @@ unhandled reply.
 | custom get | `0x08` | VIA storage status and editor pages | [Portable Profile V1](portable-profile-v1.md) |
 | custom get | `0x09` | retired; unsupported | — |
 | custom get/set | `0x0A` | bounded split transaction capture, diagnostic builds only | [Split activity sync](split-activity-sync.md) |
+| custom get | `0x0B` | detected host OS | Host OS Readback, below |
 | custom set | `0x10` | candidate begin | this document |
 | custom set | `0x11` | candidate chunk | this document |
 | custom set | `0x12` | candidate validate/prepare | this document |
@@ -1005,3 +1008,18 @@ compiled-default digest; earlier records therefore fall back to factory
 configuration and require a client restore. Full export continues to read
 current combo enable state and QMK-owned settings through device readback;
 immutable factory values never substitute for those live values.
+
+## Host OS readback
+
+Feature bit 21 also advertises custom GET on channel 0, value `0x0B`, page 0.
+The usual request ID, status and padding rules apply; only page 0 exists.
+Success carries two bytes: version 1 and the detected OS (0 unknown, 1 macOS,
+2 Windows, 3 Linux). Unknown includes unsupported iOS and unavailable detection.
+This reports QMK’s current USB guess, not the selected override or confirmation
+of host input configuration. Settings scalar 27 stores the override and Unicode
+switch separately; clients derive the effective OS with manual selection first.
+The result is volatile and is refreshed by Read keyboard; it is not a profile
+value, backup field or part of the profile fingerprint. Detection may be wrong
+or change after USB setup, particularly with switches/KVMs. Do not infer an OS
+from the computer running the client. The retired `0x09` remains unsupported;
+`0x0A` remains the diagnostic capture route.

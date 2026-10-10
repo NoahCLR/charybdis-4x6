@@ -139,6 +139,19 @@ bool macro_payload_encode_ir_write(const macro_payload_ir_t *ir, macro_payload_w
                 cursor += text_length;
                 break;
             }
+            case MACRO_PAYLOAD_IR_OP_UNICODE: {
+                if ((size_t)(end - cursor) < 3u) return false;
+                uint32_t value = (uint32_t)cursor[0] | ((uint32_t)cursor[1] << 8u) | ((uint32_t)cursor[2] << 16u);
+                cursor += 3;
+                if (value < 0xA0u || value > 0x10FFFFu || (value >= 0xD800u && value <= 0xDFFFu)) return false;
+                uint8_t bytes[4];
+                uint8_t count = value < 0x800u ? 2u : value < 0x10000u ? 3u : 4u;
+                uint32_t remaining = value;
+                for (uint8_t i = count - 1u; i > 0u; i--) {bytes[i] = 0x80u | (remaining & 0x3Fu); remaining >>= 6u;}
+                bytes[0] = (count == 2u ? 0xC0u : count == 3u ? 0xE0u : 0xF0u) | remaining;
+                for (uint8_t i = 0u; i < count; i++) if (!macro_payload_writer_write_byte(&state, bytes[i])) return false;
+                break;
+            }
             case MACRO_PAYLOAD_IR_OP_DELAY:
             case MACRO_PAYLOAD_IR_OP_KEY_DOWN:
             case MACRO_PAYLOAD_IR_OP_KEY_UP:
