@@ -16,7 +16,8 @@ any C and you don't reflash.
   while the keyboard still validates and saves the complete result.
 - **Text macros in your layout.** Macros type through your computer's keyboard
   layout (US, Dutch, German, French, UK and more on macOS, Windows and Linux),
-  accents included, with Unicode entry for emoji; see the
+  accents included, with Unicode entry for emoji. Protected playback suspends
+  held typing keys while the macro runs; see the
   [guide](docs/GUIDE.md#text-macros-and-your-keyboard-layout).
 - **Keys that do more than one thing.** Each key can do something different on
   tap, hold and longer hold, and again on double, triple or up to quintuple
