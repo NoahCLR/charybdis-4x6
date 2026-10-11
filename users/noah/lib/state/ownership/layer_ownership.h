@@ -45,5 +45,9 @@ uint8_t layer_ownership_oneshot_layer(void);
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer);
 bool layer_ownership_momentary_release(keypos_t key_pos);
+// Marks, in a key-origin bitmap, every key whose press holds a momentary
+// layer now: MO(), LM(), a held TT()/OSL(), or a behavior hold that entered one.
+// A combo's output is held by its owner key, so this names those combos too.
+void layer_ownership_momentary_owner_bitmap(uint8_t *out_bitmap);
 void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out);
 void layer_ownership_reset_for_test(void);

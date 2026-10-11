@@ -198,6 +198,19 @@ static void test_compiled_and_live_combo_rendering(const char *fixture_path) {
         check_led(&frame, led, live_color);
     }
 
+    // A layer-holding combo arrives as an empty visual footprint. Even when
+    // the layer stage is off, it must paint no combo colour or LED group.
+    noah_effective_rgb_frame_t layer_disabled_frame = profile_frame;
+    layer_disabled_frame.view.stage_enable_mask &= (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_LAYER;
+    uint8_t quiet_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    key_origin_bitmap_clear(quiet_bitmap);
+    CHECK(!rgb_runtime_combo_feedback_stage_render_effective_frame(&frame, &layer_disabled_frame, quiet_bitmap, 0u, RGB_MATRIX_LED_COUNT));
+    check_all_unpainted(&frame);
+    // Another combo still paints with layer lighting disabled.
+    CHECK(rgb_runtime_combo_feedback_stage_render_effective_frame(&frame, &layer_disabled_frame, bitmap, 0u, RGB_MATRIX_LED_COUNT));
+    check_led(&frame, 0u, live_color);
+    check_led(&frame, 6u, live_color);
+
     noah_effective_rgb_frame_t disabled_frame = profile_frame;
     disabled_frame.view.stage_enable_mask &= (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_COMBO;
     CHECK(!rgb_runtime_combo_feedback_stage_render_effective_frame(&frame, &disabled_frame, bitmap, 0u, RGB_MATRIX_LED_COUNT));

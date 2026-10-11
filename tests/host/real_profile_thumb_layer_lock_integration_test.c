@@ -3465,26 +3465,36 @@ static void test_pointer_layer_lock_holds_auto_mouse_until_unlocked(void) {
     CHECK(auto_mouse_key_tracker == 0);
 }
 
-// A layer key as a combo output, on the N+M combo for the duration of a test.
+// A layer key as a combo output, on an authored combo (N+M unless named) for
+// the duration of a test. Members press in order; QMK releases the output when
+// the first member comes up.
 typedef struct {
     int16_t  index;
     uint16_t original;
-    keypos_t n_pos;
-    keypos_t m_pos;
+    uint8_t  count;
+    keypos_t pos[4];
 } test_layer_combo_t;
+
+static test_layer_combo_t test_layer_combo_begin_on(const uint16_t *keys, uint8_t count, uint16_t output) {
+    test_layer_combo_t combo = {
+        .index = test_find_combo_index_for_exact_keys(keys, count),
+        .count = count,
+    };
+
+    CHECK(combo.index >= 0 && count <= ARRAY_SIZE(combo.pos));
+    for (uint8_t member = 0u; member < count; member++) {
+        combo.pos[member] = test_find_keypos_on_layer(LAYER_BASE, keys[member]);
+        CHECK(test_keypos_valid(combo.pos[member]));
+    }
+    combo.original                = key_combos[combo.index].keycode;
+    key_combos[combo.index].keycode = output;
+    return combo;
+}
 
 static test_layer_combo_t test_layer_combo_begin(uint16_t output) {
     static const uint16_t keys[] = {KC_N, KC_M};
-    test_layer_combo_t    combo  = {
-            .index = test_find_combo_index_for_exact_keys(keys, ARRAY_SIZE(keys)),
-            .n_pos = test_find_keypos_on_layer(LAYER_BASE, KC_N),
-            .m_pos = test_find_keypos_on_layer(LAYER_BASE, KC_M),
-    };
 
-    CHECK(combo.index >= 0 && test_keypos_valid(combo.n_pos) && test_keypos_valid(combo.m_pos));
-    combo.original                   = key_combos[combo.index].keycode;
-    key_combos[combo.index].keycode = output;
-    return combo;
+    return test_layer_combo_begin_on(keys, ARRAY_SIZE(keys), output);
 }
 
 static void test_layer_combo_end(const test_layer_combo_t *combo) {
@@ -3492,18 +3502,25 @@ static void test_layer_combo_end(const test_layer_combo_t *combo) {
 }
 
 static void test_layer_combo_press(const test_layer_combo_t *combo) {
-    test_observe_combo_member(combo->n_pos, true);
-    test_observe_combo_member(combo->m_pos, true);
+    for (uint8_t member = 0u; member < combo->count; member++) {
+        test_observe_combo_member(combo->pos[member], true);
+    }
     key_combos[combo->index].active = true;
     CHECK(!test_process_combo_output(key_combos[combo->index].keycode, true));
 }
 
-// QMK releases a combo's output when its first member comes up.
-static void test_layer_combo_release(const test_layer_combo_t *combo, bool n_first) {
+// first_up: the first member comes up first, otherwise the last one does.
+static void test_layer_combo_release(const test_layer_combo_t *combo, bool first_up) {
+    uint8_t lead = first_up ? 0u : (uint8_t)(combo->count - 1u);
+
     key_combos[combo->index].active = false;
-    test_observe_combo_member(n_first ? combo->n_pos : combo->m_pos, false);
+    test_observe_combo_member(combo->pos[lead], false);
     CHECK(!test_process_combo_output(key_combos[combo->index].keycode, false));
-    test_observe_combo_member(n_first ? combo->m_pos : combo->n_pos, false);
+    for (uint8_t member = 0u; member < combo->count; member++) {
+        if (member != lead) {
+            test_observe_combo_member(combo->pos[member], false);
+        }
+    }
 }
 
 // A layer hold from a combo is owned like one from a key: the layer is on
@@ -3518,7 +3535,7 @@ static void test_combo_layer_hold_is_owned(void) {
 
     test_layer_combo_press(&combo);
     CHECK(test_layer_active(LAYER_NAV));
-    CHECK(noah_runtime_debug_slot_owner_keycode(combo.m_pos) == MO(LAYER_NAV) || noah_runtime_debug_slot_owner_keycode(combo.n_pos) == MO(LAYER_NAV));
+    CHECK(noah_runtime_debug_slot_owner_keycode(combo.pos[1]) == MO(LAYER_NAV) || noah_runtime_debug_slot_owner_keycode(combo.pos[0]) == MO(LAYER_NAV));
     key_runtime_integration_advance(&fake_time, 300u);
     key_runtime_integration_scan();
     CHECK(test_layer_active(LAYER_NAV));
@@ -3550,6 +3567,156 @@ static void test_combo_layer_hold_is_owned(void) {
     test_layer_combo_end(&combo);
     CHECK(noah_runtime_debug_active_slot_count() == 0u);
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+}
+
+// Assert the public lighting projection, including both substages and every
+// member's key feedback. Layer activation must not add a confirmation pulse.
+static void test_assert_combo_layer_feedback_quiet(const test_layer_combo_t *combo) {
+    uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];
+
+    combo_feedback_bitmaps(underlay, overlay);
+    CHECK(!key_origin_bitmap_has_any(underlay));
+    CHECK(!key_origin_bitmap_has_any(overlay));
+    for (uint8_t member = 0u; member < combo->count; member++) {
+        CHECK(test_feedback_semantic_for_key(combo->pos[member]) == KEY_FEEDBACK_SEMANTIC_NONE);
+    }
+}
+
+static void test_combo_direct_layer_hold_shows_only_layer_feedback(void) {
+    test_reset_state();
+    test_layer_combo_t combo = test_layer_combo_begin(MO(LAYER_NAV));
+
+    test_layer_combo_press(&combo);
+    CHECK(test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    key_runtime_integration_advance(&fake_time, 300u);
+    key_runtime_integration_scan();
+    test_assert_combo_layer_feedback_quiet(&combo);
+    test_layer_combo_release(&combo, false);
+    key_runtime_integration_scan();
+    CHECK(!test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+    test_layer_combo_end(&combo);
+}
+
+static void test_cross_half_combo_layer_hold_is_quiet(void) {
+    static const uint16_t original_keys[] = {KC_N, KC_M};
+    static const uint16_t cross_half_keys[] = {LT(LAYER_NAV, KC_F), KC_N, COMBO_END};
+    int16_t index = test_find_combo_index_for_exact_keys(original_keys, ARRAY_SIZE(original_keys));
+    CHECK(index >= 0);
+    const uint16_t *saved_keys = key_combos[index].keys;
+
+    test_reset_state();
+    key_combos[index].keys = cross_half_keys;
+    test_layer_combo_t combo = test_layer_combo_begin_on(cross_half_keys, 2u, MO(LAYER_NAV));
+    uint8_t footprint[KEY_ORIGIN_BITMAP_SIZE];
+    test_layer_combo_press(&combo);
+    key_origin_bitmap_clear(footprint);
+    for (uint8_t member = 0u; member < combo.count; member++) {
+        key_origin_bitmap_add_keypos(footprint, combo.pos[member]);
+    }
+    CHECK(key_origin_bitmap_side_mask(footprint) == SPLIT_SIDE_MASK_BOTH);
+    CHECK(test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    test_layer_combo_release(&combo, true);
+    key_runtime_integration_scan();
+    CHECK(!test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    test_layer_combo_end(&combo);
+    key_combos[index].keys = saved_keys;
+}
+
+static void test_combo_behavior_layer_hold_keeps_feedback_until_resolved(void) {
+    uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset_state();
+    test_layer_combo_t combo = test_layer_combo_begin(CUSTOM_KEY_0);
+    test_layer_combo_press(&combo);
+    CHECK(!test_layer_active(LAYER_NAV));
+    combo_feedback_bitmaps(underlay, overlay);
+    CHECK(key_origin_bitmap_has_any(underlay) || key_origin_bitmap_has_any(overlay));
+    for (uint8_t member = 0u; member < combo.count; member++) {
+        CHECK(key_origin_bitmap_has_keypos(underlay, combo.pos[member]) || key_origin_bitmap_has_keypos(overlay, combo.pos[member]));
+    }
+
+    key_runtime_integration_advance(&fake_time, 300u);
+    key_runtime_integration_scan();
+    CHECK(test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    test_layer_combo_release(&combo, true);
+    key_runtime_integration_scan();
+    CHECK(!test_layer_active(LAYER_NAV));
+    test_assert_combo_layer_feedback_quiet(&combo);
+    CHECK(noah_runtime_debug_active_slot_count() == 0u);
+    CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
+    test_layer_combo_end(&combo);
+}
+
+// These footprints overlap at M but have different output owners. Filtering
+// a layer combo must happen before unioning the footprints, never by clearing
+// its keys from the combined bitmap. Another layer owner also survives release.
+static void test_combo_layer_hold_preserves_overlapping_combo_feedback_and_owners(void) {
+    static const uint16_t other_keys[] = {KC_M, KC_COMM, KC_DOT};
+    const uint16_t other_outputs[] = {KC_LGUI, LM(LAYER_NAV, MOD_LSFT)};
+    uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];
+
+    for (uint8_t output = 0u; output < ARRAY_SIZE(other_outputs); output++) {
+        test_reset_state();
+        test_layer_combo_t layer_combo = test_layer_combo_begin(MO(LAYER_NAV));
+        test_layer_combo_t other_combo = test_layer_combo_begin_on(other_keys, ARRAY_SIZE(other_keys), other_outputs[output]);
+
+        // Capture both physical completions on the base layer before either
+        // output changes the layer, as QMK's buffered combo processing can do.
+        for (uint8_t member = 0u; member < layer_combo.count; member++) {
+            test_observe_combo_member(layer_combo.pos[member], true);
+        }
+        for (uint8_t member = 1u; member < other_combo.count; member++) {
+            test_observe_combo_member(other_combo.pos[member], true);
+        }
+        key_combos[layer_combo.index].active = true;
+        CHECK(!test_process_combo_output(MO(LAYER_NAV), true));
+        key_combos[other_combo.index].active = true;
+        CHECK(!test_process_combo_output(other_outputs[output], true));
+        key_runtime_integration_advance(&fake_time, 300u);
+        key_runtime_integration_scan();
+        CHECK(test_layer_active(LAYER_NAV));
+        combo_feedback_bitmaps(underlay, overlay);
+        CHECK(!key_origin_bitmap_has_any(underlay));
+        if (output == 0u) {
+            CHECK(!key_origin_bitmap_has_keypos(overlay, layer_combo.pos[0]));
+            for (uint8_t member = 0u; member < other_combo.count; member++) {
+                CHECK(key_origin_bitmap_has_keypos(overlay, other_combo.pos[member]));
+            }
+        } else {
+            CHECK(!key_origin_bitmap_has_any(overlay));
+        }
+
+        // N releases only the layer combo; M remains physically held for the
+        // other combo. Its output and lighting stay owned until Dot comes up.
+        key_combos[layer_combo.index].active = false;
+        test_observe_combo_member(layer_combo.pos[0], false);
+        CHECK(!test_process_combo_output(MO(LAYER_NAV), false));
+        key_runtime_integration_scan();
+        CHECK(test_layer_active(LAYER_NAV) == (output != 0u));
+        combo_feedback_bitmaps(underlay, overlay);
+        if (output == 0u) {
+            CHECK(key_origin_bitmap_has_keypos(overlay, other_combo.pos[0]));
+        } else {
+            CHECK(!key_origin_bitmap_has_any(underlay) && !key_origin_bitmap_has_any(overlay));
+        }
+        test_layer_combo_release(&other_combo, false);
+        key_runtime_integration_scan();
+        CHECK(!test_layer_active(LAYER_NAV));
+        CHECK(noah_runtime_debug_active_slot_count() == 0u);
+        combo_feedback_bitmaps(underlay, overlay);
+        CHECK(!key_origin_bitmap_has_any(underlay) && !key_origin_bitmap_has_any(overlay));
+        test_layer_combo_end(&other_combo);
+        test_layer_combo_end(&layer_combo);
+    }
 }
 
 // OSL() from a combo arms its one-shot for the next key; TT() from a combo
@@ -3760,6 +3927,10 @@ int main(void) {
     test_oneshot_layer_long_press_and_second_taps_follow_qmk();
     test_layer_mod_holds_its_layer_and_modifiers();
     test_combo_layer_hold_is_owned();
+    test_combo_direct_layer_hold_shows_only_layer_feedback();
+    test_cross_half_combo_layer_hold_is_quiet();
+    test_combo_behavior_layer_hold_keeps_feedback_until_resolved();
+    test_combo_layer_hold_preserves_overlapping_combo_feedback_and_owners();
     test_combo_oneshot_and_tap_toggle_are_owned();
     test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks();
     test_to_pointer_then_to_base_leaves_the_pointer_layer_free();

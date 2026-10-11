@@ -44,6 +44,22 @@ flowchart TD
 Later stages paint over earlier ones. So a key-behavior colour hides the layer
 colour while it shows, and the layer colour returns when it stops.
 
+### Combo identity during a layer hold
+
+An active combo normally keeps its steady identity colour. Once its output
+owns a momentary layer hold, its whole footprint contributes to neither combo
+underlay nor overlay, including their LED groups. The layer stage supplies the
+hold's lighting; activation adds no confirmation flash. This applies to direct
+layer holds and behaviour outputs whose resolved hold owns a layer. Pending
+behaviours retain combo identity until that ownership exists.
+
+Disabling layer lighting does not restore combo feedback. Filter each combo
+before combining footprints, so another active combo can still light shared
+keys. Keep the origin and output owner intact for release and layer reference
+counts. Layer locks and armed one-shots do not themselves suppress combo
+identity; an actual momentary binding does. The master sends the filtered
+bitmaps to the other half.
+
 ### The resting surface
 
 What a key looks like when nothing special is happening:

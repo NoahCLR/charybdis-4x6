@@ -243,7 +243,12 @@ flowchart TD
 ```
 
 RGB rendering is projected UI. It must not create key-runtime, combo, or PD
-truth; it consumes snapshots and authored color tables.
+truth; it consumes snapshots and authored color tables. Combo feedback excludes
+entries whose output owner has a current momentary-layer binding, before
+unioning their footprints. Origin tracking and release ownership are unchanged;
+only the layer stage shows that hold, with no activation pulse. Pending holds
+retain combo feedback. The split combo packet carries these filtered bitmaps,
+independent of whether the layer stage is enabled.
 
 ## Split Sync Flow
 

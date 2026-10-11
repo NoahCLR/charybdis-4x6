@@ -33,7 +33,10 @@ void              noah_qmk_combo_origin_observe_physical_key_event(uint16_t keyc
 void              noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *record);
 void              noah_qmk_combo_origin_pressed_combo_bitmap(uint8_t *out_bitmap);
 bool              noah_qmk_combo_origin_pressed_combo_matches(uint16_t keycode, keypos_t owner_key_pos, uint16_t since, uint16_t term_ms);
-void              noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key_pos, keypos_t pd_owner_key_pos, uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap);
+// Active combo footprints, split by owner: a combo owning the preview or PD
+// state goes underneath them, any other above. A combo whose owner key is in
+// quiet_owner_bitmap (may be NULL) contributes to neither.
+void              noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key_pos, keypos_t pd_owner_key_pos, const uint8_t *quiet_owner_bitmap, uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap);
 bool              noah_qmk_combo_origin_event_owner_keypos(const keyrecord_t *record, keypos_t *out);
 bool              noah_qmk_combo_origin_event_bitmap(const keyrecord_t *record, uint8_t *out_bitmap);
 split_side_mask_t noah_qmk_combo_origin_event_side_mask(const keyrecord_t *record);

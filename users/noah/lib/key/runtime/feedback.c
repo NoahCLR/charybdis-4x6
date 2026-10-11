@@ -11,6 +11,7 @@
 #include "../behavior/key_behavior_lookup.h"
 #include "../../compat/qmk_combo_origin.h"
 #include "../../split/runtime_sync.h"
+#include "../../state/ownership/layer_ownership.h"
 #include "reducer/ownership_state.h"
 #include "reducer/state_query.h"
 
@@ -613,9 +614,14 @@ void key_feedback_tap_branch_map(uint8_t *out_map) {
     }
 }
 
+// A combo whose output holds a momentary layer shows no combo light: the layer
+// lighting already says what the hold does, as it does for a key whose hold
+// enters a layer (no pulse, no registered feedback). Until a behavior output's
+// hold resolves, the combo still lights.
 void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
     keypos_t preview_owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
     keypos_t pd_owner_key_pos      = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
+    uint8_t  layer_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 
     if (out_underlay_bitmap) {
         key_origin_bitmap_clear(out_underlay_bitmap);
@@ -633,7 +639,8 @@ void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_b
 #ifdef POINTING_DEVICE_ENABLE
     (void)pd_mode_local_owner_key_pos_snapshot(&pd_owner_key_pos);
 #endif
-    noah_qmk_combo_origin_active_bitmaps_partitioned(preview_owner_key_pos, pd_owner_key_pos, out_underlay_bitmap, out_overlay_bitmap);
+    layer_ownership_momentary_owner_bitmap(layer_owner_bitmap);
+    noah_qmk_combo_origin_active_bitmaps_partitioned(preview_owner_key_pos, pd_owner_key_pos, layer_owner_bitmap, out_underlay_bitmap, out_overlay_bitmap);
 }
 
 void combo_feedback_underlay_bitmap(uint8_t *out_bitmap) {

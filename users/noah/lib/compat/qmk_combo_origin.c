@@ -866,7 +866,7 @@ bool noah_qmk_combo_origin_pressed_combo_matches(uint16_t keycode, keypos_t owne
     return false;
 }
 
-void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key_pos, keypos_t pd_owner_key_pos, uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
+void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key_pos, keypos_t pd_owner_key_pos, const uint8_t *quiet_owner_bitmap, uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
     if (out_underlay_bitmap) {
         key_origin_bitmap_clear(out_underlay_bitmap);
     }
@@ -884,6 +884,11 @@ void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key
         bool                               underlay_owner;
 
         if (!entry->active) {
+            continue;
+        }
+
+        // The entry stays: its release still has to find this owner.
+        if (quiet_owner_bitmap && key_origin_keypos_valid(entry->owner_key_pos) && key_origin_bitmap_has_keypos(quiet_owner_bitmap, entry->owner_key_pos)) {
             continue;
         }
 
@@ -983,9 +988,10 @@ bool noah_qmk_combo_origin_pressed_combo_matches(uint16_t keycode, keypos_t owne
     (void)term_ms;
     return false;
 }
-void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key_pos, keypos_t pd_owner_key_pos, uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
+void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key_pos, keypos_t pd_owner_key_pos, const uint8_t *quiet_owner_bitmap, uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
     (void)preview_owner_key_pos;
     (void)pd_owner_key_pos;
+    (void)quiet_owner_bitmap;
     if (out_underlay_bitmap) {
         key_origin_bitmap_clear(out_underlay_bitmap);
     }

@@ -28,7 +28,8 @@ any C and you don't reflash.
   and you can snipe for precise movement.
 - **Lights that tell you what is going on.** They show which layer and mode are
   active, which keys made a combo, which tap is waiting and whether a hold has
-  committed. They also fade to show when the auto-mouse layer is about to drop.
+  committed. A combo holding a layer shows only that layer’s lighting. They also
+  fade to show when the auto-mouse layer is about to drop.
 - **Two halves that act like one keyboard.** Layers, modes, combos, lighting
   and saved edits stay in sync across the cable.
 - **Room to grow.** It has 16 layers, 128 named macros and 128 custom keys you

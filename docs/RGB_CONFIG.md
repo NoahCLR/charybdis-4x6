@@ -317,11 +317,20 @@ const combo_feedback_color_config_t combo_feedback_colors = {
 
 This is a persistent combo identity layer:
 
-- if a combo chord is active, its combo color stays active
+- if a combo chord is active, its combo color stays active unless its output
+  currently owns a momentary layer hold
 - key-behavior feedback can still repaint above it
 - combos that currently own preview or PD state are routed underneath those
   state indicators
 - unrelated combos stay above preview and PD
+
+A direct momentary layer output, or a behavior whose resolved hold owns a
+momentary layer, contributes no combo underlay, overlay or LED groups during
+that hold. There is no activation confirmation flash: the ordinary layer stage
+shows the layer. A pending behavior keeps combo lighting until the hold resolves.
+This suppression also applies when layer lighting is disabled. Other combos,
+including those sharing keys, retain their own feedback. Locks and armed
+one-shots alone do not count as momentary holds.
 
 The `locality` field controls where the combo layer paints:
 
@@ -332,9 +341,9 @@ The `locality` field controls where the combo layer paints:
   footprint
 - `RGB_KEYS_ONLY`: repaint only the exact combo keys
 
-This layer is intentionally steady while held. That keeps combo identity
-visible underneath later flashing key-behavior overlays instead of competing
-with them.
+Outside the momentary-layer exception, this layer is steady while held. That
+keeps combo identity visible underneath later flashing key-behavior overlays
+instead of competing with them.
 
 ### `combo_feedback_led_groups`
 
@@ -560,8 +569,8 @@ static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_
 5. if `RGB_PD_MODE_FEEDBACK_ENABLE` is on, the active pointing-device mode
    color using the authored PD locality
 6. if `RGB_PD_MODE_FEEDBACK_ENABLE` is on, per-mode LED groups
-7. if `RGB_COMBO_FEEDBACK_ENABLE` is on, combo overlay for all other active
-   combos, including any matching combo
+7. if `RGB_COMBO_FEEDBACK_ENABLE` is on, combo overlay for other active
+   combos except momentary-layer owners, including any matching combo
    feedback LED groups
 8. if `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` is on, the key-behavior feedback
    overlay on both halves, only the key half, or only the specific key, then

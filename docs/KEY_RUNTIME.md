@@ -234,6 +234,15 @@ decisions, leases, layer locks, modifier ownership, or PD mode ownership. Its
 only handoff into the runtime ownership model is the normalized event key and
 origin bitmap stored in `origin_registry.c`.
 
+For lighting, `feedback.c` snapshots current momentary bindings from
+`layer_ownership.c` and passes an owner bitmap to the adapter's active-footprint
+partition. Entries with those owners contribute to neither combo substage.
+This is a visual filter only: their origins still match releases and their
+layer ownership remains intact. Pending behavior outputs keep combo feedback
+until their resolved hold establishes a binding; locks and armed one-shots
+alone do not qualify. Filtering precedes footprint union so overlapping active
+combos keep their own lighting. See [the feedback model](rgbflow.md#combo-identity-during-a-layer-hold).
+
 Coverage for this contract lives in `run_qmk_combo_origin_tests.sh`: reference
 layer lookup, stable combo owner selection, active and pending combo bitmaps,
 pending output after member release, suppressed overlap, deadline boundaries
@@ -241,7 +250,8 @@ and timer wrap, capacity refusal/recovery, exact same-output generations,
 cached release footprints, fired outputs delivered after deactivation (in
 firing order, retired after one tapping term), cross-half and three-key combos,
 reset diagnostics,
-and preview/PD owner partitioning for RGB underlay/overlay feedback. The runner
+and preview/PD owner partitioning and quiet-owner exclusion for RGB
+underlay/overlay feedback. The runner
 executes normal and `EXTRA_SHORT_COMBOS` layouts and compile-checks the timerless
 branch. `run_qmk_contract_checks.sh` compares both combo layouts with the pinned
 fork and enforces the upstream pre-hook, matrix-scan, and `combo_task()` order.

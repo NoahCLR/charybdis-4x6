@@ -868,6 +868,33 @@ static void test_tick_sends_only_combo_packet_when_only_combo_feedback_changes(v
     CHECK(rpc_last_combo_packet.combo_underlay_bitmap[0] == 0x01u);
 }
 
+// Resolving a layer hold clears both visual substages, while the output itself
+// remains held on the master. Empty bitmaps must be sent and replace the peer's
+// previous footprint, even without a separate dirty notification.
+static void test_quiet_combo_projection_clears_peer_feedback(void) {
+    uint8_t underlay[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t overlay[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset_stubs();
+    key_origin_bitmap_add_keypos(fake_combo_underlay_bitmap, (keypos_t){.row = 0, .col = 0});
+    key_origin_bitmap_add_keypos(fake_combo_overlay_bitmap, (keypos_t){.row = 4, .col = 0});
+    split_runtime_sync_init();
+    test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC)(sizeof(rpc_last_combo_packet), &rpc_last_combo_packet, 0u, NULL);
+    CHECK(split_runtime_sync_remote_read_combo(underlay, overlay));
+    CHECK(key_origin_bitmap_has_any(underlay) && key_origin_bitmap_has_any(overlay));
+    test_reset_rpc_send_counts();
+
+    key_origin_bitmap_clear(fake_combo_underlay_bitmap);
+    key_origin_bitmap_clear(fake_combo_overlay_bitmap);
+    split_runtime_sync_tick();
+    CHECK(rpc_send_count_combo == 1u);
+    CHECK(!key_origin_bitmap_has_any(rpc_last_combo_packet.combo_underlay_bitmap));
+    CHECK(!key_origin_bitmap_has_any(rpc_last_combo_packet.combo_overlay_bitmap));
+    test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC)(sizeof(rpc_last_combo_packet), &rpc_last_combo_packet, 0u, NULL);
+    CHECK(split_runtime_sync_remote_read_combo(underlay, overlay));
+    CHECK(!key_origin_bitmap_has_any(underlay) && !key_origin_bitmap_has_any(overlay));
+}
+
 static void test_idle_combo_feedback_activation_sends_without_dirty_notification(void) {
     test_reset_stubs();
     test_set_idle_runtime_state();
@@ -1389,6 +1416,7 @@ int main(void) {
     test_disabled_auto_mouse_publishes_no_fade_progress();
     test_tick_sends_only_base_packet_when_only_automouse_changes();
     test_tick_sends_only_combo_packet_when_only_combo_feedback_changes();
+    test_quiet_combo_projection_clears_peer_feedback();
     test_idle_combo_feedback_activation_sends_without_dirty_notification();
     test_tick_sends_only_key_feedback_packet_when_only_key_feedback_changes();
     test_tick_sends_only_key_feedback_branch_packet_when_only_tap_branch_changes();

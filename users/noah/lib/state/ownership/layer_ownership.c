@@ -10,6 +10,7 @@
 
 #include "noah_keymap_ids.h"
 #include "../../key/runtime/reducer/ownership_state.h"
+#include "../../key/runtime/slot/origin_registry.h"
 #include "../diagnostics/runtime_trace.h"
 #include "../shared/runtime_context_internal.h"
 
@@ -280,6 +281,21 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_MOMENTARY_RELEASE, state->bindings[slot].layer, layer_ownership_trace_pack_keypos(key_pos));
 
     return layer_ownership_remove_slot((uint16_t)slot);
+}
+
+void layer_ownership_momentary_owner_bitmap(uint8_t *out_bitmap) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+
+    if (!out_bitmap) {
+        return;
+    }
+
+    key_origin_bitmap_clear(out_bitmap);
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->bindings); i++) {
+        if (state->bindings[i].active) {
+            key_origin_bitmap_add_keypos(out_bitmap, state->bindings[i].key_pos);
+        }
+    }
 }
 
 void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {

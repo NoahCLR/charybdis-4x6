@@ -523,7 +523,7 @@ Preview color: <img alt="Auto-mouse end color" src="media/profile-introspection/
 
 ## Combo Feedback LEDs
 
-This steady combo layer comes from `combo_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). It stays visible while a combo chord is active, sits underneath preview and pd-mode indicators when that combo owns those states, and otherwise repaints above preview and pd-mode overlays but below key-behavior feedback.
+This steady combo layer comes from `combo_feedback_colors` in [rgb_config.c](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c). It stays visible while a combo chord is active, except once its output owns a momentary layer hold: then only layer lighting shows, with no confirmation flash. Pending behavior holds keep combo lighting until they resolve. Other combos keep their own lighting, including on shared keys. Outside that exception, it sits underneath preview and pd-mode indicators when that combo owns those states, and otherwise repaints above preview and pd-mode overlays but below key-behavior feedback.
 
 Current authored combo feedback locality: `RGB_KEY_HALF`.
 
