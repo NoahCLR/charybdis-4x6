@@ -159,6 +159,18 @@ int main(int argc, char **argv) {
     uint8_t  bytes[NOAH_SETTINGS_MAX_SIZE], stored[NOAH_SETTINGS_MAX_SIZE] = {0};
     uint16_t length;
 
+    // Optional macro-map requests are handled even without a ready split bank.
+    memset(frame, 0, sizeof(frame));
+    frame[0] = 8u;
+    frame[2] = 0x0cu;
+    frame[3] = 1u;
+    assert(noah_qmk_portable_profile_get(frame, sizeof(frame)) && frame[5] == 3u && frame[6] == 0u);
+    frame[3] = 0u;
+    assert(noah_qmk_portable_profile_get(frame, sizeof(frame)) && frame[5] == 1u);
+    frame[3] = 1u;
+    frame[5] = 1u;
+    assert(noah_qmk_portable_profile_get(frame, sizeof(frame)) && frame[5] == 1u);
+
     // Retired source readback must not be served or mutate the request.
     memset(frame, 0, sizeof(frame));
     frame[0] = 8;

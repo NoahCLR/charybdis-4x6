@@ -550,6 +550,54 @@ peer acknowledges the retried ABORT, the keyboard starts no new save or split
 transfer; a peer that never does needs a restart. A decoder that predates the
 bit rejects the status while it is set, as it rejects any unknown flag.
 
+### Sparse VIA Macro Read Map — Optional GET Value `0x0c`
+
+Channel 0, value `0x0c`, uses the ordinary byte page and nonzero request ID;
+request bytes 5–31 are reserved zero. It is optional without a new capability
+bit, so existing clients remain compatible. Unsupported firmware returns its
+unhandled echo or UNKNOWN_PAGE; a bank without a completed clean local checksum
+returns UNAVAILABLE. The map also returns UNAVAILABLE unless the checksum worker
+hashed the standard board's exact two-byte VIA config `[1,0]` (valid EEPROM,
+zero layout options). QMK permits another client to set nonzero layout options;
+that clean state remains readable through the full VIA path. Compatibility is
+recorded in the same completed cursor as the hash and bitmap, rather than
+sampling current config during GET. A client may use the full VIA read when page 0 is unavailable
+or unsupported. Once a map is accepted, an unavailable or malformed later page
+fails that read rather than substituting data from another generation.
+
+Page 0 has exactly 13 bytes, with multibyte integers little-endian:
+
+| Offset | Bytes | Meaning |
+| --- | --- | --- |
+| 0 | 1 | Map layout version, `1` |
+| 1 | 2 | Block size, `256` bytes |
+| 3 | 2 | Full VIA macro capacity, including the write-validity byte |
+| 5 | 4 | Nonzero local storage generation |
+| 9 | 4 | Canonical full VIA-store FNV-1a digest |
+
+Pages 1 onward carry up to 25 bitmap bytes each, exactly
+`ceil(ceil(capacity / 256) / 8)` bytes altogether. Bit `block % 8` of byte
+`floor(block / 8)` marks a block containing at least one nonzero byte; every
+unmarked block is exactly zero. Unused high bits and response padding are zero.
+There are 18 bitmap bytes at capacity 34,903, and at most 32 at capacity 65,535.
+Past-end pages return UNKNOWN_PAGE with no payload.
+
+The checksum worker gathers these bits from the same bytes it hashes, within
+its existing 224-byte scan budget and 14-byte read workspace. The map is published
+with that checksum and invalidated with it on every mutation or remote apply;
+GET copies only metadata or bitmap bytes and never walks the bank. Both locally
+computed and receiver-verified identities carry their own matching bitmap.
+
+A client reads page 0, the bitmap, the marked ranges through ordinary VIA
+MACRO_READ, and page 0 again. It requires identical metadata, checks geometry
+against VIA and Profile Wire, reconstructs omitted bytes as zero, and verifies
+the full canonical VIA digest using its freshly read layout and the standard
+board's fixed VIA config. Complete capture also matches the map identity to its
+initial storage status and retains its final profile/storage/settings coherence
+checks. Stale bytes after the final macro and a nonzero write-validity marker
+are included like any other stored bytes. This is a lossless transport change;
+storage, backup, Apply and recovery formats do not change.
+
 ### Payload Readback — GET Values `0x04` And `0x05`
 
 GET `0x04` reads the committed payload and `0x05` the compiled defaults the

@@ -93,6 +93,8 @@ typedef struct {
 
 static noah_qmk_via_shared_state_t          noah_qmk_via_shared_state;
 static noah_qmk_via_storage_digest_cursor_t noah_qmk_via_local_digest_cursor;
+// The bitmap stays in the cursor that produced the published checksum.
+static bool                                 noah_qmk_via_macro_map_from_receiver;
 static noah_qmk_via_slave_mailbox_t         noah_qmk_via_slave_mailbox;
 static noah_qmk_via_logical_transaction_t   noah_qmk_via_logical;
 
@@ -1032,6 +1034,7 @@ static bool noah_qmk_via_receiver_verify_tick(void) {
                 noah_qmk_via_receiver.verifying               = false;
                 noah_qmk_via_receiver.staged                  = true;
                 noah_qmk_via_shared_state.digest              = noah_qmk_via_receiver_verify_digest;
+                noah_qmk_via_macro_map_from_receiver          = true;
                 noah_qmk_via_shared_state.digest_valid        = true;
                 noah_qmk_via_shared_state.digest_active       = false;
                 noah_qmk_via_shared_state.pending_effects     = NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
@@ -1073,6 +1076,7 @@ static bool noah_qmk_via_receiver_verify_tick(void) {
         noah_qmk_via_receiver.finalizing              = false;
         noah_qmk_via_receiver.committed               = true;
         noah_qmk_via_shared_state.digest              = noah_qmk_via_receiver_verify_digest;
+        noah_qmk_via_macro_map_from_receiver          = true;
         noah_qmk_via_shared_state.digest_valid        = true;
         noah_qmk_via_shared_state.digest_active       = false;
         noah_qmk_via_shared_state.pending_effects     = NOAH_QMK_VIA_COMMAND_EFFECT_NONE;
@@ -1112,6 +1116,7 @@ static bool noah_qmk_via_local_digest_tick(void) {
             noah_qmk_via_shared_state.digest_active                       = false;
             noah_qmk_via_shared_state.digest_valid                        = true;
             noah_qmk_via_shared_state.digest                              = digest;
+            noah_qmk_via_macro_map_from_receiver                          = false;
             invalidate_recovery_caches                                    = noah_qmk_via_shared_state.recovery_cache_invalidation_pending;
             noah_qmk_via_shared_state.recovery_cache_invalidation_pending = false;
         }
@@ -1567,6 +1572,44 @@ bool noah_qmk_via_logical_mirror_allowed(void) {
 
 void noah_qmk_via_split_sync_matrix_scan(void) {
     (void)noah_qmk_via_split_sync_matrix_scan_step();
+}
+
+uint8_t noah_qmk_via_macro_read_map_page(uint8_t page, uint8_t *payload, uint8_t *length) {
+    uint16_t capacity      = noah_qmk_via_storage_region_size(NOAH_QMK_VIA_SYNC_REGION_MACRO);
+    uint16_t blocks        = ((uint32_t)capacity + NOAH_QMK_VIA_MACRO_READ_BLOCK_SIZE - 1u) / NOAH_QMK_VIA_MACRO_READ_BLOCK_SIZE;
+    uint8_t  bitmap_length = (blocks + 7u) / 8u;
+    uint8_t  status        = 3u;
+    if (!payload || !length) return status;
+    *length = 0u;
+    if (!capacity) return status;
+    ATOMIC_BLOCK_RESTORESTATE {
+        noah_qmk_via_sync_state_snapshot_t          state  = noah_qmk_via_sync_state_snapshot();
+        const noah_qmk_via_storage_digest_cursor_t *cursor = noah_qmk_via_macro_map_from_receiver ? &noah_qmk_via_receiver_verify_cursor : &noah_qmk_via_local_digest_cursor;
+        if (noah_qmk_via_local_state_is_clean(state, noah_qmk_via_shared_state) && cursor->complete && cursor->macro_map_config_compatible && !noah_qmk_via_receiver.active && !noah_qmk_via_receiver.verifying) {
+            status = 0u;
+            if (page == 0u) {
+                payload[0] = 1u;
+                payload[1] = (uint8_t)NOAH_QMK_VIA_MACRO_READ_BLOCK_SIZE;
+                payload[2] = NOAH_QMK_VIA_MACRO_READ_BLOCK_SIZE >> 8u;
+                payload[3] = (uint8_t)capacity;
+                payload[4] = capacity >> 8u;
+                for (uint8_t i = 0u; i < 4u; i++) {
+                    payload[5u + i] = state.metadata.generation >> (8u * i);
+                    payload[9u + i] = noah_qmk_via_shared_state.digest >> (8u * i);
+                }
+                *length = 13u;
+            } else {
+                uint16_t offset = (uint16_t)(page - 1u) * 25u;
+                if (offset >= bitmap_length)
+                    status = 2u;
+                else {
+                    *length = bitmap_length - offset < 25u ? bitmap_length - offset : 25u;
+                    memcpy(payload, cursor->macro_nonzero_blocks + offset, *length);
+                }
+            }
+        }
+    }
+    return status;
 }
 
 noah_qmk_via_split_sync_debug_snapshot_t noah_qmk_via_split_sync_debug_snapshot(void) {

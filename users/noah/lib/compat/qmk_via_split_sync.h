@@ -65,6 +65,9 @@ void noah_qmk_via_split_sync_note_mutation(uint8_t effects);
 // the local digest so nothing advertises a stale one.
 void                                     noah_qmk_via_split_sync_note_local_storage_changed(void);
 noah_qmk_via_split_sync_debug_snapshot_t noah_qmk_via_split_sync_debug_snapshot(void);
+// Optional GET 0x0c: metadata then bitmap pages for the exact clean bank.
+// Returns Profile Wire status (0 OK, 2 unknown page, 3 unavailable).
+uint8_t noah_qmk_via_macro_read_map_page(uint8_t page, uint8_t *payload, uint8_t *length);
 // Callback-safe admission of one logical VIA staging frame: BEGIN, CHUNK and
 // VERIFY from the host, ACCEPT from the profile owner. The actual split RPC
 // runs from matrix-scan context. A queued frame must reach a terminal
@@ -105,6 +108,12 @@ static inline void noah_qmk_via_split_sync_note_mutation(uint8_t effects) {
 static inline void                                     noah_qmk_via_split_sync_note_local_storage_changed(void) {}
 static inline noah_qmk_via_split_sync_debug_snapshot_t noah_qmk_via_split_sync_debug_snapshot(void) {
     return (noah_qmk_via_split_sync_debug_snapshot_t){0};
+}
+static inline uint8_t noah_qmk_via_macro_read_map_page(uint8_t page, uint8_t *payload, uint8_t *length) {
+    (void)page;
+    (void)payload;
+    if (length) *length = 0u;
+    return 3u;
 }
 static inline bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_sync_frame_t *request) {
     (void)transaction_id;

@@ -14,7 +14,8 @@ any C and you don't reflash.
   Apply writes both halves and reads them back. You can export a whole profile
   to one file and import it again. Small edits can reuse unchanged profile data
   on both halves, and full-bank checksums run in batches to shorten Apply's wait
-  while the keyboard still validates and saves the complete result.
+  while the keyboard still validates and saves the complete result. Reads can
+  skip confirmed empty macro storage with a supporting Ark version.
 - **Text macros in your layout.** Macros type through your computer's keyboard
   layout (US, Dutch, German, French, UK and more on macOS, Windows and Linux),
   accents included, with Unicode entry for emoji. Protected playback suspends
