@@ -57,7 +57,9 @@ Firmware work remaining before the product is complete:
 
 Differential host uploads can reuse identified active bytes and stream bounded
 batches (D-F18), while full validation and both-half publication remain in place.
-Transfer timing and interruption acceptance for this path have not run on hardware.
+The unchanged host-upload phase has
+[hardware timing evidence](../measurements/profile-upload/2026-10-11-unchanged-baseline/README.md);
+changed-upload timing and interruption acceptance remain outstanding.
 The copy to the other half reuses the same ranges from that half's own active
 profile and sends the rest in chunks of up to 110 bytes (D-F19); it has not run
 on hardware either.
@@ -1107,11 +1109,20 @@ selection are unchanged; an interrupted reconstruction is only an uncommitted
 candidate. Validation, durable publication and split preparation retain their
 per-scan work ceilings. A client lacking either feature keeps its existing path.
 
+REUSE still alternates one source read and one candidate write per 20-byte
+piece, then performs the entire checksum and semantic validation. The
+validator's 20-byte limit is a ceiling, not a promise to consume 20 bytes
+every grant. Upload timing must count all decoder phases and the owner's
+actual scan grants, as specified in
+[upload work and elapsed time](architecture/profile-wire-v1.md#upload-work-and-elapsed-time).
+An unchanged profile does not authorize a validation shortcut or a larger
+per-scan work budget.
+
 Ark follow-up: negotiate the bits, retain the exact raw source bytes beside
 the coherent capture, compare domains across offset changes, and verify bounded
 stream batches before validation. Refresh its pinned contract from this
-firmware's published landing before the app change lands. Hardware timing and
-interruption acceptance remain outstanding.
+firmware's published landing before the app change lands. Changed-upload
+hardware timing and interruption acceptance remain outstanding.
 
 ## D-F19 — The copy to the other half reuses what that half already has
 

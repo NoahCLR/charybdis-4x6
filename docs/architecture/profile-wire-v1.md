@@ -709,6 +709,41 @@ custom save `0x09` rather than custom set `0x07`. Validate can start only after
 every declared byte is staged. It performs digest and semantic validation
 incrementally from scan context.
 
+#### Upload work and elapsed time
+
+REUSE saves host reports; it still reconstructs the entire inactive candidate.
+A range of `L` bytes needs `2 × ceil(L / 20)` candidate grants: one source read
+and one destination write per piece. Round up each range separately, including
+when adjacent ranges form one recorded range for the peer. BEGIN and VALIDATE
+each require another grant. Identical source and target digests do not bypass
+the full staged-byte checksum or any semantic check.
+
+The validator's 20-byte ceiling is a maximum per reader operation, not a
+throughput guarantee. Its checksum pass takes `ceil(payload_length / 20)`
+grants. Blob/envelope transitions and all five semantic decoders then take
+additional grants: behavior actions and RGB records often read much less than
+20 bytes, and some transitions read nothing. Counting only the checksum pass
+underestimates validation work.
+
+One candidate grant is not necessarily one matrix scan. The owner rotates
+between candidate and split work; the outer durable-I/O scheduler grants one
+ready subsystem per scan and skips idle subsystems. A continuously busy VIA
+worker and candidate alternate. HID status polls observe progress and do not
+drive it. Convert grant counts to elapsed time using the actual loop cadence
+and scheduling contention, then add host requests and polling intervals.
+There is no millisecond EEPROM-write throttle in this scheduler.
+
+`sh tests/host/run_profile_domain_owner_round_trip_tests.sh` reports transfer,
+checksum, envelope and per-domain grants for unchanged firmware-owned profiles
+through the real owner, store, validator and durable-I/O scheduler. It also
+exercises a continuously ready injected VIA worker. An optional local canonical
+blob argument runs the same diagnostic for a captured profile; the required
+suite remains independent of a device or app checkout. See the
+[upload-timing capture procedure](../../measurements/profile-upload/README.md)
+for wall-clock evidence and the distinction between measured time and modeled
+scan grants. Changing the work ceiling is a separate scheduling decision;
+raising it requires input-cadence, stack and interruption acceptance.
+
 Commit is admitted only for the matching validated transaction. The scan owner
 writes and reads back the non-marker header, streams one payload readback,
 checks canonical top-level shape, writes the two-byte commit marker last, reads

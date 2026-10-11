@@ -8,6 +8,9 @@
 #include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
+#include "users/noah/lib/compat/qmk_durable_io.h"
+#include "users/noah/lib/compat/qmk_via_split_mirror.h"
+#include "users/noah/lib/compat/qmk_via_split_sync.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap.h"
 
@@ -73,7 +76,7 @@ static const noah_profile_logical_via_ops_t via = {
 };
 
 static uint8_t  eeprom[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
-static uint32_t writes;
+static uint32_t writes, reads;
 // Power is lost before write number cut_at (counted from zero): it and every
 // later write never reach storage. UINT32_MAX never cuts.
 static uint32_t cut_at = UINT32_MAX;
@@ -83,6 +86,7 @@ static bool     power_lost(void) {
 static bool    memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
     (void)context;
     assert(length <= 32 && (size_t)address + length <= sizeof(eeprom));
+    reads++;
     memcpy(target, eeprom + address, length);
     return true;
 }
@@ -95,8 +99,42 @@ static bool memory_write(void *context, noah_profile_storage_address_t address, 
 }
 static noah_profile_owner_t owner;
 static uint32_t             now;
+// Exercise the real outer scheduler as well as the owner. A continuously
+// ready VIA worker models a bank digest without importing QMK hardware.
+static bool paced_upload, via_worker_ready;
+static uint32_t upload_grants, via_grants;
+static uint32_t checksum_grants, envelope_grants;
+static uint32_t domain_grants[NOAH_PROFILE_DOMAIN_REGISTRY_COUNT];
+
+bool noah_profile_store_runtime_matrix_scan_step(void) {
+    noah_profile_validator_v1_t *v = &owner.staging.candidate_backend.validator;
+    bool validating = owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING;
+    uint8_t phase = validating ? v->phase : NOAH_PROFILE_VALIDATOR_V1_PHASE_UNINITIALIZED;
+    uint8_t domain = validating ? v->domain : 0;
+    uint32_t before = reads + writes;
+    bool worked = noah_profile_owner_scan(&owner, true, now);
+    assert(reads + writes - before <= 1u);
+    if (worked) upload_grants++;
+    if (validating && worked) {
+        if (phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_CHECKSUM) checksum_grants++;
+        else if (phase == NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE) {
+            assert(domain < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT);
+            domain_grants[domain]++;
+        } else envelope_grants++;
+    }
+    return worked;
+}
+bool noah_qmk_via_split_mirror_matrix_scan_step(void) {
+    return false;
+}
+bool noah_qmk_via_split_sync_matrix_scan_step(void) {
+    if (via_worker_ready) via_grants++;
+    return via_worker_ready;
+}
 static void                 tick(void) {
-    noah_profile_owner_scan(&owner, true, now++);
+    if (paced_upload) noah_qmk_durable_io_matrix_scan();
+    else noah_profile_owner_scan(&owner, true, now);
+    now++;
 }
 static uint32_t state_scans;
 static void     until_state(noah_profile_owner_state_t state) {
@@ -322,6 +360,52 @@ static void reboot(void) {
     initialize();
 }
 
+static void test_unchanged_upload_pacing(size_t length) {
+    uint32_t idle_scans = 0, idle_grants = 0;
+    for (unsigned busy = 0; busy < 2; busy++) {
+        noah_qmk_durable_io_init();
+        paced_upload = true;
+        via_worker_ready = busy != 0;
+        upload_grants = via_grants = checksum_grants = envelope_grants = 0;
+        memset(domain_grants, 0, sizeof(domain_grants));
+        uint32_t start = now;
+        assert(submit_transfer(length, true) == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
+        uint32_t scans = now - start;
+        uint32_t validation = checksum_grants + envelope_grants;
+        for (unsigned i = 0; i < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; i++) {
+            assert(domain_grants[i] > 0); // Identical bytes still get every semantic check.
+            validation += domain_grants[i];
+        }
+        assert(reused_bytes == length);
+        assert(checksum_grants == (length + 19u) / 20u);
+        assert(validation > checksum_grants);
+        // BEGIN and VALIDATE each consume a grant. Every REUSE range needs
+        // separate reads and writes, including its own final partial chunk.
+        uint32_t chunks = (length / 1024u) * 52u + ((length % 1024u) + 19u) / 20u;
+        assert(upload_grants == 2u + 2u * chunks + validation);
+        if (!busy) {
+            assert(via_grants == 0 && scans == upload_grants);
+            idle_scans = scans;
+            idle_grants = upload_grants;
+        } else {
+            assert(upload_grants == idle_grants);
+            assert(scans == upload_grants + via_grants);
+            assert(scans == 2u * idle_scans - 1u);
+        }
+        printf("unchanged %u-byte upload (%s VIA worker): %u scans, %u transfer grants, %u validation grants (%u checksum, %u envelope; domains",
+               (unsigned)length, busy ? "busy" : "idle", scans, upload_grants - validation, validation, checksum_grants, envelope_grants);
+        for (unsigned i = 0; i < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; i++) printf(" %u", domain_grants[i]);
+        puts(")");
+        assert(owner.store.committed.generation == 1u);
+        uint8_t frame[32];
+        frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT);
+        send(frame);
+        assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+        assert(owner.store.committed.generation == 1u);
+        paced_upload = via_worker_ready = false;
+    }
+}
+
 // ─── The maximum profile (D-F14) ────────────────────────────────────────────
 //
 // tests/fixtures/maximum_profile_v3.fixture holds every table at its
@@ -531,7 +615,23 @@ static void test_maximum_save_interrupted(bool reuse) {
 
 int main(int argc, char **argv) {
     noah_effective_settings_set_apply(noah_qmk_portable_apply);
-    assert(argc == 3);
+    assert(argc == 3 || argc == 4);
+    // Optional local capture: count grants for the exact profile measured on
+    // hardware. The ordinary suite uses only firmware-owned fixtures below.
+    if (argc == 4) {
+        FILE *file = fopen(argv[3], "rb");
+        assert(file);
+        size_t length = fread(candidate, 1, sizeof(candidate), file);
+        assert(fgetc(file) == EOF && !ferror(file));
+        fclose(file);
+        memset(eeprom, 0xff, sizeof(eeprom));
+        initialize();
+        until_state(NOAH_PROFILE_OWNER_READY_COMPILED);
+        save(length);
+        test_unchanged_upload_pacing(length);
+        uninstall();
+        return 0;
+    }
     load_maximum(argv[2]);
     test_maximum_profile();
     test_maximum_save_interrupted(false);
@@ -584,6 +684,8 @@ int main(int argc, char **argv) {
         assert(noah_profile_blob_v1_decode(candidate, length, &expected, NULL) == NOAH_PROFILE_CODEC_V1_OK);
         save(length);
         assert(owner.store.committed.via_generation == 6 && owner.store.committed.via_digest == 0xabcdef01u);
+        assert_published(candidate, &expected, 1);
+        test_unchanged_upload_pacing(length);
         assert_published(candidate, &expected, 1);
         reboot();
         until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);

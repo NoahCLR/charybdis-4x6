@@ -1,0 +1,4 @@
+unchanged 3760-byte upload (idle VIA worker): 1006 scans, 384 transfer grants, 622 validation grants (188 checksum, 7 envelope; domains 62 230 31 47 57)
+unchanged 3760-byte upload (busy VIA worker): 2011 scans, 384 transfer grants, 622 validation grants (188 checksum, 7 envelope; domains 62 230 31 47 57)
+unchanged 3760-byte upload (idle VIA worker): 1006 scans, 384 transfer grants, 622 validation grants (188 checksum, 7 envelope; domains 62 230 31 47 57)
+unchanged 3760-byte upload (busy VIA worker): 2011 scans, 384 transfer grants, 622 validation grants (188 checksum, 7 envelope; domains 62 230 31 47 57)

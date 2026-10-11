@@ -21,6 +21,7 @@ Subjects:
 | Subject | Measures | Procedure |
 | --- | --- | --- |
 | [`pointing-cadence/`](pointing-cadence/README.md) | Master loop: pointing polls, poll gaps, loop stages, split transactions | [capture procedure](pointing-cadence/README.md#capture-procedure) |
+| [`profile-upload/`](profile-upload/README.md) | Candidate copy and validation: observed wall time and replayed scan grants | [capture procedure](profile-upload/README.md#capture-procedure) |
 
 ## Rules
 

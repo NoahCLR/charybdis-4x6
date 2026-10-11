@@ -2,6 +2,14 @@
 
 set -eu
 
+# Optional diagnostic input is a locally captured canonical custom-profile
+# blob. Required host verification supplies no argument and needs no device.
+if [ "$#" -gt 1 ]; then
+    echo "usage: $0 [PROFILE.bin]" >&2
+    exit 1
+fi
+PROFILE_PATH="${1:-}"
+
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 KEYMAP_PATH="$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
 BUILD_DIR="$(mktemp -d)"
@@ -38,6 +46,7 @@ build_and_run() {
         -DRGB_MATRIX_ENABLE \
         -DRGB_MATRIX_WS2812 \
         -DVIA_ENABLE \
+        -DSPLIT_TRANSACTION_IDS_USER \
         -DMCU_RP \
         -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
@@ -47,6 +56,7 @@ build_and_run() {
         -I"$ROOT/tests/host/include" \
         -include "$CONFIG" \
         "$ROOT/tests/host/profile_domain_owner_round_trip_test.c" \
+        "$ROOT/users/noah/lib/compat/qmk_durable_io.c" \
         "$KEYMAP_PATH/keymap.c" \
         "$KEYMAP_PATH/pd_config.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
@@ -86,7 +96,11 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_peer_store_backend.c" \
         -o "$bin"
-    "$bin" "$BUILD_DIR/portable32.bin.pd5" "$ROOT/tests/fixtures/maximum_profile_v3.fixture"
+    if [ -n "$PROFILE_PATH" ]; then
+        "$bin" "$BUILD_DIR/portable32.bin.pd5" "$ROOT/tests/fixtures/maximum_profile_v3.fixture" "$PROFILE_PATH"
+    else
+        "$bin" "$BUILD_DIR/portable32.bin.pd5" "$ROOT/tests/fixtures/maximum_profile_v3.fixture"
+    fi
 }
 build_and_run normal -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
 build_and_run sanitized -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
