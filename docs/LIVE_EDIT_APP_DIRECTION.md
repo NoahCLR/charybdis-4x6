@@ -62,6 +62,10 @@ The copy to the other half reuses the same ranges from that half's own active
 profile and sends the rest in chunks of up to 110 bytes (D-F19); it has not run
 on hardware either.
 
+VIA full-bank checksums use bounded 224-byte RAM-mirror batches on both halves
+(D-F20), reducing each pass from 2,634 to 167 granted checksum steps. Timing and
+input cadence for this budget have not run on hardware.
+
 ## Open Issues
 
 - **Unified gesture ownership.** Native LT/MT/OSM remain a compatibility
@@ -94,6 +98,11 @@ on hardware either.
   and run the compiled defaults; confirm that, that an eight-slot backup
   imports through the translation, and that slot 31 holds, locks and colours
   on both halves.
+- **The faster VIA checksum has not run on hardware** (D-F20). Time an
+  unchanged re-Apply and a VIA edit against the previous pair, and check typing
+  and pointing on both halves while stage verification runs. The local
+  roll-forward keeps its existing output fence until the full target identity
+  is ready; host tests and linked resource gates do not establish scan cadence.
 - **The faster copy to the other half has not run on hardware** (D-F19).
   Before relying on it, time an Apply of a one-key edit and of a full profile
   against the previous firmware (candidate status page 1 reports copy progress and
@@ -1155,3 +1164,23 @@ range) is reported to the host as `5` (store working), and source-unavailable
 is handled internally by byte fallback. Ark needs its imported contract docs
 refreshed after the firmware lands; its runtime needs no change to try this
 pair. Hardware timing is outstanding (Open Issues).
+
+## D-F20 — VIA checksum work is independent of split frame size
+
+Every Apply that touches VIA still verifies the complete bank on the peer and
+recomputes the USB half's identity after its local writes, even for a no-op
+keycode write. The 14-byte split payload had also limited checksum work, making
+the expanded macro bank require 2,634 checksum grants per pass. The worker now
+hashes at most 224 payload bytes per scan in sixteen reads through the same
+14-byte workspace, requiring 167 grants. Pinned QMK reads these bytes from its
+RAM mirror; no write or RPC occurs in the batch. The governing
+[checksum work contract](architecture/logical-profile-transaction-v1.md#via-checksum-work-per-scan)
+keeps scheduling, full-bank identity, mutation epochs and recovery unchanged.
+
+This budget bounds CPU work without growing stack storage or allocating a bank
+copy. It deliberately retains full re-digests rather than introducing cached
+no-op identity or partial FNV-1a updates. Both-half timing and typing/pointing
+cadence remain hardware acceptance, separate from scan-count host tests and
+per-half linked RAM and reviewed-path stack checks. Wire and storage formats
+stay unchanged; Ark's runtime needs no change, and its imported governing docs
+should be refreshed after this firmware lands.

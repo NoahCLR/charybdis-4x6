@@ -28,5 +28,8 @@ build_and_run() {
     "$BUILD_DIR/$name"
 }
 
+build_and_run full_bank -DTEST_KEYMAP_SIZE=1920 -DTEST_MACRO_SIZE=34903
 build_and_run normal
 build_and_run encoder -DENCODER_MAP_ENABLE -DNUM_ENCODERS=2
+
+build_and_run full_bank_sanitized -DTEST_KEYMAP_SIZE=1920 -DTEST_MACRO_SIZE=34903 -fsanitize=address,undefined -fno-omit-frame-pointer

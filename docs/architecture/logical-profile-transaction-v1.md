@@ -65,6 +65,44 @@ the old generation. This uses existing physical storage and makes the ordering
 explicit instead of allowing ordinary write-through commands to expose a
 partially replaced bank.
 
+## VIA Checksum Work Per Scan
+
+Both the peer's stage verification and the USB half's post-write readback hash
+at most 224 VIA payload bytes per granted matrix scan
+(`NOAH_QMK_VIA_DIGEST_SCAN_BYTE_BUDGET`). This is a checksum work limit,
+independent of the 14-byte split frame payload. The digest worker reads at most
+one region per step, in fragments of at most 14 bytes through the existing
+14-byte stack workspace. At the full budget this is at most sixteen fragment
+reads, with no EEPROM writes, RPCs, allocation or blocking waits. Region tags
+and lengths retain their canonical FNV-1a encoding, including empty regions.
+
+Pinned QMK's dynamic-keymap and macro read adapters read bytes from the
+wear-leveling RAM mirror. The bounded read/hash batch avoids a whole-bank loop
+that could hold up typing or pointing, while retaining the durable-I/O
+scheduler's single step per scan and rotating-owner fairness. Both halves run
+the worker in matrix-scan context; the split-slave RPC thread only admits its
+mailbox. The byte bound is not a measured wall-clock or cadence guarantee.
+Timing and typing/pointing acceptance on both physical halves remain required.
+
+With 1,920 layout bytes, 34,903 macro bytes, the canonical VIA config, and no
+encoders, a pass takes 167 granted steps: one config read, nine layout steps,
+156 macro steps and one completion step. At the old 14-byte work budget it took
+2,634. These are checksum-worker grants, not an assumption that every matrix
+scan grants that owner; competing durable work can add scans. Even a no-op local
+keycode write restarts the full checksum to bind the new VIA generation.
+
+Full-bank verification, mutation-epoch restart, mismatch refusal, and dirty
+storage until the target identity is complete remain mandatory. No digest is
+reused or skipped based on the size of an edit. A checksum only over changed
+ranges cannot replace the ordered full-bank FNV-1a identity; a cached no-op
+shortcut would need its own mutation and generation proof. The bounded batch
+keeps those authority and recovery contracts intact. Storage and wire formats
+are unchanged, and no client negotiation is needed. The host gates pin the
+full-bank step counts, identical digest at different budgets, last-byte
+sensitivity, read bounds, both workers' budget and one digest step per scan.
+Resource acceptance uses both reviewed-path stack manifests and fresh linked
+SRAM accounting per half; the workspace is not enlarged.
+
 ## Commit Sequence
 
 1. The host captures the complete old profile and saves its recovery file.

@@ -317,8 +317,11 @@ flowchart TD
 
 VIA macros are QMK dynamic macro slots with source-authored defaults and
 durable split reconciliation. Macro reset does not publish until the authored
-defaults have seeded successfully. A transfer is limited to one storage/digest
-chunk or one RPC per scan, and a clean generation is replicated only after the
+defaults have seeded successfully. A transfer is limited to one storage chunk,
+one checksum step (up to 224 RAM-mirror bytes through a 14-byte workspace), or
+one RPC per scan
+([checksum work contract](logical-profile-transaction-v1.md#via-checksum-work-per-scan)),
+and a clean generation is replicated only after the
 receiving half verifies and acknowledges the full snapshot. The best-effort
 write-through mirror uses the same callback-mailbox boundary: the split thread
 copies at most one frame, and scan context performs the QMK dynamic-keymap or

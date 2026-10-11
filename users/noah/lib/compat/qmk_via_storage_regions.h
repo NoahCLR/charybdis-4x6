@@ -10,6 +10,13 @@
 
 #include "qmk_via_sync_protocol.h"
 
+// RAM-mirror checksum work per granted scan; independent of split framing.
+// Keep the read workspace small even when one scan hashes several fragments.
+enum {
+    NOAH_QMK_VIA_DIGEST_SCAN_BYTE_BUDGET = 224,
+    NOAH_QMK_VIA_DIGEST_READ_CHUNK_MAX   = 14,
+};
+
 typedef struct {
     uint32_t                   hash;
     noah_qmk_via_sync_region_t region;

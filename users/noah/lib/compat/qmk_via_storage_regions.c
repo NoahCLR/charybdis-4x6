@@ -196,9 +196,9 @@ void noah_qmk_via_storage_digest_init(noah_qmk_via_storage_digest_cursor_t *curs
 }
 
 bool noah_qmk_via_storage_digest_step(noah_qmk_via_storage_digest_cursor_t *cursor, uint8_t byte_budget, uint32_t *out_digest) {
-    uint8_t bytes[NOAH_QMK_VIA_SYNC_FRAME_PAYLOAD_MAX];
+    uint8_t bytes[NOAH_QMK_VIA_DIGEST_READ_CHUNK_MAX];
 
-    if (!cursor || !out_digest || byte_budget == 0u || byte_budget > sizeof(bytes) || cursor->complete) {
+    if (!cursor || !out_digest || byte_budget == 0u || byte_budget > NOAH_QMK_VIA_DIGEST_SCAN_BYTE_BUDGET || cursor->complete) {
         return false;
     }
 
@@ -214,14 +214,21 @@ bool noah_qmk_via_storage_digest_step(noah_qmk_via_storage_digest_cursor_t *curs
             uint16_t remaining = capacity - cursor->offset;
             uint8_t  length    = remaining < byte_budget ? (uint8_t)remaining : byte_budget;
 
-            if (!noah_qmk_via_storage_region_read(cursor->region, cursor->offset, bytes, length)) {
-                return false;
+            // Several small RAM-mirror reads share this scan's byte budget.
+            // No larger stack buffer, writes, RPCs or unbounded bank walk.
+            while (length != 0u) {
+                uint8_t chunk = length < sizeof(bytes) ? length : sizeof(bytes);
+
+                if (!noah_qmk_via_storage_region_read(cursor->region, cursor->offset, bytes, chunk)) {
+                    return false;
+                }
+                for (uint8_t index = 0u; index < chunk; index++) {
+                    cursor->hash = noah_qmk_via_storage_hash_byte(cursor->hash, bytes[index]);
+                }
+                cursor->offset += chunk;
+                length -= chunk;
+                *out_digest = cursor->hash;
             }
-            for (uint8_t index = 0u; index < length; index++) {
-                cursor->hash = noah_qmk_via_storage_hash_byte(cursor->hash, bytes[index]);
-            }
-            cursor->offset += length;
-            *out_digest = cursor->hash;
             return true;
         }
 

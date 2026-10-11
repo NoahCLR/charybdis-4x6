@@ -28,6 +28,7 @@ typedef enum {
 
 static uint32_t atomic_entries;
 static uint32_t clock_reads;
+static uint32_t digest_steps;
 unsigned int noah_atomic_test_enter(void) { atomic_entries++; return 1u; }
 static void (*after_atomic)(void);
 void noah_atomic_test_leave(void) {
@@ -264,8 +265,10 @@ void noah_qmk_via_storage_digest_init(noah_qmk_via_storage_digest_cursor_t *curs
 }
 
 bool noah_qmk_via_storage_digest_step(noah_qmk_via_storage_digest_cursor_t *cursor, uint8_t byte_budget, uint32_t *out_digest) {
+    digest_steps++;
     CHECK(cursor != NULL);
-    CHECK(byte_budget == NOAH_QMK_VIA_SYNC_FRAME_PAYLOAD_MAX);
+    CHECK(NOAH_QMK_VIA_DIGEST_SCAN_BYTE_BUDGET == 224u);
+    CHECK(byte_budget == NOAH_QMK_VIA_DIGEST_SCAN_BYTE_BUDGET);
     CHECK(out_digest != NULL);
     if (cursor->offset == 0u) {
         cursor->offset = 1u;
@@ -378,8 +381,11 @@ bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const voi
 }
 
 static void scan_at(uint32_t now) {
+    uint32_t previous_digest_steps = digest_steps;
+
     fake_now = now;
     noah_qmk_via_split_sync_matrix_scan();
+    CHECK(digest_steps - previous_digest_steps <= 1u);
 }
 
 static void scan_many(uint32_t start, uint16_t count) {
