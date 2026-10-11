@@ -58,6 +58,9 @@ Firmware work remaining before the product is complete:
 Differential host uploads can reuse identified active bytes and stream bounded
 batches (D-F18), while full validation and both-half publication remain in place.
 Transfer timing and interruption acceptance for this path have not run on hardware.
+The copy to the other half reuses the same ranges from that half's own active
+profile and sends the rest in chunks of up to 110 bytes (D-F19); it has not run
+on hardware either.
 
 ## Open Issues
 
@@ -91,6 +94,14 @@ Transfer timing and interruption acceptance for this path have not run on hardwa
   and run the compiled defaults; confirm that, that an eight-slot backup
   imports through the translation, and that slot 31 holds, locks and colours
   on both halves.
+- **The faster copy to the other half has not run on hardware** (D-F19).
+  Before relying on it, time an Apply of a one-key edit and of a full profile
+  against the previous firmware (candidate status page 1 reports copy progress and
+  retries), watch for split transport failures with 128-byte frames at
+  230,400 baud, and check that typing and pointing on both halves stay smooth
+  while a copy runs: a full request alone takes about 5.6 ms on the link, before
+  the reply and handshake, and
+  the receiver writes up to 110 bytes in one scan.
 - **The bigger profiles have not run on hardware** (D-F14). Flashing them
   resets each half's storage (the flash base moves), and the stored profile
   is refused by action ABI digest. Before relying on them, measure on both
@@ -1101,3 +1112,43 @@ the coherent capture, compare domains across offset changes, and verify bounded
 stream batches before validation. Refresh its pinned contract from this
 firmware's published landing before the app change lands. Hardware timing and
 interruption acceptance remain outstanding.
+
+## D-F19 — The copy to the other half reuses what that half already has
+
+Apply used to send the other half every byte of the candidate, 14 bytes a
+frame, even when the host had built most of it with REUSE. Two changes make
+that copy cheaper, specified in
+[the split protocol](architecture/profile-split-v1.md#payload-reuse) as framing
+version 2:
+
+- **Reuse.** While the host uploads, the firmware records the ranges REUSE
+  staged (up to 16, contiguous steps merged). The copy asks the other half to
+  fill each from its own active profile, which it checks against the same
+  source identity the host named, and sends only the rest. Where that half's
+  active profile is not the source, it says so and the copy sends the bytes.
+  The other half still validates the complete candidate before its prepared
+  marker, so nothing about durability, the commit barrier or recovery
+  changes. Ranges come only from the staged host candidate; background repair,
+  and a copy restarted after this half's commit marker, send bytes.
+- **Bigger chunks.** QMK's master-to-slave RPC buffer is 128 bytes, so a chunk
+  carries up to 110 bytes. QMK sends each RPC's own lengths, so only this
+  copy's chunk frames grow; every other split RPC, all replies and pulled
+  chunks keep their 32-byte frames. It costs 96 bytes more of the shared RPC
+  buffer and of the transport CRC's staging buffer on each half. A full
+  request alone takes about 5.6 ms on the 230,400-baud link, before its reply
+  and handshake; hardware acceptance must judge the whole exchange.
+
+The receiver writes at most 110 bytes in a scan, in store writes of at most
+20, whether they arrived in a chunk or it copies them; its validator steps
+read 20 bytes like the owner's, where they read 14 before. While the receiver
+still holds the sender's request, the sender polls at the 5 ms admission pace
+up to eight times in a row without progress before its ordinary backoff, so
+a slower scan no longer costs a 100 ms wait.
+
+Firmware-only: both halves run one build, and a half on framing version 1
+reports its sibling unreadable instead of mixing formats. Profile Wire's
+status vocabulary stays unchanged: split busy reason `8` (copying a reuse
+range) is reported to the host as `5` (store working), and source-unavailable
+is handled internally by byte fallback. Ark needs its imported contract docs
+refreshed after the firmware lands; its runtime needs no change to try this
+pair. Hardware timing is outstanding (Open Issues).

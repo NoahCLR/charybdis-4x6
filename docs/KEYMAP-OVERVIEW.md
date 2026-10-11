@@ -688,6 +688,7 @@ These values come from the keymap config and the shared userspace config. When t
 | Macro | Value | Source |
 | --- | --- | --- |
 | `SERIAL_USART_TIMEOUT` | `5` | [users/noah/config.h](../users/noah/config.h) |
+| `RPC_M2S_BUFFER_SIZE` | `128` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS` | `50u` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_RUNTIME_SYNC_RETRY_MAX_MS` | `1000u` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_LAYER_STATE_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |

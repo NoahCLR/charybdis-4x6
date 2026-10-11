@@ -302,10 +302,20 @@ by a table's own ceiling or the slot.
 
 The owner validates one step a matrix scan, each step one read of at most 20
 bytes. The maximum profile validates in 7,429 scans, a boot that adopts it
-publishes after 9,912, and a peer's prepared copy spends 11,104 scans
-validating without transfer progress, which the split harness's conservative
+publishes after 9,912, and a peer's prepared copy spends 9,504 scans
+validating and preparing without transfer progress (its steps read 20 bytes
+like the owner's; they read the 14-byte split chunk size before framing
+version 2), which the split harness's conservative
 5 ms scan keeps inside the owner's 60-second no-progress window. Real
 durations depend on the scan rate and are hardware acceptance evidence.
+
+Split framing version 2 retains bounded mailbox, duplicate-request and outbound
+chunk buffers of at most 128 bytes, plus reuse source/progress state; it never
+keeps a full profile in the reconciler. Its 32-bit state regression allowance
+is 896 bytes (previously 768). The owner's 11,264-byte state allowance and the
+209,920-byte schema-3 static-data tripwire remain unchanged. These allowances
+are engineering policies; acceptance still requires fresh linked memory and
+reviewed-path stack checks for each half, and hardware high-water evidence.
 `run_profile_domain_owner_round_trip_tests.sh` saves, boots, publishes,
 refuses over-limit and truncated copies of, and cuts power through a save of
 this profile; `run_profile_split_reconciler_tests.sh` prepares and commits it

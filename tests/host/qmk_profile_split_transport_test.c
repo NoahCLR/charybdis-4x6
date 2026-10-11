@@ -8,7 +8,8 @@
 #include "users/noah/lib/compat/qmk_profile_split_transport.h"
 #include "users/noah/lib/profile/schema/profile_blob_v1.h"
 
-_Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_SIZE == 32u, "transport fixture requires the reviewed 32-byte profile frame");
+_Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_SIZE == 32u, "transport fixture requires the reviewed 32-byte profile reply");
+_Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_MAX == 128u, "transport fixture requires the reviewed 128-byte largest request");
 
 static slave_callback_t registered_callback;
 static int8_t           registered_id;
@@ -17,7 +18,7 @@ static uint8_t          rpc_exec_count;
 static int8_t           rpc_exec_id;
 static uint8_t          rpc_request_size;
 static uint8_t          rpc_response_size;
-static uint8_t          rpc_request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+static uint8_t          rpc_request[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
 static bool             rpc_exec_result;
 static uint8_t          peer_begin_count;
 
@@ -47,9 +48,9 @@ bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const voi
 
     CHECK(request_data != NULL);
     CHECK(response_data != NULL);
-    CHECK(request_size == sizeof(rpc_request));
-    CHECK(response_size == sizeof(rpc_request));
-    memcpy(rpc_request, request_data, sizeof(rpc_request));
+    CHECK(request_size >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && request_size <= sizeof(rpc_request));
+    CHECK(response_size == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    memcpy(rpc_request, request_data, request_size);
     for (uint8_t index = 0u; index < response_size; index++) {
         ((uint8_t *)response_data)[index] = (uint8_t)(rpc_request[index] ^ 0xFFu);
     }
@@ -71,6 +72,18 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_prof
     (void)offset;
     (void)bytes;
     (void)length;
+    return NOAH_PROFILE_PEER_STORE_BUSY;
+}
+
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_reuse(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const noah_profile_split_v1_source_t *source, uint16_t source_offset, uint16_t end, uint16_t byte_budget) {
+    (void)peer;
+    (void)generation;
+    (void)payload_digest;
+    (void)offset;
+    (void)source;
+    (void)source_offset;
+    (void)end;
+    (void)byte_budget;
     return NOAH_PROFILE_PEER_STORE_BUSY;
 }
 
@@ -163,9 +176,10 @@ static bool local_payload_read(void *context, const noah_profile_split_descripto
     return false;
 }
 
-static bool unused_exchange(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE], uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
+static bool unused_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
     (void)context;
     (void)request;
+    (void)request_length;
     (void)response;
     return false;
 }
@@ -251,11 +265,11 @@ static void test_callback_forwards_and_reuses_cached_busy_response(void) {
         .via_generation       = 6u,
         .via_digest           = UINT32_C(0xabcdef01),
     };
-    CHECK(noah_profile_split_v1_frame_encode(&bind, request_wire));
+    CHECK(noah_profile_split_v1_frame_encode(&bind, request_wire, sizeof(request_wire)));
     registered_callback(sizeof(request_wire), request_wire, sizeof(response_wire), response_wire);
     CHECK(noah_profile_split_reconciler_scan(&reconciler, false, 0u));
     CHECK(peer_begin_count == 0u);
-    CHECK(noah_profile_split_v1_frame_encode(&request, request_wire));
+    CHECK(noah_profile_split_v1_frame_encode(&request, request_wire, sizeof(request_wire)));
 
     memset(response_wire, 0xA5, sizeof(response_wire));
     registered_callback(sizeof(request_wire), request_wire, sizeof(response_wire), response_wire);
@@ -305,7 +319,7 @@ static void test_callback_rejects_invalid_sizes_without_leaking_output(void) {
     reset_transport_stubs();
     init_reconciler(&reconciler, &peer_store);
     CHECK(noah_qmk_profile_split_transport_init(&reconciler));
-    CHECK(noah_profile_split_v1_frame_encode(&request, request_wire));
+    CHECK(noah_profile_split_v1_frame_encode(&request, request_wire, sizeof(request_wire)));
 
     memset(response_wire, 0xA5, sizeof(response_wire));
     registered_callback((uint8_t)(sizeof(request_wire) - 1u), request_wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response_wire);
@@ -322,6 +336,19 @@ static void test_callback_rejects_invalid_sizes_without_leaking_output(void) {
     CHECK(response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - 1u] == 0x5Au);
     CHECK(!reconciler_mailbox_pending(&reconciler));
 
+    // A request longer than the largest frame is refused the same way.
+    {
+        uint8_t oversized[NOAH_PROFILE_SPLIT_V1_FRAME_MAX + 1u] = {0};
+
+        memcpy(oversized, request_wire, sizeof(request_wire));
+        memset(response_wire, 0xC3, sizeof(response_wire));
+        registered_callback(sizeof(oversized), oversized, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response_wire);
+        for (uint8_t index = 0u; index < NOAH_PROFILE_SPLIT_V1_FRAME_SIZE; index++) {
+            CHECK(response_wire[index] == 0u);
+        }
+        CHECK(!reconciler_mailbox_pending(&reconciler));
+    }
+
     memset(response_wire, 0x3C, sizeof(response_wire));
     registered_callback(sizeof(request_wire), NULL, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response_wire);
     for (uint8_t index = 0u; index < NOAH_PROFILE_SPLIT_V1_FRAME_SIZE; index++) {
@@ -330,8 +357,10 @@ static void test_callback_rejects_invalid_sizes_without_leaking_output(void) {
     registered_callback(sizeof(request_wire), request_wire, 0u, NULL);
 }
 
-static void test_exchange_uses_exact_bidirectional_frame(void) {
-    uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+// Each exchange sends its request's own length and always asks for one
+// 32-byte reply; QMK sends only those bytes.
+static void test_exchange_sends_the_request_length_and_one_reply(void) {
+    uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
     uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
 
     reset_transport_stubs();
@@ -340,30 +369,38 @@ static void test_exchange_uses_exact_bidirectional_frame(void) {
     }
     memset(response, 0, sizeof(response));
 
-    CHECK(noah_qmk_profile_split_transport_exchange(NULL, request, response));
+    CHECK(noah_qmk_profile_split_transport_exchange(NULL, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response));
     CHECK(rpc_exec_count == 1u);
     CHECK(rpc_exec_id == PUT_PROFILE_SPLIT_SYNC);
     CHECK(rpc_request_size == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
     CHECK(rpc_response_size == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
-    CHECK(memcmp(rpc_request, request, sizeof(request)) == 0);
+    CHECK(memcmp(rpc_request, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE) == 0);
     for (uint8_t index = 0u; index < sizeof(response); index++) {
         CHECK(response[index] == (uint8_t)(request[index] ^ 0xFFu));
     }
 
-    CHECK(!noah_qmk_profile_split_transport_exchange(NULL, NULL, response));
-    CHECK(!noah_qmk_profile_split_transport_exchange(NULL, request, NULL));
-    CHECK(rpc_exec_count == 1u);
+    CHECK(noah_qmk_profile_split_transport_exchange(NULL, request, NOAH_PROFILE_SPLIT_V1_FRAME_MAX, response));
+    CHECK(rpc_exec_count == 2u);
+    CHECK(rpc_request_size == NOAH_PROFILE_SPLIT_V1_FRAME_MAX);
+    CHECK(rpc_response_size == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    CHECK(memcmp(rpc_request, request, sizeof(request)) == 0);
+
+    CHECK(!noah_qmk_profile_split_transport_exchange(NULL, NULL, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response));
+    CHECK(!noah_qmk_profile_split_transport_exchange(NULL, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, NULL));
+    CHECK(!noah_qmk_profile_split_transport_exchange(NULL, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - 1u, response));
+    CHECK(!noah_qmk_profile_split_transport_exchange(NULL, request, NOAH_PROFILE_SPLIT_V1_FRAME_MAX + 1u, response));
+    CHECK(rpc_exec_count == 2u);
 
     rpc_exec_result = false;
-    CHECK(!noah_qmk_profile_split_transport_exchange(NULL, request, response));
-    CHECK(rpc_exec_count == 2u);
+    CHECK(!noah_qmk_profile_split_transport_exchange(NULL, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response));
+    CHECK(rpc_exec_count == 3u);
 }
 
 int main(void) {
     test_init_registers_exact_profile_transaction();
     test_callback_forwards_and_reuses_cached_busy_response();
     test_callback_rejects_invalid_sizes_without_leaking_output();
-    test_exchange_uses_exact_bidirectional_frame();
+    test_exchange_sends_the_request_length_and_one_reply();
 
     puts("qmk profile split transport host tests passed");
     return 0;

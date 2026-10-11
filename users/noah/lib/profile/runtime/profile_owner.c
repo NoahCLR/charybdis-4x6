@@ -114,6 +114,33 @@ static bool host_staged_read(void *context, const noah_profile_split_descriptor_
     return noah_profile_candidate_store_backend_staged_read(candidate_backend(owner), &candidate, offset, bytes, length);
 }
 
+// The ranges the host filled with REUSE, which the peer can copy from its
+// own active profile. Only while the candidate is still staged: after this
+// half's commit marker a copy is sent again from the committed record, as
+// bytes.
+static bool host_reuse_plan(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, noah_profile_split_reuse_range_t *range) {
+    noah_profile_owner_t                      *owner = context;
+    noah_profile_store_candidate_t             candidate;
+    noah_profile_split_descriptor_t            staged;
+    noah_profile_candidate_v1_source_t         source;
+    noah_profile_candidate_store_reuse_range_t reused;
+
+    if (!owner || !descriptor || !range || !owner->host_barrier_descriptor_known || !descriptor_equal(descriptor, &owner->host_barrier_descriptor) || !noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate)) {
+        return false;
+    }
+    staged = descriptor_from_candidate(&candidate);
+    if (!descriptor_equal(descriptor, &staged) || !noah_profile_candidate_store_backend_staged_reuse(candidate_backend(owner), &candidate, offset, &source, &reused)) {
+        return false;
+    }
+    *range = (noah_profile_split_reuse_range_t){
+        .source        = {.generation = source.generation, .digest = source.digest, .crc32 = source.crc32, .kind = source.kind, .origin = source.origin},
+        .offset        = reused.offset,
+        .source_offset = reused.source_offset,
+        .length        = reused.length,
+    };
+    return true;
+}
+
 static bool owner_peer_observer(void *context, uint8_t *unresolved_count) {
     noah_profile_owner_t                 *owner = context;
     noah_profile_split_authority_status_t authority;
@@ -421,13 +448,14 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
 
     if (owner->config.peer_required) {
         split_config = (noah_profile_split_reconciler_config_t){
-            .local_context     = owner,
-            .local_descriptor  = local_descriptor,
-            .local_read        = local_read,
-            .local_binding     = local_binding,
-            .transport_context = owner->config.split_transport_context,
-            .exchange          = owner->config.split_exchange,
-            .peer_store        = &owner->peer_store,
+            .local_context       = owner,
+            .local_descriptor    = local_descriptor,
+            .local_read          = local_read,
+            .local_binding       = local_binding,
+            .transport_context   = owner->config.split_transport_context,
+            .exchange            = owner->config.split_exchange,
+            .peer_store          = &owner->peer_store,
+            .prepared_reuse_plan = host_reuse_plan,
         };
         noah_profile_split_reconciler_init(&owner->reconciler, &split_config);
         owner->split_initialized = noah_profile_split_reconciler_authority(&owner->reconciler) != NULL;
@@ -1249,10 +1277,12 @@ bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_pr
         .retry_count             = status.retry_count,
         .transport_failure_count = status.transport_failure_count,
         .busy_streak             = status.busy_streak,
-        .busy_reason             = status.last_busy_reason,
-        .busy_store_state        = status.last_busy_store_state,
-        .busy_owner              = status.last_busy_owner,
-        .busy_admission          = status.last_busy_admission,
+        // Copying is internal split progress. Keep the host status vocabulary
+        // compatible with clients that know only reasons 0..7.
+        .busy_reason      = status.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_COPYING ? NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING : status.last_busy_reason,
+        .busy_store_state = status.last_busy_store_state,
+        .busy_owner       = status.last_busy_owner,
+        .busy_admission   = status.last_busy_admission,
     };
     return true;
 }

@@ -42,6 +42,9 @@ typedef enum {
     NOAH_PROFILE_PEER_STORE_STORAGE_ERROR,
     NOAH_PROFILE_PEER_STORE_VALIDATION_ERROR,
     NOAH_PROFILE_PEER_STORE_DURABILITY_UNKNOWN,
+    // A reuse source this half's active profile does not match. Not a
+    // rejection: the copy stays open at its next offset for the bytes.
+    NOAH_PROFILE_PEER_STORE_SOURCE_UNAVAILABLE,
 } noah_profile_peer_store_result_t;
 
 typedef struct {
@@ -64,10 +67,19 @@ void noah_profile_peer_store_backend_init(noah_profile_peer_store_backend_t *pee
 // flags, and all payload identities are preserved unchanged.
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor, uint32_t via_generation, uint32_t via_digest);
 
-// Accepts only sequential chunks. A fully repeated chunk is idempotent when
-// its staged bytes match; gaps, partial overlaps, and conflicting repeats
-// poison and abort the prepare.
+// Accepts only sequential chunks of up to one split chunk, stored in pieces
+// the candidate store takes. A fully repeated chunk is idempotent when its
+// staged bytes match; gaps, partial overlaps, and conflicting repeats poison
+// and abort the prepare.
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const uint8_t *bytes, uint8_t length);
+
+// Fills the copy from this half's active profile for a PAYLOAD_REUSE range
+// that starts at `offset` in the copy and at `source_offset` in `source`, and
+// ends before `end`. It continues from the next offset (a range may start
+// before it, never after), copying at most `byte_budget` bytes in pieces the
+// candidate store takes, and checks the source's identity on every read. OK
+// means progress; the range is done when the next offset reaches `end`.
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_reuse(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const noah_profile_split_v1_source_t *source, uint16_t source_offset, uint16_t end, uint16_t byte_budget);
 
 // Starts whole-profile validation after every declared byte arrived. step()
 // performs at most one bounded validator/store operation per call.

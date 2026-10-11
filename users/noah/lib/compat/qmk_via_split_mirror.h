@@ -25,6 +25,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+enum {
+    // One VIA Raw HID report. The mirror forwards nothing larger, whatever
+    // size QMK's master-to-slave RPC buffer has for other transactions.
+    NOAH_QMK_VIA_SPLIT_MIRROR_FRAME_MAX = 32u,
+};
+
 #if defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)
 void noah_qmk_via_split_mirror_init(void);
 void noah_qmk_via_split_mirror_command(const uint8_t *data, uint8_t length);

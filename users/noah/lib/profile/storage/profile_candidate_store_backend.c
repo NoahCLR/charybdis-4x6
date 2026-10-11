@@ -140,6 +140,7 @@ static noah_profile_store_result_t begin_exact_with_owner(noah_profile_candidate
         return result;
     }
     backend->metadata                    = *metadata;
+    backend->reuse_range_count           = 0u;
     backend->validation_complete         = false;
     backend->committed_available         = false;
     backend->activation_requested        = false;
@@ -198,16 +199,49 @@ static noah_profile_candidate_backend_result_t read_candidate(void *context, uin
     return candidate_payload_start(backend, &payload_start) && staged_reader_read(backend->store, (size_t)payload_start + offset, bytes, length) ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
 }
 
-static noah_profile_candidate_backend_result_t read_source(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint8_t *bytes, uint8_t length) {
-    noah_profile_candidate_store_backend_t *backend = context;
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_read_active(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t owner, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint8_t *bytes, uint8_t length) {
     noah_effective_profile_snapshot_t active;
-    if (!backend || !source || !bytes || length == 0u || length > NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX || backend->admission_owner != NOAH_PROFILE_STORAGE_ADMISSION_HOST || noah_effective_profile_provider_copy_active(backend->provider, &active) != NOAH_EFFECTIVE_PROFILE_OK) {
+    if (!backend || !source || !bytes || length == 0u || length > NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX || owner == NOAH_PROFILE_STORAGE_ADMISSION_NONE || backend->admission_owner != owner || noah_effective_profile_provider_copy_active(backend->provider, &active) != NOAH_EFFECTIVE_PROFILE_OK) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
     }
     if (active.identity.kind != source->kind + 1u || active.identity.origin != source->origin || active.identity.generation != source->generation || active.identity.payload_digest != source->digest || active.identity.payload_crc32 != source->crc32 || active.identity.compiled_default_digest != backend->compiled_default_digest || active.identity.action_abi_digest != backend->metadata.action_abi_digest || (uint32_t)offset + length > active.profile.byte_length) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
     }
     return noah_profile_reader_read(&active.reader, active.base_offset + offset, bytes, length) ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+}
+
+static noah_profile_candidate_backend_result_t read_source(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint8_t *bytes, uint8_t length) {
+    return noah_profile_candidate_store_backend_read_active(context, NOAH_PROFILE_STORAGE_ADMISSION_HOST, source, offset, bytes, length);
+}
+
+static bool source_equal(const noah_profile_candidate_v1_source_t *left, const noah_profile_candidate_v1_source_t *right) {
+    return left->generation == right->generation && left->digest == right->digest && left->crc32 == right->crc32 && left->kind == right->kind && left->origin == right->origin;
+}
+
+// Remembers a host REUSE step for the peer copy. A step that continues the
+// last range in both candidate and source extends it; one from a different
+// source, or past a full table, is left out and later sent as bytes.
+static void note_reuse(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint16_t source_offset, uint8_t length) {
+    noah_profile_candidate_store_backend_t     *backend = context;
+    noah_profile_candidate_store_reuse_range_t *last;
+
+    if (!backend || !source || length == 0u || backend->admission_owner != NOAH_PROFILE_STORAGE_ADMISSION_HOST) {
+        return;
+    }
+    if (backend->reuse_range_count == 0u) {
+        backend->reuse_source = *source;
+    } else if (!source_equal(&backend->reuse_source, source)) {
+        return;
+    } else {
+        last = &backend->reuse_ranges[backend->reuse_range_count - 1u];
+        if ((uint32_t)last->offset + last->length == offset && (uint32_t)last->source_offset + last->length == source_offset && (uint32_t)last->length + length <= UINT16_MAX) {
+            last->length = (uint16_t)(last->length + length);
+            return;
+        }
+    }
+    if (backend->reuse_range_count < NOAH_PROFILE_CANDIDATE_STORE_REUSE_RANGES) {
+        backend->reuse_ranges[backend->reuse_range_count++] = (noah_profile_candidate_store_reuse_range_t){.offset = offset, .source_offset = source_offset, .length = length};
+    }
 }
 
 static noah_profile_candidate_backend_result_t validation_begin(void *context, const noah_profile_candidate_v1_metadata_t *metadata, noah_profile_candidate_v1_error_t *error) {
@@ -331,6 +365,22 @@ bool noah_profile_candidate_store_backend_staged_read(void *context, const noah_
         return false;
     }
     return staged_reader_read(backend->store, (size_t)payload_start + offset, bytes, length);
+}
+
+bool noah_profile_candidate_store_backend_staged_reuse(const noah_profile_candidate_store_backend_t *backend, const noah_profile_store_candidate_t *candidate, uint16_t offset, noah_profile_candidate_v1_source_t *source, noah_profile_candidate_store_reuse_range_t *range) {
+    noah_profile_store_candidate_t staged;
+
+    if (!candidate || !source || !range || !noah_profile_candidate_store_backend_staged_candidate(backend, &staged) || !store_candidate_equal(&staged, candidate)) {
+        return false;
+    }
+    for (uint8_t index = 0u; index < backend->reuse_range_count; index++) {
+        if ((uint32_t)backend->reuse_ranges[index].offset + backend->reuse_ranges[index].length > offset) {
+            *source = backend->reuse_source;
+            *range  = backend->reuse_ranges[index];
+            return true;
+        }
+    }
+    return false;
 }
 
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_adopt_committed_begin(noah_profile_candidate_store_backend_t *backend, const noah_profile_store_record_t *record, noah_profile_candidate_v1_error_t *error) {
@@ -598,6 +648,7 @@ noah_profile_candidate_backend_t noah_profile_candidate_store_backend_interface(
         .write            = write_candidate,
         .read             = read_candidate,
         .read_source      = read_source,
+        .note_reuse       = note_reuse,
         .validation_begin = validation_begin,
         .validation_step  = validation_step,
         .commit_begin     = commit_begin_candidate,

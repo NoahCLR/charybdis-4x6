@@ -3,7 +3,8 @@
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
 > schema 3.0; RGB v4, key behaviors v2, combos v3, settings v6 and sparse PD v3;
 > a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
-> binds a nonzero VIA generation and digest. HID and split framing remain v1.
+> binds a nonzero VIA generation and digest. HID framing remains v1; split
+> framing is version 2 (sized payload chunks and reuse ranges, D-F19).
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > Backup translation belongs to the client, before a current-format Apply.
 
@@ -12,10 +13,20 @@ gated owner registration; normal mutation exposure and hardware acceptance
 remain open
 
 This is a dedicated sibling protocol for the durable live profile. It does not
-extend the VIA region reconciler. Every frame is exactly 32 bytes, multi-byte
-values are little-endian, byte 31 is CRC8 polynomial `0x07` over bytes 0–30,
-and every reserved or unused byte is zero. The maximum payload chunk is 14
-bytes.
+extend the VIA region reconciler. Byte 0 of every frame is the framing version,
+`2`; a frame of any other version is refused. Every reply, and every request
+except a payload chunk or a payload reuse, is exactly 32 bytes. A payload chunk
+is its 17-byte header, the chunk and the CRC: 18 + n bytes for an n-byte chunk,
+at least 32 (a shorter chunk is zero-padded to 32). A payload reuse is 36 bytes.
+The last byte of every frame is CRC8 polynomial `0x07` over the bytes before
+it, multi-byte values are little-endian, and every reserved or unused byte is
+zero. A request carries a chunk of at most 110 bytes, the largest request
+being 128 bytes; a chunk that answers a payload request travels in a 32-byte
+reply and so carries at most 14.
+
+Version 1 had only 32-byte frames and 14-byte chunks. Both halves run one
+build, so a half on version 1 simply fails to decode its sibling's frames and
+reports it unreadable; nothing durable is at risk.
 
 ## Frame Kinds And Status
 
@@ -29,10 +40,15 @@ bytes.
 | acknowledgement | `6` | report accepted progress or busy state |
 | error | `7` | report a stable terminal or retryable error |
 | payload request | `8` | let the current QMK master pull bytes from a newer sibling |
+| logical bind | `9` | carry the VIA identity bound to the copy (below) |
+| prepare durable | `10` | validate the received copy and persist only its prepared marker |
+| logical bind request | `11` | ask a newer sibling for its binding before a pull |
+| payload reuse | `12` | fill a range of the copy from the receiver's own active profile |
 
 Status ids are OK `0`, invalid frame `1`, incompatible `2`, stale `3`,
 conflict `4`, corrupt `5`, busy `6`, range error `7`, digest mismatch `8`,
-storage error `9`, and validation error `10`. Descriptor operations other than
+storage error `9`, validation error `10`, and source unavailable `11` (only in
+answer to a payload reuse, below). Descriptor operations other than
 metadata require OK. Acknowledgement accepts only OK or busy; error frames
 accept neither.
 
@@ -90,9 +106,9 @@ whole-profile validation before commit.
 | 8 | 4 | correlated payload digest |
 | 12 | 2 | payload offset or acknowledged next offset |
 | 14 | 2 | total payload length |
-| 16 | 1 | chunk length, `0..14` |
-| 17 | 14 | payload bytes followed by zero padding |
-| 31 | 1 | frame CRC8 |
+| 16 | 1 | chunk length: `1..110` in a payload chunk, `0` otherwise |
+| 17 | n | payload bytes, then zero padding to byte 30 when n < 14 |
+| last | 1 | frame CRC8: byte 31, or byte 17 + n of a longer chunk |
 
 Payload chunks require OK, a nonzero generation, a valid complete profile
 length, a nonempty chunk, and an in-range `offset + length`. Acknowledgement
@@ -115,6 +131,75 @@ A payload request has the same correlation, offset, and total length fields but
 no chunk. Its response is a payload chunk beginning at the exact requested
 offset. QMK custom RPC is initiated only by the current transport master, so
 this explicit pull prevents USB role from becoming durable profile authority.
+
+## Payload Reuse
+
+A payload reuse asks the receiver to fill `length` bytes of the copy at
+`offset` from its own active profile, at `source offset`, rather than receive
+them. It is 36 bytes:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | framing version, `2` |
+| 1 | 1 | kind, `12` |
+| 2 | 1 | status, OK |
+| 3 | 1 | reserved zero |
+| 4 | 4 | correlated durable generation |
+| 8 | 4 | correlated payload digest |
+| 12 | 2 | destination offset in the copy |
+| 14 | 2 | total payload length |
+| 16 | 2 | length, at least 1 and within the copy |
+| 18 | 2 | source offset |
+| 20 | 4 | source generation |
+| 24 | 4 | source FNV-1a digest |
+| 28 | 4 | source CRC32 |
+| 32 | 1 | source active kind: compiled `0`, committed `1` |
+| 33 | 1 | source origin: compiled `255`, committed `0..1` |
+| 34 | 1 | reserved zero |
+| 35 | 1 | frame CRC8 |
+
+The source identity is Profile Wire's candidate REUSE source (compiled sources
+have generation zero). The receiver holds a reuse like a chunk: only for the
+copy it is receiving, at or before its next offset (a later start is a gap and
+rejects the copy). It copies from its next offset to the range's end, at most
+110 bytes a scan in reads and writes of at most 20, checking the source's
+whole identity and its compiled-default and action-ABI digests on every read,
+as Profile Wire's REUSE does. Meanwhile it answers BUSY with reason `8`
+(copying) and its progress as the offset, and the ACK with the range's end
+once staged. Any new request ends an unfinished range where it stands, so the
+store's next offset is always the truth. The range keeps the receive lease
+alive while it copies, since the sender's polls meet the cached reply.
+
+Mailbox admission records the range and caches its initial BUSY reply; copying
+starts on a later scan, after the decoded request and wire buffers retire.
+Each copy step finishes its active-source read before building the progress
+reply. Reply builders fill frames in place, and the dispatcher, handlers and
+reuse reply boundary remain separate compiled calls so LTO cannot combine
+their workspaces on the process stack. The live-owner stack manifest covers
+the receive decoder, chunk writes/retries, reuse readers and progress replies,
+as well as the split-slave mailbox and sender exchange paths.
+
+When its active profile is not the named source, or stops being it, the
+receiver answers ERROR `11` (source unavailable) with how far it got. That is
+not a rejection: the copy stays open at that offset, and the sender sends the
+rest of the copy as bytes. The receiver's whole-candidate checksum and semantic
+validation before the prepared marker are unchanged, so a reuse can never
+make an invalid copy durable. The active profile's backing slot is pinned
+while a copy is staged, so the slot being written is never the source.
+
+The sender takes its ranges from the host candidate: while the host uploads,
+each Profile Wire REUSE step it stages is recorded beside the candidate, and
+contiguous steps from one source merge (up to 16 ranges; the rest is sent as
+bytes). A prepared push asks for the first range ending past its offset,
+sends chunks up to it and a reuse for it, resuming mid-range when the
+receiver's offset is inside one. After this half's commit marker the staged
+candidate is gone and a copy that has to start over is sent from the
+committed record as bytes. Background repair always sends bytes.
+
+While the receiver still holds the sender's request (admitted, behind a full
+mailbox, or copying and advancing) the sender keeps collecting at the 5 ms
+admission pace, up to eight polls in a row without progress, before the
+ordinary 50–1,000 ms backoff.
 
 ## Authority And Activation
 
@@ -190,15 +275,19 @@ value becomes an unreadable descriptor. Changes publish metadata and authority
 before any deadline return; unchanged values need neither revalidation nor a
 replacement copy. This does not cache payload bytes or defer local changes.
 
-Matrix scan performs at most one transport exchange, one bounded payload
-read/write, or one validator/marker-last commit step. It supports newer-local
+Matrix scan performs at most one transport exchange, one received chunk or
+one scan's share of a reuse range (at most 110 bytes, stored in writes of at
+most 20), or one validator/marker-last commit step of at most 20 bytes. It supports newer-local
 push, newer-peer pull, staged-source prepare/pause/commit/abort,
 byte-identical retries, 50–1,000 ms backoff, disconnect/reconnect, prepared-
 sender preservation across role changes, passive-peer expiry, and terminal
 conflict/corruption/incompatibility states. Every peer loss republishes
-fail-closed authority. The QMK adapter appends `PUT_PROFILE_SPLIT_SYNC`, checks
-both 32-byte RPC directions, and can be registered only after a real owner
-initializes the reconciler.
+fail-closed authority. The QMK adapter appends `PUT_PROFILE_SPLIT_SYNC`, sends each request at
+its own length with a 32-byte reply, and can be registered only after a real
+owner initializes the reconciler. `users/noah/config.h` raises QMK's
+master-to-slave RPC buffer to 128 bytes for the largest request. QMK carries
+each RPC's own lengths, so every other split RPC still sends its own small
+frames; the VIA mirror keeps its own 32-byte bound.
 
 An abandoned inbound provisional prepare has its own passive lease expiry. The
 receiver aborts that incomplete inactive-slot candidate and releases `PEER`

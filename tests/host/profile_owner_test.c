@@ -226,14 +226,14 @@ static bool memory_write(void *context, noah_profile_storage_address_t address, 
     return true;
 }
 
-static bool split_exchange(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE], uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
+static bool split_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
     split_link_t                    *link = context;
     noah_profile_split_reconciler_t *peer_reconciler;
 
     if (!link || !link->peer || !(peer_reconciler = noah_profile_owner_split_reconciler(link->peer))) {
         return false;
     }
-    return noah_profile_split_reconciler_receive(peer_reconciler, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    return noah_profile_split_reconciler_receive(peer_reconciler, request, request_length, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
 }
 
 static void write_u16(uint8_t *target, uint16_t value) {

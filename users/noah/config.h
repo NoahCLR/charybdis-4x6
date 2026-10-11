@@ -28,6 +28,16 @@
 #    undef SERIAL_USART_TIMEOUT
 #    define SERIAL_USART_TIMEOUT 5
 
+// Profile Apply copies the profile to the other half in split RPC frames.
+// QMK sends each RPC's own length, so this raises the ceiling for the profile
+// copy's payload chunks only (up to 110 profile bytes a frame instead of 14);
+// every other split RPC keeps its 32-byte frames. The cost is 96 bytes more
+// of the shared RPC buffer and the transport CRC's staging buffer on each
+// half. A full request alone takes about 5.6 ms on the 230,400-baud link,
+// before its reply and handshake.
+// Replies stay at QMK's 32-byte default.
+#    define RPC_M2S_BUFFER_SIZE 128
+
 // A failed userspace runtime RPC stops the current send pass. Retry probes use
 // a short exponential backoff so an unplugged half cannot spend every scan in
 // repeated serial timeouts, while reconnect recovery remains prompt.
