@@ -1140,7 +1140,10 @@ version 2:
 
 The receiver writes at most 110 bytes in a scan, in store writes of at most
 20, whether they arrived in a chunk or it copies them; its validator steps
-read 20 bytes like the owner's, where they read 14 before. While the receiver
+read 20 bytes like the owner's, where they read 14 before. The sender reads
+each chunk from its staged candidate or committed record in store reads of at
+most 32 bytes (`NOAH_PROFILE_STORE_IO_CHUNK_MAX`), the bound the QMK EEPROM
+adapter enforces; a chunk read whole fails on the keyboard as a storage error. While the receiver
 still holds the sender's request, the sender polls at the 5 ms admission pace
 up to eight times in a row without progress before its ordinary backoff, so
 a slower scan no longer costs a 100 ms wait.

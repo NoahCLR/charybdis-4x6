@@ -204,11 +204,13 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
     return activation_block_reason | (policy && policy->initialized && policy->peer_observer && policy->peer_observer(policy->peer_context, &unresolved) && unresolved == 0u ? 0u : NOAH_PROFILE_ACTIVATION_REASON_PEER);
 }
 
+// Reads and writes are bounded as the QMK EEPROM adapter bounds them
+// (qmk_profile_eeprom.c).
 static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
     memory_t *memory = context;
     memory->reads++;
     if (length > memory->largest_read) memory->largest_read = length;
-    if (!target || length == 0u || (uint32_t)address + length > sizeof(memory->bytes)) return false;
+    if (!target || length == 0u || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) return false;
     memcpy(target, &memory->bytes[address], length);
     return true;
 }
@@ -221,7 +223,7 @@ static bool memory_write(void *context, noah_profile_storage_address_t address, 
         memory->fail_next_write = false;
         return false;
     }
-    if (!source || length == 0u || (uint32_t)address + length > sizeof(memory->bytes)) return false;
+    if (!source || length == 0u || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) return false;
     memcpy(&memory->bytes[address], source, length);
     return true;
 }

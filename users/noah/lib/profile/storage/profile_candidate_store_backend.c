@@ -364,7 +364,15 @@ bool noah_profile_candidate_store_backend_staged_read(void *context, const noah_
     if (!candidate || !bytes || length == 0u || !noah_profile_candidate_store_backend_staged_candidate(backend, &staged) || !store_candidate_equal(&staged, candidate) || !candidate_payload_start(backend, &payload_start) || (uint32_t)offset + length > staged.payload_length) {
         return false;
     }
-    return staged_reader_read(backend->store, (size_t)payload_start + offset, bytes, length);
+    // A peer-copy chunk is wider than one store read; read it in pieces.
+    for (uint8_t done = 0u; done < length;) {
+        uint8_t piece = (uint8_t)(length - done) < NOAH_PROFILE_STORE_IO_CHUNK_MAX ? (uint8_t)(length - done) : NOAH_PROFILE_STORE_IO_CHUNK_MAX;
+        if (!staged_reader_read(backend->store, (size_t)payload_start + offset + done, bytes + done, piece)) {
+            return false;
+        }
+        done = (uint8_t)(done + piece);
+    }
+    return true;
 }
 
 bool noah_profile_candidate_store_backend_staged_reuse(const noah_profile_candidate_store_backend_t *backend, const noah_profile_store_candidate_t *candidate, uint16_t offset, noah_profile_candidate_v1_source_t *source, noah_profile_candidate_store_reuse_range_t *range) {
