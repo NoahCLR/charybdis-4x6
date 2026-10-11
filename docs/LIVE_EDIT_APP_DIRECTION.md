@@ -66,7 +66,16 @@ VIA full-bank checksums use bounded 224-byte RAM-mirror batches on both halves
 (D-F20), reducing each pass from 2,634 to 167 granted checksum steps. Timing and
 input cadence for this budget have not run on hardware.
 
+Optional macro read maps omit confirmed zero blocks from host transfers while
+preserving exact full-bank bytes and identity (D-F21). Hardware read timing and
+input cadence remain unmeasured for this path.
+
 ## Open Issues
+
+- **Sparse macro reads need hardware acceptance (D-F21).** Compare first read,
+  refresh and export timing with mostly empty and full banks, including after
+  shortening a macro. Check typing and pointing during reads. Host transfer
+  counts establish byte savings, not USB timing or scan cadence.
 
 - **Unified gesture ownership.** Native LT/MT/OSM remain a compatibility
   boundary; adding a row can still change classification semantics. Runtime-owned
@@ -1192,3 +1201,23 @@ cadence remain hardware acceptance, separate from scan-count host tests and
 per-half linked RAM and reviewed-path stack checks. Wire and storage formats
 stay unchanged; Ark's runtime needs no change, and its imported governing docs
 should be refreshed after this firmware lands.
+
+## D-F21 — Fresh reads omit only storage proven zero
+
+Optional Profile Wire GET `0x0c` serves a bitmap of nonzero 256-byte VIA macro
+blocks, bound to the completed local storage generation and full-store digest.
+The existing bounded checksum workers collect the bitmap while hashing and
+publish it with their identity. No GET scans the bank or allocates a bank copy.
+Stale tail bytes and interrupted-write markers remain data. A client downloads
+marked blocks, reconstructs zero blocks, checks metadata again and verifies the
+whole-store digest; the existing complete-capture coherence checks still apply.
+
+The governing [read-map contract](architecture/profile-wire-v1.md#sparse-via-macro-read-map--optional-get-value-0x0c)
+adds no capability bit or storage format. Older clients retain full reads;
+supporting clients fall back for unsupported or initially unavailable maps and
+fail malformed or changed reads. The client follow-up implements this reader
+and refreshes imported specifications after the firmware lands.
+
+The map is available only when that same checksum cursor hashed the standard
+two-byte VIA config `[1,0]`. Nonzero layout options from another VIA client
+retain the full-read path; they are not refused as corrupt macro storage.

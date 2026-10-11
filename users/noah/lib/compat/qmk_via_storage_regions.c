@@ -190,8 +190,9 @@ void noah_qmk_via_storage_digest_init(noah_qmk_via_storage_digest_cursor_t *curs
         return;
     }
     *cursor = (noah_qmk_via_storage_digest_cursor_t){
-        .hash   = NOAH_QMK_VIA_DIGEST_OFFSET,
-        .region = NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG,
+        .hash                        = NOAH_QMK_VIA_DIGEST_OFFSET,
+        .region                      = NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG,
+        .macro_map_config_compatible = NOAH_QMK_VIA_CONFIG_REGION_SIZE == 2u,
     };
 }
 
@@ -224,6 +225,13 @@ bool noah_qmk_via_storage_digest_step(noah_qmk_via_storage_digest_cursor_t *curs
                 }
                 for (uint8_t index = 0u; index < chunk; index++) {
                     cursor->hash = noah_qmk_via_storage_hash_byte(cursor->hash, bytes[index]);
+                    if (cursor->region == NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG && bytes[index] != (cursor->offset + index == 0u ? 1u : 0u)) {
+                        cursor->macro_map_config_compatible = false;
+                    }
+                    if (cursor->region == NOAH_QMK_VIA_SYNC_REGION_MACRO && bytes[index] != 0u) {
+                        uint16_t block = (cursor->offset + index) / NOAH_QMK_VIA_MACRO_READ_BLOCK_SIZE;
+                        cursor->macro_nonzero_blocks[block / 8u] |= (uint8_t)(1u << (block % 8u));
+                    }
                 }
                 cursor->offset += chunk;
                 length -= chunk;

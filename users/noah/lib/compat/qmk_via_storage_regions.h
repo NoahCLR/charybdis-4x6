@@ -15,6 +15,8 @@
 enum {
     NOAH_QMK_VIA_DIGEST_SCAN_BYTE_BUDGET = 224,
     NOAH_QMK_VIA_DIGEST_READ_CHUNK_MAX   = 14,
+    NOAH_QMK_VIA_MACRO_READ_BLOCK_SIZE   = 256,
+    NOAH_QMK_VIA_MACRO_READ_BITMAP_MAX   = 32, // Covers the full uint16 VIA capacity.
 };
 
 typedef struct {
@@ -22,6 +24,8 @@ typedef struct {
     noah_qmk_via_sync_region_t region;
     uint16_t                   offset;
     bool                       complete;
+    bool                       macro_map_config_compatible;
+    uint8_t                    macro_nonzero_blocks[NOAH_QMK_VIA_MACRO_READ_BITMAP_MAX];
 } noah_qmk_via_storage_digest_cursor_t;
 
 #ifdef VIA_ENABLE

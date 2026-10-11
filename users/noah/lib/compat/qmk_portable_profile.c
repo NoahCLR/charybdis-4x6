@@ -124,7 +124,7 @@ void noah_qmk_portable_apply(void) {
     eeconfig_update_keymap(&keymap_config);
 }
 bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
-    if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8 && frame[2] != 0x0b)) return false;
+    if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8 && frame[2] != 0x0b && frame[2] != 0x0c)) return false;
     // Settings readback (GET 7) takes a wide page: byte 5 is its high byte.
     uint16_t page      = frame[2] == 7 ? (uint16_t)(frame[4] | frame[5] << 8) : frame[4];
     bool     malformed = !frame[3];
@@ -136,6 +136,10 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
         return true;
     }
     uint8_t *p = frame + 7;
+    if (frame[2] == 0x0c) {
+        frame[5] = noah_qmk_via_macro_read_map_page(frame[4], p, frame + 6);
+        return true;
+    }
     if (frame[2] == 0x0b) {
         if (frame[4]) { frame[5] = 2; return true; }
         p[0] = 1;

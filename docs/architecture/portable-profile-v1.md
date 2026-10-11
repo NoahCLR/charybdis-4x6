@@ -93,7 +93,10 @@ a writer shortened the macros without clearing the rest; the document cannot
 carry them and export stays canonical. Differential transfer therefore never
 compares against a bank rebuilt from a document. A capture keeps the exact
 layout and macro bytes it read, beside the storage identity it verified, and an
-Apply compares staging and local roll-forward against those. Its result keeps
+Apply compares staging and local roll-forward against those. Optional
+[macro read maps](profile-wire-v1.md#sparse-via-macro-read-map--optional-get-value-0x0c)
+let a capture reconstruct firmware-confirmed zero blocks while reading every
+nonzero block and verifying the same full-store identity. Its result keeps
 the target bank, which it has just proved both halves hold. A reviewed snapshot
 without those bytes is not reused: Apply reads the keyboard again. The
 interrupted-capture path already carries the raw bank it read.

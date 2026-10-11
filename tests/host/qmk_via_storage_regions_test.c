@@ -202,12 +202,12 @@ static void test_encoder_region_is_empty_when_disabled(void) {
 static uint32_t finish_digest(uint8_t budget) {
     noah_qmk_via_storage_digest_cursor_t cursor;
     uint32_t                             digest = 0u;
-    uint16_t                             steps  = 0u;
+    uint32_t                             steps  = 0u;
 
     noah_qmk_via_storage_digest_init(&cursor);
     while (!cursor.complete) {
         CHECK(noah_qmk_via_storage_digest_step(&cursor, budget, &digest));
-        CHECK(++steps < 40000u);
+        CHECK(++steps <= 16u + sizeof(keymap_bytes) + sizeof(macro_bytes) + noah_qmk_via_storage_region_size(NOAH_QMK_VIA_SYNC_REGION_ENCODER));
     }
     return digest;
 }
@@ -283,6 +283,28 @@ static void test_digest_scan_budget_preserves_full_bank_identity(void) {
     CHECK(fast_digest != slow_digest);
 }
 
+static void test_digest_collects_exact_nonzero_macro_blocks(void) {
+    noah_qmk_via_storage_digest_cursor_t cursor;
+    uint32_t                             digest = 0u;
+    memset(macro_bytes, 0, sizeof(macro_bytes));
+    macro_bytes[0]                        = 1u;
+    macro_bytes[sizeof(macro_bytes) - 1u] = 1u; // Includes the interrupted-write marker.
+    noah_qmk_via_storage_digest_init(&cursor);
+    while (!cursor.complete)
+        CHECK(noah_qmk_via_storage_digest_step(&cursor, 223u, &digest));
+    CHECK(cursor.macro_nonzero_blocks[0] & 1u);
+    unsigned last = (sizeof(macro_bytes) - 1u) / 256u;
+    CHECK(cursor.macro_nonzero_blocks[last / 8u] & (1u << (last % 8u)));
+    for (unsigned block = 1u; block < last; block++)
+        CHECK(!(cursor.macro_nonzero_blocks[block / 8u] & (1u << (block % 8u))));
+    memset(macro_bytes, 0, sizeof(macro_bytes));
+    noah_qmk_via_storage_digest_init(&cursor);
+    while (!cursor.complete)
+        CHECK(noah_qmk_via_storage_digest_step(&cursor, 7u, &digest));
+    for (unsigned i = 0; i < sizeof(cursor.macro_nonzero_blocks); i++)
+        CHECK(cursor.macro_nonzero_blocks[i] == 0u);
+}
+
 static void test_digest_rejects_invalid_work_budgets_without_advancing(void) {
     noah_qmk_via_storage_digest_cursor_t cursor;
     uint32_t digest = UINT32_C(0x12345678);
@@ -301,7 +323,58 @@ static void test_digest_rejects_invalid_work_budgets_without_advancing(void) {
     CHECK(step_read_bytes == 0u);
 }
 
-int main(void) {
+static void test_macro_map_config_comes_from_hashed_bytes(void) {
+    noah_qmk_via_storage_digest_cursor_t cursor;
+    uint32_t                             digest;
+    for (unsigned state = 0u; state < 3u; state++) {
+        via_valid      = state != 2u;
+        layout_options = state == 1u ? 1u : 0u;
+        noah_qmk_via_storage_digest_init(&cursor);
+        // Read config one byte at a time, then change live config after that
+        // region. Compatibility must follow the bytes actually hashed.
+        while (cursor.region == NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG)
+            CHECK(noah_qmk_via_storage_digest_step(&cursor, 1u, &digest));
+        via_valid = !via_valid;
+        layout_options ^= 1u;
+        while (!cursor.complete)
+            CHECK(noah_qmk_via_storage_digest_step(&cursor, 224u, &digest));
+        CHECK(cursor.macro_map_config_compatible == (state == 0u));
+    }
+}
+
+// Optional cross-language fixture: actual checksum worker bitmap and digest,
+// followed by the exact layout and macro bytes it described.
+static void write_macro_read_fixture(const char *path, const char *mode) {
+    noah_qmk_via_storage_digest_cursor_t cursor;
+    uint32_t                             digest = 0u;
+    memset(keymap_bytes, 0, sizeof(keymap_bytes));
+    memset(macro_bytes, 0, sizeof(macro_bytes));
+    via_valid      = true;
+    layout_options = 0u;
+    if (!strcmp(mode, "sparse") || !strcmp(mode, "nonstandard")) {
+        memcpy(macro_bytes, "hello", 5u);
+        macro_bytes[sizeof(macro_bytes) - 3u] = 99u; // Stale tail is real storage.
+        if (!strcmp(mode, "nonstandard")) layout_options = 1u;
+    } else if (!strcmp(mode, "dense")) {
+        memset(macro_bytes, 97, sizeof(macro_bytes) - 1u);
+    } else
+        CHECK(!strcmp(mode, "empty"));
+    noah_qmk_via_storage_digest_init(&cursor);
+    while (!cursor.complete)
+        CHECK(noah_qmk_via_storage_digest_step(&cursor, 224u, &digest));
+    FILE *out = fopen(path, "wb");
+    CHECK(out != NULL);
+    uint8_t hash[4] = {(uint8_t)digest, (uint8_t)(digest >> 8u), (uint8_t)(digest >> 16u), (uint8_t)(digest >> 24u)};
+    CHECK(fwrite(hash, 1u, sizeof(hash), out) == sizeof(hash));
+    CHECK(fwrite(cursor.macro_nonzero_blocks, 1u, sizeof(cursor.macro_nonzero_blocks), out) == sizeof(cursor.macro_nonzero_blocks));
+    uint8_t compatible = cursor.macro_map_config_compatible;
+    CHECK(fwrite(&compatible, 1u, 1u, out) == 1u);
+    CHECK(fwrite(keymap_bytes, 1u, sizeof(keymap_bytes), out) == sizeof(keymap_bytes));
+    CHECK(fwrite(macro_bytes, 1u, sizeof(macro_bytes), out) == sizeof(macro_bytes));
+    CHECK(fclose(out) == 0);
+}
+
+int main(int argc, char **argv) {
     test_region_sizes_and_bounds();
     test_config_is_canonical_and_commits_validity_last();
     test_keymap_and_macro_round_trip();
@@ -312,7 +385,13 @@ int main(void) {
 #endif
     test_digest_is_incremental_deterministic_and_content_sensitive();
     test_digest_scan_budget_preserves_full_bank_identity();
+    test_digest_collects_exact_nonzero_macro_blocks();
     test_digest_rejects_invalid_work_budgets_without_advancing();
+    test_macro_map_config_comes_from_hashed_bytes();
+    if (argc == 3)
+        write_macro_read_fixture(argv[1], argv[2]);
+    else
+        CHECK(argc == 1);
 
     puts("qmk_via_storage_regions host tests passed");
     return 0;

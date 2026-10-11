@@ -276,6 +276,9 @@ bool noah_qmk_via_storage_digest_step(noah_qmk_via_storage_digest_cursor_t *curs
         return true;
     }
     cursor->complete = true;
+    cursor->macro_map_config_compatible = local_config[0] == 1u && local_config[1] == 0u;
+    for (unsigned i = 0; i < sizeof(local_macro); i++)
+        if (local_macro[i]) cursor->macro_nonzero_blocks[i / 2048u] |= (uint8_t)(1u << ((i / 256u) % 8u));
     *out_digest      = local_digest();
     return true;
 }
@@ -458,6 +461,45 @@ static void test_equal_boot_handshake_and_periodic_refresh(void) {
     CHECK(rpc_count == 1u);
     scan_at(1002u);
     CHECK(rpc_count == 2u);
+}
+
+static void test_macro_read_map_tracks_the_published_digest(void) {
+    uint8_t payload[25] = {0}, length = 99u;
+    test_reset();
+    local_config[1] = peer_config[1] = 0u;
+    test_init_ready();
+    CHECK(noah_qmk_via_macro_read_map_page(0u, payload, &length) == 3u && length == 0u);
+    scan_many(0u, 4u);
+    CHECK(noah_qmk_via_macro_read_map_page(0u, payload, &length) == 0u && length == 13u);
+    CHECK(payload[0] == 1u && payload[1] == 0u && payload[2] == 1u);
+    CHECK(payload[3] == TEST_MACRO_SIZE && payload[4] == 0u && payload[5] == 5u);
+    uint32_t digest = (uint32_t)payload[9] | (uint32_t)payload[10] << 8u | (uint32_t)payload[11] << 16u | (uint32_t)payload[12] << 24u;
+    CHECK(digest == local_digest());
+    CHECK(noah_qmk_via_macro_read_map_page(1u, payload, &length) == 0u && length == 1u && payload[0] == 1u);
+    CHECK(noah_qmk_via_macro_read_map_page(2u, payload, &length) == 2u && length == 0u);
+    noah_qmk_via_split_sync_note_local_storage_changed();
+    CHECK(noah_qmk_via_macro_read_map_page(0u, payload, &length) == 3u && length == 0u);
+    memset(local_macro, 0, sizeof(local_macro));
+    scan_many(10u, 4u);
+    CHECK(noah_qmk_via_macro_read_map_page(1u, payload, &length) == 0u && length == 1u && payload[0] == 0u);
+}
+
+static void test_nonstandard_config_uses_full_read_fallback(void) {
+    uint8_t payload[25], length;
+    test_reset(); // VIA accepts these nonzero layout options.
+    test_init_ready();
+    scan_many(0u, 4u);
+    CHECK(noah_qmk_via_split_sync_debug_snapshot().digest_valid);
+    CHECK(!noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    CHECK(noah_qmk_via_macro_read_map_page(0u, payload, &length) == 3u && length == 0u);
+    local_config[1] = 0u;
+    noah_qmk_via_split_sync_note_local_storage_changed();
+    scan_many(10u, 4u);
+    CHECK(noah_qmk_via_macro_read_map_page(0u, payload, &length) == 0u && length == 13u);
+    local_config[1] = 1u;
+    noah_qmk_via_split_sync_note_local_storage_changed();
+    scan_many(20u, 4u);
+    CHECK(noah_qmk_via_macro_read_map_page(0u, payload, &length) == 3u && length == 0u);
 }
 
 static void test_disconnect_uses_bounded_exponential_retry(void) {
@@ -791,7 +833,7 @@ static void test_two_dirty_recovery_seed_failure_stays_non_authoritative(void) {
     CHECK(macro_invalidate_count == 1u);
 }
 
-static void test_receiver_validates_order_accepts_duplicate_and_acks_after_digest(void) {
+static void test_receiver_validates_order_accepts_duplicate_and_acks_after_digest(uint8_t layout_options) {
     noah_qmk_via_sync_frame_t response;
     uint32_t                  source_digest;
 
@@ -800,7 +842,7 @@ static void test_receiver_validates_order_accepts_duplicate_and_acks_after_diges
     test_init_ready();
     scan_many(0u, 2u);
 
-    peer_config[1] = 0x91u;
+    peer_config[1] = layout_options;
     peer_keymap[0] = 0x92u;
     peer_macro[0]  = 0x93u;
     source_digest  = peer_digest();
@@ -829,6 +871,13 @@ static void test_receiver_validates_order_accepts_duplicate_and_acks_after_diges
     CHECK(response.status == NOAH_QMK_VIA_SYNC_STATUS_OK);
     CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 7u);
     CHECK(!noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    uint8_t map[25], map_length;
+    if (layout_options == 0u) {
+        CHECK(noah_qmk_via_macro_read_map_page(0u, map, &map_length) == 0u && map_length == 13u && map[5] == 7u);
+        CHECK(noah_qmk_via_macro_read_map_page(1u, map, &map_length) == 0u && map[0] == 1u);
+    } else {
+        CHECK(noah_qmk_via_macro_read_map_page(0u, map, &map_length) == 3u && map_length == 0u);
+    }
 }
 
 static void test_receiver_digest_mismatch_never_publishes_clean_generation(void) {
@@ -1376,6 +1425,8 @@ static void test_settled_scan_has_bounded_admission_work(void) {
 }
 
 int main(void) {
+    test_nonstandard_config_uses_full_read_fallback();
+    test_macro_read_map_tracks_the_published_digest();
     test_settled_scan_has_bounded_admission_work();
     test_work_arriving_after_admission_runs_on_next_scan();
     test_receiver_returns_structured_error_for_corrupt_frame();
@@ -1395,7 +1446,8 @@ int main(void) {
     test_prior_layout_metadata_resets_the_old_bank();
     test_failed_macro_reseed_keeps_generation_dirty_and_sends_nothing();
     test_two_dirty_recovery_seed_failure_stays_non_authoritative();
-    test_receiver_validates_order_accepts_duplicate_and_acks_after_digest();
+    test_receiver_validates_order_accepts_duplicate_and_acks_after_digest(0x91u);
+    test_receiver_validates_order_accepts_duplicate_and_acks_after_digest(0u);
     test_receiver_digest_mismatch_never_publishes_clean_generation();
     test_logical_receiver_stays_dirty_until_decision_accept();
     test_logical_receiver_accepts_its_staged_bank_after_reboot();
