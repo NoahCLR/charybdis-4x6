@@ -315,7 +315,7 @@ static bool local_read(void *context, const noah_profile_split_descriptor_t *des
     if (!record_matches_descriptor(record, descriptor) || !record_payload_start(record->slot, &payload_start) || (uint32_t)offset + length > record->payload_length) {
         return false;
     }
-    return owner->store.io.read(owner->store.io.context, (payload_start + offset), bytes, length);
+    return noah_profile_store_read_span(&owner->store, (payload_start + offset), bytes, length);
 }
 
 static bool local_binding(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t *via_generation, uint32_t *via_digest) {

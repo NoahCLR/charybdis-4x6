@@ -71,6 +71,24 @@ static bool io_read(noah_profile_store_t *store, noah_profile_storage_address_t 
     return store && store->io.read && target && length != 0u && address <= NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE && length <= NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - address && store->io.read(store->io.context, address, target, length);
 }
 
+// The store I/O reads at most NOAH_PROFILE_STORE_IO_CHUNK_MAX bytes a call
+// (the QMK EEPROM adapter refuses more), so a longer span is read in pieces.
+bool noah_profile_store_read_span(const noah_profile_store_t *store, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
+    if (!store || !store->io.read || !target || length == 0u || address > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE || length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - address) {
+        return false;
+    }
+    while (length != 0u) {
+        uint16_t piece = length < NOAH_PROFILE_STORE_IO_CHUNK_MAX ? length : NOAH_PROFILE_STORE_IO_CHUNK_MAX;
+        if (!store->io.read(store->io.context, address, target, piece)) {
+            return false;
+        }
+        address += piece;
+        target += piece;
+        length = (uint16_t)(length - piece);
+    }
+    return true;
+}
+
 static bool io_write(noah_profile_store_t *store, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
     return store && store->io.write && source && length != 0u && address <= NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE && length <= NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - address && store->io.write(store->io.context, address, source, length);
 }

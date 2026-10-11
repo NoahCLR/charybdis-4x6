@@ -34,6 +34,54 @@ enum {
 
 static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
 
+// One RGB v4 domain at its table maximums, as tests/host/make_maximum_profile.py
+// builds it. Its copy to the other half sends payload chunks wider than one
+// bounded store read.
+static const uint8_t long_profile[] = {
+    0x4eu, 0x4cu, 0x50u, 0x31u, 0x03u, 0x00u, 0x01u, 0x01u, 0x10u, 0x04u, 0x4fu, 0x02u, 0x04u, 0x00u, 0x1fu, 0x00u,
+    0x10u, 0x10u, 0x0cu, 0x20u, 0x0cu, 0x00u, 0x04u, 0x08u, 0x3au, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+    0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x01u, 0x01u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x02u, 0x02u,
+    0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x03u, 0x03u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u,
+    0x04u, 0x04u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x05u, 0x05u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+    0x00u, 0x03u, 0x06u, 0x06u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x07u, 0x07u, 0x00u, 0x00u, 0x00u,
+    0x00u, 0x00u, 0x00u, 0x03u, 0x08u, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x09u, 0x09u, 0x00u,
+    0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x0au, 0x0au, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x0bu,
+    0x0bu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x0cu, 0x0cu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
+    0x03u, 0x0du, 0x0du, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x0eu, 0x0eu, 0x00u, 0x00u, 0x00u, 0x00u,
+    0x00u, 0x00u, 0x03u, 0x0fu, 0x0fu, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x00u, 0x00u, 0xffu, 0xc8u,
+    0x00u, 0x01u, 0x10u, 0xffu, 0xc8u, 0x01u, 0x02u, 0x20u, 0xffu, 0xc8u, 0x00u, 0x03u, 0x30u, 0xffu, 0xc8u, 0x01u,
+    0x04u, 0x40u, 0xffu, 0xc8u, 0x00u, 0x05u, 0x50u, 0xffu, 0xc8u, 0x01u, 0x06u, 0x60u, 0xffu, 0xc8u, 0x00u, 0x07u,
+    0x70u, 0xffu, 0xc8u, 0x01u, 0x08u, 0x80u, 0xffu, 0xc8u, 0x00u, 0x09u, 0x90u, 0xffu, 0xc8u, 0x01u, 0x0au, 0xa0u,
+    0xffu, 0xc8u, 0x00u, 0x0bu, 0xb0u, 0xffu, 0xc8u, 0x01u, 0x0cu, 0xc0u, 0xffu, 0xc8u, 0x00u, 0x0du, 0xd0u, 0xffu,
+    0xc8u, 0x01u, 0x0eu, 0xe0u, 0xffu, 0xc8u, 0x00u, 0x0fu, 0xf0u, 0xffu, 0xc8u, 0x01u, 0x07u, 0x00u, 0xffu, 0xc8u,
+    0x00u, 0x08u, 0x0au, 0xffu, 0xc8u, 0x01u, 0x0fu, 0x14u, 0xffu, 0xc8u, 0x02u, 0xffu, 0x1eu, 0xffu, 0xc8u, 0x03u,
+    0x07u, 0x28u, 0xffu, 0xc8u, 0x04u, 0x08u, 0x32u, 0xffu, 0xc8u, 0x05u, 0x0fu, 0x3cu, 0xffu, 0xc8u, 0x06u, 0xffu,
+    0x46u, 0xffu, 0xc8u, 0x07u, 0x07u, 0x50u, 0xffu, 0xc8u, 0x08u, 0x08u, 0x5au, 0xffu, 0xc8u, 0x09u, 0x0fu, 0x64u,
+    0xffu, 0xc8u, 0x0au, 0xffu, 0x6eu, 0xffu, 0xc8u, 0x0bu, 0x00u, 0xa7u, 0xffu, 0xc7u, 0x00u, 0x00u, 0xc8u, 0x96u,
+    0x00u, 0x01u, 0x08u, 0xc8u, 0x96u, 0x01u, 0x02u, 0x10u, 0xc8u, 0x96u, 0x02u, 0x03u, 0x18u, 0xc8u, 0x96u, 0x03u,
+    0x04u, 0x20u, 0xc8u, 0x96u, 0x04u, 0x05u, 0x28u, 0xc8u, 0x96u, 0x00u, 0x06u, 0x30u, 0xc8u, 0x96u, 0x01u, 0x07u,
+    0x38u, 0xc8u, 0x96u, 0x02u, 0x08u, 0x40u, 0xc8u, 0x96u, 0x03u, 0x09u, 0x48u, 0xc8u, 0x96u, 0x04u, 0x0au, 0x50u,
+    0xc8u, 0x96u, 0x00u, 0x0bu, 0x58u, 0xc8u, 0x96u, 0x01u, 0x0cu, 0x60u, 0xc8u, 0x96u, 0x02u, 0x0du, 0x68u, 0xc8u,
+    0x96u, 0x03u, 0x0eu, 0x70u, 0xc8u, 0x96u, 0x04u, 0x0fu, 0x78u, 0xc8u, 0x96u, 0x00u, 0x10u, 0x80u, 0xc8u, 0x96u,
+    0x01u, 0x11u, 0x88u, 0xc8u, 0x96u, 0x02u, 0x12u, 0x90u, 0xc8u, 0x96u, 0x03u, 0x13u, 0x98u, 0xc8u, 0x96u, 0x04u,
+    0x14u, 0xa0u, 0xc8u, 0x96u, 0x00u, 0x15u, 0xa8u, 0xc8u, 0x96u, 0x01u, 0x16u, 0xb0u, 0xc8u, 0x96u, 0x02u, 0x17u,
+    0xb8u, 0xc8u, 0x96u, 0x03u, 0x18u, 0xc0u, 0xc8u, 0x96u, 0x04u, 0x19u, 0xc8u, 0xc8u, 0x96u, 0x00u, 0x1au, 0xd0u,
+    0xc8u, 0x96u, 0x01u, 0x1bu, 0xd8u, 0xc8u, 0x96u, 0x02u, 0x1cu, 0xe0u, 0xc8u, 0x96u, 0x03u, 0x1du, 0xe8u, 0xc8u,
+    0x96u, 0x04u, 0x1eu, 0xf0u, 0xc8u, 0x96u, 0x00u, 0x1fu, 0xf8u, 0xc8u, 0x96u, 0x01u, 0x00u, 0x00u, 0xffu, 0xc8u,
+    0x0fu, 0x1fu, 0x14u, 0xffu, 0xc8u, 0x0eu, 0xffu, 0x28u, 0xffu, 0xc8u, 0x0du, 0x00u, 0x3cu, 0xffu, 0xc8u, 0x0cu,
+    0x1fu, 0x50u, 0xffu, 0xc8u, 0x0bu, 0xffu, 0x64u, 0xffu, 0xc8u, 0x0au, 0x00u, 0x78u, 0xffu, 0xc8u, 0x09u, 0x1fu,
+    0x8cu, 0xffu, 0xc8u, 0x08u, 0xffu, 0xa0u, 0xffu, 0xc8u, 0x07u, 0x00u, 0xb4u, 0xffu, 0xc8u, 0x06u, 0x1fu, 0xc8u,
+    0xffu, 0xc8u, 0x05u, 0xffu, 0xdcu, 0xffu, 0xc8u, 0x04u, 0xbfu, 0xffu, 0xc8u, 0x03u, 0x00u, 0xffu, 0xc8u, 0x28u,
+    0xffu, 0xc8u, 0x50u, 0xffu, 0xc8u, 0x78u, 0xffu, 0xc8u, 0x00u, 0x00u, 0x96u, 0x12u, 0xffu, 0xc8u, 0x94u, 0xffu,
+    0xc8u, 0x01u, 0x03u, 0x00u, 0x00u, 0xffu, 0xc8u, 0x04u, 0x01u, 0x1eu, 0xffu, 0xc8u, 0x05u, 0x02u, 0x3cu, 0xffu,
+    0xc8u, 0x06u, 0x03u, 0x5au, 0xffu, 0xc8u, 0x07u, 0xffu, 0x78u, 0xffu, 0xc8u, 0x08u, 0x00u, 0x96u, 0xffu, 0xc8u,
+    0x09u, 0x01u, 0xb4u, 0xffu, 0xc8u, 0x0au, 0x02u, 0xd2u, 0xffu, 0xc8u, 0x0bu,
+};
+
+static const uint8_t *candidate_blob   = compiled_blob;
+static uint16_t       candidate_length = sizeof(compiled_blob);
+static uint8_t        candidate_domains;
+
 typedef struct {
     uint8_t bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
 } memory_t;
@@ -392,16 +440,18 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
     return policy && policy->initialized && policy->peer_observer && policy->peer_observer(policy->peer_context, &unresolved) && unresolved == 0u ? 0u : NOAH_PROFILE_ACTIVATION_REASON_PEER;
 }
 
+// Reads and writes are bounded as the QMK EEPROM adapter bounds them
+// (qmk_profile_eeprom.c).
 static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
     memory_t *memory = context;
-    if (!target || length == 0u || (uint32_t)address + length > sizeof(memory->bytes)) return false;
+    if (!target || length == 0u || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) return false;
     memcpy(target, &memory->bytes[address], length);
     return true;
 }
 
 static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
     memory_t *memory = context;
-    if (!source || length == 0u || (uint32_t)address + length > sizeof(memory->bytes)) return false;
+    if (!source || length == 0u || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) return false;
     memcpy(&memory->bytes[address], source, length);
     return true;
 }
@@ -513,17 +563,26 @@ static void candidate_frame(uint8_t frame[32], uint8_t value, uint16_t transacti
     write_u16(&frame[3], transaction_id);
     if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN) {
         frame[5] = NOAH_PROFILE_SCHEMA_MAJOR;
-        write_u16(&frame[9], sizeof(compiled_blob));
-        write_u32(&frame[11], crc_of(compiled_blob, sizeof(compiled_blob)));
-        write_u32(&frame[15], fnv_of(compiled_blob, sizeof(compiled_blob)));
+        frame[7] = candidate_domains;
+        write_u16(&frame[9], candidate_length);
+        write_u32(&frame[11], crc_of(candidate_blob, candidate_length));
+        write_u32(&frame[15], fnv_of(candidate_blob, candidate_length));
         write_u32(&frame[19], UINT32_C(0x12345678));
         frame[23] = NOAH_PROFILE_STORE_FORMAT_VERSION;
         write_u32(&frame[24], target_via_generation);
         write_u32(&frame[28], target_digest());
-    } else if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK) {
-        frame[7] = sizeof(compiled_blob);
-        memcpy(&frame[8], compiled_blob, sizeof(compiled_blob));
     }
+}
+
+// One CHUNK frame of the candidate, at most the wire's chunk width.
+static void candidate_chunk_frame(uint8_t frame[32], uint16_t transaction_id, uint16_t offset) {
+    uint16_t left   = (uint16_t)(candidate_length - offset);
+    uint8_t  length = left < NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX ? (uint8_t)left : NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX;
+
+    candidate_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK, transaction_id);
+    write_u16(&frame[5], offset);
+    frame[7] = length;
+    memcpy(&frame[8], candidate_blob + offset, length);
 }
 
 // Sends one host staging frame through the real handler; returns admission.
@@ -564,19 +623,42 @@ static void tick(uint32_t *now) {
     *now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
 }
 
+// One matrix scan a millisecond later, as the keyboard runs them.
+static void scan_tick(uint32_t *now) {
+    fake_now = *now;
+    (void)noah_qmk_via_split_sync_matrix_scan_step();
+    (void)noah_profile_owner_scan(&other, false, *now);
+    (void)noah_profile_owner_scan(&usb, true, *now);
+    *now += 1u;
+}
+
 static void ticks(uint32_t *now, uint32_t count) {
     for (uint32_t index = 0u; index < count; index++)
         tick(now);
+}
+
+static void host_frame(uint8_t frame[32], uint32_t *now) {
+    assert(noah_profile_owner_receive(&usb, frame, 32u));
+    for (uint32_t guard = 0u; guard < 64u && usb.host_transaction.mailbox.pending; guard++)
+        tick(now);
+    assert(!usb.host_transaction.mailbox.pending);
 }
 
 static void host_candidate(uint8_t value, uint16_t transaction_id, uint32_t *now) {
     uint8_t frame[32];
 
     candidate_frame(frame, value, transaction_id);
-    assert(noah_profile_owner_receive(&usb, frame, sizeof(frame)));
-    for (uint32_t guard = 0u; guard < 64u && usb.host_transaction.mailbox.pending; guard++)
-        tick(now);
-    assert(!usb.host_transaction.mailbox.pending);
+    host_frame(frame, now);
+}
+
+static void host_candidate_chunks(uint16_t transaction_id, uint32_t *now) {
+    uint8_t frame[32];
+
+    for (uint16_t offset = 0u; offset < candidate_length;) {
+        candidate_chunk_frame(frame, transaction_id, offset);
+        offset = (uint16_t)(offset + frame[7]); // The reply overwrites the frame.
+        host_frame(frame, now);
+    }
 }
 
 // A staging frame the handler queued, carried to the peer.
@@ -622,10 +704,10 @@ static void boot_pair(uint32_t *now) {
 // on the peer: BEGIN, one chunk, and (when `verify`) VERIFY.
 static void stage(uint16_t transaction_id, bool verify, uint32_t *now) {
     host_candidate(NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, transaction_id, now);
-    host_candidate(NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK, transaction_id, now);
+    host_candidate_chunks(transaction_id, now);
     host_candidate(NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, transaction_id, now);
-    for (uint32_t guard = 0u; guard < 64u && usb.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++)
-        tick(now);
+    for (uint32_t guard = 0u; guard < 4096u && usb.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++)
+        scan_tick(now);
     assert(usb.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_BEGIN, transaction_id, NOAH_QMK_VIA_SYNC_REGION_NONE, NULL, 0u, now);
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_CHUNK, transaction_id, NOAH_QMK_VIA_SYNC_REGION_KEYMAP, target_keymap, KEYMAP_SIZE, now);
@@ -875,6 +957,29 @@ static void test_committed_reuse_saves_both_halves_and_reboots(void) {
     puts("committed-source reuse: real owners, logical VIA staging, both-half publication and reboot passed");
 }
 
+// A first Apply of a profile longer than one bounded store read. The copy to
+// the other half sends payload chunks of up to NOAH_PROFILE_SPLIT_V1_CHUNK_MAX
+// bytes, while the store reads at most NOAH_PROFILE_STORE_IO_CHUNK_MAX at a
+// time, as the keyboard's EEPROM adapter does.
+static void test_long_profile_copy_reads_within_the_store_bound(void) {
+    uint32_t now = 0;
+    candidate_blob    = long_profile;
+    candidate_length  = sizeof(long_profile);
+    candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB;
+    _Static_assert(NOAH_PROFILE_SPLIT_V1_CHUNK_MAX > NOAH_PROFILE_STORE_IO_CHUNK_MAX, "the copy must send chunks wider than one store read");
+    boot_pair(&now);
+    stage(321u, true, &now);
+    usb_link.chunk_frames = usb_link.reuse_frames = 0u;
+    commit_staged(321u, true, &now);
+    for (uint32_t guard = 0; guard < 8192u && other.state != NOAH_PROFILE_OWNER_READY_VALIDATED; guard++) tick(&now);
+    assert(other.committed_descriptor.payload_length == sizeof(long_profile));
+    assert(usb_link.chunk_frames >= 1u);
+    candidate_blob    = compiled_blob;
+    candidate_length  = sizeof(compiled_blob);
+    candidate_domains = 0u;
+    puts("long profile: the copy to the other half reads within the store bound passed");
+}
+
 static void test_reuse_busy_detail_keeps_the_host_status_vocabulary(void) {
     uint32_t now = 0;
     boot_pair(&now);
@@ -894,6 +999,7 @@ int main(void) {
     test_cleanup_waits_for_an_absent_peer_and_resumes();
     test_committed_reuse_saves_both_halves_and_reboots();
     test_reuse_busy_detail_keeps_the_host_status_vocabulary();
+    test_long_profile_copy_reads_within_the_store_bound();
     puts("profile owner and logical VIA integration tests passed");
     return 0;
 }

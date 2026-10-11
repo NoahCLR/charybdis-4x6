@@ -191,6 +191,9 @@ typedef struct {
     noah_profile_envelope_t           boot_envelope;
 } noah_profile_store_t;
 
+// Reads any span of logical EEPROM, in reads of at most
+// NOAH_PROFILE_STORE_IO_CHUNK_MAX bytes.
+bool                        noah_profile_store_read_span(const noah_profile_store_t *store, noah_profile_storage_address_t address, uint8_t *target, uint16_t length);
 void                        noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility);
 bool                        noah_profile_store_set_reuse_guard(noah_profile_store_t *store, const noah_profile_store_reuse_guard_t *guard);
 noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t *store, noah_profile_store_record_t *selected);

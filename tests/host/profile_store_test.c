@@ -55,7 +55,7 @@ static bool fake_read(void *context, noah_profile_storage_address_t address, uin
 
     memory->read_calls++;
     memory->last_read_length = length;
-    if (memory->fail_reads || (uint32_t)address + length > sizeof(memory->bytes)) {
+    if (memory->fail_reads || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) {
         return false;
     }
     memcpy(target, &memory->bytes[address], length);
@@ -1118,7 +1118,30 @@ static void test_retired_store_headers_never_become_authority(void) {
     }
 }
 
+// A span longer than one store read is read in bounded pieces, in order, and
+// a failed piece fails the whole span.
+static void test_read_span_reads_within_the_io_bound(void) {
+    noah_profile_store_t store;
+    uint8_t              span[3u * NOAH_PROFILE_STORE_IO_CHUNK_MAX + 5u];
+    const noah_profile_storage_address_t start = NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + 7u;
+
+    reset_eeprom(&eeprom);
+    for (uint16_t index = 0u; index < sizeof(span); index++) {
+        eeprom.bytes[start + index] = (uint8_t)(index * 7u + 1u);
+    }
+    noah_profile_store_init(&store, io_for(&eeprom), pd_compatibility());
+    eeprom.read_calls = 0u;
+    CHECK(noah_profile_store_read_span(&store, start, span, sizeof(span)));
+    CHECK(eeprom.read_calls == 4u && eeprom.last_read_length == 5u);
+    CHECK(memcmp(span, &eeprom.bytes[start], sizeof(span)) == 0);
+    CHECK(!noah_profile_store_read_span(&store, NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - 4u, span, 5u));
+    eeprom.fail_reads = true;
+    CHECK(!noah_profile_store_read_span(&store, start, span, sizeof(span)));
+    eeprom.fail_reads = false;
+}
+
 int main(void) {
+    test_read_span_reads_within_the_io_bound();
     test_retired_store_headers_never_become_authority();
     test_pd_store_accepts_every_settings_version_the_validator_does();
     test_pd_store_accepts_every_combo_version_the_validator_does();
