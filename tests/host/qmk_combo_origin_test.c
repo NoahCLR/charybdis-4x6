@@ -638,7 +638,7 @@ static void test_active_combo_partition_routes_preview_owner_to_underlay(void) {
     test_set_combo_active(1, true);
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &both_combo_record);
 
-    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, underlay_bitmap, overlay_bitmap);
+    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, NULL, underlay_bitmap, overlay_bitmap);
 
     CHECK(test_bitmap_has(underlay_bitmap, 0, 0));
     CHECK(test_bitmap_has(underlay_bitmap, 1, 0));
@@ -673,13 +673,55 @@ static void test_active_combo_partition_routes_preview_and_pd_owners_to_underlay
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &both_combo_record);
     CHECK(noah_qmk_combo_origin_event_owner_keypos(&both_combo_record, &both_owner_key_pos));
 
-    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, both_owner_key_pos, underlay_bitmap, overlay_bitmap);
+    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, both_owner_key_pos, NULL, underlay_bitmap, overlay_bitmap);
 
     CHECK(test_bitmap_has(underlay_bitmap, 0, 0));
     CHECK(test_bitmap_has(underlay_bitmap, 1, 0));
     CHECK(test_bitmap_has(underlay_bitmap, 0, 1));
     CHECK(test_bitmap_has(underlay_bitmap, 4, 0));
     CHECK(!key_origin_bitmap_has_any(overlay_bitmap));
+}
+
+// A combo whose owner is quiet (its output holds a momentary layer) leaves both
+// substages, even as the preview owner, while the other combo keeps its light.
+// The quiet entry is still there for its release to find.
+static void test_active_combo_partition_drops_quiet_owner(void) {
+    keyrecord_t left_combo_record  = test_combo_record(true);
+    keyrecord_t left_release       = test_combo_record(false);
+    keyrecord_t both_combo_record  = test_combo_record(true);
+    keypos_t    left_owner_key_pos = {0};
+    uint8_t     quiet_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t     underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t     overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset();
+
+    test_observe_physical_key(test_key(0, 0), true);
+    test_observe_physical_key(test_key(1, 0), true);
+    test_set_combo_active(0, true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &left_combo_record);
+    CHECK(noah_qmk_combo_origin_event_owner_keypos(&left_combo_record, &left_owner_key_pos));
+
+    test_observe_physical_key(test_key(0, 1), true);
+    test_observe_physical_key(test_key(4, 0), true);
+    test_set_combo_active(1, true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &both_combo_record);
+
+    key_origin_bitmap_clear(quiet_owner_bitmap);
+    key_origin_bitmap_add_keypos(quiet_owner_bitmap, left_owner_key_pos);
+    noah_qmk_combo_origin_active_bitmaps_partitioned(left_owner_key_pos, (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, quiet_owner_bitmap, underlay_bitmap, overlay_bitmap);
+
+    CHECK(!key_origin_bitmap_has_any(underlay_bitmap));
+    CHECK(!test_bitmap_has(overlay_bitmap, 0, 0));
+    CHECK(!test_bitmap_has(overlay_bitmap, 1, 0));
+    CHECK(test_bitmap_has(overlay_bitmap, 0, 1));
+    CHECK(test_bitmap_has(overlay_bitmap, 4, 0));
+
+    test_set_combo_active(0, false);
+    test_observe_physical_key(test_key(1, 0), false);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &left_release);
+    CHECK(left_release.event.key.row == left_owner_key_pos.row);
+    CHECK(left_release.event.key.col == left_owner_key_pos.col);
 }
 
 static void test_overlap_disabled_candidate_retires_before_feedback_bitmap(void) {
@@ -971,6 +1013,7 @@ int main(void) {
     test_reset_clears_cached_combo_origin_state();
     test_active_combo_partition_routes_preview_owner_to_underlay();
     test_active_combo_partition_routes_preview_and_pd_owners_to_underlay();
+    test_active_combo_partition_drops_quiet_owner();
     test_overlap_disabled_candidate_retires_before_feedback_bitmap();
     test_delayed_output_gets_final_deadline_scan_opportunity();
     test_deadline_expiry_boundaries_and_timer_wrap();
