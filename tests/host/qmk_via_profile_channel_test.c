@@ -433,6 +433,18 @@ static void test_hook_rejects_unsupported_or_malformed_commands(void) {
     assert(frame[0] == id_unhandled);
 #endif
 
+    make_request(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS, 4u, 2u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+#ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+    assert(frame[0] == id_custom_get_value && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(frame[WIRE_PAYLOAD] == 1u);
+    assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == live_peer_status.reused_bytes);
+    assert(read_u16(&frame[WIRE_PAYLOAD + 16u]) == 40u && read_u16(&frame[WIRE_PAYLOAD + 18u]) == 120u);
+    for (uint8_t index = WIRE_PAYLOAD + 20u; index < sizeof(frame); index++) assert(frame[index] == 0u);
+#else
+    assert(frame[0] == id_unhandled);
+#endif
+
     via_custom_value_command_kb(NULL, 0u);
 }
 

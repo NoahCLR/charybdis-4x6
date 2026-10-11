@@ -20,6 +20,7 @@ Subjects:
 
 | Subject | Measures | Procedure |
 | --- | --- | --- |
+| [`peer-copy/`](peer-copy/README.md) | Unchanged committed-profile peer copy, validation and polling | [capture procedure](peer-copy/README.md#capture-procedure) |
 | [`pointing-cadence/`](pointing-cadence/README.md) | Master loop: pointing polls, poll gaps, loop stages, split transactions | [capture procedure](pointing-cadence/README.md#capture-procedure) |
 
 ## Rules

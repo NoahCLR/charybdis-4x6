@@ -812,6 +812,36 @@ peer is ready. Builds with the live-profile owner answer it; others answer
 | 21 | 1 | who held the peer's storage admission in its last BUSY: `0` none, `1` host, `2` peer |
 | 22 | 3 | reserved, zero |
 
+Page 2 is a read-only peer-copy diagnostic. Older firmware answers
+`UNKNOWN_PAGE`; existing pages and their reserved bytes are unchanged. Its
+25-byte payload is:
+
+| Payload offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | layout version, `1` |
+| 1 | 1 | flags: bit 0 reuse became unavailable; other bits zero |
+| 2 | 2 | bytes acknowledged as copied from the peer's own source |
+| 4 | 2 | PAYLOAD_REUSE RPC attempts, including repeated progress polls and transport failures |
+| 6 | 2 | correlated SOURCE_UNAVAILABLE replies accepted by the sender |
+| 8 | 4 | sender reconciler scan invocations during the prepared push |
+| 12 | 4 | all RPC attempts during the prepared push, including failed attempts |
+| 16 | 2 | current reconciler transfer offset, as on page 1 |
+| 18 | 2 | current reconciler transfer length, as on page 1 |
+| 20 | 5 | reserved, zero |
+
+Counters saturate at their field widths, reset when a new prepared push is
+accepted, and remain available after it ends. They include validation,
+preparation, commit and retries, so take differences at the phase boundaries
+to isolate sending. Reconciler invocations include visits during retry waits;
+they are not all QMK matrix scans, since another durable-I/O subsystem may
+own a scan. An RPC attempt is QMK's complete info/request/execute/reply
+sequence, not one serial subtransaction. Reused bytes advance on a range's
+acknowledgement or source-unavailable reply, not each in-flight copy step.
+Read page 1 before and after page 2 and discard a sample crossing a phase or
+transfer change; the two reports are individually coherent, not one atomic
+capture. A later background repair can change the current offset and length
+without resetting the last prepared push's counters.
+
 Flag bit 2 (added 2026-09-25) means the commit decision, or the VIA ACCEPT
 that follows it, is waiting for this half to go idle: no held key, pending
 tap, locked layer or pointer mode, one-shot, macro or combo. Input still works

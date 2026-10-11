@@ -1,0 +1,59 @@
+RESULT ok {"elapsedMs":12703,"baseSource":"verified-cache","layoutBytes":0,"macroBytes":0,"viaConfigReports":1,"layoutReports":0,"macroReports":0}
+  step 6086 check:active
+  step 6086 backup:pending
+  step 6086 upload:pending
+  step 6086 validate:pending
+  step 6086 stage:pending
+  step 6086 peer:pending
+  step 6086 commit:pending
+  step 6086 converge:pending
+  step 6086 local:pending
+  step 6086 verify:pending
+  step 6315 check:done
+  step 6315 backup:active
+  step 6325 backup:done
+  step 6325 upload:active
+  step 9118 upload:done
+  step 9118 validate:active
+  step 9118 validate:done
+  step 9118 stage:active
+  step 12150 stage:done
+  step 12150 peer:active
+  step 12994 peer:done
+  step 12994 commit:active
+  step 13418 commit:done
+  step 13418 converge:active
+  step 13481 converge:done
+  step 13481 local:active
+  step 18580 local:done
+  step 18580 verify:active
+  step 18784 verify:done
+  peer@ 6090 ["IDLE","OK",3760,3760,"STORE_WORKING","PREPARED",6,637,0]
+  peer@ 12174 ["BINDING","OK",0,3760,"UNSPECIFIED","COMMITTED",6,638,1]
+  peer@ 12187 ["BEGINNING","OK",0,3760,"UNSPECIFIED","COMMITTED",6,639,1]
+  peer@ 12197 ["SENDING","OK",0,3760,"UNSPECIFIED","COMMITTED",6,639,0]
+  peer@ 12212 ["SENDING","OK",0,3760,"STORE_WORKING","RECEIVING",6,641,2]
+  peer@ 12230 ["SENDING","OK",0,3760,"STORE_WORKING","RECEIVING",6,643,4]
+  peer@ 12244 ["SENDING","OK",0,3760,"STORE_WORKING","RECEIVING",6,645,6]
+  peer@ 12258 ["SENDING","OK",0,3760,"STORE_WORKING","RECEIVING",6,647,8]
+  peer@ 12273 ["PREPARING","OK",3760,3760,"STORE_WORKING","RECEIVING",6,648,0]
+  peer@ 12290 ["PREPARING","OK",3760,3760,"STORE_WORKING","VALIDATING",6,650,2]
+  peer@ 12388 ["PREPARING","OK",3760,3760,"STORE_WORKING","VALIDATING",6,651,3]
+  peer@ 12592 ["PREPARING","OK",3760,3760,"STORE_WORKING","VALIDATING",6,652,4]
+  peer@ 12991 ["PREPARED","OK",3760,3760,"STORE_WORKING","VALIDATING",6,652,0]
+  peer@ 13441 ["COMMITTING","OK",3760,3760,"STORE_WORKING","PREPARED",6,653,0]
+  peer@ 13449 ["IDLE","OK",3760,3760,"STORE_WORKING","PREPARED",6,653,0]
+  req check 71 requests 374 ms [["08 00 07",39],["08 00 18",26],["08 00 02",4],["08 00 08",2]]
+  req backup 2 requests 12 ms [["08 00 18",2]]
+  req upload 617 requests 2579 ms [["08 00 18",566],["08 00 07",39],["08 00 02",4],["07 00 1b",4],["08 00 08",2],["07 00 10",1]]
+  req stage 433 requests 2900 ms [["08 00 18",317],["08 00 19",113],["07 00 15",1],["07 00 16",1],["07 00 17",1]]
+  req peer 195 requests 934 ms [["08 00 18",194],["09 00 13",1]]
+  req commit 90 requests 347 ms [["08 00 18",90]]
+  req converge 9 requests 65 ms [["08 00 18",6],["08 00 19",3]]
+  req local 1127 requests 4052 ms [["08 00 18",1126],["13 00 00",1]]
+  req verify 44 requests 166 ms [["08 00 18",36],["08 00 02",4],["08 00 08",3],["08 00 0b",1]]
+peer: {"phase":0,"phaseName":"IDLE","lastStatus":0,"lastStatusName":"OK","cleanupPending":false,"master":true,"waitingSafeBoundary":false,"transferOffset":3760,"transferLength":3760,"retryCount":653,"transportFailureCount":6,"busyStreak":0,"busyReason":"STORE_WORKING","busyStoreState":"PREPARED","busyOwner":"REMOTE_PUSH","busyAdmission":"PEER"}
+diag: Found 1 compatible Charybdis Raw HID interface.
+  Connected to Charybdis (4x6) Splinky · E46484D11B4D58280000000000000000.
+  Live profile schema and current source capacities are compatible.
+  Saved the complete profile in 12.7 s; transferred 0 changed layout bytes and 0 changed macro bytes.

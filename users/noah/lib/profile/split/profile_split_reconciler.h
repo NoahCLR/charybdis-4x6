@@ -25,6 +25,10 @@ enum {
     // or a slow scan can outlast one 5 ms wait; the backoff's next step is
     // 100 ms, twenty times as long.
     NOAH_PROFILE_SPLIT_ADMISSION_RETRIES = 8u,
+    // A fully received copy validates/prepares/commits asynchronously. Its
+    // correlated STORE_WORKING reply is expected work, not a lost mailbox.
+    // Collect completion promptly without spending an RPC every 5 ms.
+    NOAH_PROFILE_SPLIT_STORE_POLL_MS = 25u,
     // The receiver writes at most one full chunk's worth of bytes in a scan,
     // whether they arrived in a chunk or are copied for PAYLOAD_REUSE.
     NOAH_PROFILE_SPLIT_PEER_SCAN_BYTES = NOAH_PROFILE_SPLIT_V1_CHUNK_MAX,
@@ -195,6 +199,12 @@ typedef struct {
     uint32_t                               incoming_profile_digest;
     uint16_t                               transfer_offset;
     uint16_t                               reused_bytes;
+    // Prepared-push diagnostics, reset on a new push and retained afterward.
+    // Scans count reconciler invocations, not every QMK matrix scan.
+    uint32_t                               prepared_scans;
+    uint32_t                               prepared_exchanges;
+    uint16_t                               reuse_exchanges;
+    uint16_t                               source_unavailable_replies;
     uint8_t                                outbound_chunk_length;
     uint8_t                                outbound_chunk[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX];
     // The next frame is PAYLOAD_REUSE for this range rather than a chunk.
@@ -239,7 +249,7 @@ typedef struct {
     bool                                   outbound_reuse_pending;
     // The peer refused a PAYLOAD_REUSE source; send the rest of this copy as
     // bytes.
-    bool reuse_unavailable;
+    bool                                   reuse_unavailable;
     bool incoming_reuse_active;
 } noah_profile_split_reconciler_t;
 

@@ -91,6 +91,8 @@ typedef struct {
     // Payload frames the link carried, by kind.
     uint32_t chunk_frames;
     uint32_t reuse_frames;
+    uint32_t exchanges;
+    uint32_t source_unavailable;
 } split_link_t;
 
 // ── The other half's VIA bank ────────────────────────────────────────────────
@@ -117,6 +119,8 @@ static split_link_t          usb_link   = {.peer = &other};
 static split_link_t          other_link = {.peer = &usb};
 static peer_bank_t           peer;
 static bool                  link_up;
+static bool                  paced_copy;
+static uint32_t              paced_peer_scans;
 static uint32_t              fake_now;
 static uint32_t              user_eeconfig_word;
 static uint8_t               local_config[CONFIG_SIZE];
@@ -463,7 +467,21 @@ static bool split_exchange(void *context, const uint8_t *request, uint8_t reques
     if (!link_up || !link || !link->peer || !(reconciler = noah_profile_owner_split_reconciler(link->peer))) return false;
     if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK) link->chunk_frames++;
     if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) link->reuse_frames++;
-    return noah_profile_split_reconciler_receive(reconciler, request, request_length, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    link->exchanges++;
+    bool result = noah_profile_split_reconciler_receive(reconciler, request, request_length, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    if (result && response[2] == NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE) link->source_unavailable++;
+    if (paced_copy) {
+        // A 32-byte request/reply RPC occupies about 5 ms, including QMK's
+        // info/execute handshakes. The slave keeps scanning during it; the
+        // master cannot start another scan until the exchange returns.
+        uint32_t rpc_ms = request_length > NOAH_PROFILE_SPLIT_V1_FRAME_SIZE ? 9u : 5u;
+        for (uint32_t elapsed = 0u; elapsed < rpc_ms; elapsed++) {
+            fake_now++;
+            (void)noah_profile_owner_scan(&other, false, fake_now);
+            paced_peer_scans++;
+        }
+    }
+    return result;
 }
 
 // The USB half's owner drives the real VIA layer, as profile_store_runtime.c
@@ -890,12 +908,17 @@ static void assert_pair_profile(uint32_t generation) {
     noah_profile_owner_t *halves[] = {&usb, &other};
     for (unsigned half = 0; half < 2; half++) {
         noah_effective_profile_snapshot_t active;
-        uint8_t bytes[sizeof(compiled_blob)];
+        uint8_t bytes[sizeof(long_profile)];
         assert(noah_effective_profile_provider_copy_active(&halves[half]->provider, &active) == NOAH_EFFECTIVE_PROFILE_OK);
         assert(active.identity.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
-        assert(active.identity.generation == generation && active.identity.payload_digest == fnv_of(compiled_blob, sizeof(compiled_blob)));
-        assert(noah_effective_profile_snapshot_read(&active, 0, bytes, sizeof(bytes)));
-        assert(memcmp(bytes, compiled_blob, sizeof(bytes)) == 0);
+        assert(active.identity.generation == generation && active.identity.payload_digest == fnv_of(candidate_blob, candidate_length));
+        for (uint16_t offset = 0u; offset < candidate_length;) {
+            uint16_t left = candidate_length - offset;
+            uint8_t piece = left < NOAH_PROFILE_STORE_IO_CHUNK_MAX ? (uint8_t)left : NOAH_PROFILE_STORE_IO_CHUNK_MAX;
+            assert(noah_effective_profile_snapshot_read(&active, offset, bytes + offset, piece));
+            offset += piece;
+        }
+        assert(memcmp(bytes, candidate_blob, candidate_length) == 0);
     }
 }
 
@@ -908,14 +931,16 @@ static void reboot_saved_pair(uint32_t *now, uint32_t generation) {
     assert_pair_profile(generation);
 }
 
-static void test_committed_reuse_saves_both_halves_and_reboots(void) {
+static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
     uint32_t now = 0;
+    target_via_generation = 6u;
+    memcpy(target_keymap, (const uint8_t[]){0x91u, 0x92u, 0x93u}, KEYMAP_SIZE);
     boot_pair(&now);
     stage(311u, true, &now);
     commit_staged(311u, true, &now);
     for (uint32_t guard = 0; guard < 8192u && other.state != NOAH_PROFILE_OWNER_READY_VALIDATED; guard++) tick(&now);
     assert_pair_profile(1);
-    reboot_saved_pair(&now, 1);
+    if (reboot) reboot_saved_pair(&now, 1);
 
     // A later key edit reuses its unchanged custom profile from committed
     // EEPROM, rather than uploading it from the host or using compiled bytes.
@@ -926,23 +951,48 @@ static void test_committed_reuse_saves_both_halves_and_reboots(void) {
     host_candidate(NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, 312u, &now);
     uint8_t frame[32];
     candidate_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE, 312u);
-    write_u16(frame + 9, sizeof(compiled_blob));
+    write_u16(frame + 9, candidate_length);
     write_u32(frame + 11, source.identity.generation);
     write_u32(frame + 15, source.identity.payload_digest);
     write_u32(frame + 19, source.identity.payload_crc32);
     frame[23] = 1;
     frame[24] = source.identity.origin;
     assert(noah_profile_owner_receive(&usb, frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_QUEUED);
-    for (uint32_t guard = 0; guard < 64u && usb.host_transaction.mailbox.pending; guard++) tick(&now);
+    for (uint32_t guard = 0; guard < 4096u && usb.host_transaction.mailbox.pending; guard++) tick(&now);
     assert(!usb.host_transaction.mailbox.pending && usb.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE);
     assert_pair_profile(1); // Reconstruction cannot publish either half.
     host_candidate(NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 312u, &now);
-    for (uint32_t guard = 0; guard < 64u && usb.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++) tick(&now);
+    for (uint32_t guard = 0; guard < 4096u && usb.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++) tick(&now);
     assert(usb.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_BEGIN, 312u, NOAH_QMK_VIA_SYNC_REGION_NONE, NULL, 0u, &now);
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_CHUNK, 312u, NOAH_QMK_VIA_SYNC_REGION_KEYMAP, target_keymap, KEYMAP_SIZE, &now);
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_VERIFY, 312u, NOAH_QMK_VIA_SYNC_REGION_NONE, NULL, 0u, &now);
-    usb_link.chunk_frames = usb_link.reuse_frames = 0u;
+    usb_link.chunk_frames = usb_link.reuse_frames = usb_link.exchanges = usb_link.source_unavailable = 0u;
+    uint32_t started = now, peer_ready_at = 0u, master_ready_at = 0u, master_scans = 0u;
+    paced_peer_scans = 0u;
+    paced_copy = true;
+    candidate_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 312u);
+    assert(noah_profile_owner_receive(&usb, frame, sizeof(frame)));
+    for (uint32_t guard = 0u; guard < 8192u && !master_ready_at; guard++) {
+        fake_now = now;
+        (void)noah_profile_owner_scan(&other, false, now);
+        paced_peer_scans++;
+        (void)noah_profile_owner_scan(&usb, true, now);
+        master_scans++;
+        now = fake_now + 1u;
+        if (!peer_ready_at && other.peer_store.state == NOAH_PROFILE_PEER_STORE_PREPARED) peer_ready_at = now;
+        if (noah_profile_split_reconciler_prepared_push_ready(&usb.reconciler, NULL)) master_ready_at = now;
+    }
+    paced_copy = false;
+    assert(peer_ready_at && master_ready_at);
+    fprintf(stderr, "committed reuse reboot=%u: %u bytes, %u master scans, %u peer scans, %u RPCs (%u reuse, %u chunks, %u unavailable); peer ready %u ms, collected %u ms, tail %u ms\n", reboot, candidate_length, master_scans, paced_peer_scans, usb_link.exchanges, usb_link.reuse_frames, usb_link.chunk_frames, usb_link.source_unavailable, peer_ready_at - started, master_ready_at - started, master_ready_at - peer_ready_at);
+    assert(master_ready_at - peer_ready_at <= NOAH_PROFILE_SPLIT_STORE_POLL_MS + 5u);
+    noah_profile_candidate_v1_peer_status_t diagnostic;
+    assert(noah_profile_owner_peer_transfer(&usb, &diagnostic));
+    assert(diagnostic.reused_bytes == candidate_length && !diagnostic.reuse_unavailable);
+    assert(diagnostic.reuse_exchanges == usb_link.reuse_frames && diagnostic.source_unavailable_replies == 0u);
+    assert(diagnostic.prepared_exchanges == usb_link.exchanges);
+    assert(diagnostic.prepared_scans > 0u && diagnostic.prepared_scans <= master_scans);
     commit_staged(312u, true, &now);
     for (uint32_t guard = 0; guard < 8192u && other.committed_descriptor.generation != 2; guard++) tick(&now);
     assert_pair_profile(2);
@@ -950,7 +1000,7 @@ static void test_committed_reuse_saves_both_halves_and_reboots(void) {
     // the split link carried a reuse range and no profile bytes.
     noah_profile_split_reconciler_status_t split;
     assert(noah_profile_split_reconciler_status(noah_profile_owner_split_reconciler(&usb), &split));
-    assert(usb_link.reuse_frames >= 1u && usb_link.chunk_frames == 0u && split.reused_bytes == sizeof(compiled_blob));
+    assert(usb_link.reuse_frames >= 1u && usb_link.chunk_frames == 0u && split.reused_bytes == candidate_length && usb_link.source_unavailable == 0u);
     reboot_saved_pair(&now, 2);
     assert(memcmp(local_keymap, target_keymap, KEYMAP_SIZE) == 0 && memcmp(peer.keymap, target_keymap, KEYMAP_SIZE) == 0);
     assert(peer.generation == 7 && noah_qmk_via_sync_state_snapshot().metadata.generation == 7);
@@ -997,7 +1047,14 @@ int main(void) {
     test_an_abandoned_staging_expires_with_its_candidate();
     test_staging_progress_is_the_candidates_lease();
     test_cleanup_waits_for_an_absent_peer_and_resumes();
-    test_committed_reuse_saves_both_halves_and_reboots();
+    candidate_blob = long_profile;
+    candidate_length = sizeof(long_profile);
+    candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB;
+    test_committed_reuse_saves_both_halves_and_reboots(false);
+    test_committed_reuse_saves_both_halves_and_reboots(true);
+    candidate_blob = compiled_blob;
+    candidate_length = sizeof(compiled_blob);
+    candidate_domains = 0u;
     test_reuse_busy_detail_keeps_the_host_status_vocabulary();
     test_long_profile_copy_reads_within_the_store_bound();
     puts("profile owner and logical VIA integration tests passed");

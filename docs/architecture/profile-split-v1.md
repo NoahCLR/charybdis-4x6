@@ -201,6 +201,24 @@ mailbox, or copying and advancing) the sender keeps collecting at the 5 ms
 admission pace, up to eight polls in a row without progress, before the
 ordinary 50–1,000 ms backoff.
 
+After the complete payload arrives, a correlated `STORE_WORKING` reply for
+that exact generation, digest and length, at the full offset, with remote-push
+ownership and peer storage admission, is ordinary asynchronous work. During
+`PUSH_DURABLE` and `PUSH_COMMIT`, validating, preparing and committing stores
+are polled every 25 ms. They do not enter exponential failure backoff just
+because semantic validation takes more than one poll. The validator and
+marker-last write budgets are unchanged, and the owner's existing no-progress
+timeout still applies before the decision. Other BUSY replies and transport
+failures retain the existing backoff.
+
+Profile Wire candidate status page 2 reports acknowledged reused bytes, reuse
+RPC attempts, source-unavailable replies, prepared-push reconciler invocations
+and RPC attempts. This distinguishes local copying from byte fallback without
+changing the page-1 client vocabulary; see [the status layout](profile-wire-v1.md).
+Diagnostic-only counters remain outside the ordinary reconciler status
+snapshot, so scan-time callers do not carry a larger workspace into nested
+receive/write paths. The owner reads them in its main-context HID status query.
+
 ## Authority And Activation
 
 The comparator follows D-014:

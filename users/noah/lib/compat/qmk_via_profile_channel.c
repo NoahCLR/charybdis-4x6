@@ -320,7 +320,7 @@ NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *da
         noah_profile_candidate_v1_status_t      candidate;
         noah_profile_candidate_v1_peer_status_t peer;
 
-        if (data[4] == 1u && noah_profile_store_runtime_peer_transfer(&peer) && noah_profile_candidate_v1_handle_peer_status_get(&peer, data, length)) {
+        if ((data[4] == 1u || data[4] == 2u) && noah_profile_store_runtime_peer_transfer(&peer) && noah_profile_candidate_v1_handle_peer_status_get(&peer, data, length)) {
             return;
         }
         if (noah_profile_store_runtime_candidate_status(&candidate) && noah_profile_candidate_v1_handle_status_get(&candidate, data, length)) {
