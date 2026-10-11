@@ -27,7 +27,7 @@ _Static_assert(TOTAL_EEPROM_BYTE_COUNT == NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SI
 _Static_assert(VIA_EEPROM_CONFIG_END == NOAH_PROFILE_STORAGE_DYNAMIC_KEYMAP_START_ADDR, "VIA config end moved the accepted dynamic-keymap start");
 _Static_assert(NOAH_PROFILE_STORAGE_COMPILED_KEYMAP_SIZE == NOAH_PROFILE_STORAGE_DYNAMIC_KEYMAP_SIZE, "compiled dynamic keymap no longer occupies the accepted 1,920-byte region");
 _Static_assert(NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_START == NOAH_PROFILE_STORAGE_VIA_MACRO_START_ADDR, "compiled VIA macro start no longer matches the accepted address map");
-_Static_assert(NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_SIZE == NOAH_PROFILE_STORAGE_VIA_MACRO_SIZE, "compiled VIA macro capacity no longer matches the accepted 10,327-byte budget");
+_Static_assert(NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_SIZE == NOAH_PROFILE_STORAGE_VIA_MACRO_SIZE, "compiled VIA macro capacity no longer matches the accepted 34,903-byte budget");
 _Static_assert(DYNAMIC_KEYMAP_LAYER_COUNT <= NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS, "compiled layer count exceeds Profile Wire v1 capacity");
 _Static_assert(KEY_BEHAVIOR_MAX_TAP_COUNT == NOAH_PROFILE_WIRE_V1_MAX_TAP_STEPS_PER_BEHAVIOR, "compiled behavior tap depth no longer matches Profile Wire v1");
 

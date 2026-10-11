@@ -23,6 +23,8 @@ static uint16_t         keymap_write_count;
 static uint16_t         macro_write_count;
 static uint16_t         rgb_invalidate_count;
 static uint16_t         macro_invalidate_count;
+static uint16_t         macro_storage_changing_count;
+static uint16_t         macro_writes_before_storage_changing;
 static uint16_t         storage_changed_count;
 static bool             mirror_allowed;
 static bool             fake_master;
@@ -46,6 +48,8 @@ static void test_reset(void) {
     macro_write_count      = 0u;
     rgb_invalidate_count   = 0u;
     macro_invalidate_count = 0u;
+    macro_storage_changing_count = 0u;
+    macro_writes_before_storage_changing = 0u;
     storage_changed_count  = 0u;
     mirror_allowed         = true;
     fake_master            = false;
@@ -154,6 +158,11 @@ void via_macro_provider_invalidate_all(void) {
     macro_invalidate_count++;
 }
 
+void via_macro_provider_storage_changing(void) {
+    macro_storage_changing_count++;
+    macro_writes_before_storage_changing = macro_write_count;
+}
+
 void noah_qmk_via_split_sync_note_local_storage_changed(void) {
     storage_changed_count++;
 }
@@ -166,6 +175,7 @@ static void test_maximum_valid_payload_is_applied_by_real_receiver(void) {
     CHECK(macro_write_count == 0u);
     CHECK(rgb_invalidate_count == 1u);
     CHECK(macro_invalidate_count == 0u);
+    CHECK(macro_storage_changing_count == 0u);
     CHECK(storage_changed_count == 1u);
     for (uint8_t index = 0u; index < TEST_PAYLOAD_MAX; index++) {
         CHECK(keymap_sink[index] == (uint8_t)(index + 4u));
@@ -176,6 +186,9 @@ static void test_maximum_valid_payload_is_applied_by_real_receiver(void) {
     CHECK(macro_write_count == 1u);
     CHECK(rgb_invalidate_count == 1u);
     CHECK(macro_invalidate_count == 1u);
+    // A macro still reading the bank stops before the write lands.
+    CHECK(macro_storage_changing_count == 1u);
+    CHECK(macro_writes_before_storage_changing == 0u);
     CHECK(storage_changed_count == 2u);
     for (uint8_t index = 0u; index < TEST_PAYLOAD_MAX; index++) {
         CHECK(macro_sink[index] == (uint8_t)(index + 4u));

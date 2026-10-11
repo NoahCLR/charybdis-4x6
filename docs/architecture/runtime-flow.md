@@ -333,8 +333,18 @@ playback. Legacy nonzero ASCII bytes retain their existing contract. Text IR
 runs contain ASCII bytes, at most 255 per run with a two-byte header; each
 non-ASCII scalar uses opcode 6 and three little-endian scalar bytes (four IR
 bytes total). Scalars never cross an IR text-chunk boundary. The program
-ceiling remains 512 bytes. VIA may store a larger or invalid slot; it remains
-unplayable and negatively cached until a mutation invalidates it. A structurally
+window remains 512 bytes, but a stored macro has no separate program ceiling.
+Feature bit 27 advertises this contract: the encoded slot and all terminators
+must fit the shared 34,903-byte bank. Decode and playback preflight visit every
+window before any output, carrying held-key balance and Unicode requirements
+across windows. Playback refills the same static window from its saved storage
+cursor; slot lookup is reused, so each refill does not walk earlier slots.
+A malformed or truncated tail is rejected before the first output, and the slot
+is negatively cached until mutation. Every macro-bank write or reset cancels
+active stored playback before changing bytes; cleanup releases all held keys
+and records cancellation, including when the final window is already loaded.
+Authored C defaults still compile into one window; their source grammar and
+512-byte compilation buffer are unchanged. A structurally
 valid slot rejected because the host is unknown, Unicode is off or the layout
 cannot type it remains retryable without a macro mutation.
 
@@ -421,7 +431,7 @@ prefix `01 05 01` forces protection on, and `01 05 02` forces it off. It must
 occur once at the beginning; zero, unknown policies, a truncated prefix or a
 prefix after executable content are rejected. Without a prefix, protection is
 automatic: preflight enables it when any scalar needs host Unicode entry under
-the latched layout. The policy is metadata outside the 512-byte executable IR;
+the latched layout. The policy is metadata outside the executable IR window;
 its three stored bytes count against macro-bank memory. Empty macros can retain
 an explicit policy without producing output. Encoders preserve the policy.
 

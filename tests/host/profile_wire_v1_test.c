@@ -13,7 +13,7 @@ static const noah_profile_wire_v1_read_service_t service = {
             .protocol_major               = 1u,
             .schema_major                 = 3u,
             .candidate_chunk_max          = 0u,
-            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_FEATURE_WIDE_PAGES,
+            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_FEATURE_WIDE_PAGES | NOAH_PROFILE_FEATURE_STREAMING_MACROS,
             .action_abi_digest            = UINT32_C(0x12345678),
             .firmware_version             = UINT32_C(0x00010000),
             .compiled_default_digest      = UINT32_C(0x89ABCDEF),
@@ -30,10 +30,10 @@ static const noah_profile_wire_v1_read_service_t service = {
             .led_bitmap_size              = 8u,
             .custom_key_slots             = 128u,
             .via_macro_slots              = 128u,
-            .max_profile_payload          = 65504u,
-            .profile_slot_payload         = 65504u,
-            .profile_slot_size            = 65536u,
-            .via_macro_bytes              = 10327u,
+            .max_profile_payload          = 53216u,
+            .profile_slot_payload         = 53216u,
+            .profile_slot_size            = 53248u,
+            .via_macro_bytes              = 34903u,
             .supported_domain_mask        = 3u,
             .max_name_bytes               = 32u,
             .layer_mask_bits              = 32u,
@@ -134,7 +134,7 @@ static void test_capability_pages(void) {
     assert(frame[7] == NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT && frame[8] == 3u);
     assert(frame[9] == 1u && frame[11] == 3u);
     assert(frame[13] == 32u && frame[14] == 0u && frame[15] == 2u);
-    assert(frame[16] == 0x1Fu && frame[17] == 0x0Cu && frame[18] == 0x08u && frame[19] == 0u);
+    assert(frame[16] == 0x1Fu && frame[17] == 0x0Cu && frame[18] == 0x08u && frame[19] == 0x08u);
 
     request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x42u, 1u);
     assert_golden("capabilities-page-1-request", frame);
@@ -144,8 +144,8 @@ static void test_capability_pages(void) {
     assert(frame[7] == 16u && frame[8] == 16u && frame[9] == 128u && frame[10] == 5u);
     // Byte 4 (populated steps) and bytes 17..18 (slot size) moved to page 2.
     assert(frame[11] == 0u && frame[24] == 0u && frame[25] == 0u);
-    assert(frame[20] == 0xE0u && frame[21] == 0xFFu && frame[22] == 0xE0u && frame[23] == 0xFFu);
-    assert(frame[26] == 0x57u && frame[27] == 0x28u);
+    assert(frame[20] == 0xE0u && frame[21] == 0xCFu && frame[22] == 0xE0u && frame[23] == 0xCFu);
+    assert(frame[26] == 0x57u && frame[27] == 0x88u);
     assert(frame[28] == 3u && frame[29] == 0u && frame[30] == 0u && frame[31] == 0u);
 
     // Page 2 holds the fields wider than a byte.
@@ -155,7 +155,7 @@ static void test_capability_pages(void) {
     assert_golden("capabilities-page-2-response", frame);
     assert_success(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x45u, 2u);
     assert(frame[7] == 0x80u && frame[8] == 0x02u && frame[9] == 5u);
-    assert(frame[10] == 0u && frame[11] == 0u && frame[12] == 1u && frame[13] == 0u);
+    assert(frame[10] == 0u && frame[11] == 0xD0u && frame[12] == 0u && frame[13] == 0u);
     assert(frame[14] == 32u && frame[15] == 32u && frame[16] == 60u);
 
     request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x46u, 3u);
@@ -217,6 +217,7 @@ static void test_malformed_requests(void) {
 int main(int argc, char **argv) {
     assert(NOAH_PROFILE_FEATURE_MACRO_PROTECTION == (1u << 23));
     assert(NOAH_PROFILE_FEATURE_MACRO_OUTPUT_ISOLATION == (1u << 26));
+    assert(NOAH_PROFILE_FEATURE_STREAMING_MACROS == (1u << 27));
     assert(NOAH_PROFILE_FEATURE_CANDIDATE_REUSE == (1u << 24));
     assert(NOAH_PROFILE_FEATURE_CANDIDATE_STREAM == (1u << 25));
     assert(argc == 2);

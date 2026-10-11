@@ -1,6 +1,7 @@
 // Reads one VIA macro per line as hex and prints the program length the
-// firmware's decoder compiles it to, or -1 when it refuses the macro. The
-// app's macroProgramBytes() is checked against this output.
+// firmware's decoder compiles it to, summed over the windows it plays in, or
+// -1 when it refuses the macro. The app's macroProgramBytes() is checked
+// against this output.
 #include <stdio.h>
 #include <string.h>
 
@@ -25,8 +26,17 @@ int main(void) {
             buffer[length++] = (uint8_t)value;
         }
         buffer[length++] = 0;
-        macro_payload_ir_t ir = {0};
-        printf("%d\n", macro_payload_decode_qmk_stream(&ir, length, read_byte, NULL) ? (int)ir.length : -1);
+        macro_payload_ir_t            ir     = {0};
+        macro_payload_stream_cursor_t cursor = {0};
+        long                          total  = 0;
+        do {
+            if (!macro_payload_decode_qmk_window(&ir, &cursor, length, read_byte, NULL)) {
+                total = -1;
+                break;
+            }
+            total += ir.length;
+        } while (ir.more);
+        printf("%ld\n", total);
     }
     return 0;
 }

@@ -311,9 +311,9 @@ Current firmware uses one geometry:
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
-| `0x00000..0x02fff` | 12,288 | QMK/VIA allocation |
-| `0x03000..0x12fff` | 65,536 | Profile slot A, 32-byte header + 65,504-byte payload |
-| `0x13000..0x22fff` | 65,536 | Profile slot B, same layout |
+| `0x00000..0x08fff` | 36,864 | QMK/VIA allocation |
+| `0x09000..0x15fff` | 53,248 | Profile slot A, 32-byte header + 53,216-byte payload |
+| `0x16000..0x22fff` | 53,248 | Profile slot B, same layout |
 
 Logical EEPROM is 143,360 bytes; RP2040 wear-level backing is 286,720 bytes
 (D-F14). Older layouts are not interpreted in place. Keep a complete backup and
@@ -324,9 +324,9 @@ belongs to [memory budgets](memory-budgets.md).
 
 ## Integration and identity gates
 
-Schema 3.0 includes domain `0x50`, advertised by domain-mask bit 4. Format 4
-(`NS`) stores five domain bits, origin in bit 5, flags in bit 6 and reserved
-bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ` and `NR`
+Schema 3.0 includes domain `0x50`, advertised by domain-mask bit 4. Format 5
+(`NT`) stores five domain bits, origin in bit 5, flags in bit 6 and reserved
+bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ`, `NR` and `NS`
 headers are rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
 
 Synchronous validation, bounded boot scanning and commit shape validation
@@ -342,7 +342,7 @@ The current action-ABI digest is the one capability page 0 reports; it covers
 the layer count, so the sixteen-layer bank changed it (D-F14). Older action
 vocabularies require client translation before a current-format Apply.
 Candidate metadata, owner, peer storage and background stale-peer repair all
-use format 4 and require a
+use format 5 and require a
 correlated VIA bind before PREPARE_BEGIN. Retry preserves the bind for that exact
 generation/digest. Incompatible peers cannot Apply.
 

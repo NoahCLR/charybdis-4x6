@@ -1048,7 +1048,7 @@ static void test_maximum_candidate_resolves_within_owner_no_progress_window(void
     descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
 
     assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
-    // A full 65,504-byte payload is 4,679 split chunks, then the peer's
+    // A full 53,216-byte payload is 3,802 split chunks, then the peer's
     // validation; the loop bound is generous, the timing assertion is not.
     for (uint32_t scan = 0u; scan < 16u * MAX_SCANS; scan++) {
         resolved_at = start_at + scan * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS;
@@ -1189,7 +1189,7 @@ static bool run_copy_with_lost_exchange(uint16_t length, bool after, uint32_t dr
 // its reply was lost after the peer acted on it, must still let the transfer
 // finish. A copy that retries one chunk forever wedges Apply. Every exchange
 // of a 5,088-byte copy is covered (the protocol does not depend on size);
-// a full 65,504-byte copy is sampled at its start, middle and end, including
+// a full 53,216-byte copy is sampled at its start, middle and end, including
 // the offsets whose 16-bit sums are largest.
 static void test_prepared_push_survives_one_lost_exchange_anywhere(void) {
     enum { EXHAUSTIVE_LENGTH = 5088u };

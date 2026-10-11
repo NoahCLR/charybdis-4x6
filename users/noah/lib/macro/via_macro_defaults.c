@@ -224,6 +224,10 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
     }
 
     via_local_commit_pending_effects |= effects;
+    if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_INVALIDATE_MACROS) {
+        // QMK writes the bank when this returns; invalidation waits a scan.
+        via_macro_provider_storage_changing();
+    }
     if (effects & NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS) {
         via_macro_seed_scan_pending   = true;
         via_macro_seed_last_succeeded = false;

@@ -433,8 +433,8 @@ static void test_malformed_frame_matrix(void) {
     for (uint8_t format = 0u; format <= 5u; format++) {
         begin_frame(frame, 1u, &metadata);
         frame[23] = format;
-        assert((noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK) == (format == 4u));
-        if (format != 4u) assert(error.frame_offset == 23u);
+        assert((noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK) == (format == NOAH_PROFILE_LOGICAL_STORE_VERSION));
+        if (format != NOAH_PROFILE_LOGICAL_STORE_VERSION) assert(error.frame_offset == 23u);
     }
     for (uint8_t offset = 24u; offset <= 28u; offset += 4u) {
         begin_frame(frame, 1u, &metadata);

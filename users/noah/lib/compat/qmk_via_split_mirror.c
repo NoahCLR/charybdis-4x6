@@ -84,6 +84,7 @@ static void noah_qmk_via_split_mirror_apply_command(const uint8_t *data, uint8_t
             dynamic_keymap_reset();
             break;
         case id_dynamic_keymap_macro_reset:
+            via_macro_provider_storage_changing();
             dynamic_keymap_macro_reset();
             break;
 #    ifdef ENCODER_MAP_ENABLE

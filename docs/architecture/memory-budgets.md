@@ -493,3 +493,40 @@ inlining it had kept that workspace in the process frame and crossed the
 main-process policy by 40 bytes. Neither a PASS nor these margins establish
 a global or interrupt-stack maximum. Allocator/stack high-water and timing
 on both physical halves remain hardware acceptance evidence.
+
+
+### Stored macro expansion within the same EEPROM allocation
+
+The macro expansion repartitions the existing 140 KiB logical EEPROM per half:
+36 KiB belongs to VIA (34,903 macro bytes), followed by two 52 KiB custom-profile
+slots. The SRAM0–3 EEPROM mirror remains 143,360 bytes, and flash backing
+remains 286,720 bytes. Each 53,216-byte payload still holds the 37,667-byte
+maximum profile with 15,549 bytes spare, retaining the 12 KiB future reserve.
+
+Stored playback reuses the 516-byte linked IR window. Added provider state is
+one 20-byte cursor, one 16-byte provider, a one-byte slot and a six-byte VIA
+lookup cache; the engine adds two 32-bit callback/context pointers. The memory
+gate includes the new provider symbols in named macro storage: 692 bytes on
+each instrumented half. Authored C defaults continue to compile in a fixed
+window; their stack workspace is unchanged rather than enlarged for long
+stored macros.
+
+The fresh instrumented pair uses pinned GCC 15.2.0 and BK
+`173eae2b5e1b21c15a84ea90eb8fe84b434c63c5`. Right and left each link 4,168
+bytes of `.data` and 202,920 bytes of `.bss` in SRAM0–3: 207,088 bytes combined,
+2,832 below the unchanged 209,920-byte regression policy. The fixed SRAM0–3
+prefix is 207,096 bytes and its boot linker/core-memory span 55,048 bytes.
+Fixed occupancy across unique SRAM banks is 214,552 bytes per half. The
+50,952-byte static headroom subtracts the linked prefix and 4,096-byte arena
+floor; none of these figures measures runtime free memory or high-water.
+
+The ordinary manifest retains its former functional paths with the compiler's
+current linked callers and adds stored-window decoding, storage reads, refill
+callbacks and persistent-hold output. Both halves pass: the largest reviewed
+main-process path is 1,920 bytes, exactly the unchanged policy (640 bytes below
+the physical 2,560-byte stack boundary); the largest split-slave path is 328
+bytes. The owner manifest reaches 1,632 bytes in the main process and 344 bytes
+in the split-slave thread. Macro startup decoding reaches 1,460 bytes and
+scan-time refill 556 bytes. These are reviewed-path bounds only; interrupt and
+global stack maxima, full-bank startup timing, cancellation, restore and
+wear-level consolidation pauses remain acceptance on the physical keyboard.

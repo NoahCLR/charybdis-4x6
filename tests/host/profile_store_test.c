@@ -244,7 +244,7 @@ static void test_commit_and_boot_selection(void) {
     CHECK(eeprom.last_write_length == NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE);
     first_candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
     header          = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
-    CHECK(header[0] == 'N' && header[1] == 'S' && header[2] == 0x40u);
+    CHECK(header[0] == 'N' && header[1] == 'T' && header[2] == 0x40u);
     CHECK(load_u16(&header[3]) == sizeof(empty_profile));
     CHECK(load_u32(&header[5]) == 1u);
     CHECK(load_u32(&header[9]) == first_candidate.payload_crc32);
@@ -285,7 +285,7 @@ static void test_logical_header_binds_via_identity(void) {
     CHECK(record.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
     CHECK(record.via_generation == candidate.via_generation && record.via_digest == candidate.via_digest);
     header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
-    CHECK(header[0] == 'N' && header[1] == 'S');
+    CHECK(header[0] == 'N' && header[1] == 'T');
     CHECK(load_u16(&header[3]) == candidate.payload_length);
     CHECK(load_u32(&header[5]) == candidate.generation);
     CHECK(load_u32(&header[9]) == candidate.payload_crc32);
@@ -920,7 +920,7 @@ static void test_pd_header_all_identity_bits_and_boot_paths(void) {
                 initialize_pd_store(&store);
                 CHECK(commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_OK);
                 const uint8_t *header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
-                CHECK(header[0] == 'N' && header[1] == 'S');
+                CHECK(header[0] == 'N' && header[1] == 'T');
                 CHECK(header[2] == (uint8_t)(mask | (origin << 5u) | (flags << 6u)));
                 CHECK(load_u16(&header[29]) == noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, header, 29u));
                 CHECK(header[31] == 0xA5u);
@@ -948,6 +948,24 @@ static void test_pd_header_all_identity_bits_and_boot_paths(void) {
             }
         }
     }
+}
+
+// Even a valid prior-layout header at a new slot boundary must not be adopted.
+static void test_previous_layout_store_header_is_refused(void) {
+    uint8_t payload[33];
+    uint16_t length = pd_payload(payload, 31u);
+    noah_profile_store_t store;
+    noah_profile_store_record_t record;
+    noah_profile_store_candidate_t candidate = pd_candidate(payload, length, 31u, 1u, 0u, 0u);
+    reset_eeprom(&eeprom);
+    initialize_pd_store(&store);
+    CHECK(commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_OK);
+    uint8_t *header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
+    header[1] = 'S';
+    store_u16(&header[29], noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, header, 29u));
+    noah_profile_store_init(&store, io_for(&eeprom), pd_compatibility());
+    CHECK(noah_profile_store_boot_select(&store, &record) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    CHECK(noah_profile_store_validate_slot(&store, NOAH_PROFILE_SLOT_A, true, &record) == NOAH_PROFILE_STORE_INVALID_HEADER);
 }
 
 static void test_pd_header_rejects_bad_contracts_before_writing(void) {
@@ -1106,6 +1124,7 @@ int main(void) {
     test_pd_store_accepts_every_combo_version_the_validator_does();
     test_pd_store_accepts_only_32_slot_rgb_and_pd_versions();
     test_pd_header_all_identity_bits_and_boot_paths();
+    test_previous_layout_store_header_is_refused();
     test_pd_header_rejects_bad_contracts_before_writing();
     test_pd_header_power_loss_keeps_complete_generation();
     test_checksums();

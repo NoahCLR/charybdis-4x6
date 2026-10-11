@@ -77,6 +77,10 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
                     "20000010 00000040 B via_macro_slots.lto_priv.7",
                     "20000050 00000202 b macro_slot_active_ir.lto_priv.8",
                     "20000254 00000004 b macro_slot_active_metadata.lto_priv.9",
+                    "20000258 00000014 b macro_slot_active_cursor.lto_priv.10",
+                    "2000026c 00000010 b macro_slot_active_provider",
+                    "2000027c 00000001 b macro_slot_active_slot",
+                    "2000027d 00000006 b via_macro_found",
                     "00000100 00000020 T macro_slot_active_ir_helper",
                 )
             )
@@ -84,6 +88,10 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
         self.assertEqual(symbols["via_macro_slots"], 64)
         self.assertEqual(symbols["macro_slot_active_ir"], 514)
         self.assertEqual(symbols["macro_slot_active_metadata"], 4)
+        self.assertEqual(symbols["macro_slot_active_cursor"], 20)
+        self.assertEqual(symbols["macro_slot_active_provider"], 16)
+        self.assertEqual(symbols["macro_slot_active_slot"], 1)
+        self.assertEqual(symbols["via_macro_found"], 6)
 
     def test_rejects_missing_required_symbol(self):
         with self.assertRaisesRegex(ValueError, "via_macro_slots"):

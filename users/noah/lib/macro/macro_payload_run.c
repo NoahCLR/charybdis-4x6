@@ -62,6 +62,8 @@ typedef struct {
     uint16_t                      second_stroke;
     macro_payload_phase_t         stroke_next;
     const macro_payload_ir_t     *ir;
+    macro_payload_load_window_fn  load_next;
+    void                         *load_context;
     uint16_t                      cursor;
     uint16_t                      text_cursor;
     uint8_t                       text_remaining;
@@ -329,12 +331,20 @@ static bool macro_payload_ir_next(const uint8_t **cursor, const uint8_t *end, ma
     return true;
 }
 
-static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, const macro_payload_host_t *host, bool *needs_unicode) {
-    const uint8_t               *cursor;
-    const uint8_t               *end;
-    macro_payload_hold_balance_t balance = {0};
+void macro_payload_preflight_begin(macro_payload_preflight_t *preflight) {
+    const macro_payload_host_t host = macro_payload_host_resolve();
 
-    if (!ir || ir->length > sizeof(ir->bytes) || ir->protection > 2u) {
+    *preflight = (macro_payload_preflight_t){.layout = host.layout, .unicode_mode = host.unicode_mode, .iso = host.iso};
+}
+
+// Held keys carry from one window to the next; only the last must end clear.
+bool macro_payload_preflight_window(macro_payload_preflight_t *preflight, const macro_payload_ir_t *ir) {
+    const uint8_t                *cursor;
+    const uint8_t                *end;
+    const host_layout_t          *layout  = preflight ? (const host_layout_t *)preflight->layout : NULL;
+    macro_payload_hold_balance_t *balance = preflight ? &preflight->balance : NULL;
+
+    if (!layout || !ir || ir->length > sizeof(ir->bytes) || ir->protection > 2u) {
         return false;
     }
 
@@ -349,24 +359,28 @@ static bool macro_payload_ir_preflight(const macro_payload_ir_t *ir, const macro
         uint16_t strokes[2];
         if (step.opcode == MACRO_PAYLOAD_IR_OP_TEXT) {
             for (uint8_t i = 0u; i < step.length; i++)
-                if (!host_layout_lookup(host->layout, step.bytes[i], strokes)) return false;
+                if (!host_layout_lookup(layout, step.bytes[i], strokes)) return false;
         }
         // A scalar the layout cannot type needs Unicode entry, which an
         // ordinary key held across it would corrupt.
-        if (step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE && !host_layout_lookup(host->layout, step.value, strokes)) {
-            *needs_unicode = true;
-            if (host->unicode_mode < 1u || host->unicode_mode > 3u) return false;
-            for (uint8_t i = 0u; i < balance.count; i++)
-                if (balance.keycodes[i] < KC_LEFT_CTRL) return false;
+        if (step.opcode == MACRO_PAYLOAD_IR_OP_UNICODE && !host_layout_lookup(layout, step.value, strokes)) {
+            preflight->needs_unicode = true;
+            if (preflight->unicode_mode < 1u || preflight->unicode_mode > 3u) return false;
+            for (uint8_t i = 0u; i < balance->count; i++)
+                if (balance->keycodes[i] < KC_LEFT_CTRL) return false;
         }
-        if (step.opcode == MACRO_PAYLOAD_IR_OP_KEY_DOWN && !macro_payload_hold_balance_note_down(&balance, (uint8_t)step.value)) {
+        if (step.opcode == MACRO_PAYLOAD_IR_OP_KEY_DOWN && !macro_payload_hold_balance_note_down(balance, (uint8_t)step.value)) {
             return false;
         }
-        if (step.opcode == MACRO_PAYLOAD_IR_OP_KEY_UP && !macro_payload_hold_balance_note_up(&balance, (uint8_t)step.value)) {
+        if (step.opcode == MACRO_PAYLOAD_IR_OP_KEY_UP && !macro_payload_hold_balance_note_up(balance, (uint8_t)step.value)) {
             return false;
         }
     }
-    return cursor == end && macro_payload_hold_balance_is_clear(&balance);
+    return cursor == end;
+}
+
+bool macro_payload_preflight_end(const macro_payload_preflight_t *preflight) {
+    return preflight && macro_payload_hold_balance_is_clear(&preflight->balance);
 }
 
 static bool macro_payload_owned_holds_acquire(macro_payload_owned_holds_t *holds, uint8_t keycode) {
@@ -667,6 +681,15 @@ static void macro_payload_execute_ready(uint32_t now) {
         macro_payload_begin_runtime_error();
         return;
     }
+    if (macro_payload_engine.cursor == macro_payload_engine.ir->length && macro_payload_engine.ir->more) {
+        // Every window passed preflight before output. Bank mutations cancel
+        // playback before changing storage; a failed refill still cleans up.
+        if (!macro_payload_engine.load_next || !macro_payload_engine.load_next(macro_payload_engine.load_context) || macro_payload_engine.ir->length == 0u) {
+            macro_payload_begin_runtime_error();
+            return;
+        }
+        macro_payload_engine.cursor = 0u;
+    }
     if (macro_payload_engine.cursor == macro_payload_engine.ir->length) {
         if (!macro_payload_hold_balance_is_clear(&macro_payload_engine.holds.balance)) {
             macro_payload_begin_runtime_error();
@@ -770,13 +793,25 @@ static void macro_payload_cleanup_one(void) {
 }
 
 macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context) {
+    macro_payload_preflight_t preflight;
+
     if (macro_payload_engine.phase != MACRO_PAYLOAD_PHASE_IDLE) {
         macro_payload_increment_u16(&macro_payload_diagnostics.busy_rejection_count);
         return MACRO_PAYLOAD_START_BUSY;
     }
-    const macro_payload_host_t host          = macro_payload_host_resolve();
-    bool                       needs_unicode = false;
-    if (!macro_payload_ir_preflight(ir, &host, &needs_unicode)) {
+    macro_payload_preflight_begin(&preflight);
+    if (!ir || ir->more || !macro_payload_preflight_window(&preflight, ir) || !macro_payload_preflight_end(&preflight)) {
+        return MACRO_PAYLOAD_START_INVALID;
+    }
+    return macro_payload_start_windows(ir, &preflight, NULL, NULL, text_output, interval, source, slot, finish, context);
+}
+
+macro_payload_start_result_t macro_payload_start_windows(const macro_payload_ir_t *ir, const macro_payload_preflight_t *preflight, macro_payload_load_window_fn load_next, void *load_context, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context) {
+    if (macro_payload_engine.phase != MACRO_PAYLOAD_PHASE_IDLE) {
+        macro_payload_increment_u16(&macro_payload_diagnostics.busy_rejection_count);
+        return MACRO_PAYLOAD_START_BUSY;
+    }
+    if (!ir || !preflight || !preflight->layout || (ir->more && !load_next)) {
         return MACRO_PAYLOAD_START_INVALID;
     }
     if (ir->length == 0u) {
@@ -784,11 +819,13 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
     }
 
     macro_payload_engine = (macro_payload_engine_t){
-        .protected      = ir->protection == 1u || (ir->protection == 0u && needs_unicode),
-        .unicode_mode   = host.unicode_mode,
-        .layout         = host.layout,
-        .layout_iso     = host.iso,
+        .protected      = ir->protection == 1u || (ir->protection == 0u && preflight->needs_unicode),
+        .unicode_mode   = preflight->unicode_mode,
+        .layout         = (const host_layout_t *)preflight->layout,
+        .layout_iso     = preflight->iso,
         .ir             = ir,
+        .load_next      = load_next,
+        .load_context   = load_context,
         .phase          = MACRO_PAYLOAD_PHASE_READY,
         .text_interval  = text_output == MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED ? interval : TAP_CODE_DELAY,
         .source         = source,

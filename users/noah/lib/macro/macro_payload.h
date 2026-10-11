@@ -6,7 +6,10 @@
 typedef bool (*macro_payload_write_byte_fn)(uint8_t byte, void *context);
 typedef bool (*macro_payload_read_byte_fn)(uint16_t offset, uint8_t *byte, void *context);
 
+// One window of compiled program. A stored macro longer than this plays as a
+// series of windows decoded from storage (macro_payload_decode_qmk_window).
 #define MACRO_PAYLOAD_IR_MAX_BYTES 512
+#define MACRO_PAYLOAD_MAX_TAP_KEYS 16
 
 typedef enum {
     MACRO_PAYLOAD_IR_OP_TEXT = 1,
@@ -25,8 +28,33 @@ typedef enum {
 typedef struct {
     uint16_t length;
     uint8_t  protection; // 0 automatic, 1 on, 2 off; VIA prefix 1,5,value.
+    bool     more;       // Another window of the same macro follows this one.
     uint8_t  bytes[MACRO_PAYLOAD_IR_MAX_BYTES];
 } macro_payload_ir_t;
+
+typedef struct {
+    uint8_t keycodes[MACRO_PAYLOAD_MAX_TAP_KEYS];
+    uint8_t count;
+} macro_payload_hold_balance_t;
+
+// Where the next window of a stored macro starts. Zeroed, it is the start.
+typedef struct {
+    uint16_t                     offset;
+    uint8_t                      protection;
+    macro_payload_hold_balance_t balance;
+} macro_payload_stream_cursor_t;
+
+// Playback checks, carried across every window of one macro before it starts.
+typedef struct {
+    const void                  *layout; // host_layout_t, latched for playback.
+    uint8_t                      unicode_mode;
+    bool                         iso;
+    bool                         needs_unicode;
+    macro_payload_hold_balance_t balance;
+} macro_payload_preflight_t;
+
+// Replaces the playing window with the next one of the same macro.
+typedef bool (*macro_payload_load_window_fn)(void *context);
 
 typedef enum {
     MACRO_PAYLOAD_SOURCE_DIRECT = 0,
@@ -75,12 +103,21 @@ typedef struct {
 bool                         macro_payload_validate(const char *payload);
 bool                         macro_payload_compile(const char *payload, macro_payload_ir_t *ir);
 macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context);
+void                         macro_payload_preflight_begin(macro_payload_preflight_t *preflight);
+bool                         macro_payload_preflight_window(macro_payload_preflight_t *preflight, const macro_payload_ir_t *ir);
+bool                         macro_payload_preflight_end(const macro_payload_preflight_t *preflight);
+// Plays a macro whose every window passed one preflight, starting at its first
+// window in ir. When a window with more set ends, load_next refills ir.
+macro_payload_start_result_t macro_payload_start_windows(const macro_payload_ir_t *ir, const macro_payload_preflight_t *preflight, macro_payload_load_window_fn load_next, void *load_context, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context);
 void                         macro_payload_engine_scan(void);
 bool                         macro_payload_engine_cancel(void);
 bool                         macro_payload_engine_protected(void);
 void                         macro_payload_engine_init(void);
 void                         macro_payload_debug_snapshot(macro_payload_debug_snapshot_t *out);
 bool                         macro_payload_decode_qmk_stream(macro_payload_ir_t *ir, uint16_t length, macro_payload_read_byte_fn read_byte, void *context);
+// Decodes from cursor up to a full window, ending on a whole step; sets
+// ir->more and advances cursor when the macro continues past it.
+bool                         macro_payload_decode_qmk_window(macro_payload_ir_t *ir, macro_payload_stream_cursor_t *cursor, uint16_t length, macro_payload_read_byte_fn read_byte, void *context);
 bool                         macro_payload_encode_ir(const macro_payload_ir_t *ir, uint8_t *buffer, uint16_t capacity, uint16_t *written);
 bool                         macro_payload_encode_ir_write(const macro_payload_ir_t *ir, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written);
 bool                         macro_payload_encode(const char *payload, uint8_t *buffer, uint16_t capacity, uint16_t *written);

@@ -29,8 +29,8 @@ typedef struct {
 
 #define TEST_KC_8 0x0025u
 #define TEST_MAX_CALLS 512
-// The keyboard's whole shared pool (D-F14: a 12 KiB VIA region).
-#define TEST_MACRO_BUFFER_SIZE 10327
+// The keyboard's whole shared pool (D-F14: a 36 KiB VIA region).
+#define TEST_MACRO_BUFFER_SIZE 34903
 
 static const char *const test_long_delay_heavy_payload = "h{829}e{627}y{665} {249}h{158}a{167}l{424}o{386} {448}h{144}o{111}e{103} {118}i{123}s{118} {125}h{132}e{134}t{158} {133}m{118}e{493}t{156} {503}y{503}u{10}o{695} {382}h{113}e{212}b{149}b{83}e{155}n{60} {102}e{65}w{164} {79} {152}h{109}i{79}e{129}r{146} {143}e{176}e{104}n{98} {148}p{124}r{119}o{165}b{126}l{130}e{172}e{104}m{1032}{+KC_LSFT}{189};{140}{-KC_LSFT}";
 
@@ -40,7 +40,12 @@ static uint8_t     fake_macro_count;
 static test_call_t test_calls[TEST_MAX_CALLS];
 static uint16_t    test_call_count;
 static uint16_t    runtime_diag_heartbeat_count;
-static uint16_t    macro_buffer_read_count;
+static uint32_t    macro_buffer_read_count;
+// Long playbacks only count presses and fold their keycodes into a digest.
+static bool        test_count_only;
+static uint32_t    test_press_count;
+static uint32_t    test_release_count;
+static uint32_t    test_press_digest;
 static uint32_t    fake_time;
 
 uint32_t timer_read32(void) {
@@ -64,6 +69,15 @@ static void test_fail(const char *expr, const char *file, int line) {
     } while (0)
 
 static void test_log_call(test_call_kind_t kind, uint16_t value, uint8_t interval) {
+    if (test_count_only) {
+        if (kind == TEST_CALL_OWNED_REGISTER) {
+            test_press_count++;
+            test_press_digest = test_press_digest * 31u + value;
+        } else if (kind == TEST_CALL_OWNED_UNREGISTER) {
+            test_release_count++;
+        }
+        return;
+    }
     CHECK(test_call_count < TEST_MAX_CALLS);
     test_calls[test_call_count++] = (test_call_t){
         .kind     = kind,
@@ -96,6 +110,10 @@ static void test_reset_state(void) {
     test_call_count              = 0;
     runtime_diag_heartbeat_count = 0;
     macro_buffer_read_count      = 0;
+    test_count_only              = false;
+    test_press_count             = 0u;
+    test_release_count           = 0u;
+    test_press_digest            = 0u;
     fake_time                    = 1000u;
     via_macro_provider_invalidate_all();
 }
@@ -682,6 +700,149 @@ static void test_last_slot_starts_on_a_full_pool(void) {
     CHECK(macro_buffer_read_count <= TEST_MACRO_BUFFER_SIZE + 16u);
 }
 
+// Fills slot `slot` from `offset` with `count` letters a..z, then terminates
+// it. Returns the offset after the terminator and folds the expected presses.
+static uint16_t test_write_letters(uint16_t offset, uint16_t count, uint32_t *digest) {
+    for (uint16_t i = 0u; i < count; i++) {
+        uint8_t letter         = (uint8_t)('a' + i % 26u);
+        macro_buffer[offset++] = letter;
+        if (digest) {
+            *digest = *digest * 31u + (uint16_t)(KC_A + (letter - 'a'));
+        }
+    }
+    macro_buffer[offset++] = 0u;
+    return offset;
+}
+
+static void test_run_long_macro_to_idle(uint32_t max_scans) {
+    macro_payload_debug_snapshot_t snapshot;
+
+    for (uint32_t scan = 0u; scan < max_scans; scan++) {
+        macro_payload_engine_scan();
+        fake_time += 1000u;
+        macro_payload_debug_snapshot(&snapshot);
+        if (snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE) {
+            return;
+        }
+    }
+    CHECK(false);
+}
+
+// One macro after a long first one fills the rest of the bank and plays to its
+// end; finding it again for each window would read the bank once per window.
+static void test_macro_filling_the_bank_plays_to_its_end(void) {
+    macro_payload_debug_snapshot_t snapshot;
+    uint32_t                       expected = 0u;
+    uint16_t                       offset;
+    uint16_t                       letters;
+
+    test_reset_state();
+    offset  = test_write_letters(0u, 17000u, NULL);
+    letters = (uint16_t)(TEST_MACRO_BUFFER_SIZE - offset - 1u - 126u);
+    offset  = test_write_letters(offset, letters, &expected);
+    CHECK(offset == TEST_MACRO_BUFFER_SIZE - 126u);
+
+    test_count_only = true;
+    noah_action_tap(QK_MACRO_0 + 1u);
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.state != MACRO_PAYLOAD_ENGINE_IDLE);
+    test_run_long_macro_to_idle(400000u);
+
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.last_finish == MACRO_PAYLOAD_FINISH_SUCCESS);
+    CHECK(test_press_count == letters && test_release_count == letters);
+    CHECK(test_press_digest == expected);
+    printf("a %u-letter macro after a 17000-byte one: %u bank reads to check and play it\n", (unsigned)letters, (unsigned)macro_buffer_read_count);
+    CHECK(macro_buffer_read_count <= 4u * TEST_MACRO_BUFFER_SIZE);
+}
+
+static void test_single_macro_uses_all_free_bank_space(void) {
+    test_reset_state();
+    uint32_t expected = 0u;
+    const uint16_t letters = TEST_MACRO_BUFFER_SIZE - DYNAMIC_KEYMAP_MACRO_COUNT;
+    CHECK(test_write_letters(0u, letters, &expected) == letters + 1u);
+    test_count_only = true;
+    noah_action_tap(QK_MACRO_0);
+    test_run_long_macro_to_idle(400000u);
+    macro_payload_debug_snapshot_t snapshot;
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.last_finish == MACRO_PAYLOAD_FINISH_SUCCESS);
+    CHECK(test_press_count == letters && test_release_count == letters);
+    CHECK(test_press_digest == expected);
+}
+
+static void test_invalid_byte_late_in_a_long_macro_types_nothing(void) {
+    macro_payload_debug_snapshot_t snapshot;
+    uint16_t                       offset;
+
+    test_reset_state();
+    offset                    = test_write_letters(0u, 20000u, NULL);
+    macro_buffer[offset - 1u] = 0x80u;
+    macro_buffer[offset]      = 0u;
+    test_count_only            = true;
+    noah_action_tap(QK_MACRO_0);
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE);
+    CHECK(test_press_count == 0u);
+
+    // A key still held when a long macro ends is refused before typing too.
+    test_reset_state();
+    macro_buffer[0] = SS_QMK_PREFIX;
+    macro_buffer[1] = SS_DOWN_CODE;
+    macro_buffer[2] = KC_LEFT_SHIFT;
+    (void)test_write_letters(3u, 20000u, NULL);
+    test_count_only = true;
+    noah_action_tap(QK_MACRO_0);
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE);
+    CHECK(test_press_count == 0u);
+}
+
+// A write to the bank stops a macro still reading it: what it holds is
+// released and nothing from the new bytes is typed.
+static void test_bank_write_cancels_a_macro_still_reading_it(void) {
+    macro_payload_debug_snapshot_t snapshot;
+    uint16_t                       offset;
+    uint32_t                       presses_at_cancel;
+
+    test_reset_state();
+    macro_buffer[0]          = SS_QMK_PREFIX;
+    macro_buffer[1]          = SS_DOWN_CODE;
+    macro_buffer[2]          = KC_LEFT_SHIFT;
+    offset                   = (uint16_t)(test_write_letters(3u, 20000u, NULL) - 1u);
+    macro_buffer[offset++]   = SS_QMK_PREFIX;
+    macro_buffer[offset++]   = SS_UP_CODE;
+    macro_buffer[offset++]   = KC_LEFT_SHIFT;
+    macro_buffer[offset]     = 0u;
+
+    test_count_only = true;
+    noah_action_tap(QK_MACRO_0);
+    for (uint16_t scan = 0u; scan < 2000u; scan++) {
+        macro_payload_engine_scan();
+        fake_time += 1000u;
+    }
+    CHECK(test_press_count > 100u);
+
+    via_macro_provider_storage_changing();
+    presses_at_cancel = test_press_count;
+    memset(macro_buffer, 'z', 30000u);
+    test_run_long_macro_to_idle(1000u);
+
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.last_finish == MACRO_PAYLOAD_FINISH_CANCELLED);
+    CHECK(test_press_count == presses_at_cancel);
+    CHECK(test_press_count == test_release_count);
+    CHECK(snapshot.cancellation_count == 1u);
+    memset(macro_buffer, 0, sizeof(macro_buffer));
+    macro_buffer[0] = 'a';
+    via_macro_provider_invalidate_all();
+    noah_action_tap(QK_MACRO_0);
+    test_run_long_macro_to_idle(1000u);
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.last_finish == MACRO_PAYLOAD_FINISH_SUCCESS);
+    CHECK(test_press_count == presses_at_cancel + 1u);
+}
+
 int main(void) {
     test_qmk_tap_command_uses_scan_driven_owned_lease();
     test_qmk_down_and_up_commands_use_owned_register_and_unregister();
@@ -699,6 +860,10 @@ int main(void) {
     test_valid_slot_redecodes_once_per_playback();
     test_invalidation_keeps_active_ir_immutable_then_reloads();
     test_busy_via_trigger_is_consumed_without_restarting();
+    test_macro_filling_the_bank_plays_to_its_end();
+    test_single_macro_uses_all_free_bank_space();
+    test_invalid_byte_late_in_a_long_macro_types_nothing();
+    test_bank_write_cancels_a_macro_still_reading_it();
 
     puts("via macro action_lifecycle host tests passed");
     return 0;
