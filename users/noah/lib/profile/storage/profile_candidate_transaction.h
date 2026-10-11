@@ -34,6 +34,9 @@ typedef struct {
     // Reads the immutable active source only when its entire supplied identity
     // still matches. Called from scan context, with at most 20 bytes.
     noah_profile_candidate_backend_result_t (*read_source)(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint8_t *bytes, uint8_t length);
+    // Optional. Told each REUSE step that was copied: `length` bytes at
+    // candidate `offset` came from `source` at `source_offset`.
+    void (*note_reuse)(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint16_t source_offset, uint8_t length);
     noah_profile_candidate_backend_result_t (*validation_begin)(void *context, const noah_profile_candidate_v1_metadata_t *metadata, noah_profile_candidate_v1_error_t *error);
     // Each step must return IN_PROGRESS, VALID, REJECTED, or IO_ERROR and obey
     // the per-step reader-work contract above. OK is deliberately not a
@@ -71,10 +74,10 @@ typedef struct {
     bool                                   has_candidate;
     bool                                   poisoned;
     bool                                   split_commit_authorization_required;
+    bool                                   reuse_read;
     uint16_t                               last_aborted_transaction_id;
     uint16_t                               last_committed_transaction_id;
     uint8_t                                reuse_bytes[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];
-    bool                                   reuse_read;
 } noah_profile_candidate_transaction_t;
 
 typedef enum {

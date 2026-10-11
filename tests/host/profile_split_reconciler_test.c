@@ -24,6 +24,7 @@ typedef struct {
     uint8_t  bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
     uint32_t reads;
     uint32_t writes;
+    uint32_t bytes_written;
     uint32_t fail_reads;  // the next reads fail, as a flash read that errors would
     uint32_t fail_writes; // likewise for writes
 } memory_t;
@@ -32,6 +33,9 @@ typedef struct {
     const uint8_t *bytes;
     uint16_t       length;
     uint32_t       reads;
+    // The copy's reuse plan, in order; none when range_count is zero.
+    const noah_profile_split_reuse_range_t *ranges;
+    uint8_t                                 range_count;
 } staged_source_t;
 
 typedef struct half half_t;
@@ -99,6 +103,7 @@ static bool memory_write(void *context, noah_profile_storage_address_t address, 
         return false;
     }
     memcpy(&memory->bytes[address], source, length);
+    memory->bytes_written += length;
     return true;
 }
 
@@ -203,7 +208,22 @@ static bool staged_read(void *context, const noah_profile_split_descriptor_t *de
     return true;
 }
 
-static bool exchange(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE], uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
+static bool staged_plan(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, noah_profile_split_reuse_range_t *range) {
+    staged_source_t *source = context;
+
+    if (!source || !descriptor || !range || descriptor->payload_length != source->length) {
+        return false;
+    }
+    for (uint8_t index = 0u; index < source->range_count; index++) {
+        if ((uint32_t)source->ranges[index].offset + source->ranges[index].length > offset) {
+            *range = source->ranges[index];
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
     link_t *link = context;
 
     link->exchanges++;
@@ -218,15 +238,15 @@ static bool exchange(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_
     }
     if (link->inject_response_exchange == link->exchanges) {
         link->inject_response_exchange = 0u;
-        return noah_profile_split_v1_frame_encode(&link->injected, response);
+        return noah_profile_split_v1_frame_encode(&link->injected, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE) != 0u;
     }
-    uint8_t delivered[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
-    memcpy(delivered, request, sizeof(delivered));
+    uint8_t delivered[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    memcpy(delivered, request, request_length);
     if (link->garble_request_exchange == link->exchanges) {
         link->garble_request_exchange = 0u;
         delivered[5] ^= 0x10u;
     }
-    if (!link->connected || !link->peer || !noah_profile_split_reconciler_receive(&link->peer->reconciler, delivered, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE)) {
+    if (!link->connected || !link->peer || !noah_profile_split_reconciler_receive(&link->peer->reconciler, delivered, request_length, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE)) {
         return false;
     }
     memcpy(link->previous_response, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
@@ -241,8 +261,10 @@ static bool exchange(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_
     return true;
 }
 
-static void half_storage_init(half_t *half) {
-    noah_profile_reader_t                     reader = noah_profile_reader_from_memory(empty_profile, sizeof(empty_profile));
+// The half's active profile is the compiled `bytes`, as a fresh half's is;
+// both halves of a pair share it, as one build does.
+static void half_storage_init_compiled(half_t *half, const uint8_t *bytes, uint16_t length) {
+    noah_profile_reader_t                     reader = noah_profile_reader_from_memory(bytes, length);
     noah_profile_validator_v1_profile_t       profile;
     noah_effective_profile_snapshot_t         compiled;
     noah_profile_validator_v1_compatibility_t compatibility = noah_profile_validator_v1_default_compatibility(ACTION_ABI_DIGEST);
@@ -251,9 +273,9 @@ static void half_storage_init(half_t *half) {
     memset(half, 0, sizeof(*half));
     memset(half->memory.bytes, 0xff, sizeof(half->memory.bytes));
     memset(&profile, 0, sizeof(profile));
-    profile.byte_length       = sizeof(empty_profile);
-    profile.crc32             = payload_crc(empty_profile, sizeof(empty_profile));
-    profile.digest            = payload_digest(empty_profile, sizeof(empty_profile));
+    profile.byte_length       = length;
+    profile.crc32             = payload_crc(bytes, length);
+    profile.digest            = payload_digest(bytes, length);
     profile.action_abi_digest = ACTION_ABI_DIGEST;
     assert(noah_effective_profile_snapshot_make_compiled(&profile, &reader, 0u, &compiled) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(noah_effective_profile_provider_init(&half->provider, &compiled, always_safe, NULL, NULL, 0u) == NOAH_EFFECTIVE_PROFILE_OK);
@@ -273,6 +295,10 @@ static void half_storage_init(half_t *half) {
     half->link.connected = true;
 }
 
+static void half_storage_init(half_t *half) {
+    half_storage_init_compiled(half, empty_profile, sizeof(empty_profile));
+}
+
 static void install_profile_with_flags(half_t *half, uint32_t generation, uint8_t origin, uint8_t flags) {
     noah_profile_split_descriptor_t  descriptor = committed_descriptor(half, generation, origin);
     noah_profile_peer_store_result_t result;
@@ -282,7 +308,7 @@ static void install_profile_with_flags(half_t *half, uint32_t generation, uint8_
     assert(noah_profile_peer_store_backend_write(&half->peer_store, descriptor.generation, descriptor.payload_digest, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_PEER_STORE_OK);
     result = noah_profile_peer_store_backend_commit_begin(&half->peer_store, &descriptor);
     while (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
-        result = noah_profile_peer_store_backend_step(&half->peer_store, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX);
+        result = noah_profile_peer_store_backend_step(&half->peer_store, NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX);
     }
     assert(result == NOAH_PROFILE_PEER_STORE_OK);
 }
@@ -300,7 +326,7 @@ static void install_logical_profile(half_t *half, uint32_t generation, uint8_t o
     assert(noah_profile_peer_store_backend_write(&half->peer_store, descriptor.generation, descriptor.payload_digest, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_PEER_STORE_OK);
     result = noah_profile_peer_store_backend_commit_begin(&half->peer_store, &descriptor);
     while (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
-        result = noah_profile_peer_store_backend_step(&half->peer_store, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX);
+        result = noah_profile_peer_store_backend_step(&half->peer_store, NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX);
     }
     assert(result == NOAH_PROFILE_PEER_STORE_OK);
 }
@@ -336,9 +362,13 @@ static void pair_init(half_t *left, half_t *right) {
 static void assert_one_scan_budget(half_t *half, bool master, uint32_t now) {
     uint32_t reads_before     = half->memory.reads;
     uint32_t writes_before    = half->memory.writes;
+    uint32_t written_before   = half->memory.bytes_written;
     uint32_t exchanges_before = half->link.exchanges;
 
     (void)noah_profile_split_reconciler_scan(&half->reconciler, master, now);
+    // A receiver stores at most one full chunk's worth of bytes in a scan,
+    // whether they arrived in a chunk or it copies them for a reuse range.
+    assert(half->memory.bytes_written - written_before <= NOAH_PROFILE_SPLIT_PEER_SCAN_BYTES);
     if (half->link.exchanges != exchanges_before) {
         assert(half->link.exchanges == exchanges_before + 1u);
         assert(half->memory.reads == reads_before);
@@ -675,7 +705,7 @@ static void test_convergence_only_answers_inbound_prepare_busy_without_storage(v
         .status     = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
         .descriptor = committed_descriptor(&left, 16u, 0u),
     };
-    assert(noah_profile_split_v1_frame_encode(&request, request_wire));
+    assert(noah_profile_split_v1_frame_encode(&request, request_wire, sizeof(request_wire)));
     assert(noah_profile_split_reconciler_receive(&right.reconciler, request_wire, sizeof(request_wire), response_wire, sizeof(response_wire)));
     assert(noah_profile_split_reconciler_scan_mode(&right.reconciler, false, 0u, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY));
     {
@@ -723,11 +753,11 @@ static void test_inbound_prepare_requires_correlated_binding(void) {
                 .via_generation       = 6u,
                 .via_digest           = UINT32_C(0xabcdef01),
             };
-            assert(noah_profile_split_v1_frame_encode(&bind, wire));
+            assert(noah_profile_split_v1_frame_encode(&bind, wire, sizeof(wire)));
             assert(noah_profile_split_reconciler_receive(&right.reconciler, wire, sizeof(wire), reply, sizeof(reply)));
             assert_one_scan_budget(&right, false, 10u);
         }
-        assert(noah_profile_split_v1_frame_encode(&request, wire));
+        assert(noah_profile_split_v1_frame_encode(&request, wire, sizeof(wire)));
         assert(noah_profile_split_reconciler_receive(&right.reconciler, wire, sizeof(wire), reply, sizeof(reply)));
         assert_one_scan_budget(&right, false, 20u + wrong_bind);
         assert(noah_profile_split_reconciler_receive(&right.reconciler, wire, sizeof(wire), reply, sizeof(reply)));
@@ -1145,6 +1175,174 @@ static void test_maximum_profile_prepares_and_commits_on_the_peer(void) {
     assert(left.store.committed.payload_length == maximum_profile_length && left.store.committed.payload_digest == descriptor.payload_digest);
 }
 
+// Both halves run on the maximum profile as their active one; right copies
+// it to left as a new record. Each test sets the reuse plan it needs.
+typedef struct {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source;
+    uint32_t                        now;
+    uint32_t                        longest_send_retry_ms; // the sender's longest wait while sending
+} reuse_pair_t;
+
+static void reuse_pair_init(reuse_pair_t *pair, const noah_profile_split_reuse_range_t *ranges, uint8_t range_count) {
+    half_storage_init_compiled(&pair->left, maximum_profile, (uint16_t)maximum_profile_length);
+    half_storage_init_compiled(&pair->right, maximum_profile, (uint16_t)maximum_profile_length);
+    pair_init(&pair->left, &pair->right);
+    pair->right.reconciler.config.prepared_reuse_plan = staged_plan;
+    run_pair_until_converged(&pair->left, &pair->right, false);
+    pair->descriptor                = committed_descriptor(&pair->right, 32u, 1u);
+    pair->descriptor.payload_length = (uint16_t)maximum_profile_length;
+    pair->descriptor.domain_mask    = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS;
+    pair->descriptor.payload_crc32  = payload_crc(maximum_profile, maximum_profile_length);
+    pair->descriptor.payload_digest = payload_digest(maximum_profile, maximum_profile_length);
+    pair->source                    = (staged_source_t){.bytes = maximum_profile, .length = (uint16_t)maximum_profile_length, .ranges = ranges, .range_count = range_count};
+    pair->now                       = 100000u;
+    pair->longest_send_retry_ms     = 0u;
+}
+
+static void reuse_pair_scan(reuse_pair_t *pair) {
+    pair->now += NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS;
+    assert_one_scan_budget(&pair->right, true, pair->now);
+    assert_one_scan_budget(&pair->left, false, pair->now);
+    if (pair->right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_SEND && (int32_t)(pair->right.reconciler.next_attempt_at - pair->now) > (int32_t)pair->longest_send_retry_ms) {
+        pair->longest_send_retry_ms = pair->right.reconciler.next_attempt_at - pair->now;
+    }
+}
+
+static void reuse_pair_finish_and_commit(reuse_pair_t *pair) {
+    for (uint32_t scan = 0u; scan < 16u * MAX_SCANS && pair->right.reconciler.state != NOAH_PROFILE_SPLIT_RECONCILER_STOPPED && !noah_profile_split_reconciler_prepared_push_ready(&pair->right.reconciler, NULL); scan++) {
+        reuse_pair_scan(pair);
+    }
+    assert(noah_profile_split_reconciler_prepared_push_ready(&pair->right.reconciler, NULL));
+    assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&pair->right.reconciler, &pair->descriptor));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && pair->left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; scan++) {
+        reuse_pair_scan(pair);
+    }
+    assert(pair->left.store.committed.generation == pair->descriptor.generation && pair->left.store.committed.payload_digest == pair->descriptor.payload_digest);
+}
+
+static void reuse_pair_prepare_and_commit(reuse_pair_t *pair) {
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&pair->right.reconciler, &pair->descriptor, &pair->source, staged_read, 6u, UINT32_C(0xabcdef01)));
+    reuse_pair_finish_and_commit(pair);
+}
+
+static noah_profile_split_v1_source_t compiled_maximum_source(void) {
+    return (noah_profile_split_v1_source_t){.digest = payload_digest(maximum_profile, maximum_profile_length), .crc32 = payload_crc(maximum_profile, maximum_profile_length), .kind = 0u, .origin = 255u};
+}
+
+static uint32_t chunks_for(uint32_t bytes) {
+    return (bytes + NOAH_PROFILE_SPLIT_V1_CHUNK_MAX - 1u) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX;
+}
+
+// Ranges the peer holds in its own active profile cross the link as two
+// reuse frames; the receiver copies them over many scans while the sender
+// collects its progress, and only the rest travels as bytes.
+static void test_reuse_ranges_copy_from_the_peers_active_profile(void) {
+    static reuse_pair_t                     pair;
+    static noah_profile_split_reuse_range_t ranges[2];
+    noah_profile_split_reconciler_status_t  status;
+    uint32_t                                chunk_bytes;
+
+    ranges[0] = (noah_profile_split_reuse_range_t){.source = compiled_maximum_source(), .offset = 0u, .source_offset = 0u, .length = 10000u};
+    ranges[1] = (noah_profile_split_reuse_range_t){.source = compiled_maximum_source(), .offset = 12000u, .source_offset = 12000u, .length = 18000u};
+    reuse_pair_init(&pair, ranges, 2u);
+    reuse_pair_prepare_and_commit(&pair);
+    chunk_bytes = (uint32_t)maximum_profile_length - 28000u;
+    assert(noah_profile_split_reconciler_status(&pair.right.reconciler, &status) && status.reused_bytes == 28000u);
+    // The sender read only the bytes it sent, in full chunks between ranges.
+    assert(pair.source.reads == chunks_for(2000u) + chunks_for(chunk_bytes - 2000u));
+    // The receiver copied 28,000 bytes in at most 110 a scan; the sender
+    // collected that in short polls and never fell back to the backoff.
+    assert(pair.longest_send_retry_ms <= NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS);
+    fprintf(stderr, "reuse push: %u exchanges, %u reads, %u reused bytes\n", (unsigned)pair.right.link.exchanges, (unsigned)pair.source.reads, (unsigned)status.reused_bytes);
+}
+
+// A source the peer's active profile is not makes it send the bytes: the
+// first reuse frame is refused and the rest of the copy goes as chunks.
+static void test_reuse_falls_back_to_bytes_without_the_source(void) {
+    static reuse_pair_t                     pair;
+    static noah_profile_split_reuse_range_t ranges[1];
+    noah_profile_split_reconciler_status_t  status;
+
+    ranges[0] = (noah_profile_split_reuse_range_t){.source = {.generation = 9u, .digest = UINT32_C(0x01020304), .crc32 = UINT32_C(0x05060708), .kind = 1u, .origin = 0u}, .offset = 500u, .source_offset = 500u, .length = 20000u};
+    reuse_pair_init(&pair, ranges, 1u);
+    reuse_pair_prepare_and_commit(&pair);
+    assert(noah_profile_split_reconciler_status(&pair.right.reconciler, &status) && status.reused_bytes == 0u);
+    assert(pair.right.reconciler.reuse_unavailable);
+    assert(pair.source.reads == chunks_for(500u) + chunks_for((uint32_t)maximum_profile_length - 500u));
+}
+
+// Losing a poll or its reply while the receiver copies must not duplicate
+// writes, discard the source plan, or authorize an incomplete candidate.
+static void test_lost_exchanges_during_reuse_resume_the_same_copy(void) {
+    static reuse_pair_t              pair;
+    noah_profile_split_reuse_range_t range = {.source = compiled_maximum_source(), .offset = 0u, .source_offset = 0u, .length = 30000u};
+
+    for (uint8_t after = 0u; after < 2u; after++) {
+        reuse_pair_init(&pair, &range, 1u);
+        assert(noah_profile_split_reconciler_prepared_push_begin_logical(&pair.right.reconciler, &pair.descriptor, &pair.source, staged_read, 6u, UINT32_C(0xabcdef01)));
+        for (uint32_t scan = 0u; scan < MAX_SCANS && noah_profile_peer_store_backend_next_offset(&pair.left.peer_store) < 5000u; scan++) {
+            reuse_pair_scan(&pair);
+        }
+        assert(pair.left.reconciler.incoming_reuse_active && pair.right.reconciler.outbound_reuse_pending);
+        assert(pair.left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+        uint32_t drop = pair.right.link.exchanges + 1u;
+        if (after) {
+            pair.right.link.drop_after_delivery_exchange = drop;
+        } else {
+            pair.right.link.drop_before_delivery_exchange = drop;
+        }
+        reuse_pair_finish_and_commit(&pair);
+        assert(pair.right.reconciler.transport_failure_count == 1u);
+        assert(pair.right.reconciler.reused_bytes == range.length);
+        assert(pair.source.reads == chunks_for((uint32_t)maximum_profile_length - range.length));
+    }
+}
+
+// A plan no reuse frame can carry (here an unknown source kind) never
+// reaches the link: the copy sends its bytes.
+static void test_an_unencodable_reuse_plan_sends_bytes(void) {
+    static reuse_pair_t                     pair;
+    static noah_profile_split_reuse_range_t ranges[1];
+    noah_profile_split_reconciler_status_t  status;
+
+    ranges[0] = (noah_profile_split_reuse_range_t){.source = {.digest = 1u, .crc32 = 2u, .kind = 2u, .origin = 255u}, .offset = 0u, .source_offset = 0u, .length = 4000u};
+    reuse_pair_init(&pair, ranges, 1u);
+    reuse_pair_prepare_and_commit(&pair);
+    assert(noah_profile_split_reconciler_status(&pair.right.reconciler, &status) && status.reused_bytes == 0u && pair.right.reconciler.transport_failure_count == 0u);
+    assert(pair.source.reads == chunks_for((uint32_t)maximum_profile_length));
+}
+
+// Cancelling the copy while the receiver is inside a reuse range: the ABORT
+// ends the range where it stands and releases the receiver's storage.
+static void test_a_cancel_ends_a_reuse_range_midway(void) {
+    static reuse_pair_t                     pair;
+    static noah_profile_split_reuse_range_t ranges[1];
+
+    ranges[0] = (noah_profile_split_reuse_range_t){.source = compiled_maximum_source(), .offset = 0u, .source_offset = 0u, .length = 30000u};
+    reuse_pair_init(&pair, ranges, 1u);
+    assert(noah_profile_split_reconciler_prepared_push_begin_logical(&pair.right.reconciler, &pair.descriptor, &pair.source, staged_read, 6u, UINT32_C(0xabcdef01)));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && noah_profile_peer_store_backend_next_offset(&pair.left.peer_store) < 5000u; scan++) {
+        reuse_pair_scan(&pair);
+    }
+    assert(pair.left.reconciler.incoming_reuse_active);
+    assert(noah_profile_peer_store_backend_next_offset(&pair.left.peer_store) < 30000u);
+    assert(noah_profile_split_reconciler_prepared_push_cancel(&pair.right.reconciler, &pair.descriptor));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && pair.right.reconciler.prepared_push_active; scan++) {
+        reuse_pair_scan(&pair);
+    }
+    assert(!pair.right.reconciler.prepared_push_active && !pair.right.reconciler.orphan_pending);
+    assert(!pair.left.reconciler.incoming_reuse_active);
+    assert(noah_profile_peer_store_backend_state(&pair.left.peer_store) == NOAH_PROFILE_PEER_STORE_IDLE);
+    assert(noah_profile_candidate_store_backend_admission_owner(&pair.left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+
+    // The next copy runs from the start.
+    pair.source.reads = 0u;
+    reuse_pair_prepare_and_commit(&pair);
+}
+
 // Runs one prepared copy of `length` bytes of max_profile with exchange
 // `drop` lost before or after delivery. Returns false when the fault never
 // fired, which means `drop` is past the last exchange of a clean copy.
@@ -1209,7 +1407,7 @@ static void test_prepared_push_survives_one_lost_exchange_anywhere(void) {
     while (run_copy_with_lost_exchange(sizeof(max_profile), false, full_exchanges + 1u)) {
         full_exchanges += 2048u;
     }
-    assert(full_exchanges > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) - 2048u);
+    assert(full_exchanges + 2048u > 2u * (sizeof(max_profile) / NOAH_PROFILE_SPLIT_V1_CHUNK_MAX));
     for (uint8_t after = 0u; after <= 1u; after++) {
         static const uint32_t near_start[] = {1u, 2u, 3u, 4u, 5u};
         for (size_t index = 0u; index < sizeof(near_start) / sizeof(near_start[0]); index++) {
@@ -2059,6 +2257,11 @@ int main(int argc, char **argv) {
     assert(argc == 2);
     load_maximum_profile(argv[1]);
     test_maximum_profile_prepares_and_commits_on_the_peer();
+    test_reuse_ranges_copy_from_the_peers_active_profile();
+    test_reuse_falls_back_to_bytes_without_the_source();
+    test_lost_exchanges_during_reuse_resume_the_same_copy();
+    test_an_unencodable_reuse_plan_sends_bytes();
+    test_a_cancel_ends_a_reuse_range_midway();
     test_inbound_prepare_requires_correlated_binding();
     test_descriptor_changes_are_validated_before_backoff();
     test_compiled_convergence();

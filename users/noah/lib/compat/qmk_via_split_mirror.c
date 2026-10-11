@@ -18,8 +18,10 @@
 #    include "qmk_via_storage_contract.h"
 #    include "transactions.h" // QMK
 
+_Static_assert(NOAH_QMK_VIA_SPLIT_MIRROR_FRAME_MAX <= RPC_M2S_BUFFER_SIZE, "a mirrored VIA frame must fit QMK's RPC buffer");
+
 typedef struct {
-    uint8_t frame[RPC_M2S_BUFFER_SIZE];
+    uint8_t frame[NOAH_QMK_VIA_SPLIT_MIRROR_FRAME_MAX];
     uint8_t length;
     bool    pending;
 } noah_qmk_via_split_mirror_mailbox_t;
@@ -131,7 +133,7 @@ void noah_qmk_via_split_mirror_init(void) {
 }
 
 bool noah_qmk_via_split_mirror_matrix_scan_step(void) {
-    uint8_t frame[RPC_M2S_BUFFER_SIZE];
+    uint8_t frame[NOAH_QMK_VIA_SPLIT_MIRROR_FRAME_MAX];
     uint8_t length = 0u;
 
     if (!noah_qmk_via_logical_mirror_allowed()) {
@@ -158,7 +160,7 @@ bool noah_qmk_via_split_mirror_matrix_scan_step(void) {
 }
 
 void noah_qmk_via_split_mirror_command(const uint8_t *data, uint8_t length) {
-    if (!data || length == 0u || length > RPC_M2S_BUFFER_SIZE || !is_keyboard_master() || !noah_qmk_via_logical_mirror_allowed()) {
+    if (!data || length == 0u || length > NOAH_QMK_VIA_SPLIT_MIRROR_FRAME_MAX || !is_keyboard_master() || !noah_qmk_via_logical_mirror_allowed()) {
         return;
     }
 

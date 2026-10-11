@@ -497,9 +497,10 @@ flowchart LR
     verify --> authority["Fail-closed peer observer"]
 ```
 
-The RPC callback only validates/copies one exact 32-byte request and returns a
-cached response. EEPROM access, whole-profile validation, and commit remain in
-matrix scan. Each half performs at most one RPC, payload read/write, or
+The RPC callback only validates/copies one exact request (32 bytes, or up to
+128 for a payload chunk) and returns a cached 32-byte response. EEPROM access,
+whole-profile validation, and commit remain in matrix scan. Each half performs
+at most one RPC, one received chunk or reuse step of at most 110 bytes, or one
 validator/commit step per scan. A newer slave is pulled explicitly, so current
 USB role never decides durable authority. Disconnect, malformed response, role
 change, or passive-peer timeout invalidates peer evidence; conflict,

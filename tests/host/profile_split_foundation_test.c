@@ -46,8 +46,12 @@ static uint8_t test_crc8(const uint8_t *bytes, size_t length) {
     return crc;
 }
 
+static void refresh_crc_length(uint8_t *wire, uint8_t length) {
+    wire[length - 1u] = test_crc8(wire, length - 1u);
+}
+
 static void refresh_crc(uint8_t wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
-    wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - 1u] = test_crc8(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - 1u);
+    refresh_crc_length(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
 }
 
 static void assert_descriptors_equal(const noah_profile_split_descriptor_t *actual, const noah_profile_split_descriptor_t *expected) {
@@ -168,11 +172,12 @@ static void test_authority_publication_and_activation_observer(void) {
 }
 
 static void assert_round_trip(const noah_profile_split_v1_frame_t *expected) {
-    uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
     noah_profile_split_v1_frame_t decoded;
+    uint8_t                       length = noah_profile_split_v1_frame_encode(expected, wire, sizeof(wire));
 
-    assert(noah_profile_split_v1_frame_encode(expected, wire));
-    assert(noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+    assert(length != 0u && length == noah_profile_split_v1_frame_length(expected));
+    assert(noah_profile_split_v1_frame_decode(wire, length, &decoded));
     assert(decoded.kind == expected->kind);
     assert(decoded.status == expected->status);
     assert_descriptors_equal(&decoded.descriptor, &expected->descriptor);
@@ -185,20 +190,32 @@ static void assert_round_trip(const noah_profile_split_v1_frame_t *expected) {
     assert(decoded.store_format_version == expected->store_format_version);
     assert(decoded.via_generation == expected->via_generation);
     assert(decoded.via_digest == expected->via_digest);
+    assert(decoded.reuse_length == expected->reuse_length);
+    assert(decoded.reuse_source_offset == expected->reuse_source_offset);
+    assert(decoded.reuse_source.generation == expected->reuse_source.generation);
+    assert(decoded.reuse_source.digest == expected->reuse_source.digest);
+    assert(decoded.reuse_source.crc32 == expected->reuse_source.crc32);
+    assert(decoded.reuse_source.kind == expected->reuse_source.kind);
+    assert(decoded.reuse_source.origin == expected->reuse_source.origin);
+    assert(decoded.busy_reason == expected->busy_reason);
 }
 
 static void test_protocol_golden_frames(void) {
     static const uint8_t metadata_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x01, 0x00, 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x00, 0x80,
+        0x02, 0x01, 0x00, 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x00, 0x37,
     };
     static const uint8_t begin_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x02, 0x00, 0x07, 0x03, 0x00, 0x01, 0x01, 0x41, 0x04, 0x07, 0x00, 0x00, 0x00, 0xD4, 0xC3, 0xB2, 0xA1, 0x40, 0x30, 0x20, 0x10, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x03, 0x67,
+        0x02, 0x02, 0x00, 0x07, 0x03, 0x00, 0x01, 0x01, 0x41, 0x04, 0x07, 0x00, 0x00, 0x00, 0xD4, 0xC3, 0xB2, 0xA1, 0x40, 0x30, 0x20, 0x10, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55, 0x03, 0xD0,
     };
     static const uint8_t chunk_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x03, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x41, 0x04, 0x0E, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x45,
+        0x02, 0x03, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x41, 0x04, 0x0E, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0xF2,
+    };
+    // Version 2 added PAYLOAD_REUSE, 36 bytes on the wire.
+    static const uint8_t reuse_golden[NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE] = {
+        0x02, 0x0C, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x00, 0x01, 0x41, 0x04, 0x00, 0x02, 0x80, 0x00, 0x05, 0x00, 0x00, 0x00, 0xBE, 0xBA, 0xFE, 0xCA, 0x0D, 0xF0, 0xAD, 0x0B, 0x01, 0x00, 0x00, 0x10,
     };
     static const uint8_t request_golden[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE] = {
-        0x01, 0x08, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x41, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xBB,
+        0x02, 0x08, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x41, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0C,
     };
     noah_profile_split_v1_frame_t metadata = {.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = compiled_descriptor()};
     noah_profile_split_v1_frame_t begin    = {.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = committed_descriptor(7u, 1u, UINT32_C(0x10203040))};
@@ -220,29 +237,155 @@ static void test_protocol_golden_frames(void) {
         .offset         = 14u,
         .payload_length = 1089u,
     };
-    uint8_t wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    noah_profile_split_v1_frame_t reuse = {
+        .kind                = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE,
+        .status              = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+        .generation          = 7u,
+        .payload_digest      = UINT32_C(0x10203040),
+        .offset              = 0x0100u,
+        .payload_length      = 1089u,
+        .reuse_length        = 0x0200u,
+        .reuse_source_offset = 0x0080u,
+        .reuse_source        = {.generation = 5u, .digest = UINT32_C(0xCAFEBABE), .crc32 = UINT32_C(0x0BADF00D), .kind = 1u, .origin = 0u},
+    };
+    noah_profile_split_v1_frame_t full_chunk = chunk;
+    uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
 
     // The fixed begin CRC uses the exact descriptor CRC, not the helper's
     // digest-derived fixture value.
     begin.descriptor.payload_crc32 = UINT32_C(0xA1B2C3D4);
-    assert(noah_profile_split_v1_frame_encode(&metadata, wire));
-    assert(memcmp(wire, metadata_golden, sizeof(wire)) == 0);
-    assert(noah_profile_split_v1_frame_encode(&begin, wire));
-    assert(memcmp(wire, begin_golden, sizeof(wire)) == 0);
-    assert(noah_profile_split_v1_frame_encode(&chunk, wire));
-    assert(memcmp(wire, chunk_golden, sizeof(wire)) == 0);
-    assert(noah_profile_split_v1_frame_encode(&request, wire));
-    assert(memcmp(wire, request_golden, sizeof(wire)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&metadata, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(memcmp(wire, metadata_golden, sizeof(metadata_golden)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&begin, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(memcmp(wire, begin_golden, sizeof(begin_golden)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&chunk, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(memcmp(wire, chunk_golden, sizeof(chunk_golden)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&request, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(memcmp(wire, request_golden, sizeof(request_golden)) == 0);
+    assert(noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE);
+    assert(memcmp(wire, reuse_golden, sizeof(reuse_golden)) == 0);
+    // A request's capacity bounds the encoding.
+    assert(noah_profile_split_v1_frame_encode(&reuse, wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE) == 0u);
+
+    // A full chunk fills the largest request: its header, 110 bytes and the
+    // CRC, which follows the chunk directly.
+    full_chunk.chunk_length = NOAH_PROFILE_SPLIT_V1_CHUNK_MAX;
+    for (uint8_t index = 0u; index < NOAH_PROFILE_SPLIT_V1_CHUNK_MAX; index++) {
+        full_chunk.chunk[index] = (uint8_t)(index * 3u + 1u);
+    }
+    assert(noah_profile_split_v1_frame_encode(&full_chunk, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_MAX);
+    assert(wire[16] == NOAH_PROFILE_SPLIT_V1_CHUNK_MAX && memcmp(&wire[17], full_chunk.chunk, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) == 0);
+    assert(wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX - 1u] == test_crc8(wire, NOAH_PROFILE_SPLIT_V1_FRAME_MAX - 1u));
+    assert_round_trip(&full_chunk);
+    full_chunk.chunk_length = 15u;
+    memset(&full_chunk.chunk[15], 0, sizeof(full_chunk.chunk) - 15u);
+    assert(noah_profile_split_v1_frame_length(&full_chunk) == 33u);
+    assert_round_trip(&full_chunk);
 
     assert_round_trip(&metadata);
     assert_round_trip(&begin);
     assert_round_trip(&chunk);
     assert_round_trip(&request);
+    assert_round_trip(&reuse);
+    reuse.reuse_source = (noah_profile_split_v1_source_t){.digest = UINT32_C(0xCAFEBABE), .crc32 = UINT32_C(0x0BADF00D), .kind = 0u, .origin = 255u};
+    assert_round_trip(&reuse);
+    assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ERROR, .status = NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 0x0180u, .payload_length = 1089u});
+    assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 0x0180u, .payload_length = 1089u, .busy_reason = NOAH_PROFILE_SPLIT_V1_BUSY_COPYING});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .store_format_version = NOAH_PROFILE_STORE_FORMAT_VERSION, .via_generation = 9u, .via_digest = UINT32_C(0x55667788)});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040)});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = begin.descriptor});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 28u, .payload_length = 1089u});
     assert_round_trip(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ERROR, .status = NOAH_PROFILE_SPLIT_V1_STATUS_CONFLICT, .generation = 7u, .payload_digest = UINT32_C(0x10203040)});
+}
+
+// Version 2's sized chunks and reuse frames: each kind has exactly one length
+// and every field outside its layout stays zero.
+static void test_protocol_rejects_malformed_sized_frames(void) {
+    noah_profile_split_v1_frame_t chunk = {
+        .kind           = NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK,
+        .status         = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+        .generation     = 3u,
+        .payload_digest = 4u,
+        .payload_length = 400u,
+        .chunk_length   = 60u,
+    };
+    noah_profile_split_v1_frame_t reuse = {
+        .kind                = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE,
+        .status              = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
+        .generation          = 3u,
+        .payload_digest      = 4u,
+        .offset              = 100u,
+        .payload_length      = 400u,
+        .reuse_length        = 300u,
+        .reuse_source_offset = 20u,
+        .reuse_source        = {.generation = 2u, .digest = 5u, .crc32 = 6u, .kind = 1u, .origin = 1u},
+    };
+    noah_profile_split_v1_frame_t probe;
+    noah_profile_split_v1_frame_t decoded;
+    uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                       length;
+
+    length = noah_profile_split_v1_frame_encode(&chunk, wire, sizeof(wire));
+    assert(length == 78u);
+    assert(noah_profile_split_v1_frame_decode(wire, length, &decoded));
+    assert(!noah_profile_split_v1_frame_decode(wire, length - 1u, &decoded));
+    assert(!noah_profile_split_v1_frame_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, &decoded));
+    // Beyond the largest request, whatever the frame claims.
+    wire[16] = NOAH_PROFILE_SPLIT_V1_CHUNK_MAX + 1u;
+    assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+    probe              = chunk;
+    probe.chunk_length = NOAH_PROFILE_SPLIT_V1_CHUNK_MAX + 1u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe              = chunk;
+    probe.reuse_length = 1u;
+    assert(noah_profile_split_v1_frame_encode(&probe, wire, sizeof(wire)) == 0u);
+    // A reply never carries more than 14 chunk bytes in a non-chunk frame.
+    probe = (noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 3u, .payload_digest = 4u, .offset = 0u, .payload_length = 400u};
+    assert(noah_profile_split_v1_frame_encode(&probe, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    wire[16] = 20u;
+    refresh_crc(wire);
+    assert(!noah_profile_split_v1_frame_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, &decoded));
+
+    length = noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire));
+    assert(length == NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE);
+    assert(noah_profile_split_v1_frame_decode(wire, length, &decoded));
+    assert(!noah_profile_split_v1_frame_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, &decoded));
+    wire[34] = 1u;
+    refresh_crc_length(wire, length);
+    assert(!noah_profile_split_v1_frame_decode(wire, length, &decoded));
+    (void)noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire));
+    wire[32] = 2u;
+    refresh_crc_length(wire, length);
+    assert(!noah_profile_split_v1_frame_decode(wire, length, &decoded));
+
+    probe              = reuse;
+    probe.reuse_length = 0u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe              = reuse;
+    probe.reuse_length = 301u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe        = reuse;
+    probe.status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe                   = reuse;
+    probe.reuse_source.kind = 0u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe                     = reuse;
+    probe.reuse_source.origin = 2u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe              = reuse;
+    probe.chunk_length = 1u;
+    probe.chunk[0]     = 1u;
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+    probe              = reuse;
+    probe.reuse_source = (noah_profile_split_v1_source_t){.generation = 1u, .kind = 0u, .origin = 255u};
+    assert(noah_profile_split_v1_frame_length(&probe) == 0u);
+
+    // Version 1 frames are refused.
+    (void)noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire));
+    wire[0] = 1u;
+    refresh_crc_length(wire, NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE);
+    assert(!noah_profile_split_v1_frame_decode(wire, NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE, &decoded));
 }
 
 static void test_protocol_rejects_malformed_frames(void) {
@@ -258,56 +401,58 @@ static void test_protocol_rejects_malformed_frames(void) {
     noah_profile_split_v1_frame_t decoded;
     uint8_t                       wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
 
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     for (uint8_t length = 0u; length < NOAH_PROFILE_SPLIT_V1_FRAME_SIZE; length++) {
         assert(!noah_profile_split_v1_frame_decode(wire, length, &decoded));
     }
     wire[31] ^= 1u;
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
 
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     wire[3] = 1u;
     refresh_crc(wire);
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     wire[30] = 1u;
     refresh_crc(wire);
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
+    // A chunk length the frame's length does not hold.
     wire[16] = 15u;
     refresh_crc(wire);
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     wire[1] = 0xFFu;
     refresh_crc(wire);
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
-    assert(noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     wire[2] = 0xFFu;
     refresh_crc(wire);
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
 
     frame.offset       = 20u;
     frame.chunk_length = 1u;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     frame.offset       = 0u;
     frame.chunk_length = 0u;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     frame.kind   = NOAH_PROFILE_SPLIT_V1_ACK;
     frame.status = NOAH_PROFILE_SPLIT_V1_STATUS_CONFLICT;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     frame.kind   = NOAH_PROFILE_SPLIT_V1_ERROR;
     frame.status = NOAH_PROFILE_SPLIT_V1_STATUS_OK;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     frame.kind           = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST;
     frame.status         = NOAH_PROFILE_SPLIT_V1_STATUS_OK;
     frame.generation     = 3u;
     frame.payload_length = 20u;
     frame.offset         = 20u;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
     frame.offset       = 0u;
     frame.chunk_length = 1u;
     frame.chunk[0]     = 0xA5u;
-    assert(!noah_profile_split_v1_frame_encode(&frame, wire));
+    assert(!noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)));
+    test_protocol_rejects_malformed_sized_frames();
 }
 
 int main(void) {

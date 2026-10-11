@@ -11,39 +11,49 @@
 #include "../storage/profile_store.h"
 
 enum {
-    WIRE_VERSION          = 0u,
-    WIRE_KIND             = 1u,
-    WIRE_STATUS           = 2u,
-    WIRE_FLAGS            = 3u,
-    WIRE_SCHEMA_MAJOR     = 4u,
-    WIRE_SCHEMA_MINOR     = 5u,
-    WIRE_PROFILE_FLAGS    = 6u,
-    WIRE_ORIGIN_HALF      = 7u,
-    WIRE_PAYLOAD_LENGTH   = 8u,
-    WIRE_GENERATION       = 10u,
-    WIRE_PAYLOAD_CRC32    = 14u,
-    WIRE_PAYLOAD_DIGEST   = 18u,
-    WIRE_COMPILED_DIGEST  = 22u,
-    WIRE_ACTION_ABI       = 26u,
-    WIRE_DOMAIN_MASK      = 30u,
-    WIRE_TRANSFER_GEN     = 4u,
-    WIRE_TRANSFER_DIGEST  = 8u,
-    WIRE_TRANSFER_OFFSET  = 12u,
-    WIRE_TRANSFER_LENGTH  = 14u,
-    WIRE_CHUNK_LENGTH     = 16u,
-    WIRE_CHUNK            = 17u,
-    WIRE_BUSY_REASON      = 17u, // ACK/BUSY reuses the unused chunk bytes
-    WIRE_BUSY_STORE_STATE = 18u,
-    WIRE_BUSY_OWNER       = 19u,
-    WIRE_BUSY_ADMISSION   = 20u,
-    WIRE_CRC              = 31u,
-    WIRE_BIND_FORMAT      = 12u,
-    WIRE_BIND_VIA_GEN     = 13u,
-    WIRE_BIND_VIA_DIGEST  = 17u,
-    WIRE_FLAG_HAS_PROFILE = 1u << 0,
-    WIRE_FLAG_READABLE    = 1u << 1,
-    WIRE_FLAG_LOGICAL     = 1u << 2,
-    WIRE_DESCRIPTOR_FLAGS = WIRE_FLAG_HAS_PROFILE | WIRE_FLAG_READABLE | WIRE_FLAG_LOGICAL,
+    WIRE_VERSION               = 0u,
+    WIRE_KIND                  = 1u,
+    WIRE_STATUS                = 2u,
+    WIRE_FLAGS                 = 3u,
+    WIRE_SCHEMA_MAJOR          = 4u,
+    WIRE_SCHEMA_MINOR          = 5u,
+    WIRE_PROFILE_FLAGS         = 6u,
+    WIRE_ORIGIN_HALF           = 7u,
+    WIRE_PAYLOAD_LENGTH        = 8u,
+    WIRE_GENERATION            = 10u,
+    WIRE_PAYLOAD_CRC32         = 14u,
+    WIRE_PAYLOAD_DIGEST        = 18u,
+    WIRE_COMPILED_DIGEST       = 22u,
+    WIRE_ACTION_ABI            = 26u,
+    WIRE_DOMAIN_MASK           = 30u,
+    WIRE_TRANSFER_GEN          = 4u,
+    WIRE_TRANSFER_DIGEST       = 8u,
+    WIRE_TRANSFER_OFFSET       = 12u,
+    WIRE_TRANSFER_LENGTH       = 14u,
+    WIRE_CHUNK_LENGTH          = 16u,
+    WIRE_CHUNK                 = 17u,
+    WIRE_BUSY_REASON           = 17u, // ACK/BUSY reuses the unused chunk bytes
+    WIRE_BUSY_STORE_STATE      = 18u,
+    WIRE_BUSY_OWNER            = 19u,
+    WIRE_BUSY_ADMISSION        = 20u,
+    WIRE_REUSE_LENGTH          = 16u,
+    WIRE_REUSE_SOURCE_OFF      = 18u,
+    WIRE_REUSE_SOURCE_GEN      = 20u,
+    WIRE_REUSE_SOURCE_DIG      = 24u,
+    WIRE_REUSE_SOURCE_CRC      = 28u,
+    WIRE_REUSE_SOURCE_KIND     = 32u,
+    WIRE_REUSE_SOURCE_ORIGIN   = 33u,
+    WIRE_REUSE_RESERVED        = 34u,
+    WIRE_REUSE_KIND_COMPILED   = 0u,
+    WIRE_REUSE_KIND_COMMITTED  = 1u,
+    WIRE_REUSE_ORIGIN_COMPILED = 255u,
+    WIRE_BIND_FORMAT           = 12u,
+    WIRE_BIND_VIA_GEN          = 13u,
+    WIRE_BIND_VIA_DIGEST       = 17u,
+    WIRE_FLAG_HAS_PROFILE      = 1u << 0,
+    WIRE_FLAG_READABLE         = 1u << 1,
+    WIRE_FLAG_LOGICAL          = 1u << 2,
+    WIRE_DESCRIPTOR_FLAGS      = WIRE_FLAG_HAS_PROFILE | WIRE_FLAG_READABLE | WIRE_FLAG_LOGICAL,
 };
 
 static uint8_t crc8(const uint8_t *bytes, size_t length) {
@@ -95,6 +105,17 @@ static bool descriptor_zero(const noah_profile_split_descriptor_t *descriptor) {
     return descriptor && descriptor->generation == 0u && descriptor->payload_crc32 == 0u && descriptor->payload_digest == 0u && descriptor->compiled_default_digest == 0u && descriptor->action_abi_digest == 0u && descriptor->payload_length == 0u && descriptor->schema_major == 0u && descriptor->schema_minor == 0u && descriptor->domain_mask == 0u && descriptor->profile_flags == 0u && descriptor->origin_half == 0u && !descriptor->readable && !descriptor->has_profile && !descriptor->logical;
 }
 
+static bool reuse_zero(const noah_profile_split_v1_frame_t *frame) {
+    return frame->reuse_length == 0u && frame->reuse_source_offset == 0u && frame->reuse_source.generation == 0u && frame->reuse_source.digest == 0u && frame->reuse_source.crc32 == 0u && frame->reuse_source.kind == 0u && frame->reuse_source.origin == 0u;
+}
+
+// A chunk frame is at least the 32 bytes every other frame has, so a reply
+// carrying one still fills the reply buffer exactly.
+static uint8_t chunk_frame_length(uint8_t chunk_length) {
+    uint16_t length = (uint16_t)NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD + chunk_length;
+    return length < NOAH_PROFILE_SPLIT_V1_FRAME_SIZE ? NOAH_PROFILE_SPLIT_V1_FRAME_SIZE : (uint8_t)length;
+}
+
 static bool busy_frame(const noah_profile_split_v1_frame_t *frame) {
     return frame->kind == NOAH_PROFILE_SPLIT_V1_ACK && frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
 }
@@ -110,6 +131,14 @@ static bool transfer_shape_valid(const noah_profile_split_v1_frame_t *frame) {
         return frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->generation != 0u && frame->payload_length >= NOAH_PROFILE_BLOB_V1_HEADER_SIZE && frame->chunk_length != 0u && frame->chunk_length <= NOAH_PROFILE_SPLIT_V1_CHUNK_MAX && frame->chunk_length <= frame->payload_length - frame->offset;
     }
     if (frame->chunk_length != 0u || !bytes_zero(frame->chunk, sizeof(frame->chunk))) {
+        return false;
+    }
+    if (frame->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) {
+        bool committed = frame->reuse_source.kind == WIRE_REUSE_KIND_COMMITTED;
+
+        return frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->generation != 0u && frame->payload_length >= NOAH_PROFILE_BLOB_V1_HEADER_SIZE && frame->reuse_length != 0u && frame->reuse_length <= frame->payload_length - frame->offset && (uint32_t)frame->reuse_source_offset + frame->reuse_length <= NOAH_PROFILE_BLOB_V1_MAX_SIZE && (committed ? frame->reuse_source.generation != 0u && frame->reuse_source.origin <= 1u : frame->reuse_source.kind == WIRE_REUSE_KIND_COMPILED && frame->reuse_source.generation == 0u && frame->reuse_source.origin == WIRE_REUSE_ORIGIN_COMPILED);
+    }
+    if (!reuse_zero(frame)) {
         return false;
     }
     if (frame->kind == NOAH_PROFILE_SPLIT_V1_ACK) {
@@ -130,7 +159,10 @@ static bool logical_bind_request_shape_valid(const noah_profile_split_v1_frame_t
 }
 
 static bool frame_shape_valid(const noah_profile_split_v1_frame_t *frame) {
-    if (!frame || frame->kind < NOAH_PROFILE_SPLIT_V1_METADATA || frame->kind > NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST || frame->status > NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR) {
+    if (!frame || frame->kind < NOAH_PROFILE_SPLIT_V1_METADATA || frame->kind > NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE || frame->status > NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE) {
+        return false;
+    }
+    if (frame->kind != NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE && !reuse_zero(frame)) {
         return false;
     }
     if (frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND) {
@@ -154,12 +186,24 @@ static bool frame_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     return transfer_shape_valid(frame);
 }
 
-bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *frame, uint8_t out[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
-    if (!out || !frame_shape_valid(frame)) {
-        return false;
+uint8_t noah_profile_split_v1_frame_length(const noah_profile_split_v1_frame_t *frame) {
+    if (!frame_shape_valid(frame)) {
+        return 0u;
     }
-    memset(out, 0, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
-    out[WIRE_VERSION] = NOAH_PROFILE_SPLIT_V1_PROTOCOL_VERSION;
+    if (frame->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK) {
+        return chunk_frame_length(frame->chunk_length);
+    }
+    return frame->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE ? NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE : NOAH_PROFILE_SPLIT_V1_FRAME_SIZE;
+}
+
+uint8_t noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *frame, uint8_t *out, uint8_t capacity) {
+    uint8_t length = noah_profile_split_v1_frame_length(frame);
+
+    if (!out || length == 0u || length > capacity) {
+        return 0u;
+    }
+    memset(out, 0, length);
+    out[WIRE_VERSION] = NOAH_PROFILE_SPLIT_PROTOCOL_VERSION;
     out[WIRE_KIND]    = (uint8_t)frame->kind;
     out[WIRE_STATUS]  = (uint8_t)frame->status;
     if (descriptor_kind(frame->kind)) {
@@ -181,6 +225,18 @@ bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *fra
         out[WIRE_BIND_FORMAT] = frame->store_format_version;
         write_u32(&out[WIRE_BIND_VIA_GEN], frame->via_generation);
         write_u32(&out[WIRE_BIND_VIA_DIGEST], frame->via_digest);
+    } else if (frame->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) {
+        write_u32(&out[WIRE_TRANSFER_GEN], frame->generation);
+        write_u32(&out[WIRE_TRANSFER_DIGEST], frame->payload_digest);
+        write_u16(&out[WIRE_TRANSFER_OFFSET], frame->offset);
+        write_u16(&out[WIRE_TRANSFER_LENGTH], frame->payload_length);
+        write_u16(&out[WIRE_REUSE_LENGTH], frame->reuse_length);
+        write_u16(&out[WIRE_REUSE_SOURCE_OFF], frame->reuse_source_offset);
+        write_u32(&out[WIRE_REUSE_SOURCE_GEN], frame->reuse_source.generation);
+        write_u32(&out[WIRE_REUSE_SOURCE_DIG], frame->reuse_source.digest);
+        write_u32(&out[WIRE_REUSE_SOURCE_CRC], frame->reuse_source.crc32);
+        out[WIRE_REUSE_SOURCE_KIND]   = frame->reuse_source.kind;
+        out[WIRE_REUSE_SOURCE_ORIGIN] = frame->reuse_source.origin;
     } else {
         write_u32(&out[WIRE_TRANSFER_GEN], frame->generation);
         write_u32(&out[WIRE_TRANSFER_DIGEST], frame->payload_digest);
@@ -195,14 +251,26 @@ bool noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *fra
             out[WIRE_BUSY_ADMISSION]   = frame->busy_admission;
         }
     }
-    out[WIRE_CRC] = crc8(out, WIRE_CRC);
-    return true;
+    out[length - 1u] = crc8(out, (size_t)length - 1u);
+    return length;
 }
 
 bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noah_profile_split_v1_frame_t *frame) {
     noah_profile_split_v1_frame_t decoded = {0};
+    uint8_t                       expected;
 
-    if (!wire || !frame || length != NOAH_PROFILE_SPLIT_V1_FRAME_SIZE || wire[WIRE_VERSION] != NOAH_PROFILE_SPLIT_V1_PROTOCOL_VERSION || wire[WIRE_CRC] != crc8(wire, WIRE_CRC)) {
+    if (!wire || !frame || length < NOAH_PROFILE_SPLIT_V1_FRAME_SIZE || length > NOAH_PROFILE_SPLIT_V1_FRAME_MAX || wire[WIRE_VERSION] != NOAH_PROFILE_SPLIT_PROTOCOL_VERSION) {
+        return false;
+    }
+    if (wire[WIRE_KIND] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK) {
+        if (wire[WIRE_CHUNK_LENGTH] > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) {
+            return false;
+        }
+        expected = chunk_frame_length(wire[WIRE_CHUNK_LENGTH]);
+    } else {
+        expected = wire[WIRE_KIND] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE ? NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE : NOAH_PROFILE_SPLIT_V1_FRAME_SIZE;
+    }
+    if (length != expected || wire[length - 1u] != crc8(wire, (size_t)length - 1u)) {
         return false;
     }
     decoded.kind   = (noah_profile_split_v1_kind_t)wire[WIRE_KIND];
@@ -236,11 +304,28 @@ bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noa
         decoded.store_format_version = wire[WIRE_BIND_FORMAT];
         decoded.via_generation       = read_u32(&wire[WIRE_BIND_VIA_GEN]);
         decoded.via_digest           = read_u32(&wire[WIRE_BIND_VIA_DIGEST]);
+    } else if (decoded.kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) {
+        if (wire[WIRE_FLAGS] != 0u || wire[WIRE_REUSE_RESERVED] != 0u) {
+            return false;
+        }
+        decoded.generation          = read_u32(&wire[WIRE_TRANSFER_GEN]);
+        decoded.payload_digest      = read_u32(&wire[WIRE_TRANSFER_DIGEST]);
+        decoded.offset              = read_u16(&wire[WIRE_TRANSFER_OFFSET]);
+        decoded.payload_length      = read_u16(&wire[WIRE_TRANSFER_LENGTH]);
+        decoded.reuse_length        = read_u16(&wire[WIRE_REUSE_LENGTH]);
+        decoded.reuse_source_offset = read_u16(&wire[WIRE_REUSE_SOURCE_OFF]);
+        decoded.reuse_source        = (noah_profile_split_v1_source_t){
+            .generation = read_u32(&wire[WIRE_REUSE_SOURCE_GEN]),
+            .digest     = read_u32(&wire[WIRE_REUSE_SOURCE_DIG]),
+            .crc32      = read_u32(&wire[WIRE_REUSE_SOURCE_CRC]),
+            .kind       = wire[WIRE_REUSE_SOURCE_KIND],
+            .origin     = wire[WIRE_REUSE_SOURCE_ORIGIN],
+        };
     } else {
         bool    busy = decoded.kind == NOAH_PROFILE_SPLIT_V1_ACK && decoded.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
         uint8_t used = busy ? 4u : wire[WIRE_CHUNK_LENGTH];
 
-        if (wire[WIRE_FLAGS] != 0u || wire[WIRE_CHUNK_LENGTH] > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX || (busy && wire[WIRE_CHUNK_LENGTH] != 0u) || !bytes_zero(&wire[WIRE_CHUNK + used], NOAH_PROFILE_SPLIT_V1_CHUNK_MAX - used)) {
+        if (wire[WIRE_FLAGS] != 0u || (decoded.kind != NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK && wire[WIRE_CHUNK_LENGTH] > NOAH_PROFILE_SPLIT_V1_REPLY_CHUNK_MAX) || (busy && wire[WIRE_CHUNK_LENGTH] != 0u) || !bytes_zero(&wire[WIRE_CHUNK + used], (size_t)(length - 1u) - (WIRE_CHUNK + used))) {
             return false;
         }
         if (busy) {
@@ -263,4 +348,7 @@ bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noa
     return true;
 }
 
-_Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_SIZE == 32u, "profile split protocol requires one reviewed QMK RPC frame");
+_Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_SIZE == 32u, "profile split replies are one reviewed 32-byte QMK RPC frame");
+_Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= UINT8_MAX, "profile split frames are sized by QMK's 8-bit RPC lengths");
+_Static_assert(NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE <= NOAH_PROFILE_SPLIT_V1_FRAME_MAX, "a reuse frame must fit the largest request");
+_Static_assert(NOAH_PROFILE_SPLIT_V1_REPLY_CHUNK_MAX == 14u, "a pulled chunk keeps the 32-byte reply layout");

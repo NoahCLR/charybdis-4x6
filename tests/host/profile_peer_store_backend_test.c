@@ -83,8 +83,9 @@ static noah_profile_split_descriptor_t descriptor_for(const fixture_t *fixture, 
     };
 }
 
-static void fixture_init(fixture_t *fixture) {
-    noah_profile_reader_t                     reader = noah_profile_reader_from_memory(empty_profile, sizeof(empty_profile));
+// The half's active profile is the compiled `bytes`, as a fresh half's is.
+static void fixture_init_compiled(fixture_t *fixture, const uint8_t *bytes, uint16_t length) {
+    noah_profile_reader_t                     reader = noah_profile_reader_from_memory(bytes, length);
     noah_profile_validator_v1_profile_t       profile;
     noah_effective_profile_snapshot_t         compiled;
     noah_profile_validator_v1_compatibility_t compatibility = noah_profile_validator_v1_default_compatibility(ACTION_ABI_DIGEST);
@@ -93,9 +94,9 @@ static void fixture_init(fixture_t *fixture) {
     memset(fixture, 0, sizeof(*fixture));
     memset(fixture->memory.bytes, 0xff, sizeof(fixture->memory.bytes));
     memset(&profile, 0, sizeof(profile));
-    profile.byte_length       = sizeof(empty_profile);
-    profile.crc32             = payload_crc(empty_profile, sizeof(empty_profile));
-    profile.digest            = payload_digest(empty_profile, sizeof(empty_profile));
+    profile.byte_length       = length;
+    profile.crc32             = payload_crc(bytes, length);
+    profile.digest            = payload_digest(bytes, length);
     profile.action_abi_digest = ACTION_ABI_DIGEST;
     assert(noah_effective_profile_snapshot_make_compiled(&profile, &reader, 0u, &compiled) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(noah_effective_profile_provider_init(&fixture->provider, &compiled, always_safe, NULL, NULL, 0u) == NOAH_EFFECTIVE_PROFILE_OK);
@@ -118,6 +119,10 @@ static void fixture_init(fixture_t *fixture) {
     noah_profile_candidate_store_backend_init(&fixture->candidate_backend, &fixture->store, &fixture->provider, &compatibility, fixture->compiled_digest, 1u);
     assert(fixture->candidate_backend.reuse_guard_installed);
     noah_profile_peer_store_backend_init(&fixture->peer, &fixture->candidate_backend);
+}
+
+static void fixture_init(fixture_t *fixture) {
+    fixture_init_compiled(fixture, empty_profile, sizeof(empty_profile));
 }
 
 static noah_profile_peer_store_result_t finish_commit(fixture_t *fixture, const noah_profile_split_descriptor_t *descriptor) {
@@ -314,6 +319,101 @@ static void test_durability_unknown_requires_boot_reconciliation(void) {
     assert(noah_profile_peer_store_backend_begin_logical(&restarted_peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_BUSY);
 }
 
+static bool staged_equals(fixture_t *fixture, const uint8_t *expected, uint16_t length) {
+    uint8_t bytes[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];
+
+    for (uint16_t offset = 0u; offset < length; offset = (uint16_t)(offset + sizeof(bytes))) {
+        uint8_t piece = (uint16_t)(length - offset) < sizeof(bytes) ? (uint8_t)(length - offset) : (uint8_t)sizeof(bytes);
+
+        if (fixture->peer.interface.read(fixture->peer.interface.context, offset, bytes, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK || memcmp(bytes, &expected[offset], piece) != 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// A copy is written in full split chunks (up to 110 bytes, stored in pieces)
+// and in reuse ranges read from this half's own active profile, whose
+// identity every read checks.
+static void test_reuse_fills_ranges_from_the_active_profile(void) {
+    static fixture_t                fixture;
+    static uint8_t                  active[300];
+    static uint8_t                  target[400];
+    noah_profile_split_descriptor_t descriptor;
+    noah_profile_split_v1_source_t  source;
+    noah_profile_split_v1_source_t  wrong;
+
+    for (uint16_t index = 0u; index < sizeof(active); index++) {
+        active[index] = (uint8_t)(index * 7u + 3u);
+    }
+    for (uint16_t index = 0u; index < sizeof(target); index++) {
+        target[index] = (uint8_t)(index ^ 0x5Au);
+    }
+    // [110, 230) comes from the active profile's [150, 270).
+    memcpy(&target[110], &active[150], 120u);
+    fixture_init_compiled(&fixture, active, sizeof(active));
+    source = (noah_profile_split_v1_source_t){.generation = 0u, .digest = payload_digest(active, sizeof(active)), .crc32 = payload_crc(active, sizeof(active)), .kind = 0u, .origin = 255u};
+
+    descriptor                = descriptor_for(&fixture, 4u, 1u, NOAH_PROFILE_STORE_FLAG_OVERRIDE, 0u);
+    descriptor.payload_length = sizeof(target);
+    descriptor.payload_crc32  = payload_crc(target, sizeof(target));
+    descriptor.payload_digest = payload_digest(target, sizeof(target));
+    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
+
+    // One full chunk and its exact repeat.
+    assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 0u, target, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(fixture.peer.next_offset == NOAH_PROFILE_SPLIT_V1_CHUNK_MAX);
+    assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 0u, target, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) == NOAH_PROFILE_PEER_STORE_OK);
+
+    // A source this half's active profile is not leaves the copy open.
+    wrong = source;
+    wrong.digest ^= 1u;
+    assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &wrong, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_SOURCE_UNAVAILABLE);
+    wrong = (noah_profile_split_v1_source_t){.generation = 3u, .digest = source.digest, .crc32 = source.crc32, .kind = 1u, .origin = 0u};
+    assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &wrong, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_SOURCE_UNAVAILABLE);
+    // Past the source's end.
+    assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &source, 290u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_SOURCE_UNAVAILABLE);
+    assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_RECEIVING && fixture.peer.next_offset == 110u);
+
+    // The range is copied a budget at a time, continuing from the next offset.
+    assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &source, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(fixture.peer.next_offset == 160u);
+    assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &source, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(fixture.peer.next_offset == 210u);
+    assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &source, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(fixture.peer.next_offset == 230u);
+    // A finished range asked again changes nothing.
+    assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &source, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(fixture.peer.next_offset == 230u);
+
+    assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 230u, &target[230], NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 340u, &target[340], 60u) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(fixture.peer.next_offset == sizeof(target));
+    assert(staged_equals(&fixture, target, sizeof(target)));
+    assert(fixture.store.candidate_written == sizeof(target));
+    // The store's running checksums cover exactly the staged bytes.
+    assert(noah_profile_crc32_finish(fixture.store.candidate_crc32_state) == descriptor.payload_crc32 && fixture.store.candidate_digest_state == descriptor.payload_digest);
+
+    // A conflicting repeat of a full chunk is caught in any of its pieces.
+    {
+        uint8_t changed[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX];
+
+        memcpy(changed, &target[230], sizeof(changed));
+        changed[sizeof(changed) - 1u] ^= 1u;
+        assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 230u, changed, sizeof(changed)) == NOAH_PROFILE_PEER_STORE_CHUNK_CONFLICT);
+        assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_REJECTED);
+        assert(noah_profile_candidate_store_backend_admission_owner(&fixture.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+    }
+
+    // A range that starts past the next offset is a gap: the copy is
+    // rejected and its storage released.
+    descriptor.generation = 5u;
+    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 1u, &source, 0u, 20u, 50u) == NOAH_PROFILE_PEER_STORE_RANGE_ERROR);
+    assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_REJECTED);
+    assert(noah_profile_candidate_store_backend_admission_owner(&fixture.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+}
+
 int main(void) {
     test_exact_identity_commit_reboot_and_idempotence();
     test_reset_record_preserves_zero_flags_without_activation();
@@ -321,6 +421,7 @@ int main(void) {
     test_chunk_replay_gap_overlap_and_conflict();
     test_domain_mismatch_rejects_without_commit();
     test_durability_unknown_requires_boot_reconciliation();
+    test_reuse_fills_ranges_from_the_active_profile();
     puts("profile peer store backend host tests passed");
     return 0;
 }

@@ -18,6 +18,26 @@
       },
       "indirect_edges": [
         {
+          "caller": "advance_incoming_reuse",
+          "callee": "write_candidate",
+          "reason": "The scan-owned peer reuse path writes bounded pieces through the shared candidate backend interface; the pinned compiler inlines backend_reuse into this caller."
+        },
+        {
+          "caller": "noah_profile_peer_store_backend_write",
+          "callee": "write_candidate",
+          "reason": "The peer store writes each received chunk through the shared candidate backend interface in pieces of at most 20 bytes."
+        },
+        {
+          "caller": "noah_profile_peer_store_backend_write",
+          "callee": "read_candidate",
+          "reason": "A fully repeated peer chunk reads the staged bytes through the shared candidate backend before accepting the retry."
+        },
+        {
+          "caller": "noah_profile_split_reconciler_scan_mode",
+          "callee": "host_staged_read",
+          "reason": "The prepared push reads the retained host candidate through its injected source reader; the pinned compiler inlines push_read into the scan owner."
+        },
+        {
           "caller": "noah_profile_candidate_store_backend_activation_step",
           "callee": "noah_effective_settings_invalidate",
           "reason": "Provider publication invokes the portable settings invalidator; its injected native apply callback is accounted separately."
@@ -115,6 +135,58 @@
       ],
       "paths": [
         {
+          "name": "peer reuse rejected mailbox admission reply",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "process_payload_reuse", "cache_reuse_busy_reply", "cache_response", "noah_profile_split_v1_frame_encode"]
+        },
+        {
+          "name": "peer reuse mailbox admission reply",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "process_payload_reuse", "cache_incoming_reuse_result", "cache_response", "noah_profile_split_v1_frame_encode"]
+        },
+        {
+          "name": "peer reuse progress reply",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "cache_incoming_reuse_result", "cache_response", "noah_profile_split_v1_frame_encode"]
+        },
+        {
+          "name": "peer reuse committed EEPROM read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "peer reuse compiled RGB materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+        },
+        {
+          "name": "peer reuse compiled settings materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
+        },
+        {
+          "name": "peer reuse compiled combo materialization",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
+        },
+        {
+          "name": "peer reuse candidate write",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "write_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+        },
+        {
+          "name": "peer large chunk candidate write",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "process_payload_chunk", "noah_profile_peer_store_backend_write", "write_candidate", "io_write", "noah_qmk_profile_eeprom_write", "wear_leveling_write"]
+        },
+        {
+          "name": "peer repeated large chunk read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "process_payload_chunk", "noah_profile_peer_store_backend_write", "read_candidate", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "peer large chunk mailbox decode",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "noah_profile_split_v1_frame_decode"]
+        },
+        {
+          "name": "prepared peer copy staged EEPROM read",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "host_staged_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "peer payload chunk and reuse exchange",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "push_send", "rpc_exchange", "noah_qmk_profile_split_transport_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
+        },
+        {
           "name": "portable profile globals and macro-name readback",
           "functions": ["main", "via_custom_value_command_kb", "readback_fill", "noah_setting"]
         },
@@ -140,19 +212,19 @@
         },
         {
           "name": "candidate reuse committed EEPROM read",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "candidate reuse compiled RGB materialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
         },
         {
           "name": "candidate reuse compiled settings materialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
         },
         {
           "name": "candidate reuse compiled combo materialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
         },
         {
           "name": "engineering owner host validation step",

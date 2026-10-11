@@ -491,6 +491,9 @@ static bool process_reuse(noah_profile_candidate_transaction_t *transaction, noa
         result = transaction->backend.write(transaction->backend.context, offset, transaction->reuse_bytes, length);
         transaction->reuse_read = false;
         if (backend_complete(result)) {
+            if (transaction->backend.note_reuse) {
+                transaction->backend.note_reuse(transaction->backend.context, &command->payload.reuse.source, offset, (uint16_t)(command->payload.reuse.source_offset + copied), length);
+            }
             command->payload.reuse.copied += length;
             transaction->status.next_offset += length;
             clear_error(transaction);

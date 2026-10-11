@@ -213,9 +213,10 @@ The host reads a complete snapshot once for review and recovery. After acquiring
 the candidate lease, it checks custom identity, VIA identity, and settings digest
 without rereading the 7,191-byte macro bank. It transfers only changed 28-byte
 VIA blocks. With Profile Wire bits 24 and 25, custom uploads also reuse exact
-active-source ranges and verify bounded batches of streamed chunks. Both halves
-still prepare the complete custom candidate and validate it; no durable boundary
-is skipped. See [differential candidate transfer](profile-wire-v1.md#differential-candidate-transfer). Success uses exact changed-block readback plus stable custom and VIA
+active-source ranges and verify bounded batches of streamed chunks; the copy to
+the other half reuses the same ranges from its own active profile and sends
+the rest in chunks of up to 110 bytes. Both halves still prepare the complete
+custom candidate and validate it; no durable boundary is skipped. See [differential candidate transfer](profile-wire-v1.md#differential-candidate-transfer). Success uses exact changed-block readback plus stable custom and VIA
 identities on both halves; Refresh and Export remain independent full reads.
 
 The logical staging channel carries 12 data bytes per report because every chunk

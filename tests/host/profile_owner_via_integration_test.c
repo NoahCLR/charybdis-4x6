@@ -40,6 +40,9 @@ typedef struct {
 
 typedef struct {
     noah_profile_owner_t *peer;
+    // Payload frames the link carried, by kind.
+    uint32_t chunk_frames;
+    uint32_t reuse_frames;
 } split_link_t;
 
 // ── The other half's VIA bank ────────────────────────────────────────────────
@@ -403,12 +406,14 @@ static bool memory_write(void *context, noah_profile_storage_address_t address, 
     return true;
 }
 
-static bool split_exchange(void *context, const uint8_t request[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE], uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
+static bool split_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
     split_link_t                    *link = context;
     noah_profile_split_reconciler_t *reconciler;
 
     if (!link_up || !link || !link->peer || !(reconciler = noah_profile_owner_split_reconciler(link->peer))) return false;
-    return noah_profile_split_reconciler_receive(reconciler, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK) link->chunk_frames++;
+    if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) link->reuse_frames++;
+    return noah_profile_split_reconciler_receive(reconciler, request, request_length, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
 }
 
 // The USB half's owner drives the real VIA layer, as profile_store_runtime.c
@@ -855,13 +860,30 @@ static void test_committed_reuse_saves_both_halves_and_reboots(void) {
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_BEGIN, 312u, NOAH_QMK_VIA_SYNC_REGION_NONE, NULL, 0u, &now);
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_CHUNK, 312u, NOAH_QMK_VIA_SYNC_REGION_KEYMAP, target_keymap, KEYMAP_SIZE, &now);
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_VERIFY, 312u, NOAH_QMK_VIA_SYNC_REGION_NONE, NULL, 0u, &now);
+    usb_link.chunk_frames = usb_link.reuse_frames = 0u;
     commit_staged(312u, true, &now);
     for (uint32_t guard = 0; guard < 8192u && other.committed_descriptor.generation != 2; guard++) tick(&now);
     assert_pair_profile(2);
+    // The other half copied the reused profile from its own committed record:
+    // the split link carried a reuse range and no profile bytes.
+    noah_profile_split_reconciler_status_t split;
+    assert(noah_profile_split_reconciler_status(noah_profile_owner_split_reconciler(&usb), &split));
+    assert(usb_link.reuse_frames >= 1u && usb_link.chunk_frames == 0u && split.reused_bytes == sizeof(compiled_blob));
     reboot_saved_pair(&now, 2);
     assert(memcmp(local_keymap, target_keymap, KEYMAP_SIZE) == 0 && memcmp(peer.keymap, target_keymap, KEYMAP_SIZE) == 0);
     assert(peer.generation == 7 && noah_qmk_via_sync_state_snapshot().metadata.generation == 7);
     puts("committed-source reuse: real owners, logical VIA staging, both-half publication and reboot passed");
+}
+
+static void test_reuse_busy_detail_keeps_the_host_status_vocabulary(void) {
+    uint32_t now = 0;
+    boot_pair(&now);
+    usb.reconciler.last_busy_reason = NOAH_PROFILE_SPLIT_V1_BUSY_COPYING;
+    usb.reconciler.busy_streak      = 3u;
+    noah_profile_candidate_v1_peer_status_t status;
+    assert(noah_profile_owner_peer_transfer(&usb, &status));
+    assert(status.busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING);
+    assert(status.busy_streak == 3u);
 }
 
 int main(void) {
@@ -871,6 +893,7 @@ int main(void) {
     test_staging_progress_is_the_candidates_lease();
     test_cleanup_waits_for_an_absent_peer_and_resumes();
     test_committed_reuse_saves_both_halves_and_reboots();
+    test_reuse_busy_detail_keeps_the_host_status_vocabulary();
     puts("profile owner and logical VIA integration tests passed");
     return 0;
 }

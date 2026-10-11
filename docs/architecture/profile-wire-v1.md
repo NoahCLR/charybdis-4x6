@@ -694,8 +694,14 @@ to resend a batch blindly.
 
 These operations only reconstruct the candidate. Full checksum and semantic
 validation, peer preparation, marker-last durability, activation, cancellation
-and recovery remain the same. Split transfer still sends the complete custom
-candidate; differential split preparation is not part of this extension.
+and recovery remain the same. The copy to the other half reuses too: the
+firmware remembers the ranges REUSE staged and asks the other half to fill
+them from its own active profile, which it checks against the same source
+identity, and sends only the rest. Where the other half's active profile is
+not that source, it sends the bytes. The other half still receives, validates
+and prepares the complete candidate. This is internal to the firmware
+([split payload reuse](profile-split-v1.md#payload-reuse)); the host sends
+nothing different.
 
 Validate and abort contain only the five-byte common header; bytes 5 through
 31 are reserved and zero. Commit uses the same body-free shape but byte 0 is
@@ -795,7 +801,7 @@ peer is ready. Builds with the live-profile owner answer it; others answer
 | 1 | 1 | peer phase |
 | 2 | 1 | the peer's last split status |
 | 3 | 1 | flags: bit 0 peer cleanup pending, bit 1 this half is transport master, bit 2 waiting for a safe boundary |
-| 4 | 2 | bytes of the profile transferred to the peer |
+| 4 | 2 | bytes of the profile transferred to the peer, including those it copied from its own profile |
 | 6 | 2 | bytes to transfer |
 | 8 | 4 | split retries since boot |
 | 12 | 4 | split transport failures since boot |
@@ -819,7 +825,8 @@ retry), `2` mailbox full (an earlier request is still unprocessed, which, if it
 persists, means the peer is not getting scan time), `3` the peer's store holds
 a different copy, `4` the store is not receiving this copy, `5` the store is
 validating, preparing or committing, `6` the peer is pulling a profile itself,
-and `7` the peer only converges just now. Store states are `0` uninitialized,
+and `7` the peer only converges just now. Copying a split reuse range is reported
+as `5` (store working), keeping the host vocabulary unchanged. Store states are `0` uninitialized,
 `1` idle, `2` receiving, `3` validating, `4` preparing, `5` prepared, `6`
 committing, `7` committed, `8` rejected and `9` reconcile required; transfer
 owners are `0` none, `1` receiving a remote push, `2` pulling. Bytes 19–21
