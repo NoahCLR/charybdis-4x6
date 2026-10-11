@@ -356,7 +356,9 @@ firmware marks local storage dirty before QMK changes it, reads back the
 committed storage afterward, and reconciles a versioned snapshot with the
 other half. Transfers are CRC-checked, range-checked, retried with bounded
 backoff, and considered complete only after the receiver verifies the complete
-digest and acknowledges it. Boot, reconnect, and USB-role changes always
+digest and acknowledges it. Full-bank checksum work runs in small RAM-read
+batches on both halves, so even a tiny edit keeps the same complete verification
+with fewer scans spent waiting for it. Boot, reconnect, and USB-role changes always
 exchange metadata again. A newer clean generation wins; if equal generations
 have different contents, the current USB master wins deterministically and
 publishes a new generation. RGB and VIA-macro caches refresh only after local

@@ -7,16 +7,19 @@
 #include "via.h"
 #include "users/noah/lib/compat/qmk_via_storage_regions.h"
 
-enum {
-    TEST_KEYMAP_SIZE = 41,
-    TEST_MACRO_SIZE  = 37,
-};
+#ifndef TEST_KEYMAP_SIZE
+#    define TEST_KEYMAP_SIZE 41
+#endif
+#ifndef TEST_MACRO_SIZE
+#    define TEST_MACRO_SIZE 37
+#endif
 
 static uint8_t  keymap_bytes[TEST_KEYMAP_SIZE];
 static uint8_t  macro_bytes[TEST_MACRO_SIZE];
 static bool     via_valid;
 static uint32_t layout_options;
 static uint8_t  max_read_length;
+static uint16_t step_read_bytes;
 static uint8_t  valid_write_count;
 static bool     first_valid_write;
 #ifdef ENCODER_MAP_ENABLE
@@ -53,6 +56,7 @@ void dynamic_keymap_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
     if (size > max_read_length) {
         max_read_length = (uint8_t)size;
     }
+    step_read_bytes += size;
     memcpy(data, &keymap_bytes[offset], size);
 }
 
@@ -66,6 +70,7 @@ void dynamic_keymap_macro_get_buffer(uint16_t offset, uint16_t size, uint8_t *da
     if (size > max_read_length) {
         max_read_length = (uint8_t)size;
     }
+    step_read_bytes += size;
     memcpy(data, &macro_bytes[offset], size);
 }
 
@@ -100,15 +105,16 @@ void dynamic_keymap_set_encoder(uint8_t layer, uint8_t encoder_id, bool clockwis
 #endif
 
 static void test_reset(void) {
-    for (uint8_t index = 0u; index < sizeof(keymap_bytes); index++) {
+    for (uint16_t index = 0u; index < sizeof(keymap_bytes); index++) {
         keymap_bytes[index] = (uint8_t)(index * 3u + 1u);
     }
-    for (uint8_t index = 0u; index < sizeof(macro_bytes); index++) {
+    for (uint16_t index = 0u; index < sizeof(macro_bytes); index++) {
         macro_bytes[index] = (uint8_t)(index * 5u + 2u);
     }
     via_valid         = true;
     layout_options    = UINT32_C(0x12345678);
     max_read_length   = 0u;
+    step_read_bytes   = 0u;
     valid_write_count = 0u;
     first_valid_write = true;
 #ifdef ENCODER_MAP_ENABLE
@@ -201,7 +207,7 @@ static uint32_t finish_digest(uint8_t budget) {
     noah_qmk_via_storage_digest_init(&cursor);
     while (!cursor.complete) {
         CHECK(noah_qmk_via_storage_digest_step(&cursor, budget, &digest));
-        CHECK(++steps < 1000u);
+        CHECK(++steps < 40000u);
     }
     return digest;
 }
@@ -225,6 +231,76 @@ static void test_digest_is_incremental_deterministic_and_content_sensitive(void)
     CHECK(finish_digest(7u) != first);
 }
 
+static uint16_t digest_scan_count(uint8_t budget, uint32_t *digest) {
+    noah_qmk_via_storage_digest_cursor_t cursor;
+    uint16_t steps = 0u;
+
+    noah_qmk_via_storage_digest_init(&cursor);
+    while (!cursor.complete) {
+        noah_qmk_via_sync_region_t previous_region = cursor.region;
+        uint16_t previous_offset = cursor.offset;
+
+        step_read_bytes = 0u;
+        CHECK(noah_qmk_via_storage_digest_step(&cursor, budget, digest));
+        CHECK(step_read_bytes <= budget);
+        if (!cursor.complete) {
+            uint16_t progress = cursor.region == previous_region ? cursor.offset - previous_offset : cursor.offset;
+            CHECK(progress > 0u && progress <= budget);
+        }
+        CHECK(++steps < 40000u);
+    }
+    CHECK(!noah_qmk_via_storage_digest_step(&cursor, budget, digest));
+    return steps;
+}
+
+static void test_digest_scan_budget_preserves_full_bank_identity(void) {
+    uint32_t slow_digest   = 0u;
+    uint32_t fast_digest   = 0u;
+    uint16_t expected_slow = 1u;
+    uint16_t expected_fast = 1u;
+
+    test_reset();
+    for (noah_qmk_via_sync_region_t region = NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG;
+         region <= NOAH_QMK_VIA_SYNC_REGION_MACRO; region++) {
+        uint16_t size = noah_qmk_via_storage_region_size(region);
+        expected_slow += (size + 13u) / 14u;
+        expected_fast += (size + 223u) / 224u;
+    }
+    CHECK(digest_scan_count(14u, &slow_digest) == expected_slow);
+    printf("VIA bank: %u layout + %u macro bytes, 14-byte budget: %u scans\n",
+           (unsigned)sizeof(keymap_bytes), (unsigned)sizeof(macro_bytes), expected_slow);
+    CHECK(digest_scan_count(224u, &fast_digest) == expected_fast);
+    CHECK(fast_digest == slow_digest);
+    CHECK(max_read_length <= 14u);
+    printf("224-byte budget: %u scans, unchanged digest\n", expected_fast);
+
+    // Odd budgets exercise fragments that end inside the 14-byte workspace.
+    CHECK(finish_digest(1u) == slow_digest);
+    CHECK(finish_digest(31u) == slow_digest);
+    CHECK(finish_digest(223u) == slow_digest);
+    macro_bytes[sizeof(macro_bytes) - 1u] ^= 0x80u;
+    CHECK(digest_scan_count(224u, &fast_digest) == expected_fast);
+    CHECK(fast_digest != slow_digest);
+}
+
+static void test_digest_rejects_invalid_work_budgets_without_advancing(void) {
+    noah_qmk_via_storage_digest_cursor_t cursor;
+    uint32_t digest = UINT32_C(0x12345678);
+
+    test_reset();
+    noah_qmk_via_storage_digest_init(&cursor);
+    CHECK(NOAH_QMK_VIA_DIGEST_SCAN_BYTE_BUDGET == 224u);
+    CHECK(NOAH_QMK_VIA_DIGEST_READ_CHUNK_MAX == 14u);
+    CHECK(!noah_qmk_via_storage_digest_step(&cursor, 0u, &digest));
+    CHECK(!noah_qmk_via_storage_digest_step(&cursor, 225u, &digest));
+    CHECK(!noah_qmk_via_storage_digest_step(NULL, 224u, &digest));
+    CHECK(!noah_qmk_via_storage_digest_step(&cursor, 224u, NULL));
+    CHECK(cursor.region == NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG);
+    CHECK(cursor.offset == 0u && !cursor.complete);
+    CHECK(digest == UINT32_C(0x12345678));
+    CHECK(step_read_bytes == 0u);
+}
+
 int main(void) {
     test_region_sizes_and_bounds();
     test_config_is_canonical_and_commits_validity_last();
@@ -235,6 +311,8 @@ int main(void) {
     test_encoder_region_is_empty_when_disabled();
 #endif
     test_digest_is_incremental_deterministic_and_content_sensitive();
+    test_digest_scan_budget_preserves_full_bank_identity();
+    test_digest_rejects_invalid_work_budgets_without_advancing();
 
     puts("qmk_via_storage_regions host tests passed");
     return 0;

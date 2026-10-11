@@ -992,7 +992,7 @@ static bool noah_qmk_via_receiver_verify_tick(void) {
         noah_qmk_via_receiver_verify_epoch  = epoch;
         noah_qmk_via_receiver_verify_active = true;
     }
-    if (!noah_qmk_via_storage_digest_step(&noah_qmk_via_receiver_verify_cursor, NOAH_QMK_VIA_SYNC_FRAME_PAYLOAD_MAX, &noah_qmk_via_receiver_verify_digest)) {
+    if (!noah_qmk_via_storage_digest_step(&noah_qmk_via_receiver_verify_cursor, NOAH_QMK_VIA_DIGEST_SCAN_BYTE_BUDGET, &noah_qmk_via_receiver_verify_digest)) {
         ATOMIC_BLOCK_RESTORESTATE {
             if (noah_qmk_via_receiver_epoch == epoch) {
                 noah_qmk_via_receiver.active    = false;
@@ -1099,7 +1099,7 @@ static bool noah_qmk_via_local_digest_tick(void) {
         return false;
     }
     digest = shared.digest;
-    if (!noah_qmk_via_storage_digest_step(&noah_qmk_via_local_digest_cursor, NOAH_QMK_VIA_SYNC_FRAME_PAYLOAD_MAX, &digest)) {
+    if (!noah_qmk_via_storage_digest_step(&noah_qmk_via_local_digest_cursor, NOAH_QMK_VIA_DIGEST_SCAN_BYTE_BUDGET, &digest)) {
         return true;
     }
     if (!noah_qmk_via_local_digest_cursor.complete) {
