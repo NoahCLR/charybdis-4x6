@@ -1283,6 +1283,14 @@ bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_pr
         .busy_store_state = status.last_busy_store_state,
         .busy_owner       = status.last_busy_owner,
         .busy_admission   = status.last_busy_admission,
+        // Diagnostic counters stay out of the scan path's normal status
+        // workspace. This owner query runs in the same main context.
+        .reused_bytes = status.reused_bytes,
+        .reuse_exchanges = owner->reconciler.reuse_exchanges,
+        .source_unavailable_replies = owner->reconciler.source_unavailable_replies,
+        .prepared_scans = owner->reconciler.prepared_scans,
+        .prepared_exchanges = owner->reconciler.prepared_exchanges,
+        .reuse_unavailable = owner->reconciler.reuse_unavailable,
     };
     return true;
 }

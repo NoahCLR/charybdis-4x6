@@ -852,6 +852,17 @@ static bool request_held(const noah_profile_split_v1_frame_t *response) {
 }
 
 static void retry_admitted_mailbox(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *response, uint32_t now) {
+    // A fully received matching copy can need many validator scans. Poll its
+    // completion at a fixed pace; failure backoff would hide a ready peer for
+    // up to a second. The owner's pre-decision no-progress timeout remains.
+    if ((reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_DURABLE || reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT) && response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING && response->generation == reconciler->transfer_descriptor.generation && response->payload_digest == reconciler->transfer_descriptor.payload_digest && response->payload_length == reconciler->transfer_descriptor.payload_length && response->offset == reconciler->transfer_descriptor.payload_length && response->busy_owner == NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH && response->busy_admission == NOAH_PROFILE_STORAGE_ADMISSION_PEER && (response->busy_store_state == NOAH_PROFILE_PEER_STORE_VALIDATING || response->busy_store_state == NOAH_PROFILE_PEER_STORE_PREPARING || response->busy_store_state == NOAH_PROFILE_PEER_STORE_COMMITTING)) {
+        reconciler->attempt_immediate = false;
+        reconciler->next_attempt_at   = now + NOAH_PROFILE_SPLIT_STORE_POLL_MS;
+        reconciler->retry_ms          = NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS * 2u;
+        reconciler->admission_retries = 0u;
+        if (reconciler->retry_count != UINT32_MAX) reconciler->retry_count++;
+        return;
+    }
     if (reconciler->retry_ms != NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS && !(request_held(response) && reconciler->admission_retries < NOAH_PROFILE_SPLIT_ADMISSION_RETRIES)) {
         retry_later(reconciler, now);
         return;
@@ -898,6 +909,10 @@ static bool rpc_exchange(noah_profile_split_reconciler_t *reconciler, const noah
     uint8_t response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
     uint8_t request_length = noah_profile_split_v1_frame_encode(request, request_wire, sizeof(request_wire));
 
+    if (reconciler->prepared_push_active && request_length != 0u) {
+        if (reconciler->prepared_exchanges != UINT32_MAX) reconciler->prepared_exchanges++;
+        if (request->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE && reconciler->reuse_exchanges != UINT16_MAX) reconciler->reuse_exchanges++;
+    }
     if (!reconciler->config.exchange || request_length == 0u || !reconciler->config.exchange(reconciler->config.transport_context, request_wire, request_length, response_wire) || !noah_profile_split_v1_frame_decode(response_wire, sizeof(response_wire), response)) {
         transport_lost(reconciler, now);
         return false;
@@ -1277,6 +1292,7 @@ static void push_send(noah_profile_split_reconciler_t *reconciler, uint32_t now)
     // range or from where it stopped matching. Its copy stays open at that
     // offset: send the rest of this copy as bytes.
     if (reuse && response.kind == NOAH_PROFILE_SPLIT_V1_ERROR && response.status == NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE && response_correlated(&response, &reconciler->transfer_descriptor) && response.offset >= reconciler->transfer_offset && response.offset <= expected_offset) {
+        if (reconciler->source_unavailable_replies != UINT16_MAX) reconciler->source_unavailable_replies++;
         reconciler->reused_bytes      = (uint16_t)(reconciler->reused_bytes + (response.offset - reconciler->transfer_offset));
         reconciler->reuse_unavailable = true;
         expected_offset               = response.offset;
@@ -1587,6 +1603,7 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
     if (!(reconciler && reconciler->initialized) || (mode != NOAH_PROFILE_SPLIT_RECONCILE_FULL && mode != NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY)) {
         return false;
     }
+    if (reconciler->prepared_push_active && reconciler->prepared_scans != UINT32_MAX) reconciler->prepared_scans++;
     if (refresh_local(reconciler)) {
         refresh_metadata_response(reconciler);
         // Publish the durable local change before any retry/backoff return so
@@ -1776,6 +1793,10 @@ bool noah_profile_split_reconciler_prepared_push_begin_logical(noah_profile_spli
     reconciler->prepared_storage_retries = 0u;
     reconciler->admission_retries        = 0u;
     reconciler->reused_bytes             = 0u;
+    reconciler->prepared_scans           = 0u;
+    reconciler->prepared_exchanges       = 0u;
+    reconciler->reuse_exchanges          = 0u;
+    reconciler->source_unavailable_replies = 0u;
     reconciler->reuse_unavailable        = false;
     reconciler->outbound_reuse_pending   = false;
     reconciler->state                    = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND;

@@ -1155,7 +1155,12 @@ most 32 bytes (`NOAH_PROFILE_STORE_IO_CHUNK_MAX`), the bound the QMK EEPROM
 adapter enforces; a chunk read whole fails on the keyboard as a storage error. While the receiver
 still holds the sender's request, the sender polls at the 5 ms admission pace
 up to eight times in a row without progress before its ordinary backoff, so
-a slower scan no longer costs a 100 ms wait.
+a slower scan no longer costs a 100 ms wait. Once the full copy is received,
+correlated validation, prepare and commit work is collected every 25 ms rather
+than entering failure backoff; validator and durability budgets remain the
+same. Read-only candidate status page 2 exposes reused bytes, reuse attempts,
+source-unavailable replies and sender reconciler/RPC counts, so hardware
+captures can distinguish reuse from byte fallback.
 
 Firmware-only: both halves run one build, and a half on framing version 1
 reports its sibling unreadable instead of mixing formats. Profile Wire's
@@ -1163,7 +1168,10 @@ status vocabulary stays unchanged: split busy reason `8` (copying a reuse
 range) is reported to the host as `5` (store working), and source-unavailable
 is handled internally by byte fallback. Ark needs its imported contract docs
 refreshed after the firmware lands; its runtime needs no change to try this
-pair. Hardware timing is outstanding (Open Issues).
+pair. Page 2 is optional diagnostics and leaves page 1 byte-identical.
+[Baseline peer-copy captures](../measurements/peer-copy/2026-10-11-pair-51/README.md)
+confirm whole-profile reuse in the measured steady state. Timing after the
+polling correction and interruption acceptance remain outstanding (Open Issues).
 
 ## D-F20 — VIA checksum work is independent of split frame size
 

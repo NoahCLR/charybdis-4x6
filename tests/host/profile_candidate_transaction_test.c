@@ -542,6 +542,12 @@ static void test_peer_status_page(void) {
         .busy_store_state        = 3u,
         .busy_owner              = 1u,
         .busy_admission          = 2u,
+        .reused_bytes = 0x1112u,
+        .reuse_exchanges = 0x1314u,
+        .source_unavailable_replies = 0x1516u,
+        .prepared_scans = 0x1718191au,
+        .prepared_exchanges = 0x1b1c1d1eu,
+        .reuse_unavailable = true,
     };
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
 
@@ -566,6 +572,22 @@ static void test_peer_status_page(void) {
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
     load_fixture("operation-status-request", frame);
     frame[4] = 2u;
+    assert(noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
+    assert(frame[7] == 1u && frame[8] == 1u);
+    assert(frame[9] == 0x12u && frame[10] == 0x11u);
+    assert(frame[11] == 0x14u && frame[12] == 0x13u);
+    assert(frame[13] == 0x16u && frame[14] == 0x15u);
+    assert(frame[15] == 0x1au && frame[18] == 0x17u && frame[19] == 0x1eu && frame[22] == 0x1bu);
+    assert(frame[23] == 0x02u && frame[24] == 0x01u && frame[25] == 0x04u && frame[26] == 0x03u);
+    for (uint8_t index = 27u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
+    load_fixture("operation-status-request", frame);
+    frame[4] = 2u;
+    frame[31] = 1u;
+    assert(noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
+    load_fixture("operation-status-request", frame);
+    frame[4] = 3u;
     assert(!noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
     frame[4] = 1u;
     assert(!noah_profile_candidate_v1_handle_peer_status_get(NULL, frame, sizeof(frame)));

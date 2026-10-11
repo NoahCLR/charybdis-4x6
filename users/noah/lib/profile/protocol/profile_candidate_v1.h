@@ -234,9 +234,16 @@ typedef struct {
     uint8_t                                busy_store_state;
     uint8_t                                busy_owner;
     uint8_t                                busy_admission; // noah_profile_storage_admission_owner_t
+    // Page 2: the current/last prepared push; page 1 stays byte-identical.
+    uint16_t                               reused_bytes;
+    uint16_t                               reuse_exchanges;
+    uint16_t                               source_unavailable_replies;
+    uint32_t                               prepared_scans;
+    uint32_t                               prepared_exchanges;
+    bool                                   reuse_unavailable;
 } noah_profile_candidate_v1_peer_status_t;
 
-// Handles value 0x18 page 1 only, and returns false for anything else so the
+// Handles value 0x18 pages 1 and 2, and returns false for anything else so the
 // caller falls through to the page-0 codec.
 bool noah_profile_candidate_v1_handle_peer_status_get(const noah_profile_candidate_v1_peer_status_t *peer, uint8_t *frame, size_t length);
 

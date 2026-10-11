@@ -1271,6 +1271,7 @@ static void test_reuse_falls_back_to_bytes_without_the_source(void) {
     reuse_pair_prepare_and_commit(&pair);
     assert(noah_profile_split_reconciler_status(&pair.right.reconciler, &status) && status.reused_bytes == 0u);
     assert(pair.right.reconciler.reuse_unavailable);
+    assert(pair.right.reconciler.source_unavailable_replies == 1u && pair.right.reconciler.reuse_exchanges >= 1u);
     assert(pair.source.reads == chunks_for(500u) + chunks_for((uint32_t)maximum_profile_length - 500u));
 }
 
@@ -2253,10 +2254,51 @@ static void test_descriptor_changes_are_validated_before_backoff(void) {
     assert(right.link.exchanges == exchanges);
 }
 
+// STORE_WORKING is quick only for a complete, correlated remote copy.
+// A stale tuple, short copy or different storage owner keeps the backoff.
+static void test_store_completion_polling_requires_the_matching_full_copy(void) {
+    for (unsigned variant = 0u; variant < 8u; variant++) {
+        half_t left, right;
+        staged_source_t source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+        half_storage_init(&left);
+        half_storage_init(&right);
+        pair_init(&left, &right);
+        run_pair_until_converged(&left, &right, false);
+        noah_profile_split_descriptor_t descriptor = committed_descriptor(&right, 32u, 1u);
+        assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
+        right.reconciler.state = variant == 7u ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_DURABLE;
+        right.reconciler.retry_ms = 100u;
+        right.link.inject_response_exchange = right.link.exchanges + 1u;
+        right.link.injected = (noah_profile_split_v1_frame_t){
+            .kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY,
+            .generation = descriptor.generation, .payload_digest = descriptor.payload_digest,
+            .offset = descriptor.payload_length, .payload_length = descriptor.payload_length,
+            .busy_reason = NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING,
+            .busy_store_state = NOAH_PROFILE_PEER_STORE_VALIDATING,
+            .busy_owner = NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH,
+            .busy_admission = NOAH_PROFILE_STORAGE_ADMISSION_PEER,
+        };
+        switch (variant) {
+            case 1u: right.link.injected.generation++; break;
+            case 2u: right.link.injected.offset--; break;
+            case 3u: right.link.injected.busy_admission = NOAH_PROFILE_STORAGE_ADMISSION_HOST; break;
+            case 4u: right.link.injected.busy_reason = NOAH_PROFILE_SPLIT_V1_BUSY_OTHER_COPY; break;
+            case 5u: right.link.injected.busy_store_state = NOAH_PROFILE_PEER_STORE_RECEIVING; break;
+            case 6u: right.link.injected.busy_store_state = NOAH_PROFILE_PEER_STORE_PREPARING; break;
+            case 7u: right.link.injected.busy_store_state = NOAH_PROFILE_PEER_STORE_COMMITTING; break;
+        }
+        assert_one_scan_budget(&right, true, 100000u);
+        bool working = variant == 0u || variant >= 6u;
+        assert(right.reconciler.next_attempt_at == 100000u + (working ? NOAH_PROFILE_SPLIT_STORE_POLL_MS : 100u));
+        assert(right.reconciler.retry_ms == (working ? 100u : 200u));
+    }
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     load_maximum_profile(argv[1]);
     test_maximum_profile_prepares_and_commits_on_the_peer();
+    test_store_completion_polling_requires_the_matching_full_copy();
     test_reuse_ranges_copy_from_the_peers_active_profile();
     test_reuse_falls_back_to_bytes_without_the_source();
     test_lost_exchanges_during_reuse_resume_the_same_copy();
