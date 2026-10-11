@@ -67,6 +67,17 @@ static void test_compile_rejects_invalid_payloads(void) {
     CHECK(ir.length == 0u);
 }
 
+static void test_authored_compile_resets_streaming_state(void) {
+    macro_payload_ir_t ir = {.more = true};
+    uint8_t encoded[16];
+    uint16_t written;
+    CHECK(macro_payload_compile("abc", &ir));
+    CHECK(!ir.more);
+    ir.more = true;
+    CHECK(!macro_payload_encode_ir(&ir, encoded, sizeof(encoded), &written));
+    CHECK(written == 0u);
+}
+
 static void test_compile_accepts_long_delay_heavy_payload(void) {
     macro_payload_ir_t ir = {0};
 
@@ -275,6 +286,194 @@ static void test_protection_prefix_round_trip(void) {
     CHECK(!macro_payload_decode_qmk_stream(&decoded, sizeof(truncated), test_qmk_reader_read_byte, &reader));
 }
 
+// Windows of one stored macro, flattened to one step per text byte so that
+// where a window splits a text run does not matter.
+#define TEST_STREAM_MAX 40000u
+#define TEST_EVENTS_MAX 120000u
+
+typedef struct {
+    uint8_t  bytes[TEST_EVENTS_MAX];
+    uint32_t length;
+    uint16_t windows;
+    uint8_t  protection;
+} test_events_t;
+
+static void test_events_append_ir(test_events_t *events, const macro_payload_ir_t *ir) {
+    uint16_t at = 0u;
+
+    while (at < ir->length) {
+        uint8_t  opcode = ir->bytes[at];
+        uint16_t size   = 0u;
+
+        switch (opcode) {
+            case MACRO_PAYLOAD_IR_OP_TEXT:
+                CHECK(at + 1u < ir->length && ir->bytes[at + 1u] != 0u);
+                for (uint8_t i = 0u; i < ir->bytes[at + 1u]; i++) {
+                    CHECK(events->length + 3u <= sizeof(events->bytes));
+                    events->bytes[events->length++] = MACRO_PAYLOAD_IR_OP_TEXT;
+                    events->bytes[events->length++] = 1u;
+                    events->bytes[events->length++] = ir->bytes[at + 2u + i];
+                }
+                at = (uint16_t)(at + 2u + ir->bytes[at + 1u]);
+                continue;
+            case MACRO_PAYLOAD_IR_OP_UNICODE:
+                size = 4u;
+                break;
+            case MACRO_PAYLOAD_IR_OP_DELAY:
+                size = 3u;
+                break;
+            case MACRO_PAYLOAD_IR_OP_KEY_DOWN:
+            case MACRO_PAYLOAD_IR_OP_KEY_UP:
+                size = 2u;
+                break;
+            case MACRO_PAYLOAD_IR_OP_TAP_LIST:
+                size = (uint16_t)(2u + ir->bytes[at + 1u]);
+                break;
+            default:
+                CHECK(false);
+        }
+        CHECK(at + size <= ir->length && events->length + size <= sizeof(events->bytes));
+        memcpy(&events->bytes[events->length], &ir->bytes[at], size);
+        events->length += size;
+        at = (uint16_t)(at + size);
+    }
+}
+
+// Decodes every window, as playback does; false if any window fails.
+static bool test_decode_windows(const uint8_t *stream, uint16_t length, test_events_t *events) {
+    macro_payload_stream_cursor_t cursor = {0};
+    macro_payload_ir_t            ir     = {0};
+    test_qmk_reader_t             reader = {.buffer = stream};
+
+    events->length  = 0u;
+    events->windows = 0u;
+    do {
+        uint16_t from = cursor.offset;
+
+        if (!macro_payload_decode_qmk_window(&ir, &cursor, length, test_qmk_reader_read_byte, &reader)) {
+            return false;
+        }
+        CHECK(ir.length <= MACRO_PAYLOAD_IR_MAX_BYTES);
+        CHECK(ir.length != 0u || !ir.more);
+        CHECK(!ir.more || cursor.offset > from);
+        if (events->windows++ == 0u) {
+            events->protection = ir.protection;
+        }
+        CHECK(ir.protection == events->protection);
+        test_events_append_ir(events, &ir);
+    } while (ir.more);
+    return true;
+}
+
+static uint16_t test_append_text(uint8_t *stream, uint16_t at, char c, uint16_t count) {
+    for (uint16_t i = 0u; i < count; i++) {
+        stream[at++] = (uint8_t)c;
+    }
+    return at;
+}
+
+// Three held keys around a tap (one chord), Shift held across text, a delay.
+static uint16_t test_append_chords(uint8_t *stream, uint16_t at) {
+    static const uint8_t chords[] = {
+        SS_QMK_PREFIX, SS_DOWN_CODE, 0xE0u, SS_QMK_PREFIX, SS_DOWN_CODE, 0xE2u, SS_QMK_PREFIX, SS_DOWN_CODE, 0xE3u,
+        SS_QMK_PREFIX, SS_TAP_CODE, 0x04u,
+        SS_QMK_PREFIX, SS_UP_CODE, 0xE3u, SS_QMK_PREFIX, SS_UP_CODE, 0xE2u, SS_QMK_PREFIX, SS_UP_CODE, 0xE0u,
+        SS_QMK_PREFIX, SS_DOWN_CODE, 0xE1u, 'x', 'y', SS_QMK_PREFIX, SS_UP_CODE, 0xE1u,
+        SS_QMK_PREFIX, SS_DELAY_CODE, '2', '5', '|',
+    };
+
+    memcpy(&stream[at], chords, sizeof(chords));
+    return (uint16_t)(at + sizeof(chords));
+}
+
+static void test_long_stream_decodes_in_windows_that_split_only_whole_steps(void) {
+    static uint8_t       stream[TEST_STREAM_MAX];
+    static uint8_t       one[64];
+    static test_events_t whole, reference;
+    uint16_t             one_length = (uint16_t)(test_append_chords(one, 0u) + 1u);
+    macro_payload_ir_t   chord_ir   = {0};
+    test_qmk_reader_t    reader     = {.buffer = one};
+
+    one[one_length - 1u] = 0u;
+    CHECK(macro_payload_decode_qmk_stream(&chord_ir, one_length, test_qmk_reader_read_byte, &reader));
+
+    // Every offset of the chords relative to a window's end.
+    for (uint16_t lead = 0u; lead < 600u; lead++) {
+        uint16_t at = test_append_text(stream, 0u, 'a', lead);
+
+        for (uint8_t i = 0u; i < 60u; i++) {
+            at = test_append_chords(stream, at);
+        }
+        stream[at++] = 0u;
+
+        CHECK(test_decode_windows(stream, at, &whole));
+        CHECK(whole.windows > 1u);
+
+        reference.length = 0u;
+        for (uint16_t i = 0u; i < lead; i++) {
+            reference.bytes[reference.length++] = MACRO_PAYLOAD_IR_OP_TEXT;
+            reference.bytes[reference.length++] = 1u;
+            reference.bytes[reference.length++] = 'a';
+        }
+        for (uint8_t i = 0u; i < 60u; i++) {
+            test_events_append_ir(&reference, &chord_ir);
+        }
+        CHECK(whole.length == reference.length && memcmp(whole.bytes, reference.bytes, whole.length) == 0);
+    }
+}
+
+static void test_whole_bank_text_with_a_held_key_and_protection(void) {
+    static uint8_t       stream[TEST_STREAM_MAX];
+    static test_events_t events;
+    uint16_t             at = 0u;
+
+    stream[at++] = SS_QMK_PREFIX;
+    stream[at++] = 5u;
+    stream[at++] = 1u;
+    stream[at++] = SS_QMK_PREFIX;
+    stream[at++] = SS_DOWN_CODE;
+    stream[at++] = 0xE1u;
+    at           = test_append_text(stream, at, 'q', 34000u);
+    stream[at++] = SS_QMK_PREFIX;
+    stream[at++] = SS_UP_CODE;
+    stream[at++] = 0xE1u;
+    stream[at++] = 0u;
+
+    CHECK(test_decode_windows(stream, at, &events));
+    CHECK(events.protection == 1u);
+    CHECK(events.windows > 60u);
+    CHECK(events.length == 2u + 34000u * 3u + 2u);
+    CHECK(events.bytes[0] == MACRO_PAYLOAD_IR_OP_KEY_DOWN && events.bytes[events.length - 2u] == MACRO_PAYLOAD_IR_OP_KEY_UP);
+
+    // One window is not the whole macro.
+    {
+        macro_payload_ir_t ir     = {0};
+        test_qmk_reader_t  reader = {.buffer = stream};
+
+        CHECK(!macro_payload_decode_qmk_stream(&ir, at, test_qmk_reader_read_byte, &reader));
+        CHECK(ir.length == 0u && !ir.more);
+    }
+
+    // A key still held at the end fails the last window, however far it is.
+    stream[at - 4u] = 0u;
+    CHECK(!test_decode_windows(stream, (uint16_t)(at - 3u), &events));
+}
+
+static void test_invalid_byte_far_into_a_macro_fails_its_window(void) {
+    static uint8_t       stream[TEST_STREAM_MAX];
+    static test_events_t events;
+    uint16_t             at = test_append_text(stream, 0u, 'a', 5000u);
+
+    stream[at++] = 0x80u;
+    at           = test_append_text(stream, at, 'b', 10u);
+    stream[at++] = 0u;
+    CHECK(!test_decode_windows(stream, at, &events));
+
+    // Unterminated: the bank ends without the macro's terminator.
+    at = test_append_text(stream, 0u, 'a', 5000u);
+    CHECK(!test_decode_windows(stream, at, &events));
+}
+
 int main(void) {
     test_protection_prefix_round_trip();
     test_unicode_round_trip_and_rejection();
@@ -282,6 +481,7 @@ int main(void) {
     test_validate_rejects_invalid_payloads();
     test_compile_rejects_invalid_payloads();
     test_compile_accepts_long_delay_heavy_payload();
+    test_authored_compile_resets_streaming_state();
     test_decode_qmk_stream_accepts_exact_maximum_ir();
     test_decode_qmk_stream_rejects_ir_over_capacity();
     test_encode_emits_expected_qmk_sequence();
@@ -292,6 +492,9 @@ int main(void) {
     test_decode_qmk_stream_plays_each_tap_under_a_held_key_once();
     test_decode_qmk_stream_rejects_every_high_text_byte();
     test_decode_qmk_stream_keeps_high_command_operands();
+    test_long_stream_decodes_in_windows_that_split_only_whole_steps();
+    test_whole_bank_text_with_a_held_key_and_protection();
+    test_invalid_byte_far_into_a_macro_fails_its_window();
 
     puts("macro_payload host tests passed");
     return 0;

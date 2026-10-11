@@ -11,6 +11,7 @@
 #    include "nvm_eeprom_eeconfig_internal.h" // IWYU pragma: keep
 #    include "nvm_eeprom_via_internal.h"
 #    include "via.h"
+#    include "../macro/via_macro_provider.h"
 #    ifdef ENCODER_MAP_ENABLE
 #        include "encoder.h"
 #    endif
@@ -62,6 +63,7 @@ uint16_t noah_qmk_via_macro_seed_capacity(void) {
 }
 
 void noah_qmk_via_macro_set_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+    via_macro_provider_storage_changing();
     dynamic_keymap_macro_set_buffer(offset, size, data);
 }
 

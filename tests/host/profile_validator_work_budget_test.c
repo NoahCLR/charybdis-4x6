@@ -262,7 +262,7 @@ int main(void) {
     }
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
     // The maximum behavior workload: 128 rows of fully populated steps at the
-    // shared depth (13,840 bytes at depth five), well inside the 65,504-byte payload.
+    // shared depth (13,840 bytes at depth five), well inside the 53,216-byte payload.
     assert(profile_length == TEST_PROFILE_LENGTH && profile_length <= NOAH_PROFILE_BLOB_V1_MAX_SIZE);
     assert(validator.profile.key_behaviors.row_count == TEST_ROW_COUNT);
     assert(validator.profile.key_behaviors.populated_step_count == TEST_STEP_COUNT);

@@ -33,7 +33,8 @@ any C and you don't reflash.
 - **Two halves that act like one keyboard.** Layers, modes, combos, lighting
   and saved edits stay in sync across the cable.
 - **Room to grow.** It has 16 layers, 128 named macros and 128 custom keys you
-  can name and give behaviours to.
+  can name and give behaviours to. The macros share 34,903 bytes; one can use
+  all the free space.
 
 > **Heads-up:** this is an opinionated firmware, not a copy-paste QMK keymap.
 > I've reshaped some QMK ideas into a Charybdis-specific runtime with its own

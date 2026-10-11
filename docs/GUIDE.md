@@ -453,7 +453,12 @@ Characters the layout cannot type, such as emoji, need Unicode entry:
 A macro with a character neither the layout nor Unicode entry can type does not
 play. Auto uses QMK's USB OS guess, which may be wrong through a KVM or switch;
 Unicode entry stays off until the OS is known or chosen. Unicode entry is slower
-than ordinary key taps, and the 512-byte compiled program limit still applies.
+than ordinary key taps. Stored macros share 34,903 bytes of memory across 128
+slots; one macro can use all the free space, with no separate playback-length
+limit. Writing or resetting the macro memory cancels a playing macro and
+releases its held keys. This storage layout resets older on-keyboard data on
+first flash: export a backup before upgrading, then restore it using a client
+that supports the new storage sizes.
 Uninterruptible playback defaults on when Unicode entry is needed, and you can
 force it On or Off per macro in Ark. Protected playback starts immediately:
 already-held ordinary keys stop repeating, and only the macro's keyboard output

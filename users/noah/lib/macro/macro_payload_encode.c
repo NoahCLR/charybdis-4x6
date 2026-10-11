@@ -107,7 +107,7 @@ bool macro_payload_encode_ir_write(const macro_payload_ir_t *ir, macro_payload_w
         *written = 0;
     }
 
-    if (!ir || !write_byte || ir->length > sizeof(ir->bytes) || ir->protection > 2u) {
+    if (!ir || ir->more || !write_byte || ir->length > sizeof(ir->bytes) || ir->protection > 2u) {
         return false;
     }
 

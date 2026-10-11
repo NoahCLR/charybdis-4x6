@@ -727,10 +727,10 @@ These values come from the keymap config and the shared userspace config. When t
 | `DYNAMIC_KEYMAP_LAYER_COUNT` | `LAYER_COUNT` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_MACRO_COUNT` | `128` | [users/noah/config.h](../users/noah/config.h) |
 | `WEAR_LEVELING_BACKING_SIZE` | `286720` | [users/noah/config.h](../users/noah/config.h) |
-| `DYNAMIC_KEYMAP_EEPROM_MAX_ADDR` | `0x2FFFu` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR` | `0x3000u` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR` | `0x12FFFu` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR` | `0x13000u` | [users/noah/config.h](../users/noah/config.h) |
+| `DYNAMIC_KEYMAP_EEPROM_MAX_ADDR` | `0x8FFFu` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR` | `0x9000u` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR` | `0x15FFFu` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR` | `0x16000u` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR` | `0x22FFFu` | [users/noah/config.h](../users/noah/config.h) |
 | `KEYRECORD_USER_DATA` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_LAYER_BANK_COUNT` | `16` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |

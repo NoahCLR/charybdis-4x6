@@ -46,6 +46,10 @@ REQUIRED_SYMBOLS = (
 BOOKKEEPING_SYMBOLS = (
     "macro_slot_active_metadata",
     "macro_slot_active_stale",
+    "macro_slot_active_cursor",
+    "macro_slot_active_provider",
+    "macro_slot_active_slot",
+    "via_macro_found",
 )
 LAYOUT_SYMBOLS = (
     "__bss_base__",

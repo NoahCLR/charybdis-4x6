@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "tests/fixtures/maximum_profile_v3.fixture"
 LAYERS = 16
 DEPTH = 5
-PAYLOAD_MAX = 65504
+PAYLOAD_MAX = 53216
 ALLOWANCE = 12288  # reserved for future payload (per-key RGB and other additions)
 
 KIND_KEY, KIND_LAYER_MO, KIND_LAYER_LOCK, KIND_PD, KIND_PD_LOCK, KIND_MACRO, KIND_CUSTOM = 1, 2, 3, 4, 5, 6, 7

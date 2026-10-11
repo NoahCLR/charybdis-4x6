@@ -7,11 +7,12 @@
 #include <stdint.h>
 
 enum {
-    // 4: sixteen layers in a 12 KiB region, 128 macros and custom keys moved
-    // to 0x7f00 (D-F14). 3: userspace keycodes moved to fixed blocks, so a
-    // schema-2 bank holds keycodes this firmware would misread. 2: geometry
-    // went to eight layers.
-    NOAH_QMK_VIA_SYNC_METADATA_SCHEMA = 4u,
+    // 5: the VIA region grew to 36 KiB, so the bank's new tail would read
+    // bytes of the old profile slot A. 4: sixteen layers in a 12 KiB region,
+    // 128 macros and custom keys moved to 0x7f00 (D-F14). 3: userspace keycodes
+    // moved to fixed blocks, so a schema-2 bank holds keycodes this firmware
+    // would misread. 2: geometry went to eight layers.
+    NOAH_QMK_VIA_SYNC_METADATA_SCHEMA = 5u,
     NOAH_QMK_VIA_SYNC_METADATA_GENERATION_BITS = 27u,
 };
 

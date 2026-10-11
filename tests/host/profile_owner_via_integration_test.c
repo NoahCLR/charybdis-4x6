@@ -218,6 +218,8 @@ bool noah_via_macro_defaults_reseed_for_recovery(void) {
     return true;
 }
 
+void via_macro_provider_storage_changing(void) {}
+
 void via_macro_provider_invalidate_all(void) {}
 
 void noah_rgb_runtime_invalidate_layer_maps(void) {}

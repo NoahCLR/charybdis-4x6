@@ -28,7 +28,7 @@ enum {
     // Ordinary host staging expires after 15 seconds without host-owned work.
     // Split preparation has a separate no-progress window: it bounds the
     // longest stretch without transfer progress, not the whole copy, which for
-    // a maximum 65,504-byte profile spans thousands of request intervals.
+    // a maximum 53,216-byte profile spans thousands of request intervals.
     NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS             = 15000u,
     NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS = 60000u,
 };

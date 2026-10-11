@@ -11,7 +11,8 @@ there; its cross-language runner bodies were moved unchanged into Ark's
   length (two bytes), then the domain bytes. The expected values were produced
   by the recorded Ark decoder and are now reviewed firmware regression data.
 - `macro-corpus.json.gz`: 3,022 seeded macro inputs, each with `hex` input and
-  `expected` C program length, or -1 for a rejected over-cap macro.
+  `expected` C program length summed over the windows it plays in, or -1 for a
+  macro the firmware refuses.
 - `portable.bin.fixture`, `.pd`, `.pd3`, `.pd4`, `.pd5`: historical and populated
   profile imports, including worst-case macro/custom-key names. The `.fixture`
   suffix on the first file avoids the repository's generated `.bin` ignore rule.
@@ -26,6 +27,11 @@ corpus cases that set it to `1` in an otherwise valid directional record are
 now expected to be accepted, and only those six expectations changed. Byte 3
 of a scrolling record became its scroll axes (D-F08): the four cases that set
 it to `1` or `2` in an otherwise valid scrolling record are likewise accepted.
+
+A stored macro plays in windows decoded from storage, so it has no program
+limit of its own (D-F14, `macro-limits`). The two corpus cases that were refused only for
+exceeding 512 program bytes, 600 letters and 171 taps, are now accepted at 606
+and 513 bytes; only those two expectations changed.
 
 Thirty-two sparse pointing slots (D-F09) made PD domain version 2 and RGB
 version 3 the only ones the firmware accepts. The PD corpus is unchanged: it is

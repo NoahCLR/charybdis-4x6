@@ -248,6 +248,7 @@ static void noah_qmk_via_local_digest_start(void) {
 static void noah_qmk_via_recover_local_defaults(void) {
     bool defaults_committed;
 
+    via_macro_provider_storage_changing();
     eeconfig_init_via();
     defaults_committed = noah_via_macro_defaults_reseed_for_recovery();
     noah_qmk_via_sync_state_reset_after_defaults(defaults_committed);

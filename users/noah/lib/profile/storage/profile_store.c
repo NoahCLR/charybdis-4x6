@@ -27,7 +27,7 @@ enum {
     DOMAIN_ENVELOPE_SIZE = NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE,
 };
 
-static const uint8_t header_magic[2]         = {'N', 'S'};
+static const uint8_t header_magic[2]         = {'N', 'T'};
 static const uint8_t invalid_marker          = 0u;
 static const uint8_t logical_commit_marker   = 0xA5u;
 static const uint8_t logical_prepared_marker = 0x5Au;

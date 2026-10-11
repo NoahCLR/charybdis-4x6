@@ -174,6 +174,8 @@ void via_macro_provider_invalidate_all(void) {
     macro_invalidate_count++;
 }
 
+void via_macro_provider_storage_changing(void) {}
+
 void noah_rgb_runtime_invalidate_layer_maps(void) {
     rgb_invalidate_count++;
 }
@@ -708,6 +710,22 @@ static void test_mutation_during_dirty_recovery_does_not_block_reconciliation(vo
     CHECK(local_keymap[0] == 0xC1u);
     CHECK(noah_qmk_via_sync_state_snapshot().metadata.generation == 9u);
     CHECK(!noah_qmk_via_sync_state_snapshot().metadata.dirty);
+}
+
+static void test_prior_layout_metadata_resets_the_old_bank(void) {
+    test_reset();
+    // A clean schema-4 word belongs to the old 12 KiB VIA region.
+    user_eeconfig_word = UINT32_C(0x40000005);
+    local_macro[0] = 0xFFu;
+    rpc_mode = TEST_RPC_PEER_DIRTY;
+    test_init_ready();
+    CHECK(noah_qmk_via_sync_state_snapshot().recovery_required);
+    scan_many(0u, 6u);
+    CHECK(eeconfig_init_via_count == 1u && macro_defaults_init_count == 1u);
+    CHECK(local_macro[0] == 0xA1u && local_macro[1] == 0xA2u);
+    CHECK(!noah_qmk_via_sync_state_snapshot().recovery_required);
+    CHECK(!noah_qmk_via_sync_state_snapshot().metadata.dirty);
+    CHECK((user_eeconfig_word >> 28u) == 5u);
 }
 
 static void test_two_dirty_halves_reseed_current_master_before_authority(void) {
@@ -1368,6 +1386,7 @@ int main(void) {
     test_boot_output_fence_covers_only_a_suspect_bank();
     test_mutation_during_dirty_recovery_does_not_block_reconciliation();
     test_two_dirty_halves_reseed_current_master_before_authority();
+    test_prior_layout_metadata_resets_the_old_bank();
     test_failed_macro_reseed_keeps_generation_dirty_and_sends_nothing();
     test_two_dirty_recovery_seed_failure_stays_non_authoritative();
     test_receiver_validates_order_accepts_duplicate_and_acks_after_digest();

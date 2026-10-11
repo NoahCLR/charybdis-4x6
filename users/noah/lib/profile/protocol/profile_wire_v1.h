@@ -80,6 +80,8 @@ enum {
     NOAH_PROFILE_FEATURE_CANDIDATE_REUSE = 1u << 24,
     NOAH_PROFILE_FEATURE_CANDIDATE_STREAM = 1u << 25,
     NOAH_PROFILE_FEATURE_MACRO_OUTPUT_ISOLATION = 1u << 26,
+    // Stored macros have no separate program ceiling; the shared bank bounds them.
+    NOAH_PROFILE_FEATURE_STREAMING_MACROS = 1u << 27,
 };
 
 // A wide-page request: [command, channel, value, request id, page low, page

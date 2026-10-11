@@ -98,9 +98,15 @@ Transfer timing and interruption acceptance for this path have not run on hardwa
   long the maximum profile's validation (7,429 owner scans), boot (9,912)
   and the peer's prepare take in real time against the 60-second no-progress
   window; how long a 140 KiB wear-leveling consolidation pauses; and how long
-  macro 127 takes to start on a full 10,327-byte macro bank. Also check
+  macro 127 takes to start on a full 34,903-byte macro bank. Also check
   typing, pointing and lighting with a maximum profile, a sixteen-key chord
   across both halves, and every participation control.
+
+- **The macro expansion has not run on hardware** (D-F14). Export a backup
+  before flashing: schema-5 VIA recovery and `NT` profile headers reset older
+  storage. Accept full-bank playback, cancellation, backup restore, macro-127
+  startup time and consolidation pauses on both halves. The Ark follow-up
+  must adopt streaming feature bit 27 and the new storage geometry first.
 
 ## Remaining Load-Bearing Contracts
 
@@ -932,7 +938,7 @@ instead of a view; the compiled fixture drops the unused
 `profile.action_abi_row_visits` key. See
 [domain ownership](architecture/profile-wire-v1.md#firmware-domain-ownership).
 
-## D-F14 — Bigger profiles: sixteen layers, 128 of everything, 64 KiB slots
+## D-F14 — Bigger profiles: sixteen layers, 128 of everything, larger macro memory
 
 The profile grows in one version transition, so a user upgrades once:
 
@@ -944,11 +950,11 @@ The profile grows in one version transition, so a user upgrades once:
 | Custom keys | 64 | 128 |
 | VIA macros | 64 | 128 |
 | Name | ASCII, 20 or 23 bytes | counted UTF-8, 32 bytes, everywhere |
-| Custom-profile slot | 5,120 bytes | 65,536 bytes (65,504 payload) |
-| VIA region (keymap and macros) | 8 KiB | 12 KiB |
+| Custom-profile slot | 5,120 bytes | 53,248 bytes (53,216 payload) |
+| VIA region (keymap and macros) | 8 KiB | 36 KiB |
 
-Each half's logical EEPROM is 140 KiB: VIA owns `0x0000–0x2FFF`, slot A
-`0x3000–0x12FFF`, slot B `0x13000–0x22FFF`. Wear-leveling backing is 280 KiB.
+Each half's logical EEPROM is 140 KiB: VIA owns `0x0000–0x8FFF`, slot A
+`0x9000–0x15FFF`, slot B `0x16000–0x22FFF`. Wear-leveling backing is 280 KiB.
 QMK mirrors logical EEPROM in SRAM0–3, so this adds 124,928 bytes of fixed RAM
 per half; the static-data regression policy moves with it, from fresh linked
 accounting ([memory budgets](architecture/memory-budgets.md)). It is a policy
@@ -957,13 +963,24 @@ timing evidence on the keyboard remains open. Pinned QMK's wear-leveling log
 addresses 19 bits, so 140 KiB needs no QMK change; consolidation now rewrites
 140 KiB of flash, a pause the hardware acceptance times.
 
-The VIA keymap grows from 960 to 1,920 bytes; the 12 KiB region keeps the
-macro bank at 10,327 bytes (it was 7,191), shared by all 128 macros, with
-the per-macro playback budget unchanged.
+The VIA keymap grows from 960 to 1,920 bytes. The macro expansion repartitions
+that same 140 KiB into a 36 KiB VIA region and two 52 KiB profile slots, giving
+all 128 macros a shared 34,903-byte bank (formerly 10,327). Stored playback
+checks every decoded window before output and refills one fixed 512-byte
+window as it runs, so there is no separate per-macro program limit. Feature
+bit 27 advertises this to clients. Writes and resets cancel stored playback
+and release its held keys before any changed bytes can be read.
+
+The expansion keeps logical EEPROM, its SRAM0–3 mirror and flash backing
+unchanged. VIA sync metadata schema 5 refuses the prior bank and recovers
+defaults; logical store format 5 (`NT`) refuses old `NS` profile headers.
+Moving the slots therefore resets saved data even though the flash base stays
+put. Export a backup before flashing and restore through a client supporting
+the new geometry; firmware does not migrate old storage.
 
 Formats: profile schema 3.0 with RGB v4, key behaviours v2, combos v3,
-settings v6 and pointing v3; logical store format 4 (`NS`); VIA sync metadata
-schema 4. Wire masks of layers are 32 bits with every bit above the advertised
+settings v6 and pointing v3; logical store format 5 (`NT`); VIA sync metadata
+schema 5. Wire masks of layers are 32 bits with every bit above the advertised
 bank refused; counts and member lists are counted, so a smaller combo sends
 fewer bytes. Readback pages, capability fields and storage addresses are wide
 where the new sizes need it (capability layout 2, feature bit 19). Older
@@ -991,7 +1008,7 @@ excluded duplicate inert to an eligible chord's member state.
 Defaults allow everything, so a profile that never uses them is unchanged.
 
 `tests/fixtures/maximum_profile_v3.fixture` holds every table at its maximum
-at once: 37,667 bytes, leaving 27,837 bytes of the slot. It validates, commits,
+at once: 37,667 bytes, leaving 15,549 bytes of the slot. It validates, commits,
 boots and publishes whole on one half and prepares and commits on the peer;
 settings validation reads 20 bytes per step, like the other domains, so the
 whole profile validates in 7,429 owner scans
@@ -1002,7 +1019,9 @@ unnamed and inactive. One supported tap depth (five) bounds behaviour steps,
 step capacity and the extra tap-branch colours; formats are counted so a
 later firmware can raise it.
 
-Client follow-up: Ark adopts every format above, derives its limits from the
+Client follow-up: Ark adopts streaming feature bit 27, store format 5 and both
+old and new macro-bank geometry, removes the 512-byte check for streaming
+firmware, and pads older backup banks on restore. Ark adopts every format above, derives its limits from the
 capability pages instead of constants, adds the controls, and translates older
 backups; pin the landed firmware.
 

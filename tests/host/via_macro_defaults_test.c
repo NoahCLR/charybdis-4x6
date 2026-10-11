@@ -117,6 +117,29 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
     return MACRO_PAYLOAD_START_STARTED;
 }
 
+void macro_payload_preflight_begin(macro_payload_preflight_t *preflight) {
+    *preflight = (macro_payload_preflight_t){0};
+}
+
+bool macro_payload_preflight_window(macro_payload_preflight_t *preflight, const macro_payload_ir_t *ir) {
+    return preflight && ir;
+}
+
+bool macro_payload_preflight_end(const macro_payload_preflight_t *preflight) {
+    return preflight != NULL;
+}
+
+macro_payload_start_result_t macro_payload_start_windows(const macro_payload_ir_t *ir, const macro_payload_preflight_t *preflight, macro_payload_load_window_fn load_next, void *load_context, macro_payload_text_output_t text_output, uint8_t interval, macro_payload_source_t source, uint8_t slot, macro_payload_finish_fn finish, void *context) {
+    (void)preflight;
+    (void)load_next;
+    (void)load_context;
+    return macro_payload_start_ir(ir, text_output, interval, source, slot, finish, context);
+}
+
+bool macro_payload_engine_cancel(void) {
+    return false;
+}
+
 bool macro_payload_encode_ir_write(const macro_payload_ir_t *ir, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {
     uint16_t count = 0;
 
@@ -161,7 +184,8 @@ typedef struct {
 static uint8_t test_provider_load_ir_calls;
 static uint8_t test_provider_lookup_calls;
 
-static bool test_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir, void *context) {
+static bool test_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir, macro_payload_stream_cursor_t *cursor, void *context) {
+    (void)cursor;
     (void)context;
 
     test_provider_load_ir_calls++;

@@ -7,7 +7,7 @@
   "files": [
     {
       "path": "macro-corpus.json.gz",
-      "sha256": "5d8747b818b75f8e8c3fb9117d79cb7c98a9cf60c73afedff3d04e4d3df81a34"
+      "sha256": "f84c01f052be2c4f75eaa51f89f18d7ab26b233c74bbb3a9991e3f2ac5fd52f6"
     },
     {
       "path": "portable.bin.fixture",

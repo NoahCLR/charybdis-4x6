@@ -174,7 +174,7 @@ typedef struct {
     uint32_t                                      digest_state;
     noah_profile_envelope_t                       envelope;
     noah_profile_domain_range_t                   payload;         // the domain being decoded
-    uint16_t                                      checksum_offset; // a blob is at most 65,504 bytes
+    uint16_t                                      checksum_offset; // a blob is at most 53,216 bytes
     uint8_t                                       domain;          // its registry index
     bool                                          has_reference_error;
     noah_profile_validator_v1_domain_validation_t domain_validation;

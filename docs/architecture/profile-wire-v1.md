@@ -1,8 +1,8 @@
 # Profile Wire V1
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 3.0; a 65,504-byte custom payload; and logical store format 4
-> (`NS`). Every save binds a nonzero VIA generation and digest. HID and split
+> schema 3.0; a 53,216-byte custom payload; and logical store format 5
+> (`NT`). Every save binds a nonzero VIA generation and digest. HID and split
 > framing remain v1. Older profile/store formats and the legacy GET 9 source
 > page are rejected. Backup translation belongs to the client, before a
 > current-format Apply.
@@ -28,7 +28,7 @@ The blob is independent of Raw HID framing and EEPROM slot metadata.
 | 7 | 1 | flags; bit 0 means canonical encoding, all others reserved |
 
 The transport candidate length or storage header supplies total blob length.
-Schema 3.0 is capped at 65,504 bytes, one 64 KiB slot less its 32-byte header
+Schema 3.0 is capped at 53,216 bytes, one 52 KiB slot less its 32-byte header
 (D-F14); schemas 1 and 2 are refused.
 
 ### Domain Envelope — 4 Bytes Plus Payload
@@ -509,6 +509,7 @@ Capability feature bits are:
 
 | 25 | candidate streaming chunks: admit sequential chunks and prove bounded batches through status (`SET 0x1C`, below) |
 | 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](runtime-flow.md) |
+| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised VIA macro bank (34,903 bytes in this layout). Without this bit, retain the legacy 512-byte program ceiling. See [runtime flow](runtime-flow.md) |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with
@@ -553,7 +554,7 @@ bit rejects the status while it is set, as it rejects any unknown flag.
 
 GET `0x04` reads the committed payload and `0x05` the compiled defaults the
 firmware was built with, through the envelope above with a wide page (feature
-bit 19): a 65,504-byte payload needs 2,621 pages. Page 0 is metadata; page
+bit 19): a 53,216-byte payload needs 2,130 pages. Page 0 is metadata; page
 `n` from 1 carries payload bytes `(n - 1) × 25` onward, at most 25, with the
 payload length byte giving the count. A page past the end answers status `2`;
 status `3` means nothing is committed, or the compiled defaults cannot be
@@ -615,11 +616,11 @@ Begin candidate uses this complete layout:
 | 6 | 1 | schema minor |
 | 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings, and schema-2 bit 4 PD |
 | 8 | 1 | flags, initially zero |
-| 9 | 2 | canonical blob length, `8..65504`, schema 3.0 only |
+| 9 | 2 | canonical blob length, `8..53216`, schema 3.0 only |
 | 11 | 4 | CRC32 of the exact canonical blob |
 | 15 | 4 | FNV-1a digest of the exact canonical blob |
 | 19 | 4 | action-ABI digest used to encode actions |
-| 23 | 1 | store format, exactly `4` |
+| 23 | 1 | store format, exactly `5` |
 | 24 | 4 | nonzero bound VIA generation |
 | 28 | 4 | nonzero bound VIA digest |
 

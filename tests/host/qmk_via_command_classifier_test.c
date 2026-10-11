@@ -17,6 +17,8 @@ static void test_fail(const char *expr, const char *file, int line) {
         }                                         \
     } while (0)
 
+void via_macro_provider_storage_changing(void) {}
+
 uint16_t dynamic_keymap_macro_get_buffer_size(void) {
     return 128u;
 }

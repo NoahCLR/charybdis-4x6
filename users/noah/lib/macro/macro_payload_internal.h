@@ -6,8 +6,6 @@
 
 #include "macro_payload.h"
 
-#define MACRO_PAYLOAD_MAX_TAP_KEYS 16
-
 static inline bool macro_payload_text_byte_is_supported(uint8_t byte) {
     return byte != 0u && byte <= 0x7Fu;
 }
@@ -57,11 +55,6 @@ typedef struct {
     uint8_t                      keycode;
     macro_payload_tap_list_t     tap_list;
 } macro_payload_command_t;
-
-typedef struct {
-    uint8_t keycodes[MACRO_PAYLOAD_MAX_TAP_KEYS];
-    uint8_t count;
-} macro_payload_hold_balance_t;
 
 static inline void macro_payload_hold_balance_reset(macro_payload_hold_balance_t *balance) {
     if (balance) {

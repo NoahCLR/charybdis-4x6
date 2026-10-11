@@ -32,7 +32,7 @@ The payload starts with this fixed 16-byte header:
 
 The aggregate of the four group-row counts at offsets 6, 8, 9, and 11 is at
 most 32. The maximum RGB payload is 65,492 bytes, so its envelope still fits
-the 65,504-byte canonical profile blob with the blob header.
+the 53,216-byte canonical profile blob with the blob header.
 
 Stage-enable bits are:
 
