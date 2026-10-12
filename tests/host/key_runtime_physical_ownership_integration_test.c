@@ -54,6 +54,7 @@ static uint8_t  fake_oneshot_mods;
 static uint8_t  fake_oneshot_locked_mods;
 
 static uint8_t send_keyboard_report_count;
+static uint8_t report_mods;
 static uint8_t report_required_mods;
 static uint8_t emitted_action_count;
 static int8_t  report_key_depth[UINT8_MAX + 1];
@@ -116,6 +117,7 @@ static void test_reset_state(void) {
     fake_oneshot_mods          = 0;
     fake_oneshot_locked_mods   = 0;
     send_keyboard_report_count = 0;
+    report_mods                = 0;
     report_required_mods        = 0;
     emitted_action_count       = 0;
     for (uint16_t index = 0; index <= UINT8_MAX; index++) {
@@ -200,6 +202,17 @@ void del_mods(uint8_t mods) {
 
 void send_keyboard_report(void) {
     CHECK((get_mods() & report_required_mods) == report_required_mods);
+    report_mods = get_mods() | get_weak_mods() | get_oneshot_mods();
+    // QMK consumes unlocked one-shot modifiers when a keyboard report contains
+    // a basic key, even when that report does not add another usage edge.
+    if (get_oneshot_mods()) {
+        for (uint16_t code = KC_A; code <= KC_EXSEL; code++) {
+            if (report_key_depth[code] > 0) {
+                clear_oneshot_mods();
+                break;
+            }
+        }
+    }
     send_keyboard_report_count++;
 }
 
@@ -807,7 +820,121 @@ static void test_consumed_modifier_combination_does_not_own_report_parts(void) {
     test_authored_mod_tap = (test_behavior_row_t){0};
 }
 
+// A duplicate basic edge must not suppress a modified native key's own weak
+// modifier transitions or forget the physical owner that remains held.
+static void test_overlapping_native_shortcut_keeps_weak_mods_and_basic_owner(void) {
+    const uint16_t shortcuts[] = {S(KC_A), RSFT(KC_A)};
+    const uint8_t masks[] = {MOD_BIT(KC_LEFT_SHIFT), MOD_BIT(KC_RIGHT_SHIFT)};
+    for (uint8_t i = 0; i < ARRAY_SIZE(shortcuts); i++) {
+        for (uint8_t physical_releases_first = 0; physical_releases_first < 2; physical_releases_first++) {
+            test_reset_state();
+            owned_keycode_lease_t hold = {0};
+            CHECK(owned_keycode_acquire(KC_A, &hold));
+            CHECK(!key_runtime_integration_process_record(shortcuts[i], test_keypos(5, 1), true));
+            CHECK(get_weak_mods() == masks[i]);
+            CHECK(test_owned_snapshot(KC_A).physical_count == 1u);
+            CHECK(report_key_depth[KC_A] == 1);
+            if (physical_releases_first) {
+                CHECK(!key_runtime_integration_process_record(shortcuts[i], test_keypos(5, 1), false));
+                CHECK(get_weak_mods() == 0u && report_key_depth[KC_A] == 1);
+                CHECK(owned_keycode_release(&hold));
+            } else {
+                CHECK(owned_keycode_release(&hold));
+                CHECK(get_weak_mods() == masks[i] && report_key_depth[KC_A] == 1);
+                CHECK(key_runtime_integration_process_record(shortcuts[i], test_keypos(5, 1), false));
+                // QMK performs the last owner's normal default action.
+                unregister_code(KC_A);
+                set_weak_mods(0u);
+            }
+            CHECK(report_key_depth[KC_A] == 0);
+            test_assert_ledgers_balanced(KC_A);
+        }
+    }
+}
+
+// Model the pinned QMK action_exec/ACT_LMODS boundary, including the weak-mod
+// clear before every press. The default basic edge runs only if userspace
+// admits it, and finalize follows that edge as it does in QMK.
+static bool test_native_keyboard_report_event(uint16_t code, keypos_t pos, bool pressed) {
+    keyrecord_t record = {.event = {.type = KEY_EVENT, .key = pos, .pressed = pressed, .time = fake_time}};
+    uint8_t basic = IS_QK_MODS(code) ? QK_MODS_GET_BASIC_KEYCODE(code) : (uint8_t)code;
+    uint8_t mods = IS_QK_MODS(code) ? noah_qmk_mods_to_report_mask(QK_MODS_GET_MODS(code)) : 0u;
+    if (pressed) clear_weak_mods();
+    CHECK(noah_pre_process_record_user(code, &record));
+    bool keep_processing = noah_process_record_user(code, &record);
+    if (keep_processing) {
+        if (pressed) {
+            if (mods) {
+                set_weak_mods(get_weak_mods() | mods);
+                send_keyboard_report();
+            }
+            register_code(basic);
+            send_keyboard_report();
+        } else {
+            unregister_code(basic);
+            send_keyboard_report();
+            if (mods) {
+                set_weak_mods(get_weak_mods() & (uint8_t)~mods);
+                send_keyboard_report();
+            }
+        }
+        noah_post_process_record_user(code, &record);
+    } else {
+        noah_process_record_user_finalize(code, &record, false);
+    }
+    return keep_processing;
+}
+
+static void test_plain_native_overlap_reports_cleared_weak_mods(void) {
+    const uint16_t shortcuts[] = {S(KC_A), RSFT(KC_A)};
+    const uint8_t masks[] = {MOD_BIT(KC_LEFT_SHIFT), MOD_BIT(KC_RIGHT_SHIFT)};
+    const keypos_t shifted = {5, 1}, plain = {5, 2};
+    for (uint8_t i = 0; i < ARRAY_SIZE(shortcuts); i++) {
+        for (uint8_t plain_releases_first = 0; plain_releases_first < 2; plain_releases_first++) {
+            test_reset_state();
+            CHECK(test_native_keyboard_report_event(shortcuts[i], shifted, true));
+            CHECK(report_mods == masks[i] && report_key_depth[KC_A] == 1);
+            uint8_t reports_before_overlap = send_keyboard_report_count;
+            CHECK(!test_native_keyboard_report_event(KC_A, plain, true));
+            CHECK(send_keyboard_report_count > reports_before_overlap);
+            CHECK(report_mods == 0 && get_weak_mods() == 0);
+            CHECK(report_key_depth[KC_A] == 1);
+            CHECK(test_owned_snapshot(KC_A).physical_count == 2);
+            if (plain_releases_first) {
+                CHECK(!test_native_keyboard_report_event(KC_A, plain, false));
+                CHECK(report_key_depth[KC_A] == 1);
+                CHECK(test_native_keyboard_report_event(shortcuts[i], shifted, false));
+            } else {
+                CHECK(!test_native_keyboard_report_event(shortcuts[i], shifted, false));
+                CHECK(report_key_depth[KC_A] == 1);
+                CHECK(test_native_keyboard_report_event(KC_A, plain, false));
+            }
+            CHECK(report_mods == 0 && report_key_depth[KC_A] == 0);
+            test_assert_ledgers_balanced(KC_A);
+        }
+    }
+}
+
+static void test_plain_native_overlap_consumes_oneshot_mods(void) {
+    const keypos_t first = {5, 1}, second = {5, 2};
+    test_reset_state();
+    CHECK(test_native_keyboard_report_event(KC_A, first, true));
+    set_oneshot_mods(MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(!test_native_keyboard_report_event(KC_A, second, true));
+    CHECK(report_mods == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(get_oneshot_mods() == 0);
+    CHECK(report_key_depth[KC_A] == 1);
+    CHECK(!test_native_keyboard_report_event(KC_A, second, false));
+    CHECK(report_mods == 0 && report_key_depth[KC_A] == 1);
+    CHECK(test_native_keyboard_report_event(KC_A, first, false));
+    CHECK(report_key_depth[KC_A] == 0);
+    test_assert_ledgers_balanced(KC_A);
+}
+
 int main(void) {
+    test_plain_native_overlap_reports_cleared_weak_mods();
+    test_plain_native_overlap_consumes_oneshot_mods();
+    test_overlapping_native_shortcut_keeps_weak_mods_and_basic_owner();
     test_native_modifier_combinations_preserve_every_owner();
     test_modified_ordinary_key_keeps_native_weak_mod_path();
     test_consumed_modifier_combination_does_not_own_report_parts();

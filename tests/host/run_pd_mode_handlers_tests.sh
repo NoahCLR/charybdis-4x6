@@ -42,6 +42,23 @@ cc -DNOAH_PD_PROFILE_ENABLE -I"$BUILD_DIR" -std=c11 -Wall -Wextra -Werror -Wno-u
 
 "$BIN"
 
+# Drive the real configured engine, emitters and basic ownership ledger together.
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
+    -DNOAH_PD_PROFILE_ENABLE -DPOINTING_DEVICE_ENABLE -DCOMBO_ENABLE \
+    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
+    -include "$ROOT/tests/host/include/noah_compile_config_no_automouse.h" \
+    "$ROOT/tests/host/pd_output_ownership_test.c" \
+    "$ROOT/users/noah/lib/pointing/modes/pd_mode_configured.c" \
+    "$ROOT/users/noah/lib/action/action_dispatch.c" \
+    "$ROOT/users/noah/lib/action/owned_keycode.c" \
+    "$ROOT/users/noah/lib/action/synthetic_record.c" \
+    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \
+    "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_state.c" \
+    -o "$BUILD_DIR/pd_output_ownership_test"
+"$BUILD_DIR/pd_output_ownership_test"
+
 expect_config_compile_failure() {
     label="$1"
     shift

@@ -859,7 +859,7 @@ report_mouse_t pointing_device_get_report(void) { return (report_mouse_t){0}; }
 void pointing_device_set_report(report_mouse_t report) { (void)report; }
 void noah_emit_owned_click(uint16_t key, uint8_t mask, bool exact) { (void)key; (void)mask; (void)exact; CHECK(false); }
 void noah_emit_synthetic_qmk_tap(uint16_t key, noah_emit_policy_t policy) { (void)key; (void)policy; CHECK(false); }
-void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t key, uint8_t mask, bool settle) { (void)key; (void)mask; (void)settle; CHECK(false); }
+void noah_emit_literal_tap_with_masked_keyboard_mods(uint16_t key, uint8_t mask, bool settle) { (void)key; (void)mask; (void)settle; CHECK(false); }
 void noah_emit_literal_tap(uint16_t key, noah_emit_policy_t policy) { (void)key; (void)policy; CHECK(false); }
 
 static void test_pointing_macros_use_existing_engine(void) {

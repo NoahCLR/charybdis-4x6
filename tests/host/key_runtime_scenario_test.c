@@ -972,7 +972,58 @@ static void test_qmk_function_key_with_only_a_double_tap_branch_taps_and_double_
     CHECK(test_effects_with_action(KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, TEST_SNIPING_KEY) == 0);
 }
 
+// Overlap suppresses a report edge, never the remaining owner's press.
+static void test_overlapping_native_owners_survive_either_release_order(void) {
+    const uint16_t usages[] = {KC_C, MS_BTN1};
+    for (uint8_t i = 0; i < ARRAY_SIZE(usages); i++) {
+        for (uint8_t managed_first = 0; managed_first < 2; managed_first++) {
+            owned_keycode_lease_t lease = {0};
+            const key_runtime_scenario_step_t press[] = {KEY_RUNTIME_SCENARIO_PRESS(usages[i], 7, 1)};
+            const key_runtime_scenario_step_t release[] = {KEY_RUNTIME_SCENARIO_RELEASE(usages[i], 7, 1)};
+            key_runtime_scenario_reset();
+            if (managed_first) CHECK(owned_keycode_acquire(usages[i], &lease));
+            key_runtime_scenario_run(press, ARRAY_SIZE(press));
+            if (!managed_first) CHECK(owned_keycode_acquire(usages[i], &lease));
+            CHECK(key_runtime_scenario_register_code_count() == 1u);
+            CHECK(owned_keycode_release(&lease));
+            CHECK(key_runtime_scenario_unregister_code_count() == 0u);
+            key_runtime_scenario_run(release, ARRAY_SIZE(release));
+            CHECK(key_runtime_scenario_unregister_code_count() == 1u);
+            owned_keycode_debug_snapshot_t snapshot;
+            owned_keycode_debug_snapshot(usages[i], &snapshot);
+            CHECK(snapshot.physical_count == 0u && snapshot.managed_count == 0u && snapshot.underflow_count == 0u);
+        }
+        const key_runtime_scenario_step_t first[] = {KEY_RUNTIME_SCENARIO_PRESS(usages[i], 7, 0)};
+        const key_runtime_scenario_step_t second[] = {KEY_RUNTIME_SCENARIO_PRESS(usages[i], 7, 1)};
+        const key_runtime_scenario_step_t first_up[] = {KEY_RUNTIME_SCENARIO_RELEASE(usages[i], 7, 0)};
+        const key_runtime_scenario_step_t second_up[] = {KEY_RUNTIME_SCENARIO_RELEASE(usages[i], 7, 1)};
+        key_runtime_scenario_reset();
+        key_runtime_scenario_run(first, ARRAY_SIZE(first));
+        key_runtime_scenario_run(second, ARRAY_SIZE(second));
+        CHECK(key_runtime_scenario_register_code_count() == 1u);
+        key_runtime_scenario_run(first_up, ARRAY_SIZE(first_up));
+        CHECK(key_runtime_scenario_unregister_code_count() == 0u);
+        key_runtime_scenario_run(second_up, ARRAY_SIZE(second_up));
+        CHECK(key_runtime_scenario_unregister_code_count() == 1u);
+    }
+}
+
+static void test_owned_usage_does_not_suppress_its_authored_behavior(void) {
+    owned_keycode_lease_t lease = {0};
+    const key_runtime_scenario_step_t tap[] = {KEY_RUNTIME_SCENARIO_PRESS(KC_C, 7, 1), KEY_RUNTIME_SCENARIO_RELEASE(KC_C, 7, 1)};
+    key_runtime_scenario_reset();
+    test_configure_fallback_tap_key(KC_C, TEST_TAP_ACTION);
+    CHECK(owned_keycode_acquire(KC_C, &lease));
+    key_runtime_scenario_run(tap, ARRAY_SIZE(tap));
+    CHECK(key_runtime_scenario_effect_count() != 0u);
+    CHECK(key_runtime_scenario_unregister_code_count() == 0u);
+    CHECK(owned_keycode_release(&lease));
+    CHECK(key_runtime_scenario_unregister_code_count() == 1u);
+}
+
 int main(void) {
+    test_overlapping_native_owners_survive_either_release_order();
+    test_owned_usage_does_not_suppress_its_authored_behavior();
     test_qmk_function_key_with_only_a_double_tap_branch_still_holds();
     test_qmk_function_key_with_only_a_double_tap_branch_taps_and_double_taps();
     test_single_tap_waits_for_multi_tap_timeout_before_dispatching();

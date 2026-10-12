@@ -77,6 +77,15 @@ void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
     noah_emit_run(keycode, owned_keycode_tap_literal, policy);
 }
 
+void noah_emit_literal_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds) {
+    if (settle_pending_fallback_holds) {
+        noah_key_runtime_settle_pending_fallback_hold();
+    }
+    keyboard_mod_state_t saved = keyboard_mod_policy_begin_masked_emit(masked_mods);
+    owned_keycode_tap_literal(keycode);
+    keyboard_mod_policy_end_masked_emit(saved);
+}
+
 static uint8_t noah_emit_host_mods(keyboard_mod_state_t state) {
     return state.real | state.weak | state.oneshot | state.oneshot_locked;
 }

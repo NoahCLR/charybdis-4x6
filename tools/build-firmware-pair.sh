@@ -46,7 +46,11 @@ PIN="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["commit"
     exit 1
 }
 QMK_HEAD="$(git -C "$QMK_ROOT" rev-parse HEAD 2>/dev/null || echo "not a Git checkout")"
-QMK_DIRTY="$(git -C "$QMK_ROOT" status --porcelain --ignore-submodules=all 2>/dev/null || true)"
+# Ignore untracked submodule metadata, but refuse tracked edits, different
+# submodule commits and dependencies that have not been initialized.
+QMK_DIRTY="$(git -C "$QMK_ROOT" status --porcelain --ignore-submodules=untracked 2>/dev/null || true)
+$(git -C "$QMK_ROOT" submodule status --recursive 2>/dev/null | sed -n '/^[+-U]/p')"
+QMK_DIRTY="$(printf '%s\n' "$QMK_DIRTY" | sed '/^$/d')"
 if [ "$QMK_HEAD" != "$PIN" ] || [ -n "$QMK_DIRTY" ]; then
     if [ "${NOAH_ALLOW_UNPINNED_QMK:-}" = 1 ]; then
         echo "Not the pin: building against BK $QMK_HEAD${QMK_DIRTY:+ (modified)}, not the pinned $PIN." >&2
@@ -232,7 +236,7 @@ build_half FORCE_SLAVE left "${n}_charybdis_left${SUFFIX}"
 
 # What the pair was built from and with, and its hashes: a published pair can
 # be matched to a local one byte for byte.
-uncommitted() { [ -z "$(git -C "$1" status --porcelain --ignore-submodules=all 2>/dev/null)" ] || echo " +uncommitted"; }
+uncommitted() { [ -z "$(git -C "$1" status --porcelain --ignore-submodules=untracked 2>/dev/null)" ] || echo " +uncommitted"; }
 {
     echo "firmware $(git -C "$REPO_ROOT" rev-parse HEAD)$(uncommitted "$REPO_ROOT")"
     echo "bk $QMK_HEAD$(uncommitted "$QMK_ROOT")${UNPINNED:-}"

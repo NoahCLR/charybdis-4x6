@@ -43,11 +43,11 @@ static bool emit_tap(const uint8_t *tap) {
         noah_qmk_contract_pointer_drop_pending_motion();
         noah_emit_owned_click(key, tap[2] == 1u ? tap[3] : 0u, tap[2] == 2u);
     } else if (tap[2] == 1u) {
-        noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(key, tap[3], true);
+        noah_emit_literal_tap_with_masked_keyboard_mods(key, tap[3], true);
     } else if (tap[2] == 2u) {
         noah_emit_literal_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
     } else {
-        noah_emit_synthetic_qmk_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+        noah_emit_literal_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
     }
     return true;
 }

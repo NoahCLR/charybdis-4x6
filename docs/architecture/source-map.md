@@ -89,6 +89,7 @@ source trace because they rewrite or verify human-facing firmware docs.
   `qmk_via_sync_protocol.c/h`, `qmk_via_sync_state.c/h`, and
   `qmk_profile_split_transport.c/h`
 - QMK contract wrappers: `qmk_contract.c`, `qmk_mod_contract.c/h`,
+  `qmk_native_report_contract.h` (weak-modifier changes for shared native usages),
   `qmk_auto_mouse_contract.h`, `qmk_pointing_contract.h`,
   `qmk_via_contract.c`, `qmk_via_playback_contract.h`,
   `qmk_via_storage_contract.h`, `qmk_via_storage_regions.c/h`

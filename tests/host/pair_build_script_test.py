@@ -131,6 +131,66 @@ if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
                 digest = hashlib.sha256(half.encode()).hexdigest()
                 self.assertIn(f'sha256 {digest} 1_charybdis_{half}.uf2', note)
 
+    def test_pinned_build_refuses_changed_or_uninitialized_submodules(self):
+        with tempfile.TemporaryDirectory(prefix='pair-submodules-') as tmp:
+            base = Path(tmp)
+            source, qmk, vendor, fakebin = (base / name for name in ('firmware', 'qmk', 'vendor', 'bin'))
+            for folder in (source / 'tools', qmk, vendor, fakebin):
+                folder.mkdir(parents=True)
+            def git(root, *args):
+                return subprocess.check_output(['git', '-C', str(root), '-c', 'user.name=Test',
+                                                '-c', 'user.email=test@example.invalid',
+                                                '-c', 'protocol.file.allow=always', *args],
+                                               stderr=subprocess.DEVNULL, text=True).strip()
+            for root in (source, qmk, vendor):
+                git(root, 'init', '-q')
+                git(root, 'commit', '--allow-empty', '-qm', 'initial')
+            (vendor / 'runtime.c').write_text('int runtime = 1;\n')
+            git(vendor, 'add', '.')
+            git(vendor, 'commit', '-qm', 'runtime')
+            nested_vendor = base / 'hal'
+            nested_vendor.mkdir()
+            git(nested_vendor, 'init', '-q')
+            (nested_vendor / 'runtime.c').write_text('int hal = 1;\n')
+            git(nested_vendor, 'add', '.')
+            git(nested_vendor, 'commit', '-qm', 'hal')
+            git(vendor, 'submodule', 'add', '-q', str(nested_vendor), 'hal')
+            git(vendor, 'commit', '-qam', 'nested vendor')
+            git(qmk, 'submodule', 'add', '-q', str(vendor), 'lib/chibios')
+            git(qmk, 'commit', '-qam', 'vendor')
+            git(qmk, 'submodule', 'update', '--init', '--recursive')
+            pin = git(qmk, 'rev-parse', 'HEAD')
+            for tool in ('build-firmware-pair.sh', 'build-image'):
+                shutil.copyfile(REPO / 'tools' / tool, source / 'tools' / tool)
+            (source / 'qmk-pin.json').write_text(json.dumps({'commit': pin}))
+            docker = fakebin / 'docker'
+            docker.write_text('#!/bin/sh\n[ "$1" = info ] && exit 0\nexit 0\n')
+            docker.chmod(0o755)
+            env = dict(os.environ, PATH=str(fakebin) + os.pathsep + os.environ['PATH'],
+                       QMK_ROOT=str(qmk), BUILD_ROOT=str(base / 'builds'), NOAH_IN_BUILD_IMAGE='0')
+            env.pop('NOAH_ALLOW_UNPINNED_QMK', None)
+            def build():
+                return subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], env=env,
+                                      capture_output=True, text=True)
+            self.assertEqual(build().returncode, 0)
+            sub = qmk / 'lib/chibios'
+            (sub / 'hal/runtime.c').write_text('int hal = 2;\n')
+            self.assertNotEqual(build().returncode, 0, 'nested tracked dependency edits must be refused')
+            git(sub / 'hal', 'checkout', '--', 'runtime.c')
+            (sub / 'runtime.c').write_text('int runtime = 2;\n')
+            result = build()
+            self.assertNotEqual(result.returncode, 0, 'tracked ChibiOS edits must invalidate a pinned build')
+            self.assertIn('with local changes', result.stderr)
+            git(sub, 'add', '.')
+            git(sub, 'commit', '-qm', 'different vendor commit')
+            self.assertNotEqual(build().returncode, 0, 'a different submodule commit must be refused')
+            git(qmk, 'submodule', 'update', '--init', '--recursive')
+            # Finder metadata does not alter tracked compiler inputs.
+            (sub / '.DS_Store').write_bytes(b'finder metadata')
+            self.assertEqual(build().returncode, 0)
+            git(qmk, 'submodule', 'deinit', '-f', '--all')
+            self.assertNotEqual(build().returncode, 0, 'an uninitialized dependency must be refused')
+
     def test_outside_the_build_image_runs_itself_inside_it(self):
         with tempfile.TemporaryDirectory(prefix='pair-docker-') as tmp:
             base = Path(tmp).resolve()

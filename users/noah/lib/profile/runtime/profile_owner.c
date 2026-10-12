@@ -1143,23 +1143,10 @@ noah_profile_owner_state_t noah_profile_owner_state(const noah_profile_owner_t *
 }
 
 bool noah_profile_owner_output_ready(const noah_profile_owner_t *owner) {
-    // Only a decided logical Apply can leave the local VIA bank mixed, and only
-    // once ACCEPT lets it change: from then until activation this half's VIA
-    // bytes, custom behaviors, or both, may belong to different generations.
-    // Before ACCEPT, including across the commit decision and a lost peer
-    // link, this half still runs the complete old generation. Boot, discovery
-    // and error states keep typing on the loaded keymap.
-    if (!owner || !owner->host_via_accept_requested) {
-        return true;
-    }
-    switch (owner->host_transaction.status.state) {
-        case NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER:
-        case NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING:
-        case NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED:
-            return false;
-        default:
-            return true;
-    }
+    // ACCEPT allows VIA bytes to change. Keep its fence until the owner resets
+    // the barrier after complete activation, including command and activation
+    // failures; a transaction status alone cannot prove a complete generation.
+    return !owner || !owner->host_via_accept_requested;
 }
 
 noah_profile_store_result_t noah_profile_owner_discovery_result(const noah_profile_owner_t *owner) {

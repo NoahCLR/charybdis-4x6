@@ -1553,8 +1553,14 @@ static void test_output_fence_covers_only_the_accepted_roll_forward(void) {
     owner.state = NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST;
     owner.host_transaction.status.state = NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED;
     assert(!noah_profile_owner_output_ready(&owner));
+    // A command error or even IDLE alone cannot release the accepted Apply's
+    // fence; the owner releases its barrier only after complete activation.
+    owner.host_transaction.status.state = NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED;
+    assert(!noah_profile_owner_output_ready(&owner));
     owner.host_transaction.status.state = NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE;
     owner.state = NOAH_PROFILE_OWNER_READY_VALIDATED;
+    assert(!noah_profile_owner_output_ready(&owner));
+    owner.host_via_accept_requested = false;
     assert(noah_profile_owner_output_ready(&owner));
 }
 

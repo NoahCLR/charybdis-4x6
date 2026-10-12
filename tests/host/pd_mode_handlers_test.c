@@ -26,7 +26,7 @@ typedef struct {
     uint8_t  oneshot;
     uint8_t  oneshot_locked;
     bool     fallback_hold_active;
-} synthetic_tap_call_t;
+} tap_call_t;
 
 typedef struct {
     uint16_t keycode;
@@ -44,8 +44,8 @@ static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
 #define fake_oneshot_locked_mods runtime_fixture.oneshot_locked_mods
 #define fake_time32 runtime_fixture.time32
 
-static synthetic_tap_call_t synthetic_tap_calls[TEST_MAX_CALLS];
-static uint8_t              synthetic_tap_call_count;
+static tap_call_t tap_calls[TEST_MAX_CALLS];
+static uint8_t              tap_call_count;
 
 static literal_tap_call_t literal_tap_calls[TEST_MAX_CALLS];
 static uint8_t            literal_tap_call_count;
@@ -95,7 +95,7 @@ static void test_fail(const char *expr, const char *file, int line) {
 
 static void test_clear_logs(void) {
     runtime_fixture.send_keyboard_report_count = 0;
-    synthetic_tap_call_count                   = 0;
+    tap_call_count                   = 0;
     literal_tap_call_count                     = 0;
     fallback_hold_activation_count             = 0;
     fallback_hold_active                       = false;
@@ -107,7 +107,7 @@ static void test_clear_logs(void) {
     last_registered_keycode                    = KC_NO;
     last_unregistered_keycode                  = KC_NO;
 
-    memset(synthetic_tap_calls, 0, sizeof(synthetic_tap_calls));
+    memset(tap_calls, 0, sizeof(tap_calls));
     memset(literal_tap_calls, 0, sizeof(literal_tap_calls));
     memset(click_calls, 0, sizeof(click_calls));
     click_call_count = 0;
@@ -130,9 +130,9 @@ bool noah_key_runtime_settle_pending_fallback_hold(void) {
     return true;
 }
 
-void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
-    CHECK(synthetic_tap_call_count < TEST_MAX_CALLS);
-    synthetic_tap_calls[synthetic_tap_call_count++] = (synthetic_tap_call_t){
+static void log_tap(uint16_t keycode) {
+    CHECK(tap_call_count < TEST_MAX_CALLS);
+    tap_calls[tap_call_count++] = (tap_call_t){
         .keycode              = keycode,
         .real                 = fake_mods,
         .weak                 = fake_weak_mods,
@@ -143,6 +143,7 @@ void noah_dispatch_synthetic_qmk_tap(uint16_t keycode) {
 }
 
 void tap_code16(uint16_t keycode) {
+    log_tap(keycode);
     CHECK(literal_tap_call_count < TEST_MAX_CALLS);
     literal_tap_calls[literal_tap_call_count++] = (literal_tap_call_t){
         .keycode        = keycode,
@@ -153,19 +154,7 @@ void tap_code16(uint16_t keycode) {
     };
 }
 
-void noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy) {
-    if (policy.settle_pending_fallback_holds) {
-        noah_key_runtime_settle_pending_fallback_hold();
-    }
-
-    if (policy.preserve_keyboard_mod_state) {
-        test_fail("pd_mode synthetic tap should not preserve mod state internally", __FILE__, __LINE__);
-    }
-
-    noah_dispatch_synthetic_qmk_tap(keycode);
-}
-
-void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds) {
+void noah_emit_literal_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds) {
     keyboard_mod_state_t saved = {
         .real           = fake_mods,
         .weak           = fake_weak_mods,
@@ -191,7 +180,7 @@ void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uin
     filtered.oneshot_locked &= (uint8_t)~masked_mods;
 
     keyboard_mod_state_apply(filtered);
-    noah_dispatch_synthetic_qmk_tap(keycode);
+    tap_code16(keycode);
     keyboard_mod_state_apply(saved);
 }
 
@@ -832,7 +821,7 @@ static void directional_move(int16_t x, int16_t y) {
 }
 
 static uint16_t tapped(uint8_t index) {
-    return index < synthetic_tap_call_count ? synthetic_tap_calls[index].keycode : KC_NO;
+    return index < tap_call_count ? tap_calls[index].keycode : KC_NO;
 }
 
 // Taps from a run of identical reports, all expected to be `keycode`.
@@ -840,11 +829,11 @@ static uint8_t directional_run(int16_t x, int16_t y, uint8_t reports, uint16_t k
     uint8_t total = 0;
     for (uint8_t i = 0; i < reports; i++) {
         directional_move(x, y);
-        for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap++) {
+        for (uint8_t tap = 0; tap < tap_call_count; tap++) {
             if (tapped(tap) != keycode) fprintf(stderr, "run (%d,%d) report %u: tapped 0x%04x, expected 0x%04x\n", x, y, (unsigned)i, (unsigned)tapped(tap), (unsigned)keycode);
             CHECK(tapped(tap) == keycode);
         }
-        total += synthetic_tap_call_count;
+        total += tap_call_count;
     }
     return total;
 }
@@ -866,18 +855,18 @@ static void test_configured_eight_directions(void) {
     // A straight move wobbling up to 35 degrees stays straight.
     directional_clock += 500u; // a pause releases the hold
     directional_move(10, 0);
-    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    CHECK(tap_call_count == 1 && tapped(0) == KC_RIGHT);
     const int16_t wobble[] = {3, 6, 2, 7, 4, 1, 6};
     for (uint8_t i = 0; i < sizeof(wobble) / sizeof(wobble[0]); i++) {
         directional_move(10, wobble[i]);
-        CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+        CHECK(tap_call_count == 1 && tapped(0) == KC_RIGHT);
     }
 
     // Turning from right to down goes through the diagonal without firing it.
     uint8_t diagonal = 0, down = 0;
     for (uint8_t i = 0; i < 6; i++) {
         directional_move(0, 10);
-        for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap++) {
+        for (uint8_t tap = 0; tap < tap_call_count; tap++) {
             if (tapped(tap) == KC_PGDN) diagonal++;
             if (tapped(tap) == KC_DOWN) down++;
         }
@@ -886,7 +875,7 @@ static void test_configured_eight_directions(void) {
 
     // A reversal switches at once.
     directional_move(0, -10);
-    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_UP);
+    CHECK(tap_call_count == 1 && tapped(0) == KC_UP);
 
     // Every diagonal, one step each.
     const struct { int16_t x, y; uint16_t key; } diagonals[] = {{-10, -10, KC_HOME}, {10, -10, KC_PGUP}, {-10, 10, KC_END}, {10, 10, KC_PGDN}};
@@ -898,7 +887,7 @@ static void test_configured_eight_directions(void) {
     // A long move is capped per tick like every discrete mode.
     directional_clock += 500u;
     directional_move(10 * 10, 0);
-    CHECK(synthetic_tap_call_count == NOAH_PD_MODE_MAX_TAPS_PER_TICK);
+    CHECK(tap_call_count == NOAH_PD_MODE_MAX_TAPS_PER_TICK);
 
     // Empty diagonals. Nearest: the quadrant splits at 45 degrees, as in
     // dominant axis, so a 40-degree move is horizontal and a 50-degree one
@@ -918,9 +907,9 @@ static void test_configured_eight_directions(void) {
         directional_clock += 500u;
         for (uint8_t i = 0; i < 4; i++) {
             directional_move(both_leans[lean].x, both_leans[lean].y);
-            CHECK(synthetic_tap_call_count % 2u == 0u);
-            for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap += 2) CHECK(tapped(tap) == both_leans[lean].lean && tapped(tap + 1u) == both_leans[lean].other);
-            both += synthetic_tap_call_count;
+            CHECK(tap_call_count % 2u == 0u);
+            for (uint8_t tap = 0; tap < tap_call_count; tap += 2) CHECK(tapped(tap) == both_leans[lean].lean && tapped(tap + 1u) == both_leans[lean].other);
+            both += tap_call_count;
         }
         CHECK(both >= 4);
     }
@@ -967,9 +956,9 @@ static void test_configured_empty_directions_and_single_axes(void) {
         directional_clock += 500u;
         for (uint8_t i = 0; i < 4; i++) {
             directional_move(-10, leans[lean].y);
-            CHECK(synthetic_tap_call_count % 2u == 0u);
-            for (uint8_t tap = 0; tap < synthetic_tap_call_count; tap += 2) CHECK(tapped(tap) == leans[lean].lean && tapped(tap + 1u) == leans[lean].other);
-            pairs += synthetic_tap_call_count / 2u;
+            CHECK(tap_call_count % 2u == 0u);
+            for (uint8_t tap = 0; tap < tap_call_count; tap += 2) CHECK(tapped(tap) == leans[lean].lean && tapped(tap + 1u) == leans[lean].other);
+            pairs += tap_call_count / 2u;
         }
         CHECK(pairs >= 3);
     }
@@ -1000,18 +989,18 @@ static void test_configured_dominant_axis(void) {
     // Reversal is immediate on either axis; a right-angle turn takes a report
     // longer, because the heading has to leave the held direction's range.
     directional_move(0, -10);
-    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_UP);
+    CHECK(tap_call_count == 1 && tapped(0) == KC_UP);
     directional_move(-10, -2);
-    CHECK(synthetic_tap_call_count == 0);
+    CHECK(tap_call_count == 0);
     CHECK(directional_run(-10, -2, 3, KC_LEFT) >= 2);
     directional_move(10, 0);
-    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    CHECK(tap_call_count == 1 && tapped(0) == KC_RIGHT);
     // Small moves add up along the held direction, even across a pause.
     directional_move(4, 0);
-    CHECK(synthetic_tap_call_count == 0);
+    CHECK(tap_call_count == 0);
     directional_clock += 500u;
     directional_move(6, 0);
-    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    CHECK(tap_call_count == 1 && tapped(0) == KC_RIGHT);
     // Each axis counts in its own threshold.
     slot[34] = 40;
     noah_pd_engine_enter(slot);
@@ -1034,7 +1023,7 @@ static void test_configured_once_per_movement(void) {
     // drain nothing.
     CHECK(directional_run(10, 0, 6, KC_RIGHT) == 1);
     directional_move(0, 0);
-    CHECK(synthetic_tap_call_count == 0);
+    CHECK(tap_call_count == 0);
     // A turn within the movement sends nothing more, even when it then
     // reverses: up is no more against right than down was.
     CHECK(directional_run(2, 10, 6, KC_DOWN) == 0);
@@ -1048,19 +1037,19 @@ static void test_configured_once_per_movement(void) {
     directional_clock += 500u;
     CHECK(directional_run(10, 0, 3, KC_RIGHT) == 1);
     directional_move(-1, 0);
-    CHECK(synthetic_tap_call_count == 0);
+    CHECK(tap_call_count == 0);
     CHECK(directional_run(10, 0, 3, KC_RIGHT) == 0);
     // So does a pause; the spent movement's motion is not banked, so the next
     // one needs its own threshold.
     directional_clock += 500u;
     directional_move(4, 0);
-    CHECK(synthetic_tap_call_count == 0);
+    CHECK(tap_call_count == 0);
     directional_move(6, 0);
-    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    CHECK(tap_call_count == 1 && tapped(0) == KC_RIGHT);
     // A move many steps long in one report sends one shortcut, not the budget.
     directional_clock += 500u;
     directional_move(10 * 10, 0);
-    CHECK(synthetic_tap_call_count == 1 && tapped(0) == KC_RIGHT);
+    CHECK(tap_call_count == 1 && tapped(0) == KC_RIGHT);
     // A short pause does not end the movement.
     directional_clock += 100u;
     CHECK(directional_run(10, 0, 3, KC_RIGHT) == 0);
@@ -1082,7 +1071,7 @@ static void test_configured_once_per_movement(void) {
     noah_pd_engine_enter(slot);
     CHECK(directional_run(10, 10, 4, KC_PGDN) == 1);
     directional_move(0, -1);
-    CHECK(synthetic_tap_call_count == 0);
+    CHECK(tap_call_count == 0);
     CHECK(directional_run(10, 10, 4, KC_PGDN) == 0);
     CHECK(directional_run(-10, -10, 4, KC_HOME) == 1);
     CHECK(directional_run(10, -10, 4, KC_PGUP) == 0);
@@ -1093,8 +1082,8 @@ static void test_configured_once_per_movement(void) {
     uint8_t pairs = 0;
     for (uint8_t i = 0; i < 6; i++) {
         directional_move(10, -8);
-        CHECK(synthetic_tap_call_count == 0 || (synthetic_tap_call_count == 2 && tapped(0) == KC_RIGHT && tapped(1) == KC_UP));
-        pairs += synthetic_tap_call_count / 2u;
+        CHECK(tap_call_count == 0 || (tap_call_count == 2 && tapped(0) == KC_RIGHT && tapped(1) == KC_UP));
+        pairs += tap_call_count / 2u;
     }
     CHECK(pairs == 1);
     noah_pd_engine_exit();
@@ -1180,10 +1169,10 @@ static void test_configured_release_ownership_and_custom_slot(void) {
     noah_pd_engine_enter(slot);
     test_clear_logs();
     noah_pd_engine_motion((report_mouse_t){.y = INT16_MAX});
-    CHECK(synthetic_tap_call_count == 4 && synthetic_tap_calls[0].keycode == KC_B);
+    CHECK(tap_call_count == 4 && tap_calls[0].keycode == KC_B);
     test_clear_logs();
     noah_pd_engine_motion((report_mouse_t){.y = -1});
-    CHECK(synthetic_tap_call_count == 1 && synthetic_tap_calls[0].keycode == KC_A);
+    CHECK(tap_call_count == 1 && tap_calls[0].keycode == KC_A);
     noah_pd_engine_exit();
     CHECK(noah_pd_engine_motion((report_mouse_t){.x = 13}).x == 13);
 }
@@ -1219,7 +1208,7 @@ static void test_configured_mouse_button_clicks(void) {
         click_move(10, 0);
         CHECK(click_call_count == 1 && click_calls[0].keycode == MS_BTN4 && click_calls[0].masked_mods == 0u && !click_calls[0].exact);
         CHECK(!click_calls[0].motion_pending && pending_report.x == 0);
-        CHECK(synthetic_tap_call_count == 0 && literal_tap_call_count == 0);
+        CHECK(tap_call_count == 0 && literal_tap_call_count == 0);
     }
     directional_clock += 500u;
     click_move(10 * 10, 0);
@@ -1232,7 +1221,7 @@ static void test_configured_mouse_button_clicks(void) {
     CHECK(click_call_count == 1 && click_calls[0].keycode == MS_BTN1 && click_calls[0].masked_mods == 0u && click_calls[0].exact);
     directional_clock += 500u;
     click_move(0, 10);
-    CHECK(click_call_count == 0 && synthetic_tap_call_count == 1 && tapped(0) == KC_DOWN);
+    CHECK(click_call_count == 0 && tap_call_count == 1 && tapped(0) == KC_DOWN);
     CHECK(pending_report.y == 10);
 
     // Once per movement: one click however far the movement goes.
@@ -1284,7 +1273,7 @@ static void test_configured_macro_start_accounting(void) {
     for (uint8_t i = 0; i < 2; i++) {
         click_move(10, 0);
         CHECK(macro_start_count == 1 && macro_start_action == 0x777f);
-        CHECK(synthetic_tap_call_count == 0 && literal_tap_call_count == 0);
+        CHECK(tap_call_count == 0 && literal_tap_call_count == 0);
     }
     macro_start_result = true;
     click_move(10, 0);

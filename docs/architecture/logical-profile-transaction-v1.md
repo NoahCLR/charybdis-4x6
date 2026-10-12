@@ -236,6 +236,12 @@ progress: the next owner scan counts it as host activity, so a staging longer
 than the 15-second lease keeps its candidate. Status polls on either channel
 are not progress, so abandoned staging still expires with its candidate. From
 COMMITTING on nothing expires or cancels.
+A BEGIN retry with the current transaction ID and different metadata is refused
+as `CONFLICTING_RETRY`; it cannot replace a durable-phase state with `REJECTED`
+or change the decided identity. Identical retries remain idempotent. After
+ACCEPT, the owner keeps its output fence until complete activation resets the
+barrier; command errors and transaction status changes cannot lift it.
+
 
 ## External VIA Writers
 

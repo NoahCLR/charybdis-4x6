@@ -51,6 +51,9 @@ bool     owned_keycode_tap(uint16_t keycode);
 // A keycode the ledger cannot represent keeps QMK's own tap.
 void     owned_keycode_tap_literal(uint16_t keycode);
 void     owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record);
+// Decide before tracking this event: a press is not yet counted, while a
+// release still includes its own physical owner. Suppression removes only a
+// duplicate native edge; the native event must still settle its ownership.
 bool     owned_keycode_should_suppress_default(uint16_t keycode, keyrecord_t *record);
 uint16_t owned_keycode_managed_usage_count(void);
 void     owned_keycode_debug_snapshot(uint8_t keycode, owned_keycode_debug_snapshot_t *out);

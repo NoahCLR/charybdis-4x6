@@ -266,6 +266,13 @@ prevents recursive activation and unbalanced holds through motion outputs. The
 engine must still dispatch through existing owned-output helpers and apply the
 existing four-tap/32-step work ceilings.
 
+Every modifier policy uses owned literal output for keyboard taps, including
+mouse-button tap overrides. A keyboard usage already held by a physical key,
+behaviour or macro stays down: the tap adds no new edge and cannot release
+that owner. Mask and exact policies still isolate and restore their ambient
+modifiers; inherit keeps them. Ordinary keyboard taps do not re-enter QMK key
+processing or the tapped key's behaviour.
+
 A click is one output, like a key tap: it counts against the per-report budget,
 spends a once-per-movement movement and follows the empty-direction policy. It
 goes through the owned-keycode ledger as one balanced press and release, never

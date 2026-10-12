@@ -1041,7 +1041,38 @@ static void test_reuse_busy_detail_keeps_the_host_status_vocabulary(void) {
     assert(status.busy_streak == 3u);
 }
 
+// A conflicting retry after ACCEPT must not expose a partially rewritten bank.
+static void test_conflicting_begin_after_accept_keeps_output_fenced(void) {
+    uint32_t now = 250000u;
+    uint8_t frame[32];
+    boot_pair(&now);
+    stage(331u, true, &now);
+    host_candidate(NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 331u, &now);
+    for (uint32_t guard = 0; guard < 8192u && via_status().state != NOAH_QMK_VIA_LOGICAL_ACCEPTED; guard++) tick(&now);
+    assert(via_status().state == NOAH_QMK_VIA_LOGICAL_ACCEPTED);
+    local_keymap[0] = target_keymap[0];
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+    assert(!noah_profile_owner_output_ready(&usb));
+    candidate_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, 331u);
+    frame[15] ^= 1u;
+    host_frame(frame, &now);
+    assert(usb.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER);
+    assert(usb.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_CONFLICTING_RETRY);
+    assert(!noah_profile_owner_output_ready(&usb));
+    host_candidate(NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 331u, &now);
+    assert(!noah_profile_owner_output_ready(&usb));
+    memcpy(local_keymap, target_keymap, KEYMAP_SIZE);
+    noah_qmk_via_split_sync_note_mutation(NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR);
+    for (uint32_t guard = 0; guard < 16384u && usb.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE; guard++) tick(&now);
+    assert(usb.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+    assert(usb.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
+    assert(noah_profile_owner_output_ready(&usb));
+    assert(memcmp(local_keymap, target_keymap, KEYMAP_SIZE) == 0);
+    assert(memcmp(peer.keymap, target_keymap, KEYMAP_SIZE) == 0);
+}
+
 int main(void) {
+    test_conflicting_begin_after_accept_keeps_output_fenced();
     test_a_decision_the_host_did_not_see_rolls_forward();
     test_a_cancel_before_the_decision_releases_both_stores();
     test_an_abandoned_staging_expires_with_its_candidate();
