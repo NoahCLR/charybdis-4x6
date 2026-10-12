@@ -4,7 +4,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Centralizes this userspace's dependence on the current Charybdis fork's
-// pointer DPI and sniping APIs.
+// pointer DPI and sniping APIs, and on when QMK sends a mouse report.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -37,6 +37,21 @@ static inline uint16_t noah_qmk_contract_pointer_sniping_dpi(void) {
 static inline uint16_t noah_qmk_contract_pointer_dragscroll_dpi(void) {
     return noah_setting(NOAH_SETTING_DRAGSCROLL_DPI, CHARYBDIS_DRAGSCROLL_DPI);
 }
+
+// QMK sends a mouse button's report at once, from the report the pointing task
+// is still building, which carries this poll's motion until the task's own
+// result replaces it. A pointing mode that clicks drops that motion first, so
+// the click cannot move a cursor the mode holds still. Outside the pointing
+// task the report has no motion and this changes nothing.
+static inline void noah_qmk_contract_pointer_drop_pending_motion(void) {
+    report_mouse_t report = pointing_device_get_report();
+
+    report.x = 0;
+    report.y = 0;
+    report.h = 0;
+    report.v = 0;
+    pointing_device_set_report(report);
+}
 #else
 static inline bool noah_qmk_contract_pointer_sniping_enabled(void) {
     return false;
@@ -57,4 +72,6 @@ static inline uint16_t noah_qmk_contract_pointer_sniping_dpi(void) {
 static inline uint16_t noah_qmk_contract_pointer_dragscroll_dpi(void) {
     return 0;
 }
+
+static inline void noah_qmk_contract_pointer_drop_pending_motion(void) {}
 #endif

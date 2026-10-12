@@ -3,6 +3,7 @@
 #if defined(NOAH_PD_PROFILE_ENABLE) && defined(POINTING_DEVICE_ENABLE)
 #include "pd_mode_handler_common.h"
 #include "pd_mode_handlers.h"
+#include "../../compat/qmk_pointing_contract.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
 #include "../../profile/schema/profile_pd_v1.h"
@@ -25,12 +26,22 @@ static void owned_modifiers(uint8_t mask, bool pressed) {
     }
 }
 
+// A mouse button clicks through the owned ledger, never through QMK's key
+// processing, so it cannot reach a mode's button overrides or release a button
+// held elsewhere.
 static bool emit_tap(const uint8_t *tap) {
     uint16_t key = u16(tap);
     if (!key) return false;
-    if (tap[2] == 1u) noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(key, tap[3], true);
-    else if (tap[2] == 2u) noah_emit_literal_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
-    else noah_emit_synthetic_qmk_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+    if (IS_MOUSEKEY_BUTTON(key)) {
+        noah_qmk_contract_pointer_drop_pending_motion();
+        noah_emit_owned_click(key, tap[2] == 1u ? tap[3] : 0u, tap[2] == 2u);
+    } else if (tap[2] == 1u) {
+        noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(key, tap[3], true);
+    } else if (tap[2] == 2u) {
+        noah_emit_literal_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
+    } else {
+        noah_emit_synthetic_qmk_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
+    }
     return true;
 }
 

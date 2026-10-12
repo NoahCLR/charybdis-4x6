@@ -243,6 +243,30 @@ int main(int argc, char **argv) {
     assert(!noah_profile_pd_v1_tap_key_valid(0x08aa));
     assert(!noah_profile_pd_v1_tap_key_valid(0x7e80));
     assert(!noah_profile_pd_v1_tap_key_valid(0x7e40));
+    // Plain mouse buttons 1-8 are taps (feature bit 28). Movement, wheel,
+    // acceleration and modified mouse codes stay out.
+    for (uint16_t key = 0xc3; key <= 0xdf; key++) {
+        assert(noah_profile_pd_v1_tap_key_valid(key) == (key >= 0xd1 && key <= 0xd8));
+    }
+    assert(!noah_profile_pd_v1_tap_key_valid(0x01d3));
+    assert(!noah_profile_pd_v1_tap_key_valid(0x02d4));
+    // Buttons 3 and 4 in a direction and in a button override, under every
+    // modifier policy; a masked policy still needs its mask.
+    noah_profile_pd_v1_encode_record(&vertical, record);
+    const uint8_t clicks[][4] = {{0xd3, 0, 0, 0}, {0xd4, 0, 1, 0x02}, {0xd8, 0, 2, 0}, {0xd1, 0, 0, 0}};
+    for (size_t i = 0; i < 4; i++) {
+        memcpy(record + 44, clicks[i], 4);
+        assert(noah_profile_pd_v1_validate_record(record, NOAH_PROFILE_PD_V1_RECORD_SIZE, 1, &error) == NOAH_PROFILE_PD_V1_OK);
+        record[58] = 2;
+        memcpy(record + 60, clicks[i], 4);
+        assert(noah_profile_pd_v1_validate_record(record, NOAH_PROFILE_PD_V1_RECORD_SIZE, 1, &error) == NOAH_PROFILE_PD_V1_OK);
+        memset(record + 58, 0, 6);
+    }
+    const uint8_t rejected_mouse[][4] = {{0xd0, 0, 0, 0}, {0xd9, 0, 0, 0}, {0xd3, 0x01, 0, 0}, {0xd3, 0, 1, 0}};
+    for (size_t i = 0; i < 4; i++) {
+        memcpy(record + 44, rejected_mouse[i], 4);
+        assert(noah_profile_pd_v1_validate_record(record, NOAH_PROFILE_PD_V1_RECORD_SIZE, 1, &error) == NOAH_PROFILE_PD_V1_INVALID_ACTION && error.offset == 44);
+    }
     printf("PD domain: %zu version-3 vectors and %zu frozen cross-language record cases (%zu valid, %zu rejected) passed\n", v3_cases, count, accepted, rejected);
     return 0;
 }

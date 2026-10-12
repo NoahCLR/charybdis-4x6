@@ -180,6 +180,10 @@ void unregister_code16(uint16_t keycode) {
     (void)keycode;
 }
 
+void wait_ms(uint16_t ms) {
+    (void)ms;
+}
+
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
     return layer < LAYER_COUNT && (state & test_layer_mask(layer)) != 0;
 }

@@ -258,6 +258,10 @@ void tap_code16(uint16_t keycode) {
     (void)keycode;
 }
 
+void wait_ms(uint16_t ms) {
+    (void)ms;
+}
+
 bool noah_synthetic_record_active(void) {
     return false;
 }
