@@ -84,6 +84,8 @@ enum {
     NOAH_PROFILE_FEATURE_STREAMING_MACROS = 1u << 27,
     // Pointing-mode taps may click plain mouse buttons 1-8.
     NOAH_PROFILE_FEATURE_POINTING_CLICKS = 1u << 28,
+    // Pointing-mode taps may start VIA macros 0-127, with inherited modifiers.
+    NOAH_PROFILE_FEATURE_POINTING_MACROS = 1u << 29,
 };
 
 // A wide-page request: [command, channel, value, request id, page low, page

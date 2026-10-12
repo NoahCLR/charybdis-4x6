@@ -42,6 +42,9 @@ from new physical presses with a per-macro override (D-F17); the encoding, owner
 and setup contract is in [runtime flow](architecture/runtime-flow.md).
 Physical host acceptance of each layout and entry method is pending.
 
+Pointing outputs can start VIA macros from directions, diagonals and button
+tap overrides (D-F23), with inherited modifiers and busy triggers dropped.
+
 Firmware work remaining before the product is complete:
 
 - physical interruption acceptance at every durable boundary;
@@ -71,6 +74,10 @@ preserving exact full-bank bytes and identity (D-F21). Hardware read timing and
 input cadence remain unmeasured for this path.
 
 ## Open Issues
+
+- **Pointing-mode macros need hardware acceptance (D-F23).** Run delayed and
+  mouse-click macros from directions under both output policies and from a
+  button override; confirm busy triggers drop and clicks reach the host.
 
 - **Sparse macro reads need hardware acceptance (D-F21).** Compare first read,
   refresh and export timing with mostly empty and full banks, including after
@@ -1248,3 +1255,21 @@ holds the rules.
 Client follow-up: Ark adopts feature bit 28, the pinned PD fixture and the
 wider tap vocabulary. Ark refuses a capability page with bits it does not know,
 so it cannot read this firmware until then.
+
+
+## D-F23 — Pointing outputs start VIA macros
+
+Directions, diagonals and mouse-button tap overrides accept VIA macro triggers
+0–127. The record layout, PD domain version and action ABI digest stay unchanged:
+older validators reject the new keycodes, and capability bit 29 advertises the
+extension. A macro record must inherit modifiers with mask zero, because its
+playback continues after the tap returns. Other excluded actions stay excluded;
+VIA payloads cannot recurse into layers or modes.
+
+The existing macro engine owns playback. Busy triggers are dropped; Every step
+is allowed. Only a successful start spends a once-per-movement movement. Empty,
+invalid or unplayable slots leave it available; attempted outputs still obey the
+motion budget. Mouse clicks in a macro use the existing owned leases and bypass
+mode overrides. The [PD contract](architecture/pd-mode-domain-v1.md#taps-modifiers-and-buttons)
+owns the full rules. Ark must adopt bit 29, the tap vocabulary and fixture;
+older Ark rejects unknown capability bits before reading this firmware.

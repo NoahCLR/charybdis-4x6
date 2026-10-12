@@ -21,6 +21,15 @@ void noah_qmk_via_macro_get_buffer(uint16_t offset, uint16_t size, uint8_t *data
 }
 #endif
 
+bool noah_qmk_contract_start_via_macro(uint16_t action) {
+#ifdef VIA_ENABLE
+    return via_macro_provider_start(action);
+#else
+    (void)action;
+    return false;
+#endif
+}
+
 bool noah_qmk_contract_try_play_via_macro(uint16_t action) {
 #ifdef VIA_ENABLE
     return via_macro_provider_try_play(action);

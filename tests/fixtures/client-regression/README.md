@@ -47,3 +47,8 @@ review and import those bytes, record provenance and update the manifest in the
 same change. Retain historical vectors when backward compatibility is required.
 The independence runner checks the manifest hashes. Running Ark's integration
 suite verifies its current implementation rather than these frozen expectations.
+
+Pointing macro triggers (D-F23) extend the tap vocabulary to `0x7700..0x777f`
+with inherited modifiers only. The frozen PD corpus was reviewed: it contains
+no newly accepted record, so its bytes and expectations remain unchanged.
+New cases live in `pd_mode_domain_v3.json` and the cold validator host test.

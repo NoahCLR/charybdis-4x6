@@ -5,12 +5,16 @@
 #include <string.h>
 
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/macro/macro_payload.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/macro/via_macro_provider.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "send_string.h"
+#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
+#include "users/noah/lib/profile/schema/profile_pd_v1.h"
+#include "users/noah/lib/compat/qmk_via_playback_contract.h"
 
 typedef enum {
     TEST_CALL_NONE = 0,
@@ -843,7 +847,89 @@ static void test_bank_write_cancels_a_macro_still_reading_it(void) {
     CHECK(test_press_count == presses_at_cancel + 1u);
 }
 
+// Keep the production pointing engine and VIA provider together: outputs use
+// the existing owned leases, which never route back through button overrides.
+void keyboard_mod_ownership_register(uint16_t key) { (void)key; }
+void keyboard_mod_ownership_unregister(uint16_t key) { (void)key; }
+uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mask) { return mask; }
+bool noah_key_runtime_settle_pending_fallback_hold(void) { return false; }
+void reset_dragscroll_mode(void) {}
+report_mouse_t noah_pd_configured_scroll(const uint8_t *record, report_mouse_t report) { (void)record; return report; }
+report_mouse_t pointing_device_get_report(void) { return (report_mouse_t){0}; }
+void pointing_device_set_report(report_mouse_t report) { (void)report; }
+void noah_emit_owned_click(uint16_t key, uint8_t mask, bool exact) { (void)key; (void)mask; (void)exact; CHECK(false); }
+void noah_emit_synthetic_qmk_tap(uint16_t key, noah_emit_policy_t policy) { (void)key; (void)policy; CHECK(false); }
+void noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t key, uint8_t mask, bool settle) { (void)key; (void)mask; (void)settle; CHECK(false); }
+void noah_emit_literal_tap(uint16_t key, noah_emit_policy_t policy) { (void)key; (void)policy; CHECK(false); }
+
+static void test_pointing_macros_use_existing_engine(void) {
+    uint8_t record[128];
+    noah_pd_config_t mode = {.id = 0, .name = "Macros", .kind = 1, .axis = NOAH_PD_AXIS_EIGHT, .threshold_x = 10, .threshold_y = 10,
+        .directions = {{0x7701, 0, 0}, {QK_MACRO_0, 0, 0}},
+        .diagonals = {{QK_MACRO_0, 0, 0}}, .direction_output = NOAH_PD_DIRECTION_OUTPUT_ONCE,
+        .buttons = {{2, 0, {QK_MACRO_0, 0, 0}}}};
+    test_reset_state();
+    // Macro 0: mouse button 1 then delay then A. Button 1's own override
+    // starts macro 0; a wrongly routed macro click would recurse or be eaten.
+    const uint8_t payload[] = {SS_QMK_PREFIX, SS_TAP_CODE, MS_BTN1, SS_QMK_PREFIX, SS_DELAY_CODE, '1', '0', '0', '|',
+        SS_QMK_PREFIX, SS_TAP_CODE, KC_A, 0};
+    memcpy(macro_buffer, payload, sizeof(payload));
+    noah_profile_pd_v1_encode_record(&mode, record);
+    noah_pd_engine_enter(record);
+    // An empty slot produces no output and leaves the movement available.
+    (void)noah_pd_engine_motion((report_mouse_t){.x = -10});
+    CHECK(test_call_count == 0);
+    (void)noah_pd_engine_motion((report_mouse_t){.x = 10});
+    macro_payload_debug_snapshot_t snapshot;
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.completed_count == 0 && snapshot.state != MACRO_PAYLOAD_ENGINE_IDLE && snapshot.active_slot == 0);
+    (void)noah_pd_engine_motion((report_mouse_t){.x = 20});
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.completed_count == 0 && snapshot.state != MACRO_PAYLOAD_ENGINE_IDLE && snapshot.busy_rejection_count == 0);
+    // A physical button trigger while busy is consumed and dropped.
+    keyrecord_t button = {.event = {.key = {.row = 0, .col = 0}, .pressed = true}};
+    CHECK(noah_pd_engine_key(MS_BTN1, &button));
+    button.event.pressed = false;
+    CHECK(noah_pd_engine_key(MS_BTN1, &button));
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.busy_rejection_count == 1);
+    test_run_macro_to_idle();
+    CHECK(test_call_count == 4);
+    CHECK(test_calls[0].kind == TEST_CALL_OWNED_REGISTER && test_calls[0].value == MS_BTN1);
+    CHECK(test_calls[1].kind == TEST_CALL_OWNED_UNREGISTER && test_calls[1].value == MS_BTN1);
+    CHECK(test_calls[2].value == KC_A && test_calls[3].value == KC_A);
+    // Diagonal and then a physical button can each start the same macro.
+    fake_time += 500;
+    (void)noah_pd_engine_motion((report_mouse_t){.x = -20, .y = -20});
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.completed_count == 1 && snapshot.state != MACRO_PAYLOAD_ENGINE_IDLE);
+    test_run_macro_to_idle();
+    button.event.pressed = true;
+    CHECK(noah_pd_engine_key(MS_BTN1, &button));
+    button.event.pressed = false;
+    CHECK(noah_pd_engine_key(MS_BTN1, &button));
+    test_run_macro_to_idle();
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.completed_count == 3);
+    // Every step remains bounded and drops busy starts, with no later queue.
+    mode.direction_output = NOAH_PD_DIRECTION_OUTPUT_REPEAT;
+    noah_profile_pd_v1_encode_record(&mode, record);
+    noah_pd_engine_enter(record);
+    (void)noah_pd_engine_motion((report_mouse_t){.x = 100});
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.completed_count == 3 && snapshot.state != MACRO_PAYLOAD_ENGINE_IDLE && snapshot.busy_rejection_count == 4);
+    // Drain the bounded motion backlog while busy, then prove no queued macro.
+    for (uint8_t i = 0; i < 8; i++) (void)noah_pd_engine_motion((report_mouse_t){0});
+    test_run_macro_to_idle();
+    macro_payload_debug_snapshot(&snapshot);
+    CHECK(snapshot.completed_count == 4);
+    noah_pd_engine_exit();
+    CHECK(!noah_qmk_contract_start_via_macro(QK_MACRO_0 + 127)); // empty last slot
+    CHECK(!noah_qmk_contract_start_via_macro(KC_A));
+}
+
 int main(void) {
+    test_pointing_macros_use_existing_engine();
     test_qmk_tap_command_uses_scan_driven_owned_lease();
     test_qmk_down_and_up_commands_use_owned_register_and_unregister();
     test_delay_command_matches_upstream_parsing();
