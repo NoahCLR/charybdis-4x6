@@ -1,0 +1,602 @@
+# Lighting Rules — RGB Domain `0x10` Version 5
+
+This document governs the keyboard's lighting: the bytes of Profile Wire
+domain `0x10` version `5`, the four open registries (facts, targets, paints,
+timings) and their contract, how the keyboard renders a rule list, how facts
+reach the other half, the conversion from version 4, the **Standard lighting**
+rule set, and the walkthroughs that prove the design grows without a rewrite.
+It supersedes [RGB domain v1](rgb-domain-v1.md) for everything the firmware
+reads and writes; that document remains the definition of the version-4 bytes
+the conversion starts from (D-F25).
+
+The shared contract file `tests/fixtures/lighting_contract_v1.json` names every
+id, parameter and meaning below in a form a program can read.
+`tests/fixtures/lighting_vectors_v1.json` holds the cross-language vectors:
+codec, conversion and per-entry render vectors. A client that edits lighting
+implements the same contract and passes the same vectors.
+
+All integers are unsigned and little-endian. Every colour is three bytes in
+`h, s, v` order, converted to RGB with QMK's `hsv_to_rgb` (no CIE curve in this
+build). LED indices are the global `0..57` of the compiled board: left half
+`0..28`, right half `29..57`.
+
+## The model
+
+The keyboard keeps an ordered list of **rules**. A rule says: *when these
+facts are true, paint these LEDs like this.* For each LED the topmost rule that
+says something about it wins. A rule may say **clear** for an LED, and then
+whatever is below shows through. Below the last rule is the QMK matrix effect:
+an LED no rule paints is not written, so the effect shows exactly as it does
+today.
+
+A rule has:
+
+- up to four **conditions**, each a fact, optionally negated;
+- one **target**: which LEDs it paints;
+- one **paint**: what each targeted LED shows;
+- an optional **background**: a paint for the LEDs the rule does not paint;
+- a **brightness**;
+- optional **timings**: when a true rule actually paints;
+- optional **extensions**: rule properties added after version 5.
+
+The keyboard only walks the list. Placing rules sensibly is the editor's job.
+
+### Subjects
+
+The first condition, if it is not negated, is the rule's **subject**. A
+condition can name one thing ("layer 3") or any thing of its kind ("any
+layer"); it then yields one subject per matching thing, in that kind's
+natural order (a higher layer before a lower one). The rule applies once per
+subject, the first subject on top, as if it were that many rules in a row.
+Every other condition is a **filter**: a positive filter holds when its fact
+yields at least one subject, a negated one when it yields none. A rule whose
+first condition is negated, or that has none, has one subject: the **board**,
+which names no thing.
+
+A subject carries what targets and paints may ask about it: its thing kind
+and id (for its identity colour and place), the keys it concerns, and the
+halves it concerns. Each fact kind below defines what its subjects carry.
+
+### Identity and place
+
+Every thing kind with a table (layers, pointing modes, combos, behaviours) has
+a **thing table** in the domain. A thing's record holds its **place** (the
+target its rules use when they say "the subject's place") and its identity
+colour or colours. Recolouring a thing once recolours every rule that paints
+"identity" for it. A record may inherit either field from the table's default
+record.
+
+## Payload
+
+### Header — 8 bytes
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | format version, `5` |
+| 1 | 1 | reserved, zero |
+| 2 | 1 | physical LED count, exactly `58` |
+| 3 | 1 | palette count `P`, `0..128` |
+| 4 | 1 | thing-table count |
+| 5 | 1 | key-set count `K`, `0..255` |
+| 6 | 1 | map count `M`, `0..255` |
+| 7 | 1 | rule count `R`, `0..255` |
+
+The sections follow without padding in this order: palette, thing tables,
+key sets, maps, rules, domain extensions. The payload is at most **8,192
+bytes** (one shared lighting budget; there are no per-section caps beyond the
+count fields). Truncation, trailing bytes or a count that does not exactly
+describe the sections rejects the whole domain.
+
+### Palette
+
+`P` colours of three bytes each. Value is at most the firmware's compiled
+`RGB_MATRIX_MAXIMUM_BRIGHTNESS`. Order is the user's; duplicates are allowed.
+Everything else refers to colours by palette index.
+
+A **colour reference** byte is a palette index below `P`, `0xff` *none* (no
+colour: a paint that would show it says clear), or, in a thing record only,
+`0xfe` *inherit*.
+
+### Thing tables
+
+Each table is:
+
+| Size | Field |
+| ---: | --- |
+| 1 | thing kind |
+| 1 | record count `N`, at most the kind's thing count |
+| record size | default record |
+| `N` × record size | records for things `0..N-1` |
+
+Tables appear in strictly ascending kind order, each kind at most once, and
+only for kinds the keyboard supports. A thing at or beyond `N`, or a record
+field that is `0xfe`, uses the default record's field. The default record may
+not inherit.
+
+A record is one **place** byte followed by the kind's colour slots:
+
+| Kind | Id | Things | Colour slots |
+| --- | ---: | ---: | --- |
+| layer | 1 | logical layers (16) | colour |
+| pointing mode | 2 | 32 | colour |
+| combo | 3 | 128 | colour |
+| behaviour | 4 | 128 | hold, long hold, tap, then one per tap branch `2..depth` |
+
+The behaviour record therefore has `1 + 3 + (depth − 1)` bytes, `9` at the
+supported tap depth of five (D-F14). Kind `0` is the board: it has no table.
+
+A place byte is a **place-capable target** id (a target kind with no
+parameters that is not "the subject's place" itself) or, in a record only,
+`0xfe` inherit.
+
+### Key sets
+
+`K` saved LED sets of eight bytes each: bit `n` of byte `n / 8` is LED `n`.
+Bits 58–63 are zero. Empty, full and duplicate sets are valid; order is the
+user's. Version 4's reusable groups become key sets with the same ids.
+
+### Maps
+
+`M` painted maps. Each starts with an encoding byte:
+
+| Encoding | Bytes | Layout |
+| ---: | ---: | --- |
+| `0` dense | 59 | encoding, 58 values in LED order |
+| `1` sparse | `2 + 2n` | encoding, count `n`, then `n` × (`led`, `value`) |
+
+A map value is a palette index `0x00..0x7f` (below `P`) or `0x80 + k`, which
+paints with paint kind `k` and no parameters (`0x80` clear, `0x81` off, `0x83`
+identity). Only supported paint kinds without parameters may appear, and never
+the map paint itself. In a sparse map the LEDs are strictly ascending and below
+58, and no value is `0x80`; the LEDs it omits are clear.
+
+The encoding is canonical: a map that paints (does not clear) at most 28 LEDs
+is sparse, any other dense. A six-key look costs 14 bytes.
+
+### Rules
+
+Each rule is:
+
+| Size | Field |
+| ---: | --- |
+| 1 | size: the bytes that follow, `6..255` |
+| 1 | flags: bit 0 disabled; bits 1–7 zero |
+| 1 | brightness, `0..255`; `255` shows the paint as it is |
+| size − 2 | parts |
+
+A disabled rule is kept, validated and never rendered.
+
+A **part** is `slot << 5 | length`, then a kind id, then `length` parameter
+bytes. `length` is `0..16` and must equal the kind's declared parameter
+length.
+
+| Slot | Part | Count |
+| ---: | --- | --- |
+| 0 | condition | together with slot 1: `0..4` |
+| 1 | negated condition | |
+| 2 | target | exactly 1 |
+| 3 | paint | exactly 1 |
+| 4 | background paint | `0..1` |
+| 5 | timing | `0..4`, kinds strictly ascending |
+| 6 | rule extension | kinds strictly ascending |
+| 7 | reserved | never |
+
+Parts appear in slot order, conditions (slots 0 and 1, in the user's order)
+first. Every kind must be one the keyboard supports, and its parameters must
+satisfy the kind's rules below.
+
+### Domain extensions
+
+| Size | Field |
+| ---: | --- |
+| 1 | extension count `E` |
+| per extension | kind, length, `length` body bytes |
+
+Kinds are strictly ascending and supported, and each body has the kind's
+declared length. A domain extension is a board-wide setting added without a
+version change.
+
+| Kind | Length | Body |
+| ---: | ---: | --- |
+| 1 auto-mouse fade | 4 | flags (bit 0 on), mode (`0` real destination, `1` end colour where the effect would show, `2` end colour on all keys), end colour (palette index), base rule count (`0..R`) |
+| 2 tap-commit flash | 1 | `1`: a committed non-base tap flashes its tap colour |
+
+The tap-commit flash is behaviour-affecting: the key runtime decides whether
+to raise the flash, so the setting takes effect at the strict activation
+boundary like every other behaviour-affecting field. Without the extension no
+tap-commit flash is raised.
+
+## Registries
+
+There is one engine and four open registries, plus two lists of
+extensions and the thing kinds:
+
+| Registry | An entry | Firmware module provides |
+| --- | --- | --- |
+| facts | a state the board knows | its frame slice, collection on the USB half, its subjects |
+| targets | a way to pick LEDs | the LED mask for a subject |
+| paints | what an LED shows | `colour = paint(below, params, led, time)` |
+| timings | when a true rule paints | a gate amount and its next change |
+| rule extensions | a rule property | (none in version 5) |
+| domain extensions | a board-wide setting | its reader |
+| thing kinds | things with identities | their record shape |
+
+The contract every entry keeps:
+
+- **A stable id, never reused.** Ids are per registry, `0..255`. A retired id
+  stays reserved.
+- **A fixed parameter layout.** Each kind declares its parameter length and
+  the rule each byte must meet. The validator checks parameters from that
+  declaration; a kind has no validation code of its own.
+- **Its own module and compile flag.** An entry is one source file under
+  `users/noah/lib/rgb/lighting/kinds/` plus one row in the registry
+  (`users/noah/lib/profile/schema/profile_lighting_kinds_v1.h`), guarded by
+  the module's flag, and one line in `users/noah/source_manifest.mk`. The
+  engine dispatches through switches generated from the rows, so every call is
+  a direct edge for the reviewed stack contexts (D-F13); it has no other code
+  per kind.
+- **Reported as a capability.** A build reports every row it compiled in the
+  lighting capability bitmaps (below). It rejects any kind it does not have,
+  as strictly as ever: it never renders something it does not understand.
+- **One definition, shared vectors.** Each entry is described once in the
+  contract file, and has render vectors in the vectors file. Adding an entry
+  means adding its contract row and its vectors.
+
+### Facts
+
+A fact kind owns a slice of the **fact frame**: the bytes that describe it
+for one render. Its module collects the slice on the USB half. A slice is
+either **local** (each half collects it itself, because both halves already
+know it) or **synced** (the USB half sends it; see
+[Facts on the split link](#facts-on-the-split-link)). The module yields its
+subjects from the slice, highest-priority first, and says whether any exist.
+
+| Id | Fact | Thing | Parameters | Slice | Subjects |
+| ---: | --- | --- | --- | --- | --- |
+| 1 | layer active | layer | layer (`0..15`, `0xff` any) | local, 2 B | each active layer, highest first; layer 0, the base layer, is always active |
+| 2 | layer previewing | layer | layer (`0..15`, `0xff` any) | synced, 1 B | the layer a pending momentary hold previews |
+| 3 | pointing mode active | pointing mode | mode (`0..31` supported, `0xff` any) | local, 11 B | the mode shown; its keys and halves are those of the key or combo that started it |
+| 4 | combos held | combo | role: `0` owning the shown preview or mode, `1` the others, `0xff` both | synced, 16 B | one subject for all such combos together: their keys, the halves those keys are on |
+| 5 | behaviour state | behaviour | states, scope | synced, 61 B | see below |
+
+"Combos held" leaves out a combo whose output holds a momentary layer: the
+layer's own lighting says what the hold does. Its subject stands for every
+held combo of that role (thing `0xff`), so it takes the combo table's default
+identity; a later fact kind can yield one subject per combo.
+
+**Behaviour state.** The USB half keeps, for every key, the state its
+behaviour shows (none, branch selected, tap, hold, long hold), the branch for
+a selected branch, whether a flashing state is lit, and the newest gesture
+that owns each surface: the board, each half, and each state. A flashing state
+(a registered hold, a repeat) counts only while lit. The slice carries those
+maps exactly as the key runtime produces them (the
+[feedback model](../rgbflow.md)). The parameters are a states mask (bit 0
+branch selected, bit 1 tap, bit 2 hold, bit 3 long hold; bits 4–7 zero, at
+least one set) and a scope:
+
+| Scope | Subjects |
+| ---: | --- |
+| 0 each key | every key whose state is in the mask; its keys are that key |
+| 1 newest per half | the newest gesture on the left half, then on the right; each subject's halves are that half only |
+| 2 newest | the newest gesture on the board |
+| 3 newest per state | for each state in the mask, long hold first, the newest gesture that entered it, while its key still shows that state |
+
+A subject's identity slot follows its state: hold, long hold, tap, or the
+branch colour for branch `n` (`n ≤ 2` uses the first, deeper branches clamp to
+the last). Its thing is `0xff` (the subject stands for the gesture, not a
+behaviour row), so it uses the behaviour table's default palette.
+
+A key that sits in a held combo's footprint never shows a selected branch: the
+combo already lights that key. This is applied when the slice is collected.
+
+### Targets
+
+| Id | Target | Parameters | Place-capable | LEDs |
+| ---: | --- | --- | --- | --- |
+| 0 | whole board | — | yes | all 58 |
+| 1 | left half | — | yes | `0..28` |
+| 2 | right half | — | yes | `29..57` |
+| 3 | key set | set (`< K`) | no | the set's LEDs |
+| 4 | the subject's keys | — | yes | its keys' LEDs; the whole board when it has none |
+| 5 | the subject's halves | — | yes | the halves it concerns; the whole board when none |
+| 6 | the subject layer's mapped keys | — | yes | LEDs of keys that are neither `KC_NO` nor `KC_TRNS` on the subject's layer, read live from the keymap; none for a subject that is not a layer |
+| 7 | the subject's place | — | no | the target named by the subject's place; none for a kind without a table |
+
+### Paints
+
+A paint receives the colour **below** (what the LED would show without this
+rule and the subjects above it), its parameters, the LED and the time, and
+returns a colour or clear. It declares whether it **reads below** and whether
+it **changes with time**.
+
+| Id | Paint | Parameters | Reads below | Shows |
+| ---: | --- | --- | --- | --- |
+| 0 | clear | — | no | clear |
+| 1 | off | — | no | black |
+| 2 | colour | palette index | no | that colour |
+| 3 | identity | — | no | the subject's identity colour; clear when it has none |
+| 4 | map | map (`< M`) | as its value | the map's value for the LED, a palette colour or the param-less paint it names |
+| 5 | dim | level | yes | `below × level / 255` |
+| 6 | tint | palette index, amount | yes | `below` mixed toward the colour by `amount / 255` |
+
+No version-5 paint changes with time. Arithmetic per channel, with integer
+division:
+
+- brightness `b`: `(c × b + 127) / 255`;
+- dim: `(below × level + 127) / 255`;
+- tint and timing blends: `(below × (255 − a) + colour × a + 127) / 255`.
+
+### Timings
+
+A timing gates a rule's subject: from the moment the subject appears it
+returns an amount `0..255`, the time of its next change, and whether it is
+animating. `0` hides the subject; `255` shows it as painted; a value between
+blends the painted colour over below with the timing blend above. Gate state
+is kept per (rule, subject thing) while the subject exists and dropped when it
+disappears.
+
+| Id | Timing | Parameters | Amount |
+| ---: | --- | --- | --- |
+| 1 | show after | milliseconds `1..65535` | `0` until the subject has existed that long, then `255` |
+
+Each half times from the frame in which it first sees the subject, so the
+halves may differ by the link's latency.
+
+### Thing kinds
+
+Listed under [Thing tables](#thing-tables). A fact kind names the thing kind
+of its subjects.
+
+## Rendering
+
+### Publication
+
+When a profile is published the firmware copies the validated lighting payload
+into RAM and indexes it: palette RGB, thing tables, key sets, map offsets and
+rule part offsets. Rendering never reads the profile. The compiled defaults are
+decoded the same way the first time they are needed. Both halves decode their
+own copy of the profile.
+
+### The walk
+
+The meaning of a rule list, for one LED, is this walk (the firmware evaluates
+it rule by rule for all LEDs at once, which is equivalent):
+
+```text
+walk(led, from):
+  for each enabled rule from `from`, top first, and each of its subjects in order:
+      skip the rule if a filter fails
+      amount ← the subject's timing gate (255 without timings); skip if 0
+      v ← paint(subject) if led is in target(subject), else clear
+      if v is clear and the rule has a background: v ← background(subject)
+      if v is clear: continue
+      if v reads below, or amount < 255: below ← walk(led, the next subject)
+      colour ← brightness(v(below))
+      if amount < 255: colour ← blend(below, colour, amount)
+      return colour
+  return unpainted
+```
+
+Below the last rule, **below** is the matrix effect's colour at that LED as the
+effect drew it this frame (black where the driver cannot report it). An LED
+the walk leaves unpainted is not written. At most four paints that read below
+(timing blends included) compose on one LED; a fifth, lower one says clear.
+
+### When it re-resolves
+
+The firmware resolves a whole frame when the first LED chunk of a frame
+starts, and only when something changed: the fact frame, the published
+program, the keymap (for mapped-key targets), a timing's next change, or every
+frame while something time-based shows (an animating timing, a paint that
+changes with time, the auto-mouse fade). Between resolutions each chunk copies
+the resolved colours; LEDs whose result composes over the effect are finished
+per chunk from the effect the chunk just drew.
+
+### Outside the registries
+
+- **Diagnostics win outright.** While the runtime diagnostics indicator is
+  active every LED shows it and nothing else renders.
+- **The auto-mouse fade** stays as it was. The fade extension names the
+  bottom `base` rules as the fade's scene. While auto-mouse is fading (the
+  auto-mouse layer is active, its timeout is past the dead time, no pointing
+  mode is locked, and the extension is on), the scene is walked twice: once
+  as it is, once with the auto-mouse layer inactive. The start and end colours
+  combine with today's blend for the progress, the end follows the mode
+  (real destination: the effect where the scene paints nothing; end colour
+  where the effect would show; end colour on all keys), and the rules above the
+  scene paint over the result as usual. It is re-expressed as a paint once
+  time-based paints exist.
+- **The RGB timeout** still turns every LED off after the idle timeout.
+
+## Facts on the split link
+
+Each half renders its own LEDs from its own profile and its own fact frame.
+Local slices are collected on each half from state both halves already share
+(the layer state QMK syncs; the pointing state the runtime base packet
+carries). Synced slices are collected on the USB half and sent to the other
+half as one **lighting facts frame**, which replaces the per-stage combo and
+key-feedback packets and the preview byte of the base packet.
+
+The synced frame is the synced slices in registry order (78 bytes in this
+build). It travels in chunks on one transaction, `PUT_SPLIT_LIGHTING_FACTS_SYNC`:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | frame sequence |
+| 1 | 1 | chunk index (bits 0–3); bit 7 commit |
+| 2 | 30 | frame bytes `index × 30 ..`, the last chunk zero-padded |
+
+Each pass the USB half rebuilds the frame and sends the chunks that changed
+(every chunk on a heartbeat, after a failure or when forced), all with a new
+sequence; the last chunk it sends carries commit. The other half starts a
+staging copy of its live frame on the first chunk of a new sequence, applies
+each chunk, and publishes staging as its live frame on commit, as one
+generation, so a render never mixes two frames. A pass that fails part-way
+publishes nothing and the next pass resends every chunk. Heartbeats and
+transport back-off are the ones the runtime sync already uses.
+
+## Capabilities
+
+Feature bit 31 advertises version-5 lighting and the lighting capability
+read: custom GET on channel 0, value `0x0D`, with the usual request id, status
+and padding rules.
+
+| Page | Payload |
+| ---: | --- |
+| 0 | layout version `1`, domain version `5`, payload budget (u16, `8192`), palette maximum (`128`), conditions per rule (`4`), part parameter maximum (`16`), tap depth, LED count (`58`), registry count (`7`) |
+| `1 + 2r + h` | registry `r`, ids `128h..128h+127`: registry id, first id, then a 16-byte bitmap (bit `i` of byte `i / 8` is id `first + i`) |
+
+Registries `r` are `0` facts, `1` targets, `2` paints, `3` timings, `4` rule
+extensions, `5` domain extensions, `6` thing kinds. A client offers only what
+the keyboard reports and keeps a rule it cannot edit byte for byte.
+
+## Version 4 → version 5 conversion
+
+Firmware accepts only version 5 (D-F10). A version-4 domain, from a profile
+stored by earlier firmware or an older backup, becomes version 5 through this
+conversion, which a client performs before Apply. The firmware performs the
+same conversion on its compiled `rgb_config.c` tables, encoded as version 4,
+to produce its compiled defaults and factory fallback, so a v4 profile and the
+firmware's own lighting are the same function of the same bytes. The result is
+**Standard lighting**: exactly the frames the version-4 renderer drew.
+
+Inputs: a valid version-4 payload, the target keyboard's tap depth, and the
+kinds it supports. A rule is emitted only if the keyboard supports every kind
+it uses; a thing table or extension only if it supports that kind. A rule from
+a stage whose version-4 enable bit is clear is emitted **disabled**. Every rule
+has brightness `255` and no background, timings or extensions.
+
+Notation: `pal(c)` is the palette index of colour `c` (below); a group row's
+colour `0,0,0` means **inherit**, painted as `identity`, any other colour as
+`colour pal(c)`. Localities map to places: both halves → whole board (0),
+left → left half (1), right → right half (2), key half → the subject's halves
+(5), keys only → the subject's keys (4).
+
+**Rules**, top to bottom:
+
+1. *Behaviour feedback* (only when the version-4 tap-branch count is not zero;
+   stage bit 4):
+   1. each key-feedback group row whose semantic is not "all", last stored
+      first: `behaviour state(states = 1 << semantic, scope 3)`, `key set
+      (group)`, inherit or colour;
+   2. each "all" row, last stored first: the same with states `0x0f`;
+   3. `behaviour state(0x0f, scope)`, `the subject's place`, `identity`, where
+      scope is `0` for keys only, `1` for key half, `2` otherwise.
+2. *Combo overlay* (stage bit 3): each combo group row, last first: `combos
+   held(1)`, `key set`, inherit or colour; then `combos held(1)`, `the
+   subject's place`, `identity`.
+3. *Pointing modes* (only when the PD-colour count is not zero; bit 2): each
+   PD group row, last first: `pointing mode active(selector)`, `key set`,
+   inherit or colour; then `pointing mode active(any)`, `the subject's place`,
+   `identity`.
+4. *Preview* (only when the layer-colour count is not zero; bit 0): each layer
+   group row, last first: `layer previewing(selector)`, `key set`, inherit or
+   colour; then `layer previewing(any)`, `the subject's place`, `identity`.
+5. *Combo underlay* (bit 3): as 2 with role `0`.
+6. *Layers* (only when the layer-colour count is not zero; bit 0): each layer
+   group row, last first: `layer active(selector)`, `key set`, inherit or
+   colour; then **Every layer**: `layer active(any)`, `the subject's place`,
+   `identity`. These rules are the fade's scene.
+
+**Thing tables:**
+
+- layer (when layer colours exist): one record per layer colour row; place
+  whole board for "all keys", else the subject layer's mapped keys; colour
+  `pal` of the row, or none when its saturation and value are both zero.
+  Default record: mapped keys, none.
+- pointing mode (when PD colours exist): one record per slot: place from its
+  locality, colour `pal` of the row (black is a colour here). Default record:
+  whole board, none.
+- combo: no records; default record: place from the combo locality, colour
+  `pal` of the combo colour.
+- behaviour (when tap-branch colours exist; their count must be the target's
+  depth − 1): no records; default record: place from the key-feedback
+  locality, then `pal` of hold, long hold, tap committed and each tap-branch
+  colour in order.
+
+**Key sets:** the version-4 groups, in id order. **Maps:** none.
+
+**Extensions:** auto-mouse fade with flags = stage bit 1, the version-4 mode,
+`pal(end colour)` and base = the number of rules emitted in step 6;
+tap-commit flash when stage bit 4 is set and the tap-commit policy is `1`.
+
+**Palette:** each distinct colour gets the next index the first time the
+encoded result references it, reading the payload in order (thing tables,
+default record first, fields in record order; then rules top to bottom; then
+extensions). The worst version-4 profile needs at most 89 colours (92 at depth
+eight), under the 128-colour ceiling.
+
+## Standard lighting
+
+The compiled profile converts to these rules (`tests/fixtures/lighting_vectors_v1.json`
+holds its exact bytes as `standard`):
+
+| Rule | When | Where | Paint |
+| --- | --- | --- | --- |
+| Behaviour accents | behaviour state any, newest per state | thumbs key set | identity |
+| Behaviour feedback | behaviour state any, newest per half | the subject's place (its half) | identity |
+| Combo accents (overlay) | combos held, others | thumbs | identity |
+| Combo overlay | combos held, others | the subject's place (its halves) | identity |
+| Pointing accents | pointing mode active, any | thumbs | identity |
+| Every mode | pointing mode active, any | the subject's place | identity |
+| Preview | layer previewing, any | the subject's place | identity |
+| Combo accents (underlay) | combos held, owning | thumbs | identity |
+| Combo underlay | combos held, owning | the subject's place | identity |
+| Every layer | layer active, any | the subject's place | identity |
+
+with the auto-mouse fade over **Every layer** and the tap-commit flash on.
+Layer 0 has no colour, so the matrix effect shows wherever no rule paints.
+
+## Modularity walkthroughs
+
+Each walkthrough adds one entry to the version-5 engine. Each touches one
+firmware module (its file, its registry row and manifest line), the contract
+file and its vectors, and no format version; a client adds one descriptor.
+
+1. **Host OS fact.** New fact id `6`, *host OS is* (parameter: os `1` macOS,
+   `2` Windows, `3` Linux; thing: board). Its module `fact_host_os.c` reads
+   the effective OS (the settings override, else QMK's detection) into a
+   synced one-byte slice and yields one board subject when it matches. The
+   frame grows by one byte, which the slice table sizes; the chunked frame
+   carries it with no protocol change. Capability: fact bit 6. Vectors: each
+   OS against a rule `host OS is(macOS)`, `whole board`, `colour`.
+2. **"Keys under the fingers" target.** New target id `8`, *keys held now*
+   (no parameters; place-capable). Its module `target_held_keys.c` owns a
+   synced eight-byte slice of the matrix keys currently down, collected on the
+   USB half (which sees both halves' matrices), and returns their LEDs. A
+   target owning a slice uses the same slice table as facts. Capability:
+   target bit 8. Vectors: two held keys under a rule `always`, `keys held
+   now`, `colour`.
+3. **Breathing paint.** New paint id `7`, *breathe* (palette index, period
+   ms u16, floor u8; changes with time). Its module `paint_breathe.c` computes
+   `floor + (255 − floor) × wave(time / period)` of the colour. Because it
+   declares that it changes with time, the engine re-resolves every frame
+   while it shows; time is the split-synchronised millisecond clock, so both
+   halves breathe in phase. Capability: paint bit 7. Vectors: the colour at
+   four times.
+4. **Fade-in timing.** New timing id `2`, *fade in* (milliseconds). Its module
+   `timing_fade_in.c` returns `255 × elapsed / ms`, animating until it reaches
+   `255`, with the engine's per-(rule, subject) gate state. The walk already
+   blends partial amounts over below. Capability: timing bit 2. Vectors: a
+   layer rule at 0, 50 % and 100 % of the time.
+
+None of the four changes the header, a section, the part encoding, the walk
+or the split frame's protocol, so the domain stays version 5. A keyboard
+without the module rejects the new id; a client without the descriptor keeps
+the rule read-only and byte for byte.
+
+## Validation
+
+The firmware validates a candidate before it can become active, in bounded
+steps of at most 20 bytes read each, as every domain does: header and counts,
+palette brightness, thing tables (kinds, counts, place and colour bytes),
+key-set padding bits, map encodings, canonical sparse/dense choice and values,
+every rule's size, flags, part order, counts and kinds, each part's declared
+length and parameter rules, and the extensions. Reference bounds (`< P`, `< K`,
+`< M`, base `≤ R`) are checked against the header counts. Errors carry the
+payload-relative offset; the vectors file names each rejection.
+
+This document governs the bytes and their meaning. Transport and activation
+are specified by [Profile Wire](profile-wire-v1.md) and the
+[logical transaction contract](logical-profile-transaction-v1.md); RAM policy
+by [memory budgets](memory-budgets.md).

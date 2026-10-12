@@ -36,6 +36,9 @@ default activity policy and opt-in diagnostics; recorded captures live under
   EEPROM maps, storage ceilings, and the measured resource baseline.
 - Use [field-classification.md](./field-classification.md) for which settings
   are live-editable, structurally bounded, or compiled-only.
+- Use [lighting-rules-v1.md](./lighting-rules-v1.md) for lighting: RGB domain
+  `0x10` version 5, the fact/target/paint/timing registries, the renderer,
+  the split facts frame, the version-4 conversion and Standard lighting.
 - Use [pd-mode-domain-v1.md](./pd-mode-domain-v1.md) for the eight
   configurable PD slots: scope, factory presets, runtime publication rules,
   the schema-2 codec, validation, capacity evidence, storage/ABI contract, the

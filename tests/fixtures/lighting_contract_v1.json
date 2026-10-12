@@ -1,0 +1,82 @@
+{
+  "format": 1,
+  "description": "Shared contract for RGB domain 0x10 version 5 (lighting rules): every registry entry's stable id, parameters and meaning, as docs/architecture/lighting-rules-v1.md defines them. The firmware's registry rows and every client descriptor implement this file; tests/fixtures/lighting_vectors_v1.json holds the vectors each entry must pass. Ids are never reused.",
+  "domain": {
+    "id": 16,
+    "version": 5,
+    "payloadBudget": 8192,
+    "ledCount": 58,
+    "paletteMaximum": 128,
+    "conditionsPerRule": 4,
+    "partParameterMaximum": 16,
+    "belowCompositionDepth": 4
+  },
+  "parameterTypes": {
+    "layerSelector": "a logical layer below the keyboard's layer count, or 255 for any layer",
+    "modeSelector": "a supported pointing-mode slot 0..31, or 255 for any mode",
+    "comboRole": "0 combos owning the shown preview or mode, 1 the other held combos, 255 both",
+    "behaviourStates": "bit 0 branch selected, bit 1 tap, bit 2 hold, bit 3 long hold; bits 4..7 zero; at least one bit set",
+    "behaviourScope": "0 each key, 1 newest per half, 2 newest, 3 newest per state",
+    "keySet": "a key-set index below the domain's key-set count",
+    "paletteIndex": "a palette index below the domain's palette count",
+    "map": "a map index below the domain's map count",
+    "level": "0..255",
+    "milliseconds": "u16 little-endian, 1..65535"
+  },
+  "partSlots": [
+    {"slot": 0, "name": "condition"},
+    {"slot": 1, "name": "negated condition"},
+    {"slot": 2, "name": "target"},
+    {"slot": 3, "name": "paint"},
+    {"slot": 4, "name": "background"},
+    {"slot": 5, "name": "timing"},
+    {"slot": 6, "name": "rule extension"}
+  ],
+  "registries": {
+    "facts": [
+      {"id": 1, "name": "layer active", "thing": 1, "parameters": [{"name": "layer", "type": "layerSelector"}], "slice": "local", "meaning": "Each active layer, highest first. Layer 0, the base layer, is always active."},
+      {"id": 2, "name": "layer previewing", "thing": 1, "parameters": [{"name": "layer", "type": "layerSelector"}], "slice": "synced", "meaning": "The layer a pending momentary hold previews."},
+      {"id": 3, "name": "pointing mode active", "thing": 2, "parameters": [{"name": "mode", "type": "modeSelector"}], "slice": "local", "meaning": "The pointing mode shown. Its keys and halves are those of the key or combo that started it."},
+      {"id": 4, "name": "combos held", "thing": 3, "parameters": [{"name": "role", "type": "comboRole"}], "slice": "synced", "meaning": "One subject for every held combo of the role, excluding combos whose output holds a momentary layer: their keys and the halves those keys are on. Thing 255, so the combo table's default identity."},
+      {"id": 5, "name": "behaviour state", "thing": 4, "parameters": [{"name": "states", "type": "behaviourStates"}, {"name": "scope", "type": "behaviourScope"}], "slice": "synced", "meaning": "Gestures whose shown state is in the mask; a flashing state counts only while lit; a key in a held combo's footprint never shows a selected branch. Scope 0: each key. Scope 1: the newest gesture on the left half, then the right, each with that half only. Scope 2: the newest gesture. Scope 3: for each state in the mask, long hold first, the newest gesture that entered it while its key still shows it. Identity slot from the state. Thing 255."}
+    ],
+    "targets": [
+      {"id": 0, "name": "whole board", "parameters": [], "place": true, "meaning": "All 58 LEDs."},
+      {"id": 1, "name": "left half", "parameters": [], "place": true, "meaning": "LEDs 0..28."},
+      {"id": 2, "name": "right half", "parameters": [], "place": true, "meaning": "LEDs 29..57."},
+      {"id": 3, "name": "key set", "parameters": [{"name": "set", "type": "keySet"}], "place": false, "meaning": "The key set's LEDs."},
+      {"id": 4, "name": "the subject's keys", "parameters": [], "place": true, "meaning": "The LEDs of the subject's keys; the whole board when it has none."},
+      {"id": 5, "name": "the subject's halves", "parameters": [], "place": true, "meaning": "The halves the subject concerns; the whole board when none."},
+      {"id": 6, "name": "the subject layer's mapped keys", "parameters": [], "place": true, "meaning": "LEDs of keys that are neither KC_NO nor KC_TRNS on the subject's layer, read live from the keymap; none for a subject that is not a layer."},
+      {"id": 7, "name": "the subject's place", "parameters": [], "place": false, "meaning": "The target named by the subject's thing record; none for a kind without a table."}
+    ],
+    "paints": [
+      {"id": 0, "name": "clear", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "Says nothing; what is below shows."},
+      {"id": 1, "name": "off", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "Black."},
+      {"id": 2, "name": "colour", "parameters": [{"name": "colour", "type": "paletteIndex"}], "readsBelow": false, "changesWithTime": false, "meaning": "That palette colour."},
+      {"id": 3, "name": "identity", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "The subject's identity colour from its thing record; clear when it has none."},
+      {"id": 4, "name": "map", "parameters": [{"name": "map", "type": "map"}], "readsBelow": "as the map value", "changesWithTime": false, "meaning": "The map's value at the LED: a palette colour, or the parameterless paint 0x80 + k names."},
+      {"id": 5, "name": "dim", "parameters": [{"name": "level", "type": "level"}], "readsBelow": true, "changesWithTime": false, "meaning": "(below x level + 127) / 255 per channel."},
+      {"id": 6, "name": "tint", "parameters": [{"name": "colour", "type": "paletteIndex"}, {"name": "amount", "type": "level"}], "readsBelow": true, "changesWithTime": false, "meaning": "(below x (255 - amount) + colour x amount + 127) / 255 per channel."}
+    ],
+    "timings": [
+      {"id": 1, "name": "show after", "parameters": [{"name": "delay", "type": "milliseconds"}], "changesWithTime": false, "meaning": "Amount 0 until the subject has existed for the delay, then 255."}
+    ],
+    "ruleExtensions": [],
+    "domainExtensions": [
+      {"id": 1, "name": "auto-mouse fade", "length": 4, "fields": ["flags: bit 0 on", "mode: 0 real destination, 1 end colour where the effect would show, 2 end colour on all keys", "end colour: palette index", "base: the bottom rule count forming the fade's scene, 0..R"], "meaning": "Outside the registries: while auto-mouse fades, the scene is walked with and without the auto-mouse layer and blended by the fade progress."},
+      {"id": 2, "name": "tap-commit flash", "length": 1, "fields": ["mode: 1 non-base taps"], "meaning": "A committed non-base tap flashes its tap colour. Behaviour-affecting: applied at the strict activation boundary. Absent: no tap-commit flash."}
+    ],
+    "thingKinds": [
+      {"id": 1, "name": "layer", "things": "logical layers", "colourSlots": ["colour"]},
+      {"id": 2, "name": "pointing mode", "things": 32, "colourSlots": ["colour"]},
+      {"id": 3, "name": "combo", "things": 128, "colourSlots": ["colour"]},
+      {"id": 4, "name": "behaviour", "things": 128, "colourSlots": ["hold", "long hold", "tap", "branch 2", "... one per branch up to the tap depth"]}
+    ]
+  },
+  "references": {
+    "colour": "0x00..0x7f a palette index below P; 0xff none; 0xfe inherit (thing records only)",
+    "place": "a place-capable target id; 0xfe inherit (thing records only)",
+    "mapValue": "0x00..0x7f a palette index below P; 0x80 + k the parameterless paint k (0x80 clear, 0x81 off, 0x83 identity)"
+  }
+}

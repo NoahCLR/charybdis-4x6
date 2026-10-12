@@ -22,6 +22,8 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPYCACHEPREFIX="$PYTHON_CACHE"
 
 "$PYTHON" -m py_compile "$REPO_ROOT/tools/profile_introspect.py"
+"$PYTHON" -m py_compile "$REPO_ROOT/tools/lighting_reference.py"
+"$PYTHON" "$REPO_ROOT/tools/lighting_reference.py" --check
 
 "$PYTHON" "$REPO_ROOT/tools/profile_introspect.py" --check
 "$PYTHON" "$REPO_ROOT/tools/profile_introspect.py" --keymap noah --check

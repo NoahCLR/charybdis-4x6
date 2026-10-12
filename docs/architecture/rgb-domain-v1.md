@@ -1,5 +1,12 @@
 # RGB Domain V1
 
+> **Superseded by [lighting rules](lighting-rules-v1.md) (D-F25).** Firmware
+> now reads and writes only domain `0x10` version 5. This document remains the
+> definition of the version-4 bytes: the firmware encodes its compiled
+> `rgb_config.c` tables this way before converting them, and a client converts
+> a version-4 domain from an older profile or backup with the same
+> [conversion](lighting-rules-v1.md#version-4--version-5-conversion).
+
 This document freezes the canonical encoding for Profile Wire domain `0x10`,
 version `4`: every RGB surface, as the keyboard stores it and the
 live app decodes, edits and re-encodes it for the candidate mailbox.
