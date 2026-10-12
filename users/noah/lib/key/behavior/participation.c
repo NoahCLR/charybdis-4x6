@@ -110,6 +110,22 @@ bool noah_participation_behavior_generated(uint16_t keycode, uint8_t origin_laye
     return noah_setting(NOAH_SETTING_BEHAVIORS_ENABLED, 1u) != 0u && behavior_definition(keycode, origin_layer);
 }
 
+bool noah_participation_combo_output(uint16_t combo_index, uint16_t keycode, uint8_t origin_layer) {
+    if (!noah_setting_combo_output_behaviors()) return false;
+#ifdef COMBO_ENABLE
+    if (combo_index != UINT16_MAX) return noah_qmk_combo_output_behavior(combo_index) && noah_participation_behavior_generated(keycode, origin_layer);
+    // Keep legacy fallback ownership without accidentally using another
+    // combo's permission when outputs share a keycode.
+    for (uint16_t index = 0; index < noah_qmk_combo_count(); index++) {
+        combo_t *combo = noah_qmk_combo_get(index);
+        if (combo && combo->keycode == keycode && !noah_qmk_combo_output_behavior(index)) return false;
+    }
+#else
+    (void)combo_index;
+#endif
+    return noah_participation_behavior_generated(keycode, origin_layer);
+}
+
 bool noah_participation_combo_press(uint8_t source_layer, keypos_t key_pos) {
     return layer_bit(noah_setting(NOAH_SETTING_LAYER_COMBOS, UINT32_MAX), source_layer) && !placement_bit(source_layer, NOAH_SETTINGS_LAYER_EXCLUDE, key_pos);
 }
@@ -200,13 +216,16 @@ bool noah_participation_record_generated_captured(const keyrecord_t *record) {
 #endif
 }
 void noah_participation_record_generated(keyrecord_t *record, uint16_t keycode, uint8_t origin_layer) {
+    noah_participation_record_generated_permission(record, origin_layer, noah_participation_behavior_generated(keycode, origin_layer));
+}
+void noah_participation_record_generated_permission(keyrecord_t *record, uint8_t origin_layer, bool behavior) {
 #ifdef KEYRECORD_USER_DATA
     if (record) record->user_data = CONTEXT_VALID | CONTEXT_GENERATED | (origin_layer & CONTEXT_LAYER)
-        | (noah_participation_behavior_generated(keycode, origin_layer) ? CONTEXT_BEHAVIOR : 0);
+        | (behavior ? CONTEXT_BEHAVIOR : 0);
 #else
     (void)record;
-    (void)keycode;
     (void)origin_layer;
+    (void)behavior;
 #endif
 }
 

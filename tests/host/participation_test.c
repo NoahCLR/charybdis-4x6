@@ -8,6 +8,8 @@
 #include "users/noah/lib/profile/runtime/effective_key_behavior_runtime.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
 
+static bool combo_output_behaviors = true;
+bool noah_setting_combo_output_behaviors(void) { return combo_output_behaviors; }
 static uint32_t scalars[NOAH_SETTINGS_COUNT];
 static uint8_t  records[NOAH_SETTINGS_LAYERS][NOAH_SETTINGS_LAYER_RECORD_SIZE];
 uint32_t        noah_setting(uint8_t id, uint32_t fallback) {
@@ -28,6 +30,12 @@ noah_effective_key_behavior_result_t     noah_effective_key_behavior_lookup(uint
     return keycode == KC_X ? NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK : NOAH_EFFECTIVE_KEY_BEHAVIOR_NOT_FOUND;
 }
 
+static const uint16_t inputs[] = {KC_A, KC_B, COMBO_END};
+static combo_t combos[] = {{.keys = inputs, .keycode = KC_W}, {.keys = inputs, .keycode = KC_W}};
+static uint8_t combo_flags[2];
+uint16_t noah_effective_combo_count(void) { return 2; }
+combo_t *noah_effective_combo_get(uint16_t index) { return index < 2 ? &combos[index] : NULL; }
+uint8_t noah_effective_combo_flags(uint16_t index) { return index < 2 ? combo_flags[index] : 0; }
 static bool     combo_enabled[2]       = {true, true};
 static uint32_t combo_layers[2]        = {UINT32_MAX, UINT32_MAX};
 bool            noah_effective_combo_enabled(uint16_t index) {
@@ -38,6 +46,8 @@ uint32_t noah_effective_combo_allowed_layers(uint16_t index) {
 }
 
 static void defaults(void) {
+    combo_output_behaviors = true;
+    memset(combo_flags, 0, sizeof(combo_flags));
     memset(scalars, 0, sizeof(scalars));
     memset(records, 0, sizeof(records));
     scalars[NOAH_SETTING_BEHAVIORS_ENABLED] = 1u;
@@ -124,6 +134,32 @@ static void test_generated_outputs(void) {
     assert(!noah_participation_behavior_generated(KC_W, 1));
 }
 
+static void test_combo_output_permissions(void) {
+    defaults();
+    assert(noah_participation_combo_output(0, KC_W, 2));
+    combo_flags[1] = NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+    assert(noah_participation_combo_output(0, KC_W, 2));
+    assert(!noah_participation_combo_output(1, KC_W, 2));
+    assert(!noah_participation_combo_output(UINT16_MAX, KC_W, 2));
+    assert(noah_participation_behavior(KC_W, 2, A));
+    assert(noah_participation_combo_row(1, 2));
+    combo_output_behaviors = false;
+    assert(!noah_participation_combo_output(0, KC_W, 2));
+    assert(noah_participation_behavior(KC_W, 2, A));
+    assert(noah_participation_combo_row(0, 2));
+    defaults();
+    scalars[NOAH_SETTING_LAYER_BEHAVIORS] = 0;
+    assert(noah_participation_combo_output(0, KC_W, 2));
+    w_row.allowed_layers = 1u << 1;
+    assert(!noah_participation_combo_output(0, KC_W, 2));
+    assert(noah_participation_combo_output(0, KC_W, 1));
+    w_row.flags = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_DISABLED;
+    assert(!noah_participation_combo_output(0, KC_W, 1));
+    defaults();
+    scalars[NOAH_SETTING_BEHAVIORS_ENABLED] = 0;
+    assert(!noah_participation_combo_output(0, KC_W, 1));
+}
+
 static void test_combo_rows(void) {
     defaults();
     combo_enabled[1] = false;
@@ -159,6 +195,7 @@ int main(void) {
     test_master_and_definition();
     test_placement();
     test_generated_outputs();
+    test_combo_output_permissions();
     test_combo_rows();
     test_record_context_is_immutable();
     puts("participation policy host tests passed");

@@ -23,7 +23,9 @@ any C and you don't reflash.
   [guide](docs/GUIDE.md#text-macros-and-your-keyboard-layout).
 - **Keys that do more than one thing.** Each key can do something different on
   tap, hold and longer hold, and again on double, triple or up to quintuple
-  tap, each with its own timing. Combos can use the same behaviours.
+  tap, each with its own timing. Combos can use the same behaviours or send
+  their normal action, independently per combo or for all combo outputs
+  (requires supporting Ark controls).
 - **A trackball that changes roles.** Thirty-two pointing-mode slots turn the ball
   into scrolling, volume, brightness, zoom, arrow keys, mouse-button clicks, macros or
   your own shortcuts, held or locked. A pointer layer comes up by itself when you move the ball,

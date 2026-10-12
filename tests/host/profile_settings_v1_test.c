@@ -90,7 +90,12 @@ static void test_header_and_versions(void) {
     for (uint8_t at = 1; at < NOAH_SETTINGS_HEADER_SIZE; at++) {
         defaults();
         bytes[at]++;
-        assert(!valid());
+        assert(valid() == (at == NOAH_SETTINGS_FLAGS_OFFSET));
+    }
+    for (unsigned flags = 0; flags <= 255; flags++) {
+        defaults();
+        bytes[NOAH_SETTINGS_FLAGS_OFFSET] = flags;
+        assert(valid() == (flags <= NOAH_SETTINGS_KNOWN_FLAGS));
     }
     // The bank is the firmware's sixteen layers.
     defaults();
@@ -219,6 +224,7 @@ static void test_names(void) {
 }
 static void test_publication(void) {
     defaults();
+    bytes[NOAH_SETTINGS_FLAGS_OFFSET] = NOAH_SETTINGS_FLAG_COMBO_OUTPUT_BYPASS;
     put_name(NOAH_SETTINGS_LAYERS + 5, "\xc3\x89t\xc3\xa9", 5);
     put_name(0, "Base", 4);
     bytes[layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE)] = 2;
@@ -227,6 +233,7 @@ static void test_publication(void) {
     noah_effective_profile_snapshot_t view = settings_view();
     noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
     assert(applied == 1 && noah_effective_settings_length() == length);
+    assert(!noah_setting_combo_output_behaviors());
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 200);
     assert(noah_setting(NOAH_SETTING_LAYER_COMBOS, 0) == 0xffff);
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE) == 2);
@@ -248,6 +255,7 @@ static void test_publication(void) {
     noah_effective_settings_invalidate(NULL, 3, view.identity, view.identity, &view);
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 99);
     assert(!noah_effective_settings_length() && !noah_effective_settings_byte(0));
+    assert(noah_setting_combo_output_behaviors());
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE) == 0xA5u);
     // The largest domain publishes whole.
     named(NOAH_SETTINGS_NAME_MAX, 'z');

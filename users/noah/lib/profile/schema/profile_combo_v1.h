@@ -20,13 +20,15 @@ enum {
     NOAH_PROFILE_COMBO_VERSION           = NOAH_PROFILE_DOMAIN_VERSION_COMBOS,
 };
 // Row flags: bit 0 must hold, 1 must tap (not both), 2 press in order,
-// 3 disabled. A disabled combo keeps its inputs, output and window.
+// 3 disabled, 4 bypass output behaviour (feature bit 30). A disabled combo
+// keeps its inputs, output and window; a bypassed one still fires.
 enum {
     NOAH_PROFILE_COMBO_V3_FLAG_MUST_HOLD     = 1u << 0,
     NOAH_PROFILE_COMBO_V3_FLAG_MUST_TAP      = 1u << 1,
     NOAH_PROFILE_COMBO_V3_FLAG_PRESS_IN_ORDER = 1u << 2,
     NOAH_PROFILE_COMBO_V3_FLAG_DISABLED      = 1u << 3,
-    NOAH_PROFILE_COMBO_V3_KNOWN_FLAGS        = 0x0fu,
+    NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS = 1u << 4,
+    NOAH_PROFILE_COMBO_V3_KNOWN_FLAGS        = 0x1fu,
 };
 typedef struct {
     uint8_t  row_count;

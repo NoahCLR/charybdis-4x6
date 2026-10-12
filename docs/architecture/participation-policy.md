@@ -143,14 +143,64 @@ behaviour step's synthetic record keep their existing dispatch and ownership
 contracts and have no physical placement, so no placement bit applies to
 them.
 
-A custom key emitted by a combo still observes the behaviour master and its
+### Combo output behaviour permission
+
+Chord admission and output dispatch are independent. A combo can fire while
+bypassing its output keycode's shared behaviour. The global **Combo outputs
+use behaviours** switch and the per-combo **Use output behaviour** switch
+both default on. An output uses its shared behaviour only when all of these
+allow it:
+
+1. the behaviour master;
+2. the combo-output behaviour master;
+3. that combo's output behaviour switch;
+4. the output behaviour definition's enable and allowed-origin-layer mask.
+
+The layer behaviour switch and physical placement bypass bits do not apply.
+The combo master, layer combo switches and the combo's chord allowed-layer
+mask still govern whether the chord fires; disabling output behaviour changes
+none of them. A veto sends an ordinary keycode's normal action, with its native
+tap-hold timing and modifier/layer/pointing ownership. A custom key has no
+native action and produces nothing. Other combos with the same output, and
+physical placements of that output, keep their own permissions.
+
+The origin layer remains the captured source layer of the last declared
+input, regardless of press order. With layer 3 active and transparent at that
+input, a key supplied by layer 1 uses the output definition's layer-1 bit.
+If another member came from layer 2, its layer controls chord admission but
+does not replace layer 1 as the output context. Remapping the chord to match
+reference layer 0 also leaves layer 1 as the output context.
+
+The completed chord snapshots the permission together with its origin,
+before QMK can queue its generated output behind native tapping. QMK can
+enqueue an output without asking its tap classification until later, so
+classification alone is too late to take this snapshot. The generated press
+record carries the decision through tapping and admission, and the pending
+completion and active owner retain it for release. Changing either switch,
+the definition or active layers cannot reclassify an already completed
+output or lose its matching release. Suppressed completions discard their
+snapshots. If origin reconstruction is unresolved, dispatch conservatively
+bypasses behaviour whenever any combo definition sharing that output bypasses
+it; it never borrows another definition's permission.
+
+Capability feature bit 30 advertises this extension. The stored switches are
+inverted: settings v6 header byte 5 bit 0 bypasses all combo output behaviours;
+combo v3 row flag bit 4 bypasses that row's output behaviour. Zero preserves
+existing profiles, compiled defaults and translated older backups, without a
+domain-version or action-ABI change. Older firmware rejects either new bit.
+Clients must require bit 30 before writing the extension, preserve the flags
+through unrelated edits, and refuse a downgrade that would erase a bypass.
+Native combo readback v3 reports the row bypass as flag bit 5; settings
+readback carries its header byte unchanged.
+
+A key emitted by a combo still observes the behaviour master and its
 row's enable. Its allowed-layer context is the combo's **origin layer**: the
 source layer captured from the chord's representative owner press, the same owner key
 the combo-origin tracker already chooses for release matching and feedback.
 A chord whose members came from different source layers therefore uses its
 owner press's layer, never a union or intersection of the others. The origin
 tracker retains that layer through delayed output delivery. Generated permission
-is captured before native tapping and admission queues; origin normalization remains at dispatch
+is captured with completion before native tapping and admission queues; origin normalization remains at dispatch
 and does not consume a pending origin merely to classify tapping.
 
 Origin reconstruction uses only occurrences eligible for that combo: the

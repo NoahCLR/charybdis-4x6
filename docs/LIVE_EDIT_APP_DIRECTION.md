@@ -45,6 +45,9 @@ Physical host acceptance of each layout and entry method is pending.
 Pointing outputs can start VIA macros from directions, diagonals and button
 tap overrides (D-F23), with inherited modifiers and busy triggers dropped.
 
+Combo outputs can bypass their shared behaviours globally or per combo
+(D-F24), independently of chord admission; both switches default on.
+
 Firmware work remaining before the product is complete:
 
 - physical interruption acceptance at every durable boundary;
@@ -74,6 +77,13 @@ preserving exact full-bank bytes and identity (D-F21). Hardware read timing and
 input cadence remain unmeasured for this path.
 
 ## Open Issues
+
+- **Combo output permissions need an Ark follow-up and hardware acceptance
+  (D-F24).** Ark must adopt capability bit 30, settings header flags and combo
+  output flags before reading this firmware. Add both editor controls,
+  backup/restore gating, reachability and compatibility coverage after the
+  firmware contract lands. Then try shared outputs with opposite permissions,
+  global bypass and held releases on both halves.
 
 - **Pointing-mode macros need hardware acceptance (D-F23).** Run delayed and
   mouse-click macros from directions under both output policies and from a
@@ -1273,3 +1283,20 @@ motion budget. Mouse clicks in a macro use the existing owned leases and bypass
 mode overrides. The [PD contract](architecture/pd-mode-domain-v1.md#taps-modifiers-and-buttons)
 owns the full rules. Ark must adopt bit 29, the tap vocabulary and fixture;
 older Ark rejects unknown capability bits before reading this firmware.
+
+## D-F24 — Combo output behaviour permission is separate from chord admission
+
+A global combo-output behaviour switch and one per combo determine whether a
+completed chord uses its output keycode's shared behaviour or its normal
+action. Both default on; the existing behaviour master and output definition
+remain vetoes. The definition checks the representative owner's captured
+origin layer. Physical layer behaviour switches and placement bits remain
+physical-only, and no independent combo output layer mask is added.
+
+The governing [participation policy](architecture/participation-policy.md#combo-output-behaviour-permission)
+defines completion snapshots, queued delivery, release ownership and the
+no-native-action consequence for custom keys. Feature bit 30 advertises
+reserved-bit extensions in settings v6 and combo v3, preserving existing
+profile bytes, domain versions and action ABI. Ark must adopt the capability,
+codecs, editor, backup translation and reachability model after this firmware
+lands; current Ark rejects unknown capability bits.

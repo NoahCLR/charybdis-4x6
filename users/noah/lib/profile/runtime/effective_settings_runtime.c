@@ -33,6 +33,9 @@ uint16_t noah_effective_settings_length(void) {
 uint8_t noah_effective_settings_byte(uint16_t offset) {
     return offset < settings_length ? settings[offset] : 0u;
 }
+bool noah_setting_combo_output_behaviors(void) {
+    return !(noah_effective_settings_byte(NOAH_SETTINGS_FLAGS_OFFSET) & NOAH_SETTINGS_FLAG_COMBO_OUTPUT_BYPASS);
+}
 void noah_effective_settings_invalidate(void *context, uint32_t publication, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *view) {
     bool apply = view && (view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS) && active.kind != NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
     if (view && !(view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS) && context) view = context;

@@ -5,6 +5,7 @@
 #include "users/noah/lib/profile/runtime/effective_combo_runtime.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 #include "users/noah/lib/compat/qmk_combo_readback.h"
+#include "users/noah/lib/compat/qmk_effective_combos.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "profile_test_blob.h"
 
@@ -63,7 +64,7 @@ static unsigned nibble(char value) {
     return value <= '9' ? (unsigned)(value - '0') : (unsigned)(value - 'a' + 10);
 }
 int main(int argc, char **argv) {
-    assert(argc == 2);
+    assert(argc == 3);
     FILE *fixture = fopen(argv[1], "r");
     assert(fixture);
     char encoded[129];
@@ -189,6 +190,19 @@ int main(int argc, char **argv) {
     v2_report[4] = 4;
     memset(&v2_report[5], 0, 27);
     assert(noah_qmk_combo_readback_get(v2_report, 32) && v2_report[11] == 45 && v2_report[13] == 6);
+    // Two rows sharing an output retain independent permissions and readback.
+    FILE *permissions = fopen(argv[2], "r");
+    assert(permissions && fscanf(permissions, "%128s", encoded) == 1);
+    fclose(permissions);
+    assert(strlen(encoded) == 2u * sizeof(v3));
+    for (size_t i = 0; i < sizeof(v3); i++)
+        bytes[i] = (uint8_t)((nibble(encoded[2 * i]) << 4) | nibble(encoded[2 * i + 1]));
+    noah_effective_combo_runtime_invalidate(&runtime, 6, second_view.identity, second_view.identity, &second_view);
+    assert(combo_get(0)->keycode == combo_get(1)->keycode);
+    assert(noah_qmk_combo_output_behavior(0) && !noah_qmk_combo_output_behavior(1));
+    assert(noah_effective_combo_enabled(1) && get_combo_must_tap(1, combo_get(1)));
+    uint8_t bypass_report[32] = {8, 0, 6, 1, 4};
+    assert(noah_qmk_combo_readback_get(bypass_report, 32) && bypass_report[5] == 0 && bypass_report[13] == (6 | 32));
     // An empty version 2 table still carries both combo-wide values.
     bytes[0]                          = 0;
     second_view = combo_view(8);

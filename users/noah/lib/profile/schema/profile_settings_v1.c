@@ -76,7 +76,7 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
     uint16_t offset = s->offset++;
     if (offset < NOAH_SETTINGS_HEADER_SIZE) {
         static const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
-        return b == header[offset];
+        return offset == NOAH_SETTINGS_FLAGS_OFFSET ? !(b & (uint8_t)~NOAH_SETTINGS_KNOWN_FLAGS) : b == header[offset];
     }
     if (offset < NOAH_SETTINGS_LAYER_RECORDS_OFFSET) {
         uint8_t id = (offset - NOAH_SETTINGS_SCALARS_OFFSET) / 4, part = (offset - NOAH_SETTINGS_SCALARS_OFFSET) % 4;

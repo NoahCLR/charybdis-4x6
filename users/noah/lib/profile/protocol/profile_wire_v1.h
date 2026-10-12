@@ -86,6 +86,8 @@ enum {
     NOAH_PROFILE_FEATURE_POINTING_CLICKS = 1u << 28,
     // Pointing-mode taps may start VIA macros 0-127, with inherited modifiers.
     NOAH_PROFILE_FEATURE_POINTING_MACROS = 1u << 29,
+    // Global and per-combo permission to use the output's shared behaviour.
+    NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS = 1u << 30,
 };
 
 // A wide-page request: [command, channel, value, request id, page low, page

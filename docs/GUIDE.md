@@ -63,6 +63,24 @@ held modifiers (Ignore and Exact cannot cover playback across scans). A mouse
 click inside the macro bypasses the mode's button overrides and reaches the
 host through the existing owned-output ledger.
 
+## Combo outputs and shared behaviours
+
+A combo can use its output keycode's shared behaviour or take that keycode's
+normal action. **Use output behaviour** controls one combo; **Combo outputs
+use behaviours** controls all combo outputs while leaving physical-key
+behaviours eligible. Both start on, and the existing behaviour master remains
+a veto. Disabling the combo itself still stops the chord entirely.
+
+An ordinary keycode keeps its normal action when bypassed. A custom key has
+no native action, so bypassing it produces nothing. Output permission uses the
+output behaviour's allowed-layer mask on the last declared input's captured
+source layer; the layer behaviour switch remains physical-only. An output
+already completed keeps its decision through queued delivery and release.
+
+These firmware controls require an Ark version that adopts capability bit 30.
+The app editor follow-up remains pending; the current app rejects the new
+capability bit. Existing profile flags are zero and retain previous behaviour.
+
 ## Authoring the profile in C
 
 Edit compiled defaults directly in `keymap.c`, `config.h`, and `rgb_config.c`

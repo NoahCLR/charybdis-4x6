@@ -76,7 +76,7 @@ bool noah_record_admission_admit(keyrecord_t *record) {
 
     if (record->event.type == COMBO_EVENT && !noah_participation_record_generated_captured(record)) {
         uint16_t keycode = get_record_keycode(record, false);
-        noah_participation_record_generated(record, keycode, noah_qmk_combo_origin_record_source_layer(keycode, record));
+        noah_qmk_combo_origin_capture_record(keycode, record);
     }
 
     if (!record->event.pressed) {

@@ -13,6 +13,10 @@
 enum {
     NOAH_SETTINGS_VERSION              = NOAH_PROFILE_SETTINGS_VERSION,
     NOAH_SETTINGS_HEADER_SIZE          = 8,
+    // Feature bit 30 uses header byte 5; zero retains generated behaviours.
+    NOAH_SETTINGS_FLAGS_OFFSET         = 5,
+    NOAH_SETTINGS_FLAG_COMBO_OUTPUT_BYPASS = 1u << 0,
+    NOAH_SETTINGS_KNOWN_FLAGS          = NOAH_SETTINGS_FLAG_COMBO_OUTPUT_BYPASS,
     NOAH_SETTINGS_COUNT                = 31,
     NOAH_SETTINGS_LAYERS               = 16,
     NOAH_SETTINGS_MACRO_NAMES          = 128,

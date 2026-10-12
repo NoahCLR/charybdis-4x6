@@ -24,6 +24,9 @@ bool noah_participation_behavior(uint16_t keycode, uint8_t source_layer, keypos_
 // A custom key a combo emits has no placement: the master and the row's
 // enable decide, with the combo's origin layer as its layer context.
 bool noah_participation_behavior_generated(uint16_t keycode, uint8_t origin_layer);
+// Chord admission is separate. UINT16_MAX means an unresolved combo origin;
+// then every definition with this output must allow behaviour dispatch.
+bool noah_participation_combo_output(uint16_t combo_index, uint16_t keycode, uint8_t origin_layer);
 // A physical press's own combo permission: its source layer's combo switch and
 // its placement's exclusion bit. Decided at the press and kept for its release.
 bool noah_participation_combo_press(uint8_t source_layer, keypos_t key_pos);
@@ -54,6 +57,7 @@ bool noah_participation_record_combo(const keyrecord_t *record);
 uint8_t noah_participation_record_source(const keyrecord_t *record);
 bool noah_participation_record_generated_captured(const keyrecord_t *record);
 void noah_participation_record_generated(keyrecord_t *record, uint16_t keycode, uint8_t origin_layer);
+void noah_participation_record_generated_permission(keyrecord_t *record, uint8_t origin_layer, bool behavior);
 
 bool noah_participation_record_generated_normalized(const keyrecord_t *record);
 void noah_participation_record_generated_normalize(keyrecord_t *record, uint16_t keycode, uint8_t origin_layer);

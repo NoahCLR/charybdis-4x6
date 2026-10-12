@@ -304,6 +304,7 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
         assert(noah_profile_action_runtime_v1_to_native(&row.output, &output) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
         assert(noah_effective_combo_get(i)->keycode == output);
         assert(noah_effective_combo_allowed_layers(i) == row.allowed_layers);
+        assert(noah_effective_combo_flags(i) == row.flags);
         for (uint8_t j = 0; j < row.input_count; j++) {
             uint16_t input;
             assert(noah_profile_action_runtime_v1_to_native(&row.inputs[j], &input) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
@@ -579,15 +580,27 @@ int main(int argc, char **argv) {
                 }
             assert(found && domains[i].version == shape->version);
         }
+        // The imported case also saves the two output behaviour controls.
+        // Original zero flags continue to run unchanged in the defaults case.
+        if (use_imported) {
+            for (size_t i = 0; i < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; i++) {
+                if (domains[i].id == NOAH_PROFILE_DOMAIN_V1_SETTINGS)
+                    imported[(size_t)(domains[i].payload - imported) + NOAH_SETTINGS_FLAGS_OFFSET] |= NOAH_SETTINGS_FLAG_COMBO_OUTPUT_BYPASS;
+                if (domains[i].id == NOAH_PROFILE_DOMAIN_V1_COMBOS && domains[i].payload[0])
+                    imported[(size_t)(domains[i].payload - imported) + 8 + 1] |= NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+            }
+        }
         size_t length;
         assert(noah_profile_blob_v1_encode(domains, NOAH_PROFILE_DOMAIN_REGISTRY_COUNT, candidate, sizeof(candidate), &length, NULL) == NOAH_PROFILE_CODEC_V1_OK);
         assert(noah_profile_blob_v1_decode(candidate, length, &expected, NULL) == NOAH_PROFILE_CODEC_V1_OK);
         save(length);
         assert(owner.store.committed.via_generation == 6 && owner.store.committed.via_digest == 0xabcdef01u);
         assert_published(candidate, &expected, 1);
+        assert(noah_setting_combo_output_behaviors() == !use_imported);
         reboot();
         until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);
         assert(via_boots == 1 && settings_applies == 2);
+        assert(noah_setting_combo_output_behaviors() == !use_imported);
         assert_published(candidate, &expected, 1);
         puts(use_imported ? "all current domains: populated imported combos/settings saved, booted and published through the owner" : "all current domains: complete compiled defaults saved, booted and published through the owner");
         uninstall();

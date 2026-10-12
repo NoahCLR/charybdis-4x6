@@ -121,6 +121,10 @@ static uint32_t      gesture_live_row_layers;
 static uint32_t      gesture_combo_layers = UINT32_MAX;
 static uint32_t      gesture_row_layers[12];
 static uint64_t      gesture_excluded[LAYER_COUNT];
+static bool gesture_combo_output_behaviors = true;
+static uint8_t gesture_combo_flags[12];
+bool noah_setting_combo_output_behaviors(void) { return gesture_combo_output_behaviors; }
+uint8_t noah_effective_combo_flags(uint16_t index) { return gesture_combo_flags[index]; }
 uint32_t noah_setting(uint8_t id, uint32_t fallback) {
     return id == NOAH_SETTING_LAYER_COMBOS ? gesture_combo_layers : fallback;
 }
@@ -424,6 +428,8 @@ static void test_reset_state(void) {
     gesture_live_row        = false;
     gesture_live_row_layers = 1u << 3;
     gesture_combo_layers = UINT32_MAX;
+    gesture_combo_output_behaviors = true;
+    memset(gesture_combo_flags, 0, sizeof(gesture_combo_flags));
     for (uint8_t i = 0; i < ARRAY_SIZE(gesture_row_layers); i++) gesture_row_layers[i] = UINT32_MAX;
     memset(gesture_excluded, 0, sizeof(gesture_excluded));
 #endif
@@ -2711,6 +2717,86 @@ static void test_qmk_generated_custom_uses_owner_layer(void) {
     gesture_engine_combo_output_set(0, original);
     gesture_live_row = false;
 }
+// The real QMK chord/tapping path: bypass is independent of admission, and
+// changing either permission after classification cannot change that output.
+static void test_qmk_combo_output_permissions(void) {
+    uint16_t original = gesture_engine_combo_output(0);
+    for (unsigned global = 0; global < 2; global++)
+    for (unsigned per_combo = 0; per_combo < 2; per_combo++)
+    for (unsigned delayed = 0; delayed < 2; delayed++) {
+        test_reset_state(); fake_time = 10000;
+        gesture_out_count = gesture_combo_output_count = 0;
+        gesture_live_row = true;
+        gesture_source_layers[4][2] = 3;
+        gesture_combo_output_behaviors = global;
+        gesture_combo_flags[0] = per_combo ? 0 : NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        gesture_engine_combo_output_set(0, TEST_HANDLED_TAP_KEY);
+        if (delayed) { gesture_at(4,4,true); gesture_advance(10); }
+        gesture_at(4,0,true); gesture_advance(5); gesture_at(4,2,true); gesture_advance(60);
+        CHECK(delayed ? gesture_combo_output_count == 0 : gesture_combo_output_count == 1);
+        gesture_combo_output_behaviors = !global;
+        gesture_combo_flags[0] ^= NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        gesture_source_layers[4][2] = 0;
+        gesture_at(4,2,false); gesture_at(4,0,false);
+        if (delayed) gesture_at(4,4,false);
+        gesture_advance(500);
+        CHECK(gesture_combo_output_count == 1);
+        if (gesture_tap_count(KC_J) != (global && per_combo ? 1u : 0u)) fprintf(stderr, "combo output: global=%u row=%u delayed=%u taps=%u\n", global, per_combo, delayed, gesture_tap_count(KC_J));
+        CHECK(gesture_tap_count(KC_J) == (global && per_combo ? 1u : 0u));
+        CHECK(noah_runtime_debug_active_slot_count() == 0);
+        CHECK(noah_record_admission_held_count() == 0);
+    }
+    // Both chords emit the same custom key, with opposite permissions,
+    // while a native hold keeps their presses and releases in QMK's queue.
+    uint16_t alpha_output = gesture_engine_combo_output(7), mouse_output = gesture_engine_combo_output(8);
+    gesture_engine_combo_output_set(7, TEST_HANDLED_TAP_KEY);
+    gesture_engine_combo_output_set(8, TEST_HANDLED_TAP_KEY);
+    for (unsigned reversed = 0; reversed < 2; reversed++) {
+        test_reset_state(); fake_time = 18000;
+        gesture_out_count = gesture_combo_output_count = 0;
+        gesture_live_row = true;
+        gesture_source_layers[5][0] = gesture_source_layers[5][5] = 3;
+        gesture_combo_flags[7] = reversed ? 0 : NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        gesture_combo_flags[8] = reversed ? NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS : 0;
+        gesture_at(4,4,true); gesture_advance(5);
+        gesture_at(5,2,true); gesture_at(5,0,true); gesture_advance(110);
+        gesture_at(4,1,true); gesture_at(5,5,true); gesture_advance(55);
+        CHECK(gesture_combo_output_count == 0);
+        gesture_combo_output_behaviors = false;
+        gesture_at(5,0,false); gesture_at(5,2,false);
+        gesture_at(5,5,false); gesture_at(4,1,false);
+        gesture_at(4,4,false); gesture_advance(500);
+        CHECK(gesture_combo_output_count == 2);
+        CHECK(gesture_tap_count(KC_J) == 1);
+        CHECK(noah_runtime_debug_active_slot_count() == 0);
+        CHECK(noah_record_admission_held_count() == 0);
+    }
+    gesture_engine_combo_output_set(7, alpha_output);
+    gesture_engine_combo_output_set(8, mouse_output);
+    // An authored LT output becomes native again when bypassed. Its tapping
+    // clock is QMK's 200 ms rather than the authored 100 ms hold threshold.
+    gesture_engine_combo_output_set(0, LT(TEST_LAYER_NAV, KC_B));
+    for (unsigned allowed = 0; allowed < 2; allowed++) {
+        test_reset_state(); fake_time = 20000; gesture_combo_output_count = 0;
+        gesture_combo_flags[0] = allowed ? 0 : NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        gesture_at(4,0,true); gesture_advance(5); gesture_at(4,2,true); gesture_advance(160);
+        CHECK(layer_state_cmp(layer_state, TEST_LAYER_NAV) == (bool)allowed);
+        CHECK(gesture_combo_output_count == allowed);
+        gesture_advance(120);
+        // The harness observes delivery/classification; it does not execute
+        // QMK's action dispatcher for an unhandled native LT.
+        CHECK(gesture_combo_output_count == 1);
+        CHECK(allowed ? layer_state_cmp(layer_state, TEST_LAYER_NAV) : gesture_delivered_taps == 0);
+        gesture_combo_output_behaviors = false;
+        gesture_combo_flags[0] ^= NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        gesture_at(4,2,false); gesture_at(4,0,false); gesture_advance(500);
+        CHECK(!layer_state_cmp(layer_state, TEST_LAYER_NAV));
+        CHECK(noah_runtime_debug_active_slot_count() == 0);
+    }
+    gesture_engine_combo_output_set(0, original);
+    gesture_live_row = false;
+}
+
 static void test_qmk_excluded_duplicate_preserves_chord(void) {
     test_reset_state(); fake_time = 10000; gesture_out_count = 0; gesture_second_code = KC_D;
     gesture_at(5, 6, true); gesture_advance(5); gesture_at(5, 7, true); gesture_advance(250);
@@ -3757,7 +3843,8 @@ int main(int argc, char **argv) {
 #ifdef NOAH_TEST_QMK_GESTURES
     const char *regression = getenv("NOAH_GESTURE_REGRESSION");
     if (regression) {
-        if (strcmp(regression, "generated") == 0) test_qmk_generated_custom_uses_owner_layer();
+        if (strcmp(regression, "combo-output") == 0) test_qmk_combo_output_permissions();
+        else if (strcmp(regression, "generated") == 0) test_qmk_generated_custom_uses_owner_layer();
         else if (strcmp(regression, "duplicate") == 0) test_qmk_excluded_duplicate_preserves_chord();
         else if (strcmp(regression, "queued") == 0) test_qmk_queued_participation_is_per_press();
         else if (strcmp(regression, "rules") == 0) test_qmk_sixteen_member_matching_rules();
@@ -3772,6 +3859,7 @@ int main(int argc, char **argv) {
         else CHECK(false);
         return 0;
     }
+    test_qmk_combo_output_permissions();
     test_qmk_generated_custom_uses_owner_layer();
     test_qmk_excluded_duplicate_preserves_chord();
     test_qmk_queued_participation_is_per_press();
