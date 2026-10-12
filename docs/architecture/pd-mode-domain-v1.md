@@ -28,7 +28,7 @@ and restore preserve them without the repository.
   modifier and mouse-button policies cover Arrow and Pinch. No behavior depends
   on a slot's name.
 
-Out of scope: scripts or C hooks, macro programs as motion outputs, layer or
+Out of scope: scripts or C hooks, layer or
 mode changes emitted by motion, simultaneous modes, new gesture engines,
 foreground-app switching and volatile device preview.
 
@@ -255,8 +255,12 @@ The allowlist is tied to the audited QMK 0.0.8 native ABI:
   client writes them only to a keyboard that sets it. Older firmware rejects
   them as `INVALID_ACTION`, so the domain version is unchanged.
 
+- VIA macro triggers: plain `0x7700..0x777f`, slots 0–127 (D-F23). Feature
+  bit 29 advertises them. Their modifier policy must be inherit and their mask
+  zero; older firmware rejects them as `INVALID_ACTION` without a version change.
+
 Standalone modifiers, mouse movement, wheel and acceleration, modified mouse
-codes, layer/PD controls, macro triggers and custom/control keycodes are
+codes, layer/PD controls and custom/control keycodes are
 rejected. Modified consumer/system codes are not part of this vocabulary. This
 prevents recursive activation and unbalanced holds through motion outputs. The
 engine must still dispatch through existing owned-output helpers and apply the
@@ -275,6 +279,19 @@ modifiers return 8 ms after the button is up, because the mouse endpoint drains
 apart from the keyboard's. QMK sends a button's report at once from the report
 the pointing task is building, which still holds that poll's motion; a click
 from motion clears that motion first, so it cannot move the held-still cursor.
+
+A macro starts through the existing VIA provider and runs across scans. A start
+counts as one output and spends a once-per-movement movement only if playback
+actually starts. Empty, invalid/unplayable or busy slots send nothing and leave
+it unspent. Every attempted direction still consumes the existing per-report
+budget and its threshold motion; refused triggers are not queued. Every step
+is allowed, with busy triggers dropped. Empty-direction policies use the
+stored tap presence, as for other taps: an empty macro is a defined output
+that currently sends nothing, not an absent direction. Pending fallback holds
+settle before a macro start, and playback inherits the held modifiers; the
+macro's own protection policy still applies. A mouse key inside the macro uses
+an owned lease directly, bypassing the active mode's button overrides and the
+clicked button's behaviour. It never releases another owner's held button.
 
 A button record is `kind:u8, modifiers:u8, tap:4 bytes`. Pass-through `0` and
 consume `1` require five zero payload bytes. Tap `2` requires modifiers zero
@@ -311,7 +328,8 @@ disabled slots in version 1, with independently packed golden bytes.
 domain, the presets (the firmware's compiled domain, checked against the
 golden compiled profile), a gap with a named disabled slot 31, all 32 slots
 (4,104 bytes), a 32-byte multibyte name, mouse-button clicks under each
-modifier policy, and rejections with their codes and payload offsets
+modifier policy, macro triggers at both ends of the range, and rejections with
+their codes and payload offsets
 (noncanonical record, unordered, repeated and out-of-range IDs, count/length
 mismatches, header and reserved bytes including version 2's name field, a
 version-2 payload, over-long, malformed, control-character, cut-sequence and
@@ -464,3 +482,9 @@ profile digest and both-half state for each case:
    and once per movement; held modifiers under each policy; a physical button
    held while a mode clicks it; the cursor staying still. Record the events the
    host actually receives; do not infer Back or Forward from a button number.
+
+9. VIA macro outputs (D-F23): delayed and mouse-click macros from straight and
+   diagonal motion, Once per movement and Every step, and physical button tap
+   overrides. Confirm triggers while busy are dropped, empty macros leave a
+   movement unspent, held modifiers follow inherited playback and mouse clicks
+   reach the host without invoking mode overrides.

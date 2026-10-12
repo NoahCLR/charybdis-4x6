@@ -4,6 +4,8 @@
 #include "pd_mode_handler_common.h"
 #include "pd_mode_handlers.h"
 #include "../../compat/qmk_pointing_contract.h"
+#include "../../compat/qmk_via_playback_contract.h"
+#include "../../key/runtime/api.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
 #include "../../profile/schema/profile_pd_v1.h"
@@ -32,6 +34,11 @@ static void owned_modifiers(uint8_t mask, bool pressed) {
 static bool emit_tap(const uint8_t *tap) {
     uint16_t key = u16(tap);
     if (!key) return false;
+    if (IS_QK_MACRO(key)) {
+        // Playback continues across scans, so only inherited modifiers apply.
+        (void)noah_key_runtime_settle_pending_fallback_hold();
+        return noah_qmk_contract_start_via_macro(key);
+    }
     if (IS_MOUSEKEY_BUTTON(key)) {
         noah_qmk_contract_pointer_drop_pending_motion();
         noah_emit_owned_click(key, tap[2] == 1u ? tap[3] : 0u, tap[2] == 2u);

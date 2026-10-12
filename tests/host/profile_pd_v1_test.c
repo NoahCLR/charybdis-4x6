@@ -267,6 +267,27 @@ int main(int argc, char **argv) {
         memcpy(record + 44, rejected_mouse[i], 4);
         assert(noah_profile_pd_v1_validate_record(record, NOAH_PROFILE_PD_V1_RECORD_SIZE, 1, &error) == NOAH_PROFILE_PD_V1_INVALID_ACTION && error.offset == 44);
     }
+    // Macros 0-127 are accepted at every tap place, inherit only.
+    const noah_pd_config_t macros = {.id = 0, .name = "Macros", .kind = 1, .axis = NOAH_PD_AXIS_EIGHT, .threshold_x = 10, .threshold_y = 10};
+    const size_t places[] = {36, 40, 44, 48, 70, 74, 78, 82, 54, 60, 66};
+    for (size_t place = 0; place < sizeof(places) / sizeof(places[0]); place++) {
+        for (uint16_t key = 0x7700; key <= 0x777f; key++) {
+            noah_profile_pd_v1_encode_record(&macros, record);
+            size_t at = places[place];
+            if (at == 54 || at == 60 || at == 66) record[at - 2] = 2;
+            record[at] = (uint8_t)key; record[at + 1] = (uint8_t)(key >> 8);
+            assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_OK);
+            record[at + 2] = 1; record[at + 3] = 2;
+            assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_INVALID_ACTION);
+            record[at + 2] = 2; record[at + 3] = 0;
+            assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_INVALID_ACTION);
+            record[at + 2] = 0; record[at + 3] = 2;
+            assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_INVALID_ACTION);
+        }
+    }
+    assert(!noah_profile_pd_v1_tap_key_valid(0x76ff));
+    assert(!noah_profile_pd_v1_tap_key_valid(0x7780));
+    assert(!noah_profile_pd_v1_tap_key_valid(0x7f00));
     printf("PD domain: %zu version-3 vectors and %zu frozen cross-language record cases (%zu valid, %zu rejected) passed\n", v3_cases, count, accepted, rejected);
     return 0;
 }

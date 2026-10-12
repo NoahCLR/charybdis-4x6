@@ -32,4 +32,6 @@ static inline void noah_qmk_via_macro_get_buffer(uint16_t offset, uint16_t size,
 }
 #endif
 
+// Start result, for outputs whose once-per-movement accounting needs it.
+bool noah_qmk_contract_start_via_macro(uint16_t action);
 bool noah_qmk_contract_try_play_via_macro(uint16_t action);

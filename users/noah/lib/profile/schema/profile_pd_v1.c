@@ -53,6 +53,7 @@ bool noah_profile_pd_v1_tap_key_valid(uint16_t keycode) {
     // Plain mouse buttons 1-8 click (feature bit 28); movement, wheel and
     // acceleration stay out.
     if (keycode >= 0xd1 && keycode <= 0xd8) return true;
+    if (keycode >= 0x7700 && keycode <= 0x777f) return true; // VIA macros 0-127 (feature bit 29)
     uint8_t mods = (uint8_t)(keycode >> 8);
     uint8_t key  = (uint8_t)keycode;
     return mods <= 0x1f && (mods & 0x0f) != 0 && key >= 4 && key <= 0xa4;
@@ -62,6 +63,7 @@ static bool tap_valid(const uint8_t *p) {
     uint16_t key = u16(p);
     if (!key) return zero(p, 4);
     if (!noah_profile_pd_v1_tap_key_valid(key)) return false;
+    if (key >= 0x7700 && key <= 0x777f) return p[2] == 0 && p[3] == 0;
     return p[2] == 1 ? p[3] != 0 : (p[2] == 0 || p[2] == 2) && p[3] == 0;
 }
 

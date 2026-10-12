@@ -63,6 +63,16 @@ static report_mouse_t pending_report;
 static click_call_t   click_calls[TEST_MAX_CALLS];
 static uint8_t        click_call_count;
 
+static uint16_t macro_start_action;
+static uint8_t macro_start_count;
+static bool macro_start_result;
+
+bool noah_qmk_contract_start_via_macro(uint16_t action) {
+    macro_start_action = action;
+    macro_start_count++;
+    return macro_start_result;
+}
+
 static uint8_t fallback_hold_activation_count;
 static bool    fallback_hold_active;
 
@@ -101,6 +111,7 @@ static void test_clear_logs(void) {
     memset(literal_tap_calls, 0, sizeof(literal_tap_calls));
     memset(click_calls, 0, sizeof(click_calls));
     click_call_count = 0;
+    macro_start_count = 0;
     pending_report   = (report_mouse_t){0};
 }
 
@@ -1261,6 +1272,29 @@ static void test_configured_mouse_button_clicks(void) {
 }
 #endif
 
+static void test_configured_macro_start_accounting(void) {
+    uint8_t slot[96];
+    directional_slot(slot, NOAH_PD_AXIS_HORIZONTAL, 0, false);
+    memset(slot + 36, 0, 16);
+    slot[40] = 0x7f; slot[41] = 0x77; // right: last VIA macro
+    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    test_reset_stubs();
+    noah_pd_engine_enter(slot);
+    macro_start_result = false; // empty, busy or invalid: movement unspent
+    for (uint8_t i = 0; i < 2; i++) {
+        click_move(10, 0);
+        CHECK(macro_start_count == 1 && macro_start_action == 0x777f);
+        CHECK(synthetic_tap_call_count == 0 && literal_tap_call_count == 0);
+    }
+    macro_start_result = true;
+    click_move(10, 0);
+    CHECK(macro_start_count == 1);
+    CHECK(fallback_hold_activation_count == 1);
+    click_move(10, 0);
+    CHECK(macro_start_count == 0); // only an actual start spends the movement
+    noah_pd_engine_exit();
+}
+
 int main(void) {
     test_configured_release_ownership_and_custom_slot();
     test_configured_eight_directions();
@@ -1268,6 +1302,7 @@ int main(void) {
     test_configured_empty_directions_and_single_axes();
     test_configured_once_per_movement();
     test_configured_mouse_button_clicks();
+    test_configured_macro_start_accounting();
     test_configured_scroll_one_axis();
     test_dragscroll_horizontal_lock_filters_vertical_jitter();
     test_dragscroll_vertical_lock_filters_horizontal_jitter();

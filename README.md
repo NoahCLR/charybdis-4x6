@@ -25,7 +25,7 @@ any C and you don't reflash.
   tap, hold and longer hold, and again on double, triple or up to quintuple
   tap, each with its own timing. Combos can use the same behaviours.
 - **A trackball that changes roles.** Thirty-two pointing-mode slots turn the ball
-  into scrolling, volume, brightness, zoom, arrow keys, mouse-button clicks or
+  into scrolling, volume, brightness, zoom, arrow keys, mouse-button clicks, macros or
   your own shortcuts, held or locked. A pointer layer comes up by itself when you move the ball,
   and you can snipe for precise movement.
 - **Lights that tell you what is going on.** They show which layer and mode are

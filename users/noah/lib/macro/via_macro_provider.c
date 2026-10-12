@@ -102,7 +102,7 @@ static bool via_macro_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir, mac
     return macro_payload_decode_qmk_window(ir, cursor, via_macro_found.remaining, via_macro_provider_reader_read_byte, &reader);
 }
 
-bool via_macro_provider_try_play(uint16_t action) {
+bool via_macro_provider_start(uint16_t action) {
     macro_slot_provider_t provider = via_macro_provider;
 
     if (!IS_QK_MACRO(action)) {
@@ -110,7 +110,12 @@ bool via_macro_provider_try_play(uint16_t action) {
     }
 
     provider.load_ir = via_macro_provider_load_ir;
-    (void)macro_slot_provider_start(&provider, via_macro_slots, (uint8_t)(action - QK_MACRO), MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, DYNAMIC_KEYMAP_MACRO_DELAY, MACRO_PAYLOAD_SOURCE_VIA);
+    return macro_slot_provider_start(&provider, via_macro_slots, (uint8_t)(action - QK_MACRO), MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, DYNAMIC_KEYMAP_MACRO_DELAY, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED;
+}
+
+bool via_macro_provider_try_play(uint16_t action) {
+    if (!IS_QK_MACRO(action)) return false;
+    (void)via_macro_provider_start(action);
     return true;
 }
 

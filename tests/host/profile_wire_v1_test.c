@@ -219,6 +219,7 @@ int main(int argc, char **argv) {
     assert(NOAH_PROFILE_FEATURE_MACRO_OUTPUT_ISOLATION == (1u << 26));
     assert(NOAH_PROFILE_FEATURE_STREAMING_MACROS == (1u << 27));
     assert(NOAH_PROFILE_FEATURE_POINTING_CLICKS == (1u << 28));
+    assert(NOAH_PROFILE_FEATURE_POINTING_MACROS == (1u << 29));
     assert(NOAH_PROFILE_FEATURE_CANDIDATE_REUSE == (1u << 24));
     assert(NOAH_PROFILE_FEATURE_CANDIDATE_STREAM == (1u << 25));
     assert(argc == 2);

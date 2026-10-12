@@ -48,7 +48,7 @@ with existing bindings must be unbound before clearing it.
 A click is one balanced press and release. It does not run the clicked
 button's own behaviour or the mode's button overrides, and a button that is
 already held stays held rather than clicking. Mouse movement, wheel and
-acceleration, macro programs, recursive mode/layer actions and arbitrary
+acceleration, recursive mode/layer actions and arbitrary
 scripts are not motion outputs. Ordinary pointer movement and auto-sniping remain outside the
 slot bank. Dragscroll and Pinch use this repository's scroll implementation.
 All current firmware builds use the 32-slot engine. The generic build runs
@@ -273,3 +273,9 @@ While active:
 - the other dims
 - motion is accumulated and emitted in discrete steps
 - large motion follows the shared bounded discrete-output policy
+
+A direction, diagonal or button tap override can start a VIA macro (D-F23),
+with inherited modifiers only. Busy triggers are dropped. Every step is allowed;
+Once per movement is useful for longer macros. Empty slots send nothing and do
+not spend a movement. Mouse clicks inside a macro bypass the mode's button
+overrides; see [the PD contract](architecture/pd-mode-domain-v1.md#taps-modifiers-and-buttons).

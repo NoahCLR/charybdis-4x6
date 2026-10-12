@@ -48,12 +48,20 @@ RGB configurations. Dragscroll, Volume, Brightness, Zoom, Arrow and Pinch occupy
 the first six slots; slot 6 provides Undo / Redo and slots 7–31 start empty
 (`PD_SLOT_0`…`PD_SLOT_31` hold a slot, `PD_SLOT_n_LOCK` locks it). Only the
 slots in use take space in the saved profile. Create directional key,
-shortcut or mouse-button click actions with the shared keycode picker, duplicate a mode, or configure
+shortcut, macro or mouse-button click actions with the shared keycode picker, duplicate a mode, or configure
 scrolling with optional held modifiers. The everyday flow shows name, movement,
 DPI and actions; pointer policy, thresholds, timing, modifier rules and mouse
 buttons are under **Advanced**. Keep changes in the shared draft, bind its
 hold/toggle action, set RGB, then review and Apply. See
 [Pointer modes](POINTER_MODES.md).
+
+A direction, diagonal or button tap override can start a VIA macro. Triggers
+while another macro is playing are dropped, never queued. **Every step** is
+allowed; **Once per movement** usually fits a longer macro better. An empty
+macro sends nothing and leaves the movement unspent. Macro outputs inherit
+held modifiers (Ignore and Exact cannot cover playback across scans). A mouse
+click inside the macro bypasses the mode's button overrides and reaches the
+host through the existing owned-output ledger.
 
 ## Authoring the profile in C
 
