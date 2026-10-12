@@ -84,9 +84,8 @@ static bool key_runtime_core_lease_owner_keypos_equal(const lease_t *lease, keyp
 }
 
 static uint8_t key_runtime_core_modifier_mask_for_keycode(uint16_t keycode) {
-    if (IS_MODIFIER_KEYCODE(keycode)) {
-        return MOD_BIT(keycode);
-    }
+    uint8_t mods = noah_qmk_real_mods_for_keycode(keycode);
+    if (mods) return mods;
 
     if (IS_QK_MOD_TAP(keycode)) {
         return noah_qmk_mods_to_report_mask(QK_MOD_TAP_GET_MODS(keycode));
@@ -116,7 +115,7 @@ static uint8_t key_runtime_core_layer_for_keycode(uint16_t keycode) {
 }
 
 static bool key_runtime_core_keycode_owns_modifier_on_press(uint16_t keycode) {
-    return IS_MODIFIER_KEYCODE(keycode);
+    return noah_qmk_real_mods_for_keycode(keycode) != 0u;
 }
 
 static bool key_runtime_core_keycode_owns_modifier_on_hold(uint16_t keycode) {

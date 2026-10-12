@@ -696,7 +696,27 @@ static void test_literal_tap_keeps_qmk_for_keycodes_the_ledger_cannot_hold(void)
     CHECK(register_code_count == 0 && unregister_code_count == 0);
 }
 
+static void test_modded_modifier_keeps_both_components(void) {
+    const struct { uint16_t code; uint8_t mods; } cases[] = {
+        {S(KC_LEFT_CTRL), MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_CTRL)},
+        {RSFT(KC_LEFT_CTRL), MOD_BIT(KC_RIGHT_SHIFT) | MOD_BIT(KC_LEFT_CTRL)},
+        {C(KC_RIGHT_CTRL), MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_CTRL)},
+        {C(KC_LEFT_CTRL), MOD_BIT(KC_LEFT_CTRL)},
+    };
+    for (uint8_t i = 0; i < ARRAY_SIZE(cases); i++) {
+        owned_keycode_lease_t lease = {0};
+        test_reset_stubs();
+        CHECK(owned_keycode_acquire(cases[i].code, &lease));
+        CHECK(lease.mods == cases[i].mods);
+        CHECK(!lease.has_basic && register_code_count == 0);
+        CHECK(register_mods_count == 1 && register_mods_calls[0] == cases[i].mods);
+        CHECK(owned_keycode_release(&lease));
+        CHECK(unregister_mods_count == 1 && unregister_mods_calls[0] == cases[i].mods);
+    }
+}
+
 int main(void) {
+    test_modded_modifier_keeps_both_components();
     test_plain_key_registers_and_unregisters_directly();
     test_plain_modifier_uses_mod_ownership();
     test_modded_key_registers_mods_and_basic_key();

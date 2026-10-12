@@ -86,18 +86,19 @@ static void keyboard_mod_ownership_validate_state(const char *context) {
 
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
-    int8_t                               index = keyboard_mod_ownership_index_for_keycode(keycode);
+    uint8_t                              mods  = noah_qmk_real_mods_for_keycode(keycode);
 
-    if (index < 0 || !record || IS_NOEVENT(record->event)) {
+    if (!mods || !record || IS_NOEVENT(record->event)) {
         return;
     }
 
-    if (record->event.pressed) {
-        if (state->physical_refcounts[index] < UINT8_MAX) {
-            state->physical_refcounts[index]++;
+    for (uint8_t index = 0; index < KEYBOARD_MOD_OWNERSHIP_MOD_COUNT; index++) {
+        if (!(mods & keyboard_mod_ownership_mod_masks[index])) continue;
+        if (record->event.pressed) {
+            if (state->physical_refcounts[index] < UINT8_MAX) state->physical_refcounts[index]++;
+        } else if (state->physical_refcounts[index] > 0) {
+            state->physical_refcounts[index]--;
         }
-    } else if (state->physical_refcounts[index] > 0) {
-        state->physical_refcounts[index]--;
     }
 
     keyboard_mod_ownership_validate_state("track_physical_keycode_event");
@@ -105,18 +106,28 @@ void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyre
 
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
     noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
-    int8_t                               index = keyboard_mod_ownership_index_for_keycode(keycode);
+    uint8_t                              mods  = noah_qmk_real_mods_for_keycode(keycode);
+    uint8_t                              released = 0;
 
-    if (index < 0 || !record || IS_NOEVENT(record->event)) {
+    if (!mods || !record || IS_NOEVENT(record->event)) {
         return;
     }
 
-    if (record->event.pressed) {
-        if (state->report_refcounts[index] < UINT8_MAX) {
-            state->report_refcounts[index]++;
+    for (uint8_t index = 0; index < KEYBOARD_MOD_OWNERSHIP_MOD_COUNT; index++) {
+        uint8_t mask = keyboard_mod_ownership_mod_masks[index];
+        if (!(mods & mask)) continue;
+        if (record->event.pressed) {
+            if (state->report_refcounts[index] < UINT8_MAX) state->report_refcounts[index]++;
+        } else if (state->report_refcounts[index] > 0) {
+            state->report_refcounts[index]--;
+            if (!state->report_refcounts[index] && !state->managed_refcounts[index]) released |= mask;
         }
-    } else if (state->report_refcounts[index] > 0) {
-        state->report_refcounts[index]--;
+    }
+    // A combination's native release is consumed before QMK can clear every
+    // part. Retire its report owner, then drop only components nobody holds.
+    if (released & get_mods()) {
+        del_mods(released);
+        send_keyboard_report();
     }
 }
 
@@ -150,14 +161,20 @@ void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord
 
 bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
     noah_keyboard_mod_ownership_state_t *state = keyboard_mod_ownership_state();
-    int8_t                               index = keyboard_mod_ownership_index_for_keycode(keycode);
+    uint8_t                              mods  = noah_qmk_real_mods_for_keycode(keycode);
 
-    if (index < 0 || !record || record->event.pressed) {
+    if (!mods || !record || record->event.pressed) {
         return false;
     }
 
     keyboard_mod_ownership_validate_state("should_suppress_default");
-    return state->managed_refcounts[index] > 0;
+    // A multi-component release must be selective even if only one part has
+    // another owner. Finalize releases its unshared components together.
+    if (IS_QK_MODS(keycode)) return record->event.type == KEY_EVENT;
+    for (uint8_t index = 0; index < KEYBOARD_MOD_OWNERSHIP_MOD_COUNT; index++) {
+        if ((mods & keyboard_mod_ownership_mod_masks[index]) && (state->managed_refcounts[index] > 0 || state->report_refcounts[index] > 1u)) return true;
+    }
+    return false;
 }
 
 bool keyboard_mod_ownership_can_register_mods(uint8_t mods) {

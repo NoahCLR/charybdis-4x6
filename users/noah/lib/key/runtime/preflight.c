@@ -9,6 +9,7 @@
 #include "../../action/action_dispatch.h"
 #include "../../action/owned_keycode.h"
 #include "reducer/state_query.h"
+#include "reducer/ownership_state.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record, bool press_is_handled) {
@@ -18,6 +19,11 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record, bool pr
         if (!record->event.pressed && token && token->handled_key) {
             // Let the handled-key release path run.
         } else {
+            if (!record->event.pressed && token && !token->handled_key) {
+                // A suppressed native release still retires its reducer
+                // leases; finalize separately settles its report components.
+                (void)key_runtime_core_finalize_non_handled_release(record->event.key);
+            }
             key_runtime_trace_message("preflight:suppress_default", "default QMK path suppressed before handled-key runtime");
             return false;
         }

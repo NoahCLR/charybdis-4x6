@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "key_runtime_integration_harness.h"
+#include "users/noah/noah_runtime.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/owned_keycode.h"
@@ -53,6 +54,7 @@ static uint8_t  fake_oneshot_mods;
 static uint8_t  fake_oneshot_locked_mods;
 
 static uint8_t send_keyboard_report_count;
+static uint8_t report_required_mods;
 static uint8_t emitted_action_count;
 static int8_t  report_key_depth[UINT8_MAX + 1];
 
@@ -114,6 +116,7 @@ static void test_reset_state(void) {
     fake_oneshot_mods          = 0;
     fake_oneshot_locked_mods   = 0;
     send_keyboard_report_count = 0;
+    report_required_mods        = 0;
     emitted_action_count       = 0;
     for (uint16_t index = 0; index <= UINT8_MAX; index++) {
         report_key_depth[index] = 0;
@@ -196,6 +199,7 @@ void del_mods(uint8_t mods) {
 }
 
 void send_keyboard_report(void) {
+    CHECK((get_mods() & report_required_mods) == report_required_mods);
     send_keyboard_report_count++;
 }
 
@@ -689,7 +693,124 @@ static void test_mod_tap_shadow_matches_applied_ownership(void) {
     }
 }
 
+// Native ACT_LMODS/ACT_RMODS with KC_NO or a modifier uses add_mods/del_mods,
+// not register_mods. Run that default action between the real process and
+// finalize hooks; a consumed release must never send a transient missing mod.
+static void test_native_modifier_event(uint16_t code, keypos_t pos, bool pressed, uint8_t mods) {
+    keyrecord_t record = {.event = {.type = KEY_EVENT, .key = pos, .pressed = pressed, .time = fake_time}};
+    CHECK(noah_pre_process_record_user(code, &record));
+    if (noah_process_record_user(code, &record)) {
+        if (pressed) add_mods(mods);
+        else del_mods(mods);
+        send_keyboard_report();
+        noah_post_process_record_user(code, &record);
+    } else {
+        noah_process_record_user_finalize(code, &record, false);
+    }
+}
+
+static void test_native_modifier_combination(uint16_t code, uint8_t mods) {
+    const keypos_t pos = {4, 4};
+    uint8_t shared = (uint8_t)(mods & (uint8_t)(0u - mods));
+    for (uint8_t order = 0; order < 4u; order++) {
+        test_reset_state();
+        if (order & 1u) keyboard_mod_ownership_register_mods(shared);
+        test_native_modifier_event(code, pos, true, mods);
+        if (!(order & 1u)) keyboard_mod_ownership_register_mods(shared);
+        CHECK(get_mods() == mods);
+        CHECK(keyboard_mod_policy_managed_only_mask(shared) == 0);
+        CHECK(key_runtime_core_projection_snapshot_capture().keyboard_physical_mod_mask == mods);
+        CHECK(key_runtime_core_state()->shadow_projection.keyboard_physical_mod_mask == mods);
+        report_required_mods = shared;
+        if (order & 2u) {
+            test_native_modifier_event(code, pos, false, mods);
+            CHECK(get_mods() == shared); // unshared parts must leave immediately
+            CHECK(keyboard_mod_policy_managed_only_mask(shared) == shared);
+            report_required_mods = 0;
+            keyboard_mod_ownership_unregister_mods(shared);
+        } else {
+            keyboard_mod_ownership_unregister_mods(shared);
+            CHECK(get_mods() == mods); // the native key still holds every part
+            report_required_mods = 0;
+            test_native_modifier_event(code, pos, false, mods);
+        }
+        test_assert_mods_balanced();
+        CHECK(key_runtime_core_state()->press_token_count == 0u);
+        CHECK(key_runtime_core_state()->lease_count == 0u);
+        CHECK(key_runtime_core_state()->shadow_projection.keyboard_physical_mod_mask == 0);
+    }
+}
+
+static void test_native_modifier_combinations_preserve_every_owner(void) {
+    for (uint8_t side = 0; side < 2u; side++) {
+        for (uint8_t subset = 1; subset < 16u; subset++) {
+            uint8_t encoded = (uint8_t)(subset | (side ? 0x10u : 0u));
+            test_native_modifier_combination((uint16_t)encoded << 8u, side ? (uint8_t)(subset << 4u) : subset);
+        }
+    }
+    test_native_modifier_combination(S(KC_LEFT_CTRL), MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_CTRL));
+    test_native_modifier_combination(RSFT(KC_LEFT_CTRL), MOD_BIT(KC_RIGHT_SHIFT) | MOD_BIT(KC_LEFT_CTRL));
+    test_native_modifier_combination(C(KC_LEFT_CTRL), MOD_BIT(KC_LEFT_CTRL));
+
+    // A plain physical modifier overlaps a combination too, without a managed
+    // owner. Neither release may clear the other physical owner's component.
+    for (uint8_t order = 0; order < 2u; order++) {
+        const keypos_t plain = {4, 3}, combo = {4, 4};
+        uint8_t ctrl = MOD_BIT(KC_LEFT_CTRL), meh = ctrl | MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_ALT);
+        test_reset_state();
+        test_native_modifier_event(KC_MEH, combo, true, meh);
+        test_native_modifier_event(KC_LEFT_CTRL, plain, true, ctrl);
+        report_required_mods = ctrl;
+        if (order) {
+            test_native_modifier_event(KC_LEFT_CTRL, plain, false, ctrl);
+            CHECK(get_mods() == meh);
+            report_required_mods = 0;
+            test_native_modifier_event(KC_MEH, combo, false, meh);
+        } else {
+            test_native_modifier_event(KC_MEH, combo, false, meh);
+            CHECK(get_mods() == ctrl);
+            report_required_mods = 0;
+            test_native_modifier_event(KC_LEFT_CTRL, plain, false, ctrl);
+        }
+        test_assert_mods_balanced();
+    }
+}
+
+static void test_modified_ordinary_key_keeps_native_weak_mod_path(void) {
+    const keypos_t pos = {4, 4};
+    const uint16_t code = S(KC_A);
+    test_reset_state();
+    keyboard_mod_ownership_register(KC_LEFT_SHIFT);
+    CHECK(key_runtime_integration_process_record(code, pos, true));
+    CHECK(keyboard_mod_policy_managed_only_mask(MOD_BIT(KC_LEFT_SHIFT)) == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(key_runtime_core_state()->shadow_projection.keyboard_physical_mod_mask == 0);
+    CHECK(key_runtime_integration_process_record(code, pos, false));
+    keyboard_mod_ownership_unregister(KC_LEFT_SHIFT);
+    test_assert_mods_balanced();
+}
+
+static void test_consumed_modifier_combination_does_not_own_report_parts(void) {
+    const keypos_t pos = {4, 4};
+    const uint16_t code = KC_HYPR;
+    const uint8_t mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_LEFT_GUI);
+    test_authored_mod_tap = (test_behavior_row_t){.keycode = code, .single = {.tap = TAP_SENDS(KC_Q)}};
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(code, pos, true));
+    CHECK(test_report_mod_refcount_total() == 0);
+    keyboard_mod_ownership_register_mods(mods);
+    keyboard_mod_ownership_unregister_mods(mods);
+    CHECK(get_mods() == 0); // a consumed physical press cannot veto teardown
+    CHECK(!key_runtime_integration_process_record(code, pos, false));
+    key_runtime_integration_advance(&fake_time, 400u);
+    key_runtime_integration_scan();
+    test_assert_mods_balanced();
+    test_authored_mod_tap = (test_behavior_row_t){0};
+}
+
 int main(void) {
+    test_native_modifier_combinations_preserve_every_owner();
+    test_modified_ordinary_key_keeps_native_weak_mod_path();
+    test_consumed_modifier_combination_does_not_own_report_parts();
     test_mod_tap_shadow_matches_applied_ownership();
     test_handled_same_basic_hold_registers_base_key(TEST_SHIFTED_SYMBOL_KEY, KC_1);
     test_handled_same_basic_hold_registers_base_key(TEST_SHIFT_ENTER_KEY, KC_ENT);
