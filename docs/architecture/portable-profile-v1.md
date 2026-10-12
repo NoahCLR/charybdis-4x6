@@ -113,7 +113,7 @@ All multibyte fields are little-endian:
 
 | Offset | Bytes | Contents |
 | ---: | ---: | --- |
-| 0 | 8 | `[6, 16, 31, 128, 128, 0, 0, 0]`: version, layer count, scalar count, macro-name count, custom-key-name count, reserved zeros |
+| 0 | 8 | `[6, 16, 31, 128, 128, flags, 0, 0]`: version, layer count, scalar count, macro-name count, custom-key-name count, flags, reserved zeros |
 | 8 | 124 | 31 uint32 scalar values |
 | 132 | 272 | 16 layer records of 17 bytes, layer 0 first: byte 0 the layer's combo reference layer (below 16); bytes 1–8 its behaviour-bypass placement bitmap; bytes 9–16 its combo-exclusion placement bitmap |
 | 404 | variable | 272 counted names: 16 layer names, then 128 VIA macro names, then 128 custom-key names; each a uint8 length `0..32`, then that many bytes of UTF-8 |
@@ -124,6 +124,17 @@ rejects excess without trimming. Names are profile data for the client. Macro
 content belongs to the bound VIA bank; custom keys execute their behavior rows.
 Validation reads at most 20 settings bytes per step, in one read. Retired per-mode DPI
 scalars 10–14 must be zero; mode tuning is in domain `0x50`.
+
+Settings header byte 5 bit 0 bypasses shared behaviours for every combo output
+while physical-key behaviours remain eligible. Other header flag bits are
+zero. Require capability feature bit 30 before setting it. Zero means **Combo
+outputs use behaviours** is on, preserving existing v6 profiles and compiled
+defaults. The corresponding per-combo switch is combo v3 row flag bit 4;
+[participation policy](participation-policy.md#combo-output-behaviour-permission)
+defines their vetoes, origin context and release pairing. An older backup's
+translation leaves both flags zero. An export preserves them; importing to a
+keyboard without feature bit 30 must refuse nonzero flags instead of dropping
+them. Neither extension changes domain versions, offsets or the action ABI.
 
 Every name in this domain follows one rule: at most 32 encoded bytes of
 well-formed UTF-8 (no overlong forms, no surrogates, nothing past U+10FFFF), no

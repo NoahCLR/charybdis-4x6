@@ -7,6 +7,7 @@
 #include "noah_real_profile_keyboard.h"
 #include "users/noah/lib/compat/qmk_combo_origin.h"
 #include "users/noah/lib/key/behavior/participation.h"
+#include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
 
 enum {
     TEST_BURST_COMBOS     = 5,
@@ -22,6 +23,23 @@ layer_state_t default_layer_state = (layer_state_t)1u << LAYER_BASE;
 
 static uint16_t test_keymaps[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
 static uint16_t fake_time;
+static uint8_t test_source_layer;
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+extern const uint8_t noah_combo_count;
+extern combo_t key_combos[];
+static uint8_t test_combo_flags[6];
+static bool test_combo_output_behaviors = true;
+bool noah_setting_combo_output_behaviors(void) { return test_combo_output_behaviors; }
+uint32_t noah_setting(uint8_t id, uint32_t fallback) { (void)id; return fallback; }
+uint8_t noah_setting_layer_record(uint8_t layer, uint8_t field) { return field == NOAH_SETTINGS_LAYER_REFERENCE ? layer : 0; }
+uint16_t noah_effective_combo_count(void) { return noah_combo_count; }
+combo_t *noah_effective_combo_get(uint16_t index) { return index < noah_combo_count ? &key_combos[index] : NULL; }
+bool noah_effective_combo_enabled(uint16_t index) { return index < noah_combo_count; }
+uint32_t noah_effective_combo_allowed_layers(uint16_t index) { (void)index; return 0xffff; }
+uint8_t noah_effective_combo_flags(uint16_t index) { return test_combo_flags[index]; }
+uint16_t get_combo_term(uint16_t index, combo_t *combo) { (void)index; (void)combo; return COMBO_TERM; }
+uint16_t noah_qmk_combo_hold_term(void) { return TAPPING_TERM; }
+#endif
 
 static const uint16_t combo_keys_left[] = {
     KC_A,
@@ -152,6 +170,11 @@ static void test_reset(void) {
     layer_state         = 0;
     default_layer_state = (layer_state_t)1u << LAYER_BASE;
     fake_time           = 1000u;
+    test_source_layer = 0;
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    memset(test_combo_flags, 0, sizeof(test_combo_flags));
+    test_combo_output_behaviors = true;
+#endif
     test_reset_keymaps();
     test_reset_combo_state();
     key_origin_registry_reset();
@@ -217,6 +240,7 @@ static keyrecord_t test_combo_record(bool pressed) {
 static void test_observe_physical_key(keypos_t key_pos, bool pressed) {
     keyrecord_t record = test_physical_record(key_pos, pressed);
 
+    noah_participation_record_capture(&record, test_source_layer);
     noah_qmk_combo_origin_observe_physical_key_event(KC_NO, &record);
 }
 
@@ -934,7 +958,6 @@ static void test_reset_clears_candidate_diagnostics(void) {
 }
 
 bool           combo_key_record_allowed(uint16_t combo_index, combo_t *combo, uint16_t keycode, keyrecord_t *record);
-static uint8_t test_source_layer;
 uint8_t        read_source_layers_cache(keypos_t key) {
     (void)key;
     return test_source_layer;
@@ -992,7 +1015,62 @@ static void test_origin_mirror_keeps_captured_duplicate_exclusion(void) {
     CHECK(!key_origin_bitmap_has_any(bitmap));
 }
 
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+// Same output, distinct combo definitions, source layers and queued decisions.
+// Releases may be classified before the matching press reaches dispatch.
+static void test_output_permission_survives_queues_and_release(void) {
+    for (unsigned allowed = 0; allowed < 2; allowed++) {
+        test_reset();
+        test_combo_flags[3] = allowed ? 0 : NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        test_combo_flags[4] = allowed ? NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS : 0;
+        test_source_layer = 2;
+        test_observe_physical_key(test_key(1, 2), true); // last declared input, first press
+        test_source_layer = 7;
+        test_observe_physical_key(test_key(0, 2), true);
+        test_set_combo_active(3, true);
+        keyrecord_t first = test_combo_record(true);
+        noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &first);
+        CHECK(noah_participation_record_behavior(&first) == (bool)allowed);
+        CHECK(noah_participation_record_source(&first) == 2);
+        test_set_combo_disabled(3, true);
+        noah_qmk_combo_origin_scan(); // fired completion remains pending
+        test_observe_physical_key(test_key(1, 2), false);
+        test_set_combo_active(3, false);
+        test_combo_flags[3] ^= NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        test_combo_output_behaviors = !allowed;
+        keyrecord_t first_release = test_combo_record(false);
+        noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &first_release);
+        CHECK(noah_participation_record_behavior(&first_release) == (bool)allowed);
+        CHECK(noah_participation_record_source(&first_release) == 2);
+        noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &first);
+        CHECK(noah_participation_record_behavior(&first) == (bool)allowed);
+        noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &first_release);
+        CHECK(noah_participation_record_behavior(&first_release) == (bool)allowed);
+
+        test_combo_output_behaviors = true;
+        test_source_layer = 5;
+        test_observe_physical_key(test_key(4, 2), true);
+        test_observe_physical_key(test_key(5, 2), true);
+        test_set_combo_active(4, true);
+        keyrecord_t second = test_combo_record(true);
+        noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &second);
+        CHECK(noah_participation_record_behavior(&second) == !(bool)allowed);
+        test_combo_output_behaviors = false;
+        keyrecord_t second_release = test_combo_record(false);
+        noah_qmk_combo_origin_capture_record(TEST_COMBO_OUT_DUP, &second_release);
+        CHECK(noah_participation_record_behavior(&second_release) == !(bool)allowed);
+        noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_DUP, &second_release);
+        CHECK(noah_participation_record_behavior(&second_release) == !(bool)allowed);
+    }
+}
+#endif
+
 int main(void) {
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    test_output_permission_survives_queues_and_release();
+    puts("combo output permission queue and release tests passed");
+    return 0;
+#endif
     test_combo_participation_hook();
     test_origin_mirror_keeps_captured_duplicate_exclusion();
     test_single_half_combo_uses_last_key_from_combo_ref_layer();

@@ -509,7 +509,8 @@ static void test_combo_domain(void) {
         {20, 17, false},  // a seventeenth input
         {20, 1, false},   // a one-key combo
         {21, 3, false},   // must hold and must tap
-        {21, 0x10, false},
+        {21, 0x10, true}, // output bypass is retained without disabling the chord
+        {21, 0x20, false}, // unknown output flag
         {21, 0x08, true}, // disabled is kept
         {21, 0x04, true},
         {24, 0, true}, {25, 0, true}, // no layer allowed

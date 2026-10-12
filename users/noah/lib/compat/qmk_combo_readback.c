@@ -73,7 +73,7 @@ static void write_u32(uint8_t *out, uint32_t value) {
 // One row as its two pages, 50 bytes: page A is the row index, input count,
 // native output, window, flags, allowed-layer mask and inputs 0..6; page B
 // inputs 7..15. Flags: bit 0 must hold, 1 must tap, 2 press in order, 3
-// follows the default window, 4 disabled.
+// follows the default window, 4 disabled, 5 bypass output behaviour.
 static bool combo_row(uint8_t index, uint8_t out[2u * READOUT_PAGE]) {
     memset(out, 0, 2u * READOUT_PAGE);
 #    ifdef COMBO_ENABLE
@@ -105,6 +105,7 @@ static bool combo_row(uint8_t index, uint8_t out[2u * READOUT_PAGE]) {
     out[6] |= 4u;
 #        endif
     if (!noah_qmk_combo_enabled(index)) out[6] |= 16u;
+    if (!noah_qmk_combo_output_behavior(index)) out[6] |= 32u;
     write_u32(&out[7], noah_qmk_combo_allowed_layers(index));
     for (uint8_t member = 0u; member <= NOAH_PROFILE_WIRE_V1_MAX_KEYS_PER_COMBO; member++) {
         uint16_t key = pgm_read_word(&combo->keys[member]);

@@ -13,7 +13,7 @@ static const noah_profile_wire_v1_read_service_t service = {
             .protocol_major               = 1u,
             .schema_major                 = 3u,
             .candidate_chunk_max          = 0u,
-            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_FEATURE_WIDE_PAGES | NOAH_PROFILE_FEATURE_STREAMING_MACROS,
+            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_FEATURE_WIDE_PAGES | NOAH_PROFILE_FEATURE_STREAMING_MACROS | NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS,
             .action_abi_digest            = UINT32_C(0x12345678),
             .firmware_version             = UINT32_C(0x00010000),
             .compiled_default_digest      = UINT32_C(0x89ABCDEF),
@@ -134,7 +134,7 @@ static void test_capability_pages(void) {
     assert(frame[7] == NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT && frame[8] == 3u);
     assert(frame[9] == 1u && frame[11] == 3u);
     assert(frame[13] == 32u && frame[14] == 0u && frame[15] == 2u);
-    assert(frame[16] == 0x1Fu && frame[17] == 0x0Cu && frame[18] == 0x08u && frame[19] == 0x08u);
+    assert(frame[16] == 0x1Fu && frame[17] == 0x0Cu && frame[18] == 0x08u && frame[19] == 0x48u);
 
     request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x42u, 1u);
     assert_golden("capabilities-page-1-request", frame);
@@ -220,6 +220,7 @@ int main(int argc, char **argv) {
     assert(NOAH_PROFILE_FEATURE_STREAMING_MACROS == (1u << 27));
     assert(NOAH_PROFILE_FEATURE_POINTING_CLICKS == (1u << 28));
     assert(NOAH_PROFILE_FEATURE_POINTING_MACROS == (1u << 29));
+    assert(NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS == (1u << 30));
     assert(NOAH_PROFILE_FEATURE_CANDIDATE_REUSE == (1u << 24));
     assert(NOAH_PROFILE_FEATURE_CANDIDATE_STREAM == (1u << 25));
     assert(argc == 2);

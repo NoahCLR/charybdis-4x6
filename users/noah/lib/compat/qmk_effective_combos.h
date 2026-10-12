@@ -9,6 +9,9 @@
 // Participation fields of a combo definition (participation-policy.md).
 #        define noah_qmk_combo_allowed_layers noah_effective_combo_allowed_layers
 #        define noah_qmk_combo_enabled noah_effective_combo_enabled
+static inline bool noah_qmk_combo_output_behavior(uint16_t index) {
+    return !(noah_effective_combo_flags(index) & NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS);
+}
 #    else
 static inline uint16_t noah_qmk_combo_count(void) {
     return noah_combo_count;
@@ -23,6 +26,10 @@ static inline uint32_t noah_qmk_combo_allowed_layers(uint16_t index) {
     return (uint32_t)((UINT64_C(1) << LAYER_COUNT) - 1u);
 }
 static inline bool noah_qmk_combo_enabled(uint16_t index) {
+    (void)index;
+    return true;
+}
+static inline bool noah_qmk_combo_output_behavior(uint16_t index) {
     (void)index;
     return true;
 }

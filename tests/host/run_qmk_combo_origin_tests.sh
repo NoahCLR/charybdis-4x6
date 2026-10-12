@@ -39,6 +39,8 @@ run_variant() {
 
 run_variant normal
 run_variant extra_short -DEXTRA_SHORT_COMBOS
+run_variant output_permissions -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
+run_variant output_permissions_sanitized -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
 
 # Timerless combos can remain legally pending until release. Compile that
 # branch to ensure its deliberately unbounded deadline path stays warning-free.

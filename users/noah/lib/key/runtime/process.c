@@ -350,7 +350,7 @@ static bool key_runtime_process_output_fenced(const keyrecord_t *record) {
 
 // Whether a record uses its keycode's behaviour row (participation-policy.md).
 // A physical key answers with the decision its press stored; a combo's output
-// with the master, its row's enable and the combo's origin layer; anything
+// with its completed chord's output permission and origin layer; anything
 // else uses the row.
 static bool key_runtime_process_record_uses_row(uint16_t keycode, const keyrecord_t *record) {
     if (!record) {
@@ -361,7 +361,7 @@ static bool key_runtime_process_record_uses_row(uint16_t keycode, const keyrecor
     }
     if (noah_participation_record_generated_captured(record)) return noah_participation_record_behavior(record);
     if (record->event.type == COMBO_EVENT) {
-        return noah_participation_behavior_generated(keycode, noah_qmk_combo_origin_record_source_layer(keycode, record));
+        return noah_participation_combo_output(UINT16_MAX, keycode, noah_qmk_combo_origin_record_source_layer(keycode, record));
     }
     return true;
 }
@@ -379,9 +379,9 @@ bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) 
         noah_participation_record_deliver(record, keycode, noah_qmk_contract_resolve_source_layer(record->event.key));
     }
     if (record->event.type == COMBO_EVENT && !noah_participation_record_generated_captured(record)) {
-        // Capture before native tapping can queue it, without consuming the
-        // pending origin that will be normalized at actual dispatch.
-        noah_participation_record_generated(record, keycode, noah_qmk_combo_origin_record_source_layer(keycode, record));
+        // Attach the completion snapshot without consuming the pending
+        // origin that will be normalized at actual dispatch.
+        noah_qmk_combo_origin_capture_record(keycode, record);
     }
 
     if (key_runtime_process_record_uses_row(keycode, record)) {

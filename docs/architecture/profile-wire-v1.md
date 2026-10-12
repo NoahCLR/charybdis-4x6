@@ -357,7 +357,7 @@ Row `n` occupies pages `2 + 2n` (page A) and `3 + 2n` (page B):
 | A | 1 | 1 | input count, `2..16` |
 | A | 2 | 2 | native output keycode; zero means a firmware callback |
 | A | 4 | 2 | combo window in milliseconds, including per-combo hook result |
-| A | 6 | 1 | flags: bit 0 must hold, 1 must tap, 2 press in order, 3 follows the default window, 4 disabled |
+| A | 6 | 1 | flags: bit 0 must hold, 1 must tap, 2 press in order, 3 follows the default window, 4 disabled, 5 bypass output behaviour (feature bit 30) |
 | A | 7 | 4 | allowed-layer mask, uint32, one bit per layer; bits at or above the layer count zero |
 | A | 11 | 14 | native inputs 0..6 in declared order, uint16 each; unused entries zero |
 | B | 0 | 18 | native inputs 7..15, uint16 each; unused entries zero |
@@ -512,6 +512,7 @@ Capability feature bits are:
 | 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised VIA macro bank (34,903 bytes in this layout). Without this bit, retain the legacy 512-byte program ceiling. See [runtime flow](runtime-flow.md) |
 | 28 | pointing-mode clicks: a direction or button-override tap in the PD domain may be a plain mouse button 1–8 (`0x00d1..0x00d8`). Require this bit before writing one; older firmware rejects it as `INVALID_ACTION`. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 29 | pointing-mode VIA macros: direction, diagonal and button tap overrides may start slots 0–127 (`0x7700..0x777f`), inherit policy and zero mask only. Require this bit before writing one. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
+| 30 | combo output behaviour permissions: settings v6 header byte 5 bit 0 bypasses all combo output behaviours; combo v3 row flag bit 4 bypasses one output. Both zero means allowed. Native combo readback v3 row flag bit 5 reports the per-combo bypass. Require this bit before writing either extension. See [participation policy](participation-policy.md#combo-output-behaviour-permission) |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with
@@ -1095,7 +1096,7 @@ Each row is `12 + 4 × inputs` bytes (20 to 76), in priority/index order:
 | Offset | Bytes | Field |
 | ---: | ---: | --- |
 | 0 | 1 | input count, 2..16 |
-| 1 | 1 | flags: bit 0 must hold, bit 1 tap only, bit 2 ordered, bit 3 disabled; others zero |
+| 1 | 1 | flags: bit 0 must hold, bit 1 tap only, bit 2 ordered, bit 3 disabled, bit 4 bypass output behaviour (feature bit 30); others zero |
 | 2 | 2 | combo window in ms, little endian; `0` follows the default window |
 | 4 | 4 | allowed layers, `u32`, one bit per layer; bits at or above the bank (16) zero, an empty mask allowed |
 | 8 | 4 | output semantic action |
@@ -1111,6 +1112,14 @@ Input actions must be distinct, including after native translation;
 no-action/transparent inputs and callback/no-action outputs are rejected.
 Semantic references must exist in the compiled action ABI. Unknown versions,
 unknown flags, a short or overlong row and trailing bytes are rejected.
+
+The output bypass flag does not disable the chord or change its inputs,
+output, timing or chord-layer mask. It is independent of the global output
+behaviour switch in settings header byte 5. Both flags are zero by default;
+existing v3 combo data keeps its behaviour and needs no format migration.
+Older firmware rejects the new flag, so clients require feature bit 30 before
+writing it. The completed chord snapshots output permission and origin for
+queued delivery and release; see the [participation policy](participation-policy.md#combo-output-behaviour-permission).
 Incremental validation reads the header in one step, a row's fixed part in
 one, then its inputs four at a time (16 bytes), preserving the one-read /
 20-byte scan bound. Translation from version 2 keeps each 28-byte row's count,

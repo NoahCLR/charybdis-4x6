@@ -44,3 +44,7 @@ void              noah_qmk_combo_origin_debug_snapshot(noah_qmk_combo_origin_deb
 
 // Read-only generated-output layer context, before tapping/admission queues.
 uint8_t noah_qmk_combo_origin_record_source_layer(uint16_t keycode, const keyrecord_t *record);
+// Attach the completed chord's output permission to a generated record
+// without consuming its pending origin. Release uses
+// the matching press's snapshot, even when that press is still queued.
+void noah_qmk_combo_origin_capture_record(uint16_t keycode, keyrecord_t *record);
