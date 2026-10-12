@@ -250,12 +250,31 @@ The allowlist is tied to the audited QMK 0.0.8 native ABI:
   consumer `0xa8..0xc2`.
 - Modified keyboard taps: high byte `0x01..0x1f` with at least one of its low
   four modifier bits set, low byte `0x04..0xa4`.
+- Mouse-button clicks: plain `0x00d1..0x00d8`, buttons 1–8 (D-F22, added
+  2026-10-12). Capability feature bit 28 says the keyboard accepts them; a
+  client writes them only to a keyboard that sets it. Older firmware rejects
+  them as `INVALID_ACTION`, so the domain version is unchanged.
 
-Standalone modifiers, mouse actions, layer/PD controls, macro triggers and
-custom/control keycodes are rejected. Modified consumer/system codes are not
-part of this vocabulary. This prevents recursive activation and unbalanced
-holds through motion outputs. The engine must still dispatch through existing
-owned-output helpers and apply the existing four-tap/32-step work ceilings.
+Standalone modifiers, mouse movement, wheel and acceleration, modified mouse
+codes, layer/PD controls, macro triggers and custom/control keycodes are
+rejected. Modified consumer/system codes are not part of this vocabulary. This
+prevents recursive activation and unbalanced holds through motion outputs. The
+engine must still dispatch through existing owned-output helpers and apply the
+existing four-tap/32-step work ceilings.
+
+A click is one output, like a key tap: it counts against the per-report budget,
+spends a once-per-movement movement and follows the empty-direction policy. It
+goes through the owned-keycode ledger as one balanced press and release, never
+through QMK's key processing, so it reaches neither a mode's button overrides
+(a button may click its own number) nor the clicked button's own behaviour. It
+never releases a button another owner holds: a button a physical key, behaviour
+or macro already holds gets no new edge and stays down until that owner lets
+go. The modifier policy applies as for a key. When hiding modifiers changes what
+the host sees, the button waits 8 ms after that modifier report, and the
+modifiers return 8 ms after the button is up, because the mouse endpoint drains
+apart from the keyboard's. QMK sends a button's report at once from the report
+the pointing task is building, which still holds that poll's motion; a click
+from motion clears that motion first, so it cannot move the held-still cursor.
 
 A button record is `kind:u8, modifiers:u8, tap:4 bytes`. Pass-through `0` and
 consume `1` require five zero payload bytes. Tap `2` requires modifiers zero
@@ -291,11 +310,12 @@ disabled slots in version 1, with independently packed golden bytes.
 `tests/fixtures/pd_mode_domain_v3.json` holds version-3 vectors: an empty
 domain, the presets (the firmware's compiled domain, checked against the
 golden compiled profile), a gap with a named disabled slot 31, all 32 slots
-(4,104 bytes), a 32-byte multibyte name, and rejections with their codes and
-payload offsets (noncanonical record, unordered, repeated and out-of-range IDs,
-count/length mismatches, header and reserved bytes including version 2's name
-field, a version-2 payload, and over-long, malformed, control-character,
-cut-sequence and unpadded names). Both are test
+(4,104 bytes), a 32-byte multibyte name, mouse-button clicks under each
+modifier policy, and rejections with their codes and payload offsets
+(noncanonical record, unordered, repeated and out-of-range IDs, count/length
+mismatches, header and reserved bytes including version 2's name field, a
+version-2 payload, over-long, malformed, control-character, cut-sequence and
+unpadded names, and mouse movement and modified mouse-button taps). Both are test
 evidence, **never a fallback migration source**. The frozen C/JS differential
 corpus (8,635 version-1 cases, including byte mutations, all truncated lengths
 and Unicode) still checks every record rule by extracting the frozen records,
@@ -440,3 +460,7 @@ profile digest and both-half state for each case:
 6. Mixed-version halves, stale drafts and old clients refuse mutation without
    losing the prior configuration.
 7. Pointing cadence, save time and per-half memory and stack evidence.
+8. Mouse-button clicks (D-F22): buttons 3 and 4 from ball motion, every step
+   and once per movement; held modifiers under each policy; a physical button
+   held while a mode clicks it; the cursor staying still. Record the events the
+   host actually receives; do not infer Back or Forward from a button number.

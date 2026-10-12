@@ -137,6 +137,12 @@ input cadence remain unmeasured for this path.
   startup time and consolidation pauses on both halves. The Ark follow-up
   must adopt streaming feature bit 27 and the new storage geometry first.
 
+- **Pointing-mode clicks have not run on hardware** (D-F22). Accept buttons 3
+  and 4 from ball motion, every step and once per movement, with held
+  modifiers, with the same button physically held, and with the cursor held
+  still; record what the host receives. The Ark follow-up must adopt feature
+  bit 28 first.
+
 ## Remaining Load-Bearing Contracts
 
 - **The canonical profile format.** D-L15 and
@@ -1221,3 +1227,24 @@ and refreshes imported specifications after the firmware lands.
 The map is available only when that same checksum cursor hashed the standard
 two-byte VIA config `[1,0]`. Nonzero layout options from another VIA client
 retain the full-read path; they are not refused as corrupt macro storage.
+
+## D-F22 — Pointing modes click mouse buttons
+
+A direction, straight or diagonal, and a mouse-button override's tap may click
+a plain mouse button 1–8, so moving the ball can send buttons 3 and 4 without a
+macro. Movement, wheel, acceleration and modified mouse codes stay out. The tap
+record is unchanged and older firmware rejects these keycodes, so the PD domain
+version is unchanged; capability feature bit 28 is how a client learns that a
+keyboard accepts them, never the record layout.
+
+A click goes through the owned-keycode ledger, not QMK's key processing. It
+cannot reach a mode's button overrides or the clicked button's own behaviour,
+and it never releases a button another owner holds. Its modifier policy works
+as for a key, with the modifier report given a head start over the button and
+restored only after it, and a click sent from motion drops that poll's motion
+from QMK's report first. The [PD-mode domain](architecture/pd-mode-domain-v1.md#taps-modifiers-and-buttons)
+holds the rules.
+
+Client follow-up: Ark adopts feature bit 28, the pinned PD fixture and the
+wider tap vocabulary. Ark refuses a capability page with bits it does not know,
+so it cannot read this firmware until then.

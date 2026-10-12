@@ -25,6 +25,8 @@ a DPI preset (including normal pointer speed), then either an axis choice and
 the relevant direction actions or scroll direction/modifiers. Direction
 actions and mouse-button shortcuts use the same keycode picker as Layout, so a
 plain key or modified key such as `G(KC_Z)` can be selected instead of typed.
+They can also click a mouse button 1–8, such as buttons 3 and 4 from a
+left/right movement, on firmware that advertises it (feature bit 28).
 Choose **Keep mode**, assign the mode's hold or toggle action in Layout, set
 its color under RGB → Pointing modes, then review and
 Apply the draft. The layout key picker reads populated slots from the current
@@ -43,8 +45,11 @@ does first; its shortcut field or modifier switches then appear, and the
 override is staged once it has a shortcut or at least one modifier. A slot
 with existing bindings must be unbound before clearing it.
 
-Macro programs, recursive mode/layer actions and arbitrary scripts are not
-motion outputs. Ordinary pointer movement and auto-sniping remain outside the
+A click is one balanced press and release. It does not run the clicked
+button's own behaviour or the mode's button overrides, and a button that is
+already held stays held rather than clicking. Mouse movement, wheel and
+acceleration, macro programs, recursive mode/layer actions and arbitrary
+scripts are not motion outputs. Ordinary pointer movement and auto-sniping remain outside the
 slot bank. Dragscroll and Pinch use this repository's scroll implementation.
 All current firmware builds use the 32-slot engine. The generic build runs
 the compiled factory slots without a live profile owner; the side-specific pair

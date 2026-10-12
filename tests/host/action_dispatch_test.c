@@ -2,8 +2,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
@@ -42,6 +44,15 @@ static uint8_t action_tap_call_count;
 static uint8_t synthetic_qmk_tap_call_count;
 static uint8_t literal_tap_call_count;
 
+// Keyboard reports R, waits W and literal taps T, in order.
+static char     event_trace[32];
+static uint8_t  event_count;
+static uint32_t waited_ms;
+
+static void test_trace(char event) {
+    if (event_count < sizeof(event_trace) - 1u) event_trace[event_count++] = event;
+}
+
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
     exit(1);
@@ -72,6 +83,9 @@ static void test_reset_stubs(void) {
     action_tap_call_count                    = 0;
     synthetic_qmk_tap_call_count             = 0;
     literal_tap_call_count                   = 0;
+    memset(event_trace, 0, sizeof(event_trace));
+    event_count = 0;
+    waited_ms   = 0;
 
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
         layer_locked_state[layer] = false;
@@ -141,6 +155,12 @@ void clear_oneshot_locked_mods(void) {
 
 void send_keyboard_report(void) {
     send_keyboard_report_count++;
+    test_trace('R');
+}
+
+void wait_ms(uint16_t ms) {
+    waited_ms += ms;
+    test_trace('W');
 }
 
 bool noah_key_runtime_settle_pending_fallback_hold(void) {
@@ -265,6 +285,7 @@ void unregister_code16(uint16_t keycode) {
 void tap_code16(uint16_t keycode) {
     literal_tap_call = test_current_tap_call(keycode);
     literal_tap_call_count++;
+    test_trace('T');
 }
 
 #define NOAH_PD_MODE_TEST_ROW(name, mode_keycode) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
@@ -824,6 +845,59 @@ static void test_saved_profile_placement_matches_the_rules(void) {
     CHECK(!noah_profile_action_placement_v1_supported(&invalid, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
 }
 
+// A click keeps the modifiers it may keep, and hides the rest only around the
+// button: a hiding report leads the button by the settle time and the restore
+// trails its release by it. Nothing hidden means no wait.
+static void test_owned_click_orders_modifier_changes_around_the_button(void) {
+    const uint8_t shift = MOD_BIT(KC_LEFT_SHIFT), alt = MOD_BIT(KC_LEFT_ALT), gui = MOD_BIT(KC_RIGHT_GUI);
+
+    test_reset_stubs();
+    fake_mods = shift;
+    noah_emit_owned_click(MS_BTN3, 0u, false);
+    CHECK(fallback_hold_activation_count == 1);
+    CHECK(literal_tap_call.fallback_hold_active);
+    CHECK(literal_tap_call.keycode == MS_BTN3 && literal_tap_call.real == shift);
+    CHECK(strcmp(event_trace, "RTR") == 0 && waited_ms == 0u);
+    CHECK(fake_mods == shift);
+
+    test_reset_stubs();
+    fake_mods      = shift | alt;
+    fake_weak_mods = shift;
+    noah_emit_owned_click(MS_BTN4, shift, false);
+    CHECK(literal_tap_call.keycode == MS_BTN4 && literal_tap_call.real == alt && literal_tap_call.weak == 0u);
+    CHECK(strcmp(event_trace, "RWTWR") == 0 && waited_ms == 2u * OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS);
+    CHECK(fake_mods == (shift | alt) && fake_weak_mods == shift);
+
+    test_reset_stubs();
+    fake_mods = alt;
+    noah_emit_owned_click(MS_BTN4, shift, false);
+    CHECK(literal_tap_call.real == alt);
+    CHECK(strcmp(event_trace, "RTR") == 0 && waited_ms == 0u);
+
+    test_reset_stubs();
+    fake_mods                = alt;
+    fake_weak_mods           = shift;
+    fake_oneshot_mods        = MOD_BIT(KC_LEFT_CTRL);
+    fake_oneshot_locked_mods = gui;
+    noah_emit_owned_click(MS_BTN1, 0u, true);
+    CHECK(literal_tap_call.real == 0u && literal_tap_call.weak == 0u && literal_tap_call.oneshot == 0u && literal_tap_call.oneshot_locked == 0u);
+    CHECK(strcmp(event_trace, "RWTWR") == 0);
+    CHECK(fake_mods == alt && fake_weak_mods == shift && fake_oneshot_mods == MOD_BIT(KC_LEFT_CTRL) && fake_oneshot_locked_mods == gui);
+
+    test_reset_stubs();
+    noah_emit_owned_click(MS_BTN8, 0u, true);
+    CHECK(literal_tap_call.keycode == MS_BTN8);
+    CHECK(strcmp(event_trace, "RTR") == 0 && waited_ms == 0u);
+
+    // A fallback hold settled first is ambient like any other modifier.
+    test_reset_stubs();
+    fallback_hold_settle_real_mods = gui;
+    noah_emit_owned_click(MS_BTN2, 0u, true);
+    CHECK(literal_tap_call.real == 0u);
+    CHECK(strcmp(event_trace, "RWTWR") == 0);
+    CHECK(fake_mods == gui);
+}
+
 int main(void) {
     test_action_placement_rules();
     test_saved_profile_placement_matches_the_rules();
@@ -838,6 +912,7 @@ int main(void) {
     test_synthetic_qmk_emit_settles_fallback_hold_without_touching_mod_state();
     test_masked_synthetic_qmk_emit_settles_fallback_hold_and_restores_post_settlement_mod_state();
     test_literal_emit_can_suspend_and_restore_mods();
+    test_owned_click_orders_modifier_changes_around_the_button();
 
     puts("action_dispatch host tests passed");
     return 0;

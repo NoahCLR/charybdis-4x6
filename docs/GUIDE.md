@@ -47,8 +47,8 @@ Charybdis Ark has **Pointing modes** with 32 slots and 32 matching
 RGB configurations. Dragscroll, Volume, Brightness, Zoom, Arrow and Pinch occupy
 the first six slots; slot 6 provides Undo / Redo and slots 7–31 start empty
 (`PD_SLOT_0`…`PD_SLOT_31` hold a slot, `PD_SLOT_n_LOCK` locks it). Only the
-slots in use take space in the saved profile. Create directional key or
-shortcut actions with the shared keycode picker, duplicate a mode, or configure
+slots in use take space in the saved profile. Create directional key,
+shortcut or mouse-button click actions with the shared keycode picker, duplicate a mode, or configure
 scrolling with optional held modifiers. The everyday flow shows name, movement,
 DPI and actions; pointer policy, thresholds, timing, modifier rules and mouse
 buttons are under **Advanced**. Keep changes in the shared draft, bind its

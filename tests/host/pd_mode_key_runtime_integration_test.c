@@ -623,6 +623,16 @@ void wait_ms(uint16_t ms) {
     (void)ms;
 }
 
+static report_mouse_t pending_mouse_report;
+
+report_mouse_t pointing_device_get_report(void) {
+    return pending_mouse_report;
+}
+
+void pointing_device_set_report(report_mouse_t mouse_report) {
+    pending_mouse_report = mouse_report;
+}
+
 #ifndef NOAH_TEST_QMK_GESTURES
 bool noah_synthetic_record_active(void) {
     return false;
@@ -2446,6 +2456,29 @@ static void test_configured_consume_button_runs_nothing(void) {
     CHECK(tap_code16_count == 0u);
     test_assert_button_quiescent(pos);
 }
+
+// A button override that clicks a mouse button sends just that click. It never
+// passes through key processing, so neither the mode's overrides nor the
+// clicked button's own behaviour (button 3's double-tap-hold here) run.
+static void test_configured_button_click_runs_no_behaviour(void) {
+    keypos_t pos = test_keypos(4, 0);
+
+    test_reset_state();
+    memset(configured_pd_records[1] + 52, 0, 6);
+    configured_pd_records[1][52] = 2u;    // Volume's button 1 taps
+    configured_pd_records[1][54] = 0xd3u; // button 3
+    publish_configured_pd();
+    action_dispatch(PD_SLOT_1_LOCK);
+    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
+    CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
+    CHECK(tap_code16_count == 1u && last_tap_code16 == MS_BTN3);
+    test_hold_consumed_button(MS_BTN1, pos, TEST_PD_TAP_HOLD_TERM + 40u);
+    test_release_and_settle(MS_BTN1, pos);
+    key_runtime_integration_advance(&fake_time, TEST_PD_MULTI_TAP_TERM + 1u);
+    key_runtime_integration_scan();
+    CHECK(tap_code16_count == 1u && last_tap_code16 == MS_BTN3);
+    test_assert_button_quiescent(pos);
+}
 #endif
 
 // The sparse row above matches a live row with only double-hold authored.
@@ -3791,6 +3824,7 @@ int main(int argc, char **argv) {
     test_consumed_button_is_an_ordinary_interrupting_press();
 #ifdef NOAH_PD_PROFILE_ENABLE
     test_configured_consume_button_runs_nothing();
+    test_configured_button_click_runs_no_behaviour();
 #endif
 #ifdef NOAH_PD_PROFILE_ENABLE
     test_last_slot_hold_lock_dpi_and_disabled_slot();

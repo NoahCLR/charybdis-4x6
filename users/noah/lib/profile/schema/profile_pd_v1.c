@@ -50,6 +50,9 @@ static bool name_valid(const uint8_t *record) {
 
 bool noah_profile_pd_v1_tap_key_valid(uint16_t keycode) {
     if (keycode >= 4 && keycode <= 0xc2) return true;
+    // Plain mouse buttons 1-8 click (feature bit 28); movement, wheel and
+    // acceleration stay out.
+    if (keycode >= 0xd1 && keycode <= 0xd8) return true;
     uint8_t mods = (uint8_t)(keycode >> 8);
     uint8_t key  = (uint8_t)keycode;
     return mods <= 0x1f && (mods & 0x0f) != 0 && key >= 4 && key <= 0xa4;

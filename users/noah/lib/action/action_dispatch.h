@@ -294,4 +294,9 @@ void               noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, no
 void               noah_emit_synthetic_qmk_tap(uint16_t keycode, noah_emit_policy_t policy);
 void               noah_emit_synthetic_qmk_tap_with_masked_keyboard_mods(uint16_t keycode, uint8_t masked_mods, bool settle_pending_fallback_holds);
 void               noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy);
+// A plain mouse-button click through the owned-keycode ledger, so it never
+// releases a button another owner still holds. `exact` hides every ambient
+// modifier for the click; otherwise `masked_mods` hides those, and zero keeps
+// them all. Settles a pending fallback hold first.
+void               noah_emit_owned_click(uint16_t keycode, uint8_t masked_mods, bool exact);
 void               action_dispatch(uint16_t action);

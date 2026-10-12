@@ -297,6 +297,8 @@ uint16_t charybdis_get_pointer_sniping_dpi(void);
 void     charybdis_set_pointer_dragscroll_enabled(bool enabled);
 void     charybdis_set_pointer_sniping_enabled(bool enabled);
 void     pointing_device_set_cpi(uint16_t cpi);
+report_mouse_t pointing_device_get_report(void);
+void           pointing_device_set_report(report_mouse_t mouse_report);
 
 #ifndef QMK_REPORT_KEYS_FILTER
 #define QMK_REPORT_KEYS_FILTER 1

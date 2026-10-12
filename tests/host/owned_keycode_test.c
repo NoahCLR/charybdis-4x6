@@ -664,6 +664,31 @@ static void test_literal_tap_never_releases_another_owners_usage(void) {
     CHECK(owned_keycode_release(&hold));
 }
 
+// A pointing mode's click: a free button gets one balanced click; a button a
+// physical key holds gets no new edge and stays down until that key lets go.
+static void test_click_never_releases_a_physically_held_button(void) {
+    keyrecord_t                    press   = test_record(true);
+    keyrecord_t                    release = test_record(false);
+    owned_keycode_debug_snapshot_t snapshot;
+
+    test_reset_stubs();
+    owned_keycode_tap_literal(MS_BTN4);
+    CHECK(register_code_count == 1 && register_code_calls[0] == MS_BTN4 && unregister_code_count == 1 && tap_code16_count == 0);
+    CHECK(pointer_action_call_count == 2);
+
+    test_reset_stubs();
+    owned_keycode_track_physical_event(MS_BTN3, &press);
+    owned_keycode_tap_literal(MS_BTN3);
+    owned_keycode_tap_literal(MS_BTN3);
+    CHECK(register_code_count == 0 && unregister_code_count == 0 && tap_code16_count == 0);
+    owned_keycode_debug_snapshot(MS_BTN3, &snapshot);
+    CHECK(snapshot.physical_count == 1 && snapshot.managed_count == 0);
+    CHECK(!owned_keycode_should_suppress_default(MS_BTN3, &release));
+    owned_keycode_track_physical_event(MS_BTN3, &release);
+    owned_keycode_debug_snapshot(MS_BTN3, &snapshot);
+    CHECK(snapshot.physical_count == 0 && snapshot.underflow_count == 0);
+}
+
 static void test_literal_tap_keeps_qmk_for_keycodes_the_ledger_cannot_hold(void) {
     test_reset_stubs();
     owned_keycode_tap_literal(QK_BOOT);
@@ -701,6 +726,7 @@ int main(void) {
     test_basic_saturation_unwinds_the_mods_it_already_registered();
     test_system_usage_shares_two_managed_owners();
     test_literal_tap_never_releases_another_owners_usage();
+    test_click_never_releases_a_physically_held_button();
     test_literal_tap_keeps_qmk_for_keycodes_the_ledger_cannot_hold();
 
     puts("owned_keycode host tests passed");

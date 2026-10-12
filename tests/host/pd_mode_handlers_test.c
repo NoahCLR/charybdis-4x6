@@ -50,6 +50,19 @@ static uint8_t              synthetic_tap_call_count;
 static literal_tap_call_t literal_tap_calls[TEST_MAX_CALLS];
 static uint8_t            literal_tap_call_count;
 
+// QMK's in-progress pointing report and the owned clicks sent from it; each
+// click records whether that report still carried motion.
+typedef struct {
+    uint16_t keycode;
+    uint8_t  masked_mods;
+    bool     exact;
+    bool     motion_pending;
+} click_call_t;
+
+static report_mouse_t pending_report;
+static click_call_t   click_calls[TEST_MAX_CALLS];
+static uint8_t        click_call_count;
+
 static uint8_t fallback_hold_activation_count;
 static bool    fallback_hold_active;
 
@@ -86,6 +99,9 @@ static void test_clear_logs(void) {
 
     memset(synthetic_tap_calls, 0, sizeof(synthetic_tap_calls));
     memset(literal_tap_calls, 0, sizeof(literal_tap_calls));
+    memset(click_calls, 0, sizeof(click_calls));
+    click_call_count = 0;
+    pending_report   = (report_mouse_t){0};
 }
 
 static void test_reset_stubs(void) {
@@ -181,6 +197,24 @@ void noah_emit_literal_tap(uint16_t keycode, noah_emit_policy_t policy) {
     }
 
     tap_code16(keycode);
+}
+
+report_mouse_t pointing_device_get_report(void) {
+    return pending_report;
+}
+
+void pointing_device_set_report(report_mouse_t mouse_report) {
+    pending_report = mouse_report;
+}
+
+void noah_emit_owned_click(uint16_t keycode, uint8_t masked_mods, bool exact) {
+    CHECK(click_call_count < TEST_MAX_CALLS);
+    click_calls[click_call_count++] = (click_call_t){
+        .keycode        = keycode,
+        .masked_mods    = masked_mods,
+        .exact          = exact,
+        .motion_pending = pending_report.x || pending_report.y || pending_report.h || pending_report.v,
+    };
 }
 
 bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
@@ -1142,6 +1176,89 @@ static void test_configured_release_ownership_and_custom_slot(void) {
     noah_pd_engine_exit();
     CHECK(noah_pd_engine_motion((report_mouse_t){.x = 13}).x == 13);
 }
+// One report as QMK's pointing task holds it: the in-progress report carries
+// the motion until the engine's frozen result replaces it.
+static void click_move(int16_t x, int16_t y) {
+    test_clear_logs();
+    directional_clock += 8u;
+    fake_time32    = directional_clock;
+    pending_report = (report_mouse_t){.x = x, .y = y};
+    CHECK(noah_pd_engine_motion(pending_report).x == 0);
+}
+
+// Plain mouse buttons click through the owned ledger with the tap's modifier
+// policy, never through QMK's key processing, and paced like any other output.
+// The in-progress report loses its motion before a click, and only for one.
+static void test_configured_mouse_button_clicks(void) {
+    uint8_t slot[96];
+
+    directional_slot(slot, NOAH_PD_AXIS_DOMINANT, 0, false);
+    const uint8_t straight[4][4] = {
+        {0xd3, 0, 1, MOD_BIT(KC_LEFT_SHIFT)}, // left: button 3, Shift hidden
+        {0xd4, 0, 0, 0},                      // right: button 4, modifiers kept
+        {0xd1, 0, 2, 0},                      // up: button 1, exact
+        {KC_DOWN, 0, 0, 0},                   // down: a key, as before
+    };
+    memcpy(slot + 36, straight, sizeof(straight));
+    test_reset_stubs();
+    directional_clock = 1000u;
+    noah_pd_engine_enter(slot);
+
+    for (uint8_t i = 0; i < 3; i++) {
+        click_move(10, 0);
+        CHECK(click_call_count == 1 && click_calls[0].keycode == MS_BTN4 && click_calls[0].masked_mods == 0u && !click_calls[0].exact);
+        CHECK(!click_calls[0].motion_pending && pending_report.x == 0);
+        CHECK(synthetic_tap_call_count == 0 && literal_tap_call_count == 0);
+    }
+    directional_clock += 500u;
+    click_move(10 * 10, 0);
+    CHECK(click_call_count == NOAH_PD_MODE_MAX_TAPS_PER_TICK);
+    directional_clock += 500u;
+    click_move(-10, 0);
+    CHECK(click_call_count == 1 && click_calls[0].keycode == MS_BTN3 && click_calls[0].masked_mods == MOD_BIT(KC_LEFT_SHIFT) && !click_calls[0].exact);
+    directional_clock += 500u;
+    click_move(0, -10);
+    CHECK(click_call_count == 1 && click_calls[0].keycode == MS_BTN1 && click_calls[0].masked_mods == 0u && click_calls[0].exact);
+    directional_clock += 500u;
+    click_move(0, 10);
+    CHECK(click_call_count == 0 && synthetic_tap_call_count == 1 && tapped(0) == KC_DOWN);
+    CHECK(pending_report.y == 10);
+
+    // Once per movement: one click however far the movement goes.
+    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    noah_pd_engine_enter(slot);
+    directional_clock += 500u;
+    uint8_t clicks = 0;
+    for (uint8_t i = 0; i < 6; i++) {
+        click_move(10, 0);
+        clicks += click_call_count;
+    }
+    CHECK(clicks == 1);
+
+    // Button overrides: a button tapping its own number clicks once, with no
+    // second pass through the override; its release sends nothing.
+    memset(slot + 52, 0, 18);
+    slot[52] = 2;
+    slot[54] = 0xd1;
+    slot[58] = 2;
+    slot[60] = 0xd4;
+    slot[62] = 2;
+    noah_pd_engine_enter(slot);
+    keyrecord_t button = test_record(true);
+    test_clear_logs();
+    CHECK(noah_pd_engine_key(MS_BTN1, &button));
+    CHECK(click_call_count == 1 && click_calls[0].keycode == MS_BTN1 && !click_calls[0].exact);
+    button.event.pressed = false;
+    CHECK(noah_pd_engine_key(MS_BTN1, &button));
+    CHECK(click_call_count == 1);
+    button.event.pressed = true;
+    CHECK(noah_pd_engine_key(MS_BTN2, &button));
+    CHECK(click_call_count == 2 && click_calls[1].keycode == MS_BTN4 && click_calls[1].exact);
+    button.event.pressed = false;
+    CHECK(noah_pd_engine_key(MS_BTN2, &button));
+    CHECK(!noah_pd_engine_pending_release());
+    noah_pd_engine_exit();
+}
 #endif
 
 int main(void) {
@@ -1150,6 +1267,7 @@ int main(void) {
     test_configured_dominant_axis();
     test_configured_empty_directions_and_single_axes();
     test_configured_once_per_movement();
+    test_configured_mouse_button_clicks();
     test_configured_scroll_one_axis();
     test_dragscroll_horizontal_lock_filters_vertical_jitter();
     test_dragscroll_vertical_lock_filters_horizontal_jitter();
