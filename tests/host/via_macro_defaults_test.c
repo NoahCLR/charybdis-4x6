@@ -13,6 +13,7 @@
 
 void via_init_kb(void);
 bool via_command_kb(uint8_t *data, uint8_t length);
+void noah_test_native_via_buffer_dispatch(uint8_t *data, uint8_t length);
 
 enum {
     TEST_MACRO_BUFFER_CAPACITY = 256,
@@ -31,6 +32,32 @@ static uint8_t  dynamic_keymap_set_buffer_calls;
 static uint8_t  macro_payload_compile_calls;
 static uint8_t  macro_payload_encode_ir_write_calls;
 static uint8_t  macro_payload_encode_write_calls;
+static unsigned native_buffer_calls;
+static unsigned raw_hid_send_calls;
+static uint8_t raw_hid_last_length;
+static uint8_t raw_hid_last_command;
+
+void raw_hid_send(uint8_t *data, uint8_t length) {
+    raw_hid_send_calls++;
+    raw_hid_last_length = length;
+    raw_hid_last_command = data[0];
+}
+
+void dynamic_keymap_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+    (void)offset;
+    native_buffer_calls++;
+    memset(data, 0xA5, size);
+}
+
+void dynamic_keymap_macro_get_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+    dynamic_keymap_get_buffer(offset, size, data);
+}
+
+void dynamic_keymap_set_buffer(uint16_t offset, uint16_t size, uint8_t *data) {
+    (void)offset;
+    native_buffer_calls++;
+    memcpy(macro_buffer, data, size);
+}
 
 const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT] = {
     [0] = "AB",
@@ -86,6 +113,7 @@ void dynamic_keymap_macro_set_buffer(uint16_t offset, uint16_t size, uint8_t *da
     CHECK((uint32_t)offset + (uint32_t)size <= sizeof(macro_buffer));
     memcpy(&macro_buffer[offset], data, size);
     dynamic_keymap_set_buffer_calls++;
+    native_buffer_calls++;
 }
 
 bool via_eeprom_is_valid(void) {
@@ -466,7 +494,49 @@ static void test_provider_encode_write_reloads_after_invalidate(void) {
     CHECK(macro_payload_encode_ir_write_calls == 2);
 }
 
+static void test_native_buffer_commands_reject_malformed_lengths(void) {
+    static const uint8_t commands[] = {
+        id_dynamic_keymap_get_buffer, id_dynamic_keymap_set_buffer,
+        id_dynamic_keymap_macro_get_buffer, id_dynamic_keymap_macro_set_buffer,
+    };
+    for (size_t command = 0u; command < sizeof(commands); command++) {
+        for (uint8_t length = 32u; length > 0u; length--) {
+            for (unsigned size = 0u; size <= UINT8_MAX; size++) {
+                uint8_t frame[32] = {0};
+                frame[0] = commands[command];
+                frame[3] = (uint8_t)size;
+                test_reset_state();
+                native_buffer_calls = raw_hid_send_calls = 0u;
+                // Check admission first so a failing regression has a clear
+                // verdict before the unguarded native copy reaches memory.
+                bool malformed = length < 4u || size > (unsigned)(length - 4u);
+                if (malformed) {
+                    CHECK(via_command_kb(frame, length));
+                    CHECK(frame[0] == id_unhandled);
+                    CHECK(raw_hid_send_calls == 1u && raw_hid_last_length == length);
+                    CHECK(raw_hid_last_command == id_unhandled);
+                    CHECK(split_mirror_count == 0u && split_sync_pending_count == 0u);
+                    frame[0] = commands[command];
+                }
+                noah_test_native_via_buffer_dispatch(frame, length);
+                CHECK(native_buffer_calls == (malformed ? 0u : 1u));
+                CHECK(raw_hid_send_calls == (malformed ? 2u : 1u));
+                if (!malformed) {
+                    bool writes = commands[command] == id_dynamic_keymap_set_buffer || commands[command] == id_dynamic_keymap_macro_set_buffer;
+                    CHECK(split_mirror_count == (writes ? 1u : 0u));
+                    CHECK(split_sync_pending_count == (writes ? 1u : 0u));
+                    CHECK(raw_hid_last_command == commands[command]);
+                }
+            }
+        }
+    }
+    // Valid SET commands scheduled deferred invalidation through the real
+    // hook. Drain it so this regression leaves the next test's runtime clean.
+    noah_via_macro_defaults_matrix_scan();
+}
+
 int main(void) {
+    test_native_buffer_commands_reject_malformed_lengths();
     test_post_init_seeds_defaults_when_via_eeprom_is_invalid();
     test_eeprom_init_seeds_defaults_immediately();
     test_seed_needs_every_terminator();

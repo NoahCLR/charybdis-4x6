@@ -11,6 +11,7 @@
 #    include "nvm_eeprom_eeconfig_internal.h" // IWYU pragma: keep
 #    include "nvm_eeprom_via_internal.h"
 #    include "via.h"
+#    include "raw_hid.h"
 #    include "../macro/via_macro_provider.h"
 #    ifdef ENCODER_MAP_ENABLE
 #        include "encoder.h"
@@ -69,6 +70,24 @@ void noah_qmk_via_macro_set_buffer(uint16_t offset, uint16_t size, uint8_t *data
 
 bool noah_qmk_via_should_seed_defaults_post_init(void) {
     return !via_eeprom_is_valid();
+}
+
+bool noah_qmk_via_handle_malformed_buffer_command(uint8_t *data, uint8_t length) {
+    if (!data || length == 0u) return false;
+    switch (data[0]) {
+        case id_dynamic_keymap_get_buffer:
+        case id_dynamic_keymap_set_buffer:
+        case id_dynamic_keymap_macro_get_buffer:
+        case id_dynamic_keymap_macro_set_buffer:
+            // Native VIA trusts byte 3 for both reads and writes. Its four
+            // header bytes leave at most 28 payload bytes in a Raw HID report.
+            if (length >= 4u && length <= 32u && data[3] <= length - 4u) return false;
+            data[0] = id_unhandled;
+            raw_hid_send(data, length);
+            return true;
+        default:
+            return false;
+    }
 }
 
 uint8_t noah_qmk_via_command_effects(uint8_t command_id) {

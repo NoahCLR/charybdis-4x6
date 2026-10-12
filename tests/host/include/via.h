@@ -17,9 +17,11 @@ enum {
     id_eeprom_reset                    = 0x0A,
     id_dynamic_keymap_set_keycode      = 0x05,
     id_dynamic_keymap_set_buffer       = 0x13,
+    id_dynamic_keymap_get_buffer       = 0x12,
     id_dynamic_keymap_reset            = 0x06,
     id_dynamic_keymap_macro_reset      = 0x10,
     id_dynamic_keymap_macro_set_buffer = 0x0F,
+    id_dynamic_keymap_macro_get_buffer = 0x0E,
     id_dynamic_keymap_set_encoder      = 0x15,
     id_layout_options                  = 0x02,
 };

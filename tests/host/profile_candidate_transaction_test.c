@@ -662,6 +662,44 @@ static void begin_transaction(noah_profile_candidate_transaction_t *transaction,
     assert(status_of(transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
 }
 
+static void test_begin_retry_requires_identical_via_binding(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
+    for (uint8_t changed = 1u; changed <= 3u; changed++) {
+        fake_backend_t fake;
+        fake_init(&fake);
+        noah_profile_candidate_backend_t backend = backend_for(&fake);
+        noah_profile_candidate_compatibility_t compatible = compatibility();
+        noah_profile_candidate_transaction_t transaction;
+        noah_profile_candidate_v1_metadata_t original = metadata_for(profile, sizeof(profile));
+        noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+        begin_transaction(&transaction, &fake, 123u, &original);
+
+        uint8_t frame[32];
+        begin_frame(frame, 123u, &original);
+        queue_and_scan(&transaction, &fake, frame);
+        assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+        assert(fake.begin_calls == 1u);
+
+        noah_profile_candidate_v1_metadata_t retry = original;
+        if (changed & 1u) retry.via_generation++;
+        if (changed & 2u) retry.via_digest++;
+        begin_frame(frame, 123u, &retry);
+        queue_and_scan(&transaction, &fake, frame);
+        noah_profile_candidate_v1_status_t status = status_of(&transaction);
+        assert(status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_CONFLICTING_RETRY);
+        assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
+        assert(status.flags == NOAH_PROFILE_CANDIDATE_V1_STATUS_POISONED);
+        assert(fake.begin_calls == 1u && fake.commit_begin_calls == 0u);
+        assert(transaction.metadata.via_generation == original.via_generation);
+        assert(transaction.metadata.via_digest == original.via_digest);
+
+        // An original BEGIN cannot revive a poisoned candidate either.
+        begin_frame(frame, 123u, &original);
+        queue_and_scan(&transaction, &fake, frame);
+        assert(status_of(&transaction).error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_POISONED);
+    }
+}
+
 static void write_chunk(noah_profile_candidate_transaction_t *transaction, fake_backend_t *fake, uint16_t transaction_id, uint16_t offset, const uint8_t *bytes, uint8_t length) {
     uint8_t frame[32];
     chunk_frame(frame, transaction_id, offset, bytes, length);
@@ -1488,6 +1526,7 @@ int main(int argc, char **argv) {
     test_operation_status_codec();
     test_peer_status_page();
     test_mailbox_and_begin_retries();
+    test_begin_retry_requires_identical_via_binding();
     test_sequential_chunks_and_duplicate_rules();
     test_bounded_validation_and_error_locations();
     test_commit_activation_and_idempotent_retry();

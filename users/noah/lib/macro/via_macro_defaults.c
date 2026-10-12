@@ -219,6 +219,10 @@ void via_init_kb(void) {
 bool via_command_kb(uint8_t *data, uint8_t length) {
     uint8_t effects;
 
+    if (noah_qmk_via_handle_malformed_buffer_command(data, length)) {
+        return true;
+    }
+
     if (!noah_qmk_via_classify_mutation(data, length, &effects)) {
         return false;
     }

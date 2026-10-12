@@ -626,6 +626,21 @@ opened. Page 0's 25-byte payload, little-endian:
 | 20 | 1 | record flags; committed record only |
 | 21 | 4 | reserved, zero |
 
+### Native VIA Buffer Admission
+
+Native keymap and macro buffer GET/SET commands use a four-byte header followed
+by at most 28 data bytes in a 32-byte Raw HID report. Before mutation
+classification or native QMK dispatch, firmware checks that the header is
+present and the requested byte count fits the received report. A malformed
+request receives VIA's `id_unhandled` reply (`0xff`) and is fully consumed:
+it performs no native read/write, split mirror or mutation bookkeeping.
+Classification alone cannot reject a request because an unclassified command
+still reaches native QMK.
+
+Valid buffer requests retain native VIA's region-bound behavior, including
+zero-length requests and writes that straddle the storage region's end. The
+guard bounds the report payload; storage range policy remains with QMK.
+
 ### Candidate Mutation Envelope
 
 Candidate staging mutations use VIA custom set command `0x07`; durable commit
@@ -679,6 +694,12 @@ The requested-domain mask may be zero for the canonical empty profile and may
 contain only the domains advertised by that firmware. Compatibility with the build's advertised
 schema, domain mask, action ABI, and capacity is checked by the scan owner
 before storage work begins.
+
+A repeated BEGIN for the same transaction is idempotent only when every field
+matches the original, including store format and bound VIA generation/digest.
+A changed field rejects and poisons the candidate with `CONFLICTING_RETRY`;
+it cannot replace the original binding or restart storage work. Repeating the
+original BEGIN afterward does not revive the poisoned candidate.
 
 Candidate chunk uses this complete layout:
 
