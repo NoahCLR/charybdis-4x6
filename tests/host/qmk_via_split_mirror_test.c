@@ -30,6 +30,11 @@ static bool             mirror_allowed;
 static bool             fake_master;
 static uint16_t         sent_count;
 
+void raw_hid_send(uint8_t *data, uint8_t length) {
+    (void)data;
+    (void)length;
+}
+
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
     exit(1);

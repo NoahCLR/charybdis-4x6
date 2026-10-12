@@ -19,6 +19,11 @@ static void test_fail(const char *expr, const char *file, int line) {
 
 void via_macro_provider_storage_changing(void) {}
 
+void raw_hid_send(uint8_t *data, uint8_t length) {
+    (void)data;
+    (void)length;
+}
+
 uint16_t dynamic_keymap_macro_get_buffer_size(void) {
     return 128u;
 }

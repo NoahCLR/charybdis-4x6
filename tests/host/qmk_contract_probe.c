@@ -110,6 +110,11 @@ int main(void) {
     printf("SS_DELAY_CODE=%u\n", (unsigned)SS_DELAY_CODE);
     printf("VIA_ID_CUSTOM_GET_VALUE=0x%02X\n", (unsigned)id_custom_get_value);
     printf("VIA_ID_CUSTOM_CHANNEL=0x%02X\n", (unsigned)id_custom_channel);
+    printf("VIA_ID_UNHANDLED=0x%02X\n", (unsigned)id_unhandled);
+    printf("VIA_ID_KEYMAP_GET_BUFFER=0x%02X\n", (unsigned)id_dynamic_keymap_get_buffer);
+    printf("VIA_ID_KEYMAP_SET_BUFFER=0x%02X\n", (unsigned)id_dynamic_keymap_set_buffer);
+    printf("VIA_ID_MACRO_GET_BUFFER=0x%02X\n", (unsigned)id_dynamic_keymap_macro_get_buffer);
+    printf("VIA_ID_MACRO_SET_BUFFER=0x%02X\n", (unsigned)id_dynamic_keymap_macro_set_buffer);
 
     return 0;
 }

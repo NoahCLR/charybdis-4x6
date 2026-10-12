@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Centralizes this userspace's dependence on VIA/QMK internals used for
-// authored default macro seeding and VIA command classification.
+// authored default macro seeding, native buffer admission and classification.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -25,6 +25,9 @@ uint16_t noah_qmk_via_keymap_buffer_capacity(void);
 uint16_t noah_qmk_via_macro_seed_capacity(void);
 void     noah_qmk_via_macro_set_buffer(uint16_t offset, uint16_t size, uint8_t *data);
 bool     noah_qmk_via_should_seed_defaults_post_init(void);
+// Call before classification or native dispatch: a non-mutation still reaches
+// QMK. Returns true after replying to a malformed buffer command; consume it.
+bool     noah_qmk_via_handle_malformed_buffer_command(uint8_t *data, uint8_t length);
 uint8_t  noah_qmk_via_command_effects(uint8_t command_id);
 bool     noah_qmk_via_classify_mutation(const uint8_t *data, uint8_t length, uint8_t *out_effects);
 #else
@@ -43,6 +46,12 @@ static inline void noah_qmk_via_macro_set_buffer(uint16_t offset, uint16_t size,
 }
 
 static inline bool noah_qmk_via_should_seed_defaults_post_init(void) {
+    return false;
+}
+
+static inline bool noah_qmk_via_handle_malformed_buffer_command(uint8_t *data, uint8_t length) {
+    (void)data;
+    (void)length;
     return false;
 }
 
