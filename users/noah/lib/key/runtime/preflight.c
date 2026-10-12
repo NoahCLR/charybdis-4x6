@@ -7,7 +7,6 @@
 #include "trace.h"
 #include "transition.h"
 #include "../../action/action_dispatch.h"
-#include "../../action/owned_keycode.h"
 #include "reducer/state_query.h"
 #include "reducer/ownership_state.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
@@ -15,7 +14,7 @@
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record, bool press_is_handled) {
     const press_token_t *token = key_runtime_core_press_token_at(record->event.key);
 
-    if (owned_keycode_should_suppress_default(keycode, record) || keyboard_mod_ownership_should_suppress_default(keycode, record)) {
+    if (keyboard_mod_ownership_should_suppress_default(keycode, record)) {
         if (!record->event.pressed && token && token->handled_key) {
             // Let the handled-key release path run.
         } else {

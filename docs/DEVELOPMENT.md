@@ -104,8 +104,11 @@ establish allocator/stack high-water or timing on the keyboard.
 The UF2 is this userspace and the BK fork compiled together, so this repository
 names the exact BK commit it builds with in `qmk-pin.json`: a published commit
 on the fork's `noah-userspace-contracts-dev`. Everything uses it:
-`tools/build-firmware-pair.sh` refuses a BK checkout that is not at the pin or
-has local changes, and CI's `Host suite (GCC)` and `Pair build` check BK out at
+`tools/build-firmware-pair.sh` refuses a BK checkout that is not at the pin,
+has local tracked submodule changes, has different submodule commits, or has
+uninitialized dependencies. Untracked submodule metadata does not change the
+tracked build inputs. The same check refuses other BK working-tree changes.
+CI's `Host suite (GCC)` and `Pair build` check BK out at
 the pin. `NOAH_ALLOW_UNPINNED_QMK=1` builds against the BK checkout as it is,
 printed as such and recorded in the pair's note as "not the pin": VS Code's
 build tasks set it, because they are development builds of the checkouts you

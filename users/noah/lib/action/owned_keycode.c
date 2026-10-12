@@ -288,7 +288,11 @@ void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
 bool owned_keycode_should_suppress_default(uint16_t keycode, keyrecord_t *record) {
     owned_keycode_lease_t components;
 
-    return record && owned_keycode_decompose(keycode, &components) && components.has_basic && owned_keycode_state.managed_refcounts[components.basic] != 0u;
+    if (!record || !owned_keycode_decompose(keycode, &components) || !components.has_basic) return false;
+    // Counts are settled after the native path chooses whether to send an
+    // edge, so a release still includes its own physical owner here.
+    uint8_t physical = owned_keycode_state.physical_refcounts[components.basic];
+    return owned_keycode_state.managed_refcounts[components.basic] != 0u || physical > (record->event.pressed ? 0u : 1u);
 }
 
 uint16_t owned_keycode_managed_usage_count(void) {

@@ -39,7 +39,7 @@ flowchart TD
     physical --> process_user["process_record_user"]
     process_user --> normalize["Compatibility: combo origin normalizes event key"]
     normalize --> observe["Authoritative: reducer observes physical event"]
-    observe --> preflight["Planned: preflight interrupts or suppresses aggregate-owned defaults"]
+    observe --> preflight["Planned: preflight interrupts and protects shared modifier releases"]
     preflight --> pd_handler["PD key handler is offered the press; a consumed press becomes inert"]
     pd_handler --> lookup["key/behavior handled_key_lookup"]
     lookup --> press_plan["Planned: reducer press effect plan"]
@@ -54,11 +54,20 @@ flowchart TD
     finalize --> report_track["Applied: owned_keycode and modifier report ownership settle on the final event result"]
 ```
 
-Report ownership is settled in the finalize hook rather than in pre-process,
-because only the final event result says whether QMK's default handler will
-register the usage at all. A press userspace consumes owns nothing in the
-report, so it must not stop a managed owner of the same usage from registering
-it, or stop the last managed modifier release from clearing the report bit.
+Report ownership is settled after the key's behaviour and pointing override
+have decided who takes it, rather than in pre-process. A press consumed by a
+behaviour or mode owns no native report usage, so it cannot block a managed
+owner's registration or teardown. Native report overlap is checked only after
+those consumers: a plain key sharing an already-held usage owns it without
+sending another press edge. That suppressed native press is credited at this
+late stage; other native presses are credited by finalize. Every credited
+release retires its owner in finalize, with no release edge until the last
+physical and managed owner lets go. Modified native keys still perform their
+weak-modifier changes when their basic usage's edge is suppressed.
+Plain overlapping keyboard keys also send the modifier report: QMK clears weak
+modifiers before a physical press, and that cleared state must reach the host
+without another basic usage edge. Report emission retains QMK's one-shot
+modifier consumption.
 Pre-process still tracks which physical modifier keys are down, which is the
 separate question masking policy asks. A QMK mod-tap is a physically held
 modifier too, once QMK has resolved it as a hold: pre-process runs before QMK's

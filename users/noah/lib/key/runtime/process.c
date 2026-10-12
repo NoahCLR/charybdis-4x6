@@ -22,6 +22,7 @@
 #include "../../macro/macro_input_guard.h"
 #include "../../macro/macro_payload.h"
 #include "../../compat/qmk_oneshot_contract.h"
+#include "../../compat/qmk_native_report_contract.h"
 #include "../../compat/qmk_source_layer_contract.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/ownership/layer_ownership.h"
@@ -57,6 +58,8 @@ struct key_runtime_process_ctx_t {
     bool                     resolution_loaded;
     bool                     use_row; // participation: whether this record uses the keycode's behaviour row
 };
+
+static void key_runtime_process_settle_report_ownership(uint16_t keycode, keyrecord_t *record, bool keep_processing);
 
 static void key_runtime_process_end_keyboard_event_mod_mask(void) {
     key_runtime_core_state_t *state = key_runtime_core_state();
@@ -267,6 +270,19 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_direct_acti
     return KEY_RUNTIME_PROCESS_RETURN_FALSE;
 }
 
+// Behaviours and mode overrides have already had their turn. A native key
+// sharing a usage still owns it; only the redundant QMK register/unregister
+// edge is suppressed. Credit a suppressed press exactly once, just as finalize
+// credits a press that reaches QMK's default action.
+static key_runtime_process_stage_outcome_t key_runtime_process_stage_native_overlap(key_runtime_process_ctx_t *ctx) {
+    if (!owned_keycode_should_suppress_default(ctx->keycode, ctx->record)) return KEY_RUNTIME_PROCESS_NEXT;
+    if (ctx->record->event.pressed) {
+        key_runtime_process_settle_report_ownership(ctx->keycode, ctx->record, true);
+    }
+    noah_qmk_native_overlap_report_event(ctx->keycode, ctx->record->event.pressed);
+    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
+}
+
 // A custom key without a behaviour does nothing. Its press is consumed so the
 // keycode never reaches QMK.
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_idle_custom_key(key_runtime_process_ctx_t *ctx) {
@@ -284,13 +300,12 @@ static bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep
     return keep_processing;
 }
 
-// Report ownership means "QMK's default handler holds this usage in the report".
-// That is only knowable once the event result is final, so it is settled from
-// the finalize hook rather than pre-process. Crediting a press that userspace
-// later consumes would make a managed owner of the same usage skip its own key
-// registration, and would keep the last managed modifier release from clearing
-// the report bit. Pre-process still tracks which physical keys are down, which
-// is a different question and stays where it is.
+// Native report ownership is settled after behaviour/mode admission. Finalize
+// credits presses QMK processes; the late overlap stage credits native presses
+// whose usage is already held without sending a redundant edge. Its bitmap
+// entry prevents finalize from crediting that press twice. A press consumed by
+// a behaviour or mode remains uncredited, so it cannot veto managed teardown.
+// Physical modifier observation is a separate masking question in pre-process.
 static void key_runtime_process_settle_report_ownership(uint16_t keycode, keyrecord_t *record, bool keep_processing) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 
@@ -427,7 +442,7 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {
-        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "pd_mode_release", .handler = key_runtime_process_stage_pd_mode_release}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "layer_tap_hold", .handler = key_runtime_process_stage_layer_tap_hold}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "idle_custom_key", .handler = key_runtime_process_stage_idle_custom_key},
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "pd_mode_release", .handler = key_runtime_process_stage_pd_mode_release}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "layer_tap_hold", .handler = key_runtime_process_stage_layer_tap_hold}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "native_overlap", .handler = key_runtime_process_stage_native_overlap}, {.name = "idle_custom_key", .handler = key_runtime_process_stage_idle_custom_key},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,

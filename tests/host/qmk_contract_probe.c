@@ -19,6 +19,7 @@
 #include "via.h"
 #include "../../users/noah/lib/compat/qmk_factory_settings.h"
 #include "../../users/noah/lib/compat/qmk_mod_contract.h"
+#include "../../users/noah/lib/compat/qmk_native_report_contract.h"
 
 _Static_assert(offsetof(keyrecord_t, event) == 0, "keyrecord_t.event must remain the first field");
 

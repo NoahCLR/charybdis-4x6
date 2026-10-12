@@ -98,8 +98,11 @@ static bool visible(uint8_t key) {
 }
 static void physical(uint8_t key, bool down) {
     keyrecord_t record = {.event = {.type = KEY_EVENT, .pressed = down, .key = {.row = 0, .col = 0}}};
+    // Native admission checks existing owners before crediting this event.
+    // A suppressed duplicate press still owns the already-held usage.
+    bool suppress = owned_keycode_should_suppress_default(key, &record);
     owned_keycode_track_physical_event(key, &record);
-    if (!owned_keycode_should_suppress_default(key, &record)) {
+    if (!suppress) {
         if (down)
             register_code(key);
         else

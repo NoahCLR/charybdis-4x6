@@ -38,6 +38,8 @@ ball movement each threshold is at the mode's DPI), what each direction's
 shortcut does with held modifiers (inherit them, leave chosen ones out, or send
 exactly the shortcut), scroll gesture ratios/timing and mouse-button overrides.
 A mouse-button shortcut keeps the modifier handling it was stored with.
+A shortcut never releases a keyboard key another key or macro is holding;
+that usage stays down until its last owner releases it.
 Volume, brightness, zoom, arrow navigation, history shortcuts and
 modifier-assisted scrolling use the same facilities. Mouse buttons 1–3 can pass
 through, be consumed, tap a shortcut or hold modifiers. Choose what a button

@@ -131,6 +131,10 @@ static bool process_begin(noah_profile_candidate_transaction_t *transaction, con
         }
         if (metadata_equal(&transaction->metadata, metadata)) {
             clear_error(transaction);
+        } else if (transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED) {
+            // Reject the operation, never the durable decision. Replacing its
+            // state would stop roll-forward and could lift the output fence.
+            set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_CONFLICTING_RETRY, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
         } else {
             poison(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_CONFLICTING_RETRY, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16);
         }

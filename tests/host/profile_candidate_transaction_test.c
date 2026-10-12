@@ -917,6 +917,63 @@ static void test_commit_activation_and_idempotent_retry(void) {
     assert(fake.commit_begin_calls == 1u && fake.commit_step_calls == 2u && fake.activation_begin_calls == 1u && fake.activation_step_calls == 2u);
 }
 
+static void test_conflicting_begin_preserves_durable_phases(void) {
+    static const uint8_t profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
+    const noah_profile_candidate_v1_state_t phases[] = {
+        NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING,
+        NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER,
+        NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING,
+        NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED,
+    };
+    for (uint8_t i = 0; i < sizeof(phases) / sizeof(phases[0]); i++) {
+        fake_backend_t fake;
+        fake_init(&fake);
+        fake.commit_steps_remaining = fake.activation_steps_remaining = 1u;
+        noah_profile_candidate_backend_t backend = backend_for(&fake);
+        noah_profile_candidate_compatibility_t compatible = compatibility();
+        noah_profile_candidate_transaction_t transaction;
+        noah_profile_candidate_transaction_init(&transaction, &backend, &compatible);
+        assert(noah_profile_candidate_transaction_require_split_authorization(&transaction, true));
+        noah_profile_candidate_v1_metadata_t metadata = metadata_for(profile, sizeof(profile));
+        stage_validated(&transaction, &fake, 73u, profile, sizeof(profile), &metadata);
+        uint8_t frame[32];
+        simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 73u);
+        queue_and_scan(&transaction, &fake, frame);
+        assert(noah_profile_candidate_transaction_authorize_commit(&transaction));
+        if (phases[i] != NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING) {
+            while (transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING)
+                assert(noah_profile_candidate_transaction_scan(&transaction));
+        }
+        if (phases[i] == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING)
+            assert(noah_profile_candidate_transaction_authorize_activation(&transaction));
+        if (phases[i] == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED)
+            assert(noah_profile_candidate_transaction_fail_postcommit(&transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST));
+        assert(transaction.status.state == phases[i]);
+        metadata.digest ^= 1u;
+        begin_frame(frame, 73u, &metadata);
+        queue_and_scan(&transaction, &fake, frame);
+        assert(transaction.status.state == phases[i]);
+        assert(transaction.metadata.digest != metadata.digest);
+        if (phases[i] != NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED) {
+            assert(transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_CONFLICTING_RETRY);
+            assert(!transaction.poisoned);
+        }
+        simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_ABORT, 73u);
+        queue_and_scan(&transaction, &fake, frame);
+        assert(transaction.status.state == phases[i] && fake.abort_calls == 0u);
+        assert(noah_profile_candidate_transaction_expire_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DURABLE_PHASE);
+        if (phases[i] == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED) continue;
+        while (transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING)
+            assert(noah_profile_candidate_transaction_scan(&transaction));
+        if (transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER)
+            assert(noah_profile_candidate_transaction_authorize_activation(&transaction));
+        while (transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING)
+            assert(noah_profile_candidate_transaction_scan(&transaction));
+        assert(transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
+        assert(transaction.last_committed_transaction_id == 73u);
+    }
+}
+
 static void test_split_authorization_barriers(void) {
     static const uint8_t                   profile[8] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
     fake_backend_t                         fake;
@@ -1530,6 +1587,7 @@ int main(int argc, char **argv) {
     test_sequential_chunks_and_duplicate_rules();
     test_bounded_validation_and_error_locations();
     test_commit_activation_and_idempotent_retry();
+    test_conflicting_begin_preserves_durable_phases();
     test_split_authorization_barriers();
     test_postcommit_authority_failure_is_terminal_and_retains_candidate();
     test_split_commit_failure_reports_and_cleans_known_precommit_failure();
