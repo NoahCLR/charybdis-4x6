@@ -67,6 +67,15 @@ record with tap count 0 that QMK's default action took. Its modifiers are also
 managed owners, because QMK registers them through `register_mods()`, so
 teardown is unchanged. A tapped mod-tap never held a modifier.
 
+Physical modifier-only combinations (`KC_MEH`, `KC_HYPR`, or a modifier
+wrapped in `QK_MODS`, such as `S(KC_LEFT_CTRL)`) count every real modifier they
+hold. A modified ordinary key such as `S(KC_A)` keeps QMK's weak-modifier
+path. Combination releases are consumed before QMK's all-parts teardown;
+finalize retires the press's report counts and releases only parts with no
+remaining native or managed owner. A suppressed non-handled release also
+retires its reducer leases. Left and right components remain distinct, and
+wrapping a modifier in itself counts that component once.
+
 The active pointing mode is offered a press before the key's behavior. While
 offered, the press is not a behavior press yet, so an output the mode emits
 cannot settle that key's pending fallback hold. If the mode consumes it, the
@@ -86,6 +95,10 @@ Literal taps go through the ownership ledger (`owned_keycode_tap_literal()`),
 never straight to QMK's `tap_code16()`, whose final unregister would clear a
 usage another owner still holds. A usage already held stays held and its tap
 changes nothing in the report.
+
+Owned modifier combinations retain both the wrapper mask and a modifier in
+the basic field: an owned `S(KC_LEFT_CTRL)` holds Shift and Ctrl through the
+same modifier ledger, without registering an ordinary key usage.
 
 The reducer owns active press identity by physical `keypos_t`. Layer changes or
 transparent resolution do not move that identity. If a runtime-handled pd-mode

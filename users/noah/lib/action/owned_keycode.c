@@ -5,6 +5,7 @@
 #include "owned_keycode.h"
 
 #include "../pointing/policy/pointer_layer_policy.h"
+#include "../compat/qmk_mod_contract.h"
 #include "../state/ownership/keyboard_mod_ownership.h"
 
 #define OWNED_KEYCODE_USAGE_CAPACITY ((uint16_t)QK_MOUSE_ACCELERATION_2 + 1u)
@@ -32,21 +33,7 @@ static bool owned_keycode_is_modded(uint16_t keycode) {
 }
 
 static uint8_t owned_keycode_extract_mods(uint16_t keycode) {
-    uint8_t mods_to_send = 0;
-
-    if (keycode & QK_RMODS_MIN) {
-        if (keycode & QK_LCTL) mods_to_send |= MOD_BIT(KC_RIGHT_CTRL);
-        if (keycode & QK_LSFT) mods_to_send |= MOD_BIT(KC_RIGHT_SHIFT);
-        if (keycode & QK_LALT) mods_to_send |= MOD_BIT(KC_RIGHT_ALT);
-        if (keycode & QK_LGUI) mods_to_send |= MOD_BIT(KC_RIGHT_GUI);
-    } else {
-        if (keycode & QK_LCTL) mods_to_send |= MOD_BIT(KC_LEFT_CTRL);
-        if (keycode & QK_LSFT) mods_to_send |= MOD_BIT(KC_LEFT_SHIFT);
-        if (keycode & QK_LALT) mods_to_send |= MOD_BIT(KC_LEFT_ALT);
-        if (keycode & QK_LGUI) mods_to_send |= MOD_BIT(KC_LEFT_GUI);
-    }
-
-    return mods_to_send;
+    return noah_qmk_mods_to_report_mask(QK_MODS_GET_MODS(keycode));
 }
 
 static uint8_t owned_keycode_basic_part(uint16_t keycode) {
@@ -67,6 +54,7 @@ static bool owned_keycode_decompose(uint16_t keycode, owned_keycode_lease_t *lea
         lease->basic     = owned_keycode_basic_part(keycode);
         lease->has_basic = owned_keycode_is_report_usage(lease->basic);
         lease->mods      = owned_keycode_extract_mods(keycode);
+        if (IS_MODIFIER_KEYCODE(lease->basic)) lease->mods |= MOD_BIT(lease->basic);
         return true;
     }
     if (keycode > UINT8_MAX) {
