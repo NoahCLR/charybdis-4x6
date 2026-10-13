@@ -209,7 +209,7 @@ static noah_profile_compiled_v1_result_t emit_group_row(compiled_writer_t *write
     return NOAH_PROFILE_COMPILED_V1_OK;
 }
 
-noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
+static noah_profile_compiled_v1_result_t rgb_v4_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
     size_t                            payload_length;
     uint8_t                           group_count;
     noah_profile_compiled_v1_result_t result = rgb_compiled_length(&payload_length, &group_count, error);
@@ -294,52 +294,85 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
 #    endif
     return writer->result;
 }
+#endif
+
+noah_profile_lighting_v1_limits_t noah_profile_rgb_compiled_v1_limits(void) {
+    noah_profile_lighting_v1_limits_t limits = noah_profile_lighting_v1_default_limits();
+    limits.logical_layer_count               = LAYER_COUNT;
+    limits.supported_mode_mask               = UINT32_MAX >> (32u - PD_MODE_COUNT);
+    limits.tap_depth                         = KEY_BEHAVIOR_MAX_TAP_COUNT;
+#ifdef RGB_MATRIX_MAXIMUM_BRIGHTNESS
+    limits.maximum_brightness = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
+#endif
+    return limits;
+}
+
+#if defined(RGB_MATRIX_ENABLE)
+// Maximum canonical version-4 geometry: fixed records, sixteen bitmap groups,
+// sixteen layer colours, 32 PD colours, 32 stage rows in total and the tap
+// colours. A structural bound, not a RAM claim.
+enum { RGB_V4_CACHE_SIZE = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + NOAH_PROFILE_RGB_V1_MAX_GROUPS * NOAH_PROFILE_RGB_V1_GROUP_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS * NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_PD_MODES * NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE };
+// The conversion of that geometry: header, at most 92 palette colours, the
+// four thing tables, sixteen key sets, up to 70 rules of at most 14 bytes and
+// the extensions (docs/architecture/lighting-rules-v1.md, Standard lighting).
+enum { RGB_V5_CACHE_SIZE = 1664u };
+static uint8_t                         v4_bytes[RGB_V4_CACHE_SIZE];
+static uint8_t                         v5_bytes[RGB_V5_CACHE_SIZE];
+static size_t                          v5_length;
+static noah_profile_rgb_v1_view_t      v4_view;
+static noah_profile_lighting_v1_view_t v5_view;
+static bool                            cached;
+typedef struct {
+    size_t length;
+} cache_sink_t;
+static bool cache_write(void *context, const uint8_t *bytes, size_t length) {
+    cache_sink_t *sink = context;
+    if (length > sizeof(v4_bytes) - sink->length) return false;
+    memcpy(v4_bytes + sink->length, bytes, length);
+    sink->length += length;
+    return true;
+}
+
+static bool warm(void) {
+    if (!cached) {
+        cache_sink_t                      sink      = {0};
+        compiled_writer_t                 writer    = {.write = cache_write, .context = &sink};
+        noah_profile_rgb_v1_limits_t      v4_limits = noah_profile_rgb_v1_default_limits();
+        noah_profile_lighting_v1_limits_t limits    = noah_profile_rgb_compiled_v1_limits();
+        v4_limits.logical_layer_count               = LAYER_COUNT;
+        v4_limits.supported_pd_mode_mask            = UINT32_MAX >> (32u - PD_MODE_COUNT);
+        v4_limits.maximum_brightness                = limits.maximum_brightness;
+        v4_limits.tap_branch_color_count            = KEY_BEHAVIOR_MAX_TAP_COUNT - 1u;
+        v4_limits.compiled_stage_mask               = noah_profile_rgb_compiled_v1_stage_mask();
+#    ifdef NOAH_COMPILED_DEFAULTS_TEST
+        extern void noah_compiled_defaults_test_domain_write(uint8_t id);
+        noah_compiled_defaults_test_domain_write(NOAH_PROFILE_DOMAIN_V1_RGB);
+#    endif
+        if (rgb_v4_write(&writer, NULL) != NOAH_PROFILE_COMPILED_V1_OK || noah_profile_rgb_v1_decode(v4_bytes, sink.length, &v4_limits, &v4_view, NULL) != NOAH_PROFILE_RGB_V1_OK) return false;
+        if (noah_profile_lighting_v1_convert_rgb_v4(&v4_view, &limits, v5_bytes, sizeof(v5_bytes), &v5_length) != NOAH_PROFILE_LIGHTING_V1_OK || noah_profile_lighting_v1_decode(v5_bytes, v5_length, &limits, &v5_view, NULL) != NOAH_PROFILE_LIGHTING_V1_OK) return false;
+        cached = true;
+    }
+    return true;
+}
+
+const noah_profile_lighting_v1_view_t *noah_profile_rgb_compiled_v1_view(void) {
+    return warm() ? &v5_view : NULL;
+}
+
+const noah_profile_rgb_v1_view_t *noah_profile_rgb_compiled_v1_v4_view(void) {
+    return warm() ? &v4_view : NULL;
+}
+
+noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
+    if (!warm()) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
+    emit(writer, v5_bytes, v5_length);
+    return writer->result;
+}
 #else
 // Without RGB Matrix the compiled profile has no RGB domain.
 noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
     (void)writer;
     (void)error;
     return NOAH_PROFILE_COMPILED_V1_OK;
-}
-#endif
-
-#if defined(RGB_MATRIX_ENABLE)
-// Maximum canonical RGB geometry: fixed records, sixteen bitmap groups,
-// eight layer colors, 32 PD colors, 32 stage rows total, four tap colors.
-// This is a structural bound, not a profile-sized buffer or a RAM claim.
-enum { RGB_DEFAULTS_CACHE_SIZE = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + NOAH_PROFILE_RGB_V1_MAX_GROUPS * NOAH_PROFILE_RGB_V1_GROUP_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS * NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_PD_MODES * NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE };
-static uint8_t                    cached_bytes[RGB_DEFAULTS_CACHE_SIZE];
-static noah_profile_rgb_v1_view_t cached_view;
-static bool                       cached;
-typedef struct {
-    size_t length;
-} cache_sink_t;
-static bool cache_write(void *context, const uint8_t *bytes, size_t length) {
-    cache_sink_t *sink = context;
-    if (length > sizeof(cached_bytes) - sink->length) return false;
-    memcpy(cached_bytes + sink->length, bytes, length);
-    sink->length += length;
-    return true;
-}
-const noah_profile_rgb_v1_view_t *noah_profile_rgb_compiled_v1_view(void) {
-    if (!cached) {
-        cache_sink_t                 sink   = {0};
-        compiled_writer_t            writer = {.write = cache_write, .context = &sink};
-        noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
-        limits.logical_layer_count          = LAYER_COUNT;
-        limits.supported_pd_mode_mask       = UINT32_MAX >> (32u - PD_MODE_COUNT);
-#    ifdef RGB_MATRIX_MAXIMUM_BRIGHTNESS
-        limits.maximum_brightness = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
-#    endif
-        limits.tap_branch_color_count = KEY_BEHAVIOR_MAX_TAP_COUNT - 1u;
-        limits.compiled_stage_mask    = noah_profile_rgb_compiled_v1_stage_mask();
-#    ifdef NOAH_COMPILED_DEFAULTS_TEST
-        extern void noah_compiled_defaults_test_domain_write(uint8_t id);
-        noah_compiled_defaults_test_domain_write(NOAH_PROFILE_DOMAIN_V1_RGB);
-#    endif
-        if (noah_profile_rgb_compiled_v1_write(&writer, NULL) != NOAH_PROFILE_COMPILED_V1_OK || noah_profile_rgb_v1_decode(cached_bytes, sink.length, &limits, &cached_view, NULL) != NOAH_PROFILE_RGB_V1_OK) return NULL;
-        cached = true;
-    }
-    return &cached_view;
 }
 #endif

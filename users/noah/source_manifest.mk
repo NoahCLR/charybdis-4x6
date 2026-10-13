@@ -16,6 +16,8 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_reader.c \
     lib/profile/schema/key_behavior_domain_v1.c \
     lib/profile/schema/profile_rgb_v1.c \
+    lib/profile/schema/profile_lighting_v1.c \
+    lib/profile/schema/profile_lighting_v1_convert.c \
     lib/profile/schema/profile_validator_v1.c \
     lib/profile/schema/profile_compiled_defaults_v1.c \
     lib/profile/schema/profile_rgb_compiled_v1.c \
@@ -130,13 +132,30 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/planning/tap_series_flush.c \
     lib/key/runtime/trace/core_trace.c \
     lib/rgb/core/rgb_runtime.c \
-    lib/rgb/core/rgb_effective_config.c \
-    lib/rgb/stages/rgb_combo_feedback_stage.c \
-    lib/rgb/stages/rgb_key_feedback_stage.c \
-    lib/rgb/stages/rgb_layer_stage.c \
-    lib/rgb/automouse/rgb_automouse_stage.c \
-    lib/rgb/stages/rgb_pd_mode_stage.c \
-    lib/rgb/stages/rgb_preview_stage.c \
+    lib/rgb/lighting/lighting_dispatch.c \
+    lib/rgb/lighting/lighting_engine.c \
+    lib/rgb/lighting/lighting_fade.c \
+    lib/rgb/lighting/kinds/fact_behaviour_state.c \
+    lib/rgb/lighting/kinds/fact_combos_held.c \
+    lib/rgb/lighting/kinds/fact_layer_active.c \
+    lib/rgb/lighting/kinds/fact_layer_previewing.c \
+    lib/rgb/lighting/kinds/fact_pointing_mode_active.c \
+    lib/rgb/lighting/kinds/paint_clear.c \
+    lib/rgb/lighting/kinds/paint_colour.c \
+    lib/rgb/lighting/kinds/paint_dim.c \
+    lib/rgb/lighting/kinds/paint_identity.c \
+    lib/rgb/lighting/kinds/paint_map.c \
+    lib/rgb/lighting/kinds/paint_off.c \
+    lib/rgb/lighting/kinds/paint_tint.c \
+    lib/rgb/lighting/kinds/target_key_set.c \
+    lib/rgb/lighting/kinds/target_left_half.c \
+    lib/rgb/lighting/kinds/target_right_half.c \
+    lib/rgb/lighting/kinds/target_subject_halves.c \
+    lib/rgb/lighting/kinds/target_subject_keys.c \
+    lib/rgb/lighting/kinds/target_subject_layer_keys.c \
+    lib/rgb/lighting/kinds/target_subject_place.c \
+    lib/rgb/lighting/kinds/target_whole_board.c \
+    lib/rgb/lighting/kinds/timing_show_after.c \
     lib/rgb/core/rgb_config_defaults.c \
     lib/rgb/core/rgb_validation.c
 

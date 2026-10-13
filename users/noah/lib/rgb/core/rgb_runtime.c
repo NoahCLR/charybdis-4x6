@@ -2,31 +2,49 @@
 // ────────────────────────────────────────────────────────────────────────────
 // RGB Runtime
 // ────────────────────────────────────────────────────────────────────────────
+//
+// The lighting rule engine's entry point (docs/architecture/lighting-rules-v1.md).
+// When QMK starts the first LED chunk of a frame, this captures the facts and
+// re-resolves the frame if anything it depends on changed; every chunk then
+// writes the resolved colours of its own LEDs. Diagnostics win outright and
+// the RGB timeout still turns everything off.
+// ────────────────────────────────────────────────────────────────────────────
 
 #include "rgb_runtime.h"
-#include "rgb_effective_config.h"
 #include "rgb_helpers.h"
-#include "../automouse/rgb_automouse_stage.h"
-#include "../stages/rgb_combo_feedback_stage.h"
-#include "../stages/rgb_key_feedback_stage.h"
-#include "../stages/rgb_layer_stage.h"
-#include "../stages/rgb_pd_mode_stage.h"
-#include "../stages/rgb_preview_stage.h"
-#include "../../state/diagnostics/runtime_diag.h"
 #include "rgb_validation.h"
-
-#if defined(RGB_MATRIX_ENABLE) && (defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE) || (defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)))
-#    include "../../key/runtime/feedback.h"
-#    include "../../split/runtime_sync.h"
-#endif
+#include "../../state/diagnostics/runtime_diag.h"
 
 #ifdef RGB_MATRIX_ENABLE
-static rgb_runtime_frame_t        rgb_runtime_frame_primary;
-static noah_effective_rgb_frame_t rgb_runtime_profile_frame;
+#    include <string.h>
+
+#    include "../lighting/lighting_engine.h"
+#    include "../../profile/runtime/effective_rgb_runtime.h"
+#    include "../../split/runtime_sync.h"
+#    if __has_include("sync_timer.h")
+#        include "sync_timer.h" // QMK
+#    else
+#        define sync_timer_read32() timer_read32()
+#    endif
+#    if defined(RGB_MATRIX_WS2812)
+#        include "ws2812.h" // QMK driver buffer access
+#    endif
+
+static noah_lighting_facts_t        rgb_runtime_facts;
+static noah_lighting_facts_t        rgb_runtime_resolved_facts;
+static noah_lighting_frame_t        rgb_runtime_frame;
+static noah_lighting_resolve_info_t rgb_runtime_info;
+static noah_lighting_scene_t        rgb_runtime_scene;
+static uint32_t                     rgb_runtime_now;
+static uint32_t                     rgb_runtime_program_generation;
+static uint32_t                     rgb_runtime_keymap_generation;
+static uint32_t                     rgb_runtime_resolved_keymap_generation;
+static bool                         rgb_runtime_resolved;
 
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
 static uint16_t rgb_runtime_stage_pipeline_count;
 static uint16_t rgb_runtime_early_exit_count;
+static uint16_t rgb_runtime_resolve_count;
 
 uint16_t rgb_runtime_test_stage_pipeline_count(void) {
     return rgb_runtime_stage_pipeline_count;
@@ -35,98 +53,92 @@ uint16_t rgb_runtime_test_stage_pipeline_count(void) {
 uint16_t rgb_runtime_test_early_exit_count(void) {
     return rgb_runtime_early_exit_count;
 }
+
+uint16_t rgb_runtime_test_resolve_count(void) {
+    return rgb_runtime_resolve_count;
+}
 #    endif
 
-#    if defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE) || (defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE))
-typedef struct {
-    bool    combo_valid;
-    uint8_t combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    uint8_t combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-#        ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    bool    key_feedback_valid;
-    uint8_t key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
-    uint8_t key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
-    uint8_t key_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    uint8_t key_feedback_broad_owner_map[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
-#        endif
-} rgb_runtime_render_snapshot_t;
-
-// Keep this source cache small enough that render-work optimization cannot
-// silently grow into another LED-frame-sized allocation.
-_Static_assert(sizeof(rgb_runtime_render_snapshot_t) <= 96u, "RGB render source snapshot exceeds its 96-byte RAM budget");
-
-static rgb_runtime_render_snapshot_t rgb_runtime_render_snapshot;
-
-static void rgb_runtime_render_snapshot_invalidate(void) {
-    rgb_runtime_render_snapshot.combo_valid = false;
-#        ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    rgb_runtime_render_snapshot.key_feedback_valid = false;
-#        endif
+uint32_t noah_lighting_keymap_generation(void) {
+    return rgb_runtime_keymap_generation;
 }
 
-static void rgb_runtime_render_snapshot_ensure_combo(void) {
-    if (rgb_runtime_render_snapshot.combo_valid) {
-        return;
-    }
+#    if defined(RGB_MATRIX_WS2812)
+extern ws2812_led_t ws2812_leds[WS2812_LED_COUNT];
 
-    if (is_keyboard_master()) {
-        combo_feedback_bitmaps(rgb_runtime_render_snapshot.combo_underlay_bitmap, rgb_runtime_render_snapshot.combo_overlay_bitmap);
-    } else {
-        // A false read means the split worker was still publishing this
-        // domain; the cached bitmaps are untouched, so the frame renders the
-        // last coherent snapshot instead of a mixture of two packets.
-        (void)split_runtime_sync_remote_read_combo(rgb_runtime_render_snapshot.combo_underlay_bitmap, rgb_runtime_render_snapshot.combo_overlay_bitmap);
-    }
+// The colour the matrix effect drew this frame, read back from the driver
+// buffer before this chunk's lighting writes over it.
+bool noah_lighting_effect_colour(uint8_t led, rgb_t *colour) {
+    int driver_index = rgb_matrix_led_index(led);
 
-    rgb_runtime_render_snapshot.combo_valid = true;
+    if (driver_index < 0) return false;
+    *colour = (rgb_t){.r = ws2812_leds[driver_index].r, .g = ws2812_leds[driver_index].g, .b = ws2812_leds[driver_index].b};
+    return true;
 }
-
-#        ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-// Split staleness only. The mirrored key-feedback packet can lag the combo
-// packet, so a key the slave now paints as part of a combo footprint may still
-// carry a tap-branch semantic from before. Dropping it here keeps a stale color
-// from stomping the live footprint; this is not a judgement about whether a combo
-// member should ever show its branch, which the engine map decides.
-static void rgb_runtime_render_snapshot_suppress_combo_tap_branch_semantics(void) {
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-            keypos_t key_pos = {.row = row, .col = col};
-            bool     combo_key;
-
-            combo_key = key_origin_bitmap_has_keypos(rgb_runtime_render_snapshot.combo_underlay_bitmap, key_pos) || key_origin_bitmap_has_keypos(rgb_runtime_render_snapshot.combo_overlay_bitmap, key_pos);
-            if (combo_key && key_feedback_semantic_map_get(rgb_runtime_render_snapshot.key_feedback_semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING) {
-                key_feedback_semantic_map_set(rgb_runtime_render_snapshot.key_feedback_semantic_map, key_pos, KEY_FEEDBACK_SEMANTIC_NONE);
-            }
-        }
-    }
-}
-
-static void rgb_runtime_render_snapshot_ensure_key_feedback(void) {
-    if (rgb_runtime_render_snapshot.key_feedback_valid) {
-        return;
-    }
-
-    rgb_runtime_render_snapshot_ensure_combo();
-    if (is_keyboard_master()) {
-        key_feedback_semantic_map(rgb_runtime_render_snapshot.key_feedback_semantic_map);
-        key_feedback_tap_branch_map(rgb_runtime_render_snapshot.key_feedback_tap_branch_map);
-        key_feedback_flash_visibility_bitmap_for_semantic_map(rgb_runtime_render_snapshot.key_feedback_semantic_map, rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap);
-        key_feedback_broad_owner_map(rgb_runtime_render_snapshot.key_feedback_broad_owner_map);
-    } else {
-        // Semantic and branch state travel as two RPC domains, so each one is
-        // captured as its own coherent generation. A false read leaves that
-        // domain's cached maps untouched and keeps the last coherent snapshot.
-        (void)split_runtime_sync_remote_read_key_feedback_semantic(rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap, rgb_runtime_render_snapshot.key_feedback_semantic_map);
-        (void)split_runtime_sync_remote_read_key_feedback_branch(rgb_runtime_render_snapshot.key_feedback_broad_owner_map, rgb_runtime_render_snapshot.key_feedback_tap_branch_map);
-    }
-
-    rgb_runtime_render_snapshot_suppress_combo_tap_branch_semantics();
-    rgb_runtime_render_snapshot.key_feedback_valid = true;
-}
-#        endif
 #    else
-static void rgb_runtime_render_snapshot_invalidate(void) {}
+__attribute__((weak)) bool noah_lighting_effect_colour(uint8_t led, rgb_t *colour) {
+    (void)led;
+    (void)colour;
+    return false;
+}
 #    endif
+
+#    if NOAH_LIGHTING_EXTENSION_TAP_COMMIT_FLASH
+key_feedback_tap_commit_mode_t key_feedback_tap_commit_mode(void) {
+    return noah_effective_lighting_program(NULL)->tap_commit_flash ? KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS : KEY_FEEDBACK_TAP_COMMIT_OFF;
+}
+#    endif
+
+static noah_lighting_leds_t rgb_runtime_local_leds(void) {
+#    ifdef RGB_MATRIX_SPLIT
+    return is_keyboard_left() ? NOAH_LIGHTING_LEFT_LEDS : NOAH_LIGHTING_RIGHT_LEDS;
+#    else
+    return NOAH_LIGHTING_ALL_LEDS;
+#    endif
+}
+
+// Each half collects the facts both halves share; the USB half also collects
+// the synced ones, which the other half reads from the link. A read that finds
+// the link mid-publication keeps the last coherent frame.
+static void rgb_runtime_capture_facts(void) {
+    if (is_keyboard_master()) {
+        noah_lighting_facts_collect(&rgb_runtime_facts, true, true);
+        return;
+    }
+    noah_lighting_facts_collect(&rgb_runtime_facts, true, false);
+#    if NOAH_LIGHTING_HAS_SYNCED_FACTS
+    {
+        uint8_t synced[NOAH_LIGHTING_SYNCED_BYTES];
+        if (split_runtime_sync_remote_read_lighting_facts(synced)) noah_lighting_facts_unpack_synced(&rgb_runtime_facts, synced);
+    }
+#    endif
+}
+
+static void rgb_runtime_begin_frame(void) {
+    uint32_t generation;
+    bool     wake_due;
+
+    rgb_runtime_capture_facts();
+    rgb_runtime_scene.program = noah_effective_lighting_program(&generation);
+    rgb_runtime_now           = sync_timer_read32();
+    if (generation != rgb_runtime_program_generation) {
+        rgb_runtime_program_generation = generation;
+        rgb_runtime_resolved           = false;
+        noah_lighting_engine_program_changed();
+    }
+    wake_due = rgb_runtime_info.wake_set && (int32_t)(rgb_runtime_now - rgb_runtime_info.wake) >= 0;
+    if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation && memcmp(&rgb_runtime_facts, &rgb_runtime_resolved_facts, sizeof(rgb_runtime_facts)) == 0) return;
+
+    rgb_runtime_resolved_facts             = rgb_runtime_facts;
+    rgb_runtime_resolved_keymap_generation = rgb_runtime_keymap_generation;
+    rgb_runtime_scene.facts                = &rgb_runtime_resolved_facts;
+    rgb_runtime_scene.keymap_generation    = rgb_runtime_keymap_generation;
+    noah_lighting_resolve(&rgb_runtime_scene, rgb_runtime_local_leds(), rgb_runtime_now, true, &rgb_runtime_frame, &rgb_runtime_info);
+    rgb_runtime_resolved = true;
+#    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
+    rgb_runtime_resolve_count++;
+#    endif
+}
 
 static bool rgb_runtime_range_starts_frame(uint8_t led_min, uint8_t led_max) {
     struct rgb_matrix_limits_t first_limits = rgb_matrix_get_limits(0u);
@@ -167,109 +179,20 @@ static bool rgb_runtime_normalize_local_range(uint8_t *led_min, uint8_t *led_max
     return *led_min < *led_max;
 }
 
-typedef void (*rgb_runtime_stage_fn_t)(void);
-
 #    define RGB_RUNTIME_BOOT_INDICATOR_HSV ((hsv_t){.h = 0u, .s = 0u, .v = 150u})
 
-static bool rgb_runtime_render_runtime_diag_stage(uint8_t led_min, uint8_t led_max) {
-    if (!noah_runtime_diag_indicator_active()) {
-        return false;
-    }
+static noah_lighting_leds_t rgb_runtime_range_leds(uint8_t led_min, uint8_t led_max) {
+    noah_lighting_leds_t leds = 0u;
 
-    rgb_set_both_halves(hsv_to_rgb(RGB_RUNTIME_BOOT_INDICATOR_HSV), led_min, led_max);
-    return true;
+    for (uint8_t led = led_min; led < led_max; led++) leds |= NOAH_LIGHTING_LED_BIT(led);
+    return leds;
 }
 
-static bool rgb_runtime_render_layer_base_stage(uint8_t led_min, uint8_t led_max) {
-    rgb_runtime_layer_stage_render_effective_frame(&rgb_runtime_frame_primary, layer_state, &rgb_runtime_profile_frame, led_min, led_max);
-    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
-}
-
-#    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
-static bool rgb_runtime_render_base_stage(uint8_t led_min, uint8_t led_max) {
-    // The synthetic automouse destination is not a persistent board state.
-    // Once this branch stops running, the next frame falls back to ordinary
-    // layer rendering below.
-    if (rgb_runtime_automouse_stage_should_render_effective(layer_state, &rgb_runtime_profile_frame)) {
-        return rgb_runtime_automouse_stage_render_effective(layer_state, &rgb_runtime_profile_frame, led_min, led_max);
-    }
-
-    return rgb_runtime_render_layer_base_stage(led_min, led_max);
-}
-#    else
-static bool rgb_runtime_render_base_stage(uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_render_layer_base_stage(led_min, led_max);
-}
-#    endif
-
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-static bool rgb_runtime_render_preview_stage(uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_preview_stage_render_effective(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, led_min, led_max);
-}
-#    endif
-
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-static bool rgb_runtime_render_pd_mode_stage(uint8_t led_min, uint8_t led_max) {
-    rgb_runtime_pd_mode_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, led_min, led_max);
-    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
-}
-#    endif
-
-#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
-static bool rgb_runtime_render_combo_underlay_stage(uint8_t led_min, uint8_t led_max) {
-    rgb_runtime_render_snapshot_ensure_combo();
-    rgb_runtime_combo_feedback_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.combo_underlay_bitmap, led_min, led_max);
-    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
-}
-
-static bool rgb_runtime_render_combo_overlay_stage(uint8_t led_min, uint8_t led_max) {
-    rgb_runtime_render_snapshot_ensure_combo();
-    rgb_runtime_combo_feedback_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.combo_overlay_bitmap, led_min, led_max);
-    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
-}
-#    endif
-
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-static bool rgb_runtime_render_key_feedback_stage(uint8_t led_min, uint8_t led_max) {
-    rgb_runtime_render_snapshot_ensure_key_feedback();
-    rgb_runtime_key_feedback_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.key_feedback_semantic_map, rgb_runtime_render_snapshot.key_feedback_tap_branch_map, rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap, rgb_runtime_render_snapshot.key_feedback_broad_owner_map, led_min, led_max);
-    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
-}
-#    endif
-#endif
-
-void noah_rgb_runtime_invalidate_layer_maps(void) {
-#ifdef RGB_MATRIX_ENABLE
-    rgb_runtime_layer_stage_invalidate_maps();
-#endif
-}
-
-void noah_rgb_runtime_post_init(void) {
-#ifdef RGB_MATRIX_ENABLE
-    static const rgb_runtime_stage_fn_t stages[] = {
-        noah_rgb_validate_config,
-        rgb_runtime_layer_stage_post_init,
-    };
-
-    rgb_runtime_render_snapshot_invalidate();
-    (void)rgb_effective_config_capture_frame(&rgb_runtime_profile_frame);
-#    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
-    rgb_runtime_stage_pipeline_count = 0u;
-    rgb_runtime_early_exit_count     = 0u;
-#    endif
-    for (uint8_t index = 0; index < ARRAY_SIZE(stages); index++) {
-        stages[index]();
-    }
-#endif
-}
-
-#ifdef RGB_MATRIX_ENABLE
 static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
     if (rgb_runtime_range_starts_frame(led_min, led_max)) {
-        rgb_runtime_render_snapshot_invalidate();
-        (void)rgb_effective_config_capture_frame(&rgb_runtime_profile_frame);
+        rgb_runtime_begin_frame();
     }
 
     if (!rgb_runtime_normalize_local_range(&led_min, &led_max)) {
@@ -283,27 +206,22 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
     rgb_runtime_stage_pipeline_count++;
 #    endif
 
-    if (rgb_runtime_render_runtime_diag_stage(led_min, led_max)) {
+    if (noah_runtime_diag_indicator_active()) {
+        rgb_set_both_halves(hsv_to_rgb(RGB_RUNTIME_BOOT_INDICATOR_HSV), led_min, led_max);
         return true;
     }
 
-    painted |= rgb_runtime_render_base_stage(led_min, led_max);
-
-#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
-    painted |= rgb_runtime_render_combo_underlay_stage(led_min, led_max);
-#    endif
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    painted |= rgb_runtime_render_preview_stage(led_min, led_max);
-#    endif
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-    painted |= rgb_runtime_render_pd_mode_stage(led_min, led_max);
-#    endif
-#    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
-    painted |= rgb_runtime_render_combo_overlay_stage(led_min, led_max);
-#    endif
-#    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-    painted |= rgb_runtime_render_key_feedback_stage(led_min, led_max);
-#    endif
+    // A result that composes over the matrix effect is finished per chunk,
+    // from the colours the effect just drew for these LEDs.
+    if (rgb_runtime_resolved && rgb_runtime_info.effect_used) {
+        noah_lighting_resolve_info_t chunk_info;
+        noah_lighting_resolve(&rgb_runtime_scene, rgb_runtime_range_leds(led_min, led_max), rgb_runtime_now, false, &rgb_runtime_frame, &chunk_info);
+    }
+    for (uint8_t led = led_min; led < led_max; led++) {
+        if ((rgb_runtime_frame.painted & NOAH_LIGHTING_LED_BIT(led)) == 0u) continue;
+        rgb_set_led_color(led, led_min, led_max, rgb_runtime_frame.colour[led]);
+        painted = true;
+    }
 
 #    ifdef NOAH_PORTABLE_PROFILE_ENABLE
     uint32_t timeout = noah_setting(NOAH_SETTING_RGB_TIMEOUT, 900000);
@@ -315,7 +233,31 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
 #    endif
     return painted;
 }
+#endif // RGB_MATRIX_ENABLE
 
+void noah_rgb_runtime_invalidate_layer_maps(void) {
+#ifdef RGB_MATRIX_ENABLE
+    rgb_runtime_keymap_generation++;
+#endif
+}
+
+void noah_rgb_runtime_post_init(void) {
+#ifdef RGB_MATRIX_ENABLE
+    noah_rgb_validate_config();
+    // Idle facts until the first capture: no preview, no gesture, no combo.
+    noah_lighting_facts_collect(&rgb_runtime_facts, true, true);
+    rgb_runtime_resolved = false;
+    rgb_runtime_keymap_generation++;
+    memset(&rgb_runtime_info, 0, sizeof(rgb_runtime_info));
+#    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
+    rgb_runtime_stage_pipeline_count = 0u;
+    rgb_runtime_early_exit_count     = 0u;
+    rgb_runtime_resolve_count        = 0u;
+#    endif
+#endif
+}
+
+#ifdef RGB_MATRIX_ENABLE
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     bool painted;
 

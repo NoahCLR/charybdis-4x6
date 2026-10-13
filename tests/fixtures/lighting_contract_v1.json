@@ -8,8 +8,7 @@
     "ledCount": 58,
     "paletteMaximum": 128,
     "conditionsPerRule": 4,
-    "partParameterMaximum": 16,
-    "belowCompositionDepth": 4
+    "partParameterMaximum": 16
   },
   "parameterTypes": {
     "layerSelector": "a logical layer below the keyboard's layer count, or 255 for any layer",

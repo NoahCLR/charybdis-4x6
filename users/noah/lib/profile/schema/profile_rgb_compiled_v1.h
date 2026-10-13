@@ -1,11 +1,17 @@
 #pragma once
+#include "profile_lighting_v1.h"
 #include "profile_rgb_v1.h"
+// The firmware's own lighting: the authored rgb_config.c tables, encoded as
+// RGB domain version 4 and converted to version 5 (Standard lighting) by the
+// conversion a client also performs. Cold initialization produces both caches
+// once; later calls borrow the immutable views.
 #if defined(RGB_MATRIX_ENABLE)
-// Cold initialization produces an immutable memory-backed RGB view. Subsequent
-// calls borrow the immutable view; frame access never invokes an authored writer.
-const noah_profile_rgb_v1_view_t *noah_profile_rgb_compiled_v1_view(void);
+const noah_profile_lighting_v1_view_t *noah_profile_rgb_compiled_v1_view(void);
+const noah_profile_rgb_v1_view_t      *noah_profile_rgb_compiled_v1_v4_view(void);
 #else
-static inline const noah_profile_rgb_v1_view_t *noah_profile_rgb_compiled_v1_view(void) {
+static inline const noah_profile_lighting_v1_view_t *noah_profile_rgb_compiled_v1_view(void) {
     return NULL;
 }
 #endif
+// What this build supports: its registry rows, layers, depth and brightness.
+noah_profile_lighting_v1_limits_t noah_profile_rgb_compiled_v1_limits(void);

@@ -2,23 +2,23 @@
 // Split Runtime Sync
 // ────────────────────────────────────────────────────────────────────────────
 //
-// Owns the custom split RPC sync for runtime-visible state. The sync surface
-// is intentionally split into three logical domains:
-// - base runtime state (automouse / pd / preview)
-// - combo RGB locality (underlay + overlay)
-// - authored key-feedback truth (semantic state + broad owner state + tap branch state)
+// Owns the custom split RPC sync for runtime-visible state, in two parts:
+// - the base packet: auto-mouse fade progress and the pointing mode the other
+//   half's pointing runtime mirrors
+// - the lighting facts frame: the synced slices of the lighting fact frame
+//   (docs/architecture/lighting-rules-v1.md, "Facts on the split link"), in
+//   30-byte chunks published on the other half as one generation
 //
-// The master periodically re-sends each surface as a heartbeat so a rebooted
-// or rejoined half can recover even if the relevant state did not change. Heavy
-// combo/key-feedback surfaces are rebuilt only while active, dirty, forced, or
-// heartbeat-due so idle scans do not spend time deriving unchanged RGB packets.
-// A shared transport-health gate stops a send pass after its first failure and
-// suppresses packet building until a bounded recovery-probe deadline.
+// The master periodically re-sends each part as a heartbeat so a rebooted or
+// rejoined half can recover even if the relevant state did not change. The
+// gated lighting slices (key feedback) are rebuilt only while dirty, active,
+// forced or heartbeat-due so idle scans do not spend time deriving unchanged
+// facts. A shared transport-health gate stops a send pass after its first
+// failure and suppresses work until a bounded recovery-probe deadline.
 //
 // Slave RPC callbacks run in the split worker context, not the main loop, so
-// every domain is published as one publication generation and main-context
-// readers copy a domain through the `split_runtime_sync_remote_read_*` helpers
-// below instead of touching the fields directly.
+// each part is published as one publication generation and main-context
+// readers copy it through the `split_runtime_sync_remote_read_*` helpers below.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -26,6 +26,7 @@
 #include <string.h>
 
 #include "../key/runtime/feedback.h"
+#include "../rgb/lighting/lighting.h"
 #include "../key/runtime/slot/origin_registry.h"
 #include "../pointing/defs/pd_mode_flags.h"
 #include "../state/shared/runtime_publication.h"
@@ -42,23 +43,26 @@ typedef struct __attribute__((packed)) {
     uint8_t pd_mode_owner_sides;
     uint8_t pd_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
-    uint8_t key_preview_layer;
 } split_runtime_base_sync_packet_t;
 
-typedef struct __attribute__((packed)) {
-    uint8_t combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    uint8_t combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-} split_runtime_combo_feedback_packet_t;
+// One chunk of the lighting facts frame: the frame sequence, the chunk index
+// (bits 0-3) with bit 7 marking the chunk that commits the pass, and 30 frame
+// bytes from index * 30.
+enum {
+    SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES = 30u,
+    SPLIT_RUNTIME_SYNC_FACTS_COMMIT      = 0x80u,
+    SPLIT_RUNTIME_SYNC_FACTS_INDEX_MASK  = 0x0fu,
+};
+
+#define SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES (NOAH_LIGHTING_SYNCED_BYTES > 0u ? NOAH_LIGHTING_SYNCED_BYTES : 1u)
+#define SPLIT_RUNTIME_SYNC_FACTS_CHUNKS ((NOAH_LIGHTING_SYNCED_BYTES + SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES - 1u) / SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES)
+_Static_assert(SPLIT_RUNTIME_SYNC_FACTS_CHUNKS <= SPLIT_RUNTIME_SYNC_FACTS_INDEX_MASK + 1u, "the lighting facts frame must fit sixteen chunks");
 
 typedef struct __attribute__((packed)) {
-    uint8_t key_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    uint8_t key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
-} split_runtime_key_feedback_semantic_packet_t;
-
-typedef struct __attribute__((packed)) {
-    uint8_t key_feedback_broad_owner_map[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
-    uint8_t key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
-} split_runtime_key_feedback_branch_packet_t;
+    uint8_t sequence;
+    uint8_t chunk;
+    uint8_t bytes[SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES];
+} split_runtime_lighting_facts_packet_t;
 
 typedef struct {
     uint16_t     automouse_progress;
@@ -68,26 +72,18 @@ typedef struct {
     uint8_t pd_mode_owner_sides;
     uint8_t pd_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
-    uint8_t key_preview_layer;
-    uint8_t combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    uint8_t combo_overlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    uint8_t key_feedback_flash_visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    uint8_t key_feedback_semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
-    uint8_t key_feedback_broad_owner_map[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
-    uint8_t key_feedback_tap_branch_map[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
+    uint8_t lighting_facts[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
     // One publication generation per logical domain. The split worker keeps a
     // generation odd while that domain's fields are in flight.
     noah_runtime_publication_generation_t base_generation;
-    noah_runtime_publication_generation_t combo_generation;
-    noah_runtime_publication_generation_t key_feedback_semantic_generation;
-    noah_runtime_publication_generation_t key_feedback_branch_generation;
+    noah_runtime_publication_generation_t lighting_facts_generation;
+    // Set once the first lighting facts frame commits.
+    volatile bool lighting_facts_received;
 } split_runtime_sync_remote_t;
 
 typedef enum {
     SPLIT_RUNTIME_SYNC_DOMAIN_BASE = 0,
-    SPLIT_RUNTIME_SYNC_DOMAIN_COMBO,
-    SPLIT_RUNTIME_SYNC_DOMAIN_KEY_FEEDBACK_SEMANTIC,
-    SPLIT_RUNTIME_SYNC_DOMAIN_KEY_FEEDBACK_BRANCH,
+    SPLIT_RUNTIME_SYNC_DOMAIN_LIGHTING_FACTS,
 } split_runtime_sync_domain_t;
 
 #ifdef SPLIT_RUNTIME_SYNC_PUBLISH_TEST_BACKEND
@@ -102,9 +98,7 @@ void split_runtime_sync_test_set_publish_seam(split_runtime_sync_publish_seam_fn
 #ifdef NOAH_HOST_TEST_ENV
 typedef struct {
     uint32_t base_last_send;
-    uint32_t combo_last_send;
-    uint32_t semantic_last_send;
-    uint32_t branch_last_send;
+    uint32_t lighting_facts_last_send;
 } split_runtime_sync_debug_clock_t;
 
 typedef struct {
@@ -116,49 +110,33 @@ typedef struct {
 #endif
 
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-#    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                                             \
-        {                                                                                    \
-            .automouse_progress                   = 0,                                       \
-            .active_mode_id                       = PD_MODE_ID_NONE,                         \
-            .locked_mode_id                       = PD_MODE_ID_NONE,                         \
-            .pd_mode_owner_sides                  = SPLIT_SIDE_MASK_NONE,                    \
-            .pd_mode_owner_bitmap                 = {0},                                     \
-            .key_preview_layer                    = UINT8_MAX,                               \
-            .combo_underlay_bitmap                = {0},                                     \
-            .combo_overlay_bitmap                 = {0},                                     \
-            .key_feedback_flash_visibility_bitmap = {0},                                     \
-            .key_feedback_semantic_map            = {0},                                     \
-            .key_feedback_broad_owner_map         = KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT, \
-            .key_feedback_tap_branch_map          = {0},                                     \
-            .base_generation                      = 0,                                       \
-            .combo_generation                     = 0,                                       \
-            .key_feedback_semantic_generation     = 0,                                       \
-            .key_feedback_branch_generation       = 0,                                       \
+#    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                \
+        {                                                       \
+            .automouse_progress        = 0,                     \
+            .active_mode_id            = PD_MODE_ID_NONE,       \
+            .locked_mode_id            = PD_MODE_ID_NONE,       \
+            .pd_mode_owner_sides       = SPLIT_SIDE_MASK_NONE,  \
+            .pd_mode_owner_bitmap      = {0},                   \
+            .lighting_facts            = {0},                   \
+            .base_generation           = 0,                     \
+            .lighting_facts_generation = 0,                     \
+            .lighting_facts_received   = false,                 \
         }
 #else
-#    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                                             \
-        {                                                                                    \
-            .automouse_progress                   = 0,                                       \
-            .active_mode_id                       = PD_MODE_ID_NONE,                         \
-            .locked_mode_id                       = PD_MODE_ID_NONE,                         \
-            .key_preview_layer                    = UINT8_MAX,                               \
-            .combo_underlay_bitmap                = {0},                                     \
-            .combo_overlay_bitmap                 = {0},                                     \
-            .key_feedback_flash_visibility_bitmap = {0},                                     \
-            .key_feedback_semantic_map            = {0},                                     \
-            .key_feedback_broad_owner_map         = KEY_FEEDBACK_BROAD_OWNER_MAP_EMPTY_INIT, \
-            .key_feedback_tap_branch_map          = {0},                                     \
-            .base_generation                      = 0,                                       \
-            .combo_generation                     = 0,                                       \
-            .key_feedback_semantic_generation     = 0,                                       \
-            .key_feedback_branch_generation       = 0,                                       \
+#    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                \
+        {                                                       \
+            .automouse_progress        = 0,                     \
+            .active_mode_id            = PD_MODE_ID_NONE,       \
+            .locked_mode_id            = PD_MODE_ID_NONE,       \
+            .lighting_facts            = {0},                   \
+            .base_generation           = 0,                     \
+            .lighting_facts_generation = 0,                     \
+            .lighting_facts_received   = false,                 \
         }
 #endif
 
 _Static_assert(sizeof(split_runtime_base_sync_packet_t) <= RPC_M2S_BUFFER_SIZE, "split_runtime_base_sync_packet_t must fit in one QMK RPC payload");
-_Static_assert(sizeof(split_runtime_combo_feedback_packet_t) <= RPC_M2S_BUFFER_SIZE, "split_runtime_combo_feedback_packet_t must fit in one QMK RPC payload");
-_Static_assert(sizeof(split_runtime_key_feedback_semantic_packet_t) <= RPC_M2S_BUFFER_SIZE, "split_runtime_key_feedback_semantic_packet_t must fit in one QMK RPC payload");
-_Static_assert(sizeof(split_runtime_key_feedback_branch_packet_t) <= RPC_M2S_BUFFER_SIZE, "split_runtime_key_feedback_branch_packet_t must fit in one QMK RPC payload");
+_Static_assert(sizeof(split_runtime_lighting_facts_packet_t) <= RPC_M2S_BUFFER_SIZE, "split_runtime_lighting_facts_packet_t must fit in one QMK RPC payload");
 
 #if defined(SPLIT_TRANSACTION_IDS_USER)
 
@@ -216,81 +194,33 @@ static inline void split_runtime_sync_notify_key_feedback_dirty(void) {}
 //
 // Main-context readers copy a whole domain through these helpers so a
 // publication that preempts the copy is retried instead of committed as a
-// mixture of two packets. Each attempt copies into a local staging buffer and
+// mixture of two frames. Each attempt copies into a local staging buffer and
 // only commits to the caller's destination once the generation is confirmed
 // unchanged, so a helper that returns false has written nothing at all and the
-// caller keeps the copy it already holds. Staging costs a few dozen bytes of
-// stack on the render path, which is what makes "a failed read leaves your
-// buffer alone" true rather than merely intended.
+// caller keeps the copy it already holds.
 
-static inline bool split_runtime_sync_remote_read_combo(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_bitmap) {
-    uint8_t staged_underlay[KEY_ORIGIN_BITMAP_SIZE];
-    uint8_t staged_overlay[KEY_ORIGIN_BITMAP_SIZE];
+static inline bool split_runtime_sync_remote_read_lighting_facts(uint8_t *out_frame) {
+#if NOAH_LIGHTING_HAS_SYNCED_FACTS
+    uint8_t staged[NOAH_LIGHTING_SYNCED_BYTES];
 
     for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
-        uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.combo_generation);
+        uint8_t generation;
 
+        if (!split_runtime_sync_remote.lighting_facts_received) return false;
+        generation = noah_runtime_publication_observe(&split_runtime_sync_remote.lighting_facts_generation);
         if (noah_runtime_publication_in_flight(generation)) {
             continue;
         }
 
-        key_origin_bitmap_copy(staged_underlay, split_runtime_sync_remote.combo_underlay_bitmap);
-        key_origin_bitmap_copy(staged_overlay, split_runtime_sync_remote.combo_overlay_bitmap);
+        memcpy(staged, split_runtime_sync_remote.lighting_facts, NOAH_LIGHTING_SYNCED_BYTES);
 
-        if (noah_runtime_publication_settled(&split_runtime_sync_remote.combo_generation, generation)) {
-            key_origin_bitmap_copy(out_underlay_bitmap, staged_underlay);
-            key_origin_bitmap_copy(out_overlay_bitmap, staged_overlay);
+        if (noah_runtime_publication_settled(&split_runtime_sync_remote.lighting_facts_generation, generation)) {
+            memcpy(out_frame, staged, NOAH_LIGHTING_SYNCED_BYTES);
             return true;
         }
     }
-
-    return false;
-}
-
-static inline bool split_runtime_sync_remote_read_key_feedback_semantic(uint8_t *out_flash_visibility_bitmap, uint8_t *out_semantic_map) {
-    uint8_t staged_visibility[KEY_ORIGIN_BITMAP_SIZE];
-    uint8_t staged_semantic[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
-
-    for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
-        uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.key_feedback_semantic_generation);
-
-        if (noah_runtime_publication_in_flight(generation)) {
-            continue;
-        }
-
-        key_origin_bitmap_copy(staged_visibility, split_runtime_sync_remote.key_feedback_flash_visibility_bitmap);
-        memcpy(staged_semantic, split_runtime_sync_remote.key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
-
-        if (noah_runtime_publication_settled(&split_runtime_sync_remote.key_feedback_semantic_generation, generation)) {
-            key_origin_bitmap_copy(out_flash_visibility_bitmap, staged_visibility);
-            memcpy(out_semantic_map, staged_semantic, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
-            return true;
-        }
-    }
-
-    return false;
-}
-
-static inline bool split_runtime_sync_remote_read_key_feedback_branch(uint8_t *out_broad_owner_map, uint8_t *out_tap_branch_map) {
-    uint8_t staged_broad_owner[KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE];
-    uint8_t staged_tap_branch[KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE];
-
-    for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
-        uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.key_feedback_branch_generation);
-
-        if (noah_runtime_publication_in_flight(generation)) {
-            continue;
-        }
-
-        memcpy(staged_broad_owner, split_runtime_sync_remote.key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
-        memcpy(staged_tap_branch, split_runtime_sync_remote.key_feedback_tap_branch_map, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
-
-        if (noah_runtime_publication_settled(&split_runtime_sync_remote.key_feedback_branch_generation, generation)) {
-            memcpy(out_broad_owner_map, staged_broad_owner, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE);
-            memcpy(out_tap_branch_map, staged_tap_branch, KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE);
-            return true;
-        }
-    }
-
+#else
+    (void)out_frame;
+#endif
     return false;
 }

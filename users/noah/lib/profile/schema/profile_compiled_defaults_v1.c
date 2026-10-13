@@ -8,6 +8,7 @@
 
 #include "key_behavior_domain_v1.h"
 #include "profile_rgb_v1.h"
+#include "profile_rgb_compiled_v1.h"
 #include "profile_compiled_writer.h"
 #include "../runtime/profile_action_runtime_v1.h"
 #include "../storage/profile_checksum.h"
@@ -280,15 +281,7 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     result.supported_pd_mode_mask            = UINT32_MAX >> (32u - PD_MODE_COUNT);
     result.via_macro_slot_count              = VIA_MACRO_SLOT_COUNT;
     result.custom_key_count                  = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
-    result.rgb_limits.logical_layer_count    = LAYER_COUNT;
-    result.rgb_limits.supported_pd_mode_mask = result.supported_pd_mode_mask;
-    result.rgb_limits.tap_branch_color_count = KEY_BEHAVIOR_MAX_TAP_COUNT - 1u;
-#if defined(RGB_MATRIX_ENABLE)
-    result.rgb_limits.maximum_brightness  = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
-    result.rgb_limits.compiled_stage_mask = noah_profile_rgb_compiled_v1_stage_mask();
-#else
-    result.rgb_limits.compiled_stage_mask = 0u;
-#endif
+    result.rgb_limits = noah_profile_rgb_compiled_v1_limits();
     *compatibility = result;
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
     compatibility->allowed_domain_mask |= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;

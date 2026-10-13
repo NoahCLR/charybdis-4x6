@@ -14,12 +14,10 @@ typedef void (*slave_callback_t)(uint8_t initiator2target_buffer_size, const voi
 
 enum {
     PUT_SPLIT_RUNTIME_BASE_SYNC          = 1,
-    PUT_SPLIT_COMBO_FEEDBACK_SYNC        = 2,
-    PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC = 3,
-    PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC   = 4,
-    PUT_VIA_KEYMAP_SYNC                  = 5,
-    PUT_VIA_KEYMAP_MIRROR                = 6,
-    PUT_PROFILE_SPLIT_SYNC               = 7,
+    PUT_SPLIT_LIGHTING_FACTS_SYNC        = 2,
+    PUT_VIA_KEYMAP_SYNC                  = 3,
+    PUT_VIA_KEYMAP_MIRROR                = 4,
+    PUT_PROFILE_SPLIT_SYNC               = 5,
 };
 
 void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback);

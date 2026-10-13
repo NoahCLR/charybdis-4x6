@@ -359,8 +359,7 @@ own copy of the profile.
 
 ### The walk
 
-The meaning of a rule list, for one LED, is this walk (the firmware evaluates
-it rule by rule for all LEDs at once, which is equivalent):
+The meaning of a rule list, for one LED, is this walk:
 
 ```text
 walk(led, from):
@@ -379,8 +378,13 @@ walk(led, from):
 
 Below the last rule, **below** is the matrix effect's colour at that LED as the
 effect drew it this frame (black where the driver cannot report it). An LED
-the walk leaves unpainted is not written. At most four paints that read below
-(timing blends included) compose on one LED; a fifth, lower one says clear.
+the walk leaves unpainted is not written. Any number of paints that read
+below compose.
+
+The firmware evaluates the same thing bottom up, as the old stages did: it
+starts from an unpainted board and applies each rule from the last to the
+first, and each rule's subjects from the last to the first, so every paint
+sees exactly what is below it.
 
 ### When it re-resolves
 

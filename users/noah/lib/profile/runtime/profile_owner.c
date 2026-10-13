@@ -397,7 +397,7 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
     }
     noah_effective_key_behavior_runtime_invalidate(&owner->key_behaviors, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     noah_effective_rgb_runtime_invalidate(&owner->rgb, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
-    if (!owner->rgb.banks[owner->rgb.active_index].valid) return false;
+    if (!owner->rgb.loaded) return false;
 #ifdef COMBO_ENABLE
     owner->combos.compiled_defaults = &owner->compiled_snapshot;
     noah_effective_combo_runtime_invalidate(&owner->combos, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);

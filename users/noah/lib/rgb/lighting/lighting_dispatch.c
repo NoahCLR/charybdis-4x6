@@ -1,0 +1,159 @@
+// ────────────────────────────────────────────────────────────────────────────
+// Lighting Dispatch
+// ────────────────────────────────────────────────────────────────────────────
+//
+// Every switch here is generated from the registry rows, so a kind reaches
+// its module by a direct call (a reviewed stack edge, D-F13) and the engine
+// names no kind. An id without a row falls to the default: nothing.
+
+#include "lighting.h"
+
+#include <string.h>
+
+#ifdef RGB_MATRIX_ENABLE
+
+bool noah_lighting_fact_next(uint8_t kind, const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject) {
+    (void)facts;
+    (void)params;
+    (void)cursor;
+    (void)subject;
+    switch (kind) {
+#    define NOAH_LIGHTING_FACT_CASE(id, name, thing, layout) \
+        case id:                                             \
+            return noah_lighting_fact_##name##_next(facts, params, cursor, subject);
+        NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_FACT_CASE)
+#    undef NOAH_LIGHTING_FACT_CASE
+        default:
+            return false;
+    }
+}
+
+noah_lighting_leds_t noah_lighting_target(uint8_t kind, const noah_lighting_scene_t *scene, const uint8_t *params, const noah_lighting_subject_t *subject) {
+    (void)scene;
+    (void)params;
+    (void)subject;
+    switch (kind) {
+#    define NOAH_LIGHTING_TARGET_CASE(id, name, layout, place) \
+        case id:                                               \
+            return noah_lighting_target_##name(scene, params, subject);
+        NOAH_LIGHTING_TARGET_ROWS(NOAH_LIGHTING_TARGET_CASE)
+#    undef NOAH_LIGHTING_TARGET_CASE
+        default:
+            return 0u;
+    }
+}
+
+bool noah_lighting_paint(uint8_t kind, const noah_lighting_paint_context_t *context, rgb_t *colour) {
+    (void)context;
+    (void)colour;
+    switch (kind) {
+#    define NOAH_LIGHTING_PAINT_CASE(id, name, layout, below, timed) \
+        case id:                                                     \
+            return noah_lighting_paint_##name(context, colour);
+        NOAH_LIGHTING_PAINT_ROWS(NOAH_LIGHTING_PAINT_CASE)
+#    undef NOAH_LIGHTING_PAINT_CASE
+        default:
+            return false;
+    }
+}
+
+bool noah_lighting_paint_changes_with_time(uint8_t kind) {
+    switch (kind) {
+#    define NOAH_LIGHTING_PAINT_TIMED_CASE(id, name, layout, below, timed) \
+        case id:                                                           \
+            return (timed) != 0;
+        NOAH_LIGHTING_PAINT_ROWS(NOAH_LIGHTING_PAINT_TIMED_CASE)
+#    undef NOAH_LIGHTING_PAINT_TIMED_CASE
+        default:
+            return false;
+    }
+}
+
+uint8_t noah_lighting_timing(uint8_t kind, const uint8_t *params, uint32_t elapsed, uint32_t *next_change, bool *animating) {
+    (void)params;
+    (void)elapsed;
+    *next_change = 0u;
+    *animating   = false;
+    switch (kind) {
+#    define NOAH_LIGHTING_TIMING_CASE(id, name, layout, timed)                  \
+        case id:                                                                \
+            *animating = (timed) != 0;                                          \
+            return noah_lighting_timing_##name(params, elapsed, next_change);
+        NOAH_LIGHTING_TIMING_ROWS(NOAH_LIGHTING_TIMING_CASE)
+#    undef NOAH_LIGHTING_TIMING_CASE
+        default:
+            return UINT8_MAX;
+    }
+}
+
+// ─── The fact frame ─────────────────────────────────────────────────────────
+
+void noah_lighting_facts_collect(noah_lighting_facts_t *facts, bool local, bool synced) {
+    (void)facts;
+    (void)local;
+    (void)synced;
+#    define NOAH_LIGHTING_SLICE_COLLECT(name, bytes, is_synced, gated) \
+        if ((is_synced) ? synced : local) noah_lighting_slice_##name##_collect(facts->name);
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SLICE_COLLECT)
+#    undef NOAH_LIGHTING_SLICE_COLLECT
+}
+
+void noah_lighting_facts_pack_synced(const noah_lighting_facts_t *facts, uint8_t *frame) {
+    size_t offset = 0u;
+    (void)facts;
+    (void)frame;
+    (void)offset;
+#    define NOAH_LIGHTING_SLICE_PACK(name, bytes, is_synced, gated) \
+        if (is_synced) {                                           \
+            memcpy(&frame[offset], facts->name, (bytes));          \
+            offset += (bytes);                                     \
+        }
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SLICE_PACK)
+#    undef NOAH_LIGHTING_SLICE_PACK
+}
+
+void noah_lighting_facts_unpack_synced(noah_lighting_facts_t *facts, const uint8_t *frame) {
+    size_t offset = 0u;
+    (void)facts;
+    (void)frame;
+    (void)offset;
+#    define NOAH_LIGHTING_SLICE_UNPACK(name, bytes, is_synced, gated) \
+        if (is_synced) {                                             \
+            memcpy(facts->name, &frame[offset], (bytes));            \
+            offset += (bytes);                                       \
+        }
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SLICE_UNPACK)
+#    undef NOAH_LIGHTING_SLICE_UNPACK
+}
+
+void noah_lighting_facts_build_synced(uint8_t *frame, bool refresh_gated) {
+    size_t offset = 0u;
+    (void)frame;
+    (void)refresh_gated;
+    (void)offset;
+#    define NOAH_LIGHTING_SLICE_BUILD(name, bytes, is_synced, gated)               \
+        if (is_synced) {                                                           \
+            if (!(gated) || refresh_gated) noah_lighting_slice_##name##_collect(&frame[offset]); \
+            offset += (bytes);                                                     \
+        }
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SLICE_BUILD)
+#    undef NOAH_LIGHTING_SLICE_BUILD
+}
+
+bool noah_lighting_facts_gated_active(const uint8_t *frame, const uint8_t *idle) {
+    size_t offset = 0u;
+    bool   active = false;
+    (void)frame;
+    (void)idle;
+    (void)offset;
+#    define NOAH_LIGHTING_SLICE_ACTIVE(name, bytes, is_synced, gated)                          \
+        if (is_synced) {                                                                       \
+            if ((gated) && memcmp(&frame[offset], &idle[offset], (bytes)) != 0) active = true; \
+            offset += (bytes);                                                                 \
+        }
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SLICE_ACTIVE)
+#    undef NOAH_LIGHTING_SLICE_ACTIVE
+    return active;
+}
+
+#endif // RGB_MATRIX_ENABLE

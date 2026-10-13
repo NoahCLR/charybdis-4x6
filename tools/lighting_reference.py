@@ -30,7 +30,6 @@ BUDGET = 8192
 PALETTE_MAX = 128
 CONDITIONS_MAX = 4
 PARAM_MAX = 16
-BELOW_DEPTH = 4
 NONE = 0xFF
 INHERIT = 0xFE
 ANY = 0xFF
@@ -696,8 +695,6 @@ class Renderer:
                 continue
             needs_below = value[0] == "below" or amount < 255
             if needs_below:
-                if depth >= BELOW_DEPTH:
-                    continue
                 below = self.walk(entries, at, led, situation, depth + 1, bottom)
                 below = below if below is not None else situation.effect.get(led, (0, 0, 0))
             colour = value[1](below) if value[0] == "below" else value[1]
@@ -1025,7 +1022,7 @@ def render_vectors(limits):
         under,
     ]}, [{"layers": [1]}, {"layers": [2]}], limits))
     stack = [rule(part(T, 0), part(P, 5, 200)) for _ in range(5)] + [under]
-    cases.append(render_case("below-depth", "engine", {"palette": PALETTE, "rules": stack}, [{}], limits))
+    cases.append(render_case("below-composition", "engine", {"palette": PALETTE, "rules": stack}, [{}], limits))
     cases.append(render_case("conditions", "engine", {"palette": PALETTE, "rules": [
         rule(part(C, 1, 1), part(N, 1, 2), part(T, 1), part(P, 2, GREEN)),
         rule(part(N, 1, 1), part(T, 2), part(P, 2, BLUE)),
@@ -1164,7 +1161,7 @@ def conversion_vectors(limits):
     pd = [[n, 0, 0, 0, n % 5] for n in range(32)]
     pd[1] = [1, 127, 255, 200, 4]
     synthetic = encode_v4(
-        stages=0x15, groups=[[3], THUMBS], layers=layers,
+        stages=0x15, groups=[THUMBS, [3]], layers=layers,
         layer_rows=[[0xFF, 0, 0, 0, 1], [2, 43, 255, 200, 0]], automouse=(2, 167, 255, 199), pd=pd,
         pd_rows=[[1, 0, 0, 0, 0], [0xFF, 200, 255, 200, 1]], combo=(191, 255, 200, 4), combo_rows=[[0, 0, 0, 0], [21, 255, 200, 1]],
         branches=[[169, 255, 200], [222, 255, 200], [85, 255, 200], [25, 255, 200]],

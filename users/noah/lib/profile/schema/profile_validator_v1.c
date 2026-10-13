@@ -40,9 +40,9 @@ noah_profile_validator_v1_compatibility_t noah_profile_validator_v1_default_comp
     compatibility.via_macro_slot_count              = NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS;
     compatibility.custom_key_count        = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     compatibility.behavior_limits                   = noah_key_behavior_domain_v1_default_limits();
-    compatibility.rgb_limits                        = noah_profile_rgb_v1_default_limits();
+    compatibility.rgb_limits                        = noah_profile_lighting_v1_default_limits();
     compatibility.rgb_limits.logical_layer_count    = compatibility.logical_layer_count;
-    compatibility.rgb_limits.supported_pd_mode_mask = compatibility.supported_pd_mode_mask;
+    compatibility.rgb_limits.supported_mode_mask    = compatibility.supported_pd_mode_mask;
     return compatibility;
 }
 
@@ -83,9 +83,9 @@ static bool behavior_limits_are_valid(const noah_key_behavior_limits_v1_t *limit
 }
 
 static bool rgb_limits_are_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
-    const noah_profile_rgb_v1_limits_t *limits = &compatibility->rgb_limits;
+    const noah_profile_lighting_v1_limits_t *limits = &compatibility->rgb_limits;
 
-    return (limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) == 0u && limits->max_payload_size != 0u && limits->max_payload_size <= NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE && limits->max_logical_layers <= NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS && limits->logical_layer_count == compatibility->logical_layer_count && limits->logical_layer_count <= limits->max_logical_layers && limits->tap_branch_color_count != 0u && limits->tap_branch_color_count <= NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS && limits->supported_pd_mode_mask == compatibility->supported_pd_mode_mask && (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) == 0u;
+    return limits->max_payload_size != 0u && limits->max_payload_size <= NOAH_PROFILE_LIGHTING_V1_PAYLOAD_MAX && limits->logical_layer_count == compatibility->logical_layer_count && limits->tap_depth != 0u && limits->tap_depth <= NOAH_PROFILE_TAP_DEPTH && limits->supported_mode_mask == compatibility->supported_pd_mode_mask;
 }
 
 static bool compatibility_is_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
@@ -247,13 +247,12 @@ static noah_profile_validator_v1_result_t map_behavior_error(noah_profile_valida
     return reject(validator, result, validator->payload.offset + source->offset, (uint8_t)(validator->envelope.index - 1u), NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, source->table_id, row_index, source->step_index, source->field_id, NOAH_PROFILE_VALIDATOR_V1_DETAIL_KEY_BEHAVIOR, source->code, error);
 }
 
-static noah_profile_validator_v1_result_t map_rgb_error(noah_profile_validator_v1_t *validator, const noah_profile_rgb_v1_error_t *source, noah_profile_validator_v1_error_t *error) {
-    noah_profile_validator_v1_result_t result    = NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN;
-    uint16_t                           row_index = source->row == UINT8_MAX ? NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16 : source->row;
+static noah_profile_validator_v1_result_t map_rgb_error(noah_profile_validator_v1_t *validator, const noah_profile_lighting_v1_error_t *source, noah_profile_validator_v1_error_t *error) {
+    noah_profile_validator_v1_result_t result = NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN;
 
-    if (source->code == NOAH_PROFILE_RGB_V1_READ_ERROR) result = NOAH_PROFILE_VALIDATOR_V1_READ_ERROR;
-    if (source->code == NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED) result = NOAH_PROFILE_VALIDATOR_V1_CAPACITY_EXCEEDED;
-    return reject(validator, result, validator->payload.offset + source->offset, (uint8_t)(validator->envelope.index - 1u), NOAH_PROFILE_DOMAIN_V1_RGB, source->table, row_index, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, source->field, NOAH_PROFILE_VALIDATOR_V1_DETAIL_RGB, source->code, error);
+    if (source->code == NOAH_PROFILE_LIGHTING_V1_READ_ERROR) result = NOAH_PROFILE_VALIDATOR_V1_READ_ERROR;
+    if (source->code == NOAH_PROFILE_LIGHTING_V1_CAPACITY_EXCEEDED) result = NOAH_PROFILE_VALIDATOR_V1_CAPACITY_EXCEEDED;
+    return reject(validator, result, validator->payload.offset + source->offset, (uint8_t)(validator->envelope.index - 1u), NOAH_PROFILE_DOMAIN_V1_RGB, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_RGB, source->code, error);
 }
 
 static bool action_reference_is_valid(const noah_profile_validator_v1_t *validator, const noah_profile_action_v1_t *action);
@@ -292,17 +291,17 @@ static void record_action_reference(noah_profile_validator_v1_t *validator) {
 // IN_PROGRESS after a bounded step, VALID once its payload is complete, or a
 // rejection.
 static noah_profile_validator_v1_result_t validate_rgb(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
-    noah_profile_rgb_v1_error_t             error_rgb;
-    noah_profile_rgb_v1_validation_result_t result;
+    noah_profile_lighting_v1_error_t             error_rgb = {0};
+    noah_profile_lighting_v1_validation_result_t result;
 
-    if (validator->domain_validation.rgb.phase == NOAH_PROFILE_RGB_V1_VALIDATION_PHASE_UNINITIALIZED) {
-        result = noah_profile_rgb_v1_validation_begin(&validator->domain_validation.rgb, &validator->reader, validator->base_offset + validator->payload.offset, validator->payload.length, &validator->compatibility.rgb_limits, &error_rgb);
-        if (result == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED) return map_rgb_error(validator, &error_rgb, error);
+    if (!validator->domain_validation.rgb.phase) {
+        result = noah_profile_lighting_v1_validation_begin(&validator->domain_validation.rgb, &validator->reader, validator->base_offset + validator->payload.offset, validator->payload.length, &validator->compatibility.rgb_limits, &error_rgb);
+        if (result == NOAH_PROFILE_LIGHTING_V1_VALIDATION_REJECTED) return map_rgb_error(validator, &error_rgb, error);
     }
-    result = noah_profile_rgb_v1_validation_step(&validator->domain_validation.rgb, &error_rgb);
-    if (result == NOAH_PROFILE_RGB_V1_VALIDATION_REJECTED) return map_rgb_error(validator, &error_rgb, error);
-    if (result == NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
-    if (noah_profile_rgb_v1_validation_view(&validator->domain_validation.rgb, &validator->profile.rgb, &error_rgb) != NOAH_PROFILE_RGB_V1_VALIDATION_VALID) return map_rgb_error(validator, &error_rgb, error);
+    result = noah_profile_lighting_v1_validation_step(&validator->domain_validation.rgb, &error_rgb);
+    if (result == NOAH_PROFILE_LIGHTING_V1_VALIDATION_REJECTED) return map_rgb_error(validator, &error_rgb, error);
+    if (result == NOAH_PROFILE_LIGHTING_V1_VALIDATION_IN_PROGRESS) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+    if (noah_profile_lighting_v1_validation_view(&validator->domain_validation.rgb, &validator->profile.rgb, &error_rgb) != NOAH_PROFILE_LIGHTING_V1_VALIDATION_VALID) return map_rgb_error(validator, &error_rgb, error);
     return NOAH_PROFILE_VALIDATOR_V1_VALID;
 }
 

@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "key_behavior_domain_v1.h"
+#include "profile_lighting_v1.h"
 #include "profile_rgb_v1.h"
 #include "profile_combo_v1.h"
 #include "profile_settings_v1.h"
@@ -26,7 +27,9 @@ enum {
     // is not a hardware SRAM-capacity claim; target resource gates account
     // for the linked instance separately. D-F14's 128-byte pointing records
     // make the PD iterator the largest domain state: 372 bytes on Cortex-M0+.
-    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 384u,
+    // D-F25's lighting limits (one support word per registry) add 24 bytes to
+    // the compatibility copy: 396 bytes, under a reviewed 400.
+    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 400u,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8      = 0xffu,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16     = 0xffffu,
 };
@@ -131,7 +134,7 @@ typedef struct {
     // combo input and actions the installed engine cannot execute.
     const noah_profile_validator_v1_runtime_t *runtime;
     noah_key_behavior_limits_v1_t behavior_limits;
-    noah_profile_rgb_v1_limits_t  rgb_limits;
+    noah_profile_lighting_v1_limits_t rgb_limits;
 } noah_profile_validator_v1_compatibility_t;
 
 typedef struct {
@@ -143,7 +146,7 @@ typedef struct {
     uint32_t                        action_abi_digest;
     // Decoded views for the domains read through record accessors. Other
     // domains are found by walking the blob's envelope when published.
-    noah_profile_rgb_v1_view_t      rgb;
+    noah_profile_lighting_v1_view_t rgb;
     noah_key_behavior_domain_v1_t   key_behaviors;
 } noah_profile_validator_v1_profile_t;
 
@@ -155,7 +158,7 @@ typedef union {
 #endif
     noah_profile_settings_v1_validation_t    settings;
     noah_profile_combo_v1_validation_t       combos;
-    noah_profile_rgb_v1_validation_t         rgb;
+    noah_profile_lighting_v1_validation_t    rgb;
     noah_key_behavior_domain_v1_validation_t key_behaviors;
 } noah_profile_validator_v1_domain_validation_t;
 

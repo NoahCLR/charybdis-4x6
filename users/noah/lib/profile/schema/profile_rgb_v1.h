@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Canonical RGB Domain — Profile Wire v1.0
+// RGB Domain Version 4 — the conversion's input
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -11,8 +11,11 @@
 
 enum {
     NOAH_PROFILE_RGB_V1_DOMAIN_ID             = NOAH_PROFILE_DOMAIN_V1_RGB,
-    NOAH_PROFILE_RGB_V1_DOMAIN_VERSION        = NOAH_PROFILE_DOMAIN_V1_RGB_VERSION,
-    NOAH_PROFILE_RGB_V1_FORMAT_VERSION        = NOAH_PROFILE_RGB_VERSION,
+    // Version 4: no longer a profile's RGB domain (that is version 5,
+    // profile_lighting_v1.h), only the encoding of the compiled tables that
+    // the version-4 conversion reads (D-F25).
+    NOAH_PROFILE_RGB_V1_DOMAIN_VERSION        = 4u,
+    NOAH_PROFILE_RGB_V1_FORMAT_VERSION        = 4u,
     NOAH_PROFILE_RGB_V1_HEADER_SIZE           = 16u,
     NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT    = 58u,
     NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE       = 8u,
