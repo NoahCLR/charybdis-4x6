@@ -500,8 +500,8 @@ on both physical halves remain hardware acceptance evidence.
 The macro expansion repartitions the existing 140 KiB logical EEPROM per half:
 36 KiB belongs to VIA (34,903 macro bytes), followed by two 52 KiB custom-profile
 slots. The SRAM0–3 EEPROM mirror remains 143,360 bytes, and flash backing
-remains 286,720 bytes. Each 53,216-byte payload still holds the 37,667-byte
-maximum profile with 15,549 bytes spare, retaining the 12 KiB future reserve.
+remains 286,720 bytes. Each 53,216-byte payload still holds the 37,700-byte
+maximum profile with 15,516 bytes spare, retaining the 12 KiB future reserve.
 
 Stored playback reuses the 516-byte linked IR window. Added provider state is
 one 20-byte cursor, one 16-byte provider, a one-byte slot and a six-byte VIA

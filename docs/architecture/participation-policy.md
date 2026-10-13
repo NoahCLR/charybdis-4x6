@@ -6,7 +6,7 @@ combo decision at the physical press, the behaviour decision when the press
 takes effect.
 This document is the contract for that decision (D-F14). The stored fields
 live in the settings, key-behaviour and combo domains; their bytes are in
-[Portable Profile V1](portable-profile-v1.md#settings-domain-0x40-version-6)
+[Portable Profile V1](portable-profile-v1.md#settings-domain-0x40-version-7)
 and [Profile Wire V1](profile-wire-v1.md).
 
 ## Scopes
@@ -129,7 +129,7 @@ The existing trigger hook alone cannot provide this guarantee. Members of one ch
 layers; each must pass on its own, and any member that does not prevents that
 chord. A press that passes no combo is not buffered.
 
-Combo reference remapping (the per-layer reference layer, settings v6) can
+Combo reference remapping (the per-layer reference layer in settings) can
 change the keycode a combo matches against. It never replaces the press's
 source layer as the permission context.
 
@@ -184,7 +184,7 @@ bypasses behaviour whenever any combo definition sharing that output bypasses
 it; it never borrows another definition's permission.
 
 Capability feature bit 30 advertises this extension. The stored switches are
-inverted: settings v6 header byte 5 bit 0 bypasses all combo output behaviours;
+inverted: settings header byte 5 bit 0 bypasses all combo output behaviours;
 combo v3 row flag bit 4 bypasses that row's output behaviour. Zero preserves
 existing profiles, compiled defaults and translated older backups, without a
 domain-version or action-ABI change. Older firmware rejects either new bit.

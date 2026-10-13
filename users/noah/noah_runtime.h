@@ -26,6 +26,7 @@ void           noah_matrix_scan_user(void);
 void           noah_matrix_slave_scan_user(void);
 void           noah_housekeeping_task_user(void);
 void           noah_suspend_power_down_user(void);
+void           noah_keyboard_pre_init_user(void);
 void           noah_keyboard_post_init_user(void);
 layer_state_t  noah_layer_state_set_user(layer_state_t state);
 report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report);

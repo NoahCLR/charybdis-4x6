@@ -7,6 +7,7 @@
 #include "../schema/profile_compiled_defaults_v1.h"
 #include "profile_store_runtime_hooks.h"
 #include "../runtime/profile_owner.h"
+#include "../schema/profile_settings_v1.h"
 
 typedef enum {
     NOAH_PROFILE_STORE_RUNTIME_UNINITIALIZED = 0u,
@@ -40,3 +41,18 @@ bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status
 bool noah_profile_store_runtime_candidate_status(noah_profile_candidate_v1_status_t *status);
 bool noah_profile_store_runtime_peer_transfer(noah_profile_candidate_v1_peer_status_t *peer);
 bool noah_profile_store_runtime_candidate_receive(uint8_t *frame, size_t length);
+
+// The committed profile's keyboard name (D-F25), read before the owner starts
+// so USB can enumerate with it. It borrows the runtime's not yet started store
+// and leaves it cleared; once the runtime has started it returns false. Boot
+// selection checks the profile's checksum and compatibility, but not the peer:
+// the activated profile is authoritative, so a different name there is only
+// corrected by a later USB restart. Empty, and false, when nothing usable is
+// committed.
+bool noah_profile_store_runtime_boot_keyboard_name(noah_profile_keyboard_name_t *name);
+// The keyboard name of the profile `store` would boot, through its IO and
+// compatibility. The boot read above and tests use it.
+bool noah_profile_store_runtime_read_keyboard_name(noah_profile_store_t *store, noah_profile_keyboard_name_t *name);
+// The owner's USB restart check (noah_profile_owner_usb_restart_safe); false
+// without a working owner.
+bool noah_profile_store_runtime_usb_restart_safe(void);

@@ -56,6 +56,10 @@ __attribute__((weak)) void suspend_power_down_user(void) {
     noah_suspend_power_down_user();
 }
 
+__attribute__((weak)) void keyboard_pre_init_user(void) {
+    noah_keyboard_pre_init_user();
+}
+
 __attribute__((weak)) void keyboard_post_init_user(void) {
     noah_keyboard_post_init_user();
 }

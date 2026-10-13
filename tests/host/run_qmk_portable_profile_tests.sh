@@ -14,6 +14,7 @@ for variant in normal sanitized; do
         "$ROOT/users/noah/lib/compat/qmk_portable_profile.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_settings_runtime.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \

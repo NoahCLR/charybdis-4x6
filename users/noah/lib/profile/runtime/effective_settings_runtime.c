@@ -4,6 +4,7 @@
 static uint8_t                          settings[NOAH_SETTINGS_MAX_SIZE];
 static uint16_t                         settings_length;
 static bool                             booting;
+static uint32_t                         publication_count;
 static noah_effective_settings_apply_fn apply_settings;
 void                                    noah_effective_settings_set_apply(noah_effective_settings_apply_fn apply) {
     apply_settings = apply;
@@ -33,6 +34,13 @@ uint16_t noah_effective_settings_length(void) {
 uint8_t noah_effective_settings_byte(uint16_t offset) {
     return offset < settings_length ? settings[offset] : 0u;
 }
+void noah_effective_settings_keyboard_name(noah_profile_keyboard_name_t *name) {
+    noah_profile_reader_t reader = noah_profile_reader_from_memory(settings, settings_length);
+    (void)noah_profile_settings_v1_keyboard_name(&reader, 0, settings_length, name);
+}
+uint32_t noah_effective_settings_publication(void) {
+    return publication_count;
+}
 bool noah_setting_combo_output_behaviors(void) {
     return !(noah_effective_settings_byte(NOAH_SETTINGS_FLAGS_OFFSET) & NOAH_SETTINGS_FLAG_COMBO_OUTPUT_BYPASS);
 }
@@ -42,6 +50,7 @@ void noah_effective_settings_invalidate(void *context, uint32_t publication, noa
     (void)publication;
     (void)previous;
     (void)active;
+    publication_count++;
     settings_length = 0;
     noah_profile_domain_range_t payload;
     if (view && (view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS) && noah_profile_blob_v1_find_domain(&view->reader, view->base_offset, view->profile.byte_length, NOAH_PROFILE_DOMAIN_V1_SETTINGS, &payload)) {

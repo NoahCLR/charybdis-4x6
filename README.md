@@ -36,6 +36,9 @@ any C and you don't reflash.
   fade to show when the auto-mouse layer is about to drop.
 - **Two halves that act like one keyboard.** Layers, modes, combos, lighting
   and saved edits stay in sync across the cable.
+- **Your keyboard, your name.** Name it in Ark and your computer, Chrome's
+  device picker and Ark all show that name; see the
+  [guide](docs/GUIDE.md#the-keyboards-name).
 - **Room to grow.** It has 16 layers, 128 named macros and 128 custom keys you
   can name and give behaviours to. The macros share 34,903 bytes; one can use
   all the free space.

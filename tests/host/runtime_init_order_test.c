@@ -146,6 +146,14 @@ void noah_qmk_durable_io_init(void) {
 
 void noah_runtime_diag_post_init(void) {}
 
+void noah_qmk_usb_product_name_pre_init(void) {
+    test_log_stage("qmk_usb_product_name_pre_init");
+}
+
+void noah_qmk_usb_product_name_task(void) {
+    test_log_stage("qmk_usb_product_name_task");
+}
+
 void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
     (void)stage;
 }
@@ -201,10 +209,22 @@ static void test_keyboard_post_init_order(void) {
     test_expect_sequence(expected, ARRAY_SIZE(expected));
 }
 
+// Before USB starts, only the USB product name (D-F25) is set up.
+static void test_keyboard_pre_init_order(void) {
+    static const char *const expected[] = {
+        "qmk_usb_product_name_pre_init",
+    };
+
+    test_log_reset();
+    noah_keyboard_pre_init_user();
+    test_expect_sequence(expected, ARRAY_SIZE(expected));
+}
+
 static void test_housekeeping_order(void) {
     static const char *const expected[] = {
         "held_repeat_tick",
         "runtime_diag_heartbeat",
+        "qmk_usb_product_name_task",
     };
 
     test_log_reset();
@@ -228,6 +248,7 @@ int main(void) {
     test_eeconfig_init_order();
     test_matrix_scan_order();
     test_matrix_slave_scan_order();
+    test_keyboard_pre_init_order();
     test_housekeeping_order();
     test_suspend_power_down_feeds_watchdog_only();
     test_keyboard_post_init_order();

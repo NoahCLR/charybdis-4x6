@@ -73,8 +73,10 @@ static uint8_t name_length(const char *name) {
         length++;
     return length;
 }
-// Name records in order: the layers', the macros', then the custom keys'.
+// Name records in order: the layers', the macros', the custom keys', then the
+// keyboard's, which is empty: the built-in name until someone names it.
 static const char *record_name(uint16_t record) {
+    if (record == NOAH_SETTINGS_KEYBOARD_NAME_RECORD) return "";
     if (record < NOAH_SETTINGS_LAYERS) return layer_names[record];
     record -= NOAH_SETTINGS_LAYERS;
     if (record < NOAH_SETTINGS_MACRO_NAMES) return via_macro_names[record];
@@ -92,7 +94,7 @@ uint8_t noah_profile_settings_defaults_byte(uint16_t offset) {
         return noah_profile_settings_default(id) >> (8u * ((offset - NOAH_SETTINGS_SCALARS_OFFSET) % 4u));
     }
     // No profile settings are live: the current version with the keymap's
-    // layer, macro and custom-key names.
+    // layer, macro and custom-key names and no keyboard name.
     const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
     if (offset < NOAH_SETTINGS_HEADER_SIZE) return header[offset];
     if (offset < NOAH_SETTINGS_FIXED_SIZE) {

@@ -390,7 +390,7 @@ static void test_current_domain_registry(void) {
     // Frozen wire identities: changing the registry cannot silently renumber
     // a domain/mask or broaden current-format admission.
     const noah_profile_domain_shape_t expected[] = {
-        {0x10, 0, 1, 4}, {0x20, 1, 2, 2}, {0x30, 2, 4, 3}, {0x40, 3, 8, 6}, {0x50, 4, 16, 3},
+        {0x10, 0, 1, 4}, {0x20, 1, 2, 2}, {0x30, 2, 4, 3}, {0x40, 3, 8, 7}, {0x50, 4, 16, 3},
     };
     assert(NOAH_PROFILE_DOMAIN_REGISTRY_COUNT == sizeof(expected) / sizeof(expected[0]));
     uint8_t mask = 0;
