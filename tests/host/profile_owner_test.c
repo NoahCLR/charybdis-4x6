@@ -168,7 +168,7 @@ void noah_effective_key_behavior_runtime_invalidate(void *context, uint32_t publ
 
 void noah_effective_rgb_runtime_init(noah_effective_rgb_runtime_t *runtime) {
     memset(runtime, 0, sizeof(*runtime));
-    runtime->banks[0].valid = runtime->banks[1].valid = true;
+    runtime->loaded      = true;
     runtime->initialized = true;
 }
 
@@ -184,7 +184,7 @@ void noah_effective_rgb_runtime_uninstall(noah_effective_rgb_runtime_t *runtime)
 
 void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_count, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *callback_view) {
     noah_effective_rgb_runtime_t *runtime = context;
-    runtime->banks[runtime->active_index].valid = rgb_cache_valid;
+    runtime->loaded = rgb_cache_valid;
     (void)publication_count;
     (void)previous;
     (void)active;

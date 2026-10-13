@@ -26,6 +26,7 @@
 #    include "qmk_via_logical_profile.h"
 
 #    include "../profile/protocol/profile_wire_v1.h"
+#    include "../profile/schema/profile_rgb_compiled_v1.h"
 #    include "../profile/storage/profile_storage_layout.h"
 #    include "../profile/storage/profile_store_runtime.h"
 #    include "../state/diagnostics/runtime_diag.h"
@@ -208,6 +209,31 @@ static void noah_profile_channel_write_u32(uint8_t *target, uint32_t value) {
 //
 // This is the read D-026 requires. The READ_SURFACE capability bit describes
 // status reporting and is not this.
+// GET 0x0D: the lighting kinds and bounds this build accepts.
+static bool noah_profile_channel_handle_lighting_get(uint8_t *data, uint8_t length) {
+#    ifdef RGB_MATRIX_ENABLE
+    noah_profile_lighting_v1_limits_t limits;
+    bool                              malformed;
+
+    if (!data || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || data[0] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || data[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || data[2] != NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING) return false;
+    malformed = data[3] == 0u;
+    for (uint8_t i = 5u; i < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; i++) malformed |= data[i] != 0u;
+    limits = noah_profile_rgb_compiled_v1_limits();
+    memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
+    if (malformed) {
+        data[5] = NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED;
+        return true;
+    }
+    data[6] = noah_profile_lighting_v1_capability_page(&limits, data[4], &data[7]);
+    data[5] = data[6] ? NOAH_PROFILE_WIRE_V1_STATUS_OK : NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE;
+    return true;
+#    else
+    (void)data;
+    (void)length;
+    return false;
+#    endif
+}
+
 static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t length) {
     const noah_profile_store_record_t  *record = NULL;
     noah_profile_compiled_v1_metadata_t compiled_metadata;
@@ -345,6 +371,7 @@ NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *da
         (void)noah_profile_channel_refresh_owner(false);
     }
 #    endif
+    if (noah_profile_channel_handle_lighting_get(data, length)) return;
     if (noah_qmk_portable_profile_get(data, length)) return;
     if (noah_profile_channel_handle_payload_get(data, length)) {
         return;
@@ -374,6 +401,7 @@ _Static_assert(NOAH_PROFILE_LED_COUNT == NOAH_PROFILE_WIRE_V1_MAX_PHYSICAL_LEDS,
 #    endif
 
 #    undef NOAH_PROFILE_LED_COUNT
+#    undef NOAH_PROFILE_LIGHTING_CAPABILITY
 #    undef NOAH_PROFILE_MUTATION_CHUNK_MAX
 #    undef NOAH_PROFILE_MUTATION_CAPABILITIES
 #    undef NOAH_PROFILE_SPLIT_CAPABILITY

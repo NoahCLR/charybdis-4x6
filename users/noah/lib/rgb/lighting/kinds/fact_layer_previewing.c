@@ -8,6 +8,10 @@ void noah_lighting_slice_layer_previewing_collect(uint8_t *slice) {
     slice[0] = key_feedback_preview_layer();
 }
 
+void noah_lighting_slice_layer_previewing_idle(uint8_t *slice) {
+    slice[0] = UINT8_MAX;
+}
+
 bool noah_lighting_fact_layer_previewing_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject) {
     uint8_t layer = facts->layer_previewing[0];
 

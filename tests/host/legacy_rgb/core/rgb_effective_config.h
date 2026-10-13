@@ -6,8 +6,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "rgb_helpers.h"
-#include "../../profile/runtime/effective_rgb_runtime.h"
+#include "users/noah/lib/rgb/core/rgb_helpers.h"
+#include "legacy_rgb_frame.h"
 
 typedef struct {
     uint8_t selector;

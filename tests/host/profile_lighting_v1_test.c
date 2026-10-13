@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
     static char    hex[2][40000];
     static uint8_t payload[20000], expected[20000], converted[4096];
     char           kind[16], code[32], name[96];
-    size_t         offset, codec = 0, rejected = 0, conversions = 0;
+    size_t         offset, codec = 0, rejected = 0, conversions = 0, capabilities = 0;
 
     assert(argc == 2);
     FILE *file = fopen(argv[1], "r");
@@ -68,6 +68,18 @@ int main(int argc, char **argv) {
             }
             rejected += result != NOAH_PROFILE_LIGHTING_V1_OK;
             codec++;
+        } else if (strcmp(kind, "CAPABILITY") == 0) {
+            unsigned page;
+            uint8_t  answer[25];
+            assert(fscanf(file, "%u %39999s", &page, hex[0]) == 2);
+            size_t  expected_length = from_hex(hex[0], expected, sizeof(expected));
+            uint8_t length          = noah_profile_lighting_v1_capability_page(&limits, (uint8_t)page, answer);
+            if (length != expected_length || memcmp(answer, expected, length) != 0) {
+                fprintf(stderr, "lighting capability page %u differs\n", page);
+                return 1;
+            }
+            assert(noah_profile_lighting_v1_capability_page(&limits, (uint8_t)(page + 1u), answer) == (page + 1u < NOAH_PROFILE_LIGHTING_V1_CAPABILITY_PAGES ? 18u : 0u));
+            capabilities++;
         } else {
             assert(strcmp(kind, "CONVERT") == 0);
             assert(fscanf(file, "%95s", name) == 1);
@@ -98,7 +110,7 @@ int main(int argc, char **argv) {
         }
     }
     fclose(file);
-    assert(codec >= 50 && rejected >= 45 && conversions >= 5);
-    printf("lighting domain v5: %zu codec vectors (%zu rejected), %zu conversions passed\n", codec, rejected, conversions);
+    assert(codec >= 50 && rejected >= 45 && conversions >= 5 && capabilities == NOAH_PROFILE_LIGHTING_V1_CAPABILITY_PAGES);
+    printf("lighting domain v5: %zu codec vectors (%zu rejected), %zu conversions, %zu capability pages passed\n", codec, rejected, conversions, capabilities);
     return 0;
 }

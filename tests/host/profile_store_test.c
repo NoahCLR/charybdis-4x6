@@ -884,8 +884,8 @@ static void test_pd_store_accepts_every_combo_version_the_validator_does(void) {
     }
 }
 
-// The 32-slot domains: the store keeps only RGB v3 and PD v2, the versions
-// the validator accepts. An eight-slot RGB v2 or PD v1 never reaches it.
+// The store keeps only the RGB and PD versions the validator accepts: RGB 5
+// (lighting rules, D-F25) and PD 3. Any older version never reaches it.
 static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
     const struct { uint8_t mask, id; } domains[] = {{1u << 0u, 0x10u}, {1u << 4u, 0x50u}};
     for (size_t d = 0u; d < sizeof(domains) / sizeof(domains[0]); d++) {
@@ -902,7 +902,7 @@ static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
             reset_eeprom(&eeprom);
             initialize_pd_store(&store);
             CHECK((commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_OK) == accepted);
-            CHECK(accepted == (version == (domains[d].id == 0x10u ? 4u : 3u)));
+            CHECK(accepted == (version == (domains[d].id == 0x10u ? 5u : 3u)));
         }
     }
 }

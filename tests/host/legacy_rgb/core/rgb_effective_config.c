@@ -5,32 +5,22 @@
 #include "rgb_effective_config.h"
 
 #include <string.h>
-#include "../../profile/schema/profile_rgb_compiled_v1.h"
+#include "users/noah/lib/profile/schema/profile_rgb_v1.h"
 
-// Narrow host/feature variants can compile RGB stages without the profile
-// runtime. Production's source manifest supplies strong implementations.
-__attribute__((weak)) noah_effective_rgb_result_t noah_effective_rgb_capture_frame(noah_effective_rgb_frame_t *frame) {
+// The oracle renders one configuration at a time: every frame is current and
+// reads that configuration's version-4 view.
+static noah_effective_rgb_result_t noah_effective_rgb_capture_frame(noah_effective_rgb_frame_t *frame) {
     if (!frame) {
         return NOAH_EFFECTIVE_RGB_INVALID_ARGUMENT;
     }
-    *frame       = (noah_effective_rgb_frame_t){0};
     frame->valid = true;
-    return NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK;
-}
-
-__attribute__((weak)) noah_effective_rgb_result_t noah_effective_rgb_frame_status(const noah_effective_rgb_frame_t *frame) {
-    return frame && frame->valid && !frame->live ? NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK : NOAH_EFFECTIVE_RGB_INVALID_ARGUMENT;
+    return NOAH_EFFECTIVE_RGB_OK;
 }
 
 static noah_effective_rgb_result_t frame_status(const noah_effective_rgb_frame_t *frame, const noah_profile_rgb_v1_view_t **view) {
-    noah_effective_rgb_result_t status = frame ? noah_effective_rgb_frame_status(frame) : NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK;
-    *view                              = NULL;
-    if (status == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK) {
-        *view = noah_profile_rgb_compiled_v1_view();
-        return *view ? NOAH_EFFECTIVE_RGB_OK : NOAH_EFFECTIVE_RGB_INVALID_ARGUMENT;
-    }
-    if (status == NOAH_EFFECTIVE_RGB_OK) *view = &frame->view;
-    return status;
+    (void)frame;
+    *view = legacy_rgb_v4_view();
+    return *view ? NOAH_EFFECTIVE_RGB_OK : NOAH_EFFECTIVE_RGB_INVALID_ARGUMENT;
 }
 
 static hsv_t native_hsv(noah_profile_rgb_v1_hsv_t color) {

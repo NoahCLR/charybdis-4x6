@@ -15,6 +15,11 @@ void noah_lighting_slice_layer_active_collect(uint8_t *slice) {
     slice[1] = (uint8_t)(layer_state >> 8u);
 }
 
+void noah_lighting_slice_layer_active_idle(uint8_t *slice) {
+    slice[0] = 1u;
+    slice[1] = 0u;
+}
+
 bool noah_lighting_fact_layer_active_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject) {
     uint16_t mask = active_mask(facts);
 

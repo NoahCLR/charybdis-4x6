@@ -13,7 +13,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../core/rgb_helpers.h"
+#include "users/noah/lib/rgb/core/rgb_helpers.h"
 #include "../core/rgb_effective_config.h"
 
 #ifdef RGB_MATRIX_ENABLE

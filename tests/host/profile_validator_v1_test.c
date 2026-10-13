@@ -119,11 +119,9 @@ static noah_profile_validator_v1_compatibility_t compatibility(void) {
     value.supported_pd_mode_mask            = 63u;
     value.via_macro_slot_count              = 11u;
     value.custom_key_count        = 3u;
-    value.rgb_limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL;
-    value.rgb_limits.logical_layer_count    = value.logical_layer_count;
-    value.rgb_limits.maximum_brightness     = 200u;
-    value.rgb_limits.tap_branch_color_count = 4u;
-    value.rgb_limits.supported_pd_mode_mask = value.supported_pd_mode_mask;
+    value.rgb_limits.logical_layer_count = value.logical_layer_count;
+    value.rgb_limits.maximum_brightness  = 200u;
+    value.rgb_limits.supported_mode_mask = value.supported_pd_mode_mask;
     return value;
 }
 
@@ -202,7 +200,7 @@ static void test_golden_incremental_phases(const char *fixture_path) {
     expect_result(noah_profile_validator_v1_profile(&validator, &profile, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
     assert(profile.domain_mask == (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) && profile.domain_count == 2u);
     assert(profile.byte_length == length && profile.crc32 == declaration.crc32 && profile.digest == declaration.digest);
-    assert(profile.rgb.layer_color_count == 3u && profile.key_behaviors.row_count == 2u);
+    assert(profile.rgb.rule_count == 16u && profile.rgb.thing_table_count == 4u && profile.key_behaviors.row_count == 2u);
 }
 
 static void test_identity_capacity_and_masks(const char *fixture_path) {
@@ -291,7 +289,7 @@ static void test_blob_and_domain_rejections(const char *fixture_path) {
     bytes[12]   = 2u;
     declaration = declaration_for(bytes, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
-    assert(error.detail_kind == NOAH_PROFILE_VALIDATOR_V1_DETAIL_RGB && error.detail_code == NOAH_PROFILE_RGB_V1_INVALID_VERSION && error.byte_offset == 12u);
+    assert(error.detail_kind == NOAH_PROFILE_VALIDATOR_V1_DETAIL_RGB && error.detail_code == NOAH_PROFILE_LIGHTING_V1_INVALID_VERSION && error.byte_offset == 12u);
 
     memcpy(bytes, valid, length);
     bytes[behavior_payload + 1u] = 1u; // the reserved header byte
@@ -341,10 +339,10 @@ static void test_stable_action_cross_references(const char *fixture_path) {
     compatible.logical_layer_count               = 3u;
     compatible.rgb_limits.logical_layer_count    = 3u;
     compatible.supported_pd_mode_mask            = (uint8_t)(NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL & (uint8_t)~(1u << 2u));
-    compatible.rgb_limits.supported_pd_mode_mask = compatible.supported_pd_mode_mask;
+    compatible.rgb_limits.supported_mode_mask = compatible.supported_pd_mode_mask;
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
     compatible.supported_pd_mode_mask            = NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL;
-    compatible.rgb_limits.supported_pd_mode_mask = compatible.supported_pd_mode_mask;
+    compatible.rgb_limits.supported_mode_mask = compatible.supported_pd_mode_mask;
     compatible.custom_key_count        = 2u;
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION);
 }

@@ -17,7 +17,8 @@ enabled and allowed on all sixteen layers. Combos v2 become v3: each
 28-byte row keeps its count, flags, window, output and its inputs only, with
 every layer allowed. PD v2 becomes v3: each 96-byte record keeps its mode
 bytes and moves its name to the counted rule (length in byte 8, UTF-8 at 96,
-a 128-byte record). Test tooling: the firmware never translates.
+a 128-byte record). RGB v4 then becomes v5 (lighting rules, D-F25) by the
+version-4 conversion. Test tooling: the firmware never translates.
 """
 import struct
 import sys
@@ -55,6 +56,15 @@ def translate_rgb_v4(payload: bytes) -> bytes:
     if layer_colors:
         header[5] = 16
     return bytes(header) + payload[RGB_HEADER:end] + added + payload[end:]
+
+
+def translate_rgb_v5(payload: bytes) -> bytes:
+    """RGB v4 becomes v5 (D-F25) by the lighting conversion, for a keyboard
+    supporting every lighting kind (docs/architecture/lighting-rules-v1.md)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
+    import lighting_reference
+
+    return lighting_reference.convert_v4(payload, lighting_reference.Limits())
 
 
 def translate_settings(payload: bytes) -> bytes:
@@ -154,6 +164,8 @@ def translate(blob: bytes) -> bytes:
             payload, version = translate_rgb(payload), 3
         if domain == RGB_DOMAIN and version == 3:
             payload, version = translate_rgb_v4(payload), 4
+        if domain == RGB_DOMAIN and version == 4:
+            payload, version = translate_rgb_v5(payload), 5
         if domain == 0x20 and version == 1:
             payload, version = translate_behaviors(payload), 2
         if domain == PD_DOMAIN and version == 1:

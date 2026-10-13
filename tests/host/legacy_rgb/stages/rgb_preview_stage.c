@@ -7,11 +7,10 @@
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
 
 #    include "rgb_layer_stage.h"
-#    include "../../key/runtime/feedback.h"
-#    include "../../split/runtime_sync.h"
+#    include "users/noah/lib/key/runtime/feedback.h"
 
 static uint8_t rgb_runtime_preview_stage_current_layer(void) {
-    return is_keyboard_master() ? key_feedback_preview_layer() : split_runtime_sync_remote.key_preview_layer;
+    return key_feedback_preview_layer();
 }
 
 bool rgb_runtime_preview_stage_render(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max) {

@@ -124,11 +124,7 @@ static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_a
     value.supported_pd_mode_mask                    = UINT32_MAX >> (32u - PD_MODE_COUNT);
     value.via_macro_slot_count                      = VIA_MACRO_SLOT_COUNT;
     value.custom_key_count                = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
-    value.rgb_limits.logical_layer_count            = LAYER_COUNT;
-    value.rgb_limits.supported_pd_mode_mask         = value.supported_pd_mode_mask;
-    value.rgb_limits.maximum_brightness             = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
-    value.rgb_limits.tap_branch_color_count         = KEY_BEHAVIOR_MAX_TAP_COUNT - 1u;
-    value.rgb_limits.compiled_stage_mask            = NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL;
+    value.rgb_limits                                = noah_profile_rgb_compiled_v1_limits();
     return value;
 }
 
@@ -257,7 +253,9 @@ static void test_real_authored_profile(void) {
     assert(runtime_compatibility.custom_key_count == NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS);
     assert(runtime_compatibility.rgb_limits.logical_layer_count == LAYER_COUNT);
     assert(runtime_compatibility.rgb_limits.maximum_brightness == RGB_MATRIX_MAXIMUM_BRIGHTNESS);
-    assert(runtime_compatibility.rgb_limits.compiled_stage_mask == NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL);
+    assert(runtime_compatibility.rgb_limits.tap_depth == KEY_BEHAVIOR_MAX_TAP_COUNT && runtime_compatibility.rgb_limits.supported_mode_mask == UINT32_MAX);
+    assert(runtime_compatibility.rgb_limits.facts == NOAH_LIGHTING_COMPILED_FACTS && runtime_compatibility.rgb_limits.targets == NOAH_LIGHTING_COMPILED_TARGETS && runtime_compatibility.rgb_limits.paints == NOAH_LIGHTING_COMPILED_PAINTS);
+    assert(runtime_compatibility.rgb_limits.domain_extensions == NOAH_LIGHTING_COMPILED_DOMAIN_EXTENSIONS && runtime_compatibility.rgb_limits.things == NOAH_LIGHTING_COMPILED_THINGS);
 
     output_length = 0u;
     largest_write = 0u;
@@ -266,7 +264,7 @@ static void test_real_authored_profile(void) {
     assert(noah_profile_compiled_v1_write(&profile, reject_write, NULL, &error) == NOAH_PROFILE_COMPILED_V1_WRITE_ERROR);
     assert(noah_profile_compiled_v1_write(&profile, collect, NULL, &error) == NOAH_PROFILE_COMPILED_V1_OK);
     assert(output_length == profile.metadata.byte_length);
-    assert(largest_write <= NOAH_PROFILE_RGB_V1_HEADER_SIZE);
+    assert(largest_write <= 16u);
     assert(noah_profile_blob_v1_decode(output, output_length, &decoded, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
     assert(decoded.domain_count == NOAH_PROFILE_DOMAIN_REGISTRY_COUNT);
     assert(decoded.domains[0].id == NOAH_PROFILE_DOMAIN_V1_RGB);
@@ -346,11 +344,13 @@ static void test_real_authored_profile(void) {
     }
     assert(behavior_visits == 0);
 #endif
-    noah_profile_rgb_v1_view_t cached_rgb;
+    noah_profile_lighting_v1_view_t cached_rgb;
     memset(domain_writes, 0, sizeof(domain_writes));
+    // The compiled stream above warmed the one lighting cache (authored v4
+    // tables, converted once); reading the view writes nothing more.
     assert(noah_profile_rgb_compiled_v1_view());
     cached_rgb = *noah_profile_rgb_compiled_v1_view();
-    assert(domain_writes[0] == 1);
+    assert(domain_writes[0] == 0);
     assert(cached_rgb.byte_length == decoded.domains[0].payload_length);
     for (size_t offset = 0; offset < cached_rgb.byte_length; offset += sizeof(slice)) {
         size_t length = cached_rgb.byte_length - offset < sizeof(slice) ? cached_rgb.byte_length - offset : sizeof(slice);
@@ -359,10 +359,10 @@ static void test_real_authored_profile(void) {
     }
     memset(domain_writes, 0, sizeof(domain_writes));
     for (size_t i = 0; i < 100; i++) {
-        noah_profile_rgb_v1_layer_color_t color;
+        noah_profile_lighting_v1_view_t view;
         assert(noah_profile_rgb_compiled_v1_view());
-    cached_rgb = *noah_profile_rgb_compiled_v1_view();
-        assert(noah_profile_rgb_v1_layer_color_at(&cached_rgb, 0, &color, NULL) == NOAH_PROFILE_RGB_V1_OK);
+        cached_rgb = *noah_profile_rgb_compiled_v1_view();
+        assert(noah_profile_lighting_v1_decode_reader(&cached_rgb.reader, cached_rgb.base_offset, cached_rgb.byte_length, &runtime_compatibility.rgb_limits, &view, NULL) == NOAH_PROFILE_LIGHTING_V1_OK);
     }
     for (size_t i = 0; i < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; i++) assert(domain_writes[i] == 0);
     assert(noah_profile_settings_default(NOAH_SETTING_DEFAULT_DPI) == CHARYBDIS_MINIMUM_DEFAULT_DPI);

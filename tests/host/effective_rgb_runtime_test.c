@@ -7,84 +7,53 @@
 
 #include "users/noah/lib/profile/runtime/effective_rgb_runtime.h"
 
-enum {
-    TEST_BUFFER_SIZE = NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE + 8u,
-};
+// Publication decodes the profile's lighting into the one program rendering
+// reads; a profile without lighting, or one whose reader fails, leaves the
+// compiled defaults (none in this build, which has no RGB matrix).
 
 typedef struct {
     const uint8_t *bytes;
     size_t         length;
     size_t         calls;
+    size_t         fail_after; // 0: never
 } instrumented_reader_t;
-
-static bool fixture_value(const char *path, const char *key, char *value, size_t capacity) {
-    FILE  *file = fopen(path, "r");
-    char   line[TEST_BUFFER_SIZE * 2u + 64u];
-    size_t key_length = strlen(key);
-
-    assert(file);
-    while (fgets(line, sizeof(line), file)) {
-        size_t length;
-        if (strncmp(line, key, key_length) != 0 || line[key_length] != '=') continue;
-        length = strcspn(&line[key_length + 1u], "\r\n");
-        assert(length + 1u <= capacity);
-        memcpy(value, &line[key_length + 1u], length);
-        value[length] = '\0';
-        fclose(file);
-        return true;
-    }
-    fclose(file);
-    return false;
-}
-
-static uint8_t hex_nibble(char value) {
-    if (value >= '0' && value <= '9') return (uint8_t)(value - '0');
-    if (value >= 'a' && value <= 'f') return (uint8_t)(value - 'a' + 10);
-    if (value >= 'A' && value <= 'F') return (uint8_t)(value - 'A' + 10);
-    abort();
-}
-
-static size_t fixture_hex(const char *path, const char *key, uint8_t *output, size_t capacity) {
-    char   encoded[TEST_BUFFER_SIZE * 2u + 1u];
-    size_t length;
-
-    assert(fixture_value(path, key, encoded, sizeof(encoded)));
-    length = strlen(encoded);
-    assert((length % 2u) == 0u && length / 2u <= capacity);
-    for (size_t index = 0u; index < length; index += 2u) {
-        output[index / 2u] = (uint8_t)((hex_nibble(encoded[index]) << 4u) | hex_nibble(encoded[index + 1u]));
-    }
-    return length / 2u;
-}
-
-static unsigned fixture_uint(const char *path, const char *key) {
-    char          encoded[32];
-    char         *end;
-    unsigned long value;
-
-    assert(fixture_value(path, key, encoded, sizeof(encoded)));
-    value = strtoul(encoded, &end, 10);
-    assert(*encoded != '\0' && *end == '\0' && value <= UINT16_MAX);
-    return (unsigned)value;
-}
 
 static bool instrumented_read(void *context_value, size_t offset, uint8_t *target, size_t length) {
     instrumented_reader_t *context = context_value;
 
     context->calls++;
+    if (context->fail_after != 0u && context->calls > context->fail_after) return false;
     assert(offset <= context->length && length <= context->length - offset);
     if (length != 0u) memcpy(target, &context->bytes[offset], length);
     return true;
 }
 
-static noah_profile_rgb_v1_limits_t fixture_limits(const char *path) {
-    noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
+static size_t read_payload(const char *path, uint8_t *out, size_t capacity) {
+    FILE  *file = fopen(path, "rb");
+    size_t length;
 
-    limits.compiled_stage_mask    = (uint16_t)fixture_uint(path, "codec.compiled_stage_mask");
-    limits.logical_layer_count    = (uint8_t)fixture_uint(path, "codec.logical_layer_count");
-    limits.maximum_brightness     = (uint8_t)fixture_uint(path, "codec.maximum_brightness");
-    limits.tap_branch_color_count = (uint8_t)fixture_uint(path, "codec.tap_branch_color_count");
-    limits.supported_pd_mode_mask = (uint8_t)fixture_uint(path, "codec.supported_pd_mode_mask");
+    assert(file);
+    length = fread(out, 1u, capacity, file);
+    assert(length > 0u && length < capacity && feof(file));
+    fclose(file);
+    return length;
+}
+
+// The keyboard the shared "standard" conversion vector targets.
+static noah_profile_lighting_v1_limits_t standard_limits(void) {
+    noah_profile_lighting_v1_limits_t limits = noah_profile_lighting_v1_default_limits();
+
+    limits.tap_depth           = 5u;
+    limits.logical_layer_count = 16u;
+    limits.maximum_brightness  = 200u;
+    limits.supported_mode_mask = UINT32_MAX;
+    limits.facts               = 0x3eu;
+    limits.targets             = 0xffu;
+    limits.paints              = 0x7fu;
+    limits.timings             = 0x02u;
+    limits.rule_extensions     = 0u;
+    limits.domain_extensions   = 0x06u;
+    limits.things              = 0x1eu;
     return limits;
 }
 
@@ -100,7 +69,7 @@ static noah_effective_profile_identity_t identity(uint32_t generation, uint8_t k
     };
 }
 
-static noah_effective_profile_snapshot_t live_rgb_snapshot(noah_effective_profile_identity_t active, noah_profile_rgb_v1_view_t view) {
+static noah_effective_profile_snapshot_t lighting_snapshot(noah_effective_profile_identity_t active, noah_profile_lighting_v1_view_t view) {
     noah_effective_profile_snapshot_t snapshot = {0};
 
     snapshot.identity            = active;
@@ -109,105 +78,146 @@ static noah_effective_profile_snapshot_t live_rgb_snapshot(noah_effective_profil
     return snapshot;
 }
 
-static noah_effective_profile_snapshot_t fallback_snapshot(noah_effective_profile_identity_t active) {
-    noah_effective_profile_snapshot_t snapshot = {0};
-
-    snapshot.identity = active;
-    return snapshot;
-}
-
-static void test_init_install_and_fail_closed_capture(void) {
+static void test_install_is_exclusive(void) {
     noah_effective_rgb_runtime_t first;
     noah_effective_rgb_runtime_t second;
-    noah_effective_rgb_frame_t   frame;
-
-    assert(noah_effective_rgb_capture_frame(&frame) == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK);
-    assert(noah_effective_rgb_frame_status(&frame) == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK);
-    assert(!noah_effective_rgb_runtime_install(NULL));
+    noah_effective_rgb_runtime_t uninitialized = {0};
 
     noah_effective_rgb_runtime_init(&first);
     noah_effective_rgb_runtime_init(&second);
-    assert(noah_effective_rgb_runtime_capture_frame(&first, &frame) == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK);
-    assert(noah_effective_rgb_runtime_frame_status(&first, &frame) == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK);
+    assert(first.initialized && !first.loaded);
+    assert(!noah_effective_rgb_runtime_install(NULL));
+    assert(!noah_effective_rgb_runtime_install(&uninitialized));
     assert(noah_effective_rgb_runtime_install(&first));
     assert(noah_effective_rgb_runtime_install(&first));
     assert(!noah_effective_rgb_runtime_install(&second));
-    assert(noah_effective_rgb_capture_frame(&frame) == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK);
-
-    first.publication_sequence = 1u;
-    assert(noah_effective_rgb_runtime_capture_frame(&first, &frame) == NOAH_EFFECTIVE_RGB_BUSY);
-    assert(!frame.valid);
-    first.publication_sequence = 2u;
-
     noah_effective_rgb_runtime_uninstall(&second);
     assert(!noah_effective_rgb_runtime_install(&second));
     noah_effective_rgb_runtime_uninstall(&first);
     assert(noah_effective_rgb_runtime_install(&second));
     noah_effective_rgb_runtime_uninstall(&second);
+    // Without RGB there are no compiled defaults to fall back to.
+    assert(!noah_effective_lighting_program(NULL)->valid);
 }
 
-static void test_callback_only_live_view_and_frame_staleness(const char *fixture_path) {
-    uint8_t                           payload[TEST_BUFFER_SIZE];
-    size_t                            payload_length = fixture_hex(fixture_path, "payload.hex", payload, sizeof(payload));
-    instrumented_reader_t             reader_context = {.bytes = payload, .length = payload_length};
-    noah_profile_reader_t             reader         = {.read = instrumented_read, .context = &reader_context, .length = payload_length};
-    noah_profile_rgb_v1_limits_t      limits         = fixture_limits(fixture_path);
-    noah_profile_rgb_v1_view_t        view;
-    noah_profile_rgb_v1_error_t       error;
-    noah_effective_rgb_runtime_t      runtime;
-    noah_effective_rgb_frame_t        live_frame;
-    noah_effective_rgb_frame_t        fallback_frame;
-    noah_effective_profile_identity_t live_identity = identity(7u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
-    noah_effective_profile_snapshot_t live          = live_rgb_snapshot(live_identity, (noah_profile_rgb_v1_view_t){0});
-    noah_profile_rgb_v1_layer_color_t layer;
-    size_t                            calls_after_decode;
+static void test_publication_decodes_the_profile_lighting(const uint8_t *payload, size_t length) {
+    noah_profile_lighting_v1_limits_t         limits = standard_limits();
+    instrumented_reader_t                     source = {.bytes = payload, .length = length};
+    noah_profile_lighting_v1_view_t           view;
+    noah_profile_lighting_v1_error_t          error = {0};
+    noah_profile_lighting_v1_program_t        expected;
+    noah_effective_rgb_runtime_t              runtime;
+    noah_effective_profile_snapshot_t         snapshot;
+    const noah_profile_lighting_v1_program_t *program;
+    noah_profile_reader_t                     reader = {.read = instrumented_read, .context = &source, .length = length};
+    uint32_t                                  before;
+    uint32_t                                  after;
 
-    assert(noah_profile_rgb_v1_decode_reader(&reader, 0u, payload_length, &limits, &view, &error) == NOAH_PROFILE_RGB_V1_OK);
-    live.profile.rgb   = view;
-    calls_after_decode = reader_context.calls;
+    assert(noah_profile_lighting_v1_decode_reader(&reader, 0u, length, &limits, &view, &error) == NOAH_PROFILE_LIGHTING_V1_OK);
+    assert(noah_profile_lighting_v1_program_load(&view, &expected) && expected.valid);
 
     noah_effective_rgb_runtime_init(&runtime);
-    noah_effective_rgb_runtime_invalidate(&runtime, 1u, identity(0u, NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS), live_identity, &live);
-    assert(reader_context.calls == calls_after_decode);
-    assert(noah_effective_rgb_runtime_capture_frame(&runtime, &live_frame) == NOAH_EFFECTIVE_RGB_OK);
-    assert(live_frame.valid && live_frame.live);
-    assert(live_frame.identity.generation == 7u);
-    assert(live_frame.publication_count == 1u);
-    assert(noah_effective_rgb_runtime_frame_status(&runtime, &live_frame) == NOAH_EFFECTIVE_RGB_OK);
-    assert(reader_context.calls == calls_after_decode);
-    assert(noah_profile_rgb_v1_layer_color_at(&live_frame.view, 2u, &layer, &error) == NOAH_PROFILE_RGB_V1_OK);
-    assert(reader_context.calls > calls_after_decode);
-    assert(layer.layer_id == 2u && layer.color.h == 40u && layer.color.s == 50u && layer.color.v == 60u && layer.mode == 1u);
+    assert(noah_effective_rgb_runtime_install(&runtime));
+    (void)noah_effective_lighting_program(&before);
 
-    noah_effective_profile_identity_t behavior_only_identity = identity(8u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
-    noah_effective_profile_snapshot_t behavior_only          = fallback_snapshot(behavior_only_identity);
-    noah_effective_rgb_runtime_invalidate(&runtime, 2u, live_identity, behavior_only_identity, &behavior_only);
-    assert(noah_effective_rgb_runtime_frame_status(&runtime, &live_frame) == NOAH_EFFECTIVE_RGB_STALE);
-    assert(noah_effective_rgb_runtime_capture_frame(&runtime, &fallback_frame) == NOAH_EFFECTIVE_RGB_COMPILED_FALLBACK);
-    assert(fallback_frame.valid && !fallback_frame.live && fallback_frame.publication_count == 2u);
+    snapshot     = lighting_snapshot(identity(1u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE), view);
+    source.calls = 0u;
+    noah_effective_rgb_runtime_invalidate(&runtime, 1u, identity(0u, NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS), snapshot.identity, &snapshot);
+    program = noah_effective_lighting_program(&after);
+    assert(runtime.loaded);
+    assert(after != before);
+    assert(source.calls > 0u);
+    assert(program->valid && program->length == length && memcmp(program->bytes, payload, length) == 0);
+    assert(program->rule_count == expected.rule_count && program->palette_count == expected.palette_count);
+    assert(memcmp(program->rules, expected.rules, ((size_t)expected.rule_count + 1u) * sizeof(expected.rules[0])) == 0);
+    assert(program->fade_present == expected.fade_present && program->tap_commit_flash == expected.tap_commit_flash);
 
-    noah_effective_rgb_runtime_invalidate(&runtime, 3u, behavior_only_identity, behavior_only_identity, &behavior_only);
-    assert(noah_effective_rgb_runtime_frame_status(&runtime, &fallback_frame) == NOAH_EFFECTIVE_RGB_STALE);
+    // Rendering reads the program, never the profile: reading it again does
+    // not touch the reader or move the generation.
+    source.calls = 0u;
+    assert(noah_effective_lighting_program(&before) == program);
+    assert(before == after && source.calls == 0u);
+
+    // Every publication moves the generation, even of the same profile.
+    noah_effective_rgb_runtime_invalidate(&runtime, 2u, snapshot.identity, snapshot.identity, &snapshot);
+    (void)noah_effective_lighting_program(&before);
+    assert(before != after && runtime.loaded);
+
+    noah_effective_rgb_runtime_uninstall(&runtime);
 }
 
-static void test_invalid_callback_identity_fails_closed(void) {
+static void test_profile_without_lighting_falls_back(const uint8_t *payload, size_t length) {
+    noah_profile_lighting_v1_limits_t limits = standard_limits();
+    noah_profile_lighting_v1_view_t   view;
+    noah_profile_lighting_v1_error_t  error = {0};
     noah_effective_rgb_runtime_t      runtime;
-    noah_effective_rgb_frame_t        frame;
-    noah_effective_profile_identity_t active     = identity(3u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE);
-    noah_effective_profile_snapshot_t mismatched = fallback_snapshot(identity(4u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE));
+    noah_effective_profile_snapshot_t snapshot;
 
+    assert(noah_profile_lighting_v1_decode(payload, length, &limits, &view, &error) == NOAH_PROFILE_LIGHTING_V1_OK);
     noah_effective_rgb_runtime_init(&runtime);
-    noah_effective_rgb_runtime_invalidate(&runtime, 1u, identity(0u, NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS), active, &mismatched);
-    assert(noah_effective_rgb_runtime_capture_frame(&runtime, &frame) == NOAH_EFFECTIVE_RGB_INVALID_ARGUMENT);
-    assert(frame.valid == false);
-    assert(noah_effective_rgb_runtime_frame_status(&runtime, &frame) == NOAH_EFFECTIVE_RGB_INVALID_ARGUMENT);
+    assert(noah_effective_rgb_runtime_install(&runtime));
+
+    snapshot = lighting_snapshot(identity(3u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE), view);
+    noah_effective_rgb_runtime_invalidate(&runtime, 3u, identity(2u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE), snapshot.identity, &snapshot);
+    assert(runtime.loaded);
+
+    // The profile carries no lighting domain.
+    snapshot.profile.domain_mask = 0u;
+    noah_effective_rgb_runtime_invalidate(&runtime, 4u, identity(3u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE), snapshot.identity, &snapshot);
+    assert(!runtime.loaded);
+    assert(!noah_effective_lighting_program(NULL)->valid);
+
+    // The compiled defaults are active.
+    snapshot = lighting_snapshot(identity(5u, NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS), view);
+    noah_effective_rgb_runtime_invalidate(&runtime, 5u, identity(4u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE), snapshot.identity, &snapshot);
+    assert(!runtime.loaded);
+
+    // No snapshot at all.
+    noah_effective_rgb_runtime_invalidate(&runtime, 6u, identity(5u, NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS), identity(6u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE), NULL);
+    assert(!runtime.loaded);
+
+    // An uninitialized runtime ignores publications.
+    noah_effective_rgb_runtime_t idle = {0};
+    noah_effective_rgb_runtime_invalidate(&idle, 7u, identity(6u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE), snapshot.identity, &snapshot);
+    assert(!idle.loaded);
+    noah_effective_rgb_runtime_uninstall(&runtime);
+}
+
+static void test_reader_failure_does_not_publish_a_partial_program(const uint8_t *payload, size_t length) {
+    noah_profile_lighting_v1_limits_t limits = standard_limits();
+    instrumented_reader_t             source = {.bytes = payload, .length = length};
+    noah_profile_reader_t             reader = {.read = instrumented_read, .context = &source, .length = length};
+    noah_profile_lighting_v1_view_t   view;
+    noah_profile_lighting_v1_error_t  error = {0};
+    noah_effective_rgb_runtime_t      runtime;
+    noah_effective_profile_snapshot_t snapshot;
+
+    assert(noah_profile_lighting_v1_decode_reader(&reader, 0u, length, &limits, &view, &error) == NOAH_PROFILE_LIGHTING_V1_OK);
+    noah_effective_rgb_runtime_init(&runtime);
+    assert(noah_effective_rgb_runtime_install(&runtime));
+
+    // The storage read fails part-way through the copy.
+    source.calls      = 0u;
+    source.fail_after = 2u;
+    snapshot          = lighting_snapshot(identity(8u, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE), view);
+    noah_effective_rgb_runtime_invalidate(&runtime, 8u, identity(7u, NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS), snapshot.identity, &snapshot);
+    assert(!runtime.loaded);
+    assert(!noah_effective_lighting_program(NULL)->valid);
+    noah_effective_rgb_runtime_uninstall(&runtime);
 }
 
 int main(int argc, char **argv) {
+    static uint8_t payload[NOAH_PROFILE_LIGHTING_V1_PAYLOAD_MAX + 1u];
+    size_t         length;
+
     assert(argc == 2);
-    test_init_install_and_fail_closed_capture();
-    test_callback_only_live_view_and_frame_staleness(argv[1]);
-    test_invalid_callback_identity_fails_closed();
-    puts("effective RGB runtime tests: PASS");
+    length = read_payload(argv[1], payload, sizeof(payload));
+    assert(length > 64u);
+
+    test_install_is_exclusive();
+    test_publication_decodes_the_profile_lighting(payload, length);
+    test_profile_without_lighting_falls_back(payload, length);
+    test_reader_failure_does_not_publish_a_partial_program(payload, length);
+    puts("effective lighting program tests passed");
     return 0;
 }

@@ -164,6 +164,16 @@ bool    noah_profile_lighting_v1_place_capable(const noah_profile_lighting_v1_li
 uint8_t noah_profile_lighting_v1_colour_slots(uint8_t tap_depth, uint8_t thing);
 uint8_t noah_profile_lighting_v1_thing_count(const noah_profile_lighting_v1_limits_t *limits, uint8_t thing);
 
+// The lighting capability read (GET 0x0D): page 0 is the format's bounds,
+// page 1 + 2r + h registry r's ids 128h..128h+127. Writes at most 25 bytes and
+// returns their count, or 0 past the last page.
+enum {
+    NOAH_PROFILE_LIGHTING_V1_CAPABILITY_LAYOUT     = 1u,
+    NOAH_PROFILE_LIGHTING_V1_CAPABILITY_REGISTRIES = 7u,
+    NOAH_PROFILE_LIGHTING_V1_CAPABILITY_PAGES      = 1u + 2u * NOAH_PROFILE_LIGHTING_V1_CAPABILITY_REGISTRIES,
+};
+uint8_t noah_profile_lighting_v1_capability_page(const noah_profile_lighting_v1_limits_t *limits, uint8_t page, uint8_t *payload);
+
 // The version-4 → version-5 conversion (Standard lighting). Reads a decoded
 // version-4 view and writes the canonical version-5 payload for a keyboard
 // with these limits. Rules, tables and extensions whose kinds the limits do

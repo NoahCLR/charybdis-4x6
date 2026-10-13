@@ -1,23 +1,27 @@
 #include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
-// RGB Runtime
+// Retired RGB Stage Renderer — parity oracle only
 // ────────────────────────────────────────────────────────────────────────────
+//
+// The stage pipeline the lighting rule engine replaced (D-F25), kept as the
+// oracle the parity test renders against: a version-4 profile must light
+// exactly as it did. Never built into firmware. Changed only to read the
+// configuration under test and to render as the USB half.
 
 #include "rgb_runtime.h"
 #include "rgb_effective_config.h"
-#include "rgb_helpers.h"
+#include "users/noah/lib/rgb/core/rgb_helpers.h"
 #include "../automouse/rgb_automouse_stage.h"
 #include "../stages/rgb_combo_feedback_stage.h"
 #include "../stages/rgb_key_feedback_stage.h"
 #include "../stages/rgb_layer_stage.h"
 #include "../stages/rgb_pd_mode_stage.h"
 #include "../stages/rgb_preview_stage.h"
-#include "../../state/diagnostics/runtime_diag.h"
-#include "rgb_validation.h"
+#include "users/noah/lib/state/diagnostics/runtime_diag.h"
+#include "users/noah/lib/rgb/core/rgb_validation.h"
 
 #if defined(RGB_MATRIX_ENABLE) && (defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE) || (defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)))
-#    include "../../key/runtime/feedback.h"
-#    include "../../split/runtime_sync.h"
+#    include "users/noah/lib/key/runtime/feedback.h"
 #endif
 
 #ifdef RGB_MATRIX_ENABLE
@@ -69,14 +73,8 @@ static void rgb_runtime_render_snapshot_ensure_combo(void) {
         return;
     }
 
-    if (is_keyboard_master()) {
-        combo_feedback_bitmaps(rgb_runtime_render_snapshot.combo_underlay_bitmap, rgb_runtime_render_snapshot.combo_overlay_bitmap);
-    } else {
-        // A false read means the split worker was still publishing this
-        // domain; the cached bitmaps are untouched, so the frame renders the
-        // last coherent snapshot instead of a mixture of two packets.
-        (void)split_runtime_sync_remote_read_combo(rgb_runtime_render_snapshot.combo_underlay_bitmap, rgb_runtime_render_snapshot.combo_overlay_bitmap);
-    }
+    // Parity oracle: the USB half's view only (the retired split packets are gone).
+    combo_feedback_bitmaps(rgb_runtime_render_snapshot.combo_underlay_bitmap, rgb_runtime_render_snapshot.combo_overlay_bitmap);
 
     rgb_runtime_render_snapshot.combo_valid = true;
 }
@@ -107,18 +105,10 @@ static void rgb_runtime_render_snapshot_ensure_key_feedback(void) {
     }
 
     rgb_runtime_render_snapshot_ensure_combo();
-    if (is_keyboard_master()) {
-        key_feedback_semantic_map(rgb_runtime_render_snapshot.key_feedback_semantic_map);
-        key_feedback_tap_branch_map(rgb_runtime_render_snapshot.key_feedback_tap_branch_map);
-        key_feedback_flash_visibility_bitmap_for_semantic_map(rgb_runtime_render_snapshot.key_feedback_semantic_map, rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap);
-        key_feedback_broad_owner_map(rgb_runtime_render_snapshot.key_feedback_broad_owner_map);
-    } else {
-        // Semantic and branch state travel as two RPC domains, so each one is
-        // captured as its own coherent generation. A false read leaves that
-        // domain's cached maps untouched and keeps the last coherent snapshot.
-        (void)split_runtime_sync_remote_read_key_feedback_semantic(rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap, rgb_runtime_render_snapshot.key_feedback_semantic_map);
-        (void)split_runtime_sync_remote_read_key_feedback_branch(rgb_runtime_render_snapshot.key_feedback_broad_owner_map, rgb_runtime_render_snapshot.key_feedback_tap_branch_map);
-    }
+    key_feedback_semantic_map(rgb_runtime_render_snapshot.key_feedback_semantic_map);
+    key_feedback_tap_branch_map(rgb_runtime_render_snapshot.key_feedback_tap_branch_map);
+    key_feedback_flash_visibility_bitmap_for_semantic_map(rgb_runtime_render_snapshot.key_feedback_semantic_map, rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap);
+    key_feedback_broad_owner_map(rgb_runtime_render_snapshot.key_feedback_broad_owner_map);
 
     rgb_runtime_render_snapshot_suppress_combo_tap_branch_semantics();
     rgb_runtime_render_snapshot.key_feedback_valid = true;

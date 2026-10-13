@@ -163,7 +163,11 @@ uint32_t noah_lighting_keymap_generation(void);
 NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_DECLARE_FACT)
 #undef NOAH_LIGHTING_DECLARE_FACT
 
-#define NOAH_LIGHTING_DECLARE_SLICE(name, bytes, synced, gated) void noah_lighting_slice_##name##_collect(uint8_t *slice);
+// A synced slice also states its bytes at rest (no gesture, combo or
+// preview), which the link compares against to tell an active frame.
+#define NOAH_LIGHTING_DECLARE_SLICE(name, bytes, synced, gated) \
+    void noah_lighting_slice_##name##_collect(uint8_t *slice);  \
+    void noah_lighting_slice_##name##_idle(uint8_t *slice);
 NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_DECLARE_SLICE)
 #undef NOAH_LIGHTING_DECLARE_SLICE
 
@@ -194,5 +198,7 @@ void                 noah_lighting_facts_unpack_synced(noah_lighting_facts_t *fa
 // Rebuilds the synced frame for the link; gated slices keep their bytes in
 // `frame` unless `refresh_gated` is set.
 void                 noah_lighting_facts_build_synced(uint8_t *frame, bool refresh_gated);
+// The synced frame at rest.
+void                 noah_lighting_facts_build_idle(uint8_t *frame);
 // Whether a gated slice in `frame` differs from `idle`.
 bool                 noah_lighting_facts_gated_active(const uint8_t *frame, const uint8_t *idle);

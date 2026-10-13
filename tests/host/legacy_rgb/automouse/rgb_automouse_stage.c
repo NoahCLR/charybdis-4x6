@@ -6,10 +6,10 @@
 
 #if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
 
-#    include "rgb_automouse.h"
-#    include "../core/rgb_helpers.h"
+#    include "users/noah/lib/rgb/automouse/rgb_automouse.h"
+#    include "users/noah/lib/rgb/core/rgb_helpers.h"
 #    include "../stages/rgb_layer_stage.h"
-#    include "../../compat/qmk_auto_mouse_contract.h"
+#    include "users/noah/lib/compat/qmk_auto_mouse_contract.h"
 
 #    if defined(RGB_MATRIX_WS2812)
 #        include "ws2812.h" // QMK driver buffer access

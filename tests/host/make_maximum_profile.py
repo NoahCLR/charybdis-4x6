@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Write the maximum profile fixture (D-F14), or check it is current.
 
-Every table at its simultaneous maximum in one schema 3.0 blob: RGB v4 with
-sixteen groups, sixteen layer colours and 32 group rows; 128 behaviour rows of
+Every table at its simultaneous maximum in one schema 3.0 blob: lighting (RGB
+v5, D-F25) filling its whole 8 KiB budget, with every thing table at its
+maximum record count, 128 palette colours, maps both dense and sparse and 255
+rules using every kind; 128 behaviour rows of
 five full steps (640 steps); 128 combos of sixteen inputs; settings v6 with
 every one of its 272 names at 32 bytes of UTF-8; and 32 pointing slots, each
 named with 32 bytes. Values reach the edges the plan names: layers 7, 8 and
@@ -24,7 +26,10 @@ FIXTURE = ROOT / "tests/fixtures/maximum_profile_v3.fixture"
 LAYERS = 16
 DEPTH = 5
 PAYLOAD_MAX = 53216
-ALLOWANCE = 12288  # reserved for future payload (per-key RGB and other additions)
+LIGHTING_BUDGET = 8192
+# Reserved for future payload once lighting has its budget (D-F25 took 8 KiB
+# of the earlier 12 KiB reserve).
+ALLOWANCE = 4096
 
 KIND_KEY, KIND_LAYER_MO, KIND_LAYER_LOCK, KIND_PD, KIND_PD_LOCK, KIND_MACRO, KIND_CUSTOM = 1, 2, 3, 4, 5, 6, 7
 
@@ -50,42 +55,50 @@ def basic_keycode(n: int) -> int:
 
 
 def rgb() -> bytes:
-    vectors = json.loads((ROOT / "tests/fixtures/rgb_domain_v4.json").read_text())
-    compiled = bytes.fromhex(next(v for v in vectors["valid"] if v["name"] == "compiled")["hex"])
-    g, l, lg, p, pg, cg, t, kg = compiled[4:12]
-    offset = 16 + 9 * g + 5 * l + 5 * lg
-    fade = compiled[offset:offset + 4]
-    offset += 4 + 5 * p + 5 * pg
-    combo_feedback = compiled[offset:offset + 4]
-    offset += 4 + 4 * cg + 3 * t
-    key_feedback = compiled[offset:offset + 11]
-    assert t == DEPTH - 1 and l == LAYERS and p == 32
+    """A version-5 lighting domain of exactly 8,192 bytes (lighting-rules-v1.md)."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import lighting_reference as ref
 
-    groups = 16
-    out = bytearray([4, 0, 0x1F, 0x00, groups, LAYERS, 12, 32, 12, 0, DEPTH - 1, 8, 58, 8, 0, 0])
-    # Distinct bitmaps over LEDs 0..57, already in ascending byte order.
-    for i in range(groups):
-        bitmap = bytearray(8)
-        bitmap[0] = i
-        bitmap[7] = 0x03
-        out += bytes([i]) + bitmap
-    for layer in range(LAYERS):
-        out += bytes([layer, (layer * 16) & 0xFF, 255, 200, layer & 1])
-    for i in range(12):
-        out += bytes([[7, 8, 15, 0xFF][i % 4], 10 * i, 255, 200, i])
-    out += fade
-    for slot in range(32):
-        out += bytes([slot, 8 * slot, 200, 150, slot % 5])
-    for i in range(12):
-        out += bytes([[0, 31, 0xFF][i % 3], 20 * i, 255, 200, 15 - i])
-    out += combo_feedback
-    for i in range(DEPTH - 1):
-        out += bytes([40 * i, 255, 200])
-    out += key_feedback
-    for i in range(8):
-        out += bytes([[0, 1, 2, 3, 0xFF][i % 5], 30 * i, 255, 200, i + 4])
-    assert len(out) == 35 + 9 * 16 + 5 * 16 + 5 * 12 + 5 * 32 + 5 * 12 + 3 * (DEPTH - 1) + 5 * 8
-    return bytes(out)
+    part, rule = ref.part, ref.rule
+    C, N, T, P, B, G = ref.SLOT_CONDITION, ref.SLOT_NEGATED, ref.SLOT_TARGET, ref.SLOT_PAINT, ref.SLOT_BACKGROUND, ref.SLOT_TIMING
+    palette = [[(7 * i) % 256, 255 - i, 200 - (i % 200)] for i in range(128)]
+    behaviour_record = [5] + [(3 * i) % 128 for i in range(3 + DEPTH - 1)]
+    things = [
+        {"kind": 1, "default": [6, 255], "records": [[0 if layer & 1 else 6, layer] for layer in range(LAYERS)]},
+        {"kind": 2, "default": [0, 255], "records": [[[0, 1, 2, 4, 5][slot % 5], 16 + slot] for slot in range(32)]},
+        {"kind": 3, "default": [5, 50], "records": [[[0xFE, 4, 5][i % 3], [0xFE, 0xFF, 64 + i % 64][i % 3]] for i in range(128)]},
+        {"kind": 4, "default": behaviour_record, "records": [[0xFE] + [(i + j) % 128 if (i + j) % 4 else 0xFE for j in range(3 + DEPTH - 1)] for i in range(128)]},
+    ]
+    key_sets = [[(set_index + led) % 58 for led in range(set_index % 9)] for set_index in range(32)]
+    kinds = [
+        part(C, 1, 0xFF), part(C, 1, 7), part(C, 2, 8), part(C, 3, 31), part(C, 4, 0), part(C, 4, 0xFF),
+        part(C, 5, 0x0F, 0), part(C, 5, 0x04, 1), part(C, 5, 0x01, 2), part(C, 5, 0x0A, 3), part(N, 1, 15), part(N, 3, 0xFF),
+    ]
+    targets = [part(T, 0), part(T, 1), part(T, 2), part(T, 3, 31), part(T, 4), part(T, 5), part(T, 6), part(T, 7)]
+    rules = []
+    for index in range(255):
+        conditions = [kinds[(index + k) % len(kinds)] for k in range(index % 5)]
+        paint = [part(P, 0), part(P, 1), part(P, 2, index % 128), part(P, 3), part(P, 4, index % 4), part(P, 5, index), part(P, 6, 127 - index % 128, index)][index % 7]
+        extra = []
+        if index % 11 == 0:
+            extra.append(part(B, 5, 64))
+        if index % 13 == 0:
+            extra.append(part(G, 1, index, 1))
+        rules.append(rule(*conditions, targets[index % len(targets)], paint, *extra, flags=1 if index % 17 == 0 else 0, brightness=255 - index % 100))
+    extensions = [[1, [1, 2, 127, 10]], [2, [1]]]
+    maps = [{led: (led * 5 + m) % 128 if (led + m) % 7 else 0x83 for led in range(58) if (led + m) % 3} for m in range(4)]
+    maps += [{led: 0x81 for led in range(m % 29)} for m in range(4)]
+    domain = {"palette": palette, "things": things, "keySets": key_sets, "maps": maps, "rules": rules, "extensions": extensions}
+    # Fill the budget exactly with dense maps and, last, one sparse map.
+    while len(ref.encode(domain)) + 59 + 2 <= LIGHTING_BUDGET:
+        domain["maps"].append({led: (led + len(domain["maps"])) % 128 for led in range(58)})
+    remaining = LIGHTING_BUDGET - len(ref.encode(domain))
+    assert remaining >= 2 and remaining % 2 == 0, remaining
+    domain["maps"].append({led: led % 128 for led in range((remaining - 2) // 2)})
+    out = ref.encode(domain)
+    assert len(out) == LIGHTING_BUDGET
+    ref.validate(out, ref.Limits(tap_depth=DEPTH, layers=LAYERS))
+    return out
 
 
 def behaviors() -> bytes:
@@ -164,7 +177,7 @@ def pointing() -> bytes:
 
 
 def blob() -> tuple[bytes, list[tuple[int, int, bytes]]]:
-    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 6, settings()), (0x50, 3, pointing())]
+    domains = [(0x10, 5, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 6, settings()), (0x50, 3, pointing())]
     out = bytearray(b"NLP1" + bytes([3, 0, len(domains), 1]))
     for domain_id, version, payload in domains:
         out += bytes([domain_id, version]) + struct.pack("<H", len(payload)) + payload

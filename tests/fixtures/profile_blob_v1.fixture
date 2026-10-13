@@ -3,9 +3,9 @@
 blob.empty.hex=4e4c503103000001
 blob.empty.fnv1a32=c0aa6ecc
 blob.empty.crc32=2fe31602
-blob.ordered.hex=4e4c50310300020110040400deadbeef20020300000102
-blob.ordered.fnv1a32=411bccb8
-blob.ordered.crc32=38812493
+blob.ordered.hex=4e4c50310300020110050400deadbeef20020300000102
+blob.ordered.fnv1a32=5db49a1d
+blob.ordered.crc32=a58ec5e5
 action.NONE.operand=0
 action.NONE.hex=00000000
 action.QMK_KEYCODE.operand=4660

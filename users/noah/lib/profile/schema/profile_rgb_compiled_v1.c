@@ -365,7 +365,10 @@ const noah_profile_rgb_v1_view_t *noah_profile_rgb_compiled_v1_v4_view(void) {
 
 noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
     if (!warm()) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
-    emit(writer, v5_bytes, v5_length);
+    // Sixteen bytes at a time, as every compiled domain emits.
+    for (size_t offset = 0u; offset < v5_length; offset += 16u) {
+        if (!emit(writer, &v5_bytes[offset], v5_length - offset < 16u ? v5_length - offset : 16u)) break;
+    }
     return writer->result;
 }
 #else

@@ -9,6 +9,11 @@ void noah_lighting_slice_combos_held_collect(uint8_t *slice) {
     combo_feedback_bitmaps(slice, &slice[KEY_ORIGIN_BITMAP_SIZE]);
 }
 
+void noah_lighting_slice_combos_held_idle(uint8_t *slice) {
+    key_origin_bitmap_clear(slice);
+    key_origin_bitmap_clear(&slice[KEY_ORIGIN_BITMAP_SIZE]);
+}
+
 bool noah_lighting_fact_combos_held_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject) {
     const uint8_t *owning = facts->combos_held;
     const uint8_t *others = &facts->combos_held[KEY_ORIGIN_BITMAP_SIZE];

@@ -140,6 +140,19 @@ void noah_lighting_facts_build_synced(uint8_t *frame, bool refresh_gated) {
 #    undef NOAH_LIGHTING_SLICE_BUILD
 }
 
+void noah_lighting_facts_build_idle(uint8_t *frame) {
+    size_t offset = 0u;
+    (void)frame;
+    (void)offset;
+#    define NOAH_LIGHTING_SLICE_IDLE(name, bytes, is_synced, gated) \
+        if (is_synced) {                                           \
+            noah_lighting_slice_##name##_idle(&frame[offset]);     \
+            offset += (bytes);                                     \
+        }
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SLICE_IDLE)
+#    undef NOAH_LIGHTING_SLICE_IDLE
+}
+
 bool noah_lighting_facts_gated_active(const uint8_t *frame, const uint8_t *idle) {
     size_t offset = 0u;
     bool   active = false;

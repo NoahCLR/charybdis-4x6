@@ -21,8 +21,18 @@ enum {
     TEST_BEHAVIOR_LENGTH      = 4u + TEST_ROW_COUNT * (2u + 16u + 18u * TEST_STEPS_PER_ROW),
     TEST_PROFILE_LENGTH       = TEST_BEHAVIOR_LENGTH + 12u,
     MAX_VALIDATION_STEPS      = MAX_BEHAVIOR_DOMAIN_STEPS + TEST_PROFILE_LENGTH / 20u + 64u,
-    MAX_RGB_DOMAIN_STEPS          = 58u,
-    TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 344u,
+    // A lighting domain filling its 8 KiB budget: the 128-colour palette, a
+    // layer table, 64 key sets, 84 dense maps and 255 rules.
+    TEST_RGB_PALETTE   = 128u,
+    TEST_RGB_KEY_SETS  = 64u,
+    TEST_RGB_MAPS      = 84u,
+    TEST_RGB_RULES     = 255u,
+    TEST_RGB_RULE_SIZE = 9u,
+    TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 8u + 3u * TEST_RGB_PALETTE + 6u + 8u * TEST_RGB_KEY_SETS + 59u * TEST_RGB_MAPS + TEST_RGB_RULE_SIZE * TEST_RGB_RULES + 1u,
+    // Steps: header; six colours a step; table header and two records; two key
+    // sets a step; per map its encoding then 20, 20 and 18 values; per rule its
+    // header and two parts; the extension count; the end.
+    MAX_RGB_DOMAIN_STEPS = 1u + (TEST_RGB_PALETTE + 5u) / 6u + 3u + TEST_RGB_KEY_SETS / 2u + 4u * TEST_RGB_MAPS + 3u * TEST_RGB_RULES + 2u,
 };
 
 typedef struct {
@@ -129,26 +139,46 @@ static void run_maximum_rgb_profile(void) {
     noah_profile_codec_v1_error_t codec_error;
 
     memset(rgb_payload, 0, sizeof(rgb_payload));
-    rgb_payload[0]  = NOAH_PROFILE_RGB_V1_FORMAT_VERSION;
-    rgb_payload[2]  = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
-    rgb_payload[4]  = NOAH_PROFILE_RGB_V1_MAX_GROUPS;
-    rgb_payload[5]  = 1u;
-    rgb_payload[6]  = NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS;
-    rgb_payload[12] = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
-    rgb_payload[13] = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
-    offset          = NOAH_PROFILE_RGB_V1_HEADER_SIZE;
-    for (uint8_t group = 0u; group < NOAH_PROFILE_RGB_V1_MAX_GROUPS; group++) {
-        rgb_payload[offset]      = group;
-        rgb_payload[offset + 1u] = group;
-        offset += 9u;
+    rgb_payload[0] = NOAH_PROFILE_LIGHTING_V1_FORMAT_VERSION;
+    rgb_payload[2] = NOAH_PROFILE_LIGHTING_V1_LED_COUNT;
+    rgb_payload[3] = TEST_RGB_PALETTE;
+    rgb_payload[4] = 1u;
+    rgb_payload[5] = TEST_RGB_KEY_SETS;
+    rgb_payload[6] = TEST_RGB_MAPS;
+    rgb_payload[7] = TEST_RGB_RULES;
+    offset         = NOAH_PROFILE_LIGHTING_V1_HEADER_SIZE;
+    for (uint8_t colour = 0u; colour < TEST_RGB_PALETTE; colour++) {
+        rgb_payload[offset]      = colour;
+        rgb_payload[offset + 1u] = 255u;
+        rgb_payload[offset + 2u] = (uint8_t)(colour % 150u);
+        offset += 3u;
     }
-    offset += 5u;
-    for (uint8_t row = 0u; row < NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS; row++) {
-        rgb_payload[offset]      = NOAH_PROFILE_RGB_V1_SELECTOR_ALL;
-        rgb_payload[offset + 4u] = 0u;
-        offset += 5u;
+    {
+        static const uint8_t layer_table[6] = {NOAH_LIGHTING_THING_LAYER, 1u, NOAH_LIGHTING_TARGET_ID_SUBJECT_LAYER_KEYS, NOAH_PROFILE_LIGHTING_V1_NONE, NOAH_LIGHTING_TARGET_ID_WHOLE_BOARD, 7u};
+        memcpy(&rgb_payload[offset], layer_table, sizeof(layer_table));
+        offset += sizeof(layer_table);
     }
-    assert(offset + 4u + 4u + 11u == sizeof(rgb_payload));
+    for (uint8_t set = 0u; set < TEST_RGB_KEY_SETS; set++) {
+        rgb_payload[offset] = set;
+        offset += 8u;
+    }
+    for (uint8_t map = 0u; map < TEST_RGB_MAPS; map++) {
+        rgb_payload[offset++] = 0u;
+        for (uint8_t led = 0u; led < NOAH_PROFILE_LIGHTING_V1_LED_COUNT; led++) {
+            rgb_payload[offset++] = (uint8_t)((led + map) % 4u == 0u ? NOAH_PROFILE_LIGHTING_V1_MAP_CLEAR : (led + map) % TEST_RGB_PALETTE);
+        }
+    }
+    for (uint16_t rule = 0u; rule < TEST_RGB_RULES; rule++) {
+        const uint8_t bytes[TEST_RGB_RULE_SIZE] = {
+            TEST_RGB_RULE_SIZE - 1u, 0u, 255u,
+            (NOAH_PROFILE_LIGHTING_V1_SLOT_TARGET << 5u) | 1u, NOAH_LIGHTING_TARGET_ID_KEY_SET, (uint8_t)(rule % TEST_RGB_KEY_SETS),
+            (NOAH_PROFILE_LIGHTING_V1_SLOT_PAINT << 5u) | 1u, NOAH_LIGHTING_PAINT_ID_MAP, (uint8_t)(rule % TEST_RGB_MAPS),
+        };
+        memcpy(&rgb_payload[offset], bytes, sizeof(bytes));
+        offset += sizeof(bytes);
+    }
+    rgb_payload[offset++] = 0u;
+    assert(offset == sizeof(rgb_payload) && sizeof(rgb_payload) <= NOAH_PROFILE_LIGHTING_V1_PAYLOAD_MAX);
 
     const noah_profile_domain_v1_t domain = {
         .id             = NOAH_PROFILE_DOMAIN_V1_RGB,
@@ -187,9 +217,8 @@ static void run_maximum_rgb_profile(void) {
     compatibility.allowed_domain_mask               = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     compatibility.logical_layer_count               = 1u;
     compatibility.supported_pd_mode_mask            = 0u;
-    compatibility.rgb_limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
     compatibility.rgb_limits.logical_layer_count    = 1u;
-    compatibility.rgb_limits.supported_pd_mode_mask = 0u;
+    compatibility.rgb_limits.supported_mode_mask    = 0u;
     assert(noah_profile_validator_v1_begin(&validator, &reader, 0u, &declaration, &compatibility, &error) == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS);
 
     noah_profile_validator_v1_result_t result = NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
@@ -206,8 +235,7 @@ static void run_maximum_rgb_profile(void) {
         assert(++total_steps < MAX_VALIDATION_STEPS);
     }
     assert(result == NOAH_PROFILE_VALIDATOR_V1_VALID);
-    assert(validator.profile.rgb.group_count == NOAH_PROFILE_RGB_V1_MAX_GROUPS);
-    assert(validator.profile.rgb.layer_group_count == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS);
+    assert(validator.profile.rgb.key_set_count == TEST_RGB_KEY_SETS && validator.profile.rgb.map_count == TEST_RGB_MAPS && validator.profile.rgb.rule_count == TEST_RGB_RULES);
 
     const phase_budget_t decode = budgets[NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE];
     assert(decode.steps == MAX_RGB_DOMAIN_STEPS);

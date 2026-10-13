@@ -128,7 +128,9 @@ static inline uint8_t noah_lighting_param_layout_length(uint16_t layout) {
 // to compile that module out; it then reports, accepts and renders one kind
 // fewer.
 
-#ifdef RGB_MATRIX_ENABLE
+// Schema-only host tests (no RGB runtime) set NOAH_LIGHTING_SCHEMA_ALL_KINDS
+// to validate against every row.
+#if defined(RGB_MATRIX_ENABLE) || defined(NOAH_LIGHTING_SCHEMA_ALL_KINDS)
 #    define NOAH_LIGHTING_DEFAULT_ON 1
 #else
 #    define NOAH_LIGHTING_DEFAULT_ON 0
@@ -138,28 +140,28 @@ static inline uint8_t noah_lighting_param_layout_length(uint16_t layout) {
 #    define NOAH_LIGHTING_FACT_LAYER_ACTIVE NOAH_LIGHTING_DEFAULT_ON
 #endif
 #ifndef NOAH_LIGHTING_FACT_LAYER_PREVIEWING
-#    if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
+#    if defined(NOAH_LIGHTING_SCHEMA_ALL_KINDS) || (defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE))
 #        define NOAH_LIGHTING_FACT_LAYER_PREVIEWING 1
 #    else
 #        define NOAH_LIGHTING_FACT_LAYER_PREVIEWING 0
 #    endif
 #endif
 #ifndef NOAH_LIGHTING_FACT_POINTING_MODE_ACTIVE
-#    if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
+#    if defined(NOAH_LIGHTING_SCHEMA_ALL_KINDS) || (defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE))
 #        define NOAH_LIGHTING_FACT_POINTING_MODE_ACTIVE 1
 #    else
 #        define NOAH_LIGHTING_FACT_POINTING_MODE_ACTIVE 0
 #    endif
 #endif
 #ifndef NOAH_LIGHTING_FACT_COMBOS_HELD
-#    if defined(RGB_MATRIX_ENABLE) && defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
+#    if defined(NOAH_LIGHTING_SCHEMA_ALL_KINDS) || (defined(RGB_MATRIX_ENABLE) && defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE))
 #        define NOAH_LIGHTING_FACT_COMBOS_HELD 1
 #    else
 #        define NOAH_LIGHTING_FACT_COMBOS_HELD 0
 #    endif
 #endif
 #ifndef NOAH_LIGHTING_FACT_BEHAVIOUR_STATE
-#    if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
+#    if defined(NOAH_LIGHTING_SCHEMA_ALL_KINDS) || (defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE))
 #        define NOAH_LIGHTING_FACT_BEHAVIOUR_STATE 1
 #    else
 #        define NOAH_LIGHTING_FACT_BEHAVIOUR_STATE 0
@@ -218,7 +220,7 @@ static inline uint8_t noah_lighting_param_layout_length(uint16_t layout) {
 #endif
 
 #ifndef NOAH_LIGHTING_EXTENSION_AUTOMOUSE_FADE
-#    if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
+#    if defined(NOAH_LIGHTING_SCHEMA_ALL_KINDS) || (defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE))
 #        define NOAH_LIGHTING_EXTENSION_AUTOMOUSE_FADE 1
 #    else
 #        define NOAH_LIGHTING_EXTENSION_AUTOMOUSE_FADE 0

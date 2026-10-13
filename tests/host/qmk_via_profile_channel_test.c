@@ -10,6 +10,7 @@
 #include "users/noah/lib/profile/storage/profile_store_runtime.h"
 #include "users/noah/lib/state/diagnostics/runtime_diag.h"
 #include "users/noah/lib/compat/qmk_via_split_sync.h"
+#include "users/noah/lib/profile/schema/profile_rgb_compiled_v1.h"
 
 void via_custom_value_command_kb(uint8_t *data, uint8_t length);
 
@@ -238,6 +239,9 @@ static uint32_t expected_feature_flags(void) {
 #endif
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     flags |= NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH;
+#    ifdef RGB_MATRIX_ENABLE
+    flags |= NOAH_PROFILE_FEATURE_LIGHTING_RULES;
+#    endif
 #endif
 #ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
     flags |= NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION | NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY | NOAH_PROFILE_FEATURE_CANDIDATE_REUSE | NOAH_PROFILE_FEATURE_CANDIDATE_STREAM;
@@ -672,6 +676,46 @@ static void test_combo_read_route_without_combo_feature(void) {
     assert(frame[0] == id_unhandled);
 }
 
+#ifdef RGB_MATRIX_ENABLE
+// The keyboard the lighting capability read describes.
+noah_profile_lighting_v1_limits_t noah_profile_rgb_compiled_v1_limits(void) {
+    noah_profile_lighting_v1_limits_t limits = noah_profile_lighting_v1_default_limits();
+    limits.tap_depth                         = 5u;
+    limits.facts                             = 0x3eu;
+    limits.things                            = 0x1eu;
+    return limits;
+}
+
+static void test_lighting_capability_read(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 21u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[0] == id_custom_get_value && frame[2] == NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING && frame[3] == 21u);
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 10u);
+    assert(frame[7] == 1u && frame[8] == 5u && frame[9] == 0x00u && frame[10] == 0x20u && frame[14] == 5u && frame[15] == 58u && frame[16] == 7u);
+    // Page 1: facts 0-127.
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 22u, 1u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 18u && frame[7] == 0u && frame[8] == 0u && frame[9] == 0x3eu && frame[10] == 0u);
+    // Page 14: thing kinds 128-255, none.
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 23u, 14u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 18u && frame[7] == 6u && frame[8] == 128u && frame[9] == 0u);
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 24u, 15u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE && frame[6] == 0u);
+    // A request without an id, or with reserved bytes set, is malformed.
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 0u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED && frame[6] == 0u);
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 25u, 0u);
+    frame[31] = 1u;
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED && frame[31] == 0u);
+}
+#endif
+
 int main(void) {
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     initialize_live_owner_status();
@@ -695,6 +739,9 @@ int main(void) {
     test_compiled_read_serves_what_the_firmware_runs();
     test_compiled_read_reports_unavailable_when_absent();
     test_combo_read_route_without_combo_feature();
+#ifdef RGB_MATRIX_ENABLE
+    test_lighting_capability_read();
+#endif
     puts("qmk VIA Profile Wire channel tests passed");
     return 0;
 }

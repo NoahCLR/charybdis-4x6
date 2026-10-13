@@ -52,6 +52,7 @@ _Static_assert((unsigned)NOAH_PROFILE_LIGHTING_V1_RECORD_MAX <= (unsigned)NOAH_P
 // ─── Registry facts ─────────────────────────────────────────────────────────
 
 static bool fact_layout(uint8_t id, uint16_t *layout) {
+    (void)layout;
     switch (id) {
 #define NOAH_LIGHTING_FACT_LAYOUT(fid, name, thing, params) \
     case fid:                                              \
@@ -65,6 +66,7 @@ static bool fact_layout(uint8_t id, uint16_t *layout) {
 }
 
 static bool target_layout(uint8_t id, uint16_t *layout) {
+    (void)layout;
     switch (id) {
 #define NOAH_LIGHTING_TARGET_LAYOUT(tid, name, params, place) \
     case tid:                                                 \
@@ -78,6 +80,7 @@ static bool target_layout(uint8_t id, uint16_t *layout) {
 }
 
 static bool paint_layout(uint8_t id, uint16_t *layout) {
+    (void)layout;
     switch (id) {
 #define NOAH_LIGHTING_PAINT_LAYOUT(pid, name, params, below, timed) \
     case pid:                                                       \
@@ -91,6 +94,7 @@ static bool paint_layout(uint8_t id, uint16_t *layout) {
 }
 
 static bool timing_layout(uint8_t id, uint16_t *layout) {
+    (void)layout;
     switch (id) {
 #define NOAH_LIGHTING_TIMING_LAYOUT(gid, name, params, timed) \
     case gid:                                                 \
@@ -104,6 +108,7 @@ static bool timing_layout(uint8_t id, uint16_t *layout) {
 }
 
 static bool extension_length(uint8_t id, uint8_t *length) {
+    (void)length;
     switch (id) {
 #define NOAH_LIGHTING_EXTENSION_LENGTH(xid, name, bytes) \
     case xid:                                            \
@@ -122,6 +127,39 @@ static bool supported(uint32_t mask, uint8_t id) {
 
 bool noah_profile_lighting_v1_place_capable(const noah_profile_lighting_v1_limits_t *limits, uint8_t target) {
     return limits && supported(limits->targets, target) && supported(NOAH_LIGHTING_COMPILED_PLACES, target);
+}
+
+uint8_t noah_profile_lighting_v1_capability_page(const noah_profile_lighting_v1_limits_t *limits, uint8_t page, uint8_t *payload) {
+    uint32_t registry;
+
+    if (!limits || !payload || page >= NOAH_PROFILE_LIGHTING_V1_CAPABILITY_PAGES) return 0u;
+    if (page == 0u) {
+        payload[0]  = NOAH_PROFILE_LIGHTING_V1_CAPABILITY_LAYOUT;
+        payload[1]  = NOAH_PROFILE_LIGHTING_V1_FORMAT_VERSION;
+        payload[2]  = (uint8_t)(limits->max_payload_size & 0xffu);
+        payload[3]  = (uint8_t)(limits->max_payload_size >> 8u);
+        payload[4]  = NOAH_PROFILE_LIGHTING_V1_PALETTE_MAX;
+        payload[5]  = NOAH_PROFILE_LIGHTING_V1_CONDITIONS_MAX;
+        payload[6]  = NOAH_PROFILE_LIGHTING_V1_PARAMETER_MAX;
+        payload[7]  = limits->tap_depth;
+        payload[8]  = NOAH_PROFILE_LIGHTING_V1_LED_COUNT;
+        payload[9]  = NOAH_PROFILE_LIGHTING_V1_CAPABILITY_REGISTRIES;
+        return 10u;
+    }
+    page = (uint8_t)(page - 1u);
+    switch (page / 2u) {
+        case 0u: registry = limits->facts; break;
+        case 1u: registry = limits->targets; break;
+        case 2u: registry = limits->paints; break;
+        case 3u: registry = limits->timings; break;
+        case 4u: registry = limits->rule_extensions; break;
+        case 5u: registry = limits->domain_extensions; break;
+        default: registry = limits->things; break;
+    }
+    payload[0] = (uint8_t)(page / 2u);
+    payload[1] = (uint8_t)((page % 2u) * 128u);
+    for (uint8_t i = 0u; i < 16u; i++) payload[2u + i] = (page % 2u) == 0u && i < 4u ? (uint8_t)(registry >> (8u * i)) : 0u;
+    return 18u;
 }
 
 uint8_t noah_profile_lighting_v1_colour_slots(uint8_t tap_depth, uint8_t thing) {
@@ -670,13 +708,21 @@ noah_profile_lighting_v1_result_t noah_profile_lighting_v1_decode(const uint8_t 
 
 // ─── The decoded program ────────────────────────────────────────────────────
 
+enum { NOAH_PROFILE_LIGHTING_V1_LOAD_CHUNK = 32u };
+
 bool noah_profile_lighting_v1_program_load(const noah_profile_lighting_v1_view_t *view, noah_profile_lighting_v1_program_t *program) {
     uint16_t offset;
     uint8_t *bytes;
 
     if (!view || !program) return false;
     program->valid = false;
-    if (view->byte_length > sizeof(program->bytes) || !noah_profile_reader_read(&view->reader, view->base_offset, program->bytes, view->byte_length)) return false;
+    if (view->byte_length > sizeof(program->bytes)) return false;
+    // Storage readers bound each read, so copy 32 bytes at a time.
+    for (uint16_t at = 0u; at < view->byte_length; at = (uint16_t)(at + NOAH_PROFILE_LIGHTING_V1_LOAD_CHUNK)) {
+        uint16_t left  = (uint16_t)(view->byte_length - at);
+        uint16_t chunk = left < NOAH_PROFILE_LIGHTING_V1_LOAD_CHUNK ? left : (uint16_t)NOAH_PROFILE_LIGHTING_V1_LOAD_CHUNK;
+        if (!noah_profile_reader_read(&view->reader, view->base_offset + at, &program->bytes[at], chunk)) return false;
+    }
     bytes                  = program->bytes;
     program->length        = view->byte_length;
     program->palette_count = view->palette_count;

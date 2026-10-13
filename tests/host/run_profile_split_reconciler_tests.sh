@@ -23,6 +23,7 @@ build_and_run() {
         -DNOAH_PROFILE_SPLIT_TEST_HOOKS \
         -DVIA_ENABLE \
         -DNOAH_PD_PROFILE_ENABLE \
+        -DNOAH_LIGHTING_SCHEMA_ALL_KINDS \
         -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
@@ -36,6 +37,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_lighting_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_lighting_v1_convert.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \

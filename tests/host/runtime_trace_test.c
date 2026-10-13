@@ -249,18 +249,8 @@ bool transaction_rpc_send(int8_t transaction_id, uint8_t initiator2target_buffer
         return fake_rpc_send_result;
     }
 
-    if (transaction_id == PUT_SPLIT_COMBO_FEEDBACK_SYNC) {
-        CHECK(initiator2target_buffer_size == sizeof(split_runtime_combo_feedback_packet_t));
-        return fake_rpc_send_result;
-    }
-
-    if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC) {
-        CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_semantic_packet_t));
-        return fake_rpc_send_result;
-    }
-
-    if (transaction_id == PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC) {
-        CHECK(initiator2target_buffer_size == sizeof(split_runtime_key_feedback_branch_packet_t));
+    if (transaction_id == PUT_SPLIT_LIGHTING_FACTS_SYNC) {
+        CHECK(initiator2target_buffer_size == sizeof(split_runtime_lighting_facts_packet_t));
         return fake_rpc_send_result;
     }
 
@@ -347,9 +337,8 @@ static void test_key_runtime_and_layer_ownership_share_one_trace_buffer(void) {
 static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     noah_runtime_trace_snapshot_t    snapshot;
     split_runtime_base_sync_packet_t packet = {
-        .active_mode_id    = pd_mode_id_from_mask(PD_MODE_ZOOM),
-        .locked_mode_id    = pd_mode_id_from_mask(PD_MODE_ZOOM),
-        .key_preview_layer = UINT8_MAX,
+        .active_mode_id = pd_mode_id_from_mask(PD_MODE_ZOOM),
+        .locked_mode_id = pd_mode_id_from_mask(PD_MODE_ZOOM),
     };
 
     test_reset_stubs();
@@ -360,12 +349,11 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     pd_mode_apply_remote_snapshot(PD_MODE_ARROW, PD_MODE_ARROW);
 
     split_runtime_sync_init();
-    CHECK(rpc_register_count == 4u);
+    // Without RGB the link carries no lighting facts, only the base packet.
+    CHECK(rpc_register_count == 1u);
     CHECK(test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC) != NULL);
-    CHECK(test_registered_callback(PUT_SPLIT_COMBO_FEEDBACK_SYNC) != NULL);
-    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC) != NULL);
-    CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC) != NULL);
-    CHECK(rpc_send_count == 4u);
+    CHECK(test_registered_callback(PUT_SPLIT_LIGHTING_FACTS_SYNC) == NULL);
+    CHECK(rpc_send_count == 1u);
     CHECK(rpc_last_base_packet.active_mode_id == PD_MODE_ID_NONE);
     CHECK(rpc_last_base_packet.locked_mode_id == PD_MODE_ID_NONE);
 

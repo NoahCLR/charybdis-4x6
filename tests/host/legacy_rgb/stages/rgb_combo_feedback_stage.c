@@ -6,7 +6,7 @@
 
 #if defined(RGB_MATRIX_ENABLE) && defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 
-#    include "../../key/runtime/feedback.h"
+#    include "users/noah/lib/key/runtime/feedback.h"
 
 static bool rgb_runtime_combo_feedback_stage_paint_range(rgb_runtime_frame_t *frame, rgb_t color, uint8_t from, uint8_t to, uint8_t led_min, uint8_t led_max) {
     bool painted = false;

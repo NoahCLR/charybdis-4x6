@@ -6,7 +6,7 @@
 
 #if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
 
-#    include "../../key/runtime/slot/origin_registry.h"
+#    include "users/noah/lib/key/runtime/slot/origin_registry.h"
 
 static bool rgb_runtime_pd_mode_stage_led_range_intersects(uint8_t led_min, uint8_t led_max, uint8_t from, uint8_t to) {
     return led_min < to && led_max > from;

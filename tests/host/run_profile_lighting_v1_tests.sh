@@ -26,6 +26,7 @@ lines += [f"CODEC OK 0 {case['name']} {case['hex']}" for case in fixture["codec"
 lines += [f"CODEC {case['error']['code']} {case['error']['offset']} {case['name']} {case['hex']}" for case in fixture["codec"]["invalid"]]
 lines += [f"CONVERT {case['name']} {limits(case['limits'])} {case['v4']} {case['hex']}" for case in fixture["conversion"]]
 lines += [f"CODEC OK 0 render-{case['name']} {case['hex']}" for case in fixture["render"]]
+lines += [f"CAPABILITY {page} {hex}" for page, hex in enumerate(fixture["capability"])]
 pathlib.Path(sys.argv[2]).write_text("\n".join(lines) + "\n")
 PY
 

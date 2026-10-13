@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "users/noah/lib/profile/runtime/profile_owner.h"
+#include "users/noah/lib/profile/schema/profile_rgb_compiled_v1.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 #include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
@@ -284,9 +285,11 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
             if (pd->payload[at] == slot) stored = pd->payload + at;
         assert(noah_effective_pd_record(slot) && memcmp(noah_effective_pd_record(slot), stored ? stored : record, NOAH_PROFILE_PD_V1_RECORD_SIZE) == 0);
     }
-    noah_effective_rgb_frame_t rgb;
-    assert(noah_effective_rgb_runtime_capture_frame(&owner.rgb, &rgb) == NOAH_EFFECTIVE_RGB_OK && rgb.live && rgb.valid);
-    assert(rgb.identity.payload_digest == expected->digest);
+    // The published lighting is the profile's own domain, decoded into RAM.
+    const noah_profile_lighting_v1_program_t *lighting = noah_effective_lighting_program(NULL);
+    assert(owner.rgb.loaded && lighting->valid);
+    for (size_t i = 0; i < expected->domain_count; i++)
+        if (expected->domains[i].id == NOAH_PROFILE_DOMAIN_V1_RGB) assert(lighting->length == expected->domains[i].payload_length && memcmp(lighting->bytes, expected->domains[i].payload, lighting->length) == 0);
     noah_effective_key_behavior_snapshot_t behaviors;
     assert(noah_effective_key_behavior_runtime_status(&owner.key_behaviors, &behaviors) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && behaviors.live && behaviors.valid);
     assert(behaviors.identity.payload_digest == expected->digest && behaviors.live && behaviors.indexed);
@@ -344,7 +347,8 @@ static void    load_maximum(const char *path) {
                 maximum[maximum_length++] = (uint8_t)byte;
             }
     fclose(file);
-    assert(maximum_length > 32768u && maximum_length + 12288u <= NOAH_PROFILE_PAYLOAD_MAX);
+    // Lighting takes 8 KiB of the earlier 12 KiB reserve (D-F25); 4 KiB stays free.
+    assert(maximum_length > 32768u && maximum_length + 4096u <= NOAH_PROFILE_PAYLOAD_MAX);
 }
 static void use_maximum(noah_profile_blob_v1_t *expected) {
     memcpy(candidate, maximum, maximum_length);
@@ -407,8 +411,9 @@ static void test_maximum_profile(void) {
     printf("maximum profile: %u bytes validated in %u scans\n", (unsigned)maximum_length, (unsigned)validation_scans);
     // One validator step a scan, each one read of at most 20 bytes. The peer's
     // copy of this validation is the longest stretch a split prepare spends
-    // without transfer progress, inside the owner's no-progress window.
-    assert(validation_scans < 8000u);
+    // without transfer progress, inside the owner's no-progress window. The
+    // 8 KiB lighting domain (D-F25) takes it from 7,429 to 9,540 scans.
+    assert(validation_scans < 10000u);
     assert_published(maximum, &expected, 1);
     assert_maximum_edges();
     reboot();
@@ -423,8 +428,8 @@ static void test_maximum_profile(void) {
     size_t     rgb = domain_offset(0x10), behaviors = domain_offset(0x20), combos = domain_offset(0x30), settings = domain_offset(0x40), pd = domain_offset(0x50);
     size_t     first_combo = combos + 8, names = settings + 404;
     mutation_t mutations[] = {
-        {"seventeen layer colours", rgb + 5, 17},
-        {"a layer-colour row for layer 16", rgb + 16 + 9 * 16 + 5 * 15, 16},
+        {"a 129th palette colour", rgb + 3, 129},
+        {"seventeen layer records", rgb + 8 + 3 * 128 + 1, 17},
         {"a 129th behaviour row", behaviors, 129},
         {"641 behaviour steps", behaviors + 2, 0x81},
         {"a sixth step", behaviors + 4 + 2 + 15, 6},
@@ -556,9 +561,10 @@ int main(int argc, char **argv) {
             }
         }
         assert(noah_effective_settings_length() > 0 && noah_setting(NOAH_SETTING_TAPPING_TERM, 0) == TAPPING_TERM);
-        noah_effective_rgb_frame_t factory_rgb;
-        assert(noah_effective_rgb_runtime_capture_frame(&owner.rgb, &factory_rgb) == NOAH_EFFECTIVE_RGB_OK);
-        assert(factory_rgb.identity.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS && factory_rgb.view.reader.read != owner.compiled_reader.read);
+        // Factory lighting is the compiled Standard lighting, decoded from its own cache.
+        const noah_profile_lighting_v1_view_t *factory_view = noah_profile_rgb_compiled_v1_view();
+        assert(owner.rgb.loaded && noah_effective_lighting_program(NULL)->valid && factory_view && factory_view->reader.read != owner.compiled_reader.read);
+        assert(noah_effective_lighting_program(NULL)->length == factory_view->byte_length);
         assert(noah_profile_compiled_v1_write(&owner.compiled, collect, NULL, NULL) == NOAH_PROFILE_COMPILED_V1_OK);
         noah_profile_blob_v1_t compiled, fixture, expected;
         assert(noah_profile_blob_v1_decode(compiled_bytes, collected, &compiled, NULL) == NOAH_PROFILE_CODEC_V1_OK);

@@ -19,6 +19,13 @@ void noah_lighting_slice_pointing_mode_active_collect(uint8_t *slice) {
     slice[SLICE_HAS_KEYS] = has_keys ? 1u : 0u;
 }
 
+void noah_lighting_slice_pointing_mode_active_idle(uint8_t *slice) {
+    slice[SLICE_MODE]     = PD_MODE_COUNT;
+    slice[SLICE_SIDES]    = SPLIT_SIDE_MASK_NONE;
+    slice[SLICE_HAS_KEYS] = 0u;
+    key_origin_bitmap_clear(&slice[SLICE_KEYS]);
+}
+
 bool noah_lighting_fact_pointing_mode_active_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject) {
     const uint8_t *slice = facts->pointing_mode_active;
     uint8_t        mode  = slice[SLICE_MODE];

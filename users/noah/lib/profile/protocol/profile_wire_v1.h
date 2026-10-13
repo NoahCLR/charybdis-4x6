@@ -21,6 +21,9 @@ enum {
     // something, and this is it.
     NOAH_PROFILE_WIRE_V1_VALUE_COMPILED = 0x05u,
     NOAH_PROFILE_WIRE_V1_VALUE_COMBOS   = 0x06u,
+    // What the lighting rules may use on this keyboard
+    // (docs/architecture/lighting-rules-v1.md, "Capabilities").
+    NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING = 0x0Du,
     // Page 0 of a payload read is metadata; pages 1..N carry raw payload
     // bytes, a full report payload each.
     NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE = 0u,
@@ -89,6 +92,10 @@ enum {
     // Global and per-combo permission to use the output's shared behaviour.
     NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS = 1u << 30,
 };
+
+// Version-5 lighting rules and their capability read, GET 0x0D. Bit 31 does
+// not fit an enumerator.
+#define NOAH_PROFILE_FEATURE_LIGHTING_RULES ((uint32_t)1u << 31)
 
 // A wide-page request: [command, channel, value, request id, page low, page
 // high], then 26 reserved zero bytes. The response echoes bytes 0..4 only,

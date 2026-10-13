@@ -23,6 +23,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_lighting_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_lighting_v1_convert.c" \
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \

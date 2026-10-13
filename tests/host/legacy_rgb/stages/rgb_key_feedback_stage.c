@@ -7,7 +7,7 @@
 
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
 
-#    include "../../key/runtime/feedback.h"
+#    include "users/noah/lib/key/runtime/feedback.h"
 
 typedef struct {
     key_feedback_semantic_t semantic;

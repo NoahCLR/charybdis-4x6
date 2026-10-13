@@ -75,6 +75,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_lighting_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_lighting_v1_convert.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
@@ -122,9 +124,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c"
 
 # The golden compiled PD domain is the shared "presets" vector, and its RGB
-# domain is version 4 with a colour for each of the sixteen layers and a row
-# for each of the 32 slots.
-python3 - "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" "$ROOT/tests/fixtures/pd_mode_domain_v3.json" <<'PY'
+# domain is Standard lighting: exactly the shared lighting vectors' "standard"
+# conversion of the compiled version-4 tables.
+python3 - "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" "$ROOT/tests/fixtures/pd_mode_domain_v3.json" "$ROOT/tests/fixtures/lighting_vectors_v1.json" <<'PY'
 import json, struct, sys
 from pathlib import Path
 fields = dict(line.split("=", 1) for line in Path(sys.argv[1]).read_text().splitlines() if "=" in line)
@@ -136,5 +138,6 @@ for _ in range(blob[6]):
     offset += 4 + length
 presets = next(case for case in json.loads(Path(sys.argv[2]).read_text())["valid"] if case["name"] == "presets")
 assert domains[0x50] == (3, bytes.fromhex(presets["hex"])), "compiled PD domain differs from the presets vector"
-assert domains[0x10][0] == 4 and domains[0x10][1][0] == 4 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32
+standard = next(case for case in json.loads(Path(sys.argv[3]).read_text())["conversion"] if case["name"] == "standard")
+assert domains[0x10] == (5, bytes.fromhex(standard["hex"])), "compiled lighting differs from Standard lighting"
 PY

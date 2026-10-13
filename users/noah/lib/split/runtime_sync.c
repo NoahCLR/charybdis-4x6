@@ -34,16 +34,18 @@ static uint32_t                         split_runtime_base_last_send = 0;
 // keep their bytes between rebuilds), what the other half last committed, and
 // the frame at rest. The other half stages one pass's chunks before
 // publishing them as one generation.
-static uint8_t  split_runtime_lighting_built[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
-static uint8_t  split_runtime_lighting_sent[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
-static uint8_t  split_runtime_lighting_idle[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
-static uint8_t  split_runtime_lighting_staging[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
 static bool     split_runtime_lighting_sent_once  = false;
 static bool     split_runtime_lighting_resend_all = true;
 static uint32_t split_runtime_lighting_last_send  = 0;
-static uint8_t  split_runtime_lighting_sequence   = 0;
-static uint8_t  split_runtime_lighting_staging_sequence = 0;
-static bool     split_runtime_lighting_staging_open     = false;
+static bool     split_runtime_lighting_staging_open = false;
+#    if NOAH_LIGHTING_HAS_SYNCED_FACTS
+static uint8_t split_runtime_lighting_built[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
+static uint8_t split_runtime_lighting_sent[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
+static uint8_t split_runtime_lighting_idle[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
+static uint8_t split_runtime_lighting_staging[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
+static uint8_t split_runtime_lighting_sequence         = 0;
+static uint8_t split_runtime_lighting_staging_sequence = 0;
+#    endif
 
 typedef struct {
     uint32_t last_failure;
@@ -299,7 +301,9 @@ static void split_runtime_sync_slave_lighting_rpc(uint8_t initiator2target_buffe
     chunk = (uint8_t)(packet->chunk & SPLIT_RUNTIME_SYNC_FACTS_INDEX_MASK);
     if (chunk >= SPLIT_RUNTIME_SYNC_FACTS_CHUNKS) return;
     if (!split_runtime_lighting_staging_open || packet->sequence != split_runtime_lighting_staging_sequence) {
-        memcpy(split_runtime_lighting_staging, split_runtime_sync_remote.lighting_facts, NOAH_LIGHTING_SYNCED_BYTES);
+        // A pass carries only the chunks that changed; the rest are what this
+        // half last committed, or the frame at rest before its first commit.
+        memcpy(split_runtime_lighting_staging, split_runtime_sync_remote.lighting_facts_received ? split_runtime_sync_remote.lighting_facts : split_runtime_lighting_idle, NOAH_LIGHTING_SYNCED_BYTES);
         split_runtime_lighting_staging_sequence = packet->sequence;
         split_runtime_lighting_staging_open     = true;
     }
@@ -362,9 +366,8 @@ void split_runtime_sync_init(void) {
     transaction_register_rpc(PUT_SPLIT_RUNTIME_BASE_SYNC, split_runtime_sync_slave_base_rpc);
 #    if NOAH_LIGHTING_HAS_SYNCED_FACTS
     transaction_register_rpc(PUT_SPLIT_LIGHTING_FACTS_SYNC, split_runtime_sync_slave_lighting_rpc);
-    // The frame at rest, before any key, combo or preview: what an idle
-    // half would collect.
-    noah_lighting_facts_build_synced(split_runtime_lighting_idle, true);
+    // The frame at rest, as each slice's module states it.
+    noah_lighting_facts_build_idle(split_runtime_lighting_idle);
     memcpy(split_runtime_lighting_built, split_runtime_lighting_idle, NOAH_LIGHTING_SYNCED_BYTES);
     memset(split_runtime_lighting_sent, 0, sizeof(split_runtime_lighting_sent));
 #    endif

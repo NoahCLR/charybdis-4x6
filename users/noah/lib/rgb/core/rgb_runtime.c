@@ -39,7 +39,9 @@ static uint32_t                     rgb_runtime_now;
 static uint32_t                     rgb_runtime_program_generation;
 static uint32_t                     rgb_runtime_keymap_generation;
 static uint32_t                     rgb_runtime_resolved_keymap_generation;
+static noah_lighting_leds_t         rgb_runtime_resolved_leds;
 static bool                         rgb_runtime_resolved;
+static bool                         rgb_runtime_frame_due;
 
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
 static uint16_t rgb_runtime_stage_pipeline_count;
@@ -115,8 +117,9 @@ static void rgb_runtime_capture_facts(void) {
 }
 
 static void rgb_runtime_begin_frame(void) {
-    uint32_t generation;
-    bool     wake_due;
+    noah_lighting_leds_t leds = rgb_runtime_local_leds();
+    uint32_t             generation;
+    bool                 wake_due;
 
     rgb_runtime_capture_facts();
     rgb_runtime_scene.program = noah_effective_lighting_program(&generation);
@@ -127,14 +130,15 @@ static void rgb_runtime_begin_frame(void) {
         noah_lighting_engine_program_changed();
     }
     wake_due = rgb_runtime_info.wake_set && (int32_t)(rgb_runtime_now - rgb_runtime_info.wake) >= 0;
-    if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation && memcmp(&rgb_runtime_facts, &rgb_runtime_resolved_facts, sizeof(rgb_runtime_facts)) == 0) return;
+    if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_leds == leds && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation && memcmp(&rgb_runtime_facts, &rgb_runtime_resolved_facts, sizeof(rgb_runtime_facts)) == 0) return;
 
     rgb_runtime_resolved_facts             = rgb_runtime_facts;
     rgb_runtime_resolved_keymap_generation = rgb_runtime_keymap_generation;
     rgb_runtime_scene.facts                = &rgb_runtime_resolved_facts;
     rgb_runtime_scene.keymap_generation    = rgb_runtime_keymap_generation;
-    noah_lighting_resolve(&rgb_runtime_scene, rgb_runtime_local_leds(), rgb_runtime_now, true, &rgb_runtime_frame, &rgb_runtime_info);
-    rgb_runtime_resolved = true;
+    noah_lighting_resolve(&rgb_runtime_scene, leds, rgb_runtime_now, true, &rgb_runtime_frame, &rgb_runtime_info);
+    rgb_runtime_resolved_leds = leds;
+    rgb_runtime_resolved      = true;
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
     rgb_runtime_resolve_count++;
 #    endif
@@ -191,8 +195,10 @@ static noah_lighting_leds_t rgb_runtime_range_leds(uint8_t led_min, uint8_t led_
 static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
+    // A frame starts at QMK's first chunk, and is captured at its first chunk
+    // with LEDs on this half, so the other half's chunks cost nothing.
     if (rgb_runtime_range_starts_frame(led_min, led_max)) {
-        rgb_runtime_begin_frame();
+        rgb_runtime_frame_due = true;
     }
 
     if (!rgb_runtime_normalize_local_range(&led_min, &led_max)) {
@@ -200,6 +206,11 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
         rgb_runtime_early_exit_count++;
 #    endif
         return false;
+    }
+
+    if (rgb_runtime_frame_due || !rgb_runtime_resolved) {
+        rgb_runtime_frame_due = false;
+        rgb_runtime_begin_frame();
     }
 
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
@@ -244,9 +255,17 @@ void noah_rgb_runtime_invalidate_layer_maps(void) {
 void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
     noah_rgb_validate_config();
-    // Idle facts until the first capture: no preview, no gesture, no combo.
-    noah_lighting_facts_collect(&rgb_runtime_facts, true, true);
-    rgb_runtime_resolved = false;
+    // Until the other half hears its first frame, the synced facts are at rest.
+    noah_lighting_facts_collect(&rgb_runtime_facts, true, false);
+#    if NOAH_LIGHTING_HAS_SYNCED_FACTS
+    {
+        uint8_t idle[NOAH_LIGHTING_SYNCED_BYTES];
+        noah_lighting_facts_build_idle(idle);
+        noah_lighting_facts_unpack_synced(&rgb_runtime_facts, idle);
+    }
+#    endif
+    rgb_runtime_resolved  = false;
+    rgb_runtime_frame_due = false;
     rgb_runtime_keymap_generation++;
     memset(&rgb_runtime_info, 0, sizeof(rgb_runtime_info));
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
