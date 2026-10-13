@@ -376,7 +376,7 @@ headers are rejected. Header CRC, marker-last publication and bounded I/O remain
 
 Synchronous validation, bounded boot scanning and commit shape validation
 share the current version rules in `profile_versions.h`: RGB v4, key behaviors
-v2, combos v3, settings v6 and sparse PD v3. Blob magic remains `NLP1`; schema
+v2, combos v3, settings v7 and sparse PD v3. Blob magic remains `NLP1`; schema
 bytes must be 3.0. Domain bodies also require semantic validation. Store tests
 cover all mask/origin/flag combinations, both boot paths, old-header rejection,
 reserved bits with repaired CRCs, incompatible versions, one-byte commit steps,

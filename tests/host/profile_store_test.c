@@ -841,7 +841,7 @@ static noah_profile_store_result_t commit_pd(noah_profile_store_t *store, const 
 // a profile with named macros (settings v4) once passed validation on both
 // halves and was then refused here on every try.
 static void test_pd_store_accepts_every_settings_version_the_validator_does(void) {
-    for (uint8_t version = 1u; version <= 5u; version++) {
+    for (uint8_t version = 1u; version <= 7u; version++) {
         uint8_t                        payload[33];
         uint16_t                       length = pd_payload(payload, 1u << 3u);
         noah_profile_store_t           store;
@@ -854,7 +854,7 @@ static void test_pd_store_accepts_every_settings_version_the_validator_does(void
         initialize_pd_store(&store);
         noah_profile_store_result_t result = commit_pd(&store, payload, &candidate);
         CHECK((result == NOAH_PROFILE_STORE_OK) == (version == NOAH_PROFILE_DOMAIN_VERSION_SETTINGS));
-        CHECK(NOAH_PROFILE_DOMAIN_VERSION_SETTINGS == 6u);
+        CHECK(NOAH_PROFILE_DOMAIN_VERSION_SETTINGS == 7u);
     }
 }
 

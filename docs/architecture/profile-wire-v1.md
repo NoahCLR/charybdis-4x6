@@ -52,7 +52,7 @@ Accepted domains (`users/noah/lib/profile/schema/profile_domain_registry.h`):
 | `0x10` | RGB | 4 |
 | `0x20` | Key behaviors | 2 |
 | `0x30` | Combo overrides | 3 |
-| `0x40` | Settings, layer records, layer names, VIA macro names and custom-key names | 6 |
+| `0x40` | Settings, layer records, layer names, VIA macro names, custom-key names and the keyboard name | 7 |
 | `0x50` | Sparse pointing-mode slots | 3 |
 
 ### Firmware domain ownership
@@ -512,7 +512,7 @@ Capability feature bits are:
 | 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised VIA macro bank (34,903 bytes in this layout). Without this bit, retain the legacy 512-byte program ceiling. See [runtime flow](runtime-flow.md) |
 | 28 | pointing-mode clicks: a direction or button-override tap in the PD domain may be a plain mouse button 1–8 (`0x00d1..0x00d8`). Require this bit before writing one; older firmware rejects it as `INVALID_ACTION`. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 29 | pointing-mode VIA macros: direction, diagonal and button tap overrides may start slots 0–127 (`0x7700..0x777f`), inherit policy and zero mask only. Require this bit before writing one. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
-| 30 | combo output behaviour permissions: settings v6 header byte 5 bit 0 bypasses all combo output behaviours; combo v3 row flag bit 4 bypasses one output. Both zero means allowed. Native combo readback v3 row flag bit 5 reports the per-combo bypass. Require this bit before writing either extension. See [participation policy](participation-policy.md#combo-output-behaviour-permission) |
+| 30 | combo output behaviour permissions: settings header byte 5 bit 0 bypasses all combo output behaviours; combo v3 row flag bit 4 bypasses one output. Both zero means allowed. Native combo readback v3 row flag bit 5 reports the per-combo bypass. Require this bit before writing either extension. See [participation policy](participation-policy.md#combo-output-behaviour-permission) |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with
@@ -1163,7 +1163,7 @@ unavailable and exposes zero definitions rather than a partially decoded table.
 
 ## Portable Settings And Complete Readback
 
-Domain `0x40` v6 and GET values `0x07`/`0x08` are specified in
+Domain `0x40` v7 and GET values `0x07`/`0x08` are specified in
 [portable-profile-v1.md](portable-profile-v1.md). The canonical envelope now
 permits five known domains; an unknown domain still rejects the candidate.
 The settings validator uses the existing bounded reader and safe publication

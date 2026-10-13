@@ -5,6 +5,7 @@
 #include "profile_store_runtime.h"
 
 #include <stddef.h>
+#include <string.h>
 
 #include "../../compat/qmk_profile_eeprom.h"
 #include "../schema/profile_compiled_defaults_v1.h"
@@ -263,10 +264,10 @@ bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target,
 #endif
 }
 
-// Opened lazily on first host request rather than at boot: computing the
-// compiled digest walks the authored tables, and nothing on the scan path
-// needs it. One open is enough, since the compiled bytes cannot change at
-// runtime.
+// Opened lazily on first use rather than in the scan path: computing the
+// compiled digest walks the authored tables. The boot keyboard-name read and
+// the first host request use it. One open is enough, since the compiled bytes
+// cannot change at runtime.
 static bool                       compiled_opened;
 static bool                       compiled_valid;
 static noah_profile_compiled_v1_t compiled_profile;
@@ -361,5 +362,81 @@ void noah_profile_store_runtime_logical_via_progress(void) {
     if (runtime_owner_initialized && !runtime_integration_error) {
         noah_profile_owner_logical_via_progress(&runtime_owner);
     }
+#endif
+}
+
+#if defined(VIA_ENABLE)
+typedef struct {
+    const noah_profile_store_t    *store;
+    noah_profile_storage_address_t start;
+} boot_payload_t;
+
+static bool boot_payload_read(void *context, size_t offset, uint8_t *target, size_t length) {
+    const boot_payload_t *payload = context;
+
+    return length == 0u || (length <= UINT16_MAX && noah_profile_store_read_span(payload->store, (noah_profile_storage_address_t)(payload->start + offset), target, (uint16_t)length));
+}
+
+bool noah_profile_store_runtime_read_keyboard_name(noah_profile_store_t *store, noah_profile_keyboard_name_t *name) {
+    noah_profile_store_record_t record;
+    noah_profile_domain_range_t settings;
+
+    if (!name) {
+        return false;
+    }
+    memset(name, 0, sizeof(*name));
+    if (!store || noah_profile_store_boot_select(store, &record) != NOAH_PROFILE_STORE_OK || (record.slot != NOAH_PROFILE_SLOT_A && record.slot != NOAH_PROFILE_SLOT_B)) {
+        return false;
+    }
+    boot_payload_t payload = {
+        .store = store,
+        .start = (record.slot == NOAH_PROFILE_SLOT_A ? NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR : NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR) + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE,
+    };
+    noah_profile_reader_t reader = {.read = boot_payload_read, .context = &payload, .length = record.payload_length};
+
+    return noah_profile_blob_v1_find_domain(&reader, 0u, record.payload_length, NOAH_PROFILE_DOMAIN_V1_SETTINGS, &settings) && noah_profile_settings_v1_keyboard_name(&reader, settings.offset, settings.length, name);
+}
+#endif
+
+bool noah_profile_store_runtime_boot_keyboard_name(noah_profile_keyboard_name_t *name) {
+#if defined(VIA_ENABLE) && defined(NOAH_PORTABLE_PROFILE_ENABLE)
+    // Borrow the store the runtime has not started yet: no RAM of its own and
+    // nothing large on the boot stack.
+#    if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    noah_profile_store_t *store = runtime_owner_initialized ? NULL : &runtime_owner.store;
+#    else
+    noah_profile_store_t *store = runtime_state == NOAH_PROFILE_STORE_RUNTIME_UNINITIALIZED ? &runtime_store : NULL;
+#    endif
+    bool found;
+
+    if (name) {
+        memset(name, 0, sizeof(*name));
+    }
+    if (!name || !store || !ensure_compiled_open()) {
+        return false;
+    }
+    noah_profile_store_init(store, noah_qmk_profile_eeprom_read_only_io(),
+                            (noah_profile_store_compatibility_t){
+                                .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
+                                .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
+                                .compiled_default_digest = compiled_profile.metadata.digest,
+                                .action_abi_digest       = compiled_profile.metadata.action_abi_digest,
+                            });
+    found = noah_profile_store_runtime_read_keyboard_name(store, name);
+    memset(store, 0, sizeof(*store));
+    return found;
+#else
+    if (name) {
+        memset(name, 0, sizeof(*name));
+    }
+    return false;
+#endif
+}
+
+bool noah_profile_store_runtime_usb_restart_safe(void) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_usb_restart_safe(&runtime_owner);
+#else
+    return false;
 #endif
 }

@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
     if (named) assert(fclose(named) == 0);
     assert(length == NOAH_SETTINGS_MIN_SIZE + 4 + 5 + 32 + 15 + 32 + 11 + 4);
     const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
-    assert(NOAH_SETTINGS_VERSION == 6u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
+    assert(NOAH_SETTINGS_VERSION == 7u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
     keyrecord_t record = {0};
     assert(get_tapping_term(0, &record) == TAPPING_TERM && get_quick_tap_term(0, &record) == TAPPING_TERM);
@@ -220,10 +220,11 @@ int main(int argc, char **argv) {
         expected[NOAH_SETTINGS_LAYER_RECORDS_OFFSET + layer * NOAH_SETTINGS_LAYER_RECORD_SIZE + NOAH_SETTINGS_LAYER_REFERENCE] = layer;
         assert(combo_ref_from_layer(layer) == layer);
     }
-    // Then every name counted: the layers', each macro's, and each custom key's.
+    // Then every name counted: the layers', each macro's, each custom key's,
+    // and the keyboard's, which is empty until someone names it.
     uint8_t *name = expected + NOAH_SETTINGS_FIXED_SIZE;
     for (uint16_t index = 0; index < NOAH_SETTINGS_NAME_COUNT; index++) {
-        const char *text        = index < NOAH_SETTINGS_LAYERS ? layer_names[index] : index < NOAH_SETTINGS_LAYERS + NOAH_SETTINGS_MACRO_NAMES ? via_macro_names[index - NOAH_SETTINGS_LAYERS] : custom_key_names[index - NOAH_SETTINGS_LAYERS - NOAH_SETTINGS_MACRO_NAMES];
+        const char *text        = index == NOAH_SETTINGS_KEYBOARD_NAME_RECORD ? "" : index < NOAH_SETTINGS_LAYERS ? layer_names[index] : index < NOAH_SETTINGS_LAYERS + NOAH_SETTINGS_MACRO_NAMES ? via_macro_names[index - NOAH_SETTINGS_LAYERS] : custom_key_names[index - NOAH_SETTINGS_LAYERS - NOAH_SETTINGS_MACRO_NAMES];
         uint8_t     name_length = (uint8_t)strlen(text);
         *name++                 = name_length;
         memcpy(name, text, name_length);

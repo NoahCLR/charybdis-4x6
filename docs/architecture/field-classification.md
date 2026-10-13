@@ -22,10 +22,10 @@ behavior. The UI must explain every intentional non-live boundary.
 | Hold mode and repeat rate | Milestone A behavior policy | 04 | behavior validator and lifecycle runtime |
 | `keymaps[][]` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic keymap/VIA reconciliation |
 | `VIA_MACROS` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic macro storage |
-| Macro names | Portable settings domain `0x40` v6, 64 counted UTF-8 names of at most 32 bytes each; replaces the retired user macros | 06 | profile schema |
-| Custom-key names | Portable settings domain `0x40` v6, 64 counted UTF-8 names of at most 32 bytes each after the macro names; `CUSTOM_KEYS` in C is the compiled default | 06 | profile schema |
+| Macro names | Portable settings domain `0x40` v7, 128 counted UTF-8 names of at most 32 bytes each; replaces the retired user macros | 06 | profile schema |
+| Custom-key names | Portable settings domain `0x40` v7, 128 counted UTF-8 names of at most 32 bytes each after the macro names; `CUSTOM_KEYS` in C is the compiled default | 06 | profile schema |
 | `COMBOS` | GET `0x06` readout; optional live domain `0x30` for rows, timing and matching flags | 07 | combo validator/provider |
-| Logical layer names/order | Sixteen-layer bank (IDs 0–15; the authored keymap fills 0–7, and 8–15 are transparent, unnamed and inactive); counted UTF-8 names in settings v6 and reference-preserving order | 07 | whole-profile cross-reference validator |
+| Logical layer names/order | Sixteen-layer bank (IDs 0–15; the authored keymap fills 0–7, and 8–15 are transparent, unnamed and inactive); counted UTF-8 names in settings v7 and reference-preserving order | 07 | whole-profile cross-reference validator |
 | Userspace keycode blocks and the 128 custom-key slots | Executable firmware/action ABI; what a custom key does is its `key_behaviors[]` row | flash required | firmware build |
 
 ## `rgb_config.c`
@@ -68,6 +68,8 @@ the following settings:
 - auto-sniping enable/layer;
 - auto-mouse enable, layer, and timeout;
 - default RGB effect, HSV value, and idle timeout;
+- the keyboard name, served as the USB product string (D-F25); empty keeps
+  QMK's built-in `keyboard_name`;
 - key-feedback flash period and auto-mouse RGB dead time.
 
 The [portable settings contract](portable-profile-v1.md) supplies a bounded
@@ -115,7 +117,8 @@ Safety ceilings can bound live values but cannot themselves be raised live.
 - comments, source labels, whitespace and C macro names (user-facing layer
   names are portable settings);
 - C helper implementations and QMK hooks;
-- USB descriptors, VID/PID, Raw HID report size, and split transaction ids;
+- USB descriptors other than the product string, VID/PID, Raw HID report size,
+  and split transaction ids;
 - hardware pins, drivers, sensor type, and matrix geometry.
 
 These require source changes and a firmware build.

@@ -24,6 +24,7 @@
 #include "lib/compat/qmk_via_split_mirror.h"
 #include "lib/compat/qmk_via_split_sync.h"
 #include "lib/compat/qmk_via_sync_state.h"
+#include "lib/compat/qmk_usb_product_name.h"
 #include "lib/profile/storage/profile_store_runtime_hooks.h"
 #include "lib/profile/runtime/effective_pd_runtime.h"
 #include "lib/rgb/core/rgb_runtime.h"
@@ -86,6 +87,7 @@ void noah_matrix_slave_scan_user(void) {
 void noah_housekeeping_task_user(void) {
     held_repeat_tick();
     noah_runtime_diag_heartbeat();
+    noah_qmk_usb_product_name_task();
 }
 
 void noah_suspend_power_down_user(void) {
@@ -94,6 +96,11 @@ void noah_suspend_power_down_user(void) {
     // reset the master about 2 s after the host sleeps. The suspend loop
     // calls this every pass (~17 ms), so a hang there still trips the watchdog.
     noah_runtime_diag_heartbeat();
+}
+
+// Before USB starts: the logical EEPROM is readable, nothing else is up yet.
+void noah_keyboard_pre_init_user(void) {
+    noah_qmk_usb_product_name_pre_init();
 }
 
 void noah_keyboard_post_init_user(void) {

@@ -128,6 +128,107 @@ static void reset_eeprom(uint8_t *bytes) {
     memset(bytes, 0xFF, NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE);
 }
 
+// A profile holding only a settings domain whose keyboard name is `name`;
+// the reader needs only the domain's shape, so every other byte is zero.
+static uint16_t settings_profile(uint8_t *blob, const char *name) {
+    uint8_t  name_length = (uint8_t)strlen(name);
+    uint16_t length      = (uint16_t)(NOAH_SETTINGS_MIN_SIZE + name_length);
+    uint8_t *payload     = blob + 12;
+
+    memcpy(blob, (const uint8_t[]){'N', 'L', 'P', '1', 3u, 0u, 1u, 1u, NOAH_PROFILE_DOMAIN_V1_SETTINGS, NOAH_SETTINGS_VERSION, (uint8_t)length, (uint8_t)(length >> 8)}, 12);
+    memset(payload, 0, length);
+    memcpy(payload, (const uint8_t[]){NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES}, 5);
+    payload[length - 1u - name_length] = name_length;
+    memcpy(payload + length - name_length, name, name_length);
+    return (uint16_t)(12u + length);
+}
+
+static void commit_settings(uint8_t *bytes, const char *name, uint32_t generation) {
+    static uint8_t                 blob[12 + NOAH_SETTINGS_MAX_SIZE];
+    uint16_t                       length = settings_profile(blob, name);
+    noah_profile_store_t           store;
+    noah_profile_store_record_t    selected;
+    noah_profile_store_candidate_t candidate = candidate_for(blob, length, generation);
+    noah_profile_store_io_t        io        = {.read = memory_read, .write = memory_write, .context = bytes};
+
+    candidate.domain_mask = NOAH_PROFILE_DOMAIN_MASK_SETTINGS;
+    noah_profile_store_init(&store, io,
+                            (noah_profile_store_compatibility_t){
+                                .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
+                                .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
+                                .compiled_default_digest = current_compiled_digest,
+                                .action_abi_digest       = 0u,
+                            });
+    (void)noah_profile_store_boot_select(&store, &selected);
+    assert(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+    for (uint16_t offset = 0u; offset < length; offset += NOAH_PROFILE_STORE_IO_CHUNK_MAX) {
+        uint16_t piece = length - offset < NOAH_PROFILE_STORE_IO_CHUNK_MAX ? length - offset : NOAH_PROFILE_STORE_IO_CHUNK_MAX;
+        assert(noah_profile_store_prepare_write(&store, offset, blob + offset, piece) == NOAH_PROFILE_STORE_OK);
+    }
+    assert(noah_profile_store_prepare_commit(&store, &selected) == NOAH_PROFILE_STORE_OK);
+}
+
+static bool read_name(uint8_t *bytes, noah_profile_keyboard_name_t *name) {
+    noah_profile_store_t store;
+
+    noah_profile_store_init(&store, (noah_profile_store_io_t){.read = memory_read, .context = bytes},
+                            (noah_profile_store_compatibility_t){
+                                .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
+                                .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
+                                .compiled_default_digest = TEST_COMPILED_DIGEST,
+                                .action_abi_digest       = 0u,
+                            });
+    return noah_profile_store_runtime_read_keyboard_name(&store, name);
+}
+
+// D-F25: the committed keyboard name, read before USB starts.
+static void test_keyboard_name_of_the_committed_profile(void) {
+    noah_profile_keyboard_name_t name = {.length = 9u};
+
+    reset_eeprom(alternate_bytes);
+    assert(!read_name(alternate_bytes, &name) && name.length == 0u);
+    commit_settings(alternate_bytes, "Desk \xc3\xa9", 3u);
+    assert(read_name(alternate_bytes, &name) && name.length == 7u && !memcmp(name.bytes, "Desk \xc3\xa9", 7u));
+    // The newer generation, in the other slot, wins.
+    commit_settings(alternate_bytes, "Travel", 4u);
+    assert(read_name(alternate_bytes, &name) && name.length == 6u && !memcmp(name.bytes, "Travel", 6u));
+    // A profile without settings, or one for other compiled defaults, has none.
+    reset_eeprom(alternate_bytes);
+    commit_to(alternate_bytes, rgb_profile, sizeof(rgb_profile), 5u);
+    assert(!read_name(alternate_bytes, &name) && name.length == 0u);
+    reset_eeprom(alternate_bytes);
+    current_compiled_digest = TEST_COMPILED_DIGEST ^ 1u;
+    commit_settings(alternate_bytes, "Desk", 1u);
+    current_compiled_digest = TEST_COMPILED_DIGEST;
+    assert(!read_name(alternate_bytes, &name) && name.length == 0u);
+    // A checksum failure has no name either.
+    reset_eeprom(alternate_bytes);
+    commit_settings(alternate_bytes, "Desk", 1u);
+    alternate_bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + 40u] ^= 1u;
+    assert(!read_name(alternate_bytes, &name) && name.length == 0u);
+    assert(!noah_profile_store_runtime_read_keyboard_name(NULL, &name));
+}
+
+// The boot read borrows the runtime's store only before the runtime starts,
+// reads through the QMK adapter and writes nothing.
+static void test_boot_keyboard_name_before_the_runtime_starts(void) {
+    noah_profile_keyboard_name_t name;
+
+    reset_eeprom(eeprom_bytes);
+    assert(!noah_profile_store_runtime_boot_keyboard_name(&name) && name.length == 0u);
+    commit_settings(eeprom_bytes, "Desk", 2u);
+    qmk_read_calls  = 0u;
+    qmk_write_calls = 0u;
+    assert(noah_profile_store_runtime_boot_keyboard_name(&name) && name.length == 4u && !memcmp(name.bytes, "Desk", 4u));
+    assert(qmk_read_calls > 0u && qmk_write_calls == 0u);
+    assert(!noah_profile_store_runtime_boot_keyboard_name(NULL));
+    noah_profile_store_runtime_init();
+    assert(!noah_profile_store_runtime_boot_keyboard_name(&name) && name.length == 0u);
+    // The borrowed store was left as the runtime expects to find it.
+    noah_profile_store_runtime_matrix_scan();
+    assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND);
+}
+
 static void test_qmk_adapter_is_slot_bounded_and_read_only(void) {
     noah_profile_store_io_t io = noah_qmk_profile_eeprom_read_only_io();
     uint8_t                 byte;
@@ -246,6 +347,9 @@ static void test_old_compiled_default_record_falls_back(void) {
 }
 
 int main(void) {
+    // Boot order: before anything initializes the runtime.
+    test_boot_keyboard_name_before_the_runtime_starts();
+    test_keyboard_name_of_the_committed_profile();
     test_qmk_adapter_is_slot_bounded_and_read_only();
     test_qmk_write_adapter_is_slot_bounded();
     test_boot_discovery_runs_once_from_scan();
