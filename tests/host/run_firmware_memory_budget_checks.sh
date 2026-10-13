@@ -30,14 +30,16 @@ fi
 # 32-bit mode masks). D-F14 then mirrors 140 KiB of logical EEPROM instead
 # of 18 KiB, 124,928 more cache bytes, and its capacities (128 combos of
 # sixteen inputs, the behaviour row index, 272 names, 128-byte pointing
-# records) another 20 KiB over the 17,400 bytes they linked at. All are
+# records) another 20 KiB over the 17,400 bytes they linked at. D-F25's
+# lighting rules add one reviewed 16 KiB increment for the decoded program,
+# the compiled Standard lighting and the engine's working set. All are
 # policy, not capacity. See
 # docs/architecture/memory-budgets.md for linked accounting and the
 # outstanding physical high-water release gate.
 STATIC_RAM_POLICY=57344
 CFLAGS_FILE="$QMK_ROOT/.build/obj_$TARGET/cflags.txt"
 if [ -f "$CFLAGS_FILE" ] && grep -Eq '(^|[[:space:]])-DNOAH_PD_PROFILE_ENABLE([[:space:]]|$)' "$CFLAGS_FILE"; then
-    STATIC_RAM_POLICY=$((60416 + 4096 + 124928 + 20480))
+    STATIC_RAM_POLICY=$((60416 + 4096 + 124928 + 20480 + 16384))
 fi
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \

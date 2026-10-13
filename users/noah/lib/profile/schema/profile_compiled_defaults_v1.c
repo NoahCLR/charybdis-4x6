@@ -194,6 +194,9 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_com
     if (error) *error = no_error();
     if (!profile) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_ARGUMENT, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, UINT8_MAX, UINT8_MAX);
     memset(profile, 0, sizeof(*profile));
+    // Opening builds the compiled lighting once; the readers that later
+    // stream the profile only copy it.
+    if (!noah_profile_rgb_compiled_v1_prepare()) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
     result = action_abi_digest(&action_abi, error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
     result = layout(profile, error);

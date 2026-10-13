@@ -346,26 +346,36 @@ static noah_profile_lighting_v1_validation_result_t step_thing_header(validation
     return progress(v, PHASE_THING_RECORD);
 }
 
+// As many whole records as one read holds, each checked in order.
 static noah_profile_lighting_v1_validation_result_t step_thing_record(validation_t *v, noah_profile_lighting_v1_error_t *error) {
-    uint8_t bytes[NOAH_PROFILE_LIGHTING_V1_RECORD_MAX];
-    bool    is_default = v->encoding != 0u;
+    uint8_t  bytes[NOAH_PROFILE_LIGHTING_V1_VALIDATION_READ_MAX];
+    uint16_t records = (uint16_t)(v->sub + (v->encoding != 0u ? 1u : 0u));
+    uint16_t fit     = (uint16_t)(sizeof(bytes) / v->record_size);
+    uint16_t whole   = (uint16_t)(available(v, v->offset) / v->record_size);
 
-    if (v->record_size > sizeof(bytes)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_ARGUMENT, v->offset);
-    if (available(v, v->offset) < v->record_size) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
-    if (!read_at(v, v->offset, bytes, v->record_size)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);
-    if (!noah_profile_lighting_v1_place_capable(v->limits, bytes[0]) && !(bytes[0] == NOAH_PROFILE_LIGHTING_V1_INHERIT && !is_default)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_REFERENCE, v->offset);
-    for (uint8_t field = 1u; field < v->record_size; field++) {
-        uint8_t colour = bytes[field];
-        if (colour == NOAH_PROFILE_LIGHTING_V1_NONE || (colour == NOAH_PROFILE_LIGHTING_V1_INHERIT && !is_default) || colour < v->candidate.palette_count) continue;
-        return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_REFERENCE, (size_t)v->offset + field);
+    if (v->record_size > NOAH_PROFILE_LIGHTING_V1_RECORD_MAX) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_ARGUMENT, v->offset);
+    if (whole == 0u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
+    if (records > fit) records = fit;
+    if (records > whole) records = whole;
+    if (!read_at(v, v->offset, bytes, (size_t)records * v->record_size)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);
+    for (uint16_t record = 0u; record < records; record++) {
+        const uint8_t *fields     = &bytes[record * v->record_size];
+        bool           is_default = v->encoding != 0u;
+
+        if (!noah_profile_lighting_v1_place_capable(v->limits, fields[0]) && !(fields[0] == NOAH_PROFILE_LIGHTING_V1_INHERIT && !is_default)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_REFERENCE, v->offset);
+        for (uint8_t field = 1u; field < v->record_size; field++) {
+            uint8_t colour = fields[field];
+            if (colour == NOAH_PROFILE_LIGHTING_V1_NONE || (colour == NOAH_PROFILE_LIGHTING_V1_INHERIT && !is_default) || colour < v->candidate.palette_count) continue;
+            return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_REFERENCE, (size_t)v->offset + field);
+        }
+        v->offset = (uint16_t)(v->offset + v->record_size);
+        if (is_default) {
+            v->encoding = 0u;
+        } else {
+            v->sub--;
+        }
     }
-    v->offset = (uint16_t)(v->offset + v->record_size);
-    if (is_default) {
-        v->encoding = 0u;
-    } else {
-        v->sub--;
-    }
-    if (v->sub) return progress(v, PHASE_THING_RECORD);
+    if (v->sub || v->encoding) return progress(v, PHASE_THING_RECORD);
     v->remaining--;
     return v->remaining ? progress(v, PHASE_THING_HEADER) : enter_key_sets(v);
 }
@@ -391,40 +401,8 @@ static noah_profile_lighting_v1_validation_result_t next_map(validation_t *v) {
     return v->remaining ? progress(v, PHASE_MAP_HEADER) : enter_rules(v);
 }
 
-static noah_profile_lighting_v1_validation_result_t step_map_header(validation_t *v, noah_profile_lighting_v1_error_t *error) {
-    uint8_t  bytes[2];
-    uint16_t left = available(v, v->offset);
-    uint8_t  count;
-
-    if (left < 1u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
-    count = left >= 2u ? 2u : 1u;
-    if (!read_at(v, v->offset, bytes, count)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);
-    if (bytes[0] == 0u) {
-        if (left < NOAH_PROFILE_LIGHTING_V1_DENSE_MAP_SIZE) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
-        v->item_end = v->offset; // the map's start, for the canonical check
-        v->sub      = NOAH_PROFILE_LIGHTING_V1_LED_COUNT;
-        v->painted  = 0u;
-        v->offset   = (uint16_t)(v->offset + 1u);
-        return progress(v, PHASE_MAP_DENSE);
-    }
-    if (bytes[0] == 1u) {
-        if (count < 2u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
-        if (bytes[1] > NOAH_PROFILE_LIGHTING_V1_SPARSE_MAX) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_NONCANONICAL_ENCODING, (size_t)v->offset + 1u);
-        if (left < 2u + 2u * (uint16_t)bytes[1]) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
-        v->sub      = bytes[1];
-        v->previous = 0u;
-        v->rank     = 0u; // no LED yet
-        v->offset   = (uint16_t)(v->offset + 2u);
-        return v->sub ? progress(v, PHASE_MAP_SPARSE) : next_map(v);
-    }
-    return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_ENUM, v->offset);
-}
-
-static noah_profile_lighting_v1_validation_result_t step_map_dense(validation_t *v, noah_profile_lighting_v1_error_t *error) {
-    uint8_t bytes[DENSE_VALUES_PER_STEP];
-    uint8_t count = v->sub < DENSE_VALUES_PER_STEP ? v->sub : DENSE_VALUES_PER_STEP;
-
-    if (!read_at(v, v->offset, bytes, count)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);
+// Checks `count` dense values read at v->offset and moves past them.
+static noah_profile_lighting_v1_validation_result_t check_dense(validation_t *v, noah_profile_lighting_v1_error_t *error, const uint8_t *bytes, uint8_t count) {
     for (uint8_t index = 0u; index < count; index++) {
         if (!map_value_valid(v, bytes[index])) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_REFERENCE, (size_t)v->offset + index);
         if (bytes[index] != NOAH_PROFILE_LIGHTING_V1_MAP_CLEAR) v->painted++;
@@ -436,11 +414,8 @@ static noah_profile_lighting_v1_validation_result_t step_map_dense(validation_t 
     return next_map(v);
 }
 
-static noah_profile_lighting_v1_validation_result_t step_map_sparse(validation_t *v, noah_profile_lighting_v1_error_t *error) {
-    uint8_t bytes[SPARSE_ENTRIES_PER_STEP * 2u];
-    uint8_t count = v->sub < SPARSE_ENTRIES_PER_STEP ? v->sub : SPARSE_ENTRIES_PER_STEP;
-
-    if (!read_at(v, v->offset, bytes, (size_t)count * 2u)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);
+// Checks `count` sparse entries read at v->offset and moves past them.
+static noah_profile_lighting_v1_validation_result_t check_sparse(validation_t *v, noah_profile_lighting_v1_error_t *error, const uint8_t *bytes, uint8_t count) {
     for (uint8_t index = 0u; index < count; index++) {
         uint8_t  led   = bytes[index * 2u];
         uint8_t  value = bytes[index * 2u + 1u];
@@ -458,29 +433,54 @@ static noah_profile_lighting_v1_validation_result_t step_map_sparse(validation_t
     return v->sub ? progress(v, PHASE_MAP_SPARSE) : next_map(v);
 }
 
-static noah_profile_lighting_v1_validation_result_t step_rule_header(validation_t *v, noah_profile_lighting_v1_error_t *error) {
-    uint8_t  bytes[3];
+// The encoding byte, read with the map's first values.
+static noah_profile_lighting_v1_validation_result_t step_map_header(validation_t *v, noah_profile_lighting_v1_error_t *error) {
+    uint8_t  bytes[NOAH_PROFILE_LIGHTING_V1_VALIDATION_READ_MAX];
     uint16_t left = available(v, v->offset);
     uint8_t  count;
 
     if (left < 1u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
     count = left < sizeof(bytes) ? (uint8_t)left : (uint8_t)sizeof(bytes);
     if (!read_at(v, v->offset, bytes, count)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);
-    if (bytes[0] < NOAH_PROFILE_LIGHTING_V1_RULE_MIN_SIZE) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_LENGTH, v->offset);
-    if (left < 1u + (uint16_t)bytes[0]) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
-    if ((bytes[1] & (uint8_t)~NOAH_PROFILE_LIGHTING_V1_RULE_DISABLED) != 0u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_RESERVED_BITS, (size_t)v->offset + 1u);
-    v->item_end           = (uint16_t)(v->offset + 1u + bytes[0]);
-    v->previous           = (uint8_t)0u; // rule start is item_end - size - 1; kept below
-    v->rank               = 0u;
-    v->conditions         = 0u;
-    v->timings            = 0u;
-    v->singles            = 0u;
-    v->previous_timing    = 0u;
-    v->previous_extension = 0u;
-    v->painted            = 0u; // bit 0: a timing seen, bit 1: an extension seen
-    v->sub                = bytes[0];
-    v->offset             = (uint16_t)(v->offset + 3u);
-    return progress(v, PHASE_RULE_PART);
+    if (bytes[0] == 0u) {
+        if (left < NOAH_PROFILE_LIGHTING_V1_DENSE_MAP_SIZE) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
+        v->item_end = v->offset; // the map's start, for the canonical check
+        v->sub      = NOAH_PROFILE_LIGHTING_V1_LED_COUNT;
+        v->painted  = 0u;
+        v->offset   = (uint16_t)(v->offset + 1u);
+        return check_dense(v, error, &bytes[1], (uint8_t)(count - 1u));
+    }
+    if (bytes[0] == 1u) {
+        uint8_t entries;
+
+        if (count < 2u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
+        if (bytes[1] > NOAH_PROFILE_LIGHTING_V1_SPARSE_MAX) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_NONCANONICAL_ENCODING, (size_t)v->offset + 1u);
+        if (left < 2u + 2u * (uint16_t)bytes[1]) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
+        v->sub      = bytes[1];
+        v->previous = 0u;
+        v->rank     = 0u; // no LED yet
+        v->offset   = (uint16_t)(v->offset + 2u);
+        if (!v->sub) return next_map(v);
+        entries = (uint8_t)((count - 2u) / 2u);
+        return check_sparse(v, error, &bytes[2], entries < v->sub ? entries : v->sub);
+    }
+    return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_ENUM, v->offset);
+}
+
+static noah_profile_lighting_v1_validation_result_t step_map_dense(validation_t *v, noah_profile_lighting_v1_error_t *error) {
+    uint8_t bytes[DENSE_VALUES_PER_STEP];
+    uint8_t count = v->sub < DENSE_VALUES_PER_STEP ? v->sub : DENSE_VALUES_PER_STEP;
+
+    if (!read_at(v, v->offset, bytes, count)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);
+    return check_dense(v, error, bytes, count);
+}
+
+static noah_profile_lighting_v1_validation_result_t step_map_sparse(validation_t *v, noah_profile_lighting_v1_error_t *error) {
+    uint8_t bytes[SPARSE_ENTRIES_PER_STEP * 2u];
+    uint8_t count = v->sub < SPARSE_ENTRIES_PER_STEP ? v->sub : SPARSE_ENTRIES_PER_STEP;
+
+    if (!read_at(v, v->offset, bytes, (size_t)count * 2u)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);
+    return check_sparse(v, error, bytes, count);
 }
 
 static uint8_t slot_rank(uint8_t slot) {
@@ -495,19 +495,16 @@ static noah_profile_lighting_v1_validation_result_t finish_rule(validation_t *v,
     return progress(v, v->remaining ? PHASE_RULE_HEADER : PHASE_EXTENSION_COUNT);
 }
 
-static noah_profile_lighting_v1_validation_result_t step_rule_part(validation_t *v, noah_profile_lighting_v1_error_t *error) {
-    uint8_t  bytes[PART_READ_MAX];
+// Checks the part at v->offset, whose bytes (at least the whole part, or
+// PART_READ_MAX of them) start at `bytes`, and moves past it.
+static noah_profile_lighting_v1_validation_result_t check_part(validation_t *v, noah_profile_lighting_v1_error_t *error, const uint8_t *bytes) {
     uint16_t left = (uint16_t)(v->item_end - v->offset);
     uint16_t at   = v->offset;
     uint16_t layout;
-    uint8_t  slot, length, kind, count;
+    uint8_t  slot, length, kind;
     bool     known;
     uint32_t mask;
 
-    if (v->offset >= v->item_end) return finish_rule(v, error);
-    if (left < 2u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_LENGTH, at);
-    count = left < sizeof(bytes) ? (uint8_t)left : (uint8_t)sizeof(bytes);
-    if (!read_at(v, at, bytes, count)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, at);
     slot   = (uint8_t)(bytes[0] >> 5u);
     length = (uint8_t)(bytes[0] & 0x1fu);
     kind   = bytes[1];
@@ -566,7 +563,67 @@ static noah_profile_lighting_v1_validation_result_t step_rule_part(validation_t 
         }
     }
     v->offset = (uint16_t)(at + 2u + length);
+    return NOAH_PROFILE_LIGHTING_V1_VALIDATION_IN_PROGRESS;
+}
+
+// Checks every whole part of the current rule that `count` bytes read at
+// `base` hold, from v->offset on, then finishes the rule or waits for the
+// next step. A part cut off by the end of the read is read again whole.
+static noah_profile_lighting_v1_validation_result_t check_parts(validation_t *v, noah_profile_lighting_v1_error_t *error, const uint8_t *bytes, uint16_t base, uint16_t count) {
+    while (v->offset < v->item_end) {
+        uint16_t pos  = (uint16_t)(v->offset - base);
+        uint16_t left = (uint16_t)(v->item_end - v->offset);
+
+        if (left < 2u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_LENGTH, v->offset);
+        if (pos + 2u > count) break;
+        {
+            uint16_t whole = (uint16_t)(2u + (bytes[pos] & 0x1fu));
+            // Without the whole part in hand, check it from a fresh read,
+            // unless this read already holds all it could.
+            if (pos + whole > count && pos != 0u) break;
+        }
+        if (check_part(v, error, &bytes[pos]) == NOAH_PROFILE_LIGHTING_V1_VALIDATION_REJECTED) return NOAH_PROFILE_LIGHTING_V1_VALIDATION_REJECTED;
+    }
     return v->offset >= v->item_end ? finish_rule(v, error) : progress(v, PHASE_RULE_PART);
+}
+
+static noah_profile_lighting_v1_validation_result_t step_rule_part(validation_t *v, noah_profile_lighting_v1_error_t *error) {
+    uint8_t  bytes[NOAH_PROFILE_LIGHTING_V1_VALIDATION_READ_MAX];
+    uint16_t left = (uint16_t)(v->item_end - v->offset);
+    uint16_t count;
+
+    if (v->offset >= v->item_end) return finish_rule(v, error);
+    if (left < 2u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_LENGTH, v->offset);
+    count = left < sizeof(bytes) ? left : (uint16_t)sizeof(bytes);
+    if (!read_at(v, v->offset, bytes, count)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);
+    return check_parts(v, error, bytes, v->offset, count);
+}
+
+static noah_profile_lighting_v1_validation_result_t step_rule_header(validation_t *v, noah_profile_lighting_v1_error_t *error) {
+    uint8_t  bytes[NOAH_PROFILE_LIGHTING_V1_VALIDATION_READ_MAX];
+    uint16_t left = available(v, v->offset);
+    uint16_t base = v->offset;
+    uint16_t count;
+
+    if (left < 1u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
+    count = left < sizeof(bytes) ? left : (uint16_t)sizeof(bytes);
+    if (!read_at(v, v->offset, bytes, count)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);
+    if (bytes[0] < NOAH_PROFILE_LIGHTING_V1_RULE_MIN_SIZE) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_LENGTH, v->offset);
+    if (left < 1u + (uint16_t)bytes[0]) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_TRUNCATED, v->offset);
+    if ((bytes[1] & (uint8_t)~NOAH_PROFILE_LIGHTING_V1_RULE_DISABLED) != 0u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_RESERVED_BITS, (size_t)v->offset + 1u);
+    v->item_end           = (uint16_t)(v->offset + 1u + bytes[0]);
+    v->previous           = (uint8_t)0u; // rule start is item_end - size - 1; kept below
+    v->rank               = 0u;
+    v->conditions         = 0u;
+    v->timings            = 0u;
+    v->singles            = 0u;
+    v->previous_timing    = 0u;
+    v->previous_extension = 0u;
+    v->painted            = 0u; // bit 0: a timing seen, bit 1: an extension seen
+    v->sub                = bytes[0];
+    v->offset             = (uint16_t)(v->offset + 3u);
+    // The same read carries the rule's first parts.
+    return check_parts(v, error, bytes, base, (uint16_t)(count < 1u + (uint16_t)bytes[0] ? count : 1u + bytes[0]));
 }
 
 static noah_profile_lighting_v1_validation_result_t step_extension_count(validation_t *v, noah_profile_lighting_v1_error_t *error) {

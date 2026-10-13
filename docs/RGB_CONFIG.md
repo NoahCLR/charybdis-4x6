@@ -40,8 +40,23 @@ The interaction feedback stages are individually gated from the active keymap
   LED groups; the preview-layer overlay remains internal to this path
 - `RGB_AUTOMOUSE_GRADIENT_ENABLE` controls the auto-mouse timeout fade
 
-When one of those flags is off, the runtime skips that render stage instead of
-calling an empty stage.
+When one of those flags is off, the firmware's lighting has no rules for that
+feature and the modules that would serve them are compiled out.
+
+## How these tables become lighting
+
+The keyboard's lighting is an ordered list of rules
+([lighting rules](./architecture/lighting-rules-v1.md)): each rule names a
+condition (a layer is active, a pointing mode is on, a combo is held, a key
+shows a behaviour state), the LEDs it lights and how, and the topmost rule
+that paints an LED wins. The tables in `rgb_config.c` do not render
+themselves. The firmware encodes them as RGB domain version 4 and converts
+them, with the same conversion a client uses for an old backup, into
+**Standard lighting**: the rule list that draws exactly what these tables
+always meant, in the render order below. That rule list is the keyboard's
+compiled default and its factory fallback; a profile saved from the app
+replaces it with its own rules, and the tables here no longer apply until
+that profile is removed.
 
 `rgb_config.c` is the main authored RGB surface:
 
@@ -57,21 +72,23 @@ If you want to change how the current profile looks, start there.
 
 If you want to change how RGB is rendered, look at:
 
-- [`users/noah/lib/rgb/core/rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c)
-- [`users/noah/lib/rgb/stages/rgb_layer_stage.c`](../users/noah/lib/rgb/stages/rgb_layer_stage.c)
-- [`users/noah/lib/rgb/automouse/rgb_automouse_stage.c`](../users/noah/lib/rgb/automouse/rgb_automouse_stage.c)
-- [`users/noah/lib/rgb/stages/rgb_preview_stage.c`](../users/noah/lib/rgb/stages/rgb_preview_stage.c)
-- [`users/noah/lib/rgb/stages/rgb_pd_mode_stage.c`](../users/noah/lib/rgb/stages/rgb_pd_mode_stage.c)
-- [`users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c`](../users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c)
-- [`users/noah/lib/rgb/stages/rgb_key_feedback_stage.c`](../users/noah/lib/rgb/stages/rgb_key_feedback_stage.c)
+- [`users/noah/lib/rgb/core/rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c): the
+  frame entry, fact capture, re-resolution and diagnostics
+- [`users/noah/lib/rgb/lighting/`](../users/noah/lib/rgb/lighting/): the rule
+  engine, its generated dispatch, the auto-mouse fade and one module per fact,
+  target, paint and timing under `kinds/`
+- [`users/noah/lib/profile/schema/profile_lighting_v1.c`](../users/noah/lib/profile/schema/profile_lighting_v1.c)
+  and [`profile_lighting_v1_convert.c`](../users/noah/lib/profile/schema/profile_lighting_v1_convert.c):
+  the version-5 codec and the conversion that turns these tables into
+  Standard lighting
 - [`users/noah/lib/rgb/automouse/rgb_automouse.c`](../users/noah/lib/rgb/automouse/rgb_automouse.c)
 - [`users/noah/lib/rgb/core/rgb_helpers.h`](../users/noah/lib/rgb/core/rgb_helpers.h)
 
 `users/noah/lib/rgb/` is organized by edit surface:
 
-- `core/` for runtime orchestration, shared authored-config helpers, and validation
-- `automouse/` for the auto-mouse state and its gradient renderer
-- `stages/` for the remaining ordered render stages
+- `core/` for the frame entry, shared authored-config helpers, and validation
+- `automouse/` for the auto-mouse state and its fade progress
+- `lighting/` for the rule engine and its registered kinds
 
 If you want to change the small helper surface used by `rgb_config.c`,
 look at:
@@ -97,7 +114,8 @@ quick reference when picking hue values:
 
 ## What `rgb_config.c` Controls
 
-The file reads best in render order:
+The file reads best in render order, bottom to top; Standard lighting keeps
+this order as its rules, topmost last here:
 
 1. base layer render surfaces
 2. the auto-mouse base-stage transition
@@ -728,8 +746,15 @@ python3 tools/profile_introspect.py --check
 sh tests/host/run_profile_introspection_checks.sh
 sh tests/host/run_rgb_validation_tests.sh
 sh tests/host/run_rgb_layer_render_tests.sh
+sh tests/host/run_profile_compiled_defaults_v1_tests.sh
 sh tests/host/run_real_profile_validation_tests.sh
 ```
+
+A change to the tables changes the compiled Standard lighting, so the golden
+compiled profile (`tests/fixtures/compiled_profile_pd_v2.fixture`) and the
+shared vectors built from the compiled version-4 domain
+(`tests/fixtures/rgb_domain_v4.json`, then `python3 tools/lighting_reference.py
+--write`) change with it; the compiled-defaults test names what differs.
 
 Before handing back firmware-behavior changes, also run the full host suite and
 firmware compile from the repo root.

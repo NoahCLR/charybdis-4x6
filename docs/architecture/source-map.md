@@ -62,10 +62,10 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `pointing/runtime/` | PD mode state, snapshots, lifecycle, key bridge | Authoritative PD state | PD key events, key-runtime effects, pointer reports, split snapshots | Local/display/remote PD state, active handler routing, DPI sync | PD runtime/mode/bridge integration tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [runtime-flow](./runtime-flow.md) |
 | `profile/runtime/` | Effective-profile publication, semantic-action translation, generation-owned behavior/RGB views, activation safety, and the gated single-owner composition | Pending/active profile generation plus activation wait evidence; complete owner only in a side-specific engineering artifact | Compiled/validated snapshots, candidate and peer leases, authoritative runtime activity, provisional/durable split convergence | Incremental boot/adoption, distributed prepare/commit fencing, coherent generation publication, behavior/RGB view swaps, bounded host/split scheduling, stale-token refusal | `run_profile_owner_tests.sh`, `run_profile_owner_via_integration_tests.sh`, effective-provider/RGB/activation tests, feature and engineering stack gates | active live-edit architecture review |
 | `profile/split/` | Canonical live-profile sibling frames, D-014 authority, and D-022 distributed commit reconciliation | Caller-owned reconciler; registered only by the gated engineering profile owner | Durable local/peer descriptors, provisional prepare intent, staged or durable bounded payload reader, exact peer store, one-frame QMK exchange | Strict push/pull/prepare frames (32-byte replies, chunks up to 110 bytes, reuse ranges filled from the receiver's active profile), prepared pause/abort/authorization, one callback mailbox, full or convergence-only arbitration, coherent authority snapshots, fail-closed activation peer count | `run_profile_split_foundation_tests.sh`, `run_profile_split_reconciler_tests.sh`, `run_qmk_profile_split_transport_tests.sh`, engineering stack gate | active live-edit architecture review and `profile-split-v1.md` |
-| `rgb/automouse/` | Auto-mouse RGB fade support | Projected UI | Effective fade destination, auto-mouse timing, and layer state | Generation-consistent fade frame and progress quantization | RGB layer render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
-| `rgb/core/` | RGB orchestration, effective-config adapters, helpers, validation | Render pipeline owner | One captured effective RGB frame, compiled fallbacks, runtime snapshots | LED frame application, bounded reads for every RGB family and key-feedback tap policy, validation, map invalidation | `run_effective_rgb_runtime_tests.sh`, `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` | [RGB_CONFIG](../RGB_CONFIG.md) |
-| `rgb/stages/` | Individual RGB overlays | Projected UI | Effective layer, pointing, combo, and key-feedback profile data; layer state, combo bitmaps, key feedback, PD snapshots | Generation-consistent stage composition and LED painting | RGB render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
-| `split/` | Runtime split sync transport, outbound timing, and outage backoff | Transport only | One sampled tick timestamp plus PD, automouse, preview, combo, and key-feedback snapshots | Bounded master-to-slave runtime attempts, per-domain success state, and current-state recovery | `run_split_runtime_sync_tests.sh`, `run_runtime_trace_tests.sh` | [runtime-flow](./runtime-flow.md) |
+| `rgb/automouse/` | Auto-mouse fade progress | Projected UI | Auto-mouse timing and lock state | Progress quantization and blend amount for the lighting fade extension | RGB layer render tests, lighting parity | [RGB_CONFIG](../RGB_CONFIG.md) |
+| `rgb/core/` | Frame entry, authored-config helpers, validation | Render owner | The published lighting program, the facts frame, diagnostics | Fact capture, re-resolution only on change, per-chunk LED writes, RGB timeout, map invalidation | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` | [RGB_CONFIG](../RGB_CONFIG.md) |
+| `rgb/lighting/` | The lighting rule engine and its registered kinds (D-F25) | Projected UI | Decoded program; layer, preview, pointing-mode, combo and behaviour facts | Rule resolution top-down, one module per fact, target, paint and timing, the auto-mouse fade extension, the facts frame's slices | `run_lighting_render_vectors_tests.sh`, `run_lighting_parity_tests.sh`, `run_rgb_layer_render_tests.sh` | [lighting rules](./lighting-rules-v1.md) |
+| `split/` | Runtime split sync transport, outbound timing, and outage backoff | Transport only | One sampled tick timestamp plus PD and automouse snapshots and the synced lighting facts frame | Bounded master-to-slave runtime attempts, per-domain success state, and current-state recovery | `run_split_runtime_sync_tests.sh`, `run_runtime_trace_tests.sh` | [runtime-flow](./runtime-flow.md) |
 | `state/shared/` | Internal runtime storage and test reset | Storage owner | Runtime owners | Shared singleton context and reset | runtime init/debug/trace/diag and feature gate tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `state/diagnostics/` | Runtime debug, diagnostics, trace | Diagnostic owner | Runtime stage scopes and state snapshots | Debug APIs, restart watchdog, boot indicator state, trace snapshots | `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` | [runtime-flow](./runtime-flow.md) |
 | `state/modifiers/` | Keyboard modifier snapshots and replay policy | Modifier policy helper | QMK mod state, action replay, delayed actions, PD masks | Saved/restored/filtered modifier state | keyboard mod ownership, action, delayed action, modifier-hold, PD integration tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
@@ -205,8 +205,13 @@ semantics without taking another platform timer sample.
 
 - Runtime publication and consumers: `runtime/effective_profile_provider.c/h`,
   `runtime/effective_key_behavior_runtime.c/h`,
-  `runtime/effective_rgb_runtime.c/h`, and
+  `runtime/effective_rgb_runtime.c/h` (the decoded lighting program), and
   `runtime/profile_activation_policy.c/h`
+- Lighting schema: `schema/profile_lighting_kinds_v1.h` (the registries),
+  `schema/profile_lighting_v1.c/h` (the version-5 codec, program and
+  capability read), `schema/profile_lighting_v1_convert.c` (version 4 to
+  Standard lighting) and `schema/profile_rgb_compiled_v1.c/h` (the compiled
+  tables, encoded and converted once)
 - Split protocol foundation: `split/profile_split_authority.c/h` and
   `split/profile_split_protocol_v1.c/h`. These files define decisions and
   framing only; they do not own QMK RPC, EEPROM transfer, or production
@@ -214,17 +219,16 @@ semantics without taking another platform timer sample.
 
 ### `rgb/`
 
-- Automouse fade: `automouse/rgb_automouse.c/h`,
-  `automouse/rgb_automouse_stage.c/h`
-- Core rendering and authored config helpers: `core/rgb_runtime.c/h`,
-  `core/rgb_effective_config.c/h`, `core/rgb_config_defaults.c`,
-  `core/rgb_config_helpers.h`, `core/rgb_helpers.h`,
-  `core/rgb_validation.c/h`
-- Stages: `stages/rgb_layer_stage.c/h`,
-  `stages/rgb_combo_feedback_stage.c/h`,
-  `stages/rgb_key_feedback_stage.c/h`,
-  `stages/rgb_pd_mode_stage.c/h`,
-  `stages/rgb_preview_stage.c/h`
+- Automouse fade progress: `automouse/rgb_automouse.c/h`
+- Frame entry and authored config helpers: `core/rgb_runtime.c/h`,
+  `core/rgb_config_defaults.c`, `core/rgb_config_helpers.h`,
+  `core/rgb_helpers.h`, `core/rgb_validation.c/h`
+- Lighting engine: `lighting/lighting.h`, `lighting/lighting_engine.c/h`,
+  `lighting/lighting_dispatch.c`, `lighting/lighting_fade.c`, and one module
+  per registered kind under `lighting/kinds/` (`fact_*`, `target_*`,
+  `paint_*`, `timing_*`)
+- The retired stage renderer survives only as the parity oracle under
+  `tests/host/legacy_rgb/`
 
 ### `split/`
 

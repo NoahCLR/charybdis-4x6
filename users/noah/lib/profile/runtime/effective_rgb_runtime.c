@@ -15,7 +15,7 @@ static noah_effective_rgb_runtime_t      *installed_runtime;
 
 static bool load_compiled(void) {
 #ifdef RGB_MATRIX_ENABLE
-    const noah_profile_lighting_v1_view_t *compiled = noah_profile_rgb_compiled_v1_view();
+    const noah_profile_lighting_v1_view_t *compiled = noah_profile_rgb_compiled_v1_prepare() ? noah_profile_rgb_compiled_v1_view() : NULL;
     return compiled && noah_profile_lighting_v1_program_load(compiled, &program);
 #else
     program.valid = false;

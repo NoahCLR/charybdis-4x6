@@ -168,6 +168,30 @@
           "functions": ["main", "matrix_scan", "split_runtime_sync_elapsed_internal", "transaction_rpc_exec", "transport_execute_transaction"]
         },
         {
+          "name": "matrix scan split lighting facts build",
+          "functions": ["main", "matrix_scan", "split_runtime_sync_elapsed_internal", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner"]
+        },
+        {
+          "name": "RGB frame fact collection",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner"]
+        },
+        {
+          "name": "RGB frame behaviour subjects",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_fact_next", "gesture", "key_feedback_tap_branch_map_get", "handled_key_keypos_in_bounds"]
+        },
+        {
+          "name": "RGB frame layer-key target",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_target", "keycode_at_keymap_location", "nvm_dynamic_keymap_read_keycode", "eeprom_read_byte", "wear_leveling_read"]
+        },
+        {
+          "name": "RGB frame paint over the effect",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_paint", "noah_lighting_below", "noah_lighting_effect_colour"]
+        },
+        {
+          "name": "RGB frame palette colour",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_paint", "noah_lighting_palette_rgb", "hsv_to_rgb"]
+        },
+        {
           "name": "matrix scan macro text press",
           "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_strokes", "macro_payload_start_transient", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
         },
@@ -260,10 +284,6 @@
           "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "owned_keycode_tap_literal", "register_code16", "register_code"]
         },
         {
-          "name": "pointing task directional QMK-function tap",
-          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_dispatch_synthetic_qmk_tap", "noah_dispatch_synthetic_qmk_record", "process_record"]
-        },
-        {
           "name": "physical press participation indexed behavior lookup",
           "functions": ["main", "action_exec", "noah_participation_behavior", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
@@ -329,18 +349,8 @@
         },
         {
           "caller": "slave_rpc_exec_callback",
-          "callee": "split_runtime_sync_slave_combo_rpc",
-          "reason": "local split RPC registry combo-state callback"
-        },
-        {
-          "caller": "slave_rpc_exec_callback",
-          "callee": "split_runtime_sync_slave_key_feedback_semantic_rpc",
-          "reason": "local split RPC registry semantic-feedback callback"
-        },
-        {
-          "caller": "slave_rpc_exec_callback",
-          "callee": "split_runtime_sync_slave_key_feedback_branch_rpc",
-          "reason": "local split RPC registry branch-feedback callback"
+          "callee": "split_runtime_sync_slave_lighting_rpc",
+          "reason": "local split RPC registry lighting-facts callback"
         },
         {
           "caller": "slave_rpc_exec_callback",
@@ -360,16 +370,8 @@
           "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_base_rpc", "pd_mode_apply_command"]
         },
         {
-          "name": "combo-state RPC",
-          "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_combo_rpc"]
-        },
-        {
-          "name": "semantic-feedback RPC",
-          "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_key_feedback_semantic_rpc"]
-        },
-        {
-          "name": "branch-feedback RPC",
-          "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_key_feedback_branch_rpc"]
+          "name": "lighting-facts RPC",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_lighting_rpc", "noah_runtime_publication_begin"]
         },
         {
           "name": "VIA durable request mailbox admission",

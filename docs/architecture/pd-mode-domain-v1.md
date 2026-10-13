@@ -116,8 +116,9 @@ meaning, so the pointing engine reads the same 96 bytes it always has.
 Translation from version 2 moves the 24-byte name field's text (up to its
 terminator) to bytes 96..127, writes its length to byte 8 and zeroes bytes
 9..31. The surrounding profile domain envelope adds four
-bytes. RGB remains in its own domain; RGB v4 holds 32 ID/HSV/locality rows,
-one per slot whether or not the slot is stored here.
+bytes. RGB remains in its own domain; RGB v5's pointing-mode thing table holds up
+to 32 place-and-colour records, one per slot whether or not the slot is
+stored here ([lighting rules](lighting-rules-v1.md)).
 
 Retired version 1 was fixed: 776 bytes, the header `01 08 60 00 00 00 00 00`
 then eight records in ID order `0..7`, disabled slots included. No schema-2
@@ -375,7 +376,7 @@ bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ`, `NR` and `NS`
 headers are rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
 
 Synchronous validation, bounded boot scanning and commit shape validation
-share the current version rules in `profile_versions.h`: RGB v4, key behaviors
+share the current version rules in `profile_versions.h`: RGB v5, key behaviors
 v2, combos v3, settings v6 and sparse PD v3. Blob magic remains `NLP1`; schema
 bytes must be 3.0. Domain bodies also require semantic validation. Store tests
 cover all mask/origin/flag combinations, both boot paths, old-header rejection,

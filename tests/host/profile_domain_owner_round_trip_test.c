@@ -412,8 +412,8 @@ static void test_maximum_profile(void) {
     // One validator step a scan, each one read of at most 20 bytes. The peer's
     // copy of this validation is the longest stretch a split prepare spends
     // without transfer progress, inside the owner's no-progress window. The
-    // 8 KiB lighting domain (D-F25) takes it from 7,429 to 9,540 scans.
-    assert(validation_scans < 10000u);
+    // 8 KiB lighting domain (D-F25) takes it from 7,429 to 8,251 scans.
+    assert(validation_scans < 9000u);
     assert_published(maximum, &expected, 1);
     assert_maximum_edges();
     reboot();

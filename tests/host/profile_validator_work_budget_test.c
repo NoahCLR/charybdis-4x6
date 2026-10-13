@@ -29,10 +29,11 @@ enum {
     TEST_RGB_RULES     = 255u,
     TEST_RGB_RULE_SIZE = 9u,
     TEST_MAXIMUM_RGB_PAYLOAD_SIZE = 8u + 3u * TEST_RGB_PALETTE + 6u + 8u * TEST_RGB_KEY_SETS + 59u * TEST_RGB_MAPS + TEST_RGB_RULE_SIZE * TEST_RGB_RULES + 1u,
-    // Steps: header; six colours a step; table header and two records; two key
-    // sets a step; per map its encoding then 20, 20 and 18 values; per rule its
-    // header and two parts; the extension count; the end.
-    MAX_RGB_DOMAIN_STEPS = 1u + (TEST_RGB_PALETTE + 5u) / 6u + 3u + TEST_RGB_KEY_SETS / 2u + 4u * TEST_RGB_MAPS + 3u * TEST_RGB_RULES + 2u,
+    // Steps: header; six colours a step; table header, then its two records
+    // in one read; two key sets a step; per map its encoding with 19 values,
+    // then 20 and 19; per rule one read holding its header and both parts; the
+    // extension count; the end.
+    MAX_RGB_DOMAIN_STEPS = 1u + (TEST_RGB_PALETTE + 5u) / 6u + 2u + TEST_RGB_KEY_SETS / 2u + 3u * TEST_RGB_MAPS + TEST_RGB_RULES + 2u,
 };
 
 typedef struct {

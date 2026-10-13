@@ -5,16 +5,21 @@ What the code actually does, as distinct from what it is meant to do.
 it, including the places the two do not line up. For authoring colors, locality
 and LED groups see [RGB_CONFIG.md](./RGB_CONFIG.md).
 
-## Where the key-behavior stage sits
+## Where the key-behavior rules sit
 
-Stages composite in a fixed order in
-[`rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c). Each may overpaint
-the ones before it. Key-behavior feedback runs **last**, so it wins over every
-other stage wherever it paints.
+Lighting is one ordered rule list, resolved by the engine under
+[`users/noah/lib/rgb/lighting/`](../users/noah/lib/rgb/lighting/) and specified
+in [lighting rules](./architecture/lighting-rules-v1.md). The topmost rule that
+paints an LED wins. The firmware's own lighting is **Standard lighting**, the
+conversion of `rgb_config.c`, whose rules run, top to bottom: key-behavior
+feedback (its specific groups, its all-states groups, then its main rule),
+combo overlay, pointing mode, layer preview, combo underlay, then the layers
+with the auto-mouse fade. Key-behavior feedback is on top, so it wins over
+everything else wherever it paints.
 
 ```mermaid
 flowchart LR
-    B["base<br>layer colours<br>or automouse fade"] --> CU["combo<br>underlay"]
+    B["layers<br>with the auto-mouse fade,<br>else the matrix effect"] --> CU["combo<br>underlay"]
     CU --> PV["layer<br>preview"]
     PV --> PD["pointer<br>mode"]
     PD --> CO["combo<br>overlay"]
@@ -28,46 +33,42 @@ flowchart LR
     style KF fill:#0006FF,stroke:#00049E,color:#FFFFFF
 ```
 
-`locality` decides how much it paints. The authored profile uses `RGB_KEY_HALF`,
-so one key's feedback state repaints that entire half, over the layer colors and
-pointer-mode overlay underneath.
+`locality` becomes each rule's target. The authored profile uses
+`RGB_KEY_HALF`, the subject's halves, so one key's feedback state repaints that
+entire half, over the layer colors and pointer-mode overlay underneath.
 
-## Where live-capable RGB configuration comes from
+## Where the lighting program comes from
 
-The renderer captures one effective RGB frame token when QMK starts the first
-LED chunk of a frame. Normal layer rendering, the auto-mouse destination scene,
-layer preview, the pointing-mode overlay, both combo-feedback passes, and
-key-behavior feedback all receive that same token. Layer colors, mapped-only
-render modes, pointing-mode colors and locality, reusable group bitmaps, every
-stage's group rows, the auto-mouse fade mode and end color, combo-feedback
-color/locality, and key-feedback colors, ordered tap branches, locality, and
-tap-commit policy are read through
-[`rgb_effective_config.c`](../users/noah/lib/rgb/core/rgb_effective_config.c),
-which selects either a validated live view or the compiled tables in
-`rgb_config.c`.
+Each half holds one decoded lighting program in RAM
+([`effective_rgb_runtime.c`](../users/noah/lib/profile/runtime/effective_rgb_runtime.c)).
+Every profile publication rebuilds it from the published profile's RGB domain,
+or from the compiled Standard lighting when the profile carries none, and moves
+its generation. The compiled Standard lighting is built once
+([`profile_rgb_compiled_v1.c`](../users/noah/lib/profile/schema/profile_rgb_compiled_v1.c)):
+the `rgb_config.c` tables encoded as RGB domain version 4, converted by
+[`profile_lighting_v1_convert.c`](../users/noah/lib/profile/schema/profile_lighting_v1_convert.c),
+and validated like any profile's.
 
-A token becomes stale as soon as a later profile generation is published.
-Every renderer family then refuses a stale token instead of reading part of
-each generation. They compose into caller-owned render frames before touching
-the LEDs, so an invalid or stale access can clear or discard the incomplete
-result. The mapped-key LED map is generation-independent; colors, modes,
-locality, groups, and feedback policy are resolved as render-local state, so
-they cannot remain cached after a profile switch.
+The renderer ([`rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c)) reads
+only that program. At the first LED chunk of a frame that falls on its own half
+it captures the facts and resolves the whole frame again only if the program
+generation, the keymap, the facts or its LED range changed, a timing is due,
+or something time-based is showing; otherwise the previous resolution stands.
+Each chunk then writes the resolved colours of its own LEDs. A rule that
+composes over the matrix effect finishes per chunk from the colours the effect
+just drew. Diagnostics still win outright, and the RGB timeout still turns the
+board off.
 
-Ordinary firmware still selects the compiled tables. The side-specific
-engineering artifact installs the complete effective-profile owner and all
-renderer invalidators. A separate explicit mutation gate now makes this path
-writeable for the first two-half hardware test while resource-policy and
-hardware validation remain open.
-Its distributed split barrier already prepares both halves before local
-durability and requires exact durable convergence before activation. All
-current renderer families are behind the effective adapter.
+The engine names no kind. Facts, targets, paints and timings are registry rows
+in [`profile_lighting_kinds_v1.h`](../users/noah/lib/profile/schema/profile_lighting_kinds_v1.h),
+each with its own module under `lighting/kinds/` and compile flag, reached
+through the switches generated in `lighting_dispatch.c`.
 
 ## How truth reaches the LEDs
 
-Per-key truth is computed only on the master. The slave renders from synced
-copies and never evaluates the feedback rules itself, which is why the two halves
-cannot disagree about the rules, only about freshness.
+Per-key truth is computed only on the USB half. The other half receives the
+behaviour state as facts and runs the same rules on them, which is why the two
+halves cannot disagree about the rules, only about freshness.
 
 ```mermaid
 flowchart TD
@@ -77,26 +78,23 @@ flowchart TD
     ENG --> OWN["key_feedback_broad_owner_map<br>newest owner per surface"]
     SEM --> FV["flash_visibility_bitmap<br>derived from the semantic map"]
 
-    SEM --> RENDER["rgb_runtime_key_feedback_stage_render_effective_frame"]
-    BR --> RENDER
-    OWN --> RENDER
-    FV --> RENDER
+    SEM --> SLICE["behaviour-state facts<br>one slice of the facts frame"]
+    BR --> SLICE
+    OWN --> SLICE
+    FV --> SLICE
 
-    SEM --> P1["semantic packet"]
-    FV --> P1
-    BR --> P2["branch packet"]
-    OWN --> P2
-    P1 --> SLAVE["slave render<br>same stage, synced inputs"]
-    P2 --> SLAVE
+    SLICE --> RENDER["rules on the USB half"]
+    SLICE --> LINK["synced facts frame<br>30-byte chunks, one generation"]
+    LINK --> SLAVE["the same rules<br>on the other half"]
 
     style ENG fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
     style SEM fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
     style BR fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
     style OWN fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
     style FV fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
+    style SLICE fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
     style RENDER fill:#0006FF,stroke:#00049E,color:#FFFFFF
-    style P1 fill:#FFE8D6,stroke:#A34500,color:#5C2800
-    style P2 fill:#FFE8D6,stroke:#A34500,color:#5C2800
+    style LINK fill:#FFE8D6,stroke:#A34500,color:#5C2800
     style SLAVE fill:#D6EAFF,stroke:#00539E,color:#00305C
 ```
 
@@ -108,11 +106,14 @@ expiry and queued-pulse promotion run even when both active bitmaps are empty:
 a released key can still own visible feedback. RGB and split update cadence
 remain unchanged.
 
-A single `mark_key_feedback_dirty()` marks both packets, so the owner map cannot
-lag the semantic map. It fires when a transition plan is non-empty, or when a
-plan was empty but `next_feedback_sequence` moved, checked on the press, release
-and scan entry points. `should_build_packet` also rebuilds unconditionally while
-the last sent packet was active, so an active-to-inactive edge is never missed.
+`mark_key_feedback_dirty()` marks the lighting facts frame. It fires when a
+transition plan is non-empty, or when a plan was empty but
+`next_feedback_sequence` moved, checked on the press, release and scan entry
+points. The behaviour slice is the frame's one gated slice: the USB half
+rebuilds it while it is dirty, while it is away from rest, on a heartbeat or a
+forced pass, so an active-to-rest edge is never missed. Only the chunks that
+changed are sent; the last chunk of a pass commits it, and a pass that fails
+part-way publishes nothing and is resent whole.
 
 ## The tap phase runs on no clock
 
@@ -233,16 +234,18 @@ that authors nothing nameable keeps the key because nothing outranks it.
 
 ## Deliberate silences
 
-This stage declining to paint leaves the stage beneath it showing, so these are
-silences of the override, not of the LED.
+The behaviour fact producing no subject leaves the rules beneath showing, so
+these are silences of the override, not of the LED.
 
 - branch 0, always: the non-tapping surface
 - a tap count with no authored step, which would otherwise take a clamped colour
 - layer and pointer-mode actions, whose own overlays are the persistent feedback
-- any hold tier carrying a layer preview, which routes to the preview stage
+- any hold tier carrying a layer preview, which routes to the preview rules
 - base-tap commits, limited by `tap_commit_mode`
 - implicit-hold and fallback-hold tokens, which are holds the engine synthesised
   rather than behaviour anyone authored
+- a selected branch inside a held combo's footprint: the behaviour fact reads
+  the frame's combos slice, so both halves drop it from the same facts
 
 ## Where this does not match rgbflow.md
 
@@ -255,13 +258,13 @@ silences of the override, not of the LED.
 1. **The palette has homonyms.** Three feedback colours are byte-for-byte identical
    to a layer colour: branch 2 `#0006FF` is `LAYER_SYM`, branch 4 `#00FF00` is
    `LAYER_NUM`, and the tap colour `#FFFFFF` is `LAYER_POINTER`. Because the layers
-   paint mapped keys only and this stage repaints the whole half, the signal is
+   paint mapped keys only and this feedback repaints the whole half, the signal is
    degraded rather than lost — the pressed key holds still while its neighbours
    move. The branch colours are also on screen for longer than they used to be,
    so these collisions are more visible than before rather than less.
 
 2. **Scale is out of proportion to scope.** `RGB_KEY_HALF` repaints half the board
-   for a single key's state, and this stage renders last, so it overrides the
+   for a single key's state, and its rules sit on top, so it overrides the
    layer and pointer-mode colours underneath while it is active.
 
 ### Closed by the single-state tap phase

@@ -530,3 +530,52 @@ in the split-slave thread. Macro startup decoding reaches 1,460 bytes and
 scan-time refill 556 bytes. These are reviewed-path bounds only; interrupt and
 global stack maxima, full-bank startup timing, cancellation, restore and
 wear-level consolidation pauses remain acceptance on the physical keyboard.
+
+## Lighting rules — D-F25
+
+RGB domain version 5 (`lighting-rules-v1.md`) replaces the stage renderer with
+one rule engine. Each half decodes the published lighting domain into RAM once
+per publication and renders only from that program, so the format's 8 KiB
+budget is resident. The instrumented pair at BK
+`173eae2b5e1b21c15a84ea90eb8fe84b434c63c5` (pinned GCC 15.2.0) links, on each
+half, 4,148 bytes of `.data` and 215,968 bytes of `.bss` in SRAM0–3: 220,116
+bytes, 13,028 more than the 207,088 the same pin linked before. The
+contributors:
+
+| State | Bytes |
+| --- | ---: |
+| decoded program (`program`: 8,192 payload bytes, rule and map indexes) | 9,252 |
+| compiled Standard lighting cache (`v5_bytes`) | 1,664 |
+| engine working set (`subjects` 1,024, `gates` 384, `palette` 384, the frame 184, two fact frames 184) | 2,160 |
+| version-4 conversion emitter (`emitter`) | 404 |
+| split lighting-facts frame (built, sent, at-rest and staging copies) | 312 |
+
+The removed stage snapshots, effective-frame tokens and per-stage split packets
+account for the difference. The `.data + .bss` tripwire gains one reviewed
+16,384-byte D-F25 increment, the plan's budget, to 226,304 bytes: 6,188 above
+this measurement. The fixed SRAM0–3 prefix is 220,128 bytes, its boot
+linker/core-memory span 42,016 bytes and fixed occupancy across unique SRAM
+banks 227,584 bytes per half; the true static headroom (SRAM0–3 minus the
+linked prefix and the 4,096-byte arena floor) is 37,920 bytes. None of these
+measures runtime free memory or high-water.
+
+The compiled lighting is built once, by `noah_profile_rgb_compiled_v1_prepare`
+from the compiled profile's open and the program's load, both at boot depth.
+The streamed compiled RGB domain only copies that cache, so a peer or
+candidate transfer reading the compiled profile never runs the conversion
+inside its reader (that nesting measured 2,208 bytes, over the main-process
+policy). The ordinary manifest adds the lighting-facts build, fact collection
+and the rule walk through facts, layer-key targets, paints over the effect
+and palette colours: at most 984 bytes. The split slave's lighting-facts RPC
+takes 80 bytes, replacing the three retired per-stage RPCs. The owner manifest
+replaces the compiled-RGB materialization paths with the compiled lighting's
+encoding, conversion, validation and program load from each entry point: the
+largest is the published fallback's conversion at 1,544 bytes, and the
+streamed peer-reuse read 1,696. Both halves pass with the unchanged 1,920-byte
+main-process and 768-byte split-slave policies: the ordinary manifest's
+largest main-process path is still 1,920 bytes and its largest split-slave
+path 328; the owner manifest's largest are 1,912 and 624. The pointing path
+through the synthetic QMK-function tap left the manifest: since #86 routes
+pointing taps through the owned literal emitter, that edge no longer links.
+These are reviewed-path bounds only; the physical high-water of both halves
+remains hardware acceptance.

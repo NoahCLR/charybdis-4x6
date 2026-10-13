@@ -333,7 +333,7 @@ static bool cache_write(void *context, const uint8_t *bytes, size_t length) {
     return true;
 }
 
-static bool warm(void) {
+bool noah_profile_rgb_compiled_v1_prepare(void) {
     if (!cached) {
         cache_sink_t                      sink      = {0};
         compiled_writer_t                 writer    = {.write = cache_write, .context = &sink};
@@ -356,15 +356,17 @@ static bool warm(void) {
 }
 
 const noah_profile_lighting_v1_view_t *noah_profile_rgb_compiled_v1_view(void) {
-    return warm() ? &v5_view : NULL;
+    return cached ? &v5_view : NULL;
 }
 
 const noah_profile_rgb_v1_view_t *noah_profile_rgb_compiled_v1_v4_view(void) {
-    return warm() ? &v4_view : NULL;
+    return cached ? &v4_view : NULL;
 }
 
 noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
-    if (!warm()) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
+    // Streamed from the prepared cache only: building it here would nest the
+    // whole conversion inside whichever reader asked.
+    if (!cached) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
     // Sixteen bytes at a time, as every compiled domain emits.
     for (size_t offset = 0u; offset < v5_length; offset += 16u) {
         if (!emit(writer, &v5_bytes[offset], v5_length - offset < 16u ? v5_length - offset : 16u)) break;
@@ -372,6 +374,10 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
     return writer->result;
 }
 #else
+bool noah_profile_rgb_compiled_v1_prepare(void) {
+    return true;
+}
+
 // Without RGB Matrix the compiled profile has no RGB domain.
 noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
     (void)writer;

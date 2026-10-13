@@ -151,8 +151,68 @@
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
-          "name": "peer reuse compiled RGB materialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+          "name": "peer reuse compiled lighting stream",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "emit"]
+        },
+        {
+          "name": "candidate reuse compiled lighting stream",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "emit"]
+        },
+        {
+          "name": "compiled profile initial lighting version-4 encoding",
+          "functions": ["main", "noah_profile_store_runtime_init", "noah_profile_compiled_v1_open", "noah_profile_rgb_compiled_v1_prepare", "emit_group_row", "rgb_group_id", "rgb_group_is_first", "rgb_group_row_at"]
+        },
+        {
+          "name": "compiled profile initial lighting Standard lighting conversion",
+          "functions": ["main", "noah_profile_store_runtime_init", "noah_profile_compiled_v1_open", "noah_profile_rgb_compiled_v1_prepare", "emit_body", "emit_layer_rules", "emit_group_rule", "emit_rule", "put_u8", "put"]
+        },
+        {
+          "name": "compiled profile initial lighting Standard lighting validation",
+          "functions": ["main", "noah_profile_store_runtime_init", "noah_profile_compiled_v1_open", "noah_profile_rgb_compiled_v1_prepare", "noah_profile_lighting_v1_validation_step", "read_at", "noah_profile_reader_read"]
+        },
+        {
+          "name": "compiled lighting boot publication version-4 encoding",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_rgb_runtime_invalidate", "load_compiled", "noah_profile_rgb_compiled_v1_prepare", "emit_group_row", "rgb_group_id", "rgb_group_is_first", "rgb_group_row_at"]
+        },
+        {
+          "name": "compiled lighting boot publication Standard lighting conversion",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_rgb_runtime_invalidate", "load_compiled", "noah_profile_rgb_compiled_v1_prepare", "emit_body", "emit_layer_rules", "emit_group_rule", "emit_rule", "put_u8", "put"]
+        },
+        {
+          "name": "compiled lighting boot publication Standard lighting validation",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_rgb_runtime_invalidate", "load_compiled", "noah_profile_rgb_compiled_v1_prepare", "noah_profile_lighting_v1_validation_step", "read_at", "noah_profile_reader_read"]
+        },
+        {
+          "name": "compiled lighting boot program load",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_rgb_runtime_invalidate", "load_compiled", "noah_profile_lighting_v1_program_load", "noah_profile_reader_read"]
+        },
+        {
+          "name": "compiled lighting published fallback version-4 encoding",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate", "load_compiled", "noah_profile_rgb_compiled_v1_prepare", "emit_group_row", "rgb_group_id", "rgb_group_is_first", "rgb_group_row_at"]
+        },
+        {
+          "name": "compiled lighting published fallback Standard lighting conversion",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate", "load_compiled", "noah_profile_rgb_compiled_v1_prepare", "emit_body", "emit_layer_rules", "emit_group_rule", "emit_rule", "put_u8", "put"]
+        },
+        {
+          "name": "compiled lighting published fallback Standard lighting validation",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate", "load_compiled", "noah_profile_rgb_compiled_v1_prepare", "noah_profile_lighting_v1_validation_step", "read_at", "noah_profile_reader_read"]
+        },
+        {
+          "name": "published profile lighting program load",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_lighting_v1_program_load", "noah_profile_reader_read"]
+        },
+        {
+          "name": "compiled lighting first frame version-4 encoding",
+          "functions": ["main", "rgb_matrix_task", "noah_effective_lighting_program", "load_compiled", "noah_profile_rgb_compiled_v1_prepare", "emit_group_row", "rgb_group_id", "rgb_group_is_first", "rgb_group_row_at"]
+        },
+        {
+          "name": "compiled lighting first frame Standard lighting conversion",
+          "functions": ["main", "rgb_matrix_task", "noah_effective_lighting_program", "load_compiled", "noah_profile_rgb_compiled_v1_prepare", "emit_body", "emit_layer_rules", "emit_group_rule", "emit_rule", "put_u8", "put"]
+        },
+        {
+          "name": "compiled lighting first frame Standard lighting validation",
+          "functions": ["main", "rgb_matrix_task", "noah_effective_lighting_program", "load_compiled", "noah_profile_rgb_compiled_v1_prepare", "noah_profile_lighting_v1_validation_step", "read_at", "noah_profile_reader_read"]
         },
         {
           "name": "peer reuse compiled settings materialization",
@@ -215,10 +275,6 @@
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
-          "name": "candidate reuse compiled RGB materialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
-        },
-        {
           "name": "candidate reuse compiled settings materialization",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
         },
@@ -273,30 +329,6 @@
         {
           "name": "PD published record validation",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_pd_v1_validate_record", "tap_valid"]
-        },
-        {
-          "name": "Compiled profile initial RGB materialization",
-          "functions": ["main", "noah_profile_store_runtime_init", "noah_profile_compiled_v1_open", "write_domain", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
-        },
-        {
-          "name": "Compiled RGB boot cache materialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
-        },
-        {
-          "name": "Compiled RGB boot cache validation",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_v1_validation_step", "read_bytes", "noah_profile_reader_read"]
-        },
-        {
-          "name": "Compiled RGB published fallback materialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
-        },
-        {
-          "name": "Compiled RGB published fallback validation",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_v1_validation_step", "read_bytes", "noah_profile_reader_read"]
-        },
-        {
-          "name": "Compiled RGB first frame materialization",
-          "functions": ["main", "rgb_matrix_task", "rgb_effective_config_frame_current", "frame_status", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
         },
         {
           "name": "Compiled settings boot cache materialization",

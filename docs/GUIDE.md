@@ -330,6 +330,14 @@ lets you author the visible language of the board:
 - auto-mouse timeout feedback that fades as the temporary pointer layer is
   about to clear
 
+Under the hood the keyboard's lighting is an ordered list of rules: each one
+says when it applies (a layer is on, a combo is held, a key is waiting for
+another tap), which LEDs it lights and how, and the topmost rule that paints an
+LED wins. These tables become that list, called Standard lighting, so they
+look exactly as they always did; a profile saved from the app can replace it
+with rules of its own. The [lighting rules](architecture/lighting-rules-v1.md)
+spec has the full vocabulary.
+
 `locality` is the RGB word for where a feedback surface paints. Depending on
 the table, it can mean both halves, one fixed half, the half that owns the
 triggering key or combo, or only the exact triggering keys with options such as
@@ -362,13 +370,10 @@ layer set and activity timer; this userspace adds custom split RPCs in
 [`runtime_sync.h`](../users/noah/lib/split/runtime_sync.h):
 
 - `PUT_SPLIT_RUNTIME_BASE_SYNC`: auto-mouse RGB progress, active or locked
-  pointing-mode IDs, key-local pointing-mode ownership, and preview-layer state
-- `PUT_SPLIT_COMBO_FEEDBACK_SYNC`: combo underlay and overlay footprints, so
-  `RGB_KEY_HALF` and `RGB_KEYS_ONLY` know which half or exact keys caused the
-  combo
-- `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` and
-  `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC`: key-feedback flash visibility, semantic
-  state, broad owner groups, and tap-branch colors
+  pointing-mode IDs and key-local pointing-mode ownership
+- `PUT_SPLIT_LIGHTING_FACTS_SYNC`: the lighting facts only the USB half knows
+  (the previewed layer, held combos, and every key's behaviour state), sent as
+  one frame in chunks so the other half lights its LEDs from the same facts
 - `PUT_VIA_KEYMAP_SYNC`: durable reconciliation of committed VIA keymap,
   encoder, macro, validity, and layout-option storage
 

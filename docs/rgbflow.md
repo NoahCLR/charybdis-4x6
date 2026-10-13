@@ -1,6 +1,6 @@
 # RGB Feedback Model
 
-The complete model: what paints the board, what the key-behavior stage adds on
+The complete model: what paints the board, what the key-behavior rules add on
 top, and which colour it shows at every position in a gesture.
 
 One sentence carries the whole thing: **the light answers "what would letting go
@@ -17,9 +17,11 @@ are authored in
 
 ## 1. The board is already lit
 
-The key-behavior stage is the **last** of several painters, and it only ever
-*overrides*. When it has nothing to say it paints nothing, and what you see is
-whatever the stage beneath it left there. "No feedback" and "no light" are
+The board's lighting is an ordered list of rules
+([lighting rules](./architecture/lighting-rules-v1.md)); the topmost rule that
+paints an LED wins. The key-behavior rules sit **on top** of the standard
+lighting, and they only ever *override*. When they have nothing to say they
+paint nothing, and what you see is whatever the rules beneath left there. "No feedback" and "no light" are
 different things, and confusing them is the easiest way to misread this model.
 
 ```mermaid
@@ -41,8 +43,9 @@ flowchart TD
     style KF fill:#0006FF,stroke:#00049E,color:#FFFFFF
 ```
 
-Later stages paint over earlier ones. So a key-behavior colour hides the layer
-colour while it shows, and the layer colour returns when it stops.
+The diagram reads bottom to top: each layer of rules paints over the ones
+before it. So a key-behavior colour hides the layer colour while it shows, and
+the layer colour returns when it stops.
 
 ### Combo identity during a layer hold
 
@@ -80,7 +83,7 @@ these, not against black.
 ## 2. Branch 0 is the non-tapping surface
 
 A key on its base branch is behaving normally, so it **looks** normal. The
-key-behavior stage declines to paint and the resting surface shows through.
+key-behavior rules decline to paint and the resting surface shows through.
 
 That is not a gap in the language — it is the language's answer. "Nothing unusual
 is selected" and "the key looks like itself" are the same statement. It also
@@ -228,7 +231,7 @@ flowchart TD
     T -->|"TAP_ON_RELEASE_AFTER_HOLD"| E1["nothing sent yet<br>steady tier colour<br>while you hold"]
     E1 -->|"let go"| E2["action sent now"]
 
-    T -->|"PRESS_AND_HOLD_UNTIL_RELEASE<br>momentary layer or pointer mode"| C1["that layer or mode takes over<br>its own overlay colour<br>this stage does not paint"]
+    T -->|"PRESS_AND_HOLD_UNTIL_RELEASE<br>momentary layer or pointer mode"| C1["that layer or mode takes over<br>its own overlay colour<br>these rules do not paint"]
     C1 -->|"let go"| C2["layer or mode ends"]
 
     style T fill:#EDF0F4,stroke:#5A6673,color:#1A1F26
@@ -301,7 +304,7 @@ immediately.
 
 ---
 
-## 9. Where this stage declines to paint
+## 9. Where the key-behavior rules decline to paint
 
 Silence is a word in this language. These conditions choose it:
 
@@ -310,12 +313,12 @@ Silence is a word in this language. These conditions choose it:
   cannot fire
 - **layer and pointer-mode actions**, whose own overlays are the persistent
   feedback and sit earlier in the stack
-- **a hold tier carrying a layer preview**, which routes to the preview stage
+- **a hold tier carrying a layer preview**, which routes to the preview rules
 - **base-tap commits**, because `tap_commit_mode` is limited to non-base taps
 - **implicit and fallback hold tokens**, which are holds the engine synthesised
   rather than behaviour anyone authored
-- **a stale mirrored semantic on the slave** where combo feedback has already
-  synced that key, so an out-of-date colour cannot stomp a live combo footprint
+- **a selected branch inside a held combo's footprint**, on either half: the
+  combo already lights that key, so a branch colour cannot stomp it
 
 ---
 
@@ -339,10 +342,13 @@ LED groups can add accents after the main locality render. See
 
 ## 11. Both halves
 
-Per-key truth is computed on the USB half. The other half renders the same scene
-from mirrored packed maps, captured once per RGB frame as a coherent snapshot, so
-a frame cannot mix two generations of state. A mirrored read that lands
-mid-publish keeps the previous frame's values rather than tearing.
+Per-key truth is computed on the USB half. It sends the facts the other half
+cannot see for itself (the previewed layer, held combos and every key's
+behaviour state) as one lighting facts frame, which the other half publishes
+whole; each half then runs the same rules from its own copy of the profile over
+its own LEDs. A frame is captured once per RGB frame as a coherent snapshot, so
+it cannot mix two generations of state, and a read that lands mid-publish keeps
+the previous frame's facts rather than tearing.
 
 Consequence: the non-USB half can be at most one RGB frame behind, and never
 inconsistent within a frame.
@@ -362,7 +368,7 @@ common hold feedback on the board is painted against the surface it most resembl
 **Palette collisions.** Three feedback colours are byte-for-byte identical to a
 layer colour: branch 2 `#0006FF` is `LAYER_SYM`, branch 4 `#00FF00` is `LAYER_NUM`,
 and the tap colour `#FFFFFF` is `LAYER_POINTER`. Because every layer here paints
-`KEYS_MAPPED_ON_THIS_LAYER_ONLY` and this stage repaints the whole half, the signal
+`KEYS_MAPPED_ON_THIS_LAYER_ONLY` and this feedback repaints the whole half, the signal
 is degraded rather than lost: the key you pressed does not change colour, while the
 unmapped keys around it do. The sharpest instance is on `CUSTOM_KEY_0` (Right
 Thumb), where the quadruple-tap branch is exactly the colour that same key's
@@ -370,8 +376,8 @@ double-tap long hold turns the board. Branch 2 also sits only 11° from `LAYER_N
 branch 5 `#FF9600` is 7° from `hold_active_color` `#FF6C00` and they would be
 consecutive states in one gesture — no row authors five branches today.
 
-**Scale.** `RGB_KEY_HALF` repaints half a lit board for one key's state, and this
-stage renders last, so the layer context under it is lost while it shows.
+**Scale.** `RGB_KEY_HALF` repaints half a lit board for one key's state, and its
+rules sit on top, so the layer context under it is lost while it shows.
 
 **Latency.** The 151 ms window is the price of a multi-tap branch and is paid on
 *every* tap of that key, including the single tap that is usually the common one.

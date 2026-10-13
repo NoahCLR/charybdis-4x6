@@ -74,6 +74,7 @@ typedef struct {
     uint32_t chunk_frames;
     uint32_t reuse_frames;
     uint32_t exchanges;
+    uint32_t push_exchanges; // made while the USB half's prepared push is active
     uint32_t source_unavailable;
 } split_link_t;
 
@@ -450,6 +451,7 @@ static bool split_exchange(void *context, const uint8_t *request, uint8_t reques
     if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK) link->chunk_frames++;
     if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) link->reuse_frames++;
     link->exchanges++;
+    if (noah_profile_owner_split_reconciler(&usb)->prepared_push_active) link->push_exchanges++;
     bool result = noah_profile_split_reconciler_receive(reconciler, request, request_length, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
     if (result && response[2] == NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE) link->source_unavailable++;
     if (paced_copy) {
@@ -949,7 +951,7 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_BEGIN, 312u, NOAH_QMK_VIA_SYNC_REGION_NONE, NULL, 0u, &now);
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_CHUNK, 312u, NOAH_QMK_VIA_SYNC_REGION_KEYMAP, target_keymap, KEYMAP_SIZE, &now);
     host_staged(NOAH_QMK_VIA_LOGICAL_VALUE_VERIFY, 312u, NOAH_QMK_VIA_SYNC_REGION_NONE, NULL, 0u, &now);
-    usb_link.chunk_frames = usb_link.reuse_frames = usb_link.exchanges = usb_link.source_unavailable = 0u;
+    usb_link.chunk_frames = usb_link.reuse_frames = usb_link.exchanges = usb_link.push_exchanges = usb_link.source_unavailable = 0u;
     uint32_t started = now, peer_ready_at = 0u, master_ready_at = 0u, master_scans = 0u;
     paced_peer_scans = 0u;
     paced_copy = true;
@@ -973,7 +975,9 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
     assert(noah_profile_owner_peer_transfer(&usb, &diagnostic));
     assert(diagnostic.reused_bytes == candidate_length && !diagnostic.reuse_unavailable);
     assert(diagnostic.reuse_exchanges == usb_link.reuse_frames && diagnostic.source_unavailable_replies == 0u);
-    assert(diagnostic.prepared_exchanges == usb_link.exchanges);
+    // A metadata poll may fall between the commit and the push; the push's own
+    // count is every exchange it made.
+    assert(diagnostic.prepared_exchanges == usb_link.push_exchanges && usb_link.push_exchanges <= usb_link.exchanges);
     assert(diagnostic.prepared_scans > 0u && diagnostic.prepared_scans <= master_scans);
     commit_staged(312u, true, &now);
     for (uint32_t guard = 0; guard < 8192u && other.committed_descriptor.generation != 2; guard++) tick(&now);

@@ -49,7 +49,7 @@ Accepted domains (`users/noah/lib/profile/schema/profile_domain_registry.h`):
 
 | Id | Domain | Version |
 | ---: | --- | ---: |
-| `0x10` | RGB | 4 |
+| `0x10` | RGB (lighting rules) | 5 |
 | `0x20` | Key behaviors | 2 |
 | `0x30` | Combo overrides | 3 |
 | `0x40` | Settings, layer records, layer names, VIA macro names and custom-key names | 6 |
@@ -221,77 +221,22 @@ in the snapshot a lookup copies.
 
 ## RGB Domain
 
-Domain `0x10` version `4` begins with this exact 16-byte header
-(see [RGB domain](rgb-domain-v1.md)):
+Domain `0x10` version `5` is the lighting rules: palette, thing tables, saved
+key sets, maps, the ordered rule list and domain extensions, within one 8 KiB
+budget. [Lighting rules](lighting-rules-v1.md) is its specification: the
+format, the registries of facts, targets, paints and timings, validation, the
+split facts frame, the capability read and the conversion from version 4.
 
-| Offset | Size | Field |
-| ---: | ---: | --- |
-| 0 | 1 | RGB payload format, `4` |
-| 1 | 1 | reserved, zero |
-| 2 | 2 | stage-enable mask |
-| 4 | 1 | reusable-group count, maximum 16 |
-| 5 | 1 | layer-color count, maximum 16 |
-| 6 | 1 | layer-group row count |
-| 7 | 1 | PD-color count, exactly 32 when compiled |
-| 8 | 1 | PD-group row count |
-| 9 | 1 | combo-group row count |
-| 10 | 1 | tap-branch color count, maximum 4 |
-| 11 | 1 | key-feedback group row count |
-| 12 | 1 | physical LED count, exactly 58 |
-| 13 | 1 | group-bitmap bytes, exactly 8 |
-| 14 | 2 | reserved, zero |
+Firmware accepts only version 5 (D-F10, D-F25). A version-4 domain, from a
+profile written by earlier firmware or an older backup, is converted to
+version 5 by the client before Apply; the conversion is defined in the
+lighting spec and pinned by `tests/fixtures/lighting_vectors_v1.json`. The
+compiled defaults carry Standard lighting: the same conversion of the
+firmware's own `rgb_config.c` tables. The version-4 layout remains documented,
+as conversion input only, in [RGB domain v1](rgb-domain-v1.md).
 
-Stage bits 0 through 4 select layer, auto-mouse, PD-mode, combo, and
-key-behavior feedback respectively. Bits 5 through 15 are reserved. The four
-group-row counts have an aggregate maximum of 32.
-
-Records then appear without padding in this fixed order:
-
-| Section | Bytes per record | Layout |
-| --- | ---: | --- |
-| reusable group | 9 | `id, bitmap[8]` |
-| layer color | 5 | `layer_id, h, s, v, mode` |
-| layer group | 5 | `selector, h, s, v, group_id` |
-| auto-mouse fade | 4 fixed | `mode, h, s, v` |
-| PD color | 5 | `pd_id, h, s, v, locality` |
-| PD group | 5 | `selector, h, s, v, group_id` |
-| combo feedback | 4 fixed | `h, s, v, locality` |
-| combo group | 4 | `h, s, v, group_id` |
-| tap-branch color | 3 | `h, s, v` |
-| key feedback | 11 fixed | committed/hold/long-hold HSV, tap policy, locality |
-| key group | 5 | `semantic, h, s, v, group_id` |
-
-For the compiled 58-LED board, every reusable group is a stable profile-local
-`u8` id plus an eight-byte bitmap. Bits 58 through 63 must be zero. Inline
-source groups receive generated anonymous ids during canonicalization. Unique
-bitmaps sort lexicographically by their eight unsigned bytes and receive
-consecutive ids from zero; group names and declaration syntax never enter the
-wire representation.
-
-Rows reference dictionary ids rather than embedding native
-`rgb_led_group_t`. Row order is preserved because later overlapping rows can
-repaint earlier rows. HSV uses three bytes. Selectors and enums use explicit
-one-byte ids. Layer and PD selectors use `0xff` for all; otherwise a layer
-selector is below 16 and a PD selector below 32. Key group semantics
-are pending `0`, committed `1`, hold `2`, long hold `3`, and all `0xff`.
-
-Layer modes are all keys `0` and mapped keys only `1`. Locality is both `0`,
-left `1`, right `2`, key half `3`, or keys only `4`. Auto-mouse modes are real
-destination `0`, end color only at base-effect positions `1`, or end color on
-all keys `2`. Tap-commit policy is off `0` or non-base taps `1`. Stable PD ids
-are drag-scroll `0`, volume `1`, brightness `2`, zoom `3`, arrow `4`, and
-pinch `5`.
-
-Stage-enable bits are valid only for features advertised as compiled. The
-key-feedback tap-commit policy is behavior-affecting and therefore uses the
-strict activation boundary even though it lives in the RGB domain.
-
-Layer colors cover every logical layer exactly once, PD colors cover every
-supported stable PD id exactly once, and tap-branch colors match the compiled
-tap count. Identity tables sort by id; renderer group rows and tap-branch
-colors preserve authored order. The full validation and canonicalization
-contract is mirrored in
-[RGB domain v1](rgb-domain-v1.md).
+The tap-commit flash (domain extension 2) is behaviour-affecting and therefore
+uses the strict activation boundary even though it lives in the RGB domain.
 
 ## Digests And Checksums
 
@@ -513,6 +458,7 @@ Capability feature bits are:
 | 28 | pointing-mode clicks: a direction or button-override tap in the PD domain may be a plain mouse button 1–8 (`0x00d1..0x00d8`). Require this bit before writing one; older firmware rejects it as `INVALID_ACTION`. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 29 | pointing-mode VIA macros: direction, diagonal and button tap overrides may start slots 0–127 (`0x7700..0x777f`), inherit policy and zero mask only. Require this bit before writing one. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 30 | combo output behaviour permissions: settings v6 header byte 5 bit 0 bypasses all combo output behaviours; combo v3 row flag bit 4 bypasses one output. Both zero means allowed. Native combo readback v3 row flag bit 5 reports the per-combo bypass. Require this bit before writing either extension. See [participation policy](participation-policy.md#combo-output-behaviour-permission) |
+| 31 | lighting rules: the RGB domain is version 5 ([lighting rules](lighting-rules-v1.md)), and custom GET `0x0D` reports the lighting registries and bounds this keyboard accepts. A client converts a version-4 RGB domain before Apply and offers only the kinds the read reports |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with
@@ -1014,6 +960,8 @@ unhandled reply.
 | custom get | `0x09` | retired; unsupported | — |
 | custom get/set | `0x0A` | bounded split transaction capture, diagnostic builds only | [Split activity sync](split-activity-sync.md) |
 | custom get | `0x0B` | detected host OS | Host OS Readback, below |
+| custom get | `0x0C` | sparse VIA macro read map | Sparse VIA Macro Read Map, above |
+| custom get | `0x0D` | lighting capabilities, feature bit 31 | [Lighting rules](lighting-rules-v1.md#capabilities) |
 | custom set | `0x10` | candidate begin | this document |
 | custom set | `0x11` | candidate chunk | this document |
 | custom set | `0x12` | candidate validate/prepare | this document |

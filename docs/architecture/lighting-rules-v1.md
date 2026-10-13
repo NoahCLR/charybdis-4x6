@@ -287,7 +287,10 @@ the last). Its thing is `0xff` (the subject stands for the gesture, not a
 behaviour row), so it uses the behaviour table's default palette.
 
 A key that sits in a held combo's footprint never shows a selected branch: the
-combo already lights that key. This is applied when the slice is collected.
+combo already lights that key. The fact applies this as it reads the frame,
+from the frame's combos slice, so both halves drop the same branches from the
+same facts. A build without the combos fact applies it to the slice as the USB
+half collects it instead.
 
 ### Targets
 
@@ -353,9 +356,10 @@ of its subjects.
 
 When a profile is published the firmware copies the validated lighting payload
 into RAM and indexes it: palette RGB, thing tables, key sets, map offsets and
-rule part offsets. Rendering never reads the profile. The compiled defaults are
-decoded the same way the first time they are needed. Both halves decode their
-own copy of the profile.
+rule part offsets. Rendering never reads the profile. Both halves decode their
+own copy of the profile. The compiled Standard lighting is built once, at boot
+depth, when the compiled profile is first opened or the program first loads;
+the compiled RGB domain that profile transfers stream only copies it.
 
 ### The walk
 
@@ -388,8 +392,9 @@ sees exactly what is below it.
 
 ### When it re-resolves
 
-The firmware resolves a whole frame when the first LED chunk of a frame
-starts, and only when something changed: the fact frame, the published
+The firmware resolves a whole frame at the first LED chunk of a frame that
+falls on its own half (or the first chunk drawn at all), and only when
+something changed: the fact frame, the published
 program, the keymap (for mapped-key targets), a timing's next change, or every
 frame while something time-based shows (an animating timing, a paint that
 changes with time, the auto-mouse fade). Between resolutions each chunk copies
@@ -433,7 +438,8 @@ build). It travels in chunks on one transaction, `PUT_SPLIT_LIGHTING_FACTS_SYNC`
 Each pass the USB half rebuilds the frame and sends the chunks that changed
 (every chunk on a heartbeat, after a failure or when forced), all with a new
 sequence; the last chunk it sends carries commit. The other half starts a
-staging copy of its live frame on the first chunk of a new sequence, applies
+staging copy of its live frame (or of the frame at rest, before its first
+commit) on the first chunk of a new sequence, applies
 each chunk, and publishes staging as its live frame on commit, as one
 generation, so a render never mixes two frames. A pass that fails part-way
 publishes nothing and the next pass resends every chunk. Heartbeats and
@@ -592,7 +598,9 @@ the rule read-only and byte for byte.
 ## Validation
 
 The firmware validates a candidate before it can become active, in bounded
-steps of at most 20 bytes read each, as every domain does: header and counts,
+steps of at most 20 bytes read each, as every domain does; each step checks
+every whole colour, record, key set, map value or rule part its read holds:
+header and counts,
 palette brightness, thing tables (kinds, counts, place and colour bytes),
 key-set padding bits, map encodings, canonical sparse/dense choice and values,
 every rule's size, flags, part order, counts and kinds, each part's declared
