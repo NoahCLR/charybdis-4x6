@@ -48,7 +48,7 @@ tap overrides (D-F23), with inherited modifiers and busy triggers dropped.
 Combo outputs can bypass their shared behaviours globally or per combo
 (D-F24), independently of chord admission; both switches default on.
 
-Lighting is one rule engine over RGB domain version 5 (D-F25): ordered rules
+Lighting is one rule engine over RGB domain version 5 (D-F26): ordered rules
 built from registered facts, targets, paints and timings, decoded into RAM on
 publication and resolved only when a fact, the keymap or a timer changes. The
 compiled lighting is Standard lighting, the conversion of `rgb_config.c`, and
@@ -56,6 +56,10 @@ the host parity test finds its frames identical to the retired stage
 renderer's. The USB half sends the synced facts in one chunked frame; each half
 renders its own LEDs from its own profile. GET `0x0D` (feature bit 31)
 reports what the rules may use. None of it has run on hardware.
+
+The keyboard's name lives in settings v7 and is its USB product string
+(D-F25): read before USB starts, and taken up after a rename by one USB
+restart of the half on USB once nothing is in flight.
 
 Firmware work remaining before the product is complete:
 
@@ -87,7 +91,7 @@ input cadence remain unmeasured for this path.
 
 ## Open Issues
 
-- **Lighting rules need the Ark follow-up and hardware acceptance (D-F25).**
+- **Lighting rules need the Ark follow-up and hardware acceptance (D-F26).**
   Ark must adopt RGB domain version 5, feature bit 31 and GET `0x0D`, and
   convert a version-4 domain before Apply ("Lighting rules phase 1 — Ark" in
   the work queue); until then current Ark cannot edit or restore lighting on
@@ -97,6 +101,13 @@ input cadence remain unmeasured for this path.
   locality, combos, every behaviour state and the auto-mouse fade), that the
   other half matches the USB half, and that pointing rate and typing are
   unchanged with lighting resolving.
+
+- **The keyboard name needs broader hardware acceptance (D-F25).** Check
+  Chrome's HID chooser, the system device list and Ark individually; that a
+  held key or a running macro delays the restart; that the half without USB
+  stays off USB; and that unplugging and restarting under the saved name
+  enumerates without a second restart. Ark clients must support settings v7,
+  the editor and expected reconnect; older backups need v6 translation.
 
 - **Combo output permissions need an Ark follow-up and hardware acceptance
   (D-F24).** Ark must adopt capability bit 30, settings header flags and combo
@@ -161,7 +172,7 @@ input cadence remain unmeasured for this path.
   resets each half's storage (the flash base moves), and the stored profile
   is refused by action ABI digest. Before relying on them, measure on both
   halves: allocator and stack high-water with the 140 KiB EEPROM mirror; how
-  long the maximum profile's validation (8,251 owner scans), boot (11,084)
+  long the maximum profile's validation (8,255 owner scans), boot (11,090)
   and the peer's prepare take in real time against the 60-second no-progress
   window; how long a 140 KiB wear-leveling consolidation pauses; and how long
   macro 127 takes to start on a full 34,903-byte macro bank. Also check
@@ -1080,10 +1091,10 @@ excluded duplicate inert to an eligible chord's member state.
 Defaults allow everything, so a profile that never uses them is unchanged.
 
 `tests/fixtures/maximum_profile_v3.fixture` holds every table at its maximum
-at once: 37,667 bytes, leaving 15,549 bytes of the slot. It validates, commits,
+at once: 45,301 bytes, leaving 7,915 bytes of the slot. It validates, commits,
 boots and publishes whole on one half and prepares and commits on the peer;
 settings validation reads 20 bytes per step, like the other domains, so the
-whole profile validates in 7,429 owner scans
+whole profile validates in 8,255 owner scans
 ([storage baseline](architecture/storage-and-resource-baseline.md#schema-3-ceilings-and-the-maximum-profile)).
 
 The authored layout keeps its eight layers; layers 8–15 are transparent,
@@ -1321,7 +1332,28 @@ profile bytes, domain versions and action ABI. Ark must adopt the capability,
 codecs, editor, backup translation and reachability model after this firmware
 lands; current Ark rejects unknown capability bits.
 
-## D-F25 — Lighting is a list of rules over registered kinds
+## D-F25 — The keyboard's name is its USB product string
+
+Settings v7 adds one counted name after the custom-key names: the keyboard's
+own name, under the shared name rule. Empty, the compiled default, keeps QMK's
+built-in `keyboard_name`. The firmware serves it as the USB product string
+through a BK fork hook, so Chrome's HID chooser, the system's device list and
+Ark list the keyboard under the name its owner chose; manufacturer and serial
+number stay as they were.
+
+Hosts read the string when they enumerate, so the name must be known before
+USB starts and a rename needs a new enumeration. `keyboard_pre_init` reads the
+committed profile's name; the activated profile stays authoritative. When its
+name differs from the enumerated one, the half on USB restarts USB once the
+owner is settled on both halves, nothing is held or running, VIA is idle and
+the host has been quiet for a second. The half without USB never restarts it.
+The [runtime flow](architecture/runtime-flow.md#usb-product-name) owns the
+rules. Settings v7 is a new domain version: firmware refuses v6, and clients
+translate an older document by appending an empty keyboard name. Ark clients
+must support v7, the editor, its labels and the expected reconnect. Earlier
+clients that accept only settings v6 refuse this format.
+
+## D-F26 — Lighting is a list of rules over registered kinds
 
 RGB domain `0x10` version 5 replaces the fixed stage pipeline (layer,
 auto-mouse, pointing mode, combo and key-feedback stages, each with its own
@@ -1349,7 +1381,7 @@ Choices the plan left open, as decided:
   a converted backup are one function of the same bytes.
 - **One 8 KiB budget, 128 palette colours, no per-kind caps.** The whole
   domain is decoded into RAM on publication (one 16 KiB tripwire increment,
-  [memory budgets](architecture/memory-budgets.md#lighting-rules--d-f25)).
+  [memory budgets](architecture/memory-budgets.md#lighting-rules--d-f26)).
 - **Facts are one frame.** The USB half builds the synced facts (previewed
   layer, held combos, behaviour state) and sends them as one frame of 30-byte
   chunks published on the other half as one generation; the per-stage split

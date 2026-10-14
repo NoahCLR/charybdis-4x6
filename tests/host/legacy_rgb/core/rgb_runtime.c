@@ -3,7 +3,7 @@
 // Retired RGB Stage Renderer — parity oracle only
 // ────────────────────────────────────────────────────────────────────────────
 //
-// The stage pipeline the lighting rule engine replaced (D-F25), kept as the
+// The stage pipeline the lighting rule engine replaced (D-F26), kept as the
 // oracle the parity test renders against: a version-4 profile must light
 // exactly as it did. Never built into firmware. Changed only to read the
 // configuration under test and to render as the USB half.

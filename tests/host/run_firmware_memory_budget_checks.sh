@@ -30,7 +30,7 @@ fi
 # 32-bit mode masks). D-F14 then mirrors 140 KiB of logical EEPROM instead
 # of 18 KiB, 124,928 more cache bytes, and its capacities (128 combos of
 # sixteen inputs, the behaviour row index, 272 names, 128-byte pointing
-# records) another 20 KiB over the 17,400 bytes they linked at. D-F25's
+# records) another 20 KiB over the 17,400 bytes they linked at. D-F26's
 # lighting rules add one reviewed 16 KiB increment for the decoded program,
 # the compiled Standard lighting and the engine's working set. All are
 # policy, not capacity. See

@@ -347,7 +347,7 @@ static void    load_maximum(const char *path) {
                 maximum[maximum_length++] = (uint8_t)byte;
             }
     fclose(file);
-    // Lighting takes 8 KiB of the earlier 12 KiB reserve (D-F25); 4 KiB stays free.
+    // Lighting takes 8 KiB of the earlier 12 KiB reserve (D-F26); 4 KiB stays free.
     assert(maximum_length > 32768u && maximum_length + 4096u <= NOAH_PROFILE_PAYLOAD_MAX);
 }
 static void use_maximum(noah_profile_blob_v1_t *expected) {
@@ -412,7 +412,7 @@ static void test_maximum_profile(void) {
     // One validator step a scan, each one read of at most 20 bytes. The peer's
     // copy of this validation is the longest stretch a split prepare spends
     // without transfer progress, inside the owner's no-progress window. The
-    // 8 KiB lighting domain (D-F25) takes it from 7,429 to 8,251 scans.
+    // 8 KiB lighting domain (D-F26) takes it from 7,432 to 8,255 scans.
     assert(validation_scans < 9000u);
     assert_published(maximum, &expected, 1);
     assert_maximum_edges();

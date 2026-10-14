@@ -162,6 +162,26 @@ if "auto_mouse_get_time_elapsed_at(timer_read())" not in elapsed:
 if not re.search(r"^\s*#\s*define\s+RAW_EPSIZE\s+32\s*$", usb_descriptor_header, re.MULTILINE):
     raise SystemExit("QMK Raw HID endpoint size no longer matches Profile Wire's 32-byte report contract")
 
+# The keyboard name (D-F25): the fork serves a runtime product string, the
+# name is read from EEPROM in keyboard_pre_init before USB starts, and the half
+# on USB can restart the driver to be enumerated again.
+if not re.search(r"#ifdef USB_PRODUCT_STRING_USER\s*(//[^\n]*\n\s*)*const USB_Descriptor_String_t\s*\*\s*usb_product_string_user\(void\);", usb_descriptor_header):
+    raise SystemExit("QMK must declare usb_product_string_user() under USB_PRODUCT_STRING_USER (BK runtime product string hook)")
+descriptors = body((qmk / "tmk_core/protocol/usb_descriptor.c").read_text(encoding="utf-8"), "uint16_t get_usb_descriptor(")
+product = descriptors[descriptors.index("case 0x02:"):]
+if "usb_product_string_user()" not in product or product.index("usb_product_string_user()") > product.index("&ProductString"):
+    raise SystemExit("QMK must offer the product string descriptor to usb_product_string_user() before PRODUCT")
+setup = body(keyboard, "void keyboard_setup(void)")
+if setup.index("eeprom_driver_init();") > setup.index("keyboard_pre_init_quantum();"):
+    raise SystemExit("QMK no longer initializes EEPROM before keyboard_pre_init")
+main = body((qmk / "quantum/main.c").read_text(encoding="utf-8"), "int main(void) {")
+if "keyboard_setup();" not in main or "protocol_pre_init();" not in main or main.index("keyboard_setup();") > main.index("protocol_pre_init();"):
+    raise SystemExit("QMK no longer runs keyboard_setup before protocol_pre_init starts USB")
+if "init_usb_driver(" not in body((qmk / "tmk_core/protocol/chibios/chibios.c").read_text(encoding="utf-8"), "void protocol_pre_init(void)"):
+    raise SystemExit("QMK's ChibiOS protocol_pre_init no longer starts USB")
+if not re.search(r"void\s+restart_usb_driver\(USBDriver \*usbp\);", (qmk / "tmk_core/protocol/chibios/usb_main.h").read_text(encoding="utf-8")):
+    raise SystemExit("QMK's ChibiOS USB no longer offers restart_usb_driver")
+
 qmk_toggle = re.search(r"^\s*#\s*define\s+TAPPING_TOGGLE\s+(\d+)\s*$", action_tapping_header, re.MULTILINE)
 our_toggle = re.search(r"^\s*#\s*define\s+NOAH_QMK_TAPPING_TOGGLE\s+(\d+)\s*$", tapping_contract, re.MULTILINE)
 if not (qmk_toggle and our_toggle and qmk_toggle.group(1) == our_toggle.group(1)):

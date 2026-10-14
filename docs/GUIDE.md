@@ -81,6 +81,22 @@ These firmware controls require an Ark version that adopts capability bit 30.
 The app editor follow-up remains pending; the current app rejects the new
 capability bit. Existing profile flags are zero and retain previous behaviour.
 
+## The keyboard's name
+
+Name the keyboard in Ark's Settings and your computer lists it under that
+name: Chrome's HID chooser, the system's device list and Ark's keyboard menu.
+It is stored in the profile, so it travels with backups. Left empty, the
+keyboard keeps its built-in name, `keyboard_name` in the QMK fork's
+`keyboard.json`.
+
+Computers read a USB device's name only when it connects. After an Apply that
+renames the keyboard, the half the cable is plugged into disconnects from USB
+for a moment and reconnects under the new name. It waits until nothing is
+held, no macro is running, both halves have the new profile and Ark has
+stopped talking to it for a second; the other half never switches its USB on.
+Installing firmware with this feature changes the profile format, so export a
+backup in Ark first and restore it afterwards.
+
 ## Authoring the profile in C
 
 Edit compiled defaults directly in `keymap.c`, `config.h`, and `rgb_config.c`

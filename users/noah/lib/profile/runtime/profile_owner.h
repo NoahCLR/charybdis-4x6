@@ -197,6 +197,11 @@ const noah_profile_store_t           *noah_profile_owner_store(const noah_profil
 noah_profile_candidate_transaction_t *noah_profile_owner_host_transaction(noah_profile_owner_t *owner);
 noah_profile_split_reconciler_t      *noah_profile_owner_split_reconciler(noah_profile_owner_t *owner);
 bool                                  noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_owner_status_t *status);
+// Whether the keyboard may drop off USB now (D-F25): the owner is ready with
+// no candidate, save, activation or cleanup in flight, both halves hold the
+// same profile, and nothing is held or running on either half (the boundary a
+// profile activates at).
+bool                                  noah_profile_owner_usb_restart_safe(noah_profile_owner_t *owner);
 
 #ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
 uint32_t noah_profile_owner_test_ready_refresh_count(void);

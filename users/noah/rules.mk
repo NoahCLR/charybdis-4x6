@@ -115,6 +115,9 @@ ifneq ($(strip $(NOAH_LIVE_PROFILE_MUTATION)),no)
     endif
     ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
         OPT_DEFS += -DNOAH_LIVE_PROFILE_MUTATION_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
+        # The keyboard name in the profile is the USB product string (D-F25),
+        # through the BK fork's runtime product string hook.
+        OPT_DEFS += -DUSB_PRODUCT_STRING_USER
     endif
 endif
 

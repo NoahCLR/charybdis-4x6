@@ -5,11 +5,12 @@
 #include "profile_versions.h"
 #include "profile_name_v1.h"
 
-// Settings v6 (D-F14) stores, in order: an eight-byte header, the scalar
-// policy, one fixed record per layer (its combo reference layer and its two
-// placement bitmaps), then every name counted: a length byte and at most 32
-// bytes of UTF-8, the layers' first, then the VIA macros', then the custom
-// keys'. The fixed part comes first so its fields sit at known offsets.
+// Settings v7 (D-F14, D-F25) stores, in order: an eight-byte header, the
+// scalar policy, one fixed record per layer (its combo reference layer and its
+// two placement bitmaps), then every name counted: a length byte and at most
+// 32 bytes of UTF-8, the layers' first, then the VIA macros', then the custom
+// keys', then the keyboard's own name. The fixed part comes first so its
+// fields sit at known offsets.
 enum {
     NOAH_SETTINGS_VERSION              = NOAH_PROFILE_SETTINGS_VERSION,
     NOAH_SETTINGS_HEADER_SIZE          = 8,
@@ -21,6 +22,9 @@ enum {
     NOAH_SETTINGS_LAYERS               = 16,
     NOAH_SETTINGS_MACRO_NAMES          = 128,
     NOAH_SETTINGS_CUSTOM_KEY_NAMES     = 128,
+    // The keyboard name the USB product string carries; empty means the
+    // firmware's built-in name (D-F25).
+    NOAH_SETTINGS_KEYBOARD_NAMES       = 1,
     NOAH_SETTINGS_NAME_MAX             = NOAH_PROFILE_NAME_MAX,
     // A placement bitmap covers up to 64 matrix positions; bits past the
     // firmware's rows × columns are zero.
@@ -30,7 +34,8 @@ enum {
     NOAH_SETTINGS_SCALARS_OFFSET       = NOAH_SETTINGS_HEADER_SIZE,
     NOAH_SETTINGS_LAYER_RECORDS_OFFSET = NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTINGS_COUNT * 4,
     NOAH_SETTINGS_FIXED_SIZE           = NOAH_SETTINGS_LAYER_RECORDS_OFFSET + NOAH_SETTINGS_LAYERS * NOAH_SETTINGS_LAYER_RECORD_SIZE,
-    NOAH_SETTINGS_NAME_COUNT           = NOAH_SETTINGS_LAYERS + NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES,
+    NOAH_SETTINGS_NAME_COUNT           = NOAH_SETTINGS_LAYERS + NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES + NOAH_SETTINGS_KEYBOARD_NAMES,
+    NOAH_SETTINGS_KEYBOARD_NAME_RECORD = NOAH_SETTINGS_NAME_COUNT - 1,
     NOAH_SETTINGS_MIN_SIZE             = NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_NAME_COUNT,
     NOAH_SETTINGS_MAX_SIZE             = NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_NAME_COUNT * (1 + NOAH_SETTINGS_NAME_MAX),
 };
@@ -90,6 +95,18 @@ typedef struct {
 bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *state, uint8_t byte, uint16_t length, uint8_t layers, uint8_t positions);
 bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *state, uint16_t length);
 bool noah_profile_setting_v1_valid(uint8_t id, uint32_t value, uint8_t layers);
+
+// The keyboard's own name, the domain's last name record (D-F25). Empty means
+// the firmware's built-in name.
+typedef struct {
+    uint8_t length;
+    uint8_t bytes[NOAH_SETTINGS_NAME_MAX];
+} noah_profile_keyboard_name_t;
+// Reads the keyboard name from a current settings domain of `length` bytes at
+// `offset`. False, with the name left empty, when the bytes cannot be read or
+// are not a current domain whose last record is a valid name ending the domain.
+bool noah_profile_settings_v1_keyboard_name(const noah_profile_reader_t *reader, size_t offset, size_t length, noah_profile_keyboard_name_t *name);
+bool noah_profile_keyboard_name_equal(const noah_profile_keyboard_name_t *a, const noah_profile_keyboard_name_t *b);
 
 // Scalar 27 was reserved zero after combo references moved into layer records.
 // Bits 0..1 select Auto/macOS/Windows/Linux; bit 8 enables Unicode entry.

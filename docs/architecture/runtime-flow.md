@@ -546,6 +546,44 @@ checks fail and the real two-half safety matrix is open. The separate mutation
 engineering artifact now advertises and routes the complete write capability
 set for hardware testing; it does not change the ordinary build.
 
+## USB Product Name
+
+The settings domain's keyboard name (D-F25) is the USB product string,
+through the BK fork's runtime product string hook (`USB_PRODUCT_STRING_USER`,
+`usb_product_string_user()`); `compat/qmk_usb_product_name.c` owns it. An
+empty name serves QMK's built-in `keyboard_name`. The manufacturer and serial
+number never change.
+
+Hosts read the string when they enumerate the keyboard, which QMK starts in
+`protocol_pre_init`, before the profile owner exists. So `keyboard_pre_init`
+reads the committed profile's name first: QMK has initialized EEPROM by then,
+and the read borrows the store the runtime has not started, so it costs no
+RAM. Boot selection checks the record's checksum and compatibility, not the
+peer. Both halves do this before either knows its role; on the half without
+USB the name only sits in memory.
+
+The activated profile is authoritative. When its name differs from the one
+USB enumerated with — an Apply renamed the keyboard, or boot activated a
+different profile than the one read early — the half on USB restarts its USB
+driver (`restart_usb_driver`, about 50 ms off the bus) once all of these hold:
+
+- the profile owner is ready with no candidate, save, activation or cleanup
+  in flight, both halves hold the same profile and nothing is held or running
+  on either half (`noah_profile_owner_usb_restart_safe`, the activation safe
+  boundary);
+- VIA has no logical save, local write or replication in flight;
+- no Raw HID frame has arrived for a second, so a client finishes the reads
+  that follow its Apply;
+- USB is enumerated and not suspended.
+
+The new descriptor is built in a second buffer and served by switching to it
+just before the restart, so a host never reads a half-written string. One
+change of the stored name is one restart, and an unchanged stored name never
+restarts. The empty built-in-name sentinel and explicitly storing that same
+text are different stored names, so that change also restarts USB. The half without
+USB never restarts it: QMK disconnected its USB at role detection and latches
+the role, so its USB stays off.
+
 ## Test Coverage Map
 
 ```mermaid
@@ -557,5 +595,6 @@ flowchart TD
     rgb["RGB rendering"] --> rgb_tests["rgb_validation, rgb_layer_render"]
     split["Split transport"] --> split_tests["split_runtime_sync, qmk_via_split_sync, profile_split_reconciler"]
     hooks["Hooks and boundaries"] --> boundary_tests["hook_chaining, feature_gate_compile, qmk_contract"]
+    usb_name["USB product name"] --> usb_name_tests["qmk_usb_product_name, profile_store_runtime, profile_owner"]
     all["Whole userspace"] --> full["run_all_host_tests.sh and qmk compile"]
 ```

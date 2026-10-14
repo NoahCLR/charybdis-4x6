@@ -2,11 +2,11 @@
 """Write the maximum profile fixture (D-F14), or check it is current.
 
 Every table at its simultaneous maximum in one schema 3.0 blob: lighting (RGB
-v5, D-F25) filling its whole 8 KiB budget, with every thing table at its
+v5, D-F26) filling its whole 8 KiB budget, with every thing table at its
 maximum record count, 128 palette colours, maps both dense and sparse and 255
 rules using every kind; 128 behaviour rows of
-five full steps (640 steps); 128 combos of sixteen inputs; settings v6 with
-every one of its 272 names at 32 bytes of UTF-8; and 32 pointing slots, each
+five full steps (640 steps); 128 combos of sixteen inputs; settings v7 with
+every one of its 273 names at 32 bytes of UTF-8; and 32 pointing slots, each
 named with 32 bytes. Values reach the edges the plan names: layers 7, 8 and
 15, combo rows 31, 32, 63, 64 and 127, macros and custom keys 0, 63, 64 and
 127. It is test evidence built from the byte specs, not from firmware code.
@@ -27,7 +27,7 @@ LAYERS = 16
 DEPTH = 5
 PAYLOAD_MAX = 53216
 LIGHTING_BUDGET = 8192
-# Reserved for future payload once lighting has its budget (D-F25 took 8 KiB
+# Reserved for future payload once lighting has its budget (D-F26 took 8 KiB
 # of the earlier 12 KiB reserve).
 ALLOWANCE = 4096
 
@@ -149,18 +149,18 @@ def settings() -> bytes:
     scalars[24] = 0
     scalars[25:27] = [100, 8]
     scalars[28:31] = [1, 0xFF7F, 0x7FFF]  # behaviours off on layer 7, combos off on 15
-    out = bytearray([6, LAYERS, 31, 128, 128, 0, 0, 0])
+    out = bytearray([7, LAYERS, 31, 128, 128, 0, 0, 0])
     out += b"".join(struct.pack("<I", v) for v in scalars)
     for layer in range(LAYERS):
         reference = (layer + 1) % LAYERS
         bypass = (1 << (layer % 60)) | (1 << 59)
         exclusion = (1 << ((3 * layer) % 60)) if layer % 2 else 0
         out += bytes([reference]) + struct.pack("<QQ", bypass, exclusion)
-    names = [f"Layer {n} " for n in range(LAYERS)] + [f"Macro {n} " for n in range(128)] + [f"Key {n} " for n in range(128)]
+    names = [f"Layer {n} " for n in range(LAYERS)] + [f"Macro {n} " for n in range(128)] + [f"Key {n} " for n in range(128)] + ["Keyboard "]
     for label in names:
         encoded = name(label)
         out += bytes([len(encoded)]) + encoded
-    assert len(out) == 9380
+    assert len(out) == 9413
     return bytes(out)
 
 
@@ -177,7 +177,7 @@ def pointing() -> bytes:
 
 
 def blob() -> tuple[bytes, list[tuple[int, int, bytes]]]:
-    domains = [(0x10, 5, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 6, settings()), (0x50, 3, pointing())]
+    domains = [(0x10, 5, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 7, settings()), (0x50, 3, pointing())]
     out = bytearray(b"NLP1" + bytes([3, 0, len(domains), 1]))
     for domain_id, version, payload in domains:
         out += bytes([domain_id, version]) + struct.pack("<H", len(payload)) + payload

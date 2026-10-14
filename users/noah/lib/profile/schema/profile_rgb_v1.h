@@ -13,7 +13,7 @@ enum {
     NOAH_PROFILE_RGB_V1_DOMAIN_ID             = NOAH_PROFILE_DOMAIN_V1_RGB,
     // Version 4: no longer a profile's RGB domain (that is version 5,
     // profile_lighting_v1.h), only the encoding of the compiled tables that
-    // the version-4 conversion reads (D-F25).
+    // the version-4 conversion reads (D-F26).
     NOAH_PROFILE_RGB_V1_DOMAIN_VERSION        = 4u,
     NOAH_PROFILE_RGB_V1_FORMAT_VERSION        = 4u,
     NOAH_PROFILE_RGB_V1_HEADER_SIZE           = 16u,

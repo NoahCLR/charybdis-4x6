@@ -188,7 +188,7 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
 #endif
 
 #if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(COMBO_ONLY_FROM_LAYER)
-// Settings v6 keeps each layer's combo reference layer in its layer record.
+// Settings keep each layer's combo reference layer in its layer record.
 uint8_t combo_ref_from_layer(uint8_t layer) {
     return layer < NOAH_SETTINGS_LAYERS ? noah_setting_layer_record(layer, NOAH_SETTINGS_LAYER_REFERENCE) : layer;
 }

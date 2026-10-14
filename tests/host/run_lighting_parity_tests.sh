@@ -1,6 +1,6 @@
 #!/bin/sh
 # Old stage renderer vs lighting rule engine over a corpus of situations and
-# version-4 configurations: the frames must be identical (D-F25).
+# version-4 configurations: the frames must be identical (D-F26).
 
 set -eu
 

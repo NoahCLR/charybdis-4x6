@@ -98,3 +98,29 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
 bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *s, uint16_t length) {
     return s && s->offset == length && s->name == NOAH_SETTINGS_NAME_COUNT && !s->in_name;
 }
+
+bool noah_profile_settings_v1_keyboard_name(const noah_profile_reader_t *reader, size_t offset, size_t length, noah_profile_keyboard_name_t *name) {
+    if (!name) return false;
+    memset(name, 0, sizeof(*name));
+    uint8_t byte;
+    if (length < NOAH_SETTINGS_MIN_SIZE || length > NOAH_SETTINGS_MAX_SIZE || !noah_profile_reader_read(reader, offset, &byte, 1) || byte != NOAH_SETTINGS_VERSION) return false;
+    // Skip every name before the keyboard's: each is its length byte and bytes.
+    size_t at = NOAH_SETTINGS_FIXED_SIZE;
+    for (uint16_t record = 0; record < NOAH_SETTINGS_KEYBOARD_NAME_RECORD; record++) {
+        if (at >= length || !noah_profile_reader_read(reader, offset + at, &byte, 1)) return false;
+        at += 1u + byte;
+    }
+    noah_profile_name_v1_t rule;
+    uint8_t                bytes[NOAH_SETTINGS_NAME_MAX];
+    if (at >= length || !noah_profile_reader_read(reader, offset + at, &byte, 1) || !noah_profile_name_v1_begin(&rule, byte) || at + 1u + byte != length || !noah_profile_reader_read(reader, offset + at + 1u, bytes, byte)) return false;
+    for (uint8_t i = 0; i < byte; i++)
+        if (!noah_profile_name_v1_byte(&rule, bytes[i])) return false;
+    if (!noah_profile_name_v1_complete(&rule)) return false;
+    name->length = byte;
+    memcpy(name->bytes, bytes, byte);
+    return true;
+}
+
+bool noah_profile_keyboard_name_equal(const noah_profile_keyboard_name_t *a, const noah_profile_keyboard_name_t *b) {
+    return a && b && a->length == b->length && !memcmp(a->bytes, b->bytes, a->length);
+}

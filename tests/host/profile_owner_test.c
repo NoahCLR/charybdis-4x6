@@ -1436,6 +1436,42 @@ static void test_accept_waits_for_a_safe_boundary_while_typing(void) {
     finish_after_reconnect(&left, &right, &now);
 }
 
+// D-F25: the half on USB may restart it to take a new keyboard name only
+// once a save has fully settled on both halves and nothing is held.
+static void test_usb_restart_waits_for_a_settled_save(void) {
+    noah_profile_owner_t left;
+    noah_profile_owner_t right;
+    memory_t             left_memory;
+    memory_t             right_memory;
+    split_link_t         left_link  = {.peer = &right};
+    split_link_t         right_link = {.peer = &left};
+    uint32_t             now        = 600000u;
+
+    assert(!noah_profile_owner_usb_restart_safe(NULL));
+    decide_logical_commit(&left, &left_memory, &right, &right_memory, &left_link, &right_link, 214u, &now);
+    // Decided but not yet on the other half or activated.
+    assert(!noah_profile_owner_usb_restart_safe(&left));
+    finish_after_reconnect(&left, &right, &now);
+    for (uint32_t guard = 0u; guard < 256u && !noah_profile_owner_usb_restart_safe(&left); guard++)
+        scan_pair(&left, &right, &now);
+    assert(noah_profile_owner_usb_restart_safe(&left));
+    // Anything held or running on either half holds it back.
+    activation_block_reason = NOAH_PROFILE_ACTIVATION_REASON_PHYSICAL_PRESS;
+    assert(!noah_profile_owner_usb_restart_safe(&left));
+    activation_block_reason = NOAH_PROFILE_ACTIVATION_REASON_MACRO;
+    assert(!noah_profile_owner_usb_restart_safe(&left));
+    activation_block_reason = 0u;
+    assert(noah_profile_owner_usb_restart_safe(&left));
+    // A new save in flight holds it back again.
+    {
+        uint8_t frame[32];
+
+        logical_begin_frame(frame, 215u, 7u, UINT32_C(0xabcdef02));
+        send_and_scan_pair(&left, &right, frame, &now);
+        assert(!noah_profile_owner_usb_restart_safe(&left));
+    }
+}
+
 static void test_link_lost_during_roll_forward_still_activates(void) {
     noah_profile_owner_t left;
     noah_profile_owner_t right;
@@ -1768,6 +1804,7 @@ int main(void) {
     test_lost_link_after_decision_keeps_typing_and_resumes();
     test_peer_rebooted_while_unlinked_after_decision_resumes();
     test_accept_waits_for_a_safe_boundary_while_typing();
+    test_usb_restart_waits_for_a_settled_save();
     test_link_lost_during_roll_forward_still_activates();
     test_accept_is_never_sent_to_an_unreachable_peer();
     test_empty_boot_live_commit_and_timeout();

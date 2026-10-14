@@ -253,8 +253,8 @@ Format-5 `NT` keeps the `NR` header layout: identity byte 2 holds domain bits
 0–4, origin bit 5 and override bit 6; payload length stays a 16-bit field
 because a slot payload is at most 53,216 bytes. Storage addresses are 32 bits
 (`noah_profile_storage_address_t`), since slot B ends at `0x22FFF`. Format 5
-binds schema 3.0 and accepts only RGB v5 (D-F25), key-behavior v2, combo v3, settings
-v6 and sparse PD v3.
+binds schema 3.0 and accepts only RGB v5 (D-F26), key-behavior v2, combo v3, settings
+v7 and sparse PD v3.
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
@@ -293,17 +293,17 @@ remaining space without a separate compiled-program limit (feature bit 27).
 Unlike the V1 ceilings above, every one of these is reachable at once.
 `tests/fixtures/maximum_profile_v3.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table at
-its maximum and every name at 32 bytes: 45,268 bytes (lighting 8,192,
-behaviours 13,828, combos 9,736, settings 9,380, pointing 4,104, plus 28 bytes
-of header and envelopes). That leaves 7,948 bytes of the slot, more than the
+its maximum and every name at 32 bytes: 45,301 bytes (lighting 8,192,
+behaviours 13,828, combos 9,736, settings 9,413, pointing 4,104, plus 28 bytes
+of header and envelopes). That leaves 7,915 bytes of the slot, more than the
 4 KiB still reserved for future payload once lighting took 8 KiB of the
-former 12 KiB reserve (D-F25). The fixture is the maximum for the
+former 12 KiB reserve (D-F26). The fixture is the maximum for the
 encodings, not a limit the firmware checks: a larger profile is refused only
 by a table's own ceiling or the slot.
 
 The owner validates one step a matrix scan, each step one read of at most 20
-bytes. The maximum profile validates in 8,251 scans, a boot that adopts it
-publishes after 11,084, and a peer's prepared copy spends 10,534 scans
+bytes. The maximum profile validates in 8,255 scans, a boot that adopts it
+publishes after 11,090, and a peer's prepared copy spends 10,539 scans
 validating and preparing without transfer progress (its steps read 20 bytes
 like the owner's; they read the 14-byte split chunk size before framing
 version 2), which the split harness's conservative
@@ -316,8 +316,8 @@ Split framing version 2 retains bounded mailbox, duplicate-request and outbound
 chunk buffers of at most 128 bytes, plus reuse source/progress state; it never
 keeps a full profile in the reconciler. Its 32-bit state regression allowance
 is 896 bytes (previously 768). The owner's 11,264-byte state allowance is
-unchanged; the schema-3 static-data tripwire is 226,304 bytes since D-F25's
-lighting increment ([memory budgets](memory-budgets.md#lighting-rules--d-f25)). These allowances
+unchanged; the schema-3 static-data tripwire is 226,304 bytes since D-F26's
+lighting increment ([memory budgets](memory-budgets.md#lighting-rules--d-f26)). These allowances
 are engineering policies; acceptance still requires fresh linked memory and
 reviewed-path stack checks for each half, and hardware high-water evidence.
 `run_profile_domain_owner_round_trip_tests.sh` saves, boots, publishes,

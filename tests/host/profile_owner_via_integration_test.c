@@ -34,7 +34,7 @@ enum {
 
 static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
 
-// Standard lighting (RGB v5, D-F25) alone. Its copy to the other half sends
+// Standard lighting (RGB v5, D-F26) alone. Its copy to the other half sends
 // payload chunks wider than one bounded store read.
 static const uint8_t long_profile[] = {
     0x4eu, 0x4cu, 0x50u, 0x31u, 0x03u, 0x00u, 0x01u, 0x01u, 0x10u, 0x05u, 0x41u, 0x01u, 0x05u, 0x00u, 0x3au, 0x15u,

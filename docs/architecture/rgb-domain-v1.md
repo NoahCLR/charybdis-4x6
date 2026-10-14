@@ -1,6 +1,6 @@
 # RGB Domain V1
 
-> **Superseded by [lighting rules](lighting-rules-v1.md) (D-F25).** Firmware
+> **Superseded by [lighting rules](lighting-rules-v1.md) (D-F26).** Firmware
 > now reads and writes only domain `0x10` version 5. This document remains the
 > definition of the version-4 bytes: the firmware encodes its compiled
 > `rgb_config.c` tables this way before converting them, and a client converts

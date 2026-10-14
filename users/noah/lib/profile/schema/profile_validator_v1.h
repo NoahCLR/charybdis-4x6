@@ -27,7 +27,7 @@ enum {
     // is not a hardware SRAM-capacity claim; target resource gates account
     // for the linked instance separately. D-F14's 128-byte pointing records
     // make the PD iterator the largest domain state: 372 bytes on Cortex-M0+.
-    // D-F25's lighting limits (one support word per registry) add 24 bytes to
+    // D-F26's lighting limits (one support word per registry) add 24 bytes to
     // the compatibility copy: 396 bytes, under a reviewed 400.
     NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 400u,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8      = 0xffu,

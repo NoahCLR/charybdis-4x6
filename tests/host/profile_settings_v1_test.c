@@ -41,7 +41,7 @@ static uint16_t layer_record(uint8_t layer, uint8_t field) {
 static void named(uint8_t size, char fill) {
     const uint32_t values[NOAH_SETTINGS_COUNT] = {200, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff};
     memset(bytes, 0, sizeof(bytes));
-    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {6, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
+    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {7, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
     memcpy(bytes, header, sizeof(header));
     for (uint8_t i = 0; i < NOAH_SETTINGS_COUNT; i++)
         set_scalar(i, values[i]);
@@ -86,7 +86,7 @@ static void test_header_and_versions(void) {
         bytes[0] = version;
         assert(valid() == (version == NOAH_SETTINGS_VERSION));
     }
-    assert(NOAH_SETTINGS_VERSION == 6);
+    assert(NOAH_SETTINGS_VERSION == 7);
     for (uint8_t at = 1; at < NOAH_SETTINGS_HEADER_SIZE; at++) {
         defaults();
         bytes[at]++;
@@ -205,10 +205,13 @@ static void test_names(void) {
     defaults();
     bytes[length++] = 0;
     assert(!valid());
-    // 272 names (D-F14): entry 255 is past any byte counter, entry 271 the
-    // last; a name in either is read in order.
-    assert(NOAH_SETTINGS_NAME_COUNT == 272);
+    // 273 names (D-F14, D-F25): entry 255 is past any byte counter, entry 271
+    // the last custom key's and 272 the keyboard's; a name in any is read in
+    // order.
+    assert(NOAH_SETTINGS_NAME_COUNT == 273 && NOAH_SETTINGS_KEYBOARD_NAME_RECORD == 272);
+    assert(NOAH_SETTINGS_MIN_SIZE == 677 && NOAH_SETTINGS_MAX_SIZE == 9413);
     defaults();
+    put_name(272, "Keyboard", 8);
     put_name(271, "Last custom", 11);
     put_name(255, "Two-five-five", 13);
     assert(valid());
@@ -222,17 +225,65 @@ static void test_names(void) {
     length--;
     assert(!valid());
 }
+static bool keyboard_name(noah_profile_keyboard_name_t *name) {
+    noah_profile_reader_t reader = noah_profile_reader_from_memory(bytes, length);
+    return noah_profile_settings_v1_keyboard_name(&reader, 0, length, name);
+}
+static void test_keyboard_name(void) {
+    noah_profile_keyboard_name_t name, other;
+    // No name is the built-in one.
+    defaults();
+    assert(keyboard_name(&name) && name.length == 0);
+    // The last record, whatever comes before it.
+    named(NOAH_SETTINGS_NAME_MAX, 'q');
+    assert(keyboard_name(&name) && name.length == NOAH_SETTINGS_NAME_MAX && name.bytes[0] == 'q' && name.bytes[31] == 'q');
+    defaults();
+    put_name(NOAH_SETTINGS_KEYBOARD_NAME_RECORD, "Noah's \xc3\xa9", 9);
+    put_name(NOAH_SETTINGS_KEYBOARD_NAME_RECORD - 1, "Last custom", 11);
+    assert(valid() && keyboard_name(&name) && name.length == 9 && !memcmp(name.bytes, "Noah's \xc3\xa9", 9));
+    other = name;
+    assert(noah_profile_keyboard_name_equal(&name, &other));
+    other.bytes[8] ^= 1u;
+    assert(!noah_profile_keyboard_name_equal(&name, &other));
+    other = name;
+    other.length--;
+    assert(!noah_profile_keyboard_name_equal(&name, &other));
+    // Anything that is not a current domain ending in a valid name reads as
+    // no name, and says so.
+    bytes[0] = 6;
+    assert(!keyboard_name(&name) && name.length == 0);
+    bytes[0] = NOAH_SETTINGS_VERSION;
+    length--;
+    assert(!keyboard_name(&name) && name.length == 0);
+    defaults();
+    bytes[length++] = 0;
+    assert(!keyboard_name(&name));
+    defaults();
+    put_name(NOAH_SETTINGS_KEYBOARD_NAME_RECORD, "\xc3", 1);
+    assert(!keyboard_name(&name) && name.length == 0);
+    defaults();
+    bytes[NOAH_SETTINGS_FIXED_SIZE] = 200; // a layer name running past the end
+    assert(!keyboard_name(&name));
+}
 static void test_publication(void) {
     defaults();
+    put_name(NOAH_SETTINGS_KEYBOARD_NAME_RECORD, "Desk", 4);
     bytes[NOAH_SETTINGS_FLAGS_OFFSET] = NOAH_SETTINGS_FLAG_COMBO_OUTPUT_BYPASS;
     put_name(NOAH_SETTINGS_LAYERS + 5, "\xc3\x89t\xc3\xa9", 5);
     put_name(0, "Base", 4);
     bytes[layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE)] = 2;
     bytes[layer_record(9, NOAH_SETTINGS_LAYER_BYPASS + 7)] = 0x08;
     assert(valid());
+    noah_profile_keyboard_name_t name = {.length = 1};
+    noah_effective_settings_keyboard_name(&name);
+    assert(name.length == 0);
     noah_effective_profile_snapshot_t view = settings_view();
+    uint32_t publication = noah_effective_settings_publication();
     noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
     assert(applied == 1 && noah_effective_settings_length() == length);
+    assert(noah_effective_settings_publication() == publication + 1u);
+    noah_effective_settings_keyboard_name(&name);
+    assert(name.length == 4 && !memcmp(name.bytes, "Desk", 4));
     assert(!noah_setting_combo_output_behaviors());
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 200);
     assert(noah_setting(NOAH_SETTING_LAYER_COMBOS, 0) == 0xffff);
@@ -255,6 +306,8 @@ static void test_publication(void) {
     noah_effective_settings_invalidate(NULL, 3, view.identity, view.identity, &view);
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 99);
     assert(!noah_effective_settings_length() && !noah_effective_settings_byte(0));
+    noah_effective_settings_keyboard_name(&name);
+    assert(name.length == 0);
     assert(noah_setting_combo_output_behaviors());
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE) == 0xA5u);
     // The largest domain publishes whole.
@@ -285,6 +338,7 @@ int main(void) {
     assert(noah_host_layout_id(UINT32_C(0x01090103)) == 9u);
     test_layer_records();
     test_names();
+    test_keyboard_name();
     test_publication();
     puts("portable settings validation and publication tests passed");
 }

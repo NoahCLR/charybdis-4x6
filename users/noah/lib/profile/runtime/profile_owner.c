@@ -1217,6 +1217,21 @@ bool noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_o
     return true;
 }
 
+bool noah_profile_owner_usb_restart_safe(noah_profile_owner_t *owner) {
+    noah_profile_owner_status_t status;
+
+    if (!owner || (owner->state != NOAH_PROFILE_OWNER_READY_COMPILED && owner->state != NOAH_PROFILE_OWNER_READY_VALIDATED)) {
+        return false;
+    }
+    if (owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || owner->host_transaction.has_candidate || owner->host_transaction.mailbox.pending || owner->host_via_accept_requested || host_session_cleanup_needed(owner)) {
+        return false;
+    }
+    if (!noah_profile_owner_status(owner, &status) || status.has_pending || status.transfer_pending || status.peer_cleanup_pending || (owner->config.peer_required && !status.peer_converged)) {
+        return false;
+    }
+    return noah_profile_activation_policy_safe_boundary(&owner->activation_policy) == 0u;
+}
+
 static noah_profile_candidate_v1_peer_phase_t peer_phase(const noah_profile_split_reconciler_status_t *status) {
     if (status->state == NOAH_PROFILE_SPLIT_RECONCILER_STOPPED) {
         return NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_STOPPED;

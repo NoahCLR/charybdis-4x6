@@ -75,6 +75,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic "$@" \
     "$ROOT/users/noah/lib/macro/via_macro_provider.c" \
     "$ROOT/users/noah/lib/compat/qmk_via_contract.c" \
     "$ROOT/users/noah/lib/macro/via_macro_defaults.c" \
+    "$ROOT/users/noah/lib/compat/qmk_usb_product_name.c" \
     "$BUILD_DIR/native_via_buffer_dispatch.c" \
     -o "$BIN"
 

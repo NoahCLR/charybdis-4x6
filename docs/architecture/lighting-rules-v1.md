@@ -7,7 +7,7 @@ reach the other half, the conversion from version 4, the **Standard lighting**
 rule set, and the walkthroughs that prove the design grows without a rewrite.
 It supersedes [RGB domain v1](rgb-domain-v1.md) for everything the firmware
 reads and writes; that document remains the definition of the version-4 bytes
-the conversion starts from (D-F25).
+the conversion starts from (D-F26).
 
 The shared contract file `tests/fixtures/lighting_contract_v1.json` names every
 id, parameter and meaning below in a form a program can read.

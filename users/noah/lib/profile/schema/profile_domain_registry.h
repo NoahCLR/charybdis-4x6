@@ -13,7 +13,7 @@
     X(RGB,           rgb,           0x10u, 5u) \
     X(KEY_BEHAVIORS, key_behaviors, 0x20u, 2u) \
     X(COMBOS,        combos,        0x30u, 3u) \
-    X(SETTINGS,      settings,      0x40u, 6u) \
+    X(SETTINGS,      settings,      0x40u, 7u) \
     X(PD,            pd,            0x50u, 3u)
 
 enum {

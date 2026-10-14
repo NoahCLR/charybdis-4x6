@@ -8,6 +8,11 @@ void     noah_effective_settings_invalidate(void *context, uint32_t publication,
 uint16_t noah_effective_settings_length(void); // 0 when no profile settings are live
 uint8_t  noah_effective_settings_byte(uint16_t offset);
 bool     noah_setting_combo_output_behaviors(void);
+// The live keyboard name (D-F25), empty before any settings are live. The
+// publication count changes each time the cached domain is replaced, so a
+// reader rereads the name only when it may have changed.
+void     noah_effective_settings_keyboard_name(noah_profile_keyboard_name_t *name);
+uint32_t noah_effective_settings_publication(void);
 typedef void (*noah_effective_settings_apply_fn)(void);
 void     noah_effective_settings_set_apply(noah_effective_settings_apply_fn apply);
 void     noah_effective_settings_boot(bool booting);

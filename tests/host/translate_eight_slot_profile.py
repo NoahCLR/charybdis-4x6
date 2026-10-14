@@ -8,16 +8,16 @@ adding an uncoloured PD row (h=0, s=0, v=0, right half) for slots 8..31.
 Combo v1 becomes v2 using a 60 ms default window and its shared hold
 threshold; row hold fields become reserved zero. The blob becomes schema 3
 (D-F14): RGB v3 becomes v4 with a black, mapped-keys-only colour row for each
-of layers 8..15, and settings v5 becomes v6 (the combo reference nibbles move
+of layers 8..15, and settings v5 becomes v7 (the combo reference nibbles move
 to the layer records, layer names become counted, the 64 macro names are
 followed by 64 empty ones for macros 64..127, the 64 custom-key names by 64
-empty ones for custom keys 64..127, participation allows
-everything). Key behaviors v1 become v2: a 16-bit step count, and each row
+empty ones for custom keys 64..127, then an empty keyboard name, and
+participation allows everything). Key behaviors v1 become v2: a 16-bit step count, and each row
 enabled and allowed on all sixteen layers. Combos v2 become v3: each
 28-byte row keeps its count, flags, window, output and its inputs only, with
 every layer allowed. PD v2 becomes v3: each 96-byte record keeps its mode
 bytes and moves its name to the counted rule (length in byte 8, UTF-8 at 96,
-a 128-byte record). RGB v4 then becomes v5 (lighting rules, D-F25) by the
+a 128-byte record). RGB v4 then becomes v5 (lighting rules, D-F26) by the
 version-4 conversion. Test tooling: the firmware never translates.
 """
 import struct
@@ -59,7 +59,7 @@ def translate_rgb_v4(payload: bytes) -> bytes:
 
 
 def translate_rgb_v5(payload: bytes) -> bytes:
-    """RGB v4 becomes v5 (D-F25) by the lighting conversion, for a keyboard
+    """RGB v4 becomes v5 (D-F26) by the lighting conversion, for a keyboard
     supporting every lighting kind (docs/architecture/lighting-rules-v1.md)."""
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
     import lighting_reference
@@ -87,7 +87,7 @@ def translate_settings(payload: bytes) -> bytes:
     for _ in range(64):
         offset += 1 + tail[offset]
     macros, custom = tail[:offset], tail[offset:]
-    return bytes([6, 16, 31, 128, 128, 0, 0, 0]) + struct.pack("<31I", *scalars) + records + names + macros + bytes(64) + custom + bytes(64)
+    return bytes([7, 16, 31, 128, 128, 0, 0, 0]) + struct.pack("<31I", *scalars) + records + names + macros + bytes(64) + custom + bytes(64) + bytes(1)
 
 
 def translate_behaviors(payload: bytes) -> bytes:
@@ -177,7 +177,7 @@ def translate(blob: bytes) -> bytes:
         if domain == 0x30 and version == 2:
             payload, version = translate_combos_v3(payload), 3
         if domain == 0x40 and version == 5:
-            payload, version = translate_settings(payload), 6
+            payload, version = translate_settings(payload), 7
         elif domain == 0x40:
             raise ValueError("expected settings v5")
         out += bytes([domain, version]) + struct.pack("<H", len(payload)) + payload
