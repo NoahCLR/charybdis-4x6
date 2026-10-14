@@ -192,6 +192,10 @@
           "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_paint", "noah_lighting_palette_rgb", "hsv_to_rgb"]
         },
         {
+          "name": "boot RGB idle facts initialization",
+          "functions": ["main", "noah_rgb_runtime_post_init", "noah_lighting_facts_unpack_synced"]
+        },
+        {
           "name": "matrix scan individual combo capture",
           "functions": ["main", "matrix_scan", "split_runtime_sync_elapsed_internal", "noah_lighting_slice_combo_held_collect", "key_runtime_core_preview_owner_key_pos"]
         },
