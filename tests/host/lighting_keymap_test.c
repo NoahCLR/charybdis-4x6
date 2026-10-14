@@ -3,6 +3,7 @@
 #include "users/noah/lib/rgb/lighting/lighting_keymap.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/profile/runtime/effective_combo_runtime.h"
+#include "users/noah/lib/profile/runtime/effective_key_behavior_runtime.h"
 #include "noah_keymap_ids.h"
 
 static uint16_t codes[LAYER_COUNT][NOAH_LIGHTING_MATRIX_KEYS];
@@ -11,7 +12,11 @@ static uint32_t generation, reads, interrupt_at;
 static combo_t combos[128];
 static uint16_t inputs[128][17];
 static uint32_t layers[128];
-static bool enabled[128];
+static bool enabled[128], read_error;
+noah_effective_key_behavior_result_t noah_effective_key_behavior_lookup(uint16_t code, noah_effective_key_behavior_row_t *row) {
+    (void)code; (void)row;
+    return read_error ? NOAH_EFFECTIVE_KEY_BEHAVIOR_READ_ERROR : NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK;
+}
 layer_state_t layer_state, default_layer_state;
 
 uint32_t noah_lighting_keymap_generation(void) { return generation; }
@@ -79,6 +84,9 @@ int main(void) {
     interrupt_at=0;assert(noah_lighting_keymap_refresh(generation));
     assert(noah_lighting_keymap_matches(15,3,NOAH_LIGHTING_QUERY_TRANSPARENT,255));
     assert(!noah_lighting_keymap_matches(15,3,NOAH_LIGHTING_QUERY_BEHAVIOUR,255));
+    generation++; read_error=true;
+    assert(!noah_lighting_keymap_refresh(generation)); // failed reads cannot become absent rows
+    read_error=false;assert(noah_lighting_keymap_refresh(generation));
     noah_lighting_keymap_invalidate();
     assert(!noah_lighting_keymap_identity(15,0,&kind,&id));
     assert(noah_lighting_keymap_refresh(generation));

@@ -8,6 +8,7 @@
 #    include "noah_keymap_ids.h"
 #    include "../../key/behavior/key_behavior_lookup.h"
 #    include "../../profile/runtime/effective_combo_runtime.h"
+#    include "../../profile/runtime/effective_key_behavior_runtime.h"
 
 static uint16_t native[LAYER_COUNT][NOAH_LIGHTING_MATRIX_KEYS];
 static uint8_t behaviour[LAYER_COUNT][NOAH_LIGHTING_MATRIX_KEYS];
@@ -26,6 +27,16 @@ uint8_t noah_lighting_keymap_led_key(uint8_t led) { return ready && led < NOAH_L
 
 void noah_lighting_keymap_invalidate(void) { ready = false; }
 
+static bool capture_behaviour(uint16_t code, uint8_t *identity) {
+    noah_effective_key_behavior_row_t row;
+    noah_effective_key_behavior_result_t result = noah_effective_key_behavior_lookup(code, &row);
+    if (result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK) *identity = row.row_index + 1u;
+    else if (result == NOAH_EFFECTIVE_KEY_BEHAVIOR_NOT_FOUND) *identity = 0u;
+    else if (result == NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK) *identity = key_behavior_lookup(code).lighting_identity;
+    else return false;
+    return true;
+}
+
 bool __attribute__((noinline)) noah_lighting_keymap_refresh(uint32_t generation) {
     if (ready && cached_generation == generation) return true;
     ready = false;
@@ -40,7 +51,7 @@ bool __attribute__((noinline)) noah_lighting_keymap_refresh(uint32_t generation)
         for (uint8_t key = 0u; key < NOAH_LIGHTING_MATRIX_KEYS; key++) {
             uint16_t code = keycode_at_keymap_location(layer, key / MATRIX_COLS, key % MATRIX_COLS);
             native[layer][key] = code;
-            behaviour[layer][key] = key_behavior_lookup(code).lighting_identity;
+            if (!capture_behaviour(code, &behaviour[layer][key])) return false;
             if (combo_matches(code, layer, 255u)) key_origin_bitmap_add_keypos(combo_inputs[layer], (keypos_t){.row = key / MATRIX_COLS, .col = key % MATRIX_COLS});
         }
     }

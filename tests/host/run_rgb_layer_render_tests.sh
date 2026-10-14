@@ -65,6 +65,11 @@ build_scene scene $SMALL
 build_scene scene_sanitized $SMALL -fsanitize=address,undefined -fno-omit-frame-pointer
 "$BUILD_DIR/scene_sanitized"
 
+build_scene cached_scene $SMALL -DNOAH_LIGHTING_TARGET_KEYS_THAT=1 -DNOAH_LIGHTING_PAINT_WHAT_IT_DOES=1
+"$BUILD_DIR/cached_scene"
+build_scene cached_scene_sanitized $SMALL -DNOAH_LIGHTING_TARGET_KEYS_THAT=1 -DNOAH_LIGHTING_PAINT_WHAT_IT_DOES=1 -fsanitize=address,undefined -fno-omit-frame-pointer
+"$BUILD_DIR/cached_scene_sanitized"
+
 build_scene workload -DRGB_MATRIX_SPLIT=1 -DRGB_MATRIX_LED_PROCESS_LIMIT=12 -DRGB_LEFT_LED_COUNT=29 -DRGB_MATRIX_LED_COUNT=58 -DRGB_LAYER_RENDER_TEST_WORKLOAD=1
 "$BUILD_DIR/workload"
 

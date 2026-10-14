@@ -13,6 +13,7 @@
 #include "users/noah/lib/rgb/lighting/lighting_keymap.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/profile/runtime/effective_combo_runtime.h"
+#include "users/noah/lib/profile/runtime/effective_key_behavior_runtime.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
 
@@ -31,6 +32,10 @@ static uint16_t query_inputs[128][17];
 static uint32_t query_layers[128];
 static uint8_t query_enabled[128];
 static uint32_t keymap_generation, storage_reads;
+noah_effective_key_behavior_result_t noah_effective_key_behavior_lookup(uint16_t code, noah_effective_key_behavior_row_t *row) {
+    (void)code; (void)row;
+    return NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK;
+}
 key_behavior_view_t key_behavior_lookup(uint16_t code) {
     storage_reads++;
     for (uint8_t layer=0;layer<LAYER_COUNT;layer++) for(uint8_t key=0;key<NOAH_LIGHTING_MATRIX_KEYS;key++)

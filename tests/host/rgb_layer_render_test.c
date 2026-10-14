@@ -15,6 +15,9 @@
 #include "users/noah/lib/rgb/core/rgb_runtime.h"
 #include "users/noah/lib/rgb/core/rgb_helpers.h"
 #include "users/noah/lib/rgb/lighting/lighting.h"
+#include "users/noah/lib/key/behavior/key_behavior_lookup.h"
+#include "users/noah/lib/profile/runtime/effective_key_behavior_runtime.h"
+#include "users/noah/lib/profile/runtime/effective_combo_runtime.h"
 #include "users/noah/lib/profile/runtime/effective_rgb_runtime.h"
 #include "users/noah/lib/profile/schema/profile_rgb_compiled_v1.h"
 #include "ws2812.h"
@@ -408,8 +411,25 @@ static int32_t test_sync_offset;
 uint32_t sync_timer_read32(void) { return timer_read32() + (uint32_t)test_sync_offset; }
 #endif
 
+#if NOAH_LIGHTING_KEYMAP_CACHE
+static bool test_query_read_error;
+static uint32_t test_keymap_reads;
+noah_effective_key_behavior_result_t noah_effective_key_behavior_lookup(uint16_t code, noah_effective_key_behavior_row_t *row) {
+    (void)code; (void)row;
+    return test_query_read_error ? NOAH_EFFECTIVE_KEY_BEHAVIOR_READ_ERROR : NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK;
+}
+key_behavior_view_t key_behavior_lookup(uint16_t code) { (void)code;return (key_behavior_view_t){0}; }
+uint16_t noah_effective_combo_count(void) { return 0u; }
+combo_t *noah_effective_combo_get(uint16_t row) { (void)row;return NULL; }
+bool noah_effective_combo_enabled(uint16_t row) { (void)row;return false; }
+uint32_t noah_effective_combo_allowed_layers(uint16_t row) { (void)row;return 0u; }
+#endif
+
 static bool test_remote_publication_busy;
 static void test_reset(void) {
+#if NOAH_LIGHTING_KEYMAP_CACHE
+    test_query_read_error=false;test_keymap_reads=0u;
+#endif
     test_remote_publication_busy = false;
 #ifdef RGB_RUNTIME_CLOCK_TEST_BACKEND
     test_sync_offset = 0;
@@ -562,6 +582,9 @@ rgb_t hsv_to_rgb(hsv_t hsv) {
 }
 
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+#if NOAH_LIGHTING_KEYMAP_CACHE
+    test_keymap_reads++;
+#endif
     return test_keymap[layer_num][row][column];
 }
 
@@ -920,6 +943,29 @@ static void test_invalidating_layer_map_refreshes_dynamic_keymap_coverage(void) 
     check_led(1, (rgb_t){0, 0, 0});
     check_led(2, rgb_from_hsv(layer_colors[LAYER_NAV].color));
 }
+
+#if NOAH_LIGHTING_KEYMAP_CACHE
+static void test_query_reader_failure_keeps_pixels_and_retries(void) {
+    for (unsigned role=0;role<2;role++) {
+        test_reset();fake_is_master=(bool)role;
+        test_keymap[LAYER_NAV][0][1]=0x30;
+        layer_state=(layer_state_t)1u << LAYER_NAV;
+        CHECK(render_output());
+        rgb_t expected=rgb_from_hsv(layer_colors[LAYER_NAV].color);
+        check_led(1,expected);check_led(2,(rgb_t){0});
+        uint32_t reads=test_keymap_reads;
+        CHECK(render_output());CHECK(test_keymap_reads==reads);
+        test_keymap[LAYER_NAV][0][1]=KC_TRNS;test_keymap[LAYER_NAV][0][2]=0x31;
+        noah_rgb_runtime_invalidate_layer_maps();test_query_read_error=true;
+        CHECK(render_output()); // previous coherent pixels, no partly rebuilt basis
+        check_led(1,expected);check_led(2,(rgb_t){0});
+        test_query_read_error=false;
+        CHECK(render_output());check_led(1,(rgb_t){0});check_led(2,expected);
+        reads=test_keymap_reads;
+        CHECK(render_output());CHECK(test_keymap_reads==reads);
+    }
+}
+#endif
 
 static void test_preview_layer_overlays_existing_active_layers(void) {
     test_reset();
@@ -2613,6 +2659,9 @@ int main(int argc, char **argv) {
     test_mapped_only_layers_compose_in_layer_order();
     test_full_board_layer_fills_gaps_under_mapped_only_layer();
     test_invalidating_layer_map_refreshes_dynamic_keymap_coverage();
+#if NOAH_LIGHTING_KEYMAP_CACHE
+    test_query_reader_failure_keeps_pixels_and_retries();
+#endif
     test_preview_layer_overlays_existing_active_layers();
     test_slave_preview_layer_uses_remote_sync_state();
     test_slave_preview_handoff_to_matching_remote_layer_stays_continuous();

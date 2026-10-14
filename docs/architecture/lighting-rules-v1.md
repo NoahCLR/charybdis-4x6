@@ -425,7 +425,8 @@ metadata; no query/rule/identity cap is added. On the main context before a
 frame's render walk, a changed VIA/keymap or effective-profile generation
 rebuilds the basis. Behaviour rows are captured there because their lookup
 is reader-backed. Before/after generation disagreement rejects the in-place
-rebuild; existing pixels remain and no chunk may render the incomplete basis.
+rebuild; reader-busy/read-error results also reject it rather than inventing
+an absent behaviour. Existing pixels remain and no chunk may render the incomplete basis.
 A later settled frame retries. Publication callbacks never walk storage to
 rebuild it. Existing VIA local/split/default-restore invalidations and effective
 profile generation changes cover the source generations. Rendering uses no

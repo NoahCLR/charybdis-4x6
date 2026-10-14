@@ -61,8 +61,11 @@ hold/long-hold layer/mode outcome paint support Painting through additive kinds
 state kinds 9–18 expose actual ownership, gesture phases, named macro playback,
 physical pressed keys, modifiers, host locks, pointer observations and the
 existing sleep predicate; sleep still forces black and raw sensor observation
-has no extra continuation timer. None of it
-has run on hardware.
+has no extra continuation timer. Target8 selects keys on the shown layer from
+a cached native/behaviour basis; paint9 uses their direct layer/mode/macro
+identity. Reader failures retain previous pixels until a settled refresh.
+Generic events and retained timing remain in progress. None of it has run on
+hardware.
 
 The keyboard's name lives in settings v7 and is its USB product string
 (D-F25): read before USB starts, and taken up after a rename by one USB

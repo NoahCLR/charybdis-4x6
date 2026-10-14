@@ -117,6 +117,7 @@ static void rgb_runtime_begin_frame(void) {
     noah_lighting_leds_t leds = rgb_runtime_local_leds();
     uint32_t             generation;
     bool                 wake_due;
+    uint32_t             keymap_generation;
 
     bool facts_changed = rgb_runtime_capture_facts();
     rgb_runtime_scene.program = noah_effective_lighting_program(&generation);
@@ -130,18 +131,19 @@ static void rgb_runtime_begin_frame(void) {
         noah_lighting_keymap_invalidate();
 #    endif
     }
+    keymap_generation = rgb_runtime_keymap_generation;
 #    if NOAH_LIGHTING_KEYMAP_CACHE
-    if (!noah_lighting_keymap_refresh(rgb_runtime_keymap_generation)) {
+    if (!noah_lighting_keymap_refresh(keymap_generation)) {
         rgb_runtime_resolved = false; // keep old pixels, never rerender with an incomplete basis
         return;
     }
 #    endif
     wake_due = rgb_runtime_info.wake_set && (int32_t)(rgb_runtime_now - rgb_runtime_info.wake) >= 0;
-    if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_leds == leds && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation && !facts_changed) return;
+    if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_leds == leds && rgb_runtime_resolved_keymap_generation == keymap_generation && !facts_changed) return;
 
-    rgb_runtime_resolved_keymap_generation = rgb_runtime_keymap_generation;
+    rgb_runtime_resolved_keymap_generation = keymap_generation;
     rgb_runtime_scene.facts                = &rgb_runtime_resolved_facts;
-    rgb_runtime_scene.keymap_generation    = rgb_runtime_keymap_generation;
+    rgb_runtime_scene.keymap_generation    = keymap_generation;
     noah_lighting_resolve(&rgb_runtime_scene, leds, rgb_runtime_now, true, &rgb_runtime_frame, &rgb_runtime_info);
     rgb_runtime_resolved_leds = leds;
     rgb_runtime_resolved      = true;
