@@ -11,8 +11,17 @@
 enum {
     // Subjects one rule may yield; the most any fact yields is one per key.
     SUBJECT_MAX = 64u,
-    GATE_MAX    = 32u,
+    // Sum of every registry entry's finite parameter signatures and full
+    // subject domain. All accepted first conditions fit, regardless of load.
+#define NOAH_LIGHTING_TRACKERS(id, name, thing, layout, slots, selector, signatures) +(signatures)
+    TRACKER_MAX = 0u NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_TRACKERS),
+#undef NOAH_LIGHTING_TRACKERS
+#define NOAH_LIGHTING_CLOCKS(id, name, thing, layout, slots, selector, signatures) +((signatures) * (slots))
+    CLOCK_MAX = 0u NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_CLOCKS),
+#undef NOAH_LIGHTING_CLOCKS
+    RULE_MAX = 255u,
 };
+_Static_assert(CLOCK_MAX <= UINT16_MAX, "registry-derived timer clock offsets fit u16");
 _Static_assert(MATRIX_ROWS * MATRIX_COLS <= SUBJECT_MAX, "a rule's subjects must fit one per key");
 
 typedef struct {
@@ -43,18 +52,29 @@ typedef struct {
     uint8_t              amount;
 } placed_subject_t;
 
+// Millisecond ages saturate at the largest accepted u16 timing. Sharing the
+// first-condition presence clock is exact: a filtered rule's continuous age
+// is min(subject presence age, filter-conjunction age).
 typedef struct {
-    uint32_t since;
-    uint8_t  rule;
-    uint8_t  thing_kind;
-    uint8_t  thing;
-    bool     used;
-    bool     seen;
-} gate_t;
+    uint16_t part_offset;
+    uint16_t clock_offset;
+    uint8_t selector_parameter;
+    uint8_t slots;
+    bool seen;
+} presence_tracker_t;
 
 // Resolution scratch, kept off the reviewed render stack.
 static placed_subject_t subjects[SUBJECT_MAX];
-static gate_t           gates[GATE_MAX];
+static presence_tracker_t trackers[TRACKER_MAX ? TRACKER_MAX : 1u];
+static uint16_t clocks[CLOCK_MAX ? CLOCK_MAX : 1u];
+static uint8_t clock_active[(CLOCK_MAX + 7u) / 8u + 1u];
+static uint16_t tracker_count;
+static uint16_t rule_tracker[RULE_MAX];
+static uint16_t filter_clocks[RULE_MAX];
+static uint8_t filter_active[(RULE_MAX + 7u) / 8u];
+static uint32_t clock_last_time;
+static bool clocks_current;
+static bool timing_index_current;
 static rgb_t            palette[NOAH_PROFILE_LIGHTING_V1_PALETTE_MAX];
 static bool             palette_current;
 static noah_lighting_frame_t fade_start;
@@ -63,7 +83,8 @@ static noah_lighting_facts_t fade_facts;
 
 void noah_lighting_engine_program_changed(void) {
     palette_current = false;
-    memset(gates, 0, sizeof(gates));
+    timing_index_current = false;
+    clocks_current = false;
 }
 
 rgb_t noah_lighting_palette_rgb(const noah_lighting_scene_t *scene, uint8_t index) {
@@ -150,37 +171,127 @@ static bool fact_holds(const noah_lighting_facts_t *facts, const part_t *conditi
     return condition->slot == NOAH_PROFILE_LIGHTING_V1_SLOT_NEGATED ? !any : any;
 }
 
-static gate_t *gate_for(uint8_t rule, uint8_t thing_kind, uint8_t thing, uint32_t now, bool update) {
-    gate_t *free_gate = NULL;
+static uint16_t advance_clock(uint16_t value, uint32_t elapsed) {
+    return elapsed >= 65535u - value ? 65535u : (uint16_t)(value + elapsed);
+}
 
-    for (uint8_t index = 0u; index < GATE_MAX; index++) {
-        gate_t *gate = &gates[index];
-        if (gate->used && gate->rule == rule && gate->thing_kind == thing_kind && gate->thing == thing) return gate;
-        if (!gate->used && !free_gate) free_gate = gate;
+static bool same_condition(const uint8_t *a, const uint8_t *b, uint8_t selector) {
+    if (a[0] != b[0] || a[1] != b[1]) return false;
+    for (uint8_t i = 0u; i < (a[0] & 0x1fu); i++) {
+        if (i != selector && a[2u + i] != b[2u + i]) return false;
     }
-    if (!update || !free_gate) return NULL;
-    *free_gate = (gate_t){.since = now, .rule = rule, .thing_kind = thing_kind, .thing = thing, .used = true};
-    return free_gate;
+    return true;
+}
+
+static void prepare_timing_index(const noah_profile_lighting_v1_program_t *program) {
+    uint32_t clock_count = 0u;
+    tracker_count = 0u;
+    memset(rule_tracker, 0xff, sizeof(rule_tracker));
+    memset(filter_clocks, 0, sizeof(filter_clocks));
+    memset(filter_active, 0, sizeof(filter_active));
+    memset(clock_active, 0, sizeof(clock_active));
+    for (uint16_t i = 0u; i < program->rule_count; i++) {
+        rule_t rule;
+        parse_rule(program, i, &rule);
+        if (!rule.timing_count || (rule.flags & NOAH_PROFILE_LIGHTING_V1_RULE_DISABLED)) continue;
+        if (!rule.condition_count || rule.conditions[0].slot != NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION) continue;
+        const uint8_t *part = rule.conditions[0].params - 2u;
+        uint8_t selector = noah_lighting_fact_selector_parameter(rule.conditions[0].kind);
+        uint16_t index;
+        for (index = 0u; index < tracker_count; index++) {
+            if (same_condition(part, program->bytes + trackers[index].part_offset, selector)) break;
+        }
+        if (index == tracker_count) {
+            uint8_t slots = noah_lighting_fact_subject_slots(rule.conditions[0].kind);
+            trackers[index] = (presence_tracker_t){.part_offset = part - program->bytes, .clock_offset = clock_count, .selector_parameter = selector, .slots = slots};
+            clock_count += slots;
+            tracker_count++;
+        }
+        rule_tracker[i] = index;
+    }
+    // The bounds follow from accepted payload and registry domain sizes.
+    memset(clocks, 0, clock_count * sizeof(clocks[0]));
+    timing_index_current = true;
+}
+
+static void refresh_presence(presence_tracker_t *tracker, const noah_lighting_facts_t *facts, const noah_profile_lighting_v1_program_t *program, uint32_t elapsed) {
+    const uint8_t *part = program->bytes + tracker->part_offset;
+    uint8_t params[NOAH_PROFILE_LIGHTING_V1_PARAMETER_MAX];
+    uint8_t present[16] = {0};
+    uint16_t cursor = 0u;
+    noah_lighting_subject_t subject;
+    memcpy(params, part + 2u, part[0] & 0x1fu);
+    if (tracker->selector_parameter != 255u) params[tracker->selector_parameter] = 255u;
+    while (noah_lighting_fact_next(part[1], facts, params, &cursor, &subject)) {
+        uint8_t slot = tracker->slots == 1u ? 0u : subject.thing;
+        if (slot < tracker->slots) present[slot / 8u] |= 1u << (slot % 8u);
+    }
+    uint16_t *ages = clocks + tracker->clock_offset;
+    for (uint8_t slot = 0u; slot < tracker->slots; slot++) {
+        uint32_t index = tracker->clock_offset + slot;
+        uint8_t bit = 1u << (index % 8u);
+        if (present[slot / 8u] & (1u << (slot % 8u))) {
+            ages[slot] = clock_active[index / 8u] & bit ? advance_clock(ages[slot], elapsed) : 0u;
+            clock_active[index / 8u] |= bit;
+        } else {
+            ages[slot] = 0u;
+            clock_active[index / 8u] &= ~bit;
+        }
+    }
+    tracker->seen = true;
+}
+
+static void prepare_rule_clocks(const noah_lighting_scene_t *scene, uint32_t now) {
+    if (!timing_index_current) prepare_timing_index(scene->program);
+    uint32_t elapsed = clocks_current ? now - clock_last_time : 0u;
+    for (uint16_t i = 0u; i < tracker_count; i++) trackers[i].seen = false;
+    for (uint16_t i = 0u; i < scene->program->rule_count; i++) {
+        rule_t rule;
+        parse_rule(scene->program, i, &rule);
+        if (!rule.timing_count || (rule.flags & NOAH_PROFILE_LIGHTING_V1_RULE_DISABLED)) continue;
+        uint8_t filter = rule.condition_count && rule.conditions[0].slot == NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION ? 1u : 0u;
+        bool holds = true;
+        for (; filter < rule.condition_count; filter++) {
+            if (!fact_holds(scene->facts, &rule.conditions[filter])) { holds = false; break; }
+        }
+        uint8_t bit = 1u << (i % 8u);
+        if (holds) {
+            filter_clocks[i] = filter_active[i / 8u] & bit ? advance_clock(filter_clocks[i], elapsed) : 0u;
+            filter_active[i / 8u] |= bit;
+        } else {
+            filter_clocks[i] = 0u;
+            filter_active[i / 8u] &= ~bit;
+        }
+        if (rule_tracker[i] != UINT16_MAX) {
+            presence_tracker_t *tracker = trackers + rule_tracker[i];
+            if (!tracker->seen) refresh_presence(tracker, scene->facts, scene->program, elapsed);
+        }
+    }
+    clock_last_time = now;
+    clocks_current = true;
 }
 
 static uint8_t gate_amount(const rule_t *rule, uint8_t index, const noah_lighting_subject_t *subject, uint32_t now, bool update, noah_lighting_resolve_info_t *info) {
-    gate_t  *gate;
-    uint32_t since;
-    uint8_t  amount = UINT8_MAX;
-
-    if (rule->timing_count == 0u) return UINT8_MAX;
-    gate  = gate_for(index, subject->thing_kind, subject->thing, now, update);
-    since = gate ? gate->since : now;
-    if (gate) gate->seen = true;
+    (void)update;
+    if (!rule->timing_count) return UINT8_MAX;
+    uint16_t age = filter_clocks[index];
+    if (rule_tracker[index] != UINT16_MAX) {
+        const presence_tracker_t *tracker = trackers + rule_tracker[index];
+        uint8_t slot = tracker->slots == 1u ? 0u : subject->thing;
+        uint16_t presence = slot < tracker->slots ? clocks[tracker->clock_offset + slot] : 0u;
+        if (presence < age) age = presence;
+    }
+    uint8_t amount = UINT8_MAX;
     for (uint8_t timing = 0u; timing < rule->timing_count; timing++) {
         uint32_t next_change;
-        bool     animating;
-        uint8_t  value = noah_lighting_timing(rule->timings[timing].kind, rule->timings[timing].params, now - since, &next_change, &animating);
-
+        bool animating;
+        // Ages saturate at the largest accepted u16 delay, never before it.
+        uint32_t elapsed = age;
+        uint8_t value = noah_lighting_timing(rule->timings[timing].kind, rule->timings[timing].params, elapsed, &next_change, &animating);
         if (value < amount) amount = value;
         if (animating) info->live = true;
         if (next_change && (!info->wake_set || (int32_t)(now + next_change - info->wake) < 0)) {
-            info->wake     = now + next_change;
+            info->wake = now + next_change;
             info->wake_set = true;
         }
     }
@@ -281,9 +392,7 @@ void noah_lighting_resolve(const noah_lighting_scene_t *scene, noah_lighting_led
 
     *info = (noah_lighting_resolve_info_t){0};
     clear(frame, leds);
-    if (update) {
-        for (uint8_t index = 0u; index < GATE_MAX; index++) gates[index].seen = false;
-    }
+    if (update && rules) prepare_rule_clocks(scene, now);
     if (!rules) return;
     if (!noah_lighting_fade_active(scene, &fade) || fade.base > rules) {
         apply_rules(scene, 0u, rules, leds, now, update, frame, info);
@@ -334,11 +443,7 @@ void noah_lighting_resolve(const noah_lighting_scene_t *scene, noah_lighting_led
         }
         apply_rules(scene, 0u, scene_first, leds, now, update, frame, info);
     }
-    if (update) {
-        for (uint8_t index = 0u; index < GATE_MAX; index++) {
-            if (!gates[index].seen) gates[index].used = false;
-        }
-    }
+
 }
 
 #endif // RGB_MATRIX_ENABLE

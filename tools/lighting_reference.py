@@ -1151,6 +1151,33 @@ def render_vectors(limits):
     cases.append(render_case("timing-show-after", "timing:1", {"palette": PALETTE, "rules": [rule(part(C, 1, 1), part(T, 0), part(P, 2, RED), part(G, 1, 100, 0))]}, [
         {"layers": [1], "time": 1000}, {"layers": [1], "time": 1099}, {"layers": [1], "time": 1100}, {"layers": [], "time": 1200}, {"layers": [1], "time": 1300}, {"layers": [1], "time": 1450},
     ], limits))
+    # Accepted-domain capacity and lifetime boundaries. These are render
+    # vectors, so every implementation must retain their exact semantics.
+    for count in (32, 33, 255):
+        delayed = [rule(part(T, 0), part(P, 2, BLUE), part(G, 1, 100, 0))]
+        delayed += [rule(part(T, 0), part(P, 2, RED), part(G, 1, 100, 0)) for _ in range(count - 1)]
+        cases.append(render_case(f"show-after-{count}-rules", "timing:1", {"palette": PALETTE, "rules": delayed}, [{"time": 0}, {"time": 100}], limits))
+    held_rows = {str(key): {"id": key, "state": "hold"} for key in range(60)}
+    sixty = {"behaviour": {"keys": held_rows}}
+    many = [rule(part(C, 8, ANY, 4), part(T, 4), part(P, 2, BLUE), part(G, 1, 100, 0))]
+    many += [rule(part(C, 8, ANY, 4), part(T, 4), part(P, 2, RED), part(G, 1, 100, 0)) for _ in range(254)]
+    high_rows = {str(key): {"id": 68 + key, "state": "hold"} for key in range(60)}
+    cases.append(render_case("show-after-255-rules-60-subjects", "timing:1", {"palette": PALETTE, "rules": many}, [dict(sixty, time=0), dict(sixty, time=100), {"time": 200, "behaviour": {"keys": high_rows}}, {"time": 300, "behaviour": {"keys": high_rows}}], limits))
+    cases.append(render_case("show-after-subject-leaves-and-returns", "timing:1", {"palette": PALETTE, "rules": [rule(part(C, 8, ANY, 4), part(T, 4), part(P, 2, BLUE), part(G, 1, 100, 0))]}, [
+        {"time": 0, "behaviour": {"keys": {"0": {"id": 0, "state": "hold"}, "31": {"id": 1, "state": "hold"}}}},
+        {"time": 50, "behaviour": {"keys": {"31": {"id": 1, "state": "hold"}}}},
+        {"time": 100, "behaviour": {"keys": {"0": {"id": 0, "state": "hold"}, "31": {"id": 1, "state": "hold"}}}},
+        {"time": 200, "behaviour": {"keys": {"0": {"id": 0, "state": "hold"}, "31": {"id": 1, "state": "hold"}}}},
+    ], limits))
+    cases.append(render_case("show-after-filter-loss-and-other-rule", "timing:1", {"palette": PALETTE, "rules": [
+        rule(part(C, 1, 1), part(C, 16, 0), part(T, 0), part(P, 2, BLUE), part(G, 1, 100, 0)),
+        rule(part(C, 1, 1), part(T, 0), part(P, 2, RED), part(G, 1, 100, 0)),
+    ]}, [{"time": 0, "layers": [1], "hostLocks": 1}, {"time": 99, "layers": [1]}, {"time": 100, "layers": [1], "hostLocks": 1}, {"time": 199, "layers": [1], "hostLocks": 1}, {"time": 200, "layers": [1], "hostLocks": 1}], limits))
+    cases.append(render_case("show-after-normalized-specific-and-any", "timing:1", {"palette": PALETTE, "rules": [
+        rule(part(C, 8, 0, 4), part(T, 4), part(P, 2, BLUE), part(G, 1, 100, 0)),
+        rule(part(C, 8, ANY, 4), part(T, 4), part(P, 2, RED), part(G, 1, 100, 0)),
+    ]}, [{"time": 0, "behaviour": {"keys": {"0": {"id": 0, "state": "hold"}, "31": {"id": 1, "state": "hold"}}}}, {"time": 100, "behaviour": {"keys": {"0": {"id": 0, "state": "hold"}, "31": {"id": 1, "state": "hold"}}}}], limits))
+    cases.append(render_case("show-after-max-delay-and-large-jump", "timing:1", {"palette": PALETTE, "rules": [rule(part(C, 1, 1), part(T, 0), part(P, 2, BLUE), part(G, 1, 255, 255))]}, [{"time": 0, "layers": [1]}, {"time": 65534, "layers": [1]}, {"time": 65535, "layers": [1]}, {"time": 200000, "layers": [1]}, {"time": 300000}, {"time": 400000, "layers": [1]}, {"time": 465535, "layers": [1]}], limits))
     fade_layers = layer_table([[6, NONE], [0, GREEN], [0, NONE], [0, NONE], [0, WHITE]])
     fade_rules = [rule(part(T, 3, 0), part(P, 2, PURPLE)), every_layer]
     for mode in (0, 1, 2):

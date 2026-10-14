@@ -54,7 +54,7 @@ _Static_assert((unsigned)NOAH_PROFILE_LIGHTING_V1_RECORD_MAX <= (unsigned)NOAH_P
 static bool fact_layout(uint8_t id, uint32_t *layout) {
     (void)layout;
     switch (id) {
-#define NOAH_LIGHTING_FACT_LAYOUT(fid, name, thing, params) \
+#define NOAH_LIGHTING_FACT_LAYOUT(fid, name, thing, params, slots, selector, signatures) \
     case fid:                                              \
         *layout = params;                                  \
         return true;
@@ -329,7 +329,7 @@ static noah_profile_lighting_v1_validation_result_t step_header(validation_t *v,
 static noah_profile_lighting_v1_validation_result_t step_palette(validation_t *v, noah_profile_lighting_v1_error_t *error) {
     uint8_t bytes[COLOURS_PER_STEP * 3u];
     uint8_t count = v->remaining < COLOURS_PER_STEP ? v->remaining : COLOURS_PER_STEP;
-    uint8_t whole = (uint8_t)(available(v, v->offset) / 3u);
+    uint16_t whole = available(v, v->offset) / 3u;
 
     if (whole < count) count = whole;
     if (count && !read_at(v, v->offset, bytes, (size_t)count * 3u)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_READ_ERROR, v->offset);

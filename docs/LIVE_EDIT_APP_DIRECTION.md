@@ -1414,6 +1414,13 @@ Choices the plan left open, as decided:
   layer-activation provenance is omitted because QMK's aggregate active query
   does not distinguish sensor activation from manual retention. No new idle or
   motion-duration policy is introduced; see the governing spec for subjects.
+- **Accepted timing capacity is real capacity.** Shared first-condition
+  presence clocks and separate rule-filter clocks retain every accepted
+  rule/subject lifetime. Their sizes follow registry subject/signature bounds,
+  rather than a runtime pool that silently starves timed rules. Show-after
+  capacity and lifecycle use the same reference/vectors, including 255 rules
+  with sixty authored subjects and disappearing filters/subjects. No wire
+  change or new accepted-profile cap is introduced.
 - **Facts are one frame.** The USB half builds the synced facts (previewed
   layer, held combos, behaviour state) and sends them as one frame of 30-byte
   chunks published on the other half as one generation; the per-stage split

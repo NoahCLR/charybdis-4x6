@@ -240,7 +240,7 @@ uint32_t noah_lighting_keymap_generation(void);
 
 // ─── Module shapes, one prototype per registry row ──────────────────────────
 
-#define NOAH_LIGHTING_DECLARE_FACT(id, name, thing, layout) bool noah_lighting_fact_##name##_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject);
+#define NOAH_LIGHTING_DECLARE_FACT(id, name, thing, layout, slots, selector, signatures) bool noah_lighting_fact_##name##_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject);
 NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_DECLARE_FACT)
 #undef NOAH_LIGHTING_DECLARE_FACT
 
@@ -283,3 +283,7 @@ void                 noah_lighting_facts_build_synced(uint8_t *frame, bool refre
 void                 noah_lighting_facts_build_idle(uint8_t *frame);
 // Whether a gated slice in `frame` differs from `idle`.
 bool                 noah_lighting_facts_gated_active(const uint8_t *frame, const uint8_t *idle);
+
+// Capacity comes from each registry entry's subject domain, not runtime load.
+uint8_t noah_lighting_fact_subject_slots(uint8_t kind);
+uint8_t noah_lighting_fact_selector_parameter(uint8_t kind);

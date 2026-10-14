@@ -443,6 +443,17 @@ disappears.
 | ---: | --- | --- | --- |
 | 1 | show after | milliseconds `1..65535` | `0` until the subject has existed that long, then `255` |
 
+The C implementation retains every accepted timed rule and every subject
+thing, rather than allocating a fixed number of runtime gates. Registry rows
+bound the subject domain and the number of distinct non-selector parameter
+signatures. Equivalent first conditions share presence clocks, normalizing a
+specific thing selector to any; rule filters retain separate clocks. The
+continuous matching age is the smaller of subject presence and filter age.
+An absent subject or failed filter resets its matching lifetime, independently
+of other rules. Millisecond ages saturate at 65535, after every possible
+show-after delay has elapsed. The payload, rule count and registry domains
+bound storage; exhaustion never silently leaves an accepted rule hidden.
+
 Each half times from the frame in which it first sees the subject, so the
 halves may differ by the link's latency.
 
