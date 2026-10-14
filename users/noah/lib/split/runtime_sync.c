@@ -371,7 +371,11 @@ void split_runtime_sync_init(void) {
     memcpy(split_runtime_lighting_built, split_runtime_lighting_idle, NOAH_LIGHTING_SYNCED_BYTES);
     memset(split_runtime_lighting_sent, 0, sizeof(split_runtime_lighting_sent));
 #    endif
-    split_runtime_sync_remote               = (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
+    // Initialize in place: a frame-sized compound literal here can be inlined
+    // into main and reserve its stack space for every later handled-key path.
+    memset(&split_runtime_sync_remote, 0, sizeof(split_runtime_sync_remote));
+    split_runtime_sync_remote.active_mode_id = PD_MODE_ID_NONE;
+    split_runtime_sync_remote.locked_mode_id = PD_MODE_ID_NONE;
     split_runtime_base_last_sent            = (split_runtime_base_sync_packet_t){0};
     split_runtime_base_sent_once            = false;
     split_runtime_lighting_sent_once        = false;

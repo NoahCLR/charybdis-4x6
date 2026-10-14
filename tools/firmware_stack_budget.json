@@ -173,7 +173,7 @@
         },
         {
           "name": "RGB frame fact collection",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_capture_facts", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner"]
         },
         {
           "name": "RGB frame behaviour subjects",
@@ -190,6 +190,30 @@
         {
           "name": "RGB frame palette colour",
           "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_paint", "noah_lighting_palette_rgb", "hsv_to_rgb"]
+        },
+        {
+          "name": "matrix scan individual combo capture",
+          "functions": ["main", "matrix_scan", "split_runtime_sync_elapsed_internal", "noah_lighting_slice_combo_held_collect", "key_runtime_core_preview_owner_key_pos"]
+        },
+        {
+          "name": "matrix scan individual behaviour capture",
+          "functions": ["main", "matrix_scan", "split_runtime_sync_elapsed_internal", "key_feedback_lighting_map", "key_feedback_lighting_apply", "key_runtime_core_flashing_feedback_visible_at", "noah_setting"]
+        },
+        {
+          "name": "RGB frame individual behaviour capture",
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_capture_facts", "key_feedback_lighting_map", "key_feedback_lighting_apply", "key_runtime_core_flashing_feedback_visible_at", "noah_setting"]
+        },
+        {
+          "name": "RGB frame behaviour outcome capture",
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_capture_facts", "key_feedback_lighting_map", "key_feedback_lighting_hold_outcome", "noah_action_describe"]
+        },
+        {
+          "name": "RGB frame individual combo subjects",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
+        },
+        {
+          "name": "RGB frame outcome identity paint",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_paint", "noah_profile_lighting_v1_program_thing_field"]
         },
         {
           "name": "matrix scan macro text press",
@@ -245,7 +269,7 @@
         },
         {
           "name": "matrix scan live-profile boot discovery",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_profile_store_boot_select_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "matrix scan VIA metadata and snapshot RPC",
