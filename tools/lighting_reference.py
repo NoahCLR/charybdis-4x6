@@ -687,6 +687,8 @@ class Renderer:
         self.rgb = [hsv_to_rgb(*colour) for colour in domain["palette"]]
         self.gates: dict = {}
         self.seen: set = set()
+        self.observed_time = 0
+        self.clock_sample = None
 
     def record_field(self, subj, field: int):
         table = self.domain["things"].get(subj["kind"])
@@ -765,11 +767,11 @@ class Renderer:
                 amount = 255
                 for kind, params in item["timings"]:
                     key = (index, subj["kind"], subj["thing"])
-                    since = self.gates.setdefault(key, situation.time) if timed else self.gates.get(key, situation.time)
+                    since = self.gates.setdefault(key, self.observed_time) if timed else self.gates.get(key, self.observed_time)
                     if timed:
                         self.seen.add(key)
                     if kind == 1:
-                        amount = min(amount, 255 if situation.time - since >= (params[0] | params[1] << 8) else 0)
+                        amount = min(amount, 255 if self.observed_time - since >= (params[0] | params[1] << 8) else 0)
                 entries.append((index, item, subj, amount, self.target(item["target"][0], item["target"][1], subj, situation)))
         return entries
 
@@ -796,6 +798,14 @@ class Renderer:
         return bottom(led) if bottom else None
 
     def render(self, situation) -> list:
+        # Gate time is a per-half local observation clock. Defensively ignore
+        # backward samples; a 32-bit wrap advances by its modular delta.
+        now = situation.time & 0xffffffff
+        if self.clock_sample is None:
+            self.clock_sample = now
+        elif now >= self.clock_sample or self.clock_sample - now >= 0x7fffffff:
+            self.observed_time += (now - self.clock_sample) & 0xffffffff
+            self.clock_sample = now
         rules = self.domain["rules"]
         fade = self.domain["extensions"].get(1)
         fading = bool(fade and fade[0] & 1 and situation.fade and situation.fade["autoMouseLayer"] in situation.layers and situation.fade["progress"] != 0)
@@ -1211,6 +1221,10 @@ def render_vectors(limits):
                      dict(populated(True, True), time=300), dict(populated(True, True), time=400),
                      {"time": 500}, dict(populated(True), time=600), dict(populated(True), time=700)]
         cases.append(render_case(f"show-after-all-signatures-probe-{probe}", "timing:1", {"palette": PALETTE, "rules": full}, scenarios, limits))
+    cases.append(render_case("show-after-backward-time-regression", "timing:1", {"palette": PALETTE, "rules": [rule(part(C, 1, 1), part(T, 0), part(P, 2, BLUE), part(G, 1, 244, 1))]}, [{"time": t, "layers": [1]} for t in (1000, 1100, 1099, 1200, 1499, 1500)], limits))
+    cases.append(render_case("show-after-clock-wrap-and-backward-matured", "timing:1", {"palette": PALETTE, "rules": [rule(part(C, 1, 1), part(T, 0), part(P, 2, BLUE), part(G, 1, 100, 0))]}, [{"time": t, "layers": [1]} for t in (0xfffffff0, 0x20, 0x54, 0x53, 0x60, 200000)], limits))
+    cases.append(render_case("show-after-backward-filter-reappearance", "timing:1", {"palette": PALETTE, "rules": [rule(part(C, 1, 1), part(C, 16, 0), part(T, 0), part(P, 2, BLUE), part(G, 1, 255, 255))]}, [{"time": t, "layers": [1], "hostLocks": locks} for t, locks in ((1000, 1), (66534, 1), (66535, 1), (66534, 1), (66536, 0), (66537, 1), (132071, 1), (132072, 1))], limits))
+    cases.append(render_case("fade-top-layer-regression", "fact:9", {"palette": PALETTE, "things": [layer_table([[0, GREEN], [0, GREEN], [0, GREEN], [0, GREEN], [0, WHITE]])], "rules": [rule(part(C, 9, ANY, 0), part(T, 0), part(P, 3))], "extensions": [[1, [1, 0, 0, 1]]]}, [{"layers": [4]}, {"layers": [4], "fade": {"progress": 600, "timeout": 900, "deadTime": 300, "autoMouseLayer": 4}}], limits))
     fade_layers = layer_table([[6, NONE], [0, GREEN], [0, NONE], [0, NONE], [0, WHITE]])
     fade_rules = [rule(part(T, 3, 0), part(P, 2, PURPLE)), every_layer]
     for mode in (0, 1, 2):

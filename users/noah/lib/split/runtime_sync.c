@@ -27,7 +27,8 @@
 split_runtime_sync_remote_t             split_runtime_sync_remote    = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
 static split_runtime_base_sync_packet_t split_runtime_base_last_sent = {0};
 static bool                             split_runtime_base_sent_once = false;
-static bool                             split_runtime_sync_initialized = false;
+static volatile bool                    split_runtime_sync_initialized = false;
+static bool                             split_runtime_sync_master_role;
 static uint32_t                         split_runtime_base_last_send = 0;
 
 // The lighting facts frame. The master keeps what it last built (gated slices
@@ -39,10 +40,9 @@ static bool     split_runtime_lighting_resend_all = true;
 static uint32_t split_runtime_lighting_last_send  = 0;
 static bool     split_runtime_lighting_staging_open = false;
 #    if NOAH_LIGHTING_HAS_SYNCED_FACTS
-static uint8_t split_runtime_lighting_built[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
-static uint8_t split_runtime_lighting_sent[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
-static uint8_t split_runtime_lighting_idle[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
-static uint8_t split_runtime_lighting_staging[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
+#    define split_runtime_lighting_built (split_runtime_sync_remote.lighting_master.built)
+#    define split_runtime_lighting_sent (split_runtime_sync_remote.lighting_master.sent)
+#    define split_runtime_lighting_staging (split_runtime_sync_remote.lighting_staging)
 static uint8_t split_runtime_lighting_sequence         = 0;
 static uint8_t split_runtime_lighting_staging_sequence = 0;
 #    endif
@@ -239,7 +239,7 @@ static bool split_runtime_sync_broadcast_base(const split_runtime_base_sync_pack
 
 #    if NOAH_LIGHTING_HAS_SYNCED_FACTS
 static bool split_runtime_lighting_frame_active(const uint8_t *frame) {
-    return memcmp(frame, split_runtime_lighting_idle, NOAH_LIGHTING_SYNCED_BYTES) != 0;
+    return noah_lighting_facts_active(frame, false);
 }
 
 // Sends the chunks that changed, or every chunk on a heartbeat, the first
@@ -248,7 +248,7 @@ static bool split_runtime_lighting_frame_active(const uint8_t *frame) {
 static bool split_runtime_sync_broadcast_lighting(bool force, uint32_t now) {
     bool    active    = split_runtime_lighting_sent_once && split_runtime_lighting_frame_active(split_runtime_lighting_sent);
     bool    heartbeat = split_runtime_sync_heartbeat_due(split_runtime_lighting_sent_once, split_runtime_lighting_last_send, active, now);
-    bool    refresh   = force || heartbeat || split_runtime_sync_lighting_facts_is_dirty() || (split_runtime_lighting_sent_once && noah_lighting_facts_gated_active(split_runtime_lighting_sent, split_runtime_lighting_idle));
+    bool    refresh   = force || heartbeat || split_runtime_sync_lighting_facts_is_dirty() || (split_runtime_lighting_sent_once && noah_lighting_facts_active(split_runtime_lighting_sent, true));
     bool    send_all  = force || heartbeat || split_runtime_lighting_resend_all || !split_runtime_lighting_sent_once;
     uint8_t last      = SPLIT_RUNTIME_SYNC_FACTS_CHUNKS;
     bool    send[SPLIT_RUNTIME_SYNC_FACTS_CHUNKS];
@@ -286,6 +286,7 @@ static bool split_runtime_sync_broadcast_lighting(bool force, uint32_t now) {
 }
 
 static void split_runtime_sync_slave_lighting_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
+    if (!split_runtime_sync_initialized || split_runtime_sync_master_role || is_keyboard_master()) return;
     const split_runtime_lighting_facts_packet_t *packet = initiator2target_buffer;
     uint8_t                                      chunk;
     size_t                                       offset;
@@ -303,7 +304,8 @@ static void split_runtime_sync_slave_lighting_rpc(uint8_t initiator2target_buffe
     if (!split_runtime_lighting_staging_open || packet->sequence != split_runtime_lighting_staging_sequence) {
         // A pass carries only the chunks that changed; the rest are what this
         // half last committed, or the frame at rest before its first commit.
-        memcpy(split_runtime_lighting_staging, split_runtime_sync_remote.lighting_facts_received ? split_runtime_sync_remote.lighting_facts : split_runtime_lighting_idle, NOAH_LIGHTING_SYNCED_BYTES);
+        if (split_runtime_sync_remote.lighting_facts_received) memcpy(split_runtime_lighting_staging, split_runtime_sync_remote.lighting_facts, NOAH_LIGHTING_SYNCED_BYTES);
+        else noah_lighting_facts_build_idle(split_runtime_lighting_staging);
         split_runtime_lighting_staging_sequence = packet->sequence;
         split_runtime_lighting_staging_open     = true;
     }
@@ -323,6 +325,7 @@ static void split_runtime_sync_slave_lighting_rpc(uint8_t initiator2target_buffe
 #    endif
 
 static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
+    if (!split_runtime_sync_initialized || split_runtime_sync_master_role || is_keyboard_master()) return;
     const split_runtime_base_sync_packet_t *packet = initiator2target_buffer;
 
     (void)target2initiator_buffer_size;
@@ -363,26 +366,40 @@ static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_si
 void split_runtime_sync_init(void) {
     uint32_t now;
 
-    transaction_register_rpc(PUT_SPLIT_RUNTIME_BASE_SYNC, split_runtime_sync_slave_base_rpc);
+    // Main-context init/reinit closes the callback gate first. SlaveThread can
+    // preempt main but main cannot preempt an in-flight callback, so every
+    // callback either finished before this point or sees ready=false.
+    split_runtime_sync_initialized = false;
+    NOAH_RUNTIME_PUBLICATION_BARRIER();
+    split_runtime_sync_master_role = is_keyboard_master();
+    split_runtime_sync_remote = (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
 #    if NOAH_LIGHTING_HAS_SYNCED_FACTS
-    transaction_register_rpc(PUT_SPLIT_LIGHTING_FACTS_SYNC, split_runtime_sync_slave_lighting_rpc);
-    // The frame at rest, as each slice's module states it.
-    noah_lighting_facts_build_idle(split_runtime_lighting_idle);
-    memcpy(split_runtime_lighting_built, split_runtime_lighting_idle, NOAH_LIGHTING_SYNCED_BYTES);
-    memset(split_runtime_lighting_sent, 0, sizeof(split_runtime_lighting_sent));
+    if (split_runtime_sync_master_role) {
+        noah_lighting_facts_build_idle(split_runtime_lighting_built);
+        memset(split_runtime_lighting_sent, 0, sizeof(split_runtime_lighting_sent));
+    } else {
+        noah_lighting_facts_build_idle(split_runtime_sync_remote.lighting_facts);
+        noah_lighting_facts_build_idle(split_runtime_lighting_staging);
+    }
 #    endif
-    split_runtime_sync_remote               = (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
     split_runtime_base_last_sent            = (split_runtime_base_sync_packet_t){0};
     split_runtime_base_sent_once            = false;
     split_runtime_lighting_sent_once        = false;
     split_runtime_lighting_resend_all       = true;
     split_runtime_lighting_staging_open     = false;
     split_runtime_sync_transport            = (split_runtime_sync_transport_t){0};
-    split_runtime_sync_initialized          = true;
     split_runtime_sync_dirty_reset();
     now                                     = timer_read32();
     split_runtime_base_last_send            = now;
     split_runtime_lighting_last_send        = now;
+    // Publish ready only after both RPC registrations. A callback injected
+    // during registration cannot overwrite initialized sender storage.
+    transaction_register_rpc(PUT_SPLIT_RUNTIME_BASE_SYNC, split_runtime_sync_slave_base_rpc);
+#    if NOAH_LIGHTING_HAS_SYNCED_FACTS
+    transaction_register_rpc(PUT_SPLIT_LIGHTING_FACTS_SYNC, split_runtime_sync_slave_lighting_rpc);
+#    endif
+    NOAH_RUNTIME_PUBLICATION_BARRIER();
+    split_runtime_sync_initialized = true;
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_INIT, is_keyboard_master() ? 1u : 0u, 0u);
 
     if (is_keyboard_master()) {

@@ -135,6 +135,22 @@
       ],
       "paths": [
         {
+          "name": "RGB frame fact collection",
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_capture_facts", "noah_lighting_facts_collect_changed", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner"]
+        },
+        {
+          "name": "RGB frame individual behaviour capture",
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_capture_facts", "noah_lighting_facts_collect_changed", "key_feedback_lighting_map", "key_feedback_lighting_apply", "key_runtime_core_flashing_feedback_visible_at", "noah_setting"]
+        },
+        {
+          "name": "RGB frame behaviour outcome capture",
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_capture_facts", "noah_lighting_facts_collect_changed", "key_feedback_lighting_map", "key_feedback_lighting_hold_outcome", "noah_action_describe"]
+        },
+        {
+          "name": "RGB module idle comparison",
+          "functions": ["main", "matrix_scan", "split_runtime_sync_elapsed_internal", "noah_lighting_facts_active"]
+        },
+        {
           "name": "RGB timing selected-signature preparation",
           "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "prepare_timing_index"]
         },
@@ -148,7 +164,7 @@
         },
         {
           "name": "RGB timing filter refresh",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "fact_holds", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
         },
         {
           "name": "RGB timing shared-presence lookup",

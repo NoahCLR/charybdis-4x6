@@ -69,6 +69,19 @@ typedef struct {
 #define NOAH_LIGHTING_COMBO_RECORD_BYTES (2u + KEY_ORIGIN_BITMAP_SIZE)
 #define NOAH_LIGHTING_COMBO_SLICE_BYTES (COMBO_BUFFER_LENGTH * NOAH_LIGHTING_COMBO_RECORD_BYTES)
 
+// Shared producer/consumer layouts. These sizes follow the compiled matrix
+// and combo buffer; the default wire layout remains byte-identical.
+#define NOAH_LIGHTING_MATRIX_KEYS (MATRIX_ROWS * MATRIX_COLS)
+#define NOAH_LIGHTING_LAYER_LOCK_OFFSET NOAH_LIGHTING_MATRIX_KEYS
+#define NOAH_LIGHTING_LAYER_ONESHOT_OFFSET (NOAH_LIGHTING_LAYER_LOCK_OFFSET + 2u)
+#define NOAH_LIGHTING_LAYER_TOP_OFFSET (NOAH_LIGHTING_LAYER_ONESHOT_OFFSET + 1u)
+#define NOAH_LIGHTING_LAYER_STATUS_BYTES (NOAH_LIGHTING_LAYER_TOP_OFFSET + 1u)
+#define NOAH_LIGHTING_MODE_STATUS_BYTES (3u + KEY_ORIGIN_BITMAP_SIZE)
+#define NOAH_LIGHTING_BEHAVIOUR_PHASE_RECORD_BYTES KEY_FEEDBACK_LIGHTING_PHASE_RECORD_BYTES
+#define NOAH_LIGHTING_BEHAVIOUR_PHASE_BYTES KEY_FEEDBACK_LIGHTING_PHASE_BYTES
+_Static_assert(LAYER_COUNT <= 16u, "lighting layer masks contain sixteen layers");
+_Static_assert(NOAH_LIGHTING_MATRIX_KEYS <= 64u, "lighting subjects fit one per key");
+
 #define NOAH_LIGHTING_BEHAVIOUR_SLICE_BYTES (KEY_ORIGIN_BITMAP_SIZE + KEY_FEEDBACK_SEMANTIC_MAP_SIZE + KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE + KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE)
 
 #if NOAH_LIGHTING_FACT_LAYER_ACTIVE
@@ -109,22 +122,22 @@ typedef struct {
 #endif
 
 #if NOAH_LIGHTING_FACT_LAYER_STATUS
-#    define NOAH_LIGHTING_SLICE_LAYER_STATUS(X) X(layer_status, 64u, 1, 0)
+#    define NOAH_LIGHTING_SLICE_LAYER_STATUS(X) X(layer_status, NOAH_LIGHTING_LAYER_STATUS_BYTES, 1, 0)
 #else
 #    define NOAH_LIGHTING_SLICE_LAYER_STATUS(X)
 #endif
 #if NOAH_LIGHTING_FACT_MODE_STATUS
-#    define NOAH_LIGHTING_SLICE_MODE_STATUS(X) X(mode_status, 11u, 1, 0)
+#    define NOAH_LIGHTING_SLICE_MODE_STATUS(X) X(mode_status, NOAH_LIGHTING_MODE_STATUS_BYTES, 1, 0)
 #else
 #    define NOAH_LIGHTING_SLICE_MODE_STATUS(X)
 #endif
 #if NOAH_LIGHTING_FACT_COMBO_LAYER
-#    define NOAH_LIGHTING_SLICE_COMBO_LAYER(X) X(combo_layer, 40u, 1, 0)
+#    define NOAH_LIGHTING_SLICE_COMBO_LAYER(X) X(combo_layer, NOAH_LIGHTING_COMBO_SLICE_BYTES, 1, 0)
 #else
 #    define NOAH_LIGHTING_SLICE_COMBO_LAYER(X)
 #endif
 #if NOAH_LIGHTING_FACT_BEHAVIOUR_PHASE
-#    define NOAH_LIGHTING_SLICE_BEHAVIOUR_PHASE(X) X(behaviour_phase, 180u, 1, 0)
+#    define NOAH_LIGHTING_SLICE_BEHAVIOUR_PHASE(X) X(behaviour_phase, NOAH_LIGHTING_BEHAVIOUR_PHASE_BYTES, 1, 0)
 #else
 #    define NOAH_LIGHTING_SLICE_BEHAVIOUR_PHASE(X)
 #endif
@@ -134,7 +147,7 @@ typedef struct {
 #    define NOAH_LIGHTING_SLICE_MACRO_PLAYING(X)
 #endif
 #if NOAH_LIGHTING_FACT_KEY_PRESSED
-#    define NOAH_LIGHTING_SLICE_KEY_PRESSED(X) X(key_pressed, 8u, 1, 0)
+#    define NOAH_LIGHTING_SLICE_KEY_PRESSED(X) X(key_pressed, KEY_ORIGIN_BITMAP_SIZE, 1, 0)
 #else
 #    define NOAH_LIGHTING_SLICE_KEY_PRESSED(X)
 #endif
@@ -205,7 +218,8 @@ static inline void noah_lighting_subject_init(noah_lighting_subject_t *subject, 
 // What a target may consult: the program, the facts and the keymap.
 typedef struct {
     const noah_profile_lighting_v1_program_t *program;
-    const noah_lighting_facts_t              *facts;
+    noah_lighting_facts_t                    *facts; // main-context owned; fade overlay is restored before return
+    uint32_t                                  paint_time; // synced animation time, separate from local gate time
     uint32_t                                  keymap_generation;
 } noah_lighting_scene_t;
 
@@ -281,8 +295,11 @@ void                 noah_lighting_facts_unpack_synced(noah_lighting_facts_t *fa
 void                 noah_lighting_facts_build_synced(uint8_t *frame, bool refresh_gated);
 // The synced frame at rest.
 void                 noah_lighting_facts_build_idle(uint8_t *frame);
-// Whether a gated slice in `frame` differs from `idle`.
-bool                 noah_lighting_facts_gated_active(const uint8_t *frame, const uint8_t *idle);
+void                 noah_lighting_facts_init_synced(noah_lighting_facts_t *facts);
+bool                 noah_lighting_facts_collect_changed(noah_lighting_facts_t *facts, bool local, bool synced);
+bool                 noah_lighting_facts_unpack_synced_changed(noah_lighting_facts_t *facts, const uint8_t *frame);
+bool                 noah_lighting_facts_active(const uint8_t *frame, bool gated_only);
+// Module-specific idle comparison; scratch never exceeds one slice.
 
 // Capacity comes from each registry entry's subject domain, not runtime load.
 uint8_t noah_lighting_fact_subject_slots(uint8_t kind);

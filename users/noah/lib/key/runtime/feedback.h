@@ -299,4 +299,6 @@ uint8_t key_feedback_lighting_hold_outcome(hold_behavior_t hold);
 void    key_feedback_lighting_map(uint8_t *out);
 void    key_feedback_lighting_pulse_metadata(keypos_t key, key_feedback_pulse_kind_t kind, uint8_t *identity, uint8_t *outcome);
 
+#define KEY_FEEDBACK_LIGHTING_PHASE_RECORD_BYTES 3u
+#define KEY_FEEDBACK_LIGHTING_PHASE_BYTES (MATRIX_ROWS * MATRIX_COLS * KEY_FEEDBACK_LIGHTING_PHASE_RECORD_BYTES)
 void key_feedback_lighting_phases(uint8_t *out);

@@ -105,6 +105,67 @@ uint8_t noah_lighting_timing(uint8_t kind, const uint8_t *params, uint32_t elaps
 
 // ─── The fact frame ─────────────────────────────────────────────────────────
 
+// At most one module slice is staged. No full-frame duplicate or large
+// stack copy is needed to compare collection or module-specific idle values.
+typedef union {
+    uint8_t none;
+#    define NOAH_LIGHTING_SCRATCH(name, bytes, synced, gated) uint8_t name[bytes];
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SCRATCH)
+#    undef NOAH_LIGHTING_SCRATCH
+} slice_scratch_t;
+
+bool __attribute__((noinline)) noah_lighting_facts_collect_changed(noah_lighting_facts_t *facts, bool local, bool synced) {
+    slice_scratch_t scratch;
+    bool changed = false;
+    (void)scratch; (void)facts; (void)local; (void)synced;
+#    define NOAH_LIGHTING_COLLECT_CHANGED(name, bytes, is_synced, gated) \
+    if ((is_synced) ? synced : local) { \
+        noah_lighting_slice_##name##_collect(scratch.name); \
+        if (memcmp(facts->name, scratch.name, bytes)) { memcpy(facts->name, scratch.name, bytes); changed = true; } \
+    }
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_COLLECT_CHANGED)
+#    undef NOAH_LIGHTING_COLLECT_CHANGED
+    return changed;
+}
+
+void noah_lighting_facts_init_synced(noah_lighting_facts_t *facts) {
+    (void)facts;
+#    define NOAH_LIGHTING_INIT_SYNCED(name, bytes, is_synced, gated) if (is_synced) noah_lighting_slice_##name##_idle(facts->name);
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_INIT_SYNCED)
+#    undef NOAH_LIGHTING_INIT_SYNCED
+}
+
+bool noah_lighting_facts_unpack_synced_changed(noah_lighting_facts_t *facts, const uint8_t *frame) {
+    size_t offset = 0u;
+    bool changed = false;
+    (void)facts; (void)frame; (void)offset;
+#    define NOAH_LIGHTING_UNPACK_CHANGED(name, bytes, is_synced, gated) \
+    if (is_synced) { \
+        if (memcmp(facts->name, frame + offset, bytes)) { memcpy(facts->name, frame + offset, bytes); changed = true; } \
+        offset += bytes; \
+    }
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_UNPACK_CHANGED)
+#    undef NOAH_LIGHTING_UNPACK_CHANGED
+    return changed;
+}
+
+bool __attribute__((noinline)) noah_lighting_facts_active(const uint8_t *frame, bool gated_only) {
+    slice_scratch_t scratch;
+    size_t offset = 0u;
+    (void)scratch; (void)offset; (void)frame; (void)gated_only;
+#    define NOAH_LIGHTING_CHECK_IDLE(name, bytes, is_synced, gated) \
+    if (is_synced) { \
+        if (!gated_only || (gated)) { \
+            noah_lighting_slice_##name##_idle(scratch.name); \
+            if (memcmp(frame + offset, scratch.name, bytes)) return true; \
+        } \
+        offset += bytes; \
+    }
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_CHECK_IDLE)
+#    undef NOAH_LIGHTING_CHECK_IDLE
+    return false;
+}
+
 void noah_lighting_facts_collect(noah_lighting_facts_t *facts, bool local, bool synced) {
     (void)facts;
     (void)local;
@@ -168,22 +229,6 @@ void noah_lighting_facts_build_idle(uint8_t *frame) {
         }
     NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SLICE_IDLE)
 #    undef NOAH_LIGHTING_SLICE_IDLE
-}
-
-bool noah_lighting_facts_gated_active(const uint8_t *frame, const uint8_t *idle) {
-    size_t offset = 0u;
-    bool   active = false;
-    (void)frame;
-    (void)idle;
-    (void)offset;
-#    define NOAH_LIGHTING_SLICE_ACTIVE(name, bytes, is_synced, gated)                          \
-        if (is_synced) {                                                                       \
-            if ((gated) && memcmp(&frame[offset], &idle[offset], (bytes)) != 0) active = true; \
-            offset += (bytes);                                                                 \
-        }
-    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SLICE_ACTIVE)
-#    undef NOAH_LIGHTING_SLICE_ACTIVE
-    return active;
 }
 
 #endif // RGB_MATRIX_ENABLE

@@ -11,7 +11,7 @@ void noah_lighting_slice_mode_status_collect(uint8_t *slice) {
     slice[1] = snapshot.local.locked_index;
     slice[2] = keys ? snapshot.local.owner_sides : 0u;
 }
-void noah_lighting_slice_mode_status_idle(uint8_t *slice) { memset(slice, 0, 11u); slice[0] = slice[1] = 255u; }
+void noah_lighting_slice_mode_status_idle(uint8_t *slice) { memset(slice, 0, NOAH_LIGHTING_MODE_STATUS_BYTES); slice[0] = slice[1] = 255u; }
 bool noah_lighting_fact_mode_status_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject) {
     const uint8_t *slice = facts->mode_status;
     uint8_t mode = params[1] == 1u ? slice[1] : slice[0];

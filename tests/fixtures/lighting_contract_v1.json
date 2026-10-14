@@ -83,7 +83,7 @@
       {"id": 8, "name": "outcome", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "For a fact-8 hold or long-hold, the identity of its resolved supported layer or single pointing-mode outcome. Other subjects, tap/branch slots, ordinary key/modifier/macro/unsupported outcomes, absent tables or none identity say clear; palette black stays opaque. Map value 0x88."}
     ],
     "timings": [
-      {"id": 1, "name": "show after", "parameters": [{"name": "delay", "type": "milliseconds"}], "changesWithTime": false, "meaning": "Amount 0 until the subject has existed for the delay, then 255."}
+      {"id": 1, "name": "show after", "parameters": [{"name": "delay", "type": "milliseconds"}], "changesWithTime": false, "meaning": "Amount 0 until the subject has existed for the delay, then 255. Gate observation and wake times use each half's local clock, separately from synced paint time; backward samples do not advance or rewind gates and a forward 32-bit timer wrap advances normally."}
     ],
     "ruleExtensions": [],
     "domainExtensions": [

@@ -72,7 +72,18 @@ typedef struct {
     uint8_t pd_mode_owner_sides;
     uint8_t pd_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
-    uint8_t lighting_facts[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
+    // Fixed boot roles share storage. Only the initialized arm may be used;
+    // the callback ready/role guard protects reinitialization as well.
+    union {
+        struct {
+            uint8_t lighting_facts[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
+            uint8_t lighting_staging[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
+        };
+        struct {
+            uint8_t built[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
+            uint8_t sent[SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES];
+        } lighting_master;
+    };
     // One publication generation per logical domain. The split worker keeps a
     // generation odd while that domain's fields are in flight.
     noah_runtime_publication_generation_t base_generation;
@@ -199,28 +210,45 @@ static inline void split_runtime_sync_notify_key_feedback_dirty(void) {}
 // unchanged, so a helper that returns false has written nothing at all and the
 // caller keeps the copy it already holds.
 
+// Internal staging copier: destination is scratch, and may change on failure.
+// Public readers below commit only after this validates a complete generation.
+static inline bool split_runtime_sync_remote_stage_lighting(uint8_t *staged) {
+#if NOAH_LIGHTING_HAS_SYNCED_FACTS
+    for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
+        if (!split_runtime_sync_remote.lighting_facts_received) return false;
+        uint8_t generation = noah_runtime_publication_observe(&split_runtime_sync_remote.lighting_facts_generation);
+        if (noah_runtime_publication_in_flight(generation)) continue;
+        memcpy(staged, split_runtime_sync_remote.lighting_facts, NOAH_LIGHTING_SYNCED_BYTES);
+        if (noah_runtime_publication_settled(&split_runtime_sync_remote.lighting_facts_generation, generation)) return true;
+    }
+#else
+    (void)staged;
+#endif
+    return false;
+}
+
 static inline bool split_runtime_sync_remote_read_lighting_facts(uint8_t *out_frame) {
 #if NOAH_LIGHTING_HAS_SYNCED_FACTS
     uint8_t staged[NOAH_LIGHTING_SYNCED_BYTES];
-
-    for (uint8_t attempt = 0; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
-        uint8_t generation;
-
-        if (!split_runtime_sync_remote.lighting_facts_received) return false;
-        generation = noah_runtime_publication_observe(&split_runtime_sync_remote.lighting_facts_generation);
-        if (noah_runtime_publication_in_flight(generation)) {
-            continue;
-        }
-
-        memcpy(staged, split_runtime_sync_remote.lighting_facts, NOAH_LIGHTING_SYNCED_BYTES);
-
-        if (noah_runtime_publication_settled(&split_runtime_sync_remote.lighting_facts_generation, generation)) {
-            memcpy(out_frame, staged, NOAH_LIGHTING_SYNCED_BYTES);
-            return true;
-        }
+    if (split_runtime_sync_remote_stage_lighting(staged)) {
+        memcpy(out_frame, staged, sizeof(staged));
+        return true;
     }
 #else
     (void)out_frame;
+#endif
+    return false;
+}
+
+// Rendering commits the validated staging directly into its owned slices.
+// There is still one full coherent-read staging buffer, never an unstaged
+// copy into resolved facts; no second full-frame output buffer is needed.
+static inline bool split_runtime_sync_remote_collect_lighting(noah_lighting_facts_t *facts) {
+#if NOAH_LIGHTING_HAS_SYNCED_FACTS
+    uint8_t staged[NOAH_LIGHTING_SYNCED_BYTES];
+    if (split_runtime_sync_remote_stage_lighting(staged)) return noah_lighting_facts_unpack_synced_changed(facts, staged);
+#else
+    (void)facts;
 #endif
     return false;
 }

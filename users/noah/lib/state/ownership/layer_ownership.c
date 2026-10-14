@@ -339,7 +339,7 @@ void layer_ownership_lighting_projection(uint8_t *out) {
     for (uint16_t i = 0u; i < ARRAY_SIZE(state->bindings); i++) {
         if (state->bindings[i].active && key_origin_keypos_valid(state->bindings[i].key_pos)) out[key_origin_keypos_index(state->bindings[i].key_pos)] = state->bindings[i].layer + 1u;
     }
-    out[MATRIX_ROWS * MATRIX_COLS] = state->locked_mask;
-    out[MATRIX_ROWS * MATRIX_COLS + 1u] = state->locked_mask >> 8u;
-    out[MATRIX_ROWS * MATRIX_COLS + 2u] = layer_ownership_oneshot_layer();
+    out[LAYER_OWNERSHIP_LIGHTING_LOCK_OFFSET] = state->locked_mask;
+    out[LAYER_OWNERSHIP_LIGHTING_LOCK_OFFSET + 1u] = state->locked_mask >> 8u;
+    out[LAYER_OWNERSHIP_LIGHTING_ONESHOT_OFFSET] = layer_ownership_oneshot_layer();
 }

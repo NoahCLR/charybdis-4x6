@@ -30,7 +30,6 @@
 #        include "ws2812.h" // QMK driver buffer access
 #    endif
 
-static noah_lighting_facts_t        rgb_runtime_facts;
 static noah_lighting_facts_t        rgb_runtime_resolved_facts;
 static noah_lighting_frame_t        rgb_runtime_frame;
 static noah_lighting_resolve_info_t rgb_runtime_info;
@@ -102,18 +101,15 @@ static noah_lighting_leds_t rgb_runtime_local_leds(void) {
 // Each half collects the facts both halves share; the USB half also collects
 // the synced ones, which the other half reads from the link. A read that finds
 // the link mid-publication keeps the last coherent frame.
-static void rgb_runtime_capture_facts(void) {
+static bool rgb_runtime_capture_facts(void) {
     if (is_keyboard_master()) {
-        noah_lighting_facts_collect(&rgb_runtime_facts, true, true);
-        return;
+        return noah_lighting_facts_collect_changed(&rgb_runtime_resolved_facts, true, true);
     }
-    noah_lighting_facts_collect(&rgb_runtime_facts, true, false);
+    bool changed = noah_lighting_facts_collect_changed(&rgb_runtime_resolved_facts, true, false);
 #    if NOAH_LIGHTING_HAS_SYNCED_FACTS
-    {
-        uint8_t synced[NOAH_LIGHTING_SYNCED_BYTES];
-        if (split_runtime_sync_remote_read_lighting_facts(synced)) noah_lighting_facts_unpack_synced(&rgb_runtime_facts, synced);
-    }
+    changed |= split_runtime_sync_remote_collect_lighting(&rgb_runtime_resolved_facts);
 #    endif
+    return changed;
 }
 
 static void rgb_runtime_begin_frame(void) {
@@ -121,18 +117,18 @@ static void rgb_runtime_begin_frame(void) {
     uint32_t             generation;
     bool                 wake_due;
 
-    rgb_runtime_capture_facts();
+    bool facts_changed = rgb_runtime_capture_facts();
     rgb_runtime_scene.program = noah_effective_lighting_program(&generation);
-    rgb_runtime_now           = sync_timer_read32();
+    rgb_runtime_now           = timer_read32();
+    rgb_runtime_scene.paint_time = sync_timer_read32();
     if (generation != rgb_runtime_program_generation) {
         rgb_runtime_program_generation = generation;
         rgb_runtime_resolved           = false;
         noah_lighting_engine_program_changed();
     }
     wake_due = rgb_runtime_info.wake_set && (int32_t)(rgb_runtime_now - rgb_runtime_info.wake) >= 0;
-    if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_leds == leds && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation && memcmp(&rgb_runtime_facts, &rgb_runtime_resolved_facts, sizeof(rgb_runtime_facts)) == 0) return;
+    if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_leds == leds && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation && !facts_changed) return;
 
-    rgb_runtime_resolved_facts             = rgb_runtime_facts;
     rgb_runtime_resolved_keymap_generation = rgb_runtime_keymap_generation;
     rgb_runtime_scene.facts                = &rgb_runtime_resolved_facts;
     rgb_runtime_scene.keymap_generation    = rgb_runtime_keymap_generation;
@@ -256,14 +252,8 @@ void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
     noah_rgb_validate_config();
     // Until the other half hears its first frame, the synced facts are at rest.
-    noah_lighting_facts_collect(&rgb_runtime_facts, true, false);
-#    if NOAH_LIGHTING_HAS_SYNCED_FACTS
-    {
-        uint8_t idle[NOAH_LIGHTING_SYNCED_BYTES];
-        noah_lighting_facts_build_idle(idle);
-        noah_lighting_facts_unpack_synced(&rgb_runtime_facts, idle);
-    }
-#    endif
+    noah_lighting_facts_collect(&rgb_runtime_resolved_facts, true, false);
+    noah_lighting_facts_init_synced(&rgb_runtime_resolved_facts);
     rgb_runtime_resolved  = false;
     rgb_runtime_frame_due = false;
     rgb_runtime_keymap_generation++;

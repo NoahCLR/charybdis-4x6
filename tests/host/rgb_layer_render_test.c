@@ -403,7 +403,17 @@ static uint8_t automouse_blend_amount_from_elapsed(uint16_t elapsed) {
     return automouse_rgb_blend_amount(progress);
 }
 
+#ifdef RGB_RUNTIME_CLOCK_TEST_BACKEND
+static int32_t test_sync_offset;
+uint32_t sync_timer_read32(void) { return timer_read32() + (uint32_t)test_sync_offset; }
+#endif
+
+static bool test_remote_publication_busy;
 static void test_reset(void) {
+    test_remote_publication_busy = false;
+#ifdef RGB_RUNTIME_CLOCK_TEST_BACKEND
+    test_sync_offset = 0;
+#endif
     host_runtime_fixture_reset(&runtime_fixture);
     noah_runtime_diag_reset_for_test();
     memset(test_keymap, 0, sizeof(test_keymap));
@@ -614,7 +624,7 @@ static bool test_render_range(uint8_t led_min, uint8_t led_max) {
         test_collect_remote = true;
         noah_lighting_facts_build_synced(split_runtime_sync_remote.lighting_facts, true);
         test_collect_remote                                 = false;
-        split_runtime_sync_remote.lighting_facts_generation = test_remote.combo_generation;
+        split_runtime_sync_remote.lighting_facts_generation = test_remote.combo_generation | (test_remote_publication_busy ? 1u : 0u);
         split_runtime_sync_remote.lighting_facts_received   = true;
         fake_semantic_build_count                           = counts[0];
         fake_tap_branch_build_count                         = counts[1];
@@ -1682,6 +1692,83 @@ static void test_runtime_boot_indicator_overrides_scene(void) {
 // A published profile's lighting replaces the compiled program on the next
 // frame, resolves once, and a profile without lighting brings the compiled
 // program back.
+#ifdef RGB_RUNTIME_CLOCK_TEST_BACKEND
+static void test_local_gate_clock_survives_sync_adjustment(void) {
+    // One positive layer subject, whole-board blue, show-after500.
+    static const uint8_t lighting[] = {
+        5,0,58,1,0,0,0,1, 170,255,200,
+        14,0,255, 1,1,1, 0x40,0, 0x61,2,0, 0xa2,1,244,1, 0
+    };
+    noah_effective_rgb_runtime_t runtime;
+    noah_effective_profile_snapshot_t snapshot = {0};
+    noah_profile_lighting_v1_limits_t limits = noah_profile_rgb_compiled_v1_limits();
+    for (unsigned role=0;role<2;role++) {
+        test_reset();
+        fake_is_master = (bool)role;
+        runtime_fixture.time32 = 1000;
+        layer_state = 1u << 1;
+        noah_effective_rgb_runtime_init(&runtime);
+        CHECK(noah_effective_rgb_runtime_install(&runtime));
+        CHECK(noah_profile_lighting_v1_decode(lighting, sizeof(lighting), &limits, &snapshot.profile.rgb, NULL) == NOAH_PROFILE_LIGHTING_V1_OK);
+        snapshot.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+        snapshot.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE;
+        noah_effective_rgb_runtime_invalidate(&runtime, 1, (noah_effective_profile_identity_t){0}, snapshot.identity, &snapshot);
+        CHECK(!render_output());
+        uint16_t resolves = rgb_runtime_test_resolve_count();
+        runtime_fixture.time32 = 1100;
+        test_sync_offset = -200; // actual sync clock steps backward, local continues
+        CHECK(!render_output());
+        CHECK(rgb_runtime_test_resolve_count() == resolves);
+        runtime_fixture.time32 = 1499;
+        test_sync_offset = 50000; // forward sync jump cannot mature local gates
+        CHECK(!render_output());
+        runtime_fixture.time32 = 1500;
+        CHECK(render_output());
+        CHECK(rgb_runtime_test_resolve_count() == resolves + 1u);
+        check_led(0, rgb_from_hsv((hsv_t){.h=170,.s=255,.v=200}));
+        runtime_fixture.time32 = 1501;
+        test_sync_offset = -1000;
+        CHECK(render_output());
+        CHECK(rgb_runtime_test_resolve_count() == resolves + 1u);
+        layer_state = 0;
+        CHECK(!render_output());
+        layer_state = 1u << 1;
+        runtime_fixture.time32 = 2000;
+        CHECK(!render_output());
+        runtime_fixture.time32 = 2499;
+        CHECK(!render_output());
+        runtime_fixture.time32 = 2500;
+        CHECK(render_output());
+        // A new program generation observes a local clock spanning u32 wrap.
+        runtime_fixture.time32 = 0xffffff00u;
+        noah_effective_rgb_runtime_invalidate(&runtime, 2, snapshot.identity, snapshot.identity, &snapshot);
+        CHECK(!render_output());
+        runtime_fixture.time32 = 243u;
+        CHECK(!render_output());
+        runtime_fixture.time32 = 244u;
+        CHECK(render_output());
+        // Maximum accepted delay uses the same local wake domain on both halves.
+        uint8_t maximum[sizeof(lighting)];
+        memcpy(maximum,lighting,sizeof(maximum));
+        maximum[sizeof(maximum)-3u]=255u;
+        maximum[sizeof(maximum)-2u]=255u;
+        CHECK(noah_profile_lighting_v1_decode(maximum,sizeof(maximum),&limits,&snapshot.profile.rgb,NULL) == NOAH_PROFILE_LIGHTING_V1_OK);
+        runtime_fixture.time32 = 100000u;
+        noah_effective_rgb_runtime_invalidate(&runtime, 3, snapshot.identity, snapshot.identity, &snapshot);
+        CHECK(!render_output());
+        runtime_fixture.time32 = 165534u;
+        test_sync_offset = 500000;
+        CHECK(!render_output());
+        runtime_fixture.time32 = 165535u;
+        CHECK(render_output());
+        // Publication owns the shared program; uninstall only removes its provider.
+        snapshot.profile.domain_mask = 0;
+        noah_effective_rgb_runtime_invalidate(&runtime, 2, snapshot.identity, snapshot.identity, &snapshot);
+        noah_effective_rgb_runtime_uninstall(&runtime);
+    }
+}
+#endif
+
 static void test_published_profile_lighting_replaces_compiled_program(void) {
     // One rule: the whole board in palette colour 0.
     static const uint8_t profile_lighting[] = {
@@ -2458,6 +2545,26 @@ static void test_workload_remote_snapshot_is_frame_coherent(void) {
     check_led(RGB_MATRIX_LED_COUNT - 9u, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
+static void test_workload_failed_remote_read_keeps_resolved_facts(void) {
+    test_workload_setup_scene(false, false);
+    key_feedback_semantic_map_clear(test_remote.key_feedback_semantic_map);
+    key_feedback_broad_owner_map_clear(test_remote.key_feedback_broad_owner_map);
+    struct rgb_matrix_limits_t first = rgb_matrix_get_limits(0u);
+    struct rgb_matrix_limits_t local = rgb_matrix_get_limits(4u);
+    (void)noah_rgb_matrix_indicators_advanced_user(first.led_min_index, first.led_max_index);
+    CHECK(noah_rgb_matrix_indicators_advanced_user(local.led_min_index, local.led_max_index));
+    check_led(RGB_MATRIX_LED_COUNT-9u, rgb_from_combo_feedback());
+    key_origin_bitmap_clear(test_remote.combo_overlay_bitmap);
+    test_remote_publication_busy = true;
+    (void)noah_rgb_matrix_indicators_advanced_user(first.led_min_index, first.led_max_index);
+    CHECK(noah_rgb_matrix_indicators_advanced_user(local.led_min_index, local.led_max_index));
+    check_led(RGB_MATRIX_LED_COUNT-9u, rgb_from_combo_feedback());
+    test_remote_publication_busy = false;
+    (void)noah_rgb_matrix_indicators_advanced_user(first.led_min_index, first.led_max_index);
+    CHECK(noah_rgb_matrix_indicators_advanced_user(local.led_min_index, local.led_max_index));
+    check_led(RGB_MATRIX_LED_COUNT-9u, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
 static void test_workload_render_contract(void) {
     test_workload_full_and_five_chunk_parity(true);
     test_workload_full_and_five_chunk_parity(false);
@@ -2465,6 +2572,7 @@ static void test_workload_render_contract(void) {
     test_workload_idle_frame_has_one_bounded_source_probe();
     test_workload_local_snapshot_is_frame_coherent();
     test_workload_remote_snapshot_is_frame_coherent();
+    test_workload_failed_remote_read_keeps_resolved_facts();
 }
 #endif
 
@@ -2567,6 +2675,9 @@ int main(int argc, char **argv) {
     test_render_order_base_then_preview_then_pd_mode_then_feedback();
 #endif
     test_runtime_boot_indicator_overrides_scene();
+#ifdef RGB_RUNTIME_CLOCK_TEST_BACKEND
+    test_local_gate_clock_survives_sync_adjustment();
+#endif
     test_published_profile_lighting_replaces_compiled_program();
 #if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();

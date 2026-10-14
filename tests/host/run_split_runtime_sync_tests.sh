@@ -48,10 +48,12 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     $LIGHTING_FLAGS \
     "$ROOT/tests/host/split_runtime_sync_test.c" \
+    "$ROOT/tests/host/split_runtime_sync_peer.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/split/runtime_sync_dirty.c" \
     "$ROOT/users/noah/lib/split/runtime_sync.c" \
     $LIGHTING_SOURCES \
+    -fsanitize=address,undefined -fno-omit-frame-pointer \
     -o "$BIN"
 
 "$BIN"
@@ -72,6 +74,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/tests/host/include" \
     $LIGHTING_FLAGS \
     "$ROOT/tests/host/split_runtime_sync_test.c" \
+    "$ROOT/tests/host/split_runtime_sync_peer.c" \
     "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/split/runtime_sync_dirty.c" \
     "$ROOT/users/noah/lib/split/runtime_sync.c" \

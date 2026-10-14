@@ -11,6 +11,10 @@
 #include "users/noah/lib/split/runtime_sync.h"
 #include "users/noah/lib/rgb/lighting/lighting.h"
 
+void test_split_peer_reset(void);
+void test_split_peer_deliver(const split_runtime_lighting_facts_packet_t *packet);
+bool test_split_peer_read(uint8_t *frame);
+
 static host_runtime_fixture_t runtime_fixture = HOST_RUNTIME_FIXTURE_INIT;
 
 #define fake_time32 runtime_fixture.time32
@@ -46,6 +50,7 @@ static uint16_t          auto_mouse_elapsed_read_count;
 static uint16_t          auto_mouse_elapsed_at_read_count;
 static uint16_t          auto_mouse_elapsed_at_last_now;
 
+static bool rpc_inject_during_registration;
 static uint8_t                                      rpc_register_count;
 static int8_t                                       rpc_registered_ids[4];
 static slave_callback_t                             rpc_registered_callbacks[4];
@@ -101,8 +106,14 @@ static void test_fail(const char *expr, const char *file, int line) {
         }                                         \
     } while (0)
 
+static bool test_read_lighting(uint8_t *out) {
+    return fake_is_master ? test_split_peer_read(out) : split_runtime_sync_remote_read_lighting_facts(out);
+}
+
 static void test_reset_stubs(void) {
     host_runtime_fixture_reset(&runtime_fixture);
+    test_split_peer_reset();
+    rpc_inject_during_registration = false;
     fake_auto_mouse_elapsed = 83u;
     fake_auto_mouse_active  = true;
     fake_auto_mouse_enabled = true;
@@ -355,6 +366,14 @@ void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback) 
     rpc_registered_ids[rpc_register_count]       = transaction_id;
     rpc_registered_callbacks[rpc_register_count] = callback;
     rpc_register_count++;
+    if (rpc_inject_during_registration) {
+        split_runtime_sync_remote_t before = split_runtime_sync_remote;
+        split_runtime_lighting_facts_packet_t lighting = {.sequence=77u,.chunk=SPLIT_RUNTIME_SYNC_FACTS_COMMIT};
+        split_runtime_base_sync_packet_t base = {.active_mode_id=0u};
+        callback(transaction_id == PUT_SPLIT_LIGHTING_FACTS_SYNC ? sizeof(lighting) : sizeof(base),
+                 transaction_id == PUT_SPLIT_LIGHTING_FACTS_SYNC ? (const void *)&lighting : (const void *)&base,0u,NULL);
+        CHECK(memcmp(&before,&split_runtime_sync_remote,sizeof(before)) == 0);
+    }
 }
 
 bool transaction_rpc_send(int8_t transaction_id, uint8_t initiator2target_buffer_size, const void *initiator2target_buffer) {
@@ -468,7 +487,8 @@ static bool test_last_chunk_commits(void) {
 
 // Replays the chunks the master sent into the other half's RPC handler.
 static void test_deliver_lighting_chunks(slave_callback_t callback) {
-    for (uint8_t i = 0u; i < rpc_send_count_lighting; i++) callback(sizeof(rpc_lighting_chunks[i]), &rpc_lighting_chunks[i], 0u, NULL);
+    (void)callback;
+    for (uint8_t i = 0u; i < rpc_send_count_lighting; i++) test_split_peer_deliver(&rpc_lighting_chunks[i]);
 }
 
 // Which chunks hold bytes that differ between two frames.
@@ -546,7 +566,7 @@ static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
     CHECK(memcmp(&rpc_lighting_frame[FRAME_OWNERS], fake_key_feedback_broad_owner_map, KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE) == 0);
     CHECK(memcmp(&rpc_lighting_frame[FRAME_VISIBLE], fake_key_feedback_flash_visibility_bitmap, KEY_ORIGIN_BITMAP_SIZE) == 0);
     // The USB half never reads its own link.
-    CHECK(!split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(!test_read_lighting(read));
 }
 
 static void test_init_registers_rpcs_without_sending_on_slave(void) {
@@ -561,7 +581,7 @@ static void test_init_registers_rpcs_without_sending_on_slave(void) {
     CHECK(test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC) != NULL);
     CHECK(test_registered_callback(PUT_SPLIT_LIGHTING_FACTS_SYNC) != NULL);
     CHECK(rpc_send_count == 0u);
-    CHECK(!split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(!test_read_lighting(read));
 }
 
 static void test_elapsed_skips_unchanged_packets_until_heartbeat(void) {
@@ -795,7 +815,7 @@ static void test_failed_lighting_pass_resends_the_whole_latest_frame(void) {
     CHECK(!test_last_chunk_commits());
     // The chunk that did arrive stays staged and is never published.
     test_deliver_lighting_chunks(test_registered_callback(PUT_SPLIT_LIGHTING_FACTS_SYNC));
-    CHECK(!split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(!test_read_lighting(read));
 
     fake_combo_underlay_bitmap[0] = 0x72u;
     key_feedback_semantic_map_set(fake_key_feedback_semantic_map, (keypos_t){.row = 1, .col = 1}, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
@@ -820,7 +840,7 @@ static void test_failed_lighting_pass_resends_the_whole_latest_frame(void) {
     CHECK(memcmp(rpc_lighting_frame, expected, FRAME_BYTES) == 0);
     CHECK(rpc_lighting_frame[FRAME_COMBOS] == 0x72u);
     test_deliver_lighting_chunks(test_registered_callback(PUT_SPLIT_LIGHTING_FACTS_SYNC));
-    CHECK(split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(test_read_lighting(read));
     CHECK(memcmp(read, expected, FRAME_BYTES) == 0);
     split_runtime_sync_debug_transport_snapshot(&transport);
     CHECK(!transport.backoff_active);
@@ -984,7 +1004,7 @@ static void test_tick_sends_exactly_the_changed_chunks(void (*change)(void)) {
     CHECK(memcmp(rpc_lighting_frame, after, FRAME_BYTES) == 0);
     // The other half merges the changed chunks into the frame it holds.
     test_deliver_lighting_chunks(test_registered_callback(PUT_SPLIT_LIGHTING_FACTS_SYNC));
-    CHECK(split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(test_read_lighting(read));
     CHECK(memcmp(read, after, FRAME_BYTES) == 0);
 }
 
@@ -1020,7 +1040,7 @@ static void test_quiet_combo_projection_clears_peer_feedback(void) {
     key_origin_bitmap_add_keypos(fake_combo_overlay_bitmap, (keypos_t){.row = 4, .col = 0});
     split_runtime_sync_init();
     test_deliver_lighting_chunks(test_registered_callback(PUT_SPLIT_LIGHTING_FACTS_SYNC));
-    CHECK(split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(test_read_lighting(read));
     CHECK(key_origin_bitmap_has_any(&read[FRAME_COMBOS]) && key_origin_bitmap_has_any(&read[FRAME_COMBOS + KEY_ORIGIN_BITMAP_SIZE]));
     test_reset_rpc_send_counts();
 
@@ -1030,7 +1050,7 @@ static void test_quiet_combo_projection_clears_peer_feedback(void) {
     CHECK(rpc_send_count_lighting >= 1u);
     CHECK(test_last_chunk_commits());
     test_deliver_lighting_chunks(test_registered_callback(PUT_SPLIT_LIGHTING_FACTS_SYNC));
-    CHECK(split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(test_read_lighting(read));
     CHECK(!key_origin_bitmap_has_any(&read[FRAME_COMBOS]) && !key_origin_bitmap_has_any(&read[FRAME_COMBOS + KEY_ORIGIN_BITMAP_SIZE]));
 }
 
@@ -1185,8 +1205,13 @@ static void test_slave_rpcs_apply_exact_remote_state(void) {
     CHECK(remote_snapshot_apply_count == 1u);
     CHECK(remote_snapshot_active == pd_mode_mask_from_id(base_packet.active_mode_id));
     CHECK(remote_snapshot_locked == pd_mode_mask_from_id(base_packet.locked_mode_id));
-    CHECK(split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(test_read_lighting(read));
     CHECK(memcmp(read, frame, FRAME_BYTES) == 0);
+    noah_lighting_facts_t resolved = {0};
+    CHECK(split_runtime_sync_remote_collect_lighting(&resolved));
+    noah_lighting_facts_pack_synced(&resolved, read);
+    CHECK(memcmp(read, frame, FRAME_BYTES) == 0);
+    CHECK(!split_runtime_sync_remote_collect_lighting(&resolved));
 }
 
 static void test_slave_base_rpc_ignores_short_packets(void) {
@@ -1220,17 +1245,17 @@ static void test_slave_publishes_a_frame_only_on_its_commit(void) {
     test_fill_frame(second, 0x90u);
 
     for (uint8_t index = 0u; index + 1u < CHUNKS; index++) test_deliver_chunk(1u, index, false, first);
-    CHECK(!split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(!test_read_lighting(read));
     test_deliver_chunk(1u, CHUNKS - 1u, true, first);
-    CHECK(split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(test_read_lighting(read));
     CHECK(memcmp(read, first, FRAME_BYTES) == 0);
 
     // A pass of one changed chunk keeps the others as committed.
     test_deliver_chunk(2u, 0u, false, second);
-    CHECK(split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(test_read_lighting(read));
     CHECK(memcmp(read, first, FRAME_BYTES) == 0);
     test_deliver_chunk(2u, 1u, true, second);
-    CHECK(split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(test_read_lighting(read));
     CHECK(memcmp(read, second, 2u * SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES) == 0);
     CHECK(memcmp(&read[2u * SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES], &first[2u * SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES], FRAME_BYTES - 2u * SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES) == 0);
 }
@@ -1253,7 +1278,7 @@ static void test_slave_drops_an_abandoned_pass(void) {
     test_deliver_chunk(2u, 0u, false, abandoned);
     test_deliver_chunk(3u, 1u, true, third);
 
-    CHECK(split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(test_read_lighting(read));
     CHECK(memcmp(read, first, SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES) == 0);
     CHECK(memcmp(&read[SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES], &third[SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES], SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES) == 0);
 }
@@ -1273,7 +1298,7 @@ static void test_slave_first_partial_pass_starts_from_rest(void) {
 
     test_deliver_chunk(4u, 1u, true, frame);
 
-    CHECK(split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(test_read_lighting(read));
     CHECK(read[FRAME_PREVIEW] == UINT8_MAX);
     CHECK(memcmp(read, idle, SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES) == 0);
     CHECK(memcmp(&read[SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES], &frame[SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES], SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES) == 0);
@@ -1290,11 +1315,11 @@ static void test_slave_ignores_malformed_lighting_chunks(void) {
     memset(packet.bytes, 0x5A, sizeof(packet.bytes));
 
     test_registered_callback(PUT_SPLIT_LIGHTING_FACTS_SYNC)((uint8_t)(sizeof(packet) - 1u), &packet, 0u, NULL);
-    CHECK(!split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(!test_read_lighting(read));
 
     packet.chunk = (uint8_t)(CHUNKS | SPLIT_RUNTIME_SYNC_FACTS_COMMIT);
     test_registered_callback(PUT_SPLIT_LIGHTING_FACTS_SYNC)(sizeof(packet), &packet, 0u, NULL);
-    CHECK(!split_runtime_sync_remote_read_lighting_facts(read));
+    CHECK(!test_read_lighting(read));
 }
 
 // ─── Publication interleaving ───────────────────────────────────────────────
@@ -1334,7 +1359,7 @@ static void test_publish_seam(split_runtime_sync_domain_t domain) {
         case SPLIT_RUNTIME_SYNC_DOMAIN_LIGHTING_FACTS:
             publish_seam.saw_generation_in_flight = noah_runtime_publication_in_flight(split_runtime_sync_remote.lighting_facts_generation);
             publish_seam.saw_partial_store        = memcmp(split_runtime_sync_remote.lighting_facts, seam_second_frame, FRAME_BYTES / 2u) == 0 && memcmp(&split_runtime_sync_remote.lighting_facts[FRAME_BYTES / 2u], &seam_first_frame[FRAME_BYTES / 2u], FRAME_BYTES - FRAME_BYTES / 2u) == 0;
-            publish_seam.read_coherent            = split_runtime_sync_remote_read_lighting_facts(seam_read_frame);
+            publish_seam.read_coherent            = test_read_lighting(seam_read_frame);
             break;
         default:
             break;
@@ -1363,7 +1388,7 @@ static void test_lighting_facts_publication_is_atomic_for_readers(void) {
     test_fill_frame(seam_second_frame, 0x80u);
 
     test_deliver_frame(1u, seam_first_frame);
-    CHECK(split_runtime_sync_remote_read_lighting_facts(seam_read_frame));
+    CHECK(test_read_lighting(seam_read_frame));
     CHECK(memcmp(seam_read_frame, seam_first_frame, FRAME_BYTES) == 0);
 
     test_arm_publish_seam();
@@ -1377,7 +1402,7 @@ static void test_lighting_facts_publication_is_atomic_for_readers(void) {
     CHECK(memcmp(seam_read_frame, seam_first_frame, FRAME_BYTES) == 0);
 
     CHECK(!noah_runtime_publication_in_flight(split_runtime_sync_remote.lighting_facts_generation));
-    CHECK(split_runtime_sync_remote_read_lighting_facts(seam_read_frame));
+    CHECK(test_read_lighting(seam_read_frame));
     CHECK(memcmp(seam_read_frame, seam_second_frame, FRAME_BYTES) == 0);
 }
 
@@ -1429,22 +1454,58 @@ static void test_failed_coherent_read_leaves_the_destination_untouched(void) {
     uint8_t frame[FRAME_BYTES];
 
     test_reset_stubs();
+    fake_is_master = false;
+    split_runtime_sync_init();
     memset(frame, 0xA5, sizeof(frame));
     // Fill the shared frame with a different pattern, so any write shows up.
     memset(split_runtime_sync_remote.lighting_facts, 0x11, FRAME_BYTES);
 
+    noah_lighting_facts_t resolved, before;
+    memset(&resolved,0xa5,sizeof(resolved)); before = resolved;
     split_runtime_sync_remote.lighting_facts_received = false;
-    CHECK(!split_runtime_sync_remote_read_lighting_facts(frame));
+    CHECK(!test_read_lighting(frame));
+    CHECK(!split_runtime_sync_remote_collect_lighting(&resolved));
+    CHECK(memcmp(&before,&resolved,sizeof(resolved)) == 0);
 
     // Odd generation means a publication is in flight for every attempt.
     split_runtime_sync_remote.lighting_facts_received   = true;
     split_runtime_sync_remote.lighting_facts_generation = 1u;
-    CHECK(!split_runtime_sync_remote_read_lighting_facts(frame));
+    CHECK(!test_read_lighting(frame));
+    CHECK(!split_runtime_sync_remote_collect_lighting(&resolved));
+    CHECK(memcmp(&before,&resolved,sizeof(resolved)) == 0);
 
     for (uint16_t index = 0; index < FRAME_BYTES; index++) {
         CHECK(frame[index] == 0xA5);
     }
     split_runtime_sync_remote = (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
+}
+
+static void test_role_storage_is_ready_before_callbacks(void) {
+    for (unsigned role=0;role<2;role++) {
+        test_reset_stubs();
+        fake_is_master = (bool)role;
+        rpc_inject_during_registration = true;
+        split_runtime_sync_init();
+        rpc_inject_during_registration = false;
+        if (fake_is_master) {
+            split_runtime_sync_remote_t before = split_runtime_sync_remote;
+            // A wrong-role callback must reject before dereferencing even a
+            // nominally full-sized packet. It cannot overwrite sender storage.
+            test_registered_callback(PUT_SPLIT_LIGHTING_FACTS_SYNC)(sizeof(split_runtime_lighting_facts_packet_t),NULL,0,NULL);
+            test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)(sizeof(split_runtime_base_sync_packet_t),NULL,0,NULL);
+            CHECK(memcmp(&before,&split_runtime_sync_remote,sizeof(before)) == 0);
+            test_reset_rpc_send_counts();
+            split_runtime_sync_tick();
+            CHECK(rpc_send_count == 0u);
+        }
+        // Quiescent role reinit must not interpret the previous union arm.
+        fake_is_master = !fake_is_master;
+        rpc_register_count = 0;
+        rpc_inject_during_registration = true;
+        split_runtime_sync_init();
+        rpc_inject_during_registration = false;
+        CHECK(!split_runtime_sync_remote.lighting_facts_received);
+    }
 }
 
 static void change_lighting_identity(void) {
@@ -1454,6 +1515,7 @@ static void change_lighting_identity(void) {
 
 int main(void) {
     test_failed_coherent_read_leaves_the_destination_untouched();
+    test_role_storage_is_ready_before_callbacks();
     test_init_registers_rpcs_and_sends_initial_packets_on_master();
     test_init_registers_rpcs_without_sending_on_slave();
     test_elapsed_skips_unchanged_packets_until_heartbeat();

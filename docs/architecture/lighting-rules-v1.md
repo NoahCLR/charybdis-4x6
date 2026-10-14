@@ -498,7 +498,34 @@ live-state maximum does not establish it. No event/linger module is advertised
 by this checkpoint.
 
 Each half times from the frame in which it first sees the subject, so the
-halves may differ by the link's latency.
+halves may differ by the link's latency. Gate observation and wake deadlines
+use local `timer_read32()`, independently of `sync_timer_read32()` passed to
+paint context for animations. Split offset adjustments cannot mature, delay or
+rewind a gate. The engine defensively ignores a backward observation sample
+and retains its last forward sample; a forward 32-bit wrap advances normally.
+As with QMK deadline ordering, wrap/backward discrimination assumes successive
+observations within the timer's half-range (about24 days); active RGB frames
+observe at the configured frame interval. Millisecond ages remain saturated
+at65535 and existing forward/large-jump pixels are preserved.
+
+Resolved facts are owned by the main render context through every effect
+chunk. Collection stages one module slice, compares actual bytes and updates
+that resolved frame; a failed coherent peer read preserves its previous synced
+slices. During fade destination rendering, the engine temporarily removes the
+auto-mouse layer from active layers, retains base0 and recomputes synthetic
+top from that active set. It saves/restores only active/top bytes synchronously;
+held, locked and one-shot ownership remain actual. Split callbacks publish to
+separate remote storage and cannot mutate the pinned render frame.
+
+Transport storage has disjoint role lifetimes: master built/sent frames share
+a union with slave staging/committed frames. Main-context init closes callback
+readiness, initializes the selected role arm, registers RPC handlers and only
+then publishes readiness. A wrong-role or unready callback rejects before
+accessing packet or role storage. Reinitialization is quiescent: the high
+priority split worker can preempt main, while main cannot preempt a running
+callback. Failed sends preserve the last committed sent frame and force a
+whole latest-frame retry. Module-specific idle builders initialize/compare
+sentinels using at most one slice of scratch, not a persistent idle frame.
 
 ### Thing kinds
 

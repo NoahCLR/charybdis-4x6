@@ -357,11 +357,15 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     CHECK(rpc_last_base_packet.active_mode_id == PD_MODE_ID_NONE);
     CHECK(rpc_last_base_packet.locked_mode_id == PD_MODE_ID_NONE);
 
+    // A receiver callback belongs to an initialized slave role. Reinitialize
+    // quiescently, recording its own init event before the received event.
+    fake_is_master = false;
+    split_runtime_sync_init();
     test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)(sizeof(packet), &packet, 0u, NULL);
 
     snapshot = test_trace_snapshot();
 
-    CHECK(snapshot.count == 10u);
+    CHECK(snapshot.count == 11u);
     CHECK(snapshot.entries[0].kind == NOAH_TRACE_PD_MODE);
     CHECK(snapshot.entries[0].event == NOAH_TRACE_PD_MODE_EVENT_KEY_PRESS);
     CHECK(snapshot.entries[0].a == PD_MODE_VOLUME);
@@ -398,14 +402,17 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     CHECK(snapshot.entries[7].b == 0u);
 
     CHECK(snapshot.entries[8].kind == NOAH_TRACE_SPLIT_SYNC);
-    CHECK(snapshot.entries[8].event == NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE);
-    CHECK(snapshot.entries[8].a == PD_MODE_ZOOM);
-    CHECK(snapshot.entries[8].b == PD_MODE_ZOOM);
-
-    CHECK(snapshot.entries[9].kind == NOAH_TRACE_PD_MODE);
-    CHECK(snapshot.entries[9].event == NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT);
+    CHECK(snapshot.entries[8].event == NOAH_TRACE_SPLIT_SYNC_EVENT_INIT);
+    CHECK(snapshot.entries[8].a == 0u); // slave
+    CHECK(snapshot.entries[9].kind == NOAH_TRACE_SPLIT_SYNC);
+    CHECK(snapshot.entries[9].event == NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE);
     CHECK(snapshot.entries[9].a == PD_MODE_ZOOM);
     CHECK(snapshot.entries[9].b == PD_MODE_ZOOM);
+
+    CHECK(snapshot.entries[10].kind == NOAH_TRACE_PD_MODE);
+    CHECK(snapshot.entries[10].event == NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT);
+    CHECK(snapshot.entries[10].a == PD_MODE_ZOOM);
+    CHECK(snapshot.entries[10].b == PD_MODE_ZOOM);
 }
 
 static void test_split_failure_and_recovery_trace_is_bounded(void) {

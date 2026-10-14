@@ -736,7 +736,7 @@ static void key_feedback_lighting_phase_apply(uint8_t *out, keypos_t owner, uint
     if (!identity || !key_origin_registry_get_bitmap(owner, keys)) return;
     for (uint8_t i = 0u; i < MATRIX_ROWS * MATRIX_COLS; i++) {
         if (!key_origin_bitmap_has_keypos(keys, key_feedback_slot_key_pos(i))) continue;
-        uint8_t *record = out + 3u * i;
+        uint8_t *record = out + KEY_FEEDBACK_LIGHTING_PHASE_RECORD_BYTES * i;
         record[0] = identity;
         record[1] |= phase;
         record[2] = branch;
@@ -744,7 +744,7 @@ static void key_feedback_lighting_phase_apply(uint8_t *out, keypos_t owner, uint
 }
 void key_feedback_lighting_phases(uint8_t *out) {
     key_runtime_core_state_t *state = key_runtime_core_state();
-    memset(out, 0, MATRIX_ROWS * MATRIX_COLS * 3u);
+    memset(out, 0, KEY_FEEDBACK_LIGHTING_PHASE_BYTES);
     if (!state) return;
     for (uint16_t cursor = 0u; key_feedback_next_active_slot(state->tap_series_active_bitmap, &cursor);) {
         uint16_t i = cursor - 1u;

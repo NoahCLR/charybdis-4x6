@@ -1435,3 +1435,14 @@ Choices the plan left open, as decided:
 - **The auto-mouse fade and diagnostics stay outside the registries.** The
   fade is a domain extension applied over the resolved frame; diagnostics
   still win outright.
+
+Gate lifetimes and wake deadlines use each half's local observation clock;
+split-synced time is reserved for paint animation. Backward sync adjustments
+cannot mature show-after. Fade destination active layers and top-layer facts
+share the same synthetic scene; actual ownership stays intact. Main owns one
+resolved fact frame through chunk rerenders, and transport buffers share storage
+only across initialized, callback-guarded master/slave roles. The detailed
+lifetime and module-idle contracts live in the lighting spec. Generic event
+facts, linger/flash and keys-that/what-it-does remain unfinished; this corrected
+current-feature checkpoint does not complete phase3 or establish hardware
+acceptance.

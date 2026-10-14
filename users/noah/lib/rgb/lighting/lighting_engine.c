@@ -90,7 +90,7 @@ static rgb_t            palette[NOAH_PROFILE_LIGHTING_V1_PALETTE_MAX];
 static bool             palette_current;
 static noah_lighting_frame_t fade_start;
 static noah_lighting_frame_t fade_end;
-static noah_lighting_facts_t fade_facts;
+
 
 void noah_lighting_engine_program_changed(void) {
     palette_current = false;
@@ -292,7 +292,11 @@ static __attribute__((noinline)) uint16_t rule_presence_tracker(const noah_profi
 
 static __attribute__((noinline)) void prepare_rule_clocks(const noah_lighting_scene_t *scene, uint32_t now) {
     if (!timing_index_current) prepare_timing_index(scene->program);
+    // Runtime supplies the local observation clock, never the adjustable split
+    // sync clock. Ignore a defensive backward sample; a wrap is forward when
+    // its modular delta is within the timer's half-range ordering window.
     uint32_t elapsed = clocks_current ? now - clock_last_time : 0u;
+    if (clocks_current && now < clock_last_time && clock_last_time - now < INT32_MAX) elapsed = 0u;
     // Remove forwards, insert backwards: linear age movement, no transient
     // union of old and new ids and no scratch copy of the age array.
     uint16_t read = 0u, write = 0u, present_count = 0u;
@@ -326,7 +330,7 @@ static __attribute__((noinline)) void prepare_rule_clocks(const noah_lighting_sc
             filter_active[i / 8u] &= ~bit;
         }
     }
-    clock_last_time = now;
+    if (!clocks_current || elapsed) clock_last_time = now;
     clocks_current = true;
 }
 
@@ -372,9 +376,9 @@ static rgb_t mix(rgb_t below, rgb_t colour, uint8_t amount) {
     };
 }
 
-static void paint_subject(const noah_lighting_scene_t *scene, const rule_t *rule, const placed_subject_t *placed, noah_lighting_leds_t leds, uint32_t now, noah_lighting_frame_t *frame, noah_lighting_resolve_info_t *info) {
+static void paint_subject(const noah_lighting_scene_t *scene, const rule_t *rule, const placed_subject_t *placed, noah_lighting_leds_t leds, noah_lighting_frame_t *frame, noah_lighting_resolve_info_t *info) {
     noah_lighting_subject_t       subject;
-    noah_lighting_paint_context_t context = {.scene = scene, .subject = &subject, .time = now, .effect_used = &info->effect_used};
+    noah_lighting_paint_context_t context = {.scene = scene, .subject = &subject, .time = scene->paint_time, .effect_used = &info->effect_used};
 
     noah_lighting_subject_init(&subject, placed->thing_kind, placed->thing, placed->slot);
     subject.outcome = placed->outcome;
@@ -439,7 +443,7 @@ static void apply_rules(const noah_lighting_scene_t *scene, uint8_t first, uint8
         }
         // The first subject is on top, so it paints last.
         while (count-- > 0u) {
-            if (subjects[count].amount != 0u) paint_subject(scene, &rule, &subjects[count], leds, now, frame, info);
+            if (subjects[count].amount != 0u) paint_subject(scene, &rule, &subjects[count], leds, frame, info);
         }
     }
 }
@@ -461,18 +465,31 @@ void noah_lighting_resolve(const noah_lighting_scene_t *scene, noah_lighting_led
     if (!noah_lighting_fade_active(scene, &fade) || fade.base > rules) {
         apply_rules(scene, 0u, rules, leds, now, update, frame, info);
     } else {
-        noah_lighting_scene_t end_scene = *scene;
         rgb_t                 end_colour = noah_lighting_palette_rgb(scene, fade.end);
 
         info->live  = true;
         scene_first = (uint8_t)(rules - fade.base);
         clear(&fade_start, leds);
         apply_rules(scene, scene_first, rules, leds, now, update, &fade_start, info);
-        fade_facts = *scene->facts;
-        noah_lighting_fade_end_facts(&fade_facts, fade.layer);
-        end_scene.facts = &fade_facts;
+        // Main owns these resolved facts until this synchronous resolve returns.
+        // Registry walkers read RAM; split callbacks write separate remote state.
+        // Only scene-derived active/top fields change, never ownership facts.
+#    if NOAH_LIGHTING_FACT_LAYER_ACTIVE
+        uint8_t saved_active[2];
+        memcpy(saved_active, scene->facts->layer_active, sizeof(saved_active));
+#    endif
+#    if NOAH_LIGHTING_FACT_LAYER_STATUS
+        uint8_t saved_top = scene->facts->layer_status[NOAH_LIGHTING_LAYER_TOP_OFFSET];
+#    endif
+        noah_lighting_fade_end_facts(scene->facts, fade.layer);
         clear(&fade_end, leds);
-        apply_rules(&end_scene, scene_first, rules, leds, now, false, &fade_end, info);
+        apply_rules(scene, scene_first, rules, leds, now, false, &fade_end, info);
+#    if NOAH_LIGHTING_FACT_LAYER_ACTIVE
+        memcpy(scene->facts->layer_active, saved_active, sizeof(saved_active));
+#    endif
+#    if NOAH_LIGHTING_FACT_LAYER_STATUS
+        scene->facts->layer_status[NOAH_LIGHTING_LAYER_TOP_OFFSET] = saved_top;
+#    endif
         for (uint8_t led = 0u; led < NOAH_LIGHTING_LED_COUNT; led++) {
             noah_lighting_leds_t bit = NOAH_LIGHTING_LED_BIT(led);
             bool                 start_visible = (fade_start.painted & bit) != 0u;

@@ -29,6 +29,13 @@ bool noah_lighting_fade_active(const noah_lighting_scene_t *scene, noah_lighting
 
 void noah_lighting_fade_end_facts(noah_lighting_facts_t *facts, uint8_t layer) {
     noah_lighting_fact_layer_active_without(facts, layer);
+    facts->layer_active[0] |= 1u; // the base remains active, including layer-zero removal
+#    if NOAH_LIGHTING_FACT_LAYER_STATUS
+    uint16_t active = facts->layer_active[0] | (uint16_t)facts->layer_active[1] << 8u;
+    uint8_t top = 0u;
+    for (uint8_t i = 1u; i < LAYER_COUNT; i++) if (active & (1u << i)) top = i;
+    facts->layer_status[NOAH_LIGHTING_LAYER_TOP_OFFSET] = top;
+#    endif
 }
 
 #elif defined(RGB_MATRIX_ENABLE)

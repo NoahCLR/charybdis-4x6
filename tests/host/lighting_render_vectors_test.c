@@ -311,7 +311,9 @@ int main(int argc, char **argv) {
         noah_lighting_scene_t        scene = {.program = &program, .facts = &facts, .keymap_generation = 1u};
         noah_lighting_resolve_info_t info;
         memset(&frame, 0, sizeof(frame));
+        noah_lighting_facts_t original_facts = facts;
         noah_lighting_resolve(&scene, NOAH_LIGHTING_ALL_LEDS, (uint32_t)now, true, &frame, &info);
+        assert(memcmp(&original_facts, &facts, sizeof(facts)) == 0); // fade overlay always restored
         uint16_t live = noah_lighting_test_live_clocks();
         assert(live <= noah_lighting_test_live_bound());
         if (live > peak_clocks) peak_clocks = live;
