@@ -216,8 +216,8 @@
           "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_fact_next", "gesture", "key_feedback_tap_branch_map_get", "handled_key_keypos_in_bounds"]
         },
         {
-          "name": "RGB frame layer-key target",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_target", "keycode_at_keymap_location", "nvm_dynamic_keymap_read_keycode", "eeprom_read_byte", "wear_leveling_read"]
+          "name": "RGB query native basis refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_keymap_refresh", "keycode_at_keymap_location", "nvm_dynamic_keymap_read_keycode", "eeprom_read_byte", "wear_leveling_read"]
         },
         {
           "name": "RGB frame paint over the effect",
@@ -394,6 +394,26 @@
         {
           "name": "generated origin reconstruction combo allowed layer",
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "noah_qmk_combo_origin_normalize_record", "combo_origin_combo_build_from_pressed_keys", "noah_participation_combo_row", "noah_effective_combo_allowed_layers"]
+        },
+        {
+          "name": "RGB query live behaviour identity refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_keymap_refresh", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "RGB query compiled fallback refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_keymap_refresh", "key_behavior_view_build", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "RGB query combo membership",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_target", "combo_matches"]
+        },
+        {
+          "name": "RGB query LED mapping",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_target", "noah_lighting_key_leds", "rgb_matrix_map_row_column_to_led"]
+        },
+        {
+          "name": "RGB direct action identity paint",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_paint", "noah_lighting_keymap_identity"]
         }
       ]
     },

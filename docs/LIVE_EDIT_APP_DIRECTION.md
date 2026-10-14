@@ -1453,3 +1453,15 @@ render walk. This implements the plan's cache intent without one bitmap per
 rule. Effective-profile and VIA publications invalidate it; main-context
 refresh rejects a generation interrupted by split publication. This partial
 phase3 implementation does not establish hardware acceptance.
+
+
+The query basis has a separately authorized3072 B static-regression-policy
+increment for the recorded portable RGB profile artifact, to229376 B; unrelated
+artifact thresholds and disabled-cache configurations are preserved. Its bound
+is geometry-sized, independent of accepted255 rules and the shared8192-byte
+lighting payload. The right-only historical229064 B link justified this
+increment; it was not a two-half pass. Physical SRAM270336 B/half, boot allocator
+floor4096 B and reviewed stack1920/768 policies are unchanged. This increment
+budgets no future event/linger/flash history. See
+[memory budgets](architecture/memory-budgets.md#cached-key-queries-and-direct-action-paint).
+Hardware, cadence and allocator/global/interrupt-stack high-water remain unproven.

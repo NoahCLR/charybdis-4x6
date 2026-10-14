@@ -622,3 +622,41 @@ largest split-slave path is 328/768; the owner manifest reaches 1,912/1,920 and
 policies cover reviewed linked paths only; global/interrupt maxima, allocator
 and stack high-water, split cadence and outcome rendering remain acceptance
 on both physical halves.
+
+### Cached key queries and direct action paint
+
+The per-layer native/behaviour basis for keys-that and what-it-does has an
+additional **3,072-byte static regression-policy increment**, approved by the
+orchestrator under Noah's delegated engineering decision authority. The relevant
+D-F26 portable RGB profile artifact threshold is **229,376 bytes**, previously
+226,304. The artifact selector reads recorded compiler flags: PD profile,
+portable profile and RGB Matrix enabled, with at least one of the keys-that or
+what-it-does modules enabled, and the cache-refresh implementation actually
+linked in the ELF. Both consumers disabled retains226,304; unrelated
+artifact policies retain their previous thresholds. This budgets this query
+basis only, without promising space for event, linger or flash histories.
+
+The representation is bounded by compiled geometry, independent of accepted
+rule/query count: nativeu16 plus authored behaviour-rowu8 per key/layer, one
+any-combo bitmap per layer, and one matrix-key index per LED. At16layers,
+60matrix positions and58LEDs these linked arrays are1920+960+128+58 bytes,
+plus generation4 and readiness1. They replace the old mapped128/generation4/
+valid-layers4 cache. Existing resident combo rows are reused; there is no heap,
+per-query mask bank, eviction, admission limit or format/budget redefinition.
+
+Historical **right-only** GCC15.2.0 link at firmwaree352687b, BKd280a447, before
+the amendment: data5280+bss223784=229064 B, a2928 B net linked increase over the
+repaired pre-query checkpoint, including alignment/optimization effects. It
+failed the old policy by2760 B; at the approved threshold it would have312 B
+policy margin. SRAM0–3 fixed prefix229072 B, boot linker/core-memory span33072 B,
+fixed occupancy across unique banks236528 B. The left was not built because
+the tool stopped at the right gate. These are allocation evidence for the
+amendment, **not a two-half verification pass or a pair to try**.
+
+Physical270336 B per half, boot core-memory floor4096 B and reviewed-path stack
+limits1920/768 B stay unchanged. Boot span is not runtime-free or high-water
+memory. The cache refresh and query/paint paths must appear in both tracked
+stack manifests and pass fresh linked checks on each half. Declared query
+operation bounds and host tests do not prove physical cadence, global or
+interrupt-stack maximum, allocator high-water or hardware acceptance. Those
+remain explicit physical acceptance obligations before release.

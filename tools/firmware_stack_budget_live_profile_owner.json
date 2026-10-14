@@ -401,6 +401,30 @@
         {
           "name": "sixteen-member combo host validation reads",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step", "noah_profile_combo_v1_iteration_step", "read_at", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "RGB query native basis refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_keymap_refresh", "keycode_at_keymap_location", "nvm_dynamic_keymap_read_keycode", "eeprom_read_byte", "wear_leveling_read"]
+        },
+        {
+          "name": "RGB query live behaviour identity refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_keymap_refresh", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "RGB query compiled fallback refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_keymap_refresh", "key_behavior_view_build", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "RGB query combo membership",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_target", "combo_matches"]
+        },
+        {
+          "name": "RGB query LED mapping",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_target", "noah_lighting_key_leds", "rgb_matrix_map_row_column_to_led"]
+        },
+        {
+          "name": "RGB direct action identity paint",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_paint", "noah_lighting_keymap_identity"]
         }
       ]
     },

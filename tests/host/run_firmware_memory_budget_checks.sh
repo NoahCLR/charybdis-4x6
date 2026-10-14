@@ -32,15 +32,20 @@ fi
 # sixteen inputs, the behaviour row index, 272 names, 128-byte pointing
 # records) another 20 KiB over the 17,400 bytes they linked at. D-F26's
 # lighting rules add one reviewed 16 KiB increment for the decoded program,
-# the compiled Standard lighting and the engine's working set. All are
+# the compiled Standard lighting and the engine's working set. Its portable RGB
+# query configuration has a further reviewed 3 KiB for the geometry-bounded
+# query basis. Compiling both consumers out retains the preceding threshold.
+# All are
 # policy, not capacity. See
 # docs/architecture/memory-budgets.md for linked accounting and the
 # outstanding physical high-water release gate.
-STATIC_RAM_POLICY=57344
 CFLAGS_FILE="$QMK_ROOT/.build/obj_$TARGET/cflags.txt"
-if [ -f "$CFLAGS_FILE" ] && grep -Eq '(^|[[:space:]])-DNOAH_PD_PROFILE_ENABLE([[:space:]]|$)' "$CFLAGS_FILE"; then
-    STATIC_RAM_POLICY=$((60416 + 4096 + 124928 + 20480 + 16384))
+. "$HOST_ROOT/noah_firmware_memory_policy.sh"
+QUERY_CACHE_LINKED=no
+if "${NM:-arm-none-eabi-nm}" --defined-only "$ELF" | grep -Eq '[[:space:]]noah_lighting_keymap_refresh$'; then
+    QUERY_CACHE_LINKED=yes
 fi
+STATIC_RAM_POLICY="$(noah_firmware_static_ram_policy "$CFLAGS_FILE" "$QUERY_CACHE_LINKED")"
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \
     --elf "$ELF" \

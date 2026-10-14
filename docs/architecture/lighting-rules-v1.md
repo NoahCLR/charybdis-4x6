@@ -433,7 +433,11 @@ profile generation changes cover the source generations. Rendering uses no
 keymap/behaviour profile-reader I/O. Specific combo queries cost at most16 input
 comparisons per key; any-combo reads its canonical bitmap. Rebuilding that bitmap costs at most
 `LAYER_COUNT * matrix_keys * 128 * 16` input comparisons. These are operation bounds, not
-physical timing or cadence measurements.
+physical timing or cadence measurements. The current query basis has a scoped
+3072-byte static-policy increment documented in
+[memory budgets](memory-budgets.md#cached-key-queries-and-direct-action-paint);
+it does not alter the shared8192-byte lighting budget,255 accepted rules or
+any physical/core-memory/stack limit, and does not budget future retained histories.
 
 ### Paints
 
