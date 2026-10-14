@@ -54,6 +54,7 @@ static pending_release_t key_runtime_core_pending_release_slot_snapshot(const pe
     return (pending_release_t){
         .active              = true,
         .tap_commit_feedback = key_runtime_core_pending_release_slot_has_tap_commit_feedback(pending),
+        .lighting_identity   = pending->lighting_identity,
         .owner_token_id      = pending->owner_token_id,
         .key_pos             = key_runtime_core_pending_release_slot_key_pos(pending),
         .action              = pending->action,
@@ -312,7 +313,7 @@ uint8_t key_runtime_core_pending_release_count(void) {
     return state ? state->pending_release_count : 0u;
 }
 
-bool key_runtime_core_queue_pending_release_dispatch_for_owner(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id) {
+bool key_runtime_core_queue_pending_release_dispatch_with_identity(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id, uint8_t identity) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     pending_release_slot_t   *pending;
     uint8_t                   index;
@@ -332,12 +333,13 @@ bool key_runtime_core_queue_pending_release_dispatch_for_owner(keypos_t key_pos,
     }
     pending  = &state->pending_releases[index];
     *pending = (pending_release_slot_t){
-        .owner_token_id   = owner_token_id,
-        .action           = action,
-        .mods             = mods,
-        .next_queue_index = KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE,
-        .packed_key_pos   = key_runtime_keypos_pack(key_pos),
-        .flags            = flags,
+        .owner_token_id    = owner_token_id,
+        .action            = action,
+        .mods              = mods,
+        .next_queue_index  = KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE,
+        .packed_key_pos    = key_runtime_keypos_pack(key_pos),
+        .flags             = flags,
+        .lighting_identity = identity,
     };
     if (!key_runtime_core_append_pending_release(state, index)) {
         *pending = (pending_release_slot_t){0};
@@ -345,6 +347,18 @@ bool key_runtime_core_queue_pending_release_dispatch_for_owner(keypos_t key_pos,
     }
     key_runtime_core_pending_release_mark_token(state, pending->owner_token_id);
     return true;
+}
+
+bool key_runtime_core_queue_pending_release_dispatch_for_owner(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id) {
+    key_runtime_core_state_t *state    = key_runtime_core_state();
+    uint8_t                   identity = 0u;
+    if (state && key_runtime_core_pending_release_keypos_valid(key_pos)) {
+        uint16_t             index  = key_pos.row * MATRIX_COLS + key_pos.col;
+        const press_token_t *token  = &state->press_tokens[index];
+        const tap_series_t  *series = &state->tap_series[index];
+        identity                    = token->active || !series->active ? token->interaction.selection.lighting_identity : series->lighting_identity;
+    }
+    return key_runtime_core_queue_pending_release_dispatch_with_identity(key_pos, action, mods, tap_commit_feedback, owner_token_id, identity);
 }
 
 bool key_runtime_core_queue_pending_release_dispatch(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback) {

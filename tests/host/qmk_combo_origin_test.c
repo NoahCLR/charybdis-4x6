@@ -1065,6 +1065,39 @@ static void test_output_permission_survives_queues_and_release(void) {
 }
 #endif
 
+static void test_lighting_subjects_have_individual_combo_identity(void) {
+    uint8_t     keys[KEY_ORIGIN_BITMAP_SIZE], quiet[KEY_ORIGIN_BITMAP_SIZE], id, role;
+    uint16_t    cursor = 0u;
+    keypos_t    none   = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
+    keyrecord_t left = test_combo_record(true), both = test_combo_record(true);
+    test_reset();
+    key_origin_bitmap_clear(quiet);
+    test_observe_physical_key(test_key(0, 0), true);
+    test_observe_physical_key(test_key(1, 0), true);
+    test_set_combo_active(0, true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT, &left);
+    fake_time++;
+    test_observe_physical_key(test_key(0, 1), true);
+    test_observe_physical_key(test_key(4, 0), true);
+    test_set_combo_active(1, true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &both);
+    CHECK(noah_qmk_combo_origin_lighting_next(none, both.event.key, quiet, &cursor, &id, &role, keys));
+    CHECK(id == 1u && role == 0u && test_bitmap_has(keys, 0, 1) && test_bitmap_has(keys, 4, 0));
+    CHECK(noah_qmk_combo_origin_lighting_next(none, both.event.key, quiet, &cursor, &id, &role, keys));
+    CHECK(id == 0u && role == 1u && test_bitmap_has(keys, 0, 0) && test_bitmap_has(keys, 1, 0));
+    CHECK(!noah_qmk_combo_origin_lighting_next(none, none, quiet, &cursor, &id, &role, keys));
+    cursor = 0u;
+    key_origin_bitmap_add_keypos(quiet, both.event.key);
+    CHECK(noah_qmk_combo_origin_lighting_next(none, none, quiet, &cursor, &id, &role, keys));
+    CHECK(id == 0u);
+    both = test_combo_record(false);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_BOTH, &both);
+    cursor = 0u;
+    key_origin_bitmap_clear(quiet);
+    CHECK(noah_qmk_combo_origin_lighting_next(none, none, quiet, &cursor, &id, &role, keys));
+    CHECK(id == 0u);
+}
+
 int main(void) {
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     test_output_permission_survives_queues_and_release();
@@ -1073,6 +1106,7 @@ int main(void) {
 #endif
     test_combo_participation_hook();
     test_origin_mirror_keeps_captured_duplicate_exclusion();
+    test_lighting_subjects_have_individual_combo_identity();
     test_single_half_combo_uses_last_key_from_combo_ref_layer();
     test_combo_owner_is_stable_when_member_press_order_changes();
     test_pressed_combo_bitmap_reports_complete_physical_combo();

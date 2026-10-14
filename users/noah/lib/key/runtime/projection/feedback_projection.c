@@ -8,7 +8,7 @@ __attribute__((weak)) void key_feedback_pulse_observe(keypos_t key_pos, key_feed
     (void)tap_branch;
 }
 
-static void key_runtime_core_feedback_projection_set_pulse(key_runtime_core_state_t *state, keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
+static void key_runtime_core_feedback_projection_set_pulse(key_runtime_core_state_t *state, keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch, uint8_t identity, uint8_t outcome) {
     if (!state) {
         return;
     }
@@ -19,11 +19,13 @@ static void key_runtime_core_feedback_projection_set_pulse(key_runtime_core_stat
     state->feedback_pulse_kind            = kind;
     state->feedback_pulse_key_pos         = key_pos;
     state->feedback_pulse_tap_branch      = tap_branch;
+    state->feedback_pulse_identity        = identity;
+    state->feedback_pulse_outcome         = outcome;
     state->feedback_pulse_queued          = false;
     state->feedback_pulse_queued_sequence = 0u;
 }
 
-static void key_runtime_core_feedback_projection_queue_pulse(key_runtime_core_state_t *state, keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
+static void key_runtime_core_feedback_projection_queue_pulse(key_runtime_core_state_t *state, keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch, uint8_t identity, uint8_t outcome) {
     if (!state) {
         return;
     }
@@ -34,14 +36,16 @@ static void key_runtime_core_feedback_projection_queue_pulse(key_runtime_core_st
         state->feedback_pulse_queued_kind       = kind;
         state->feedback_pulse_queued_key_pos    = key_pos;
         state->feedback_pulse_queued_tap_branch = tap_branch;
+        state->feedback_pulse_queued_identity   = identity;
+        state->feedback_pulse_queued_outcome    = outcome;
         return;
     }
 
-    key_runtime_core_feedback_projection_set_pulse(state, key_pos, kind, tap_branch);
+    key_runtime_core_feedback_projection_set_pulse(state, key_pos, kind, tap_branch, identity, outcome);
 }
 
-void key_runtime_core_feedback_projection_project_pulse(keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch) {
-    key_runtime_core_feedback_projection_queue_pulse(key_runtime_core_state(), key_pos, kind, tap_branch);
+void key_runtime_core_feedback_projection_project_pulse(keypos_t key_pos, key_feedback_pulse_kind_t kind, uint8_t tap_branch, uint8_t identity, uint8_t outcome) {
+    key_runtime_core_feedback_projection_queue_pulse(key_runtime_core_state(), key_pos, kind, tap_branch, identity, outcome);
     key_feedback_pulse_observe(key_pos, kind, tap_branch);
     split_runtime_sync_notify_key_feedback_dirty();
 }

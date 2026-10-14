@@ -37,6 +37,18 @@ flowchart LR
 `RGB_KEY_HALF`, the subject's halves, so one key's feedback state repaints that
 entire half, over the layer colors and pointer-mode overlay underneath.
 
+## Individual Painting subjects
+
+`fact_combo_held.c` reads identified active outputs from the centralized combo
+origin adapter, preserving roles and quiet layer owners while ordering each
+combo's own footprint newest first. `fact_behaviour.c` reads the key runtime's
+captured row/slot/outcome records. A row id travels with branch resolution,
+release effects and queued feedback, rather than being inferred from a current
+keymap read. `paint_outcome.c` resolves supported layer/mode outcomes through
+the existing thing tables. Fact 4/5 aggregate subjects and the compiled
+Standard conversion are unchanged. The split frame appends these slices and
+publishes the whole generation before either half renders it.
+
 ## Where the lighting program comes from
 
 Each half holds one decoded lighting program in RAM

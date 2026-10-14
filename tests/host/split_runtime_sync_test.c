@@ -60,17 +60,21 @@ static split_runtime_lighting_facts_packet_t rpc_lighting_chunks[32];
 static uint8_t                               rpc_lighting_frame[NOAH_LIGHTING_SYNCED_BYTES];
 static bool                                  fake_rpc_send_result = true;
 
+static uint8_t fake_lighting_identity = 1u;
+
 enum { FRAME_BYTES = NOAH_LIGHTING_SYNCED_BYTES, CHUNKS = SPLIT_RUNTIME_SYNC_FACTS_CHUNKS };
 // Synced slices in registry order: preview, combos, behaviour.
 enum {
-    FRAME_PREVIEW  = 0u,
-    FRAME_COMBOS   = 1u,
-    FRAME_VISIBLE  = FRAME_COMBOS + 2u * KEY_ORIGIN_BITMAP_SIZE,
-    FRAME_SEMANTIC = FRAME_VISIBLE + KEY_ORIGIN_BITMAP_SIZE,
-    FRAME_OWNERS   = FRAME_SEMANTIC + KEY_FEEDBACK_SEMANTIC_MAP_SIZE,
-    FRAME_BRANCH   = FRAME_OWNERS + KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE,
+    FRAME_PREVIEW              = 0u,
+    FRAME_COMBOS               = 1u,
+    FRAME_VISIBLE              = FRAME_COMBOS + 2u * KEY_ORIGIN_BITMAP_SIZE,
+    FRAME_SEMANTIC             = FRAME_VISIBLE + KEY_ORIGIN_BITMAP_SIZE,
+    FRAME_OWNERS               = FRAME_SEMANTIC + KEY_FEEDBACK_SEMANTIC_MAP_SIZE,
+    FRAME_BRANCH               = FRAME_OWNERS + KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE,
+    FRAME_COMBO_IDENTITIES     = FRAME_BRANCH + KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE,
+    FRAME_BEHAVIOUR_IDENTITIES = FRAME_COMBO_IDENTITIES + NOAH_LIGHTING_COMBO_SLICE_BYTES,
 };
-_Static_assert(FRAME_BRANCH + KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE == NOAH_LIGHTING_SYNCED_BYTES, "frame layout");
+_Static_assert(FRAME_BEHAVIOUR_IDENTITIES + KEY_FEEDBACK_LIGHTING_BYTES == NOAH_LIGHTING_SYNCED_BYTES, "frame layout");
 
 #define RPC_SEND_SCRIPT_CAPACITY 32u
 static bool     rpc_send_script[RPC_SEND_SCRIPT_CAPACITY];
@@ -260,6 +264,40 @@ void key_feedback_flash_visibility_bitmap_for_semantic_map(const uint8_t *semant
     }
 }
 
+bool key_runtime_core_preview_owner_key_pos(keypos_t *key) {
+    (void)key;
+    return false;
+}
+bool pd_mode_local_owner_key_pos_snapshot(keypos_t *key) {
+    (void)key;
+    return false;
+}
+void layer_ownership_momentary_owner_bitmap(uint8_t *out) {
+    key_origin_bitmap_clear(out);
+}
+bool noah_qmk_combo_origin_lighting_next(keypos_t preview, keypos_t mode, const uint8_t *quiet, uint16_t *cursor, uint8_t *id, uint8_t *role, uint8_t *keys) {
+    (void)preview;
+    (void)mode;
+    (void)quiet;
+    (void)cursor;
+    (void)id;
+    (void)role;
+    (void)keys;
+    return false;
+}
+void key_feedback_lighting_map(uint8_t *out) {
+    memset(out, 0, KEY_FEEDBACK_LIGHTING_BYTES);
+    bool active = false;
+    for (uint8_t i = 0; i < KEY_FEEDBACK_SEMANTIC_MAP_SIZE; i++)
+        active |= fake_key_feedback_semantic_map[i] != 0u;
+    if (!active) return;
+    out[0]                                = fake_lighting_identity;
+    out[1]                                = 3u;
+    out[KEY_FEEDBACK_LIGHTING_BYTES - 3u] = 128u;
+    out[KEY_FEEDBACK_LIGHTING_BYTES - 2u] = 1u;
+    out[KEY_FEEDBACK_LIGHTING_BYTES - 1u] = 34u;
+}
+
 void key_feedback_semantic_map(uint8_t *out_map) {
     key_feedback_semantic_read_count++;
     memcpy(out_map, fake_key_feedback_semantic_map, KEY_FEEDBACK_SEMANTIC_MAP_SIZE);
@@ -436,7 +474,7 @@ static void test_deliver_lighting_chunks(slave_callback_t callback) {
 // Which chunks hold bytes that differ between two frames.
 static uint16_t test_changed_chunk_mask(const uint8_t *before, const uint8_t *after) {
     uint16_t mask = 0u;
-    for (uint8_t i = 0u; i < FRAME_BYTES; i++) {
+    for (uint16_t i = 0u; i < FRAME_BYTES; i++) {
         if (before[i] != after[i]) mask |= (uint16_t)(1u << (i / SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES));
     }
     return mask;
@@ -458,7 +496,8 @@ static void test_deliver_frame(uint8_t sequence, const uint8_t *frame) {
 }
 
 static void test_fill_frame(uint8_t *frame, uint8_t seed) {
-    for (uint8_t i = 0u; i < FRAME_BYTES; i++) frame[i] = (uint8_t)(seed + i * 7u);
+    for (uint16_t i = 0u; i < FRAME_BYTES; i++)
+        frame[i] = (uint8_t)(seed + i * 7u);
 }
 
 static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
@@ -1402,10 +1441,15 @@ static void test_failed_coherent_read_leaves_the_destination_untouched(void) {
     split_runtime_sync_remote.lighting_facts_generation = 1u;
     CHECK(!split_runtime_sync_remote_read_lighting_facts(frame));
 
-    for (uint8_t index = 0; index < FRAME_BYTES; index++) {
+    for (uint16_t index = 0; index < FRAME_BYTES; index++) {
         CHECK(frame[index] == 0xA5);
     }
     split_runtime_sync_remote = (split_runtime_sync_remote_t)SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
+}
+
+static void change_lighting_identity(void) {
+    fake_lighting_identity = fake_lighting_identity == 1u ? 128u : 1u;
+    split_runtime_sync_notify_key_feedback_dirty();
 }
 
 int main(void) {
@@ -1435,6 +1479,7 @@ int main(void) {
     test_tick_sends_exactly_the_changed_chunks(change_semantic);
     test_tick_sends_exactly_the_changed_chunks(change_tap_branch);
     test_tick_sends_exactly_the_changed_chunks(change_broad_owner);
+    test_tick_sends_exactly_the_changed_chunks(change_lighting_identity);
     test_quiet_combo_projection_clears_peer_feedback();
     test_idle_combo_feedback_activation_sends_without_dirty_notification();
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE

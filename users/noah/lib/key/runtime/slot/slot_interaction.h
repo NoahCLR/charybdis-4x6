@@ -14,6 +14,7 @@
 typedef struct {
     uint16_t            keycode;
     uint8_t             tap_count;
+    uint8_t             lighting_identity;
     key_behavior_step_t step;
 } key_runtime_slot_selection_t;
 
@@ -76,9 +77,10 @@ static inline void key_runtime_slot_interaction_from_materialized_into(const han
     *out = (key_runtime_slot_interaction_t){
         .selection =
             {
-                .keycode   = materialized->authored.keycode,
-                .tap_count = materialized->authored.tap_count,
-                .step      = materialized->authored.step,
+                .keycode           = materialized->authored.keycode,
+                .tap_count         = materialized->authored.tap_count,
+                .lighting_identity = materialized->authored.lighting_identity,
+                .step              = materialized->authored.step,
             },
         .binding =
             {

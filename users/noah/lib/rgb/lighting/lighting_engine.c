@@ -39,6 +39,7 @@ typedef struct {
     uint8_t              thing_kind;
     uint8_t              thing;
     uint8_t              slot;
+    uint8_t              outcome;
     uint8_t              amount;
 } placed_subject_t;
 
@@ -203,6 +204,7 @@ static void paint_subject(const noah_lighting_scene_t *scene, const rule_t *rule
     noah_lighting_paint_context_t context = {.scene = scene, .subject = &subject, .time = now, .effect_used = &info->effect_used};
 
     noah_lighting_subject_init(&subject, placed->thing_kind, placed->thing, placed->slot);
+    subject.outcome = placed->outcome;
     if (noah_lighting_paint_changes_with_time(rule->paint.kind) || (rule->has_background && noah_lighting_paint_changes_with_time(rule->background.kind))) info->live = true;
     for (uint8_t led = 0u; led < NOAH_LIGHTING_LED_COUNT; led++) {
         noah_lighting_leds_t bit = NOAH_LIGHTING_LED_BIT(led);
@@ -247,8 +249,12 @@ static void apply_rules(const noah_lighting_scene_t *scene, uint8_t first, uint8
             uint16_t                cursor = 0u;
             while (count < SUBJECT_MAX && noah_lighting_fact_next(rule.conditions[0].kind, scene->facts, rule.conditions[0].params, &cursor, &subject)) {
                 subjects[count++] = (placed_subject_t){
-                    .leds = noah_lighting_target(rule.target.kind, scene, rule.target.params, &subject) & leds, .thing_kind = subject.thing_kind, .thing = subject.thing, .slot = subject.slot,
-                    .amount = gate_amount(&rule, index, &subject, now, update, info),
+                    .leds       = noah_lighting_target(rule.target.kind, scene, rule.target.params, &subject) & leds,
+                    .thing_kind = subject.thing_kind,
+                    .thing      = subject.thing,
+                    .slot       = subject.slot,
+                    .outcome    = subject.outcome,
+                    .amount     = gate_amount(&rule, index, &subject, now, update, info),
                 };
             }
         } else {

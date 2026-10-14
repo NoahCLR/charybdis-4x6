@@ -16,6 +16,7 @@ void handled_key_lookup_row_tap_count_into(uint16_t keycode, uint8_t tap_count, 
     *out = (handled_key_resolution_t){
         .keycode            = keycode,
         .tap_count          = tap_count,
+        .lighting_identity  = behavior.lighting_identity,
         .step               = step,
         .tap_hold_term      = behavior.tap_hold_term,
         .longer_hold_term   = behavior.longer_hold_term,

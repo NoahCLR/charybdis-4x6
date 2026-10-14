@@ -146,7 +146,7 @@ user's. Version 4's reusable groups become key sets with the same ids.
 
 A map value is a palette index `0x00..0x7f` (below `P`) or `0x80 + k`, which
 paints with paint kind `k` and no parameters (`0x80` clear, `0x81` off, `0x83`
-identity). Only supported paint kinds without parameters may appear, and never
+identity, `0x88` outcome). Only supported paint kinds without parameters may appear, and never
 the map paint itself. In a sparse map the LEDs are strictly ascending and below
 58, and no value is `0x80`; the LEDs it omits are clear.
 
@@ -258,11 +258,13 @@ subjects from the slice, highest-priority first, and says whether any exist.
 | 3 | pointing mode active | pointing mode | mode (`0..31` supported, `0xff` any) | local, 11 B | the mode shown; its keys and halves are those of the key or combo that started it |
 | 4 | combos held | combo | role: `0` owning the shown preview or mode, `1` the others, `0xff` both | synced, 16 B | one subject for all such combos together: their keys, the halves those keys are on |
 | 5 | behaviour state | behaviour | states, scope | synced, 61 B | see below |
+| 7 | combo held | combo | combo (`0..127`, `0xff` any), role (`0`, `1`, `0xff`) | synced, 40 B | each identified held combo, newest completion first; its own input keys and halves |
+| 8 | behaviour | behaviour | behaviour (`0..127`, `0xff` any), states | synced, 180 B | each key showing that authored row, in matrix order; its selected colour slot |
 
 "Combos held" leaves out a combo whose output holds a momentary layer: the
 layer's own lighting says what the hold does. Its subject stands for every
 held combo of that role (thing `0xff`), so it takes the combo table's default
-identity; a later fact kind can yield one subject per combo.
+identity; fact 7 yields one subject per identified combo without changing this aggregate.
 
 **Behaviour state.** The USB half keeps, for every key, the state its
 behaviour shows (none, branch selected, tap, hold, long hold), the branch for
@@ -291,6 +293,35 @@ combo already lights that key. The fact applies this as it reads the frame,
 from the frame's combos slice, so both halves drop the same branches from the
 same facts. A build without the combos fact applies it to the slice as the USB
 half collects it instead.
+
+**Individual Painting subjects.** Fact 7 uses the same owning/other roles and
+momentary-layer-owner exclusion as fact 4, but yields actual combo-domain row
+ids (equal completions break ties by lower combo id). It carries the existing runtime's simultaneous output slots (four in
+this build), not a new limit on authored combo definitions. Unidentified
+fallback outputs yield no subject. Fact 4 continues to use thing `0xff` and
+the table default. Fact 7 is the first condition for a rule customising a
+single combo, or an Every combo rule that uses individual identities/places.
+
+Fact 8 selects an authored behaviour-domain row id, captured when the runtime
+resolves its branch, including compiled rows in authored table order. Intrinsic
+and bypassed gestures have no authored row and yield no subject. `states`
+has the same bit layout as fact 5; no new state families or scope parameter
+are added. Each subject carries the current key (a combo-output behaviour is
+projected onto its physical input keys), that key's half, and the selected
+identity slot. Flashing holds are absent in their dark interval; release
+pulses retain their captured row after slot settlement, including queued
+pulses and deferred tap dispatch. Selected branches are suppressed under a
+held combo, just as in fact 5. Layer/mode holds that Standard lighting leaves
+to the layer/mode scene are also available on this individual surface,
+including a pending layer preview, with steady feedback. Fact 5 retains its
+aggregate/default identity and its four scopes exactly.
+
+Use fact 8 first for an individual behaviour's identity/painted map; a later
+condition is only a filter and cannot supply an identity. An identity paint
+uses the chosen slot of this row, inheriting each unset slot separately from
+the board-wide behaviour default. The row's place follows the same field-wise
+inheritance. An outcome paint is chosen on a rule or map cell; selecting it on
+a behaviour's hold/long-hold rule is the colour-by-outcome option.
 
 ### Targets
 
@@ -321,6 +352,20 @@ it **changes with time**.
 | 4 | map | map (`< M`) | as its value | the map's value for the LED, a palette colour or the param-less paint it names |
 | 5 | dim | level | yes | `below × level / 255` |
 | 6 | tint | palette index, amount | yes | `below` mixed toward the colour by `amount / 255` |
+| 8 | outcome | — | no | a fact-8 hold/long-hold's resolved layer or pointing-mode identity, else clear |
+
+**Outcome support.** Paint 8 follows the materialized hold or long-hold action
+of the selected branch, including a resolved transparent tier, rather than the
+key's current mapping. Supported layer outcomes are the userspace layer hold,
+lock/toggle, goto, one-shot and layer-with-modifiers actions; supported pointing
+outcomes are a single slot's momentary or lock action. The target table's colour
+slot zero supplies the colour, with ordinary default/inherit handling. A missing
+table or `none` identity is clear; a palette entry whose value is zero is opaque
+black. Literal keys, modifiers, macros, raw unsupported QMK layer actions,
+layer-tap action outputs and any multi-mode/unknown outcome are clear. Tap and
+branch slots, board and aggregate subjects also say clear. This paint supplies
+no fallback to the behaviour palette: use identity for that, or another rule
+below. It takes no parameters and is legal in a painted map as `0x88`.
 
 No version-5 paint changes with time. Arithmetic per channel, with integer
 division:
@@ -426,8 +471,8 @@ carries). Synced slices are collected on the USB half and sent to the other
 half as one **lighting facts frame**, which replaces the per-stage combo and
 key-feedback packets and the preview byte of the base packet.
 
-The synced frame is the synced slices in registry order (78 bytes in this
-build). It travels in chunks on one transaction, `PUT_SPLIT_LIGHTING_FACTS_SYNC`:
+The synced frame is the synced slices in registry order (298 bytes in this
+build: the original 78-byte prefix plus 40 combo bytes and 180 behaviour bytes). It travels in chunks on one transaction, `PUT_SPLIT_LIGHTING_FACTS_SYNC`:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
@@ -459,6 +504,18 @@ and padding rules.
 Registries `r` are `0` facts, `1` targets, `2` paints, `3` timings, `4` rule
 extensions, `5` domain extensions, `6` thing kinds. A client offers only what
 the keyboard reports and keeps a rule it cannot edit byte for byte.
+
+With all modules enabled, the low-id fact page is registry 0, first id 0,
+bitmap prefix `be 01` (ids 1–5, 7, 8); the paint page is registry 2,
+bitmap prefix `7f 01` (ids 0–6, 8). Target bits remain `ff` (ids 0–7).
+The rest of each 16-byte bitmap is zero. Disabling
+`NOAH_LIGHTING_FACT_COMBO_HELD`, `NOAH_LIGHTING_FACT_BEHAVIOUR` or
+`NOAH_LIGHTING_PAINT_OUTCOME` removes only its kind/bit and rejects that kind
+in rules/maps. The default fact flags follow combo and key-feedback support;
+the paint defaults on with RGB. These additions use the open registries:
+domain version 5, page layout version 1, existing ids and Standard lighting's
+encoded bytes are unchanged. The illustrative future ids 6 (host OS) and
+7 (breathing paint) in the walkthroughs remain unimplemented.
 
 ## Version 4 → version 5 conversion
 

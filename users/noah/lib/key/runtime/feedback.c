@@ -300,6 +300,8 @@ static bool key_feedback_pulse_active(void) {
         state->feedback_pulse_kind            = state->feedback_pulse_queued_kind;
         state->feedback_pulse_key_pos         = state->feedback_pulse_queued_key_pos;
         state->feedback_pulse_tap_branch      = state->feedback_pulse_queued_tap_branch;
+        state->feedback_pulse_identity        = state->feedback_pulse_queued_identity;
+        state->feedback_pulse_outcome         = state->feedback_pulse_queued_outcome;
         state->feedback_pulse_queued          = false;
         state->feedback_pulse_queued_sequence = 0u;
         return true;
@@ -653,4 +655,78 @@ void combo_feedback_overlay_bitmap(uint8_t *out_bitmap) {
     uint8_t unused_underlay[KEY_ORIGIN_BITMAP_SIZE];
 
     combo_feedback_bitmaps(unused_underlay, out_bitmap);
+}
+
+static uint8_t key_feedback_lighting_slot(key_feedback_semantic_t semantic, uint8_t branch) {
+    switch (semantic) {
+        case KEY_FEEDBACK_SEMANTIC_HOLD_PENDING:
+        case KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING:
+            return 1u;
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY:
+        case KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING:
+            return 2u;
+        case KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED:
+            return 3u;
+        case KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING: {
+            uint8_t index = branch <= 2u ? 0u : branch - 2u;
+            uint8_t last  = KEY_BEHAVIOR_MAX_TAP_COUNT - 2u;
+            return (uint8_t)(4u + (index > last ? last : index));
+        }
+        default:
+            return 0u;
+    }
+}
+
+static uint8_t key_feedback_lighting_priority(uint8_t slot) {
+    return slot == 0u ? 0u : slot == 3u ? 4u : slot == 2u ? 3u : slot == 1u ? 2u : 1u;
+}
+
+static void key_feedback_lighting_apply(uint8_t *out, keypos_t owner, uint8_t identity, key_feedback_semantic_t semantic, uint8_t branch, uint8_t outcome) {
+    uint8_t keys[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t slot = key_feedback_lighting_slot(semantic, branch);
+    if (!identity || !slot || !key_origin_registry_get_bitmap(owner, keys)) return;
+    for (uint8_t row = 0u; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0u; col < MATRIX_COLS; col++) {
+            keypos_t key = {.row = row, .col = col};
+            if (!key_origin_bitmap_has_keypos(keys, key)) continue;
+            if (key_feedback_semantic_is_flashing(semantic) && !key_runtime_core_flashing_feedback_visible_at(key)) continue;
+            uint8_t *record = &out[(row * MATRIX_COLS + col) * KEY_FEEDBACK_LIGHTING_RECORD_BYTES];
+            if (key_feedback_lighting_priority(slot) < key_feedback_lighting_priority(record[1])) continue;
+            record[0] = identity;
+            record[1] = slot;
+            record[2] = outcome;
+        }
+    }
+}
+
+void key_feedback_lighting_map(uint8_t *out) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    memset(out, 0, KEY_FEEDBACK_LIGHTING_BYTES);
+    if (!state) return;
+    if (key_feedback_pulse_active()) key_feedback_lighting_apply(out, state->feedback_pulse_key_pos, state->feedback_pulse_identity, key_feedback_semantic_for_pulse(state->feedback_pulse_kind), state->feedback_pulse_tap_branch, state->feedback_pulse_outcome);
+    for (uint16_t cursor = 0u; key_feedback_next_active_slot(state->tap_series_active_bitmap, &cursor);) {
+        uint16_t      i      = cursor - 1u;
+        tap_series_t *series = &state->tap_series[i];
+        if (key_feedback_tap_series_shows_tap_branch(series)) key_feedback_lighting_apply(out, key_feedback_slot_key_pos(i), series->lighting_identity, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING, series->tap_count, 0u);
+    }
+    for (uint16_t cursor = 0u; key_feedback_next_active_slot(state->press_token_active_bitmap, &cursor);) {
+        uint16_t                i         = cursor - 1u;
+        keypos_t                key       = key_feedback_slot_key_pos(i);
+        press_token_t          *token     = &state->press_tokens[i];
+        key_feedback_semantic_t semantic  = key_feedback_semantic_for_token(token, key);
+        bool                    long_hold = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.longer_hold_term;
+        uint8_t                 outcome   = key_feedback_lighting_hold_outcome(long_hold ? token->interaction.binding.long_hold : token->interaction.binding.hold);
+        // Layer/mode holds that Standard lighting delegates to their own scene
+        // still belong to this behaviour's Painting surface, without a flash.
+        if (semantic == KEY_FEEDBACK_SEMANTIC_NONE && outcome != 0u && (key_feedback_preview_layer_for_token(token) != UINT8_MAX || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING)) semantic = long_hold ? KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY : KEY_FEEDBACK_SEMANTIC_HOLD_PENDING;
+        key_feedback_lighting_apply(out, key, token->interaction.selection.lighting_identity, semantic, token->interaction.selection.tap_count, outcome);
+    }
+    // Preserve selected-branch suppression for the whole combo footprint.
+    uint8_t owning[KEY_ORIGIN_BITMAP_SIZE], others[KEY_ORIGIN_BITMAP_SIZE];
+    combo_feedback_bitmaps(owning, others);
+    key_origin_bitmap_or_inplace(owning, others);
+    for (uint8_t i = 0u; i < MATRIX_ROWS * MATRIX_COLS; i++) {
+        uint8_t *record = &out[i * KEY_FEEDBACK_LIGHTING_RECORD_BYTES];
+        if (record[1] >= 4u && key_origin_bitmap_has_keypos(owning, key_feedback_slot_key_pos(i))) memset(record, 0, KEY_FEEDBACK_LIGHTING_RECORD_BYTES);
+    }
 }

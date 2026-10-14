@@ -20,7 +20,7 @@ trap cleanup EXIT INT TERM
 # The lighting facts frame is built from the synced fact slices (preview,
 # combos, behaviour), fed by this test's fake builders. The engine's targets,
 # paints and other kinds are compiled out so dispatch names only those slices.
-LIGHTING_FLAGS="-DRGB_MATRIX_ENABLE -DCOMBO_ENABLE -DRGB_COMBO_FEEDBACK_ENABLE
+LIGHTING_FLAGS="-DNOAH_LIGHTING_PAINT_OUTCOME=0 -DRGB_MATRIX_ENABLE -DCOMBO_ENABLE -DRGB_COMBO_FEEDBACK_ENABLE
     -DNOAH_LIGHTING_FACT_LAYER_ACTIVE=0 -DNOAH_LIGHTING_FACT_POINTING_MODE_ACTIVE=0
     -DNOAH_LIGHTING_TARGET_WHOLE_BOARD=0 -DNOAH_LIGHTING_TARGET_LEFT_HALF=0 -DNOAH_LIGHTING_TARGET_RIGHT_HALF=0
     -DNOAH_LIGHTING_TARGET_KEY_SET=0 -DNOAH_LIGHTING_TARGET_SUBJECT_KEYS=0 -DNOAH_LIGHTING_TARGET_SUBJECT_HALVES=0
@@ -29,7 +29,7 @@ LIGHTING_FLAGS="-DRGB_MATRIX_ENABLE -DCOMBO_ENABLE -DRGB_COMBO_FEEDBACK_ENABLE
     -DNOAH_LIGHTING_PAINT_MAP=0 -DNOAH_LIGHTING_PAINT_DIM=0 -DNOAH_LIGHTING_PAINT_TINT=0
     -DNOAH_LIGHTING_TIMING_SHOW_AFTER=0 -DNOAH_LIGHTING_EXTENSION_AUTOMOUSE_FADE=0 -DNOAH_LIGHTING_EXTENSION_TAP_COMMIT_FLASH=0"
 LIGHTING="$ROOT/users/noah/lib/rgb/lighting"
-LIGHTING_SOURCES="$LIGHTING/lighting_dispatch.c $LIGHTING/kinds/fact_layer_previewing.c $LIGHTING/kinds/fact_combos_held.c $LIGHTING/kinds/fact_behaviour_state.c"
+LIGHTING_SOURCES="$LIGHTING/lighting_dispatch.c $LIGHTING/kinds/fact_layer_previewing.c $LIGHTING/kinds/fact_combos_held.c $LIGHTING/kinds/fact_behaviour_state.c $LIGHTING/kinds/fact_combo_held.c $LIGHTING/kinds/fact_behaviour.c"
 
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \

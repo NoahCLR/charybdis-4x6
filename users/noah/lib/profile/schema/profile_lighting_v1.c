@@ -263,6 +263,8 @@ static noah_profile_lighting_v1_result_t check_param(const validation_t *v, uint
             return value == NOAH_PROFILE_LIGHTING_V1_ANY || value < limits->logical_layer_count ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
         case NOAH_LIGHTING_PARAM_MODE_SELECTOR:
             return value == NOAH_PROFILE_LIGHTING_V1_ANY || (value < 32u && (limits->supported_mode_mask & (UINT32_C(1) << value)) != 0u) ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
+        case NOAH_LIGHTING_PARAM_THING_SELECTOR:
+            return value == NOAH_PROFILE_LIGHTING_V1_ANY || value < 128u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
         case NOAH_LIGHTING_PARAM_COMBO_ROLE:
             return value == 0u || value == 1u || value == NOAH_PROFILE_LIGHTING_V1_ANY ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
         case NOAH_LIGHTING_PARAM_BEHAVIOUR_STATES:

@@ -62,3 +62,20 @@ for source in profile_lighting_v1.c profile_lighting_v1_convert.c; do
         -c "$ROOT/users/noah/lib/profile/schema/$source" \
         -o "$BUILD_DIR/${source%.c}_cortex_m0plus.o"
 done
+
+# Compile out each new kind independently; existing rows remain available.
+for disabled in none COMBO_HELD BEHAVIOUR OUTCOME; do
+    case "$disabled" in
+        none) gate_flags="" ;;
+        OUTCOME) gate_flags="-DNOAH_LIGHTING_PAINT_OUTCOME=0" ;;
+        *) gate_flags="-DNOAH_LIGHTING_FACT_$disabled=0" ;;
+    esac
+    # shellcheck disable=SC2086
+    cc -std=c11 -Wall -Wextra -Werror -pedantic $FLAGS $gate_flags \
+        -I"$ROOT" -I"$ROOT/users/noah" \
+        "$ROOT/tests/host/lighting_module_gates_test.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_lighting_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+        -o "$BUILD_DIR/module_gate_$disabled"
+    "$BUILD_DIR/module_gate_$disabled"
+done

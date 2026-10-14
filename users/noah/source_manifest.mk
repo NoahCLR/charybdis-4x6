@@ -138,6 +138,8 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/lighting/lighting_fade.c \
     lib/rgb/lighting/kinds/fact_behaviour_state.c \
     lib/rgb/lighting/kinds/fact_combos_held.c \
+    lib/rgb/lighting/kinds/fact_combo_held.c \
+    lib/rgb/lighting/kinds/fact_behaviour.c \
     lib/rgb/lighting/kinds/fact_layer_active.c \
     lib/rgb/lighting/kinds/fact_layer_previewing.c \
     lib/rgb/lighting/kinds/fact_pointing_mode_active.c \
@@ -145,6 +147,7 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/lighting/kinds/paint_colour.c \
     lib/rgb/lighting/kinds/paint_dim.c \
     lib/rgb/lighting/kinds/paint_identity.c \
+    lib/rgb/lighting/kinds/paint_outcome.c \
     lib/rgb/lighting/kinds/paint_map.c \
     lib/rgb/lighting/kinds/paint_off.c \
     lib/rgb/lighting/kinds/paint_tint.c \

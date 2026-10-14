@@ -969,6 +969,7 @@ static void key_runtime_core_tap_series_seed(key_runtime_core_state_t *state, co
     *series = (tap_series_t){
         .active                       = true,
         .keycode                      = seed->keycode,
+        .lighting_identity            = seed->lighting_identity,
         .tap_count                    = seed->tap_count == 0u ? 1u : seed->tap_count,
         .pending_hold                 = false,
         .single_action                = seed->tap_action,
@@ -1005,6 +1006,7 @@ static void key_runtime_core_tap_series_update_for_press(key_runtime_core_state_
 
     series->active                       = true;
     series->keycode                      = token->resolved_keycode;
+    series->lighting_identity            = token->interaction.selection.lighting_identity;
     series->wrapped                      = series->wrapped || key_runtime_core_tap_series_next_tap_count(series) <= series->tap_count;
     series->tap_count                    = token->interaction.selection.tap_count ? token->interaction.selection.tap_count : key_runtime_core_tap_series_next_tap_count(series);
     series->pending_hold                 = token->interaction.binding.hold.present || token->interaction.binding.long_hold.present;

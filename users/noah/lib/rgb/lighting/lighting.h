@@ -50,6 +50,7 @@ typedef struct {
     uint8_t thing_kind; // NOAH_LIGHTING_THING_*
     uint8_t thing;      // the thing's id, or NOAH_PROFILE_LIGHTING_V1_ANY for every thing of the kind
     uint8_t slot;       // identity colour slot
+    uint8_t outcome;    // feedback outcome encoding (feedback.h)
     uint8_t sides;      // split_side_mask_t of the halves it concerns
     bool    has_keys;
     uint8_t keys[KEY_ORIGIN_BITMAP_SIZE];
@@ -61,6 +62,12 @@ typedef struct {
 // is collected on each half; a synced one on the USB half, which sends it in
 // the lighting facts frame. A gated slice is rebuilt for the link only when
 // its owner marks it dirty, it was active, or a heartbeat is due.
+
+#ifndef COMBO_BUFFER_LENGTH
+#    define COMBO_BUFFER_LENGTH 4
+#endif
+#define NOAH_LIGHTING_COMBO_RECORD_BYTES (2u + KEY_ORIGIN_BITMAP_SIZE)
+#define NOAH_LIGHTING_COMBO_SLICE_BYTES (COMBO_BUFFER_LENGTH * NOAH_LIGHTING_COMBO_RECORD_BYTES)
 
 #define NOAH_LIGHTING_BEHAVIOUR_SLICE_BYTES (KEY_ORIGIN_BITMAP_SIZE + KEY_FEEDBACK_SEMANTIC_MAP_SIZE + KEY_FEEDBACK_BROAD_OWNER_MAP_SIZE + KEY_FEEDBACK_TAP_BRANCH_MAP_SIZE)
 
@@ -90,12 +97,25 @@ typedef struct {
 #    define NOAH_LIGHTING_SLICE_BEHAVIOUR_STATE(X)
 #endif
 
+#if NOAH_LIGHTING_FACT_COMBO_HELD
+#    define NOAH_LIGHTING_SLICE_COMBO_HELD(X) X(combo_held, NOAH_LIGHTING_COMBO_SLICE_BYTES, 1, 0)
+#else
+#    define NOAH_LIGHTING_SLICE_COMBO_HELD(X)
+#endif
+#if NOAH_LIGHTING_FACT_BEHAVIOUR
+#    define NOAH_LIGHTING_SLICE_BEHAVIOUR(X) X(behaviour, KEY_FEEDBACK_LIGHTING_BYTES, 1, 1)
+#else
+#    define NOAH_LIGHTING_SLICE_BEHAVIOUR(X)
+#endif
+
 #define NOAH_LIGHTING_SLICE_ROWS(X)             \
     NOAH_LIGHTING_SLICE_LAYER_ACTIVE(X)         \
     NOAH_LIGHTING_SLICE_LAYER_PREVIEWING(X)     \
     NOAH_LIGHTING_SLICE_POINTING_MODE_ACTIVE(X) \
     NOAH_LIGHTING_SLICE_COMBOS_HELD(X)          \
-    NOAH_LIGHTING_SLICE_BEHAVIOUR_STATE(X)
+    NOAH_LIGHTING_SLICE_BEHAVIOUR_STATE(X)      \
+    NOAH_LIGHTING_SLICE_COMBO_HELD(X)           \
+    NOAH_LIGHTING_SLICE_BEHAVIOUR(X)
 
 typedef struct {
 #define NOAH_LIGHTING_SLICE_FIELD(name, bytes, synced, gated) uint8_t name[bytes];
@@ -109,7 +129,7 @@ enum { NOAH_LIGHTING_SYNCED_BYTES = 0u NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SL
 #undef NOAH_LIGHTING_SLICE_SYNCED_SIZE
 
 // Whether this build sends any synced slice; the link carries none otherwise.
-#if NOAH_LIGHTING_FACT_LAYER_PREVIEWING || NOAH_LIGHTING_FACT_COMBOS_HELD || NOAH_LIGHTING_FACT_BEHAVIOUR_STATE
+#if NOAH_LIGHTING_FACT_LAYER_PREVIEWING || NOAH_LIGHTING_FACT_COMBOS_HELD || NOAH_LIGHTING_FACT_BEHAVIOUR_STATE || NOAH_LIGHTING_FACT_COMBO_HELD || NOAH_LIGHTING_FACT_BEHAVIOUR
 #    define NOAH_LIGHTING_HAS_SYNCED_FACTS 1
 #else
 #    define NOAH_LIGHTING_HAS_SYNCED_FACTS 0

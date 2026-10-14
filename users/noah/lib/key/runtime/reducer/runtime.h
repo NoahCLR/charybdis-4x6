@@ -142,6 +142,7 @@ typedef struct {
     // wrapped series sits on branch one again, so tap_count alone can no longer
     // tell an ongoing gesture from a first tap.
     bool                 wrapped;
+    uint8_t              lighting_identity;
     hold_behavior_t      hold;
     hold_behavior_t      long_hold;
     uint16_t             tap_hold_term_ms;
@@ -172,13 +173,15 @@ typedef struct {
     uint8_t                     next_queue_index;
     key_runtime_packed_keypos_t packed_key_pos;
     uint8_t                     flags;
+    uint8_t                     lighting_identity;
 } pending_release_slot_t;
 
 _Static_assert(sizeof(pending_release_slot_t) <= 12u, "pending_release_slot_t must stay compact");
 
 typedef struct {
-    bool                 active;
-    bool                 tap_commit_feedback;
+    bool                 active : 1;
+    bool                 tap_commit_feedback : 1;
+    uint8_t              lighting_identity;
     uint16_t             owner_token_id;
     keypos_t             key_pos;
     uint16_t             action;
@@ -342,11 +345,15 @@ typedef struct {
     key_feedback_pulse_kind_t            feedback_pulse_kind;
     keypos_t                             feedback_pulse_key_pos;
     uint8_t                              feedback_pulse_tap_branch;
+    uint8_t                              feedback_pulse_identity;
+    uint8_t                              feedback_pulse_outcome;
     bool                                 feedback_pulse_queued;
     uint32_t                             feedback_pulse_queued_sequence;
     key_feedback_pulse_kind_t            feedback_pulse_queued_kind;
     keypos_t                             feedback_pulse_queued_key_pos;
     uint8_t                              feedback_pulse_queued_tap_branch;
+    uint8_t                              feedback_pulse_queued_identity;
+    uint8_t                              feedback_pulse_queued_outcome;
     uint16_t                             preview_display_bridge_started_at;
     uint8_t                              preview_display_last_semantic_layer;
     uint8_t                              preview_display_bridge_layer;

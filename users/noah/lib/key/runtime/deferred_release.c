@@ -38,7 +38,8 @@ void key_runtime_deferred_release_defer_dispatch_actions_until_release(keypos_t 
             keypos_t dispatch_key_pos    = key_runtime_effect_dispatch_action_key_pos(&effect);
             bool     tap_commit_feedback = (read_index + 1u) < plan->count && key_runtime_deferred_release_effect_is_tap_commit_feedback_for_key(&plan->items[read_index + 1u], dispatch_key_pos);
 
-            if (key_runtime_core_queue_pending_release_dispatch(dispatch_key_pos, effect.data.dispatch_action.action, mods, tap_commit_feedback)) {
+            const press_token_t *token = key_runtime_core_press_token_at(dispatch_key_pos);
+            if (key_runtime_core_queue_pending_release_dispatch_with_identity(dispatch_key_pos, effect.data.dispatch_action.action, mods, tap_commit_feedback, token ? token->token_id : 0u, tap_commit_feedback ? plan->items[read_index + 1u].data.feedback_pulse.lighting_identity : 0u)) {
                 if (tap_commit_feedback) {
                     read_index++;
                 }

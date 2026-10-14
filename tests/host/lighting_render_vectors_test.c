@@ -90,6 +90,31 @@ uint8_t get_auto_mouse_layer(void) {
     return fade_layer;
 }
 
+bool key_runtime_core_preview_owner_key_pos(keypos_t *key) {
+    (void)key;
+    return false;
+}
+bool pd_mode_local_owner_key_pos_snapshot(keypos_t *key) {
+    (void)key;
+    return false;
+}
+void layer_ownership_momentary_owner_bitmap(uint8_t *out) {
+    key_origin_bitmap_clear(out);
+}
+bool noah_qmk_combo_origin_lighting_next(keypos_t preview, keypos_t mode, const uint8_t *quiet, uint16_t *cursor, uint8_t *id, uint8_t *role, uint8_t *keys) {
+    (void)preview;
+    (void)mode;
+    (void)quiet;
+    (void)cursor;
+    (void)id;
+    (void)role;
+    (void)keys;
+    return false;
+}
+void key_feedback_lighting_map(uint8_t *out) {
+    memset(out, 0, KEY_FEEDBACK_LIGHTING_BYTES);
+}
+
 // Collection is the USB half's job; these vectors set the facts directly.
 void    key_feedback_semantic_map(uint8_t *out_map) { key_feedback_semantic_map_clear(out_map); }
 void    key_feedback_tap_branch_map(uint8_t *out_map) { key_feedback_tap_branch_map_clear(out_map); }
@@ -174,6 +199,16 @@ int main(int argc, char **argv) {
         facts.pointing_mode_active[2] = (uint8_t)keyed;
         memcpy(&facts.pointing_mode_active[3], mode_keys, sizeof(mode_keys));
         read_hex(file, facts.combos_held, 2u * KEY_ORIGIN_BITMAP_SIZE);
+        noah_lighting_slice_combo_held_idle(facts.combo_held);
+        assert(fscanf(file, "%u", &count) == 1 && count <= COMBO_BUFFER_LENGTH);
+        for (unsigned i = 0; i < count; i++) {
+            unsigned id, role;
+            assert(fscanf(file, "%u %u", &id, &role) == 2);
+            uint8_t *record = &facts.combo_held[i * NOAH_LIGHTING_COMBO_RECORD_BYTES];
+            record[0]       = id;
+            record[1]       = role;
+            read_hex(file, record + 2u, KEY_ORIGIN_BITMAP_SIZE);
+        }
         for (unsigned layer = 0; layer < LAYER_COUNT; layer++) read_hex(file, mapped[layer], KEY_ORIGIN_BITMAP_SIZE);
         {
             uint8_t *slice    = facts.behaviour_state;
@@ -184,8 +219,15 @@ int main(int argc, char **argv) {
             key_feedback_broad_owner_map_clear(owner);
             assert(fscanf(file, "%u", &count) == 1);
             for (unsigned entry = 0; entry < count; entry++) {
-                unsigned key, state, branch_value, flashing, lit;
-                assert(fscanf(file, "%u %u %u %u %u", &key, &state, &branch_value, &flashing, &lit) == 5);
+                unsigned key, state, branch_value, flashing, lit, identity, outcome;
+                assert(fscanf(file, "%u %u %u %u %u %u %u", &key, &state, &branch_value, &flashing, &lit, &identity, &outcome) == 7);
+                if (identity < 128u && (!flashing || lit)) {
+                    uint8_t *record = &facts.behaviour[key * KEY_FEEDBACK_LIGHTING_RECORD_BYTES];
+                    record[0]       = identity + 1u;
+                    unsigned index  = branch_value <= 2u ? 0u : branch_value - 2u;
+                    record[1]       = state == 0u ? 4u + (index > NOAH_PROFILE_TAP_DEPTH - 2u ? NOAH_PROFILE_TAP_DEPTH - 2u : index) : state == 1u ? 3u : state == 2u ? 1u : 2u;
+                    record[2]       = outcome;
+                }
                 key_feedback_semantic_t value = state == 0 ? KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING : state == 1 ? KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED : state == 2 ? (flashing ? KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING : KEY_FEEDBACK_SEMANTIC_HOLD_PENDING) : (flashing ? KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING : KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_STEADY);
                 key_feedback_semantic_map_set(semantic, key_at(key), value);
                 if (state == 0) key_feedback_tap_branch_map_set(branch, key_at(key), (uint8_t)branch_value);

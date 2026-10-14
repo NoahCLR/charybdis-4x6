@@ -337,6 +337,9 @@ static void test_authored_lt_uses_custom_runtime(void) {
     key_behavior_view_t behavior = key_behavior_lookup(TEST_AUTHORED_LAYER_TAP);
 
     CHECK(behavior.handled);
+    CHECK(behavior.lighting_identity != 0u);
+    CHECK(key_behaviors[behavior.lighting_identity - 1u].keycode == TEST_AUTHORED_LAYER_TAP);
+    CHECK(key_behavior_lookup_without_row(TEST_AUTHORED_LAYER_TAP).lighting_identity == 0u);
     // Its layer is a hold past the tap-hold term, not held from the press
     // like MO(): a tap must never turn the layer on.
     CHECK(!behavior.is_momentary_layer);
@@ -818,6 +821,7 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
 
     behavior = key_behavior_lookup(TEST_MULTI_TAP_KEY);
     CHECK(behavior.source_is_live && behavior.config == NULL && behavior.handled);
+    CHECK(behavior.lighting_identity == 1u);
     CHECK(behavior.tap_hold_term == 123u && behavior.longer_hold_term == 456u && behavior.multi_tap_term == 78u);
     CHECK(behavior.has_multi_tap && behavior.authored_tap_depth == 2u);
     CHECK(behavior.single.tap.present && behavior.single.tap.action == KC_Z);

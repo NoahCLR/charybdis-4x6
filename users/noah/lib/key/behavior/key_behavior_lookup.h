@@ -15,6 +15,7 @@ typedef struct {
     uint32_t              source_epoch; // live-profile epoch; zero for compiled defaults
     uint16_t              keycode;
     uint8_t               source_row;
+    uint8_t               lighting_identity; // row + 1; zero without an authored row
     bool                  source_is_live;
     bool                  handled;
     bool                  is_momentary_layer; // holds its layer from the press: MO(), TT(), OSL(), LM()

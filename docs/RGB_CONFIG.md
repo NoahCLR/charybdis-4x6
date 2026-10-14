@@ -58,6 +58,12 @@ compiled default and its factory fallback; a profile saved from the app
 replaces it with its own rules, and the tables here no longer apply until
 that profile is removed.
 
+Stored Painting rules can use individual combo/behaviour subjects and identity
+records, or the hold/long-hold outcome paint. These are additive registry kinds,
+not new authored C tables; the Standard conversion keeps its existing bytes
+and aggregate behaviour. See the [individual-subject contract](./architecture/lighting-rules-v1.md#facts)
+for row ids, colour slots and outcome limits.
+
 `rgb_config.c` is the main authored RGB surface:
 
 - layer colors

@@ -86,7 +86,9 @@ static void test_layout_and_reset_contract(void) {
     // Thirty-two pointing slots widen each pd-mode mask from 16 to 32 bits:
     // 8 bytes per press token (two masks and their alignment), 4 per
     // persistent intent and 20 across the projection and shadow, 580 bytes.
-    CHECK(sizeof(key_runtime_core_state_t) == 21112u);
+    // Painting captures identities/outcomes for the active and queued pulse:
+    // eight bytes with alignment; per-slot row ids use existing padding.
+    CHECK(sizeof(key_runtime_core_state_t) == 21120u);
     CHECK(test_state.pending_release_count == 0u);
     CHECK(test_state.pending_release_head_index == KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE);
     CHECK(test_state.pending_release_tail_index == KEY_RUNTIME_CORE_PENDING_RELEASE_INDEX_NONE);

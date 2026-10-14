@@ -62,10 +62,12 @@ def key_leds(keys) -> frozenset:
 # ─── Registries ─────────────────────────────────────────────────────────────
 # Parameter types, by name, as the contract defines them.
 FACTS = {1: ("layer active", ["layerSelector"]), 2: ("layer previewing", ["layerSelector"]), 3: ("pointing mode active", ["modeSelector"]), 4: ("combos held", ["comboRole"]), 5: ("behaviour state", ["behaviourStates", "behaviourScope"])}
-FACT_THING = {1: 1, 2: 1, 3: 2, 4: 3, 5: 4}
+FACTS.update({7: ("combo held", ["thingSelector", "comboRole"]), 8: ("behaviour", ["thingSelector", "behaviourStates"])})
+FACT_THING = {1: 1, 2: 1, 3: 2, 4: 3, 5: 4, 7: 3, 8: 4}
 TARGETS = {0: [], 1: [], 2: [], 3: ["keySet"], 4: [], 5: [], 6: [], 7: []}
 PLACE_TARGETS = {0, 1, 2, 4, 5, 6}
 PAINTS = {0: [], 1: [], 2: ["paletteIndex"], 3: [], 4: ["map"], 5: ["level"], 6: ["paletteIndex", "level"]}
+PAINTS[8] = []
 PAINT_READS_BELOW = {5, 6}
 TIMINGS = {1: ["milliseconds"]}
 RULE_EXTENSIONS: dict = {}
@@ -187,6 +189,9 @@ def check_param(kind_type: str, data: bytes, offset: int, limits: Limits, counts
             raise Invalid("INVALID_PARAMETER", offset)
     elif kind_type == "modeSelector":
         if value != ANY and (value >= 32 or not (limits.modes >> value) & 1):
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "thingSelector":
+        if value != ANY and value >= 128:
             raise Invalid("INVALID_PARAMETER", offset)
     elif kind_type == "comboRole":
         if value not in (0, 1, ANY):
@@ -568,6 +573,22 @@ class Situation:
             if params[0] in (1, ANY):
                 keys |= set(self.combos.get("others", []))
             return [subject(3, ANY, 0, keys, {key_half(k) for k in keys})] if keys else []
+        if kind == 7:
+            return [subject(3, item["id"], 0, item["keys"], {key_half(k) for k in item["keys"]}) for item in self.combos.get("instances", []) if params[0] in (ANY, item["id"]) and params[1] in (ANY, item["role"])]
+        if kind == 8:
+            found = []
+            covered = set(self.combos.get("owning", [])) | set(self.combos.get("others", []))
+            for key in sorted(int(k) for k in self.behaviour["keys"]):
+                entry = self.shown(key)
+                if not entry or "id" not in entry or params[0] not in (ANY, entry["id"]) or not (params[1] >> STATE_BIT[entry["state"]] & 1):
+                    continue
+                if entry["state"] == "branch" and key in covered:
+                    continue
+                subj = self.behaviour_subject(key, entry)
+                subj["thing"] = entry["id"]
+                subj["outcome"] = entry.get("outcome", 0)
+                found.append(subj)
+            return found
         if kind == 5:
             mask, scope = params
             owners = self.behaviour.get("owners", {})
@@ -642,6 +663,15 @@ class Renderer:
             return ("colour", self.rgb[params[0]])
         if kind == 3:
             ref = self.record_field(subj, 1 + subj["slot"])
+            return None if ref is None or ref == NONE else ("colour", self.rgb[ref])
+        if kind == 8:
+            outcome = subj.get("outcome", 0)
+            if subj["kind"] != 4 or subj["slot"] > 1:
+                return None
+            kind, thing = (1, outcome - 1) if 1 <= outcome <= 16 else (2, outcome - 33) if 33 <= outcome <= 64 else (0, 0)
+            if kind == 0:
+                return None
+            ref = self.record_field(subject(kind, thing), 1)
             return None if ref is None or ref == NONE else ("colour", self.rgb[ref])
         if kind == 4:
             value = self.domain["maps"][params[0]].get(led, 0x80)
@@ -1040,6 +1070,17 @@ def render_vectors(limits):
             {"layers": [1, 4], "effect": {"0": "302010"}, "fade": {"progress": 450, "timeout": 900, "deadTime": 300, "autoMouseLayer": 4}},
             {"layers": [4], "effect": {"0": "302010"}, "fade": {"progress": 600, "timeout": 900, "deadTime": 300, "autoMouseLayer": 4}},
         ], limits))
+    identified_combos = {"kind": 3, "default": [5, YELLOW], "records": [[4, RED], [2, GREEN], [INHERIT, INHERIT], [1, NONE]]}
+    instances = [{"id": 1, "role": 1, "keys": [30, 31]}, {"id": 0, "role": 0, "keys": [0, 1]}]
+    for selector, role in ((ANY, ANY), (0, ANY), (1, 1), (1, 0), (127, ANY)):
+        cases.append(render_case(f"combo-identity-{selector}-{role}", "fact:7", {"palette": PALETTE, "things": [identified_combos], "rules": [rule(part(C, 7, selector, role), part(T, 7), part(P, 3))]}, [{}, {"combos": {"instances": instances}}, {"combos": {"instances": list(reversed(instances))}}, {"combos": {"instances": [{"id": 2, "role": 1, "keys": [0]}]}}, {"combos": {"instances": [{"id": 3, "role": 1, "keys": [0]}]}}], limits))
+    behaviours = dict(BEHAVIOUR_TABLE, records=[[4, RED, GREEN, BLUE, WHITE, CYAN, PURPLE, YELLOW], [2] + [INHERIT] * 7])
+    keys = {"0": {"id": 0, "state": "hold", "outcome": 2}, "31": {"id": 1, "state": "long", "outcome": 34}}
+    for selector in (ANY, 0, 1, 127):
+        cases.append(render_case(f"behaviour-identity-{selector}", "fact:8", {"palette": PALETTE, "things": [behaviours], "rules": [rule(part(C, 8, selector, 15), part(T, 7), part(P, 3))]}, [{}, {"behaviour": {"keys": keys}}, *[{"behaviour": {"keys": {"0": {"id": 0, "state": "branch", "branch": branch}}}} for branch in (2, 3, 5, 7)], {"behaviour": {"keys": {"0": {"id": 0, "state": "tap"}, "31": {"id": 1, "state": "hold", "flashing": True, "lit": False}}}}], limits))
+    outcome_domain = {"palette": PALETTE, "things": [layers, modes, behaviours], "rules": [rule(part(C, 8, ANY, 15), part(T, 4), part(P, 8)), rule(part(T, 0), part(P, 2, PURPLE))]}
+    cases.append(render_case("behaviour-outcome", "paint:8", outcome_domain, [{"behaviour": {"keys": keys}}, *[{"behaviour": {"keys": {"0": {"id": 0, "state": state, "outcome": outcome}}}} for state, outcome in (("hold", 0), ("hold", 1), ("hold", 2), ("long", 34), ("tap", 2), ("branch", 2), ("hold", 65))]], limits))
+    cases.append(render_case("painting-map-outcome-clear-off", "paint:8", {"palette": PALETTE, "things": [layers, modes, behaviours], "maps": [{0: 0x88, 1: 0x81, 57: 0x83}], "rules": [rule(part(C, 8, ANY, 15), part(T, 0), part(P, 4, 0)), rule(part(T, 0), part(P, 2, PURPLE))]}, [{"behaviour": {"keys": {"0": {"id": 0, "state": "hold", "outcome": 2}}}}, {"behaviour": {"keys": {"0": {"id": 0, "state": "tap"}}}}], limits))
     return cases
 
 
@@ -1119,6 +1160,12 @@ def codec_vectors(limits, standard: bytes):
     reject("rule-parameter-length", simple(part(C, 1, ANY, 0), *good))
     reject("rule-layer", simple(part(C, 1, 16), *good))
     reject("rule-mode", simple(part(C, 3, 32), *good))
+    reject("combo-selector-128", simple(part(C, 7, 128, 255), *good))
+    reject("behaviour-selector-254", simple(part(C, 8, 254, 15), *good))
+    reject("identified-combo-role", simple(part(C, 7, 0, 2), *good))
+    reject("identified-behaviour-states-zero", simple(part(C, 8, 0, 0), *good))
+    reject("identified-behaviour-states-high", simple(part(C, 8, 0, 16), *good))
+    reject("outcome-has-no-params", simple(part(T, 0), part(P, 8, 1)))
     reject("rule-combo-role", simple(part(C, 4, 2), *good))
     reject("rule-behaviour-states-zero", simple(part(C, 5, 0, 0), *good))
     reject("rule-behaviour-states-high", simple(part(C, 5, 0x10, 0), *good))

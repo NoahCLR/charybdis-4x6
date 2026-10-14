@@ -1,6 +1,7 @@
 #include "projection.h"
 
 #include "feedback_projection.h"
+#include "../feedback.h"
 #include "../reducer/ownership_state.h"
 #include "pd_projection.h"
 #include "../queue/pending_release_queue.h"
@@ -54,7 +55,7 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             (void)layer_ownership_oneshot_consume();
             return;
         case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
-            key_runtime_core_feedback_projection_project_pulse(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch);
+            key_runtime_core_feedback_projection_project_pulse(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch, effect->data.feedback_pulse.lighting_identity, effect->data.feedback_pulse.lighting_outcome);
             return;
         case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
             key_runtime_core_pd_projection_project_lock_tap(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos);
@@ -76,12 +77,15 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
 
                 dispatch_delayed_action_at(key_pos, effect->data.delayed_action.action, effect->data.delayed_action.mods);
                 if (defer_until_release && tap_commit_feedback) {
+                    uint8_t identity, outcome;
+                    key_feedback_lighting_pulse_metadata(key_pos, KEY_FEEDBACK_PULSE_TAP_COMMITTED, &identity, &outcome);
                     key_runtime_core_project_effect(&(key_runtime_effect_t){
                         .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
                         .data.feedback_pulse =
                             {
-                                .key_pos = key_pos,
-                                .kind    = KEY_FEEDBACK_PULSE_TAP_COMMITTED,
+                                .key_pos           = key_pos,
+                                .kind              = KEY_FEEDBACK_PULSE_TAP_COMMITTED,
+                                .lighting_identity = identity,
                             },
                     });
                 }
@@ -104,8 +108,9 @@ void key_runtime_core_project_pending_release_dispatch(const pending_release_t *
             .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
             .data.feedback_pulse =
                 {
-                    .key_pos = pending->key_pos,
-                    .kind    = KEY_FEEDBACK_PULSE_TAP_COMMITTED,
+                    .key_pos           = pending->key_pos,
+                    .kind              = KEY_FEEDBACK_PULSE_TAP_COMMITTED,
+                    .lighting_identity = pending->lighting_identity,
                 },
         });
     }

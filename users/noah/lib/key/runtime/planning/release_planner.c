@@ -5,6 +5,7 @@
 #include "../reducer/state_query.h"
 
 #include "../../../action/action_dispatch.h"
+#include "../feedback.h"
 #include "../../../compat/qmk_oneshot_contract.h"
 #include "../../../pointing/defs/pd_modes.h"
 
@@ -88,12 +89,17 @@ static void key_runtime_core_release_effect_plan_push_feedback_pulse(key_runtime
         return;
     }
 
+    uint8_t identity, outcome;
+    key_feedback_lighting_pulse_metadata(key_pos, kind, &identity, &outcome);
+
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
                                                         .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
                                                         .data.feedback_pulse =
                                                             {
-                                                                .key_pos = key_pos,
-                                                                .kind    = kind,
+                                                                .key_pos           = key_pos,
+                                                                .kind              = kind,
+                                                                .lighting_identity = identity,
+                                                                .lighting_outcome  = outcome,
                                                             },
                                                     });
 }
@@ -301,6 +307,7 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
                         .tap_count                    = resolution->interaction->selection.tap_count,
                         .tap_action                   = contract.tap.action,
                         .tap_repeat_count             = contract.tap.repeat_count,
+                        .lighting_identity            = resolution->interaction->selection.lighting_identity,
                         .tap_branch_has_authored_step = key_behavior_step_present(resolution->interaction->selection.step),
                         .tap_branch_has_authored_tap  = resolution->interaction->selection.step.tap.present,
                         .tap_hold_term                = resolution->interaction->binding.tap_hold_term,

@@ -16,6 +16,7 @@
 typedef struct {
     uint16_t            keycode;
     uint8_t             tap_count;
+    uint8_t             lighting_identity; // authored row + 1, zero without a row
     key_behavior_step_t step;
     uint16_t            tap_hold_term;
     uint16_t            longer_hold_term;

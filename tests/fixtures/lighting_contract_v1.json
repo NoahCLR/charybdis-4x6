@@ -13,6 +13,7 @@
   "parameterTypes": {
     "layerSelector": "a logical layer below the keyboard's layer count, or 255 for any layer",
     "modeSelector": "a supported pointing-mode slot 0..31, or 255 for any mode",
+    "thingSelector": "an authored combo/behaviour row 0..127, or 255 for any; absent rows yield no subject",
     "comboRole": "0 combos owning the shown preview or mode, 1 the other held combos, 255 both",
     "behaviourStates": "bit 0 branch selected, bit 1 tap, bit 2 hold, bit 3 long hold; bits 4..7 zero; at least one bit set",
     "behaviourScope": "0 each key, 1 newest per half, 2 newest, 3 newest per state",
@@ -37,7 +38,9 @@
       {"id": 2, "name": "layer previewing", "thing": 1, "parameters": [{"name": "layer", "type": "layerSelector"}], "slice": "synced", "meaning": "The layer a pending momentary hold previews."},
       {"id": 3, "name": "pointing mode active", "thing": 2, "parameters": [{"name": "mode", "type": "modeSelector"}], "slice": "local", "meaning": "The pointing mode shown. Its keys and halves are those of the key or combo that started it."},
       {"id": 4, "name": "combos held", "thing": 3, "parameters": [{"name": "role", "type": "comboRole"}], "slice": "synced", "meaning": "One subject for every held combo of the role, excluding combos whose output holds a momentary layer: their keys and the halves those keys are on. Thing 255, so the combo table's default identity."},
-      {"id": 5, "name": "behaviour state", "thing": 4, "parameters": [{"name": "states", "type": "behaviourStates"}, {"name": "scope", "type": "behaviourScope"}], "slice": "synced", "meaning": "Gestures whose shown state is in the mask; a flashing state counts only while lit; a key in a held combo's footprint never shows a selected branch. Scope 0: each key. Scope 1: the newest gesture on the left half, then the right, each with that half only. Scope 2: the newest gesture. Scope 3: for each state in the mask, long hold first, the newest gesture that entered it while its key still shows it. Identity slot from the state. Thing 255."}
+      {"id": 5, "name": "behaviour state", "thing": 4, "parameters": [{"name": "states", "type": "behaviourStates"}, {"name": "scope", "type": "behaviourScope"}], "slice": "synced", "meaning": "Gestures whose shown state is in the mask; a flashing state counts only while lit; a key in a held combo's footprint never shows a selected branch. Scope 0: each key. Scope 1: the newest gesture on the left half, then the right, each with that half only. Scope 2: the newest gesture. Scope 3: for each state in the mask, long hold first, the newest gesture that entered it while its key still shows it. Identity slot from the state. Thing 255."},
+      {"id": 7, "name": "combo held", "thing": 3, "parameters": [{"name": "combo", "type": "thingSelector"}, {"name": "role", "type": "comboRole"}], "slice": "synced", "meaning": "One subject per identified held combo, newest completion first; same roles and layer-hold suppression as fact 4. Its own id, input keys and halves; identity slot zero. Unidentified fallback outputs omitted."},
+      {"id": 8, "name": "behaviour", "thing": 4, "parameters": [{"name": "behaviour", "type": "thingSelector"}, {"name": "states", "type": "behaviourStates"}], "slice": "synced", "meaning": "One subject per key of an authored behaviour row, matrix order. Captured row id and selected colour slot; branches suppressed under combos and flashing states only while lit. Includes layer/mode holds Standard delegates to their scenes. Intrinsic/bypassed gestures omitted. No aggregate scopes."}
     ],
     "targets": [
       {"id": 0, "name": "whole board", "parameters": [], "place": true, "meaning": "All 58 LEDs."},
@@ -56,7 +59,8 @@
       {"id": 3, "name": "identity", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "The subject's identity colour from its thing record; clear when it has none."},
       {"id": 4, "name": "map", "parameters": [{"name": "map", "type": "map"}], "readsBelow": "as the map value", "changesWithTime": false, "meaning": "The map's value at the LED: a palette colour, or the parameterless paint 0x80 + k names."},
       {"id": 5, "name": "dim", "parameters": [{"name": "level", "type": "level"}], "readsBelow": true, "changesWithTime": false, "meaning": "(below x level + 127) / 255 per channel."},
-      {"id": 6, "name": "tint", "parameters": [{"name": "colour", "type": "paletteIndex"}, {"name": "amount", "type": "level"}], "readsBelow": true, "changesWithTime": false, "meaning": "(below x (255 - amount) + colour x amount + 127) / 255 per channel."}
+      {"id": 6, "name": "tint", "parameters": [{"name": "colour", "type": "paletteIndex"}, {"name": "amount", "type": "level"}], "readsBelow": true, "changesWithTime": false, "meaning": "(below x (255 - amount) + colour x amount + 127) / 255 per channel."},
+      {"id": 8, "name": "outcome", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "For a fact-8 hold or long-hold, the identity of its resolved supported layer or single pointing-mode outcome. Other subjects, tap/branch slots, ordinary key/modifier/macro/unsupported outcomes, absent tables or none identity say clear; palette black stays opaque. Map value 0x88."}
     ],
     "timings": [
       {"id": 1, "name": "show after", "parameters": [{"name": "delay", "type": "milliseconds"}], "changesWithTime": false, "meaning": "Amount 0 until the subject has existed for the delay, then 255."}

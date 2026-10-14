@@ -19,6 +19,7 @@
 #include <stdint.h>
 
 #include "feedback_kind.h"
+#include "../behavior/key_behavior.h"
 #include "slot/keypos_codec.h"
 #include "slot/origin_registry.h"
 
@@ -288,3 +289,12 @@ void    combo_feedback_overlay_bitmap(uint8_t *out_bitmap);
 void     key_feedback_test_slot_visits_reset(void);
 uint16_t key_feedback_test_slot_visits(void);
 #endif
+
+// Phase-2 identity facts: one (row + 1, slot + 1, outcome) record per key.
+// Outcome zero is absent; 1..16 are layers 0..15; 33..64 are mode slots 0..31.
+#define KEY_FEEDBACK_LIGHTING_RECORD_BYTES 3u
+#define KEY_FEEDBACK_LIGHTING_BYTES (MATRIX_ROWS * MATRIX_COLS * KEY_FEEDBACK_LIGHTING_RECORD_BYTES)
+// Only one layer or mode; unsupported outcomes have no identity.
+uint8_t key_feedback_lighting_hold_outcome(hold_behavior_t hold);
+void    key_feedback_lighting_map(uint8_t *out);
+void    key_feedback_lighting_pulse_metadata(keypos_t key, key_feedback_pulse_kind_t kind, uint8_t *identity, uint8_t *outcome);

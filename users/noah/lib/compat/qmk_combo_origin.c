@@ -936,6 +936,27 @@ void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key
     }
 }
 
+bool noah_qmk_combo_origin_lighting_next(keypos_t preview, keypos_t mode, const uint8_t *quiet, uint16_t *cursor, uint8_t *id, uint8_t *role, uint8_t *keys) {
+    const combo_origin_active_cache_entry_t *best = NULL;
+    for (uint8_t i = 0; i < ARRAY_SIZE(combo_active_cache); i++) {
+        const combo_origin_active_cache_entry_t *entry = &combo_active_cache[i];
+        if (!entry->active || entry->combo_index >= 128u || !key_origin_bitmap_has_any(entry->bitmap) || (quiet && key_origin_bitmap_has_keypos(quiet, entry->owner_key_pos))) continue;
+        uint16_t rank = 0u;
+        for (uint8_t j = 0; j < ARRAY_SIZE(combo_active_cache); j++) {
+            const combo_origin_active_cache_entry_t *other = &combo_active_cache[j];
+            if (!other->active || other->combo_index >= 128u || !key_origin_bitmap_has_any(other->bitmap) || (quiet && key_origin_bitmap_has_keypos(quiet, other->owner_key_pos))) continue;
+            if (combo_origin_generation_before(entry->generation, other->generation) || (entry->generation == other->generation && (other->combo_index < entry->combo_index || (other->combo_index == entry->combo_index && j < i)))) rank++;
+        }
+        if (rank == *cursor) { best = entry; break; }
+    }
+    if (!best) return false;
+    (*cursor)++;
+    *id     = (uint8_t)best->combo_index;
+    *role   = ((preview.row == best->owner_key_pos.row && preview.col == best->owner_key_pos.col) || (mode.row == best->owner_key_pos.row && mode.col == best->owner_key_pos.col)) ? 0u : 1u;
+    key_origin_bitmap_copy(keys, best->bitmap);
+    return true;
+}
+
 bool noah_qmk_combo_origin_event_owner_keypos(const keyrecord_t *record, keypos_t *out) {
     if (out) {
         *out = (keypos_t){0};
@@ -1034,6 +1055,17 @@ void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key
         key_origin_bitmap_clear(out_overlay_bitmap);
     }
 }
+bool noah_qmk_combo_origin_lighting_next(keypos_t preview, keypos_t mode, const uint8_t *quiet, uint16_t *cursor, uint8_t *id, uint8_t *role, uint8_t *keys) {
+    (void)preview;
+    (void)mode;
+    (void)quiet;
+    (void)cursor;
+    (void)id;
+    (void)role;
+    (void)keys;
+    return false;
+}
+
 bool noah_qmk_combo_origin_event_owner_keypos(const keyrecord_t *record, keypos_t *out) {
     (void)record;
     if (out) {

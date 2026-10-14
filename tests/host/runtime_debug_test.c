@@ -351,6 +351,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
     return (handled_key_resolution_t){
         .keycode            = keycode,
         .tap_count          = tap_count,
+        .lighting_identity  = keycode >= TEST_ACTION && keycode <= TEST_LAYER_LOCK_HOLD_KEY ? (uint8_t)(keycode - TEST_ACTION + 1u) : 0u,
         .step               = step,
         .tap_hold_term      = (keycode == TEST_PENDING_MULTI_TAP_KEY || keycode == TEST_SPLIT_TERM_TAP_KEY) ? 120 : CUSTOM_TAP_HOLD_TERM,
         .longer_hold_term   = CUSTOM_LONGER_HOLD_TERM,
@@ -1958,6 +1959,11 @@ static void test_key_feedback_maps_name_final_tap_only_branch_until_the_action_f
     key_feedback_tap_branch_map(tap_branch_map);
     CHECK(key_feedback_semantic_map_get(semantic_map, key_pos) == KEY_FEEDBACK_SEMANTIC_TAP_COMMITTED);
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
+    uint8_t lighting[KEY_FEEDBACK_LIGHTING_BYTES];
+    key_feedback_lighting_map(lighting);
+    uint8_t *record = &lighting[(key_pos.row * MATRIX_COLS + key_pos.col) * KEY_FEEDBACK_LIGHTING_RECORD_BYTES];
+    CHECK(record[0] == TEST_FINAL_TAP_ONLY_KEY - TEST_ACTION + 1u);
+    CHECK(record[1] == 3u && record[2] == 0u);
 }
 
 // KC_LEFT_GUI authors branches at tap counts 2 and 3. Each tap past the base one
@@ -3494,10 +3500,63 @@ static void test_key_feedback_sparse_slots_and_pending_series(void) {
     CHECK(key_feedback_tap_branch_map_get(branches, newest) == 2u);
 }
 
+static void test_painting_captures_behaviour_slots_outcomes_and_release_identity(void) {
+    const uint16_t layer_actions[] = {MO(2), LOCK_LAYER(2), TG(2), TO(2), OSL(2), LM(2, MOD_LSFT)};
+    for (uint8_t i = 0u; i < ARRAY_SIZE(layer_actions); i++) {
+        CHECK(key_feedback_lighting_hold_outcome((hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(layer_actions[i])) == 3u);
+    }
+    CHECK(key_feedback_lighting_hold_outcome((hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_0)) == 33u);
+    CHECK(key_feedback_lighting_hold_outcome((hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_0_LOCK)) == 33u);
+    CHECK(key_feedback_lighting_hold_outcome((hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(KC_A)) == 0u);
+    CHECK(key_feedback_lighting_hold_outcome((hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_CTRL)) == 0u);
+    CHECK(key_feedback_lighting_hold_outcome((hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(LT(2, KC_A))) == 0u);
+    uint8_t  records[KEY_FEEDBACK_LIGHTING_BYTES];
+    keypos_t key = test_keypos(0, 0);
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    CHECK(!test_process_record(TEST_LAYER_LOCK_HOLD_KEY, key, true));
+    key_feedback_lighting_map(records);
+    CHECK(records[0] == TEST_LAYER_LOCK_HOLD_KEY - TEST_ACTION + 1u);
+    CHECK(records[1] == 1u && records[2] == 3u); // pending hold -> layer 2
+    fake_time += CUSTOM_TAP_HOLD_TERM + 1u;
+    noah_key_runtime_scan();
+    key_feedback_lighting_map(records);
+    CHECK(records[0] != 0u && records[1] == 1u && records[2] == 3u);
+    CHECK(!test_process_record(TEST_LAYER_LOCK_HOLD_KEY, key, false));
+
+    // Release planning sees an inactive token before settlement clears it.
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_RELEASE_PRIMARY_KEY, key, fake_time);
+    fake_time += CUSTOM_TAP_HOLD_TERM + 1u;
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_RELEASE_PRIMARY_KEY, key, fake_time);
+    key_runtime_core_effect_plan_t plan;
+    key_runtime_core_effect_plan_init(&plan);
+    key_runtime_core_effect_plan_push_feedback_pulse(&plan, key, KEY_FEEDBACK_PULSE_HOLD);
+    CHECK(plan.count == 1u);
+    CHECK(plan.items[0].data.feedback_pulse.lighting_identity == TEST_RELEASE_PRIMARY_KEY - TEST_ACTION + 1u);
+    key_runtime_core_project_effect(&plan.items[0]);
+    key_feedback_lighting_map(records);
+    CHECK(records[0] == TEST_RELEASE_PRIMARY_KEY - TEST_ACTION + 1u);
+    CHECK(records[1] == 1u && records[2] == 0u);
+
+    // Queue metadata survives slot reset/reuse and does not grow effect plans.
+    test_reset_stubs();
+    noah_runtime_reset_for_test();
+    CHECK(key_runtime_core_queue_pending_release_dispatch_with_identity(key, TEST_ACTION, (keyboard_mod_state_t){0}, true, 0u, 128u));
+    key_runtime_deferred_release_drain_dispatches();
+    key_feedback_lighting_map(records);
+    CHECK(records[0] == 128u && records[1] == 3u);
+    fake_time += KEY_FEEDBACK_FLASH_HALF_PERIOD_MS;
+    key_feedback_lighting_map(records);
+    CHECK(records[0] == 0u);
+}
+
 int main(void) {
     test_key_feedback_empty_queries_keep_pulses();
     test_key_feedback_sparse_slots_and_pending_series();
 #if KEY_RUNTIME_CORE_TOKEN_ID_MAX == UINT16_MAX
+    test_painting_captures_behaviour_slots_outcomes_and_release_identity();
     test_debug_reports_slot_phase_and_momentary_layer_interrupt_state();
     test_snapshot_captures_cross_subsystem_runtime_state();
     test_reset_clears_all_runtime_surfaces();

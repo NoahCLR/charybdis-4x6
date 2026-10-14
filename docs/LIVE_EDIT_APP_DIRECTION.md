@@ -55,7 +55,10 @@ compiled lighting is Standard lighting, the conversion of `rgb_config.c`, and
 the host parity test finds its frames identical to the retired stage
 renderer's. The USB half sends the synced facts in one chunked frame; each half
 renders its own LEDs from its own profile. GET `0x0D` (feature bit 31)
-reports what the rules may use. None of it has run on hardware.
+reports what the rules may use. Individual combo/behaviour subjects and
+hold/long-hold layer/mode outcome paint support Painting through additive kinds
+7/8 (facts) and 8 (paint), preserving Standard lighting and RGB v5. None of it
+has run on hardware.
 
 The keyboard's name lives in settings v7 and is its USB product string
 (D-F25): read before USB starts, and taken up after a rename by one USB
@@ -100,7 +103,10 @@ input cadence remain unmeasured for this path.
   scene looks as it did (layer stacks, previews, every pointing mode and
   locality, combos, every behaviour state and the auto-mouse fade), that the
   other half matches the USB half, and that pointing rate and typing are
-  unchanged with lighting resolving.
+  unchanged with lighting resolving. Painting also needs Ark to adopt the
+  individual subjects/outcome paint and repin their contract; per-item maps,
+  inherited identities, release flashes and layer/mode outcomes on both halves
+  remain hardware acceptance.
 
 - **The keyboard name needs broader hardware acceptance (D-F25).** Check
   Chrome's HID chooser, the system device list and Ark individually; that a
@@ -1382,6 +1388,15 @@ Choices the plan left open, as decided:
 - **One 8 KiB budget, 128 palette colours, no per-kind caps.** The whole
   domain is decoded into RAM on publication (one 16 KiB tripwire increment,
   [memory budgets](architecture/memory-budgets.md#lighting-rules--d-f26)).
+- **Painting uses additive kinds.** Fact 7 names one combo or yields each
+  identified held combo; fact 8 names one authored behaviour row or yields
+  its key instances with captured colour slots. Existing facts 4/5 remain
+  aggregate and Standard bytes/pixels stay the same. Paint 8 uses the resolved
+  hold/long-hold layer or mode identity and says clear for unsupported outcomes;
+  it is parameterless, including in maps. Individual identity/place records
+  use existing inheritance, and capabilities advertise each new kind. No new
+  state family or format version is introduced. Ark must adopt the contract
+  and vectors and repin the committed/landed result for Painting.
 - **Facts are one frame.** The USB half builds the synced facts (previewed
   layer, held combos, behaviour state) and sends them as one frame of 30-byte
   chunks published on the other half as one generation; the per-stage split

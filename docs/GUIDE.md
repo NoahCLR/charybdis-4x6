@@ -352,7 +352,13 @@ another tap), which LEDs it lights and how, and the topmost rule that paints an
 LED wins. These tables become that list, called Standard lighting, so they
 look exactly as they always did; a profile saved from the app can replace it
 with rules of its own. The [lighting rules](architecture/lighting-rules-v1.md)
-spec has the full vocabulary.
+spec has the full vocabulary. With a supporting editor, each combo and
+behaviour can have its own identity colours and placement, and painted maps
+can mix chosen colours, identity, clear and real off per LED. A behaviour's
+hold or long hold can instead use the identity colour of its resolved layer
+or pointing mode. Other outcomes, taps and branch selection are clear under
+that paint; a rule below can provide their colour. Standard lighting keeps
+its existing aggregate feedback and exact appearance.
 
 `locality` is the RGB word for where a feedback surface paints. Depending on
 the table, it can mean both halves, one fixed half, the half that owns the

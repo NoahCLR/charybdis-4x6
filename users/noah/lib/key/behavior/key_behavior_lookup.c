@@ -275,6 +275,7 @@ static key_behavior_view_t key_behavior_view_build(uint16_t keycode, bool use_ro
         .source_epoch       = live.epoch,
         .keycode            = keycode,
         .source_row         = live.row_index,
+        .lighting_identity  = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? (uint8_t)(live.row_index + 1u) : (config ? (uint8_t)(config - key_behaviors + 1u) : 0u),
         .source_is_live     = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK,
         .handled            = has_authored || noah_action_desc_is_runtime_handled_keycode(desc),
         .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc),

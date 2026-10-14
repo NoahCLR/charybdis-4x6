@@ -44,13 +44,17 @@ for case in fixture["render"]:
         fields = [str(s.get("time", 0)), str(layers), str(255 if s.get("preview") is None else s["preview"]),
                   str(mode["id"] if mode else 255), str(sides), str(1 if mode and mode.get("keys") else 0), bitmap(mode.get("keys", []) if mode else []),
                   bitmap(s.get("combos", {}).get("owning", [])), bitmap(s.get("combos", {}).get("others", []))]
+        instances = s.get("combos", {}).get("instances", [])
+        fields.append(str(len(instances)))
+        for item in instances:
+            fields += [str(item["id"]), str(item["role"]), bitmap(item["keys"])]
         mapped = s.get("mapped", {})
         fields += [bitmap(mapped.get(str(layer), [])) for layer in range(16)]
         behaviour = s.get("behaviour", {"keys": {}, "owners": {}})
         keys = behaviour.get("keys", {})
         fields.append(str(len(keys)))
         for key, entry in sorted(keys.items(), key=lambda item: int(item[0])):
-            fields += [key, str(STATE[entry["state"]]), str(entry.get("branch", 0)), str(int(bool(entry.get("flashing")))), str(int(bool(entry.get("lit"))))]
+            fields += [key, str(STATE[entry["state"]]), str(entry.get("branch", 0)), str(int(bool(entry.get("flashing")))), str(int(bool(entry.get("lit")))), str(entry.get("id", 255)), str(entry.get("outcome", 0))]
         owners = behaviour.get("owners", {})
         fields += [str(255 if owners.get(slot) is None else owners[slot]) for slot in OWNERS]
         effect = s.get("effect", {})
