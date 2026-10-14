@@ -579,3 +579,46 @@ through the synthetic QMK-function tap left the manifest: since #86 routes
 pointing taps through the owned literal emitter, that edge no longer links.
 These are reviewed-path bounds only; the physical high-water of both halves
 remains hardware acceptance.
+
+### Painting identities and outcomes
+
+Painting adds identified combo and behaviour fact slices while preserving the
+existing 78-byte split-facts prefix. The new slices are 40 bytes for four held
+combo records and 180 bytes for sixty per-key behaviour records: 298 bytes in
+all, sent through the existing atomic chunk protocol. Row and outcome metadata
+reuse padding in interaction, effect and deferred-release records; the reducer's
+active/queued pulse metadata adds eight bytes. Identity tables and maps reuse
+the version-5 program and its existing 8 KiB payload budget.
+
+A fresh `NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh` pair with
+pinned GCC 15.2.0 and BK `d280a4471e414533f198f02e3faf33b7368ecea3` links the
+following on **each half**:
+
+| Measurement | Bytes |
+| --- | ---: |
+| SRAM0–3 `.data` | 4,368 |
+| SRAM0–3 `.bss` | 217,752 |
+| `.data + .bss` | 222,120 |
+| SRAM0–3 fixed linked prefix | 222,128 |
+| SRAM0–3 linker/core-memory span at boot | 40,016 |
+| Fixed linked occupancy across unique SRAM banks | 229,584 |
+
+The unchanged 226,304-byte static-data regression tripwire has 4,184 bytes
+of margin; the boot allocator span passes its separate 4,096-byte floor.
+Neither is measured runtime free memory. Each RP2040 still has 270,336 bytes
+of physical SRAM across its banks.
+
+The USB-name boot reader and rename safety snapshot keep their temporary
+workspaces in separate compiled calls, so neither remains in `main` beneath
+ordinary key processing. A separate tap-feedback projection helper similarly
+retires its metadata workspace outside nested fallback settlement; the effect
+projection boundary remains compiled to avoid retaining both workspaces in
+its caller. Both stack manifests follow the actual linked boot-selection and
+owner-status calls and explicitly cover these extracted paths. On each half,
+the ordinary manifest's largest main-process path is 1,912/1,920 bytes and its
+largest split-slave path is 328/768; the owner manifest reaches 1,912/1,920 and
+624/768 respectively. Main-process policy margin is eight bytes, separately
+648 bytes to the physical 2,560-byte process-stack boundary. These unchanged
+policies cover reviewed linked paths only; global/interrupt maxima, allocator
+and stack high-water, split cadence and outcome rendering remain acceptance
+on both physical halves.

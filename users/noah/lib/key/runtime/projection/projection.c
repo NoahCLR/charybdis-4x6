@@ -19,7 +19,25 @@
 #include "../../ownership/held_repeat.h"
 #include "../delayed_action.h"
 
-void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
+// This feedback-only workspace must not sit beneath every action projection,
+// including the nested fallback-settlement path.
+__attribute__((noinline)) static void key_runtime_core_project_live_tap_feedback(keypos_t key) {
+    uint8_t identity, outcome;
+    key_feedback_lighting_pulse_metadata(key, KEY_FEEDBACK_PULSE_TAP_COMMITTED, &identity, &outcome);
+    key_runtime_core_project_effect(&(key_runtime_effect_t){
+        .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
+        .data.feedback_pulse =
+            {
+                .key_pos           = key,
+                .kind              = KEY_FEEDBACK_PULSE_TAP_COMMITTED,
+                .lighting_identity = identity,
+            },
+    });
+}
+
+// Preserve this projection boundary after extracting feedback-only work.
+// Otherwise LTO folds the switch into its caller and retains both workspaces.
+__attribute__((noinline)) void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
     if (!effect) {
         return;
     }
@@ -77,17 +95,7 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
 
                 dispatch_delayed_action_at(key_pos, effect->data.delayed_action.action, effect->data.delayed_action.mods);
                 if (defer_until_release && tap_commit_feedback) {
-                    uint8_t identity, outcome;
-                    key_feedback_lighting_pulse_metadata(key_pos, KEY_FEEDBACK_PULSE_TAP_COMMITTED, &identity, &outcome);
-                    key_runtime_core_project_effect(&(key_runtime_effect_t){
-                        .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-                        .data.feedback_pulse =
-                            {
-                                .key_pos           = key_pos,
-                                .kind              = KEY_FEEDBACK_PULSE_TAP_COMMITTED,
-                                .lighting_identity = identity,
-                            },
-                    });
+                    key_runtime_core_project_live_tap_feedback(key_pos);
                 }
             }
             return;

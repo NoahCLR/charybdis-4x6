@@ -192,6 +192,18 @@
           "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_paint", "noah_lighting_palette_rgb", "hsv_to_rgb"]
         },
         {
+          "name": "boot USB name reader",
+          "functions": ["main", "noah_qmk_usb_product_name_pre_init", "noah_profile_store_boot_select_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+        },
+        {
+          "name": "matrix scan tap feedback metadata",
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "key_runtime_core_project_live_tap_feedback", "key_feedback_lighting_pulse_metadata"]
+        },
+        {
+          "name": "matrix scan tap feedback pulse projection",
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "key_runtime_core_project_live_tap_feedback", "key_runtime_core_project_effect", "timer_read32"]
+        },
+        {
           "name": "USB rename safety snapshot",
           "functions": ["main", "noah_qmk_usb_product_name_task", "noah_profile_owner_status"]
         },

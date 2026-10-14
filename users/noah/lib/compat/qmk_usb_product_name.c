@@ -94,7 +94,8 @@ static void serve(const noah_profile_keyboard_name_t *name) {
     enumerated = *name;
 }
 
-void noah_qmk_usb_product_name_pre_init(void) {
+// Keep the boot reader's record/name workspace out of main's later key paths.
+__attribute__((noinline)) void noah_qmk_usb_product_name_pre_init(void) {
     noah_profile_keyboard_name_t name;
 
     served     = NULL;
