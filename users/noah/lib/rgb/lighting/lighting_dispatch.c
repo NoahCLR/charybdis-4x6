@@ -18,7 +18,7 @@ bool noah_lighting_fact_next(uint8_t kind, const noah_lighting_facts_t *facts, c
     (void)cursor;
     (void)subject;
     switch (kind) {
-#    define NOAH_LIGHTING_FACT_CASE(id, name, thing, layout, slots, selector, signatures) \
+#    define NOAH_LIGHTING_FACT_CASE(id, name, thing, layout, slots, selector, signatures, live) \
         case id:                                             \
             return noah_lighting_fact_##name##_next(facts, params, cursor, subject);
         NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_FACT_CASE)
@@ -30,7 +30,7 @@ bool noah_lighting_fact_next(uint8_t kind, const noah_lighting_facts_t *facts, c
 
 uint8_t noah_lighting_fact_subject_slots(uint8_t kind) {
     switch (kind) {
-#    define NOAH_LIGHTING_FACT_SLOTS(id, name, thing, layout, slots, selector, signatures) case id: return slots;
+#    define NOAH_LIGHTING_FACT_SLOTS(id, name, thing, layout, slots, selector, signatures, live) case id: return slots;
         NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_FACT_SLOTS)
 #    undef NOAH_LIGHTING_FACT_SLOTS
         default: return 1u;
@@ -38,7 +38,7 @@ uint8_t noah_lighting_fact_subject_slots(uint8_t kind) {
 }
 uint8_t noah_lighting_fact_selector_parameter(uint8_t kind) {
     switch (kind) {
-#    define NOAH_LIGHTING_FACT_SELECTOR(id, name, thing, layout, slots, selector, signatures) case id: return selector;
+#    define NOAH_LIGHTING_FACT_SELECTOR(id, name, thing, layout, slots, selector, signatures, live) case id: return selector;
         NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_FACT_SELECTOR)
 #    undef NOAH_LIGHTING_FACT_SELECTOR
         default: return 255u;

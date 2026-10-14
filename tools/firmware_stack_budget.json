@@ -92,6 +92,34 @@
       ],
       "paths": [
         {
+          "name": "RGB timing selected-signature preparation",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "prepare_timing_index"]
+        },
+        {
+          "name": "RGB timing subject refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "refresh_presence", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
+        },
+        {
+          "name": "RGB timing aggregate gesture refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "refresh_presence", "noah_lighting_fact_next", "gesture", "key_feedback_tap_branch_map_get", "handled_key_keypos_in_bounds"]
+        },
+        {
+          "name": "RGB timing filter refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
+        },
+        {
+          "name": "RGB timing shared-presence lookup",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "rule_presence_tracker"]
+        },
+        {
+          "name": "RGB timing dense-age rank",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "gate_amount", "clock_rank"]
+        },
+        {
+          "name": "RGB timing next change",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "gate_amount"]
+        },
+        {
           "name": "press observation materialization",
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_core_observe_process_record_press", "key_runtime_core_press_token_begin", "handled_key_materialize_hold", "handled_key_transparent_source_at_position", "handled_key_lookup_row_tap_count_into"]
         },

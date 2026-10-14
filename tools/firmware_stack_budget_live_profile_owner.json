@@ -135,6 +135,34 @@
       ],
       "paths": [
         {
+          "name": "RGB timing selected-signature preparation",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "prepare_timing_index"]
+        },
+        {
+          "name": "RGB timing subject refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "refresh_presence", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
+        },
+        {
+          "name": "RGB timing aggregate gesture refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "refresh_presence", "noah_lighting_fact_next", "gesture", "key_feedback_tap_branch_map_get", "handled_key_keypos_in_bounds"]
+        },
+        {
+          "name": "RGB timing filter refresh",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "prepare_rule_clocks", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
+        },
+        {
+          "name": "RGB timing shared-presence lookup",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "rule_presence_tracker"]
+        },
+        {
+          "name": "RGB timing dense-age rank",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "gate_amount", "clock_rank"]
+        },
+        {
+          "name": "RGB timing next change",
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "gate_amount"]
+        },
+        {
           "name": "peer reuse rejected mailbox admission reply",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "process_mailbox", "process_payload_reuse", "cache_reuse_busy_reply", "cache_response", "noah_profile_split_v1_frame_encode"]
         },

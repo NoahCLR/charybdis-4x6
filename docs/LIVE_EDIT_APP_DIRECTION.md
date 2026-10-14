@@ -1417,7 +1417,9 @@ Choices the plan left open, as decided:
 - **Accepted timing capacity is real capacity.** Shared first-condition
   presence clocks and separate rule-filter clocks retain every accepted
   rule/subject lifetime. Their sizes follow registry subject/signature bounds,
-  rather than a runtime pool that silently starves timed rules. Show-after
+  rather than a runtime pool that silently starves timed rules. Presence ages
+  are compacted only after absent pairs are removed, under registry-proved
+  joint live bounds; this is not a bound for unfinished event/linger history. Show-after
   capacity and lifecycle use the same reference/vectors, including 255 rules
   with sixty authored subjects and disappearing filters/subjects. No wire
   change or new accepted-profile cap is introduced.

@@ -54,7 +54,7 @@ _Static_assert((unsigned)NOAH_PROFILE_LIGHTING_V1_RECORD_MAX <= (unsigned)NOAH_P
 static bool fact_layout(uint8_t id, uint32_t *layout) {
     (void)layout;
     switch (id) {
-#define NOAH_LIGHTING_FACT_LAYOUT(fid, name, thing, params, slots, selector, signatures) \
+#define NOAH_LIGHTING_FACT_LAYOUT(fid, name, thing, params, slots, selector, signatures, live) \
     case fid:                                              \
         *layout = params;                                  \
         return true;

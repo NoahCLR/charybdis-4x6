@@ -13,6 +13,9 @@
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
 
+uint16_t noah_lighting_test_live_clocks(void);
+uint16_t noah_lighting_test_live_bound(void);
+
 // ─── QMK and runtime stand-ins ──────────────────────────────────────────────
 
 layer_state_t layer_state;
@@ -194,6 +197,7 @@ int main(int argc, char **argv) {
     static uint8_t                            payload[10000];
     char                                      word[96], name[96];
     size_t                                    cases = 0, steps = 0;
+    uint16_t peak_clocks = 0u;
     noah_profile_lighting_v1_limits_t         limits = noah_profile_lighting_v1_default_limits();
 
     assert(argc == 2);
@@ -259,7 +263,10 @@ int main(int argc, char **argv) {
             for (unsigned entry = 0; entry < count; entry++) {
                 unsigned key, state, branch_value, flashing, lit, identity, outcome;
                 assert(fscanf(file, "%u %u %u %u %u %u %u", &key, &state, &branch_value, &flashing, &lit, &identity, &outcome) == 7);
-                if (identity < 128u && (!flashing || lit)) {
+                bool covered_branch = state == 0u && (key_origin_bitmap_has_keypos(facts.combos_held, key_at(key)) || key_origin_bitmap_has_keypos(facts.combos_held + KEY_ORIGIN_BITMAP_SIZE, key_at(key)));
+                // The runtime collector suppresses selected branches covered
+                // by a combo (key_feedback_lighting_map); emulate that input.
+                if (identity < 128u && (!flashing || lit) && !covered_branch) {
                     uint8_t *record = &facts.behaviour[key * KEY_FEEDBACK_LIGHTING_RECORD_BYTES];
                     record[0]       = identity + 1u;
                     unsigned index  = branch_value <= 2u ? 0u : branch_value - 2u;
@@ -305,6 +312,9 @@ int main(int argc, char **argv) {
         noah_lighting_resolve_info_t info;
         memset(&frame, 0, sizeof(frame));
         noah_lighting_resolve(&scene, NOAH_LIGHTING_ALL_LEDS, (uint32_t)now, true, &frame, &info);
+        uint16_t live = noah_lighting_test_live_clocks();
+        assert(live <= noah_lighting_test_live_bound());
+        if (live > peak_clocks) peak_clocks = live;
         for (unsigned led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
             char expected[16], actual[16];
             assert(fscanf(file, "%15s", expected) == 1);
@@ -322,6 +332,8 @@ int main(int argc, char **argv) {
     }
     fclose(file);
     assert(cases >= 30 && steps >= 60);
+    assert(peak_clocks >= 1000u); // Adversarial distinct signatures, not only duplicate rules.
+    printf("compact timing: peak %u, proved live bound %u\n", peak_clocks, noah_lighting_test_live_bound());
     printf("lighting render vectors: %zu cases, %zu steps passed\n", cases, steps);
     return 0;
 }

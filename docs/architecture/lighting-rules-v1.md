@@ -444,15 +444,58 @@ disappears.
 | 1 | show after | milliseconds `1..65535` | `0` until the subject has existed that long, then `255` |
 
 The C implementation retains every accepted timed rule and every subject
-thing, rather than allocating a fixed number of runtime gates. Registry rows
-bound the subject domain and the number of distinct non-selector parameter
-signatures. Equivalent first conditions share presence clocks, normalizing a
+thing. Equivalent first conditions share presence clocks, normalizing a
 specific thing selector to any; rule filters retain separate clocks. The
 continuous matching age is the smaller of subject presence and filter age.
 An absent subject or failed filter resets its matching lifetime, independently
 of other rules. Millisecond ages saturate at 65535, after every possible
-show-after delay has elapsed. The payload, rule count and registry domains
-bound storage; exhaustion never silently leaves an accepted rule hidden.
+show-after delay has elapsed.
+
+Presence storage uses a bitmap of possible signature/subject pairs and a dense
+array of ages for the pairs currently present, in bitmap order. Forward removal
+then backward insertion preserves every continuing age without a temporary
+union of departed and arriving ids or a second age array. A rank query finds
+an age; no age is evicted to make room. Only signatures selected by enabled
+timed rules are indexed. Duplicate rules share presence but keep independent
+filter lifetimes. All 255 rules remain accepted within the shared 8192-byte
+payload; no timed-rule or subject limit is added.
+
+The registry's joint live bound applies across **all** non-selector signatures
+of a fact, not separately to each signature. This bounds the dense age array
+for every accepted profile, including one containing every distinct signature:
+
+| Fact | Joint live clocks, default four combo records | Reason |
+| --- | ---: | --- |
+| layer active / preview / mode active | 16 / 1 / 1 | layer bitmap; single preview and shown mode |
+| aggregate combos / aggregate behaviour | 3 / 60 | three role signatures; 15 state masks times four scopes, thing 255 |
+| combo held | 8 | each of four records matches its role and any |
+| behaviour | 480 | at most 60 key records, each in one state; eight of 15 masks contain that state |
+| layer status | 34 | 16 held plus 16 locked, one top and one one-shot |
+| mode status | 2 | at most one held and one locked subject |
+| combo layer | 8 | four records, each matches one layer and any |
+| behaviour phase | 600 | at most five phase bits per key, each matching its branch and any; 60 keys |
+| macro playing / key pressed | 1 / 60 | one current slot; one record per physical key |
+| modifier | 32 | eight bits in each of two classes, each matching its side and either |
+| host locks / pointer / idle | 3 / 4 / 1 | one boolean for each parameter signature |
+| **Total** | **1314** | sum of the independent conservative upper bounds |
+
+Repeated authored ids only reduce these counts: a pair is stored once even
+when several keys yield it. High ids through 127 do not consume extra ages.
+Increasing combo buffer length changes its two registry bounds mechanically;
+tap depth changes possible signatures but a live phase record still matches
+at most its branch and any. Module-off builds sum only their compiled rows.
+The possible-pair bitmap covers the full subject domains (8963 pairs with the
+default registry/tap depth); the dense ages need 2628 bytes instead of 17926.
+The selected-signature index, filter ages and bitmap remain separate, linked
+fixed storage, with no allocator escape from RAM accounting.
+
+This live bound is specific to show-after. It cannot be reused as a bound for
+linger or event retention: absent things can retain timing state and their
+last owner footprint until expiry, and a repeated event must refresh its own
+lifetime. The unfinished additions need a separate accepted-profile history
+bound, including independently filtered rules; a normal profile or the current
+live-state maximum does not establish it. No event/linger module is advertised
+by this checkpoint.
 
 Each half times from the frame in which it first sees the subject, so the
 halves may differ by the link's latency.

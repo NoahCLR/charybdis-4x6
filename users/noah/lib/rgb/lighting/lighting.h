@@ -240,7 +240,7 @@ uint32_t noah_lighting_keymap_generation(void);
 
 // ─── Module shapes, one prototype per registry row ──────────────────────────
 
-#define NOAH_LIGHTING_DECLARE_FACT(id, name, thing, layout, slots, selector, signatures) bool noah_lighting_fact_##name##_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject);
+#define NOAH_LIGHTING_DECLARE_FACT(id, name, thing, layout, slots, selector, signatures, live) bool noah_lighting_fact_##name##_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject);
 NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_DECLARE_FACT)
 #undef NOAH_LIGHTING_DECLARE_FACT
 

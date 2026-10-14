@@ -1178,6 +1178,39 @@ def render_vectors(limits):
         rule(part(C, 8, ANY, 4), part(T, 4), part(P, 2, RED), part(G, 1, 100, 0)),
     ]}, [{"time": 0, "behaviour": {"keys": {"0": {"id": 0, "state": "hold"}, "31": {"id": 1, "state": "hold"}}}}, {"time": 100, "behaviour": {"keys": {"0": {"id": 0, "state": "hold"}, "31": {"id": 1, "state": "hold"}}}}], limits))
     cases.append(render_case("show-after-max-delay-and-large-jump", "timing:1", {"palette": PALETTE, "rules": [rule(part(C, 1, 1), part(T, 0), part(P, 2, BLUE), part(G, 1, 255, 255))]}, [{"time": 0, "layers": [1]}, {"time": 65534, "layers": [1]}, {"time": 65535, "layers": [1]}, {"time": 200000, "layers": [1]}, {"time": 300000}, {"time": 400000, "layers": [1]}, {"time": 465535, "layers": [1]}], limits))
+    # Select every normalized non-selector signature in one accepted profile.
+    # Many simultaneous true signatures and high/low id churn exercise dense
+    # storage beyond the former 32 entries and the 255-rule duplication case.
+    import itertools
+    domains = {"layerSelector": [*range(16), ANY], "layerStatus": range(4), "modeStatus": range(2),
+               "comboRole": [0, 1, ANY], "behaviourStates": range(1, 16), "behaviourScope": range(4),
+               "behaviourPhase": range(5), "tapSelector": [*range(1, limits.tap_depth + 1), ANY],
+               "modifier": range(4), "side": range(3), "modifierState": range(2), "hostLock": range(3), "pointerState": range(4)}
+    signatures = []
+    for kind, (_, types) in FACTS.items():
+        selector = bool(types and types[0] in ("layerSelector", "modeSelector", "thingSelector", "keySelector"))
+        values = [[ANY] if i == 0 and selector else domains[t] for i, t in enumerate(types)]
+        signatures.extend((kind, list(params)) for params in itertools.product(*values))
+    assert len(signatures) == 171
+    for probe in (8, 12):
+        selected = [(kind, params) for kind, params in signatures if kind == probe] + [(kind, params) for kind, params in signatures if kind != probe]
+        full = [rule(part(C, kind, *params), part(T, 4), part(P, 2, BLUE) if kind == probe else part(P, 0), part(G, 1, 100, 0)) for kind, params in selected]
+        def populated(high, duplicate=False):
+            ids = [127 if duplicate else (68 if high else 0) + k for k in range(60)]
+            return {"layers": list(range(16)), "preview": 15, "mode": {"id": 31, "keys": [59]},
+                    "combos": {"owning": [0], "others": [59], "instances": [{"id": 124 + k, "role": k % 2, "keys": [k]} for k in range(4)]},
+                    "behaviour": {"keys": {str(k): {"id": ids[k], "state": ["branch", "tap", "hold", "long"][k % 4], "branch": 2} for k in range(60)},
+                                  "owners": {"board": 0, "left": 0, "right": 31, "branch": 0, "tap": 1, "hold": 2, "long": 3}},
+                    "layerOwners": {str(k): k % 16 for k in range(60)}, "lockedLayers": list(range(16)), "oneshotLayer": 15,
+                    "modeStatus": {"id": 31, "locked": True, "keys": [59]},
+                    "comboLayers": [{"id": 124 + k, "layer": k, "keys": [k]} for k in range(4)],
+                    "behaviourPhases": {str(k): {"id": ids[k], "phases": list(range(5)), "branch": 1 + k % limits.tap_depth} for k in range(60)},
+                    "macroPlaying": 127, "pressedKeys": list(range(60)), "modifiers": [255, 255], "hostLocks": 7, "pointer": 15, "idle": True}
+        scenarios = [dict(populated(True), time=0), dict(populated(True), time=100),
+                     dict(populated(False), time=150), dict(populated(False), time=250),
+                     dict(populated(True, True), time=300), dict(populated(True, True), time=400),
+                     {"time": 500}, dict(populated(True), time=600), dict(populated(True), time=700)]
+        cases.append(render_case(f"show-after-all-signatures-probe-{probe}", "timing:1", {"palette": PALETTE, "rules": full}, scenarios, limits))
     fade_layers = layer_table([[6, NONE], [0, GREEN], [0, NONE], [0, NONE], [0, WHITE]])
     fade_rules = [rule(part(T, 3, 0), part(P, 2, PURPLE)), every_layer]
     for mode in (0, 1, 2):
