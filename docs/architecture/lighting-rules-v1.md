@@ -122,7 +122,7 @@ A record is one **place** byte followed by the kind's colour slots:
 | combo | 3 | 128 | colour |
 | behaviour | 4 | 128 | hold, long hold, tap, then one per tap branch `2..depth` |
 
-The behaviour record therefore has `1 + 3 + (depth − 1)` bytes, `9` at the
+The behaviour record therefore has `1 + 3 + (depth − 1)` bytes, `8` at the
 supported tap depth of five (D-F14). Kind `0` is the board: it has no table.
 
 A place byte is a **place-capable target** id (a target kind with no
