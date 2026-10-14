@@ -134,6 +134,9 @@ NOAH_COMMON_SOURCES := \
     lib/key/runtime/trace/core_trace.c \
     lib/rgb/core/rgb_runtime.c \
     lib/rgb/lighting/lighting_dispatch.c \
+    lib/rgb/lighting/lighting_event_protocol.c \
+    lib/rgb/lighting/lighting_event_receiver.c \
+    lib/rgb/lighting/lighting_event_sender.c \
     lib/rgb/lighting/lighting_engine.c \
     lib/rgb/lighting/lighting_keymap.c \
     lib/rgb/lighting/lighting_fade.c \

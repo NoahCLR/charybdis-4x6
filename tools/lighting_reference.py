@@ -1492,6 +1492,29 @@ def build_vectors() -> dict:
     }
 
 
+def encode_event_group(group: dict) -> bytes:
+    """Qualified internal split group, independent of profile format version."""
+    owners = bytes.fromhex(group["owners"])
+    qualified = bytes.fromhex(group["qualified"])
+    if len(owners) != 8 or len(qualified) != 32 or not any(qualified) or qualified[-1] & 0x80:
+        raise ValueError("event owner/rule mask")
+    fields = [group[name] for name in ("thingKind", "thing", "slot", "outcome", "sides", "hasKeys")]
+    if not all(0 <= value <= 255 for value in fields) or fields[4] > 3 or fields[5] > 1:
+        raise ValueError("event subject")
+    return group["order"].to_bytes(8, "little") + bytes(fields) + owners + qualified
+
+
+def decode_event_group(wire: bytes) -> dict:
+    if len(wire) != 54:
+        raise ValueError("event group length")
+    result = {"order": int.from_bytes(wire[:8], "little"),
+              **dict(zip(("thingKind", "thing", "slot", "outcome", "sides", "hasKeys"), wire[8:14])),
+              "owners": wire[14:22].hex(), "qualified": wire[22:].hex()}
+    if encode_event_group(result) != wire:
+        raise ValueError("event group encoding")
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     mode = parser.add_mutually_exclusive_group(required=True)

@@ -30,8 +30,9 @@
 
 // Profile Apply copies the profile to the other half in split RPC frames.
 // QMK sends each RPC's own length, so this raises the ceiling for the profile
-// copy's payload chunks only (up to 110 profile bytes a frame instead of 14);
-// every other split RPC keeps its 32-byte frames. The cost is 96 bytes more
+// copy's payload chunks (up to 110 profile bytes a frame instead of 14).
+// Grouped lighting events use at most 64-byte requests; other runtime RPCs
+// keep their 32-byte frames. The ceiling stays 128 bytes. Its cost is 96 bytes more
 // of the shared RPC buffer and the transport CRC's staging buffer on each
 // half. A full request alone takes about 5.6 ms on the 230,400-baud link,
 // before its reply and handshake.

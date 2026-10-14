@@ -746,6 +746,79 @@ generation, so a render never mixes two frames. A pass that fails part-way
 publishes nothing and the next pass resends every chunk. Heartbeats and
 transport back-off are the ones the runtime sync already uses.
 
+### Qualified event groups (internal split protocol)
+
+Event transport is separate from the coherent state-fact frame. The portable
+codec/session component below is implemented; the occurrence qualifier,
+retained-history consumer and QMK RPC adapter are still required before event
+modules can be advertised. It does not add a profile/domain version or enlarge
+QMK's 128-byte request/32-byte reply allocation. All integers are little endian;
+there is no native struct serialization.
+
+| Message | Bytes | Layout |
+| --- | ---: | --- |
+| HELLO1 |27 | opcode1, agreed profile identity (22 bytes), exact first sequence u32 |
+| CONFIRM2 |9 | opcode2, receiver epoch u32, exact first sequence u32 |
+| DATA3 |63 | opcode3, epoch u32, sequence u32, qualified group (54 bytes) |
+| REPLY4 |10 | opcode4, status u8, epoch u32, echoed sequence u32 |
+
+Profile identity (22 bytes) is generation, payload CRC32, payload digest, compiled-default
+digest and action ABI digest (five u32), followed by origin and kind (two u8),
+using the effective provider's identity fields. HELLO must agree before any
+rule mask is consumed; publication/reboot/role change invalidates the session.
+The group is order u64, subject thing-kind/thing/slot/outcome/sides/has-keys
+(six u8), owner bitmap8 and qualified-rule mask32. Bits 0..254 name accepted
+rule ordinals; bit 255 is zero and the mask is nonempty. Sides 0..3 and
+has-keys 0..1 retain their subject meanings. Capture has already qualified all
+independent filters at the coherent occurrence; the receiver never substitutes
+its current filters. The order distinguishes a newer qualifying repeat from
+the immutable outgoing version. Source qualification and storage bounds are
+not established by these packet sizes.
+
+Statuses are 1 pending,2 committed ACK,3 need HELLO,4 reject,5 profile mismatch
+and6 HELLO ready. Callback validates and stages only. Main owns the immutable
+mailbox through synchronous consumption and publishes ACK only after the whole
+group commits. A consumer that cannot commit changes nothing and leaves the
+packet pending. Retries before main return pending; the last committed sequence
+returns ACK without consuming/restarting its clock. Any other DATA sequence
+rejects. The exact next-u32 sequence increments modulo2^32. The sender advances
+the first sequence when an old pending request discovers a fresh receiver, so
+that request is excluded even if the receiver's boot epoch repeats. HELLO and
+CONFIRM are retried byte-identically until their respective replies; a lost
+CONFIRM ACK retries CONFIRM, never starts another HELLO/reset.
+
+Epoch is a receiver session counter, not a unique boot nonce. Pinned QMK runs
+one synchronous CRC-protected info/request/execute/reply sequence at a time:
+no older asynchronous RPC survives a later completed request. The sender owns
+one outgoing packet until ACK; a boot loses it, and a role/profile reinit closes
+callback readiness before touching union/control storage. Epoch/sequence wrap
+therefore does not rely on comparing arbitrary packets retained across 2^32
+completed sessions. Out-of-order/stale DATA within the bounded RPC lifetime
+rejects; an already committed last request is the sole idempotent duplicate.
+Synthetic packets retained outside that lifetime are not an extra transport
+queue or a security/replay guarantee.
+
+An ordinary failed request or lost ACK never resets the session or discards an
+expired unsent marker. Marker 100/flash500 first committed remotely at 1000 starts
+that half's local window 1000..1499 and expires 1500; a duplicate cannot restart
+it. An explicit fresh session clears receiver histories and seeds the sender
+only from currently live qualified markers, excluding expired past events.
+Main gives a staged reset priority over an old pending/consuming group; an old
+ACK cannot publish across it. A qualifying newer repeat remains dirty when ACK
+cleanup compares the captured order/mask with current records; a nonqualifying
+repeat leaves the older qualified record untouched. Round-robin dirty history
+selection remains a consumer integration obligation, not a short dropping
+transport queue.
+
+One caller-owned link object bounds control plus the role-disjoint outgoing/
+mailbox storage at 112 bytes (native layout is not the wire layout). No retained
+history or event queue is allocated inside it. Initialization/readiness and
+synchronous borrowed group lifetimes must hold on each half; no packet pointer
+survives its ACK callback. Component host vectors cover codec boundaries,
+pending/ACK loss, immutable retries, newer occurrences, sequence wrap, reset
+while consuming and role readiness. They do not prove the unfinished retained
+history bound, enabled ARM integration, physical cadence or hardware behavior.
+
 ## Capabilities
 
 Feature bit 31 advertises version-5 lighting and the lighting capability

@@ -1446,7 +1446,12 @@ share the same synthetic scene; actual ownership stays intact. Main owns one
 resolved fact frame through chunk rerenders, and transport buffers share storage
 only across initialized, callback-guarded master/slave roles. The detailed
 lifetime and module-idle contracts live in the lighting spec. Generic event
-facts and linger/flash remain unfinished. Keys-that target8 and what-it-does
+facts and linger/flash remain unfinished. The grouped-event codec/session
+component uses explicit63-byte requests,27-byte HELLO,9-byte CONFIRM and
+10-byte replies inside the existing128/32 QMK allocation. Immutable retries,
+main-before-ACK consumption and fresh-session reset are specified in the
+lighting split contract. The portable component allocates no history and does
+not yet enable event capabilities; its runtime consumer/adapter still follow. Keys-that target8 and what-it-does
 paint9 share a finite per-layer native/behaviour basis; queries compose from
 that cache and existing resident combo rows, with no reader I/O during the
 render walk. This implements the plan's cache intent without one bitmap per

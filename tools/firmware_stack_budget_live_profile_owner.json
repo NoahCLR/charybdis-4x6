@@ -18,6 +18,11 @@
       },
       "indirect_edges": [
         {
+          "caller": "key_runtime_core_effect_plan_push",
+          "callee": "key_runtime_transition_plan_push",
+          "reason": "The scan transition installs plan_push as its synchronous core sink; the generic effect-plan appender retains this indirect call after LTO. Planner and caller workspaces remain live through drain projection."
+        },
+        {
           "caller": "process_record_user",
           "callee": "key_runtime_process_stage_handled_key",
           "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
@@ -140,6 +145,11 @@
       ],
       "cycle_bounds": [
         {
+          "function": "key_runtime_transition_plan_push",
+          "max_occurrences": 2,
+          "reason": "One outer planning drain may settle fallback registrations through the inner stream appender; held registration does not recursively emit another fallback tap."
+        },
+        {
           "function": "key_runtime_transition_execute_plan",
           "max_occurrences": 2,
           "reason": "an emitted action may synchronously settle one pending fallback-hold plan"
@@ -151,6 +161,18 @@
         }
       ],
       "paths": [
+        {
+          "name": "scan streaming delayed drain nested fallback",
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_core_effect_plan_push_delayed_action_with_flags", "key_runtime_core_effect_plan_push", "key_runtime_transition_plan_push", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "dispatch_delayed_action_at", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "scan streaming delayed drain feedback metadata",
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_core_effect_plan_push_delayed_action_with_flags", "key_runtime_core_effect_plan_push", "key_runtime_transition_plan_push", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_project_live_tap_feedback", "key_feedback_lighting_pulse_metadata"]
+        },
+        {
+          "name": "scan streaming delayed drain feedback projection",
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_core_effect_plan_push_delayed_action_with_flags", "key_runtime_core_effect_plan_push", "key_runtime_transition_plan_push", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_project_live_tap_feedback", "key_runtime_core_project_effect", "key_runtime_core_project_commit_feedback", "timer_read32"]
+        },
         {
           "name": "handled press projection with fallback settlement during planning drain",
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
