@@ -107,7 +107,9 @@ void noah_qmk_usb_product_name_pre_init(void) {
     }
 }
 
-void noah_qmk_usb_product_name_task(void) {
+// The owner-status workspace belongs to this housekeeping call. Inlining it
+// into main reserves that space beneath every later key-runtime path.
+__attribute__((noinline)) void noah_qmk_usb_product_name_task(void) {
     if (!is_keyboard_master()) {
         return;
     }

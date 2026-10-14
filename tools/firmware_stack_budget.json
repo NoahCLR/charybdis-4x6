@@ -192,8 +192,8 @@
           "functions": ["main", "rgb_matrix_task", "noah_lighting_resolve", "apply_rules", "noah_lighting_paint", "noah_lighting_palette_rgb", "hsv_to_rgb"]
         },
         {
-          "name": "boot RGB idle facts initialization",
-          "functions": ["main", "noah_rgb_runtime_post_init", "noah_lighting_facts_unpack_synced"]
+          "name": "USB rename safety snapshot",
+          "functions": ["main", "noah_qmk_usb_product_name_task", "noah_profile_owner_status"]
         },
         {
           "name": "matrix scan individual combo capture",

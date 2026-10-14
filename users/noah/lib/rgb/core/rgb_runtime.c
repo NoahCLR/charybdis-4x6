@@ -252,8 +252,7 @@ void noah_rgb_runtime_invalidate_layer_maps(void) {
 #endif
 }
 
-// Keep the boot-only idle frame out of main's lifetime stack allocation.
-__attribute__((noinline)) void noah_rgb_runtime_post_init(void) {
+void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
     noah_rgb_validate_config();
     // Until the other half hears its first frame, the synced facts are at rest.
