@@ -7,6 +7,7 @@
 #endif
 
 #include "layer_ownership.h"
+#include "../../rgb/lighting/lighting_events.h"
 
 #include "noah_keymap_ids.h"
 #include "../../key/runtime/reducer/ownership_state.h"
@@ -127,6 +128,19 @@ bool layer_ownership_is_held(uint8_t layer) {
     return false;
 }
 
+static void layer_ownership_event(uint8_t kind, uint8_t layer) {
+    if (!noah_lighting_events_observed()) return;
+    uint8_t owners[KEY_ORIGIN_BITMAP_SIZE] = {0};
+    for (uint8_t row = 0u; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0u; col < MATRIX_COLS; col++) {
+            keypos_t key = {.row = row, .col = col};
+            if (layer_ownership_momentary_layer_at(key) == layer) key_origin_bitmap_add_keypos(owners, key);
+        }
+    }
+    const noah_lighting_event_t event = {.kind = kind, .thing = layer, .owners = owners};
+    noah_lighting_event_emit(&event);
+}
+
 bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
     noah_layer_ownership_state_t *state = layer_ownership_state();
 
@@ -152,6 +166,7 @@ bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
     bool changed = true;
     changed |= layer_ownership_apply_layer(layer);
     key_runtime_core_layer_lock_set(layer, locked);
+    layer_ownership_event(locked ? NOAH_LIGHTING_EVENT_LAYER_LOCKED : NOAH_LIGHTING_EVENT_LAYER_UNLOCKED, layer);
     return changed;
 }
 
@@ -232,6 +247,13 @@ bool layer_ownership_oneshot_consume(void) {
     uint8_t armed = layer_ownership_oneshot_layer();
 
     return armed != UINT8_MAX && layer_ownership_oneshot_set(armed, false);
+}
+
+bool layer_ownership_oneshot_use(void) {
+    uint8_t layer   = layer_ownership_oneshot_layer();
+    bool    changed = layer_ownership_oneshot_consume();
+    if (changed) layer_ownership_event(NOAH_LIGHTING_EVENT_ONESHOT_USED, layer);
+    return changed;
 }
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {

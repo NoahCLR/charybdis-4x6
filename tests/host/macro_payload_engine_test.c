@@ -8,6 +8,7 @@
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/compat/qmk_host.h"
 #include "users/noah/lib/macro/macro_payload.h"
+#include "users/noah/lib/rgb/lighting/lighting_events.h"
 
 typedef enum {
     TEST_OP_ACQUIRE = 1,
@@ -56,6 +57,17 @@ static void test_fail(const char *expr, const char *file, int line) {
             test_fail(#expr, __FILE__, __LINE__); \
         }                                         \
     } while (0)
+
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+static unsigned played_events;
+static uint8_t played_id;
+void noah_lighting_event_observe(const noah_lighting_event_t *event) {
+    CHECK(event->kind==NOAH_LIGHTING_EVENT_MACRO_PLAYED);
+    CHECK(event->thing<128u && !event->owners && event->key.row>=MATRIX_ROWS);
+    CHECK(macro_payload_playing_slot()==255u); // completion after leases/state cleanup
+    played_id=event->thing;played_events++;
+}
+#endif
 
 static void test_log_op(test_op_kind_t kind, uint8_t keycode) {
     CHECK(test_op_count < TEST_MAX_OPS);
@@ -235,6 +247,24 @@ static void test_busy_start_is_rejected_without_restarting_active_ir(void) {
     CHECK(macro_payload_playing_slot() == 3u); // cleanup still owns this slot
     test_drain_cleanup();
 }
+
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+static void test_only_successful_named_completion_is_an_event(void) {
+    const macro_payload_ir_t ir={.length=3,.bytes={MACRO_PAYLOAD_IR_OP_DELAY,1,0}};
+    test_reset();played_events=0;
+    for(unsigned repeat=0;repeat<2;repeat++) {
+        CHECK(macro_payload_start_ir(&ir,MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN,0,MACRO_PAYLOAD_SOURCE_VIA,127,NULL,NULL)==MACRO_PAYLOAD_START_STARTED);
+        macro_payload_engine_scan();test_scan_after(1);test_drain_cleanup();
+        CHECK(played_events==repeat+1 && played_id==127);
+        macro_payload_engine_scan();CHECK(played_events==repeat+1);
+    }
+    CHECK(macro_payload_start_ir(&ir,MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN,0,MACRO_PAYLOAD_SOURCE_DIRECT,127,NULL,NULL)==MACRO_PAYLOAD_START_STARTED);
+    macro_payload_engine_scan();test_scan_after(1);test_drain_cleanup();CHECK(played_events==2);
+    CHECK(macro_payload_start_ir(&ir,MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN,0,MACRO_PAYLOAD_SOURCE_VIA,3,NULL,NULL)==MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_payload_engine_cancel());test_drain_cleanup();CHECK(played_events==2);
+    test_reset();played_events=0;
+}
+#endif
 
 static void test_cancel_releases_one_persistent_hold_per_scan(void) {
     macro_payload_ir_t ir = {
@@ -583,6 +613,9 @@ static void test_protected_unicode_cancellation_never_replays_existing_keys(void
 }
 
 int main(void) {
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    test_only_successful_named_completion_is_an_event();
+#endif
     test_protected_output_isolates_existing_keys_and_modifiers();
     test_protected_unicode_cancellation_never_replays_existing_keys();
     test_protection_is_latched_and_released();

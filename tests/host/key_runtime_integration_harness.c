@@ -22,6 +22,8 @@ __attribute__((weak)) bool layer_ownership_oneshot_consume(void) {
     return false;
 }
 
+__attribute__((weak)) bool layer_ownership_oneshot_use(void) { return layer_ownership_oneshot_consume(); }
+
 __attribute__((weak)) bool is_oneshot_enabled(void) {
     return true;
 }

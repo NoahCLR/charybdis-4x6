@@ -7,6 +7,7 @@
 #include "macro_payload_internal.h"
 #include "../profile/runtime/effective_settings_runtime.h"
 #include "../compat/qmk_host.h"
+#include "../rgb/lighting/lighting_events.h"
 
 #if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(NOAH_HOST_QMK_STUB) && (!defined(QMK_REPORT_MODS_OVERRIDE) || !defined(QMK_REPORT_KEYS_FILTER))
 #    error "Unicode macro playback requires the QMK report modifier override and key filter contracts"
@@ -435,6 +436,7 @@ static void macro_payload_begin_runtime_error(void) {
 }
 
 static void macro_payload_finish(macro_payload_finish_result_t result) {
+    uint8_t                 played_slot    = result == MACRO_PAYLOAD_FINISH_SUCCESS && macro_payload_engine.source == MACRO_PAYLOAD_SOURCE_VIA && macro_payload_engine.slot < 128u ? macro_payload_engine.slot : 255u;
     macro_payload_finish_fn finish         = macro_payload_engine.finish;
     void                   *finish_context = macro_payload_engine.finish_context;
 
@@ -463,6 +465,10 @@ static void macro_payload_finish(macro_payload_finish_result_t result) {
         send_keyboard_report();
     } else
         macro_payload_engine = (macro_payload_engine_t){0};
+    if (played_slot != 255u) {
+        const noah_lighting_event_t event = {.kind = NOAH_LIGHTING_EVENT_MACRO_PLAYED, .thing = played_slot, .key = {.row = MATRIX_ROWS, .col = MATRIX_COLS}};
+        noah_lighting_event_emit(&event);
+    }
     if (finish) {
         finish(result, finish_context);
     }

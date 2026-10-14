@@ -5,6 +5,8 @@
 #include <string.h>
 
 #include "users/noah/lib/state/ownership/layer_ownership.h"
+#include "users/noah/lib/rgb/lighting/lighting_events.h"
+#include "users/noah/lib/key/runtime/slot/origin_registry.h"
 
 layer_state_t layer_state;
 
@@ -22,6 +24,40 @@ static void test_fail(const char *expr, const char *file, int line) {
             test_fail(#expr, __FILE__, __LINE__); \
         }                                         \
     } while (0)
+
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+static noah_lighting_event_t last_event;
+static uint8_t event_owners[KEY_ORIGIN_BITMAP_SIZE];
+static unsigned event_count;
+void noah_lighting_event_observe(const noah_lighting_event_t *event) {
+    CHECK(event && event->thing<LAYER_COUNT);
+    last_event=*event;event_count++;
+    CHECK(event->owners != NULL);
+    memcpy(event_owners,event->owners,sizeof(event_owners));last_event.owners=event_owners;
+    if(event->kind==NOAH_LIGHTING_EVENT_LAYER_LOCKED) CHECK(layer_ownership_is_locked(event->thing));
+    if(event->kind==NOAH_LIGHTING_EVENT_LAYER_UNLOCKED) CHECK(!layer_ownership_is_locked(event->thing));
+    if(event->kind==NOAH_LIGHTING_EVENT_ONESHOT_USED) CHECK(layer_ownership_oneshot_layer()==255u);
+}
+static void test_actual_events_capture_once_and_keep_borrowed_owners(void) {
+    layer_ownership_reset_for_test();event_count=0;
+    keypos_t key={.row=1,.col=2};
+    layer_ownership_momentary_press(key,3);
+    CHECK(layer_ownership_set_lock_state(3,true));CHECK(event_count==1);
+    CHECK(last_event.kind==NOAH_LIGHTING_EVENT_LAYER_LOCKED && last_event.thing==3);
+    CHECK(key_origin_bitmap_has_keypos(event_owners,key));
+    CHECK(!layer_ownership_set_lock_state(3,true));CHECK(event_count==1);
+    layer_ownership_momentary_release(key);
+    CHECK(key_origin_bitmap_has_keypos(event_owners,key)); // synchronous copy survives producer mutation
+    CHECK(layer_ownership_set_lock_state(3,false));CHECK(event_count==2);
+    CHECK(last_event.kind==NOAH_LIGHTING_EVENT_LAYER_UNLOCKED && !key_origin_bitmap_has_any(event_owners));
+    CHECK(layer_ownership_oneshot_tap(4,100,200));
+    CHECK(layer_ownership_oneshot_use());CHECK(event_count==3);
+    CHECK(last_event.kind==NOAH_LIGHTING_EVENT_ONESHOT_USED && last_event.thing==4);
+    CHECK(!layer_ownership_oneshot_use());CHECK(event_count==3);
+    CHECK(layer_ownership_oneshot_tap(4,500,200));
+    CHECK(layer_ownership_oneshot_consume());CHECK(event_count==3); // administrative clear is not use
+}
+#endif
 
 static keypos_t test_keypos(uint8_t row, uint8_t col) {
     return (keypos_t){
@@ -419,6 +455,9 @@ static void test_lighting_projection_keeps_real_owner_keys_and_masks(void) {
 }
 
 int main(void) {
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    test_actual_events_capture_once_and_keep_borrowed_owners();
+#endif
     test_lighting_projection_keeps_real_owner_keys_and_masks();
     test_single_momentary_press_and_release_toggles_layer();
     test_multiple_keys_share_momentary_layer_reference();

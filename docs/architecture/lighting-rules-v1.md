@@ -553,6 +553,32 @@ bound, including independently filtered rules; a normal profile or the current
 live-state maximum does not establish it. No event/linger module is advertised
 by this checkpoint.
 
+New event kinds are positive first-condition triggers and require explicit
+flash timing. They do not define a recent-event boolean or a negated truth
+window. State kinds remain independently negatable filters. The filters
+qualify against the coherent occurrence context: a layer appearing later
+cannot resurrect an occurrence that failed its layer filter. No occurrence
+at boot means no flash. A qualifying repeat of the same event thing replaces
+its last ordered matching batch and restarts expiry; a nonqualifying repeat
+preserves its older qualifying flash. Different thing ids coexist, retaining
+their captured natural order.
+
+Linger is per (rule, subject thing). While the full condition matches, its
+last whole ordered matching batch is refreshed. When the full match ends,
+that batch freezes until expiry. Departure of some keys while the same thing
+still matches updates the live batch rather than creating independent tails.
+These construction and retention rules constrain the forthcoming modules;
+this checkpoint does not advertise flash or linger support.
+
+Producer occurrences use an explicit `NOAH_LIGHTING_EVENT_CAPTURE_ENABLE`
+integration gate. Disabled builds have inline no-ops and no observer symbol,
+queue or event capability. Enabled builds must link the actual synchronous
+observer. Its owner bitmap is borrowed only for the call: the observer must
+copy needed data before returning and must not reenter an input producer.
+Standalone producer tests link recording observers; these do not provide
+the production consumer. An event module cannot be advertised until its
+consumer is enabled and linked on the production and host build surfaces.
+
 Each half times from the frame in which it first sees the subject, so the
 halves may differ by the link's latency. Gate observation and wake deadlines
 use local `timer_read32()`, independently of `sync_timer_read32()` passed to

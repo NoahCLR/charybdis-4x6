@@ -38,6 +38,8 @@ run_variant() {
 }
 
 run_variant normal
+run_variant event_capture -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1
+run_variant event_capture_sanitized -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -fsanitize=address,undefined -fno-omit-frame-pointer
 run_variant extra_short -DEXTRA_SHORT_COMBOS
 run_variant output_permissions -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
 run_variant output_permissions_sanitized -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer

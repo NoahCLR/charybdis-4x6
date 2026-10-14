@@ -1454,6 +1454,16 @@ rule. Effective-profile and VIA publications invalidate it; main-context
 refresh rejects a generation interrupted by split publication. This partial
 phase3 implementation does not establish hardware acceptance.
 
+New events are positive first-condition triggers with explicit flash timing;
+state filters retain unrestricted negation. Qualification uses the coherent
+occurrence context. Qualifying repeats replace the same thing's frozen batch
+and restart expiry; nonqualifying repeats preserve it. Linger freezes the last
+whole matching batch per rule/thing when its full match ends. Producer capture
+uses an explicit compile gate with a required linked synchronous observer when
+enabled, and no external requirement or event capability when disabled. These
+constraints are detailed in the lighting spec; the incomplete producer
+foundation does not advertise an event or retention module.
+
 
 The query basis has a separately authorized3072 B static-regression-policy
 increment for the recorded portable RGB profile artifact, to229376 B; unrelated

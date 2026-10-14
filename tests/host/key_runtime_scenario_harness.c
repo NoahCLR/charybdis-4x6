@@ -737,6 +737,8 @@ bool layer_ownership_oneshot_consume(void) {
     return false;
 }
 
+bool layer_ownership_oneshot_use(void) { return layer_ownership_oneshot_consume(); }
+
 void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
     if (!out) {
         return;

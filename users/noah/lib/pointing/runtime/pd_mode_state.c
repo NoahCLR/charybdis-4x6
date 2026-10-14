@@ -11,6 +11,7 @@
 #include "../policy/pd_mode_policy.h"
 #include "pd_mode_key_runtime_bridge.h"
 #include "pd_mode_internal.h"
+#include "../../rgb/lighting/lighting_events.h"
 
 static pd_mode_runtime_shared_state_t *pd_mode_shared_state(void) {
     return pd_mode_runtime_shared_state();
@@ -574,6 +575,8 @@ bool pd_any_display_mode_locked(void) {
 
 pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
     pd_mode_apply_result_t result              = pd_mode_apply_result_begin();
+    uint8_t                previous_owners[KEY_ORIGIN_BITMAP_SIZE] = {0};
+    if (noah_lighting_events_observed() && command.kind != PD_MODE_COMMAND_REMOTE_SNAPSHOT) (void)pd_mode_local_owner_bitmap_snapshot(previous_owners);
     bool                   split_sync_required = false;
     pd_mode_mask_t         mode                = command.mode;
 
@@ -661,6 +664,16 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
     }
 
     pd_mode_apply_result_finish(&result, split_sync_required);
+    if (noah_lighting_events_observed() && command.kind != PD_MODE_COMMAND_REMOTE_SNAPSHOT && result.before.local.active_mode != result.after.local.active_mode) {
+        const noah_lighting_event_t ended = {.kind = NOAH_LIGHTING_EVENT_MODE_ENDED, .thing = pd_mode_id_from_mask(result.before.local.active_mode), .owners = previous_owners};
+        if (ended.thing < PD_MODE_COUNT) noah_lighting_event_emit(&ended);
+        if (result.after.local.active_mode) {
+            uint8_t owners[KEY_ORIGIN_BITMAP_SIZE];
+            (void)pd_mode_local_owner_bitmap_snapshot(owners);
+            const noah_lighting_event_t started = {.kind = NOAH_LIGHTING_EVENT_MODE_STARTED, .thing = pd_mode_id_from_mask(result.after.local.active_mode), .owners = owners};
+            if (started.thing < PD_MODE_COUNT) noah_lighting_event_emit(&started);
+        }
+    }
     return result;
 }
 

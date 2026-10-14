@@ -11,6 +11,8 @@
 #include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "host_runtime_reset_fixture.h"
+#include "users/noah/lib/rgb/lighting/lighting_events.h"
+#include "users/noah/lib/key/runtime/slot/origin_registry.h"
 
 // Local dispatch fakes let this test observe the configured slot selection.
 report_mouse_t handle_volume_mode(report_mouse_t mouse_report);
@@ -637,7 +639,49 @@ static void test_is_mouse_record_user_delegates_pointer_layer_policy(void) {
     CHECK(!noah_is_mouse_record_user(PD_SLOT_4, &record));
 }
 
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+static noah_lighting_event_t mode_events[8];
+static uint8_t mode_event_owners[8][KEY_ORIGIN_BITMAP_SIZE];
+static unsigned mode_event_count;
+static bool recording_mode_events;
+void noah_lighting_event_observe(const noah_lighting_event_t *event) {
+    if (!recording_mode_events) return;
+    CHECK(mode_event_count<8 && event->owners && event->thing<PD_MODE_COUNT);
+    CHECK(event->kind==NOAH_LIGHTING_EVENT_MODE_STARTED || event->kind==NOAH_LIGHTING_EVENT_MODE_ENDED);
+    mode_events[mode_event_count]=*event;
+    memcpy(mode_event_owners[mode_event_count],event->owners,KEY_ORIGIN_BITMAP_SIZE);
+    mode_events[mode_event_count].owners=mode_event_owners[mode_event_count];mode_event_count++;
+}
+static void test_mode_events_local_transition_owners_and_no_remote_replay(void) {
+    test_reset_stubs();mode_event_count=0;recording_mode_events=true;
+    keypos_t a={.row=0,.col=0},b={.row=1,.col=1};
+    pd_mode_command_t start={.kind=PD_MODE_COMMAND_KEY_PRESS,.keycode=PD_SLOT_0,.owner_key_pos=a,.owner_sides=SPLIT_SIDE_MASK_LEFT};
+    (void)pd_mode_apply_command(start);
+    CHECK(mode_event_count==1 && mode_events[0].kind==NOAH_LIGHTING_EVENT_MODE_STARTED && mode_events[0].thing==0);
+    CHECK(key_origin_bitmap_has_keypos(mode_event_owners[0],a));
+    (void)pd_mode_apply_command(start);CHECK(mode_event_count==1);
+    start.keycode=PD_SLOT_1;start.owner_key_pos=b;
+    (void)pd_mode_apply_command(start);
+    CHECK(mode_event_count==3 && mode_events[1].kind==NOAH_LIGHTING_EVENT_MODE_ENDED && mode_events[1].thing==0);
+    CHECK(mode_events[2].kind==NOAH_LIGHTING_EVENT_MODE_STARTED && mode_events[2].thing==1);
+    CHECK(key_origin_bitmap_has_keypos(mode_event_owners[1],a) && key_origin_bitmap_has_keypos(mode_event_owners[2],b));
+    pd_mode_command_t remote={.kind=PD_MODE_COMMAND_REMOTE_SNAPSHOT,.active_mode_id=2,.locked_mode_id=2};
+    (void)pd_mode_apply_command(remote);CHECK(mode_event_count==3);
+    pd_mode_command_t end={.kind=PD_MODE_COMMAND_KEY_RELEASE,.keycode=PD_SLOT_1,.owner_key_pos=b};
+    (void)pd_mode_apply_command(end);
+    CHECK(mode_event_count==4 && mode_events[3].kind==NOAH_LIGHTING_EVENT_MODE_ENDED && mode_events[3].thing==1);
+    CHECK(key_origin_bitmap_has_keypos(mode_event_owners[3],b));
+    (void)pd_mode_apply_command(end);CHECK(mode_event_count==4);
+    // Copies outlive the producer's owner cleanup.
+    CHECK(key_origin_bitmap_has_keypos(mode_event_owners[2],b));
+    recording_mode_events=false;mode_event_count=0;test_reset_stubs();
+}
+#endif
+
 int main(void) {
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    test_mode_events_local_transition_owners_and_no_remote_replay();
+#endif
     test_pointing_device_init_enables_auto_mouse_and_default_layer();
     test_pointing_device_task_returns_original_report_without_local_mode();
     test_pointing_device_task_ignores_remote_display_only_mode_on_slave();

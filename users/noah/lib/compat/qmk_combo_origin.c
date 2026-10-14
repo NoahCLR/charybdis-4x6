@@ -2,6 +2,7 @@
 // QMK Combo Origin Compatibility
 // ────────────────────────────────────────────────────────────────────────────
 
+#include "../rgb/lighting/lighting_events.h"
 #include "qmk_combo_origin.h"
 #include "../state/ownership/layer_ownership.h"
 #include "qmk_source_layer_contract.h"
@@ -478,6 +479,10 @@ static void combo_origin_pending_output_reconcile(bool observe_deadline) {
             entry->applied          = true;
             entry->applied_at       = timer_read();
             entry->deadline_crossed = false;
+            if (entry->combo_index < 128u) {
+                const noah_lighting_event_t event = {.kind = NOAH_LIGHTING_EVENT_COMBO_FIRED, .thing = entry->combo_index, .owners = entry->bitmap};
+                noah_lighting_event_emit(&event);
+            }
         }
         if (!combo || (!entry->applied && combo_origin_combo_is_disabled(combo))) {
             combo_origin_pending_output_entry_clear(entry);
@@ -766,6 +771,7 @@ __attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t k
     uint8_t  origin_layer  = 0;
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
     bool     matched = false;
+    bool     event_needed = false;
 
     if (!(record && record->event.type == COMBO_EVENT) || noah_participation_record_generated_normalized(record)) {
         return;
@@ -775,6 +781,7 @@ __attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t k
         combo_origin_pending_output_entry_t *pending = combo_origin_pending_entry_for_press(keycode);
 
         if (pending) {
+            event_needed = !pending->applied;
             noah_qmk_combo_origin_capture_record(keycode, record);
             combo_index   = pending->combo_index;
             generation    = pending->generation;
@@ -788,10 +795,15 @@ __attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t k
         } else {
             combo_origin_increment_counter(&combo_origin_diagnostics.unmatched_delayed_output_count);
             matched = combo_origin_collect_untracked_active_combo(keycode, &combo_index, &generation, &owner_key_pos, &complete_at, bitmap);
+            event_needed = matched;
             if (matched) {
                 origin_layer = physical_key_states[key_origin_keypos_index(owner_key_pos)].source_layer;
                 if (!noah_participation_record_generated_captured(record)) noah_participation_record_generated_permission(record, origin_layer, noah_participation_combo_output(combo_index, keycode, origin_layer));
             }
+        }
+        if (event_needed && combo_index < 128u) {
+            const noah_lighting_event_t event = {.kind = NOAH_LIGHTING_EVENT_COMBO_FIRED, .thing = combo_index, .owners = bitmap};
+            noah_lighting_event_emit(&event);
         }
         if (matched && key_origin_keypos_valid(owner_key_pos)) {
             record->event.key = owner_key_pos;

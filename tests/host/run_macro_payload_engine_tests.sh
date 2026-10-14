@@ -19,7 +19,8 @@ trap cleanup EXIT INT TERM
 
 # TAP_CODE_DELAY is QMK's default, which the firmware keeps, so timing checks
 # match the keyboard rather than the stub's slower fallback.
-cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+for capture in 0 1; do
+cc -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE="$capture" -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNKRO_ENABLE -DTAP_CODE_DELAY=0u \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$QMK_ROOT/platforms" \
@@ -35,7 +36,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 
 "$BIN"
 
-cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+cc -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE="$capture" -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -fsanitize=address,undefined \
     -fno-omit-frame-pointer \
     -DNKRO_ENABLE -DTAP_CODE_DELAY=0u \
@@ -52,6 +53,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$SANITIZED_BIN"
 
 "$SANITIZED_BIN"
+
+done
 
 if rg -n '\b(wait_ms|send_char|send_char_with_delay|owned_keycode_tap)[[:space:]]*\(' \
     "$ROOT/users/noah/lib/macro/macro_payload_run.c"; then

@@ -524,7 +524,7 @@ static void key_runtime_process_settle_oneshot_layer(uint16_t keycode, const key
     }
 
     if (layer_ownership_oneshot_layer() != UINT8_MAX && key_runtime_process_press_uses_oneshot_layer(keycode, record)) {
-        (void)layer_ownership_oneshot_consume();
+        (void)layer_ownership_oneshot_use();
     }
 }
 

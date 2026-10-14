@@ -15,7 +15,12 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+for capture in 0 1; do
+for variant in normal sanitized; do
+FLAGS=""
+if [ "$variant" = sanitized ]; then FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"; fi
+# shellcheck disable=SC2086
+cc $FLAGS -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE="$capture" -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_HOST_TESTS \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$ROOT" \
@@ -29,3 +34,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$BIN"
 
 "$BIN"
+
+done
+done

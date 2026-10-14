@@ -45,6 +45,8 @@ bool layer_ownership_goto(uint8_t layer);
 // layer_ownership_oneshot_consume() once its own press has been processed.
 bool    layer_ownership_oneshot_tap(uint8_t layer, uint16_t now, uint16_t double_tap_ms);
 bool    layer_ownership_oneshot_consume(void);
+// Actual input use only; administrative goto/clear keeps consume().
+bool    layer_ownership_oneshot_use(void);
 uint8_t layer_ownership_oneshot_layer(void);
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer);

@@ -6,6 +6,7 @@
 
 #include "noah_real_profile_keyboard.h"
 #include "users/noah/lib/compat/qmk_combo_origin.h"
+#include "users/noah/lib/rgb/lighting/lighting_events.h"
 #include "users/noah/lib/key/behavior/participation.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
 
@@ -247,6 +248,42 @@ static void test_observe_physical_key(keypos_t key_pos, bool pressed) {
 static bool test_bitmap_has(const uint8_t *bitmap, uint8_t row, uint8_t col) {
     return key_origin_bitmap_has_keypos(bitmap, test_key(row, col));
 }
+
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+static unsigned fired_count;
+static uint8_t fired_id, fired_owners[KEY_ORIGIN_BITMAP_SIZE];
+void noah_lighting_event_observe(const noah_lighting_event_t *event) {
+    CHECK(event->kind==NOAH_LIGHTING_EVENT_COMBO_FIRED && event->thing<128 && event->owners);
+    fired_count++;fired_id=event->thing;
+    memcpy(fired_owners,event->owners,sizeof(fired_owners));
+}
+static void test_fired_event_is_actual_once_with_captured_inputs(void) {
+    test_reset();fired_count=0;
+    test_observe_physical_key(test_key(0,0),true);
+    test_observe_physical_key(test_key(1,0),true);
+    CHECK(fired_count==0); // a completed chord is not yet a fired combo
+    test_set_combo_active(0,true);
+    keyrecord_t record=test_combo_record(true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT,&record);
+    CHECK(fired_count==1 && fired_id==0);
+    CHECK(test_bitmap_has(fired_owners,0,0) && test_bitmap_has(fired_owners,1,0));
+    noah_qmk_combo_origin_scan();
+    noah_qmk_combo_origin_scan();
+    CHECK(fired_count==1); // applied pending or active cache cannot duplicate occurrence
+    test_observe_physical_key(test_key(0,0),false);
+    test_observe_physical_key(test_key(1,0),false);
+    CHECK(test_bitmap_has(fired_owners,0,0) && test_bitmap_has(fired_owners,1,0));
+    test_reset();fired_count=0;
+    test_observe_physical_key(test_key(0,0),true);
+    test_observe_physical_key(test_key(1,0),true);
+    test_set_combo_active(0,true);
+    noah_qmk_combo_origin_scan();CHECK(fired_count==1);
+    record=test_combo_record(true);
+    noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT,&record);
+    CHECK(fired_count==1); // scan-time occurrence is not replayed by delayed output
+    test_reset();fired_count=0;
+}
+#endif
 
 static void test_single_half_combo_uses_last_key_from_combo_ref_layer(void) {
     keyrecord_t combo_record = test_combo_record(true);
@@ -1099,6 +1136,9 @@ static void test_lighting_subjects_have_individual_combo_identity(void) {
 }
 
 int main(void) {
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    test_fired_event_is_actual_once_with_captured_inputs();
+#endif
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     test_output_permission_survives_queues_and_release();
     puts("combo output permission queue and release tests passed");

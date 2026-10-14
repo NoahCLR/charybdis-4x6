@@ -872,6 +872,8 @@ bool layer_ownership_oneshot_consume(void) {
     return false;
 }
 
+bool layer_ownership_oneshot_use(void) { return layer_ownership_oneshot_consume(); }
+
 uint8_t layer_ownership_oneshot_layer(void) {
     return UINT8_MAX;
 }
