@@ -579,6 +579,35 @@ Standalone producer tests link recording observers; these do not provide
 the production consumer. An event module cannot be advertised until its
 consumer is enabled and linked on the production and host build surfaces.
 
+Authored behaviour occurrences follow actual branch emission, independently
+of Standard's visual feedback eligibility. A committed buffered base tap or
+inherited tap still has its captured row and branch even when no visual pulse
+is requested. A pending release hold is not a fired hold. Repeated action
+emission from one committed tap branch is one branch occurrence, after its
+final emission. Deferred output carries the captured row and branch through
+the existing dispatch queue; queue-full immediate fallback observes the
+actual immediate emission. It does not look up a later key binding. Behaviour
+subjects own the same physical matrix key as the per-key phase facts, with
+the captured colour slot and supported layer/mode outcome.
+
+The compact action effects and persistent dispatch slots remain12 bytes in
+the current compiler configuration. Deferred branch metadata uses the six
+unused dispatch-flag bits and snapshot bitfields. Compiled tap depths above63
+use an explicit byte per dispatch slot instead (two slots per matrix key),
+and larger snapshots remain bounded by the existing64-byte drain workspace.
+The default and8/64/255-depth host configurations test those representations;
+these sizeof/serialization checks are not linked resource or stack proof.
+
+Flash is valid only for an event trigger; linger only for state/board rules.
+Combining event flash and linger is invalid. Show-after and event flash use
+parallel clocks from the qualifying occurrence: observation100, flash500 and
+show-after200 paints300..599 and expires600; show-after700 never paints.
+Qualifying repeats restart both clocks; nonqualifying repeats change neither.
+Subsequent filter changes cannot alter an already qualified event's flash.
+For state show-after100/linger200, a match100..149 never paints or leaves a
+tail; a match100..249 paints200..449 and expires450. Departure cannot mature
+unmet show-after. Without show-after, an eligible state can linger immediately.
+
 Each half times from the frame in which it first sees the subject, so the
 halves may differ by the link's latency. Gate observation and wake deadlines
 use local `timer_read32()`, independently of `sync_timer_read32()` passed to

@@ -1,4 +1,5 @@
 #include "projection.h"
+#include "../../../rgb/lighting/lighting_events.h"
 
 #include "feedback_projection.h"
 #include "../feedback.h"
@@ -73,7 +74,21 @@ __attribute__((noinline)) void key_runtime_core_project_effect(const key_runtime
             (void)layer_ownership_oneshot_use();
             return;
         case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
-            key_runtime_core_feedback_projection_project_pulse(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch, effect->data.feedback_pulse.lighting_identity, effect->data.feedback_pulse.lighting_outcome);
+            if ((effect->data.feedback_pulse.commit_flags & KEY_RUNTIME_COMMIT_QUIET) == 0u) {
+                key_runtime_core_feedback_projection_project_pulse(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch, effect->data.feedback_pulse.lighting_identity, effect->data.feedback_pulse.lighting_outcome);
+            }
+            if (noah_lighting_events_observed() && effect->data.feedback_pulse.lighting_identity != 0u && effect->data.feedback_pulse.lighting_branch != 0u) {
+                const uint8_t kind = effect->data.feedback_pulse.kind;
+                const noah_lighting_event_t event = {
+                    .kind = kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED ? NOAH_LIGHTING_EVENT_TAP_FIRED : (kind == KEY_FEEDBACK_PULSE_LONG_HOLD ? NOAH_LIGHTING_EVENT_LONG_HOLD_FIRED : NOAH_LIGHTING_EVENT_HOLD_FIRED),
+                    .thing = (uint8_t)(effect->data.feedback_pulse.lighting_identity - 1u),
+                    .key = effect->data.feedback_pulse.key_pos,
+                    .branch = effect->data.feedback_pulse.lighting_branch,
+                    .slot = kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED ? 2u : (kind == KEY_FEEDBACK_PULSE_LONG_HOLD ? 1u : 0u),
+                    .outcome = effect->data.feedback_pulse.lighting_outcome,
+                };
+                noah_lighting_event_emit(&event);
+            }
             return;
         case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
             key_runtime_core_pd_projection_project_lock_tap(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos);
@@ -105,21 +120,40 @@ __attribute__((noinline)) void key_runtime_core_project_effect(const key_runtime
     }
 }
 
+// A committed tap series may wait behind another press. Only the final
+// authored branch emission carries its occurrence; autorepeated actions are
+// not additional branch commits. Queue saturation preserves the existing
+// immediate-dispatch fallback and emits that occurrence after real dispatch.
+__attribute__((noinline)) void key_runtime_core_project_deferred_commit(const key_runtime_effect_t *action, const key_runtime_effect_t *commit) {
+    keypos_t key = key_runtime_effect_delayed_action_key_pos(action);
+    uint8_t count = action->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK;
+    const press_token_t *token = key_runtime_core_press_token_at(key);
+    uint16_t owner = token && token->active ? token->token_id : 0u;
+    for (uint8_t repeat = 0u; repeat < count; repeat++) {
+        bool last = repeat == (uint8_t)(count - 1u);
+        bool visible = last && (commit->data.feedback_pulse.commit_flags & KEY_RUNTIME_COMMIT_QUIET) == 0u;
+        if (key_runtime_core_queue_pending_release_dispatch_with_commit(key, action->data.delayed_action.action, action->data.delayed_action.mods, visible, owner, last ? commit->data.feedback_pulse.lighting_identity : 0u, last ? commit->data.feedback_pulse.lighting_branch : 0u)) continue;
+        dispatch_delayed_action_at(key, action->data.delayed_action.action, action->data.delayed_action.mods);
+        if (last) key_runtime_core_project_effect(commit);
+    }
+}
+
 void key_runtime_core_project_pending_release_dispatch(const pending_release_t *pending) {
     if (!pending) {
         return;
     }
 
     dispatch_delayed_action_at(pending->key_pos, pending->action, pending->mods);
-    if (pending->tap_commit_feedback) {
+    if (pending->tap_commit_feedback || pending->lighting_branch != 0u) {
         key_runtime_core_project_effect(&(key_runtime_effect_t){
             .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-            .data.feedback_pulse =
-                {
-                    .key_pos           = pending->key_pos,
-                    .kind              = KEY_FEEDBACK_PULSE_TAP_COMMITTED,
-                    .lighting_identity = pending->lighting_identity,
-                },
+            .data.feedback_pulse = {
+                .key_pos = pending->key_pos,
+                .kind = KEY_FEEDBACK_PULSE_TAP_COMMITTED,
+                .lighting_identity = pending->lighting_identity,
+                .lighting_branch = pending->lighting_branch,
+                .commit_flags = pending->tap_commit_feedback ? 0u : KEY_RUNTIME_COMMIT_QUIET,
+            },
         });
     }
 }

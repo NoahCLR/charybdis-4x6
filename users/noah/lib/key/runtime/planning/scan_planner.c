@@ -357,9 +357,7 @@ static void key_runtime_core_plan_threshold_hold_effects(key_runtime_core_state_
             return;
         case HANDLED_KEY_HOLD_THRESHOLD_REGISTER_HELD:
             key_runtime_core_effect_plan_push_held_action(plan, KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, token_key_pos, hold.action);
-            if (key_runtime_core_scan_hold_activation_needs_pulse(hold, semantics, false)) {
-                key_runtime_core_effect_plan_push_feedback_pulse(plan, token_key_pos, feedback_kind);
-            }
+            key_runtime_core_effect_plan_push_hold_commit(plan, token_key_pos, feedback_kind, key_runtime_core_scan_hold_activation_needs_pulse(hold, semantics, false));
             key_runtime_core_press_token_commit_hold_phase(state, token, completes_hold, long_hold_level);
             return;
         case HANDLED_KEY_HOLD_THRESHOLD_REPEAT:
@@ -397,9 +395,7 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
 
             (void)authored_branch;
             key_runtime_core_effect_plan_push_delayed_action(plan, key_pos, resolution.action, mods, resolution.repeat_count);
-            if (authored_tap_branch) {
-                key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, key_pos, resolution.action, resolution.tap_count);
-            }
+            key_runtime_core_effect_plan_push_tap_commit(plan, key_pos, resolution.action, resolution.tap_count, authored_tap_branch);
             key_runtime_core_tap_series_clear(state, series);
             return;
         }

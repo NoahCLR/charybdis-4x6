@@ -1,6 +1,7 @@
 // Key Runtime Core Release Planner Effects
 
 #include "release_internal.h"
+#include "effect_plan.h"
 
 #include "../reducer/state_query.h"
 
@@ -84,30 +85,13 @@ static void key_runtime_core_release_effect_plan_push_layer_release(key_runtime_
                                                     });
 }
 
-static void key_runtime_core_release_effect_plan_push_feedback_pulse(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, key_feedback_pulse_kind_t kind) {
-    if (!plan) {
-        return;
-    }
-
-    uint8_t identity, outcome;
-    key_feedback_lighting_pulse_metadata(key_pos, kind, &identity, &outcome);
-
-    key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
-                                                        .kind = KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-                                                        .data.feedback_pulse =
-                                                            {
-                                                                .key_pos           = key_pos,
-                                                                .kind              = kind,
-                                                                .lighting_identity = identity,
-                                                                .lighting_outcome  = outcome,
-                                                            },
-                                                    });
+static void key_runtime_core_release_effect_plan_push_commit(key_runtime_core_release_effect_plan_t *plan, keypos_t key, key_feedback_pulse_kind_t kind, bool visible) {
+    key_runtime_effect_t effect;
+    if (plan && key_runtime_core_feedback_effect(key, kind, visible, &effect)) key_runtime_core_release_effect_plan_push(plan, effect);
 }
 
 static void key_runtime_core_release_effect_plan_push_tap_commit_feedback_pulse(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, uint16_t action, uint8_t tap_count) {
-    if (key_runtime_core_tap_commit_feedback_allowed(action, tap_count)) {
-        key_runtime_core_release_effect_plan_push_feedback_pulse(plan, key_pos, KEY_FEEDBACK_PULSE_TAP_COMMITTED);
-    }
+    if (action != KC_NO) key_runtime_core_release_effect_plan_push_commit(plan, key_pos, KEY_FEEDBACK_PULSE_TAP_COMMITTED, key_runtime_core_tap_commit_feedback_allowed(action, tap_count));
 }
 
 static void key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, pd_mode_mask_t mode) {
@@ -329,9 +313,16 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
             }
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION:
             key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, key_pos, resolution->decision.action);
+            {
+                key_feedback_pulse_kind_t kind;
+                if (key_runtime_core_release_hold_action_feedback_kind(key_runtime_core_press_token_at(key_pos), resolution->decision.action, resolution->elapsed, &kind)) {
+                    key_runtime_core_release_effect_plan_push_commit(out, key_pos, kind, false);
+                }
+            }
             return true;
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
             key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(out, key_pos, resolution->decision.pd_mode_lock_tap);
+            key_runtime_core_release_effect_plan_push_commit(out, key_pos, KEY_FEEDBACK_PULSE_TAP_COMMITTED, false);
             return true;
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_NONE:
         default:
@@ -398,13 +389,16 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION: {
             uint16_t                  held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, decision.action, elapsed);
             key_feedback_pulse_kind_t action_feedback_kind  = KEY_FEEDBACK_PULSE_HOLD;
-            bool                      action_feedback       = series_tap_count > 1u && key_runtime_core_release_hold_action_feedback_kind(token, decision.action, elapsed, &action_feedback_kind);
+            bool                      action_commit         = key_runtime_core_release_hold_action_feedback_kind(token, decision.action, elapsed, &action_feedback_kind);
+            bool                      action_feedback       = series_tap_count > 1u && action_commit;
 
             if (held_lifecycle_action != KC_NO) {
                 key_runtime_core_tap_series_clear(state, series);
                 *out = (key_runtime_core_pending_multi_tap_release_resolution_t){
                     .outcome = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
                     .action  = held_lifecycle_action,
+                    .action_commit = true,
+                    .action_feedback_kind = KEY_FEEDBACK_PULSE_HOLD,
                 };
                 return true;
             }
@@ -416,6 +410,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .tap_branch_feedback  = tap_branch_feedback_on_release,
                 .tap_commit_feedback  = false,
                 .action_feedback      = action_feedback,
+                .action_commit        = action_commit,
                 .action_feedback_kind = action_feedback_kind,
                 .tap_count            = series_tap_count,
             };
@@ -430,6 +425,8 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 *out = (key_runtime_core_pending_multi_tap_release_resolution_t){
                     .outcome = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
                     .action  = held_lifecycle_action,
+                    .action_commit = true,
+                    .action_feedback_kind = KEY_FEEDBACK_PULSE_HOLD,
                 };
                 return true;
             }
@@ -450,6 +447,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .consumes_oneshot    = consumes_oneshot,
                 .tap_branch_feedback = authored_branch,
                 .tap_commit_feedback = authored_tap_branch,
+                .tap_commit          = true,
                 .tap_count           = series_tap_count,
             };
             return true;
@@ -464,6 +462,8 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 *out = (key_runtime_core_pending_multi_tap_release_resolution_t){
                     .outcome = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE,
                     .action  = held_lifecycle_action,
+                    .action_commit = true,
+                    .action_feedback_kind = KEY_FEEDBACK_PULSE_HOLD,
                 };
                 return true;
             }
@@ -481,6 +481,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
                 .repeat_count        = tap_repeat_count,
                 .tap_branch_feedback = authored_branch,
                 .tap_commit_feedback = authored_tap_branch,
+                .tap_commit          = true,
                 .tap_count           = series_tap_count,
             };
             return true;
@@ -511,6 +512,7 @@ bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, b
     switch (resolution->outcome) {
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_RELEASE_OUTCOME_HELD_LIFECYCLE:
             key_runtime_core_release_effect_plan_push_held_action(out, KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, key_pos, resolution->action);
+            if (resolution->action_commit) key_runtime_core_release_effect_plan_push_commit(out, key_pos, resolution->action_feedback_kind, false);
             key_runtime_core_release_effect_plan_push_held_action(out, KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER, key_pos, resolution->action);
             (void)key_runtime_core_reset_pending_multi_tap(key_pos);
             return true;
@@ -518,9 +520,11 @@ bool key_runtime_core_plan_pending_multi_tap_release_effects(keypos_t key_pos, b
             key_runtime_core_release_effect_plan_push_delayed_action(out, key_pos, resolution->action, mods, resolution->repeat_count);
             if (resolution->tap_commit_feedback) {
                 key_runtime_core_release_effect_plan_push_tap_commit_feedback_pulse(out, key_pos, resolution->action, resolution->tap_count);
+            } else if (resolution->tap_commit && resolution->action != KC_NO) {
+                key_runtime_core_release_effect_plan_push_commit(out, key_pos, KEY_FEEDBACK_PULSE_TAP_COMMITTED, false);
             }
-            if (resolution->action_feedback) {
-                key_runtime_core_release_effect_plan_push_feedback_pulse(out, key_pos, resolution->action_feedback_kind);
+            if (resolution->action_commit || resolution->action_feedback) {
+                key_runtime_core_release_effect_plan_push_commit(out, key_pos, resolution->action_feedback_kind, resolution->action_feedback);
             }
             if (is_momentary_layer && release_layer_after) {
                 key_runtime_core_release_effect_plan_push_layer_release(out, key_pos);

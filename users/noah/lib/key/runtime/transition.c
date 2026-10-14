@@ -5,6 +5,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "transition.h"
+#include "../../rgb/lighting/lighting_events.h"
 
 #include "trace.h"
 #include "planning/effect_plan.h"
@@ -17,15 +18,24 @@ enum {
     KEY_RUNTIME_TRANSITION_PLAN_FLAG_AUTO_DRAIN = 1u << 0,
 };
 
-static void key_runtime_transition_plan_project_items(const key_runtime_transition_plan_t *plan) {
+static void key_runtime_transition_plan_project_items(const key_runtime_transition_plan_t *plan, uint8_t count) {
     if (!plan) {
         return;
     }
 
-    for (uint8_t index = 0; index < plan->count; index++) {
+    for (uint8_t index = 0; index < count; index++) {
         const key_runtime_effect_t *effect = &plan->items[index];
 
         key_runtime_trace_effect_execute(index, effect);
+        if (noah_lighting_events_observed() && effect->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION && (effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_FLAG_DEFER_UNTIL_RELEASE) != 0u && index + 1u < count) {
+            const key_runtime_effect_t *commit = &plan->items[index + 1u];
+            keypos_t key = key_runtime_effect_delayed_action_key_pos(effect);
+            if (commit->kind == KEY_RUNTIME_EFFECT_FEEDBACK_PULSE && (commit->data.feedback_pulse.commit_flags & KEY_RUNTIME_COMMIT_DEFERRED) != 0u && key.row == commit->data.feedback_pulse.key_pos.row && key.col == commit->data.feedback_pulse.key_pos.col) {
+                key_runtime_trace_effect_execute(++index, commit);
+                key_runtime_core_project_deferred_commit(effect, commit);
+                continue;
+            }
+        }
         key_runtime_core_project_effect(effect);
     }
 }
@@ -35,8 +45,14 @@ static void key_runtime_transition_plan_drain(key_runtime_transition_plan_t *pla
         return;
     }
 
-    key_runtime_transition_plan_project_items(plan);
-    plan->count = 0u;
+    // A streaming drain must not split an action from its following captured
+    // commit. Leave only a trailing potentially annotated action in the plan;
+    // its actual bytes remain owned by this stack until the next append.
+    const key_runtime_effect_t *tail = &plan->items[plan->count - 1u];
+    bool keep = noah_lighting_events_observed() && tail->kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION && (tail->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_FLAG_DEFER_UNTIL_RELEASE) != 0u;
+    key_runtime_transition_plan_project_items(plan, (uint8_t)(plan->count - (keep ? 1u : 0u)));
+    if (keep) plan->items[0] = plan->items[plan->count - 1u];
+    plan->count = keep ? 1u : 0u;
 }
 
 static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan, key_runtime_effect_t effect) {
@@ -61,9 +77,12 @@ static void key_runtime_transition_plan_append_core_plan(key_runtime_transition_
         return;
     }
 
+    uint8_t previous_flags = plan->flags;
+    if (noah_lighting_events_observed()) plan->flags |= KEY_RUNTIME_TRANSITION_PLAN_FLAG_AUTO_DRAIN;
     for (uint8_t index = 0; index < core_plan->count; index++) {
         key_runtime_transition_plan_push(plan, core_plan->items[index]);
     }
+    plan->flags = previous_flags;
 
     plan->overflowed |= core_plan->overflowed;
 }
@@ -131,7 +150,7 @@ void key_runtime_transition_execute_plan(const key_runtime_transition_plan_t *pl
         split_runtime_sync_notify_key_feedback_dirty();
     }
 
-    key_runtime_transition_plan_project_items(plan);
+    key_runtime_transition_plan_project_items(plan, plan ? plan->count : 0u);
 }
 
 void key_runtime_transition_flush_multi_tap(key_runtime_transition_plan_t *plan) {

@@ -121,9 +121,7 @@ static void key_runtime_core_tap_series_flush_plan_series(key_runtime_core_state
     }
 
     key_runtime_core_effect_plan_push_delayed_action(plan, key_pos, action, mods, repeat_count);
-    if (key_runtime_core_tap_series_has_authored_tap_branch(series)) {
-        key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, key_pos, action, series->tap_count);
-    }
+    key_runtime_core_effect_plan_push_tap_commit(plan, key_pos, action, series->tap_count, key_runtime_core_tap_series_has_authored_tap_branch(series));
     key_runtime_core_tap_series_clear(state, series);
 }
 

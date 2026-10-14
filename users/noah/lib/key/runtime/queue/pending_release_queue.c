@@ -2,6 +2,21 @@
 
 #include "../reducer/state_query.h"
 
+// Six unused flag bits hold branches1..63 without enlarging persistent slots.
+// Larger compiled tap depths use an explicitly accounted byte per slot;
+// there is no new accepted-branch cap. Inactive/reused slots never read old
+// sidecar values: every enqueue writes its branch before publishing the slot.
+#if KEY_BEHAVIOR_MAX_TAP_COUNT > 63u
+static uint8_t pending_commit_branches[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
+#endif
+static uint8_t key_runtime_core_pending_commit_branch(const pending_release_slot_t *pending) {
+#if KEY_BEHAVIOR_MAX_TAP_COUNT > 63u
+    return pending_commit_branches[pending - key_runtime_core_state()->pending_releases];
+#else
+    return pending->flags >> 2u;
+#endif
+}
+
 typedef struct {
     uint8_t previous_index;
     uint8_t index;
@@ -55,6 +70,7 @@ static pending_release_t key_runtime_core_pending_release_slot_snapshot(const pe
         .active              = true,
         .tap_commit_feedback = key_runtime_core_pending_release_slot_has_tap_commit_feedback(pending),
         .lighting_identity   = pending->lighting_identity,
+        .lighting_branch     = key_runtime_core_pending_commit_branch(pending),
         .owner_token_id      = pending->owner_token_id,
         .key_pos             = key_runtime_core_pending_release_slot_key_pos(pending),
         .action              = pending->action,
@@ -313,13 +329,13 @@ uint8_t key_runtime_core_pending_release_count(void) {
     return state ? state->pending_release_count : 0u;
 }
 
-bool key_runtime_core_queue_pending_release_dispatch_with_identity(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id, uint8_t identity) {
+bool key_runtime_core_queue_pending_release_dispatch_with_commit(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id, uint8_t identity, uint8_t branch) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     pending_release_slot_t   *pending;
     uint8_t                   index;
     uint8_t                   flags = KEY_RUNTIME_PENDING_RELEASE_FLAG_ACTIVE;
 
-    if (!(state && action != KC_NO && key_runtime_core_pending_release_keypos_valid(key_pos))) {
+    if (!(state && action != KC_NO && key_runtime_core_pending_release_keypos_valid(key_pos)) || branch > KEY_BEHAVIOR_MAX_TAP_COUNT) {
         return false;
     }
 
@@ -331,6 +347,11 @@ bool key_runtime_core_queue_pending_release_dispatch_with_identity(keypos_t key_
     if (tap_commit_feedback) {
         flags |= KEY_RUNTIME_PENDING_RELEASE_FLAG_TAP_COMMIT_FEEDBACK;
     }
+#if KEY_BEHAVIOR_MAX_TAP_COUNT > 63u
+    pending_commit_branches[index] = branch;
+#else
+    flags |= (uint8_t)(branch << 2u);
+#endif
     pending  = &state->pending_releases[index];
     *pending = (pending_release_slot_t){
         .owner_token_id    = owner_token_id,
@@ -347,6 +368,10 @@ bool key_runtime_core_queue_pending_release_dispatch_with_identity(keypos_t key_
     }
     key_runtime_core_pending_release_mark_token(state, pending->owner_token_id);
     return true;
+}
+
+bool key_runtime_core_queue_pending_release_dispatch_with_identity(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id, uint8_t identity) {
+    return key_runtime_core_queue_pending_release_dispatch_with_commit(key_pos, action, mods, tap_commit_feedback, owner_token_id, identity, 0u);
 }
 
 bool key_runtime_core_queue_pending_release_dispatch_for_owner(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id) {

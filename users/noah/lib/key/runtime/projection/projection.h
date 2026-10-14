@@ -12,6 +12,7 @@
 #include "../reducer/runtime.h"
 
 void                  key_runtime_core_project_effect(const key_runtime_effect_t *effect);
+void                  key_runtime_core_project_deferred_commit(const key_runtime_effect_t *action, const key_runtime_effect_t *commit);
 void                  key_runtime_core_project_pending_release_dispatch(const pending_release_t *pending);
 projection_snapshot_t key_runtime_core_projection_snapshot_capture(void);
 bool                  key_runtime_core_projection_snapshot_equal(const projection_snapshot_t *lhs, const projection_snapshot_t *rhs);

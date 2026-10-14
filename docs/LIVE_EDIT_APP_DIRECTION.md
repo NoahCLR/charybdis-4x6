@@ -1463,6 +1463,11 @@ uses an explicit compile gate with a required linked synchronous observer when
 enabled, and no external requirement or event capability when disabled. These
 constraints are detailed in the lighting spec; the incomplete producer
 foundation does not advertise an event or retention module.
+Flash belongs only to event rules and linger only to state/board rules;
+event+flash+linger rejects. Show-after and flash run in parallel from the
+qualifying occurrence, so delay cannot extend flash expiry. A state departing
+before show-after matures leaves no tail. Later filter changes do not alter
+an already qualified flash. See the spec's exact boundary traces.
 
 
 The query basis has a separately authorized3072 B static-regression-policy

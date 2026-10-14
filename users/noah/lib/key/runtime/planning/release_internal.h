@@ -44,7 +44,9 @@ typedef struct {
     uint8_t                                              repeat_count;
     bool                                                 tap_branch_feedback;
     bool                                                 tap_commit_feedback;
+    bool                                                 tap_commit;
     bool                                                 action_feedback;
+    bool                                                 action_commit;
     key_feedback_pulse_kind_t                            action_feedback_kind;
     uint8_t                                              tap_count;
     bool                                                 keeps_own_layer; // the action keeps the key's own layer on

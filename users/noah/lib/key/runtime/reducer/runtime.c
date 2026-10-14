@@ -651,6 +651,7 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
         .active                       = true,
         .keycode                      = token->resolved_keycode,
         .tap_count                    = tap_count,
+        .lighting_identity            = token->interaction.selection.lighting_identity,
         .pending_hold                 = pending_hold,
         .single_action                = single_action,
         .tap_action                   = tap_action,

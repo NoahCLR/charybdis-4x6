@@ -181,6 +181,11 @@ _Static_assert(sizeof(pending_release_slot_t) <= 12u, "pending_release_slot_t mu
 typedef struct {
     bool                 active : 1;
     bool                 tap_commit_feedback : 1;
+#if KEY_BEHAVIOR_MAX_TAP_COUNT <= 63u
+    uint8_t              lighting_branch : 6; // zero => no authored commit
+#else
+    uint8_t              lighting_branch;
+#endif
     uint8_t              lighting_identity;
     uint16_t             owner_token_id;
     keypos_t             key_pos;

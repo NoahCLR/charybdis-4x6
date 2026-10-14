@@ -39,6 +39,11 @@ typedef enum {
     KEY_RUNTIME_DELAYED_ACTION_FLAG_DEFER_UNTIL_RELEASE = 0x80u,
 } key_runtime_delayed_action_flag_t;
 
+enum {
+    KEY_RUNTIME_COMMIT_QUIET = 1u << 0,
+    KEY_RUNTIME_COMMIT_DEFERRED = 1u << 1,
+};
+
 typedef struct {
     key_runtime_effect_kind_t kind;
     union {
@@ -67,6 +72,8 @@ typedef struct {
             uint8_t  tap_branch;
             uint8_t  lighting_identity;
             uint8_t  lighting_outcome;
+            uint8_t  lighting_branch;
+            uint8_t  commit_flags;
         } feedback_pulse;
         struct {
             pd_mode_mask_t pd_mode;
