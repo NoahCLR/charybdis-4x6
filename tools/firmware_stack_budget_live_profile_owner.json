@@ -135,16 +135,20 @@
       ],
       "paths": [
         {
+          "name": "RGB coherent remote staging and commit",
+          "functions": ["main", "rgb_matrix_task", "split_runtime_sync_remote_collect_lighting"]
+        },
+        {
           "name": "RGB frame fact collection",
-          "functions": ["main", "rgb_matrix_task", "rgb_runtime_capture_facts", "noah_lighting_facts_collect_changed", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner"]
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_facts_collect_changed", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner"]
         },
         {
           "name": "RGB frame individual behaviour capture",
-          "functions": ["main", "rgb_matrix_task", "rgb_runtime_capture_facts", "noah_lighting_facts_collect_changed", "key_feedback_lighting_map", "key_feedback_lighting_apply", "key_runtime_core_flashing_feedback_visible_at", "noah_setting"]
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_facts_collect_changed", "key_feedback_lighting_map", "key_feedback_lighting_apply", "key_runtime_core_flashing_feedback_visible_at", "noah_setting"]
         },
         {
           "name": "RGB frame behaviour outcome capture",
-          "functions": ["main", "rgb_matrix_task", "rgb_runtime_capture_facts", "noah_lighting_facts_collect_changed", "key_feedback_lighting_map", "key_feedback_lighting_hold_outcome", "noah_action_describe"]
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_facts_collect_changed", "key_feedback_lighting_map", "key_feedback_lighting_hold_outcome", "noah_action_describe"]
         },
         {
           "name": "RGB module idle comparison",
