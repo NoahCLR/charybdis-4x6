@@ -391,6 +391,48 @@ and their required subsystem; each has its own compile flag and capability.
 | 5 | the subject's halves | — | yes | the halves it concerns; the whole board when none |
 | 6 | the subject layer's mapped keys | — | yes | LEDs of keys that are neither `KC_NO` nor `KC_TRNS` on the subject's layer, read live from the keymap; none for a subject that is not a layer |
 | 7 | the subject's place | — | no | the target named by the subject's place; none for a kind without a table |
+| 8 | keys that | query `0..15`, selector `0..127` or `255` | no | keys matching the query on the shown layer |
+
+**Key queries.** Target8 takes two bytes. Queries0/1/2 select mapped (neither
+`KC_NO` nor `KC_TRNS`), transparent and `KC_NO`. Queries3..9 select modifier,
+letter, number, symbol, navigation, media/system and mouse usages. Queries10/11/12
+select direct layer/mode/macro actions;13 custom keys;14 authored behaviour
+rows;15 combo inputs. Selector255 means any; a specific selector is an identity
+for10/11/12/14/15 and is ignored otherwise. Out-of-domain or absent identities
+match nothing. Behaviour means a row exists, independent of its participation
+policy. Combo membership requires an enabled row whose allowed layers include
+the shown layer, and exact native-input equality (at most16 inputs per row).
+The shown layer is a layer subject's own layer, otherwise the highest active
+layer, including the synthetic fade destination.
+
+These are native usages/actions, never host-layout characters. Modifier-wrapped
+literals use their base HID usage for categories and also match modifiers.
+Modifier-tap, one-shot-modifier and layer-mod actions match modifiers; their
+other possible emissions are not inferred. HID ranges are letters04..1d,
+numbers1e..27/59..62, symbols2d..38/54..57/64/67/85,
+navigation49..52/28/29/2a/2b/58, media/systema5..be and mousecd..df.
+Direct layer actions include MO/TO/TG/OSL/TT/LM/LT and userspace layer locks;
+mode holds/locks and named macros use their stable native action blocks.
+Raw DF/PDF, authored branches and other unsupported actions have no inferred
+identity.
+
+The per-layer cache retains native u16 plus authored behaviour row+1 u8 per
+matrix position, a canonical any-combo input bitmap per layer, and one geometry
+key index per LED. This sufficient basis
+composes exact queries without a bitmap per rule. RAM is
+`3 * LAYER_COUNT * MATRIX_ROWS * MATRIX_COLS + LAYER_COUNT * KEY_ORIGIN_BITMAP_SIZE + LED_COUNT`, plus generation/readiness
+metadata; no query/rule/identity cap is added. On the main context before a
+frame's render walk, a changed VIA/keymap or effective-profile generation
+rebuilds the basis. Behaviour rows are captured there because their lookup
+is reader-backed. Before/after generation disagreement rejects the in-place
+rebuild; existing pixels remain and no chunk may render the incomplete basis.
+A later settled frame retries. Publication callbacks never walk storage to
+rebuild it. Existing VIA local/split/default-restore invalidations and effective
+profile generation changes cover the source generations. Rendering uses no
+keymap/behaviour profile-reader I/O. Specific combo queries cost at most16 input
+comparisons per key; any-combo reads its canonical bitmap. Rebuilding that bitmap costs at most
+`LAYER_COUNT * matrix_keys * 128 * 16` input comparisons. These are operation bounds, not
+physical timing or cadence measurements.
 
 ### Paints
 
@@ -409,6 +451,15 @@ it **changes with time**.
 | 5 | dim | level | yes | `below × level / 255` |
 | 6 | tint | palette index, amount | yes | `below` mixed toward the colour by `amount / 255` |
 | 8 | outcome | — | no | a fact-8 hold/long-hold's resolved layer or pointing-mode identity, else clear |
+| 9 | what it does | — | no | the key's direct layer/mode/macro target identity on the shown layer; unsupported/absent is clear |
+
+**What it does.** Paint9 uses the same shown layer and cached native actions as
+target8. It takes the target thing's colour slot zero, with ordinary default,
+inherit and `none` handling. A missing table or unsupported action is clear;
+black remains opaque. It is parameterless, including map value0x89. Non-key
+LEDs are clear; when geometry maps several matrix positions to one LED, the
+first matrix position supplies its action. The geometry lookup is cached so
+this paint does not scan the matrix or read storage per LED.
 
 **Outcome support.** Paint 8 follows the materialized hold or long-hold action
 of the selected branch, including a resolved transparent tier, rather than the
@@ -644,7 +695,7 @@ the keyboard reports and keeps a rule it cannot edit byte for byte.
 
 With all modules enabled, the low-id fact page is registry 0, first id 0,
 bitmap prefix `be ff 07` (ids 1–5, 7–18); the paint page is registry 2,
-bitmap prefix `7f 01` (ids 0–6, 8). Target bits remain `ff` (ids 0–7).
+bitmap prefix `7f 01` (ids 0–6, 8). Target prefix becomes `ff 01` (ids0–8); paint prefix `7f 03` adds paint9.
 Thing kinds now include 5–7, giving the low-id thing bitmap `fe`.
 The rest of each 16-byte bitmap is zero. Disabling
 `NOAH_LIGHTING_FACT_COMBO_HELD`, `NOAH_LIGHTING_FACT_BEHAVIOUR` or

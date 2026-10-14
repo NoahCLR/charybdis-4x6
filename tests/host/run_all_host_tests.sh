@@ -106,6 +106,7 @@ sh "$ROOT/run_rgb_validation_tests.sh"
 sh "$ROOT/run_rgb_layer_render_tests.sh"
 sh "$ROOT/run_lighting_render_vectors_tests.sh"
 sh "$ROOT/run_lighting_slice_layout_tests.sh"
+sh "$ROOT/run_lighting_keymap_tests.sh"
 sh "$ROOT/run_lighting_parity_tests.sh"
 # The contract Ark is checked against must always build and state itself.
 sh "$ROOT/run_contract_probe.sh" >/dev/null

@@ -10,6 +10,9 @@
 #include "matrix.h"
 
 #include "users/noah/lib/rgb/lighting/lighting_engine.h"
+#include "users/noah/lib/rgb/lighting/lighting_keymap.h"
+#include "users/noah/lib/key/behavior/key_behavior_lookup.h"
+#include "users/noah/lib/profile/runtime/effective_combo_runtime.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
 
@@ -21,6 +24,24 @@ uint16_t noah_lighting_test_live_bound(void);
 layer_state_t layer_state;
 static int8_t  key_leds[MATRIX_ROWS * MATRIX_COLS];
 static uint8_t mapped[LAYER_COUNT][KEY_ORIGIN_BITMAP_SIZE];
+static uint16_t native_keys[LAYER_COUNT][NOAH_LIGHTING_MATRIX_KEYS];
+static uint8_t native_behaviour[LAYER_COUNT][NOAH_LIGHTING_MATRIX_KEYS];
+static combo_t query_combos[128];
+static uint16_t query_inputs[128][17];
+static uint32_t query_layers[128];
+static uint8_t query_enabled[128];
+static uint32_t keymap_generation, storage_reads;
+key_behavior_view_t key_behavior_lookup(uint16_t code) {
+    storage_reads++;
+    for (uint8_t layer=0;layer<LAYER_COUNT;layer++) for(uint8_t key=0;key<NOAH_LIGHTING_MATRIX_KEYS;key++)
+        if(native_keys[layer][key]==code && native_behaviour[layer][key]) return (key_behavior_view_t){.lighting_identity=native_behaviour[layer][key]};
+    return (key_behavior_view_t){0};
+}
+uint16_t noah_effective_combo_count(void) { return 128u; }
+combo_t *noah_effective_combo_get(uint16_t row) { return row<128u ? &query_combos[row] : NULL; }
+bool noah_effective_combo_enabled(uint16_t row) { return row<128u && query_enabled[row]; }
+uint32_t noah_effective_combo_allowed_layers(uint16_t row) { return row<128u ? query_layers[row] : 0u; }
+
 static rgb_t   effect[RGB_MATRIX_LED_COUNT];
 static bool    effect_known[RGB_MATRIX_LED_COUNT];
 static uint16_t fade_progress;
@@ -72,8 +93,8 @@ uint8_t rgb_matrix_map_row_column_to_led(uint8_t row, uint8_t column, uint8_t *l
 }
 
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
-    keypos_t key = {.row = row, .col = column};
-    return key_origin_bitmap_has_keypos(mapped[layer_num], key) ? KC_A : KC_NO;
+    storage_reads++;
+    return native_keys[layer_num][row*MATRIX_COLS+column];
 }
 
 bool noah_lighting_effect_colour(uint8_t led, rgb_t *colour) {
@@ -160,7 +181,7 @@ pd_mode_snapshot_t pd_mode_snapshot_with_owner_bitmap(uint8_t *out_owner_bitmap,
 }
 
 uint32_t noah_lighting_keymap_generation(void) {
-    return 1u;
+    return keymap_generation;
 }
 
 // ─── Vectors ────────────────────────────────────────────────────────────────
@@ -252,6 +273,29 @@ int main(int argc, char **argv) {
             read_hex(file, record + 2u, KEY_ORIGIN_BITMAP_SIZE);
         }
         for (unsigned layer = 0; layer < LAYER_COUNT; layer++) read_hex(file, mapped[layer], KEY_ORIGIN_BITMAP_SIZE);
+        memset(native_behaviour,0,sizeof(native_behaviour));
+        for(unsigned layer=0;layer<LAYER_COUNT;layer++) for(unsigned key=0;key<NOAH_LIGHTING_MATRIX_KEYS;key++)
+            native_keys[layer][key] = key_origin_bitmap_has_keypos(mapped[layer],key_at(key)) ? KC_A : KC_NO;
+        assert(fscanf(file,"%u",&count)==1);
+        for(unsigned i=0;i<count;i++) {
+            unsigned layer,key,code,identity;
+            assert(fscanf(file,"%u %u %u %u",&layer,&key,&code,&identity)==4);
+            assert(layer<LAYER_COUNT && key<NOAH_LIGHTING_MATRIX_KEYS);
+            native_keys[layer][key]=code;native_behaviour[layer][key]=identity==255?0:identity+1;
+        }
+        memset(query_enabled,0,sizeof(query_enabled));
+        assert(fscanf(file,"%u",&count)==1);
+        for(unsigned i=0;i<count;i++) {
+            unsigned row,enabled,layers,inputs;
+            assert(fscanf(file,"%u %u %u %u",&row,&enabled,&layers,&inputs)==4);
+            assert(row<128 && inputs<=16);
+            query_enabled[row]=enabled;query_layers[row]=layers;query_combos[row].keys=query_inputs[row];
+            for(unsigned j=0;j<inputs;j++) {unsigned code;assert(fscanf(file,"%u",&code)==1);query_inputs[row][j]=code;}
+            query_inputs[row][inputs]=COMBO_END;
+        }
+        keymap_generation++;
+        assert(noah_lighting_keymap_refresh(keymap_generation));
+
         {
             uint8_t *slice    = facts.behaviour_state;
             uint8_t *visible  = slice;
@@ -308,11 +352,13 @@ int main(int argc, char **argv) {
         read_hex(file, facts.pointer, sizeof(facts.pointer));
         read_hex(file, facts.idle, sizeof(facts.idle));
 
-        noah_lighting_scene_t        scene = {.program = &program, .facts = &facts, .keymap_generation = 1u};
+        noah_lighting_scene_t        scene = {.program = &program, .facts = &facts, .keymap_generation = keymap_generation};
         noah_lighting_resolve_info_t info;
         memset(&frame, 0, sizeof(frame));
         noah_lighting_facts_t original_facts = facts;
+        uint32_t reads_before_walk=storage_reads;
         noah_lighting_resolve(&scene, NOAH_LIGHTING_ALL_LEDS, (uint32_t)now, true, &frame, &info);
+        assert(storage_reads == reads_before_walk);
         assert(memcmp(&original_facts, &facts, sizeof(facts)) == 0); // fade overlay always restored
         uint16_t live = noah_lighting_test_live_clocks();
         assert(live <= noah_lighting_test_live_bound());

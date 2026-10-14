@@ -15,6 +15,12 @@ int main(void) {
     const uint8_t                     behaviour[] = {5, 0, 58, 0, 0, 0, 0, 1, 10, 0, 255, 2, 8, 127, 15, 0x40, 0, 0x60, 0, 0};
     const uint8_t                     outcome[]   = {5, 0, 58, 0, 0, 0, 0, 1, 6, 0, 255, 0x40, 0, 0x60, 8, 0};
     const uint8_t                     map[]       = {5, 0, 58, 0, 0, 0, 1, 0, 1, 1, 0, 0x88, 0};
+    const uint8_t keys_that[] = {5,0,58,0,0,0,0,1,8,0,255,0x42,8,15,127,0x60,0,0};
+    const uint8_t what_it_does[] = {5,0,58,0,0,0,0,1,6,0,255,0x40,0,0x60,9,0};
+    assert(!!(limits.targets & (1u << 8)) == !!NOAH_LIGHTING_TARGET_KEYS_THAT);
+    assert(!!(limits.paints & (1u << 9)) == !!NOAH_LIGHTING_PAINT_WHAT_IT_DOES);
+    check(keys_that,sizeof(keys_that),&limits,NOAH_LIGHTING_TARGET_KEYS_THAT);
+    check(what_it_does,sizeof(what_it_does),&limits,NOAH_LIGHTING_PAINT_WHAT_IT_DOES);
     assert(!!(limits.facts & (1u << 7)) == !!NOAH_LIGHTING_FACT_COMBO_HELD);
     assert(!!(limits.facts & (1u << 8)) == !!NOAH_LIGHTING_FACT_BEHAVIOUR);
     assert(!!(limits.paints & (1u << 8)) == !!NOAH_LIGHTING_PAINT_OUTCOME);

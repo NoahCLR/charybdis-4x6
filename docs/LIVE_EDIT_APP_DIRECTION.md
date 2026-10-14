@@ -1443,6 +1443,10 @@ share the same synthetic scene; actual ownership stays intact. Main owns one
 resolved fact frame through chunk rerenders, and transport buffers share storage
 only across initialized, callback-guarded master/slave roles. The detailed
 lifetime and module-idle contracts live in the lighting spec. Generic event
-facts, linger/flash and keys-that/what-it-does remain unfinished; this corrected
-current-feature checkpoint does not complete phase3 or establish hardware
-acceptance.
+facts and linger/flash remain unfinished. Keys-that target8 and what-it-does
+paint9 share a finite per-layer native/behaviour basis; queries compose from
+that cache and existing resident combo rows, with no reader I/O during the
+render walk. This implements the plan's cache intent without one bitmap per
+rule. Effective-profile and VIA publications invalidate it; main-context
+refresh rejects a generation interrupted by split publication. This partial
+phase3 implementation does not establish hardware acceptance.

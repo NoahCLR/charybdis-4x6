@@ -31,7 +31,8 @@
     "side": "0 left, 1 right, 2 either (left before right)",
     "modifierState": "0 real/weak/locked-one-shot active modifiers, 1 armed one-shot modifiers",
     "hostLock": "0 Caps Lock, 1 Num Lock, 2 Scroll Lock",
-    "pointerState": "0 auto-mouse target on, 1 auto-mouse fading, 2 sniping, 3 latest raw sensor x/y nonzero"
+    "pointerState": "0 auto-mouse target on, 1 auto-mouse fading, 2 sniping, 3 latest raw sensor x/y nonzero",
+    "keyQuery": "0 mapped, 1 transparent, 2 KC_NO, 3 modifier, 4 letter, 5 number, 6 symbol, 7 navigation, 8 media/system, 9 mouse, 10 layer action, 11 mode action, 12 named macro, 13 custom key, 14 authored behaviour, 15 combo input; native usages/actions, never host characters"
   },
   "partSlots": [
     {"slot": 0, "name": "condition"},
@@ -70,7 +71,8 @@
       {"id": 4, "name": "the subject's keys", "parameters": [], "place": true, "meaning": "The LEDs of the subject's keys; the whole board when it has none."},
       {"id": 5, "name": "the subject's halves", "parameters": [], "place": true, "meaning": "The halves the subject concerns; the whole board when none."},
       {"id": 6, "name": "the subject layer's mapped keys", "parameters": [], "place": true, "meaning": "LEDs of keys that are neither KC_NO nor KC_TRNS on the subject's layer, read live from the keymap; none for a subject that is not a layer."},
-      {"id": 7, "name": "the subject's place", "parameters": [], "place": false, "meaning": "The target named by the subject's thing record; none for a kind without a table."}
+      {"id": 7, "name": "the subject's place", "parameters": [], "place": false, "meaning": "The target named by the subject's thing record; none for a kind without a table."},
+      {"id": 8, "name": "keys that", "parameters": [{"name": "query", "type": "keyQuery"}, {"name": "selector", "type": "thingSelector"}], "place": false, "meaning": "Keys on the shown layer matching the query: subject layer for a layer subject, otherwise highest active layer. Selector 255 any or specific identity for queries10/11/12/14/15; ignored otherwise. Exact KC_NO/TRNS. Behaviour row existence; combo membership requires enabled row and shown layer allowed. Per-layer cached native/behaviour basis; no reader I/O in render."}
     ],
     "paints": [
       {"id": 0, "name": "clear", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "Says nothing; what is below shows."},
@@ -80,7 +82,8 @@
       {"id": 4, "name": "map", "parameters": [{"name": "map", "type": "map"}], "readsBelow": "as the map value", "changesWithTime": false, "meaning": "The map's value at the LED: a palette colour, or the parameterless paint 0x80 + k names."},
       {"id": 5, "name": "dim", "parameters": [{"name": "level", "type": "level"}], "readsBelow": true, "changesWithTime": false, "meaning": "(below x level + 127) / 255 per channel."},
       {"id": 6, "name": "tint", "parameters": [{"name": "colour", "type": "paletteIndex"}, {"name": "amount", "type": "level"}], "readsBelow": true, "changesWithTime": false, "meaning": "(below x (255 - amount) + colour x amount + 127) / 255 per channel."},
-      {"id": 8, "name": "outcome", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "For a fact-8 hold or long-hold, the identity of its resolved supported layer or single pointing-mode outcome. Other subjects, tap/branch slots, ordinary key/modifier/macro/unsupported outcomes, absent tables or none identity say clear; palette black stays opaque. Map value 0x88."}
+      {"id": 8, "name": "outcome", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "For a fact-8 hold or long-hold, the identity of its resolved supported layer or single pointing-mode outcome. Other subjects, tap/branch slots, ordinary key/modifier/macro/unsupported outcomes, absent tables or none identity say clear; palette black stays opaque. Map value 0x88."},
+      {"id": 9, "name": "what it does", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "The direct supported layer/mode/macro action at the LED key on the shown layer, using that target identity colour. Absent/unsupported action, table or colour is clear. No authored-branch or host-character inference. First matrix key owns a multiply-mapped LED; non-key LEDs clear. Map value0x89."}
     ],
     "timings": [
       {"id": 1, "name": "show after", "parameters": [{"name": "delay", "type": "milliseconds"}], "changesWithTime": false, "meaning": "Amount 0 until the subject has existed for the delay, then 255. Gate observation and wake times use each half's local clock, separately from synced paint time; backward samples do not advance or rewind gates and a forward 32-bit timer wrap advances normally."}

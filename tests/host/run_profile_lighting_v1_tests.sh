@@ -64,9 +64,11 @@ for source in profile_lighting_v1.c profile_lighting_v1_convert.c; do
 done
 
 # Compile out each new kind independently; existing rows remain available.
-for disabled in none COMBO_HELD BEHAVIOUR OUTCOME; do
+for disabled in none COMBO_HELD BEHAVIOUR OUTCOME KEYS_THAT WHAT_IT_DOES; do
     case "$disabled" in
         none) gate_flags="" ;;
+        KEYS_THAT) gate_flags="-DNOAH_LIGHTING_TARGET_KEYS_THAT=0" ;;
+        WHAT_IT_DOES) gate_flags="-DNOAH_LIGHTING_PAINT_WHAT_IT_DOES=0" ;;
         OUTCOME) gate_flags="-DNOAH_LIGHTING_PAINT_OUTCOME=0" ;;
         *) gate_flags="-DNOAH_LIGHTING_FACT_$disabled=0" ;;
     esac

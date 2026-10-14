@@ -66,10 +66,11 @@ FACTS.update({7: ("combo held", ["thingSelector", "comboRole"]), 8: ("behaviour"
 FACTS.update({9: ('layer status', ['layerSelector', 'layerStatus']), 10: ('mode status', ['modeSelector', 'modeStatus']), 11: ('combo layer', ['thingSelector', 'layerSelector']), 12: ('behaviour phase', ['thingSelector', 'behaviourPhase', 'tapSelector']), 13: ('macro playing', ['thingSelector']), 14: ('key pressed', ['keySelector']), 15: ('modifier', ['modifier', 'side', 'modifierState']), 16: ('host lock', ['hostLock']), 17: ('pointer', ['pointerState']), 18: ('idle', [])})
 FACT_THING = {1: 1, 2: 1, 3: 2, 4: 3, 5: 4, 7: 3, 8: 4}
 FACT_THING.update({9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 6, 16: 0, 17: 0, 18: 0})
-TARGETS = {0: [], 1: [], 2: [], 3: ["keySet"], 4: [], 5: [], 6: [], 7: []}
+TARGETS = {0: [], 1: [], 2: [], 3: ["keySet"], 4: [], 5: [], 6: [], 7: [], 8: ["keyQuery", "thingSelector"]}
 PLACE_TARGETS = {0, 1, 2, 4, 5, 6}
 PAINTS = {0: [], 1: [], 2: ["paletteIndex"], 3: [], 4: ["map"], 5: ["level"], 6: ["paletteIndex", "level"]}
 PAINTS[8] = []
+PAINTS[9] = []
 PAINT_READS_BELOW = {5, 6}
 TIMINGS = {1: ["milliseconds"]}
 RULE_EXTENSIONS: dict = {}
@@ -215,6 +216,9 @@ def check_param(kind_type: str, data: bytes, offset: int, limits: Limits, counts
             raise Invalid("INVALID_REFERENCE", offset)
     elif kind_type == "milliseconds":
         if data[offset] | data[offset + 1] << 8 == 0:
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "keyQuery":
+        if value >= 16:
             raise Invalid("INVALID_PARAMETER", offset)
     elif kind_type == "layerStatus":
         if not (value <= 3):
@@ -554,6 +558,46 @@ def subject(kind, thing, slot=0, keys=None, halves=None):
     return {"kind": kind, "thing": thing, "slot": slot, "keys": frozenset(keys or ()), "halves": frozenset(halves or ())}
 
 
+def native_identity(code, layers=16):
+    """Direct native action only; no authored branch or host-character guess."""
+    for lo, hi in ((0x5220, 0x523f), (0x5200, 0x521f), (0x5260, 0x527f), (0x5280, 0x529f), (0x52c0, 0x52df)):
+        if lo <= code <= hi:
+            return (1, code-lo) if code-lo < layers else None
+    if 0x4000 <= code <= 0x4fff:
+        return (1, (code >> 8) & 15)
+    if 0x5000 <= code <= 0x51ff:
+        return (1, (code >> 5) & 15)
+    if 0x7ec0 <= code < 0x7ec0+layers:
+        return (1, code-0x7ec0)
+    if 0x7e80 <= code <= 0x7ebf:
+        return (2, (code-0x7e80) % 32)
+    if 0x7700 <= code <= 0x777f:
+        return (5, code-0x7700)
+    return None
+
+
+def key_query(code, behaviour, query, selector, layer, combos):
+    basic = code & 255 if 0x100 <= code <= 0x1fff else code
+    if query == 0: return code not in (0, 1)
+    if query == 1: return code == 1
+    if query == 2: return code == 0
+    if query == 3: return 0xe0 <= basic <= 0xe7 or 0x100 <= code <= 0x3fff or 0x5000 <= code <= 0x51ff or 0x52a0 <= code <= 0x52bf
+    if query == 4: return 4 <= basic <= 0x1d
+    if query == 5: return 0x1e <= basic <= 0x27 or 0x59 <= basic <= 0x62
+    if query == 6: return 0x2d <= basic <= 0x38 or 0x54 <= basic <= 0x57 or basic in (0x64, 0x67, 0x85)
+    if query == 7: return 0x49 <= basic <= 0x52 or basic in (0x2a, 0x2b, 0x28, 0x29, 0x58)
+    if query == 8: return 0xa5 <= basic <= 0xbe
+    if query == 9: return 0xcd <= basic <= 0xdf
+    if query in (10, 11, 12):
+        identity = native_identity(code)
+        return bool(identity and identity[0] == (1, 2, 5)[query-10] and (selector == ANY or selector == identity[1]))
+    if query == 13: return 0x7f00 <= code <= 0x7f7f
+    if query == 14: return behaviour is not None and (selector == ANY or selector == behaviour)
+    if query == 15:
+        return any((selector == ANY or int(row) == selector) and combo.get("enabled", True) and layer in combo.get("layers", list(range(16))) and code in combo["inputs"] for row, combo in combos.items())
+    raise AssertionError(query)
+
+
 class Situation:
     """The facts for one render, in the contract's terms."""
 
@@ -711,6 +755,10 @@ class Renderer:
             return frozenset().union(*(HALF_LEDS[h] for h in subj["halves"])) if subj["halves"] else ALL_LEDS
         if kind == 6:
             return key_leds(situation.mapped.get(subj["thing"], ())) if subj["kind"] == 1 else frozenset()
+        if kind == 8:
+            layer = subj["thing"] if subj["kind"] == 1 else max(situation.layers)
+            keymap = situation.data.get("keymap", {}).get(str(layer), {})
+            return key_leds(key for key in range(MATRIX_ROWS*MATRIX_COLS) if key_query(keymap.get(str(key), {}).get("code", 4 if key in situation.mapped.get(layer, ()) else 0), keymap.get(str(key), {}).get("behaviour"), params[0], params[1], layer, situation.data.get("queryCombos", {})))
         if kind == 7:
             place = self.record_field(subj, 0)
             return frozenset() if place is None else self.target(place, [], subj, situation)
@@ -726,6 +774,14 @@ class Renderer:
             return ("colour", self.rgb[params[0]])
         if kind == 3:
             ref = self.record_field(subj, 1 + subj["slot"])
+            return None if ref is None or ref == NONE else ("colour", self.rgb[ref])
+        if kind == 9:
+            layer = subj["thing"] if subj["kind"] == 1 else max(self.situation.layers)
+            key = next((i for i, value in enumerate(KEY_LEDS) if value == led), None)
+            item = self.situation.data.get("keymap", {}).get(str(layer), {}).get(str(key), {})
+            identity = native_identity(item.get("code", 0))
+            if identity is None: return None
+            ref = self.record_field(subject(*identity), 1)
             return None if ref is None or ref == NONE else ("colour", self.rgb[ref])
         if kind == 8:
             outcome = subj.get("outcome", 0)
@@ -781,6 +837,7 @@ class Renderer:
             at += 1
             if amount == 0:
                 continue
+            self.situation = situation
             value = self.paint(*item["paint"], subj, led) if led in target else None
             if value is None and item["background"] is not None:
                 value = self.paint(*item["background"], subj, led)
@@ -798,6 +855,7 @@ class Renderer:
         return bottom(led) if bottom else None
 
     def render(self, situation) -> list:
+        self.situation = situation
         # Gate time is a per-half local observation clock. Defensively ignore
         # backward samples; a 32-bit wrap advances by its modular delta.
         now = situation.time & 0xffffffff
@@ -1045,6 +1103,16 @@ def render_case(name, entry, domain, situations, limits):
 
 def render_vectors(limits):
     cases = []
+    codes = [0,1,4,0x1d,0x1e,0x62,0x2d,0x49,0xa8,0xcd,0xe7,0x204,0x2104,0x52a1,0x522f,0x5263,0x5282,0x52c1,0x5021,0x4304,0x7ecf,0x7e9f,0x7ebf,0x777f,0x7f7f,0x7e00]
+    keymap = {"3": {str(key): {"code": code, **({"behaviour": 127} if key in (2,24) else {})} for key,code in enumerate(codes)}}
+    qs = {"layers": [3], "keymap": keymap, "queryCombos": {"127": {"inputs": [4,0x7f7f], "layers": [3]}}}
+    changed = {**qs, "keymap": {"3": {"31": {"code": 0x7e9f, "behaviour": 0}}}, "queryCombos": {"127": {"inputs": [0x7e9f], "layers": [2]}}}
+    for query in range(16):
+        selectors = [ANY, 127, 0, 15, 31] if query in (10,11,12,14,15) else [ANY]
+        for selector in selectors:
+            cases.append(render_case(f"keys-that-{query}-{selector}", "target:8", {"palette": PALETTE, "rules": [rule(part(C,1,3),part(T,8,query,selector),part(P,2,GREEN))]}, [qs,changed], limits))
+    identity_tables = [{"kind": kind, "default": [0,colour], "records": []} for kind,colour in ((1,RED),(2,GREEN),(5,WHITE))]
+    cases.append(render_case("what-it-does", "paint:9", {"palette": PALETTE, "things": identity_tables, "rules": [rule(part(T,0),part(P,2,BLUE)),rule(part(C,1,3),part(T,0),part(P,9))]}, [qs,changed], limits))
     cases.append(render_case("phase3-fact-9", "fact:9", {"palette": PALETTE, "rules": [rule(part(C, 9, *[255, 1]), part(T, 4), part(P, 2, RED))]}, [{}, {'layers': [1, 3], 'layerOwners': {'0': 1, '31': 3}, 'lockedLayers': [1, 3], 'oneshotLayer': 3}], limits))
     cases.append(render_case("phase3-negated-9", "fact:9", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 9, *[255, 1]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'layers': [1, 3], 'layerOwners': {'0': 1, '31': 3}, 'lockedLayers': [1, 3], 'oneshotLayer': 3}], limits))
     cases.append(render_case("phase3-fact-10", "fact:10", {"palette": PALETTE, "rules": [rule(part(C, 10, *[255, 0]), part(T, 4), part(P, 2, RED))]}, [{}, {'modeStatus': {'id': 2, 'locked': False, 'keys': [0, 31], 'halves': ['left', 'right']}}], limits))
@@ -1330,6 +1398,11 @@ def codec_vectors(limits, standard: bytes):
     reject("identified-behaviour-states-zero", simple(part(C, 8, 0, 0), *good))
     reject("identified-behaviour-states-high", simple(part(C, 8, 0, 16), *good))
     reject("outcome-has-no-params", simple(part(T, 0), part(P, 8, 1)))
+    reject("key-query-out-of-range", simple(part(T,8,16,255),part(P,0)))
+    reject("key-query-selector-out-of-range", simple(part(T,8,0,128),part(P,0)))
+    reject("key-query-missing-selector", simple(part(T,8,0),part(P,0)))
+    reject("key-query-not-a-place", domain_with(things=[layer_table([[8,NONE]])]))
+    reject("what-it-does-parameterless", simple(part(T,0),part(P,9,0)))
     reject("rule-combo-role", simple(part(C, 4, 2), *good))
     reject("rule-behaviour-states-zero", simple(part(C, 5, 0, 0), *good))
     reject("rule-behaviour-states-high", simple(part(C, 5, 0x10, 0), *good))

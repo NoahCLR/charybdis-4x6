@@ -262,6 +262,7 @@ static noah_profile_lighting_v1_result_t check_param(const validation_t *v, uint
     uint8_t                                  value  = bytes[0];
 
     switch (type) {
+        case NOAH_LIGHTING_PARAM_KEY_QUERY: return value < 16u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
         case NOAH_LIGHTING_PARAM_LAYER_STATUS: return value <= 3u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
         case NOAH_LIGHTING_PARAM_MODE_STATUS: return value <= 1u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
         case NOAH_LIGHTING_PARAM_BEHAVIOUR_PHASE: return value <= 4u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;

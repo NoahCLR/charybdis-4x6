@@ -135,6 +135,7 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/core/rgb_runtime.c \
     lib/rgb/lighting/lighting_dispatch.c \
     lib/rgb/lighting/lighting_engine.c \
+    lib/rgb/lighting/lighting_keymap.c \
     lib/rgb/lighting/lighting_fade.c \
     lib/rgb/lighting/kinds/fact_behaviour_state.c \
     lib/rgb/lighting/kinds/fact_combos_held.c \
@@ -157,11 +158,13 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/lighting/kinds/paint_colour.c \
     lib/rgb/lighting/kinds/paint_dim.c \
     lib/rgb/lighting/kinds/paint_identity.c \
+    lib/rgb/lighting/kinds/paint_what_it_does.c \
     lib/rgb/lighting/kinds/paint_outcome.c \
     lib/rgb/lighting/kinds/paint_map.c \
     lib/rgb/lighting/kinds/paint_off.c \
     lib/rgb/lighting/kinds/paint_tint.c \
     lib/rgb/lighting/kinds/target_key_set.c \
+    lib/rgb/lighting/kinds/target_keys_that.c \
     lib/rgb/lighting/kinds/target_left_half.c \
     lib/rgb/lighting/kinds/target_right_half.c \
     lib/rgb/lighting/kinds/target_subject_halves.c \

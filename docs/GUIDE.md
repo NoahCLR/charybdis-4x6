@@ -351,8 +351,11 @@ says when it applies (a layer is on, a combo is held, a key is waiting for
 another tap), which LEDs it lights and how, and the topmost rule that paints an
 LED wins. These tables become that list, called Standard lighting, so they
 look exactly as they always did; a profile saved from the app can replace it
-with rules of its own. The [lighting rules](architecture/lighting-rules-v1.md)
-spec has the full vocabulary. With a supporting editor, each combo and
+with rules of its own. Rules can select keys from the shown layer by native usage,
+layer/mode/macro action, custom or behaviour identity, or combo membership.
+“What it does” uses the direct layer/mode/macro identity colour; unsupported
+actions say clear. These follow remaps and do not infer host-layout characters.
+The [lighting rules](architecture/lighting-rules-v1.md) spec has the full vocabulary. With a supporting editor, each combo and
 behaviour can have its own identity colours and placement, and painted maps
 can mix chosen colours, identity, clear and real off per LED. A behaviour's
 hold or long hold can instead use the identity colour of its resolved layer

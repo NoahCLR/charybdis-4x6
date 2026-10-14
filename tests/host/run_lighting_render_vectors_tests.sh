@@ -50,6 +50,14 @@ for case in fixture["render"]:
             fields += [str(item["id"]), str(item["role"]), bitmap(item["keys"])]
         mapped = s.get("mapped", {})
         fields += [bitmap(mapped.get(str(layer), [])) for layer in range(16)]
+        entries = [(int(layer),int(key),item) for layer,keys in s.get("keymap", {}).items() for key,item in keys.items()]
+        fields.append(str(len(entries)))
+        for layer,key,item in entries:
+            fields += [str(layer),str(key),str(item["code"]),str(item.get("behaviour",255))]
+        combos = s.get("queryCombos", {})
+        fields.append(str(len(combos)))
+        for row,item in combos.items():
+            fields += [str(row),str(int(item.get("enabled",True))),str(sum(1 << layer for layer in item.get("layers",range(16)))),str(len(item["inputs"]))] + list(map(str,item["inputs"]))
         behaviour = s.get("behaviour", {"keys": {}, "owners": {}})
         keys = behaviour.get("keys", {})
         fields.append(str(len(keys)))

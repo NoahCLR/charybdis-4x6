@@ -19,6 +19,7 @@
 #    include <string.h>
 
 #    include "../lighting/lighting_engine.h"
+#    include "../lighting/lighting_keymap.h"
 #    include "../../profile/runtime/effective_rgb_runtime.h"
 #    include "../../split/runtime_sync.h"
 #    if __has_include("sync_timer.h")
@@ -36,7 +37,7 @@ static noah_lighting_resolve_info_t rgb_runtime_info;
 static noah_lighting_scene_t        rgb_runtime_scene;
 static uint32_t                     rgb_runtime_now;
 static uint32_t                     rgb_runtime_program_generation;
-static uint32_t                     rgb_runtime_keymap_generation;
+static volatile uint32_t            rgb_runtime_keymap_generation;
 static uint32_t                     rgb_runtime_resolved_keymap_generation;
 static noah_lighting_leds_t         rgb_runtime_resolved_leds;
 static bool                         rgb_runtime_resolved;
@@ -125,7 +126,16 @@ static void rgb_runtime_begin_frame(void) {
         rgb_runtime_program_generation = generation;
         rgb_runtime_resolved           = false;
         noah_lighting_engine_program_changed();
+#    if NOAH_LIGHTING_KEYMAP_CACHE
+        noah_lighting_keymap_invalidate();
+#    endif
     }
+#    if NOAH_LIGHTING_KEYMAP_CACHE
+    if (!noah_lighting_keymap_refresh(rgb_runtime_keymap_generation)) {
+        rgb_runtime_resolved = false; // keep old pixels, never rerender with an incomplete basis
+        return;
+    }
+#    endif
     wake_due = rgb_runtime_info.wake_set && (int32_t)(rgb_runtime_now - rgb_runtime_info.wake) >= 0;
     if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_leds == leds && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation && !facts_changed) return;
 
