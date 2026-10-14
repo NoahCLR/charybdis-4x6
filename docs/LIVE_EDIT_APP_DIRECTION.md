@@ -1463,6 +1463,10 @@ uses an explicit compile gate with a required linked synchronous observer when
 enabled, and no external requirement or event capability when disabled. These
 constraints are detailed in the lighting spec; the incomplete producer
 foundation does not advertise an event or retention module.
+Fallback settlement streams one effect through a synchronous caller-owned
+sink. Planner/drain projection and later execution have distinct stack
+lifetimes; both require linked coverage without moving scratch into globals
+or reducing queues.
 Flash belongs only to event rules and linger only to state/board rules;
 event+flash+linger rejects. Show-after and flash run in parallel from the
 qualifying occurrence, so delay cannot extend flash expiry. A state departing

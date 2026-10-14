@@ -438,6 +438,8 @@ bool                           key_runtime_core_handle_handled_key_press(uint16_
 bool                           key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, const handled_key_resolution_t *resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_scan(key_runtime_core_effect_plan_t *plan, uint16_t now);
 bool                           key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan);
+// Synchronous, caller-owned streaming sink; no buffered core-plan workspace.
+bool key_runtime_core_stream_pending_fallback_holds(void (*sink)(void *, key_runtime_effect_t), void *context);
 
 static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state) {
     if (!state) {

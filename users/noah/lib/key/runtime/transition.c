@@ -87,7 +87,7 @@ static void key_runtime_transition_plan_append_core_plan(key_runtime_transition_
     plan->overflowed |= core_plan->overflowed;
 }
 
-static void key_runtime_transition_core_effect_sink(void *ctx, key_runtime_effect_t effect) {
+__attribute__((noinline)) static void key_runtime_transition_core_effect_sink(void *ctx, key_runtime_effect_t effect) {
     key_runtime_transition_plan_push((key_runtime_transition_plan_t *)ctx, effect);
 }
 
@@ -258,14 +258,12 @@ void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
     key_runtime_transition_end_auto_drain(plan, previous_flags, &core_plan);
 }
 
-bool key_runtime_transition_settle_pending_fallback_hold(key_runtime_transition_plan_t *plan) {
-    key_runtime_core_effect_plan_t core_plan;
-    uint8_t                        previous_flags;
-    bool                           settled_any;
-
-    previous_flags = key_runtime_transition_begin_auto_drain(plan);
-    key_runtime_transition_core_plan_init_streaming(&core_plan, plan);
-    settled_any = key_runtime_core_settle_pending_fallback_hold(&core_plan);
-    key_runtime_transition_end_auto_drain(plan, previous_flags, &core_plan);
+// End planner scratch before the API executes its retained transition plan.
+// Streaming drains still execute under this frame and are reviewed separately.
+__attribute__((noinline)) bool key_runtime_transition_settle_pending_fallback_hold(key_runtime_transition_plan_t *plan) {
+    if (!plan) return false;
+    uint8_t previous_flags = key_runtime_transition_begin_auto_drain(plan);
+    bool settled_any = key_runtime_core_stream_pending_fallback_holds(key_runtime_transition_core_effect_sink, plan);
+    key_runtime_transition_end_auto_drain(plan, previous_flags, NULL);
     return settled_any;
 }

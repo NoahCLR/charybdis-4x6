@@ -590,6 +590,14 @@ actual immediate emission. It does not look up a later key binding. Behaviour
 subjects own the same physical matrix key as the per-key phase facts, with
 the captured colour slot and supported layer/mode outcome.
 
+Fallback settlement uses a synchronous one-effect stream with caller-owned
+context, rather than an unused buffered core plan. Its explicit planning
+boundary ends before later transition execution. A sink may drain/project
+while planning remains active: that route retains the stream's effect and
+caller plan on stack and requires separate reviewed-path coverage. Queue
+admission scratch ends before queue-full immediate dispatch. Neither lifetime
+boundary changes queue capacity, output order or captured owner/commit data.
+
 The compact action effects and persistent dispatch slots remain12 bytes in
 the current compiler configuration. Deferred branch metadata uses the six
 unused dispatch-flag bits and snapshot bitfields. Compiled tap depths above63

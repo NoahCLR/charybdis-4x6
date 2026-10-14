@@ -329,7 +329,8 @@ uint8_t key_runtime_core_pending_release_count(void) {
     return state ? state->pending_release_count : 0u;
 }
 
-bool key_runtime_core_queue_pending_release_dispatch_with_commit(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id, uint8_t identity, uint8_t branch) {
+// Admission scratch ends before the caller takes its queue-full dispatch path.
+__attribute__((noinline)) bool key_runtime_core_queue_pending_release_dispatch_with_commit(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id, uint8_t identity, uint8_t branch) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     pending_release_slot_t   *pending;
     uint8_t                   index;

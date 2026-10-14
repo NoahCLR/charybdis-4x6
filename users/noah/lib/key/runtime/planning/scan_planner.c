@@ -308,22 +308,37 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
     return true;
 }
 
+static bool key_runtime_core_fallback_hold_effect(key_runtime_core_state_t *state, press_token_t *token, key_runtime_effect_t *effect) {
+    if (!(state && key_runtime_core_scan_token_hold_eligible(state, token) && key_runtime_core_scan_press_token_uses_fallback_hold(token))) return false;
+    if (key_runtime_core_scan_press_token_has_runtime_owned_state(state, token) || token->resolved_keycode == KC_NO) return false;
+    keypos_t key = key_runtime_core_scan_press_token_key_pos(state, token);
+    if (key_runtime_core_press_offered_to_mode(key)) return false;
+    *effect = (key_runtime_effect_t){.kind = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
+        .data.held_action = {.key_pos = key, .action = token->resolved_keycode}};
+    return true;
+}
+
 void key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *state, press_token_t *token, key_runtime_core_effect_plan_t *plan) {
-    keypos_t token_key_pos;
-
-    if (!(state && key_runtime_core_scan_token_hold_eligible(state, token) && key_runtime_core_scan_press_token_uses_fallback_hold(token))) {
-        return;
+    key_runtime_effect_t effect;
+    if (key_runtime_core_fallback_hold_effect(state, token, &effect)) {
+        key_runtime_core_effect_plan_push_held_action(plan, effect.kind, effect.data.held_action.key_pos, effect.data.held_action.action);
     }
+}
 
-    if (key_runtime_core_scan_press_token_has_runtime_owned_state(state, token) || token->resolved_keycode == KC_NO) {
-        return;
+// Fallback settlement emits only held registrations. Its streaming caller
+// needs one effect, not the unused fourteen-effect buffered-plan storage.
+// The caller-owned sink may drain/project synchronously while this is active.
+__attribute__((noinline)) bool key_runtime_core_stream_pending_fallback_holds(void (*sink)(void *, key_runtime_effect_t), void *context) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    bool any = false;
+    if (!(state && sink)) return false;
+    for (uint16_t index = 0u; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
+        key_runtime_effect_t effect;
+        if (!key_runtime_core_fallback_hold_effect(state, &state->press_tokens[index], &effect)) continue;
+        sink(context, effect);
+        any = true;
     }
-
-    token_key_pos = key_runtime_core_scan_press_token_key_pos(state, token);
-    if (key_runtime_core_press_offered_to_mode(token_key_pos)) {
-        return;
-    }
-    key_runtime_core_effect_plan_push_held_action(plan, KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, token_key_pos, token->resolved_keycode);
+    return any;
 }
 
 static void key_runtime_core_scan_clear_confirmed_tap_series_at(key_runtime_core_state_t *state, keypos_t key_pos) {

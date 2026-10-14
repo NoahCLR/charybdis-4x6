@@ -233,7 +233,35 @@ static void saturated_queue_keeps_actual_dispatch_occurrence(void) {
     expect(0, NOAH_LIGHTING_EVENT_TAP_FIRED, 2u, 2u);
     assert(key_runtime_core_pending_release_count() == KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY);
 }
+// The planner may invoke its sink with caller-owned items still pending.
+// Force that drain while the new fallback effect is being constructed, then
+// execute the retained remainder only after the planner has returned.
+static void fallback_planning_drain_preserves_order_and_lifetimes(void) {
+    reset();
+    key_behavior_view_t view = define_key(KC_LEFT_GUI);
+    view.lighting_identity = 0u;
+    view.single.tap = (tap_behavior_t)TAP_SENDS(KC_A);
+    key_runtime_scenario_add_behavior_view(view);
+    const key_runtime_scenario_step_t press[] = {KEY_RUNTIME_SCENARIO_PRESS(KC_LEFT_GUI, 0, 1)};
+    key_runtime_scenario_run(press, ARRAY_SIZE(press));
+    key_runtime_transition_plan_t plan;
+    key_runtime_transition_plan_init(&plan);
+    plan.count = KEY_RUNTIME_TRANSITION_PLAN_CAPACITY;
+    plan.items[0] = (key_runtime_effect_t){.kind = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
+        .data.held_action = {.key_pos = {.row = 0u, .col = 2u}, .action = KC_LEFT_SHIFT}};
+    assert(key_runtime_scenario_slot_held_action_keycode((keypos_t){.row = 0u, .col = 2u}) == KC_NO);
+    (void)key_runtime_transition_settle_pending_fallback_hold(&plan);
+    assert(!plan.overflowed && plan.count == 1u);
+    assert(plan.items[0].kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
+    assert(plan.items[0].data.held_action.action == KC_LEFT_GUI);
+    assert(key_runtime_scenario_slot_held_action_keycode((keypos_t){.row = 0u, .col = 2u}) == KC_LEFT_SHIFT);
+    assert(key_runtime_scenario_slot_held_action_keycode((keypos_t){.row = 0u, .col = 1u}) == KC_NO);
+    key_runtime_transition_execute_plan(&plan);
+    assert(key_runtime_scenario_slot_held_action_keycode((keypos_t){.row = 0u, .col = 1u}) == KC_LEFT_GUI);
+    assert(count == 0u);
+}
 int main(void) {
+    fallback_planning_drain_preserves_order_and_lifetimes();
     tap_without_visual_feedback();
     branch_two_commits_once();
     unnumbered_intrinsic_gesture_has_no_authored_event();
