@@ -1,3 +1,4 @@
+#include "users/noah/lib/pointing/runtime/pd_sensor_observation.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -464,6 +465,9 @@ static void test_pointing_device_task_suppresses_idle_noise_after_quiet_window(v
     report_mouse_t input = {.x = -1, .y = 1, .h = 0, .v = 0, .buttons = 0};
 
     CHECK(report_mouse_equal(noah_pointing_device_task_user(input), (report_mouse_t){0}));
+    CHECK(noah_pointing_sensor_motion_observed()); // literal sensor sample, even when suppressed
+    (void)noah_pointing_device_task_user((report_mouse_t){0});
+    CHECK(!noah_pointing_sensor_motion_observed()); // no continuation
 }
 
 static void test_pointing_device_task_keeps_small_motion_while_recently_active(void) {

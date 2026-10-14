@@ -730,3 +730,43 @@ void key_feedback_lighting_map(uint8_t *out) {
         if (record[1] >= 4u && key_origin_bitmap_has_keypos(owning, key_feedback_slot_key_pos(i))) memset(record, 0, KEY_FEEDBACK_LIGHTING_RECORD_BYTES);
     }
 }
+
+static void key_feedback_lighting_phase_apply(uint8_t *out, keypos_t owner, uint8_t identity, uint8_t phase, uint8_t branch) {
+    uint8_t keys[KEY_ORIGIN_BITMAP_SIZE];
+    if (!identity || !key_origin_registry_get_bitmap(owner, keys)) return;
+    for (uint8_t i = 0u; i < MATRIX_ROWS * MATRIX_COLS; i++) {
+        if (!key_origin_bitmap_has_keypos(keys, key_feedback_slot_key_pos(i))) continue;
+        uint8_t *record = out + 3u * i;
+        record[0] = identity;
+        record[1] |= phase;
+        record[2] = branch;
+    }
+}
+void key_feedback_lighting_phases(uint8_t *out) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    memset(out, 0, MATRIX_ROWS * MATRIX_COLS * 3u);
+    if (!state) return;
+    for (uint16_t cursor = 0u; key_feedback_next_active_slot(state->tap_series_active_bitmap, &cursor);) {
+        uint16_t i = cursor - 1u;
+        const tap_series_t *series = &state->tap_series[i];
+        if (!series->active || series->resolved) continue;
+        key_feedback_lighting_phase_apply(out, key_feedback_slot_key_pos(i), series->lighting_identity, (series->pending_hold ? 4u : 2u) | (key_feedback_tap_series_shows_tap_branch(series) ? 1u : 0u), series->tap_count);
+    }
+    for (uint16_t cursor = 0u; key_feedback_next_active_slot(state->press_token_active_bitmap, &cursor);) {
+        uint16_t i = cursor - 1u;
+        const press_token_t *token = &state->press_tokens[i];
+        if (!token->active || !token->handled_key || !token->interaction.selection.lighting_identity) continue;
+        uint8_t phase;
+        switch (token->slot_phase) {
+            case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW: phase = 2u; break;
+            case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
+            case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING: phase = 4u; break;
+            case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
+            case KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE:
+                phase = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.longer_hold_term ? 16u : 8u;
+                break;
+            default: continue;
+        }
+        key_feedback_lighting_phase_apply(out, key_feedback_slot_key_pos(i), token->interaction.selection.lighting_identity, phase, token->interaction.selection.tap_count);
+    }
+}

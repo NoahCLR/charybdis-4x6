@@ -51,3 +51,5 @@ uint8_t noah_qmk_combo_origin_record_source_layer(uint16_t keycode, const keyrec
 // without consuming its pending origin. Release uses
 // the matching press's snapshot, even when that press is still queued.
 void noah_qmk_combo_origin_capture_record(uint16_t keycode, keyrecord_t *record);
+
+void noah_qmk_combo_origin_lighting_layers(uint8_t *out);

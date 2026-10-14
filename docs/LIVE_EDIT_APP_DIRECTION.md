@@ -57,7 +57,11 @@ renderer's. The USB half sends the synced facts in one chunked frame; each half
 renders its own LEDs from its own profile. GET `0x0D` (feature bit 31)
 reports what the rules may use. Individual combo/behaviour subjects and
 hold/long-hold layer/mode outcome paint support Painting through additive kinds
-7/8 (facts) and 8 (paint), preserving Standard lighting and RGB v5. None of it
+7/8 (facts) and 8 (paint), preserving Standard lighting and RGB v5. Additive
+state kinds 9–18 expose actual ownership, gesture phases, named macro playback,
+physical pressed keys, modifiers, host locks, pointer observations and the
+existing sleep predicate; sleep still forces black and raw sensor observation
+has no extra continuation timer. None of it
 has run on hardware.
 
 The keyboard's name lives in settings v7 and is its USB product string
@@ -106,7 +110,10 @@ input cadence remain unmeasured for this path.
   unchanged with lighting resolving. Painting also needs Ark to adopt the
   individual subjects/outcome paint and repin their contract; per-item maps,
   inherited identities, release flashes and layer/mode outcomes on both halves
-  remain hardware acceptance.
+  remain hardware acceptance. The Lighting facts follow-up must adopt the
+  additive state kinds and tables, their capability/vector changes and the
+  expanded split-facts contract; remaining event/timing/query work and its
+  acceptance are separate from these state predicates.
 
 - **The keyboard name needs broader hardware acceptance (D-F25).** Check
   Chrome's HID chooser, the system device list and Ark individually; that a
@@ -1397,6 +1404,16 @@ Choices the plan left open, as decided:
   use existing inheritance, and capabilities advertise each new kind. No new
   state family or format version is introduced. Ark must adopt the contract
   and vectors and repin the committed/landed result for Painting.
+- **Facts report existing state literally.** Additional state modules project
+  actual held/locked/one-shot ownership and real holding keys, live gesture
+  phases, named playback, matrix keys, report modifiers, host lock LEDs and
+  pointer state. Idle is the parameterless existing sleep predicate and cannot
+  override its all-black output. Ball motion is the latest raw x/y observation,
+  before suppression and transforms, without an implicit continuation timer;
+  collection and split publication can miss intervening samples. Automatic
+  layer-activation provenance is omitted because QMK's aggregate active query
+  does not distinguish sensor activation from manual retention. No new idle or
+  motion-duration policy is introduced; see the governing spec for subjects.
 - **Facts are one frame.** The USB half builds the synced facts (previewed
   layer, held combos, behaviour state) and sends them as one frame of 30-byte
   chunks published on the other half as one generation; the per-stage split

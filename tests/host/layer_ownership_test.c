@@ -398,7 +398,28 @@ static void test_invalid_layer_requests_are_ignored(void) {
     CHECK(!layer_ownership_momentary_release(key_pos));
 }
 
+static void test_lighting_projection_keeps_real_owner_keys_and_masks(void) {
+    uint8_t projection[MATRIX_ROWS * MATRIX_COLS + 3u];
+    keypos_t a = test_keypos(0, 0), b = test_keypos(1, 1);
+    test_reset_stubs();
+    layer_ownership_momentary_press(a, 2u);
+    layer_ownership_momentary_press(b, 3u);
+    CHECK(layer_ownership_set_lock_state(3u, true));
+    CHECK(layer_ownership_oneshot_tap(4u, 1000u, 200u));
+    layer_ownership_lighting_projection(projection);
+    CHECK(projection[0] == 3u);
+    CHECK(projection[MATRIX_COLS + 1u] == 4u);
+    CHECK(projection[MATRIX_ROWS * MATRIX_COLS] == (1u << 3u));
+    CHECK(projection[MATRIX_ROWS * MATRIX_COLS + 2u] == 4u);
+    CHECK(layer_ownership_momentary_layer_at(a) == 2u);
+    CHECK(layer_ownership_momentary_release(a));
+    CHECK(layer_ownership_momentary_layer_at(a) == 255u);
+    layer_ownership_lighting_projection(projection);
+    CHECK(projection[0] == 0u);
+}
+
 int main(void) {
+    test_lighting_projection_keeps_real_owner_keys_and_masks();
     test_single_momentary_press_and_release_toggles_layer();
     test_multiple_keys_share_momentary_layer_reference();
     test_is_held_tracks_key_holds_not_locks();

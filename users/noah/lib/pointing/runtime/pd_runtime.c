@@ -1,4 +1,8 @@
 #include "../modes/pd_mode_configured.h"
+#include "pd_sensor_observation.h"
+
+static bool sensor_motion_observed;
+bool noah_pointing_sensor_motion_observed(void) { return sensor_motion_observed; }
 #include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // PD Runtime
@@ -68,6 +72,7 @@ static inline uint32_t pd_runtime_idle_noise_any_activity_elapsed(void) {
 #endif
 
 void noah_pointing_device_init_user(void) {
+    sensor_motion_observed = false;
 #if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
     pd_runtime_idle_noise_note_pointer_activity();
 #endif
@@ -92,6 +97,7 @@ bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
 
 report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
     report_mouse_t output = mouse_report;
+    sensor_motion_observed = mouse_report.x != 0 || mouse_report.y != 0;
 
 #if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)
     noah_runtime_cadence_note_pointing_poll();

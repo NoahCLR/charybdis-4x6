@@ -51,7 +51,7 @@ _Static_assert((unsigned)NOAH_PROFILE_LIGHTING_V1_RECORD_MAX <= (unsigned)NOAH_P
 
 // ─── Registry facts ─────────────────────────────────────────────────────────
 
-static bool fact_layout(uint8_t id, uint16_t *layout) {
+static bool fact_layout(uint8_t id, uint32_t *layout) {
     (void)layout;
     switch (id) {
 #define NOAH_LIGHTING_FACT_LAYOUT(fid, name, thing, params) \
@@ -65,7 +65,7 @@ static bool fact_layout(uint8_t id, uint16_t *layout) {
     }
 }
 
-static bool target_layout(uint8_t id, uint16_t *layout) {
+static bool target_layout(uint8_t id, uint32_t *layout) {
     (void)layout;
     switch (id) {
 #define NOAH_LIGHTING_TARGET_LAYOUT(tid, name, params, place) \
@@ -79,7 +79,7 @@ static bool target_layout(uint8_t id, uint16_t *layout) {
     }
 }
 
-static bool paint_layout(uint8_t id, uint16_t *layout) {
+static bool paint_layout(uint8_t id, uint32_t *layout) {
     (void)layout;
     switch (id) {
 #define NOAH_LIGHTING_PAINT_LAYOUT(pid, name, params, below, timed) \
@@ -93,7 +93,7 @@ static bool paint_layout(uint8_t id, uint16_t *layout) {
     }
 }
 
-static bool timing_layout(uint8_t id, uint16_t *layout) {
+static bool timing_layout(uint8_t id, uint32_t *layout) {
     (void)layout;
     switch (id) {
 #define NOAH_LIGHTING_TIMING_LAYOUT(gid, name, params, timed) \
@@ -175,6 +175,9 @@ uint8_t noah_profile_lighting_v1_thing_count(const noah_profile_lighting_v1_limi
         case NOAH_LIGHTING_THING_COMBO:
         case NOAH_LIGHTING_THING_BEHAVIOUR:
             return 128u;
+        case NOAH_LIGHTING_THING_MACRO: return 128u;
+        case NOAH_LIGHTING_THING_MODIFIER: return 8u;
+        case NOAH_LIGHTING_THING_KEY: return 60u;
         default:
             return 0u;
     }
@@ -259,6 +262,16 @@ static noah_profile_lighting_v1_result_t check_param(const validation_t *v, uint
     uint8_t                                  value  = bytes[0];
 
     switch (type) {
+        case NOAH_LIGHTING_PARAM_LAYER_STATUS: return value <= 3u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
+        case NOAH_LIGHTING_PARAM_MODE_STATUS: return value <= 1u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
+        case NOAH_LIGHTING_PARAM_BEHAVIOUR_PHASE: return value <= 4u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
+        case NOAH_LIGHTING_PARAM_TAP_SELECTOR: return value == 255u || (value > 0u && value <= limits->tap_depth) ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
+        case NOAH_LIGHTING_PARAM_KEY_SELECTOR: return value == 255u || value < 60u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
+        case NOAH_LIGHTING_PARAM_MODIFIER: return value < 4u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
+        case NOAH_LIGHTING_PARAM_SIDE: return value < 3u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
+        case NOAH_LIGHTING_PARAM_MODIFIER_STATE: return value < 2u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
+        case NOAH_LIGHTING_PARAM_HOST_LOCK: return value < 3u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
+        case NOAH_LIGHTING_PARAM_POINTER_STATE: return value < 4u ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
         case NOAH_LIGHTING_PARAM_LAYER_SELECTOR:
             return value == NOAH_PROFILE_LIGHTING_V1_ANY || value < limits->logical_layer_count ? NOAH_PROFILE_LIGHTING_V1_OK : NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER;
         case NOAH_LIGHTING_PARAM_MODE_SELECTOR:
@@ -287,7 +300,7 @@ static noah_profile_lighting_v1_result_t check_param(const validation_t *v, uint
 }
 
 static bool map_value_valid(const validation_t *v, uint8_t value) {
-    uint16_t layout;
+    uint32_t layout;
     uint8_t  kind;
 
     if (value < NOAH_PROFILE_LIGHTING_V1_MAP_PAINT) return value < v->candidate.palette_count;
@@ -502,7 +515,7 @@ static noah_profile_lighting_v1_validation_result_t finish_rule(validation_t *v,
 static noah_profile_lighting_v1_validation_result_t check_part(validation_t *v, noah_profile_lighting_v1_error_t *error, const uint8_t *bytes) {
     uint16_t left = (uint16_t)(v->item_end - v->offset);
     uint16_t at   = v->offset;
-    uint16_t layout;
+    uint32_t layout;
     uint8_t  slot, length, kind;
     bool     known;
     uint32_t mask;
@@ -557,8 +570,8 @@ static noah_profile_lighting_v1_validation_result_t check_part(validation_t *v, 
     if (2u + (uint16_t)length > left) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_LENGTH, at);
     {
         uint8_t param_at = 2u;
-        for (; layout != 0u; layout >>= 4u) {
-            uint8_t                           type   = (uint8_t)(layout & 0x0fu);
+        for (; layout != 0u; layout >>= 5u) {
+            uint8_t                           type   = (uint8_t)(layout & 0x1fu);
             noah_profile_lighting_v1_result_t result = check_param(v, type, &bytes[param_at]);
             if (result != NOAH_PROFILE_LIGHTING_V1_OK) return reject(v, error, result, (size_t)at + param_at);
             param_at = (uint8_t)(param_at + noah_lighting_param_size(type));

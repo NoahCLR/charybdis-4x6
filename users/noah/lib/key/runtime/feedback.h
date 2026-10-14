@@ -298,3 +298,5 @@ uint16_t key_feedback_test_slot_visits(void);
 uint8_t key_feedback_lighting_hold_outcome(hold_behavior_t hold);
 void    key_feedback_lighting_map(uint8_t *out);
 void    key_feedback_lighting_pulse_metadata(keypos_t key, key_feedback_pulse_kind_t kind, uint8_t *identity, uint8_t *outcome);
+
+void key_feedback_lighting_phases(uint8_t *out);

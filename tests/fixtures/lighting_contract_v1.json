@@ -21,7 +21,17 @@
     "paletteIndex": "a palette index below the domain's palette count",
     "map": "a map index below the domain's map count",
     "level": "0..255",
-    "milliseconds": "u16 little-endian, 1..65535"
+    "milliseconds": "u16 little-endian, 1..65535",
+    "layerStatus": "0 top layer, 1 held, 2 locked, 3 one-shot armed",
+    "modeStatus": "0 held, 1 locked",
+    "behaviourPhase": "0 branch selected, 1 tap pending, 2 hold pending, 3 active hold tier, 4 active long-hold tier",
+    "tapSelector": "1..supported tap depth, or 255 any branch",
+    "keySelector": "matrix index 0..59, or 255 any",
+    "modifier": "0 Ctrl, 1 Shift, 2 Alt, 3 GUI",
+    "side": "0 left, 1 right, 2 either (left before right)",
+    "modifierState": "0 real/weak/locked-one-shot active modifiers, 1 armed one-shot modifiers",
+    "hostLock": "0 Caps Lock, 1 Num Lock, 2 Scroll Lock",
+    "pointerState": "0 auto-mouse target on, 1 auto-mouse fading, 2 sniping, 3 latest raw sensor x/y nonzero"
   },
   "partSlots": [
     {"slot": 0, "name": "condition"},
@@ -40,7 +50,17 @@
       {"id": 4, "name": "combos held", "thing": 3, "parameters": [{"name": "role", "type": "comboRole"}], "slice": "synced", "meaning": "One subject for every held combo of the role, excluding combos whose output holds a momentary layer: their keys and the halves those keys are on. Thing 255, so the combo table's default identity."},
       {"id": 5, "name": "behaviour state", "thing": 4, "parameters": [{"name": "states", "type": "behaviourStates"}, {"name": "scope", "type": "behaviourScope"}], "slice": "synced", "meaning": "Gestures whose shown state is in the mask; a flashing state counts only while lit; a key in a held combo's footprint never shows a selected branch. Scope 0: each key. Scope 1: the newest gesture on the left half, then the right, each with that half only. Scope 2: the newest gesture. Scope 3: for each state in the mask, long hold first, the newest gesture that entered it while its key still shows it. Identity slot from the state. Thing 255."},
       {"id": 7, "name": "combo held", "thing": 3, "parameters": [{"name": "combo", "type": "thingSelector"}, {"name": "role", "type": "comboRole"}], "slice": "synced", "meaning": "One subject per identified held combo, newest completion first; same roles and layer-hold suppression as fact 4. Its own id, input keys and halves; identity slot zero. Unidentified fallback outputs omitted."},
-      {"id": 8, "name": "behaviour", "thing": 4, "parameters": [{"name": "behaviour", "type": "thingSelector"}, {"name": "states", "type": "behaviourStates"}], "slice": "synced", "meaning": "One subject per key of an authored behaviour row, matrix order. Captured row id and selected colour slot; branches suppressed under combos and flashing states only while lit. Includes layer/mode holds Standard delegates to their scenes. Intrinsic/bypassed gestures omitted. No aggregate scopes."}
+      {"id": 8, "name": "behaviour", "thing": 4, "parameters": [{"name": "behaviour", "type": "thingSelector"}, {"name": "states", "type": "behaviourStates"}], "slice": "synced", "meaning": "One subject per key of an authored behaviour row, matrix order. Captured row id and selected colour slot; branches suppressed under combos and flashing states only while lit. Includes layer/mode holds Standard delegates to their scenes. Intrinsic/bypassed gestures omitted. No aggregate scopes."},
+      {"id": 9, "name": "layer status", "thing": 1, "parameters": [{"name": "layerSelector", "type": "layerSelector"}, {"name": "layerStatus", "type": "layerStatus"}], "slice": "synced", "meaning": "Real layer ownership, highest layer first; owner keys are the actual momentary bindings, including a combo output representative owner only. Top uses highest active layer; locked and one-shot use ownership state. No inferred automatic-activation provenance."},
+      {"id": 10, "name": "mode status", "thing": 2, "parameters": [{"name": "modeSelector", "type": "modeSelector"}, {"name": "modeStatus", "type": "modeStatus"}], "slice": "synced", "meaning": "Actual held or locked pointing mode and its real owner keys/halves."},
+      {"id": 11, "name": "combo layer", "thing": 3, "parameters": [{"name": "thingSelector", "type": "thingSelector"}, {"name": "layerSelector", "type": "layerSelector"}], "slice": "synced", "meaning": "Identified held combo outputs whose representative owner actually holds a layer; newest completion first. Its input keys and halves."},
+      {"id": 12, "name": "behaviour phase", "thing": 4, "parameters": [{"name": "thingSelector", "type": "thingSelector"}, {"name": "behaviourPhase", "type": "behaviourPhase"}, {"name": "tapSelector", "type": "tapSelector"}], "slice": "synced", "meaning": "Authored per-key gesture phases independent of Standard flash visibility. Matrix order, captured row id, branch and colour slot. A selected branch may also have a tap or hold pending."},
+      {"id": 13, "name": "macro playing", "thing": 5, "parameters": [{"name": "thingSelector", "type": "thingSelector"}], "slice": "synced", "meaning": "Actual named VIA macro playback slot, including cleanup. Direct unnumbered payloads yield no subject."},
+      {"id": 14, "name": "key pressed", "thing": 7, "parameters": [{"name": "keySelector", "type": "keySelector"}], "slice": "synced", "meaning": "Physical matrix keys down, matrix order; each subject owns its actual key and half."},
+      {"id": 15, "name": "modifier", "thing": 6, "parameters": [{"name": "modifier", "type": "modifier"}, {"name": "side", "type": "side"}, {"name": "modifierState", "type": "modifierState"}], "slice": "synced", "meaning": "Actual active real/weak/locked-one-shot modifier masks or armed one-shot mask, with left/right/either selectors. Either yields left then right."},
+      {"id": 16, "name": "host lock", "thing": 0, "parameters": [{"name": "hostLock", "type": "hostLock"}], "slice": "synced", "meaning": "Actual host Caps/Num/Scroll LED state from the USB half."},
+      {"id": 17, "name": "pointer", "thing": 0, "parameters": [{"name": "pointerState", "type": "pointerState"}], "slice": "synced", "meaning": "Actual auto-mouse target active/fading and automatic/manual sniping; latest raw sensor x/y before suppression or mode transform. Raw reports may contain noise; no continuation timer. The split peer sees the latest committed observation, and a sample can be replaced before collection/publication."},
+      {"id": 18, "name": "idle", "thing": 0, "parameters": [], "slice": "synced", "meaning": "Actual RGB sleep predicate: effective timeout nonzero and QMK input activity elapsed strictly greater than timeout. No extra duration or veto. Preserved global sleep forces black, even when this fact matches."}
     ],
     "targets": [
       {"id": 0, "name": "whole board", "parameters": [], "place": true, "meaning": "All 58 LEDs."},
@@ -74,7 +94,10 @@
       {"id": 1, "name": "layer", "things": "logical layers", "colourSlots": ["colour"]},
       {"id": 2, "name": "pointing mode", "things": 32, "colourSlots": ["colour"]},
       {"id": 3, "name": "combo", "things": 128, "colourSlots": ["colour"]},
-      {"id": 4, "name": "behaviour", "things": 128, "colourSlots": ["hold", "long hold", "tap", "branch 2", "... one per branch up to the tap depth"]}
+      {"id": 4, "name": "behaviour", "things": 128, "colourSlots": ["hold", "long hold", "tap", "branch 2", "... one per branch up to the tap depth"]},
+      {"id": 5, "name": "macro", "things": 128, "colourSlots": ["colour"]},
+      {"id": 6, "name": "modifier", "things": 8, "colourSlots": ["colour"]},
+      {"id": 7, "name": "key", "things": 60, "colourSlots": ["colour"]}
     ]
   },
   "references": {

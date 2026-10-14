@@ -946,3 +946,7 @@ void macro_payload_debug_snapshot(macro_payload_debug_snapshot_t *out) {
             break;
     }
 }
+
+uint8_t macro_payload_playing_slot(void) {
+    return macro_payload_engine.phase != MACRO_PAYLOAD_PHASE_IDLE && macro_payload_engine.source == MACRO_PAYLOAD_SOURCE_VIA && macro_payload_engine.slot < 128u ? macro_payload_engine.slot : 255u;
+}

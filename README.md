@@ -35,7 +35,8 @@ any C and you don't reflash.
   committed. A combo holding a layer shows only that layer’s lighting. They also
   fade to show when the auto-mouse layer is about to drop. With a supporting
   Ark version, paint individual combo and behaviour looks, or colour a hold
-  by the layer or pointing mode it enters.
+  by the layer or pointing mode it enters, and make rules for held or locked
+  layers, modifiers and host lock LEDs.
 - **Two halves that act like one keyboard.** Layers, modes, combos, lighting
   and saved edits stay in sync across the cable.
 - **Your keyboard, your name.** Name it in Ark and your computer, Chrome's

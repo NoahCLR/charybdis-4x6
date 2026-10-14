@@ -51,3 +51,7 @@ bool layer_ownership_momentary_release(keypos_t key_pos);
 void layer_ownership_momentary_owner_bitmap(uint8_t *out_bitmap);
 void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out);
 void layer_ownership_reset_for_test(void);
+
+// Lighting: layer+1 at each real owner key, then locked mask and one-shot id.
+void layer_ownership_lighting_projection(uint8_t *out);
+uint8_t layer_ownership_momentary_layer_at(keypos_t key);

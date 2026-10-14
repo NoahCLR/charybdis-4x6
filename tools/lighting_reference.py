@@ -63,7 +63,9 @@ def key_leds(keys) -> frozenset:
 # Parameter types, by name, as the contract defines them.
 FACTS = {1: ("layer active", ["layerSelector"]), 2: ("layer previewing", ["layerSelector"]), 3: ("pointing mode active", ["modeSelector"]), 4: ("combos held", ["comboRole"]), 5: ("behaviour state", ["behaviourStates", "behaviourScope"])}
 FACTS.update({7: ("combo held", ["thingSelector", "comboRole"]), 8: ("behaviour", ["thingSelector", "behaviourStates"])})
+FACTS.update({9: ('layer status', ['layerSelector', 'layerStatus']), 10: ('mode status', ['modeSelector', 'modeStatus']), 11: ('combo layer', ['thingSelector', 'layerSelector']), 12: ('behaviour phase', ['thingSelector', 'behaviourPhase', 'tapSelector']), 13: ('macro playing', ['thingSelector']), 14: ('key pressed', ['keySelector']), 15: ('modifier', ['modifier', 'side', 'modifierState']), 16: ('host lock', ['hostLock']), 17: ('pointer', ['pointerState']), 18: ('idle', [])})
 FACT_THING = {1: 1, 2: 1, 3: 2, 4: 3, 5: 4, 7: 3, 8: 4}
+FACT_THING.update({9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 6, 16: 0, 17: 0, 18: 0})
 TARGETS = {0: [], 1: [], 2: [], 3: ["keySet"], 4: [], 5: [], 6: [], 7: []}
 PLACE_TARGETS = {0, 1, 2, 4, 5, 6}
 PAINTS = {0: [], 1: [], 2: ["paletteIndex"], 3: [], 4: ["map"], 5: ["level"], 6: ["paletteIndex", "level"]}
@@ -72,7 +74,7 @@ PAINT_READS_BELOW = {5, 6}
 TIMINGS = {1: ["milliseconds"]}
 RULE_EXTENSIONS: dict = {}
 DOMAIN_EXTENSIONS = {1: 4, 2: 1}
-THING_KINDS = {1: 16, 2: 32, 3: 128, 4: 128}
+THING_KINDS = {1: 16, 2: 32, 3: 128, 4: 128, 5: 128, 6: 8, 7: 60}
 TYPE_BYTES = {"milliseconds": 2}
 
 SLOT_CONDITION, SLOT_NEGATED, SLOT_TARGET, SLOT_PAINT, SLOT_BACKGROUND, SLOT_TIMING, SLOT_EXTENSION = range(7)
@@ -213,6 +215,36 @@ def check_param(kind_type: str, data: bytes, offset: int, limits: Limits, counts
             raise Invalid("INVALID_REFERENCE", offset)
     elif kind_type == "milliseconds":
         if data[offset] | data[offset + 1] << 8 == 0:
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "layerStatus":
+        if not (value <= 3):
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "modeStatus":
+        if not (value <= 1):
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "behaviourPhase":
+        if not (value <= 4):
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "tapSelector":
+        if not (value == ANY or 1 <= value <= limits.tap_depth):
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "keySelector":
+        if not (value == ANY or value < 60):
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "modifier":
+        if not (value < 4):
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "side":
+        if not (value < 3):
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "modifierState":
+        if not (value < 2):
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "hostLock":
+        if not (value < 3):
+            raise Invalid("INVALID_PARAMETER", offset)
+    elif kind_type == "pointerState":
+        if not (value < 4):
             raise Invalid("INVALID_PARAMETER", offset)
     elif kind_type != "level":
         raise AssertionError(kind_type)
@@ -527,6 +559,7 @@ class Situation:
 
     def __init__(self, data: dict, limits: Limits):
         self.limits = limits
+        self.data = data
         self.layers = set(data.get("layers", [])) | {0}
         self.mapped = {int(layer): frozenset(keys) for layer, keys in data.get("mapped", {}).items()}
         self.preview = data.get("preview")
@@ -558,6 +591,34 @@ class Situation:
         return subject(4, ANY, slot, {key}, halves if halves is not None else {key_half(key)})
 
     def subjects(self, kind: int, params) -> list:
+        if kind == 9:
+            owners = {int(k): layer for k, layer in self.data.get("layerOwners", {}).items()}
+            matches = [max(self.layers)] if params[1] == 0 else set(owners.values()) if params[1] == 1 else self.data.get("lockedLayers", []) if params[1] == 2 else [self.data.get("oneshotLayer")]
+            return [subject(1, layer, 0, [key for key, owned in owners.items() if owned == layer], {key_half(key) for key, owned in owners.items() if owned == layer}) for layer in sorted((l for l in matches if l is not None), reverse=True) if params[0] in (ANY, layer)]
+        if kind == 10:
+            mode = self.data.get("modeStatus")
+            if not mode or (params[1] == 1) != bool(mode.get("locked")) or params[0] not in (ANY, mode["id"]): return []
+            return [subject(2, mode["id"], 0, mode.get("keys", []), mode.get("halves", []))]
+        if kind == 11:
+            return [subject(3, item["id"], 0, item["keys"], {key_half(key) for key in item["keys"]}) for item in self.data.get("comboLayers", []) if params[0] in (ANY, item["id"]) and params[1] in (ANY, item["layer"])]
+        if kind == 12:
+            found = []
+            for key, item in sorted(self.data.get("behaviourPhases", {}).items(), key=lambda kv: int(kv[0])):
+                if params[0] not in (ANY, item["id"]) or params[1] not in item["phases"] or params[2] not in (ANY, item["branch"]): continue
+                slot = 1 if params[1] == 4 else 0 if params[1] in (2, 3) else 2 if params[1] == 1 else self.branch_slot(item["branch"])
+                found.append(subject(4, item["id"], slot, [int(key)], [key_half(int(key))]))
+            return found
+        if kind == 13:
+            slot = self.data.get("macroPlaying")
+            return [subject(5, slot)] if slot is not None and params[0] in (ANY, slot) else []
+        if kind == 14:
+            return [subject(7, key, 0, [key], [key_half(key)]) for key in sorted(self.data.get("pressedKeys", [])) if params[0] in (ANY, key)]
+        if kind == 15:
+            mods = self.data.get("modifiers", [0, 0])[params[2]]
+            return [subject(6, params[0] + side * 4) for side in (0, 1) if params[1] in (2, side) and mods & (1 << (params[0] + side * 4))]
+        if kind in (16, 17, 18):
+            holds = self.data.get("hostLocks", 0) & (1 << params[0]) if kind == 16 else self.data.get("pointer", 0) & (1 << params[0]) if kind == 17 else self.data.get("idle", False)
+            return [subject(0, ANY)] if holds else []
         if kind == 1:
             return [subject(1, layer) for layer in sorted(self.layers, reverse=True) if params[0] in (ANY, layer)]
         if kind == 2:
@@ -974,6 +1035,35 @@ def render_case(name, entry, domain, situations, limits):
 
 def render_vectors(limits):
     cases = []
+    cases.append(render_case("phase3-fact-9", "fact:9", {"palette": PALETTE, "rules": [rule(part(C, 9, *[255, 1]), part(T, 4), part(P, 2, RED))]}, [{}, {'layers': [1, 3], 'layerOwners': {'0': 1, '31': 3}, 'lockedLayers': [1, 3], 'oneshotLayer': 3}], limits))
+    cases.append(render_case("phase3-negated-9", "fact:9", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 9, *[255, 1]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'layers': [1, 3], 'layerOwners': {'0': 1, '31': 3}, 'lockedLayers': [1, 3], 'oneshotLayer': 3}], limits))
+    cases.append(render_case("phase3-fact-10", "fact:10", {"palette": PALETTE, "rules": [rule(part(C, 10, *[255, 0]), part(T, 4), part(P, 2, RED))]}, [{}, {'modeStatus': {'id': 2, 'locked': False, 'keys': [0, 31], 'halves': ['left', 'right']}}], limits))
+    cases.append(render_case("phase3-negated-10", "fact:10", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 10, *[255, 0]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'modeStatus': {'id': 2, 'locked': False, 'keys': [0, 31], 'halves': ['left', 'right']}}], limits))
+    cases.append(render_case("phase3-fact-11", "fact:11", {"palette": PALETTE, "rules": [rule(part(C, 11, *[255, 255]), part(T, 4), part(P, 2, RED))]}, [{}, {'comboLayers': [{'id': 2, 'layer': 3, 'keys': [0, 31]}]}], limits))
+    cases.append(render_case("phase3-negated-11", "fact:11", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 11, *[255, 255]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'comboLayers': [{'id': 2, 'layer': 3, 'keys': [0, 31]}]}], limits))
+    cases.append(render_case("phase3-fact-12", "fact:12", {"palette": PALETTE, "rules": [rule(part(C, 12, *[255, 0, 255]), part(T, 4), part(P, 2, RED))]}, [{}, {'behaviourPhases': {'0': {'id': 2, 'phases': [0, 1], 'branch': 3}, '31': {'id': 3, 'phases': [2, 3, 4], 'branch': 2}}}], limits))
+    cases.append(render_case("phase3-negated-12", "fact:12", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 12, *[255, 0, 255]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'behaviourPhases': {'0': {'id': 2, 'phases': [0, 1], 'branch': 3}, '31': {'id': 3, 'phases': [2, 3, 4], 'branch': 2}}}], limits))
+    cases.append(render_case("phase3-fact-13", "fact:13", {"palette": PALETTE, "rules": [rule(part(C, 13, *[255]), part(T, 4), part(P, 2, RED))]}, [{}, {'macroPlaying': 127}], limits))
+    cases.append(render_case("phase3-negated-13", "fact:13", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 13, *[255]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'macroPlaying': 127}], limits))
+    cases.append(render_case("phase3-fact-14", "fact:14", {"palette": PALETTE, "rules": [rule(part(C, 14, *[255]), part(T, 4), part(P, 2, RED))]}, [{}, {'pressedKeys': [0, 31]}], limits))
+    cases.append(render_case("phase3-negated-14", "fact:14", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 14, *[255]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'pressedKeys': [0, 31]}], limits))
+    cases.append(render_case("phase3-fact-15", "fact:15", {"palette": PALETTE, "rules": [rule(part(C, 15, *[1, 2, 0]), part(T, 4), part(P, 2, RED))]}, [{}, {'modifiers': [34, 68]}], limits))
+    cases.append(render_case("phase3-negated-15", "fact:15", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 15, *[1, 2, 0]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'modifiers': [34, 68]}], limits))
+    cases.append(render_case("phase3-fact-16", "fact:16", {"palette": PALETTE, "rules": [rule(part(C, 16, *[0]), part(T, 4), part(P, 2, RED))]}, [{}, {'hostLocks': 7}], limits))
+    cases.append(render_case("phase3-negated-16", "fact:16", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 16, *[0]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'hostLocks': 7}], limits))
+    cases.append(render_case("phase3-fact-17", "fact:17", {"palette": PALETTE, "rules": [rule(part(C, 17, *[0]), part(T, 4), part(P, 2, RED))]}, [{}, {'pointer': 15}], limits))
+    cases.append(render_case("phase3-negated-17", "fact:17", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 17, *[0]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'pointer': 15}], limits))
+    cases.append(render_case("phase3-fact-18", "fact:18", {"palette": PALETTE, "rules": [rule(part(C, 18, *[]), part(T, 4), part(P, 2, RED))]}, [{}, {'idle': True}], limits))
+    cases.append(render_case("phase3-negated-18", "fact:18", {"palette": PALETTE, "rules": [rule(part(SLOT_NEGATED, 18, *[]), part(T, 0), part(P, 2, GREEN))]}, [{}, {'idle': True}], limits))
+    cases.append(render_case("layer-status-0", "fact:9", {"palette": PALETTE, "rules": [rule(part(C, 9, 255, 0), part(T, 4), part(P, 2, RED))]}, [{'layers': [1, 3], 'layerOwners': {'0': 1, '31': 3}, 'lockedLayers': [1, 3], 'oneshotLayer': 3}], limits))
+    cases.append(render_case("layer-status-1", "fact:9", {"palette": PALETTE, "rules": [rule(part(C, 9, 255, 1), part(T, 4), part(P, 2, RED))]}, [{'layers': [1, 3], 'layerOwners': {'0': 1, '31': 3}, 'lockedLayers': [1, 3], 'oneshotLayer': 3}], limits))
+    cases.append(render_case("layer-status-2", "fact:9", {"palette": PALETTE, "rules": [rule(part(C, 9, 255, 2), part(T, 4), part(P, 2, RED))]}, [{'layers': [1, 3], 'layerOwners': {'0': 1, '31': 3}, 'lockedLayers': [1, 3], 'oneshotLayer': 3}], limits))
+    cases.append(render_case("layer-status-3", "fact:9", {"palette": PALETTE, "rules": [rule(part(C, 9, 255, 3), part(T, 4), part(P, 2, RED))]}, [{'layers': [1, 3], 'layerOwners': {'0': 1, '31': 3}, 'lockedLayers': [1, 3], 'oneshotLayer': 3}], limits))
+    cases.append(render_case("behaviour-phase-0", "fact:12", {"palette": PALETTE, "rules": [rule(part(C, 12, 255, 0, 255), part(T, 4), part(P, 2, RED))]}, [{'behaviourPhases': {'0': {'id': 2, 'phases': [0, 1], 'branch': 3}, '31': {'id': 3, 'phases': [2, 3, 4], 'branch': 2}}}], limits))
+    cases.append(render_case("behaviour-phase-1", "fact:12", {"palette": PALETTE, "rules": [rule(part(C, 12, 255, 1, 255), part(T, 4), part(P, 2, RED))]}, [{'behaviourPhases': {'0': {'id': 2, 'phases': [0, 1], 'branch': 3}, '31': {'id': 3, 'phases': [2, 3, 4], 'branch': 2}}}], limits))
+    cases.append(render_case("behaviour-phase-2", "fact:12", {"palette": PALETTE, "rules": [rule(part(C, 12, 255, 2, 255), part(T, 4), part(P, 2, RED))]}, [{'behaviourPhases': {'0': {'id': 2, 'phases': [0, 1], 'branch': 3}, '31': {'id': 3, 'phases': [2, 3, 4], 'branch': 2}}}], limits))
+    cases.append(render_case("behaviour-phase-3", "fact:12", {"palette": PALETTE, "rules": [rule(part(C, 12, 255, 3, 255), part(T, 4), part(P, 2, RED))]}, [{'behaviourPhases': {'0': {'id': 2, 'phases': [0, 1], 'branch': 3}, '31': {'id': 3, 'phases': [2, 3, 4], 'branch': 2}}}], limits))
+    cases.append(render_case("behaviour-phase-4", "fact:12", {"palette": PALETTE, "rules": [rule(part(C, 12, 255, 4, 255), part(T, 4), part(P, 2, RED))]}, [{'behaviourPhases': {'0': {'id': 2, 'phases': [0, 1], 'branch': 3}, '31': {'id': 3, 'phases': [2, 3, 4], 'branch': 2}}}], limits))
     layers = layer_table([[0, NONE], [6, RED], [0, GREEN], [6, BLUE]])
     every_layer = rule(part(C, 1, ANY), part(T, 7), part(P, 3))
     mapped = {"1": [0, 1, 2, 30], "2": [5], "3": [1, 31, 32]}
@@ -1054,8 +1144,8 @@ def render_vectors(limits):
     stack = [rule(part(T, 0), part(P, 5, 200)) for _ in range(5)] + [under]
     cases.append(render_case("below-composition", "engine", {"palette": PALETTE, "rules": stack}, [{}], limits))
     cases.append(render_case("conditions", "engine", {"palette": PALETTE, "rules": [
-        rule(part(C, 1, 1), part(N, 1, 2), part(T, 1), part(P, 2, GREEN)),
-        rule(part(N, 1, 1), part(T, 2), part(P, 2, BLUE)),
+        rule(part(C, 1, 1), part(SLOT_NEGATED, 1, 2), part(T, 1), part(P, 2, GREEN)),
+        rule(part(SLOT_NEGATED, 1, 1), part(T, 2), part(P, 2, BLUE)),
         rule(part(T, 0), part(P, 2, WHITE), flags=1),
     ]}, [{"layers": []}, {"layers": [1]}, {"layers": [1, 2]}], limits))
     cases.append(render_case("timing-show-after", "timing:1", {"palette": PALETTE, "rules": [rule(part(C, 1, 1), part(T, 0), part(P, 2, RED), part(G, 1, 100, 0))]}, [
@@ -1098,7 +1188,7 @@ def codec_vectors(limits, standard: bytes):
         "keySets": [THUMBS, []],
         "maps": [{0: RED, 57: 0x81}, {led: WHITE for led in range(30)}],
         "rules": [
-            rule(part(C, 1, ANY), part(N, 3, 2), part(C, 4, 0xFF), part(C, 5, 0x0F, 3), part(T, 7), part(P, 4, 1), part(B, 6, BLUE, 30), part(G, 1, 0x34, 0x12), brightness=90),
+            rule(part(C, 1, ANY), part(SLOT_NEGATED, 3, 2), part(C, 4, 0xFF), part(C, 5, 0x0F, 3), part(T, 7), part(P, 4, 1), part(B, 6, BLUE, 30), part(G, 1, 0x34, 0x12), brightness=90),
             rule(part(C, 2, 1), part(T, 3, 1), part(P, 5, 0)),
         ],
         "extensions": [[1, [1, 2, BLUE, 2]], [2, [1]]],
@@ -1155,7 +1245,7 @@ def codec_vectors(limits, standard: bytes):
     reject("rule-conditions", simple(*[part(C, 1, ANY)] * 5, *good))
     reject("rule-two-targets", simple(part(T, 0), part(T, 1), part(P, 2, RED)))
     reject("rule-no-paint", simple(part(T, 0)))
-    reject("rule-unknown-fact", simple(part(C, 9), *good))
+    reject("rule-unknown-fact", simple(part(C, 31), *good))
     reject("rule-unknown-rule-extension", simple(*good, part(SLOT_EXTENSION, 1)))
     reject("rule-parameter-length", simple(part(C, 1, ANY, 0), *good))
     reject("rule-layer", simple(part(C, 1, 16), *good))

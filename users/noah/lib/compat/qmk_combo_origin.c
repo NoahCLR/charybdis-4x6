@@ -3,6 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "qmk_combo_origin.h"
+#include "../state/ownership/layer_ownership.h"
 #include "qmk_source_layer_contract.h"
 #include "../key/behavior/participation.h"
 
@@ -936,6 +937,25 @@ void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key
     }
 }
 
+void noah_qmk_combo_origin_lighting_layers(uint8_t *out) {
+#if NOAH_LIGHTING_FACT_COMBO_LAYER
+    uint16_t cursor = 0u;
+    memset(out, 0xff, COMBO_BUFFER_LENGTH * (2u + KEY_ORIGIN_BITMAP_SIZE));
+    for (uint8_t i = 0u; i < COMBO_BUFFER_LENGTH; i++) {
+        uint8_t *record = out + i * (2u + KEY_ORIGIN_BITMAP_SIZE);
+        uint8_t role;
+        keypos_t none = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
+        if (!noah_qmk_combo_origin_lighting_next(none, none, NULL, &cursor, record, &role, record + 2u)) break;
+        for (uint8_t j = 0u; j < ARRAY_SIZE(combo_active_cache); j++) {
+            const combo_origin_active_cache_entry_t *entry = &combo_active_cache[j];
+            if (entry->active && entry->combo_index == record[0]) record[1] = layer_ownership_momentary_layer_at(entry->owner_key_pos);
+        }
+    }
+#else
+    memset(out, 0xff, COMBO_BUFFER_LENGTH * (2u + KEY_ORIGIN_BITMAP_SIZE));
+#endif
+}
+
 bool noah_qmk_combo_origin_lighting_next(keypos_t preview, keypos_t mode, const uint8_t *quiet, uint16_t *cursor, uint8_t *id, uint8_t *role, uint8_t *keys) {
     const combo_origin_active_cache_entry_t *best = NULL;
     for (uint8_t i = 0; i < ARRAY_SIZE(combo_active_cache); i++) {
@@ -1055,6 +1075,10 @@ void noah_qmk_combo_origin_active_bitmaps_partitioned(keypos_t preview_owner_key
         key_origin_bitmap_clear(out_overlay_bitmap);
     }
 }
+void noah_qmk_combo_origin_lighting_layers(uint8_t *out) {
+    (void)out; // No combo slice can be enabled without combo support.
+}
+
 bool noah_qmk_combo_origin_lighting_next(keypos_t preview, keypos_t mode, const uint8_t *quiet, uint16_t *cursor, uint8_t *id, uint8_t *role, uint8_t *keys) {
     (void)preview;
     (void)mode;

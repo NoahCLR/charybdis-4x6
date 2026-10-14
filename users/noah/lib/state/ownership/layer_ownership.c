@@ -325,3 +325,21 @@ void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
 void layer_ownership_reset_for_test(void) {
     memset(layer_ownership_state(), 0, sizeof(*layer_ownership_state()));
 }
+
+uint8_t layer_ownership_momentary_layer_at(keypos_t key) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+    for (uint16_t i = 0u; i < ARRAY_SIZE(state->bindings); i++) {
+        if (state->bindings[i].active && layer_ownership_keypos_equal(state->bindings[i].key_pos, key)) return state->bindings[i].layer;
+    }
+    return 255u;
+}
+void layer_ownership_lighting_projection(uint8_t *out) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+    memset(out, 0, MATRIX_ROWS * MATRIX_COLS);
+    for (uint16_t i = 0u; i < ARRAY_SIZE(state->bindings); i++) {
+        if (state->bindings[i].active && key_origin_keypos_valid(state->bindings[i].key_pos)) out[key_origin_keypos_index(state->bindings[i].key_pos)] = state->bindings[i].layer + 1u;
+    }
+    out[MATRIX_ROWS * MATRIX_COLS] = state->locked_mask;
+    out[MATRIX_ROWS * MATRIX_COLS + 1u] = state->locked_mask >> 8u;
+    out[MATRIX_ROWS * MATRIX_COLS + 2u] = layer_ownership_oneshot_layer();
+}

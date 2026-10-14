@@ -121,6 +121,9 @@ A record is one **place** byte followed by the kind's colour slots:
 | pointing mode | 2 | 32 | colour |
 | combo | 3 | 128 | colour |
 | behaviour | 4 | 128 | hold, long hold, tap, then one per tap branch `2..depth` |
+| macro | 5 | 128 | colour |
+| modifier | 6 | 8 | colour |
+| key | 7 | 60 matrix positions | colour |
 
 The behaviour record therefore has `1 + 3 + (depth − 1)` bytes, `8` at the
 supported tap depth of five (D-F14). Kind `0` is the board: it has no table.
@@ -260,6 +263,17 @@ subjects from the slice, highest-priority first, and says whether any exist.
 | 5 | behaviour state | behaviour | states, scope | synced, 61 B | see below |
 | 7 | combo held | combo | combo (`0..127`, `0xff` any), role (`0`, `1`, `0xff`) | synced, 40 B | each identified held combo, newest completion first; its own input keys and halves |
 | 8 | behaviour | behaviour | behaviour (`0..127`, `0xff` any), states | synced, 180 B | each key showing that authored row, in matrix order; its selected colour slot |
+| 9 | layer status | layer | layer, status (`0` top, `1` held, `2` locked, `3` one-shot armed) | synced, 64 B | matching layers, highest first; actual momentary owner keys and their halves |
+| 10 | mode status | pointing mode | mode, status (`0` held, `1` locked) | synced, 11 B | the actual held or locked mode with its real owner keys/halves |
+| 11 | combo layer | combo | combo, layer | synced, 40 B | held outputs whose representative key actually holds the selected layer, newest first; combo inputs/halves |
+| 12 | behaviour phase | behaviour | behaviour, phase (`0` selected branch, `1` tap pending, `2` hold pending, `3` active hold tier, `4` active long-hold tier), branch (`1..depth`, `255` any) | synced, 180 B | authored key instances in matrix order, independent of flash visibility; captured row, branch and selected colour slot |
+| 13 | macro playing | macro | slot (`0..127`, `255` any) | synced, 1 B | actual named VIA playback slot through cleanup; anonymous direct payloads yield none |
+| 14 | key pressed | key | matrix index (`0..59`, `255` any) | synced, 8 B | physical matrix keys down, in matrix order; each owns that key and half |
+| 15 | modifier | modifier | modifier (`0` Ctrl, `1` Shift, `2` Alt, `3` GUI), side (`0` left, `1` right, `2` either), state (`0` active, `1` one-shot armed) | synced, 2 B | actual modifier mask; either yields left then right |
+| 16 | host lock | board | LED (`0` Caps, `1` Num, `2` Scroll) | synced, 1 B | board subject when the USB host's corresponding lock LED is set |
+| 17 | pointer | board | state (`0` auto-mouse target on, `1` fading, `2` sniping, `3` raw sensor x/y nonzero) | synced, 1 B | board subject for the actual selected state |
+| 18 | idle | board | — | synced, 1 B | board subject for the existing RGB sleep predicate |
+
 
 "Combos held" leaves out a combo whose output holds a momentary layer: the
 layer's own lighting says what the hold does. Its subject stands for every
@@ -322,6 +336,48 @@ uses the chosen slot of this row, inheriting each unset slot separately from
 the board-wide behaviour default. The row's place follows the same field-wise
 inheritance. An outcome paint is chosen on a rule or map cell; selecting it on
 a behaviour's hold/long-hold rule is the colour-by-outcome option.
+
+**Actual state and observation boundaries.** Fact 9 reads momentary bindings,
+locked mask and one-shot ownership directly; the keys of a layer subject are
+its actual momentary owners. A combo output contributes its representative
+owner key, never inferred owners at every input. Top means the highest active
+layer, including the permanent base. Automatic activation provenance is not
+advertised: QMK's public auto-mouse-active predicate also includes mouse keys,
+manual layer anchors, toggle and one-shot retention, so it cannot establish
+that sensor motion raised a layer. Facts 17's target-on and fading states
+remain available without making that provenance claim.
+
+Fact 12 distinguishes gesture phases from fact 8's displayed feedback. Its
+phase bits can overlap: a selected branch can have a tap or hold pending.
+An entered hold/long-hold tier remains a phase even when a feedback flash is
+dark. Intrinsic/bypassed gestures with no authored row yield none.
+
+Fact 15's active mask is QMK real plus weak plus locked-one-shot modifiers;
+its armed mask is the unconsumed one-shot mask. It describes current modifier
+state rather than claiming every modifier originates at a physical key.
+Modifier ids are their report-bit positions (`0..3` left, `4..7` right).
+
+Fact 17's target-on means auto-mouse is enabled and its configured target layer
+is active. Fading uses the existing nonzero fade progress while that target
+is on. Sniping includes automatic layer sniping and manually enabled sniping.
+Sensor observation is literally the latest x/y passed to
+`noah_pointing_device_task_user`, before idle-noise suppression and pointing-mode
+transforms. It excludes wheel output and buttons, can include tiny sensor
+noise, and makes no claim to distinguish physical ball movement from noise.
+Every poll replaces the observation; there is no continuation window. Lighting
+collection samples it, and the peer sees the latest committed split frame;
+a nonzero sample replaced by a later zero before collection/publication need
+not appear on either render. This is distinct from auto-mouse on/fading and
+preserves their timing and Standard pixels.
+
+Fact 18 is parameterless: effective RGB timeout is nonzero and
+`last_input_activity_elapsed() > timeout`, exactly the existing sleep test.
+The collector exports the boolean, so a threshold crossing changes fact bytes
+without a new wake API. Timeout zero disables the predicate. There is no
+independent idle interval or held-key/macro veto. The existing global sleep
+override still forces every LED black; a matching idle rule, or its negation,
+cannot override sleep. These new modules default on with the portable runtime
+and their required subsystem; each has its own compile flag and capability.
 
 ### Targets
 
@@ -471,13 +527,13 @@ carries). Synced slices are collected on the USB half and sent to the other
 half as one **lighting facts frame**, which replaces the per-stage combo and
 key-feedback packets and the preview byte of the base packet.
 
-The synced frame is the synced slices in registry order (298 bytes in this
-build: the original 78-byte prefix plus 40 combo bytes and 180 behaviour bytes). It travels in chunks on one transaction, `PUT_SPLIT_LIGHTING_FACTS_SYNC`:
+The synced frame is the synced slices in registry order (607 bytes with these modules enabled:
+the original 298-byte Painting prefix plus 309 state bytes). It travels in chunks on one transaction, `PUT_SPLIT_LIGHTING_FACTS_SYNC`:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 1 | frame sequence |
-| 1 | 1 | chunk index (bits 0–3); bit 7 commit |
+| 1 | 1 | chunk index (bits 0–6); bit 7 commit |
 | 2 | 30 | frame bytes `index × 30 ..`, the last chunk zero-padded |
 
 Each pass the USB half rebuilds the frame and sends the chunks that changed
@@ -506,8 +562,9 @@ extensions, `5` domain extensions, `6` thing kinds. A client offers only what
 the keyboard reports and keeps a rule it cannot edit byte for byte.
 
 With all modules enabled, the low-id fact page is registry 0, first id 0,
-bitmap prefix `be 01` (ids 1–5, 7, 8); the paint page is registry 2,
+bitmap prefix `be ff 07` (ids 1–5, 7–18); the paint page is registry 2,
 bitmap prefix `7f 01` (ids 0–6, 8). Target bits remain `ff` (ids 0–7).
+Thing kinds now include 5–7, giving the low-id thing bitmap `fe`.
 The rest of each 16-byte bitmap is zero. Disabling
 `NOAH_LIGHTING_FACT_COMBO_HELD`, `NOAH_LIGHTING_FACT_BEHAVIOUR` or
 `NOAH_LIGHTING_PAINT_OUTCOME` removes only its kind/bit and rejects that kind

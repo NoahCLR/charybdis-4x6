@@ -140,6 +140,16 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/lighting/kinds/fact_combos_held.c \
     lib/rgb/lighting/kinds/fact_combo_held.c \
     lib/rgb/lighting/kinds/fact_behaviour.c \
+    lib/rgb/lighting/kinds/fact_layer_status.c \
+    lib/rgb/lighting/kinds/fact_mode_status.c \
+    lib/rgb/lighting/kinds/fact_combo_layer.c \
+    lib/rgb/lighting/kinds/fact_behaviour_phase.c \
+    lib/rgb/lighting/kinds/fact_macro_playing.c \
+    lib/rgb/lighting/kinds/fact_key_pressed.c \
+    lib/rgb/lighting/kinds/fact_modifier.c \
+    lib/rgb/lighting/kinds/fact_host_lock.c \
+    lib/rgb/lighting/kinds/fact_pointer.c \
+    lib/rgb/lighting/kinds/fact_idle.c \
     lib/rgb/lighting/kinds/fact_layer_active.c \
     lib/rgb/lighting/kinds/fact_layer_previewing.c \
     lib/rgb/lighting/kinds/fact_pointing_mode_active.c \

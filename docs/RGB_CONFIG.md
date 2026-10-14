@@ -43,6 +43,13 @@ The interaction feedback stages are individually gated from the active keymap
 When one of those flags is off, the firmware's lighting has no rules for that
 feature and the modules that would serve them are compiled out.
 
+Supporting clients can also build conditions from real held/locked/one-shot
+layers, gesture phases, pressed keys, named macro playback, modifiers, host
+lock LEDs and pointer observations. Idle reports the existing RGB sleep state;
+sleeping lights stay off. Raw sensor x/y is a separate observation from
+auto-mouse on/fading, can include sensor noise and has no extra continuation
+window. See the [fact contract](architecture/lighting-rules-v1.md#facts).
+
 ## How these tables become lighting
 
 The keyboard's lighting is an ordered list of rules

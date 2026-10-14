@@ -122,3 +122,6 @@ bool                         macro_payload_encode_ir(const macro_payload_ir_t *i
 bool                         macro_payload_encode_ir_write(const macro_payload_ir_t *ir, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written);
 bool                         macro_payload_encode(const char *payload, uint8_t *buffer, uint16_t capacity, uint16_t *written);
 bool                         macro_payload_encode_write(const char *payload, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written);
+
+// Playing includes cleanup; 255 when idle or the source has no named slot.
+uint8_t macro_payload_playing_slot(void);

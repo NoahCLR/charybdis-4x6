@@ -63,6 +63,34 @@ for case in fixture["render"]:
             fields += [led, colour]
         fade = s.get("fade")
         fields += [str(fade["progress"]), str(fade["timeout"]), str(fade["deadTime"]), str(fade["autoMouseLayer"])] if fade else ["0", "900", "300", "255"]
+        state = bytearray(309)
+        owners = s.get("layerOwners", {})
+        for key, layer in owners.items(): state[int(key)] = layer + 1
+        locked = sum(1 << layer for layer in s.get("lockedLayers", []))
+        state[60:62] = locked.to_bytes(2, "little")
+        state[62] = s.get("oneshotLayer", 255)
+        state[63] = max(s.get("layers", []) + [0])
+        mode = s.get("modeStatus")
+        state[64:75] = bytes([255,255,0]) + bytes(8)
+        if mode:
+            state[64] = mode["id"]
+            state[65] = mode["id"] if mode.get("locked") else 255
+            state[66] = sum(1 if half == "left" else 2 for half in mode.get("halves", []))
+            state[67:75] = bytes.fromhex(bitmap(mode.get("keys", [])))
+        state[75:115] = bytes([255]) * 40
+        for index, item in enumerate(s.get("comboLayers", [])):
+            at = 75 + 10 * index
+            state[at:at+10] = bytes([item["id"],item["layer"]]) + bytes.fromhex(bitmap(item["keys"]))
+        for key, item in s.get("behaviourPhases", {}).items():
+            at = 115 + 3 * int(key)
+            state[at:at+3] = bytes([item["id"]+1, sum(1 << phase for phase in item["phases"]),item["branch"]])
+        state[295] = s.get("macroPlaying", 255)
+        state[296:304] = bytes.fromhex(bitmap(s.get("pressedKeys", [])))
+        state[304:306] = bytes(s.get("modifiers", [0,0]))
+        state[306] = s.get("hostLocks", 0)
+        state[307] = s.get("pointer", 0)
+        state[308] = int(s.get("idle", False))
+        fields.append(state.hex())
         fields += step["expect"]
         lines.append("STEP " + " ".join(fields))
 pathlib.Path(sys.argv[2]).write_text("\n".join(lines) + "\n")

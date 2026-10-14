@@ -176,6 +176,7 @@ static void test_long_delay_start_is_nonblocking_and_wrap_safe(void) {
     macro_payload_engine_scan();
     macro_payload_debug_snapshot(&snapshot);
     CHECK(snapshot.state == MACRO_PAYLOAD_ENGINE_IDLE);
+    CHECK(macro_payload_playing_slot() == 255u);
     CHECK(snapshot.last_finish == MACRO_PAYLOAD_FINISH_SUCCESS);
     CHECK(callback_count == 1u);
     CHECK(callback_result == MACRO_PAYLOAD_FINISH_SUCCESS);
@@ -227,9 +228,11 @@ static void test_busy_start_is_rejected_without_restarting_active_ir(void) {
     CHECK(macro_payload_start_ir(&other, MACRO_PAYLOAD_TEXT_OUTPUT_PLAIN, 0u, MACRO_PAYLOAD_SOURCE_VIA, 2u, NULL, NULL) == MACRO_PAYLOAD_START_BUSY);
     macro_payload_debug_snapshot(&snapshot);
     CHECK(snapshot.busy_rejection_count == 1u);
+    CHECK(macro_payload_playing_slot() == 3u);
     CHECK(snapshot.active_source == MACRO_PAYLOAD_SOURCE_VIA);
     CHECK(snapshot.active_slot == 3u);
     CHECK(macro_payload_engine_cancel());
+    CHECK(macro_payload_playing_slot() == 3u); // cleanup still owns this slot
     test_drain_cleanup();
 }
 

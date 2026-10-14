@@ -51,12 +51,12 @@ typedef struct __attribute__((packed)) {
 enum {
     SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES = 30u,
     SPLIT_RUNTIME_SYNC_FACTS_COMMIT      = 0x80u,
-    SPLIT_RUNTIME_SYNC_FACTS_INDEX_MASK  = 0x0fu,
+    SPLIT_RUNTIME_SYNC_FACTS_INDEX_MASK  = 0x7fu,
 };
 
 #define SPLIT_RUNTIME_SYNC_FACTS_FRAME_BYTES (NOAH_LIGHTING_SYNCED_BYTES > 0u ? NOAH_LIGHTING_SYNCED_BYTES : 1u)
 #define SPLIT_RUNTIME_SYNC_FACTS_CHUNKS ((NOAH_LIGHTING_SYNCED_BYTES + SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES - 1u) / SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES)
-_Static_assert(SPLIT_RUNTIME_SYNC_FACTS_CHUNKS <= SPLIT_RUNTIME_SYNC_FACTS_INDEX_MASK + 1u, "the lighting facts frame must fit sixteen chunks");
+_Static_assert(SPLIT_RUNTIME_SYNC_FACTS_CHUNKS <= SPLIT_RUNTIME_SYNC_FACTS_INDEX_MASK + 1u, "the lighting facts frame must fit 128 chunks");
 
 typedef struct __attribute__((packed)) {
     uint8_t sequence;

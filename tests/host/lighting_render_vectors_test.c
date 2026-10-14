@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "host.h"
+#include "matrix.h"
 
 #include "users/noah/lib/rgb/lighting/lighting_engine.h"
 #include "users/noah/lib/pointing/defs/pd_mode_flags.h"
@@ -21,6 +23,8 @@ static bool    effect_known[RGB_MATRIX_LED_COUNT];
 static uint16_t fade_progress;
 static uint32_t fade_timeout = 900u, fade_dead_time = 300u;
 static uint8_t  fade_layer = 0xffu;
+static uint32_t input_elapsed;
+static uint32_t rgb_timeout = 900000u;
 
 rgb_t hsv_to_rgb(hsv_t hsv) {
     rgb_t    rgb;
@@ -76,6 +80,7 @@ bool noah_lighting_effect_colour(uint8_t led, rgb_t *colour) {
 }
 
 uint32_t noah_setting(uint8_t id, uint32_t fallback) {
+    if (id == NOAH_SETTING_RGB_TIMEOUT) return rgb_timeout;
     if (id == NOAH_SETTING_AUTO_MOUSE_TIMEOUT) return fade_timeout;
     if (id == NOAH_SETTING_AUTO_MOUSE_DEAD_TIME) return fade_dead_time;
     return fallback;
@@ -115,6 +120,27 @@ void key_feedback_lighting_map(uint8_t *out) {
     memset(out, 0, KEY_FEEDBACK_LIGHTING_BYTES);
 }
 
+uint8_t get_highest_layer(layer_state_t state) {
+    for (uint8_t layer = LAYER_COUNT; layer-- > 0u;) if (state & ((layer_state_t)1u << layer)) return layer;
+    return 0u;
+}
+bool layer_state_cmp(layer_state_t state, uint8_t layer) { return (state & ((layer_state_t)1u << layer)) != 0u; }
+uint32_t last_input_activity_elapsed(void) { return input_elapsed; }
+matrix_row_t matrix_get_row(uint8_t row) { (void)row; return 0u; }
+led_t host_keyboard_led_state(void) { return (led_t){.raw = 0u}; }
+uint8_t get_mods(void) { return 0u; }
+uint8_t get_weak_mods(void) { return 0u; }
+uint8_t get_oneshot_mods(void) { return 0u; }
+uint8_t get_oneshot_locked_mods(void) { return 0u; }
+uint8_t macro_payload_playing_slot(void) { return 255u; }
+void layer_ownership_lighting_projection(uint8_t *out) { memset(out, 0, 63u); out[62] = 255u; }
+void noah_qmk_combo_origin_lighting_layers(uint8_t *out) { memset(out, 255, NOAH_LIGHTING_COMBO_SLICE_BYTES); }
+void key_feedback_lighting_phases(uint8_t *out) { memset(out, 0, MATRIX_ROWS * MATRIX_COLS * 3u); }
+bool get_auto_mouse_enable(void) { return false; }
+bool pd_mode_auto_sniping_layer_active(void) { return false; }
+bool charybdis_get_pointer_sniping_enabled(void) { return false; }
+bool noah_pointing_sensor_motion_observed(void) { return false; }
+
 // Collection is the USB half's job; these vectors set the facts directly.
 void    key_feedback_semantic_map(uint8_t *out_map) { key_feedback_semantic_map_clear(out_map); }
 void    key_feedback_tap_branch_map(uint8_t *out_map) { key_feedback_tap_branch_map_clear(out_map); }
@@ -149,6 +175,18 @@ static keypos_t key_at(unsigned index) {
 }
 
 int main(int argc, char **argv) {
+    uint8_t idle;
+    input_elapsed = 900000u;
+    noah_lighting_slice_idle_collect(&idle);
+    assert(!idle); // existing sleep is strictly greater than timeout
+    input_elapsed++;
+    noah_lighting_slice_idle_collect(&idle);
+    assert(idle);
+    rgb_timeout = 0u;
+    noah_lighting_slice_idle_collect(&idle);
+    assert(!idle); // zero disables sleep
+    rgb_timeout = 900000u;
+    input_elapsed = 0u;
     static noah_profile_lighting_v1_program_t program;
     static noah_lighting_facts_t              facts;
     static noah_lighting_frame_t              frame;
@@ -251,6 +289,17 @@ int main(int argc, char **argv) {
         fade_timeout   = fade_values[1];
         fade_dead_time = fade_values[2];
         fade_layer     = (uint8_t)fade_values[3];
+
+        read_hex(file, facts.layer_status, sizeof(facts.layer_status));
+        read_hex(file, facts.mode_status, sizeof(facts.mode_status));
+        read_hex(file, facts.combo_layer, sizeof(facts.combo_layer));
+        read_hex(file, facts.behaviour_phase, sizeof(facts.behaviour_phase));
+        read_hex(file, facts.macro_playing, sizeof(facts.macro_playing));
+        read_hex(file, facts.key_pressed, sizeof(facts.key_pressed));
+        read_hex(file, facts.modifier, sizeof(facts.modifier));
+        read_hex(file, facts.host_lock, sizeof(facts.host_lock));
+        read_hex(file, facts.pointer, sizeof(facts.pointer));
+        read_hex(file, facts.idle, sizeof(facts.idle));
 
         noah_lighting_scene_t        scene = {.program = &program, .facts = &facts, .keymap_generation = 1u};
         noah_lighting_resolve_info_t info;
