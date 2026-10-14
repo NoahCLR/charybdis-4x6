@@ -1500,6 +1500,11 @@ static void test_role_storage_is_ready_before_callbacks(void) {
         }
         // Quiescent role reinit must not interpret the previous union arm.
         fake_is_master = !fake_is_master;
+        test_reset_rpc_send_counts();
+        split_runtime_sync_tick();
+        split_runtime_sync_elapsed(100u);
+        split_runtime_sync();
+        CHECK(rpc_send_count == 0u); // neither role may use the other arm before init
         rpc_register_count = 0;
         rpc_inject_during_registration = true;
         split_runtime_sync_init();

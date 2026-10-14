@@ -411,7 +411,7 @@ void split_runtime_sync_tick(void) {
     uint16_t raw_elapsed;
     uint32_t now;
 
-    if (!split_runtime_sync_initialized || !is_keyboard_master()) {
+    if (!split_runtime_sync_initialized || !split_runtime_sync_master_role || !is_keyboard_master()) {
         return;
     }
 
@@ -449,7 +449,7 @@ static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force
 }
 
 void split_runtime_sync_elapsed(uint16_t raw_elapsed) {
-    if (!split_runtime_sync_initialized || !is_keyboard_master()) {
+    if (!split_runtime_sync_initialized || !split_runtime_sync_master_role || !is_keyboard_master()) {
         return;
     }
 
@@ -460,7 +460,7 @@ void split_runtime_sync(void) {
     uint16_t raw_elapsed;
     uint32_t now;
 
-    if (!split_runtime_sync_initialized || !is_keyboard_master()) {
+    if (!split_runtime_sync_initialized || !split_runtime_sync_master_role || !is_keyboard_master()) {
         return;
     }
 
