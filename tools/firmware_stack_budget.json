@@ -92,6 +92,10 @@
       ],
       "paths": [
         {
+          "name": "handled press delayed action fallback settlement",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "dispatch_delayed_action_at", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+        },
+        {
           "name": "RGB coherent remote staging and commit",
           "functions": ["main", "rgb_matrix_task", "split_runtime_sync_remote_collect_lighting"]
         },
@@ -233,11 +237,11 @@
         },
         {
           "name": "matrix scan tap feedback metadata",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "key_runtime_core_project_live_tap_feedback", "key_feedback_lighting_pulse_metadata"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_project_live_tap_feedback", "key_feedback_lighting_pulse_metadata"]
         },
         {
           "name": "matrix scan tap feedback pulse projection",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "key_runtime_core_project_live_tap_feedback", "key_runtime_core_project_effect", "timer_read32"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_project_live_tap_feedback", "key_runtime_core_project_effect", "key_runtime_core_project_commit_feedback", "timer_read32"]
         },
         {
           "name": "USB rename safety snapshot",

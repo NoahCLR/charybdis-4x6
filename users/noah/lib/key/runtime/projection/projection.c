@@ -36,6 +36,45 @@ __attribute__((noinline)) static void key_runtime_core_project_live_tap_feedback
     });
 }
 
+// Keep event/pulse construction and delayed-queue workspace off unrelated
+// action projections, including both levels of fallback settlement.
+__attribute__((noinline)) static void key_runtime_core_project_commit_feedback(const key_runtime_effect_t *effect) {
+    if ((effect->data.feedback_pulse.commit_flags & KEY_RUNTIME_COMMIT_QUIET) == 0u) {
+        key_runtime_core_feedback_projection_project_pulse(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch, effect->data.feedback_pulse.lighting_identity, effect->data.feedback_pulse.lighting_outcome);
+    }
+    if (noah_lighting_events_observed() && effect->data.feedback_pulse.lighting_identity != 0u && effect->data.feedback_pulse.lighting_branch != 0u) {
+        const uint8_t kind = effect->data.feedback_pulse.kind;
+        const noah_lighting_event_t event = {
+            .kind = kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED ? NOAH_LIGHTING_EVENT_TAP_FIRED : (kind == KEY_FEEDBACK_PULSE_LONG_HOLD ? NOAH_LIGHTING_EVENT_LONG_HOLD_FIRED : NOAH_LIGHTING_EVENT_HOLD_FIRED),
+            .thing = (uint8_t)(effect->data.feedback_pulse.lighting_identity - 1u),
+            .key = effect->data.feedback_pulse.key_pos,
+            .branch = effect->data.feedback_pulse.lighting_branch,
+            .slot = kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED ? 2u : (kind == KEY_FEEDBACK_PULSE_LONG_HOLD ? 1u : 0u),
+            .outcome = effect->data.feedback_pulse.lighting_outcome,
+        };
+        noah_lighting_event_emit(&event);
+    }
+}
+
+__attribute__((noinline)) static void key_runtime_core_project_delayed_action(const key_runtime_effect_t *effect) {
+    for (uint8_t repeat = 0, repeat_count = (uint8_t)(effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK); repeat < repeat_count; repeat++) {
+        keypos_t             key_pos             = key_runtime_effect_delayed_action_key_pos(effect);
+        bool                 defer_until_release = (effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_FLAG_DEFER_UNTIL_RELEASE) != 0u;
+        bool                 tap_commit_feedback = (effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_FLAG_TAP_COMMIT_FEEDBACK) != 0u && repeat == (uint8_t)(repeat_count - 1u);
+        const press_token_t *token               = defer_until_release ? key_runtime_core_press_token_at(key_pos) : NULL;
+        uint16_t             owner               = token && token->active ? token->token_id : 0u;
+
+        if (defer_until_release && key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, effect->data.delayed_action.action, effect->data.delayed_action.mods, tap_commit_feedback, owner)) {
+            continue;
+        }
+
+        dispatch_delayed_action_at(key_pos, effect->data.delayed_action.action, effect->data.delayed_action.mods);
+        if (defer_until_release && tap_commit_feedback) {
+            key_runtime_core_project_live_tap_feedback(key_pos);
+        }
+    }
+}
+
 // Preserve this projection boundary after extracting feedback-only work.
 // Otherwise LTO folds the switch into its caller and retains both workspaces.
 __attribute__((noinline)) void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
@@ -74,21 +113,7 @@ __attribute__((noinline)) void key_runtime_core_project_effect(const key_runtime
             (void)layer_ownership_oneshot_use();
             return;
         case KEY_RUNTIME_EFFECT_FEEDBACK_PULSE:
-            if ((effect->data.feedback_pulse.commit_flags & KEY_RUNTIME_COMMIT_QUIET) == 0u) {
-                key_runtime_core_feedback_projection_project_pulse(effect->data.feedback_pulse.key_pos, (key_feedback_pulse_kind_t)effect->data.feedback_pulse.kind, effect->data.feedback_pulse.tap_branch, effect->data.feedback_pulse.lighting_identity, effect->data.feedback_pulse.lighting_outcome);
-            }
-            if (noah_lighting_events_observed() && effect->data.feedback_pulse.lighting_identity != 0u && effect->data.feedback_pulse.lighting_branch != 0u) {
-                const uint8_t kind = effect->data.feedback_pulse.kind;
-                const noah_lighting_event_t event = {
-                    .kind = kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED ? NOAH_LIGHTING_EVENT_TAP_FIRED : (kind == KEY_FEEDBACK_PULSE_LONG_HOLD ? NOAH_LIGHTING_EVENT_LONG_HOLD_FIRED : NOAH_LIGHTING_EVENT_HOLD_FIRED),
-                    .thing = (uint8_t)(effect->data.feedback_pulse.lighting_identity - 1u),
-                    .key = effect->data.feedback_pulse.key_pos,
-                    .branch = effect->data.feedback_pulse.lighting_branch,
-                    .slot = kind == KEY_FEEDBACK_PULSE_TAP_COMMITTED ? 2u : (kind == KEY_FEEDBACK_PULSE_LONG_HOLD ? 1u : 0u),
-                    .outcome = effect->data.feedback_pulse.lighting_outcome,
-                };
-                noah_lighting_event_emit(&event);
-            }
+            key_runtime_core_project_commit_feedback(effect);
             return;
         case KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP:
             key_runtime_core_pd_projection_project_lock_tap(effect->data.pd_mode_lock_tap.pd_mode, effect->data.pd_mode_lock_tap.key_pos);
@@ -97,22 +122,7 @@ __attribute__((noinline)) void key_runtime_core_project_effect(const key_runtime
             key_runtime_core_pd_projection_project_lock_state(effect->data.pd_mode_lock_state.pd_mode, effect->data.pd_mode_lock_state.locked, effect->data.pd_mode_lock_state.key_pos);
             return;
         case KEY_RUNTIME_EFFECT_DELAYED_ACTION:
-            for (uint8_t repeat = 0, repeat_count = (uint8_t)(effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_REPEAT_COUNT_MASK); repeat < repeat_count; repeat++) {
-                keypos_t             key_pos             = key_runtime_effect_delayed_action_key_pos(effect);
-                bool                 defer_until_release = (effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_FLAG_DEFER_UNTIL_RELEASE) != 0u;
-                bool                 tap_commit_feedback = (effect->data.delayed_action.repeat_count & KEY_RUNTIME_DELAYED_ACTION_FLAG_TAP_COMMIT_FEEDBACK) != 0u && repeat == (uint8_t)(repeat_count - 1u);
-                const press_token_t *token               = defer_until_release ? key_runtime_core_press_token_at(key_pos) : NULL;
-                uint16_t             owner               = token && token->active ? token->token_id : 0u;
-
-                if (defer_until_release && key_runtime_core_queue_pending_release_dispatch_for_owner(key_pos, effect->data.delayed_action.action, effect->data.delayed_action.mods, tap_commit_feedback, owner)) {
-                    continue;
-                }
-
-                dispatch_delayed_action_at(key_pos, effect->data.delayed_action.action, effect->data.delayed_action.mods);
-                if (defer_until_release && tap_commit_feedback) {
-                    key_runtime_core_project_live_tap_feedback(key_pos);
-                }
-            }
+            key_runtime_core_project_delayed_action(effect);
             return;
         case KEY_RUNTIME_EFFECT_NONE:
         default:

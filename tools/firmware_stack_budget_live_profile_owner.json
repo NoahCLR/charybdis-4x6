@@ -18,6 +18,11 @@
       },
       "indirect_edges": [
         {
+          "caller": "process_record_user",
+          "callee": "key_runtime_process_stage_handled_key",
+          "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
+        },
+        {
           "caller": "advance_incoming_reuse",
           "callee": "write_candidate",
           "reason": "The scan-owned peer reuse path writes bounded pieces through the shared candidate backend interface; the pinned compiler inlines backend_reuse into this caller."
@@ -133,7 +138,43 @@
           "reason": "The post-init stage table dispatch is inlined into main by the pinned release compiler; its profile stage invokes the owner initializer."
         }
       ],
+      "cycle_bounds": [
+        {
+          "function": "key_runtime_transition_execute_plan",
+          "max_occurrences": 2,
+          "reason": "an emitted action may synchronously settle one pending fallback-hold plan"
+        },
+        {
+          "function": "key_runtime_core_project_effect",
+          "max_occurrences": 2,
+          "reason": "fallback settlement projects its held-action effect beneath the triggering projection"
+        }
+      ],
       "paths": [
+        {
+          "name": "handled press projection with fallback settlement",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "handled release projection with fallback settlement",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "matrix scan bounded deferred fallback settlement",
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+        },
+        {
+          "name": "matrix scan tap feedback metadata",
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_project_live_tap_feedback", "key_feedback_lighting_pulse_metadata"]
+        },
+        {
+          "name": "matrix scan tap feedback pulse projection",
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_project_live_tap_feedback", "key_runtime_core_project_effect", "key_runtime_core_project_commit_feedback", "timer_read32"]
+        },
+        {
+          "name": "handled press delayed action fallback settlement",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "dispatch_delayed_action_at", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+        },
         {
           "name": "RGB coherent remote staging and commit",
           "functions": ["main", "rgb_matrix_task", "split_runtime_sync_remote_collect_lighting"]
