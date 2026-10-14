@@ -479,6 +479,13 @@ static void action_dispatch_at(keypos_t key_pos, uint16_t action) {
     });
 }
 
+#ifdef NOAH_SCENARIO_REAL_EMISSION
+// Leaf action output remains observable here; emission policy and delayed
+// replay come from the actual production translation units in this variant.
+void noah_action_tap_at(keypos_t key, uint16_t action) { action_dispatch_at(key, action); }
+void noah_action_tap(uint16_t action) { action_dispatch_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action); }
+void noah_dispatch_synthetic_qmk_tap(uint16_t action) { noah_action_tap(action); }
+#else
 void action_dispatch(uint16_t action) {
     action_dispatch_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action);
 }
@@ -491,6 +498,8 @@ void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy
     (void)policy;
     action_dispatch_at(key_pos, action);
 }
+
+#endif
 
 bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
@@ -633,6 +642,7 @@ uint8_t key_behavior_validate_all(void) {
     return 0u;
 }
 
+#ifndef NOAH_SCENARIO_REAL_EMISSION
 void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     dispatch_delayed_action_at((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}, action, mods);
 }
@@ -649,6 +659,8 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
             },
     });
 }
+
+#endif
 
 void held_action_register(keypos_t key_pos, uint16_t action) {
     key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){

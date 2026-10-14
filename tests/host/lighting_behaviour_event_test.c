@@ -217,6 +217,14 @@ static void old_series_commit_survives_streaming_boundary_and_new_row(void) {
 }
 static void saturated_queue_keeps_actual_dispatch_occurrence(void) {
     reset();
+    // Queue-full immediate replay must first settle the actual native
+    // fallback through the planner, then preserve the captured tap commit.
+    key_behavior_view_t fallback = define_key(KC_LEFT_GUI);
+    fallback.lighting_identity = 0u;
+    fallback.single.tap = (tap_behavior_t)TAP_SENDS(KC_A);
+    key_runtime_scenario_add_behavior_view(fallback);
+    const key_runtime_scenario_step_t press[] = {KEY_RUNTIME_SCENARIO_PRESS(KC_LEFT_GUI, 0, 0)};
+    key_runtime_scenario_run(press, ARRAY_SIZE(press));
     keypos_t key = {.row = 0u, .col = 1u};
     for (unsigned i = 0; i < KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY; i++) {
         assert(key_runtime_core_queue_pending_release_dispatch_with_identity(key, KC_B, (keyboard_mod_state_t){0}, false, 0u, 0u));
@@ -231,6 +239,7 @@ static void saturated_queue_keeps_actual_dispatch_occurrence(void) {
     key_runtime_transition_execute_plan(&plan);
     assert(count == 1u);
     expect(0, NOAH_LIGHTING_EVENT_TAP_FIRED, 2u, 2u);
+    assert(key_runtime_scenario_slot_held_action_keycode((keypos_t){.row = 0u, .col = 0u}) == KC_LEFT_GUI);
     assert(key_runtime_core_pending_release_count() == KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY);
 }
 // The planner may invoke its sink with caller-owned items still pending.

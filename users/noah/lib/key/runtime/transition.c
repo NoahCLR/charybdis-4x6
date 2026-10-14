@@ -55,7 +55,10 @@ static void key_runtime_transition_plan_drain(key_runtime_transition_plan_t *pla
     plan->count = keep ? 1u : 0u;
 }
 
-static void key_runtime_transition_plan_push(key_runtime_transition_plan_t *plan, key_runtime_effect_t effect) {
+// This is also the synchronous core sink: avoid a second by-value forwarding
+// frame beneath planner drains. Context and effect remain caller-owned.
+__attribute__((noinline)) static void key_runtime_transition_plan_push(void *context, key_runtime_effect_t effect) {
+    key_runtime_transition_plan_t *plan = context;
     if (!plan) {
         return;
     }
@@ -87,9 +90,6 @@ static void key_runtime_transition_plan_append_core_plan(key_runtime_transition_
     plan->overflowed |= core_plan->overflowed;
 }
 
-__attribute__((noinline)) static void key_runtime_transition_core_effect_sink(void *ctx, key_runtime_effect_t effect) {
-    key_runtime_transition_plan_push((key_runtime_transition_plan_t *)ctx, effect);
-}
 
 static uint8_t key_runtime_transition_begin_auto_drain(key_runtime_transition_plan_t *plan) {
     uint8_t previous_flags = plan ? plan->flags : 0u;
@@ -113,7 +113,7 @@ static void key_runtime_transition_end_auto_drain(key_runtime_transition_plan_t 
 }
 
 static void key_runtime_transition_core_plan_init_streaming(key_runtime_core_effect_plan_t *core_plan, key_runtime_transition_plan_t *plan) {
-    key_runtime_core_effect_plan_init_with_sink(core_plan, key_runtime_transition_core_effect_sink, plan);
+    key_runtime_core_effect_plan_init_with_sink(core_plan, key_runtime_transition_plan_push, plan);
 }
 
 static __attribute__((noinline)) void key_runtime_transition_append_unmatched_release_effects(keypos_t key_pos, const handled_key_resolution_t *resolution, key_runtime_transition_plan_t *plan) {
@@ -263,7 +263,7 @@ void key_runtime_transition_scan(key_runtime_transition_plan_t *plan) {
 __attribute__((noinline)) bool key_runtime_transition_settle_pending_fallback_hold(key_runtime_transition_plan_t *plan) {
     if (!plan) return false;
     uint8_t previous_flags = key_runtime_transition_begin_auto_drain(plan);
-    bool settled_any = key_runtime_core_stream_pending_fallback_holds(key_runtime_transition_core_effect_sink, plan);
+    bool settled_any = key_runtime_core_stream_pending_fallback_holds(key_runtime_transition_plan_push, plan);
     key_runtime_transition_end_auto_drain(plan, previous_flags, NULL);
     return settled_any;
 }
