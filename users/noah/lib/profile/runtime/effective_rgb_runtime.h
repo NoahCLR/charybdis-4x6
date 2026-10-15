@@ -36,3 +36,9 @@ const noah_profile_lighting_v1_program_t *noah_effective_lighting_program(uint32
 // RAM-only publication stamp, including between chunks. Unlike obtaining the
 // program, this never lazily loads defaults or touches a profile reader.
 uint32_t noah_effective_lighting_generation(void);
+
+// Owner safe-boundary preflight. Reads/admission finish before provider commit.
+bool noah_effective_rgb_runtime_prepare(const noah_effective_profile_snapshot_t *snapshot);
+
+// RAM-only exact published provider identity for lighting split agreement.
+bool noah_effective_lighting_identity(uint8_t bytes[22]);

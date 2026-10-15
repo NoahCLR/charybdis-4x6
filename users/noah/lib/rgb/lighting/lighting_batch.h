@@ -6,10 +6,11 @@
 // Exact internal ordered-batch codec. Identity kind/id belongs to its history
 // cell, so only slot/outcome/actual owners/sides are stored per member. No LED
 // or final-colour cache: current keymap queries still work after remapping.
-enum { NOAH_LIGHTING_BATCH_SUBJECTS = 64u, NOAH_LIGHTING_BATCH_BYTES = 1u + NOAH_LIGHTING_BATCH_SUBJECTS * (3u + KEY_ORIGIN_BITMAP_SIZE) };
-_Static_assert((unsigned)NOAH_LIGHTING_BATCH_BYTES <= (unsigned)NOAH_LIGHTING_ARENA_OBJECT_BYTES_MAX, "all accepted ordered batches fit typed arena length");
+enum { NOAH_LIGHTING_BATCH_SUBJECTS = 64u, NOAH_LIGHTING_BATCH_BYTES = 1u + NOAH_LIGHTING_BATCH_SUBJECTS * (3u + KEY_ORIGIN_BITMAP_SIZE), NOAH_LIGHTING_BATCH_PRIORITY_FLAG = 128u, NOAH_LIGHTING_BATCH_SNAPSHOT_BYTES = NOAH_LIGHTING_BATCH_BYTES + 8u };
+_Static_assert((unsigned)NOAH_LIGHTING_BATCH_SNAPSHOT_BYTES <= (unsigned)NOAH_LIGHTING_ARENA_OBJECT_BYTES_MAX, "all accepted ordered batches fit typed arena length");
 _Static_assert(KEY_ORIGIN_BITMAP_SIZE <= 8u, "batch key index encoding covers up to64 owner bits");
 typedef struct {
+    uint64_t       priority; // optional captured natural order, independent of filtered entry
     const uint8_t *bytes;
     size_t         size, offset;
     uint8_t        remaining, slot, outcome, thing_kind, thing;
@@ -22,6 +23,10 @@ typedef struct {
     uint8_t  count, slot, outcome;
 } noah_lighting_batch_writer_t;
 void noah_lighting_batch_write_begin(noah_lighting_batch_writer_t *writer, uint8_t *bytes, size_t size);
+// Before the first member, optionally capture the fact's actual natural-order
+// token. The reserved count bit announces an explicit eight-byte LE prefix;
+// batches without it retain exactly their previous bytes. Failure is atomic.
+bool noah_lighting_batch_write_priority(noah_lighting_batch_writer_t *writer, uint64_t priority);
 bool noah_lighting_batch_write(noah_lighting_batch_writer_t *writer, const noah_lighting_subject_t *subject);
 bool noah_lighting_batch_read_begin(noah_lighting_batch_reader_t *reader, const uint8_t *bytes, size_t size, uint8_t thing_kind, uint8_t thing);
 bool noah_lighting_batch_read(noah_lighting_batch_reader_t *reader, noah_lighting_subject_t *subject);

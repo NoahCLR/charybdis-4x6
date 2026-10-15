@@ -13,6 +13,14 @@
 #include "users/noah/lib/split/runtime_sync.h"
 #include "users/noah/lib/state/diagnostics/runtime_diag.h"
 #include "users/noah/lib/rgb/core/rgb_runtime.h"
+#include "users/noah/lib/rgb/lighting/lighting_runtime.h"
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+#include "transactions.h"
+#include "users/noah/lib/rgb/lighting/lighting_events.h"
+void transaction_register_rpc(int8_t id,slave_callback_t cb){(void)id;(void)cb;}
+bool transaction_rpc_exec(int8_t id,uint8_t n,const void *p,uint8_t m,void *r){(void)id;(void)n;(void)p;(void)m;(void)r;return false;}
+#endif
+
 #include "users/noah/lib/rgb/core/rgb_helpers.h"
 #include "users/noah/lib/rgb/lighting/lighting.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
@@ -1851,6 +1859,31 @@ static void test_publication_between_effect_chunks_keeps_coherent_frame(void) {
     noah_effective_rgb_runtime_uninstall(&runtime);
 }
 
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+static void test_strong_event_consumer_full_scene(void) {
+    static const uint8_t bytes[]={5,0,58,1,0,0,0,1,170,255,200,14,0,255,1,28,127,0x40,0,0x61,2,0,0xa2,3,244,1,0};
+    test_reset();fake_is_master=true;runtime_fixture.time32=100;
+    noah_effective_rgb_runtime_t runtime;noah_effective_profile_snapshot_t snapshot={0};
+    noah_profile_lighting_v1_limits_t limits=noah_profile_rgb_compiled_v1_limits();
+    CHECK(noah_profile_lighting_v1_decode(bytes,sizeof bytes,&limits,&snapshot.profile.rgb,NULL)==NOAH_PROFILE_LIGHTING_V1_OK);
+    snapshot.profile.domain_mask=NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;snapshot.identity.kind=NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE;snapshot.identity.generation=51;
+    noah_effective_rgb_runtime_init(&runtime);CHECK(noah_effective_rgb_runtime_install(&runtime));
+    noah_effective_rgb_runtime_invalidate(&runtime,1,(noah_effective_profile_identity_t){0},snapshot.identity,&snapshot);
+    CHECK(!render_output());
+    noah_lighting_event_t event={.kind=NOAH_LIGHTING_EVENT_MACRO_PLAYED,.thing=127,.key={MATRIX_ROWS,MATRIX_COLS}};
+    noah_lighting_event_emit(&event);CHECK(render_output());check_led(0,hsv_to_rgb((hsv_t){170,255,200}));
+    uint32_t cut = noah_lighting_runtime_revision();
+    runtime_fixture.time32=101;
+    noah_lighting_runtime_task();
+    CHECK(noah_lighting_runtime_revision()!=cut);
+    runtime_fixture.time32=599;CHECK(render_output());check_led(0,hsv_to_rgb((hsv_t){170,255,200}));
+    runtime_fixture.time32=600;CHECK(!render_output());
+    snapshot.profile.domain_mask=0;
+    noah_effective_rgb_runtime_invalidate(&runtime,2u,snapshot.identity,snapshot.identity,&snapshot);
+    noah_effective_rgb_runtime_uninstall(&runtime);
+}
+#endif
+
 static void test_published_profile_lighting_replaces_compiled_program(void) {
     // One rule: the whole board in palette colour 0.
     static const uint8_t profile_lighting[] = {
@@ -2764,6 +2797,9 @@ int main(int argc, char **argv) {
     test_local_gate_clock_survives_sync_adjustment();
 #endif
     test_publication_between_effect_chunks_keeps_coherent_frame();
+#if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    test_strong_event_consumer_full_scene();
+#endif
     test_published_profile_lighting_replaces_compiled_program();
 #if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();

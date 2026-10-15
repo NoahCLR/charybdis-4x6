@@ -3,6 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "lighting_engine.h"
+#include "lighting_working.h"
 #include "lighting_workspace.h"
 #include "lighting_history_index.h"
 
@@ -437,6 +438,20 @@ bool noah_lighting_apply_retained_rule(const noah_lighting_scene_t *scene, uint8
     return noah_lighting_retained_render(view->store, NOAH_LIGHTING_ARENA_FRAME, index, &description.timing, retained_natural, retained_paint, &painter, view->candidates);
 }
 
+typedef struct {
+    const noah_lighting_scene_t *scene;
+    const rule_t *rule;
+    noah_lighting_leds_t leds;
+    noah_lighting_frame_t *frame;
+    noah_lighting_resolve_info_t *info;
+} working_painter_t;
+static void working_paint(void *context, const noah_lighting_subject_t *subject) {
+    working_painter_t *p = context;
+    placed_subject_t placed = {.leds = noah_lighting_target(p->rule->target.kind, p->scene, p->rule->target.params, subject) & p->leds,
+        .thing_kind=subject->thing_kind,.thing=subject->thing,.slot=subject->slot,.outcome=subject->outcome,.amount=255u};
+    paint_owned_subject(p->scene,p->rule,&placed,subject,p->leds,p->frame,p->info);
+}
+
 // Applies rules [first, end) bottom up over `leds` of `frame`.
 static void apply_rules(const noah_lighting_scene_t *scene, uint8_t first, uint8_t end, noah_lighting_leds_t leds, uint32_t now, bool update, noah_lighting_frame_t *frame, noah_lighting_resolve_info_t *info) {
     for (uint8_t index = end; index-- > first;) {
@@ -446,6 +461,14 @@ static void apply_rules(const noah_lighting_scene_t *scene, uint8_t first, uint8
 
         parse_rule(scene->program, index, &rule);
         if (rule.flags & NOAH_PROFILE_LIGHTING_V1_RULE_DISABLED) continue;
+        if (scene->working) {
+            working_painter_t painter = {.scene=scene,.rule=&rule,.leds=leds,.frame=frame,.info=info};
+            if (noah_lighting_working_paint(scene->working,index,working_paint,&painter)) {
+                uint32_t delay=noah_lighting_working_wake(scene->working);
+                if(delay!=UINT32_MAX && (!info->wake_set || (int32_t)(now + delay - info->wake)<0)) { info->wake_set=true; info->wake=now+delay; }
+                continue;
+            }
+        }
         if (rule.condition_count && rule.conditions[0].slot == NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION) filter = 1u;
         while (filter < rule.condition_count && fact_holds(scene->facts, &rule.conditions[filter])) filter++;
         if (filter < rule.condition_count) continue;

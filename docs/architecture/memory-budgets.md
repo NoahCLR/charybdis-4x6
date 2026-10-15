@@ -660,3 +660,32 @@ stack manifests and pass fresh linked checks on each half. Declared query
 operation bounds and host tests do not prove physical cadence, global or
 interrupt-stack maximum, allocator high-water or hardware acceptance. Those
 remain explicit physical acceptance obligations before release.
+
+## Admitted retained lighting candidate
+
+The unreleased phase3 candidate reserves8220 bytes per half for new flash/linger
+history. This is one fixed pool, not a raised static policy or a heap-backed
+reservation. Registry bounds charge two complete profile-sized banks and one
+replacement slot, Q=2*S+W. Current plus immutable outgoing/slave staging coexist;
+replacement workspace is separately charged. No third frozen history bank is
+used: render consumes the current scene synchronously and publishes owned LED
+pixels. Source capture facts and replacement workspace coexist. The replacement
+split protocol additionally owns one complete role-disjoint fact snapshot outside
+the pool; its bytes must appear in linked accounting.
+
+A separate decoded candidate program keeps reads/admission before active program
+replacement. Provider publication preflights it at the existing safe boundary;
+commit copies owned RAM without later source I/O. The working-memory capability
+reports the reproducible conservative model and an over-budget candidate rejects
+before activation. This deliberately amends payload-only acceptance for new
+timing; unchanged Standard and state/show-after profiles retain their acceptance.
+The lighting spec governs the exact descriptor/member layout and module bounds.
+
+The earlier9704-byte fixed and17924-byte total increment estimates did not include
+the subsequently required coherent fact snapshot. They are projections, not fresh
+linked values, an allocator measurement, or authority to raise229376. Initial
+linked diagnostics retain the229376 static tripwire,4096 boot core-memory floor,
+and1920/768 reviewed stack policies. Physical SRAM remains270336 bytes per half.
+A measured amendment still requires the delegated resource decision. Hardware
+cadence, oscillator drift and allocator/global/interrupt-stack high-water remain
+unproved; host equal-rate logical-clock tests do not prove those properties.

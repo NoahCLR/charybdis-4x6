@@ -73,7 +73,7 @@ changes do not create new full-match entries or independent linger clocks.
 The shared `retainedOrdering` traces pin pixel, complete member order and entry
 tokens through these cases, show-after maturation and timer boundaries. They
 exercise the owned-record/ordered-batch/merge seam; they do not substitute for
-the unfinished production history owner's accepted-domain resource proof.
+the production admission model and linked resource checks below.
 
 A subject carries what targets and paints may ask about it: its thing kind
 and id (for its identity colour and place), the keys it concerns, and the
@@ -535,8 +535,9 @@ then backward insertion preserves every continuing age without a temporary
 union of departed and arriving ids or a second age array. A rank query finds
 an age; no age is evicted to make room. Only signatures selected by enabled
 timed rules are indexed. Duplicate rules share presence but keep independent
-filter lifetimes. All 255 rules remain accepted within the shared 8192-byte
-payload; no timed-rule or subject limit is added.
+filter lifetimes. All 255 state/show-after rules remain accepted within the
+shared 8192-byte payload; the new flash/linger admission model below is a
+deliberate additional constraint for those new constructions only.
 
 The registry's joint live bound applies across **all** non-selector signatures
 of a fact, not separately to each signature. This bounds the dense age array
@@ -570,15 +571,14 @@ fixed storage, with no allocator escape from RAM accounting.
 This live bound is specific to show-after. It cannot be reused as a bound for
 linger or event retention: absent things can retain timing state and their
 last owner footprint until expiry, and a repeated event must refresh its own
-lifetime. The unfinished additions need a separate accepted-profile history
-bound, including independently filtered rules; a normal profile or the current
-live-state maximum does not establish it. No event/linger module is advertised
-by this checkpoint.
+lifetime. New flash/linger rules therefore use the separate deterministic
+reservation and admission bound below, including independently filtered rules;
+a normal profile or the current live-state maximum does not establish it.
 
-The event catalog reserves the following additive, optional entries. They
-are schema/matcher components while the production consumer is disabled;
-they are omitted from production capabilities and cannot yet be enabled for
-handoff. Each has its own source module and generated registry dispatch.
+The event catalog provides the following additive, optional entries. Each has
+its own source module and generated registry dispatch. Production RGB builds
+enable the strong capture/consumer seam; a build without that consumer must
+omit event capabilities and reject an explicit event-module configuration.
 
 | Id | Event trigger | Parameters | Captured subject |
 | --- | --- | --- | --- |
@@ -904,13 +904,11 @@ mailbox. Existing shared render/occurrence traces alternate these phases and
 poison scratch while preserving caller facts and frames. Complete enabled
 producer/callback/role integration and its linked stacks remain required.
 
-These are ownership and transition components, not a fixed global reservation
-or a complete retained-history representation. The full ordered owner/slot/outcome
-batches, per-rule/thing indexing, source ordering, delivery references and
-accepted-profile storage bound still belong to the unfinished history owner.
-Host tests of255×128 independent cells establish transition independence,
-not that a raw matrix of those cells fits the target or is the chosen bank.
-No retained bank or event capability is enabled in production yet.
+The earlier ownership/transition and experimental arena components are not the
+production allocation. Host tests of255×128 independent cells establish
+transition independence, not that a raw matrix fits the target. Production
+uses the admitted direct current/snapshot reservations below; experimental
+component allocations are not linked runtime banks.
 
 Each half times from the frame in which it first sees the subject, so the
 halves may differ by the link's latency. Gate observation and wake deadlines
@@ -1047,7 +1045,124 @@ generation, so a render never mixes two frames. A pass that fails part-way
 publishes nothing and the next pass resends every chunk. Heartbeats and
 transport back-off are the ones the runtime sync already uses.
 
-### Qualified event groups (internal split protocol)
+### Admitted local histories and conservative split freshness
+
+New flash/linger rules require structural validation **and** shared working-memory
+admission before activation. Existing Standard, state and show-after-only rules
+retain their acceptance. This deliberately replaces the earlier promise that
+8192 payload bytes alone suffice for every new timing construction. It is a
+conservative admission tradeoff, not an impossibility claim about other layouts.
+Over-budget activation/import is rejected atomically; the active program,
+histories and pixels remain intact. There is no eviction or runtime drop escape.
+
+Retained natural priority is registry-owned: layer surfaces use descending
+layer identity; matrix/key surfaces retain their stable walker cursor; event
+and single-current surfaces use captured entry order after natural ties. Named
+combo tails preserve the complete actual newest-first batch. With the current
+8220 pool, a broad128-identity combo tail with M>=2 already exceeds Q (10304
+bytes at M=2), independent of occupancy. With M=1, the actual origin cache holds
+at most one live completion, so older departed completions precede newer entries
+only by their captured recency; there is no concurrently older live completion
+behind a newer departed one. Named selectors have one whole live-or-tail batch.
+This derives from existing producer capacity and admission arithmetic, not a new
+selector cap or a sharing assumption. Increasing the pool/admitting broader
+multi-live combo tails would also require durable module occurrence-order
+bindings before advertising that changed working model.
+
+Working model1 reserves two complete banks and one replacement slot in an
+8220-byte pool per half. For each enabled new-timing rule, registry metadata
+supplies N selected identities (1 for a named selector) and M maximum complete
+ordered members per identity. With B=ceil(matrix_keys/8), C=align4(12+M*(5+B)),
+S=sum(12+N*C), W=max(C), and Q=2*S+W; Q=0 without new timing. Checked arithmetic
+rejects overflow. Owners, slot, outcome, sides, natural priority and independent
+entry order/lifetimes are retained. No sharing, sparse occupancy, short duration,
+filter impossibility or input-rate discount affects admission. The second bank
+is master immutable outgoing snapshot **or** slave validated staging; local
+render consumes current synchronously, never a third pinned bank. The 8220-byte
+candidate is an allocation decision; it does not raise linked RAM/stack policy.
+
+Each half renders locally. Source-expired flashes are not deliberately replayed
+or granted a fresh window by reconnect. A remote flash paints only when its
+**entire** proved age interval satisfies lower>=show-after and upper<flash.
+A departed linger preserves its whole eligible batch and departure age, with
+no extended expiry. Unknown freshness suppresses transient paint; uncertainty
+can shorten or hide a transient. State facts still resynchronize coherently.
+The former late-arrival full-window journal below is superseded for the new
+production snapshot discriminator; its historical codec/component tests are
+not evidence for the revised production protocol.
+
+V1 explicitly assumes nominal **equal-rate logical millisecond timers** between
+valid causal evidence and use; independent offsets are arbitrary. This is a
+product/software model, not a measured crystal tolerance, ppm bound or exact
+physical-deadline guarantee. No-resurrection is conditional on that model.
+Slow physical drift need not be detected. Hardware drift, cadence and high-water
+acceptance remain unproved.
+
+For snapshot capture C, source request samples M0 before and M1 after a successful
+synchronous RPC, and receiver callback sample S inside that causal interval.
+At receiver time R the elapsed-source-age interval since C is conservatively
+[max(0,M0-C+(R-S)-2), M1-C+(R-S)+2]. Each subtraction of two floor-to-ms timer
+readings differs from elapsed logical time by less than one millisecond; the two
+subtractions justify outward two-millisecond rounding. No symmetric-delay or
+zero-delay assumption is used. C precedes M0, so capture/assembly time is charged;
+R-S charges transfer, main-consume delay and subsequent elapsed time. Snapshot
+slot ages at C are added with saturation at65535, which is expired for every
+u16 duration, never wrapped or restarted.
+
+Every modular span, and its composed evidence-to-use span, must be below2^31ms.
+Detected backward/discontinuous local time, ambiguous wrap, session/profile/role
+reset or malformed causal evidence invalidates calibration; fresh causal evidence
+is required. Full-wrap silence cannot be inferred from a wrapping counter alone:
+normal observation/use requires the half-range continuity precondition. This
+model is deliberately separate from stepped synchronized paint-animation time.
+
+### Coherent history snapshot v2 (internal split protocol)
+
+The replacement uses HELLO/CONFIRM/DATA/REPLY tags0x81/0x82/0x83/0x84;
+legacy tags1..4 are rejected by this endpoint. HELLO retains the exact22-byte
+profile identity and u32 sequence, CONFIRM epoch+sequence. DATA is64 bytes:
+tag, epoch u32, sequence u32, payload55. REPLY is14 bytes: tag,status,epoch,
+sequence and receiver callback timer u32. Requests/replies stay within the
+existing128/32 QMK allocation. All integers are explicit little endian; no
+native descriptor padding is transmitted.
+
+Payload byte0 selects PING3, BEGIN0, CHUNK1 or COMMIT2. PING establishes one
+successful causal exchange. BEGIN bytes1/5/9/13 carry capture/source-before/
+source-after/receiver-callback u32 samples; bytes17..18 carry total snapshot
+length. CHUNK bytes1..2 are exact sequential offset, byte3 length1..51, bytes4..
+are data. COMMIT follows exactly the complete length. Reserved payload bytes
+are zero. The stream is the admitted bank's explicit descriptors/slots followed
+by the complete registry-defined byte-only fact frame. Source pins that whole
+cut through retries; the slave owns one fact staging buffer alongside its
+reserved second history bank. Callback stages one immutable request only;
+main validates complete snapshot metadata and adjusts transient ages before
+swapping the bank and copying its facts, then acknowledges. Partial transfer,
+wrong offset/profile/size or malformed descriptors never publish a mixed scene.
+The additional fact staging buffer is fixed storage outside the8220 pool and
+must be included in linked accounting; it is not a third history bank.
+
+There is one synchronous RPC and one immutable pending request. Exact committed
+sequence duplicates acknowledge without repeating a calendar commit. A newer
+source occurrence changes current only; a pinned outgoing snapshot remains
+unchanged and the next cut carries the newer still-live state. No journal pins
+source-expired markers. Normal failed transfers preserve current pixels; late
+snapshots age against their original capture and can suppress expired tails or
+flashes. A valid session/profile/role reset closes callback readiness before
+storage initialization and clears receiver transient history. A boot epoch is
+not a unique nonce: stale rejection uses the same bounded synchronous QMK RPC
+lifetime and exact next-sequence/HELLO/CONFIRM discipline as below. Mixed protocol
+peers never consume each other's masks or snapshot payloads.
+
+Matching state show-after remains local observed-frame time; a continuously
+observed matching thing retains its local gate through resynchronization.
+Source-aged flashes and already eligible departed tails retain their captured
+qualification, whole batch and deadline interval. Local render never requalifies
+an event with later filters. Published pixels survive input/publication between
+QMK chunks; history-dependent rerender uses a matching revision only. The
+snapshot staging buffer and render placement/capture scratch have separate
+lifetimes and are charged separately.
+
+### Qualified event groups (internal split protocol) — legacy component
 
 `qmk_lighting_event_transport` binds the portable sender/receiver to actual
 `transaction_register_rpc` / `transaction_rpc_exec` with at most one bounded
@@ -1065,7 +1180,7 @@ is enabled. This adapter alone does not advertise or implement that owner.
 
 Event transport is separate from the coherent state-fact frame. The portable
 codec/session component below is implemented; the occurrence qualifier,
-retained-history consumer and QMK RPC adapter are still required before event
+retained-history consumer and QMK RPC adapter were required before event
 modules can be advertised. It does not add a profile/domain version or enlarge
 QMK's 128-byte request/32-byte reply allocation. All integers are little endian;
 there is no native struct serialization.
@@ -1113,8 +1228,8 @@ rejects; an already committed last request is the sole idempotent duplicate.
 Synthetic packets retained outside that lifetime are not an extra transport
 queue or a security/replay guarantee.
 
-An ordinary failed request or lost ACK never resets the session or discards an
-expired unsent marker. Marker 100/flash500 first committed remotely at 1000 starts
+In the superseded legacy component, an ordinary failed request or lost ACK never
+resets the session or discards an expired unsent marker. Marker 100/flash500 first committed remotely at 1000 starts
 that half's local window 1000..1499 and expires 1500; a duplicate cannot restart
 it. An explicit fresh session clears receiver histories and seeds the sender
 only from currently live qualified markers, excluding expired past events.
@@ -1144,14 +1259,16 @@ and padding rules.
 | ---: | --- |
 | 0 | layout version `1`, domain version `5`, payload budget (u16, `8192`), palette maximum (`128`), conditions per rule (`4`), part parameter maximum (`16`), tap depth, LED count (`58`), registry count (`7`) |
 | `1 + 2r + h` | registry `r`, ids `128h..128h+127`: registry id, first id, then a 16-byte bitmap (bit `i` of byte `i / 8` is id `first + i`) |
+| 15 | working model1, pool capacity u16, owner bitmap bytes, descriptor12, slot header12, member base5, alignment4 |
+| `128 + fact-id` | compiled module id, subject domain, selector parameter (255 if none), maximum whole-batch members; unsupported pages return no payload |
 
 Registries `r` are `0` facts, `1` targets, `2` paints, `3` timings, `4` rule
 extensions, `5` domain extensions, `6` thing kinds. A client offers only what
 the keyboard reports and keeps a rule it cannot edit byte for byte.
 
 With all modules enabled, the low-id fact page is registry 0, first id 0,
-bitmap prefix `be ff ff 1f` (ids 1–5, 7–28); the default-off
-retention consumer omits ids19–28 (`be ff 07`); the paint page is registry 2,
+bitmap prefix `be ff ff 1f` (ids 1–5, 7–28); builds without the
+retention consumer omit ids19–28 (`be ff 07`); the paint page is registry 2,
 bitmap prefix `7f 01` (ids 0–6, 8). Target prefix becomes `ff 01` (ids0–8); paint prefix `7f 03` adds paint9.
 Thing kinds now include 5–7, giving the low-id thing bitmap `fe`.
 The rest of each 16-byte bitmap is zero. Disabling

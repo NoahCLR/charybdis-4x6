@@ -251,7 +251,7 @@ static noah_profile_validator_v1_result_t map_rgb_error(noah_profile_validator_v
     noah_profile_validator_v1_result_t result = NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN;
 
     if (source->code == NOAH_PROFILE_LIGHTING_V1_READ_ERROR) result = NOAH_PROFILE_VALIDATOR_V1_READ_ERROR;
-    if (source->code == NOAH_PROFILE_LIGHTING_V1_CAPACITY_EXCEEDED) result = NOAH_PROFILE_VALIDATOR_V1_CAPACITY_EXCEEDED;
+    if (source->code == NOAH_PROFILE_LIGHTING_V1_CAPACITY_EXCEEDED || source->code == NOAH_PROFILE_LIGHTING_V1_WORKING_MEMORY_EXCEEDED) result = NOAH_PROFILE_VALIDATOR_V1_CAPACITY_EXCEEDED;
     return reject(validator, result, validator->payload.offset + source->offset, (uint8_t)(validator->envelope.index - 1u), NOAH_PROFILE_DOMAIN_V1_RGB, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_RGB, source->code, error);
 }
 
@@ -302,6 +302,10 @@ static noah_profile_validator_v1_result_t validate_rgb(noah_profile_validator_v1
     if (result == NOAH_PROFILE_LIGHTING_V1_VALIDATION_REJECTED) return map_rgb_error(validator, &error_rgb, error);
     if (result == NOAH_PROFILE_LIGHTING_V1_VALIDATION_IN_PROGRESS) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     if (noah_profile_lighting_v1_validation_view(&validator->domain_validation.rgb, &validator->profile.rgb, &error_rgb) != NOAH_PROFILE_LIGHTING_V1_VALIDATION_VALID) return map_rgb_error(validator, &error_rgb, error);
+    if (2u * validator->domain_validation.rgb.working_bank + validator->domain_validation.rgb.working_max > NOAH_LIGHTING_WORKING_CAPACITY) {
+        error_rgb = (noah_profile_lighting_v1_error_t){.code = NOAH_PROFILE_LIGHTING_V1_WORKING_MEMORY_EXCEEDED, .offset = validator->profile.rgb.rules_offset};
+        return map_rgb_error(validator, &error_rgb, error);
+    }
     return NOAH_PROFILE_VALIDATOR_V1_VALID;
 }
 

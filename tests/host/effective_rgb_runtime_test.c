@@ -204,6 +204,22 @@ static void test_reader_failure_does_not_publish_a_partial_program(const uint8_t
     noah_effective_rgb_runtime_invalidate(&runtime, 8u, identity(7u, NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS), snapshot.identity, &snapshot);
     assert(!runtime.loaded);
     assert(!noah_effective_lighting_program(NULL)->valid);
+    source.fail_after=0u;source.calls=0u;
+    assert(noah_effective_rgb_runtime_prepare(&snapshot));
+    noah_effective_rgb_runtime_invalidate(&runtime,9u,snapshot.identity,snapshot.identity,&snapshot);
+    assert(runtime.loaded);
+    uint32_t generation=noah_effective_lighting_generation();
+    assert(!memcmp(noah_effective_lighting_program(NULL)->bytes,payload,length));
+    source.calls=0u;source.fail_after=2u;snapshot.identity.generation++;
+    assert(!noah_effective_rgb_runtime_prepare(&snapshot));
+    assert(runtime.loaded && generation==noah_effective_lighting_generation());
+    assert(!memcmp(noah_effective_lighting_program(NULL)->bytes,payload,length));
+    // Direct invalidation callers also preserve prior program/pixels on a
+    // failed staged read. Production never invokes commit after false prepare.
+    source.calls=0u;
+    noah_effective_rgb_runtime_invalidate(&runtime,10u,snapshot.identity,snapshot.identity,&snapshot);
+    assert(runtime.loaded && generation==noah_effective_lighting_generation());
+    assert(!memcmp(noah_effective_lighting_program(NULL)->bytes,payload,length));
     noah_effective_rgb_runtime_uninstall(&runtime);
 }
 

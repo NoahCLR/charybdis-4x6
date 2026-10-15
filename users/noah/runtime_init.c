@@ -28,6 +28,7 @@
 #include "lib/profile/storage/profile_store_runtime_hooks.h"
 #include "lib/profile/runtime/effective_pd_runtime.h"
 #include "lib/rgb/core/rgb_runtime.h"
+#include "lib/rgb/lighting/lighting_runtime.h"
 #include "lib/state/diagnostics/runtime_diag.h"
 #include "lib/state/shared/runtime_reset.h"
 #include "lib/split/runtime_sync.h"
@@ -74,10 +75,12 @@ void noah_matrix_scan_user(void) {
 
     noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_SPLIT_SYNC);
     split_runtime_sync_tick();
+    noah_lighting_runtime_task();
     noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_QMK_TASKS);
 }
 
 void noah_matrix_slave_scan_user(void) {
+    noah_lighting_runtime_task();
     // QMK does not call matrix_scan_user() on the slave half. Keep the
     // durable receiver scheduler alive there without running master-side key,
     // macro, or shared-state senders a second time.

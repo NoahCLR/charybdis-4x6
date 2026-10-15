@@ -2,16 +2,16 @@
 #include "lighting_retained.h"
 #include "lighting_event_protocol.h"
 
-// One owned arena contains immutable full batches and losslessly grouped
-// metadata. Equal serialized histories may share representation, while every
-// rule retains separate membership and is independently updated/split. No
-// state is shared merely because filters or rendered pixels happen to agree.
+// One arena owns full-equality payloads and immutable factored assignment
+// blocks. Each rule/thing keeps exact independent order, lifetime and delivery;
+// columns share constants/deltas without requiring whole-cell equality. Current
+// and frozen references use the existing registry bound128 identities + board.
+// No production bank allocation or accepted-profile fit is selected here.
+enum { NOAH_LIGHTING_HISTORY_ADDRESSES = 129u };
 typedef struct {
     noah_lighting_batch_arena_t *arena;
+    noah_lighting_batch_ref_t    current[NOAH_LIGHTING_HISTORY_ADDRESSES], frame[NOAH_LIGHTING_HISTORY_ADDRESSES];
 } noah_lighting_history_store_t;
-// A record contains one exact retained-cell template (rule byte normalized),
-// plus a sparse or bitmap rule-membership set, whichever takes fewer bytes.
-enum { NOAH_LIGHTING_HISTORY_COHORT_BYTES = 1u + 18u + 32u };
 void noah_lighting_history_store_init(noah_lighting_history_store_t *store, noah_lighting_batch_arena_t *arena);
 bool noah_lighting_history_store_read(const noah_lighting_history_store_t *store, uint8_t type, uint8_t rule, uint8_t thing, noah_lighting_retained_t *cell);
 // Consumes cell's one owned batch reference ONLY on success; caller discards
@@ -26,8 +26,11 @@ typedef struct {
 } noah_lighting_history_cursor_t;
 void noah_lighting_history_store_cursor(const noah_lighting_history_store_t *store, noah_lighting_history_cursor_t *cursor);
 bool noah_lighting_history_store_next(const noah_lighting_history_store_t *store, uint8_t type, noah_lighting_history_cursor_t *cursor, noah_lighting_retained_t *cell);
-// Frozen metadata and batches stay owned across capture, ACK, expiry and
-// compaction. Preflight accounts the complete current+frame metadata overlap.
+// Frozen metadata/batches stay owned across capture, ACK, expiry and
+// compaction. Fully consumable immutable blocks are pinned; mixed blocks are
+// filtered into owned render-only assignments. Expired delivery-only markers
+// never enter the frame. Failed reserve releases partial pins and keeps current
+// state. Current replacement also accounts complete old/new block overlap.
 bool noah_lighting_history_store_freeze(noah_lighting_history_store_t *store);
 void noah_lighting_history_store_clear(noah_lighting_history_store_t *store, uint8_t type);
 // Atomic same-occurrence group install. Consumes one owned payload reference

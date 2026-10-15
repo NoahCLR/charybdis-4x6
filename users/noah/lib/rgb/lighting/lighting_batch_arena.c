@@ -2,6 +2,13 @@
 #include <limits.h>
 #include <string.h>
 
+#ifdef NOAH_LIGHTING_ARENA_USAGE_TEST_BACKEND
+void noah_lighting_arena_usage(uint32_t used);
+#    define ARENA_USAGE(used) noah_lighting_arena_usage(used)
+#else
+#    define ARENA_USAGE(used) ((void)0)
+#endif
+
 enum { REF = 0u, COUNT = 4u, SIZE = 8u, KIND = 10u, THING = 11u, HEADER = NOAH_LIGHTING_BATCH_ENTRY_HEADER };
 static uint16_t read16(const uint8_t *p) {
     return (uint16_t)p[0] | (uint16_t)((uint16_t)p[1] << 8);
@@ -45,8 +52,10 @@ static bool append(noah_lighting_batch_arena_t *arena, uint8_t type_value, uint8
     write16(&entry[SIZE], (uint16_t)(size | (uint16_t)type_value << 14u));
     entry[KIND]  = kind;
     entry[THING] = thing;
-    memcpy(&entry[HEADER], bytes, size);
+    if (bytes) memcpy(&entry[HEADER], bytes, size);
+    else memset(&entry[HEADER],0,size);
     arena->used += HEADER + size;
+    ARENA_USAGE(arena->used);
     arena->next_reference = reference_next + 1u;
     *reference            = reference_next;
     return true;
@@ -135,6 +144,14 @@ bool noah_lighting_record_type(const noah_lighting_batch_arena_t *arena, noah_li
     *type_value = type(arena->bytes + offset);
     return true;
 }
+bool noah_lighting_record_reserve(noah_lighting_batch_arena_t *arena, uint8_t thing, uint16_t size, noah_lighting_batch_ref_t *reference) {
+    return arena && reference && size && size<=NOAH_LIGHTING_ARENA_OBJECT_BYTES_MAX && append(arena,NOAH_LIGHTING_ARENA_CURRENT,0u,thing,NULL,size,reference);
+}
+bool noah_lighting_record_store(noah_lighting_batch_arena_t *arena,noah_lighting_batch_ref_t reference,uint16_t offset,const void *bytes,uint16_t size) {
+    uint32_t entry=find(arena,reference);
+    if(entry==arena->used || !bytes || type(arena->bytes+entry)!=NOAH_LIGHTING_ARENA_CURRENT || read32(arena->bytes+entry+COUNT)!=1u || offset>entry_length(arena->bytes+entry) || size>entry_length(arena->bytes+entry)-offset)return false;
+    memcpy(arena->bytes+entry+HEADER+offset,bytes,size);return true;
+}
 bool noah_lighting_record_update(noah_lighting_batch_arena_t *arena, noah_lighting_batch_ref_t reference, const uint8_t *bytes, uint16_t size) {
     uint32_t offset = find(arena, reference);
     if (offset == arena->used || !bytes || !size || size > NOAH_LIGHTING_ARENA_OBJECT_BYTES_MAX || type(arena->bytes + offset) != NOAH_LIGHTING_ARENA_CURRENT || read32(arena->bytes + offset + COUNT) != 1u) return false;
@@ -145,6 +162,7 @@ bool noah_lighting_record_update(noah_lighting_batch_arena_t *arena, noah_lighti
     memcpy(arena->bytes + offset + HEADER, bytes, size);
     write16(arena->bytes + offset + SIZE, (uint16_t)(size | NOAH_LIGHTING_ARENA_CURRENT << 14u));
     arena->used = arena->used - old + size;
+    ARENA_USAGE(arena->used);
     return true;
 }
 bool noah_lighting_record_next(const noah_lighting_batch_arena_t *arena, uint8_t type_value, uint32_t *offset, noah_lighting_batch_ref_t *reference) {

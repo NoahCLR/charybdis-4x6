@@ -355,6 +355,14 @@ with rules of its own. Rules can select keys from the shown layer by native usag
 layer/mode/macro action, custom or behaviour identity, or combo membership.
 “What it does” uses the direct layer/mode/macro identity colour; unsupported
 actions say clear. These follow remaps and do not infer host-layout characters.
+Event flashes and condition linger reserve shared working memory before a
+profile activates. The keyboard reports the same conservative cost to the
+editor; a profile over that allowance leaves the running profile intact.
+Show-after alone and Standard lighting do not consume that reservation.
+Each half renders locally. Split timing uses a conservative age interval:
+uncertain or late flashes may be shortened or hidden, and an expired flash
+never receives a new window on arrival under the declared equal-rate logical
+timer model. Physical clock drift has not been measured.
 The [lighting rules](architecture/lighting-rules-v1.md) spec has the full vocabulary. With a supporting editor, each combo and
 behaviour can have its own identity colours and placement, and painted maps
 can mix chosen colours, identity, clear and real off per LED. A behaviour's

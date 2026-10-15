@@ -48,6 +48,7 @@ build_scene() {
         -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
         "$ROOT/tests/host/rgb_layer_render_test.c" \
         "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+        "$ROOT/users/noah/lib/compat/qmk_lighting_snapshot_transport.c" \
         "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
         "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
         $PROFILE_SOURCES $LIGHTING_SOURCES \
@@ -61,6 +62,9 @@ SMALL="-DRGB_LEFT_LED_COUNT=4 -DRGB_MATRIX_LED_COUNT=8"
 
 build_scene scene $SMALL
 "$BUILD_DIR/scene"
+
+build_scene scene_enabled $SMALL -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DNOAH_LIGHTING_FACT_MACRO_PLAYED=1 -DNOAH_LIGHTING_TIMING_FLASH=1 -DNOAH_LIGHTING_TIMING_LINGER=1 -DRPC_M2S_BUFFER_SIZE=128
+"$BUILD_DIR/scene_enabled"
 
 build_scene scene_sanitized $SMALL -fsanitize=address,undefined -fno-omit-frame-pointer
 "$BUILD_DIR/scene_sanitized"

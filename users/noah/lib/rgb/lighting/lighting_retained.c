@@ -42,6 +42,7 @@ bool noah_lighting_retained_needed(const noah_lighting_retained_t *cell) {
 uint64_t noah_lighting_retained_order(const noah_lighting_retained_t *cell) {
     return (uint64_t)read32(cell->bytes + ORDER) | ((uint64_t)read32(cell->bytes + ORDER + 4u) << 32u);
 }
+bool noah_lighting_retained_rendering(const noah_lighting_retained_t *cell) { return (cell->bytes[FLAGS]&RENDER)!=0u; }
 bool noah_lighting_retained_dirty(const noah_lighting_retained_t *cell) {
     return (cell->bytes[FLAGS] & DIRTY) != 0u;
 }

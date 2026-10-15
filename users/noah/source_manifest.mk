@@ -141,6 +141,11 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/lighting/lighting_occurrence.c \
     lib/rgb/lighting/lighting_event_capture.c \
     lib/rgb/lighting/lighting_lifetime.c \
+    lib/rgb/lighting/lighting_working.c \
+    lib/rgb/lighting/lighting_freshness.c \
+    lib/rgb/lighting/lighting_snapshot.c \
+    lib/rgb/lighting/lighting_runtime.c \
+    lib/compat/qmk_lighting_snapshot_transport.c \
     lib/rgb/lighting/lighting_batch.c \
     lib/rgb/lighting/lighting_batch_arena.c \
     lib/rgb/lighting/lighting_retained.c \

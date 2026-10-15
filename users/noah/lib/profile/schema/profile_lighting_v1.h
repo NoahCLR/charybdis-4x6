@@ -77,6 +77,8 @@ typedef enum {
     NOAH_PROFILE_LIGHTING_V1_INVALID_STRUCTURE,
     NOAH_PROFILE_LIGHTING_V1_INVALID_PARAMETER,
     NOAH_PROFILE_LIGHTING_V1_INVALID_REFERENCE,
+    NOAH_PROFILE_LIGHTING_V1_WORKING_MEMORY_EXCEEDED,
+    NOAH_PROFILE_LIGHTING_V1_UNSUPPORTED_WORKING_MODEL,
 } noah_profile_lighting_v1_result_t;
 
 typedef struct {
@@ -147,6 +149,10 @@ typedef struct {
     uint8_t                          painted;
     uint8_t                          encoding;
     uint8_t                          result;
+    uint32_t                         working_bank;
+    uint16_t                         working_max;
+    uint8_t                          working_count, working_members;
+    bool                             working_retained, working_disabled;
 } noah_profile_lighting_v1_validation_t;
 
 noah_profile_lighting_v1_limits_t noah_profile_lighting_v1_default_limits(void);
@@ -166,11 +172,13 @@ uint8_t noah_profile_lighting_v1_thing_count(const noah_profile_lighting_v1_limi
 
 // The lighting capability read (GET 0x0D): page 0 is the format's bounds,
 // page 1 + 2r + h registry r's ids 128h..128h+127. Writes at most 25 bytes and
-// returns their count, or 0 past the last page.
+// returns their count. Page15 declares shared working-memory admission;
+// page128+fact-id declares that module's subject/member bound. Unsupported
+// pages return0; sparse extension pages do not close the registry.
 enum {
     NOAH_PROFILE_LIGHTING_V1_CAPABILITY_LAYOUT     = 1u,
     NOAH_PROFILE_LIGHTING_V1_CAPABILITY_REGISTRIES = 7u,
-    NOAH_PROFILE_LIGHTING_V1_CAPABILITY_PAGES      = 1u + 2u * NOAH_PROFILE_LIGHTING_V1_CAPABILITY_REGISTRIES,
+    NOAH_PROFILE_LIGHTING_V1_CAPABILITY_PAGES      = 2u + 2u * NOAH_PROFILE_LIGHTING_V1_CAPABILITY_REGISTRIES,
 };
 uint8_t noah_profile_lighting_v1_capability_page(const noah_profile_lighting_v1_limits_t *limits, uint8_t page, uint8_t *payload);
 
@@ -211,3 +219,14 @@ bool noah_profile_lighting_v1_program_load(const noah_profile_lighting_v1_view_t
 // A thing's record field (0 place, 1.. colour slots), inheriting from the
 // table's default record. False without a table for the kind.
 bool noah_profile_lighting_v1_program_thing_field(const noah_profile_lighting_v1_program_t *program, uint8_t kind, uint8_t thing, uint8_t field, uint8_t *value);
+
+// Structural v5 decoding remains separate from target working-memory admission.
+// Model1 is direct reservation: two complete banks and one replacement slot.
+enum { NOAH_LIGHTING_WORKING_MODEL = 1u, NOAH_LIGHTING_WORKING_CAPACITY = 8220u, NOAH_LIGHTING_WORKING_DESCRIPTOR = 12u, NOAH_LIGHTING_WORKING_HEADER = 12u };
+typedef struct {
+    uint32_t bank_bytes, required;
+    uint16_t max_slot;
+    uint8_t rules, contributor;
+} noah_lighting_working_cost_t;
+noah_profile_lighting_v1_result_t noah_profile_lighting_v1_working_cost(const noah_profile_lighting_v1_view_t *view, noah_lighting_working_cost_t *cost);
+noah_profile_lighting_v1_result_t noah_profile_lighting_v1_working_admit(const noah_profile_lighting_v1_view_t *view, uint32_t capacity, noah_lighting_working_cost_t *cost);

@@ -134,7 +134,21 @@ bool noah_profile_lighting_v1_place_capable(const noah_profile_lighting_v1_limit
 uint8_t noah_profile_lighting_v1_capability_page(const noah_profile_lighting_v1_limits_t *limits, uint8_t page, uint8_t *payload) {
     uint32_t registry;
 
-    if (!limits || !payload || page >= NOAH_PROFILE_LIGHTING_V1_CAPABILITY_PAGES) return 0u;
+    if (!limits || !payload) return 0u;
+    if (page >= 128u) {
+        uint8_t kind=page-128u,selector;
+        if (!supported(limits->facts,kind)) return 0u;
+        payload[0]=kind;payload[1]=noah_lighting_history_domain(kind,&selector);
+        payload[2]=selector;payload[3]=noah_lighting_history_members(kind);
+        return 4u;
+    }
+    if (page >= NOAH_PROFILE_LIGHTING_V1_CAPABILITY_PAGES) return 0u;
+    if (page == 15u) {
+        payload[0]=NOAH_LIGHTING_WORKING_MODEL;
+        payload[1]=(uint8_t)NOAH_LIGHTING_WORKING_CAPACITY;payload[2]=(uint8_t)(NOAH_LIGHTING_WORKING_CAPACITY>>8u);
+        payload[3]=(NOAH_LIGHTING_REGISTRY_KEYS+7u)/8u;payload[4]=12u;payload[5]=12u;payload[6]=5u;payload[7]=4u;
+        return 8u;
+    }
     if (page == 0u) {
         payload[0]  = NOAH_PROFILE_LIGHTING_V1_CAPABILITY_LAYOUT;
         payload[1]  = NOAH_PROFILE_LIGHTING_V1_FORMAT_VERSION;
@@ -510,6 +524,13 @@ static noah_profile_lighting_v1_validation_result_t finish_rule(validation_t *v,
 
     if ((v->singles & (SINGLE_TARGET | SINGLE_PAINT)) != (SINGLE_TARGET | SINGLE_PAINT)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_STRUCTURE, start);
     if ((v->singles & SINGLE_EVENT) && !(v->singles & SINGLE_EVENT_WINDOW)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_STRUCTURE, start);
+    if (v->working_retained && !v->working_disabled) {
+        uint32_t stride = (12u + v->working_members * (5u + (NOAH_LIGHTING_REGISTRY_KEYS + 7u) / 8u) + 3u) & ~UINT32_C(3);
+        uint32_t charge = 12u + v->working_count * stride;
+        // Registry domains <=128 and at most255 rows bound this below u32.
+        v->working_bank += charge;
+        if (stride > v->working_max) v->working_max = (uint16_t)stride;
+    }
     v->remaining--;
     return progress(v, v->remaining ? PHASE_RULE_HEADER : PHASE_EXTENSION_COUNT);
 }
@@ -590,6 +611,13 @@ static noah_profile_lighting_v1_validation_result_t check_part(validation_t *v, 
             param_at = (uint8_t)(param_at + noah_lighting_param_size(type));
         }
     }
+    if (slot == NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION && v->conditions == 1u) {
+        uint8_t selector;
+        v->working_count = noah_lighting_history_domain(kind, &selector);
+        v->working_members = noah_lighting_history_members(kind);
+        if (selector != 255u && bytes[2u + selector] != 255u) v->working_count = 1u;
+    }
+    if (slot == NOAH_PROFILE_LIGHTING_V1_SLOT_TIMING && noah_lighting_timing_role(kind) != NOAH_LIGHTING_TIMING_ANY) v->working_retained = true;
     v->offset = (uint16_t)(at + 2u + length);
     return NOAH_PROFILE_LIGHTING_V1_VALIDATION_IN_PROGRESS;
 }
@@ -648,6 +676,10 @@ static noah_profile_lighting_v1_validation_result_t step_rule_header(validation_
     v->previous_timing    = 0u;
     v->previous_extension = 0u;
     v->painted            = 0u; // bit 0: a timing seen, bit 1: an extension seen
+    v->working_count = 1u;
+    v->working_members = 1u;
+    v->working_retained = false;
+    v->working_disabled = !!(bytes[1] & NOAH_PROFILE_LIGHTING_V1_RULE_DISABLED);
     v->sub                = bytes[0];
     v->offset             = (uint16_t)(v->offset + 3u);
     // The same read carries the rule's first parts.
@@ -870,4 +902,54 @@ bool noah_profile_lighting_v1_program_thing_field(const noah_profile_lighting_v1
         *value = record[field];
     }
     return true;
+}
+
+
+noah_profile_lighting_v1_result_t noah_profile_lighting_v1_working_cost(const noah_profile_lighting_v1_view_t *view, noah_lighting_working_cost_t *cost) {
+    if (!view || !cost) return NOAH_PROFILE_LIGHTING_V1_INVALID_ARGUMENT;
+    *cost = (noah_lighting_working_cost_t){0};
+    uint32_t offset = view->rules_offset;
+    for (uint16_t index = 0u; index < view->rule_count; index++) {
+        uint8_t header[3];
+        if (!noah_profile_reader_read(&view->reader, view->base_offset + offset, header, sizeof header)) return NOAH_PROFILE_LIGHTING_V1_READ_ERROR;
+        uint32_t end = offset + 1u + header[0], at = offset + 3u;
+        uint16_t count = 1u, members = 1u;
+        bool retained = false, first = true;
+        while (at < end) {
+            uint8_t part[33];
+            if (!noah_profile_reader_read(&view->reader, view->base_offset + at, part, 2u)) return NOAH_PROFILE_LIGHTING_V1_READ_ERROR;
+            uint8_t length = part[0] & 31u, slot = part[0] >> 5u;
+            if (length > sizeof part - 2u || !noah_profile_reader_read(&view->reader, view->base_offset + at, part, length + 2u)) return NOAH_PROFILE_LIGHTING_V1_READ_ERROR;
+            if (first && slot == NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION) {
+                uint8_t selector;
+                count = noah_lighting_history_domain(part[1], &selector);
+                members = noah_lighting_history_members(part[1]);
+                if (!count || !members) return NOAH_PROFILE_LIGHTING_V1_UNSUPPORTED_WORKING_MODEL;
+                if (selector != 255u && part[2u + selector] != 255u) count = 1u;
+            }
+            if (slot == NOAH_PROFILE_LIGHTING_V1_SLOT_TIMING && noah_lighting_timing_role(part[1]) != NOAH_LIGHTING_TIMING_ANY) retained = true;
+            first = false;
+            at += 2u + length;
+        }
+        if (retained && !(header[1] & NOAH_PROFILE_LIGHTING_V1_RULE_DISABLED)) {
+            // Member = slot/outcome, flags, complete owners, u16 natural relation.
+            uint32_t owners = (NOAH_LIGHTING_REGISTRY_KEYS + 7u) / 8u;
+            uint32_t stride = (12u + members * (5u + owners) + 3u) & ~UINT32_C(3);
+            if (stride > UINT16_MAX || count > (UINT32_MAX - 12u) / stride) return NOAH_PROFILE_LIGHTING_V1_WORKING_MEMORY_EXCEEDED;
+            uint32_t add = 12u + count * stride;
+            if (cost->bank_bytes > UINT32_MAX - add) return NOAH_PROFILE_LIGHTING_V1_WORKING_MEMORY_EXCEEDED;
+            cost->bank_bytes += add;
+            if (stride > cost->max_slot) cost->max_slot = (uint16_t)stride;
+            cost->rules++;
+            cost->contributor = (uint8_t)index;
+        }
+        offset = end;
+    }
+    if (cost->bank_bytes > (UINT32_MAX - cost->max_slot) / 2u) return NOAH_PROFILE_LIGHTING_V1_WORKING_MEMORY_EXCEEDED;
+    cost->required = 2u * cost->bank_bytes + cost->max_slot;
+    return NOAH_PROFILE_LIGHTING_V1_OK;
+}
+noah_profile_lighting_v1_result_t noah_profile_lighting_v1_working_admit(const noah_profile_lighting_v1_view_t *view, uint32_t capacity, noah_lighting_working_cost_t *cost) {
+    noah_profile_lighting_v1_result_t result = noah_profile_lighting_v1_working_cost(view, cost);
+    return result == NOAH_PROFILE_LIGHTING_V1_OK && cost->required > capacity ? NOAH_PROFILE_LIGHTING_V1_WORKING_MEMORY_EXCEEDED : result;
 }

@@ -702,7 +702,12 @@ static void test_lighting_capability_read(void) {
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 23u, 14u);
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 18u && frame[7] == 6u && frame[8] == 128u && frame[9] == 0u);
+    // Additive page15 reports conservative history admission, keeping pages0..14.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 24u, 15u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 8u);
+    assert(frame[7] == 1u && read_u16(frame+8u) == 8220u && frame[10] == 8u && frame[11] == 12u && frame[12] == 12u && frame[13] == 5u && frame[14] == 4u);
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 24u, 16u);
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE && frame[6] == 0u);
     // A request without an id, or with reserved bytes set, is malformed.

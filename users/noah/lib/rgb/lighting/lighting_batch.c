@@ -6,6 +6,13 @@ void noah_lighting_batch_write_begin(noah_lighting_batch_writer_t *writer, uint8
     *writer = (noah_lighting_batch_writer_t){.bytes=bytes,.size=size,.used=size ? 1u : 0u};
     if (bytes && size) bytes[0]=0;
 }
+bool noah_lighting_batch_write_priority(noah_lighting_batch_writer_t *writer, uint64_t priority) {
+    if (!writer || !writer->bytes || writer->count || writer->used != 1u || writer->size < 9u || writer->bytes[0]) return false;
+    for (uint8_t byte=0u;byte<8u;byte++)writer->bytes[1u+byte]=(uint8_t)(priority>>(8u*byte));
+    writer->bytes[0]=NOAH_LIGHTING_BATCH_PRIORITY_FLAG;
+    writer->used=9u;
+    return true;
+}
 bool noah_lighting_batch_write(noah_lighting_batch_writer_t *writer, const noah_lighting_subject_t *subject) {
     if (!writer || !writer->bytes || !writer->size || !subject || subject->sides > 3u || writer->count >= NOAH_LIGHTING_BATCH_SUBJECTS) return false;
     unsigned key_count=0u;
@@ -21,13 +28,18 @@ bool noah_lighting_batch_write(noah_lighting_batch_writer_t *writer, const noah_
     if (owner==OWNER_KEY) *at++=key;
     else if (owner==OWNER_BITMAP) memcpy(at,subject->keys,KEY_ORIGIN_BITMAP_SIZE);
     writer->used+=length;writer->count++;
-    writer->bytes[0]=writer->count;
+    writer->bytes[0]=(writer->bytes[0]&NOAH_LIGHTING_BATCH_PRIORITY_FLAG)|writer->count;
     writer->slot=subject->slot;writer->outcome=subject->outcome;
     return true;
 }
 bool noah_lighting_batch_read_begin(noah_lighting_batch_reader_t *reader, const uint8_t *bytes, size_t size, uint8_t thing_kind, uint8_t thing) {
-    if (!reader || !bytes || !size || bytes[0]>NOAH_LIGHTING_BATCH_SUBJECTS) return false;
-    *reader=(noah_lighting_batch_reader_t){.bytes=bytes,.size=size,.offset=1u,.remaining=bytes[0],.thing_kind=thing_kind,.thing=thing};
+    if (!reader || !bytes || !size) return false;
+    uint8_t count=bytes[0]&~NOAH_LIGHTING_BATCH_PRIORITY_FLAG;
+    bool captured=(bytes[0]&NOAH_LIGHTING_BATCH_PRIORITY_FLAG)!=0u;
+    if(count>NOAH_LIGHTING_BATCH_SUBJECTS || (captured && size<9u))return false;
+    uint64_t priority=0u;
+    if(captured)for(uint8_t byte=0u;byte<8u;byte++)priority|=(uint64_t)bytes[1u+byte]<<(8u*byte);
+    *reader=(noah_lighting_batch_reader_t){.priority=priority,.bytes=bytes,.size=size,.offset=captured?9u:1u,.remaining=count,.thing_kind=thing_kind,.thing=thing};
     return true;
 }
 bool noah_lighting_batch_read(noah_lighting_batch_reader_t *reader, noah_lighting_subject_t *subject) {

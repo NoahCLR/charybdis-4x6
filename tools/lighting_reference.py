@@ -1507,6 +1507,7 @@ def capability_pages(limits: Limits) -> list:
                 if 128 * half <= i < 128 * half + 128:
                     bitmap[(i - 128 * half) // 8] |= 1 << (i % 8)
             pages.append(bytes([index, 128 * half]) + bytes(bitmap))
+    pages.append(bytes([1,8220 & 255,8220 >> 8,8,12,12,5,4]))
     return [page.hex() for page in pages]
 
 
@@ -1858,6 +1859,91 @@ def history_index_vectors():
     return cases
 
 
+def working_cost(program, matrix_keys=60, combo_members=4):
+    """Model1 conservative admission, independent from structural validation."""
+    facts={r['id']:r for r in json.loads(CONTRACT.read_text())['registries']['facts']}
+    bank=maximum=0
+    for row in program['rules']:
+        if row.get('flags',0)&1 or not any(k in (2,3) for k,p in row.get('timings',[])):
+            continue
+        conditions=row.get('conditions',[])
+        n=m=1
+        if conditions and not conditions[0][0]:
+            _,kind,params=conditions[0]
+            metadata=facts[kind];n=metadata['subjectDomain'];selector=metadata['selectorParameter']
+            if selector!=255 and params[selector]!=255:n=1
+            m=metadata['historyMembers']
+            if m=='matrixKeys':m=matrix_keys
+            elif m=='comboBuffer':m=combo_members
+        stride=(12+m*(5+(matrix_keys+7)//8)+3)&~3
+        bank+=12+n*stride;maximum=max(maximum,stride)
+    return dict(bank=bank,maximum=maximum,required=2*bank+maximum,admitted=2*bank+maximum<=8220)
+
+
+def working_vectors(limits):
+    cases=[]
+    for source in history_index_vectors():
+        program=validate(bytes.fromhex(source['hex']),limits)
+        cases.append(dict(name=source['name'],hex=source['hex'],**working_cost(program)))
+    C,T,P,G=SLOT_CONDITION,SLOT_TARGET,SLOT_PAINT,SLOT_TIMING
+    named=rule(part(C,28,127),part(T,4),part(P,0),part(G,3,255,255))
+    behaviour=rule(part(C,25,255,255),part(T,4),part(P,0),part(G,3,255,255))
+    layer=rule(part(C,1,255),part(T,4),part(P,0),part(G,2,255,255))
+    for name,rows in [('useful-mixture-exact8220',[named,behaviour,layer]),('unchanged-showafter255',[rule(part(C,14,255),part(T,4),part(P,0),part(G,1,255,255)) for _ in range(255)]),('one-more-named-overbudget',[named,behaviour,layer,named])]:
+        wire=encode(dict(rules=rows));cases.append(dict(name=name,hex=wire.hex(),**working_cost(validate(wire,limits))))
+    assert next(c for c in cases if c['name']=='useful-mixture-exact8220')['required']==8220
+    return cases
+
+
+def snapshot_vectors():
+    """Unreleased internal snapshot v2, saved domain version remains5."""
+    def u32(n):return n.to_bytes(4,'little')
+    packets=[]
+    payloads=[('ping',bytes([3])+bytes(54)),
+              ('begin',bytes([0])+u32(100)+u32(120)+u32(130)+u32(5000)+(661).to_bytes(2,'little')+bytes(36)),
+              ('chunk',bytes([1,40,0,3,0x55,0xaa,0xff])+bytes(48)),
+              ('commit',bytes([2])+bytes(54))]
+    for name,payload in payloads:
+        assert len(payload)==55
+        request=bytes([0x83])+u32(7)+u32(0xffffffff)+payload
+        packets.append(dict(name=name,epoch=7,sequence=0xffffffff,payload=payload.hex(),request=request.hex()))
+    return packets
+
+
+def freshness_interval(capture, before, remote, after, now):
+    """Equal-rate logical model, causal endpoints, outward floor-ms error."""
+    mask = (1 << 32) - 1
+    assembly, rtt, elapsed = (before-capture)&mask, (after-before)&mask, (now-remote)&mask
+    if any(x >= 1 << 31 for x in (assembly, rtt, elapsed)) or assembly+rtt+elapsed >= 1 << 31:
+        return None
+    return [min(65535,max(0,assembly+elapsed-2)), min(65535,assembly+rtt+elapsed+2)]
+
+
+def freshness_vectors():
+    samples = [
+        ('healthy-asymmetric-arbitrary-offset',100,120,5000,128,5004,0,500),
+        ('capture-assembly-consume-delay',100,160,0xffffff00,171,0xffffff19,0,500),
+        ('show-boundary-uncertain-suppressed',100,120,5000,128,5180,200,500),
+        ('show-whole-interval-positive',100,120,5000,128,5182,200,500),
+        ('expiry-upper-boundary-suppressed',100,120,5000,128,5470,0,500),
+        ('late-no-new-window',100,120,5000,128,5900,0,500),
+        ('wrap-both-clocks',0xfffffff0,0xfffffff8,0xfffffffc,3,12,0,500),
+        ('saturating-delay-over65535',0,10,1234,20,71234,0,65535),
+        ('backward-receiver-invalid',100,120,5000,128,4999,0,500),
+        ('backward-source-invalid',100,120,5000,119,5004,0,500),
+        ('capture-half-range-invalid',0,0x80000000,5000,0x80000001,5004,0,500),
+        ('composed-half-range-invalid',0,0x7ffffffe,10,0x7fffffff,12,0,500),
+        ('near-zero-rounding',100,100,321,100,321,0,500),
+    ]
+    cases=[]
+    for name,capture,before,remote,after,now,show,flash in samples:
+        bounds=freshness_interval(capture,before,remote,after,now)
+        cases.append(dict(name=name,capture=capture,before=before,remote=remote,after=after,now=now,
+                          show=show,flash=flash,bounds=bounds,
+                          visible=bounds is not None and bounds[0]>=show and bounds[1]<flash))
+    return cases
+
+
 def build_vectors() -> dict:
     limits = Limits()
     conversion = conversion_vectors(limits)
@@ -1877,6 +1963,9 @@ def build_vectors() -> dict:
         "historyIndex": history_index_vectors(),
         "historyObservations": history_observation_vectors(limits),
         "historyEvents": history_event_vectors(limits),
+        "freshness": freshness_vectors(),
+        "snapshotTransport": snapshot_vectors(),
+        "workingMemory": working_vectors(limits),
         "capability": capability_pages(limits),
     }
 

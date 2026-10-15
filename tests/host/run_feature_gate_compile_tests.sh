@@ -358,4 +358,13 @@ check_dragscroll_config_surface
 check_runtime_sealing_boundaries
 
 compile_variant "tests/host/include/noah_compile_config.h" "-DCOMBO_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES $AUTOMOUSE_SOURCES"
+# The fully enabled lighting surface uses the same manifest. Portable readback
+# has its own QMK declaration fixture/runner; this new gate adds all actual
+# lighting leaves, strong runtime, adapter and publication integration without
+# importing real QMK types into that independent readback host fixture.
+LIGHTING_ENABLED_SOURCES=""
+for src in $COMMON_SOURCES; do
+    case "$src" in users/noah/lib/rgb/lighting/*|users/noah/lib/rgb/core/rgb_runtime.c|users/noah/lib/compat/qmk_lighting_snapshot_transport.c|users/noah/lib/profile/schema/profile_lighting_v1.c|users/noah/lib/profile/runtime/effective_rgb_runtime.c|users/noah/runtime_init.c) LIGHTING_ENABLED_SOURCES="$LIGHTING_ENABLED_SOURCES $src" ;; esac
+done
+compile_variant "tests/host/include/noah_compile_config.h" "-DCOMBO_ENABLE -DSPLIT_KEYBOARD -DVIA_ENABLE -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DNOAH_PORTABLE_PROFILE_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$LIGHTING_ENABLED_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DNOAH_PD_PROFILE_ENABLE -DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"

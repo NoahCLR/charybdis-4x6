@@ -64,8 +64,9 @@ existing sleep predicate; sleep still forces black and raw sensor observation
 has no extra continuation timer. Target8 selects keys on the shown layer from
 a cached native/behaviour basis; paint9 uses their direct layer/mode/macro
 identity. Reader failures retain previous pixels until a settled refresh.
-Generic events and retained timing remain in progress. None of it has run on
-hardware.
+The enabled generic-event/retained-timing candidate uses conservative per-profile
+working-memory admission and causal split freshness; final linked acceptance
+remains in progress. None of it has run on hardware.
 
 The keyboard's name lives in settings v7 and is its USB product string
 (D-F25): read before USB starts, and taken up after a rename by one USB
@@ -115,8 +116,9 @@ input cadence remain unmeasured for this path.
   inherited identities, release flashes and layer/mode outcomes on both halves
   remain hardware acceptance. The Lighting facts follow-up must adopt the
   additive state kinds and tables, their capability/vector changes and the
-  expanded split-facts contract; remaining event/timing/query work and its
-  acceptance are separate from these state predicates.
+  expanded split-facts contract, new event/timing construction constraints,
+  working-memory cost/error/capability model and conservative split freshness.
+  Enabled linked acceptance and independent paired review remain pending.
 
 - **The keyboard name needs broader hardware acceptance (D-F25).** Check
   Chrome's HID chooser, the system device list and Ark individually; that a
@@ -1405,8 +1407,11 @@ Choices the plan left open, as decided:
   firmware encodes `rgb_config.c` as version 4 and converts it with the same
   function a client uses, so the compiled defaults, the factory fallback and
   a converted backup are one function of the same bytes.
-- **One 8 KiB budget, 128 palette colours, no per-kind caps.** The whole
-  domain is decoded into RAM on publication (one 16 KiB tripwire increment,
+- **One 8 KiB structural budget,128 palette colours and open registries.** New
+  flash/linger constructions additionally require shared conservative working-memory
+  admission, deliberately amending payload-only acceptance; existing state/show-after
+  profiles and Standard remain accepted. The whole domain is decoded into RAM
+  on publication (one16 KiB tripwire increment,
   [memory budgets](architecture/memory-budgets.md#lighting-rules--d-f26)).
 - **Painting uses additive kinds.** Fact 7 names one combo or yields each
   identified held combo; fact 8 names one authored behaviour row or yields
@@ -1455,46 +1460,27 @@ cannot mature show-after. Fade destination active layers and top-layer facts
 share the same synthetic scene; actual ownership stays intact. Main owns one
 resolved fact frame through chunk rerenders, and transport buffers share storage
 only across initialized, callback-guarded master/slave roles. The detailed
-lifetime and module-idle contracts live in the lighting spec. Generic event
-rendering and retained linger/flash remain unfinished. Optional event matchers
-19–28, timing leaves2/3 and registry-declared construction roles now implement
-the catalog/validator/occurrence qualification seam. Shared fixtures exercise
-coherent qualification and the full255-rule mask; these components do not yet
-enable the production consumer or establish retained-history capacity. A
-registry-derived logical index and occupied-record owner now connect actual
-producer/qualification and QMK-adapter fixtures to shared state/event calendars
-and grouped delivery. A typed single-arena alternative now owns current and
-frozen metadata beside immutable full batches, sharing only exact complete
-histories with independent rule membership and splitting on divergence. Frozen
-streaming has no placement-array subject cap. Coherent state observation groups
-actual fact subjects into each thing's full last matching batch. A retained-rule
-paint seam now exercises actual targets/paints against shared state/event pixel
-traces, without requalifying captured occurrence filters. Target bank sizing, natural-priority
-module bindings, renderer integration and enabled linked acceptance remain
-unfinished. The
-allocation-free lifetime calendar implements the settled matching/tail/event
-transitions and wake boundaries. Immutable full-equality ordered-batch
-interning and independent18-byte rule/thing records now provide explicit
-render/delivery ownership, transactional replacement and stale-ACK isolation.
-Grouped application reserves all qualified-cell references before commit;
-bounded subject iteration survives arena compaction without another batch
-copy. The actual QMK adapter fixture now uses this owner on each emulated half.
-Publication/remapping between effect chunks retains coherent prior pixels
-until the next frame boundary, instead of mixing new program/cache state with
-old captured facts and histories.
-A shared phase-local workspace preserves the recorded1024-byte placement
-reservation while holding facts/group/single-event encoding together. These
-components allocate no target history bank; its index, full accepted-profile
-capacity, enabled producer integration and measured CPU/cadence remain
-unfinished. Mode/combo event capabilities require their actual producers;
-unsupported forced modules fail compilation. The grouped-event codec/session
-component uses explicit63-byte requests,27-byte HELLO,9-byte CONFIRM and
-10-byte replies inside the existing128/32 QMK allocation. Immutable retries,
-main-before-ACK consumption and fresh-session reset are specified in the
-lighting split contract. The portable component allocates no history and does
-not yet enable event capabilities. The QMK adapter now binds the portable
-component to actual registration/RPC and main-consumption calls; the retained
-history owner, effective-identity/main hooks and capture enablement still follow. Keys-that target8 and what-it-does
+lifetime and module-idle contracts live in the lighting spec. The enabled retained-timing candidate uses a direct, fixed8220-byte pool with
+registry-owned conservative admission before activation. It owns current and
+one role-disjoint outgoing/staging history bank plus replacement workspace;
+full ordered subjects, owners, natural priority, independent gates and per-thing
+expiry remain exact for admitted constructions. The experimental interned and
+factored stores are not the production representation. A main-owned coherent
+fact snapshot travels with retained histories, and main publishes a complete
+scene only after validation; callbacks stage bounded bytes. The strong observer
+qualifies actual synchronous producer occurrences against coherent facts and
+copies borrowed owners before return. Program source reads and admission finish
+in separate owned staging before provider publication. Frozen outgoing bytes
+survive concurrent newer current observations without a third history bank.
+
+Snapshot v2 has an explicit internal discriminator, immutable stop-and-wait
+requests and main-before-ACK consumption. It resynchronizes still-live transient
+state rather than replaying source-expired events with a fresh interval.
+Nominal equal-rate local logical clocks, causal RTT and derived quantization
+bound remote age; unknown freshness suppresses transient paint. This is a
+software timing assumption, not a physical drift measurement. Enabled linked
+RAM/stack acceptance and hardware/cadence/high-water remain outstanding.
+Keys-that target8 and what-it-does
 paint9 share a finite per-layer native/behaviour basis; queries compose from
 that cache and existing resident combo rows, with no reader I/O during the
 render walk. This implements the plan's cache intent without one bitmap per
@@ -1532,3 +1518,21 @@ floor4096 B and reviewed stack1920/768 policies are unchanged. This increment
 budgets no future event/linger/flash history. See
 [memory budgets](architecture/memory-budgets.md#cached-key-queries-and-direct-action-paint).
 Hardware, cadence and allocator/global/interrupt-stack high-water remain unproven.
+
+D-F26 retained timing now uses explicit conservative working-memory admission
+for new flash/linger constructions. The model1 direct candidate reserves
+Q=2*S+W in8220 bytes/half; unchanged Standard/state/show-after remain accepted.
+This deliberately revises the former payload-only promise without imposing a
+rule/kind cap or runtime eviction. Over-budget publication must preserve the
+active program/history/pixels. Candidate allocation does not amend linked policy.
+
+The replacement split design resynchronizes current state and still-live
+transients, rather than replaying source-expired events with a fresh window.
+Remote paint requires the entire causal age interval within show/expiry; unknown
+freshness suppresses it. V1 assumes equal-rate logical millisecond timers with
+arbitrary offsets, a declared software assumption rather than measured physical
+accuracy. Actual RTT and derived floor-to-ms rounding bound age, including
+assembly/transfer/consume delay. Reset/role/profile/discontinuity/ambiguous wrap
+invalidate evidence. Conditional no-resurrection does not prove oscillator drift,
+cadence or hardware high-water. The governing arithmetic and continuity limits
+are in the lighting spec. Integration and enabled linked acceptance remain open.

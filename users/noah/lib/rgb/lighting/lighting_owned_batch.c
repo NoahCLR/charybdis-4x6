@@ -5,7 +5,16 @@ bool noah_lighting_owned_batch_begin(const noah_lighting_batch_arena_t *arena, n
     if (!noah_lighting_record_type(arena, reference, &type_value) || type_value != NOAH_LIGHTING_ARENA_BATCH) return false;
 
     noah_lighting_owned_batch_reader_t next = {.reference = reference, .offset = 1u};
-    if (!noah_lighting_batch_describe(arena, reference, &next.thing_kind, &next.thing, &next.size, NULL) || !next.size || !noah_lighting_batch_copy(arena, reference, 0u, &next.remaining, 1u) || next.remaining > NOAH_LIGHTING_BATCH_SUBJECTS) return false;
+    uint8_t                            prefix[9];
+    if (!noah_lighting_batch_describe(arena, reference, &next.thing_kind, &next.thing, &next.size, NULL) || !next.size || !noah_lighting_batch_copy(arena, reference, 0u, prefix, 1u)) return false;
+    next.remaining = prefix[0] & ~NOAH_LIGHTING_BATCH_PRIORITY_FLAG;
+    if (next.remaining > NOAH_LIGHTING_BATCH_SUBJECTS) return false;
+    if (prefix[0] & NOAH_LIGHTING_BATCH_PRIORITY_FLAG) {
+        if (next.size < sizeof prefix || !noah_lighting_batch_copy(arena, reference, 1u, prefix + 1u, 8u)) return false;
+        next.offset = sizeof prefix;
+        for (uint8_t byte = 0u; byte < 8u; byte++)
+            next.priority |= (uint64_t)prefix[1u + byte] << (8u * byte);
+    }
     *reader = next;
     return true;
 }

@@ -349,6 +349,13 @@ static void fail_integration(noah_profile_owner_t *owner) {
     owner->state = NOAH_PROFILE_OWNER_INTEGRATION_ERROR;
 }
 
+static uint32_t publication_boundary(void *context) {
+    noah_profile_owner_t *owner=context;
+    uint32_t reasons=noah_profile_activation_policy_safe_boundary(&owner->activation_policy);
+    if(reasons || !owner->provider.has_pending) return reasons;
+    return noah_effective_rgb_runtime_prepare(&owner->provider.pending) ? 0u : NOAH_PROFILE_ACTIVATION_REASON_INTERNAL;
+}
+
 static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
     noah_effective_profile_invalidator_t     invalidators[5];
     uint8_t invalidator_count = 0;
@@ -391,7 +398,7 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
     observer         = owner->config.peer_required ? owner_peer_observer : no_peer_observer;
     observer_context = owner->config.peer_required ? owner : NULL;
     noah_profile_activation_policy_init(&owner->activation_policy, observer, observer_context);
-    if (noah_effective_profile_provider_init(&owner->provider, &owner->compiled_snapshot, noah_profile_activation_policy_safe_boundary, &owner->activation_policy, invalidators, invalidator_count
+    if (noah_effective_profile_provider_init(&owner->provider, &owner->compiled_snapshot, publication_boundary, owner, invalidators, invalidator_count
                                              ) != NOAH_EFFECTIVE_PROFILE_OK) {
         return false;
     }

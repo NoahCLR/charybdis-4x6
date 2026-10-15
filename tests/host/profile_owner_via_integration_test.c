@@ -406,6 +406,9 @@ void noah_effective_rgb_runtime_uninstall(noah_effective_rgb_runtime_t *runtime)
     (void)runtime;
 }
 
+bool noah_effective_rgb_runtime_prepare(const noah_effective_profile_snapshot_t *snapshot) {
+    return snapshot != NULL;
+}
 void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_count, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *callback_view) {
     (void)context;
     (void)publication_count;

@@ -70,6 +70,28 @@ int main(void) {
     assert(writer.used==NOAH_LIGHTING_BATCH_BYTES); // proved maximum achieved
     memcpy(saved,bytes,sizeof saved);assert(!noah_lighting_batch_write(&writer,&original[0]));assert(!memcmp(saved,bytes,sizeof bytes));
     noah_lighting_batch_reader_t reader;
+    // The optional captured natural-order token is separate from filtered
+    // entry recency. Preserve all old705B cases and achieve the NEW713B bound.
+    uint8_t snapshot[NOAH_LIGHTING_BATCH_SNAPSHOT_BYTES];
+    noah_lighting_batch_write_begin(&writer,snapshot,sizeof snapshot);
+    assert(noah_lighting_batch_write_priority(&writer,UINT64_C(0x100000003)));
+    assert(!noah_lighting_batch_write_priority(&writer,7));
+    for(unsigned i=0;i<64;i++)assert(noah_lighting_batch_write(&writer,&original[i]));
+    assert(writer.used==NOAH_LIGHTING_BATCH_SNAPSHOT_BYTES && snapshot[0]==(128u|64u));
+    assert(noah_lighting_batch_read_begin(&reader,snapshot,writer.used,4,127));
+    assert(reader.priority==UINT64_C(0x100000003));
+    for(unsigned i=0;i<64;i++) { noah_lighting_subject_t subject;assert(noah_lighting_batch_read(&reader,&subject));assert(!memcmp(&subject,&original[i],sizeof subject)); }
+    assert(!reader.remaining && reader.offset==writer.used);
+    assert(!noah_lighting_batch_write_priority(&writer,9));
+    for(unsigned capacity=0;capacity<9;capacity++) {
+        memset(snapshot,0xa5,sizeof snapshot);noah_lighting_batch_write_begin(&writer,snapshot,capacity);
+        uint8_t saved_prefix[9];memcpy(saved_prefix,snapshot,sizeof saved_prefix);
+        size_t before=writer.used;
+        assert(!noah_lighting_batch_write_priority(&writer,UINT64_MAX));
+        assert(writer.used==before && !memcmp(snapshot,saved_prefix,sizeof saved_prefix));
+    }
+    uint8_t short_priority[]={129u,1,2,3,4,5,6,7};
+    assert(!noah_lighting_batch_read_begin(&reader,short_priority,sizeof short_priority,4,127));
     uint8_t malformed[]={1,0xc0};assert(noah_lighting_batch_read_begin(&reader,malformed,sizeof malformed,4,127));assert(!noah_lighting_batch_read(&reader,&original[0]));
     uint8_t malformed_key[]={1,0x28,64};assert(noah_lighting_batch_read_begin(&reader,malformed_key,sizeof malformed_key,4,127));assert(!noah_lighting_batch_read(&reader,&original[0]));
     printf("ordered retained batches: exact owners/slot/outcome/order, partial batches, atomic insufficient workspace;64-member same-paint129B, exact max%uB (per batch, not bank capacity)\n",(unsigned)NOAH_LIGHTING_BATCH_BYTES);

@@ -19,6 +19,10 @@
 #    include <string.h>
 
 #    include "../lighting/lighting_engine.h"
+#    include "../lighting/lighting_runtime.h"
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+static uint32_t rgb_runtime_history_revision;
+#    endif
 #    include "../lighting/lighting_keymap.h"
 #    include "../../profile/runtime/effective_rgb_runtime.h"
 #    include "../../split/runtime_sync.h"
@@ -102,7 +106,13 @@ static noah_lighting_leds_t rgb_runtime_local_leds(void) {
 // Each half collects the facts both halves share; the USB half also collects
 // the synced ones, which the other half reads from the link. A read that finds
 // the link mid-publication keeps the last coherent frame.
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+noah_lighting_facts_t *noah_rgb_runtime_history_facts(void){return &rgb_runtime_resolved_facts;}
+#    endif
 static bool rgb_runtime_capture_facts(void) {
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    if(noah_lighting_runtime_remote_scene())return false;
+#    endif
     if (is_keyboard_master()) {
         return noah_lighting_facts_collect_changed(&rgb_runtime_resolved_facts, true, true);
     }
@@ -138,13 +148,23 @@ static void rgb_runtime_begin_frame(void) {
         return;
     }
 #    endif
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    rgb_runtime_scene.facts=&rgb_runtime_resolved_facts;
+    if(!noah_lighting_runtime_prepare(&rgb_runtime_scene,generation,rgb_runtime_now))return;
+    bool history_changed=rgb_runtime_scene.working!=NULL;
+#    else
+    bool history_changed=false;
+#    endif
     wake_due = rgb_runtime_info.wake_set && (int32_t)(rgb_runtime_now - rgb_runtime_info.wake) >= 0;
-    if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_leds == leds && rgb_runtime_resolved_keymap_generation == keymap_generation && !facts_changed) return;
+    if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_leds == leds && rgb_runtime_resolved_keymap_generation == keymap_generation && !facts_changed && !history_changed) return;
 
     rgb_runtime_resolved_keymap_generation = keymap_generation;
     rgb_runtime_scene.facts                = &rgb_runtime_resolved_facts;
     rgb_runtime_scene.keymap_generation    = keymap_generation;
     noah_lighting_resolve(&rgb_runtime_scene, leds, rgb_runtime_now, true, &rgb_runtime_frame, &rgb_runtime_info);
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    rgb_runtime_history_revision=noah_lighting_runtime_revision();
+#    endif
     rgb_runtime_resolved_leds = leds;
     rgb_runtime_resolved      = true;
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
@@ -236,7 +256,11 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
     // cached query basis. Neither may be combined with this frame's old facts,
     // palette/gates or retained references. Keep its coherent resolved pixels
     // until the next frame boundary captures the new generation.
-    if (rgb_runtime_resolved && rgb_runtime_info.effect_used && rgb_runtime_program_generation == noah_effective_lighting_generation() && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation) {
+    bool histories_pinned=true;
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    histories_pinned=rgb_runtime_history_revision==noah_lighting_runtime_revision();
+#    endif
+    if (histories_pinned && rgb_runtime_resolved && rgb_runtime_info.effect_used && rgb_runtime_program_generation == noah_effective_lighting_generation() && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation) {
         noah_lighting_resolve_info_t chunk_info;
         noah_lighting_resolve(&rgb_runtime_scene, rgb_runtime_range_leds(led_min, led_max), rgb_runtime_now, false, &rgb_runtime_frame, &chunk_info);
     }

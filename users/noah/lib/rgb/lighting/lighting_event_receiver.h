@@ -8,10 +8,11 @@ typedef struct {
     volatile uint32_t next_sequence;
     volatile uint32_t handshake_sequence;
     uint8_t profile[NOAH_LIGHTING_EVENT_PROFILE_BYTES];
-    union { uint8_t outgoing[NOAH_LIGHTING_EVENT_DATA_BYTES]; uint8_t mailbox[NOAH_LIGHTING_EVENT_DATA_BYTES]; } packet;
+    union { uint8_t outgoing[64u]; uint8_t mailbox[64u]; } packet;
     volatile bool ready, master, active, waiting_confirm;
     volatile bool reset_requested, confirm_requested, mailbox_ready;
     volatile bool committed;
+    bool snapshot_mode; // explicit new internal discriminator, never reinterpret legacy groups
 } noah_lighting_event_link_t;
 
 enum {
@@ -36,3 +37,7 @@ typedef void (*noah_lighting_event_reset_fn)(void *);
 bool noah_lighting_event_receive_main(noah_lighting_event_link_t *, uint32_t now, noah_lighting_event_consume_fn, noah_lighting_event_reset_fn, void *);
 
 _Static_assert(sizeof(noah_lighting_event_link_t) <= 112u, "event transport control and role union stay explicitly bounded");
+
+// Snapshot v2 uses tags0x81..0x84 and a55-byte opaque, validated main payload.
+// Legacy component entry points/bytes remain unchanged for regression coverage.
+void noah_lighting_snapshot_link_begin(noah_lighting_event_link_t *, bool master, const uint8_t *profile);

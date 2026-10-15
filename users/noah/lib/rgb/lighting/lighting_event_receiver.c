@@ -6,6 +6,7 @@ void noah_lighting_event_link_begin(noah_lighting_event_link_t *link, bool maste
     link->ready = false;
     BARRIER();
     link->master = master;
+    link->snapshot_mode = false;
     link->active = link->waiting_confirm = false;
     link->reset_requested = link->confirm_requested = link->mailbox_ready = false;
     link->committed = false;
@@ -18,7 +19,7 @@ void noah_lighting_event_link_publish(noah_lighting_event_link_t *link) {
     link->ready = true;
 }
 static void respond(const noah_lighting_event_link_t *link, uint8_t status, uint32_t sequence, uint8_t *reply) {
-    reply[0] = NOAH_LIGHTING_EVENT_REPLY;
+    reply[0] = NOAH_LIGHTING_EVENT_REPLY | (link->snapshot_mode ? 0x80u : 0u);
     reply[1] = status;
     noah_lighting_event_put_u32(reply + 2, link->epoch);
     noah_lighting_event_put_u32(reply + 6, sequence);
@@ -32,7 +33,7 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
     memset(reply, 0, NOAH_LIGHTING_EVENT_REPLY_BYTES);
     if (!link->ready || link->master || !request || !size) return;
     BARRIER();
-    if (request[0] == NOAH_LIGHTING_EVENT_HELLO && size == NOAH_LIGHTING_EVENT_HELLO_BYTES) {
+    if (request[0] == (NOAH_LIGHTING_EVENT_HELLO | (link->snapshot_mode ? 0x80u : 0u)) && size == NOAH_LIGHTING_EVENT_HELLO_BYTES) {
         uint32_t first = noah_lighting_event_get_u32(request + 23);
         if (memcmp(request + 1, link->profile, NOAH_LIGHTING_EVENT_PROFILE_BYTES)) {
             respond(link, NOAH_LIGHTING_EVENT_PROFILE_MISMATCH, 0, reply);
@@ -54,7 +55,7 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
         respond(link, NOAH_LIGHTING_EVENT_NEED_HELLO, sequence, reply);
         return;
     }
-    if (request[0] == NOAH_LIGHTING_EVENT_CONFIRM && size == NOAH_LIGHTING_EVENT_CONTROL_BYTES && sequence == link->next_sequence) {
+    if (request[0] == (NOAH_LIGHTING_EVENT_CONFIRM | (link->snapshot_mode ? 0x80u : 0u)) && size == NOAH_LIGHTING_EVENT_CONTROL_BYTES && sequence == link->next_sequence) {
         if (link->active && !link->confirm_requested) respond(link, NOAH_LIGHTING_EVENT_ACK, sequence, reply);
         else {
             link->confirm_requested = true;
@@ -62,7 +63,8 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
         }
         return;
     }
-    if (request[0] != NOAH_LIGHTING_EVENT_DATA || size != NOAH_LIGHTING_EVENT_DATA_BYTES || !data_valid(request)) {
+    size_t data_bytes = link->snapshot_mode ? 64u : NOAH_LIGHTING_EVENT_DATA_BYTES;
+    if (request[0] != (NOAH_LIGHTING_EVENT_DATA | (link->snapshot_mode ? 0x80u : 0u)) || size != data_bytes || (link->snapshot_mode ? request[9] > 3u : !data_valid(request))) {
         respond(link, NOAH_LIGHTING_EVENT_REJECT, sequence, reply);
         return;
     }
@@ -75,7 +77,7 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
         return;
     }
     if (link->mailbox_ready) {
-        bool same = !memcmp(link->packet.mailbox, request, NOAH_LIGHTING_EVENT_DATA_BYTES);
+        bool same = !memcmp(link->packet.mailbox, request, data_bytes);
         respond(link, same ? NOAH_LIGHTING_EVENT_PENDING : NOAH_LIGHTING_EVENT_REJECT, sequence, reply);
         return;
     }
@@ -83,7 +85,7 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
         respond(link, NOAH_LIGHTING_EVENT_REJECT, sequence, reply);
         return;
     }
-    memcpy(link->packet.mailbox, request, NOAH_LIGHTING_EVENT_DATA_BYTES);
+    memcpy(link->packet.mailbox, request, data_bytes);
     BARRIER();
     link->mailbox_ready = true;
     respond(link, NOAH_LIGHTING_EVENT_PENDING, sequence, reply);
@@ -125,4 +127,9 @@ bool noah_lighting_event_receive_main(noah_lighting_event_link_t *link, uint32_t
     BARRIER();
     link->mailbox_ready = false;
     return true;
+}
+
+void noah_lighting_snapshot_link_begin(noah_lighting_event_link_t *link, bool master, const uint8_t *profile) {
+    noah_lighting_event_link_begin(link,master,profile);
+    link->snapshot_mode=true;
 }

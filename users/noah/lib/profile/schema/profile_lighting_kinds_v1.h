@@ -598,6 +598,94 @@ static inline uint8_t noah_lighting_param_layout_length(uint32_t layout) {
 
 #define NOAH_LIGHTING_FACT_ROWS(X) NOAH_LIGHTING_STATE_FACT_ROWS(X) NOAH_LIGHTING_EVENT_FACT_ROWS(X)
 
+// Complete retained batches per identity, owned by the same optional registry
+// entries. Admission does not assume occupancy, equal payloads or input rates.
+#ifndef COMBO_BUFFER_LENGTH
+#    define NOAH_LIGHTING_HISTORY_COMBO_MEMBERS 4u
+#else
+#    define NOAH_LIGHTING_HISTORY_COMBO_MEMBERS COMBO_BUFFER_LENGTH
+#endif
+#define NOAH_LIGHTING_HISTORY_MEMBERS_layer_active 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_layer_previewing 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_pointing_mode_active 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_combos_held 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_behaviour_state NOAH_LIGHTING_REGISTRY_KEYS
+#define NOAH_LIGHTING_HISTORY_MEMBERS_combo_held NOAH_LIGHTING_HISTORY_COMBO_MEMBERS
+#define NOAH_LIGHTING_HISTORY_MEMBERS_behaviour NOAH_LIGHTING_REGISTRY_KEYS
+#define NOAH_LIGHTING_HISTORY_MEMBERS_layer_status 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_mode_status 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_combo_layer NOAH_LIGHTING_HISTORY_COMBO_MEMBERS
+#define NOAH_LIGHTING_HISTORY_MEMBERS_behaviour_phase NOAH_LIGHTING_REGISTRY_KEYS
+#define NOAH_LIGHTING_HISTORY_MEMBERS_macro_playing 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_key_pressed 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_modifier 2u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_host_lock 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_pointer 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_idle 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_layer_locked 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_layer_unlocked 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_oneshot_used 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_mode_started 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_mode_ended 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_combo_fired 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_tap_fired 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_hold_fired 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_long_hold_fired 1u
+#define NOAH_LIGHTING_HISTORY_MEMBERS_macro_played 1u
+enum { NOAH_LIGHTING_NATURAL_CURSOR=0u, NOAH_LIGHTING_NATURAL_LAYER=1u };
+#define NOAH_LIGHTING_NATURAL_layer_active NOAH_LIGHTING_NATURAL_LAYER
+#define NOAH_LIGHTING_NATURAL_layer_previewing NOAH_LIGHTING_NATURAL_LAYER
+#define NOAH_LIGHTING_NATURAL_pointing_mode_active NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_combos_held NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_behaviour_state NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_combo_held NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_behaviour NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_layer_status NOAH_LIGHTING_NATURAL_LAYER
+#define NOAH_LIGHTING_NATURAL_mode_status NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_combo_layer NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_behaviour_phase NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_macro_playing NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_key_pressed NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_modifier NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_host_lock NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_pointer NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_idle NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_layer_locked NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_layer_unlocked NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_oneshot_used NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_mode_started NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_mode_ended NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_combo_fired NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_tap_fired NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_hold_fired NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_long_hold_fired NOAH_LIGHTING_NATURAL_CURSOR
+#define NOAH_LIGHTING_NATURAL_macro_played NOAH_LIGHTING_NATURAL_CURSOR
+static inline uint8_t noah_lighting_fact_natural_policy(uint8_t kind) {
+    switch(kind) {
+#define NOAH_LIGHTING_NATURAL_POLICY(id,name,thing,layout,slots,selector,signatures,live,role) case id:return NOAH_LIGHTING_NATURAL_##name;
+        NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_NATURAL_POLICY)
+#undef NOAH_LIGHTING_NATURAL_POLICY
+        default:return NOAH_LIGHTING_NATURAL_CURSOR;
+    }
+}
+static inline uint8_t noah_lighting_history_members(uint8_t kind) {
+    switch (kind) {
+#define NOAH_LIGHTING_HISTORY_MEMBERS(id, name, thing, layout, slots, selector, signatures, live, role) case id: return NOAH_LIGHTING_HISTORY_MEMBERS_##name;
+        NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_HISTORY_MEMBERS)
+#undef NOAH_LIGHTING_HISTORY_MEMBERS
+        default: return 0u;
+    }
+}
+static inline uint8_t noah_lighting_history_domain(uint8_t kind, uint8_t *selector) {
+    switch (kind) {
+#define NOAH_LIGHTING_HISTORY_DOMAIN(id, name, thing, layout, slots, parameter, signatures, live, role) case id: *selector = parameter; return slots;
+        NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_HISTORY_DOMAIN)
+#undef NOAH_LIGHTING_HISTORY_DOMAIN
+        default: *selector = 255u; return 0u;
+    }
+}
+
+
 #if NOAH_LIGHTING_TARGET_WHOLE_BOARD
 #    define NOAH_LIGHTING_ROW_TARGET_WHOLE_BOARD(X) X(NOAH_LIGHTING_TARGET_ID_WHOLE_BOARD, whole_board, NOAH_LIGHTING_PARAMS0, 1)
 #else

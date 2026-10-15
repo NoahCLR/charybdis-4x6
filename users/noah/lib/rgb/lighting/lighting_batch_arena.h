@@ -21,6 +21,10 @@ enum { NOAH_LIGHTING_BATCH_ENTRY_HEADER = 12u, NOAH_LIGHTING_ARENA_BATCH = 0u, N
 // The object bound exceeds every accepted ordered batch (<=705B) and metadata
 // object; it changes no profile budget/count, codec bytes or registry domain.
 bool noah_lighting_record_acquire(noah_lighting_batch_arena_t *arena, uint8_t type, uint8_t kind, uint8_t thing, const uint8_t *bytes, uint16_t size, noah_lighting_batch_ref_t *reference);
+// Reserve a uniquely owned current record for a streaming immutable builder.
+// Until the owner publishes its reference it is unreachable by history readers.
+bool noah_lighting_record_reserve(noah_lighting_batch_arena_t *arena, uint8_t thing, uint16_t size, noah_lighting_batch_ref_t *reference);
+bool noah_lighting_record_store(noah_lighting_batch_arena_t *arena, noah_lighting_batch_ref_t reference, uint16_t offset, const void *bytes, uint16_t size);
 bool noah_lighting_record_update(noah_lighting_batch_arena_t *arena, noah_lighting_batch_ref_t reference, const uint8_t *bytes, uint16_t size);
 bool noah_lighting_record_type(const noah_lighting_batch_arena_t *arena, noah_lighting_batch_ref_t reference, uint8_t *type);
 // Read-only byte cursor, invalidated by structural mutation. It exposes stable

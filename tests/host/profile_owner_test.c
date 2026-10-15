@@ -182,6 +182,9 @@ void noah_effective_rgb_runtime_uninstall(noah_effective_rgb_runtime_t *runtime)
     rgb_installed = false;
 }
 
+bool noah_effective_rgb_runtime_prepare(const noah_effective_profile_snapshot_t *snapshot) {
+    return snapshot != NULL;
+}
 void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_count, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *callback_view) {
     noah_effective_rgb_runtime_t *runtime = context;
     runtime->loaded = rgb_cache_valid;

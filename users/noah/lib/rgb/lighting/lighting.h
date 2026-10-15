@@ -221,6 +221,7 @@ typedef struct {
     noah_lighting_facts_t                    *facts; // main-context owned; fade overlay is restored before return
     uint32_t                                  paint_time; // synced animation time, separate from local gate time
     uint32_t                                  keymap_generation;
+    const struct noah_lighting_working        *working; // main-owned, synchronous resolve only
 } noah_lighting_scene_t;
 
 // What a paint receives: the scene, its parameters, the subject's identity,

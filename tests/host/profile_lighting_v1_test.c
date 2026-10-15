@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "lighting capability page %u differs\n", page);
                 return 1;
             }
-            assert(noah_profile_lighting_v1_capability_page(&limits, (uint8_t)(page + 1u), answer) == (page + 1u < NOAH_PROFILE_LIGHTING_V1_CAPABILITY_PAGES ? 18u : 0u));
+            assert(noah_profile_lighting_v1_capability_page(&limits, (uint8_t)(page + 1u), answer) == (page + 1u == 15u ? 8u : page + 1u < 15u ? 18u : 0u));
             capabilities++;
         } else {
             assert(strcmp(kind, "CONVERT") == 0);

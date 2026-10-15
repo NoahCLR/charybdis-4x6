@@ -18,6 +18,7 @@ uint8_t                   noah_lighting_retained_rule(const noah_lighting_retain
 uint8_t                   noah_lighting_retained_thing(const noah_lighting_retained_t *cell);
 bool                      noah_lighting_retained_needed(const noah_lighting_retained_t *cell);
 uint64_t                  noah_lighting_retained_order(const noah_lighting_retained_t *cell);
+bool                      noah_lighting_retained_rendering(const noah_lighting_retained_t *cell);
 bool                      noah_lighting_retained_dirty(const noah_lighting_retained_t *cell);
 // Consumes one already owned reference, with no allocation or fallible callback
 // after the group's commit boundary. Same-order retries release the transferred

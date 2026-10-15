@@ -42,11 +42,11 @@ static void advance(uint32_t elapsed) {
     }
 }
 static unsigned cohorts(uint8_t type) {
-    unsigned                  count  = 0;
-    uint32_t                  offset = 0;
-    noah_lighting_batch_ref_t ref;
-    while (noah_lighting_record_next(&arena, type, &offset, &ref))
-        count++;
+    // Factored snapshots pin immutable current blocks; physical allocation tags
+    // do not change when a second logical bank acquires the same reference.
+    const noah_lighting_batch_ref_t *refs=type==NOAH_LIGHTING_ARENA_FRAME?store.frame:store.current;
+    unsigned count=0u;
+    for(unsigned i=0;i<NOAH_LIGHTING_HISTORY_ADDRESSES;i++)count+=refs[i]!=0u;
     return count;
 }
 static noah_lighting_retained_t read(uint8_t type, uint8_t rule, uint8_t thing) {
@@ -77,13 +77,13 @@ int main(void) {
     for (unsigned rule = 0; rule < 254; rule++)
         event(rule, 127, 1, 59);
     assert(cohorts(NOAH_LIGHTING_ARENA_CURRENT) == 1);
-    assert(arena.used == 80u); // batch17 + full template/mask/header63
-    assert(first == 49u);      // batch17 + singleton metadata32
+    assert(arena.used == 81u); // batch17 + factored assignment header64, constant columns
+    assert(first == 81u); // factored immutable block has the same constant header
     assert(noah_lighting_history_store_freeze(&store));
-    assert(arena.used == 143u);
+    assert(arena.used == 81u); // complete consumable immutable block is pinned, not copied
     uint32_t frozen_peak = arena.used;
     event(0, 127, 2, 0);
-    assert(cohorts(NOAH_LIGHTING_ARENA_CURRENT) == 2);
+    assert(cohorts(NOAH_LIGHTING_ARENA_CURRENT) == 1); // independently packed columns in one thing block
     noah_lighting_retained_t old = read(NOAH_LIGHTING_ARENA_FRAME, 0, 127), new = read(NOAH_LIGHTING_ARENA_CURRENT, 0, 127), other = read(NOAH_LIGHTING_ARENA_CURRENT, 254, 127);
     assert(noah_lighting_retained_order(&old) == 1 && noah_lighting_retained_order(&other) == 1 && noah_lighting_retained_order(&new) == 2);
     advance(499);
@@ -112,7 +112,7 @@ int main(void) {
     assert(noah_lighting_owned_batch_next(&arena, &reader, &subject));
     assert(subject.keys[7] == 8 && subject.slot == 59 && subject.outcome == 60);
     noah_lighting_history_store_clear(&store, NOAH_LIGHTING_ARENA_CURRENT);
-    assert(cohorts(NOAH_LIGHTING_ARENA_FRAME) == 1 && arena.used == 80u);
+    assert(cohorts(NOAH_LIGHTING_ARENA_FRAME) == 1 && arena.used == 81u);
     noah_lighting_history_store_clear(&store, NOAH_LIGHTING_ARENA_FRAME);
     assert(!arena.used);
     // Failed split/cohort expansion and failed complete-frame reservation leave
@@ -121,8 +121,8 @@ int main(void) {
     event(1, 127, 3, 1);
     uint32_t capacity = arena.capacity;
     arena.capacity    = arena.used;
-    assert(!noah_lighting_history_store_freeze(&store));
-    assert(cohorts(NOAH_LIGHTING_ARENA_FRAME) == 0);
+    assert(noah_lighting_history_store_freeze(&store)); // pinning requires no reserve
+    assert(cohorts(NOAH_LIGHTING_ARENA_FRAME) == 1);
     noah_lighting_retained_t  cell = read(NOAH_LIGHTING_ARENA_CURRENT, 0, 127), before = cell;
     noah_lighting_batch_ref_t ref = noah_lighting_retained_batch(&cell);
     assert(noah_lighting_batch_retain(&arena, ref));
@@ -133,6 +133,7 @@ int main(void) {
     assert(!memcmp(&cell, &before, sizeof cell));
     arena.capacity = capacity;
     noah_lighting_history_store_clear(&store, NOAH_LIGHTING_ARENA_CURRENT);
+    noah_lighting_history_store_clear(&store, NOAH_LIGHTING_ARENA_FRAME);
     assert(!arena.used);
     // All128 event IDs with independently addressable255 rules: common captured
     // histories encode membership, not a255x128 metadata reservation. Reference
@@ -142,7 +143,7 @@ int main(void) {
         for (unsigned rule = 0; rule < 255; rule++)
             event(rule, thing, 1000 + thing, thing % 60);
     assert(cohorts(NOAH_LIGHTING_ARENA_CURRENT) == 128);
-    assert(arena.used == 128u * 80u);
+    assert(arena.used == 128u * 81u);
     noah_lighting_history_cursor_t cursor;
     noah_lighting_history_store_cursor(&store, &cursor);
     unsigned logical = 0;
@@ -169,7 +170,7 @@ int main(void) {
     printf("frozen streaming:128 subjects beyond64 scratch, candidate visits=%llu, frame-only bytes=%u; no target-time claim\n", (unsigned long long)scans, arena.used);
     noah_lighting_history_store_clear(&store, NOAH_LIGHTING_ARENA_FRAME);
     assert(!arena.used);
-    printf("one-arena histories: singleton49B/full255 cohort80B/full128 shared occurrences%uB; current+frame first%uB; logical%u independent keys, split/rejoin/expiry/ACK/pins/failure/refwrap PASS (samples, NOT accepted-domain capacity proof)\n", 128u * 80u, frozen_peak, logical);
+    printf("one-arena histories: singleton81B/full255 constant-column block81B/full128 shared occurrences%uB; current+frame first%uB; logical%u independent keys, split/rejoin/expiry/ACK/pins/failure/refwrap PASS (samples, NOT accepted-domain capacity proof)\n", 128u * 81u, frozen_peak, logical);
     noah_lighting_history_store_clear(&store, NOAH_LIGHTING_ARENA_CURRENT);
     assert(!arena.used);
 }

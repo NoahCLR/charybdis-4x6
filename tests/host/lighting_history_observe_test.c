@@ -34,7 +34,7 @@ bool noah_lighting_fact_next(uint8_t kind, const noah_lighting_facts_t *facts, c
 static noah_profile_lighting_v1_program_t program;
 static noah_lighting_history_bank_t       bank;
 static noah_lighting_batch_arena_t        arena;
-static uint8_t                            storage[32768], scratch[NOAH_LIGHTING_BATCH_BYTES];
+static uint8_t                            storage[65536], scratch[NOAH_LIGHTING_BATCH_BYTES];
 static void                               readhex(FILE *file, uint8_t *bytes, unsigned size) {
     for (unsigned i = 0; i < size; i++) {
         unsigned value;
@@ -51,6 +51,12 @@ static void full_rule_domain(void) {
     noah_profile_lighting_v1_limits_t limits = noah_profile_lighting_v1_default_limits();
     noah_profile_lighting_v1_view_t   view;
     assert(noah_profile_lighting_v1_decode(bytes, program.length, &limits, &view, NULL) == NOAH_PROFILE_LIGHTING_V1_OK);
+    noah_lighting_working_cost_t cost;
+    assert(noah_profile_lighting_v1_working_admit(&view,NOAH_LIGHTING_WORKING_CAPACITY,&cost)==NOAH_PROFILE_LIGHTING_V1_WORKING_MEMORY_EXCEEDED);
+    // Deliberate new admission contract: this255-rule linger profile is only
+    // structurally valid, not activatable. Preserve the historical observation
+    // regression in an explicitly host-only fixture for the abandoned store;
+    // the production direct pool is tested independently at exactly8220 bytes.
     assert(noah_profile_lighting_v1_program_load(&view, &program));
     noah_lighting_history_bank_begin(&bank, &program, &arena);
     noah_lighting_facts_t facts = {0};
@@ -149,7 +155,7 @@ int main(int argc, char **argv) {
             uint64_t expected_order;
             assert(fscanf(file, "%u %u %u %u %" SCNu64 " %u", &rule, &thing, &visible, &wake, &expected_order, &members) == 6);
             noah_lighting_retained_t cell;
-            assert(noah_lighting_history_store_next(&bank.store, NOAH_LIGHTING_ARENA_FRAME, &cursor, &cell));
+            assert(noah_lighting_history_store_next(&bank.store, NOAH_LIGHTING_ARENA_CURRENT, &cursor, &cell));
             assert(noah_lighting_retained_rule(&cell) == rule && noah_lighting_retained_thing(&cell) == thing);
             noah_lighting_history_rule_t info;
             assert(noah_lighting_history_rule(&program, rule, &info));
@@ -157,6 +163,14 @@ int main(int argc, char **argv) {
                 fprintf(stderr, "%s step%u rule%u/thing%u metadata mismatch\n", name, steps, rule, thing);
                 return 1;
             }
+            // The revised experimental freeze pins consumable immutable batches,
+            // rather than duplicating non-rendering calendar/delivery metadata.
+            // Assert EVERY vector's metadata against current, and independently
+            // require exact frozen membership for every renderable batch.
+            noah_lighting_retained_t frozen;
+            bool pinned=noah_lighting_history_store_read(&bank.store,NOAH_LIGHTING_ARENA_FRAME,rule,thing,&frozen);
+            assert(pinned==(noah_lighting_retained_rendering(&cell) && noah_lighting_retained_batch(&cell)!=0u));
+            if(pinned){assert(noah_lighting_retained_order(&frozen)==expected_order);assert(noah_lighting_retained_batch(&frozen)==noah_lighting_retained_batch(&cell));}
             noah_lighting_batch_ref_t          ref    = noah_lighting_retained_batch(&cell);
             noah_lighting_owned_batch_reader_t reader = {0};
             if (members)
@@ -174,7 +188,7 @@ int main(int argc, char **argv) {
             }
         }
         noah_lighting_retained_t extra;
-        assert(!noah_lighting_history_store_next(&bank.store, NOAH_LIGHTING_ARENA_FRAME, &cursor, &extra));
+        assert(!noah_lighting_history_store_next(&bank.store, NOAH_LIGHTING_ARENA_CURRENT, &cursor, &extra));
         noah_lighting_history_store_clear(&bank.store, NOAH_LIGHTING_ARENA_FRAME);
         steps++;
     }

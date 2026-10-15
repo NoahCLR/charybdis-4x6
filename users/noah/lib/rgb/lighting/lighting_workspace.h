@@ -21,7 +21,7 @@ typedef union {
         noah_lighting_facts_t       facts;
         uint8_t                     encoded[NOAH_LIGHTING_EVENT_BATCH_BYTES];
     } capture;
-    uint8_t ordered_batch[NOAH_LIGHTING_BATCH_BYTES];
+    uint8_t ordered_batch[NOAH_LIGHTING_BATCH_SNAPSHOT_BYTES];
 } noah_lighting_workspace_t;
 // Other compiler geometries use the larger arm and must be measured against
 // their own policy; this assertion protects the recorded default configuration.
