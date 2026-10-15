@@ -759,11 +759,11 @@
         },
         {
           "name": "aggregate gesture RGB retained whole-batch observation",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_working_observe", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "rgb_matrix_task", "noah_lighting_working_observe", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "aggregate gesture main snapshot state qualification",
-          "functions": ["main", "matrix_scan", "noah_lighting_runtime_task", "noah_lighting_working_observe", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "matrix_scan", "noah_lighting_runtime_task", "noah_lighting_working_observe", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "full layout validation RGB admitted generation layout validation",
@@ -775,7 +775,7 @@
         },
         {
           "name": "aggregate gesture event qualification scan streaming delayed drain nested fallback",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_core_effect_plan_push_delayed_action_with_flags", "key_runtime_core_effect_plan_push", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_core_effect_plan_push_delayed_action_with_flags", "key_runtime_core_effect_plan_push", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture scan streaming delayed drain feedback projection",
@@ -783,7 +783,7 @@
         },
         {
           "name": "aggregate gesture event qualification scan streaming delayed drain feedback projection",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_core_effect_plan_push_delayed_action_with_flags", "key_runtime_core_effect_plan_push", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_project_live_tap_feedback", "key_runtime_core_project_effect", "key_runtime_core_project_commit_feedback", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_core_effect_plan_push_delayed_action_with_flags", "key_runtime_core_effect_plan_push", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_project_live_tap_feedback", "key_runtime_core_project_effect", "key_runtime_core_project_commit_feedback", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture handled press projection with fallback settlement during planning drain",
@@ -791,7 +791,7 @@
         },
         {
           "name": "aggregate gesture event qualification handled press projection with fallback settlement during planning drain",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture handled release projection with fallback settlement during planning drain",
@@ -799,7 +799,7 @@
         },
         {
           "name": "aggregate gesture event qualification handled release projection with fallback settlement during planning drain",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture matrix scan bounded deferred fallback settlement during planning drain",
@@ -807,7 +807,7 @@
         },
         {
           "name": "aggregate gesture event qualification matrix scan bounded deferred fallback settlement during planning drain",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture handled press delayed action fallback settlement during planning drain",
@@ -815,7 +815,7 @@
         },
         {
           "name": "aggregate gesture event qualification handled press delayed action fallback settlement during planning drain",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_settle_pending_fallback_hold", "key_runtime_core_stream_pending_fallback_holds", "key_runtime_transition_plan_push", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture handled press projection with fallback settlement",
@@ -823,7 +823,7 @@
         },
         {
           "name": "aggregate gesture event qualification handled press projection with fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture handled release projection with fallback settlement",
@@ -831,7 +831,7 @@
         },
         {
           "name": "aggregate gesture event qualification handled release projection with fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture matrix scan bounded deferred fallback settlement",
@@ -839,7 +839,7 @@
         },
         {
           "name": "aggregate gesture event qualification matrix scan bounded deferred fallback settlement",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_deferred_release_drain_dispatches", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture matrix scan tap feedback pulse projection",
@@ -847,7 +847,7 @@
         },
         {
           "name": "aggregate gesture event qualification matrix scan tap feedback pulse projection",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_project_live_tap_feedback", "key_runtime_core_project_effect", "key_runtime_core_project_commit_feedback", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_project_live_tap_feedback", "key_runtime_core_project_effect", "key_runtime_core_project_commit_feedback", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture handled press delayed action fallback settlement",
@@ -855,7 +855,7 @@
         },
         {
           "name": "aggregate gesture event qualification handled press delayed action fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_fill_single", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "dispatch_delayed_action_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "noah_action_press", "pd_mode_apply_command_effects", "noah_lighting_event_observe", "qualify_and_retain", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "complete behaviour collection event capture scan macro completion",

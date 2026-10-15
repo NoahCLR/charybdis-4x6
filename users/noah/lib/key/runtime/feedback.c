@@ -316,25 +316,23 @@ static bool key_feedback_token_allows_tap_release(const press_token_t *token) {
 }
 
 static bool key_feedback_token_uses_implicit_hold(const press_token_t *token) {
-    return token && token->handled_key && key_runtime_slot_interaction_uses_implicit_hold(token->interaction);
+    return token && token->handled_key && (token->interaction.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) != 0u;
 }
 
 static bool key_feedback_token_uses_fallback_hold(const press_token_t *token) {
-    return token && token->handled_key && key_runtime_slot_interaction_uses_fallback_hold(token->interaction);
+    return token && token->handled_key && (token->interaction.flags & HANDLED_KEY_FLAG_FALLBACK_HOLD) != 0u;
 }
 
-static handled_key_hold_semantics_t key_feedback_registered_hold_contract(key_runtime_slot_interaction_t interaction, uint16_t held_action, bool long_hold_reached) {
-    if (long_hold_reached && interaction.contract.long_hold.threshold_action == held_action) {
-        return interaction.contract.long_hold;
+static bool key_feedback_registered_hold_keeps_feedback(const key_runtime_slot_interaction_t *interaction, uint16_t held_action, bool long_hold_reached) {
+    if (long_hold_reached && interaction->contract.long_hold.threshold_action == held_action) {
+        return interaction->contract.long_hold.keeps_registered_feedback;
     }
 
-    if (interaction.contract.hold.threshold_action == held_action) {
-        return interaction.contract.hold;
+    if (interaction->contract.hold.threshold_action == held_action) {
+        return interaction->contract.hold.keeps_registered_feedback;
     }
 
-    return (handled_key_hold_semantics_t){
-        .keeps_registered_feedback = handled_key_hold_action_keeps_registered_feedback(noah_action_describe(held_action)),
-    };
+    return handled_key_hold_action_keeps_registered_feedback(noah_action_describe(held_action));
 }
 
 static bool key_feedback_hold_contract_uses_preview_layer(handled_key_hold_semantics_t semantics) {
@@ -419,9 +417,7 @@ static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token
     bool long_hold_reached = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.longer_hold_term;
 
     if (held_action != KC_NO) {
-        handled_key_hold_semantics_t active_contract = key_feedback_registered_hold_contract(token->interaction, held_action, long_hold_reached);
-
-        if (!active_contract.keeps_registered_feedback) {
+        if (!key_feedback_registered_hold_keeps_feedback(&token->interaction, held_action, long_hold_reached)) {
             return KEY_FEEDBACK_SEMANTIC_NONE;
         }
 

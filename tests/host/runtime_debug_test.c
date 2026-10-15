@@ -2120,6 +2120,39 @@ static void test_terminal_tap_branch_flush_fires_and_pulses(void) {
     CHECK(key_feedback_tap_branch_map_get(tap_branch_map, key_pos) == 0u);
 }
 
+static void registered_hold_feedback_projects_exact_contract(void) {
+    // Query the real collector with a registered held-action lease. Different
+    // cached contracts distinguish long-hold precedence, normal-hold match and
+    // the action-derived fallback, including an action that hides feedback.
+    for (unsigned variant = 0u; variant < 8u; variant++) {
+        test_reset_stubs();
+        noah_runtime_reset_for_test();
+        const keypos_t key = {.row = 0u, .col = 1u};
+        test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_HELD_ACTION_KEY, key, fake_time);
+        key_runtime_core_state_t *state = key_runtime_core_state();
+        const press_token_t *observed = key_runtime_core_press_token_at(key);
+        CHECK(observed);
+        press_token_t *token = NULL;
+        for (unsigned i = 0u; i < ARRAY_SIZE(state->press_tokens); i++)
+            if (&state->press_tokens[i] == observed) token = &state->press_tokens[i];
+        CHECK(token);
+        token->interaction.binding.long_hold.present = variant != 0u;
+        token->interaction.binding.longer_hold_term = 0u;
+        token->interaction.contract.hold.threshold_action = variant < 4u ? KC_B : KC_C;
+        token->interaction.contract.hold.keeps_registered_feedback = variant != 2u;
+        token->interaction.contract.long_hold.threshold_action = variant == 1u || variant == 3u ? KC_B : KC_C;
+        token->interaction.contract.long_hold.keeps_registered_feedback = variant == 3u;
+        if (variant == 6u) token->interaction.flags |= HANDLED_KEY_FLAG_IMPLICIT_HOLD;
+        if (variant == 7u) token->interaction.flags |= HANDLED_KEY_FLAG_FALLBACK_HOLD;
+        key_runtime_core_observe_held_action_register(key, variant == 5u ? MO(2) : KC_B);
+        uint8_t semantic[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
+        key_feedback_semantic_map(semantic);
+        key_feedback_semantic_t expected = KEY_FEEDBACK_SEMANTIC_NONE;
+        if (variant == 0u) expected = KEY_FEEDBACK_SEMANTIC_HOLD_ACTIVE_FLASHING;
+        if (variant == 3u || variant == 4u) expected = KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING;
+        CHECK(key_feedback_semantic_map_get(semantic, key) == expected);
+    }
+}
 static void test_key_feedback_flashing_visibility_tracks_each_owner_activation(void) {
     uint8_t  semantic_map[KEY_FEEDBACK_SEMANTIC_MAP_SIZE];
     uint8_t  visibility_bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -3593,6 +3626,7 @@ int main(void) {
     test_key_feedback_maps_rename_the_branch_on_every_tap();
     test_key_feedback_maps_hold_one_branch_name_across_a_slow_multi_tap();
     test_terminal_tap_branch_flush_fires_and_pulses();
+    registered_hold_feedback_projects_exact_contract();
     test_key_feedback_flashing_visibility_tracks_each_owner_activation();
     test_key_feedback_broad_owner_follows_newest_activation_without_release_restart();
     test_key_feedback_broad_owner_uses_activation_sequence_across_timer_wrap();

@@ -110,7 +110,9 @@ static bool gesture(const noah_lighting_facts_t *facts, keypos_t key, uint8_t ma
     state = shown_state(facts, key, &branch);
     if ((state & mask) == 0u) return false;
     noah_lighting_subject_init(subject, NOAH_LIGHTING_THING_BEHAVIOUR, NOAH_PROFILE_LIGHTING_V1_ANY, identity_slot(state, branch));
-    key_origin_bitmap_fill_single(subject->keys, key);
+    // subject_init already cleared every owner bit. Add this owner directly;
+    // the fill helper would clear it again while retaining another call frame.
+    key_origin_bitmap_add_keypos(subject->keys, key);
     subject->has_keys = true;
     subject->sides    = sides ? sides : split_side_mask_add_keypos(SPLIT_SIDE_MASK_NONE, key);
     return true;
