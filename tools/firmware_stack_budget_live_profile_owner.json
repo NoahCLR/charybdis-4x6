@@ -226,7 +226,7 @@
         },
         {
           "name": "handled press delayed action queue admission",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_queue_pending_release_dispatch_with_commit"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_transition_plan_project_items", "key_runtime_core_project_effect", "key_runtime_core_project_delayed_action", "key_runtime_core_queue_pending_release_dispatch_for_owner", "key_runtime_core_queue_pending_release_dispatch_with_commit", "key_runtime_keypos_pack", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "handled press projection with fallback settlement",
@@ -770,7 +770,7 @@
         },
         {
           "name": "scan public pointing snapshot query",
-          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "pd_mode_snapshot", "pd_mode_snapshot_fill_view"]
+          "functions": ["main", "matrix_scan", "noah_key_runtime_scan", "pd_mode_snapshot", "pd_mode_effective_traits", "noah_effective_pd_for_mask"]
         },
         {
           "name": "aggregate gesture RGB retained whole-batch observation",

@@ -64,9 +64,9 @@ existing sleep predicate; sleep still forces black and raw sensor observation
 has no extra continuation timer. Target8 selects keys on the shown layer from
 a cached native/behaviour basis; paint9 uses their direct layer/mode/macro
 identity. Reader failures retain previous pixels until a settled refresh.
-The enabled generic-event/retained-timing candidate uses conservative per-profile
-working-memory admission and causal split freshness; final linked acceptance
-remains in progress. The recorded default60-key/four-combo GCC15.2.0 artifact
+The enabled generic-event/retained-timing implementation uses conservative
+per-profile working-memory admission and causal split freshness. The recorded
+default60-key/four-combo GCC15.2.0 artifact
 has a scoped247808-byte static policy for this storage; core and stack policies
 are unchanged (D-F26). None of it has run on hardware.
 
@@ -120,7 +120,7 @@ input cadence remain unmeasured for this path.
   additive state kinds and tables, their capability/vector changes and the
   expanded split-facts contract, new event/timing construction constraints,
   working-memory cost/error/capability model and conservative split freshness.
-  Enabled linked acceptance and independent paired review remain pending.
+  Independent paired review and physical acceptance remain pending.
 
 - **The keyboard name needs broader hardware acceptance (D-F25).** Check
   Chrome's HID chooser, the system device list and Ark individually; that a
@@ -1480,15 +1480,16 @@ requests and main-before-ACK consumption. It resynchronizes still-live transient
 state rather than replaying source-expired events with a fresh interval.
 Nominal equal-rate local logical clocks, causal RTT and derived quantization
 bound remote age; unknown freshness suppresses transient paint. This is a
-software timing assumption, not a physical drift measurement. Enabled linked
-RAM/stack acceptance and hardware/cadence/high-water remain outstanding.
+software timing assumption, not a physical drift measurement. Linked RAM and
+reviewed stack paths have separate enforced policies; hardware/cadence/high-water
+remain outstanding.
 Keys-that target8 and what-it-does
 paint9 share a finite per-layer native/behaviour basis; queries compose from
 that cache and existing resident combo rows, with no reader I/O during the
 render walk. This implements the plan's cache intent without one bitmap per
 rule. Effective-profile and VIA publications invalidate it; main-context
-refresh rejects a generation interrupted by split publication. This partial
-phase3 implementation does not establish hardware acceptance.
+refresh rejects a generation interrupted by split publication. These software
+contracts do not establish hardware acceptance.
 
 New events are positive first-condition triggers with explicit flash timing;
 state filters retain unrestricted negation. Qualification uses the coherent
@@ -1497,8 +1498,9 @@ and restart expiry; nonqualifying repeats preserve it. Linger freezes the last
 whole matching batch per rule/thing when its full match ends. Producer capture
 uses an explicit compile gate with a required linked synchronous observer when
 enabled, and no external requirement or event capability when disabled. These
-constraints are detailed in the lighting spec; the incomplete producer
-foundation does not advertise an event or retention module.
+constraints are detailed in the lighting spec. The default RGB build links
+the strong synchronous consumer and advertises its enabled event/retention
+modules; a disabled capture build advertises none.
 Fallback settlement streams one effect through a synchronous caller-owned
 sink. Planner/drain projection and later execution have distinct stack
 lifetimes; both require linked coverage without moving scratch into globals
@@ -1537,7 +1539,8 @@ accuracy. Actual RTT and derived floor-to-ms rounding bound age, including
 assembly/transfer/consume delay. Reset/role/profile/discontinuity/ambiguous wrap
 invalidate evidence. Conditional no-resurrection does not prove oscillator drift,
 cadence or hardware high-water. The governing arithmetic and continuity limits
-are in the lighting spec. Integration and enabled linked acceptance remain open.
+are in the lighting spec. Independent paired review and hardware acceptance
+remain open.
 
 
 D-F26's retained-lighting allocation uses the fixed8220-byte admission pool,

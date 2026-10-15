@@ -265,6 +265,27 @@ def _is_register_operand(operands: str) -> bool:
     return re.fullmatch(_REGISTER_RE, operands.strip().lower()) is not None
 
 
+def _is_chibios_armv6m_context_switch(function: str, instructions: Sequence[DisassemblyInstruction]) -> bool:
+    # Pinned ChibiOS chcoreasm.S: the outgoing thread saves nine words before
+    # storing its SP, then loads a different thread's SP and restores its saved
+    # nine words. Charge the outgoing save to the reviewed caller's stack.
+    # This is deliberately an exact linked instruction match, not permission
+    # to ignore arbitrary SP replacement or a bound on the resumed thread.
+    expected = (
+        ("push", "{r4,r5,r6,r7,lr}"),
+        ("mov", "r4,r8"), ("mov", "r5,r9"),
+        ("mov", "r6,sl"), ("mov", "r7,fp"),
+        ("push", "{r4,r5,r6,r7}"), ("mov", "r3,sp"),
+        ("str", "r3,[r1,#12]"), ("ldr", "r3,[r0,#12]"),
+        ("mov", "sp,r3"), ("pop", "{r4,r5,r6,r7}"),
+        ("mov", "r8,r4"), ("mov", "r9,r5"),
+        ("mov", "sl,r6"), ("mov", "fp,r7"),
+        ("pop", "{r4,r5,r6,r7,pc}"),
+    )
+    actual = tuple((i.mnemonic, re.sub(r"\s+", "", i.operands)) for i in instructions)
+    return function == "__port_switch" and actual == expected
+
+
 def _analyze_function_frame(
     function: str,
     instructions: Sequence[DisassemblyInstruction],
@@ -277,6 +298,9 @@ def _analyze_function_frame(
     nested call is nevertheless rejected so a toolchain/flag regression cannot
     silently move part of a prologue beyond the analyzed entry frame.
     """
+
+    if _is_chibios_armv6m_context_switch(function, instructions):
+        return StackUsageRecord(function, canonicalize_function_name(function), 9 * 4, "linked-disassembly", elf_path, 0)
 
     current_depth = 0
     maximum_depth = 0

@@ -119,6 +119,44 @@ class FirmwareStackBudgetToolTest(unittest.TestCase):
         self.assertFalse(worker.bounded)
         self.assertIn("late-stack-allocation", worker.qualifier)
 
+    def test_exact_chibios_context_save_is_charged_to_outgoing_thread(self):
+        output = """
+100002cc <__port_switch>:
+100002cc:\tb5f0\tpush\t{r4, r5, r6, r7, lr}
+100002ce:\t4644\tmov\tr4, r8
+100002d0:\t464d\tmov\tr5, r9
+100002d2:\t4656\tmov\tr6, sl
+100002d4:\t465f\tmov\tr7, fp
+100002d6:\tb4f0\tpush\t{r4, r5, r6, r7}
+100002d8:\t466b\tmov\tr3, sp
+100002da:\t60cb\tstr\tr3, [r1, #12]
+100002dc:\t68c3\tldr\tr3, [r0, #12]
+100002de:\t469d\tmov\tsp, r3
+100002e0:\tbcf0\tpop\t{r4, r5, r6, r7}
+100002e2:\t46a0\tmov\tr8, r4
+100002e4:\t46a9\tmov\tr9, r5
+100002e6:\t46b2\tmov\tsl, r6
+100002e8:\t46bb\tmov\tfp, r7
+100002ea:\tbdf0\tpop\t{r4, r5, r6, r7, pc}
+"""
+        frame = stack_budget.parse_objdump_disassembly(output, Path("firmware.elf")).records[0]
+        self.assertTrue(frame.bounded)
+        self.assertEqual(frame.bytes, 36)
+        # No symbol-only exemption: any changed save/restore/transfer shape
+        # continues through the generic analyzer and rejects the unknown SP.
+        for changed in (
+            output.replace("<__port_switch>", "<other_switch>"),
+            output.replace("r3, [r1, #12]", "r3, [r1, #16]"),
+            output.replace("r3, [r0, #12]", "r3, [r1, #12]"),
+            output.replace("r4, r8", "r4, r9"),
+            output.replace("{r4, r5, r6, r7, lr}", "{r4, r5, r6, lr}"),
+            output.replace("{r4, r5, r6, r7, pc}", "{r4, r5, r6, pc}"),
+        ):
+            with self.subTest(changed=changed):
+                frame = stack_budget.parse_objdump_disassembly(changed, Path("firmware.elf")).records[0]
+                self.assertFalse(frame.bounded)
+                self.assertIn("unknown-stack-restore", frame.qualifier)
+
     def test_objdump_parser_records_direct_tail_calls(self):
         output = """
 10000000 <outer>:

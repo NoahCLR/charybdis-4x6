@@ -661,6 +661,21 @@ operation bounds and host tests do not prove physical cadence, global or
 interrupt-stack maximum, allocator high-water or hardware acceptance. Those
 remain explicit physical acceptance obligations before release.
 
+## Linked RTOS context-save accounting
+
+The reviewed timer-restoration paths include ChibiOS's ARMv6-M `__port_switch`.
+At the pinned linked instruction sequence, it pushes r4–r7/lr (20 bytes), moves
+r8–r11 into r4–r7 and pushes those (16 bytes), then stores that outgoing stack
+pointer before loading another thread's saved stack. The outgoing reviewed
+caller is therefore charged36 bytes. The other thread's restored continuation
+belongs to that thread's stack; this is no global/thread/interrupt maximum proof.
+
+The analyzer recognizes only the exact named16-instruction linked save/store/
+load/restore sequence, including the context offsets and transfer registers.
+A different sequence or arbitrary stack-pointer replacement remains unbounded
+and fails the gate. This adds actual context-save coverage without a manifest
+frame override, an excluded call edge or a changed stack policy.
+
 ## Admitted retained lighting candidate
 
 The unreleased phase3 candidate reserves8220 bytes per half for new flash/linger
