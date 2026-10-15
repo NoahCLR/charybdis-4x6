@@ -4,6 +4,7 @@
 
 #include "lighting_engine.h"
 #include "lighting_workspace.h"
+#include "lighting_history_index.h"
 
 #include <string.h>
 #ifdef NOAH_LIGHTING_TIMING_TEST_BACKEND
@@ -371,12 +372,9 @@ static rgb_t mix(rgb_t below, rgb_t colour, uint8_t amount) {
     };
 }
 
-static void paint_subject(const noah_lighting_scene_t *scene, const rule_t *rule, const placed_subject_t *placed, noah_lighting_leds_t leds, noah_lighting_frame_t *frame, noah_lighting_resolve_info_t *info) {
-    noah_lighting_subject_t       subject;
-    noah_lighting_paint_context_t context = {.scene = scene, .subject = &subject, .time = scene->paint_time, .effect_used = &info->effect_used};
+static void paint_owned_subject(const noah_lighting_scene_t *scene, const rule_t *rule, const placed_subject_t *placed, const noah_lighting_subject_t *subject, noah_lighting_leds_t leds, noah_lighting_frame_t *frame, noah_lighting_resolve_info_t *info) {
+    noah_lighting_paint_context_t context = {.scene = scene, .subject = subject, .time = scene->paint_time, .effect_used = &info->effect_used};
 
-    noah_lighting_subject_init(&subject, placed->thing_kind, placed->thing, placed->slot);
-    subject.outcome = placed->outcome;
     if (noah_lighting_paint_changes_with_time(rule->paint.kind) || (rule->has_background && noah_lighting_paint_changes_with_time(rule->background.kind))) info->live = true;
     for (uint8_t led = 0u; led < NOAH_LIGHTING_LED_COUNT; led++) {
         noah_lighting_leds_t bit = NOAH_LIGHTING_LED_BIT(led);
@@ -401,6 +399,42 @@ static void paint_subject(const noah_lighting_scene_t *scene, const rule_t *rule
         frame->colour[led] = colour;
         frame->painted |= bit;
     }
+}
+
+static void paint_subject(const noah_lighting_scene_t *scene, const rule_t *rule, const placed_subject_t *placed, noah_lighting_leds_t leds, noah_lighting_frame_t *frame, noah_lighting_resolve_info_t *info) {
+    noah_lighting_subject_t subject;
+    noah_lighting_subject_init(&subject, placed->thing_kind, placed->thing, placed->slot);
+    subject.outcome = placed->outcome;
+    paint_owned_subject(scene, rule, placed, &subject, leds, frame, info);
+}
+
+typedef struct {
+    const noah_lighting_scene_t         *scene;
+    const rule_t                        *rule;
+    const noah_lighting_retained_view_t *view;
+    noah_lighting_leds_t                 leds;
+    noah_lighting_frame_t               *frame;
+    noah_lighting_resolve_info_t        *info;
+} retained_painter_t;
+static uint64_t retained_natural(void *context, const noah_lighting_subject_t *subject, uint64_t entry, uint8_t ordinal) {
+    const retained_painter_t *painter = context;
+    return painter->view->natural(painter->view->context, subject, entry, ordinal);
+}
+static void retained_paint(void *context, const noah_lighting_subject_t *subject, const noah_lighting_priority_t *priority) {
+    (void)priority;
+    retained_painter_t *painter = context;
+    placed_subject_t    placed  = {.leds = noah_lighting_target(painter->rule->target.kind, painter->scene, painter->rule->target.params, subject) & painter->leds, .thing_kind = subject->thing_kind, .thing = subject->thing, .slot = subject->slot, .outcome = subject->outcome, .amount = 255u};
+    paint_owned_subject(painter->scene, painter->rule, &placed, subject, painter->leds, painter->frame, painter->info);
+}
+bool noah_lighting_apply_retained_rule(const noah_lighting_scene_t *scene, uint8_t index, const noah_lighting_retained_view_t *view, noah_lighting_leds_t leds, noah_lighting_frame_t *frame, noah_lighting_resolve_info_t *info) {
+    if (!scene || !view || !view->store || !view->natural || !frame || !info) return false;
+    noah_lighting_history_rule_t description;
+    if (!noah_lighting_history_rule(scene->program, index, &description)) return false;
+    if (!description.retained) return true;
+    rule_t rule;
+    parse_rule(scene->program, index, &rule);
+    retained_painter_t painter = {.scene = scene, .rule = &rule, .view = view, .leds = leds, .frame = frame, .info = info};
+    return noah_lighting_retained_render(view->store, NOAH_LIGHTING_ARENA_FRAME, index, &description.timing, retained_natural, retained_paint, &painter, view->candidates);
 }
 
 // Applies rules [first, end) bottom up over `leds` of `frame`.

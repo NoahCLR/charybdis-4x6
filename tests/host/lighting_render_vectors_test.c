@@ -13,6 +13,7 @@
 #include "users/noah/lib/rgb/lighting/lighting_occurrence.h"
 #include "users/noah/lib/rgb/lighting/lighting_event_capture.h"
 #include "users/noah/lib/rgb/lighting/lighting_batch.h"
+#include "users/noah/lib/rgb/lighting/lighting_history_observe.h"
 #include "users/noah/lib/rgb/lighting/lighting_workspace.h"
 #include "users/noah/lib/rgb/lighting/lighting_keymap.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
@@ -330,6 +331,62 @@ static void check_actual_fact_batches(const noah_profile_lighting_v1_program_t *
     }
 }
 
+static noah_lighting_batch_arena_t history_arena;
+static noah_lighting_history_bank_t history_bank;
+static uint8_t history_bytes[32768], history_scratch[NOAH_LIGHTING_BATCH_BYTES];
+static uint64_t history_natural(void *context, const noah_lighting_subject_t *subject, uint64_t entry, uint8_t ordinal) {
+    (void)ordinal;
+    if (*(const bool *)context) return UINT64_MAX-entry;
+    // These shared cases use actual layer/behaviour/key/board walkers. This
+    // fixture binding does not implement the future optional-module interface.
+    if (subject->thing_kind == NOAH_LIGHTING_THING_LAYER) return 255u-subject->thing;
+    for(unsigned key=0;key<NOAH_LIGHTING_MATRIX_KEYS;key++)
+        if(subject->keys[key/8] & (1u<<(key%8)))return key;
+    return 0;
+}
+static void check_history_pixels(FILE *file, const char *name, noah_profile_lighting_v1_program_t *program, noah_lighting_facts_t *facts, bool events) {
+    unsigned long delta;unsigned long long order;unsigned layers,count;
+    assert(fscanf(file,"%lu %llu %u %u",&delta,&order,&layers,&count)==4);
+    memset(facts,0,sizeof *facts);facts->layer_active[0]=layers;facts->layer_active[1]=layers>>8;
+    for(unsigned i=0;i<count;i++) {
+        unsigned key,id,slot,outcome;assert(fscanf(file,"%u %u %u %u",&key,&id,&slot,&outcome)==4);
+        uint8_t *at=facts->behaviour+key*KEY_FEEDBACK_LIGHTING_RECORD_BYTES;
+        at[0]=id+1;at[1]=slot+1;at[2]=outcome;
+    }
+    read_hex(file,facts->key_pressed,sizeof facts->key_pressed);
+    noah_lighting_event_t event={0};uint8_t event_owners[KEY_ORIGIN_BITMAP_SIZE];bool has_event=false;
+    if(events) {
+        unsigned kind,thing,branch,slot,outcome,key,owners;
+        assert(fscanf(file,"%u %u %u %u %u %u %u",&kind,&thing,&branch,&slot,&outcome,&key,&owners)==7);
+        read_hex(file,event_owners,sizeof event_owners);
+        has_event=kind!=255u;
+        event=(noah_lighting_event_t){.kind=kind,.thing=thing,.branch=branch,.slot=slot,.outcome=outcome,.key=key_at(key),.owners=owners?event_owners:NULL};
+    }
+    assert(noah_lighting_history_bank_advance(&history_bank,(uint32_t)delta));
+    assert(noah_lighting_history_observe(&history_bank,facts,(uint64_t)order,history_scratch));
+    if(has_event) {
+        noah_lighting_event_group_t group;
+        if(noah_lighting_event_qualify(program,facts,&event,(uint64_t)order,&group))
+            assert(noah_lighting_history_bank_event(&history_bank,&group,false,history_scratch));
+        memset(event_owners,0xa5,sizeof event_owners);
+    }
+    assert(noah_lighting_history_store_freeze(&history_bank.store));
+    noah_lighting_frame_t frame={0};noah_lighting_resolve_info_t info={0};
+    noah_lighting_scene_t scene={.program=program,.facts=facts,.keymap_generation=keymap_generation};
+    noah_lighting_retained_view_t view={.store=&history_bank.store,.natural=history_natural,.context=&events};
+    uint32_t reads=storage_reads;
+    for(unsigned rule=program->rule_count;rule-- >0;)
+        assert(noah_lighting_apply_retained_rule(&scene,rule,&view,NOAH_LIGHTING_ALL_LEDS,&frame,&info));
+    assert(storage_reads==reads);
+    for(unsigned led=0;led<NOAH_LIGHTING_LED_COUNT;led++) {
+        char expected[16],actual[16];assert(fscanf(file,"%15s",expected)==1);
+        if(frame.painted & NOAH_LIGHTING_LED_BIT(led))snprintf(actual,sizeof actual,"%02x%02x%02x",frame.colour[led].r,frame.colour[led].g,frame.colour[led].b);
+        else snprintf(actual,sizeof actual,"-");
+        if(strcmp(expected,actual)) { fprintf(stderr,"retained pixels %s order%llu LED%u expected%s got%s\n",name,order,led,expected,actual);exit(1); }
+    }
+    noah_lighting_history_store_clear(&history_bank.store,NOAH_LIGHTING_ARENA_FRAME);
+}
+
 int main(int argc, char **argv) {
     uint8_t idle;
     input_elapsed = 900000u;
@@ -350,7 +407,10 @@ int main(int argc, char **argv) {
     static uint8_t                            payload[10000];
     char                                      word[96], name[96];
     size_t                                    cases = 0, steps = 0, occurrence_cases = 0, occurrence_steps = 0;
-    bool occurrence_case = false;
+    bool occurrence_case = false, history_case = false, history_events = false;
+    size_t history_cases=0,history_steps=0;
+    noah_lighting_batch_arena_init(&history_arena,history_bytes,sizeof history_bytes);
+    noah_lighting_history_store_init(&history_bank.store,&history_arena);
     uint16_t peak_clocks = 0u;
     noah_profile_lighting_v1_limits_t         limits = noah_profile_lighting_v1_default_limits();
 
@@ -365,7 +425,11 @@ int main(int argc, char **argv) {
         key_leds[key] = (int8_t)led;
     }
     while (fscanf(file, "%95s", word) == 1) {
-        if (strcmp(word, "CASE") == 0 || strcmp(word, "OCCURRENCE") == 0) {
+        if (strcmp(word, "CASE") == 0 || strcmp(word, "OCCURRENCE") == 0 || !strcmp(word,"HISTORY") || !strcmp(word,"EVENT_HISTORY")) {
+            noah_lighting_history_store_clear(&history_bank.store,NOAH_LIGHTING_ARENA_FRAME);
+            noah_lighting_history_store_clear(&history_bank.store,NOAH_LIGHTING_ARENA_CURRENT);
+            history_events = !strcmp(word,"EVENT_HISTORY");
+            history_case = history_events || !strcmp(word,"HISTORY");
             occurrence_case = !strcmp(word, "OCCURRENCE");
             noah_profile_lighting_v1_view_t view;
             assert(fscanf(file, "%95s %19999s", name, payload_hex) == 2);
@@ -378,9 +442,11 @@ int main(int argc, char **argv) {
             assert(noah_profile_lighting_v1_decode(payload, length, &limits, &view, NULL) == NOAH_PROFILE_LIGHTING_V1_OK);
             assert(noah_profile_lighting_v1_program_load(&view, &program));
             noah_lighting_engine_program_changed();
-            if (occurrence_case) occurrence_cases++; else cases++;
+            if(history_case) { noah_lighting_history_bank_begin(&history_bank,&program,&history_arena);history_cases++; }
+            else if (occurrence_case) occurrence_cases++; else cases++;
             continue;
         }
+        if(!strcmp(word,"OBSERVE")) { assert(history_case);check_history_pixels(file,name,&program,&facts,history_events);history_steps++;continue; }
         if (!strcmp(word, "QUALIFY")) {
             assert(occurrence_case);
             check_occurrence(file, name, &program, &facts);
@@ -519,7 +585,11 @@ int main(int argc, char **argv) {
         }
         steps++;
     }
+    noah_lighting_history_store_clear(&history_bank.store,NOAH_LIGHTING_ARENA_CURRENT);
+    assert(!history_arena.used);
     fclose(file);
+    assert(history_cases==8 && history_steps==45);
+    printf("lighting actual retained target/paint pixels: %zu cases/%zu frames passed\n",history_cases,history_steps);
     assert(cases >= 30 && steps >= 60);
     assert(peak_clocks >= 1000u); // Adversarial distinct signatures, not only duplicate rules.
     printf("compact timing: peak %u, proved live bound %u\n", peak_clocks, noah_lighting_test_live_bound());

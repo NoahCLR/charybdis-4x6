@@ -1466,7 +1466,10 @@ producer/qualification and QMK-adapter fixtures to shared state/event calendars
 and grouped delivery. A typed single-arena alternative now owns current and
 frozen metadata beside immutable full batches, sharing only exact complete
 histories with independent rule membership and splitting on divergence. Frozen
-streaming has no placement-array subject cap. Target bank sizing, natural-priority
+streaming has no placement-array subject cap. Coherent state observation groups
+actual fact subjects into each thing's full last matching batch. A retained-rule
+paint seam now exercises actual targets/paints against shared state/event pixel
+traces, without requalifying captured occurrence filters. Target bank sizing, natural-priority
 module bindings, renderer integration and enabled linked acceptance remain
 unfinished. The
 allocation-free lifetime calendar implements the settled matching/tail/event

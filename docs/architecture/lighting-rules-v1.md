@@ -861,6 +861,33 @@ consumer acceptance remain required. The old flat owner remains an independent
 comparison surface in producer and QMK-adapter fixtures, both of which also run
 against this arena-backed bank.
 
+`lighting_history_observe` consumes a coherent state frame after local calendar
+advancement. It evaluates the rule's independent filters, walks the actual
+first fact and groups **all** matching subjects for each thing into one ordered
+batch. Partial same-thing departure refreshes that live batch; a full match end
+freezes its last batch. Negative-first and unconditional rules use the board
+subject. A frame's monotonic observation token is common to its new entries;
+refresh preserves the earlier entry token, while full re-entry replaces it.
+The walk neither recollects facts nor reads profile storage. Its caller-owned
+batch scratch must coexist with the immutable facts. Failures are exposed;
+accepted-domain reserve remains the production owner's obligation.
+
+`noah_lighting_apply_retained_rule` streams one authored rule's frozen histories
+through the same target, paint, brightness and background composition as the
+ordinary engine. It passes the full retained subject, including departed owners,
+slot and outcome, to relative targeting and painting. It does not requalify
+filters: event filters were captured at occurrence, and a state tail retains
+its last whole matching batch. The caller supplies that fact's natural priority
+and a same-publication frame store. Shared `historyObservations` and
+`historyEvents` cases compare the resulting pixels against the reference walk,
+in addition to independent metadata/owner assertions. They cover delayed
+visibility, full/partial departures, nonqualifying and qualifying repeats,
+per-thing coexistence and expiry, high rule/id values and no resurrection after
+later filter gain. These are component APIs; the normal scene loop, synthetic
+fade destination, production natural-priority bindings, bank allocation and
+main/capture/RPC activation still require complete integration and linked
+acceptance. Their presence alone advertises no event/retention capability.
+
 Renderer placement and synchronous occurrence capture share one explicitly
 owned workspace. The recorded60-key/four-combo/full-module configuration uses
 1024 bytes for64 placed subjects; capture holds621 fact bytes,56-byte native

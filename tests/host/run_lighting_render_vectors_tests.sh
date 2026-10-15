@@ -110,6 +110,24 @@ for case in fixture.get("occurrences", []):
         fields = [step["order"], event["kind"], event["thing"], event.get("branch",0), event.get("slot",0), event.get("outcome",0),
                   event.get("key",255), int(event.get("owners") is not None), layers, situation.get("hostLocks",0), situation.get("macroPlaying",255), *modifiers]
         lines.append("QUALIFY " + " ".join(map(str,fields)) + " " + bitmap(event.get("owners") or []) + " " + bitmap(situation.get("pressedKeys",[])) + " " + (step["expect"] or "-"))
+for case in fixture['historyObservations']:
+    lines.append(f"HISTORY {case['name']} {case['hex']}")
+    for step in case['steps']:
+        data=step['situation']; behaviours=data.get('behaviour',{}).get('keys',{})
+        fields=[step['elapsed'],step['order'],sum(1<<layer for layer in set(data.get('layers',[]))|{0}),len(behaviours)]
+        for key,item in sorted(behaviours.items(),key=lambda p:int(p[0])):
+            fields += [key,item['id'],{'hold':0,'long':1,'tap':2}[item['state']],item.get('outcome',0)]
+        fields += [bitmap(data.get('pressedKeys',[])),*step['pixels']]
+        lines.append('OBSERVE '+' '.join(map(str,fields)))
+for case in fixture['historyEvents']:
+    lines.append(f"EVENT_HISTORY {case['name']} {case['hex']}")
+    for step in case['steps']:
+        data=step['situation'];event=step['event']
+        fields=[step['elapsed'],step['order'],sum(1<<layer for layer in set(data.get('layers',[]))|{0}),0,bitmap([])]
+        fields += [event['kind'] if event else 255,event['thing'] if event else 0,event.get('branch',0) if event else 0,
+                   event.get('slot',0) if event else 0,event.get('outcome',0) if event else 0,
+                   event.get('key',255) if event else 255,int(event is not None and event.get('owners') is not None),bitmap(event.get('owners',[]) if event else [])]
+        fields += step['pixels'];lines.append('OBSERVE '+' '.join(map(str,fields)))
 pathlib.Path(sys.argv[2]).write_text("\n".join(lines) + "\n")
 PY
 

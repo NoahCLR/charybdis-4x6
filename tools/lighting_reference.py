@@ -1693,6 +1693,126 @@ def retained_ordering_vectors():
     return cases
 
 
+def history_observation_vectors(limits):
+    """Coherent frame -> full last matching batches, independent of storage."""
+    cases = []
+    C, N, T, P, G = SLOT_CONDITION, SLOT_NEGATED, SLOT_TARGET, SLOT_PAINT, SLOT_TIMING
+    def state(*conditions, show=0, linger=200, colour=0):
+        return rule(*conditions, part(T,4), part(P,2,colour),
+                    *([part(G,1,show&255,show>>8)] if show else []), part(G,2,linger&255,linger>>8))
+    def add(name, rules, steps):
+        payload = encode(dict(rules=rules,palette=PALETTE[:3])); program = validate(payload, limits)
+        renderer = Renderer(program, limits)
+        histories, entries, output = {}, {}, []
+        for elapsed, order, data in steps:
+            situation = Situation(data, limits)
+            for clock in histories.values(): clock.observe(elapsed, 'idle', None)
+            expected = []
+            for index, item in enumerate(program['rules']):
+                parameters = { {1:'show_after',2:'linger',3:'flash'}[kind]: values[0] | values[1]<<8 for kind,values in item['timings'] }
+                if item['flags'] & 1 or not parameters.get('linger'): continue
+                filters = item['conditions']; subjects = [subject(0,ANY)]
+                if filters and not filters[0][0]:
+                    _,kind,values=filters[0]; subjects=situation.subjects(kind,values); filters=filters[1:]
+                if any(bool(situation.subjects(kind,values)) == neg for neg,kind,values in filters): subjects=[]
+                batches = {}
+                for subj in subjects: batches.setdefault(subj['thing'],[]).append(subj)
+                things = set(batches) | {thing for r,thing in histories if r==index}
+                for thing in sorted(things):
+                    key=(index,thing)
+                    if key not in histories: histories[key]=ConditionLifetime(**parameters)
+                    clock=histories[key]; batch=batches.get(thing)
+                    if batch and clock.phase!='matching': entries[key]=order
+                    result=clock.observe(0,'match' if batch else 'depart',batch)
+                    if clock.phase=='absent': continue
+                    frozen=[]
+                    for subj in result['batch'] or []:
+                        frozen.append(dict(kind=subj['kind'],thing=subj['thing'],slot=subj['slot'],outcome=subj.get('outcome',0),keys=sorted(subj['keys']),halves=sorted(subj['halves'])))
+                    expected.append(dict(rule=index,thing=thing,entry=str(entries[key]),visible=result['visible'],wake=result['wake'],batch=frozen))
+            painted=[]
+            for index,item in enumerate(program['rules']):
+                members=[]
+                for cell in expected:
+                    if cell['rule']!=index or not cell['visible']:continue
+                    for ordinal,member in enumerate(cell['batch']):
+                        subj=subject(member['kind'],member['thing'],member['slot'],member['keys'],member['halves'])
+                        subj['outcome']=member['outcome']
+                        natural=255-member['thing'] if member['kind']==1 else min(member['keys'],default=0)
+                        members.append(((natural,-int(cell['entry']),member['kind'],member['thing'],ordinal),subj))
+                for _,subj in sorted(members,key=lambda value:value[0]):
+                    painted.append((index,item,subj,255,renderer.target(*item['target'],subj,situation)))
+            pixels=frame_text([renderer.walk(painted,0,led,situation,0,None) for led in range(LED_COUNT)])
+            output.append(dict(elapsed=elapsed,order=str(order),situation=data,expect=expected,pixels=pixels))
+        cases.append(dict(name=name,hex=payload.hex(),steps=output))
+    def behaviour(rows):
+        return dict(behaviour=dict(keys={str(k):dict(id=i,state='hold',outcome=o) for k,i,o in rows},owners={}))
+    add('same-thing-partial-departure-freezes-only-last-whole-batch',
+        [state(part(C,8,127,4))],
+        [(0,1,behaviour([(0,127,2),(59,127,3)])),(50,2,behaviour([(59,127,7)])),
+         (50,3,{}),(199,4,{}),(1,5,{})])
+    add('coherent-filter-loss-reappearance-and-independent-rules',
+        [state(part(C,8,255,4),part(C,1,1),show=100),state(part(C,8,255,4),part(N,1,1),colour=2)],
+        [(0,1,dict(behaviour([(0,127,2)]),layers=[1])),(99,2,behaviour([(0,127,3)])),
+         (1,3,dict(behaviour([(0,127,4)]),layers=[1])),(100,4,dict(behaviour([(0,127,5)]),layers=[1])),
+         (1,5,behaviour([(0,127,6)])),(199,6,{}),(1,7,{})])
+    add('negated-first-and-unconditional-board-match',
+        [state(part(N,14,59)),state(colour=2),state(part(C,1,1),show=50,linger=65535)],
+        [(0,1,{}),(50,2,dict(pressedKeys=[59],layers=[1])),(49,3,dict(pressedKeys=[59],layers=[1])),
+         (1,4,dict(pressedKeys=[59],layers=[1])),(1,5,dict(pressedKeys=[59])),(65535,6,{})])
+    add('any-layer-natural-batch-and-independent-high-id',
+        [state(part(C,1,255)),state(part(C,8,127,4),show=65535,linger=65535)],
+        [(0,1,dict(behaviour([(0,127,2)]),layers=[1,15])),
+         (65534,2,dict(behaviour([(0,127,3)]),layers=[15])),
+         (1,3,dict(behaviour([(59,127,4)]),layers=[15])),(1,4,{}),(65534,5,{}),(1,6,{})])
+    add('high-rule-id-and-high-key-index',
+        [dict(state(part(C,14,255),linger=65535),flags=1) for _ in range(254)] + [state(part(C,14,255),linger=65535)],
+        [(0,1,dict(pressedKeys=[0,59])),(1,2,dict(pressedKeys=[59])),(65534,3,{}),(1,4,{})])
+    return cases
+
+
+def history_event_vectors(limits):
+    """Captured D2 filters + independent flash histories through pixel paint."""
+    C,T,P,G=SLOT_CONDITION,SLOT_TARGET,SLOT_PAINT,SLOT_TIMING
+    cases=[]
+    def add(name,show,inputs):
+        default=[4,NONE,NONE,0,NONE,NONE,NONE,NONE]
+        records=[[INHERIT]*8 for _ in range(128)];records[126]=[INHERIT,INHERIT,INHERIT,2,INHERIT,INHERIT,INHERIT,INHERIT]
+        payload=encode(dict(palette=PALETTE[:3],things=[dict(kind=4,default=default,records=records)],
+                            rules=[rule(part(C,25,255,255),part(C,1,1),part(T,4),part(P,3),*([part(G,1,show&255,show>>8)] if show else []),part(G,3,244,1))]))
+        program=validate(payload,limits);renderer=Renderer(program,limits)
+        clocks={};orders={};steps=[]
+        for elapsed,order,data,event in inputs:
+            situation=Situation(data,limits)
+            for clock in clocks.values():clock.observe(elapsed,'idle',None)
+            qualified=qualify_occurrence(program,situation,event,order) if event else None
+            if qualified:
+                group=decode_event_group(bytes.fromhex(qualified));thing=group['thing']
+                keys=[key for key in range(60) if bytes.fromhex(group['owners'])[key//8] & 1<<(key%8)]
+                batch=[subject(group['thingKind'],thing,group['slot'],keys,set(map(key_half,keys)))]
+                batch[0]['outcome']=group['outcome']
+                if thing not in clocks:clocks[thing]=ConditionLifetime(show_after=show,flash=500)
+                clocks[thing].observe(0,'event',batch);orders[thing]=order
+            painted=[]
+            for thing,clock in sorted(clocks.items(),key=lambda pair:-orders[pair[0]]):
+                visible=clock.observe(0,'idle',None)['visible']
+                if visible:
+                    for subj in clock.batch:
+                        item=program['rules'][0];painted.append((0,item,subj,255,renderer.target(*item['target'],subj,situation)))
+            pixels=frame_text([renderer.walk(painted,0,led,situation,0,None) for led in range(LED_COUNT)])
+            steps.append(dict(elapsed=elapsed,order=str(order),situation=data,event=event,pixels=pixels))
+        cases.append(dict(name=name,hex=payload.hex(),steps=steps))
+    def tap(thing,key):return dict(kind=6,thing=thing,branch=1,key=key)
+    add('occurrence-filter-repeat-full-footprint-and-independent-expiry',200,
+        [(0,1,dict(layers=[1]),None),(100,2,dict(layers=[1]),tap(127,0)),(199,3,{},None),(1,4,{},None),
+         (10,5,{},tap(127,55)),(10,6,dict(layers=[1]),tap(127,55)),(200,7,dict(layers=[1]),tap(126,55)),
+         (200,8,{},None),(100,9,{},None),(200,10,{},None)])
+    add('event-show-after-outside-original-flash-never-paints',700,
+        [(100,1,dict(layers=[1]),tap(127,0)),(499,2,dict(layers=[1]),None),(1,3,dict(layers=[1]),None),(200,4,dict(layers=[1]),None)])
+    add('later-state-gain-never-resurrects-unqualified-event',0,
+        [(100,1,{},tap(127,0)),(100,2,dict(layers=[1]),None),(500,3,dict(layers=[1]),None)])
+    return cases
+
+
 def history_index_vectors():
     cases=[]
     C,N,T,P,G=SLOT_CONDITION,SLOT_NEGATED,SLOT_TARGET,SLOT_PAINT,SLOT_TIMING
@@ -1755,6 +1875,8 @@ def build_vectors() -> dict:
         "lifetimes": lifetime_vectors(),
         "retainedOrdering": retained_ordering_vectors(),
         "historyIndex": history_index_vectors(),
+        "historyObservations": history_observation_vectors(limits),
+        "historyEvents": history_event_vectors(limits),
         "capability": capability_pages(limits),
     }
 
