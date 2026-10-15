@@ -13,17 +13,18 @@ void peer_close(void);
 void peer_changed(void);
 uint8_t peer_readiness(void);
 void peer_base_init(void);
-static bool use_base;
+static bool use_base, shared_scene = true;
+static unsigned zero_response_base, legacy_fact_calls;
 static unsigned base_calls, base_wire;
 static int readiness_override = -1;
 static bool lose_base, omit_base_reply;
 static slave_callback_t base_callback;
-bool noah_lighting_runtime_shared_scene(void) {return true;}
+bool noah_lighting_runtime_shared_scene(void) {return shared_scene;}
 // The legacy fact broadcaster is forbidden in retained-scene tests. These
 // builders are required only for role initialization/disabled branch linkage.
 void noah_lighting_facts_build_idle(uint8_t *p) {memset(p,0,NOAH_LIGHTING_SYNCED_BYTES);}
-void noah_lighting_facts_build_synced(uint8_t *p,bool gated) {(void)p;(void)gated;assert(!"legacy broadcaster bypassed coherent scene");}
-bool noah_lighting_facts_active(const uint8_t *p,bool gated) {(void)p;(void)gated;assert(!"legacy broadcaster bypassed coherent scene");return false;}
+void noah_lighting_facts_build_synced(uint8_t *p,bool gated) {(void)gated;assert(!shared_scene);memset(p,0,NOAH_LIGHTING_SYNCED_BYTES);}
+bool noah_lighting_facts_active(const uint8_t *p,bool gated) {(void)p;(void)gated;assert(!shared_scene);return false;}
 
 _Static_assert(sizeof(noah_lighting_facts_t)==621u,"two-instance transport must use the real complete compiled facts");
 static bool master,lose_request,lose_reply,bad_offset,bad_commit;
@@ -107,7 +108,14 @@ bool transaction_rpc_exec(int8_t id,uint8_t length,const void *request,uint8_t r
     if(lose_reply){advance_us(5000u);blocking_us+=5000u;}
     return !lose_reply;
 }
-bool transaction_rpc_send(int8_t id,uint8_t n,const void *p) {(void)id;(void)n;(void)p;assert(!"retained scene must request readiness on base");return false;}
+bool transaction_rpc_send(int8_t id,uint8_t n,const void *p) {
+    assert(!shared_scene);
+    if(id==PUT_SPLIT_RUNTIME_BASE_SYNC) {
+        assert(n==sizeof(split_runtime_base_sync_packet_t));zero_response_base++;
+        master=false;base_callback(n,p,0,NULL);master=true;
+    } else {assert(id==PUT_SPLIT_LIGHTING_FACTS_SYNC);legacy_fact_calls++;}
+    return true;
+}
 static void scan(void) {
     master=true;noah_lighting_working_advance(&banks[1],clocks[1]);
     if(pending_input && !banks[1].snapshot_ready) {
@@ -348,6 +356,12 @@ static void quiet_reboot_recovery(void) {
     for(unsigned i=0;i<200;i++)scan();
     assert(peer_readiness()==NOAH_LIGHTING_SCENE_READY);
     printf("ACTUAL BASE heartbeat readiness: quiet same-profile peer reboot/clock reset, once-only resync, pending/unknown/absent/lost/repeated reply, subsequent delta, idle0 lightingRPC PASS; %u base RPC/%u wireB (1B reply within existing allocation)\n",base_calls,base_wire);
+    // Capture-enabled capability alone does not add a response: a program
+    // without retained constructions takes the original base/fact path.
+    unsigned no_response=zero_response_base,old_facts=legacy_fact_calls;
+    shared_scene=false;master=true;split_runtime_sync();
+    assert(zero_response_base==no_response+1u && legacy_fact_calls>old_facts);
+    shared_scene=true;
     use_base=false;
 }
 int main(void) {

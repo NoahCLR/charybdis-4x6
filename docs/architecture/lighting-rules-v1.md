@@ -1065,6 +1065,11 @@ clock drift and allocator/stack high-water remain unproved.
 
 ### Qualified event groups (internal split protocol) — legacy component
 
+The following paragraphs describe the superseded **test-only** group protocol
+and its component guarantees. Its source-expired journal, numeric occurrence
+identities and proposed owner wiring are historical; they are not the enabled
+working-owner/snapshot v4 behavior specified above.
+
 `qmk_lighting_event_transport` binds the portable sender/receiver to actual
 `transaction_register_rpc` / `transaction_rpc_exec` with at most one bounded
 RPC per master step. The callback validates/stages only; slave main invokes
