@@ -1693,6 +1693,51 @@ def retained_ordering_vectors():
     return cases
 
 
+def history_index_vectors():
+    cases=[]
+    C,N,T,P,G=SLOT_CONDITION,SLOT_NEGATED,SLOT_TARGET,SLOT_PAINT,SLOT_TIMING
+    contract=json.loads(CONTRACT.read_text())
+    facts={r['id']:r for r in contract['registries']['facts']}
+    def case(name,rules):
+        payload=encode({'rules':rules});validate(payload,Limits())
+        descriptions=[];total=0
+        for r in rules:
+            kind=thing_kind=show=linger=flash=0;domain=1;selected=255
+            if not r['flags']&1:
+                first=r['parts'][0]
+                if first[0]==C:
+                    kind=first[1];thing_kind=facts[kind]['thing'];domain=facts[kind]['subjectDomain']
+                    selector=facts[kind]['selectorParameter']
+                    if selector!=255:selected=first[2][selector]
+                for slot,k,p in r['parts']:
+                    if slot==G:
+                        value=p[0]+256*p[1]
+                        if k==1:show=value
+                        elif k==2:linger=value
+                        elif k==3:flash=value
+            count=(domain if selected==255 else 1) if linger or flash else 0
+            total+=count;descriptions.append([kind,thing_kind,domain,selected,show,linger,flash,count])
+        cases.append(dict(name=name,hex=payload.hex(),total=total,rules=descriptions))
+    tail=[part(T,4),part(P,0)]
+    for kind in range(19,29):
+        for selector in (255,{19:15,20:15,21:15,22:31,23:31}.get(kind,127)):
+            params=[selector,255] if kind==25 else [selector]
+            case(f'event{kind}-selector{selector}',[rule(part(C,kind,*params),*tail,part(G,1,200,0),part(G,3,244,1))])
+    state_params={1:[255],2:[255],3:[255],4:[255],5:[15,0],7:[255,255],8:[255,15],
+                  9:[255,1],10:[255,0],11:[255,255],12:[255,4,255],13:[255],
+                  14:[255],15:[3,2,0],16:[0],17:[3],18:[]}
+    for kind,params in state_params.items():
+        case(f'state{kind}-full-domain', [rule(part(C,kind,*params),*tail,part(G,2,255,255))])
+    case('maximum-255-any-event-rules',[rule(part(C,28,255),*tail,part(G,3,255,255)) for _ in range(255)])
+    case('state-filter-and-board-domains',[
+     rule(part(C,12,127,4,255),part(N,14,59),*tail,part(G,1,100,0),part(G,2,200,0)),
+     rule(part(N,14,59),*tail,part(G,2,255,255)),
+     rule(part(C,13,255),*tail,part(G,2,255,255),flags=1),
+     rule(part(C,7,255,255),*tail,part(G,1,255,255)),
+     rule(part(C,15,0,2,0),*tail,part(G,2,100,0))])
+    return cases
+
+
 def build_vectors() -> dict:
     limits = Limits()
     conversion = conversion_vectors(limits)
@@ -1709,6 +1754,7 @@ def build_vectors() -> dict:
         "occurrences": occurrence_vectors(limits),
         "lifetimes": lifetime_vectors(),
         "retainedOrdering": retained_ordering_vectors(),
+        "historyIndex": history_index_vectors(),
         "capability": capability_pages(limits),
     }
 

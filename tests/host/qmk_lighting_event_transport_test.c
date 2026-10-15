@@ -1,5 +1,6 @@
 #include "users/noah/lib/compat/qmk_lighting_event_transport.h"
 #include "users/noah/lib/rgb/lighting/lighting_lifetime.h"
+#include "users/noah/lib/rgb/lighting/lighting_history_owner.h"
 #include "users/noah/lib/rgb/lighting/lighting_retained_group.h"
 #include "users/noah/lib/rgb/lighting/lighting_owned_batch.h"
 #include "transactions.h"
@@ -15,19 +16,38 @@ static unsigned         requests, applies, acknowledgements, seeds, resets;
 // One history owner per emulated half. These are host-selected fixture banks,
 // not a production allocation/capacity or an extra transport history copy.
 typedef struct {
-    noah_lighting_batch_arena_t arena;
-    noah_lighting_retained_t    cell;
-    uint8_t                     bytes[512];
-    uint32_t                    last_time;
+    noah_lighting_batch_arena_t   arena;
+    noah_lighting_history_owner_t owner;
+    noah_lighting_retained_t      cell;
+    uint8_t                       bytes[512];
+    uint32_t                      last_time;
 } history_owner_t;
-static history_owner_t histories[2];
+static history_owner_t                    histories[2];
+static noah_profile_lighting_v1_program_t program;
+static noah_lighting_history_index_t      index_table;
+static void                               load_program(void) {
+    uint8_t payload[8192] = {5, 0, 58, 0, 0, 0, 0, 255};
+    size_t  used          = 8;
+    for (unsigned rule = 0; rule < 255; rule++) {
+        uint8_t bytes[] = {13, rule == 254 ? 0 : 1, 255, 1, 28, 127, 0x40, 4, 0x60, 0, 0xa2, 3, 244, 1};
+        memcpy(payload + used, bytes, sizeof bytes);
+        used += sizeof bytes;
+    }
+    payload[used++]                          = 0;
+    noah_profile_lighting_v1_limits_t limits = noah_profile_lighting_v1_default_limits();
+    noah_profile_lighting_v1_view_t   view;
+    assert(noah_profile_lighting_v1_decode(payload, used, &limits, &view, NULL) == NOAH_PROFILE_LIGHTING_V1_OK);
+    assert(noah_profile_lighting_v1_program_load(&view, &program));
+    assert(noah_lighting_history_index_prepare(&program, &index_table));
+    assert(index_table.offsets[255] == 1u);
+}
 #define dirty noah_lighting_retained_dirty(&histories[1].cell)
 static void clear_history(bool usb) {
     history_owner_t *owner = &histories[usb];
-    noah_lighting_retained_discard(&owner->cell, &owner->arena);
+    if (owner->owner.program) noah_lighting_history_owner_discard(&owner->owner);
     assert(!owner->arena.used);
     noah_lighting_batch_arena_init(&owner->arena, owner->bytes, sizeof owner->bytes);
-    noah_lighting_retained_init(&owner->cell, 254, 127);
+    assert(noah_lighting_history_owner_begin(&owner->owner, &program, &index_table, &owner->cell, 1u, &owner->arena));
 }
 static uint64_t committed_order;
 static uint32_t born;
@@ -62,39 +82,22 @@ bool transaction_rpc_exec(int8_t id, uint8_t request_size, const void *request, 
     assert(!memcmp(&before, &histories[0].cell, sizeof before) && histories[0].arena.used == used);
     return !drop_reply;
 }
-static bool prepare(void *context, const noah_lighting_event_group_t *group) {
-    (void)context;
-    assert(group->thing == 127);
-    return true;
-}
-static noah_lighting_retained_t *record(void *context, uint8_t rule, uint8_t thing, noah_lighting_lifetime_parameters_t *parameters) {
-    history_owner_t *owner = context;
-    assert(rule == 254 && thing == 127);
-    *parameters = duration;
-    return &owner->cell;
-}
 static bool retain_group(history_owner_t *owner, const noah_lighting_event_group_t *group, bool source) {
     uint8_t encoded[NOAH_LIGHTING_GROUP_BATCH_BYTES];
-    return noah_lighting_retained_group_apply(&owner->arena, group, source, encoded, prepare, record, owner);
+    return noah_lighting_history_owner_event(&owner->owner, group, source, encoded);
 }
 static void advance_history(bool usb, uint32_t now) {
     history_owner_t *owner = &histories[usb];
     uint32_t         delta = now - owner->last_time;
     owner->last_time       = now;
-    assert(noah_lighting_retained_observe(&owner->cell, &owner->arena, &duration, delta, NOAH_LIGHTING_LIFETIME_IDLE, 5, NULL, 0, 0, false));
+    noah_lighting_history_owner_advance(&owner->owner, delta);
 }
 static bool next(void *context, noah_lighting_event_group_t *group) {
     (void)context;
     assert(master);
-    if (!dirty) return false;
-    noah_lighting_owned_batch_reader_t reader;
-    noah_lighting_subject_t            subject;
-    assert(noah_lighting_owned_batch_begin(&histories[1].arena, noah_lighting_retained_batch(&histories[1].cell), &reader));
-    assert(noah_lighting_owned_batch_next(&histories[1].arena, &reader, &subject) && !reader.remaining);
-    *group = (noah_lighting_event_group_t){.order = noah_lighting_retained_order(&histories[1].cell), .thing_kind = subject.thing_kind, .thing = subject.thing, .slot = subject.slot, .outcome = subject.outcome, .sides = subject.sides, .has_keys = subject.has_keys};
-    memcpy(group->owners, subject.keys, sizeof subject.keys);
-    group->qualified[31] = 0x40;
-    return true;
+    int result = noah_lighting_history_owner_next(&histories[1].owner, group);
+    assert(result != NOAH_LIGHTING_HISTORY_INVALID);
+    return result == NOAH_LIGHTING_HISTORY_READY;
 }
 static bool consume(void *context, const uint8_t *body, uint32_t now) {
     (void)context;
@@ -112,7 +115,7 @@ static void reset(void *context) {
     (void)context;
     if (master) {
         seeds++;
-        noah_lighting_retained_seed(&histories[1].cell, &histories[1].arena);
+        noah_lighting_history_owner_session(&histories[1].owner, true);
     } else {
         resets++;
         clear_history(false);
@@ -125,7 +128,7 @@ static void ack(void *context, const uint8_t *body) {
     acknowledgements++;
     noah_lighting_event_group_t sent;
     assert(noah_lighting_event_group_decode(&sent, body, 54));
-    (void)noah_lighting_retained_ack(&histories[1].cell, &histories[1].arena, sent.order);
+    noah_lighting_history_owner_ack(&histories[1].owner, &sent);
 }
 static bool step(bool usb, uint32_t now) {
     advance_history(usb, now);
@@ -145,6 +148,7 @@ static void occurrence(uint64_t order, uint32_t now) {
     assert(retain_group(&histories[1], &group, true));
 }
 int main(void) {
+    load_program();
     uint8_t profile[22] = {1, 2, 3};
     clear_history(false);
     clear_history(true);
@@ -176,21 +180,27 @@ int main(void) {
     drop_reply = true;
     step(true, 1000);
     assert(dirty && applies == 1);
+    // Receiver can expire and reclaim its event cell while ACK is lost. The
+    // exact committed sequence is still deduplicated before owner consumption.
+    step(false, 1500);
+    assert(!histories[0].owner.count);
+    step(true, 1500);
+    assert(applies == 1 && dirty && !histories[0].owner.count);
     drop_reply = false;
-    occurrence(101, 1001); // immutable100 retry remains;101 must stay dirty after100 ACK
-    step(true, 1001);
+    occurrence(101, 1501); // immutable100 retry remains;101 must stay dirty after100 ACK
+    step(true, 1501);
     assert(applies == 1 && dirty && acknowledgements == 1);
-    step(true, 1002);
-    step(false, 1002);
-    assert(applies == 2 && committed_order == 101 && born == 1002);
-    step(true, 1002);
+    step(true, 1502);
+    step(false, 1502);
+    assert(applies == 2 && committed_order == 101 && born == 1502);
+    step(true, 1502);
     assert(!dirty && acknowledgements == 2);
     unsigned before = requests;
-    step(true, 1003);
+    step(true, 1503);
     assert(requests == before);
     // No role mismatch can consume the other arm or call another RPC.
     master = false;
-    assert(!noah_qmk_lighting_event_transport_step(1004, next, consume, reset, ack, NULL));
+    assert(!noah_qmk_lighting_event_transport_step(1504, next, consume, reset, ack, NULL));
     // Callback from the master registration also refuses a master-side receive.
     master = true;
     uint8_t response[10];

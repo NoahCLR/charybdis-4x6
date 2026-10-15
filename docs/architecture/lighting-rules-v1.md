@@ -742,6 +742,62 @@ The actual QMK adapter fixture uses one such owner per emulated half and
 asserts RPC callbacks cannot modify its arena/cells before main consumes.
 
 
+`lighting_history_index` describes the accepted publication's retained rules
+using registry-declared subject domains/selectors and each optional timing
+module's lifetime-parameter binding. Event domains are16 layers,32 modes or128
+identified things; their zero continuous-presence signatures still allocate no
+old show-after clocks. Specific selectors require one logical cell, any selectors
+the full declared domain, and board/aggregate subjects one. Disabled and
+show-after-only rules require no retained cell. A512-byte caller-owned u16 prefix
+index addresses all255 rules, including high ids:255×128=32640 is a logical
+address bound, **not** a required reservation, reachable simultaneous occupancy,
+storage lower bound or proof of fit. No target instance is allocated here.
+Rebuild the index and reset owning histories together at profile publication.
+The `historyIndex` shared fixtures enumerate every supported fact domain, all
+event selectors, mixed filter/board/disabled rules and the accepted255-rule
+maximum; lookup checks all256 supplied ids. Timing interpretation stays in the
+optional modules, not a fact/timing-kind switch in the renderer.
+
+`lighting_history_owner` connects that index to independent occupied records,
+full-equality payload ownership, per-half calendars and fair grouped delivery.
+Sorted occupied metadata uses binary lookup; group preflight reserves missing
+keys in one backward ordered merge, without a whole-bank scratch copy or a
+whole-bank shift per qualified rule. The cursor continues from the same old
+record across insertion/compaction. Parameters are decoded from the current
+RAM program, with one descriptor per occupied rule during calendar/wake scans.
+Source capture and receiver main consumption use the same atomic group path;
+state observation preserves full-match entry and D1's last whole matching batch.
+No callback, renderer or producer may reenter these main-owned mutations.
+
+An occupied matching record remains needed even before show-after has a payload.
+An expired event with pending delivery also remains needed. Once matching,
+rendering and delivery ownership all end, metadata can be reclaimed; independent
+frozen copies still own their batch references. Committed-sequence deduplication
+happens **before** receiver main consumption. Within one session, a source cohort
+is offered with all its current dirty rules; later occurrences can only replace
+members, and its committed ACK clears only unchanged versions. Acknowledged
+members cannot become dirty again under the same order except through a fresh
+session, which resets the receiver. Thus a committed expired event need not keep
+a permanent per-rule replay cell. Source observation tokens denote actual new
+occurrences. The QMK adapter trace retries a committed request after receiver
+metadata reclamation and proves that it never calls the consumer again.
+The immutable outgoing packet contains the complete single-event subject and
+mask; it borrows no arena pointer/reference. Metadata/body reserve failures at
+this component seam preserve prior records/payloads and expose failure; a
+production owner must prove those failures unreachable, not use them as an
+admission cap, history eviction or busy-drop path.
+
+For the32-bit target this owner control is24 bytes, the separate prefix index
+512, and each occupied/frozen metadata record18. Group preflight also uses a
+32-byte missing-rule mask; the bounded rule descriptor is12 bytes. These are
+in addition to arena control/payloads and still-live capture/transport workspace.
+No target metadata/payload capacity is selected or allocated by these components.
+The full logical-domain host fixture deliberately reserves32640 records to test
+independence; that is not the chosen target layout, simultaneous physical
+reachability, or a storage minimum/fit proof. Optional host counters count
+comparisons, metadata byte moves, calendars, descriptor decodes and dirty visits;
+they allocate no counters in production and make no target-time/cadence claim.
+
 For a32-bit target the arena control block is16 bytes. Payload storage is
 exactly the sum of12 plus encoded size per distinct referenced batch; record
 storage is18 per allocated current or frozen record. Reference increments need

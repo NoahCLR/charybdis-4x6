@@ -8,12 +8,15 @@
 #include "users/noah/lib/rgb/lighting/lighting_event_capture.h"
 #include "users/noah/lib/rgb/lighting/lighting_workspace.h"
 #include "users/noah/lib/rgb/lighting/lighting_retained_group.h"
+#include "users/noah/lib/rgb/lighting/lighting_history_owner.h"
 #include "users/noah/lib/rgb/lighting/lighting_owned_batch.h"
 #include <assert.h>
 
 noah_lighting_workspace_t                  noah_lighting_workspace;
 static noah_profile_lighting_v1_program_t  program;
 static noah_lighting_batch_arena_t         arena;
+static noah_lighting_history_index_t       index_table;
+static noah_lighting_history_owner_t       history;
 static noah_lighting_retained_t            cells[3];
 static uint8_t                             storage[512];
 static unsigned                            depth, captures, collections;
@@ -37,16 +40,6 @@ bool noah_lighting_fact_next(uint8_t kind, const noah_lighting_facts_t *facts, c
             return false;
     }
 }
-static bool prepare(void *context, const noah_lighting_event_group_t *group) {
-    (void)context;
-    return group->thing == 3;
-}
-static noah_lighting_retained_t *record(void *context, uint8_t rule, uint8_t thing, noah_lighting_lifetime_parameters_t *duration) {
-    (void)context;
-    assert(rule < 3 && thing == 3);
-    *duration = parameters;
-    return &cells[rule];
-}
 static void collect(noah_lighting_facts_t *facts) {
     assert(depth == 1);
     collections++;
@@ -58,7 +51,7 @@ static void collect(noah_lighting_facts_t *facts) {
 static void retain(void *context, const noah_lighting_event_group_t *group, uint32_t now) {
     (void)context;
     assert(depth == 1 && now == 100);
-    assert(noah_lighting_retained_group_apply(&arena, group, true, noah_lighting_workspace.capture.encoded, prepare, record, NULL));
+    assert(noah_lighting_history_owner_event(&history, group, true, noah_lighting_workspace.capture.encoded));
     captures++;
 }
 void noah_lighting_event_observe(const noah_lighting_event_t *event) {
@@ -81,6 +74,9 @@ int main(void) {
     noah_profile_lighting_v1_view_t   view;
     assert(noah_profile_lighting_v1_decode(bytes, sizeof bytes, &limits, &view, NULL) == NOAH_PROFILE_LIGHTING_V1_OK);
     assert(noah_profile_lighting_v1_program_load(&view, &program));
+    assert(noah_lighting_history_index_prepare(&program, &index_table));
+    assert(index_table.offsets[program.rule_count] == 3u);
+    assert(noah_lighting_history_owner_begin(&history, &program, &index_table, cells, 3u, &arena));
     layer_ownership_reset_for_test();
     event_count    = 0;
     keypos_t owner = {.row = 1, .col = 2};

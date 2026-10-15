@@ -14,6 +14,9 @@ bool                      noah_lighting_retained_observe(noah_lighting_retained_
 bool                      noah_lighting_retained_visible(const noah_lighting_retained_t *cell, const noah_lighting_lifetime_parameters_t *parameters);
 uint32_t                  noah_lighting_retained_wake(const noah_lighting_retained_t *cell, const noah_lighting_lifetime_parameters_t *parameters);
 noah_lighting_batch_ref_t noah_lighting_retained_batch(const noah_lighting_retained_t *cell);
+uint8_t                   noah_lighting_retained_rule(const noah_lighting_retained_t *cell);
+uint8_t                   noah_lighting_retained_thing(const noah_lighting_retained_t *cell);
+bool                      noah_lighting_retained_needed(const noah_lighting_retained_t *cell);
 uint64_t                  noah_lighting_retained_order(const noah_lighting_retained_t *cell);
 bool                      noah_lighting_retained_dirty(const noah_lighting_retained_t *cell);
 // Consumes one already owned reference, with no allocation or fallible callback

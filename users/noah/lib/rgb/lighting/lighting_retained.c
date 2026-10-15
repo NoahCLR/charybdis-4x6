@@ -29,6 +29,16 @@ void noah_lighting_retained_init(noah_lighting_retained_t *cell, uint8_t rule, u
 noah_lighting_batch_ref_t noah_lighting_retained_batch(const noah_lighting_retained_t *cell) {
     return read32(cell->bytes + BATCH);
 }
+uint8_t noah_lighting_retained_rule(const noah_lighting_retained_t *cell) {
+    return cell->bytes[RULE];
+}
+uint8_t noah_lighting_retained_thing(const noah_lighting_retained_t *cell) {
+    return cell->bytes[THING];
+}
+bool noah_lighting_retained_needed(const noah_lighting_retained_t *cell) {
+    noah_lighting_lifetime_t value = lifetime(cell);
+    return (cell->bytes[FLAGS] & (DIRTY | RENDER)) || noah_lighting_lifetime_matching(&value);
+}
 uint64_t noah_lighting_retained_order(const noah_lighting_retained_t *cell) {
     return (uint64_t)read32(cell->bytes + ORDER) | ((uint64_t)read32(cell->bytes + ORDER + 4u) << 32u);
 }

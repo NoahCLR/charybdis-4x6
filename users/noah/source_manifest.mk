@@ -145,6 +145,8 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/lighting/lighting_batch_arena.c \
     lib/rgb/lighting/lighting_retained.c \
     lib/rgb/lighting/lighting_priority.c \
+    lib/rgb/lighting/lighting_history_index.c \
+    lib/rgb/lighting/lighting_history_owner.c \
     lib/rgb/lighting/lighting_owned_batch.c \
     lib/rgb/lighting/lighting_retained_group.c \
     lib/rgb/lighting/kinds/event_layer_locked.c \

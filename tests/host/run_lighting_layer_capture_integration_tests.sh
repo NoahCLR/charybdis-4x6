@@ -9,7 +9,7 @@ noah_host_export_qmk_cpath "$ROOT"
 SOURCES=""
 for src in $(noah_source_manifest_userspace_paths "$ROOT" NOAH_COMMON_SOURCES); do
  case "$src" in
- users/noah/lib/rgb/lighting/lighting_event_capture.c|users/noah/lib/rgb/lighting/lighting_occurrence.c|users/noah/lib/rgb/lighting/lighting_batch.c|users/noah/lib/rgb/lighting/lighting_batch_arena.c|users/noah/lib/rgb/lighting/lighting_retained.c|users/noah/lib/rgb/lighting/lighting_retained_group.c|users/noah/lib/rgb/lighting/lighting_owned_batch.c|users/noah/lib/rgb/lighting/lighting_lifetime.c|users/noah/lib/rgb/lighting/kinds/event_layer_locked.c|users/noah/lib/rgb/lighting/kinds/event_layer_unlocked.c|users/noah/lib/rgb/lighting/kinds/fact_layer_active.c|users/noah/lib/rgb/lighting/kinds/fact_layer_status.c) SOURCES="$SOURCES $ROOT/$src";;
+ users/noah/lib/rgb/lighting/lighting_history_owner.c|users/noah/lib/rgb/lighting/lighting_history_index.c|users/noah/lib/rgb/lighting/kinds/timing_show_after.c|users/noah/lib/rgb/lighting/kinds/timing_linger.c|users/noah/lib/rgb/lighting/kinds/timing_flash.c|users/noah/lib/rgb/lighting/lighting_event_capture.c|users/noah/lib/rgb/lighting/lighting_occurrence.c|users/noah/lib/rgb/lighting/lighting_batch.c|users/noah/lib/rgb/lighting/lighting_batch_arena.c|users/noah/lib/rgb/lighting/lighting_retained.c|users/noah/lib/rgb/lighting/lighting_retained_group.c|users/noah/lib/rgb/lighting/lighting_owned_batch.c|users/noah/lib/rgb/lighting/lighting_lifetime.c|users/noah/lib/rgb/lighting/kinds/event_layer_locked.c|users/noah/lib/rgb/lighting/kinds/event_layer_unlocked.c|users/noah/lib/rgb/lighting/kinds/fact_layer_active.c|users/noah/lib/rgb/lighting/kinds/fact_layer_status.c) SOURCES="$SOURCES $ROOT/$src";;
  esac
 done
 for variant in normal sanitized; do

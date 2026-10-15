@@ -1,6 +1,8 @@
 #include "users/noah/lib/rgb/lighting/lighting_workspace.h"
 #include "users/noah/lib/rgb/lighting/lighting_batch_arena.h"
 #include "users/noah/lib/rgb/lighting/lighting_owned_batch.h"
+#include "users/noah/lib/rgb/lighting/lighting_history_owner.h"
+#include "users/noah/lib/rgb/lighting/lighting_priority.h"
 #include <stdio.h>
 
 _Static_assert(sizeof(noah_lighting_placed_subject_t) == 16u, "existing placed subject geometry");
@@ -9,6 +11,10 @@ _Static_assert(sizeof noah_lighting_workspace.render == 1024u, "existing render 
 _Static_assert(sizeof noah_lighting_workspace >= sizeof noah_lighting_workspace.capture, "all enabled fact slices fit");
 _Static_assert(sizeof noah_lighting_workspace >= NOAH_LIGHTING_BATCH_BYTES, "complete ordered batch fits");
 #if UINTPTR_MAX == UINT32_MAX
+_Static_assert(sizeof(noah_lighting_history_owner_t) == 24u, "accounted sparse-owner control, not a bank");
+_Static_assert(sizeof(noah_lighting_history_index_t) == 512u, "accounted logical prefix index");
+_Static_assert(sizeof(noah_lighting_history_rule_t) == 12u, "bounded temporary rule descriptor");
+_Static_assert(sizeof(noah_lighting_priority_t) == 24u, "bounded temporary priority key");
 _Static_assert(sizeof(noah_lighting_batch_arena_t) == 16u, "accounted target control block");
 _Static_assert(sizeof(noah_lighting_batch_writer_t) == 16u, "accounted target writer");
 _Static_assert(sizeof(noah_lighting_batch_reader_t) == 20u, "accounted target reader");
