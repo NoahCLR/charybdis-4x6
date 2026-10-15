@@ -375,7 +375,9 @@ bool key_runtime_core_queue_pending_release_dispatch_with_identity(keypos_t key_
     return key_runtime_core_queue_pending_release_dispatch_with_commit(key_pos, action, mods, tap_commit_feedback, owner_token_id, identity, 0u);
 }
 
-bool key_runtime_core_queue_pending_release_dispatch_for_owner(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id) {
+// Queue construction finishes before a full-queue caller falls back to action
+// dispatch. Keep its snapshot/append workspace off that synchronous call path.
+__attribute__((noinline)) bool key_runtime_core_queue_pending_release_dispatch_for_owner(keypos_t key_pos, uint16_t action, keyboard_mod_state_t mods, bool tap_commit_feedback, uint16_t owner_token_id) {
     key_runtime_core_state_t *state    = key_runtime_core_state();
     uint8_t                   identity = 0u;
     if (state && key_runtime_core_pending_release_keypos_valid(key_pos)) {
