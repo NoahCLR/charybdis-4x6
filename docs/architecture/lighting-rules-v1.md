@@ -809,6 +809,58 @@ cadence measurements. Its performance and a full accepted-profile capacity
 bound remain obligations of the production owner, rather than an inference
 from typical deduplication or the705-byte single-batch bound.
 
+`lighting_history_store` places current metadata, immutable frozen metadata and
+full-equality batches in the same owned arena. The header's internal size word
+uses two type bits and fourteen length bits; this changes neither profile nor
+split bytes. Every accepted batch and metadata object fits that per-object
+length. Current metadata is uniquely owned and mutable; frozen metadata and
+payloads are immutable. No movable address escapes. Structural mutation
+invalidates only an internal byte-scan cursor, never a stable reference.
+
+Metadata sharing requires equality of the complete retained template, with
+only its rule byte normalized. Each cohort carries an explicit sparse rule
+list or255-bit membership bitmap. A member's qualification, age, captured order,
+flags and full batch reference remain independent: changing one member splits
+it before changing its history. Equal pixels or filters are not an equivalence
+criterion. Group application reserves its complete destination before removing
+old memberships. Per-cell replacement reserves before release. A calendar or
+ACK walk commits cells separately; reserve failure is exposed and is not a
+retry/drop policy. Production enablement requires proving the complete reserve
+bound, including these intermediate splits.
+
+The exact cohort body is one membership tag,18 template bytes and either one
+byte per member (fewer than32) or32 bitmap bytes. Including its12-byte arena
+header, singleton metadata costs32 bytes and a255-member cohort63. One encoded
+single-owner occurrence costs17 bytes including its header, so the corresponding
+one-rule and255-rule current samples cost49 and80 bytes. Freezing the latter
+adds63 metadata bytes (143 total), with no payload copy. These are measured
+serialization sizes for those samples, **not** a bound for independently
+filtered accepted histories. The store control is4 bytes on Cortex-M0+; its
+logical cursor is4. `lighting_history_bank` adds a program reference and fair
+dirty cursor, for12 bytes including the store control, without an instance of
+the512-byte prefix index or a rule×thing array. Rule parameters still come from
+registry/module descriptors over the published RAM program.
+
+Freezing preflights all current metadata plus entry headers, then pins every
+referenced batch. Current capture, replacement, ACK and reclamation may continue
+without changing the frozen frame's ages, owners, slots or outcomes. The
+immutable outgoing packet owns its complete bytes separately and borrows no
+arena handle. Reset must release current and frame memberships before arena
+initialization. A failed freeze leaves current histories unchanged and removes
+its partial frozen references.
+
+`lighting_retained_render` streams frozen subjects in the settled natural /
+entry / thing / authored priority order without a fixed placement array or
+per-rule subject cap. A fact-module callback supplies natural priority; the
+engine supplies painting. Each selection scans that rule's full visible batches
+and emits its next lowest-priority member, so worst-case candidate visits are
+quadratic in visible members. The128-member sample visits16512 candidates and
+retains all128 subjects; it makes no target-time/cadence claim. Actual module
+priority bindings, a full accepted-profile storage bound and linked enabled
+consumer acceptance remain required. The old flat owner remains an independent
+comparison surface in producer and QMK-adapter fixtures, both of which also run
+against this arena-backed bank.
+
 Renderer placement and synchronous occurrence capture share one explicitly
 owned workspace. The recorded60-key/four-combo/full-module configuration uses
 1024 bytes for64 placed subjects; capture holds621 fact bytes,56-byte native

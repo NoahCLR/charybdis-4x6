@@ -24,7 +24,7 @@ PY
 . "$ROOT/tests/host/noah_source_manifest.sh"
 SOURCES=""
 for src in $(noah_source_manifest_userspace_paths "$ROOT" NOAH_COMMON_SOURCES); do
-    case "$src" in users/noah/lib/rgb/lighting/lighting_batch.c|users/noah/lib/rgb/lighting/lighting_batch_arena.c|users/noah/lib/rgb/lighting/lighting_owned_batch.c|users/noah/lib/rgb/lighting/lighting_retained.c|users/noah/lib/rgb/lighting/lighting_lifetime.c|users/noah/lib/rgb/lighting/lighting_priority.c) SOURCES="$SOURCES $ROOT/$src" ;; esac
+    case "$src" in users/noah/lib/rgb/lighting/lighting_retained_render.c|users/noah/lib/rgb/lighting/lighting_history_store.c|users/noah/lib/rgb/lighting/lighting_batch.c|users/noah/lib/rgb/lighting/lighting_batch_arena.c|users/noah/lib/rgb/lighting/lighting_owned_batch.c|users/noah/lib/rgb/lighting/lighting_retained.c|users/noah/lib/rgb/lighting/lighting_lifetime.c|users/noah/lib/rgb/lighting/lighting_priority.c) SOURCES="$SOURCES $ROOT/$src" ;; esac
 done
 for variant in normal sanitized; do
     flags=""

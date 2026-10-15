@@ -65,5 +65,46 @@ int                            main(void) {
     }
     assert(reader.offset == reader.size);
     assert(noah_lighting_batch_release(&arena, old));
+    // Mutable current metadata and immutable frame metadata live in this same
+    // arena, but can never intern with an immutable batch or each other.
+    uint8_t meta[] = {0xab, 0xcd, 0xef}, changed[64];
+    memset(changed, 0x42, sizeof changed);
+    noah_lighting_batch_ref_t c1, c2, f1, b1, b2;
+    assert(noah_lighting_record_acquire(&arena, NOAH_LIGHTING_ARENA_CURRENT, 4, 127, meta, sizeof meta, &c1));
+    assert(noah_lighting_record_acquire(&arena, NOAH_LIGHTING_ARENA_CURRENT, 4, 127, meta, sizeof meta, &c2));
+    assert(c1 != c2);
+    assert(noah_lighting_batch_acquire(&arena, 4, 127, meta, sizeof meta, &b1, NULL));
+    assert(noah_lighting_batch_acquire(&arena, 4, 127, meta, sizeof meta, &b2, NULL));
+    assert(b1 == b2 && b1 != c1 && b1 != c2);
+    assert(noah_lighting_record_acquire(&arena, NOAH_LIGHTING_ARENA_FRAME, 4, 127, meta, sizeof meta, &f1));
+    uint8_t type_value;
+    assert(noah_lighting_record_type(&arena, c1, &type_value) && type_value == NOAH_LIGHTING_ARENA_CURRENT);
+    assert(!noah_lighting_owned_batch_begin(&arena, c1, &reader));
+    assert(noah_lighting_batch_retain(&arena, c1));
+    assert(!noah_lighting_record_update(&arena, c1, changed, sizeof changed)); // shared current cannot mutate
+    assert(noah_lighting_batch_release(&arena, c1));
+    assert(noah_lighting_record_update(&arena, c1, changed, sizeof changed));
+    assert(!noah_lighting_record_update(&arena, b1, changed, sizeof changed));
+    assert(!noah_lighting_record_update(&arena, f1, changed, sizeof changed));
+    noah_lighting_batch_ref_t previous = c1;
+    assert(!noah_lighting_batch_replace(&arena, &c1, 4, 127, meta, sizeof meta, NULL) && c1 == previous);
+    uint8_t copied[3];
+    assert(noah_lighting_batch_copy(&arena, b1, 0, copied, sizeof copied) && !memcmp(copied, meta, sizeof meta));
+    assert(noah_lighting_batch_copy(&arena, f1, 0, copied, sizeof copied) && !memcmp(copied, meta, sizeof meta));
+    uint32_t                  offset = 0;
+    noah_lighting_batch_ref_t next;
+    assert(noah_lighting_record_next(&arena, NOAH_LIGHTING_ARENA_CURRENT, &offset, &next) && next == c1);
+    assert(noah_lighting_record_next(&arena, NOAH_LIGHTING_ARENA_CURRENT, &offset, &next) && next == c2);
+    assert(!noah_lighting_record_next(&arena, NOAH_LIGHTING_ARENA_CURRENT, &offset, &next));
+    assert(noah_lighting_batch_release(&arena, c2));
+    assert(noah_lighting_record_update(&arena, c1, changed, 1));
+    uint32_t capacity = arena.capacity;
+    arena.capacity    = arena.used;
+    assert(!noah_lighting_record_update(&arena, c1, changed, sizeof changed));
+    arena.capacity = capacity;
+    assert(noah_lighting_batch_copy(&arena, c1, 0, copied, 1) && copied[0] == 0x42);
+    assert(noah_lighting_batch_copy(&arena, f1, 0, copied, sizeof copied) && !memcmp(copied, meta, sizeof meta));
+    assert(noah_lighting_batch_release(&arena, b1) && noah_lighting_batch_release(&arena, b2));
+    assert(noah_lighting_batch_release(&arena, c1) && noah_lighting_batch_release(&arena, f1) && !arena.used);
     printf("owned ordered iterator %ux%u: max%uB payload, bounded one-member copy, compaction mid-read, pinned old/new owners, slot/outcome/order/multiplicity PASS\n", MATRIX_ROWS, MATRIX_COLS, (unsigned)NOAH_LIGHTING_BATCH_BYTES);
 }

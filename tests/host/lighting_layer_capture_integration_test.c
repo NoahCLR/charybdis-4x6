@@ -9,14 +9,19 @@
 #include "users/noah/lib/rgb/lighting/lighting_workspace.h"
 #include "users/noah/lib/rgb/lighting/lighting_retained_group.h"
 #include "users/noah/lib/rgb/lighting/lighting_history_owner.h"
+#include "users/noah/lib/rgb/lighting/lighting_history_bank.h"
 #include "users/noah/lib/rgb/lighting/lighting_owned_batch.h"
 #include <assert.h>
 
-noah_lighting_workspace_t                  noah_lighting_workspace;
-static noah_profile_lighting_v1_program_t  program;
-static noah_lighting_batch_arena_t         arena;
-static noah_lighting_history_index_t       index_table;
-static noah_lighting_history_owner_t       history;
+noah_lighting_workspace_t                 noah_lighting_workspace;
+static noah_profile_lighting_v1_program_t program;
+static noah_lighting_batch_arena_t        arena;
+static noah_lighting_history_index_t      index_table;
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+static noah_lighting_history_bank_t history;
+#else
+static noah_lighting_history_owner_t history;
+#endif
 static noah_lighting_retained_t            cells[3];
 static uint8_t                             storage[512];
 static unsigned                            depth, captures, collections;
@@ -51,7 +56,13 @@ static void collect(noah_lighting_facts_t *facts) {
 static void retain(void *context, const noah_lighting_event_group_t *group, uint32_t now) {
     (void)context;
     assert(depth == 1 && now == 100);
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    assert(noah_lighting_history_bank_event(&history, group, true, noah_lighting_workspace.capture.encoded));
+    for (unsigned rule = 0; rule < 3; rule++)
+        if (!noah_lighting_history_store_read(&history.store, NOAH_LIGHTING_ARENA_CURRENT, rule, 3, &cells[rule])) noah_lighting_retained_init(&cells[rule], rule, 3);
+#else
     assert(noah_lighting_history_owner_event(&history, group, true, noah_lighting_workspace.capture.encoded));
+#endif
     captures++;
 }
 void noah_lighting_event_observe(const noah_lighting_event_t *event) {
@@ -76,7 +87,11 @@ int main(void) {
     assert(noah_profile_lighting_v1_program_load(&view, &program));
     assert(noah_lighting_history_index_prepare(&program, &index_table));
     assert(index_table.offsets[program.rule_count] == 3u);
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    noah_lighting_history_bank_begin(&history, &program, &arena);
+#else
     assert(noah_lighting_history_owner_begin(&history, &program, &index_table, cells, 3u, &arena));
+#endif
     layer_ownership_reset_for_test();
     event_count    = 0;
     keypos_t owner = {.row = 1, .col = 2};
@@ -118,8 +133,12 @@ int main(void) {
     assert(noah_lighting_retained_order(&cells[2]) == 3 && noah_lighting_retained_dirty(&cells[2]));
     assert(noah_lighting_retained_batch(&cells[2]) == qualified && noah_lighting_retained_visible(&cells[2], &parameters));
     noah_lighting_retained_discard(&frozen, &arena);
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    noah_lighting_history_store_clear(&history.store, NOAH_LIGHTING_ARENA_CURRENT);
+#else
     for (unsigned rule = 0; rule < 3; rule++)
         noah_lighting_retained_discard(&cells[rule], &arena);
+#endif
     assert(!arena.used && !depth);
     puts("actual layer producer->coherent collector->qualifier->owned group: no reentry/dedup/occurrence filters/borrowed owners/frozen reference PASS");
 }

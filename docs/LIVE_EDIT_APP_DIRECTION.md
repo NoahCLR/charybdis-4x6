@@ -1463,8 +1463,12 @@ coherent qualification and the full255-rule mask; these components do not yet
 enable the production consumer or establish retained-history capacity. A
 registry-derived logical index and occupied-record owner now connect actual
 producer/qualification and QMK-adapter fixtures to shared state/event calendars
-and grouped delivery; target bank sizing, renderer integration and enabled
-linked acceptance remain unfinished. The
+and grouped delivery. A typed single-arena alternative now owns current and
+frozen metadata beside immutable full batches, sharing only exact complete
+histories with independent rule membership and splitting on divergence. Frozen
+streaming has no placement-array subject cap. Target bank sizing, natural-priority
+module bindings, renderer integration and enabled linked acceptance remain
+unfinished. The
 allocation-free lifetime calendar implements the settled matching/tail/event
 transitions and wake boundaries. Immutable full-equality ordered-batch
 interning and independent18-byte rule/thing records now provide explicit

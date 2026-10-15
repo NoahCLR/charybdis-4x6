@@ -2,6 +2,7 @@
 #include "users/noah/lib/rgb/lighting/lighting_batch_arena.h"
 #include "users/noah/lib/rgb/lighting/lighting_owned_batch.h"
 #include "users/noah/lib/rgb/lighting/lighting_history_owner.h"
+#include "users/noah/lib/rgb/lighting/lighting_history_bank.h"
 #include "users/noah/lib/rgb/lighting/lighting_priority.h"
 #include <stdio.h>
 
@@ -11,6 +12,9 @@ _Static_assert(sizeof noah_lighting_workspace.render == 1024u, "existing render 
 _Static_assert(sizeof noah_lighting_workspace >= sizeof noah_lighting_workspace.capture, "all enabled fact slices fit");
 _Static_assert(sizeof noah_lighting_workspace >= NOAH_LIGHTING_BATCH_BYTES, "complete ordered batch fits");
 #if UINTPTR_MAX == UINT32_MAX
+_Static_assert(sizeof(noah_lighting_history_bank_t) == 12u, "accounted compact-bank control, arena storage separate");
+_Static_assert(sizeof(noah_lighting_history_store_t) == 4u, "accounted one-arena store control");
+_Static_assert(sizeof(noah_lighting_history_cursor_t) == 4u, "logical-key cursor, no hidden index");
 _Static_assert(sizeof(noah_lighting_history_owner_t) == 24u, "accounted sparse-owner control, not a bank");
 _Static_assert(sizeof(noah_lighting_history_index_t) == 512u, "accounted logical prefix index");
 _Static_assert(sizeof(noah_lighting_history_rule_t) == 12u, "bounded temporary rule descriptor");

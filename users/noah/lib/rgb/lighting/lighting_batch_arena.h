@@ -3,8 +3,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Main-owned, dense immutable entries. References identify entries, never byte
-// addresses; release compacts immediately without invalidating other references.
+// Main-owned, dense typed entries. Batches and frame metadata are immutable;
+// current metadata is mutable only under unique ownership. References identify
+// entries, never addresses; release compacts without invalidating other references.
 // The caller chooses and accounts for storage; this module owns no heap or bank.
 typedef uint32_t noah_lighting_batch_ref_t;
 typedef struct {
@@ -14,7 +15,17 @@ typedef struct {
 typedef struct {
     uint32_t entries, equality_bytes;
 } noah_lighting_batch_search_t;
-enum { NOAH_LIGHTING_BATCH_ENTRY_HEADER = 12u };
+enum { NOAH_LIGHTING_BATCH_ENTRY_HEADER = 12u, NOAH_LIGHTING_ARENA_BATCH = 0u, NOAH_LIGHTING_ARENA_CURRENT = 1u, NOAH_LIGHTING_ARENA_FRAME = 2u, NOAH_LIGHTING_ARENA_OBJECT_BYTES_MAX = 0x3fffu };
+// Internal arena size flags distinguish immutable batches, uniquely owned
+// mutable history metadata and immutable frozen-frame metadata in ONE bank.
+// The object bound exceeds every accepted ordered batch (<=705B) and metadata
+// object; it changes no profile budget/count, codec bytes or registry domain.
+bool noah_lighting_record_acquire(noah_lighting_batch_arena_t *arena, uint8_t type, uint8_t kind, uint8_t thing, const uint8_t *bytes, uint16_t size, noah_lighting_batch_ref_t *reference);
+bool noah_lighting_record_update(noah_lighting_batch_arena_t *arena, noah_lighting_batch_ref_t reference, const uint8_t *bytes, uint16_t size);
+bool noah_lighting_record_type(const noah_lighting_batch_arena_t *arena, noah_lighting_batch_ref_t reference, uint8_t *type);
+// Read-only byte cursor, invalidated by structural mutation. It exposes stable
+// references only; no arena address escapes. Caller sequences mutable scans.
+bool noah_lighting_record_next(const noah_lighting_batch_arena_t *arena, uint8_t type, uint32_t *offset, noah_lighting_batch_ref_t *reference);
 void noah_lighting_batch_arena_init(noah_lighting_batch_arena_t *arena, uint8_t *bytes, uint32_t capacity);
 // Full kind/id/ordered-byte equality is the only sharing criterion. Failed
 // admission leaves the arena and the caller's reference unchanged. It is NOT

@@ -1,6 +1,7 @@
 #include "users/noah/lib/compat/qmk_lighting_event_transport.h"
 #include "users/noah/lib/rgb/lighting/lighting_lifetime.h"
 #include "users/noah/lib/rgb/lighting/lighting_history_owner.h"
+#include "users/noah/lib/rgb/lighting/lighting_history_bank.h"
 #include "users/noah/lib/rgb/lighting/lighting_retained_group.h"
 #include "users/noah/lib/rgb/lighting/lighting_owned_batch.h"
 #include "transactions.h"
@@ -16,11 +17,15 @@ static unsigned         requests, applies, acknowledgements, seeds, resets;
 // One history owner per emulated half. These are host-selected fixture banks,
 // not a production allocation/capacity or an extra transport history copy.
 typedef struct {
-    noah_lighting_batch_arena_t   arena;
+    noah_lighting_batch_arena_t arena;
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    noah_lighting_history_bank_t owner;
+#else
     noah_lighting_history_owner_t owner;
-    noah_lighting_retained_t      cell;
-    uint8_t                       bytes[512];
-    uint32_t                      last_time;
+#endif
+    noah_lighting_retained_t cell;
+    uint8_t                  bytes[512];
+    uint32_t                 last_time;
 } history_owner_t;
 static history_owner_t                    histories[2];
 static noah_profile_lighting_v1_program_t program;
@@ -42,12 +47,36 @@ static void                               load_program(void) {
     assert(index_table.offsets[255] == 1u);
 }
 #define dirty noah_lighting_retained_dirty(&histories[1].cell)
+static void refresh_projection(history_owner_t *owner) {
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    if (!noah_lighting_history_store_read(&owner->owner.store, NOAH_LIGHTING_ARENA_CURRENT, 254, 127, &owner->cell)) noah_lighting_retained_init(&owner->cell, 254, 127);
+#else
+    (void)owner;
+#endif
+}
+static bool receiver_has_event(void) {
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    noah_lighting_retained_t copy;
+    return noah_lighting_history_store_read(&histories[0].owner.store, NOAH_LIGHTING_ARENA_CURRENT, 254, 127, &copy);
+#else
+    return histories[0].owner.count != 0;
+#endif
+}
 static void clear_history(bool usb) {
     history_owner_t *owner = &histories[usb];
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    if (owner->owner.program) noah_lighting_history_store_clear(&owner->owner.store, NOAH_LIGHTING_ARENA_CURRENT);
+#else
     if (owner->owner.program) noah_lighting_history_owner_discard(&owner->owner);
+#endif
     assert(!owner->arena.used);
     noah_lighting_batch_arena_init(&owner->arena, owner->bytes, sizeof owner->bytes);
-    assert(noah_lighting_history_owner_begin(&owner->owner, &program, &index_table, &owner->cell, 1u, &owner->arena));
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    noah_lighting_history_bank_begin(&owner->owner, &program, &owner->arena);
+#else
+    assert(noah_lighting_history_owner_begin(&owner->owner, &program, &index_table, &owner->cell, 1, &owner->arena));
+#endif
+    refresh_projection(owner);
 }
 static uint64_t committed_order;
 static uint32_t born;
@@ -84,20 +113,35 @@ bool transaction_rpc_exec(int8_t id, uint8_t request_size, const void *request, 
 }
 static bool retain_group(history_owner_t *owner, const noah_lighting_event_group_t *group, bool source) {
     uint8_t encoded[NOAH_LIGHTING_GROUP_BATCH_BYTES];
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    bool applied = noah_lighting_history_bank_event(&owner->owner, group, source, encoded);
+    refresh_projection(owner);
+    return applied;
+#else
     return noah_lighting_history_owner_event(&owner->owner, group, source, encoded);
+#endif
 }
 static void advance_history(bool usb, uint32_t now) {
     history_owner_t *owner = &histories[usb];
     uint32_t         delta = now - owner->last_time;
     owner->last_time       = now;
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    assert(noah_lighting_history_bank_advance(&owner->owner, delta));
+    refresh_projection(owner);
+#else
     noah_lighting_history_owner_advance(&owner->owner, delta);
+#endif
 }
 static bool next(void *context, noah_lighting_event_group_t *group) {
     (void)context;
     assert(master);
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    return noah_lighting_history_bank_next(&histories[1].owner, group);
+#else
     int result = noah_lighting_history_owner_next(&histories[1].owner, group);
     assert(result != NOAH_LIGHTING_HISTORY_INVALID);
     return result == NOAH_LIGHTING_HISTORY_READY;
+#endif
 }
 static bool consume(void *context, const uint8_t *body, uint32_t now) {
     (void)context;
@@ -115,7 +159,12 @@ static void reset(void *context) {
     (void)context;
     if (master) {
         seeds++;
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+        assert(noah_lighting_history_bank_session(&histories[1].owner, true));
+        refresh_projection(&histories[1]);
+#else
         noah_lighting_history_owner_session(&histories[1].owner, true);
+#endif
     } else {
         resets++;
         clear_history(false);
@@ -128,7 +177,12 @@ static void ack(void *context, const uint8_t *body) {
     acknowledgements++;
     noah_lighting_event_group_t sent;
     assert(noah_lighting_event_group_decode(&sent, body, 54));
+#ifdef NOAH_LIGHTING_TEST_ARENA_BACKEND
+    assert(noah_lighting_history_bank_ack(&histories[1].owner, &sent));
+    refresh_projection(&histories[1]);
+#else
     noah_lighting_history_owner_ack(&histories[1].owner, &sent);
+#endif
 }
 static bool step(bool usb, uint32_t now) {
     advance_history(usb, now);
@@ -183,9 +237,9 @@ int main(void) {
     // Receiver can expire and reclaim its event cell while ACK is lost. The
     // exact committed sequence is still deduplicated before owner consumption.
     step(false, 1500);
-    assert(!histories[0].owner.count);
+    assert(!receiver_has_event());
     step(true, 1500);
-    assert(applies == 1 && dirty && !histories[0].owner.count);
+    assert(applies == 1 && dirty && !receiver_has_event());
     drop_reply = false;
     occurrence(101, 1501); // immutable100 retry remains;101 must stay dirty after100 ACK
     step(true, 1501);
