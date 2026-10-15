@@ -11,7 +11,7 @@ typedef struct {
     union { uint8_t outgoing[64u]; uint8_t mailbox[64u]; } packet;
     volatile bool ready, master, active, waiting_confirm;
     volatile bool reset_requested, confirm_requested, mailbox_ready;
-    volatile bool committed;
+    volatile bool committed, rejected;
     bool snapshot_mode; // explicit new internal discriminator, never reinterpret legacy groups
 } noah_lighting_event_link_t;
 
@@ -31,13 +31,14 @@ void noah_lighting_event_link_begin(noah_lighting_event_link_t *, bool master, c
 void noah_lighting_event_link_publish(noah_lighting_event_link_t *);
 void noah_lighting_event_receive(noah_lighting_event_link_t *, const uint8_t *request, size_t request_size, uint8_t reply[NOAH_LIGHTING_EVENT_REPLY_BYTES]);
 // Consumer copies/retains all needed bytes synchronously. false means no
-// change and retry later; true commits the whole group, once, before ACK.
+// change: legacy group fixtures may retry later; snapshot v3 rejects and
+// requires resync. true commits the complete transaction before ACK.
 typedef bool (*noah_lighting_event_consume_fn)(void *, const uint8_t *group, uint32_t now);
 typedef void (*noah_lighting_event_reset_fn)(void *);
 bool noah_lighting_event_receive_main(noah_lighting_event_link_t *, uint32_t now, noah_lighting_event_consume_fn, noah_lighting_event_reset_fn, void *);
 
 _Static_assert(sizeof(noah_lighting_event_link_t) <= 112u, "event transport control and role union stay explicitly bounded");
 
-// Snapshot v2 uses tags0x81..0x84 and a55-byte opaque, validated main payload.
+// Snapshot v3 uses tags0x91..0x94 and short precisely sized main payloads.
 // Legacy component entry points/bytes remain unchanged for regression coverage.
 void noah_lighting_snapshot_link_begin(noah_lighting_event_link_t *, bool master, const uint8_t *profile);

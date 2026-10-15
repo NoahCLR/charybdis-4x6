@@ -9,10 +9,11 @@ typedef struct {
     noah_lighting_working_t   *working;
     noah_lighting_facts_t     *facts, *published_facts;
     noah_lighting_freshness_t  clock;
-    uint32_t                   capture, before, after, remote, last_time;
+    uint32_t                   capture, before, after, remote, last_time, sent_revision;
     uint16_t                   offset;
     uint8_t                    phase;
-    bool                       staging, clock_ready;
+    uint8_t                    fact_dirty[NOAH_LIGHTING_FACT_DIRTY_BYTES ? NOAH_LIGHTING_FACT_DIRTY_BYTES : 1u];
+    bool                       staging, clock_ready, dirty, facts_only, have_baseline, delta_facts;
 } noah_lighting_snapshot_t;
 // Begin leaves the endpoint closed. Bind both owned fact pointers after RPC
 // registration; binding publishes the completely initialized role.

@@ -9,10 +9,10 @@
 typedef struct noah_lighting_working {
     const noah_profile_lighting_v1_program_t *program;
     uint8_t                                  *bytes;
-    uint32_t                                  last_time, generation;
+    uint32_t                                  last_time, generation, revision;
     uint16_t                                  bank_bytes, scratch_bytes;
     uint8_t                                   rules, current;
-    bool                                      clock_ready, snapshot_ready;
+    bool                                      clock_ready, snapshot_ready, dirty, render_dirty;
 } noah_lighting_working_t;
 typedef struct {
     uint32_t offset;
@@ -50,3 +50,8 @@ bool noah_lighting_working_stage(noah_lighting_working_t *, uint16_t offset, con
 // Re-observe the published coherent remote matching scene without requalifying
 // or replacing its captured subjects. Local show-after clocks may mature.
 void noah_lighting_working_seen(noah_lighting_working_t *);
+
+// Compact complete snapshot ranges contain only occupied slot headers/members.
+// Unsent reserved space is canonically zero; native descriptors stay local.
+bool noah_lighting_working_snapshot_span(const noah_lighting_working_t *, uint16_t from, uint16_t *offset, uint8_t *, uint8_t *length);
+void noah_lighting_working_stage_empty(noah_lighting_working_t *);

@@ -4,9 +4,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // The lighting rule engine's entry point (docs/architecture/lighting-rules-v1.md).
-// When QMK starts the first LED chunk of a frame, this captures the facts and
-// re-resolves the frame if anything it depends on changed; every chunk then
-// writes the resolved colours of its own LEDs. Diagnostics win outright and
+// After QMK draws the last local effect chunk, capture one coherent scene and
+// compose all local LEDs before QMK flushes. Earlier chunks leave the effect
+// buffer untouched. Diagnostics win outright and
 // the RGB timeout still turns everything off.
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -20,9 +20,6 @@
 
 #    include "../lighting/lighting_engine.h"
 #    include "../lighting/lighting_runtime.h"
-#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
-static uint32_t rgb_runtime_history_revision;
-#    endif
 #    include "../lighting/lighting_keymap.h"
 #    include "../../profile/runtime/effective_rgb_runtime.h"
 #    include "../../split/runtime_sync.h"
@@ -45,7 +42,6 @@ static volatile uint32_t            rgb_runtime_keymap_generation;
 static uint32_t                     rgb_runtime_resolved_keymap_generation;
 static noah_lighting_leds_t         rgb_runtime_resolved_leds;
 static bool                         rgb_runtime_resolved;
-static bool                         rgb_runtime_frame_due;
 
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
 static uint16_t rgb_runtime_stage_pipeline_count;
@@ -152,31 +148,25 @@ static void rgb_runtime_begin_frame(void) {
 #    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
     rgb_runtime_scene.facts=&rgb_runtime_resolved_facts;
     if(!noah_lighting_runtime_prepare(&rgb_runtime_scene,generation,rgb_runtime_now))return;
-    bool history_changed=rgb_runtime_scene.working!=NULL;
+    bool history_changed=rgb_runtime_scene.working && rgb_runtime_scene.working->render_dirty;
 #    else
     bool history_changed=false;
 #    endif
     wake_due = rgb_runtime_info.wake_set && (int32_t)(rgb_runtime_now - rgb_runtime_info.wake) >= 0;
-    if (rgb_runtime_resolved && !rgb_runtime_info.live && !wake_due && rgb_runtime_resolved_leds == leds && rgb_runtime_resolved_keymap_generation == keymap_generation && !facts_changed && !history_changed) return;
+    if (rgb_runtime_resolved && !rgb_runtime_info.live && !rgb_runtime_info.effect_used && !wake_due && rgb_runtime_resolved_leds == leds && rgb_runtime_resolved_keymap_generation == keymap_generation && !facts_changed && !history_changed) return;
 
     rgb_runtime_resolved_keymap_generation = keymap_generation;
     rgb_runtime_scene.facts                = &rgb_runtime_resolved_facts;
     rgb_runtime_scene.keymap_generation    = keymap_generation;
     noah_lighting_resolve(&rgb_runtime_scene, leds, rgb_runtime_now, true, &rgb_runtime_frame, &rgb_runtime_info);
 #    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
-    rgb_runtime_history_revision=noah_lighting_runtime_revision();
+    noah_lighting_runtime_resolved();
 #    endif
     rgb_runtime_resolved_leds = leds;
     rgb_runtime_resolved      = true;
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
     rgb_runtime_resolve_count++;
 #    endif
-}
-
-static bool rgb_runtime_range_starts_frame(uint8_t led_min, uint8_t led_max) {
-    struct rgb_matrix_limits_t first_limits = rgb_matrix_get_limits(0u);
-
-    return led_min == first_limits.led_min_index && led_max == first_limits.led_max_index;
 }
 
 static bool rgb_runtime_normalize_local_range(uint8_t *led_min, uint8_t *led_max) {
@@ -214,21 +204,8 @@ static bool rgb_runtime_normalize_local_range(uint8_t *led_min, uint8_t *led_max
 
 #    define RGB_RUNTIME_BOOT_INDICATOR_HSV ((hsv_t){.h = 0u, .s = 0u, .v = 150u})
 
-static noah_lighting_leds_t rgb_runtime_range_leds(uint8_t led_min, uint8_t led_max) {
-    noah_lighting_leds_t leds = 0u;
-
-    for (uint8_t led = led_min; led < led_max; led++) leds |= NOAH_LIGHTING_LED_BIT(led);
-    return leds;
-}
-
 static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
     bool painted = false;
-
-    // A frame starts at QMK's first chunk, and is captured at its first chunk
-    // with LEDs on this half, so the other half's chunks cost nothing.
-    if (rgb_runtime_range_starts_frame(led_min, led_max)) {
-        rgb_runtime_frame_due = true;
-    }
 
     if (!rgb_runtime_normalize_local_range(&led_min, &led_max)) {
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
@@ -237,10 +214,14 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
         return false;
     }
 
-    if (rgb_runtime_frame_due || !rgb_runtime_resolved) {
-        rgb_runtime_frame_due = false;
-        rgb_runtime_begin_frame();
-    }
+    uint8_t local_min = 0u, local_max = RGB_MATRIX_LED_COUNT;
+    (void)rgb_runtime_normalize_local_range(&local_min, &local_max);
+    // Pinned QMK calls advanced indicators after each effect chunk and only
+    // flushes after its last chunk. Never read not-yet-drawn effect colours or
+    // overwrite an effect chunk before the complete local frame is available.
+    if (led_max != local_max) return false;
+    led_min = local_min;
+    rgb_runtime_begin_frame();
 
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
     rgb_runtime_stage_pipeline_count++;
@@ -251,20 +232,6 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
         return true;
     }
 
-    // A result that composes over the matrix effect is finished per chunk,
-    // from the colours the effect just drew for these LEDs.
-    // Publication replaces the one RAM program, and a remap invalidates its
-    // cached query basis. Neither may be combined with this frame's old facts,
-    // palette/gates or retained references. Keep its coherent resolved pixels
-    // until the next frame boundary captures the new generation.
-    bool histories_pinned=true;
-#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
-    histories_pinned=rgb_runtime_history_revision==noah_lighting_runtime_revision();
-#    endif
-    if (histories_pinned && rgb_runtime_resolved && rgb_runtime_info.effect_used && rgb_runtime_program_generation == noah_effective_lighting_generation() && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation) {
-        noah_lighting_resolve_info_t chunk_info;
-        noah_lighting_resolve(&rgb_runtime_scene, rgb_runtime_range_leds(led_min, led_max), rgb_runtime_now, false, &rgb_runtime_frame, &chunk_info);
-    }
     for (uint8_t led = led_min; led < led_max; led++) {
         if ((rgb_runtime_frame.painted & NOAH_LIGHTING_LED_BIT(led)) == 0u) continue;
         rgb_set_led_color(led, led_min, led_max, rgb_runtime_frame.colour[led]);
@@ -299,7 +266,6 @@ void noah_rgb_runtime_post_init(void) {
     noah_lighting_facts_collect(&rgb_runtime_resolved_facts, true, false);
     noah_lighting_facts_init_synced(&rgb_runtime_resolved_facts);
     rgb_runtime_resolved  = false;
-    rgb_runtime_frame_due = false;
     rgb_runtime_keymap_generation++;
     memset(&rgb_runtime_info, 0, sizeof(rgb_runtime_info));
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND

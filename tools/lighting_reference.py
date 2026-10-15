@@ -1896,16 +1896,20 @@ def working_vectors(limits):
 
 
 def snapshot_vectors():
-    """Unreleased internal snapshot v2, saved domain version remains5."""
+    """Unreleased internal snapshot v3, saved domain version remains5."""
     def u32(n):return n.to_bytes(4,'little')
     packets=[]
     payloads=[('ping',bytes([3])+bytes(54)),
               ('begin',bytes([0])+u32(100)+u32(120)+u32(130)+u32(5000)+(661).to_bytes(2,'little')+bytes(36)),
               ('chunk',bytes([1,40,0,3,0x55,0xaa,0xff])+bytes(48)),
-              ('commit',bytes([2])+bytes(54))]
+              ('begin-history-fact-delta',bytes([0])+u32(100)+u32(120)+u32(130)+u32(5000)+(661).to_bytes(2,'little')+bytes([1])+u32(0xffffffff)+bytes(31)),
+              ('begin-facts-only-delta',bytes([0])+u32(100)+bytes(12)+(621).to_bytes(2,'little')+bytes([3])+u32(0)+bytes(31)),
+              ('changed-to-zero',bytes([1,0,0,8])+bytes(51)),
+              ('commit',bytes([2])+(661).to_bytes(2,'little')+bytes(52))]
     for name,payload in payloads:
         assert len(payload)==55
-        request=bytes([0x83])+u32(7)+u32(0xffffffff)+payload
+        used=24 if payload[0]==0 else 4+payload[3] if payload[0]==1 else 3 if payload[0]==2 else 1
+        request=bytes([0x93])+u32(7)+u32(0xffffffff)+payload[:used]
         packets.append(dict(name=name,epoch=7,sequence=0xffffffff,payload=payload.hex(),request=request.hex()))
     return packets
 

@@ -17,6 +17,10 @@ static void reset(void *context) {
     s->offset  = 0;
     s->phase   = PING;
     s->clock_ready = false;
+    s->dirty = true;
+    s->have_baseline = s->facts_only = s->delta_facts = false;
+    s->sent_revision = 0u;
+    memset(s->fact_dirty, 0, sizeof s->fact_dirty);
     if (!s->link.master) {
         // Session reset clears transient histories. Program storage is unchanged;
         // no allocation or source read occurs on this path.
@@ -28,6 +32,10 @@ void noah_lighting_snapshot_begin(noah_lighting_snapshot_t *s, noah_lighting_wor
     BARRIER();
     s->working = w;
     s->clock_ready = false;
+    s->dirty = true;
+    s->have_baseline = s->facts_only = s->delta_facts = false;
+    s->sent_revision = 0u;
+    memset(s->fact_dirty, 0, sizeof s->fact_dirty);
     s->offset  = 0;
     s->staging = false;
     s->phase   = PING;
@@ -50,7 +58,7 @@ static void observe_clock(noah_lighting_snapshot_t *s, uint32_t now) {
         if (s->link.master) {
             s->link.next_sequence++;
             s->link.active = s->link.waiting_confirm = s->link.mailbox_ready = false;
-            s->link.packet.outgoing[0] = NOAH_LIGHTING_EVENT_HELLO | 0x80u;
+            s->link.packet.outgoing[0] = NOAH_LIGHTING_EVENT_HELLO | 0x90u;
             memcpy(s->link.packet.outgoing + 1u, s->link.profile, 22u);
             noah_lighting_event_put_u32(s->link.packet.outgoing + 23u, s->link.next_sequence);
         } else {
@@ -62,7 +70,7 @@ static void observe_clock(noah_lighting_snapshot_t *s, uint32_t now) {
     s->clock_ready = true;
 }
 static uint16_t snapshot_bytes(const noah_lighting_snapshot_t *s) {
-    return s->working->bank_bytes + (s->facts ? sizeof *s->facts : 0u);
+    return (s->facts_only ? 0u : s->working->bank_bytes) + (s->facts ? sizeof *s->facts : 0u);
 }
 void noah_lighting_snapshot_receive(noah_lighting_snapshot_t *s, const uint8_t *bytes, uint8_t length, uint32_t now, uint8_t reply[14]) {
     noah_lighting_event_receive(&s->link, bytes, length, reply);
@@ -70,35 +78,47 @@ void noah_lighting_snapshot_receive(noah_lighting_snapshot_t *s, const uint8_t *
 }
 static bool consume(void *context, const uint8_t *p, uint32_t now) {
     noah_lighting_snapshot_t *s    = context;
-    uint8_t                   used = p[0] == BEGIN ? 19u : p[0] == CHUNK ? (uint8_t)(4u + p[3]) : 1u;
+    uint8_t                   used = noah_lighting_snapshot_payload_size(p);
     if (used > 55u) return false;
     for (uint8_t i = used; i < 55u; i++)
         if (p[i]) return false;
     if (p[0] == PING) return true;
     if (p[0] == BEGIN) {
+        if (p[19] > 3u || p[19] == 2u || ((p[19] & 1u) && (!s->have_baseline || noah_lighting_event_get_u32(p + 20u) != s->sent_revision))) return false;
+        s->delta_facts = (p[19] & 1u) != 0u;
+        s->facts_only = (p[19] & 2u) != 0u;
         if (get16(p + 17u) != snapshot_bytes(s)) return false;
+        s->sent_revision = noah_lighting_event_get_u32(p + 20u);
         // Main owns staging for this complete snapshot. Current is intact.
         s->staging = true;
         s->offset  = 0;
-        noah_lighting_working_release_snapshot(s->working);
-        (void)noah_lighting_freshness_calibrate(&s->clock, noah_lighting_event_get_u32(p + 1u), noah_lighting_event_get_u32(p + 5u), noah_lighting_event_get_u32(p + 13u), noah_lighting_event_get_u32(p + 9u));
+        if (!s->facts_only) noah_lighting_working_stage_empty(s->working);
+        if (s->facts) {
+            if (s->delta_facts && s->published_facts) memcpy(s->facts, s->published_facts, sizeof *s->facts);
+            else memset(s->facts, 0, sizeof *s->facts);
+        }
+        if (!s->facts_only) (void)noah_lighting_freshness_calibrate(&s->clock, noah_lighting_event_get_u32(p + 1u), noah_lighting_event_get_u32(p + 5u), noah_lighting_event_get_u32(p + 13u), noah_lighting_event_get_u32(p + 9u));
         return true;
     }
     if (!s->staging) return false;
     if (p[0] == CHUNK) {
         uint16_t offset = get16(p + 1u);
         uint8_t  length = p[3];
-        if (offset != s->offset || !length || length > NOAH_LIGHTING_SNAPSHOT_CHUNK || offset > snapshot_bytes(s) || length > snapshot_bytes(s) - offset) return false;
-        uint8_t bank_length = offset < s->working->bank_bytes ? (uint8_t)((s->working->bank_bytes - offset) < length ? s->working->bank_bytes - offset : length) : 0u;
+        if (offset < s->offset || length > NOAH_LIGHTING_SNAPSHOT_CHUNK || offset > snapshot_bytes(s) || length > snapshot_bytes(s) - offset || (!length && offset != snapshot_bytes(s)) || (!s->facts_only && offset < 12u * s->working->rules)) return false;
+        uint16_t bank_bytes = s->facts_only ? 0u : s->working->bank_bytes;
+        uint8_t bank_length = offset < bank_bytes ? (uint8_t)((bank_bytes - offset) < length ? bank_bytes - offset : length) : 0u;
         if (bank_length && !noah_lighting_working_stage(s->working, offset, p + 4u, bank_length)) return false;
-        if (length > bank_length) memcpy((uint8_t *)s->facts + offset + bank_length - s->working->bank_bytes, p + 4u + bank_length, length - bank_length);
-        s->offset += length;
+        if (length > bank_length) memcpy((uint8_t *)s->facts + offset + bank_length - bank_bytes, p + 4u + bank_length, length - bank_length);
+        s->offset = offset + length;
         return true;
     }
-    if (p[0] != COMMIT || s->offset != snapshot_bytes(s)) return false;
+    if (p[0] != COMMIT || get16(p + 1u) != snapshot_bytes(s) || s->offset > snapshot_bytes(s)) return false;
     uint16_t lower, upper;
     if (!noah_lighting_freshness_age(&s->clock, now, &lower, &upper)) lower = upper = 65535u;
-    if (!noah_lighting_working_commit(s->working, lower, upper)) return false;
+    if (!s->facts_only && !noah_lighting_working_commit(s->working, lower, upper)) return false;
+    if (s->facts_only) { s->working->revision++; s->working->render_dirty = true; }
+    s->have_baseline = true;
+    s->sent_revision++;
     if (s->facts && s->published_facts) memcpy(s->published_facts, s->facts, sizeof *s->facts);
     s->working->last_time   = now;
     s->working->clock_ready = true;
@@ -107,6 +127,7 @@ static bool consume(void *context, const uint8_t *p, uint32_t now) {
 }
 bool noah_lighting_snapshot_main(noah_lighting_snapshot_t *s, uint32_t now) {
     observe_clock(s, now);
+    noah_lighting_working_advance(s->working, now);
     return noah_lighting_event_receive_main(&s->link, now, consume, reset, s);
 }
 uint8_t noah_lighting_snapshot_request(noah_lighting_snapshot_t *s, uint32_t now) {
@@ -115,10 +136,14 @@ uint8_t noah_lighting_snapshot_request(noah_lighting_snapshot_t *s, uint32_t now
     if (s->link.active && !s->link.mailbox_ready) {
         uint8_t payload[55] = {0};
         if (!s->working->snapshot_ready) {
+            if (!s->dirty && !s->working->dirty) return 0;
+            s->dirty = false;
             noah_lighting_working_advance(s->working, now);
+            s->facts_only = s->have_baseline && !s->working->dirty;
+            s->delta_facts = s->have_baseline;
             noah_lighting_working_snapshot(s->working);
             s->capture = now;
-            s->phase   = PING;
+            s->phase   = s->facts_only ? BEGIN : PING;
             s->offset  = 0;
         }
         payload[0] = s->phase;
@@ -128,15 +153,51 @@ uint8_t noah_lighting_snapshot_request(noah_lighting_snapshot_t *s, uint32_t now
             noah_lighting_event_put_u32(payload + 9u, s->after);
             noah_lighting_event_put_u32(payload + 13u, s->remote);
             put16(payload + 17u, snapshot_bytes(s));
+            payload[19] = (uint8_t)(s->delta_facts | (s->facts_only ? 2u : 0u));
+            noah_lighting_event_put_u32(payload + 20u, s->sent_revision);
         } else if (s->phase == CHUNK) {
-            uint16_t left   = snapshot_bytes(s) - s->offset;
-            uint8_t  length = left < 51u ? (uint8_t)left : 51u;
-            put16(payload + 1u, s->offset);
-            payload[3] = length;
-            if (!length) return 0;
-            uint8_t bank_length = s->offset < s->working->bank_bytes ? (uint8_t)((s->working->bank_bytes - s->offset) < length ? s->working->bank_bytes - s->offset : length) : 0u;
-            if (bank_length && !noah_lighting_working_read_snapshot(s->working, s->offset, payload + 4u, bank_length)) return 0;
-            if (length > bank_length) memcpy(payload + 4u + bank_length, (const uint8_t *)s->facts + s->offset + bank_length - s->working->bank_bytes, length - bank_length);
+            uint16_t offset = snapshot_bytes(s);
+            uint8_t length = 0;
+            uint16_t bank_bytes = s->facts_only ? 0u : s->working->bank_bytes;
+            if ((s->facts_only || !noah_lighting_working_snapshot_span(s->working, s->offset, &offset, payload + 4u, &length)) && s->facts) {
+                uint16_t at = s->offset > bank_bytes ? s->offset - bank_bytes : 0u;
+                const uint8_t *facts = (const uint8_t *)s->facts;
+                if (s->delta_facts) {
+                    // Each changed slice is sent in full, including changed-to-
+                    // zero bytes. Unchanged slices come from the exact ACKed
+                    // baseline; no extra fact frame is reserved on the source.
+                    uint16_t ordinal = 0;
+                    (void)ordinal;
+#define NOAH_LIGHTING_FACT_DELTA_SPAN(name, bytes, synced, gated) \
+                    if (!length && (s->fact_dirty[ordinal / 8u] & (1u << (ordinal % 8u))) && at < offsetof(noah_lighting_facts_t, name) + (bytes)) { \
+                        if (at < offsetof(noah_lighting_facts_t, name)) at = offsetof(noah_lighting_facts_t, name); \
+                        offset = bank_bytes + at; \
+                        uint16_t left = offsetof(noah_lighting_facts_t, name) + (bytes) - at; \
+                        length = left < 51u ? (uint8_t)left : 51u; \
+                        memcpy(payload + 4u, facts + at, length); \
+                    } \
+                    ordinal++;
+                    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_FACT_DELTA_SPAN)
+#undef NOAH_LIGHTING_FACT_DELTA_SPAN
+                } else {
+                    // Complete reset: omitted fact bytes are canonical zero.
+                    while (at < sizeof *s->facts && !facts[at]) at++;
+                    if (at < sizeof *s->facts) {
+                        offset = bank_bytes + at;
+                        length = sizeof *s->facts - at < 51u ? (uint8_t)(sizeof *s->facts - at) : 51u;
+                        while (length && !facts[at + length - 1u]) length--;
+                        memcpy(payload + 4u, facts + at, length);
+                    }
+                }
+            }
+            if (!length) {
+                payload[0] = COMMIT; // explicit end: omitted trailing bytes retain the defined baseline/zero
+                put16(payload + 1u, snapshot_bytes(s));
+            } else {
+                put16(payload + 1u, offset);
+                payload[3] = length;
+            }
+
         }
         if (!noah_lighting_snapshot_sender_offer(&s->link, payload)) return 0;
     }
@@ -149,10 +210,13 @@ static void ack(void *context, const uint8_t *payload) {
     else if (payload[0] == BEGIN)
         s->phase = snapshot_bytes(s) ? CHUNK : COMMIT;
     else if (payload[0] == CHUNK) {
-        s->offset += payload[3];
-        if (s->offset == snapshot_bytes(s)) s->phase = COMMIT;
+        s->offset = get16(payload + 1u) + payload[3];
+        if (!payload[3]) s->phase = COMMIT;
     } else {
         noah_lighting_working_release_snapshot(s->working);
+        s->have_baseline = true;
+        s->sent_revision++;
+        memset(s->fact_dirty, 0, sizeof s->fact_dirty);
         s->phase = PING;
     }
 }

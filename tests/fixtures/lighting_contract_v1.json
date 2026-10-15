@@ -147,5 +147,33 @@
     "visibility": "Entire proved interval lower>=show-after and upper<expiry; unknown suppresses",
     "resynchronization": "Current state plus still-live transients only; no source-expired replay or fresh receiver window",
     "invalidation": "session/role/profile/reset/detected discontinuity/ambiguous modular spans; obtain fresh causal evidence"
+  },
+  "splitSnapshot": {
+    "version": 3,
+    "tags": {
+      "hello": 145,
+      "confirm": 146,
+      "data": 147,
+      "reply": 148
+    },
+    "requestMaximum": 64,
+    "replyBytes": 14,
+    "payloads": {
+      "ping": 1,
+      "begin": 24,
+      "chunk": "4+length,1..51",
+      "commit": 3
+    },
+    "beginFlags": {
+      "0": "full history and full facts",
+      "1": "full history and fact deltas on ACKed baseline",
+      "3": "unchanged ACKed history and fact deltas"
+    },
+    "baseline": "u32 exact committed token; one immutable synchronous in-flight sequence; reset/profile/role invalidates and forces complete scene",
+    "factChanges": "registry-sized slice dirty bits; frozen existing source fact cut; receiver initializes staging from published baseline; changed slices include zero bytes",
+    "historyChanges": "complete occupied ordered header/member ranges, omitted reserved bytes zero; current/snapshot fixed2S+W",
+    "commit": "main-only whole validated history/facts; malformed consume REJECT and full session recovery, never failed ACK",
+    "idle": "no settled unchanged RPC; coalesced dirty latch; old ACK never clears newer current events",
+    "clock": "history changes obtain causal calibration; facts-only does not replace transient clocks; unknown suppresses, no delivery-time restart"
   }
 }

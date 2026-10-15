@@ -21,6 +21,7 @@
 #    include "../key/runtime/feedback.h"
 #    include "../state/diagnostics/runtime_trace.h"
 #    include "runtime_sync.h"
+#    include "../rgb/lighting/lighting_runtime.h"
 #    include "runtime_sync_dirty.h"
 #    include "transactions.h" // QMK
 
@@ -441,7 +442,7 @@ static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force
     }
 
 #    if NOAH_LIGHTING_HAS_SYNCED_FACTS
-    if (!split_runtime_sync_broadcast_lighting(force, now)) {
+    if (!noah_lighting_runtime_shared_scene() && !split_runtime_sync_broadcast_lighting(force, now)) {
         split_runtime_sync_note_failure(PUT_SPLIT_LIGHTING_FACTS_SYNC, now);
         return;
     }

@@ -4,6 +4,18 @@
 #    include "transactions.h"
 #    include <string.h>
 static noah_lighting_snapshot_t snapshot;
+// Match the existing split-runtime failure policy. This throttles failed
+// transport attempts only; it is not a scene/input/flash duration limit.
+#    ifndef SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS
+#        define SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS 50u
+#    endif
+#    ifndef SPLIT_RUNTIME_SYNC_RETRY_MAX_MS
+#        define SPLIT_RUNTIME_SYNC_RETRY_MAX_MS 1000u
+#    endif
+_Static_assert(SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS > 0u && SPLIT_RUNTIME_SYNC_RETRY_MAX_MS >= SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS && SPLIT_RUNTIME_SYNC_RETRY_MAX_MS <= UINT32_MAX / 2u, "bounded existing failure backoff");
+static uint32_t last_failure, retry_delay;
+void noah_qmk_lighting_snapshot_changed(void) { snapshot.dirty = true; }
+uint8_t *noah_qmk_lighting_snapshot_fact_changes(void) { return snapshot.fact_dirty; }
 _Static_assert(NOAH_LIGHTING_SNAPSHOT_REQUEST <= RPC_M2S_BUFFER_SIZE, "snapshot request allocation unchanged");
 _Static_assert(NOAH_LIGHTING_SNAPSHOT_REPLY <= RPC_S2M_BUFFER_SIZE, "snapshot reply allocation unchanged");
 void noah_qmk_lighting_snapshot_close(void) {
@@ -18,6 +30,7 @@ static void snapshot_rpc(uint8_t request_size, const void *request, uint8_t resp
 }
 void noah_qmk_lighting_snapshot_init(noah_lighting_working_t *working, const uint8_t profile[22]) {
     noah_qmk_lighting_snapshot_close();
+    retry_delay = 0u;
     noah_lighting_snapshot_begin(&snapshot, working, is_keyboard_master(), profile);
     transaction_register_rpc(PUT_SPLIT_LIGHTING_EVENTS_SYNC, snapshot_rpc);
 }
@@ -28,11 +41,17 @@ bool noah_qmk_lighting_snapshot_step(void) {
     if (!snapshot.link.ready || snapshot.link.master != is_keyboard_master()) return false;
     uint32_t now = timer_read32();
     if (!snapshot.link.master) return noah_lighting_snapshot_main(&snapshot, now);
+    if (retry_delay && now - last_failure < retry_delay) return false;
     uint8_t length = noah_lighting_snapshot_request(&snapshot, now);
     if (!length) return false;
     uint8_t  reply[NOAH_LIGHTING_SNAPSHOT_REPLY];
     uint32_t before = timer_read32();
-    if (!transaction_rpc_exec(PUT_SPLIT_LIGHTING_EVENTS_SYNC, length, snapshot.link.packet.outgoing, sizeof reply, reply)) return false;
+    if (!transaction_rpc_exec(PUT_SPLIT_LIGHTING_EVENTS_SYNC, length, snapshot.link.packet.outgoing, sizeof reply, reply)) {
+        last_failure = timer_read32();
+        retry_delay = !retry_delay ? SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS : retry_delay >= SPLIT_RUNTIME_SYNC_RETRY_MAX_MS / 2u ? SPLIT_RUNTIME_SYNC_RETRY_MAX_MS : retry_delay * 2u;
+        return false;
+    }
+    retry_delay = 0u;
     uint32_t after = timer_read32();
     return noah_lighting_snapshot_reply(&snapshot, reply, before, after);
 }

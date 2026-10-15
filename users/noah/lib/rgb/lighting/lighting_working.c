@@ -4,6 +4,10 @@
 #include <string.h>
 
 enum { LOWER = 0u, UPPER = 2u, PHASE = 4u, COUNT = 5u, ENTRY = 6u, FLAGS = 7u, LENGTH = 8u, HEADER = 12u, MEMBER = 5u + KEY_ORIGIN_BITMAP_SIZE };
+static void changed(noah_lighting_working_t *w) {
+    w->revision++; // diagnostic notification, never the wire's baseline identity
+    w->dirty = w->render_dirty = true;
+}
 static uint16_t get16(const uint8_t *b) {
     return (uint16_t)b[0] | (uint16_t)b[1] << 8u;
 }
@@ -108,10 +112,13 @@ void noah_lighting_working_advance(noah_lighting_working_t *w, uint32_t now) {
         (void)rule_info(w, &r, &info);
         for (uint16_t t = 0; t < r.count; t++) {
             uint8_t *c = slot(w, &r, t);
+            bool was_visible = noah_lighting_working_visible(c, &info.timing);
+            uint8_t phase = c[PHASE];
             if (discontinuity && c[PHASE] != NOAH_LIGHTING_WORKING_MATCH)
                 memset(c, 0, HEADER);
             else
                 advance_slot(c, &info.timing, elapsed, elapsed);
+            if (phase != c[PHASE] || was_visible != noah_lighting_working_visible(c, &info.timing)) changed(w);
         }
     }
 }
@@ -199,6 +206,7 @@ bool noah_lighting_working_event(noah_lighting_working_t *w, const noah_lighting
         put16(c + LENGTH, MEMBER);
         write_member(c + HEADER, &s, 0u);
         entries(w, &r);
+        changed(w);
     }
     return true;
 }
@@ -271,8 +279,10 @@ bool noah_lighting_working_observe(noah_lighting_working_t *w, const noah_lighti
                 next[PHASE] = NOAH_LIGHTING_WORKING_MATCH;
                 if (get16(next + LOWER) >= info.timing.show_after) next[FLAGS] |= NOAH_LIGHTING_WORKING_ELIGIBLE;
                 put16(next + LENGTH, (uint16_t)next[COUNT] * MEMBER);
+                if (memcmp(old, next, HEADER + (uint16_t)next[COUNT] * MEMBER)) changed(w);
                 memcpy(old, next, HEADER + (uint16_t)next[COUNT] * MEMBER);
             } else if (old[PHASE] == NOAH_LIGHTING_WORKING_MATCH) {
+                changed(w);
                 if ((old[FLAGS] & NOAH_LIGHTING_WORKING_ELIGIBLE) && info.timing.linger) {
                     old[PHASE] = NOAH_LIGHTING_WORKING_TAIL;
                     put16(old + LOWER, 0);
@@ -295,6 +305,7 @@ void noah_lighting_working_snapshot(noah_lighting_working_t *w) {
     if (w && !w->snapshot_ready) {
         memcpy(bank(w, true), bank(w, false), w->bank_bytes);
         w->snapshot_ready = true;
+        w->dirty = false; // newer current changes re-arm; an old ACK never clears it
     }
 }
 void noah_lighting_working_release_snapshot(noah_lighting_working_t *w) {
@@ -339,16 +350,21 @@ bool noah_lighting_working_commit(noah_lighting_working_t *w, uint16_t lower, ui
             uint8_t       *next = bank(w, true) + r.offset + t * r.stride;
             const uint8_t *old  = slot(w, &r, t);
             if (next[PHASE] == NOAH_LIGHTING_WORKING_MATCH) {
-                // State show-after remains per-half observed-frame time.
-                // A continuously observed thing keeps its local gate; a new
-                // visible match starts locally, unlike source-aged flash/tail.
-                put16(next + LOWER, old[PHASE] == NOAH_LIGHTING_WORKING_MATCH ? get16(old + LOWER) : 0u);
-                put16(next + UPPER, old[PHASE] == NOAH_LIGHTING_WORKING_MATCH ? get16(old + UPPER) : 0u);
-                next[FLAGS] = (uint8_t)((next[FLAGS] & ~NOAH_LIGHTING_WORKING_ELIGIBLE) | ((old[PHASE] == NOAH_LIGHTING_WORKING_MATCH && (old[FLAGS] & NOAH_LIGHTING_WORKING_ELIGIBLE)) || !info.timing.show_after ? NOAH_LIGHTING_WORKING_ELIGIBLE : 0u));
+                // A continuous source match started no later than this half's
+                // observed match. A strictly smaller source age upper bound at
+                // consumption therefore proves an intervening source restart.
+                // Unknown/saturated bounds do not establish that proof. Restart
+                // locally; never inherit an old episode's eligibility.
+                bool continuous = old[PHASE] == NOAH_LIGHTING_WORKING_MATCH &&
+                                  add16(get16(next + UPPER), upper) >= get16(old + LOWER);
+                put16(next + LOWER, continuous ? get16(old + LOWER) : 0u);
+                put16(next + UPPER, continuous ? get16(old + UPPER) : 0u);
+                next[FLAGS] = (uint8_t)((next[FLAGS] & ~NOAH_LIGHTING_WORKING_ELIGIBLE) | ((continuous && (old[FLAGS] & NOAH_LIGHTING_WORKING_ELIGIBLE)) || !info.timing.show_after ? NOAH_LIGHTING_WORKING_ELIGIBLE : 0u));
             } else
                 advance_slot(next, &info.timing, lower, upper);
         }
     }
+    changed(w);
     w->current ^= 1u;
     w->snapshot_ready = false;
     return true;
@@ -466,7 +482,39 @@ void noah_lighting_working_seen(noah_lighting_working_t *w) {
         (void)rule_info(w, &r, &info);
         for (uint16_t t = 0; t < r.count; t++) {
             uint8_t *c = slot(w, &r, t);
-            if (c[PHASE] == NOAH_LIGHTING_WORKING_MATCH && get16(c + LOWER) >= info.timing.show_after) c[FLAGS] |= NOAH_LIGHTING_WORKING_ELIGIBLE;
+            if (c[PHASE] == NOAH_LIGHTING_WORKING_MATCH && !(c[FLAGS] & NOAH_LIGHTING_WORKING_ELIGIBLE) && get16(c + LOWER) >= info.timing.show_after) {
+                c[FLAGS] |= NOAH_LIGHTING_WORKING_ELIGIBLE;
+                changed(w);
+            }
         }
     }
+}
+
+bool noah_lighting_working_snapshot_span(const noah_lighting_working_t *w, uint16_t from, uint16_t *offset, uint8_t *out, uint8_t *length) {
+    if (!w || !w->snapshot_ready || !offset || !out || !length) return false;
+    *length = 0u;
+    memset(out, 0, 51u);
+    for (uint8_t i = 0; i < w->rules; i++) {
+        noah_lighting_working_rule_t r;
+        (void)noah_lighting_working_rule(w, i, &r);
+        for (uint16_t t = 0; t < r.count; t++) {
+            uint16_t start = (uint16_t)(r.offset + t * r.stride);
+            const uint8_t *c = w->bytes + (w->current ^ 1u) * w->bank_bytes + start;
+            if (!c[PHASE]) continue;
+            uint16_t end = start + HEADER + (uint16_t)c[COUNT] * MEMBER;
+            if (from >= end) continue;
+            if (from > start) start = from;
+            if (!*length) *offset = start;
+            if (start >= *offset + 51u) return true;
+            if (end > *offset + 51u) end = *offset + 51u;
+            memcpy(out + start - *offset, c + start - (r.offset + t * r.stride), end - start);
+            *length = (uint8_t)(end - *offset);
+        }
+    }
+    return *length != 0u;
+}
+void noah_lighting_working_stage_empty(noah_lighting_working_t *w) {
+    memcpy(bank(w, true), bank(w, false), 12u * w->rules);
+    memset(bank(w, true) + 12u * w->rules, 0, w->bank_bytes - 12u * w->rules);
+    w->snapshot_ready = true;
 }

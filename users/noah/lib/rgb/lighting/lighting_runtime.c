@@ -38,7 +38,6 @@ bool noah_lighting_runtime_prepare(noah_lighting_scene_t *scene, uint32_t genera
         if (!noah_lighting_working_observe(&working, scene->facts)) __builtin_trap();
     } else
         noah_lighting_working_seen(&working);
-    revision++;
     scene->working = working.rules ? &working : NULL;
     return true;
 }
@@ -56,7 +55,6 @@ __attribute__((noinline)) void noah_lighting_event_observe(const noah_lighting_e
     if (!working.rules) return;
     uint32_t now = timer_read32();
     noah_lighting_working_advance(&working, now);
-    revision++; // Timer changes also invalidate an already published chunk cut.
     noah_lighting_facts_collect(&noah_lighting_workspace.capture.facts, true, true);
     qualify_and_retain(event);
 }
@@ -65,18 +63,20 @@ void noah_lighting_runtime_task(void) {
     if (!initialized || !working.rules) return;
     uint32_t now = timer_read32();
     noah_lighting_working_advance(&working, now);
-    revision++;
     if (role && !working.snapshot_ready) {
-        noah_lighting_facts_collect(&snapshot_facts, true, true);
+        bool facts_changed = noah_lighting_facts_collect_delta(&snapshot_facts, true, true, noah_qmk_lighting_snapshot_fact_changes());
+        if (facts_changed) noah_qmk_lighting_snapshot_changed();
         noah_lighting_working_advance(&working, timer_read32());
         if (!noah_lighting_working_observe(&working, &snapshot_facts)) __builtin_trap();
     }
-    if (noah_qmk_lighting_snapshot_step()) revision++;
+    (void)noah_qmk_lighting_snapshot_step();
 }
-bool noah_lighting_runtime_remote_scene(void) {
-    return initialized && !role && working.rules && working.generation == noah_effective_lighting_generation() && role == is_keyboard_master();
+bool noah_lighting_runtime_shared_scene(void) {
+    return initialized && working.rules && working.generation == noah_effective_lighting_generation() && role == is_keyboard_master();
 }
+bool noah_lighting_runtime_remote_scene(void) { return !role && noah_lighting_runtime_shared_scene(); }
+void noah_lighting_runtime_resolved(void) { working.render_dirty = false; }
 uint32_t noah_lighting_runtime_revision(void) {
-    return revision;
+    return revision + working.revision;
 }
 #endif

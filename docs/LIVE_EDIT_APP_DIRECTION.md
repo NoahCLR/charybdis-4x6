@@ -1460,7 +1460,7 @@ Gate lifetimes and wake deadlines use each half's local observation clock;
 split-synced time is reserved for paint animation. Backward sync adjustments
 cannot mature show-after. Fade destination active layers and top-layer facts
 share the same synthetic scene; actual ownership stays intact. Main owns one
-resolved fact frame through chunk rerenders, and transport buffers share storage
+resolved fact frame through synchronous final-local-chunk composition, and transport buffers share storage
 only across initialized, callback-guarded master/slave roles. The detailed
 lifetime and module-idle contracts live in the lighting spec. The enabled retained-timing candidate uses a direct, fixed8220-byte pool with
 registry-owned conservative admission before activation. It owns current and
@@ -1475,8 +1475,11 @@ copies borrowed owners before return. Program source reads and admission finish
 in separate owned staging before provider publication. Frozen outgoing bytes
 survive concurrent newer current observations without a third history bank.
 
-Snapshot v2 has an explicit internal discriminator, immutable stop-and-wait
-requests and main-before-ACK consumption. It resynchronizes still-live transient
+Snapshot v3 has an explicit internal discriminator, immutable stop-and-wait
+requests, change-driven coalescing, occupied history ranges and changed fact
+slices on an acknowledged complete baseline. Settled idle sends no RPC; failures
+back off and rejected main commits recover by full resync. Main-before-ACK
+consumption preserves one coherent fact/history cut. It resynchronizes still-live transient
 state rather than replaying source-expired events with a fresh interval.
 Nominal equal-rate local logical clocks, causal RTT and derived quantization
 bound remote age; unknown freshness suppresses transient paint. This is a

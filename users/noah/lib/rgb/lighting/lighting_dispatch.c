@@ -128,6 +128,25 @@ bool __attribute__((noinline)) noah_lighting_facts_collect_changed(noah_lighting
     return changed;
 }
 
+bool __attribute__((noinline)) noah_lighting_facts_collect_delta(noah_lighting_facts_t *facts, bool local, bool synced, uint8_t *dirty) {
+    slice_scratch_t scratch;
+    bool changed = false;
+    uint16_t ordinal = 0;
+    (void)scratch; (void)facts; (void)local; (void)synced; (void)ordinal; (void)dirty;
+#define NOAH_LIGHTING_COLLECT_DELTA(name, bytes, is_synced, gated) \
+    if ((is_synced) ? synced : local) { \
+        noah_lighting_slice_##name##_collect(scratch.name); \
+        if (memcmp(facts->name, scratch.name, bytes)) { \
+            memcpy(facts->name, scratch.name, bytes); changed = true; \
+            if (dirty) dirty[ordinal / 8u] |= (uint8_t)(1u << (ordinal % 8u)); \
+        } \
+    } \
+    ordinal++;
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_COLLECT_DELTA)
+#undef NOAH_LIGHTING_COLLECT_DELTA
+    return changed;
+}
+
 void noah_lighting_facts_init_synced(noah_lighting_facts_t *facts) {
     (void)facts;
 #    define NOAH_LIGHTING_INIT_SYNCED(name, bytes, is_synced, gated) if (is_synced) noah_lighting_slice_##name##_idle(facts->name);

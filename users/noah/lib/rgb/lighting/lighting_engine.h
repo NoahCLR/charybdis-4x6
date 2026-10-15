@@ -9,7 +9,9 @@
 #pragma once
 
 #include "lighting.h"
-#include "lighting_retained_render.h"
+#ifdef NOAH_LIGHTING_REFERENCE_COMPONENT_TESTS
+#    include "lighting_retained_render.h"
+#endif
 
 typedef struct {
     rgb_t                colour[NOAH_LIGHTING_LED_COUNT];
@@ -30,6 +32,7 @@ void noah_lighting_resolve(const noah_lighting_scene_t *scene, noah_lighting_led
 // The palette and timing state follow the published program.
 void noah_lighting_engine_program_changed(void);
 
+#ifdef NOAH_LIGHTING_REFERENCE_COMPONENT_TESTS
 // Apply one authored rule's COMPLETE frozen histories over an existing frame.
 // The caller supplies a same-generation store and the fact module's natural
 // priority binding. No observation/filter qualification occurs during paint;
@@ -43,6 +46,8 @@ typedef struct {
     uint64_t                            *candidates;
 } noah_lighting_retained_view_t;
 bool noah_lighting_apply_retained_rule(const noah_lighting_scene_t *scene, uint8_t rule, const noah_lighting_retained_view_t *view, noah_lighting_leds_t leds, noah_lighting_frame_t *frame, noah_lighting_resolve_info_t *info);
+
+#endif
 
 // The auto-mouse fade, outside the registries (lighting_fade.c).
 typedef struct {

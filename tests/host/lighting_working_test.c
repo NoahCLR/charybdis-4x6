@@ -135,6 +135,45 @@ static void independent_full_batches(void) {
     assert(!memcmp(saved,storage,work.bank_bytes));
 }
 
+static void matching_restart_commit(void) {
+    const uint8_t bytes[]={5,0,58,0,0,0,0,1,17,0,255,1,14,59,0x40,4,0x60,0,0xa2,1,44,1,0xa2,2,200,0,0};
+    load(bytes,sizeof bytes);
+    noah_lighting_working_t source,target;
+    uint8_t src[108],dst[108];
+    assert(noah_lighting_working_begin(&source,&program,src,sizeof src,1));
+    assert(noah_lighting_working_begin(&target,&program,dst,sizeof dst,1));
+    noah_lighting_facts_t facts={0};facts.key_pressed[7]=8;
+    noah_lighting_working_advance(&source,100);assert(noah_lighting_working_observe(&source,&facts));
+    noah_lighting_working_advance(&target,105);
+    noah_lighting_working_snapshot(&source);
+    memcpy(dst+target.bank_bytes,src+source.bank_bytes,source.bank_bytes);target.snapshot_ready=true;
+    assert(noah_lighting_working_commit(&target,4,6));
+    noah_lighting_working_advance(&target,410);noah_lighting_working_seen(&target);
+    noah_lighting_working_rule_t r;assert(noah_lighting_working_rule(&target,0,&r));
+    noah_lighting_lifetime_parameters_t timing={.show_after=300,.linger=200};
+    assert(noah_lighting_working_visible(noah_lighting_working_slot(&target,false,&r,59),&timing));
+    // A continuous source match must preserve the half's own later observation.
+    noah_lighting_working_release_snapshot(&source);noah_lighting_working_advance(&source,420);
+    assert(noah_lighting_working_observe(&source,&facts));noah_lighting_working_snapshot(&source);
+    noah_lighting_working_advance(&target,425);
+    memcpy(dst+(target.current^1u)*target.bank_bytes,src+(source.current^1u)*source.bank_bytes,source.bank_bytes);target.snapshot_ready=true;
+    assert(noah_lighting_working_commit(&target,4,6));
+    assert(noah_lighting_working_visible(noah_lighting_working_slot(&target,false,&r,59),&timing));
+    // Source departure/reentry between coherent cuts is proved by its age's
+    // upper bound being below the receiver's uninterrupted observed lower age.
+    noah_lighting_working_release_snapshot(&source);facts.key_pressed[7]=0;
+    noah_lighting_working_advance(&source,450);assert(noah_lighting_working_observe(&source,&facts));
+    facts.key_pressed[7]=8;noah_lighting_working_advance(&source,500);assert(noah_lighting_working_observe(&source,&facts));
+    noah_lighting_working_advance(&source,510);noah_lighting_working_snapshot(&source);
+    noah_lighting_working_advance(&target,515);
+    memcpy(dst+(target.current^1u)*target.bank_bytes,src+(source.current^1u)*source.bank_bytes,source.bank_bytes);target.snapshot_ready=true;
+    assert(noah_lighting_working_commit(&target,4,6));
+    assert(!noah_lighting_working_visible(noah_lighting_working_slot(&target,false,&r,59),&timing));
+    noah_lighting_working_advance(&target,814);noah_lighting_working_seen(&target);
+    assert(!noah_lighting_working_visible(noah_lighting_working_slot(&target,false,&r,59),&timing));
+    noah_lighting_working_advance(&target,815);noah_lighting_working_seen(&target);
+    assert(noah_lighting_working_visible(noah_lighting_working_slot(&target,false,&r,59),&timing));
+}
 static void snapshots(void) {
     const uint8_t bytes[]={5,0,58,0,0,0,0,1,13,0,255,1,28,127,0x40,4,0x60,0,0xa2,3,244,1,0};
     load(bytes,sizeof bytes);
@@ -184,7 +223,7 @@ static void snapshots(void) {
     assert(!rx.clock.valid);
 }
 int main(int argc,char **argv) {
-    useful();unmet_show();independent_full_batches();snapshots();assert(argc==4);FILE *f=fopen(argv[1],"r");assert(f);
+    matching_restart_commit();useful();unmet_show();independent_full_batches();snapshots();assert(argc==4);FILE *f=fopen(argv[1],"r");assert(f);
     unsigned c,b,s,a,n,known,lo,hi,show,flash,visible,cases=0;
     while(fscanf(f,"%u %u %u %u %u %u %u %u %u %u %u",&c,&b,&s,&a,&n,&known,&lo,&hi,&show,&flash,&visible)==11) {
         noah_lighting_freshness_t clock;uint16_t lower=0,upper=0;
@@ -211,12 +250,13 @@ int main(int argc,char **argv) {
     while(fscanf(f,"%u %u %110s %128s",&epoch,&sequence,payload_hex,request_hex)==4) {
         noah_lighting_event_link_t link={0};uint8_t identity[22]={0},payload[55],expected[64];
         noah_lighting_snapshot_sender_begin(&link,identity);link.active=true;link.epoch=epoch;link.next_sequence=sequence;
-        for(unsigned i=0;i<64;i++){unsigned v;assert(sscanf(request_hex+2*i,"%2x",&v)==1);expected[i]=v;}
+        for(unsigned i=0;i<strlen(request_hex)/2u;i++){unsigned v;assert(sscanf(request_hex+2*i,"%2x",&v)==1);expected[i]=v;}
         for(unsigned i=0;i<55;i++){unsigned v;assert(sscanf(payload_hex+2*i,"%2x",&v)==1);payload[i]=v;}
-        assert(noah_lighting_snapshot_sender_offer(&link,payload));assert(noah_lighting_event_sender_size(&link)==64);
-        assert(!memcmp(link.packet.outgoing,expected,64));wire_cases++;
+        assert(noah_lighting_snapshot_sender_offer(&link,payload));
+        size_t size=strlen(request_hex)/2u;assert(size<=64 && noah_lighting_event_sender_size(&link)==size);
+        assert(!memcmp(link.packet.outgoing,expected,size));wire_cases++;
     }
-    fclose(f);assert(wire_cases==4);
+    fclose(f);assert(wire_cases==7);
     printf("shared direct admission: %u profiles/all registry bounds/disabled/high IDs/255/boundary PASS\n",cost_cases);
     printf("direct admitted histories: exact8220 useful mixture/all128 identities+16 layers/current+snapshot overlap/atomic reject/show-tail; freshness%u shared cases PASS\n",cases);
 }

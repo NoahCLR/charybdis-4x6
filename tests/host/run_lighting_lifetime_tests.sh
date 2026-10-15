@@ -18,7 +18,7 @@ pathlib.Path(sys.argv[2]).write_text('\n'.join(lines)+'\n')
 PY
 . "$ROOT/tests/host/noah_source_manifest.sh"
 SOURCE=""
-for src in $(noah_source_manifest_userspace_paths "$ROOT" NOAH_COMMON_SOURCES); do
+for src in $(noah_source_manifest_lighting_test_paths "$ROOT"); do
     case "$src" in users/noah/lib/rgb/lighting/lighting_lifetime.c|users/noah/lib/rgb/lighting/lighting_batch_arena.c|users/noah/lib/rgb/lighting/lighting_retained.c) SOURCE="$SOURCE $ROOT/$src" ;; esac
 done
 [ -n "$SOURCE" ]

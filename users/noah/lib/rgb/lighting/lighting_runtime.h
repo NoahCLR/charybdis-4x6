@@ -7,9 +7,12 @@ void                   noah_lighting_runtime_publish(const noah_profile_lighting
 void                   noah_lighting_runtime_sync_role(void);
 void                   noah_lighting_runtime_task(void);
 uint32_t               noah_lighting_runtime_revision(void);
+void                   noah_lighting_runtime_resolved(void);
 bool                   noah_lighting_runtime_remote_scene(void);
+bool                   noah_lighting_runtime_shared_scene(void);
 noah_lighting_facts_t *noah_rgb_runtime_history_facts(void);
 #else
 static inline void noah_lighting_runtime_task(void) {}
 static inline void noah_lighting_runtime_sync_role(void) {}
+static inline bool noah_lighting_runtime_shared_scene(void) {return false;}
 #endif

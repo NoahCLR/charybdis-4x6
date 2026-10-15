@@ -46,7 +46,7 @@ build_scene() {
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' $SCENE_FLAGS "$@" \
         -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
-        "$ROOT/tests/host/rgb_layer_render_test.c" \
+        "$ROOT/tests/host/${RENDER_TEST_SOURCE:-rgb_layer_render_test.c}" \
         "$ROOT/users/noah/lib/compat/qmk_contract.c" \
         "$ROOT/users/noah/lib/compat/qmk_lighting_snapshot_transport.c" \
         "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
@@ -73,6 +73,14 @@ build_scene cached_scene $SMALL -DNOAH_LIGHTING_TARGET_KEYS_THAT=1 -DNOAH_LIGHTI
 "$BUILD_DIR/cached_scene"
 build_scene cached_scene_sanitized $SMALL -DNOAH_LIGHTING_TARGET_KEYS_THAT=1 -DNOAH_LIGHTING_PAINT_WHAT_IT_DOES=1 -fsanitize=address,undefined -fno-omit-frame-pointer
 "$BUILD_DIR/cached_scene_sanitized"
+
+for variant in normal sanitized; do
+    flags=""
+    [ "$variant" != sanitized ] || flags="-fsanitize=address,undefined -fno-omit-frame-pointer"
+    RENDER_TEST_SOURCE=rgb_chunk_composition_test.c build_scene "chunks_$variant" -DRGB_MATRIX_SPLIT=1 -DRGB_MATRIX_LED_PROCESS_LIMIT=12 -DRGB_LEFT_LED_COUNT=29 -DRGB_MATRIX_LED_COUNT=58 -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DNOAH_LIGHTING_FACT_MACRO_PLAYED=1 -DNOAH_LIGHTING_TIMING_FLASH=1 -DNOAH_LIGHTING_TIMING_LINGER=1 -DNOAH_LIGHTING_TARGET_KEYS_THAT=1 -DRPC_M2S_BUFFER_SIZE=128 $flags
+    "$BUILD_DIR/chunks_$variant"
+done
+RENDER_TEST_SOURCE=rgb_layer_render_test.c
 
 build_scene workload -DRGB_MATRIX_SPLIT=1 -DRGB_MATRIX_LED_PROCESS_LIMIT=12 -DRGB_LEFT_LED_COUNT=29 -DRGB_MATRIX_LED_COUNT=58 -DRGB_LAYER_RENDER_TEST_WORKLOAD=1
 "$BUILD_DIR/workload"

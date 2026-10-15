@@ -16,6 +16,7 @@
 #include "users/noah/lib/rgb/lighting/lighting_batch.h"
 #include "users/noah/lib/rgb/lighting/lighting_history_observe.h"
 #include "users/noah/lib/rgb/lighting/lighting_workspace.h"
+#include "users/noah/lib/rgb/lighting/lighting_working.h"
 #include "users/noah/lib/rgb/lighting/lighting_keymap.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/profile/runtime/effective_combo_runtime.h"
@@ -344,6 +345,11 @@ static void check_actual_fact_batches(const noah_profile_lighting_v1_program_t *
     }
 }
 
+static noah_lighting_working_t production_working;
+static uint8_t production_storage[NOAH_LIGHTING_WORKING_CAPACITY];
+static bool production_admitted;
+static uint32_t production_time;
+static unsigned production_cases, production_steps, reference_only_cases;
 static noah_lighting_batch_arena_t history_arena;
 static noah_lighting_history_bank_t history_bank;
 static uint8_t history_bytes[32768], history_scratch[NOAH_LIGHTING_BATCH_BYTES];
@@ -375,12 +381,19 @@ static void check_history_pixels(FILE *file, const char *name, noah_profile_ligh
         has_event=kind!=255u;
         event=(noah_lighting_event_t){.kind=kind,.thing=thing,.branch=branch,.slot=slot,.outcome=outcome,.key=key_at(key),.owners=owners?event_owners:NULL};
     }
+    if(production_admitted) {
+        production_time+=(uint32_t)delta;
+        noah_lighting_working_advance(&production_working,production_time);
+        assert(noah_lighting_working_observe(&production_working,facts));
+    }
     assert(noah_lighting_history_bank_advance(&history_bank,(uint32_t)delta));
     assert(noah_lighting_history_observe(&history_bank,facts,(uint64_t)order,history_scratch));
     if(has_event) {
         noah_lighting_event_group_t group;
-        if(noah_lighting_event_qualify(program,facts,&event,(uint64_t)order,&group))
+        if(noah_lighting_event_qualify(program,facts,&event,(uint64_t)order,&group)) {
             assert(noah_lighting_history_bank_event(&history_bank,&group,false,history_scratch));
+            if(production_admitted)assert(noah_lighting_working_event(&production_working,&group));
+        }
         memset(event_owners,0xa5,sizeof event_owners);
     }
     assert(noah_lighting_history_store_freeze(&history_bank.store));
@@ -391,11 +404,27 @@ static void check_history_pixels(FILE *file, const char *name, noah_profile_ligh
     for(unsigned rule=program->rule_count;rule-- >0;)
         assert(noah_lighting_apply_retained_rule(&scene,rule,&view,NOAH_LIGHTING_ALL_LEDS,&frame,&info));
     assert(storage_reads==reads);
+    noah_lighting_frame_t actual_production={0},chunked_production={0};
+    if(production_admitted) {
+        scene.working=&production_working;
+        noah_lighting_resolve(&scene,NOAH_LIGHTING_ALL_LEDS,production_time,true,&actual_production,&info);
+        noah_lighting_resolve(&scene,NOAH_LIGHTING_LEFT_LEDS,production_time,false,&chunked_production,&info);
+        noah_lighting_resolve(&scene,NOAH_LIGHTING_RIGHT_LEDS,production_time,false,&chunked_production,&info);
+        assert(actual_production.painted==chunked_production.painted);
+        for(unsigned led=0;led<NOAH_LIGHTING_LED_COUNT;led++)if(actual_production.painted&NOAH_LIGHTING_LED_BIT(led))
+            assert(!memcmp(&actual_production.colour[led],&chunked_production.colour[led],sizeof(rgb_t)));
+        production_steps++;
+    }
     for(unsigned led=0;led<NOAH_LIGHTING_LED_COUNT;led++) {
         char expected[16],actual[16];assert(fscanf(file,"%15s",expected)==1);
         if(frame.painted & NOAH_LIGHTING_LED_BIT(led))snprintf(actual,sizeof actual,"%02x%02x%02x",frame.colour[led].r,frame.colour[led].g,frame.colour[led].b);
         else snprintf(actual,sizeof actual,"-");
         if(strcmp(expected,actual)) { fprintf(stderr,"retained pixels %s order%llu LED%u expected%s got%s\n",name,order,led,expected,actual);exit(1); }
+        if(production_admitted) {
+            if(actual_production.painted&NOAH_LIGHTING_LED_BIT(led))snprintf(actual,sizeof actual,"%02x%02x%02x",actual_production.colour[led].r,actual_production.colour[led].g,actual_production.colour[led].b);
+            else snprintf(actual,sizeof actual,"-");
+            if(strcmp(expected,actual)){fprintf(stderr,"PRODUCTION working+scene %s time%u LED%u expected%s got%s\n",name,production_time,led,expected,actual);exit(1);}
+        }
     }
     noah_lighting_history_store_clear(&history_bank.store,NOAH_LIGHTING_ARENA_FRAME);
 }
@@ -455,7 +484,15 @@ int main(int argc, char **argv) {
             assert(noah_profile_lighting_v1_decode(payload, length, &limits, &view, NULL) == NOAH_PROFILE_LIGHTING_V1_OK);
             assert(noah_profile_lighting_v1_program_load(&view, &program));
             noah_lighting_engine_program_changed();
-            if(history_case) { noah_lighting_history_bank_begin(&history_bank,&program,&history_arena);history_cases++; }
+            if(history_case) {
+                noah_lighting_history_bank_begin(&history_bank,&program,&history_arena);history_cases++;
+                noah_lighting_working_cost_t production_cost;
+                production_admitted=noah_profile_lighting_v1_working_admit(&view,sizeof production_storage,&production_cost)==NOAH_PROFILE_LIGHTING_V1_OK;
+                if(production_admitted) {
+                    assert(noah_lighting_working_begin(&production_working,&program,production_storage,sizeof production_storage,1));
+                    production_time=0;noah_lighting_working_advance(&production_working,0);production_cases++;
+                } else reference_only_cases++;
+            }
             else if (occurrence_case) occurrence_cases++; else cases++;
             continue;
         }
@@ -602,6 +639,8 @@ int main(int argc, char **argv) {
     assert(!history_arena.used);
     fclose(file);
     assert(history_cases==8 && history_steps==45);
+    assert(production_cases && production_steps);
+    printf("PRODUCTION fixed8220 working+scene full/chunk shared retained pixels: %u cases/%u steps; %u explicitly over-admission reference-only cases\n",production_cases,production_steps,reference_only_cases);
     printf("lighting actual retained target/paint pixels: %zu cases/%zu frames passed\n",history_cases,history_steps);
     assert(cases >= 30 && steps >= 60);
     assert(peak_clocks >= 1000u); // Adversarial distinct signatures, not only duplicate rules.

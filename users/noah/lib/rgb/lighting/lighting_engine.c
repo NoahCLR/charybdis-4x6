@@ -409,6 +409,7 @@ static void paint_subject(const noah_lighting_scene_t *scene, const rule_t *rule
     paint_owned_subject(scene, rule, placed, &subject, leds, frame, info);
 }
 
+#ifdef NOAH_LIGHTING_REFERENCE_COMPONENT_TESTS
 typedef struct {
     const noah_lighting_scene_t         *scene;
     const rule_t                        *rule;
@@ -437,6 +438,8 @@ bool noah_lighting_apply_retained_rule(const noah_lighting_scene_t *scene, uint8
     retained_painter_t painter = {.scene = scene, .rule = &rule, .view = view, .leds = leds, .frame = frame, .info = info};
     return noah_lighting_retained_render(view->store, NOAH_LIGHTING_ARENA_FRAME, index, &description.timing, retained_natural, retained_paint, &painter, view->candidates);
 }
+
+#endif
 
 typedef struct {
     const noah_lighting_scene_t *scene;

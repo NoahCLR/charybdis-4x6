@@ -9,7 +9,7 @@ void noah_lighting_event_link_begin(noah_lighting_event_link_t *link, bool maste
     link->snapshot_mode = false;
     link->active = link->waiting_confirm = false;
     link->reset_requested = link->confirm_requested = link->mailbox_ready = false;
-    link->committed = false;
+    link->committed = link->rejected = false;
     link->next_sequence = link->handshake_sequence = 0;
     memcpy(link->profile, profile, NOAH_LIGHTING_EVENT_PROFILE_BYTES);
     memset(&link->packet, 0, sizeof link->packet);
@@ -19,7 +19,7 @@ void noah_lighting_event_link_publish(noah_lighting_event_link_t *link) {
     link->ready = true;
 }
 static void respond(const noah_lighting_event_link_t *link, uint8_t status, uint32_t sequence, uint8_t *reply) {
-    reply[0] = NOAH_LIGHTING_EVENT_REPLY | (link->snapshot_mode ? 0x80u : 0u);
+    reply[0] = NOAH_LIGHTING_EVENT_REPLY | (link->snapshot_mode ? 0x90u : 0u);
     reply[1] = status;
     noah_lighting_event_put_u32(reply + 2, link->epoch);
     noah_lighting_event_put_u32(reply + 6, sequence);
@@ -33,7 +33,7 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
     memset(reply, 0, NOAH_LIGHTING_EVENT_REPLY_BYTES);
     if (!link->ready || link->master || !request || !size) return;
     BARRIER();
-    if (request[0] == (NOAH_LIGHTING_EVENT_HELLO | (link->snapshot_mode ? 0x80u : 0u)) && size == NOAH_LIGHTING_EVENT_HELLO_BYTES) {
+    if (request[0] == (NOAH_LIGHTING_EVENT_HELLO | (link->snapshot_mode ? 0x90u : 0u)) && size == NOAH_LIGHTING_EVENT_HELLO_BYTES) {
         uint32_t first = noah_lighting_event_get_u32(request + 23);
         if (memcmp(request + 1, link->profile, NOAH_LIGHTING_EVENT_PROFILE_BYTES)) {
             respond(link, NOAH_LIGHTING_EVENT_PROFILE_MISMATCH, 0, reply);
@@ -55,7 +55,7 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
         respond(link, NOAH_LIGHTING_EVENT_NEED_HELLO, sequence, reply);
         return;
     }
-    if (request[0] == (NOAH_LIGHTING_EVENT_CONFIRM | (link->snapshot_mode ? 0x80u : 0u)) && size == NOAH_LIGHTING_EVENT_CONTROL_BYTES && sequence == link->next_sequence) {
+    if (request[0] == (NOAH_LIGHTING_EVENT_CONFIRM | (link->snapshot_mode ? 0x90u : 0u)) && size == NOAH_LIGHTING_EVENT_CONTROL_BYTES && sequence == link->next_sequence) {
         if (link->active && !link->confirm_requested) respond(link, NOAH_LIGHTING_EVENT_ACK, sequence, reply);
         else {
             link->confirm_requested = true;
@@ -63,13 +63,23 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
         }
         return;
     }
-    size_t data_bytes = link->snapshot_mode ? 64u : NOAH_LIGHTING_EVENT_DATA_BYTES;
-    if (request[0] != (NOAH_LIGHTING_EVENT_DATA | (link->snapshot_mode ? 0x80u : 0u)) || size != data_bytes || (link->snapshot_mode ? request[9] > 3u : !data_valid(request))) {
+    bool valid = false;
+    if (link->snapshot_mode) {
+        valid = size >= 10u && size <= 64u && request[9] <= 3u;
+        if (valid && request[9] == 1u) valid = size >= 13u && request[12] <= 51u;
+        if (valid) valid = size == 9u + noah_lighting_snapshot_payload_size(request + 9u);
+    } else valid = size == NOAH_LIGHTING_EVENT_DATA_BYTES && data_valid(request);
+    if (request[0] != (NOAH_LIGHTING_EVENT_DATA | (link->snapshot_mode ? 0x90u : 0u)) || !valid) {
         respond(link, NOAH_LIGHTING_EVENT_REJECT, sequence, reply);
         return;
     }
+    size_t data_bytes = size;
     if (!link->active || link->confirm_requested) {
         respond(link, NOAH_LIGHTING_EVENT_NEED_HELLO, sequence, reply);
+        return;
+    }
+    if (link->rejected) {
+        respond(link, NOAH_LIGHTING_EVENT_REJECT, sequence, reply);
         return;
     }
     if (link->committed && sequence == link->next_sequence - 1u) {
@@ -85,6 +95,7 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
         respond(link, NOAH_LIGHTING_EVENT_REJECT, sequence, reply);
         return;
     }
+    memset(link->packet.mailbox, 0, sizeof link->packet.mailbox);
     memcpy(link->packet.mailbox, request, data_bytes);
     BARRIER();
     link->mailbox_ready = true;
@@ -94,7 +105,7 @@ static void reset_main(noah_lighting_event_link_t *link, noah_lighting_event_res
     reset(context);
     link->epoch++;
     link->next_sequence = link->handshake_sequence;
-    link->committed = false;
+    link->committed = link->rejected = false;
     link->active = false;
     link->waiting_confirm = true;
     link->confirm_requested = link->mailbox_ready = false;
@@ -116,7 +127,17 @@ bool noah_lighting_event_receive_main(noah_lighting_event_link_t *link, uint32_t
         return true;
     }
     if (!link->active || !link->mailbox_ready) return false;
-    if (!consume(context, link->packet.mailbox + NOAH_LIGHTING_EVENT_CONTROL_BYTES, now)) return false;
+    if (!consume(context, link->packet.mailbox + NOAH_LIGHTING_EVENT_CONTROL_BYTES, now)) {
+        // A snapshot consumer has completed its validation, not deferred work.
+        // Keep the published scene intact, release only the failed mailbox and
+        // expose REJECT until a fresh HELLO supersedes this transaction.
+        if (link->snapshot_mode) {
+            link->rejected = true;
+            BARRIER();
+            link->mailbox_ready = false;
+        }
+        return false;
+    }
     // A HELLO may preempt consume. Reset wins; no ACK of the old generation.
     if (link->reset_requested) {
         reset_main(link, reset, context);

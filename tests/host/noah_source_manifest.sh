@@ -184,3 +184,9 @@ lib/state/diagnostics/runtime_trace.c'
 
     printf '%s %s %s\n' "$base_paths" "$common_paths" "$root/tests/host/macro_payload_engine_unit_stub.c"
 }
+
+# Explicit reference-only dependencies; never use this in firmware compile gates.
+noah_source_manifest_lighting_test_paths() {
+    noah_source_manifest_userspace_paths "$1" NOAH_COMMON_SOURCES
+    noah_source_manifest_userspace_paths "$1" NOAH_LIGHTING_REFERENCE_TEST_SOURCES
+}

@@ -135,29 +135,15 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/core/rgb_runtime.c \
     lib/rgb/lighting/lighting_dispatch.c \
     lib/rgb/lighting/lighting_event_protocol.c \
-    lib/compat/qmk_lighting_event_transport.c \
     lib/rgb/lighting/lighting_event_receiver.c \
     lib/rgb/lighting/lighting_event_sender.c \
     lib/rgb/lighting/lighting_occurrence.c \
-    lib/rgb/lighting/lighting_event_capture.c \
-    lib/rgb/lighting/lighting_lifetime.c \
     lib/rgb/lighting/lighting_working.c \
     lib/rgb/lighting/lighting_freshness.c \
     lib/rgb/lighting/lighting_snapshot.c \
     lib/rgb/lighting/lighting_runtime.c \
     lib/compat/qmk_lighting_snapshot_transport.c \
-    lib/rgb/lighting/lighting_batch.c \
-    lib/rgb/lighting/lighting_batch_arena.c \
-    lib/rgb/lighting/lighting_retained.c \
-    lib/rgb/lighting/lighting_priority.c \
     lib/rgb/lighting/lighting_history_index.c \
-    lib/rgb/lighting/lighting_history_owner.c \
-    lib/rgb/lighting/lighting_history_store.c \
-    lib/rgb/lighting/lighting_history_bank.c \
-    lib/rgb/lighting/lighting_history_observe.c \
-    lib/rgb/lighting/lighting_retained_render.c \
-    lib/rgb/lighting/lighting_owned_batch.c \
-    lib/rgb/lighting/lighting_retained_group.c \
     lib/rgb/lighting/kinds/event_layer_locked.c \
     lib/rgb/lighting/kinds/event_layer_unlocked.c \
     lib/rgb/lighting/kinds/event_oneshot_used.c \
@@ -239,3 +225,21 @@ NOAH_RGB_KEYMAP_SOURCES := \
 
 NOAH_PROFILE_KEYMAP_SOURCES := \
     $(KEYMAP_PATH)/pd_config.c
+
+# Superseded storage/transport experiments remain executable reference tests.
+# These are deliberately excluded from every production userspace source set.
+NOAH_LIGHTING_REFERENCE_TEST_SOURCES := \
+    lib/rgb/lighting/lighting_event_capture.c \
+    lib/rgb/lighting/lighting_lifetime.c \
+    lib/rgb/lighting/lighting_batch.c \
+    lib/rgb/lighting/lighting_batch_arena.c \
+    lib/rgb/lighting/lighting_retained.c \
+    lib/rgb/lighting/lighting_priority.c \
+    lib/rgb/lighting/lighting_history_owner.c \
+    lib/rgb/lighting/lighting_history_store.c \
+    lib/rgb/lighting/lighting_history_bank.c \
+    lib/rgb/lighting/lighting_history_observe.c \
+    lib/rgb/lighting/lighting_retained_render.c \
+    lib/rgb/lighting/lighting_owned_batch.c \
+    lib/rgb/lighting/lighting_retained_group.c \
+    lib/compat/qmk_lighting_event_transport.c

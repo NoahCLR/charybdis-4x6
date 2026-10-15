@@ -37,3 +37,9 @@ uint32_t noah_lighting_event_get_u32(const uint8_t *bytes);
 _Static_assert(NOAH_LIGHTING_EVENT_DATA_BYTES <= RPC_M2S_BUFFER_SIZE, "event request fits existing QMK allocation");
 _Static_assert(NOAH_LIGHTING_EVENT_REPLY_BYTES <= RPC_S2M_BUFFER_SIZE, "event reply fits existing QMK allocation");
 #endif
+
+// Snapshot v3 uses explicit short requests; mailbox padding is local zero.
+// Caller proves the CHUNK length byte is present before invoking this helper.
+static inline uint8_t noah_lighting_snapshot_payload_size(const uint8_t *p) {
+    return p[0] == 0u ? 24u : p[0] == 1u ? (uint8_t)(4u + p[3]) : p[0] == 2u ? 3u : p[0] == 3u ? 1u : 0u;
+}

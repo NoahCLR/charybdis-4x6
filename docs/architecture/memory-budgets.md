@@ -722,3 +722,15 @@ and are not accepted pairs. Physical SRAM remains270336 bytes per half; core
 floor4096 and reviewed main/slave1920/768 remain unchanged. Hardware cadence,
 oscillator drift and allocator/global/interrupt-stack high-water acceptance
 remain unproved. Host logical-clock and linked-path checks do not prove them.
+
+The v3 snapshot correction retains the same8220 pool and staged program.
+Additional control comprises a working-owner change latch/diagnostic revision,
+a registry-sized fact dirty bitset, one acknowledged baseline token and retry
+backoff timestamps. It reuses the existing source fact snapshot and receiver
+published/staging frames; no third621-byte fact buffer or history bank exists.
+The compiler-flag policy selector follows final ordered `-D`/`-U` definitions:
+valueless or proven nonzero integer enables a prerequisite; zero, undefined or
+unknown expressions cannot grant a larger artifact allowance. The separate
+compiler/geometry assertion remains required for247808. New exact-head links
+must account for this control and actual stack paths under the fixed policies;
+the historical initial sizes above are not a pass for later corrections.

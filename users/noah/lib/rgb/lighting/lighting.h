@@ -12,6 +12,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #include "../../key/runtime/feedback.h"
@@ -198,6 +199,24 @@ typedef struct {
     uint8_t terminator; // keeps the struct non-empty in a build without facts
 } noah_lighting_facts_t;
 
+// One bit per registry-defined fact slice; grows with the open registry.
+#define NOAH_LIGHTING_SLICE_COUNT(name, bytes, synced, gated) +1u
+enum { NOAH_LIGHTING_FACT_SLICE_COUNT = 0u NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SLICE_COUNT),
+       NOAH_LIGHTING_FACT_DIRTY_BYTES = (NOAH_LIGHTING_FACT_SLICE_COUNT + 7u) / 8u };
+#undef NOAH_LIGHTING_SLICE_COUNT
+// Source-owned metadata, accumulated only while its fact cut is unpinned.
+// Also used by adapter fixtures to mark changes at actual compiled offsets.
+static inline void noah_lighting_facts_dirty_range(uint8_t *dirty, uint16_t start, uint16_t length) {
+    uint16_t ordinal = 0;
+    (void)ordinal; (void)start; (void)length;
+    if (!dirty) return;
+#define NOAH_LIGHTING_DIRTY_RANGE(name, bytes, synced, gated) \
+    if (start < offsetof(noah_lighting_facts_t, name) + (bytes) && start + length > offsetof(noah_lighting_facts_t, name)) dirty[ordinal / 8u] |= (uint8_t)(1u << (ordinal % 8u)); \
+    ordinal++;
+    NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_DIRTY_RANGE)
+#undef NOAH_LIGHTING_DIRTY_RANGE
+}
+
 #define NOAH_LIGHTING_SLICE_SYNCED_SIZE(name, bytes, synced, gated) +((synced) ? (bytes) : 0u)
 enum { NOAH_LIGHTING_SYNCED_BYTES = 0u NOAH_LIGHTING_SLICE_ROWS(NOAH_LIGHTING_SLICE_SYNCED_SIZE) };
 #undef NOAH_LIGHTING_SLICE_SYNCED_SIZE
@@ -297,6 +316,7 @@ void                 noah_lighting_facts_build_synced(uint8_t *frame, bool refre
 // The synced frame at rest.
 void                 noah_lighting_facts_build_idle(uint8_t *frame);
 void                 noah_lighting_facts_init_synced(noah_lighting_facts_t *facts);
+bool                 noah_lighting_facts_collect_delta(noah_lighting_facts_t *facts, bool local, bool synced, uint8_t *dirty);
 bool                 noah_lighting_facts_collect_changed(noah_lighting_facts_t *facts, bool local, bool synced);
 bool                 noah_lighting_facts_unpack_synced_changed(noah_lighting_facts_t *facts, const uint8_t *frame);
 bool                 noah_lighting_facts_active(const uint8_t *frame, bool gated_only);

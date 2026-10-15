@@ -793,7 +793,8 @@ static bool test_render_normal_num(uint8_t led_min, uint8_t led_max) {
     test_reset();
     test_map_num_preview_leds();
     layer_state  = (layer_state_t)1u << LAYER_NUM;
-    bool painted = render_output_range(led_min, led_max);
+    (void)led_min; (void)led_max;
+    bool painted = render_output();
     // The rules resolve once per frame, whatever the groups.
     CHECK(rgb_runtime_test_resolve_count() == 1u);
     return painted;
@@ -803,7 +804,8 @@ static bool test_render_preview_num(uint8_t led_min, uint8_t led_max) {
     test_reset();
     test_map_num_preview_leds();
     fake_preview_layer = LAYER_NUM;
-    bool painted       = render_output_range(led_min, led_max);
+    (void)led_min; (void)led_max;
+    bool painted       = render_output();
     CHECK(rgb_runtime_test_resolve_count() == 1u);
     return painted;
 }
@@ -853,19 +855,23 @@ static void test_preview_explicit_group_renders_without_solid_base(void) {
     test_reset();
     layer_state = (layer_state_t)1u << LAYER_NAV;
     CHECK(!render_output_range(4, 5));
+    (void)render_output_range(5, RGB_MATRIX_LED_COUNT);
+    check_led(4, (rgb_t){0,0,0});
 
     test_reset();
     fake_preview_layer = LAYER_NAV;
     CHECK(!render_output_range(4, 5));
+    (void)render_output_range(5, RGB_MATRIX_LED_COUNT);
+    check_led(4, (rgb_t){0,0,0});
 
     test_reset();
     layer_state = (layer_state_t)1u << LAYER_NAV;
-    CHECK(render_output_range(4, 6));
+    CHECK(render_output_range(4, RGB_MATRIX_LED_COUNT));
     test_copy_led_output(normal);
 
     test_reset();
     fake_preview_layer = LAYER_NAV;
-    CHECK(render_output_range(4, 6));
+    CHECK(render_output_range(4, RGB_MATRIX_LED_COUNT));
     test_copy_led_output(preview);
 
     test_check_led_range_equal(normal, preview, 4, 6);
@@ -901,7 +907,7 @@ static void test_preview_full_and_chunked_output_matches_normal(void) {
     test_map_num_preview_leds();
     fake_preview_layer   = LAYER_NUM;
     bool chunked_painted = render_output_range(0, 2);
-    chunked_painted |= render_output_range(2, 4);
+    chunked_painted |= render_output_range(2, RGB_MATRIX_LED_COUNT);
     CHECK(chunked_painted);
     test_copy_led_output(preview_chunked);
 
@@ -1857,14 +1863,15 @@ static void test_publication_between_effect_chunks_keeps_coherent_frame(void) {
     CHECK(noah_profile_lighting_v1_decode(old_lighting,sizeof old_lighting,&limits,&snapshot.profile.rgb,NULL)==NOAH_PROFILE_LIGHTING_V1_OK);
     noah_effective_rgb_runtime_invalidate(&runtime,1u,(noah_effective_profile_identity_t){0},snapshot.identity,&snapshot);
     for(unsigned led=0;led<WS2812_LED_COUNT;led++)ws2812_leds[led]=(ws2812_led_t){.b=200};
-    CHECK(render_output_range(0u,2u));
-    check_led(0u,(rgb_t){.b=100});
+    CHECK(!render_output_range(0u,2u));
+    check_led(0u,(rgb_t){.b=200});
     CHECK(noah_profile_lighting_v1_decode(new_lighting,sizeof new_lighting,&limits,&snapshot.profile.rgb,NULL)==NOAH_PROFILE_LIGHTING_V1_OK);
     noah_effective_rgb_runtime_invalidate(&runtime,2u,snapshot.identity,snapshot.identity,&snapshot);
-    CHECK(render_output_range(2u,4u));
-    // The one RAM program was replaced; never combine it with old facts,
-    // palette/timing state or retained frame references in a chunk rerender.
-    check_led(2u,(rgb_t){.b=100});
+    CHECK(render_output_range(2u,RGB_MATRIX_LED_COUNT));
+    // No pixels were composed before the final local chunk. The new
+    // coherent generation now composes every local LED exactly once.
+    check_led(0u,rgb_from_hsv((hsv_t){.h=0u,.s=255u,.v=180u}));
+    check_led(2u,rgb_from_hsv((hsv_t){.h=0u,.s=255u,.v=180u}));
     CHECK(render_output());
     check_led(0u,rgb_from_hsv((hsv_t){.h=0u,.s=255u,.v=180u}));
     snapshot.profile.domain_mask=0;
@@ -1888,7 +1895,7 @@ static void test_strong_event_consumer_full_scene(void) {
     uint32_t cut = noah_lighting_runtime_revision();
     runtime_fixture.time32=101;
     noah_lighting_runtime_task();
-    CHECK(noah_lighting_runtime_revision()!=cut);
+    CHECK(noah_lighting_runtime_revision()==cut); // age progression alone is not a scene change
     runtime_fixture.time32=599;CHECK(render_output());check_led(0,hsv_to_rgb((hsv_t){170,255,200}));
     runtime_fixture.time32=600;CHECK(!render_output());
     // Publication must prepare histories before exposing the new generation:
@@ -2605,7 +2612,7 @@ static void test_workload_full_and_five_chunk_parity(bool left) {
     CHECK(test_workload_render_qmk_frame());
     memcpy(chunked, led_output, sizeof(chunked));
     test_workload_check_projection_budget();
-    CHECK(rgb_runtime_test_stage_pipeline_count() == 3u);
+    CHECK(rgb_runtime_test_stage_pipeline_count() == 1u);
     CHECK(rgb_runtime_test_early_exit_count() == 2u);
     test_workload_check_local_colors_equal(full, chunked, left);
 }
@@ -2635,56 +2642,36 @@ static void test_workload_idle_frame_has_one_bounded_source_probe(void) {
     fake_is_left = true;
     (void)test_workload_render_qmk_frame();
     test_workload_check_projection_budget();
-    CHECK(rgb_runtime_test_stage_pipeline_count() == 3u);
+    CHECK(rgb_runtime_test_stage_pipeline_count() == 1u);
     CHECK(rgb_runtime_test_early_exit_count() == 2u);
 }
 
 static void test_workload_local_snapshot_is_frame_coherent(void) {
-    struct rgb_matrix_limits_t first;
-    struct rgb_matrix_limits_t second;
-
     test_workload_setup_scene(true, true);
-    first  = rgb_matrix_get_limits(0u);
-    second = rgb_matrix_get_limits(1u);
-    CHECK(noah_rgb_matrix_indicators_advanced_user(first.led_min_index, first.led_max_index));
-    test_workload_check_projection_budget();
-
+    struct rgb_matrix_limits_t first = rgb_matrix_get_limits(0u);
+    struct rgb_matrix_limits_t final = rgb_matrix_get_limits(2u);
+    CHECK(!noah_rgb_matrix_indicators_advanced_user(first.led_min_index,first.led_max_index));
+    CHECK(fake_semantic_build_count == 0u);
     key_feedback_semantic_map_clear(fake_feedback_semantic_map);
     key_feedback_broad_owner_map_clear(fake_feedback_broad_owner_map);
     key_origin_bitmap_clear(fake_combo_underlay_bitmap);
     key_origin_bitmap_clear(fake_combo_overlay_bitmap);
-    CHECK(noah_rgb_matrix_indicators_advanced_user(second.led_min_index, second.led_max_index));
+    CHECK(noah_rgb_matrix_indicators_advanced_user(final.led_min_index,final.led_max_index));
     test_workload_check_projection_budget();
-
-    CHECK(noah_rgb_matrix_indicators_advanced_user(first.led_min_index, first.led_max_index));
-    CHECK(fake_semantic_build_count == 2u);
-    CHECK(fake_tap_branch_build_count == 2u);
-    CHECK(fake_flash_visibility_build_count == 2u);
-    CHECK(fake_broad_owner_build_count == 2u);
-    CHECK(fake_combo_projection_build_count == 2u);
+    CHECK(rgb_runtime_test_resolve_count() == 1u);
 }
 
 static void test_workload_remote_snapshot_is_frame_coherent(void) {
-    struct rgb_matrix_limits_t first_local;
-    struct rgb_matrix_limits_t final_local;
-
     test_workload_setup_scene(false, false);
     key_feedback_semantic_map_clear(test_remote.key_feedback_semantic_map);
     key_feedback_broad_owner_map_clear(test_remote.key_feedback_broad_owner_map);
-    first_local = rgb_matrix_get_limits(2u);
-    final_local = rgb_matrix_get_limits(4u);
-    CHECK(noah_rgb_matrix_indicators_advanced_user(rgb_matrix_get_limits(0u).led_min_index, rgb_matrix_get_limits(0u).led_max_index) == false);
-    CHECK(noah_rgb_matrix_indicators_advanced_user(rgb_matrix_get_limits(1u).led_min_index, rgb_matrix_get_limits(1u).led_max_index) == false);
-    CHECK(noah_rgb_matrix_indicators_advanced_user(first_local.led_min_index, first_local.led_max_index));
-
+    struct rgb_matrix_limits_t first = rgb_matrix_get_limits(2u), final = rgb_matrix_get_limits(4u);
+    CHECK(!noah_rgb_matrix_indicators_advanced_user(first.led_min_index,first.led_max_index));
     key_origin_bitmap_clear(test_remote.combo_overlay_bitmap);
-    CHECK(noah_rgb_matrix_indicators_advanced_user(final_local.led_min_index, final_local.led_max_index));
-    check_led(RGB_MATRIX_LED_COUNT - 9u, rgb_from_combo_feedback());
-
-    CHECK(!noah_rgb_matrix_indicators_advanced_user(rgb_matrix_get_limits(0u).led_min_index, rgb_matrix_get_limits(0u).led_max_index));
-    CHECK(noah_rgb_matrix_indicators_advanced_user(first_local.led_min_index, first_local.led_max_index));
-    CHECK(noah_rgb_matrix_indicators_advanced_user(final_local.led_min_index, final_local.led_max_index));
-    check_led(RGB_MATRIX_LED_COUNT - 9u, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    CHECK(noah_rgb_matrix_indicators_advanced_user(final.led_min_index,final.led_max_index));
+    // One coherent cut at final local effect completion, including earlier LEDs.
+    check_led(RGB_MATRIX_LED_COUNT - 9u,rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    CHECK(rgb_runtime_test_resolve_count() == 1u);
 }
 
 static void test_workload_failed_remote_read_keeps_resolved_facts(void) {

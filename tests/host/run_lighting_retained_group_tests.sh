@@ -7,7 +7,7 @@ trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 noah_host_export_qmk_cpath "$ROOT"
 . "$ROOT/tests/host/noah_source_manifest.sh"
 SOURCES=""
-for src in $(noah_source_manifest_userspace_paths "$ROOT" NOAH_COMMON_SOURCES); do
+for src in $(noah_source_manifest_lighting_test_paths "$ROOT"); do
     case "$src" in users/noah/lib/rgb/lighting/lighting_batch.c|users/noah/lib/rgb/lighting/lighting_batch_arena.c|users/noah/lib/rgb/lighting/lighting_owned_batch.c|users/noah/lib/rgb/lighting/lighting_retained.c|users/noah/lib/rgb/lighting/lighting_retained_group.c|users/noah/lib/rgb/lighting/lighting_lifetime.c) SOURCES="$SOURCES $ROOT/$src" ;; esac
 done
 for variant in normal sanitized; do
