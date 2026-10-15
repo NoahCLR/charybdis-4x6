@@ -137,6 +137,17 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/lighting/lighting_event_protocol.c \
     lib/rgb/lighting/lighting_event_receiver.c \
     lib/rgb/lighting/lighting_event_sender.c \
+    lib/rgb/lighting/lighting_occurrence.c \
+    lib/rgb/lighting/kinds/event_layer_locked.c \
+    lib/rgb/lighting/kinds/event_layer_unlocked.c \
+    lib/rgb/lighting/kinds/event_oneshot_used.c \
+    lib/rgb/lighting/kinds/event_mode_started.c \
+    lib/rgb/lighting/kinds/event_mode_ended.c \
+    lib/rgb/lighting/kinds/event_combo_fired.c \
+    lib/rgb/lighting/kinds/event_tap_fired.c \
+    lib/rgb/lighting/kinds/event_hold_fired.c \
+    lib/rgb/lighting/kinds/event_long_hold_fired.c \
+    lib/rgb/lighting/kinds/event_macro_played.c \
     lib/rgb/lighting/lighting_engine.c \
     lib/rgb/lighting/lighting_keymap.c \
     lib/rgb/lighting/lighting_fade.c \
@@ -176,6 +187,8 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/lighting/kinds/target_subject_place.c \
     lib/rgb/lighting/kinds/target_whole_board.c \
     lib/rgb/lighting/kinds/timing_show_after.c \
+    lib/rgb/lighting/kinds/timing_linger.c \
+    lib/rgb/lighting/kinds/timing_flash.c \
     lib/rgb/core/rgb_config_defaults.c \
     lib/rgb/core/rgb_validation.c
 

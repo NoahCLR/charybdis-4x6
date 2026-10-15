@@ -10,6 +10,7 @@
 #include "matrix.h"
 
 #include "users/noah/lib/rgb/lighting/lighting_engine.h"
+#include "users/noah/lib/rgb/lighting/lighting_occurrence.h"
 #include "users/noah/lib/rgb/lighting/lighting_keymap.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/profile/runtime/effective_combo_runtime.h"
@@ -203,6 +204,41 @@ static keypos_t key_at(unsigned index) {
     return (keypos_t){.row = (uint8_t)(index / MATRIX_COLS), .col = (uint8_t)(index % MATRIX_COLS)};
 }
 
+static void check_occurrence(FILE *file, const char *name, const noah_profile_lighting_v1_program_t *program, noah_lighting_facts_t *facts) {
+    unsigned long long order;
+    unsigned kind, thing, branch, slot, outcome, key, has_owners, layers, locks, macro, mods, armed;
+    uint8_t owners[KEY_ORIGIN_BITMAP_SIZE];
+    char expected[2u * NOAH_LIGHTING_EVENT_GROUP_BYTES + 1u];
+    assert(fscanf(file, "%llu %u %u %u %u %u %u %u %u %u %u %u %u", &order, &kind, &thing, &branch, &slot, &outcome, &key, &has_owners, &layers, &locks, &macro, &mods, &armed) == 13);
+    read_hex(file, owners, sizeof owners);
+    memset(facts, 0, sizeof *facts);
+    noah_lighting_facts_init_synced(facts);
+    facts->layer_active[0] = layers;
+    facts->layer_active[1] = layers >> 8u;
+    facts->host_lock[0] = locks;
+    facts->macro_playing[0] = macro;
+    facts->modifier[0] = mods;
+    facts->modifier[1] = armed;
+    read_hex(file, facts->key_pressed, sizeof facts->key_pressed);
+    assert(fscanf(file, "%108s", expected) == 1);
+    noah_lighting_event_t event = {.kind=kind, .thing=thing, .branch=branch, .slot=slot, .outcome=outcome, .key=key_at(key), .owners=has_owners ? owners : NULL};
+    noah_lighting_event_group_t group;
+    noah_lighting_facts_t before = *facts;
+    uint32_t reads = storage_reads;
+    bool result = noah_lighting_event_qualify(program, facts, &event, (uint64_t)order, &group);
+    assert(storage_reads == reads && !memcmp(&before, facts, sizeof before));
+    if (!strcmp(expected, "-")) { assert(!result); return; }
+    assert(result);
+    memset(owners, 0x55, sizeof owners); // Borrowed producer data has expired.
+    uint8_t wire[NOAH_LIGHTING_EVENT_GROUP_BYTES];
+    assert(noah_lighting_event_group_encode(wire, sizeof wire, &group));
+    for (unsigned i = 0; i < sizeof wire; i++) {
+        unsigned value;
+        assert(sscanf(expected + 2u*i, "%2x", &value) == 1);
+        if (wire[i] != value) { fprintf(stderr, "occurrence %s byte%u: expected%02x got%02x\n",name,i,value,wire[i]); exit(1); }
+    }
+}
+
 int main(int argc, char **argv) {
     uint8_t idle;
     input_elapsed = 900000u;
@@ -222,7 +258,8 @@ int main(int argc, char **argv) {
     static char                               payload_hex[20000];
     static uint8_t                            payload[10000];
     char                                      word[96], name[96];
-    size_t                                    cases = 0, steps = 0;
+    size_t                                    cases = 0, steps = 0, occurrence_cases = 0, occurrence_steps = 0;
+    bool occurrence_case = false;
     uint16_t peak_clocks = 0u;
     noah_profile_lighting_v1_limits_t         limits = noah_profile_lighting_v1_default_limits();
 
@@ -237,7 +274,8 @@ int main(int argc, char **argv) {
         key_leds[key] = (int8_t)led;
     }
     while (fscanf(file, "%95s", word) == 1) {
-        if (strcmp(word, "CASE") == 0) {
+        if (strcmp(word, "CASE") == 0 || strcmp(word, "OCCURRENCE") == 0) {
+            occurrence_case = !strcmp(word, "OCCURRENCE");
             noah_profile_lighting_v1_view_t view;
             assert(fscanf(file, "%95s %19999s", name, payload_hex) == 2);
             size_t length = strlen(payload_hex) / 2u;
@@ -249,10 +287,16 @@ int main(int argc, char **argv) {
             assert(noah_profile_lighting_v1_decode(payload, length, &limits, &view, NULL) == NOAH_PROFILE_LIGHTING_V1_OK);
             assert(noah_profile_lighting_v1_program_load(&view, &program));
             noah_lighting_engine_program_changed();
-            cases++;
+            if (occurrence_case) occurrence_cases++; else cases++;
             continue;
         }
-        assert(strcmp(word, "STEP") == 0);
+        if (!strcmp(word, "QUALIFY")) {
+            assert(occurrence_case);
+            check_occurrence(file, name, &program, &facts);
+            occurrence_steps++;
+            continue;
+        }
+        assert(!occurrence_case && strcmp(word, "STEP") == 0);
         unsigned long now;
         unsigned      layers, preview, mode, sides, keyed, count, owners[KEY_FEEDBACK_BROAD_OWNER_COUNT], fade_values[4];
         uint8_t       mode_keys[KEY_ORIGIN_BITMAP_SIZE];
@@ -387,6 +431,8 @@ int main(int argc, char **argv) {
     assert(cases >= 30 && steps >= 60);
     assert(peak_clocks >= 1000u); // Adversarial distinct signatures, not only duplicate rules.
     printf("compact timing: peak %u, proved live bound %u\n", peak_clocks, noah_lighting_test_live_bound());
+    assert(occurrence_cases >= 14 && occurrence_steps >= 30);
+    printf("lighting coherent occurrence vectors: %zu cases, %zu steps passed\n", occurrence_cases, occurrence_steps);
     printf("lighting render vectors: %zu cases, %zu steps passed\n", cases, steps);
     return 0;
 }

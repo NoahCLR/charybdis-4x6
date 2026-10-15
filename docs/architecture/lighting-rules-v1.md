@@ -553,6 +553,37 @@ bound, including independently filtered rules; a normal profile or the current
 live-state maximum does not establish it. No event/linger module is advertised
 by this checkpoint.
 
+The event catalog reserves the following additive, optional entries. They
+are schema/matcher components while the production consumer is disabled;
+they are omitted from production capabilities and cannot yet be enabled for
+handoff. Each has its own source module and generated registry dispatch.
+
+| Id | Event trigger | Parameters | Captured subject |
+| --- | --- | --- | --- |
+| 19 / 20 / 21 | layer locked / unlocked / one-shot used | layer or any | actual layer and momentary owner keys at occurrence |
+| 22 / 23 | pointing mode started / ended | mode or any | actual mode and its captured owner keys |
+| 24 | combo fired | combo row or any | actual row and input footprint, once per fired completion |
+| 25 | tap fired | behaviour row or any, branch or any | actual row, physical key, captured branch colour slot and outcome |
+| 26 / 27 | hold / long-hold fired | behaviour row or any | actual row, physical key, captured hold tier and outcome |
+| 28 | named macro played | slot or any | successful completed slot; no invented key owner |
+
+The corresponding optional timing rows are `2 linger` (state-tail role) and
+`3 flash` (event-window role), each with a nonzero little-endian u16 duration.
+Show-after row1 has the unrestricted role. Construction roles live on registry
+rows and in the client contract; validators use those roles rather than event
+or timing id switches. An event is an occurrence matcher, never a fact walker
+with an implicit held/recent truth. The qualifier walks the published program
+against its caller-supplied coherent occurrence frame, copies borrowed owners
+synchronously and returns the qualified255-rule mask plus captured subject.
+A false qualification does not authorize erasing a previous qualified marker.
+It performs no profile-reader I/O and does not mutate the input fact frame.
+Runtime capture of that coherent frame and retained histories remain separate
+integration requirements. In the immediate combo-output path, origin/cache
+publication and record normalization precede observation; the output action
+itself executes afterwards. A scan-first fired completion can be observed
+before delayed output has published an active output owner, so filters see
+that actual existing state, not a manufactured layer or cache entry.
+
 New event kinds are positive first-condition triggers and require explicit
 flash timing. They do not define a recent-event boolean or a negated truth
 window. State kinds remain independently negatable filters. The filters
@@ -835,7 +866,8 @@ extensions, `5` domain extensions, `6` thing kinds. A client offers only what
 the keyboard reports and keeps a rule it cannot edit byte for byte.
 
 With all modules enabled, the low-id fact page is registry 0, first id 0,
-bitmap prefix `be ff 07` (ids 1–5, 7–18); the paint page is registry 2,
+bitmap prefix `be ff ff 1f` (ids 1–5, 7–28); the default-off
+retention consumer omits ids19–28 (`be ff 07`); the paint page is registry 2,
 bitmap prefix `7f 01` (ids 0–6, 8). Target prefix becomes `ff 01` (ids0–8); paint prefix `7f 03` adds paint9.
 Thing kinds now include 5–7, giving the low-id thing bitmap `fe`.
 The rest of each 16-byte bitmap is zero. Disabling

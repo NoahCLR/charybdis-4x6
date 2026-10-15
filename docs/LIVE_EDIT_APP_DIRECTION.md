@@ -1446,7 +1446,11 @@ share the same synthetic scene; actual ownership stays intact. Main owns one
 resolved fact frame through chunk rerenders, and transport buffers share storage
 only across initialized, callback-guarded master/slave roles. The detailed
 lifetime and module-idle contracts live in the lighting spec. Generic event
-facts and linger/flash remain unfinished. The grouped-event codec/session
+rendering and retained linger/flash remain unfinished. Optional event matchers
+19–28, timing leaves2/3 and registry-declared construction roles now implement
+the catalog/validator/occurrence qualification seam. Shared fixtures exercise
+coherent qualification and the full255-rule mask; these components do not yet
+enable the production consumer or establish retained-history capacity. The grouped-event codec/session
 component uses explicit63-byte requests,27-byte HELLO,9-byte CONFIRM and
 10-byte replies inside the existing128/32 QMK allocation. Immutable retries,
 main-before-ACK consumption and fresh-session reset are specified in the

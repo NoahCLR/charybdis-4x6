@@ -101,6 +101,15 @@ for case in fixture["render"]:
         fields.append(state.hex())
         fields += step["expect"]
         lines.append("STEP " + " ".join(fields))
+for case in fixture.get("occurrences", []):
+    lines.append(f"OCCURRENCE {case['name']} {case['hex']}")
+    for step in case["steps"]:
+        event, situation = step["event"], step["situation"]
+        layers = 1 | sum(1 << layer for layer in situation.get("layers", []))
+        modifiers = situation.get("modifiers", [0,0])
+        fields = [step["order"], event["kind"], event["thing"], event.get("branch",0), event.get("slot",0), event.get("outcome",0),
+                  event.get("key",255), int(event.get("owners") is not None), layers, situation.get("hostLocks",0), situation.get("macroPlaying",255), *modifiers]
+        lines.append("QUALIFY " + " ".join(map(str,fields)) + " " + bitmap(event.get("owners") or []) + " " + bitmap(situation.get("pressedKeys",[])) + " " + (step["expect"] or "-"))
 pathlib.Path(sys.argv[2]).write_text("\n".join(lines) + "\n")
 PY
 
@@ -123,7 +132,7 @@ build_and_run() {
         -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE -DCOMBO_ENABLE -DRGB_COMBO_FEEDBACK_ENABLE \
         -DPOINTING_DEVICE_ENABLE -DRGB_PD_MODE_FEEDBACK_ENABLE -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
         -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE -DRGB_AUTOMOUSE_GRADIENT_ENABLE -DAUTO_MOUSE_TIME=900 \
-        -DNOAH_PORTABLE_PROFILE_ENABLE -DNOAH_PD_PROFILE_ENABLE -DNOAH_LIGHTING_TIMING_TEST_BACKEND \
+        -DNOAH_PORTABLE_PROFILE_ENABLE -DNOAH_PD_PROFILE_ENABLE -DNOAH_LIGHTING_SCHEMA_ALL_KINDS -DNOAH_LIGHTING_TIMING_TEST_BACKEND \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \

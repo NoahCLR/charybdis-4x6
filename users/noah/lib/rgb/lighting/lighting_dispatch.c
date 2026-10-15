@@ -18,10 +18,10 @@ bool noah_lighting_fact_next(uint8_t kind, const noah_lighting_facts_t *facts, c
     (void)cursor;
     (void)subject;
     switch (kind) {
-#    define NOAH_LIGHTING_FACT_CASE(id, name, thing, layout, slots, selector, signatures, live) \
+#    define NOAH_LIGHTING_FACT_CASE(id, name, thing, layout, slots, selector, signatures, live, role) \
         case id:                                             \
             return noah_lighting_fact_##name##_next(facts, params, cursor, subject);
-        NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_FACT_CASE)
+        NOAH_LIGHTING_STATE_FACT_ROWS(NOAH_LIGHTING_FACT_CASE)
 #    undef NOAH_LIGHTING_FACT_CASE
         default:
             return false;
@@ -30,7 +30,7 @@ bool noah_lighting_fact_next(uint8_t kind, const noah_lighting_facts_t *facts, c
 
 uint8_t noah_lighting_fact_subject_slots(uint8_t kind) {
     switch (kind) {
-#    define NOAH_LIGHTING_FACT_SLOTS(id, name, thing, layout, slots, selector, signatures, live) case id: return slots;
+#    define NOAH_LIGHTING_FACT_SLOTS(id, name, thing, layout, slots, selector, signatures, live, role) case id: return slots;
         NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_FACT_SLOTS)
 #    undef NOAH_LIGHTING_FACT_SLOTS
         default: return 1u;
@@ -38,7 +38,7 @@ uint8_t noah_lighting_fact_subject_slots(uint8_t kind) {
 }
 uint8_t noah_lighting_fact_selector_parameter(uint8_t kind) {
     switch (kind) {
-#    define NOAH_LIGHTING_FACT_SELECTOR(id, name, thing, layout, slots, selector, signatures, live) case id: return selector;
+#    define NOAH_LIGHTING_FACT_SELECTOR(id, name, thing, layout, slots, selector, signatures, live, role) case id: return selector;
         NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_FACT_SELECTOR)
 #    undef NOAH_LIGHTING_FACT_SELECTOR
         default: return 255u;
@@ -92,7 +92,7 @@ uint8_t noah_lighting_timing(uint8_t kind, const uint8_t *params, uint32_t elaps
     *next_change = 0u;
     *animating   = false;
     switch (kind) {
-#    define NOAH_LIGHTING_TIMING_CASE(id, name, layout, timed)                  \
+#    define NOAH_LIGHTING_TIMING_CASE(id, name, layout, timed, role)                  \
         case id:                                                                \
             *animating = (timed) != 0;                                          \
             return noah_lighting_timing_##name(params, elapsed, next_change);

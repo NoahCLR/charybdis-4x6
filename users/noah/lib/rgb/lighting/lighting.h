@@ -254,8 +254,8 @@ uint32_t noah_lighting_keymap_generation(void);
 
 // ─── Module shapes, one prototype per registry row ──────────────────────────
 
-#define NOAH_LIGHTING_DECLARE_FACT(id, name, thing, layout, slots, selector, signatures, live) bool noah_lighting_fact_##name##_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject);
-NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_DECLARE_FACT)
+#define NOAH_LIGHTING_DECLARE_FACT(id, name, thing, layout, slots, selector, signatures, live, role) bool noah_lighting_fact_##name##_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject);
+NOAH_LIGHTING_STATE_FACT_ROWS(NOAH_LIGHTING_DECLARE_FACT)
 #undef NOAH_LIGHTING_DECLARE_FACT
 
 // A synced slice also states its bytes at rest (no gesture, combo or
@@ -276,7 +276,7 @@ NOAH_LIGHTING_PAINT_ROWS(NOAH_LIGHTING_DECLARE_PAINT)
 
 // A timing returns the gate amount for a subject that has existed for
 // `elapsed` ms, and the ms until its amount next changes (0: never).
-#define NOAH_LIGHTING_DECLARE_TIMING(id, name, layout, timed) uint8_t noah_lighting_timing_##name(const uint8_t *params, uint32_t elapsed, uint32_t *next_change);
+#define NOAH_LIGHTING_DECLARE_TIMING(id, name, layout, timed, role) uint8_t noah_lighting_timing_##name(const uint8_t *params, uint32_t elapsed, uint32_t *next_change);
 NOAH_LIGHTING_TIMING_ROWS(NOAH_LIGHTING_DECLARE_TIMING)
 #undef NOAH_LIGHTING_DECLARE_TIMING
 

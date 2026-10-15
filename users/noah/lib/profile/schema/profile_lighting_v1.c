@@ -39,6 +39,8 @@ enum {
     SINGLE_TARGET = 1u << 0,
     SINGLE_PAINT = 1u << 1,
     SINGLE_BACKGROUND = 1u << 2,
+    SINGLE_EVENT = 1u << 3,
+    SINGLE_EVENT_WINDOW = 1u << 4,
     // Ranks: conditions share one, then target, paint, background, timing, extension.
     RANK_NONE = 0u,
 };
@@ -54,7 +56,7 @@ _Static_assert((unsigned)NOAH_PROFILE_LIGHTING_V1_RECORD_MAX <= (unsigned)NOAH_P
 static bool fact_layout(uint8_t id, uint32_t *layout) {
     (void)layout;
     switch (id) {
-#define NOAH_LIGHTING_FACT_LAYOUT(fid, name, thing, params, slots, selector, signatures, live) \
+#define NOAH_LIGHTING_FACT_LAYOUT(fid, name, thing, params, slots, selector, signatures, live, role) \
     case fid:                                              \
         *layout = params;                                  \
         return true;
@@ -96,7 +98,7 @@ static bool paint_layout(uint8_t id, uint32_t *layout) {
 static bool timing_layout(uint8_t id, uint32_t *layout) {
     (void)layout;
     switch (id) {
-#define NOAH_LIGHTING_TIMING_LAYOUT(gid, name, params, timed) \
+#define NOAH_LIGHTING_TIMING_LAYOUT(gid, name, params, timed, role) \
     case gid:                                                 \
         *layout = params;                                     \
         return true;
@@ -507,6 +509,7 @@ static noah_profile_lighting_v1_validation_result_t finish_rule(validation_t *v,
     uint16_t start = (uint16_t)(v->item_end - v->sub - 1u);
 
     if ((v->singles & (SINGLE_TARGET | SINGLE_PAINT)) != (SINGLE_TARGET | SINGLE_PAINT)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_STRUCTURE, start);
+    if ((v->singles & SINGLE_EVENT) && !(v->singles & SINGLE_EVENT_WINDOW)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_STRUCTURE, start);
     v->remaining--;
     return progress(v, v->remaining ? PHASE_RULE_HEADER : PHASE_EXTENSION_COUNT);
 }
@@ -567,6 +570,15 @@ static noah_profile_lighting_v1_validation_result_t check_part(validation_t *v, 
             break;
     }
     if (!known || !supported(mask, kind)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_UNSUPPORTED_KIND, (size_t)at + 1u);
+    if ((slot == NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION || slot == NOAH_PROFILE_LIGHTING_V1_SLOT_NEGATED) && noah_lighting_fact_role(kind) == NOAH_LIGHTING_FACT_EVENT) {
+        if (slot != NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION || v->conditions != 1u) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_STRUCTURE, at);
+        v->singles |= SINGLE_EVENT;
+    }
+    if (slot == NOAH_PROFILE_LIGHTING_V1_SLOT_TIMING) {
+        uint8_t role = noah_lighting_timing_role(kind);
+        if ((role == NOAH_LIGHTING_TIMING_STATE_TAIL && (v->singles & SINGLE_EVENT)) || (role == NOAH_LIGHTING_TIMING_EVENT_WINDOW && !(v->singles & SINGLE_EVENT))) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_STRUCTURE, at);
+        if (role == NOAH_LIGHTING_TIMING_EVENT_WINDOW) v->singles |= SINGLE_EVENT_WINDOW;
+    }
     if (length != noah_lighting_param_layout_length(layout)) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_LENGTH, at);
     if (2u + (uint16_t)length > left) return reject(v, error, NOAH_PROFILE_LIGHTING_V1_INVALID_LENGTH, at);
     {

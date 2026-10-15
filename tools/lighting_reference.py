@@ -66,13 +66,19 @@ FACTS.update({7: ("combo held", ["thingSelector", "comboRole"]), 8: ("behaviour"
 FACTS.update({9: ('layer status', ['layerSelector', 'layerStatus']), 10: ('mode status', ['modeSelector', 'modeStatus']), 11: ('combo layer', ['thingSelector', 'layerSelector']), 12: ('behaviour phase', ['thingSelector', 'behaviourPhase', 'tapSelector']), 13: ('macro playing', ['thingSelector']), 14: ('key pressed', ['keySelector']), 15: ('modifier', ['modifier', 'side', 'modifierState']), 16: ('host lock', ['hostLock']), 17: ('pointer', ['pointerState']), 18: ('idle', [])})
 FACT_THING = {1: 1, 2: 1, 3: 2, 4: 3, 5: 4, 7: 3, 8: 4}
 FACT_THING.update({9: 1, 10: 2, 11: 3, 12: 4, 13: 5, 14: 7, 15: 6, 16: 0, 17: 0, 18: 0})
+EVENT_FACTS = {19: ('layer locked', ['layerSelector']), 20: ('layer unlocked', ['layerSelector']), 21: ('one-shot used', ['layerSelector']), 22: ('mode started', ['modeSelector']), 23: ('mode ended', ['modeSelector']), 24: ('combo fired', ['thingSelector']), 25: ('tap fired', ['thingSelector', 'tapSelector']), 26: ('hold fired', ['thingSelector']), 27: ('long hold fired', ['thingSelector']), 28: ('macro played', ['thingSelector'])}
+FACTS.update(EVENT_FACTS)
+FACT_THING.update({19: 1, 20: 1, 21: 1, 22: 2, 23: 2, 24: 3, 25: 4, 26: 4, 27: 4, 28: 5})
+FACT_CONSTRUCTION = {kind: "state" for kind in FACTS}
+FACT_CONSTRUCTION.update({kind: "event" for kind in EVENT_FACTS})
 TARGETS = {0: [], 1: [], 2: [], 3: ["keySet"], 4: [], 5: [], 6: [], 7: [], 8: ["keyQuery", "thingSelector"]}
 PLACE_TARGETS = {0, 1, 2, 4, 5, 6}
 PAINTS = {0: [], 1: [], 2: ["paletteIndex"], 3: [], 4: ["map"], 5: ["level"], 6: ["paletteIndex", "level"]}
 PAINTS[8] = []
 PAINTS[9] = []
 PAINT_READS_BELOW = {5, 6}
-TIMINGS = {1: ["milliseconds"]}
+TIMINGS = {1: ["milliseconds"], 2: ["milliseconds"], 3: ["milliseconds"]}
+TIMING_CONSTRUCTION = {1: "any", 2: "stateTail", 3: "eventWindow"}
 RULE_EXTENSIONS: dict = {}
 DOMAIN_EXTENSIONS = {1: 4, 2: 1}
 THING_KINDS = {1: 16, 2: 32, 3: 128, 4: 128, 5: 128, 6: 8, 7: 60}
@@ -371,6 +377,7 @@ def validate(data: bytes, limits: Limits) -> dict:
         end = offset + 1 + size
         at = offset + 3
         rank, conditions, timings, singles, previous = 0, 0, 0, set(), {SLOT_TIMING: -1, SLOT_EXTENSION: -1}
+        event_trigger, event_window = False, False
         while at < end:
             if at + 2 > end:
                 raise Invalid("INVALID_LENGTH", at)
@@ -404,6 +411,15 @@ def validate(data: bytes, limits: Limits) -> dict:
             if kind not in supported or kind not in registry:
                 raise Invalid("UNSUPPORTED_KIND", at + 1)
             types = registry[kind][1] if slot in (SLOT_CONDITION, SLOT_NEGATED) else registry[kind]
+            if slot in (SLOT_CONDITION, SLOT_NEGATED) and FACT_CONSTRUCTION[kind] == "event":
+                if slot != SLOT_CONDITION or conditions != 1:
+                    raise Invalid("INVALID_STRUCTURE", at)
+                event_trigger = True
+            if slot == SLOT_TIMING:
+                role = TIMING_CONSTRUCTION[kind]
+                if (role == "stateTail" and event_trigger) or (role == "eventWindow" and not event_trigger):
+                    raise Invalid("INVALID_STRUCTURE", at)
+                event_window |= role == "eventWindow"
             if length != param_length(types):
                 raise Invalid("INVALID_LENGTH", at)
             if at + 2 + length > end:
@@ -414,6 +430,8 @@ def validate(data: bytes, limits: Limits) -> dict:
                 param_at += TYPE_BYTES.get(kind_type, 1)
             at += 2 + length
         if SLOT_TARGET not in singles or SLOT_PAINT not in singles:
+            raise Invalid("INVALID_STRUCTURE", offset)
+        if event_trigger and not event_window:
             raise Invalid("INVALID_STRUCTURE", offset)
         offset = end
     if offset + 1 > len(data):
@@ -1266,6 +1284,8 @@ def render_vectors(limits):
                "modifier": range(4), "side": range(3), "modifierState": range(2), "hostLock": range(3), "pointerState": range(4)}
     signatures = []
     for kind, (_, types) in FACTS.items():
+        if FACT_CONSTRUCTION[kind] != "state":
+            continue
         selector = bool(types and types[0] in ("layerSelector", "modeSelector", "thingSelector", "keySelector"))
         values = [[ANY] if i == 0 and selector else domains[t] for i, t in enumerate(types)]
         signatures.extend((kind, list(params)) for params in itertools.product(*values))
@@ -1379,6 +1399,21 @@ def codec_vectors(limits, standard: bytes):
     reject("map-encoding", encode_raw_map(bytes([2])))
     simple = lambda *parts, **kw: encode({"palette": PALETTE, "keySets": [THUMBS], "maps": [{0: RED}], "rules": [rule(*parts, **kw)]})
     good = [part(T, 0), part(P, 2, RED)]
+    for kind, (_, types) in EVENT_FACTS.items():
+        values = [ANY, ANY] if len(types) == 2 else [ANY]
+        valid.append({"name": f"event-{kind}-flash", "hex": simple(part(C, kind, *values), *good, part(G, 3, 0xf4, 1)).hex()})
+    valid += [
+        {"name": "event-show-after-parallel-flash", "hex": simple(part(C, 28, 127), part(C, 1, 1), *good, part(G, 1, 200, 0), part(G, 3, 0xf4, 1)).hex()},
+        {"name": "state-show-after-linger", "hex": simple(part(C, 1, ANY), *good, part(G, 1, 100, 0), part(G, 2, 200, 0)).hex()},
+        {"name": "board-linger-max", "hex": simple(*good, part(G, 2, 255, 255)).hex()},
+    ]
+    reject("event-negated", simple(part(SLOT_NEGATED, 28, 127), *good, part(G, 3, 0xf4, 1)))
+    reject("event-nonfirst", simple(part(C, 1, 1), part(C, 28, 127), *good, part(G, 3, 0xf4, 1)))
+    reject("event-no-flash", simple(part(C, 28, 127), *good))
+    reject("event-show-without-flash", simple(part(C, 28, 127), *good, part(G, 1, 200, 0)))
+    reject("event-with-linger", simple(part(C, 28, 127), *good, part(G, 2, 200, 0), part(G, 3, 0xf4, 1)))
+    reject("state-with-flash", simple(part(C, 1, ANY), *good, part(G, 3, 0xf4, 1)))
+    reject("board-with-flash", simple(*good, part(G, 3, 0xf4, 1)))
     reject("rule-size", mutate(simple(*good), 8 + 27 + 8 + 4, 5))
     reject("rule-truncated", simple(*good)[:-3])
     reject("rule-flags", simple(*good, flags=2))
@@ -1475,6 +1510,80 @@ def capability_pages(limits: Limits) -> list:
     return [page.hex() for page in pages]
 
 
+def qualify_occurrence(program, situation, event, order):
+    """One coherent occurrence, with no recent-event truth or filter replay."""
+    mask = bytearray(32)
+    kind = 19 + event["kind"]
+    if kind not in EVENT_FACTS or not 0 <= event["thing"] < THING_KINDS[FACT_THING[kind]]:
+        return None
+    subject = None
+    for index, item in enumerate(program["rules"]):
+        if item["flags"] & 1 or not item["conditions"]:
+            continue
+        negated, trigger, params = item["conditions"][0]
+        if negated or trigger != kind or FACT_CONSTRUCTION[trigger] != "event":
+            continue
+        if params[0] != ANY and params[0] != event["thing"]:
+            continue
+        if kind == 25 and (not event.get("branch", 0) or (params[1] != ANY and params[1] != event["branch"])):
+            continue
+        if any(bool(situation.subjects(fact, values)) == neg for neg, fact, values in item["conditions"][1:]):
+            continue
+        keys = event.get("owners")
+        if keys is None:
+            keys = [event["key"]] if event.get("key", 255) < 60 else []
+        owners = bytearray(8)
+        for key in keys:
+            owners[key // 8] |= 1 << (key % 8)
+        slot = event.get("slot", 0)
+        if kind == 25:
+            slot = 2 if event["branch"] == 1 else event["branch"] + 1
+        subject = {"order": order, "thingKind": FACT_THING[kind], "thing": event["thing"], "slot": slot,
+                   "outcome": event.get("outcome", 0), "sides": sum(1 if half == LEFT else 2 for half in set(map(key_half, keys))),
+                   "hasKeys": int(bool(keys)), "owners": owners.hex()}
+        mask[index // 8] |= 1 << (index % 8)
+    if subject is None:
+        return None
+    return encode_event_group(dict(subject, qualified=mask.hex())).hex()
+
+
+def occurrence_vectors(limits):
+    cases = []
+    def add(name, rules, inputs):
+        payload = encode({"rules": rules})
+        program = validate(payload, limits)
+        steps = []
+        for sequence, (event, situation) in enumerate(inputs):
+            order = 0x1234567800000000 + sequence
+            steps.append({"event": event, "situation": situation, "order": order,
+                          "expect": qualify_occurrence(program, Situation(situation, limits), event, order)})
+        cases.append({"name": name, "hex": payload.hex(), "steps": steps})
+    tail = [part(T, 4), part(P, 0), part(G, 3, 0xf4, 1)]
+    for kind in EVENT_FACTS:
+        thing = {1:15, 2:31}.get(FACT_THING[kind],127)
+        params = [ANY, ANY] if kind == 25 else [ANY]
+        event = {"kind": kind - 19, "thing": thing, "owners": [0,59], "slot": 2 if kind == 25 else (1 if kind == 27 else 0), "outcome": 0}
+        if kind == 25: event["branch"] = 3
+        add(f"event-{kind}-captured-identity-owners", [rule(part(C, kind, *params), *tail)], [(event, {}), (dict(event, thing=0), {})])
+    event = {"kind": 9, "thing":127}
+    add("macro-filter-at-occurrence", [rule(part(C,28,127), part(C,1,1), *tail)],
+        [(event, {}), (event, {"layers":[1]}), (event, {})])
+    add("event-independent-negated-filters", [
+        rule(part(C,28,ANY), part(C,14,59), *tail),
+        rule(part(C,28,127), part(SLOT_NEGATED,14,59), *tail),
+        rule(part(C,28,0), *tail),
+        rule(part(C,28,127), part(SLOT_NEGATED,16,0), *tail, flags=1),
+    ], [(event, {"pressedKeys":[59]}), (event, {}), (dict(event,thing=0), {})])
+    rules = [rule(part(C,28,ANY), part(C,14,index % 60), *tail) for index in range(255)]
+    add("event-255-independent-filters", rules, [(event, {"pressedKeys":list(range(60))}), (event, {"pressedKeys":[0,59]}), (dict(event,thing=0), {"pressedKeys":[31]}), (event,{})])
+    add("tap-branch-filter-and-borrowed-key", [rule(part(C,25,127,3), *tail)], [
+        ({"kind":6,"thing":127,"branch":3,"slot":2,"key":59,"outcome":17}, {}),
+        ({"kind":6,"thing":127,"branch":2,"slot":2,"key":0}, {}),
+        ({"kind":6,"thing":126,"branch":3,"slot":2,"key":0}, {}),
+    ])
+    return cases
+
+
 def build_vectors() -> dict:
     limits = Limits()
     conversion = conversion_vectors(limits)
@@ -1488,6 +1597,7 @@ def build_vectors() -> dict:
         "codec": codec_vectors(limits, standard),
         "conversion": conversion,
         "render": render_vectors(limits),
+        "occurrences": occurrence_vectors(limits),
         "capability": capability_pages(limits),
     }
 

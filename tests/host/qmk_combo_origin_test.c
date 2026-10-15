@@ -251,9 +251,18 @@ static bool test_bitmap_has(const uint8_t *bitmap, uint8_t row, uint8_t col) {
 
 #if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
 static unsigned fired_count;
+static bool require_published_combo;
 static uint8_t fired_id, fired_owners[KEY_ORIGIN_BITMAP_SIZE];
 void noah_lighting_event_observe(const noah_lighting_event_t *event) {
     CHECK(event->kind==NOAH_LIGHTING_EVENT_COMBO_FIRED && event->thing<128 && event->owners);
+    if (require_published_combo) {
+        keypos_t none = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
+        uint16_t cursor = 0u;
+        uint8_t id, role, keys[KEY_ORIGIN_BITMAP_SIZE];
+        CHECK(noah_qmk_combo_origin_lighting_next(none, none, NULL, &cursor, &id, &role, keys));
+        CHECK(id == event->thing);
+        CHECK(!memcmp(keys, event->owners, sizeof keys));
+    }
     fired_count++;fired_id=event->thing;
     memcpy(fired_owners,event->owners,sizeof(fired_owners));
 }
@@ -264,7 +273,9 @@ static void test_fired_event_is_actual_once_with_captured_inputs(void) {
     CHECK(fired_count==0); // a completed chord is not yet a fired combo
     test_set_combo_active(0,true);
     keyrecord_t record=test_combo_record(true);
+    require_published_combo = true;
     noah_qmk_combo_origin_normalize_record(TEST_COMBO_OUT_LEFT,&record);
+    require_published_combo = false;
     CHECK(fired_count==1 && fired_id==0);
     CHECK(test_bitmap_has(fired_owners,0,0) && test_bitmap_has(fired_owners,1,0));
     noah_qmk_combo_origin_scan();

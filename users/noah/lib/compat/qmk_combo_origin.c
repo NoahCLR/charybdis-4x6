@@ -801,10 +801,6 @@ __attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t k
                 if (!noah_participation_record_generated_captured(record)) noah_participation_record_generated_permission(record, origin_layer, noah_participation_combo_output(combo_index, keycode, origin_layer));
             }
         }
-        if (event_needed && combo_index < 128u) {
-            const noah_lighting_event_t event = {.kind = NOAH_LIGHTING_EVENT_COMBO_FIRED, .thing = combo_index, .owners = bitmap};
-            noah_lighting_event_emit(&event);
-        }
         if (matched && key_origin_keypos_valid(owner_key_pos)) {
             record->event.key = owner_key_pos;
             key_origin_registry_set_bitmap(owner_key_pos, key_origin_bitmap_has_any(bitmap) ? bitmap : NULL);
@@ -823,6 +819,12 @@ __attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t k
         }
         if (!noah_participation_record_generated_captured(record)) noah_qmk_combo_origin_capture_record(keycode, record);
         noah_participation_record_generated_normalize(record, keycode, origin_layer);
+        // Occurrence filters read the completed origin/cache publication. The
+        // output action itself executes later and has not raised its layers.
+        if (event_needed && combo_index < 128u) {
+            const noah_lighting_event_t event = {.kind = NOAH_LIGHTING_EVENT_COMBO_FIRED, .thing = combo_index, .owners = bitmap};
+            noah_lighting_event_emit(&event);
+        }
         return;
     }
 

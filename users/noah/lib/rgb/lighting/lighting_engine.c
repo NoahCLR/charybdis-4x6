@@ -16,19 +16,19 @@ enum {
     SUBJECT_MAX = 64u,
     // Sum of every registry entry's finite parameter signatures and full
     // subject domain. All accepted first conditions fit, regardless of load.
-#define NOAH_LIGHTING_TRACKERS(id, name, thing, layout, slots, selector, signatures, live) +(signatures)
+#define NOAH_LIGHTING_TRACKERS(id, name, thing, layout, slots, selector, signatures, live, role) +(signatures)
     TRACKER_MAX = 0u NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_TRACKERS),
 #undef NOAH_LIGHTING_TRACKERS
-#define NOAH_LIGHTING_CLOCKS(id, name, thing, layout, slots, selector, signatures, live) +((signatures) * (slots))
+#define NOAH_LIGHTING_CLOCKS(id, name, thing, layout, slots, selector, signatures, live, role) +((signatures) * (slots))
     CLOCK_MAX = 0u NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_CLOCKS),
 #undef NOAH_LIGHTING_CLOCKS
-#define NOAH_LIGHTING_LIVE_CLOCKS(id, name, thing, layout, slots, selector, signatures, live) +(live)
+#define NOAH_LIGHTING_LIVE_CLOCKS(id, name, thing, layout, slots, selector, signatures, live, role) +(live)
     LIVE_CLOCK_MAX = 0u NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_LIVE_CLOCKS),
 #undef NOAH_LIGHTING_LIVE_CLOCKS
     RULE_MAX = 255u,
 };
 _Static_assert(LIVE_CLOCK_MAX <= UINT16_MAX, "joint live count fits u16");
-#define NOAH_LIGHTING_SLOT_BOUND(id, name, thing, layout, slots, selector, signatures, live) _Static_assert((slots) <= 128u, "presence bitmap covers subject domain");
+#define NOAH_LIGHTING_SLOT_BOUND(id, name, thing, layout, slots, selector, signatures, live, role) _Static_assert((slots) <= 128u, "presence bitmap covers subject domain");
 NOAH_LIGHTING_FACT_ROWS(NOAH_LIGHTING_SLOT_BOUND)
 #undef NOAH_LIGHTING_SLOT_BOUND
 _Static_assert(CLOCK_MAX <= UINT16_MAX, "registry-derived timer clock offsets fit u16");
@@ -205,7 +205,7 @@ static __attribute__((noinline)) void prepare_timing_index(const noah_profile_li
         rule_t rule;
         parse_rule(program, i, &rule);
         if (!rule.timing_count || (rule.flags & NOAH_PROFILE_LIGHTING_V1_RULE_DISABLED)) continue;
-        if (!rule.condition_count || rule.conditions[0].slot != NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION) continue;
+        if (!rule.condition_count || rule.conditions[0].slot != NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION || noah_lighting_fact_role(rule.conditions[0].kind) == NOAH_LIGHTING_FACT_EVENT) continue;
         const uint8_t *part = rule.conditions[0].params - 2u;
         uint8_t selector = noah_lighting_fact_selector_parameter(rule.conditions[0].kind);
         uint16_t index;

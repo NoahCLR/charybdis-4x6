@@ -45,4 +45,19 @@ if ! rg -q 'noah_lighting_event_observe' "$BUILD_DIR/missing.log"; then
 fi
 build_probe -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DRECORD_OBSERVER=1
 "$BUILD_DIR/probe"
+cat > "$BUILD_DIR/capability.c" <<'C'
+#include "users/noah/lib/profile/schema/profile_lighting_kinds_v1.h"
+_Static_assert((NOAH_LIGHTING_COMPILED_FACTS & 0x1ff80000u) == 0u, "disabled consumer advertises no event");
+_Static_assert((NOAH_LIGHTING_COMPILED_TIMINGS & 0xcu) == 0u, "disabled consumer advertises no retained timing");
+int main(void) { return 0; }
+C
+cc -std=c11 -Wall -Wextra -Werror -pedantic -DRGB_MATRIX_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE \
+    -I"$ROOT" "$BUILD_DIR/capability.c" -o "$BUILD_DIR/capability"
+"$BUILD_DIR/capability"
+if cc -std=c11 -Wall -Wextra -Werror -pedantic -DRGB_MATRIX_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE \
+    -DNOAH_LIGHTING_FACT_MACRO_PLAYED=1 -I"$ROOT" -c "$BUILD_DIR/capability.c" -o "$BUILD_DIR/unsupported.o" > "$BUILD_DIR/capability.log" 2>&1; then
+    echo 'event module unexpectedly accepted without consumer integration' >&2
+    exit 1
+fi
+rg -q 'retained lighting modules require the linked event consumer' "$BUILD_DIR/capability.log"
 printf 'lighting event capture: disabled needs no observer; enabled requires and calls it\n'
