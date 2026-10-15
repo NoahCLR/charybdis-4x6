@@ -49,4 +49,6 @@ check 57344 "$profile -DNOAH_PD_PROFILE_ENABLE=unknown"
 check 229376 "$profile -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -UNOAH_LIGHTING_EVENT_CAPTURE_ENABLE" yes yes
 check 247808 "$profile -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=0 -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=2" yes yes
 check 226304 "$profile -UNOAH_LIGHTING_TARGET_KEYS_THAT -UNOAH_LIGHTING_PAINT_WHAT_IT_DOES"
+check 57344 "$profile -D NOAH_PD_PROFILE_ENABLE=0"
+check 229376 "$profile -U NOAH_PD_PROFILE_ENABLE -D NOAH_PD_PROFILE_ENABLE"
 echo 'firmware memory artifact policies: query increment scoped; unrelated and disabled-cache limits preserved'

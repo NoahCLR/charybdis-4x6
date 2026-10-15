@@ -1,6 +1,7 @@
 #include "users/noah/lib/compat/qmk_lighting_snapshot_transport.h"
 #include "users/noah/lib/rgb/lighting/lighting_snapshot.h"
 #include "transactions.h"
+#include "users/noah/lib/split/runtime_sync.h"
 #include "users/noah/lib/rgb/lighting/kinds/fact_layer_active.h"
 #include <assert.h>
 #include <stdio.h>
@@ -10,6 +11,20 @@ void peer_bind(noah_lighting_facts_t *,noah_lighting_facts_t *);
 bool peer_step(void);
 void peer_close(void);
 void peer_changed(void);
+uint8_t peer_readiness(void);
+void peer_base_init(void);
+static bool use_base;
+static unsigned base_calls, base_wire;
+static int readiness_override = -1;
+static bool lose_base, omit_base_reply;
+static slave_callback_t base_callback;
+bool noah_lighting_runtime_shared_scene(void) {return true;}
+// The legacy fact broadcaster is forbidden in retained-scene tests. These
+// builders are required only for role initialization/disabled branch linkage.
+void noah_lighting_facts_build_idle(uint8_t *p) {memset(p,0,NOAH_LIGHTING_SYNCED_BYTES);}
+void noah_lighting_facts_build_synced(uint8_t *p,bool gated) {(void)p;(void)gated;assert(!"legacy broadcaster bypassed coherent scene");}
+bool noah_lighting_facts_active(const uint8_t *p,bool gated) {(void)p;(void)gated;assert(!"legacy broadcaster bypassed coherent scene");return false;}
+
 _Static_assert(sizeof(noah_lighting_facts_t)==621u,"two-instance transport must use the real complete compiled facts");
 static bool master,lose_request,lose_reply,bad_offset,bad_commit;
 static unsigned rpc_calls,wire_bytes,rejections,full_begins,facts_begins,history_chunks;
@@ -38,6 +53,15 @@ uint32_t timer_read32(void){return clocks[master];}
 bool noah_lighting_fact_next(uint8_t kind,const noah_lighting_facts_t *f,const uint8_t *p,uint16_t *c,noah_lighting_subject_t *s){if(kind==1)return noah_lighting_fact_layer_active_next(f,p,c,s);assert(!"unexpected fixture walker");return false;}
 layer_state_t layer_state;
 void transaction_register_rpc(int8_t id,slave_callback_t cb) {
+    if(id==PUT_SPLIT_RUNTIME_BASE_SYNC) {
+        uint8_t response=255;
+        split_runtime_base_sync_packet_t packet={0};
+        cb(sizeof packet,&packet,1,&response);
+        assert(response==NOAH_LIGHTING_SCENE_NOT_READY); // init registration is closed
+        if(!master)base_callback=cb;
+        return;
+    }
+    if(id==PUT_SPLIT_LIGHTING_FACTS_SYNC)return;
     assert(id==PUT_SPLIT_LIGHTING_EVENTS_SYNC);
     uint8_t request[27]={0x81},reply[14];memset(reply,0xff,sizeof reply);
     cb(sizeof request,request,sizeof reply,reply);
@@ -45,6 +69,19 @@ void transaction_register_rpc(int8_t id,slave_callback_t cb) {
     if(!master)callback=cb;
 }
 bool transaction_rpc_exec(int8_t id,uint8_t length,const void *request,uint8_t response_size,void *response) {
+    if(id==PUT_SPLIT_RUNTIME_BASE_SYNC) {
+        assert(master && base_callback && response_size==1 && length==sizeof(split_runtime_base_sync_packet_t));
+        base_calls++;base_wire+=length+18u;
+        uint32_t outward=serial_us(length+14u)+send_wait_us(9u);
+        uint32_t returning=serial_us(4u)+send_wait_us(3u);
+        blocking_us+=outward+returning;
+        if(lose_base) {advance_us(outward+returning+5000u);blocking_us+=5000u;return false;}
+        advance_us(outward);master=false;
+        if(!omit_base_reply)base_callback(length,request,response_size,response);
+        master=true;advance_us(returning);
+        if(readiness_override>=0)*(uint8_t *)response=(uint8_t)readiness_override;
+        return true;
+    }
     assert(master && id==PUT_SPLIT_LIGHTING_EVENTS_SYNC && length<=64 && response_size==14 && callback);
     rpc_calls++;wire_bytes+=length+31u; // four pinned QMK id/handshakes + metadata4 + execute1 + CRC4 + reply14
     uint32_t outward=serial_us(length+14u)+send_wait_us(9u);
@@ -53,16 +90,16 @@ bool transaction_rpc_exec(int8_t id,uint8_t length,const void *request,uint8_t r
     if(lose_request){advance_us(outward+returning+5000u);blocking_us+=5000u;return false;}
     uint8_t request_copy[64];memcpy(request_copy,request,length);
     const uint8_t *bytes=request;
-    if(bytes[0]==0x93 && bytes[9]==0){if(bytes[28] & 2u)facts_begins++;else full_begins++;}
-    if(bytes[0]==0x93 && bytes[9]==1 && bytes[12])history_chunks++;
-    if(bad_offset && bytes[0]==0x93 && bytes[9]==1){request_copy[10]=0xff;request_copy[11]=0xff;request=request_copy;bad_offset=false;}
+    if(bytes[0]==0xa3 && bytes[9]==0){if(bytes[28] & 2u)facts_begins++;else full_begins++;}
+    if(bytes[0]==0xa3 && bytes[9]==1 && bytes[12])history_chunks++;
+    if(bad_offset && bytes[0]==0xa3 && bytes[9]==1){request_copy[10]=0xff;request_copy[11]=0xff;request=request_copy;bad_offset=false;}
 
     uint8_t before[sizeof memory[0]];memcpy(before,memory[0],sizeof before);
     advance_us(outward);master=false;
     callback(length,request,response_size,response);
     master=true;advance_us(returning);
     assert(!memcmp(before,memory[0],sizeof before)); // callback stages ONLY
-    if(bad_commit && bytes[0]==0x93 && bytes[9]==2) {
+    if(bad_commit && bytes[0]==0xa3 && bytes[9]==2) {
         memory[0][(banks[0].current^1u)*banks[0].bank_bytes+12u*banks[0].rules+4u]=0xff;
         bad_commit=false;
     }
@@ -70,6 +107,7 @@ bool transaction_rpc_exec(int8_t id,uint8_t length,const void *request,uint8_t r
     if(lose_reply){advance_us(5000u);blocking_us+=5000u;}
     return !lose_reply;
 }
+bool transaction_rpc_send(int8_t id,uint8_t n,const void *p) {(void)id;(void)n;(void)p;assert(!"retained scene must request readiness on base");return false;}
 static void scan(void) {
     master=true;noah_lighting_working_advance(&banks[1],clocks[1]);
     if(pending_input && !banks[1].snapshot_ready) {
@@ -78,6 +116,7 @@ static void scan(void) {
         noah_lighting_facts_dirty_range(noah_qmk_lighting_snapshot_fact_changes(),offsetof(noah_lighting_facts_t,key_pressed),KEY_ORIGIN_BITMAP_SIZE);
         noah_qmk_lighting_snapshot_changed();assert(noah_lighting_working_observe(&banks[1],&staged[1]));
     }
+    if(use_base)split_runtime_sync_tick();
     (void)noah_qmk_lighting_snapshot_step();
     advance_us(1000u); // explicit host main scheduling, not measured target time
     master=false;noah_lighting_working_advance(&banks[0],clocks[0]);(void)peer_step();
@@ -157,11 +196,12 @@ static void standard_pulse(void) {
     assert(first<duration && stopped && ended && last>=duration);
     printf("Standard configured%ums serialized feedback pulse: peer on%u..%u, off%u (ordinary state-link latency), %u RPC/%u wireB; no new expiry/physical guarantee\n",duration,first,last,ended,rpc_calls-calls,wire_bytes-wire);
 }
-static void useful_mix(void) {
-    const uint8_t bytes[]={5,0,58,0,0,0,0,3,
+static void useful_mix(unsigned macro_duration) {
+    uint8_t bytes[]={5,0,58,0,0,0,0,3,
         13,0,255,1,28,127,0x40,4,0x60,0,0xa2,3,255,255,
         14,0,255,2,25,255,255,0x40,4,0x60,0,0xa2,3,255,255,
         13,0,255,1,1,255,0x40,4,0x60,0,0xa2,2,255,255,0};
+    bytes[20]=(uint8_t)macro_duration;bytes[21]=(uint8_t)(macro_duration>>8);
     noah_profile_lighting_v1_view_t view;noah_profile_lighting_v1_limits_t limits=noah_profile_lighting_v1_default_limits();
     assert(noah_profile_lighting_v1_decode(bytes,sizeof bytes,&limits,&view,NULL)==NOAH_PROFILE_LIGHTING_V1_OK);
     noah_lighting_working_cost_t cost;assert(noah_profile_lighting_v1_working_admit(&view,8220,&cost)==NOAH_PROFILE_LIGHTING_V1_OK && cost.required==8220);
@@ -179,7 +219,7 @@ static void useful_mix(void) {
     staged[1].layer_active[0]=staged[1].layer_active[1]=255;
     assert(noah_lighting_working_observe(&banks[1],&staged[1]));
     noah_lighting_event_group_t macro={.thing_kind=5,.thing=127,.qualified={1}};
-    assert(noah_lighting_working_event(&banks[1],&macro));staged[1].layer_previewing[0]=0x4c;
+    if(macro_duration==65535)assert(noah_lighting_working_event(&banks[1],&macro));staged[1].layer_previewing[0]=0x4c;
     uint8_t identity[22]={3};
     master=false;peer_init(&banks[0],identity);peer_bind(&staged[0],&published);
     master=true;noah_qmk_lighting_snapshot_init(&banks[1],identity);noah_qmk_lighting_snapshot_bind_facts(&staged[1],NULL);
@@ -188,11 +228,44 @@ static void useful_mix(void) {
     assert(published.layer_previewing[0]==0x4c);
     noah_lighting_working_advance(&banks[0],clocks[0]);
     for(unsigned i=0;i<3;i++) {
+        if(!i && macro_duration!=65535)continue;
         noah_lighting_working_rule_t rule;assert(noah_lighting_working_rule(&banks[0],i,&rule));
         noah_lighting_lifetime_parameters_t timing={.flash=65535,.linger=65535};
         for(unsigned t=0;t<rule.count;t++)assert(noah_lighting_working_visible(noah_lighting_working_slot(&banks[0],false,&rule,rule.count==1?127:t),&timing));
     }
-    printf("8220 useful mix all145 occupied subjects / real621 facts: %u RPC, %u wire bytes, %u logical ms to coherent positive peer; model schedule, not hardware\n",rpc_calls-before,wire_bytes-wire_before,clocks[1]-start);
+    printf("8220 useful mix %u occupied subjects / real621 facts: %u RPC, %u wire bytes, %u logical ms to coherent positive peer; model schedule, not hardware\n",macro_duration==65535?145u:144u,rpc_calls-before,wire_bytes-wire_before,clocks[1]-start);
+    scan();scan();
+    if(macro_duration==500) {
+        unsigned start=clocks[1],calls=rpc_calls,wire=wire_bytes;
+        noah_lighting_working_rule_t r;assert(noah_lighting_working_rule(&banks[0],0,&r));
+        noah_lighting_lifetime_parameters_t timing={.flash=500};
+        assert(noah_lighting_working_event(&banks[1],&macro));
+        for(unsigned i=0;i<100 && !noah_lighting_working_visible(noah_lighting_working_slot(&banks[0],false,&r,127),&timing);i++)scan();
+        assert(noah_lighting_working_visible(noah_lighting_working_slot(&banks[0],false,&r,127),&timing));
+        assert(clocks[1]-start<200);
+        printf("warm144 unrelated histories + NEW named500: first positive peer%ums/%uRPC/%uwireB, fixed8220/real621; no unchanged history resend\n",clocks[1]-start,rpc_calls-calls,wire_bytes-wire);
+        while(clocks[1]-start<501u)scan();
+        assert(!noah_lighting_working_visible(noah_lighting_working_slot(&banks[0],false,&r,127),&timing));
+        return;
+    }
+    // One new occurrence against the acknowledged fully occupied baseline
+    // sends one exact calendar/payload and compact order-only changes. Other
+    // independent clocks and whole owners must not restart or get recopied.
+    unsigned delta_calls=rpc_calls,delta_wire=wire_bytes,delta_start=clocks[1];
+    noah_lighting_working_rule_t behaviour_rule;assert(noah_lighting_working_rule(&banks[0],1,&behaviour_rule));
+    const uint8_t *old_other=noah_lighting_working_slot(&banks[0],false,&behaviour_rule,126);
+    uint16_t old_age=(uint16_t)old_other[0]|(uint16_t)old_other[1]<<8;
+    noah_lighting_event_group_t repeat={.thing_kind=4,.thing=0,.slot=7,.sides=1,.has_keys=1,.owners={2},.qualified={2}};
+    unsigned committed=banks[0].revision;
+    assert(noah_lighting_working_event(&banks[1],&repeat));
+    for(unsigned i=0;i<120 && banks[0].revision==committed;i++)scan();
+    assert(banks[0].revision>committed);
+    const uint8_t *new_other=noah_lighting_working_slot(&banks[0],false,&behaviour_rule,126);
+    assert(((uint16_t)new_other[0]|(uint16_t)new_other[1]<<8)>=old_age);
+    noah_lighting_subject_t subject;const uint8_t *updated=noah_lighting_working_slot(&banks[0],false,&behaviour_rule,0);
+    noah_lighting_working_member(updated+12,4,127,&subject,NULL);assert(subject.slot==7 && subject.keys[0]==2);
+    assert(rpc_calls-delta_calls<30u && clocks[1]-delta_start<200u);
+    printf("warm145-subject baseline one repeat +127 changed entry ranks: %u RPC/%u wireB/%ums commit; unrelated lifetime preserved\n",rpc_calls-delta_calls,wire_bytes-delta_wire,clocks[1]-delta_start);
     scan();scan();
     // Continuous qualifying input coalesces current while the immutable old
     // cut progresses; old ACK cannot clear the newer current occurrence.
@@ -210,6 +283,72 @@ static void useful_mix(void) {
     staged[1].layer_previewing[0]=0x4d;master=true;noah_lighting_facts_dirty_range(noah_qmk_lighting_snapshot_fact_changes(),offsetof(noah_lighting_facts_t,layer_previewing),1);noah_qmk_lighting_snapshot_changed();
     for(unsigned i=0;i<100 && published.layer_previewing[0]!=0x4d;i++)scan();
     assert(published.layer_previewing[0]==0x4d && full_begins==full && facts_begins>facts);
+}
+static void quiet_reboot_recovery(void) {
+    normal_feedback(500,true);
+    uint8_t identity[22]={4,244,1};
+    master=false;peer_base_init();master=true;use_base=true;split_runtime_sync_init();
+    for(unsigned i=0;i<120;i++)scan();
+    unsigned idle=rpc_calls;for(unsigned i=0;i<2100;i++)scan();
+    assert(rpc_calls==idle && base_calls>0 && peer_readiness()==NOAH_LIGHTING_SCENE_READY);
+    assert(published.layer_active[0]==3);
+    unsigned before_base=base_calls,before_rpc=rpc_calls;
+    // Same-profile, peer-only reboot, independent offset/clock reset. Source
+    // stays entirely quiet. No event/journal/new full flash window is created.
+    master=false;peer_close();assert(peer_readiness()==NOAH_LIGHTING_SCENE_NOT_READY);
+    assert(noah_lighting_working_begin(&banks[0],&program,memory[0],sizeof memory[0],500));
+    clocks[0]=33;memset(&published,0,sizeof published);peer_init(&banks[0],identity);peer_bind(&staged[0],&published);peer_base_init();
+    for(unsigned i=0;i<2400 && published.layer_active[0]!=3;i++)scan();
+    assert(published.layer_active[0]==3 && base_calls>before_base && rpc_calls>before_rpc);
+    for(unsigned i=0;i<20;i++)scan();assert(peer_readiness()==NOAH_LIGHTING_SCENE_READY);
+    // Heartbeat NOT_READY while a resync is pending cannot reset progress.
+    readiness_override=NOAH_LIGHTING_SCENE_NOT_READY;
+    master=true;split_runtime_sync();
+    unsigned full=full_begins;
+    for(unsigned i=0;i<120;i++) {
+        master=true;split_runtime_sync();scan();
+        if(full_begins>full && peer_readiness()==NOAH_LIGHTING_SCENE_READY)break;
+    }
+    assert(full_begins==full+2u && peer_readiness()==NOAH_LIGHTING_SCENE_READY); // PENDING then committed ACK of one BEGIN
+    readiness_override=-1;
+    for(unsigned i=0;i<120;i++)scan();
+    // Unknown/missing mixed-peer reply invalidates once, remains diagnosable
+    // via existing transport backoff, and cannot spin one RPC per scan.
+    for(unsigned fault=0;fault<3;fault++) {
+        if(fault==0)readiness_override=0x81;
+        if(fault==1)omit_base_reply=true;
+        if(fault==2)lose_base=true;
+        before_base=base_calls;master=true;split_runtime_sync();
+        for(unsigned i=0;i<400;i++)scan();
+        assert(base_calls-before_base<12u);
+        readiness_override=-1;omit_base_reply=lose_base=false;
+        for(unsigned i=0;i<1400;i++)scan();
+        assert(peer_readiness()==NOAH_LIGHTING_SCENE_READY && published.layer_active[0]==3);
+    }
+    // A state change after recovery uses the coherent acknowledged baseline.
+    pending_input=true;input_layers=5;input_keys=2;
+    for(unsigned i=0;i<160 && published.layer_active[0]!=5;i++)scan();
+    assert(published.layer_active[0]==5 && published.key_pressed[0]==2);
+    for(unsigned i=0;i<650;i++)scan();idle=rpc_calls; // settle the actual500ms departed layer tail too
+    for(unsigned i=0;i<2400;i++)scan();assert(rpc_calls==idle);
+    // Profile mismatch/role reinitialization closes readiness and does not
+    // consume a stale generation. A subsequent matching session recovers.
+    uint8_t other[22]={9};
+    master=false;peer_init(&banks[0],other);peer_bind(&staged[0],&published);
+    assert(peer_readiness()==NOAH_LIGHTING_SCENE_NOT_READY);
+    before_base=base_calls;master=true;split_runtime_sync();
+    for(unsigned i=0;i<1400;i++)scan();
+    assert(peer_readiness()==NOAH_LIGHTING_SCENE_NOT_READY && base_calls-before_base<12u);
+    master=false;peer_init(&banks[0],identity);peer_bind(&staged[0],&published);
+    for(unsigned i=0;i<1600;i++)scan();
+    assert(peer_readiness()==NOAH_LIGHTING_SCENE_READY);
+    master=false;noah_qmk_lighting_snapshot_init(&banks[1],identity);
+    assert(noah_qmk_lighting_snapshot_readiness()==NOAH_LIGHTING_SCENE_NOT_READY);
+    master=true;noah_qmk_lighting_snapshot_init(&banks[1],identity);noah_qmk_lighting_snapshot_bind_facts(&staged[1],NULL);
+    for(unsigned i=0;i<200;i++)scan();
+    assert(peer_readiness()==NOAH_LIGHTING_SCENE_READY);
+    printf("ACTUAL BASE heartbeat readiness: quiet same-profile peer reboot/clock reset, once-only resync, pending/unknown/absent/lost/repeated reply, subsequent delta, idle0 lightingRPC PASS; %u base RPC/%u wireB (1B reply within existing allocation)\n",base_calls,base_wire);
+    use_base=false;
 }
 int main(void) {
     const uint8_t bytes[]={5,0,58,0,0,0,0,1,17,0,255,1,28,127,0x40,0,0x60,0,0xa2,1,200,0,0xa2,3,244,1,0};
@@ -285,7 +424,9 @@ int main(void) {
     for(unsigned i=0;i<2;i++)noah_lighting_working_advance(&banks[i],clocks[i]);
     assert(noah_lighting_working_visible(noah_lighting_working_slot(&banks[0],false,&r,127),&timing));
     assert(noah_lighting_working_visible(noah_lighting_working_slot(&banks[1],false,&r,127),&timing));
-    normal_feedback(500,false);normal_feedback(200,true);normal_feedback(500,true);standard_pulse();useful_mix();
+    normal_feedback(500,false);normal_feedback(200,true);normal_feedback(500,true);standard_pulse();useful_mix(65535);useful_mix(500);
+    quiet_reboot_recovery();
     peer_close();master=true;noah_qmk_lighting_snapshot_close();
     puts("actual two-half QMK snapshot adapter: strong registration guards/stage-only callbacks/main commit/lost request+reply/causal nonzero asymmetric RTT/both-half positive/show/expiry/no late resurrection PASS (host logical clock model, not hardware)");
+    return 0;
 }

@@ -6,13 +6,20 @@
 // Direct, profile-sized reservations inside the one advertised fixed pool.
 // Current/split snapshot banks and replacement workspace are all charged by Q.
 // No heap, interning, reserve failure or history eviction after admission.
+// Every admitted retained identity reserves at least one aligned member slot
+// in BOTH banks. This is a derived metadata bound, never another admission cap.
+enum { NOAH_LIGHTING_WORKING_MIN_SLOT = (12u + 5u + KEY_ORIGIN_BITMAP_SIZE + 3u) & ~3u,
+       NOAH_LIGHTING_WORKING_CELL_BOUND = NOAH_LIGHTING_WORKING_CAPACITY / (2u * NOAH_LIGHTING_WORKING_MIN_SLOT),
+       NOAH_LIGHTING_WORKING_DIRTY_BYTES = (NOAH_LIGHTING_WORKING_CELL_BOUND + 7u) / 8u };
 typedef struct noah_lighting_working {
     const noah_profile_lighting_v1_program_t *program;
     uint8_t                                  *bytes;
     uint32_t                                  last_time, generation, revision;
     uint16_t                                  bank_bytes, scratch_bytes;
     uint8_t                                   rules, current;
-    bool                                      clock_ready, snapshot_ready, dirty, render_dirty;
+    bool                                      clock_ready, snapshot_ready, dirty, render_dirty, staging_delta;
+    uint8_t                                   changed_cells[NOAH_LIGHTING_WORKING_DIRTY_BYTES], changed_orders[NOAH_LIGHTING_WORKING_DIRTY_BYTES];
+    uint8_t                                   snapshot_cells[NOAH_LIGHTING_WORKING_DIRTY_BYTES], snapshot_orders[NOAH_LIGHTING_WORKING_DIRTY_BYTES];
 } noah_lighting_working_t;
 typedef struct {
     uint32_t offset;
@@ -53,5 +60,15 @@ void noah_lighting_working_seen(noah_lighting_working_t *);
 
 // Compact complete snapshot ranges contain only occupied slot headers/members.
 // Unsent reserved space is canonically zero; native descriptors stay local.
-bool noah_lighting_working_snapshot_span(const noah_lighting_working_t *, uint16_t from, uint16_t *offset, uint8_t *, uint8_t *length);
+bool noah_lighting_working_snapshot_span(const noah_lighting_working_t *, uint16_t from, uint16_t *offset, uint8_t *, uint8_t *length, bool delta);
 void noah_lighting_working_stage_empty(noah_lighting_working_t *);
+
+void noah_lighting_working_stage_delta(noah_lighting_working_t *);
+
+bool noah_lighting_working_snapshot_orders(const noah_lighting_working_t *, uint16_t from, uint16_t *first, uint8_t *out, uint8_t *length);
+bool noah_lighting_working_stage_orders(noah_lighting_working_t *, uint16_t first, const uint8_t *, uint8_t length);
+
+#if UINTPTR_MAX == UINT32_MAX && NOAH_LIGHTING_MATRIX_KEYS >= 57u && NOAH_LIGHTING_MATRIX_KEYS <= 64u && NOAH_LIGHTING_WORKING_CAPACITY == 8220u
+_Static_assert(NOAH_LIGHTING_WORKING_CELL_BOUND == 146u && NOAH_LIGHTING_WORKING_DIRTY_BYTES == 19u, "admission-derived per-cell metadata bound");
+_Static_assert(sizeof(noah_lighting_working_t) == 108u, "recorded owned control includes all four dirty masks");
+#endif

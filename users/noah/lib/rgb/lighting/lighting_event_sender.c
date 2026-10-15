@@ -3,7 +3,7 @@
 
 static void hello(noah_lighting_event_link_t *link) {
     link->active = link->waiting_confirm = link->mailbox_ready = false;
-    link->packet.outgoing[0] = NOAH_LIGHTING_EVENT_HELLO | (link->snapshot_mode ? 0x90u : 0u);
+    link->packet.outgoing[0] = NOAH_LIGHTING_EVENT_HELLO | (link->snapshot_mode ? 0xa0u : 0u);
     memcpy(link->packet.outgoing + 1,link->profile,NOAH_LIGHTING_EVENT_PROFILE_BYTES);
     noah_lighting_event_put_u32(link->packet.outgoing + 23,link->next_sequence);
 }
@@ -27,7 +27,7 @@ bool noah_lighting_event_sender_offer(noah_lighting_event_link_t *link, const no
     return true;
 }
 bool noah_lighting_event_sender_reply(noah_lighting_event_link_t *link, const uint8_t *reply, size_t size, noah_lighting_event_reset_fn fresh_session, noah_lighting_event_ack_fn ack, void *context) {
-    if (!link->ready || !link->master || !fresh_session || !ack || !reply || size != NOAH_LIGHTING_EVENT_REPLY_BYTES || reply[0] != (NOAH_LIGHTING_EVENT_REPLY | (link->snapshot_mode ? 0x90u : 0u))) return false;
+    if (!link->ready || !link->master || !fresh_session || !ack || !reply || size != NOAH_LIGHTING_EVENT_REPLY_BYTES || reply[0] != (NOAH_LIGHTING_EVENT_REPLY | (link->snapshot_mode ? 0xa0u : 0u))) return false;
     uint8_t status = reply[1];
     uint32_t epoch = noah_lighting_event_get_u32(reply + 2);
     uint32_t sequence = noah_lighting_event_get_u32(reply + 6);
@@ -39,7 +39,7 @@ bool noah_lighting_event_sender_reply(noah_lighting_event_link_t *link, const ui
     }
     if (!link->active && !link->waiting_confirm && status == NOAH_LIGHTING_EVENT_HELLO_READY && sequence == link->next_sequence) {
         link->epoch = epoch;
-        link->packet.outgoing[0] = NOAH_LIGHTING_EVENT_CONFIRM | (link->snapshot_mode ? 0x90u : 0u);
+        link->packet.outgoing[0] = NOAH_LIGHTING_EVENT_CONFIRM | (link->snapshot_mode ? 0xa0u : 0u);
         noah_lighting_event_put_u32(link->packet.outgoing + 1,epoch);
         noah_lighting_event_put_u32(link->packet.outgoing + 5,sequence);
         link->waiting_confirm = true;
@@ -68,8 +68,8 @@ void noah_lighting_snapshot_sender_begin(noah_lighting_event_link_t *link, const
     noah_lighting_event_link_publish(link);
 }
 bool noah_lighting_snapshot_sender_offer(noah_lighting_event_link_t *link, const uint8_t payload[55]) {
-    if (!link || !link->snapshot_mode || !link->ready || !link->master || !link->active || link->mailbox_ready || !payload || payload[0]>3u || (payload[0]==1u && payload[3]>51u)) return false;
-    link->packet.outgoing[0]=NOAH_LIGHTING_EVENT_DATA|0x90u;
+    if (!link || !link->snapshot_mode || !link->ready || !link->master || !link->active || link->mailbox_ready || !payload || payload[0]>4u || ((payload[0]==1u || payload[0]==4u) && payload[3]>51u)) return false;
+    link->packet.outgoing[0]=NOAH_LIGHTING_EVENT_DATA|0xa0u;
     noah_lighting_event_put_u32(link->packet.outgoing+1,link->epoch);
     noah_lighting_event_put_u32(link->packet.outgoing+5,link->next_sequence);
     memcpy(link->packet.outgoing+9,payload,55u);

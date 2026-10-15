@@ -10,10 +10,10 @@ typedef struct {
     noah_lighting_facts_t     *facts, *published_facts;
     noah_lighting_freshness_t  clock;
     uint32_t                   capture, before, after, remote, last_time, sent_revision;
-    uint16_t                   offset;
+    uint16_t                   offset, order_offset;
     uint8_t                    phase;
     uint8_t                    fact_dirty[NOAH_LIGHTING_FACT_DIRTY_BYTES ? NOAH_LIGHTING_FACT_DIRTY_BYTES : 1u];
-    bool                       staging, clock_ready, dirty, facts_only, have_baseline, delta_facts;
+    bool                       staging, clock_ready, dirty, facts_only, have_baseline, delta_facts, delta_history;
 } noah_lighting_snapshot_t;
 // Begin leaves the endpoint closed. Bind both owned fact pointers after RPC
 // registration; binding publishes the completely initialized role.
@@ -26,3 +26,7 @@ bool noah_lighting_snapshot_main(noah_lighting_snapshot_t *, uint32_t now);
 // bytes identical and never advance snapshot/current state.
 uint8_t noah_lighting_snapshot_request(noah_lighting_snapshot_t *, uint32_t now);
 bool    noah_lighting_snapshot_reply(noah_lighting_snapshot_t *, const uint8_t reply[14], uint32_t before, uint32_t after);
+
+// Main-only, once per lost acknowledged baseline. Unknown status also requires
+// full resync; repeated NOT_READY during handshake cannot reset its progress.
+void noah_lighting_snapshot_peer_readiness(noah_lighting_snapshot_t *, uint8_t status);

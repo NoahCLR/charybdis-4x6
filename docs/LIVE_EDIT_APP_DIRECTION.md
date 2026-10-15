@@ -1475,9 +1475,12 @@ copies borrowed owners before return. Program source reads and admission finish
 in separate owned staging before provider publication. Frozen outgoing bytes
 survive concurrent newer current observations without a third history bank.
 
-Snapshot v3 has an explicit internal discriminator, immutable stop-and-wait
-requests, change-driven coalescing, occupied history ranges and changed fact
-slices on an acknowledged complete baseline. Settled idle sends no RPC; failures
+Snapshot v4 has an explicit internal discriminator, immutable stop-and-wait
+requests, change-driven coalescing, occupied history ranges, changed-slot/order deltas and changed fact
+slices on an acknowledged complete baseline. Settled idle sends no lighting RPC; an exact versioned one-byte readiness reply
+on the existing base heartbeat detects a quiet reboot and schedules one full
+current/live resync. The callback reads a main-published scalar only; unknown
+peers fail closed with the existing backoff and diagnostic trace. Failures
 back off and rejected main commits recover by full resync. Main-before-ACK
 consumption preserves one coherent fact/history cut. It resynchronizes still-live transient
 state rather than replaying source-expired events with a fresh interval.

@@ -3,6 +3,8 @@
 #define BARRIER() __asm__ __volatile__("" ::: "memory")
 
 void noah_lighting_event_link_begin(noah_lighting_event_link_t *link, bool master, const uint8_t *profile) {
+    link->scene_readiness = NOAH_LIGHTING_SCENE_NOT_READY;
+    BARRIER();
     link->ready = false;
     BARRIER();
     link->master = master;
@@ -19,7 +21,7 @@ void noah_lighting_event_link_publish(noah_lighting_event_link_t *link) {
     link->ready = true;
 }
 static void respond(const noah_lighting_event_link_t *link, uint8_t status, uint32_t sequence, uint8_t *reply) {
-    reply[0] = NOAH_LIGHTING_EVENT_REPLY | (link->snapshot_mode ? 0x90u : 0u);
+    reply[0] = NOAH_LIGHTING_EVENT_REPLY | (link->snapshot_mode ? 0xa0u : 0u);
     reply[1] = status;
     noah_lighting_event_put_u32(reply + 2, link->epoch);
     noah_lighting_event_put_u32(reply + 6, sequence);
@@ -33,7 +35,7 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
     memset(reply, 0, NOAH_LIGHTING_EVENT_REPLY_BYTES);
     if (!link->ready || link->master || !request || !size) return;
     BARRIER();
-    if (request[0] == (NOAH_LIGHTING_EVENT_HELLO | (link->snapshot_mode ? 0x90u : 0u)) && size == NOAH_LIGHTING_EVENT_HELLO_BYTES) {
+    if (request[0] == (NOAH_LIGHTING_EVENT_HELLO | (link->snapshot_mode ? 0xa0u : 0u)) && size == NOAH_LIGHTING_EVENT_HELLO_BYTES) {
         uint32_t first = noah_lighting_event_get_u32(request + 23);
         if (memcmp(request + 1, link->profile, NOAH_LIGHTING_EVENT_PROFILE_BYTES)) {
             respond(link, NOAH_LIGHTING_EVENT_PROFILE_MISMATCH, 0, reply);
@@ -42,6 +44,8 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
         } else {
             // Do not overwrite a mailbox owned by main, even for reset.
             // This flag supersedes that packet at the next main boundary.
+            link->scene_readiness = NOAH_LIGHTING_SCENE_NOT_READY;
+            BARRIER();
             link->handshake_sequence = first;
             link->reset_requested = true;
             respond(link, NOAH_LIGHTING_EVENT_PENDING, 0, reply);
@@ -55,7 +59,7 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
         respond(link, NOAH_LIGHTING_EVENT_NEED_HELLO, sequence, reply);
         return;
     }
-    if (request[0] == (NOAH_LIGHTING_EVENT_CONFIRM | (link->snapshot_mode ? 0x90u : 0u)) && size == NOAH_LIGHTING_EVENT_CONTROL_BYTES && sequence == link->next_sequence) {
+    if (request[0] == (NOAH_LIGHTING_EVENT_CONFIRM | (link->snapshot_mode ? 0xa0u : 0u)) && size == NOAH_LIGHTING_EVENT_CONTROL_BYTES && sequence == link->next_sequence) {
         if (link->active && !link->confirm_requested) respond(link, NOAH_LIGHTING_EVENT_ACK, sequence, reply);
         else {
             link->confirm_requested = true;
@@ -65,11 +69,11 @@ void noah_lighting_event_receive(noah_lighting_event_link_t *link, const uint8_t
     }
     bool valid = false;
     if (link->snapshot_mode) {
-        valid = size >= 10u && size <= 64u && request[9] <= 3u;
-        if (valid && request[9] == 1u) valid = size >= 13u && request[12] <= 51u;
+        valid = size >= 10u && size <= 64u && request[9] <= 4u;
+        if (valid && (request[9] == 1u || request[9] == 4u)) valid = size >= 13u && request[12] <= 51u;
         if (valid) valid = size == 9u + noah_lighting_snapshot_payload_size(request + 9u);
     } else valid = size == NOAH_LIGHTING_EVENT_DATA_BYTES && data_valid(request);
-    if (request[0] != (NOAH_LIGHTING_EVENT_DATA | (link->snapshot_mode ? 0x90u : 0u)) || !valid) {
+    if (request[0] != (NOAH_LIGHTING_EVENT_DATA | (link->snapshot_mode ? 0xa0u : 0u)) || !valid) {
         respond(link, NOAH_LIGHTING_EVENT_REJECT, sequence, reply);
         return;
     }
@@ -132,6 +136,8 @@ bool noah_lighting_event_receive_main(noah_lighting_event_link_t *link, uint32_t
         // Keep the published scene intact, release only the failed mailbox and
         // expose REJECT until a fresh HELLO supersedes this transaction.
         if (link->snapshot_mode) {
+            link->scene_readiness = NOAH_LIGHTING_SCENE_NOT_READY;
+            BARRIER();
             link->rejected = true;
             BARRIER();
             link->mailbox_ready = false;

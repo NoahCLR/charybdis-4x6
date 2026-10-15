@@ -723,10 +723,13 @@ floor4096 and reviewed main/slave1920/768 remain unchanged. Hardware cadence,
 oscillator drift and allocator/global/interrupt-stack high-water acceptance
 remain unproved. Host logical-clock and linked-path checks do not prove them.
 
-The v3 snapshot correction retains the same8220 pool and staged program.
+The v4 snapshot correction retains the same8220 pool and staged program.
 Additional control comprises a working-owner change latch/diagnostic revision,
+four admission-derived slot/order dirty bitsets (76B for60keys/8220),
 a registry-sized fact dirty bitset, one acknowledged baseline token and retry
-backoff timestamps. It reuses the existing source fact snapshot and receiver
+backoff timestamps and a one-byte published readiness scalar inside the bounded
+role-disjoint endpoint control (the base heartbeat response uses existing QMK
+RPC allocation). It reuses the existing source fact snapshot and receiver
 published/staging frames; no third621-byte fact buffer or history bank exists.
 The compiler-flag policy selector follows final ordered `-D`/`-U` definitions:
 valueless or proven nonzero integer enables a prerequisite; zero, undefined or

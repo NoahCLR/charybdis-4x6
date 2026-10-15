@@ -66,6 +66,7 @@ typedef enum {
     NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE,
     NOAH_TRACE_SPLIT_SYNC_EVENT_FAILURE,
     NOAH_TRACE_SPLIT_SYNC_EVENT_RECOVERY,
+    NOAH_TRACE_SPLIT_SYNC_EVENT_SCENE_UNAVAILABLE, // raw readiness byte, transport success
 } noah_trace_split_sync_event_t;
 
 typedef enum {

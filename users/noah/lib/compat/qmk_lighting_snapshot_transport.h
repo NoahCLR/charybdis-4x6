@@ -2,6 +2,8 @@
 #include "../rgb/lighting/lighting_working.h"
 #include "../rgb/lighting/lighting_events.h"
 #if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE && defined(SPLIT_TRANSACTION_IDS_USER)
+uint8_t noah_qmk_lighting_snapshot_readiness(void);
+void noah_qmk_lighting_snapshot_peer_readiness(uint8_t);
 void noah_qmk_lighting_snapshot_close(void);
 void noah_qmk_lighting_snapshot_changed(void);
 uint8_t *noah_qmk_lighting_snapshot_fact_changes(void);
@@ -9,6 +11,8 @@ void noah_qmk_lighting_snapshot_init(noah_lighting_working_t *, const uint8_t pr
 void noah_qmk_lighting_snapshot_bind_facts(noah_lighting_facts_t *,noah_lighting_facts_t *);
 bool noah_qmk_lighting_snapshot_step(void);
 #else
+static inline uint8_t noah_qmk_lighting_snapshot_readiness(void) {return NOAH_LIGHTING_SCENE_NOT_READY;}
+static inline void noah_qmk_lighting_snapshot_peer_readiness(uint8_t s) {(void)s;}
 static inline void noah_qmk_lighting_snapshot_close(void) {}
 static inline void noah_qmk_lighting_snapshot_changed(void) {}
 static inline uint8_t *noah_qmk_lighting_snapshot_fact_changes(void) {return NULL;}

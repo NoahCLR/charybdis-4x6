@@ -135,6 +135,38 @@ static void independent_full_batches(void) {
     assert(!memcmp(saved,storage,work.bank_bytes));
 }
 
+static void delta_order_after_conservative_expiry(void) {
+    const uint8_t bytes[]={5,0,58,0,0,0,0,1,13,0,255,1,28,255,0x40,4,0x60,0,0xa2,3,244,1,0};
+    load(bytes,sizeof bytes);noah_lighting_working_t target;
+    assert(noah_lighting_working_begin(&work,&program,storage,sizeof storage,1));
+    assert(noah_lighting_working_begin(&target,&program,saved,sizeof saved,1));
+    noah_lighting_working_advance(&work,100);noah_lighting_working_advance(&target,110);
+    noah_lighting_event_group_t event={.thing_kind=5,.thing=127,.qualified={1}};
+    assert(noah_lighting_working_event(&work,&event));noah_lighting_working_snapshot(&work);
+    memcpy(saved+target.bank_bytes,storage+work.bank_bytes,work.bank_bytes);target.snapshot_ready=true;
+    assert(noah_lighting_working_commit(&target,10,20));
+    noah_lighting_working_release_snapshot(&work);
+    // Peer's upper age expires the older event before source lower age does.
+    noah_lighting_working_advance(&target,590);noah_lighting_working_advance(&work,580);
+    noah_lighting_working_rule_t r;assert(noah_lighting_working_rule(&work,0,&r));
+    noah_lighting_lifetime_parameters_t timing={.flash=500};
+    assert(noah_lighting_working_visible(noah_lighting_working_slot(&work,false,&r,127),&timing));
+    assert(!noah_lighting_working_visible(noah_lighting_working_slot(&target,false,&r,127),&timing));
+    event.thing=0;assert(noah_lighting_working_event(&work,&event));noah_lighting_working_snapshot(&work);
+    noah_lighting_working_stage_delta(&target);
+    uint16_t from=0,offset;uint8_t payload[51],length;
+    while(noah_lighting_working_snapshot_span(&work,from,&offset,payload,&length,true)){
+        assert(noah_lighting_working_stage(&target,offset,payload,length));from=offset+length;
+    }
+    from=0;bool order=false;
+    while(noah_lighting_working_snapshot_orders(&work,from,&offset,payload,&length)){
+        order=true;assert(noah_lighting_working_stage_orders(&target,offset,payload,length));from=offset+length;
+    }
+    assert(order && !noah_lighting_working_stage_orders(&target,128,payload,1));
+    assert(noah_lighting_working_commit(&target,0,12));
+    assert(!noah_lighting_working_visible(noah_lighting_working_slot(&target,false,&r,127),&timing));
+    assert(noah_lighting_working_visible(noah_lighting_working_slot(&target,false,&r,0),&timing));
+}
 static void matching_restart_commit(void) {
     const uint8_t bytes[]={5,0,58,0,0,0,0,1,17,0,255,1,14,59,0x40,4,0x60,0,0xa2,1,44,1,0xa2,2,200,0,0};
     load(bytes,sizeof bytes);
@@ -223,7 +255,7 @@ static void snapshots(void) {
     assert(!rx.clock.valid);
 }
 int main(int argc,char **argv) {
-    matching_restart_commit();useful();unmet_show();independent_full_batches();snapshots();assert(argc==4);FILE *f=fopen(argv[1],"r");assert(f);
+    delta_order_after_conservative_expiry();matching_restart_commit();useful();unmet_show();independent_full_batches();snapshots();assert(argc==4);FILE *f=fopen(argv[1],"r");assert(f);
     unsigned c,b,s,a,n,known,lo,hi,show,flash,visible,cases=0;
     while(fscanf(f,"%u %u %u %u %u %u %u %u %u %u %u",&c,&b,&s,&a,&n,&known,&lo,&hi,&show,&flash,&visible)==11) {
         noah_lighting_freshness_t clock;uint16_t lower=0,upper=0;
@@ -256,7 +288,7 @@ int main(int argc,char **argv) {
         size_t size=strlen(request_hex)/2u;assert(size<=64 && noah_lighting_event_sender_size(&link)==size);
         assert(!memcmp(link.packet.outgoing,expected,size));wire_cases++;
     }
-    fclose(f);assert(wire_cases==7);
+    fclose(f);assert(wire_cases==9);
     printf("shared direct admission: %u profiles/all registry bounds/disabled/high IDs/255/boundary PASS\n",cost_cases);
     printf("direct admitted histories: exact8220 useful mixture/all128 identities+16 layers/current+snapshot overlap/atomic reject/show-tail; freshness%u shared cases PASS\n",cases);
 }

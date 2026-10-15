@@ -61,12 +61,12 @@ ADAPTER="$ROOT/users/noah/lib/compat/qmk_lighting_snapshot_transport.c"
 for variant in normal sanitized; do
     flags=""
     [ "$variant" != sanitized ] || flags="-fsanitize=address,undefined -fno-omit-frame-pointer"
-    baseflags="-std=c11 -Wall -Wextra -Werror -pedantic -DMATRIX_ROWS=10 -DMATRIX_COLS=6 -DNOAH_LIGHTING_SCHEMA_ALL_KINDS -DRGB_MATRIX_ENABLE -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DSPLIT_TRANSACTION_IDS_USER -DRPC_M2S_BUFFER_SIZE=128 -DRPC_S2M_BUFFER_SIZE=32"
+    baseflags="-std=c11 -Wall -Wextra -Werror -pedantic -DMATRIX_ROWS=10 -DMATRIX_COLS=6 -DNOAH_LIGHTING_SCHEMA_ALL_KINDS -DRGB_MATRIX_ENABLE -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DRGB_PD_MODE_ACTIVE_HALF_ENABLE -DSPLIT_TRANSACTION_IDS_USER -DRPC_M2S_BUFFER_SIZE=128 -DRPC_S2M_BUFFER_SIZE=32"
     # shellcheck disable=SC2086
     cc $baseflags $flags -DQMK_KEYBOARD_H='"qmk_stub.h"' -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
-      -Dnoah_qmk_lighting_snapshot_init=peer_init -Dnoah_qmk_lighting_snapshot_bind_facts=peer_bind -Dnoah_qmk_lighting_snapshot_step=peer_step -Dnoah_qmk_lighting_snapshot_close=peer_close -Dnoah_qmk_lighting_snapshot_changed=peer_changed -Dnoah_qmk_lighting_snapshot_fact_changes=peer_fact_changes -c "$ADAPTER" -o "$BUILD_DIR/peer_$variant.o"
+      -Dnoah_qmk_lighting_snapshot_readiness=peer_readiness -Dnoah_qmk_lighting_snapshot_peer_readiness=peer_peer_readiness -Dnoah_qmk_lighting_snapshot_init=peer_init -Dnoah_qmk_lighting_snapshot_bind_facts=peer_bind -Dnoah_qmk_lighting_snapshot_step=peer_step -Dnoah_qmk_lighting_snapshot_close=peer_close -Dnoah_qmk_lighting_snapshot_changed=peer_changed -Dnoah_qmk_lighting_snapshot_fact_changes=peer_fact_changes -c "$ADAPTER" -o "$BUILD_DIR/peer_$variant.o"
     # shellcheck disable=SC2086
     cc $baseflags $flags -DQMK_KEYBOARD_H='"qmk_stub.h"' -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
-      "$ROOT/tests/host/qmk_lighting_snapshot_test.c" "$ADAPTER" $SOURCES "$ROOT/users/noah/lib/profile/schema/profile_lighting_v1.c" "$ROOT/users/noah/lib/profile/schema/profile_reader.c" "$BUILD_DIR/peer_$variant.o" -o "$BUILD_DIR/qmk_$variant"
+      "$ROOT/tests/host/qmk_lighting_snapshot_test.c" "$ROOT/tests/host/qmk_lighting_snapshot_base_peer.c" "$ROOT/users/noah/lib/split/runtime_sync.c" "$ROOT/users/noah/lib/split/runtime_sync_dirty.c" "$ADAPTER" $SOURCES "$ROOT/users/noah/lib/profile/schema/profile_lighting_v1.c" "$ROOT/users/noah/lib/profile/schema/profile_reader.c" "$BUILD_DIR/peer_$variant.o" -o "$BUILD_DIR/qmk_$variant"
     "$BUILD_DIR/qmk_$variant"
 done

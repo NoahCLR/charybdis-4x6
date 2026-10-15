@@ -1,7 +1,7 @@
 #include "lighting_snapshot.h"
 #include <string.h>
 #define BARRIER() __asm__ __volatile__("" ::: "memory")
-enum { PING = 3u, BEGIN = 0u, CHUNK = 1u, COMMIT = 2u };
+enum { PING = 3u, BEGIN = 0u, CHUNK = 1u, COMMIT = 2u, ORDER = 4u };
 static uint16_t get16(const uint8_t *p) {
     return (uint16_t)p[0] | (uint16_t)p[1] << 8u;
 }
@@ -11,32 +11,38 @@ static void put16(uint8_t *p, uint16_t n) {
 }
 static void reset(void *context) {
     noah_lighting_snapshot_t *s = context;
+    s->link.scene_readiness = NOAH_LIGHTING_SCENE_NOT_READY;
+    BARRIER();
     noah_lighting_freshness_reset(&s->clock);
     noah_lighting_working_release_snapshot(s->working);
     s->staging = false;
-    s->offset  = 0;
+    s->offset = s->order_offset = 0;
     s->phase   = PING;
     s->clock_ready = false;
     s->dirty = true;
-    s->have_baseline = s->facts_only = s->delta_facts = false;
+    s->have_baseline = s->facts_only = s->delta_facts = s->delta_history = false;
     s->sent_revision = 0u;
     memset(s->fact_dirty, 0, sizeof s->fact_dirty);
     if (!s->link.master) {
         // Session reset clears transient histories. Program storage is unchanged;
         // no allocation or source read occurs on this path.
+        s->working->revision++;
+        s->working->render_dirty = true;
         memset(s->working->bytes + s->working->current * s->working->bank_bytes + 12u * s->working->rules, 0, s->working->bank_bytes - 12u * s->working->rules);
     }
 }
 void noah_lighting_snapshot_begin(noah_lighting_snapshot_t *s, noah_lighting_working_t *w, bool master, const uint8_t profile[22]) {
+    s->link.scene_readiness = NOAH_LIGHTING_SCENE_NOT_READY;
+    BARRIER();
     s->link.ready = false;
     BARRIER();
     s->working = w;
     s->clock_ready = false;
     s->dirty = true;
-    s->have_baseline = s->facts_only = s->delta_facts = false;
+    s->have_baseline = s->facts_only = s->delta_facts = s->delta_history = false;
     s->sent_revision = 0u;
     memset(s->fact_dirty, 0, sizeof s->fact_dirty);
-    s->offset  = 0;
+    s->offset = s->order_offset = 0;
     s->staging = false;
     s->phase   = PING;
     noah_lighting_freshness_reset(&s->clock);
@@ -50,6 +56,15 @@ void noah_lighting_snapshot_bind_facts(noah_lighting_snapshot_t *s, noah_lightin
     s->published_facts = published;
     noah_lighting_event_link_publish(&s->link);
 }
+void noah_lighting_snapshot_peer_readiness(noah_lighting_snapshot_t *s, uint8_t status) {
+    if (!s->link.ready || !s->link.master || !s->have_baseline || status == NOAH_LIGHTING_SCENE_READY) return;
+    reset(s);
+    s->link.next_sequence++;
+    s->link.active = s->link.waiting_confirm = s->link.mailbox_ready = false;
+    s->link.packet.outgoing[0] = NOAH_LIGHTING_EVENT_HELLO | 0xa0u;
+    memcpy(s->link.packet.outgoing + 1u, s->link.profile, 22u);
+    noah_lighting_event_put_u32(s->link.packet.outgoing + 23u, s->link.next_sequence);
+}
 static void observe_clock(noah_lighting_snapshot_t *s, uint32_t now) {
     if (s->clock_ready && now - s->last_time > INT32_MAX) {
         // A detected discontinuity invalidates the entire causal exchange,
@@ -58,7 +73,7 @@ static void observe_clock(noah_lighting_snapshot_t *s, uint32_t now) {
         if (s->link.master) {
             s->link.next_sequence++;
             s->link.active = s->link.waiting_confirm = s->link.mailbox_ready = false;
-            s->link.packet.outgoing[0] = NOAH_LIGHTING_EVENT_HELLO | 0x90u;
+            s->link.packet.outgoing[0] = NOAH_LIGHTING_EVENT_HELLO | 0xa0u;
             memcpy(s->link.packet.outgoing + 1u, s->link.profile, 22u);
             noah_lighting_event_put_u32(s->link.packet.outgoing + 23u, s->link.next_sequence);
         } else {
@@ -84,15 +99,17 @@ static bool consume(void *context, const uint8_t *p, uint32_t now) {
         if (p[i]) return false;
     if (p[0] == PING) return true;
     if (p[0] == BEGIN) {
-        if (p[19] > 3u || p[19] == 2u || ((p[19] & 1u) && (!s->have_baseline || noah_lighting_event_get_u32(p + 20u) != s->sent_revision))) return false;
+        if ((p[19] != 0u && p[19] != 1u && p[19] != 3u && p[19] != 5u) || ((p[19] & 1u) && (!s->have_baseline || noah_lighting_event_get_u32(p + 20u) != s->sent_revision))) return false;
         s->delta_facts = (p[19] & 1u) != 0u;
         s->facts_only = (p[19] & 2u) != 0u;
+        s->delta_history = (p[19] & 4u) != 0u;
         if (get16(p + 17u) != snapshot_bytes(s)) return false;
         s->sent_revision = noah_lighting_event_get_u32(p + 20u);
         // Main owns staging for this complete snapshot. Current is intact.
         s->staging = true;
-        s->offset  = 0;
-        if (!s->facts_only) noah_lighting_working_stage_empty(s->working);
+        s->offset = s->order_offset = 0;
+        if (s->delta_history) noah_lighting_working_stage_delta(s->working);
+        else if (!s->facts_only) noah_lighting_working_stage_empty(s->working);
         if (s->facts) {
             if (s->delta_facts && s->published_facts) memcpy(s->facts, s->published_facts, sizeof *s->facts);
             else memset(s->facts, 0, sizeof *s->facts);
@@ -101,10 +118,16 @@ static bool consume(void *context, const uint8_t *p, uint32_t now) {
         return true;
     }
     if (!s->staging) return false;
+    if (p[0] == ORDER) {
+        uint16_t first = get16(p + 1u);
+        if (!s->delta_history || first < s->order_offset || !noah_lighting_working_stage_orders(s->working, first, p + 4u, p[3])) return false;
+        s->order_offset = first + p[3];
+        return true;
+    }
     if (p[0] == CHUNK) {
         uint16_t offset = get16(p + 1u);
         uint8_t  length = p[3];
-        if (offset < s->offset || length > NOAH_LIGHTING_SNAPSHOT_CHUNK || offset > snapshot_bytes(s) || length > snapshot_bytes(s) - offset || (!length && offset != snapshot_bytes(s)) || (!s->facts_only && offset < 12u * s->working->rules)) return false;
+        if (offset < s->offset || !length || length > NOAH_LIGHTING_SNAPSHOT_CHUNK || offset > snapshot_bytes(s) || length > snapshot_bytes(s) - offset || (!s->facts_only && offset < 12u * s->working->rules)) return false;
         uint16_t bank_bytes = s->facts_only ? 0u : s->working->bank_bytes;
         uint8_t bank_length = offset < bank_bytes ? (uint8_t)((bank_bytes - offset) < length ? bank_bytes - offset : length) : 0u;
         if (bank_length && !noah_lighting_working_stage(s->working, offset, p + 4u, bank_length)) return false;
@@ -141,10 +164,11 @@ uint8_t noah_lighting_snapshot_request(noah_lighting_snapshot_t *s, uint32_t now
             noah_lighting_working_advance(s->working, now);
             s->facts_only = s->have_baseline && !s->working->dirty;
             s->delta_facts = s->have_baseline;
+            s->delta_history = s->have_baseline && !s->facts_only;
             noah_lighting_working_snapshot(s->working);
             s->capture = now;
             s->phase   = s->facts_only ? BEGIN : PING;
-            s->offset  = 0;
+            s->offset = s->order_offset = 0;
         }
         payload[0] = s->phase;
         if (s->phase == BEGIN) {
@@ -153,13 +177,13 @@ uint8_t noah_lighting_snapshot_request(noah_lighting_snapshot_t *s, uint32_t now
             noah_lighting_event_put_u32(payload + 9u, s->after);
             noah_lighting_event_put_u32(payload + 13u, s->remote);
             put16(payload + 17u, snapshot_bytes(s));
-            payload[19] = (uint8_t)(s->delta_facts | (s->facts_only ? 2u : 0u));
+            payload[19] = (uint8_t)(s->delta_facts | (s->facts_only ? 2u : 0u) | (s->delta_history ? 4u : 0u));
             noah_lighting_event_put_u32(payload + 20u, s->sent_revision);
         } else if (s->phase == CHUNK) {
             uint16_t offset = snapshot_bytes(s);
             uint8_t length = 0;
             uint16_t bank_bytes = s->facts_only ? 0u : s->working->bank_bytes;
-            if ((s->facts_only || !noah_lighting_working_snapshot_span(s->working, s->offset, &offset, payload + 4u, &length)) && s->facts) {
+            if ((s->facts_only || !noah_lighting_working_snapshot_span(s->working, s->offset, &offset, payload + 4u, &length, s->delta_history)) && s->facts) {
                 uint16_t at = s->offset > bank_bytes ? s->offset - bank_bytes : 0u;
                 const uint8_t *facts = (const uint8_t *)s->facts;
                 if (s->delta_facts) {
@@ -190,7 +214,11 @@ uint8_t noah_lighting_snapshot_request(noah_lighting_snapshot_t *s, uint32_t now
                     }
                 }
             }
-            if (!length) {
+            if (!length && s->delta_history && noah_lighting_working_snapshot_orders(s->working, s->order_offset, &offset, payload + 4u, &length)) {
+                payload[0] = ORDER;
+                put16(payload + 1u, offset);
+                payload[3] = length;
+            } else if (!length) {
                 payload[0] = COMMIT; // explicit end: omitted trailing bytes retain the defined baseline/zero
                 put16(payload + 1u, snapshot_bytes(s));
             } else {
@@ -209,7 +237,9 @@ static void ack(void *context, const uint8_t *payload) {
         s->phase = BEGIN;
     else if (payload[0] == BEGIN)
         s->phase = snapshot_bytes(s) ? CHUNK : COMMIT;
-    else if (payload[0] == CHUNK) {
+    else if (payload[0] == ORDER) {
+        s->order_offset = get16(payload + 1u) + payload[3];
+    } else if (payload[0] == CHUNK) {
         s->offset = get16(payload + 1u) + payload[3];
         if (!payload[3]) s->phase = COMMIT;
     } else {

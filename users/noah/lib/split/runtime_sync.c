@@ -22,6 +22,7 @@
 #    include "../state/diagnostics/runtime_trace.h"
 #    include "runtime_sync.h"
 #    include "../rgb/lighting/lighting_runtime.h"
+#    include "../compat/qmk_lighting_snapshot_transport.h"
 #    include "runtime_sync_dirty.h"
 #    include "transactions.h" // QMK
 
@@ -134,6 +135,7 @@ static uint16_t split_runtime_sync_auto_mouse_elapsed(uint32_t now) {
 }
 
 static split_runtime_base_sync_packet_t split_runtime_sync_build_base_packet(uint16_t raw_elapsed) {
+    (void)raw_elapsed; // field is optional without the auto-mouse gradient
     split_runtime_base_sync_packet_t packet = {
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
         .automouse_progress = pd_any_local_mode_locked() ? 0 : automouse_rgb_quantize_progress(raw_elapsed),
@@ -227,7 +229,20 @@ static bool split_runtime_sync_broadcast_base(const split_runtime_base_sync_pack
         return true;
     }
 
-    if (transaction_rpc_send(PUT_SPLIT_RUNTIME_BASE_SYNC, sizeof(*pkt), pkt)) {
+    bool sent;
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    if (noah_lighting_runtime_shared_scene()) {
+        uint8_t readiness = 0u; // absent/old/mixed reply is never READY
+        sent = transaction_rpc_exec(PUT_SPLIT_RUNTIME_BASE_SYNC, sizeof(*pkt), pkt, 1u, &readiness);
+        noah_qmk_lighting_snapshot_peer_readiness(sent ? readiness : 0u);
+        if (!sent || (readiness != NOAH_LIGHTING_SCENE_READY && readiness != NOAH_LIGHTING_SCENE_NOT_READY)) {
+            noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SCENE_UNAVAILABLE, readiness, sent);
+            sent = false; // existing bounded transport backoff, not reset churn
+        }
+    } else
+#    endif
+        sent = transaction_rpc_send(PUT_SPLIT_RUNTIME_BASE_SYNC, sizeof(*pkt), pkt);
+    if (sent) {
         split_runtime_base_last_sent = *pkt;
         split_runtime_base_sent_once = true;
         split_runtime_base_last_send = now;
@@ -326,6 +341,9 @@ static void split_runtime_sync_slave_lighting_rpc(uint8_t initiator2target_buffe
 #    endif
 
 static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    if (target2initiator_buffer_size == 1u && target2initiator_buffer) *(uint8_t *)target2initiator_buffer = NOAH_LIGHTING_SCENE_NOT_READY;
+#    endif
     if (!split_runtime_sync_initialized || split_runtime_sync_master_role || is_keyboard_master()) return;
     const split_runtime_base_sync_packet_t *packet = initiator2target_buffer;
 
@@ -341,6 +359,10 @@ static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_si
         split_runtime_sync_log_packet_size_mismatch("base", initiator2target_buffer_size, sizeof(split_runtime_base_sync_packet_t));
     }
 
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    // Published scalar only: callback does not inspect lifecycle or histories.
+    if (target2initiator_buffer_size == 1u && target2initiator_buffer) *(uint8_t *)target2initiator_buffer = noah_qmk_lighting_snapshot_readiness();
+#    endif
     noah_runtime_publication_begin(&split_runtime_sync_remote.base_generation);
     split_runtime_sync_remote.automouse_progress = packet->automouse_progress;
     split_runtime_sync_remote.active_mode_id     = packet->active_mode_id;

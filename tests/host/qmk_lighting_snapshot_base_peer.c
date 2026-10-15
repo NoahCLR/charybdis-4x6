@@ -1,0 +1,11 @@
+// Independent peer instance of the ACTUAL base heartbeat sender/callback code.
+#define split_runtime_sync_remote peer_base_remote
+#define split_runtime_sync_init peer_base_init
+#define split_runtime_sync_tick peer_base_tick
+#define split_runtime_sync_elapsed peer_base_elapsed
+#define split_runtime_sync peer_base_sync
+#define split_runtime_sync_debug_clock_snapshot peer_base_clock_snapshot
+#define split_runtime_sync_debug_transport_snapshot peer_base_transport_snapshot
+#define noah_qmk_lighting_snapshot_readiness peer_readiness
+#define noah_qmk_lighting_snapshot_peer_readiness peer_peer_readiness
+#include "users/noah/lib/split/runtime_sync.c"

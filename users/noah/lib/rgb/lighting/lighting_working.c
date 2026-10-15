@@ -8,6 +8,24 @@ static void changed(noah_lighting_working_t *w) {
     w->revision++; // diagnostic notification, never the wire's baseline identity
     w->dirty = w->render_dirty = true;
 }
+static bool marked(const uint8_t *bits, uint16_t index) {
+    return (bits[index / 8u] & (1u << (index % 8u))) != 0u;
+}
+static void mark(noah_lighting_working_t *w, uint16_t index, bool order_only) {
+    uint8_t *bits = order_only ? w->changed_orders : w->changed_cells;
+    bits[index / 8u] |= (uint8_t)(1u << (index % 8u));
+    changed(w);
+}
+static uint16_t cell_base(const noah_lighting_working_t *w, const noah_lighting_working_rule_t *r) {
+    uint16_t base = 0;
+    for (uint8_t i = 0; i < w->rules; i++) {
+        noah_lighting_working_rule_t before;
+        (void)noah_lighting_working_rule(w, i, &before);
+        if (before.offset == r->offset) return base;
+        base += before.count;
+    }
+    __builtin_trap(); // local, preflighted descriptors, never wire pointers
+}
 static uint16_t get16(const uint8_t *b) {
     return (uint16_t)b[0] | (uint16_t)b[1] << 8u;
 }
@@ -55,7 +73,7 @@ bool noah_lighting_working_begin(noah_lighting_working_t *w, const noah_profile_
     noah_profile_lighting_v1_view_t   view;
     noah_profile_lighting_v1_limits_t limits = noah_profile_lighting_v1_default_limits();
     noah_lighting_working_cost_t      cost;
-    if (noah_profile_lighting_v1_decode(p->bytes, p->length, &limits, &view, NULL) != NOAH_PROFILE_LIGHTING_V1_OK || noah_profile_lighting_v1_working_admit(&view, capacity, &cost) != NOAH_PROFILE_LIGHTING_V1_OK || cost.bank_bytes > UINT16_MAX) return false;
+    if (noah_profile_lighting_v1_decode(p->bytes, p->length, &limits, &view, NULL) != NOAH_PROFILE_LIGHTING_V1_OK || noah_profile_lighting_v1_working_admit(&view, capacity < NOAH_LIGHTING_WORKING_CAPACITY ? capacity : NOAH_LIGHTING_WORKING_CAPACITY, &cost) != NOAH_PROFILE_LIGHTING_V1_OK || cost.bank_bytes > UINT16_MAX) return false;
     // Descriptor preparation is deterministic from this already-owned program.
     // Check the complete layout before discarding any prior generation.
     uint32_t verified       = 12u * cost.rules;
@@ -118,7 +136,7 @@ void noah_lighting_working_advance(noah_lighting_working_t *w, uint32_t now) {
                 memset(c, 0, HEADER);
             else
                 advance_slot(c, &info.timing, elapsed, elapsed);
-            if (phase != c[PHASE] || was_visible != noah_lighting_working_visible(c, &info.timing)) changed(w);
+            if (phase != c[PHASE] || was_visible != noah_lighting_working_visible(c, &info.timing)) mark(w, cell_base(w, &r) + t, false);
         }
     }
 }
@@ -129,6 +147,7 @@ static void entries(noah_lighting_working_t *w, const noah_lighting_working_rule
     for (uint16_t t = 0; t < r->count; t++)
         any |= !!(slot(w, r, t)[FLAGS] & NOAH_LIGHTING_WORKING_NEW_ENTRY);
     if (!any) return;
+    uint16_t base = cell_base(w, r);
     uint8_t next = 1u;
     for (uint16_t rank = 0; rank < 128u; rank++) {
         bool found = false;
@@ -146,8 +165,10 @@ static void entries(noah_lighting_working_t *w, const noah_lighting_working_rule
         if (c[FLAGS] & NOAH_LIGHTING_WORKING_NEW_ENTRY) {
             c[ENTRY] = 0;
             c[FLAGS] &= (uint8_t)~NOAH_LIGHTING_WORKING_NEW_ENTRY;
-        } else if (c[PHASE])
+        } else if (c[PHASE]) {
+            if (c[ENTRY] != c[10]) mark(w, base + t, true);
             c[ENTRY] = c[10];
+        }
         c[10] = 0;
     }
 }
@@ -206,7 +227,7 @@ bool noah_lighting_working_event(noah_lighting_working_t *w, const noah_lighting
         put16(c + LENGTH, MEMBER);
         write_member(c + HEADER, &s, 0u);
         entries(w, &r);
-        changed(w);
+        mark(w, cell_base(w, &r) + t, false);
     }
     return true;
 }
@@ -279,10 +300,10 @@ bool noah_lighting_working_observe(noah_lighting_working_t *w, const noah_lighti
                 next[PHASE] = NOAH_LIGHTING_WORKING_MATCH;
                 if (get16(next + LOWER) >= info.timing.show_after) next[FLAGS] |= NOAH_LIGHTING_WORKING_ELIGIBLE;
                 put16(next + LENGTH, (uint16_t)next[COUNT] * MEMBER);
-                if (memcmp(old, next, HEADER + (uint16_t)next[COUNT] * MEMBER)) changed(w);
+                if (memcmp(old, next, HEADER + (uint16_t)next[COUNT] * MEMBER)) mark(w, cell_base(w, &r) + t, false);
                 memcpy(old, next, HEADER + (uint16_t)next[COUNT] * MEMBER);
             } else if (old[PHASE] == NOAH_LIGHTING_WORKING_MATCH) {
-                changed(w);
+                mark(w, cell_base(w, &r) + t, false);
                 if ((old[FLAGS] & NOAH_LIGHTING_WORKING_ELIGIBLE) && info.timing.linger) {
                     old[PHASE] = NOAH_LIGHTING_WORKING_TAIL;
                     put16(old + LOWER, 0);
@@ -304,12 +325,16 @@ bool noah_lighting_working_visible(const uint8_t *c, const noah_lighting_lifetim
 void noah_lighting_working_snapshot(noah_lighting_working_t *w) {
     if (w && !w->snapshot_ready) {
         memcpy(bank(w, true), bank(w, false), w->bank_bytes);
+        memcpy(w->snapshot_cells, w->changed_cells, sizeof w->snapshot_cells);
+        memcpy(w->snapshot_orders, w->changed_orders, sizeof w->snapshot_orders);
+        memset(w->changed_cells, 0, sizeof w->changed_cells);
+        memset(w->changed_orders, 0, sizeof w->changed_orders);
         w->snapshot_ready = true;
         w->dirty = false; // newer current changes re-arm; an old ACK never clears it
     }
 }
 void noah_lighting_working_release_snapshot(noah_lighting_working_t *w) {
-    if (w) w->snapshot_ready = false;
+    if (w) { w->snapshot_ready = false; w->staging_delta = false; }
 }
 bool noah_lighting_working_commit(noah_lighting_working_t *w, uint16_t lower, uint16_t upper) {
     if (!w || !w->snapshot_ready || lower > upper) return false;
@@ -349,6 +374,13 @@ bool noah_lighting_working_commit(noah_lighting_working_t *w, uint16_t lower, ui
         for (uint16_t t = 0; t < r.count; t++) {
             uint8_t       *next = bank(w, true) + r.offset + t * r.stride;
             const uint8_t *old  = slot(w, &r, t);
+            uint16_t index = cell_base(w, &r) + t;
+            if (w->staging_delta && !marked(w->snapshot_cells, index)) {
+                uint8_t entry = next[ENTRY];
+                memcpy(next, old, r.stride); // locally advanced unchanged calendar/owners
+                if (next[PHASE] && marked(w->snapshot_orders, index)) next[ENTRY] = entry;
+                continue;
+            }
             if (next[PHASE] == NOAH_LIGHTING_WORKING_MATCH) {
                 // A continuous source match started no later than this half's
                 // observed match. A strictly smaller source age upper bound at
@@ -365,6 +397,7 @@ bool noah_lighting_working_commit(noah_lighting_working_t *w, uint16_t lower, ui
         }
     }
     changed(w);
+    w->staging_delta = false;
     w->current ^= 1u;
     w->snapshot_ready = false;
     return true;
@@ -467,6 +500,23 @@ bool noah_lighting_working_stage(noah_lighting_working_t *w, uint16_t offset, co
     }
     for (uint16_t i = 0; i < length; i++)
         if (offset + i >= 12u * w->rules) bank(w, true)[offset + i] = bytes[i];
+    if (w->staging_delta) {
+        uint16_t index = 0;
+        for (uint8_t i = 0; i < w->rules; i++) {
+            noah_lighting_working_rule_t r;
+            (void)noah_lighting_working_rule(w, i, &r);
+            for (uint16_t t = 0; t < r.count; t++, index++) {
+                uint16_t start = (uint16_t)(r.offset + t * r.stride);
+                if (offset >= start + r.stride || offset + length <= start) continue;
+                bool order_only = offset == start + ENTRY && length == 1u;
+                // Conservative remote expiry can reclaim a source-live cell
+                // before an order-only update. It cannot resurrect that cell.
+                if (order_only && !bank(w, true)[start + PHASE]) bank(w, true)[start + ENTRY] = 0u;
+                uint8_t *bits = order_only ? w->snapshot_orders : w->snapshot_cells;
+                bits[index / 8u] |= (uint8_t)(1u << (index % 8u));
+            }
+        }
+    }
     // Native descriptors are local only, never copied from native wire padding.
     memcpy(bank(w, true), bank(w, false), 12u * w->rules);
     w->snapshot_ready = true;
@@ -484,13 +534,13 @@ void noah_lighting_working_seen(noah_lighting_working_t *w) {
             uint8_t *c = slot(w, &r, t);
             if (c[PHASE] == NOAH_LIGHTING_WORKING_MATCH && !(c[FLAGS] & NOAH_LIGHTING_WORKING_ELIGIBLE) && get16(c + LOWER) >= info.timing.show_after) {
                 c[FLAGS] |= NOAH_LIGHTING_WORKING_ELIGIBLE;
-                changed(w);
+                mark(w, cell_base(w, &r) + t, false);
             }
         }
     }
 }
 
-bool noah_lighting_working_snapshot_span(const noah_lighting_working_t *w, uint16_t from, uint16_t *offset, uint8_t *out, uint8_t *length) {
+bool noah_lighting_working_snapshot_span(const noah_lighting_working_t *w, uint16_t from, uint16_t *offset, uint8_t *out, uint8_t *length, bool delta) {
     if (!w || !w->snapshot_ready || !offset || !out || !length) return false;
     *length = 0u;
     memset(out, 0, 51u);
@@ -500,10 +550,19 @@ bool noah_lighting_working_snapshot_span(const noah_lighting_working_t *w, uint1
         for (uint16_t t = 0; t < r.count; t++) {
             uint16_t start = (uint16_t)(r.offset + t * r.stride);
             const uint8_t *c = w->bytes + (w->current ^ 1u) * w->bank_bytes + start;
-            if (!c[PHASE]) continue;
+            uint16_t index = cell_base(w, &r) + t;
+            bool whole = marked(w->snapshot_cells, index);
+            if (delta && !whole) continue;
+            if (!delta && !c[PHASE]) continue;
             uint16_t end = start + HEADER + (uint16_t)c[COUNT] * MEMBER;
             if (from >= end) continue;
             if (from > start) start = from;
+            if (delta) {
+                if (end - start > 51) end = start + 51u;
+                *offset = start; *length = (uint8_t)(end - start);
+                memcpy(out, w->bytes + (w->current ^ 1u) * w->bank_bytes + start, *length);
+                return true;
+            }
             if (!*length) *offset = start;
             if (start >= *offset + 51u) return true;
             if (end > *offset + 51u) end = *offset + 51u;
@@ -514,7 +573,58 @@ bool noah_lighting_working_snapshot_span(const noah_lighting_working_t *w, uint1
     return *length != 0u;
 }
 void noah_lighting_working_stage_empty(noah_lighting_working_t *w) {
+    w->staging_delta = false;
+    memset(w->snapshot_cells, 0, sizeof w->snapshot_cells);
+    memset(w->snapshot_orders, 0, sizeof w->snapshot_orders);
     memcpy(bank(w, true), bank(w, false), 12u * w->rules);
     memset(bank(w, true) + 12u * w->rules, 0, w->bank_bytes - 12u * w->rules);
     w->snapshot_ready = true;
+}
+
+void noah_lighting_working_stage_delta(noah_lighting_working_t *w) {
+    memcpy(bank(w, true), bank(w, false), w->bank_bytes);
+    memset(w->snapshot_cells, 0, sizeof w->snapshot_cells);
+    memset(w->snapshot_orders, 0, sizeof w->snapshot_orders);
+    w->staging_delta = true;
+    w->snapshot_ready = true;
+}
+
+bool noah_lighting_working_snapshot_orders(const noah_lighting_working_t *w, uint16_t from, uint16_t *first, uint8_t *out, uint8_t *length) {
+    if (!w || !w->snapshot_ready || !first || !out || !length) return false;
+    uint16_t index = 0; bool found = false; *length = 0;
+    for (uint8_t i = 0; i < w->rules; i++) {
+        noah_lighting_working_rule_t r;
+        (void)noah_lighting_working_rule(w, i, &r);
+        for (uint16_t t = 0; t < r.count; t++, index++) {
+            if (index < from) continue;
+            bool dirty = marked(w->snapshot_orders, index) && !marked(w->snapshot_cells, index);
+            if (!found) { if (!dirty) continue; *first = index; found = true; }
+            if ((uint16_t)(index - *first) >= 51u) return *length != 0u;
+            const uint8_t *c = noah_lighting_working_slot(w, true, &r, thing_at(&r, t));
+            out[index - *first] = c[PHASE] ? c[ENTRY] : 0u;
+            if (dirty) *length = (uint8_t)(index - *first + 1u);
+        }
+    }
+    return *length != 0u;
+}
+bool noah_lighting_working_stage_orders(noah_lighting_working_t *w, uint16_t first, const uint8_t *values, uint8_t length) {
+    if (!w || !w->staging_delta || !values || !length || length > 51u) return false;
+    uint16_t total = 0;
+    for (uint8_t i = 0; i < w->rules; i++) {
+        noah_lighting_working_rule_t r;
+        (void)noah_lighting_working_rule(w, i, &r); total += r.count;
+    }
+    if (first >= total || length > total - first) return false;
+    uint16_t index = 0;
+    for (uint8_t i = 0; i < w->rules; i++) {
+        noah_lighting_working_rule_t r;
+        (void)noah_lighting_working_rule(w, i, &r);
+        for (uint16_t t = 0; t < r.count; t++, index++) {
+            if (index < first || index >= first + length) continue;
+            uint8_t *c = bank(w, true) + r.offset + t * r.stride;
+            c[ENTRY] = c[PHASE] ? values[index - first] : 0u;
+            w->snapshot_orders[index / 8u] |= (uint8_t)(1u << (index % 8u));
+        }
+    }
+    return true;
 }

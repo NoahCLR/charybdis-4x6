@@ -923,20 +923,22 @@ is required. Full-wrap silence cannot be inferred from a wrapping counter alone:
 normal observation/use requires the half-range continuity precondition. This
 model is deliberately separate from stepped synchronized paint-animation time.
 
-### Coherent history snapshot v3 (internal split protocol)
+### Coherent history snapshot v4 (internal split protocol)
 
-HELLO/CONFIRM/DATA/REPLY tags are0x91/0x92/0x93/0x94. Legacy tags1..4 and
-snapshot-v2 tags0x81..0x84 are rejected; saved profile v5/ids remain unchanged.
+HELLO/CONFIRM/DATA/REPLY tags are0xa1/0xa2/0xa3/0xa4. Legacy tags1..4 and
+snapshot-v2/v3 tags0x81..0x84/0x91..0x94 are rejected; saved profile v5/ids remain unchanged.
 HELLO is27 bytes (profile identity22 and next u32 sequence); CONFIRM9 bytes.
 DATA contains tag, epoch u32, sequence u32 and a precisely sized payload:
 PING3 (one byte), BEGIN0 (24 bytes), CHUNK1 (4+length bytes, length1..51),
-COMMIT2 (3 bytes). REPLY14 contains tag,status,epoch,sequence,callback timer.
+ORDER4 (4+count bytes, count1..51) and COMMIT2 (3 bytes). REPLY14 contains tag,status,epoch,sequence,callback timer.
 Requests never exceed64 and replies stay within32; QMK allocation remains128/32.
 
 BEGIN offsets1/5/9/13 carry capture/source-before/source-after/receiver-callback
 u32 samples,17..18 logical length,19 flags,20..23 acknowledged baseline token.
 Flags0 initializes complete history/facts,1 initializes complete history with
-fact deltas,3 preserves acknowledged history with fact deltas;2 is invalid.
+fact deltas,3 preserves acknowledged history with fact deltas,5 applies changed
+history slots/orders and fact deltas on the exact baseline; other flags are
+invalid. The sender uses5 for changed history after baseline acknowledgment.
 A delta requires the exact prior committed baseline token; each successful
 whole cut advances it modulo2^32. One synchronous immutable request/sequence
 is in flight, so a token cannot be ambiguously reused across observed updates;
@@ -954,6 +956,27 @@ and freezes collection during transmission, so a slice mask needs no third621
 byte copy. New runtime state is collected/coalesced after ACK; new captured
 events still mutate current history while the outgoing bank stays immutable.
 
+For history deltas, staging starts from the current bank. Only changed slots
+send their complete header/ordered batch, including a zero header on expiry.
+ORDER4 offsets1..2 name the first profile-derived slot ordinal,3 count1..51,
+4.. the exact entry-rank bytes of consecutive slots. It never changes independent
+clocks, phase, owners or payload. Order-only updates of already conservatively
+expired receiver cells remain absent. Main copies the locally advanced unchanged
+cells at commit (preserving any local gate maturation/expiry); changed calendars
+alone receive source-age correction. All updates share the same immutable cut,
+calibration and final validation/commit. No partial scene is rendered.
+
+Four fixed dirty bitsets separate current/full-slot, current/order-only and their
+immutable outgoing copies; the receiver reuses the snapshot masks for staged
+changes. Their bound is derived from admission, not occupancy/sharing: every
+retained identity reserves at least align4(12+5+ownerBytes) in both banks, hence
+N<=floor(pool/(2*minimumSlot)). For8220/60keys this gives146 cells,19 bytes per
+bitset,76 bytes total. Descriptor bytes and replacement workspace only tighten
+that bound. Existing state/show-after-only profiles reserve no retained cells.
+No accepted sequence can exceed these masks; no new rule/subject cap is imposed.
+The bank and replacement workspace remain exactly2S+W. Descriptor-index lookup
+is bounded by the admitted rule count; its CPU time is not a measured deadline.
+
 COMMIT offsets1..2 give the exact logical end, allowing omitted trailing
 canonical zeros/unchanged baseline. Main validates the entire new history,
 advances source-aged transients with causal uncertainty, then swaps its bank
@@ -969,13 +992,39 @@ survives validation failure. Defined fresh session clears transient history.
 Source dirty latches trigger one immutable coalesced cut. Idle settled scenes
 send **zero** RPCs. An ordinary fact change on an acknowledged unchanged-history
 baseline sends only changed slices; it does not wait for an unnecessary full
-history resend. When history also changes both are captured/committed together.
+history resend. When history also changes both are captured/committed together; unchanged
+large payloads and calendars are not resent for a small update.
 Retries are byte-identical; committed sequence duplicates never reapply/restart
 clocks. Failure backoff uses the existing split policy50..1000ms (configurable),
 only after failed transport; no scene/flash/input rate or duration restriction.
 Normal source expiry is never restarted at arrival. The fixed8220 pool remains
 2S+W; fact staging, endpoint control/dirty bits and failure backoff are accounted
 separately by linked resource checks. There is no third history/fact bank.
+
+The existing base heartbeat additionally requests **one response byte** only
+when capture is enabled and the source actually uses a retained scene. Its
+version1 exact magic is `d0` NOT_READY or `d1` READY; zero, missing, unknown and
+mixed-peer bytes are never READY. Standard/non-retained/disabled paths retain
+the original zero-response base RPC. No new polling interval or buffer exists.
+READY means main committed a baseline for the current initialized endpoint;
+it is not profile/session authorization. The callback reads only a published
+scalar. Main publishes it in a short ChibiOS scheduling-critical section after
+complete validation/commit; session, role, profile, close, detected clock reset
+and rejection clear it before exposing the unready state. In-progress coherent
+deltas do not erase a previously committed baseline.
+
+A source with an acknowledged baseline invalidates it once on unavailable or
+unknown readiness, supersedes any old immutable outgoing packet with a fresh
+HELLO, and captures a full current/live scene after the session handshake.
+It keeps current histories, never creates a new window for source-expired
+flashes, and cannot repeatedly reset a pending resync: invalidation clears
+its baseline flag immediately. The same heartbeat later observes recovery.
+Missing/unknown replies and mixed snapshot discriminators/profile mismatch
+use the existing failure backoff; an unavailable base reply emits split trace
+SCENE_UNAVAILABLE with raw byte/transport result. No diagnostic claims an
+unsupported peer is compatible. A READY byte never replaces full identity,
+epoch/sequence validation or main commit. Quiet peer-only reboot recovery uses
+this existing heartbeat; settled unchanged lighting RPC count remains zero.
 
 A continuously observed remote MATCH retains this half's own show-after start.
 If the new source episode's age upper bound at consumption is strictly below
@@ -998,6 +1047,13 @@ main scheduling/retry delays; this is a software projection, not a hardware
 cadence upper bound. Main-before-ACK stop-and-wait needs a second RPC to observe
 main's commit. Short requests omit unused payload padding. A fact-only update
 skips recalibration; a changed-history cut obtains fresh causal evidence.
+
+The scoped base heartbeat has the same four transactions but RESPONSE1:
+`n+18` wire bytes, versus `n+17` for the original RESPONSE0, an extra byte
+on an existing response transaction. With the configured mode-owner base
+payload13 this is31 bytes. It retains the existing250ms active/1000ms idle
+heartbeat and50..1000ms failure backoff; recovery latency includes those waits
+plus complete resync. No additional idle lighting RPC is issued to poll readiness.
 
 Standard's existing feedback pulse uses the configured200ms default and retains
 its legacy logic. Named500ms and useful-mixture200/500ms transients are exercised

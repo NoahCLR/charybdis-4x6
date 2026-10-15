@@ -1896,7 +1896,7 @@ def working_vectors(limits):
 
 
 def snapshot_vectors():
-    """Unreleased internal snapshot v3, saved domain version remains5."""
+    """Unreleased internal snapshot v4, saved domain version remains5."""
     def u32(n):return n.to_bytes(4,'little')
     packets=[]
     payloads=[('ping',bytes([3])+bytes(54)),
@@ -1905,11 +1905,13 @@ def snapshot_vectors():
               ('begin-history-fact-delta',bytes([0])+u32(100)+u32(120)+u32(130)+u32(5000)+(661).to_bytes(2,'little')+bytes([1])+u32(0xffffffff)+bytes(31)),
               ('begin-facts-only-delta',bytes([0])+u32(100)+bytes(12)+(621).to_bytes(2,'little')+bytes([3])+u32(0)+bytes(31)),
               ('changed-to-zero',bytes([1,0,0,8])+bytes(51)),
+              ('begin-history-delta',bytes([0])+u32(100)+u32(120)+u32(130)+u32(5000)+(661).to_bytes(2,'little')+bytes([5])+u32(1)+bytes(31)),
+              ('order-range',bytes([4,2,0,3,9,8,7])+bytes(48)),
               ('commit',bytes([2])+(661).to_bytes(2,'little')+bytes(52))]
     for name,payload in payloads:
         assert len(payload)==55
-        used=24 if payload[0]==0 else 4+payload[3] if payload[0]==1 else 3 if payload[0]==2 else 1
-        request=bytes([0x93])+u32(7)+u32(0xffffffff)+payload[:used]
+        used=24 if payload[0]==0 else 4+payload[3] if payload[0] in (1,4) else 3 if payload[0]==2 else 1
+        request=bytes([0xa3])+u32(7)+u32(0xffffffff)+payload[:used]
         packets.append(dict(name=name,epoch=7,sequence=0xffffffff,payload=payload.hex(),request=request.hex()))
     return packets
 
@@ -1969,6 +1971,7 @@ def build_vectors() -> dict:
         "historyEvents": history_event_vectors(limits),
         "freshness": freshness_vectors(),
         "snapshotTransport": snapshot_vectors(),
+        "baseHeartbeatReadiness": [dict(byte=x, known=x in (0xd0,0xd1), ready=x==0xd1) for x in (0,0xd0,0xd1,0x81,0xa4,255)],
         "workingMemory": working_vectors(limits),
         "capability": capability_pages(limits),
     }

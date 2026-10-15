@@ -38,8 +38,12 @@ _Static_assert(NOAH_LIGHTING_EVENT_DATA_BYTES <= RPC_M2S_BUFFER_SIZE, "event req
 _Static_assert(NOAH_LIGHTING_EVENT_REPLY_BYTES <= RPC_S2M_BUFFER_SIZE, "event reply fits existing QMK allocation");
 #endif
 
-// Snapshot v3 uses explicit short requests; mailbox padding is local zero.
+// Base heartbeat scene readiness, version1. Every other byte (including zero
+// from a peer without this extension) is UNKNOWN, never an authorization.
+enum { NOAH_LIGHTING_SCENE_NOT_READY = 0xd0u, NOAH_LIGHTING_SCENE_READY = 0xd1u };
+
+// Snapshot v4 uses explicit short requests; mailbox padding is local zero.
 // Caller proves the CHUNK length byte is present before invoking this helper.
 static inline uint8_t noah_lighting_snapshot_payload_size(const uint8_t *p) {
-    return p[0] == 0u ? 24u : p[0] == 1u ? (uint8_t)(4u + p[3]) : p[0] == 2u ? 3u : p[0] == 3u ? 1u : 0u;
+    return p[0] == 0u ? 24u : (p[0] == 1u || p[0] == 4u) ? (uint8_t)(4u + p[3]) : p[0] == 2u ? 3u : p[0] == 3u ? 1u : 0u;
 }

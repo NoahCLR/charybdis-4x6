@@ -41,84 +41,864 @@
     "keyQuery": "0 mapped, 1 transparent, 2 KC_NO, 3 modifier, 4 letter, 5 number, 6 symbol, 7 navigation, 8 media/system, 9 mouse, 10 layer action, 11 mode action, 12 named macro, 13 custom key, 14 authored behaviour, 15 combo input; native usages/actions, never host characters"
   },
   "partSlots": [
-    {"slot": 0, "name": "condition"},
-    {"slot": 1, "name": "negated condition"},
-    {"slot": 2, "name": "target"},
-    {"slot": 3, "name": "paint"},
-    {"slot": 4, "name": "background"},
-    {"slot": 5, "name": "timing"},
-    {"slot": 6, "name": "rule extension"}
+    {
+      "slot": 0,
+      "name": "condition"
+    },
+    {
+      "slot": 1,
+      "name": "negated condition"
+    },
+    {
+      "slot": 2,
+      "name": "target"
+    },
+    {
+      "slot": 3,
+      "name": "paint"
+    },
+    {
+      "slot": 4,
+      "name": "background"
+    },
+    {
+      "slot": 5,
+      "name": "timing"
+    },
+    {
+      "slot": 6,
+      "name": "rule extension"
+    }
   ],
   "registries": {
     "facts": [
-      {"id": 1, "name": "layer active", "thing": 1, "parameters": [{"name": "layer", "type": "layerSelector"}], "slice": "local", "meaning": "Each active layer, highest first. Layer 0, the base layer, is always active.", "construction": "state", "subjectDomain": 16, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "layerDescending"},
-      {"id": 2, "name": "layer previewing", "thing": 1, "parameters": [{"name": "layer", "type": "layerSelector"}], "slice": "synced", "meaning": "The layer a pending momentary hold previews.", "construction": "state", "subjectDomain": 16, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "layerDescending"},
-      {"id": 3, "name": "pointing mode active", "thing": 2, "parameters": [{"name": "mode", "type": "modeSelector"}], "slice": "local", "meaning": "The pointing mode shown. Its keys and halves are those of the key or combo that started it.", "construction": "state", "subjectDomain": 32, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 4, "name": "combos held", "thing": 3, "parameters": [{"name": "role", "type": "comboRole"}], "slice": "synced", "meaning": "One subject for every held combo of the role, excluding combos whose output holds a momentary layer: their keys and the halves those keys are on. Thing 255, so the combo table's default identity.", "construction": "state", "subjectDomain": 1, "selectorParameter": 255, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 5, "name": "behaviour state", "thing": 4, "parameters": [{"name": "states", "type": "behaviourStates"}, {"name": "scope", "type": "behaviourScope"}], "slice": "synced", "meaning": "Gestures whose shown state is in the mask; a flashing state counts only while lit; a key in a held combo's footprint never shows a selected branch. Scope 0: each key. Scope 1: the newest gesture on the left half, then the right, each with that half only. Scope 2: the newest gesture. Scope 3: for each state in the mask, long hold first, the newest gesture that entered it while its key still shows it. Identity slot from the state. Thing 255.", "construction": "state", "subjectDomain": 1, "selectorParameter": 255, "historyMembers": "matrixKeys", "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 7, "name": "combo held", "thing": 3, "parameters": [{"name": "combo", "type": "thingSelector"}, {"name": "role", "type": "comboRole"}], "slice": "synced", "meaning": "One subject per identified held combo, newest completion first; same roles and layer-hold suppression as fact 4. Its own id, input keys and halves; identity slot zero. Unidentified fallback outputs omitted.", "construction": "state", "subjectDomain": 128, "selectorParameter": 0, "historyMembers": "comboBuffer", "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 8, "name": "behaviour", "thing": 4, "parameters": [{"name": "behaviour", "type": "thingSelector"}, {"name": "states", "type": "behaviourStates"}], "slice": "synced", "meaning": "One subject per key of an authored behaviour row, matrix order. Captured row id and selected colour slot; branches suppressed under combos and flashing states only while lit. Includes layer/mode holds Standard delegates to their scenes. Intrinsic/bypassed gestures omitted. No aggregate scopes.", "construction": "state", "subjectDomain": 128, "selectorParameter": 0, "historyMembers": "matrixKeys", "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 9, "name": "layer status", "thing": 1, "parameters": [{"name": "layerSelector", "type": "layerSelector"}, {"name": "layerStatus", "type": "layerStatus"}], "slice": "synced", "meaning": "Real layer ownership, highest layer first; owner keys are the actual momentary bindings, including a combo output representative owner only. Top uses highest active layer; locked and one-shot use ownership state. No inferred automatic-activation provenance.", "construction": "state", "subjectDomain": 16, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "layerDescending"},
-      {"id": 10, "name": "mode status", "thing": 2, "parameters": [{"name": "modeSelector", "type": "modeSelector"}, {"name": "modeStatus", "type": "modeStatus"}], "slice": "synced", "meaning": "Actual held or locked pointing mode and its real owner keys/halves.", "construction": "state", "subjectDomain": 32, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 11, "name": "combo layer", "thing": 3, "parameters": [{"name": "thingSelector", "type": "thingSelector"}, {"name": "layerSelector", "type": "layerSelector"}], "slice": "synced", "meaning": "Identified held combo outputs whose representative owner actually holds a layer; newest completion first. Its input keys and halves.", "construction": "state", "subjectDomain": 128, "selectorParameter": 0, "historyMembers": "comboBuffer", "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 12, "name": "behaviour phase", "thing": 4, "parameters": [{"name": "thingSelector", "type": "thingSelector"}, {"name": "behaviourPhase", "type": "behaviourPhase"}, {"name": "tapSelector", "type": "tapSelector"}], "slice": "synced", "meaning": "Authored per-key gesture phases independent of Standard flash visibility. Matrix order, captured row id, branch and colour slot. A selected branch may also have a tap or hold pending.", "construction": "state", "subjectDomain": 128, "selectorParameter": 0, "historyMembers": "matrixKeys", "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 13, "name": "macro playing", "thing": 5, "parameters": [{"name": "thingSelector", "type": "thingSelector"}], "slice": "synced", "meaning": "Actual named VIA macro playback slot, including cleanup. Direct unnumbered payloads yield no subject.", "construction": "state", "subjectDomain": 128, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 14, "name": "key pressed", "thing": 7, "parameters": [{"name": "keySelector", "type": "keySelector"}], "slice": "synced", "meaning": "Physical matrix keys down, matrix order; each subject owns its actual key and half.", "construction": "state", "subjectDomain": 60, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 15, "name": "modifier", "thing": 6, "parameters": [{"name": "modifier", "type": "modifier"}, {"name": "side", "type": "side"}, {"name": "modifierState", "type": "modifierState"}], "slice": "synced", "meaning": "Actual active real/weak/locked-one-shot modifier masks or armed one-shot mask, with left/right/either selectors. Either yields left then right.", "construction": "state", "subjectDomain": 8, "selectorParameter": 255, "historyMembers": 2, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 16, "name": "host lock", "thing": 0, "parameters": [{"name": "hostLock", "type": "hostLock"}], "slice": "synced", "meaning": "Actual host Caps/Num/Scroll LED state from the USB half.", "construction": "state", "subjectDomain": 1, "selectorParameter": 255, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 17, "name": "pointer", "thing": 0, "parameters": [{"name": "pointerState", "type": "pointerState"}], "slice": "synced", "meaning": "Actual auto-mouse target active/fading and automatic/manual sniping; latest raw sensor x/y before suppression or mode transform. Raw reports may contain noise; no continuation timer. The split peer sees the latest committed observation, and a sample can be replaced before collection/publication.", "construction": "state", "subjectDomain": 1, "selectorParameter": 255, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 18, "name": "idle", "thing": 0, "parameters": [], "slice": "synced", "meaning": "Actual RGB sleep predicate: effective timeout nonzero and QMK input activity elapsed strictly greater than timeout. No extra duration or veto. Preserved global sleep forces black, even when this fact matches.", "construction": "state", "subjectDomain": 1, "selectorParameter": 255, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 19, "name": "layer locked", "thing": 1, "parameters": [{"name": "layerSelector", "type": "layerSelector"}], "construction": "event", "slice": "occurrence", "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.", "subjectDomain": 16, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 20, "name": "layer unlocked", "thing": 1, "parameters": [{"name": "layerSelector", "type": "layerSelector"}], "construction": "event", "slice": "occurrence", "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.", "subjectDomain": 16, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 21, "name": "one-shot used", "thing": 1, "parameters": [{"name": "layerSelector", "type": "layerSelector"}], "construction": "event", "slice": "occurrence", "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.", "subjectDomain": 16, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 22, "name": "mode started", "thing": 2, "parameters": [{"name": "modeSelector", "type": "modeSelector"}], "construction": "event", "slice": "occurrence", "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.", "subjectDomain": 32, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 23, "name": "mode ended", "thing": 2, "parameters": [{"name": "modeSelector", "type": "modeSelector"}], "construction": "event", "slice": "occurrence", "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.", "subjectDomain": 32, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 24, "name": "combo fired", "thing": 3, "parameters": [{"name": "thingSelector", "type": "thingSelector"}], "construction": "event", "slice": "occurrence", "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.", "subjectDomain": 128, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 25, "name": "tap fired", "thing": 4, "parameters": [{"name": "thingSelector", "type": "thingSelector"}, {"name": "tapSelector", "type": "tapSelector"}], "construction": "event", "slice": "occurrence", "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.", "subjectDomain": 128, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 26, "name": "hold fired", "thing": 4, "parameters": [{"name": "thingSelector", "type": "thingSelector"}], "construction": "event", "slice": "occurrence", "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.", "subjectDomain": 128, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 27, "name": "long hold fired", "thing": 4, "parameters": [{"name": "thingSelector", "type": "thingSelector"}], "construction": "event", "slice": "occurrence", "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.", "subjectDomain": 128, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"},
-      {"id": 28, "name": "macro played", "thing": 5, "parameters": [{"name": "thingSelector", "type": "thingSelector"}], "construction": "event", "slice": "occurrence", "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.", "subjectDomain": 128, "selectorParameter": 0, "historyMembers": 1, "retainedPriority": "walkerCursorThenEntry"}
+      {
+        "id": 1,
+        "name": "layer active",
+        "thing": 1,
+        "parameters": [
+          {
+            "name": "layer",
+            "type": "layerSelector"
+          }
+        ],
+        "slice": "local",
+        "meaning": "Each active layer, highest first. Layer 0, the base layer, is always active.",
+        "construction": "state",
+        "subjectDomain": 16,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "layerDescending"
+      },
+      {
+        "id": 2,
+        "name": "layer previewing",
+        "thing": 1,
+        "parameters": [
+          {
+            "name": "layer",
+            "type": "layerSelector"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "The layer a pending momentary hold previews.",
+        "construction": "state",
+        "subjectDomain": 16,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "layerDescending"
+      },
+      {
+        "id": 3,
+        "name": "pointing mode active",
+        "thing": 2,
+        "parameters": [
+          {
+            "name": "mode",
+            "type": "modeSelector"
+          }
+        ],
+        "slice": "local",
+        "meaning": "The pointing mode shown. Its keys and halves are those of the key or combo that started it.",
+        "construction": "state",
+        "subjectDomain": 32,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 4,
+        "name": "combos held",
+        "thing": 3,
+        "parameters": [
+          {
+            "name": "role",
+            "type": "comboRole"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "One subject for every held combo of the role, excluding combos whose output holds a momentary layer: their keys and the halves those keys are on. Thing 255, so the combo table's default identity.",
+        "construction": "state",
+        "subjectDomain": 1,
+        "selectorParameter": 255,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 5,
+        "name": "behaviour state",
+        "thing": 4,
+        "parameters": [
+          {
+            "name": "states",
+            "type": "behaviourStates"
+          },
+          {
+            "name": "scope",
+            "type": "behaviourScope"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "Gestures whose shown state is in the mask; a flashing state counts only while lit; a key in a held combo's footprint never shows a selected branch. Scope 0: each key. Scope 1: the newest gesture on the left half, then the right, each with that half only. Scope 2: the newest gesture. Scope 3: for each state in the mask, long hold first, the newest gesture that entered it while its key still shows it. Identity slot from the state. Thing 255.",
+        "construction": "state",
+        "subjectDomain": 1,
+        "selectorParameter": 255,
+        "historyMembers": "matrixKeys",
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 7,
+        "name": "combo held",
+        "thing": 3,
+        "parameters": [
+          {
+            "name": "combo",
+            "type": "thingSelector"
+          },
+          {
+            "name": "role",
+            "type": "comboRole"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "One subject per identified held combo, newest completion first; same roles and layer-hold suppression as fact 4. Its own id, input keys and halves; identity slot zero. Unidentified fallback outputs omitted.",
+        "construction": "state",
+        "subjectDomain": 128,
+        "selectorParameter": 0,
+        "historyMembers": "comboBuffer",
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 8,
+        "name": "behaviour",
+        "thing": 4,
+        "parameters": [
+          {
+            "name": "behaviour",
+            "type": "thingSelector"
+          },
+          {
+            "name": "states",
+            "type": "behaviourStates"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "One subject per key of an authored behaviour row, matrix order. Captured row id and selected colour slot; branches suppressed under combos and flashing states only while lit. Includes layer/mode holds Standard delegates to their scenes. Intrinsic/bypassed gestures omitted. No aggregate scopes.",
+        "construction": "state",
+        "subjectDomain": 128,
+        "selectorParameter": 0,
+        "historyMembers": "matrixKeys",
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 9,
+        "name": "layer status",
+        "thing": 1,
+        "parameters": [
+          {
+            "name": "layerSelector",
+            "type": "layerSelector"
+          },
+          {
+            "name": "layerStatus",
+            "type": "layerStatus"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "Real layer ownership, highest layer first; owner keys are the actual momentary bindings, including a combo output representative owner only. Top uses highest active layer; locked and one-shot use ownership state. No inferred automatic-activation provenance.",
+        "construction": "state",
+        "subjectDomain": 16,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "layerDescending"
+      },
+      {
+        "id": 10,
+        "name": "mode status",
+        "thing": 2,
+        "parameters": [
+          {
+            "name": "modeSelector",
+            "type": "modeSelector"
+          },
+          {
+            "name": "modeStatus",
+            "type": "modeStatus"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "Actual held or locked pointing mode and its real owner keys/halves.",
+        "construction": "state",
+        "subjectDomain": 32,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 11,
+        "name": "combo layer",
+        "thing": 3,
+        "parameters": [
+          {
+            "name": "thingSelector",
+            "type": "thingSelector"
+          },
+          {
+            "name": "layerSelector",
+            "type": "layerSelector"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "Identified held combo outputs whose representative owner actually holds a layer; newest completion first. Its input keys and halves.",
+        "construction": "state",
+        "subjectDomain": 128,
+        "selectorParameter": 0,
+        "historyMembers": "comboBuffer",
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 12,
+        "name": "behaviour phase",
+        "thing": 4,
+        "parameters": [
+          {
+            "name": "thingSelector",
+            "type": "thingSelector"
+          },
+          {
+            "name": "behaviourPhase",
+            "type": "behaviourPhase"
+          },
+          {
+            "name": "tapSelector",
+            "type": "tapSelector"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "Authored per-key gesture phases independent of Standard flash visibility. Matrix order, captured row id, branch and colour slot. A selected branch may also have a tap or hold pending.",
+        "construction": "state",
+        "subjectDomain": 128,
+        "selectorParameter": 0,
+        "historyMembers": "matrixKeys",
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 13,
+        "name": "macro playing",
+        "thing": 5,
+        "parameters": [
+          {
+            "name": "thingSelector",
+            "type": "thingSelector"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "Actual named VIA macro playback slot, including cleanup. Direct unnumbered payloads yield no subject.",
+        "construction": "state",
+        "subjectDomain": 128,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 14,
+        "name": "key pressed",
+        "thing": 7,
+        "parameters": [
+          {
+            "name": "keySelector",
+            "type": "keySelector"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "Physical matrix keys down, matrix order; each subject owns its actual key and half.",
+        "construction": "state",
+        "subjectDomain": 60,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 15,
+        "name": "modifier",
+        "thing": 6,
+        "parameters": [
+          {
+            "name": "modifier",
+            "type": "modifier"
+          },
+          {
+            "name": "side",
+            "type": "side"
+          },
+          {
+            "name": "modifierState",
+            "type": "modifierState"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "Actual active real/weak/locked-one-shot modifier masks or armed one-shot mask, with left/right/either selectors. Either yields left then right.",
+        "construction": "state",
+        "subjectDomain": 8,
+        "selectorParameter": 255,
+        "historyMembers": 2,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 16,
+        "name": "host lock",
+        "thing": 0,
+        "parameters": [
+          {
+            "name": "hostLock",
+            "type": "hostLock"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "Actual host Caps/Num/Scroll LED state from the USB half.",
+        "construction": "state",
+        "subjectDomain": 1,
+        "selectorParameter": 255,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 17,
+        "name": "pointer",
+        "thing": 0,
+        "parameters": [
+          {
+            "name": "pointerState",
+            "type": "pointerState"
+          }
+        ],
+        "slice": "synced",
+        "meaning": "Actual auto-mouse target active/fading and automatic/manual sniping; latest raw sensor x/y before suppression or mode transform. Raw reports may contain noise; no continuation timer. The split peer sees the latest committed observation, and a sample can be replaced before collection/publication.",
+        "construction": "state",
+        "subjectDomain": 1,
+        "selectorParameter": 255,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 18,
+        "name": "idle",
+        "thing": 0,
+        "parameters": [],
+        "slice": "synced",
+        "meaning": "Actual RGB sleep predicate: effective timeout nonzero and QMK input activity elapsed strictly greater than timeout. No extra duration or veto. Preserved global sleep forces black, even when this fact matches.",
+        "construction": "state",
+        "subjectDomain": 1,
+        "selectorParameter": 255,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 19,
+        "name": "layer locked",
+        "thing": 1,
+        "parameters": [
+          {
+            "name": "layerSelector",
+            "type": "layerSelector"
+          }
+        ],
+        "construction": "event",
+        "slice": "occurrence",
+        "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.",
+        "subjectDomain": 16,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 20,
+        "name": "layer unlocked",
+        "thing": 1,
+        "parameters": [
+          {
+            "name": "layerSelector",
+            "type": "layerSelector"
+          }
+        ],
+        "construction": "event",
+        "slice": "occurrence",
+        "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.",
+        "subjectDomain": 16,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 21,
+        "name": "one-shot used",
+        "thing": 1,
+        "parameters": [
+          {
+            "name": "layerSelector",
+            "type": "layerSelector"
+          }
+        ],
+        "construction": "event",
+        "slice": "occurrence",
+        "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.",
+        "subjectDomain": 16,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 22,
+        "name": "mode started",
+        "thing": 2,
+        "parameters": [
+          {
+            "name": "modeSelector",
+            "type": "modeSelector"
+          }
+        ],
+        "construction": "event",
+        "slice": "occurrence",
+        "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.",
+        "subjectDomain": 32,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 23,
+        "name": "mode ended",
+        "thing": 2,
+        "parameters": [
+          {
+            "name": "modeSelector",
+            "type": "modeSelector"
+          }
+        ],
+        "construction": "event",
+        "slice": "occurrence",
+        "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.",
+        "subjectDomain": 32,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 24,
+        "name": "combo fired",
+        "thing": 3,
+        "parameters": [
+          {
+            "name": "thingSelector",
+            "type": "thingSelector"
+          }
+        ],
+        "construction": "event",
+        "slice": "occurrence",
+        "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.",
+        "subjectDomain": 128,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 25,
+        "name": "tap fired",
+        "thing": 4,
+        "parameters": [
+          {
+            "name": "thingSelector",
+            "type": "thingSelector"
+          },
+          {
+            "name": "tapSelector",
+            "type": "tapSelector"
+          }
+        ],
+        "construction": "event",
+        "slice": "occurrence",
+        "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.",
+        "subjectDomain": 128,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 26,
+        "name": "hold fired",
+        "thing": 4,
+        "parameters": [
+          {
+            "name": "thingSelector",
+            "type": "thingSelector"
+          }
+        ],
+        "construction": "event",
+        "slice": "occurrence",
+        "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.",
+        "subjectDomain": 128,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 27,
+        "name": "long hold fired",
+        "thing": 4,
+        "parameters": [
+          {
+            "name": "thingSelector",
+            "type": "thingSelector"
+          }
+        ],
+        "construction": "event",
+        "slice": "occurrence",
+        "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.",
+        "subjectDomain": 128,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      },
+      {
+        "id": 28,
+        "name": "macro played",
+        "thing": 5,
+        "parameters": [
+          {
+            "name": "thingSelector",
+            "type": "thingSelector"
+          }
+        ],
+        "construction": "event",
+        "slice": "occurrence",
+        "meaning": "Positive first-condition trigger requiring explicit flash timing. Captured actual thing/identity/owners and natural occurrence order; remaining state filters qualify at the coherent occurrence. Qualifying repeats replace/restart; nonqualifying repeats preserve prior qualified flash.",
+        "subjectDomain": 128,
+        "selectorParameter": 0,
+        "historyMembers": 1,
+        "retainedPriority": "walkerCursorThenEntry"
+      }
     ],
     "targets": [
-      {"id": 0, "name": "whole board", "parameters": [], "place": true, "meaning": "All 58 LEDs."},
-      {"id": 1, "name": "left half", "parameters": [], "place": true, "meaning": "LEDs 0..28."},
-      {"id": 2, "name": "right half", "parameters": [], "place": true, "meaning": "LEDs 29..57."},
-      {"id": 3, "name": "key set", "parameters": [{"name": "set", "type": "keySet"}], "place": false, "meaning": "The key set's LEDs."},
-      {"id": 4, "name": "the subject's keys", "parameters": [], "place": true, "meaning": "The LEDs of the subject's keys; the whole board when it has none."},
-      {"id": 5, "name": "the subject's halves", "parameters": [], "place": true, "meaning": "The halves the subject concerns; the whole board when none."},
-      {"id": 6, "name": "the subject layer's mapped keys", "parameters": [], "place": true, "meaning": "LEDs of keys that are neither KC_NO nor KC_TRNS on the subject's layer, read live from the keymap; none for a subject that is not a layer."},
-      {"id": 7, "name": "the subject's place", "parameters": [], "place": false, "meaning": "The target named by the subject's thing record; none for a kind without a table."},
-      {"id": 8, "name": "keys that", "parameters": [{"name": "query", "type": "keyQuery"}, {"name": "selector", "type": "thingSelector"}], "place": false, "meaning": "Keys on the shown layer matching the query: subject layer for a layer subject, otherwise highest active layer. Selector 255 any or specific identity for queries10/11/12/14/15; ignored otherwise. Exact KC_NO/TRNS. Behaviour row existence; combo membership requires enabled row and shown layer allowed. Per-layer cached native/behaviour basis; no reader I/O in render."}
+      {
+        "id": 0,
+        "name": "whole board",
+        "parameters": [],
+        "place": true,
+        "meaning": "All 58 LEDs."
+      },
+      {
+        "id": 1,
+        "name": "left half",
+        "parameters": [],
+        "place": true,
+        "meaning": "LEDs 0..28."
+      },
+      {
+        "id": 2,
+        "name": "right half",
+        "parameters": [],
+        "place": true,
+        "meaning": "LEDs 29..57."
+      },
+      {
+        "id": 3,
+        "name": "key set",
+        "parameters": [
+          {
+            "name": "set",
+            "type": "keySet"
+          }
+        ],
+        "place": false,
+        "meaning": "The key set's LEDs."
+      },
+      {
+        "id": 4,
+        "name": "the subject's keys",
+        "parameters": [],
+        "place": true,
+        "meaning": "The LEDs of the subject's keys; the whole board when it has none."
+      },
+      {
+        "id": 5,
+        "name": "the subject's halves",
+        "parameters": [],
+        "place": true,
+        "meaning": "The halves the subject concerns; the whole board when none."
+      },
+      {
+        "id": 6,
+        "name": "the subject layer's mapped keys",
+        "parameters": [],
+        "place": true,
+        "meaning": "LEDs of keys that are neither KC_NO nor KC_TRNS on the subject's layer, read live from the keymap; none for a subject that is not a layer."
+      },
+      {
+        "id": 7,
+        "name": "the subject's place",
+        "parameters": [],
+        "place": false,
+        "meaning": "The target named by the subject's thing record; none for a kind without a table."
+      },
+      {
+        "id": 8,
+        "name": "keys that",
+        "parameters": [
+          {
+            "name": "query",
+            "type": "keyQuery"
+          },
+          {
+            "name": "selector",
+            "type": "thingSelector"
+          }
+        ],
+        "place": false,
+        "meaning": "Keys on the shown layer matching the query: subject layer for a layer subject, otherwise highest active layer. Selector 255 any or specific identity for queries10/11/12/14/15; ignored otherwise. Exact KC_NO/TRNS. Behaviour row existence; combo membership requires enabled row and shown layer allowed. Per-layer cached native/behaviour basis; no reader I/O in render."
+      }
     ],
     "paints": [
-      {"id": 0, "name": "clear", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "Says nothing; what is below shows."},
-      {"id": 1, "name": "off", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "Black."},
-      {"id": 2, "name": "colour", "parameters": [{"name": "colour", "type": "paletteIndex"}], "readsBelow": false, "changesWithTime": false, "meaning": "That palette colour."},
-      {"id": 3, "name": "identity", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "The subject's identity colour from its thing record; clear when it has none."},
-      {"id": 4, "name": "map", "parameters": [{"name": "map", "type": "map"}], "readsBelow": "as the map value", "changesWithTime": false, "meaning": "The map's value at the LED: a palette colour, or the parameterless paint 0x80 + k names."},
-      {"id": 5, "name": "dim", "parameters": [{"name": "level", "type": "level"}], "readsBelow": true, "changesWithTime": false, "meaning": "(below x level + 127) / 255 per channel."},
-      {"id": 6, "name": "tint", "parameters": [{"name": "colour", "type": "paletteIndex"}, {"name": "amount", "type": "level"}], "readsBelow": true, "changesWithTime": false, "meaning": "(below x (255 - amount) + colour x amount + 127) / 255 per channel."},
-      {"id": 8, "name": "outcome", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "For a fact-8 hold or long-hold, the identity of its resolved supported layer or single pointing-mode outcome. Other subjects, tap/branch slots, ordinary key/modifier/macro/unsupported outcomes, absent tables or none identity say clear; palette black stays opaque. Map value 0x88."},
-      {"id": 9, "name": "what it does", "parameters": [], "readsBelow": false, "changesWithTime": false, "meaning": "The direct supported layer/mode/macro action at the LED key on the shown layer, using that target identity colour. Absent/unsupported action, table or colour is clear. No authored-branch or host-character inference. First matrix key owns a multiply-mapped LED; non-key LEDs clear. Map value0x89."}
+      {
+        "id": 0,
+        "name": "clear",
+        "parameters": [],
+        "readsBelow": false,
+        "changesWithTime": false,
+        "meaning": "Says nothing; what is below shows."
+      },
+      {
+        "id": 1,
+        "name": "off",
+        "parameters": [],
+        "readsBelow": false,
+        "changesWithTime": false,
+        "meaning": "Black."
+      },
+      {
+        "id": 2,
+        "name": "colour",
+        "parameters": [
+          {
+            "name": "colour",
+            "type": "paletteIndex"
+          }
+        ],
+        "readsBelow": false,
+        "changesWithTime": false,
+        "meaning": "That palette colour."
+      },
+      {
+        "id": 3,
+        "name": "identity",
+        "parameters": [],
+        "readsBelow": false,
+        "changesWithTime": false,
+        "meaning": "The subject's identity colour from its thing record; clear when it has none."
+      },
+      {
+        "id": 4,
+        "name": "map",
+        "parameters": [
+          {
+            "name": "map",
+            "type": "map"
+          }
+        ],
+        "readsBelow": "as the map value",
+        "changesWithTime": false,
+        "meaning": "The map's value at the LED: a palette colour, or the parameterless paint 0x80 + k names."
+      },
+      {
+        "id": 5,
+        "name": "dim",
+        "parameters": [
+          {
+            "name": "level",
+            "type": "level"
+          }
+        ],
+        "readsBelow": true,
+        "changesWithTime": false,
+        "meaning": "(below x level + 127) / 255 per channel."
+      },
+      {
+        "id": 6,
+        "name": "tint",
+        "parameters": [
+          {
+            "name": "colour",
+            "type": "paletteIndex"
+          },
+          {
+            "name": "amount",
+            "type": "level"
+          }
+        ],
+        "readsBelow": true,
+        "changesWithTime": false,
+        "meaning": "(below x (255 - amount) + colour x amount + 127) / 255 per channel."
+      },
+      {
+        "id": 8,
+        "name": "outcome",
+        "parameters": [],
+        "readsBelow": false,
+        "changesWithTime": false,
+        "meaning": "For a fact-8 hold or long-hold, the identity of its resolved supported layer or single pointing-mode outcome. Other subjects, tap/branch slots, ordinary key/modifier/macro/unsupported outcomes, absent tables or none identity say clear; palette black stays opaque. Map value 0x88."
+      },
+      {
+        "id": 9,
+        "name": "what it does",
+        "parameters": [],
+        "readsBelow": false,
+        "changesWithTime": false,
+        "meaning": "The direct supported layer/mode/macro action at the LED key on the shown layer, using that target identity colour. Absent/unsupported action, table or colour is clear. No authored-branch or host-character inference. First matrix key owns a multiply-mapped LED; non-key LEDs clear. Map value0x89."
+      }
     ],
     "timings": [
-      {"id": 1, "name": "show after", "parameters": [{"name": "delay", "type": "milliseconds"}], "changesWithTime": false, "meaning": "Amount 0 until the subject has existed for the delay, then 255. Gate observation and wake times use each half's local clock, separately from synced paint time; backward samples do not advance or rewind gates and a forward 32-bit timer wrap advances normally.", "construction": "any"},
-      {"id": 2, "name": "linger", "parameters": [{"name": "duration", "type": "milliseconds"}], "construction": "stateTail", "meaning": "State/board only. Eligible full-match departure retains the full last matching ordered subject batch for this duration. An unmet show-after cannot mature after departure."},
-      {"id": 3, "name": "flash", "parameters": [{"name": "duration", "type": "milliseconds"}], "construction": "eventWindow", "meaning": "Required for positive first event trigger. Expires this duration after first local qualifying observation; show-after runs in parallel inside the same window. Qualifying same-thing repeat replaces footprint and restarts both clocks; nonqualifying repeat preserves prior flash."}
+      {
+        "id": 1,
+        "name": "show after",
+        "parameters": [
+          {
+            "name": "delay",
+            "type": "milliseconds"
+          }
+        ],
+        "changesWithTime": false,
+        "meaning": "Amount 0 until the subject has existed for the delay, then 255. Gate observation and wake times use each half's local clock, separately from synced paint time; backward samples do not advance or rewind gates and a forward 32-bit timer wrap advances normally.",
+        "construction": "any"
+      },
+      {
+        "id": 2,
+        "name": "linger",
+        "parameters": [
+          {
+            "name": "duration",
+            "type": "milliseconds"
+          }
+        ],
+        "construction": "stateTail",
+        "meaning": "State/board only. Eligible full-match departure retains the full last matching ordered subject batch for this duration. An unmet show-after cannot mature after departure."
+      },
+      {
+        "id": 3,
+        "name": "flash",
+        "parameters": [
+          {
+            "name": "duration",
+            "type": "milliseconds"
+          }
+        ],
+        "construction": "eventWindow",
+        "meaning": "Required for positive first event trigger. Expires this duration after first local qualifying observation; show-after runs in parallel inside the same window. Qualifying same-thing repeat replaces footprint and restarts both clocks; nonqualifying repeat preserves prior flash."
+      }
     ],
     "ruleExtensions": [],
     "domainExtensions": [
-      {"id": 1, "name": "auto-mouse fade", "length": 4, "fields": ["flags: bit 0 on", "mode: 0 real destination, 1 end colour where the effect would show, 2 end colour on all keys", "end colour: palette index", "base: the bottom rule count forming the fade's scene, 0..R"], "meaning": "Outside the registries: while auto-mouse fades, the scene is walked with and without the auto-mouse layer and blended by the fade progress."},
-      {"id": 2, "name": "tap-commit flash", "length": 1, "fields": ["mode: 1 non-base taps"], "meaning": "A committed non-base tap flashes its tap colour. Behaviour-affecting: applied at the strict activation boundary. Absent: no tap-commit flash."}
+      {
+        "id": 1,
+        "name": "auto-mouse fade",
+        "length": 4,
+        "fields": [
+          "flags: bit 0 on",
+          "mode: 0 real destination, 1 end colour where the effect would show, 2 end colour on all keys",
+          "end colour: palette index",
+          "base: the bottom rule count forming the fade's scene, 0..R"
+        ],
+        "meaning": "Outside the registries: while auto-mouse fades, the scene is walked with and without the auto-mouse layer and blended by the fade progress."
+      },
+      {
+        "id": 2,
+        "name": "tap-commit flash",
+        "length": 1,
+        "fields": [
+          "mode: 1 non-base taps"
+        ],
+        "meaning": "A committed non-base tap flashes its tap colour. Behaviour-affecting: applied at the strict activation boundary. Absent: no tap-commit flash."
+      }
     ],
     "thingKinds": [
-      {"id": 1, "name": "layer", "things": "logical layers", "colourSlots": ["colour"]},
-      {"id": 2, "name": "pointing mode", "things": 32, "colourSlots": ["colour"]},
-      {"id": 3, "name": "combo", "things": 128, "colourSlots": ["colour"]},
-      {"id": 4, "name": "behaviour", "things": 128, "colourSlots": ["hold", "long hold", "tap", "branch 2", "... one per branch up to the tap depth"]},
-      {"id": 5, "name": "macro", "things": 128, "colourSlots": ["colour"]},
-      {"id": 6, "name": "modifier", "things": 8, "colourSlots": ["colour"]},
-      {"id": 7, "name": "key", "things": 60, "colourSlots": ["colour"]}
+      {
+        "id": 1,
+        "name": "layer",
+        "things": "logical layers",
+        "colourSlots": [
+          "colour"
+        ]
+      },
+      {
+        "id": 2,
+        "name": "pointing mode",
+        "things": 32,
+        "colourSlots": [
+          "colour"
+        ]
+      },
+      {
+        "id": 3,
+        "name": "combo",
+        "things": 128,
+        "colourSlots": [
+          "colour"
+        ]
+      },
+      {
+        "id": 4,
+        "name": "behaviour",
+        "things": 128,
+        "colourSlots": [
+          "hold",
+          "long hold",
+          "tap",
+          "branch 2",
+          "... one per branch up to the tap depth"
+        ]
+      },
+      {
+        "id": 5,
+        "name": "macro",
+        "things": 128,
+        "colourSlots": [
+          "colour"
+        ]
+      },
+      {
+        "id": 6,
+        "name": "modifier",
+        "things": 8,
+        "colourSlots": [
+          "colour"
+        ]
+      },
+      {
+        "id": 7,
+        "name": "key",
+        "things": 60,
+        "colourSlots": [
+          "colour"
+        ]
+      }
     ]
   },
   "references": {
@@ -126,7 +906,18 @@
     "place": "a place-capable target id; 0xfe inherit (thing records only)",
     "mapValue": "0x00..0x7f a palette index below P; 0x80 + k the parameterless paint k (0x80 clear, 0x81 off, 0x83 identity)"
   },
-  "construction": {"facts": {"state": "independently negatable subject or filter", "event": "positive first condition only; requires eventWindow timing"}, "timings": {"any": "state or event", "stateTail": "state/board rules only", "eventWindow": "event-triggered rules only"}, "eventFilterQualification": "coherent occurrence context; later filter changes do not requalify or erase an already qualified occurrence"},
+  "construction": {
+    "facts": {
+      "state": "independently negatable subject or filter",
+      "event": "positive first condition only; requires eventWindow timing"
+    },
+    "timings": {
+      "any": "state or event",
+      "stateTail": "state/board rules only",
+      "eventWindow": "event-triggered rules only"
+    },
+    "eventFilterQualification": "coherent occurrence context; later filter changes do not requalify or erase an already qualified occurrence"
+  },
   "workingMemory": {
     "model": 1,
     "capacity": 8220,
@@ -149,12 +940,12 @@
     "invalidation": "session/role/profile/reset/detected discontinuity/ambiguous modular spans; obtain fresh causal evidence"
   },
   "splitSnapshot": {
-    "version": 3,
+    "version": 4,
     "tags": {
-      "hello": 145,
-      "confirm": 146,
-      "data": 147,
-      "reply": 148
+      "hello": 161,
+      "confirm": 162,
+      "data": 163,
+      "reply": 164
     },
     "requestMaximum": 64,
     "replyBytes": 14,
@@ -162,18 +953,30 @@
       "ping": 1,
       "begin": 24,
       "chunk": "4+length,1..51",
-      "commit": 3
+      "commit": 3,
+      "order": "4+count,1..51"
     },
     "beginFlags": {
       "0": "full history and full facts",
       "1": "full history and fact deltas on ACKed baseline",
-      "3": "unchanged ACKed history and fact deltas"
+      "3": "unchanged ACKed history and fact deltas",
+      "5": "changed history slots/order ranges and fact deltas on ACKed baseline"
     },
     "baseline": "u32 exact committed token; one immutable synchronous in-flight sequence; reset/profile/role invalidates and forces complete scene",
     "factChanges": "registry-sized slice dirty bits; frozen existing source fact cut; receiver initializes staging from published baseline; changed slices include zero bytes",
-    "historyChanges": "complete occupied ordered header/member ranges, omitted reserved bytes zero; current/snapshot fixed2S+W",
+    "historyChanges": "full reset: complete occupied ranges; delta: changed whole slots plus entry-rank ranges, independent unchanged local calendars preserved; fixed2S+W and four admission-derived dirty bitsets",
     "commit": "main-only whole validated history/facts; malformed consume REJECT and full session recovery, never failed ACK",
     "idle": "no settled unchanged RPC; coalesced dirty latch; old ACK never clears newer current events",
-    "clock": "history changes obtain causal calibration; facts-only does not replace transient clocks; unknown suppresses, no delivery-time restart"
+    "clock": "history changes obtain causal calibration; facts-only does not replace transient clocks; unknown suppresses, no delivery-time restart",
+    "baseHeartbeatReadiness": {
+      "version": 1,
+      "responseBytes": 1,
+      "notReady": 208,
+      "ready": 209,
+      "scope": "capture-enabled actual retained scene only; Standard/nonretained/disabled unchanged",
+      "unknown": "never ready; raw-status trace and existing failure backoff",
+      "publication": "main-only after whole matching baseline; reset/close/profile/role/session/reject clear before unready",
+      "recovery": "previous ACKed baseline invalidated once; fresh HELLO/full current-live cut; pending resync not reset by repeated heartbeat"
+    }
   }
 }
