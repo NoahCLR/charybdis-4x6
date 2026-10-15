@@ -58,6 +58,7 @@ void noah_eeconfig_init_user(void) {
 }
 
 void noah_matrix_scan_user(void) {
+    noah_lighting_runtime_sync_role();
 #if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)
     noah_runtime_cadence_note_matrix_scan();
 #endif
@@ -80,6 +81,7 @@ void noah_matrix_scan_user(void) {
 }
 
 void noah_matrix_slave_scan_user(void) {
+    noah_lighting_runtime_sync_role();
     noah_lighting_runtime_task();
     // QMK does not call matrix_scan_user() on the slave half. Keep the
     // durable receiver scheduler alive there without running master-side key,

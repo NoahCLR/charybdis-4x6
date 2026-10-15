@@ -66,7 +66,9 @@ a cached native/behaviour basis; paint9 uses their direct layer/mode/macro
 identity. Reader failures retain previous pixels until a settled refresh.
 The enabled generic-event/retained-timing candidate uses conservative per-profile
 working-memory admission and causal split freshness; final linked acceptance
-remains in progress. None of it has run on hardware.
+remains in progress. The recorded default60-key/four-combo GCC15.2.0 artifact
+has a scoped247808-byte static policy for this storage; core and stack policies
+are unchanged (D-F26). None of it has run on hardware.
 
 The keyboard's name lives in settings v7 and is its USB product string
 (D-F25): read before USB starts, and taken up after a rename by one USB
@@ -1536,3 +1538,15 @@ assembly/transfer/consume delay. Reset/role/profile/discontinuity/ambiguous wrap
 invalidate evidence. Conditional no-resurrection does not prove oscillator drift,
 cadence or hardware high-water. The governing arithmetic and continuity limits
 are in the lighting spec. Integration and enabled linked acceptance remain open.
+
+
+D-F26's retained-lighting allocation uses the fixed8220-byte admission pool,
+9264-byte staged program and coherent fact snapshot/session storage. Its scoped
+GCC15.2.0 default60-key/four-combo portable RGB/PD artifact static policy is247808
+(+18432 from the query-only229376). Both initial enabled links measured247468;
+the fixed10176 non-pool increase and all physical/high-water limitations are
+recorded in [memory budgets](architecture/memory-budgets.md#admitted-retained-lighting-candidate).
+The340-byte initial regression margin is not runtime-free memory. Other artifact/
+geometry limits, physical270336 per half, core floor4096 and reviewed main/slave
+1920/768 remain unchanged. Source stack corrections require fresh measurements;
+this amendment is no automatic pool or policy growth and no hardware acceptance.

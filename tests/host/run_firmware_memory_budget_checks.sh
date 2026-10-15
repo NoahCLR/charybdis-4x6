@@ -45,7 +45,14 @@ QUERY_CACHE_LINKED=no
 if "${NM:-arm-none-eabi-nm}" --defined-only "$ELF" | grep -Eq '[[:space:]]noah_lighting_keymap_refresh$'; then
     QUERY_CACHE_LINKED=yes
 fi
-STATIC_RAM_POLICY="$(noah_firmware_static_ram_policy "$CFLAGS_FILE" "$QUERY_CACHE_LINKED")"
+# Prove the narrow GCC15.2.0 /60-key /four-combo configuration using the exact
+# compiler flags and forced headers that produced this ELF. No filename or
+# generic capture flag alone grants the reviewed18 KiB retained increment.
+RETAINED_CONFIGURATION=no
+if (cd "$QMK_ROOT" && "$PYTHON" "$ROOT/tools/firmware_memory_configuration.py" "$CFLAGS_FILE"); then
+    RETAINED_CONFIGURATION=yes
+fi
+STATIC_RAM_POLICY="$(noah_firmware_static_ram_policy "$CFLAGS_FILE" "$QUERY_CACHE_LINKED" "$RETAINED_CONFIGURATION")"
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \
     --elf "$ELF" \

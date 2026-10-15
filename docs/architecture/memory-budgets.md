@@ -681,11 +681,29 @@ before activation. This deliberately amends payload-only acceptance for new
 timing; unchanged Standard and state/show-after profiles retain their acceptance.
 The lighting spec governs the exact descriptor/member layout and module bounds.
 
-The earlier9704-byte fixed and17924-byte total increment estimates did not include
-the subsequently required coherent fact snapshot. They are projections, not fresh
-linked values, an allocator measurement, or authority to raise229376. Initial
-linked diagnostics retain the229376 static tripwire,4096 boot core-memory floor,
-and1920/768 reviewed stack policies. Physical SRAM remains270336 bytes per half.
-A measured amendment still requires the delegated resource decision. Hardware
-cadence, oscillator drift and allocator/global/interrupt-stack high-water remain
-unproved; host equal-rate logical-clock tests do not prove those properties.
+The scoped retained-lighting artifact has a247808-byte static tripwire,
+18432 above its preceding229376 query-only policy. Selection requires the
+recorded GCC15.2.0 configuration,60 matrix keys, four combo records, portable
+RGB/PD ownership, the linked query cache and enabled retained consumer. The
+memory gate proves compiler/geometry from its recorded flags and forced
+headers; capture flags or the target filename alone do not select this policy.
+All other artifact and geometry policies retain their previous thresholds.
+
+The initial enabled links on BOTH halves measured data5292+bss242176=247468,
+fixed SRAM0–3 prefix247480 and boot core-memory span14664. The18396-byte net
+increase consists of8220 pool plus10176 fixed/control bytes,472 more than the
+previous9704 fixed projection. Named fixed additions are candidate program9264,
+coherent fact snapshot621, snapshot/session168, working control24, identities48,
+flags4, revisions8, scene pointer4 and RPC resend entry1;34 bytes are alignment/
+unnamed residual. The1024-byte capture/render union replaces the same-size
+placement array, without a saving credit or another frame bank.
+
+At that measured size the new policy margin is340 bytes and boot span exceeds
+the4096 floor by10568. Neither is runtime-free memory or a high-water result.
+This funds the implemented8220-pool/staged-program/coherent-fact representation
+only; source corrections must be freshly linked against this fixed ceiling,
+which does not float. Those initial links failed reviewed main-stack policy
+and are not accepted pairs. Physical SRAM remains270336 bytes per half; core
+floor4096 and reviewed main/slave1920/768 remain unchanged. Hardware cadence,
+oscillator drift and allocator/global/interrupt-stack high-water acceptance
+remain unproved. Host logical-clock and linked-path checks do not prove them.

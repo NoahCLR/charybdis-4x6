@@ -1079,7 +1079,21 @@ entry order/lifetimes are retained. No sharing, sparse occupancy, short duration
 filter impossibility or input-rate discount affects admission. The second bank
 is master immutable outgoing snapshot **or** slave validated staging; local
 render consumes current synchronously, never a third pinned bank. The 8220-byte
-candidate is an allocation decision; it does not raise linked RAM/stack policy.
+pool is fixed independently of the scoped linked RAM policy in memory-budgets.md;
+reviewed stack policy is unchanged.
+
+Startup loads the compiled program and initializes its histories before input
+producers run. Successful publication initializes the admitted owned program,
+profile identity and split lifecycle before exposing the new lighting generation;
+all fallible source reads/admission precede active replacement. The observer
+uses only that prepared generation and synchronously collects, qualifies and
+retains an occurrence; it never lazily loads/decodes a program or defers filters.
+The pinned split role is fixed at split_pre_init. An explicit role reinitialization
+runs at a shallow main boundary before producers, closes callback readiness and
+rebuilds the selected role before publication. Render chunks keep their owned
+previous pixels across generation/reset changes. Command-mutation and collection
+scratch return before later capture/qualification phases where their lifetimes
+are disjoint; outer planning storage remains live during synchronous drains.
 
 Each half renders locally. Source-expired flashes are not deliberately replayed
 or granted a fresh window by reconnect. A remote flash paints only when its

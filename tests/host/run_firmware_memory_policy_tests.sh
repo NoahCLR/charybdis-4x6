@@ -7,7 +7,7 @@ trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 check() {
     expected="$1"
     printf '%s\n' "$2" > "$BUILD_DIR/cflags.txt"
-    actual="$(noah_firmware_static_ram_policy "$BUILD_DIR/cflags.txt" "${3:-yes}")"
+    actual="$(noah_firmware_static_ram_policy "$BUILD_DIR/cflags.txt" "${3:-yes}" "${4:-no}")"
     if [ "$actual" != "$expected" ]; then
         echo "memory policy: expected $expected, got $actual for $2" >&2
         exit 1
@@ -25,4 +25,10 @@ check 229376 "$profile -DNOAH_LIGHTING_TARGET_KEYS_THAT=0"
 check 229376 "$profile -DNOAH_LIGHTING_PAINT_WHAT_IT_DOES=0"
 check 226304 "$profile -DNOAH_LIGHTING_TARGET_KEYS_THAT=0 -DNOAH_LIGHTING_PAINT_WHAT_IT_DOES=0"
 check 57344 '-DXNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -DRGB_MATRIX_ENABLE'
+check 247808 "$profile -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1" yes yes
+check 229376 "$profile -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1" yes no
+check 229376 "$profile -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=0" yes yes
+check 229376 "$profile" yes yes
+check 226304 "$profile -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1" no yes
+check 226304 "$profile -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DNOAH_LIGHTING_TARGET_KEYS_THAT=0 -DNOAH_LIGHTING_PAINT_WHAT_IT_DOES=0" yes yes
 echo 'firmware memory artifact policies: query increment scoped; unrelated and disabled-cache limits preserved'

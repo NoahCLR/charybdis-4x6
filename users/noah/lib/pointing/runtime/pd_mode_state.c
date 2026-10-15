@@ -573,16 +573,22 @@ bool pd_any_display_mode_locked(void) {
     return pd_mode_snapshot().display.locked_mode != 0;
 }
 
-pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
-    pd_mode_apply_result_t result              = pd_mode_apply_result_begin();
-    uint8_t                previous_owners[KEY_ORIGIN_BITMAP_SIZE] = {0};
-    if (noah_lighting_events_observed() && command.kind != PD_MODE_COMMAND_REMOTE_SNAPSHOT) (void)pd_mode_local_owner_bitmap_snapshot(previous_owners);
+enum { PD_MODE_APPLIED_HANDLED = 1u, PD_MODE_APPLIED_SPLIT = 2u, PD_MODE_APPLIED_LOCAL = 4u };
+// Ordinary command callers consume flags, not two complete diagnostic views.
+// Keep their projection frame separate from the public snapshot result API.
+static __attribute__((noinline)) uint8_t pd_mode_apply_command_mutate(pd_mode_command_t command) {
+    pd_mode_mask_t previous_active = PD_MODE_LOCAL_ACTIVE_MODE;
+    pd_mode_mask_t previous_locked = PD_MODE_LOCAL_LOCKED_MODE;
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    split_side_mask_t previous_sides = PD_MODE_LOCAL_OWNER_SIDES;
+#endif
+    bool handled = false;
     bool                   split_sync_required = false;
     pd_mode_mask_t         mode                = command.mode;
 
     switch (command.kind) {
         case PD_MODE_COMMAND_ACTIVATE:
-            result.handled      = mode != 0;
+            handled      = mode != 0;
             split_sync_required = pd_mode_apply_activate_mode(mode);
             if (split_sync_required) {
                 (void)pd_mode_clear_local_key_owners();
@@ -590,7 +596,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             }
             break;
         case PD_MODE_COMMAND_DEACTIVATE:
-            result.handled      = mode != 0;
+            handled      = mode != 0;
             split_sync_required = pd_mode_apply_deactivate_mode(mode);
             if (split_sync_required) {
                 (void)pd_mode_clear_local_key_owners();
@@ -598,7 +604,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             }
             break;
         case PD_MODE_COMMAND_LOCK:
-            result.handled      = mode != 0;
+            handled      = mode != 0;
             split_sync_required = pd_mode_apply_lock_mode(mode);
             if (split_sync_required) {
                 (void)pd_mode_clear_local_key_owners();
@@ -606,7 +612,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             }
             break;
         case PD_MODE_COMMAND_UNLOCK:
-            result.handled      = mode != 0;
+            handled      = mode != 0;
             split_sync_required = pd_mode_apply_unlock_mode(mode);
             if (split_sync_required) {
                 (void)pd_mode_clear_local_key_owners();
@@ -615,7 +621,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             break;
         case PD_MODE_COMMAND_KEY_PRESS:
             mode           = pd_mode_for_keycode(command.keycode);
-            result.handled = mode != 0;
+            handled = mode != 0;
             if (mode != 0) {
                 bool locked_same_mode = pd_mode_local_locked(mode);
                 bool owner_changed    = false;
@@ -636,7 +642,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             break;
         case PD_MODE_COMMAND_KEY_RELEASE:
             mode           = pd_mode_for_keycode(command.keycode);
-            result.handled = mode != 0;
+            handled = mode != 0;
             if (mode != 0) {
                 noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_KEY_RELEASE, mode, pd_mode_trace_pack_keypos(pd_mode_command_owner_key_pos(command)));
             }
@@ -655,7 +661,7 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             }
             break;
         case PD_MODE_COMMAND_REMOTE_SNAPSHOT:
-            result.handled = true;
+            handled = true;
             (void)pd_mode_apply_remote_display_snapshot(pd_mode_mask_from_id(command.active_mode_id), pd_mode_mask_from_id(command.locked_mode_id), command.owner_sides, pd_mode_command_owner_bitmap(command));
             break;
         case PD_MODE_COMMAND_NONE:
@@ -663,22 +669,44 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
             break;
     }
 
-    pd_mode_apply_result_finish(&result, split_sync_required);
-    if (noah_lighting_events_observed() && command.kind != PD_MODE_COMMAND_REMOTE_SNAPSHOT && result.before.local.active_mode != result.after.local.active_mode) {
-        const noah_lighting_event_t ended = {.kind = NOAH_LIGHTING_EVENT_MODE_ENDED, .thing = pd_mode_id_from_mask(result.before.local.active_mode), .owners = previous_owners};
+    bool changed = previous_active != PD_MODE_LOCAL_ACTIVE_MODE || previous_locked != PD_MODE_LOCAL_LOCKED_MODE;
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    changed |= previous_sides != PD_MODE_LOCAL_OWNER_SIDES;
+#endif
+    return (handled ? PD_MODE_APPLIED_HANDLED : 0u) | (split_sync_required ? PD_MODE_APPLIED_SPLIT : 0u) | (changed ? PD_MODE_APPLIED_LOCAL : 0u);
+}
+
+// Command mutation and any diagnostic/command scratch have returned before
+// synchronous occurrence capture. Only exact old identity/owners survive here.
+static __attribute__((noinline)) uint8_t pd_mode_apply_command_effects(pd_mode_command_t command) {
+    pd_mode_mask_t previous_active = PD_MODE_LOCAL_ACTIVE_MODE;
+    uint8_t previous_owners[KEY_ORIGIN_BITMAP_SIZE] = {0};
+    bool observe = noah_lighting_events_observed() && command.kind != PD_MODE_COMMAND_REMOTE_SNAPSHOT;
+    if (observe) (void)pd_mode_local_owner_bitmap_snapshot(previous_owners);
+    uint8_t applied = pd_mode_apply_command_mutate(command);
+    if (observe && previous_active != PD_MODE_LOCAL_ACTIVE_MODE) {
+        const noah_lighting_event_t ended = {.kind = NOAH_LIGHTING_EVENT_MODE_ENDED, .thing = pd_mode_id_from_mask(previous_active), .owners = previous_owners};
         if (ended.thing < PD_MODE_COUNT) noah_lighting_event_emit(&ended);
-        if (result.after.local.active_mode) {
+        if (PD_MODE_LOCAL_ACTIVE_MODE) {
             uint8_t owners[KEY_ORIGIN_BITMAP_SIZE];
             (void)pd_mode_local_owner_bitmap_snapshot(owners);
-            const noah_lighting_event_t started = {.kind = NOAH_LIGHTING_EVENT_MODE_STARTED, .thing = pd_mode_id_from_mask(result.after.local.active_mode), .owners = owners};
+            const noah_lighting_event_t started = {.kind = NOAH_LIGHTING_EVENT_MODE_STARTED, .thing = pd_mode_id_from_mask(PD_MODE_LOCAL_ACTIVE_MODE), .owners = owners};
             if (started.thing < PD_MODE_COUNT) noah_lighting_event_emit(&started);
         }
     }
+    return applied;
+}
+
+pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
+    pd_mode_apply_result_t result = pd_mode_apply_result_begin();
+    uint8_t flags = pd_mode_apply_command_effects(command);
+    result.handled = (flags & PD_MODE_APPLIED_HANDLED) != 0u;
+    pd_mode_apply_result_finish(&result, (flags & PD_MODE_APPLIED_SPLIT) != 0u);
     return result;
 }
 
 void pd_mode_activate(pd_mode_mask_t mode) {
-    (void)pd_mode_apply_command((pd_mode_command_t){
+    (void)pd_mode_apply_command_effects((pd_mode_command_t){
         .kind          = PD_MODE_COMMAND_ACTIVATE,
         .mode          = mode,
         .owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
@@ -686,7 +714,7 @@ void pd_mode_activate(pd_mode_mask_t mode) {
 }
 
 void pd_mode_deactivate(pd_mode_mask_t mode) {
-    (void)pd_mode_apply_command((pd_mode_command_t){
+    (void)pd_mode_apply_command_effects((pd_mode_command_t){
         .kind          = PD_MODE_COMMAND_DEACTIVATE,
         .mode          = mode,
         .owner_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
@@ -698,7 +726,7 @@ void pd_mode_apply_remote_mode_ids(pd_mode_id_t active_mode_id, pd_mode_id_t loc
 }
 
 void pd_mode_apply_remote_mode_ids_with_owner_bitmap(pd_mode_id_t active_mode_id, pd_mode_id_t locked_mode_id, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
-    (void)pd_mode_apply_command((pd_mode_command_t){
+    (void)pd_mode_apply_command_effects((pd_mode_command_t){
         .kind           = PD_MODE_COMMAND_REMOTE_SNAPSHOT,
         .active_mode_id = active_mode_id,
         .locked_mode_id = locked_mode_id,
@@ -720,18 +748,18 @@ bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
 }
 
 static bool pd_mode_apply_local_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
-    pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
+    uint8_t result = pd_mode_apply_command_effects((pd_mode_command_t){
         .kind          = locked ? PD_MODE_COMMAND_LOCK : PD_MODE_COMMAND_UNLOCK,
         .mode          = mode,
         .owner_sides   = key_origin_registry_side_mask(key_pos),
         .owner_key_pos = key_pos,
     });
 
-    if (result.local_state_changed) {
+    if ((result & PD_MODE_APPLIED_LOCAL) != 0u) {
         pd_mode_key_runtime_bridge_observe_local_lock_state(mode, locked);
     }
 
-    return result.local_state_changed;
+    return (result & PD_MODE_APPLIED_LOCAL) != 0u;
 }
 
 bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
@@ -759,14 +787,14 @@ bool pd_mode_handle_keycode_press(uint16_t keycode) {
 }
 
 bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
-    pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
+    uint8_t result = pd_mode_apply_command_effects((pd_mode_command_t){
         .kind          = PD_MODE_COMMAND_KEY_PRESS,
         .keycode       = keycode,
         .owner_sides   = key_origin_registry_side_mask(key_pos),
         .owner_key_pos = key_pos,
     });
 
-    return result.handled;
+    return (result & PD_MODE_APPLIED_HANDLED) != 0u;
 }
 
 bool pd_mode_handle_keycode_release(uint16_t keycode) {
@@ -774,14 +802,14 @@ bool pd_mode_handle_keycode_release(uint16_t keycode) {
 }
 
 bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
-    pd_mode_apply_result_t result = pd_mode_apply_command((pd_mode_command_t){
+    uint8_t result = pd_mode_apply_command_effects((pd_mode_command_t){
         .kind          = PD_MODE_COMMAND_KEY_RELEASE,
         .keycode       = keycode,
         .owner_sides   = key_origin_registry_side_mask(key_pos),
         .owner_key_pos = key_pos,
     });
 
-    return result.handled;
+    return (result & PD_MODE_APPLIED_HANDLED) != 0u;
 }
 
 #undef PD_MODE_LOCAL_ACTIVE_MODE

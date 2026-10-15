@@ -656,10 +656,14 @@ static void test_mode_events_local_transition_owners_and_no_remote_replay(void) 
     test_reset_stubs();mode_event_count=0;recording_mode_events=true;
     keypos_t a={.row=0,.col=0},b={.row=1,.col=1};
     pd_mode_command_t start={.kind=PD_MODE_COMMAND_KEY_PRESS,.keycode=PD_SLOT_0,.owner_key_pos=a,.owner_sides=SPLIT_SIDE_MASK_LEFT};
-    (void)pd_mode_apply_command(start);
+    pd_mode_apply_result_t result=pd_mode_apply_command(start);
+    CHECK(result.handled && result.local_state_changed && result.display_state_changed && result.split_sync_required);
+    CHECK(result.before.local.active_mode==0 && result.after.local.active_mode==pd_mode_mask_from_id(0));
+    CHECK(result.after.display.active_mode==result.after.local.active_mode);
     CHECK(mode_event_count==1 && mode_events[0].kind==NOAH_LIGHTING_EVENT_MODE_STARTED && mode_events[0].thing==0);
     CHECK(key_origin_bitmap_has_keypos(mode_event_owners[0],a));
-    (void)pd_mode_apply_command(start);CHECK(mode_event_count==1);
+    result=pd_mode_apply_command(start);CHECK(mode_event_count==1);
+    CHECK(result.handled && !result.local_state_changed && !result.display_state_changed && !result.split_sync_required);
     start.keycode=PD_SLOT_1;start.owner_key_pos=b;
     (void)pd_mode_apply_command(start);
     CHECK(mode_event_count==3 && mode_events[1].kind==NOAH_LIGHTING_EVENT_MODE_ENDED && mode_events[1].thing==0);
@@ -674,6 +678,12 @@ static void test_mode_events_local_transition_owners_and_no_remote_replay(void) 
     (void)pd_mode_apply_command(end);CHECK(mode_event_count==4);
     // Copies outlive the producer's owner cleanup.
     CHECK(key_origin_bitmap_has_keypos(mode_event_owners[2],b));
+    // Internal flag-only wrappers preserve transition/owner/event behavior.
+    mode_event_count=0;
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_0,a));
+    CHECK(mode_event_count==1 && mode_events[0].thing==0 && key_origin_bitmap_has_keypos(mode_event_owners[0],a));
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_0,a));
+    CHECK(mode_event_count==2 && mode_events[1].kind==NOAH_LIGHTING_EVENT_MODE_ENDED && key_origin_bitmap_has_keypos(mode_event_owners[1],a));
     recording_mode_events=false;mode_event_count=0;test_reset_stubs();
 }
 #endif

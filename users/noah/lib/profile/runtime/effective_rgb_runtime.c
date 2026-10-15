@@ -7,6 +7,7 @@
 #include <string.h>
 #ifdef RGB_MATRIX_ENABLE
 #    include "../schema/profile_rgb_compiled_v1.h"
+#    include "../../rgb/lighting/lighting_runtime.h"
 #endif
 
 static noah_profile_lighting_v1_program_t program;
@@ -17,6 +18,13 @@ static noah_effective_rgb_runtime_t      *installed_runtime;
 static bool                              candidate_prepared;
 static noah_effective_profile_identity_t candidate_identity, active_identity;
 static bool                              identity_ready;
+static void publish_histories(void) {
+#if defined(RGB_MATRIX_ENABLE) && NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+    uint8_t identity[22];
+    if (!noah_effective_lighting_identity(identity)) __builtin_trap();
+    noah_lighting_runtime_publish(&program, program_generation + 1u, identity);
+#endif
+}
 static bool                              prepare_view(const noah_profile_lighting_v1_view_t *view) {
     noah_lighting_working_cost_t cost;
     return view && noah_profile_lighting_v1_working_admit(view, NOAH_LIGHTING_WORKING_CAPACITY, &cost) == NOAH_PROFILE_LIGHTING_V1_OK && noah_profile_lighting_v1_program_load(view, &candidate_program);
@@ -41,6 +49,7 @@ static bool load_compiled(void) {
         digest = (digest ^ program.bytes[i]) * UINT32_C(16777619);
     active_identity = (noah_effective_profile_identity_t){.payload_digest = digest, .compiled_default_digest = digest, .origin = 255u, .kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS};
     identity_ready  = true;
+    publish_histories();
     return true;
 }
 bool noah_effective_rgb_runtime_prepare(const noah_effective_profile_snapshot_t *snapshot) {
@@ -89,6 +98,7 @@ void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_c
     active_identity    = active;
     identity_ready     = true;
     runtime->loaded    = program.valid;
+    publish_histories();
     program_generation++;
 }
 

@@ -1878,6 +1878,20 @@ static void test_strong_event_consumer_full_scene(void) {
     CHECK(noah_lighting_runtime_revision()!=cut);
     runtime_fixture.time32=599;CHECK(render_output());check_led(0,hsv_to_rgb((hsv_t){170,255,200}));
     runtime_fixture.time32=600;CHECK(!render_output());
+    // Publication must prepare histories before exposing the new generation:
+    // this first event occurs before any render/scan of that generation.
+    snapshot.identity.generation++;
+    noah_effective_rgb_runtime_invalidate(&runtime,2u,snapshot.identity,snapshot.identity,&snapshot);
+    runtime_fixture.time32=1000;
+    noah_lighting_event_emit(&event);
+    CHECK(render_output());check_led(0,hsv_to_rgb((hsv_t){170,255,200}));
+    // Explicit role reinitialization occurs at the shallow main boundary,
+    // before accepting the first producer on the new role.
+    fake_is_master=false;noah_lighting_runtime_sync_role();
+    fake_is_master=true;noah_lighting_runtime_sync_role();
+    runtime_fixture.time32=2000;
+    noah_lighting_event_emit(&event);
+    CHECK(render_output());check_led(0,hsv_to_rgb((hsv_t){170,255,200}));
     snapshot.profile.domain_mask=0;
     noah_effective_rgb_runtime_invalidate(&runtime,2u,snapshot.identity,snapshot.identity,&snapshot);
     noah_effective_rgb_runtime_uninstall(&runtime);

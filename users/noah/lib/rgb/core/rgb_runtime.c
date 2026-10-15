@@ -124,6 +124,7 @@ static bool rgb_runtime_capture_facts(void) {
 }
 
 static void rgb_runtime_begin_frame(void) {
+    noah_lighting_runtime_sync_role();
     noah_lighting_leds_t leds = rgb_runtime_local_leds();
     uint32_t             generation;
     bool                 wake_due;
@@ -290,6 +291,9 @@ void noah_rgb_runtime_invalidate_layer_maps(void) {
 
 void noah_rgb_runtime_post_init(void) {
 #ifdef RGB_MATRIX_ENABLE
+    // Initialize the actual compiled program/history before the first input.
+    (void)noah_effective_lighting_program(NULL);
+    noah_lighting_runtime_sync_role();
     noah_rgb_validate_config();
     // Until the other half hears its first frame, the synced facts are at rest.
     noah_lighting_facts_collect(&rgb_runtime_resolved_facts, true, false);
