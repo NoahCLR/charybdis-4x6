@@ -15,17 +15,20 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+for owners in yes no; do
+OWNER_FLAGS=""
+if [ "$owners" = yes ]; then OWNER_FLAGS="-DRGB_PD_MODE_ACTIVE_HALF_ENABLE"; fi
 for capture in 0 1; do
 for variant in normal sanitized; do
 FLAGS=""
 if [ "$variant" = sanitized ]; then FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"; fi
 # shellcheck disable=SC2086
-cc $FLAGS -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE="$capture" -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
+cc $FLAGS $OWNER_FLAGS -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE="$capture" -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DPOINTING_DEVICE_ENABLE \
+    -DPD_MODE_PUBLISH_TEST_BACKEND \
     -DNOAH_PD_PROFILE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
     -DCHARYBDIS_AUTO_SNIPING_ENABLE \
     -DCHARYBDIS_AUTO_SNIPING_LAYER=2 \
     -DAUTO_MOUSE_DEFAULT_LAYER=4 \
@@ -56,5 +59,6 @@ cc $FLAGS -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE="$capture" -std=c11 -Wall -Wextra
 
 "$BIN"
 
+done
 done
 done

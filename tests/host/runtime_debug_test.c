@@ -3585,7 +3585,20 @@ static void test_painting_captures_behaviour_slots_outcomes_and_release_identity
     CHECK(records[0] == 0u);
 }
 
+static void test_packed_keypos_equality_preserves_full_unpack_domain(void) {
+    for (uint16_t packed = 0u; packed <= UINT8_MAX; packed++) {
+        keypos_t decoded = key_runtime_keypos_unpack((key_runtime_packed_keypos_t)packed);
+        for (uint16_t row = 0u; row <= UINT8_MAX; row++) {
+            for (uint16_t col = 0u; col <= UINT8_MAX; col++) {
+                keypos_t candidate = {.row = (uint8_t)row, .col = (uint8_t)col};
+                CHECK(key_runtime_keypos_packed_equal((key_runtime_packed_keypos_t)packed, candidate) == (decoded.row == row && decoded.col == col));
+            }
+        }
+    }
+}
+
 int main(void) {
+    test_packed_keypos_equality_preserves_full_unpack_domain();
     test_key_feedback_empty_queries_keep_pulses();
     test_key_feedback_sparse_slots_and_pending_series();
 #if KEY_RUNTIME_CORE_TOKEN_ID_MAX == UINT16_MAX

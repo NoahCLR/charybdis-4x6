@@ -3,13 +3,13 @@
 #include <string.h>
 
 #if NOAH_LIGHTING_FACT_MODE_STATUS
-#include "../../../pointing/defs/pd_mode_flags.h"
+#include "../../../pointing/runtime/pd_mode_snapshot_internal.h"
 void noah_lighting_slice_mode_status_collect(uint8_t *slice) {
-    bool keys;
-    pd_mode_snapshot_t snapshot = pd_mode_snapshot_with_owner_bitmap(slice + 3u, &keys);
-    slice[0] = snapshot.local.active_index;
-    slice[1] = snapshot.local.locked_index;
-    slice[2] = keys ? snapshot.local.owner_sides : 0u;
+    pd_mode_owner_view_t view;
+    pd_mode_local_owner_view(&view, slice + 3u);
+    slice[0] = view.active_index;
+    slice[1] = view.locked_index;
+    slice[2] = view.has_owner_keys ? view.owner_sides : 0u;
 }
 void noah_lighting_slice_mode_status_idle(uint8_t *slice) { memset(slice, 0, NOAH_LIGHTING_MODE_STATUS_BYTES); slice[0] = slice[1] = 255u; }
 bool noah_lighting_fact_mode_status_next(const noah_lighting_facts_t *facts, const uint8_t *params, uint16_t *cursor, noah_lighting_subject_t *subject) {

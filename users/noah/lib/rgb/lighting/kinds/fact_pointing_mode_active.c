@@ -7,16 +7,17 @@
 
 #    include "../../../pointing/defs/pd_mode_flags.h"
 #    include "../../../pointing/defs/pd_modes.h"
+#    include "../../../pointing/runtime/pd_mode_snapshot_internal.h"
 
 enum { SLICE_MODE = 0u, SLICE_SIDES, SLICE_HAS_KEYS, SLICE_KEYS };
 
 void noah_lighting_slice_pointing_mode_active_collect(uint8_t *slice) {
-    bool               has_keys = false;
-    pd_mode_snapshot_t snapshot = pd_mode_snapshot_with_owner_bitmap(&slice[SLICE_KEYS], &has_keys);
+    pd_mode_owner_view_t view;
+    pd_mode_display_owner_view(&view, &slice[SLICE_KEYS]);
 
-    slice[SLICE_MODE]     = snapshot.display.active_index;
-    slice[SLICE_SIDES]    = snapshot.display.owner_sides;
-    slice[SLICE_HAS_KEYS] = has_keys ? 1u : 0u;
+    slice[SLICE_MODE]     = view.active_index;
+    slice[SLICE_SIDES]    = view.owner_sides;
+    slice[SLICE_HAS_KEYS] = view.has_owner_keys ? 1u : 0u;
 }
 
 void noah_lighting_slice_pointing_mode_active_idle(uint8_t *slice) {

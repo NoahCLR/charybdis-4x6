@@ -13,6 +13,8 @@
 #include "host_runtime_reset_fixture.h"
 #include "users/noah/lib/rgb/lighting/lighting_events.h"
 #include "users/noah/lib/key/runtime/slot/origin_registry.h"
+#include "users/noah/lib/pointing/runtime/pd_mode_snapshot_internal.h"
+#include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
 
 // Local dispatch fakes let this test observe the configured slot selection.
 report_mouse_t handle_volume_mode(report_mouse_t mouse_report);
@@ -688,7 +690,86 @@ static void test_mode_events_local_transition_owners_and_no_remote_replay(void) 
 }
 #endif
 
+static void check_compact_mode_views_against_public_snapshot(void) {
+    uint8_t owners[KEY_ORIGIN_BITMAP_SIZE], expected[KEY_ORIGIN_BITMAP_SIZE];
+    bool has_keys;
+    pd_mode_owner_view_t view;
+    pd_mode_snapshot_t full = pd_mode_snapshot_with_owner_bitmap(expected, &has_keys);
+    memset(owners, 0xff, sizeof owners);
+    pd_mode_display_owner_view(&view, owners);
+    CHECK(view.active_index == full.display.active_index && view.locked_index == full.display.locked_index);
+    CHECK(view.owner_sides == full.display.owner_sides && view.has_owner_keys == has_keys);
+    CHECK(memcmp(owners, expected, sizeof owners) == 0);
+    has_keys = pd_mode_local_owner_bitmap_snapshot(expected);
+    memset(owners, 0xff, sizeof owners);
+    pd_mode_local_owner_view(&view, owners);
+    CHECK(view.active_index == full.local.active_index && view.locked_index == full.local.locked_index);
+    CHECK(view.owner_sides == full.local.owner_sides && view.has_owner_keys == has_keys);
+    CHECK(memcmp(owners, expected, sizeof owners) == 0);
+}
+
+static unsigned compact_publication_reads;
+static void read_compact_view_during_pending_publication(void) {
+    pd_mode_owner_view_t view;
+    uint8_t owners[KEY_ORIGIN_BITMAP_SIZE];
+    check_compact_mode_views_against_public_snapshot();
+    pd_mode_display_owner_view(&view, owners);
+    CHECK(view.active_index == 0u && view.locked_index == 0u);
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    CHECK(view.owner_sides == SPLIT_SIDE_MASK_LEFT && view.has_owner_keys);
+    CHECK(key_origin_bitmap_has_keypos(owners, (keypos_t){.row = 0u, .col = 0u}));
+    CHECK(!key_origin_bitmap_has_keypos(owners, (keypos_t){.row = MATRIX_ROWS - 1u, .col = MATRIX_COLS - 1u}));
+#else
+    CHECK(view.owner_sides == SPLIT_SIDE_MASK_NONE && !view.has_owner_keys);
+    CHECK(!key_origin_bitmap_has_any(owners));
+#endif
+    compact_publication_reads++;
+}
+
+static void test_compact_mode_queries_preserve_views_and_publication(void) {
+    test_reset_stubs();
+    check_compact_mode_views_against_public_snapshot(); // inactive sentinel
+    keypos_t a = {.row = 0u, .col = 0u}, b = {.row = MATRIX_ROWS - 1u, .col = MATRIX_COLS - 1u};
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_0, a));
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_0, b));
+    check_compact_mode_views_against_public_snapshot(); // multiple actual owners
+    uint8_t owners[KEY_ORIGIN_BITMAP_SIZE];
+    pd_mode_owner_view_t view;
+    pd_mode_local_owner_view(&view, owners);
+    CHECK(key_origin_bitmap_has_keypos(owners, a) && key_origin_bitmap_has_keypos(owners, b));
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_0, a));
+    check_compact_mode_views_against_public_snapshot();
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_0, b));
+    check_compact_mode_views_against_public_snapshot();
+    CHECK(pd_mode_apply_command((pd_mode_command_t){.kind = PD_MODE_COMMAND_LOCK, .mode = PD_MODE_VOLUME}).handled);
+    check_compact_mode_views_against_public_snapshot(); // locked and ownerless
+    fake_is_master = false;
+    uint8_t old_owners[KEY_ORIGIN_BITMAP_SIZE] = {0}, new_owners[KEY_ORIGIN_BITMAP_SIZE] = {0};
+    key_origin_bitmap_add_keypos(old_owners, a);
+    key_origin_bitmap_add_keypos(new_owners, b);
+    pd_mode_apply_remote_mode_ids_with_owner_bitmap(0u, 0u, SPLIT_SIDE_MASK_LEFT, old_owners);
+    check_compact_mode_views_against_public_snapshot(); // local differs from display
+    compact_publication_reads = 0u;
+    pd_mode_test_set_publish_seam(read_compact_view_during_pending_publication);
+    pd_mode_apply_remote_mode_ids_with_owner_bitmap(1u, PD_MODE_ID_NONE, SPLIT_SIDE_MASK_RIGHT, new_owners);
+    pd_mode_test_set_publish_seam(NULL);
+    CHECK(compact_publication_reads == 1u);
+    check_compact_mode_views_against_public_snapshot();
+    pd_mode_display_owner_view(&view, owners);
+    CHECK(view.active_index == 1u && view.locked_index == PD_MODE_COUNT);
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    CHECK(view.owner_sides == SPLIT_SIDE_MASK_RIGHT && view.has_owner_keys);
+    CHECK(!key_origin_bitmap_has_keypos(owners, a) && key_origin_bitmap_has_keypos(owners, b));
+#else
+    CHECK(view.owner_sides == SPLIT_SIDE_MASK_NONE && !view.has_owner_keys);
+    CHECK(!key_origin_bitmap_has_any(owners));
+#endif
+    pd_mode_apply_remote_mode_ids_with_owner_bitmap(PD_MODE_ID_NONE, PD_MODE_ID_NONE, SPLIT_SIDE_MASK_NONE, NULL);
+    check_compact_mode_views_against_public_snapshot(); // clears prior bytes
+}
+
 int main(void) {
+    test_compact_mode_queries_preserve_views_and_publication();
 #if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
     test_mode_events_local_transition_owners_and_no_remote_replay();
 #endif

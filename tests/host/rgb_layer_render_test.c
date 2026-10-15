@@ -1,3 +1,4 @@
+#include "users/noah/lib/pointing/runtime/pd_mode_snapshot_internal.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -575,6 +576,18 @@ pd_mode_snapshot_t pd_mode_snapshot_with_owner_bitmap(uint8_t *out_owner_bitmap,
     }
 
     return pd_mode_snapshot();
+}
+
+// Adapt the fixture's existing full view; production uses compact real queries.
+void pd_mode_local_owner_view(pd_mode_owner_view_t *out, uint8_t *owners) {
+    bool has_keys;
+    pd_mode_snapshot_t snapshot = pd_mode_snapshot_with_owner_bitmap(owners, &has_keys);
+    *out = (pd_mode_owner_view_t){.active_index = snapshot.local.active_index, .locked_index = snapshot.local.locked_index, .owner_sides = snapshot.local.owner_sides, .has_owner_keys = has_keys};
+}
+void pd_mode_display_owner_view(pd_mode_owner_view_t *out, uint8_t *owners) {
+    bool has_keys;
+    pd_mode_snapshot_t snapshot = pd_mode_snapshot_with_owner_bitmap(owners, &has_keys);
+    *out = (pd_mode_owner_view_t){.active_index = snapshot.display.active_index, .locked_index = snapshot.display.locked_index, .owner_sides = snapshot.display.owner_sides, .has_owner_keys = has_keys};
 }
 
 int rgb_matrix_led_index(int index) {

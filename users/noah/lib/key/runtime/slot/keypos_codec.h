@@ -42,3 +42,12 @@ static inline keypos_t key_runtime_keypos_unpack(key_runtime_packed_keypos_t pac
         .col = (uint8_t)(packed_key_pos % MATRIX_COLS),
     };
 }
+
+static inline bool key_runtime_keypos_packed_equal(key_runtime_packed_keypos_t packed, keypos_t key) {
+    if (packed == KEY_RUNTIME_PACKED_KEYPOS_NONE) {
+        return key.row == MATRIX_ROWS && key.col == MATRIX_COLS;
+    }
+    // Invert the unpack relation without division. Do not clamp to physical
+    // positions: unpack also defines non-sentinel bytes beyond the matrix.
+    return key.col < MATRIX_COLS && (uint16_t)packed == (uint16_t)key.row * MATRIX_COLS + key.col;
+}

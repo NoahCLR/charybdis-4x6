@@ -10,10 +10,6 @@
 #include "../../../action/action_dispatch.h"
 #include "../../../compat/qmk_mod_contract.h"
 
-static bool key_runtime_core_ownership_keypos_equal(keypos_t lhs, keypos_t rhs) {
-    return lhs.row == rhs.row && lhs.col == rhs.col;
-}
-
 static uint16_t key_runtime_core_ownership_keypos_index(keypos_t key_pos) {
     return (uint16_t)((uint16_t)key_pos.row * MATRIX_COLS + key_pos.col);
 }
@@ -75,12 +71,8 @@ static lease_kind_t key_runtime_core_lease_kind(const lease_t *lease) {
     return lease ? (lease_kind_t)lease->kind : LEASE_KIND_NONE;
 }
 
-static keypos_t key_runtime_core_lease_owner_key_pos(const lease_t *lease) {
-    return lease ? key_runtime_keypos_unpack(lease->owner_packed_key_pos) : key_runtime_core_ownership_invalid_keypos();
-}
-
 static bool key_runtime_core_lease_owner_keypos_equal(const lease_t *lease, keypos_t key_pos) {
-    return lease && key_runtime_core_ownership_keypos_equal(key_runtime_core_lease_owner_key_pos(lease), key_pos);
+    return lease && key_runtime_keypos_packed_equal(lease->owner_packed_key_pos, key_pos);
 }
 
 static uint8_t key_runtime_core_modifier_mask_for_keycode(uint16_t keycode) {

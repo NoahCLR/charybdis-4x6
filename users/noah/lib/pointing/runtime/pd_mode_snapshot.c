@@ -12,6 +12,7 @@
 #include "../../key/runtime/slot/origin_registry.h"
 #include "../defs/pd_modes.h"
 #include "pd_mode_runtime_shared_state_internal.h"
+#include "pd_mode_snapshot_internal.h"
 
 static uint8_t pd_mode_snapshot_mode_index(pd_mode_mask_t mode) {
     if (mode == 0) {
@@ -25,6 +26,44 @@ static uint8_t pd_mode_snapshot_mode_index(pd_mode_mask_t mode) {
     }
 
     return PD_MODE_COUNT;
+}
+
+__attribute__((noinline)) void pd_mode_local_owner_view(pd_mode_owner_view_t *out, uint8_t *out_owner_bitmap) {
+    const pd_mode_runtime_shared_state_t *state = pd_mode_runtime_shared_state();
+    *out = (pd_mode_owner_view_t){
+        .active_index = pd_mode_snapshot_mode_index(state->local_active_mode),
+        .locked_index = pd_mode_snapshot_mode_index(state->local_locked_mode),
+    };
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+    out->owner_sides = state->local_owner_sides;
+#endif
+    out->has_owner_keys = pd_mode_local_owner_bitmap_snapshot(out_owner_bitmap);
+}
+
+__attribute__((noinline)) void pd_mode_display_owner_view(pd_mode_owner_view_t *out, uint8_t *out_owner_bitmap) {
+    if (is_keyboard_master()) {
+        pd_mode_local_owner_view(out, out_owner_bitmap);
+        return;
+    }
+
+    const pd_mode_runtime_shared_state_t *state = pd_mode_runtime_shared_state();
+    *out = (pd_mode_owner_view_t){0};
+    key_origin_bitmap_clear(out_owner_bitmap);
+    // Copy only the consumed fields into caller-owned storage. Identity and
+    // owners use one publication generation, with the same bounded retry as
+    // the full public snapshot. No independent owner/identity accessor pair.
+    for (uint8_t attempt = 0u; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
+        uint8_t generation = noah_runtime_publication_observe(&state->remote_display_generation);
+        const pd_mode_remote_display_state_t *slot = &state->remote_display[noah_runtime_publication_slot(generation)];
+        out->active_index = pd_mode_snapshot_mode_index(slot->active_mode);
+        out->locked_index = pd_mode_snapshot_mode_index(slot->locked_mode);
+#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+        out->owner_sides = slot->owner_sides;
+        key_origin_bitmap_copy(out_owner_bitmap, slot->owner_bitmap);
+        out->has_owner_keys = key_origin_bitmap_has_any(out_owner_bitmap);
+#endif
+        if (noah_runtime_publication_settled(&state->remote_display_generation, generation)) break;
+    }
 }
 
 // Filled through a pointer rather than returned by value: this runs on the
