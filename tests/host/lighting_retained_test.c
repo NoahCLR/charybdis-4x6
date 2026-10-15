@@ -91,6 +91,20 @@ int main(void) {
     expect_payload(&current, 5, 7, 3);
     assert(observe(&current, &p, 1, idle, 0, false) && !noah_lighting_retained_batch(&current));
     assert(arena.used == 0);
+    // Entry recency is independent from last matching whole-batch refresh.
+    p = (noah_lighting_lifetime_parameters_t){.linger = 1000};
+    assert(observe(&current, &p, 0, match, 10, false));
+    assert(noah_lighting_retained_order(&current) == 10);
+    batch[2] = 13;
+    assert(observe(&current, &p, 100, match, 20, false));
+    assert(noah_lighting_retained_order(&current) == 10);
+    assert(observe(&current, &p, 0, depart, 0, false));
+    assert(observe(&current, &p, 50, match, 30, false));
+    assert(noah_lighting_retained_order(&current) == 30);
+    assert(observe(&current, &p, 10, match, 40, false));
+    assert(noah_lighting_retained_order(&current) == 30);
+    noah_lighting_retained_discard(&current, &arena);
+    assert(arena.used == 0);
     // Separate255 filters/ages/version bits share identical payload bytes only.
     p = (noah_lighting_lifetime_parameters_t){.flash = 65535};
     for (unsigned r = 0; r < 255; r++) {

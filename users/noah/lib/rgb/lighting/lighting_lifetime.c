@@ -1,23 +1,25 @@
 #include "lighting_lifetime.h"
 
 enum { ABSENT, MATCHING, TAIL, FLASH, PHASE_MASK = 3u, ELIGIBLE = 4u };
-static uint16_t age(const noah_lighting_lifetime_t *cell) { return (uint16_t)cell->bytes[0] | (uint16_t)cell->bytes[1] << 8u; }
+static uint16_t age(const noah_lighting_lifetime_t *cell) {
+    return (uint16_t)cell->bytes[0] | (uint16_t)cell->bytes[1] << 8u;
+}
 static void set(noah_lighting_lifetime_t *cell, uint16_t value, uint8_t flags) {
     cell->bytes[0] = (uint8_t)value;
     cell->bytes[1] = (uint8_t)(value >> 8u);
     cell->bytes[2] = flags;
 }
 uint8_t noah_lighting_lifetime_observe(noah_lighting_lifetime_t *cell, const noah_lighting_lifetime_parameters_t *parameters, uint32_t elapsed, uint8_t observation) {
-    uint8_t phase = cell->bytes[2] & PHASE_MASK;
+    uint8_t  phase    = cell->bytes[2] & PHASE_MASK;
     uint16_t previous = age(cell);
-    uint16_t current = elapsed >= UINT16_MAX - (uint32_t)previous ? UINT16_MAX : (uint16_t)(previous + elapsed);
-    uint8_t action = NOAH_LIGHTING_BATCH_KEEP;
+    uint16_t current  = elapsed >= UINT16_MAX - (uint32_t)previous ? UINT16_MAX : (uint16_t)(previous + elapsed);
+    uint8_t  action   = NOAH_LIGHTING_BATCH_KEEP;
     if (phase == ABSENT) current = 0u;
     if ((phase == TAIL && current >= parameters->linger) || (phase == FLASH && current >= parameters->flash)) {
         set(cell, 0u, ABSENT);
-        phase = ABSENT;
+        phase   = ABSENT;
         current = 0u;
-        action = NOAH_LIGHTING_BATCH_RELEASE_RENDER;
+        action  = NOAH_LIGHTING_BATCH_RELEASE_RENDER;
     }
     if (observation == NOAH_LIGHTING_LIFETIME_EVENT) {
         set(cell, 0u, FLASH);
@@ -48,7 +50,7 @@ bool noah_lighting_lifetime_visible(const noah_lighting_lifetime_t *cell, const 
     return phase == FLASH && age(cell) >= parameters->show_after && age(cell) < parameters->flash;
 }
 uint32_t noah_lighting_lifetime_wake(const noah_lighting_lifetime_t *cell, const noah_lighting_lifetime_parameters_t *parameters) {
-    uint8_t phase = cell->bytes[2] & PHASE_MASK;
+    uint8_t  phase   = cell->bytes[2] & PHASE_MASK;
     uint16_t current = age(cell);
     if (phase == MATCHING && !(cell->bytes[2] & ELIGIBLE) && current < parameters->show_after) return parameters->show_after - current;
     if (phase == TAIL && current < parameters->linger) return parameters->linger - current;
@@ -57,4 +59,8 @@ uint32_t noah_lighting_lifetime_wake(const noah_lighting_lifetime_t *cell, const
         return boundary - current;
     }
     return 0u;
+}
+
+bool noah_lighting_lifetime_matching(const noah_lighting_lifetime_t *cell) {
+    return (cell->bytes[2] & PHASE_MASK) == MATCHING;
 }

@@ -53,6 +53,28 @@ yields at least one subject, a negated one when it yields none. A rule whose
 first condition is negated, or that has none, has one subject: the **board**,
 which names no thing.
 
+Retained and live batches preserve that existing natural priority as the primary
+ordering. Only members at exactly equal natural priority use newer full-match
+entry observation first. A state thing's entry is a monotonic observation-order
+token: refreshing its whole matching batch does not renew it; full-match
+re-entry does. This is separate from local lifetime age and synchronized paint
+time. A saturated age or wrapping/resynchronized timestamp cannot serve as the
+token. Event subjects keep their captured natural occurrence order unchanged.
+For genuinely equal entry order, ascending thing kind then ascending thing id
+break the tie; authored within-batch order is the final stable tie.
+
+For example, row A at matrix key0 ends at100 with linger1000. Row B at that
+same key enters at600. B paints above A at600; A remains underneath until1100.
+Unequal matrix positions and higher/lower layer priorities still win before
+entry recency. This is not a preference for live batches: if A continuously
+matches at another key while its key0 member leaves and returns, a newer B
+key0 tail can remain above A's older, still-live full match. Partial member
+changes do not create new full-match entries or independent linger clocks.
+The shared `retainedOrdering` traces pin pixel, complete member order and entry
+tokens through these cases, show-after maturation and timer boundaries. They
+exercise the owned-record/ordered-batch/merge seam; they do not substitute for
+the unfinished production history owner's accepted-domain resource proof.
+
 A subject carries what targets and paints may ask about it: its thing kind
 and id (for its identity colour and place), the keys it concerns, and the
 halves it concerns. Each fact kind below defines what its subjects carry.

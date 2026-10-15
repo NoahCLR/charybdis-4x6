@@ -10,6 +10,12 @@
     "conditionsPerRule": 4,
     "partParameterMaximum": 16
   },
+  "subjectOrdering": {
+    "primary": "Existing fact natural priority, unchanged for unequal matrix/layer priority and event occurrence order",
+    "equalNaturalPriority": "Newer full-match-entry monotonic observation order first; continuous full-match batch refresh preserves entry; real full-match re-entry renews it",
+    "equalEntryOrder": "Ascending thing kind, ascending thing id, then authored within-batch order; retain stable order when all keys are equal",
+    "retention": "Older eligible tails remain below higher-priority members until their own expiry; no blanket live-over-retained preference"
+  },
   "parameterTypes": {
     "layerSelector": "a logical layer below the keyboard's layer count, or 255 for any layer",
     "modeSelector": "a supported pointing-mode slot 0..31, or 255 for any mode",

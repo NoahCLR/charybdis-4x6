@@ -1641,6 +1641,58 @@ def lifetime_vectors():
     return cases
 
 
+def retained_ordering_vectors():
+    """Materialized subject/lifetime merge seam, independent of runtime storage.
+
+    These cases pin the ordering extension; they do not claim a target arena
+    bound or that every synthetic simultaneous fallback is physically reachable.
+    Natural priorities are supplied by the fact, before this generic merge.
+    """
+    cases = []
+    def cell(thing, colour, kind=4, natural="matrix", linger=1000, show_after=0):
+        return dict(thing=thing, kind=kind, colour=colour, natural=natural,
+                    parameters=dict(linger=linger, show_after=show_after))
+    red, blue = "c80000", "0000c8"
+    def add(name, cells, steps):
+        clocks = [ConditionLifetime(**c["parameters"]) for c in cells]
+        entries = [0] * len(cells)
+        compiled = []
+        for elapsed, order, matches in steps:
+            members = []
+            for index, (c, clock, batch) in enumerate(zip(cells, clocks, matches)):
+                if batch and clock.phase != "matching":
+                    entries[index] = order
+                observation = "match" if batch else "depart" if clock.phase == "matching" else "idle"
+                state = clock.observe(elapsed, observation, batch)
+                if state["visible"]:
+                    for ordinal, key in enumerate(state["batch"]):
+                        natural = key if c["natural"] == "matrix" else 255-c["thing"] if c["natural"] == "layer-desc" else 0
+                        members.append((natural, -entries[index], c["kind"], c["thing"], ordinal, index))
+            members.sort(key=lambda m: m[:5])
+            compiled.append(dict(elapsed=elapsed, order=str(order), matching=matches,
+                                 expect=dict(pixel=cells[members[0][5]]["colour"] if members else "-",
+                                             members=[[m[5],m[4]] for m in members], entries=list(map(str,entries)))))
+        cases.append(dict(name=name, cells=cells, steps=compiled))
+    a, b = cell(0,red), cell(1,blue)
+    add("new-entry-above-older-tail-at-same-matrix-key",[a,b],
+        [(0,1,[[0],[]]),(100,2,[[],[]]),(500,3,[[],[0]]),(499,4,[[],[0]]),(1,5,[[],[0]])])
+    add("unequal-matrix-priority-precedes-entry-recency",[a,b],
+        [(0,1,[[0],[]]),(100,2,[[],[]]),(500,3,[[],[1]])])
+    add("unequal-layer-priority-precedes-entry-recency",[cell(7,red,kind=1,natural="layer-desc"),cell(3,blue,kind=1,natural="layer-desc")],
+        [(0,1,[[0],[]]),(100,2,[[],[]]),(500,3,[[],[0]])])
+    add("refresh-does-not-renew-but-full-reentry-does",[a,b],
+        [(0,1,[[0,1],[]]),(100,2,[[1],[0]]),(100,3,[[0,1],[]]),
+         (100,4,[[0,1],[]]),(100,5,[[],[]]),(100,6,[[0],[]])])
+    add("simultaneous-fallback-kind-id-and-authored-order",[cell(127,red,kind=4,natural="constant"),cell(127,blue,kind=2,natural="constant"),cell(126,red,kind=2,natural="constant")],
+        [(0,100,[[0,0],[0,0],[0,0]]),(10,101,[[],[],[]])])
+    add("entry-order-independent-of-saturating-age-and-wrapping-timer",[cell(127,red,linger=65535),cell(126,blue,linger=65535)],
+        [(0,0xffffffff,[[0,1],[]]),(65535,0x100000000,[[1],[0]]),
+         (1,0x100000001,[[0,1],[]]),(65534,0x100000002,[[0,1],[]]),(1,0x100000003,[[0,1],[]])])
+    add("entry-recency-starts-before-show-after-matures",[cell(0,red,show_after=100),cell(1,blue,show_after=50)],
+        [(0,100,[[0],[]]),(50,200,[[0],[0]]),(50,300,[[0],[0]]),(1,400,[[0],[]])])
+    return cases
+
+
 def build_vectors() -> dict:
     limits = Limits()
     conversion = conversion_vectors(limits)
@@ -1656,6 +1708,7 @@ def build_vectors() -> dict:
         "render": render_vectors(limits),
         "occurrences": occurrence_vectors(limits),
         "lifetimes": lifetime_vectors(),
+        "retainedOrdering": retained_ordering_vectors(),
         "capability": capability_pages(limits),
     }
 

@@ -55,6 +55,7 @@ bool noah_lighting_retained_observe(noah_lighting_retained_t *cell, noah_lightin
     // their observation clocks. Transport still deduplicates committed packets.
     if (observation == NOAH_LIGHTING_LIFETIME_EVENT && (cell->bytes[FLAGS] & SEEN) && noah_lighting_retained_order(cell) == order) return true;
     noah_lighting_lifetime_t  next      = lifetime(cell);
+    bool                      entering  = observation == NOAH_LIGHTING_LIFETIME_MATCH && !noah_lighting_lifetime_matching(&next);
     uint8_t                   action    = noah_lighting_lifetime_observe(&next, parameters, elapsed, observation);
     noah_lighting_batch_ref_t reference = noah_lighting_retained_batch(cell);
     if (action == NOAH_LIGHTING_BATCH_REPLACE) {
@@ -63,14 +64,16 @@ bool noah_lighting_retained_observe(noah_lighting_retained_t *cell, noah_lightin
         if (!noah_lighting_batch_replace(arena, &reference, kind, cell->bytes[THING], batch, size, NULL)) return false;
         write32(cell->bytes + BATCH, reference);
         cell->bytes[FLAGS] |= RENDER;
-        write32(cell->bytes + ORDER, (uint32_t)order);
-        write32(cell->bytes + ORDER + 4u, (uint32_t)(order >> 32u));
         if (observation == NOAH_LIGHTING_LIFETIME_EVENT) {
             cell->bytes[FLAGS] |= SEEN;
             if (source_delivery) cell->bytes[FLAGS] |= DIRTY;
         }
     } else if (action == NOAH_LIGHTING_BATCH_RELEASE_RENDER)
         cell->bytes[FLAGS] &= (uint8_t)~RENDER;
+    if (entering || observation == NOAH_LIGHTING_LIFETIME_EVENT) {
+        write32(cell->bytes + ORDER, (uint32_t)order);
+        write32(cell->bytes + ORDER + 4u, (uint32_t)(order >> 32u));
+    }
     memcpy(cell->bytes + LIFETIME, next.bytes, sizeof next.bytes);
     release_unused(cell, arena);
     return true;
