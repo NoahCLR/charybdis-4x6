@@ -647,6 +647,25 @@ For state show-after100/linger200, a match100..149 never paints or leaves a
 tail; a match100..249 paints200..449 and expires450. Departure cannot mature
 unmet show-after. Without show-after, an eligible state can linger immediately.
 
+`lighting_lifetime` provides the allocation-free matching/tail/event calendar.
+Its packed3-byte cell contains a saturated millisecond age, phase and the
+eligibility observed during the last matching observation. A match refreshes
+the last whole batch only after show-after is met; departure cannot mature an
+unmet gate. Reappearance starts a new matching lifetime. Qualified repeats
+replace/restart an event; nonqualifying observations only advance ordinary
+elapsed time. It reports batch replace/keep/release-render and the next local
+wake boundary. Releasing an expired rendering reference never authorizes
+freeing an unacknowledged delivery marker. The history owner must retain those
+references independently until ACK or the defined fresh-session reset.
+
+This cell is a transition component, not a fixed global reservation or a
+complete retained-history representation. The full ordered owner/slot/outcome
+batches, per-rule/thing indexing, source ordering, delivery references and
+accepted-profile storage bound still belong to the unfinished history owner.
+Host tests of255×128 independent cells establish transition independence,
+not that a raw matrix of those cells fits the target or is the chosen bank.
+No transition cell or event capability is enabled in production yet.
+
 Each half times from the frame in which it first sees the subject, so the
 halves may differ by the link's latency. Gate observation and wake deadlines
 use local `timer_read32()`, independently of `sync_timer_read32()` passed to

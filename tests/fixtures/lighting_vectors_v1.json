@@ -51681,6 +51681,741 @@
    ]
   }
  ],
+ "lifetimes": [
+  {
+   "name": "event-show-inside-original-window",
+   "parameters": {
+    "show_after": 200,
+    "flash": 500
+   },
+   "steps": [
+    {
+     "elapsed": 100,
+     "observation": "event",
+     "batch": 1,
+     "expect": {
+      "visible": false,
+      "wake": 200,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 199,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 1,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 300,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 299,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 1,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "event-show-longer-than-flash-never-visible",
+   "parameters": {
+    "show_after": 700,
+    "flash": 500
+   },
+   "steps": [
+    {
+     "elapsed": 100,
+     "observation": "event",
+     "batch": 1,
+     "expect": {
+      "visible": false,
+      "wake": 500,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 499,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 1,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 200,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "event-no-occurrence-at-boot",
+   "parameters": {
+    "flash": 500
+   },
+   "steps": [
+    {
+     "elapsed": 0,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 100,
+     "observation": "nonqualifying",
+     "batch": 1,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 500,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "event-qualifying-repeat-replaces-and-restarts",
+   "parameters": {
+    "show_after": 200,
+    "flash": 500
+   },
+   "steps": [
+    {
+     "elapsed": 100,
+     "observation": "event",
+     "batch": 1,
+     "expect": {
+      "visible": false,
+      "wake": 200,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 200,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 300,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 150,
+     "observation": "event",
+     "batch": 2,
+     "expect": {
+      "visible": false,
+      "wake": 200,
+      "batch": 2
+     }
+    },
+    {
+     "elapsed": 50,
+     "observation": "nonqualifying",
+     "batch": 3,
+     "expect": {
+      "visible": false,
+      "wake": 150,
+      "batch": 2
+     }
+    },
+    {
+     "elapsed": 149,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 1,
+      "batch": 2
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 300,
+      "batch": 2
+     }
+    },
+    {
+     "elapsed": 299,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 1,
+      "batch": 2
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "state-unmet-show-has-no-tail",
+   "parameters": {
+    "show_after": 100,
+    "linger": 200
+   },
+   "steps": [
+    {
+     "elapsed": 100,
+     "observation": "match",
+     "batch": 1,
+     "expect": {
+      "visible": false,
+      "wake": 100,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 49,
+     "observation": "match",
+     "batch": 2,
+     "expect": {
+      "visible": false,
+      "wake": 51,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "depart",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 200,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "state-eligible-last-whole-batch-lingers",
+   "parameters": {
+    "show_after": 100,
+    "linger": 200
+   },
+   "steps": [
+    {
+     "elapsed": 100,
+     "observation": "match",
+     "batch": 1,
+     "expect": {
+      "visible": false,
+      "wake": 100,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 100,
+     "observation": "match",
+     "batch": 2,
+     "expect": {
+      "visible": true,
+      "wake": 0,
+      "batch": 2
+     }
+    },
+    {
+     "elapsed": 49,
+     "observation": "match",
+     "batch": 3,
+     "expect": {
+      "visible": true,
+      "wake": 0,
+      "batch": 3
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "depart",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 200,
+      "batch": 3
+     }
+    },
+    {
+     "elapsed": 199,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 1,
+      "batch": 3
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "state-partial-owners-update-live-batch",
+   "parameters": {
+    "linger": 200
+   },
+   "steps": [
+    {
+     "elapsed": 100,
+     "observation": "match",
+     "batch": 1,
+     "expect": {
+      "visible": true,
+      "wake": 0,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 50,
+     "observation": "match",
+     "batch": 2,
+     "expect": {
+      "visible": true,
+      "wake": 0,
+      "batch": 2
+     }
+    },
+    {
+     "elapsed": 50,
+     "observation": "match",
+     "batch": 3,
+     "expect": {
+      "visible": true,
+      "wake": 0,
+      "batch": 3
+     }
+    },
+    {
+     "elapsed": 50,
+     "observation": "depart",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 200,
+      "batch": 3
+     }
+    },
+    {
+     "elapsed": 199,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 1,
+      "batch": 3
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "departure-does-not-mature-unseen-show",
+   "parameters": {
+    "show_after": 100,
+    "linger": 200
+   },
+   "steps": [
+    {
+     "elapsed": 100,
+     "observation": "match",
+     "batch": 1,
+     "expect": {
+      "visible": false,
+      "wake": 100,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 150,
+     "observation": "depart",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 200,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "state-reappearance-starts-new-matching-life",
+   "parameters": {
+    "show_after": 100,
+    "linger": 200
+   },
+   "steps": [
+    {
+     "elapsed": 100,
+     "observation": "match",
+     "batch": 1,
+     "expect": {
+      "visible": false,
+      "wake": 100,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 100,
+     "observation": "match",
+     "batch": 2,
+     "expect": {
+      "visible": true,
+      "wake": 0,
+      "batch": 2
+     }
+    },
+    {
+     "elapsed": 50,
+     "observation": "depart",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 200,
+      "batch": 2
+     }
+    },
+    {
+     "elapsed": 50,
+     "observation": "match",
+     "batch": 3,
+     "expect": {
+      "visible": false,
+      "wake": 100,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 99,
+     "observation": "match",
+     "batch": 4,
+     "expect": {
+      "visible": false,
+      "wake": 1,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "match",
+     "batch": 5,
+     "expect": {
+      "visible": true,
+      "wake": 0,
+      "batch": 5
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "depart",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 200,
+      "batch": 5
+     }
+    },
+    {
+     "elapsed": 200,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "event-max-delay-single-visible-millisecond",
+   "parameters": {
+    "show_after": 65534,
+    "flash": 65535
+   },
+   "steps": [
+    {
+     "elapsed": 0,
+     "observation": "event",
+     "batch": 127,
+     "expect": {
+      "visible": false,
+      "wake": 65534,
+      "batch": 127
+     }
+    },
+    {
+     "elapsed": 65533,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 1,
+      "batch": 127
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 1,
+      "batch": 127
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "state-max-show-and-max-linger",
+   "parameters": {
+    "show_after": 65535,
+    "linger": 65535
+   },
+   "steps": [
+    {
+     "elapsed": 0,
+     "observation": "match",
+     "batch": 127,
+     "expect": {
+      "visible": false,
+      "wake": 65535,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 65534,
+     "observation": "match",
+     "batch": 126,
+     "expect": {
+      "visible": false,
+      "wake": 1,
+      "batch": null
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "match",
+     "batch": 125,
+     "expect": {
+      "visible": true,
+      "wake": 0,
+      "batch": 125
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "depart",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 65535,
+      "batch": 125
+     }
+    },
+    {
+     "elapsed": 65534,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 1,
+      "batch": 125
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "tail-large-forward-jump-expires",
+   "parameters": {
+    "linger": 65535
+   },
+   "steps": [
+    {
+     "elapsed": 0,
+     "observation": "match",
+     "batch": 1,
+     "expect": {
+      "visible": true,
+      "wake": 0,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 1,
+     "observation": "depart",
+     "batch": 0,
+     "expect": {
+      "visible": true,
+      "wake": 65535,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 4294967295,
+     "observation": "idle",
+     "batch": 0,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  },
+  {
+   "name": "event-large-forward-jump-expires",
+   "parameters": {
+    "flash": 65535
+   },
+   "steps": [
+    {
+     "elapsed": 0,
+     "observation": "event",
+     "batch": 1,
+     "expect": {
+      "visible": true,
+      "wake": 65535,
+      "batch": 1
+     }
+    },
+    {
+     "elapsed": 4294967295,
+     "observation": "nonqualifying",
+     "batch": 2,
+     "expect": {
+      "visible": false,
+      "wake": 0,
+      "batch": null
+     }
+    }
+   ]
+  }
+ ],
  "capability": [
   "01050020800410053a07",
   "0000beffff1f000000000000000000000000",

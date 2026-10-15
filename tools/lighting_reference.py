@@ -1584,6 +1584,63 @@ def occurrence_vectors(limits):
     return cases
 
 
+class ConditionLifetime:
+    """Independent condition/occurrence calendar; batch storage is its caller's."""
+    def __init__(self, show_after=0, linger=0, flash=0):
+        self.show_after, self.linger, self.flash = show_after, linger, flash
+        self.time, self.since, self.phase, self.eligible, self.batch = 0, 0, "absent", False, None
+
+    def observe(self, elapsed, observation, batch):
+        self.time += elapsed
+        if self.phase in ("tail", "event") and self.time - self.since >= (self.linger if self.phase == "tail" else self.flash):
+            self.phase, self.batch = "absent", None
+        if observation == "event":
+            self.phase, self.since, self.batch = "event", self.time, batch
+        elif observation == "match":
+            if self.phase != "matching":
+                self.since = self.time
+            self.phase = "matching"
+            self.eligible = self.time - self.since >= self.show_after
+            self.batch = batch if self.eligible else None
+        elif observation == "depart" and self.phase == "matching":
+            if self.eligible and self.linger:
+                self.phase, self.since = "tail", self.time
+            else:
+                self.phase, self.batch = "absent", None
+        age = self.time - self.since
+        visible = self.eligible if self.phase == "matching" else self.phase == "tail" or (self.phase == "event" and self.show_after <= age < self.flash)
+        boundary = None
+        if self.phase == "matching" and not self.eligible and age < self.show_after:
+            boundary = self.since + self.show_after
+        elif self.phase == "tail":
+            boundary = self.since + self.linger
+        elif self.phase == "event":
+            boundary = min(self.since + self.flash, self.since + self.show_after) if age < self.show_after < self.flash else self.since + self.flash
+        return {"visible": bool(visible), "wake": boundary - self.time if boundary is not None else 0, "batch": self.batch}
+
+
+def lifetime_vectors():
+    cases = []
+    def add(name, parameters, steps):
+        model = ConditionLifetime(**parameters)
+        cases.append({"name":name, "parameters":parameters, "steps":[
+            {"elapsed":delta, "observation":observation, "batch":batch, "expect":model.observe(delta,observation,batch)} for delta,observation,batch in steps]})
+    add("event-show-inside-original-window", dict(show_after=200,flash=500), [(100,"event",1),(199,"idle",0),(1,"idle",0),(299,"idle",0),(1,"idle",0)])
+    add("event-show-longer-than-flash-never-visible",dict(show_after=700,flash=500),[(100,"event",1),(499,"idle",0),(1,"idle",0),(200,"idle",0)])
+    add("event-no-occurrence-at-boot",dict(flash=500),[(0,"idle",0),(100,"nonqualifying",1),(500,"idle",0)])
+    add("event-qualifying-repeat-replaces-and-restarts",dict(show_after=200,flash=500),[(100,"event",1),(200,"idle",0),(150,"event",2),(50,"nonqualifying",3),(149,"idle",0),(1,"idle",0),(299,"idle",0),(1,"idle",0)])
+    add("state-unmet-show-has-no-tail",dict(show_after=100,linger=200),[(100,"match",1),(49,"match",2),(1,"depart",0),(200,"idle",0)])
+    add("state-eligible-last-whole-batch-lingers",dict(show_after=100,linger=200),[(100,"match",1),(100,"match",2),(49,"match",3),(1,"depart",0),(199,"idle",0),(1,"idle",0)])
+    add("state-partial-owners-update-live-batch",dict(linger=200),[(100,"match",1),(50,"match",2),(50,"match",3),(50,"depart",0),(199,"idle",0),(1,"idle",0)])
+    add("departure-does-not-mature-unseen-show",dict(show_after=100,linger=200),[(100,"match",1),(150,"depart",0),(200,"idle",0)])
+    add("state-reappearance-starts-new-matching-life",dict(show_after=100,linger=200),[(100,"match",1),(100,"match",2),(50,"depart",0),(50,"match",3),(99,"match",4),(1,"match",5),(1,"depart",0),(200,"idle",0)])
+    add("event-max-delay-single-visible-millisecond",dict(show_after=65534,flash=65535),[(0,"event",127),(65533,"idle",0),(1,"idle",0),(1,"idle",0)])
+    add("state-max-show-and-max-linger",dict(show_after=65535,linger=65535),[(0,"match",127),(65534,"match",126),(1,"match",125),(1,"depart",0),(65534,"idle",0),(1,"idle",0)])
+    add("tail-large-forward-jump-expires",dict(linger=65535),[(0,"match",1),(1,"depart",0),(0xffffffff,"idle",0)])
+    add("event-large-forward-jump-expires",dict(flash=65535),[(0,"event",1),(0xffffffff,"nonqualifying",2)])
+    return cases
+
+
 def build_vectors() -> dict:
     limits = Limits()
     conversion = conversion_vectors(limits)
@@ -1598,6 +1655,7 @@ def build_vectors() -> dict:
         "conversion": conversion,
         "render": render_vectors(limits),
         "occurrences": occurrence_vectors(limits),
+        "lifetimes": lifetime_vectors(),
         "capability": capability_pages(limits),
     }
 
