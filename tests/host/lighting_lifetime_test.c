@@ -1,4 +1,5 @@
 #include "users/noah/lib/rgb/lighting/lighting_lifetime.h"
+#include "users/noah/lib/rgb/lighting/lighting_retained.h"
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -15,10 +16,17 @@ int main(int argc, char **argv) {
     noah_lighting_lifetime_t cell = {{0}};
     noah_lighting_lifetime_parameters_t parameters = {0};
     unsigned retained_batch = 0;
+    uint8_t storage[256];
+    noah_lighting_batch_arena_t arena;
+    noah_lighting_retained_t owned;
+    noah_lighting_batch_arena_init(&arena,storage,sizeof storage);
+    noah_lighting_retained_init(&owned,254,127);
     while (fscanf(input,"%95s",word)==1) {
         if (!strcmp(word,"CASE")) {
             assert(fscanf(input,"%95s %u %u %u",name,&show,&linger,&flash)==4);
             parameters=(noah_lighting_lifetime_parameters_t){show,linger,flash};
+            noah_lighting_retained_discard(&owned,&arena);
+            assert(arena.used==0);
             cell=(noah_lighting_lifetime_t){{0}};retained_batch=0;cases++;continue;
         }
         assert(!strcmp(word,"STEP"));
@@ -31,9 +39,21 @@ int main(int argc, char **argv) {
         if (retained_batch!=expected_batch || noah_lighting_lifetime_visible(&cell,&parameters)!=!!visible || noah_lighting_lifetime_wake(&cell,&parameters)!=wake) {
             fprintf(stderr,"lifetime %s step%u: expected batch%u visible%u wake%u, got batch%u visible%u wake%lu\n",name,steps,expected_batch,visible,wake,retained_batch,noah_lighting_lifetime_visible(&cell,&parameters),(unsigned long)noah_lighting_lifetime_wake(&cell,&parameters));return 1;
         }
+        uint8_t payload[4];
+        for(unsigned i=0;i<4;i++)payload[i]=(uint8_t)((uint32_t)batch>>(8u*i));
+        assert(noah_lighting_retained_observe(&owned,&arena,&parameters,(uint32_t)delta,observation,4,payload,sizeof payload,steps+1u,false));
+        assert(noah_lighting_retained_visible(&owned,&parameters)==!!visible);
+        assert(noah_lighting_retained_wake(&owned,&parameters)==wake);
+        noah_lighting_batch_ref_t reference=noah_lighting_retained_batch(&owned);
+        if(expected_batch) {
+            uint8_t actual[4];assert(reference && noah_lighting_batch_copy(&arena,reference,0,actual,sizeof actual));
+            uint32_t marker=(uint32_t)actual[0]|((uint32_t)actual[1]<<8u)|((uint32_t)actual[2]<<16u)|((uint32_t)actual[3]<<24u);
+            assert(marker==expected_batch);
+        } else assert(!reference);
         steps++;
     }
     fclose(input);
+    noah_lighting_retained_discard(&owned,&arena);assert(arena.used==0);
     assert(cases>=13 && steps>=60);
     parameters=(noah_lighting_lifetime_parameters_t){.flash=65535};
     for (unsigned r=0;r<255;r++) for (unsigned t=0;t<128;t++) {

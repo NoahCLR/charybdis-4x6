@@ -232,7 +232,11 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
 
     // A result that composes over the matrix effect is finished per chunk,
     // from the colours the effect just drew for these LEDs.
-    if (rgb_runtime_resolved && rgb_runtime_info.effect_used) {
+    // Publication replaces the one RAM program, and a remap invalidates its
+    // cached query basis. Neither may be combined with this frame's old facts,
+    // palette/gates or retained references. Keep its coherent resolved pixels
+    // until the next frame boundary captures the new generation.
+    if (rgb_runtime_resolved && rgb_runtime_info.effect_used && rgb_runtime_program_generation == noah_effective_lighting_generation() && rgb_runtime_resolved_keymap_generation == rgb_runtime_keymap_generation) {
         noah_lighting_resolve_info_t chunk_info;
         noah_lighting_resolve(&rgb_runtime_scene, rgb_runtime_range_leds(led_min, led_max), rgb_runtime_now, false, &rgb_runtime_frame, &chunk_info);
     }

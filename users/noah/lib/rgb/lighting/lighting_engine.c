@@ -3,6 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "lighting_engine.h"
+#include "lighting_workspace.h"
 
 #include <string.h>
 #ifdef NOAH_LIGHTING_TIMING_TEST_BACKEND
@@ -53,14 +54,7 @@ typedef struct {
     part_t  background;
 } rule_t;
 
-typedef struct {
-    noah_lighting_leds_t leds;
-    uint8_t              thing_kind;
-    uint8_t              thing;
-    uint8_t              slot;
-    uint8_t              outcome;
-    uint8_t              amount;
-} placed_subject_t;
+typedef noah_lighting_placed_subject_t placed_subject_t;
 
 // Millisecond ages saturate at the largest accepted u16 timing. Sharing the
 // first-condition presence clock is exact: a filtered rule's continuous age
@@ -71,7 +65,8 @@ typedef struct {
 } presence_tracker_t;
 
 // Resolution scratch, kept off the reviewed render stack.
-static placed_subject_t subjects[SUBJECT_MAX];
+noah_lighting_workspace_t noah_lighting_workspace;
+#define subjects noah_lighting_workspace.render
 static presence_tracker_t trackers[TRACKER_MAX ? TRACKER_MAX : 1u];
 static uint16_t clocks[LIVE_CLOCK_MAX ? LIVE_CLOCK_MAX : 1u];
 static uint16_t live_clock_count;

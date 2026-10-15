@@ -1452,8 +1452,21 @@ the catalog/validator/occurrence qualification seam. Shared fixtures exercise
 coherent qualification and the full255-rule mask; these components do not yet
 enable the production consumer or establish retained-history capacity. The
 allocation-free lifetime calendar implements the settled matching/tail/event
-transitions and wake boundaries; the retained batch/index/delivery owner and
-its full accepted-profile storage bound remain unfinished. The grouped-event codec/session
+transitions and wake boundaries. Immutable full-equality ordered-batch
+interning and independent18-byte rule/thing records now provide explicit
+render/delivery ownership, transactional replacement and stale-ACK isolation.
+Grouped application reserves all qualified-cell references before commit;
+bounded subject iteration survives arena compaction without another batch
+copy. The actual QMK adapter fixture now uses this owner on each emulated half.
+Publication/remapping between effect chunks retains coherent prior pixels
+until the next frame boundary, instead of mixing new program/cache state with
+old captured facts and histories.
+A shared phase-local workspace preserves the recorded1024-byte placement
+reservation while holding facts/group/single-event encoding together. These
+components allocate no target history bank; its index, full accepted-profile
+capacity, enabled producer integration and measured CPU/cadence remain
+unfinished. Mode/combo event capabilities require their actual producers;
+unsupported forced modules fail compilation. The grouped-event codec/session
 component uses explicit63-byte requests,27-byte HELLO,9-byte CONFIRM and
 10-byte replies inside the existing128/32 QMK allocation. Immutable retries,
 main-before-ACK consumption and fresh-session reset are specified in the

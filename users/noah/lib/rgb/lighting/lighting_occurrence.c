@@ -53,7 +53,7 @@ bool noah_lighting_event_qualify(const noah_profile_lighting_v1_program_t *progr
         group->outcome = subject.outcome;
         group->sides = subject.sides;
         group->has_keys = subject.has_keys;
-        memcpy(group->owners, subject.keys, sizeof group->owners);
+        memcpy(group->owners, subject.keys, sizeof subject.keys);
         group->qualified[index / 8u] |= 1u << (index % 8u);
         qualified = true;
     }

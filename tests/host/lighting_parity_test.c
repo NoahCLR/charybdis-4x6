@@ -229,6 +229,7 @@ const noah_profile_lighting_v1_program_t *noah_effective_lighting_program(uint32
     if (generation) *generation = program_generation;
     return &program;
 }
+uint32_t noah_effective_lighting_generation(void) { return program_generation; }
 #endif
 
 static void load_configuration(const char *hex) {

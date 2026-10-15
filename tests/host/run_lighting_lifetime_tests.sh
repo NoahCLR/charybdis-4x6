@@ -19,14 +19,16 @@ PY
 . "$ROOT/tests/host/noah_source_manifest.sh"
 SOURCE=""
 for src in $(noah_source_manifest_userspace_paths "$ROOT" NOAH_COMMON_SOURCES); do
-    case "$src" in users/noah/lib/rgb/lighting/lighting_lifetime.c) SOURCE="$ROOT/$src" ;; esac
+    case "$src" in users/noah/lib/rgb/lighting/lighting_lifetime.c|users/noah/lib/rgb/lighting/lighting_batch_arena.c|users/noah/lib/rgb/lighting/lighting_retained.c) SOURCE="$SOURCE $ROOT/$src" ;; esac
 done
 [ -n "$SOURCE" ]
 for variant in normal sanitized; do
     flags=""
     [ "$variant" != sanitized ] || flags="-fsanitize=address,undefined -fno-omit-frame-pointer"
     # shellcheck disable=SC2086
-    cc -std=c11 -Wall -Wextra -Werror -pedantic $flags -I"$ROOT" "$ROOT/tests/host/lighting_lifetime_test.c" "$SOURCE" -o "$BUILD_DIR/$variant"
+    cc -std=c11 -Wall -Wextra -Werror -pedantic $flags -I"$ROOT" "$ROOT/tests/host/lighting_lifetime_test.c" $SOURCE -o "$BUILD_DIR/$variant"
     "$BUILD_DIR/$variant" "$BUILD_DIR/vectors.txt"
 done
-"${ARM_CC:-arm-none-eabi-gcc}" -std=c11 -Wall -Wextra -Werror -pedantic -mcpu=cortex-m0plus -mthumb -c "$SOURCE" -o "$BUILD_DIR/lifetime_arm.o"
+for src in $SOURCE; do
+    "${ARM_CC:-arm-none-eabi-gcc}" -std=c11 -Wall -Wextra -Werror -pedantic -mcpu=cortex-m0plus -mthumb -c "$src" -o "$BUILD_DIR/$(basename "$src" .c)_arm.o"
+done

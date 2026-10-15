@@ -137,6 +137,7 @@ static void test_publication_decodes_the_profile_lighting(const uint8_t *payload
     source.calls = 0u;
     assert(noah_effective_lighting_program(&before) == program);
     assert(before == after && source.calls == 0u);
+    assert(noah_effective_lighting_generation() == after && source.calls == 0u);
 
     // Every publication moves the generation, even of the same profile.
     noah_effective_rgb_runtime_invalidate(&runtime, 2u, snapshot.identity, snapshot.identity, &snapshot);

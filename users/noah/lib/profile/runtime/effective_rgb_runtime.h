@@ -32,3 +32,7 @@ void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_c
 // The program to render, and a generation that changes with every
 // publication.
 const noah_profile_lighting_v1_program_t *noah_effective_lighting_program(uint32_t *generation);
+
+// RAM-only publication stamp, including between chunks. Unlike obtaining the
+// program, this never lazily loads defaults or touches a profile reader.
+uint32_t noah_effective_lighting_generation(void);

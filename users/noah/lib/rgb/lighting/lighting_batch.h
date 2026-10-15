@@ -6,7 +6,7 @@
 // cell, so only slot/outcome/actual owners/sides are stored per member. No LED
 // or final-colour cache: current keymap queries still work after remapping.
 enum { NOAH_LIGHTING_BATCH_SUBJECTS = 64u, NOAH_LIGHTING_BATCH_BYTES = 1u + NOAH_LIGHTING_BATCH_SUBJECTS * (3u + KEY_ORIGIN_BITMAP_SIZE) };
-_Static_assert(KEY_ORIGIN_BITMAP_SIZE == 8u, "batch key index encoding covers the existing64-bit owner bitmap");
+_Static_assert(KEY_ORIGIN_BITMAP_SIZE <= 8u, "batch key index encoding covers up to64 owner bits");
 typedef struct { const uint8_t *bytes; size_t size, offset; uint8_t remaining, slot, outcome, thing_kind, thing; } noah_lighting_batch_reader_t;
 // Incremental writer appends while the actual fact yields its natural order.
 // Caller supplies full bound; no truncation, eviction or silent partial batch.

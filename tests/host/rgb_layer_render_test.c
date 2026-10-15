@@ -1815,6 +1815,42 @@ static void test_local_gate_clock_survives_sync_adjustment(void) {
 }
 #endif
 
+static void test_publication_between_effect_chunks_keeps_coherent_frame(void) {
+    static const uint8_t old_lighting[] = {
+        5u,0u,NOAH_PROFILE_LIGHTING_V1_LED_COUNT,0u,0u,0u,0u,1u,
+        7u,0u,255u,0x40u,NOAH_LIGHTING_TARGET_ID_WHOLE_BOARD,0x61u,NOAH_LIGHTING_PAINT_ID_DIM,128u,0u
+    };
+    static const uint8_t new_lighting[] = {
+        5u,0u,NOAH_PROFILE_LIGHTING_V1_LED_COUNT,1u,0u,0u,0u,1u,0u,255u,180u,
+        7u,0u,255u,0x40u,NOAH_LIGHTING_TARGET_ID_WHOLE_BOARD,0x61u,NOAH_LIGHTING_PAINT_ID_COLOUR,0u,0u
+    };
+    test_reset();
+    fake_is_left = true;
+    noah_effective_rgb_runtime_t runtime;
+    noah_effective_profile_snapshot_t snapshot = {0};
+    noah_profile_lighting_v1_limits_t limits = noah_profile_rgb_compiled_v1_limits();
+    noah_effective_rgb_runtime_init(&runtime);
+    CHECK(noah_effective_rgb_runtime_install(&runtime));
+    snapshot.profile.domain_mask=NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+    snapshot.identity.kind=NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE;
+    CHECK(noah_profile_lighting_v1_decode(old_lighting,sizeof old_lighting,&limits,&snapshot.profile.rgb,NULL)==NOAH_PROFILE_LIGHTING_V1_OK);
+    noah_effective_rgb_runtime_invalidate(&runtime,1u,(noah_effective_profile_identity_t){0},snapshot.identity,&snapshot);
+    for(unsigned led=0;led<WS2812_LED_COUNT;led++)ws2812_leds[led]=(ws2812_led_t){.b=200};
+    CHECK(render_output_range(0u,2u));
+    check_led(0u,(rgb_t){.b=100});
+    CHECK(noah_profile_lighting_v1_decode(new_lighting,sizeof new_lighting,&limits,&snapshot.profile.rgb,NULL)==NOAH_PROFILE_LIGHTING_V1_OK);
+    noah_effective_rgb_runtime_invalidate(&runtime,2u,snapshot.identity,snapshot.identity,&snapshot);
+    CHECK(render_output_range(2u,4u));
+    // The one RAM program was replaced; never combine it with old facts,
+    // palette/timing state or retained frame references in a chunk rerender.
+    check_led(2u,(rgb_t){.b=100});
+    CHECK(render_output());
+    check_led(0u,rgb_from_hsv((hsv_t){.h=0u,.s=255u,.v=180u}));
+    snapshot.profile.domain_mask=0;
+    noah_effective_rgb_runtime_invalidate(&runtime,3u,snapshot.identity,snapshot.identity,&snapshot);
+    noah_effective_rgb_runtime_uninstall(&runtime);
+}
+
 static void test_published_profile_lighting_replaces_compiled_program(void) {
     // One rule: the whole board in palette colour 0.
     static const uint8_t profile_lighting[] = {
@@ -2727,6 +2763,7 @@ int main(int argc, char **argv) {
 #ifdef RGB_RUNTIME_CLOCK_TEST_BACKEND
     test_local_gate_clock_survives_sync_adjustment();
 #endif
+    test_publication_between_effect_chunks_keeps_coherent_frame();
     test_published_profile_lighting_replaces_compiled_program();
 #if !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF && !RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF
     test_multi_tap_pending_feedback_overrides_preview_and_pd_mode();

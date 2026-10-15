@@ -588,7 +588,9 @@ before delayed output has published an active output owner, so filters see
 that actual existing state, not a manufactured layer or cache entry.
 
 New event kinds are positive first-condition triggers and require explicit
-flash timing. They do not define a recent-event boolean or a negated truth
+flash timing. Mode and combo event capabilities also require their actual
+pointing/combo producers; forcing a module without its producer is a compile
+error outside the all-kinds schema build. They do not define a recent-event boolean or a negated truth
 window. State kinds remain independently negatable filters. The filters
 qualify against the coherent occurrence context: a layer appearing later
 cannot resurrect an occurrence that failed its layer filter. No occurrence
@@ -665,7 +667,9 @@ references independently until ACK or the defined fresh-session reset.
 without caching LEDs or final pixels. The cell owns the common thing kind/id;
 each member stores its slot/outcome, actual sides/has-keys flag and exact owner
 keys. Consecutive equal slot/outcome fields are omitted. Owner encoding is
-empty, one key index, or the existing8-byte bitmap. Order and multiplicity
+empty, one key index, or the compiled owner bitmap (eight bytes for60keys).
+The bounded scan follows that compiled size; smaller matrices zero-extend
+occurrence owners into the fixed8-byte split group. Order and multiplicity
 remain explicit; equal-looking subjects are never merged, because dimming and
 background composition can observe repeated paints. A same-paint64-key batch
 uses129 bytes; the exact maximum per batch is705 bytes (64 members, each with
@@ -680,13 +684,76 @@ harness also round-trips actual fact-walker batches across its accepted cases.
 This per-batch bound does not bound the number of independently filtered live,
 lingering or unacknowledged event batches.
 
-This cell is a transition component, not a fixed global reservation or a
-complete retained-history representation. The full ordered owner/slot/outcome
+`lighting_batch_arena` owns densely packed immutable batches in caller-supplied
+storage. Each entry has an explicit12-byte little-endian header:32-bit stable
+reference,32-bit owner count,16-bit payload length and common thing kind/id.
+Interning compares the full kind/id and ordered bytes, never a hash, LED mask
+or final colour. Release compacts bytes immediately; references identify
+entries rather than addresses. Readers copy bounded ranges, so no movable
+pointer escapes. The ordered iterator reads at most one encoded member at a
+time (12 bytes including prefix for the default geometry), preserving slot
+inheritance and multiplicity without another705-byte staging frame. A pinned
+reference stays valid if an unrelated release compacts its bytes mid-iteration. Replacement reserves the new entry before releasing the old;
+allocation failure leaves existing entries and references unchanged. The
+production history owner must prove that failure unreachable for accepted
+profiles; the primitive grants no eviction, rejection or overflow policy.
+
+`lighting_retained` keeps each rule/thing's qualification lifetime and delivery
+version independent of payload sharing. Its explicit18-byte record has rule/id,
+flags, the3-byte lifetime, u64 captured order and u32 batch reference. Expired
+unacknowledged markers retain their bytes; an ACK clears only the matching
+captured order. A newer qualifying occurrence replaces/restarts that record;
+nonqualifying observations preserve it. A frozen frame copies metadata and
+retains its own reference, keeping old owners/slots/outcomes and age independent
+of later capture, ACK, remap or compaction. A duplicate partial group commit
+cannot restart an already committed cell. Coordinated session/profile reset
+must discard all current and frame references before reinitializing storage.
+The shared lifetime traces also exercise this owned-record path.
+Grouped application preflights all qualified record slots and parameters,
+encodes the single captured subject, then reserves one shared immutable batch
+with all required reference counts. Only then does the non-failing commit loop
+replace each cell. Retry preserves an already committed matching order. A
+fresh same-profile transport session, after calendars advance, seeds still-live
+markers including those waiting for show-after and discards expired dirty
+markers. Per-cell ACK/version cleanup never touches a newer occurrence.
+The actual QMK adapter fixture uses one such owner per emulated half and
+asserts RPC callbacks cannot modify its arena/cells before main consumes.
+
+
+For a32-bit target the arena control block is16 bytes. Payload storage is
+exactly the sum of12 plus encoded size per distinct referenced batch; record
+storage is18 per allocated current or frozen record. Reference increments need
+no second payload. Distinct old/new maximum batches overlap at1434 bytes
+before record/control/encoding workspace. No fixed target arena or rule/id
+index is allocated by these components. Linear full-equality search has an
+explicit entry/byte-count seam; operation counts are not millisecond or split
+cadence measurements. Its performance and a full accepted-profile capacity
+bound remain obligations of the production owner, rather than an inference
+from typical deduplication or the705-byte single-batch bound.
+
+Renderer placement and synchronous occurrence capture share one explicitly
+owned workspace. The recorded60-key/four-combo/full-module configuration uses
+1024 bytes for64 placed subjects; capture holds621 fact bytes,56-byte native
+group and12-byte **single-event** batch simultaneously (696 bytes including
+alignment). A general state batch can need705 bytes and is a separate phase;
+it is not overlaid with facts still being walked. Larger compiler geometries
+use the larger union arm and require their own linked acceptance. Cortex-M0+
+layout assertions cover the recorded configuration. Resolved RGB facts/frame,
+fade frames, cached keymap basis and immutable in-flight request are separate
+owners and are never borrowed by this workspace. Render placement is dead on
+synchronous resolve return; collection, qualification and retention cannot
+call an input producer or renderer. Split callbacks only stage their separate
+mailbox. Existing shared render/occurrence traces alternate these phases and
+poison scratch while preserving caller facts and frames. Complete enabled
+producer/callback/role integration and its linked stacks remain required.
+
+These are ownership and transition components, not a fixed global reservation
+or a complete retained-history representation. The full ordered owner/slot/outcome
 batches, per-rule/thing indexing, source ordering, delivery references and
 accepted-profile storage bound still belong to the unfinished history owner.
 Host tests of255×128 independent cells establish transition independence,
 not that a raw matrix of those cells fits the target or is the chosen bank.
-No transition cell or event capability is enabled in production yet.
+No retained bank or event capability is enabled in production yet.
 
 Each half times from the frame in which it first sees the subject, so the
 halves may differ by the link's latency. Gate observation and wake deadlines
@@ -772,7 +839,12 @@ program, the keymap (for mapped-key targets), a timing's next change, or every
 frame while something time-based shows (an animating timing, a paint that
 changes with time, the auto-mouse fade). Between resolutions each chunk copies
 the resolved colours; LEDs whose result composes over the effect are finished
-per chunk from the effect the chunk just drew.
+per chunk from the effect the chunk just drew. A publication replaces the one
+RAM program; a keymap publication invalidates its query basis. If either
+changes between chunks, remaining chunks use the last coherent resolved pixels
+instead of combining the new program/basis with old facts, gates or retained
+references. The next frame boundary captures the new generation. Checking the
+program's publication stamp is RAM-only and never lazily loads defaults.
 
 ### Outside the registries
 

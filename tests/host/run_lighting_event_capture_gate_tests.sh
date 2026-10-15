@@ -61,3 +61,34 @@ if cc -std=c11 -Wall -Wextra -Werror -pedantic -DRGB_MATRIX_ENABLE -DNOAH_PORTAB
 fi
 rg -q 'retained lighting modules require the linked event consumer' "$BUILD_DIR/capability.log"
 printf 'lighting event capture: disabled needs no observer; enabled requires and calls it\n'
+
+cat > "$BUILD_DIR/producer-capabilities.c" <<'C'
+#include "users/noah/lib/profile/schema/profile_lighting_kinds_v1.h"
+_Static_assert(!!NOAH_LIGHTING_FACT_MODE_STARTED == EXPECT_POINTING, "mode-start capability follows real producer");
+_Static_assert(!!NOAH_LIGHTING_FACT_MODE_ENDED == EXPECT_POINTING, "mode-end capability follows real producer");
+_Static_assert(!!NOAH_LIGHTING_FACT_COMBO_FIRED == EXPECT_COMBO, "combo capability follows real producer");
+int main(void) { return 0; }
+C
+for pointing in 0 1; do
+    for combo in 0 1; do
+        flags=""
+        [ "$pointing" = 0 ] || flags="$flags -DPOINTING_DEVICE_ENABLE"
+        [ "$combo" = 0 ] || flags="$flags -DCOMBO_ENABLE"
+        # Schema-only metadata probe; executable observer linkage is checked above.
+        # shellcheck disable=SC2086
+        cc -std=c11 -Wall -Wextra -Werror -pedantic -DRGB_MATRIX_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE \
+          -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DEXPECT_POINTING="$pointing" -DEXPECT_COMBO="$combo" \
+          $flags -I"$ROOT" "$BUILD_DIR/producer-capabilities.c" -o "$BUILD_DIR/producer-capabilities"
+        "$BUILD_DIR/producer-capabilities"
+    done
+done
+for flag in NOAH_LIGHTING_FACT_MODE_STARTED NOAH_LIGHTING_FACT_MODE_ENDED NOAH_LIGHTING_FACT_COMBO_FIRED; do
+    if cc -std=c11 -Wall -Wextra -Werror -pedantic -DRGB_MATRIX_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE \
+      -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -D"$flag"=1 -DEXPECT_POINTING=0 -DEXPECT_COMBO=0 \
+      -I"$ROOT" -c "$BUILD_DIR/producer-capabilities.c" -o "$BUILD_DIR/unsupported-producer.o" > "$BUILD_DIR/producer.log" 2>&1; then
+        echo 'event module unexpectedly accepted without its producer' >&2
+        exit 1
+    fi
+    rg -q 'lighting event module requires its actual producer' "$BUILD_DIR/producer.log"
+done
+printf 'lighting event capabilities: producer feature combinations and unavailable overrides passed\n'

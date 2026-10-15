@@ -13,6 +13,7 @@
 #include "users/noah/lib/rgb/lighting/lighting_occurrence.h"
 #include "users/noah/lib/rgb/lighting/lighting_event_capture.h"
 #include "users/noah/lib/rgb/lighting/lighting_batch.h"
+#include "users/noah/lib/rgb/lighting/lighting_workspace.h"
 #include "users/noah/lib/rgb/lighting/lighting_keymap.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/profile/runtime/effective_combo_runtime.h"
@@ -210,10 +211,30 @@ static noah_lighting_facts_t capture_source;
 static noah_lighting_event_group_t capture_retained;
 static unsigned capture_collects, capture_retains;
 static uint32_t capture_time;
+static bool capture_shared;
 static void capture_collect(noah_lighting_facts_t *facts) { *facts = capture_source; capture_collects++; }
 static void capture_retain(void *context, const noah_lighting_event_group_t *group, uint32_t now) {
     assert(context == &capture_retained && now == capture_time);
     capture_retained = *group;
+    if (capture_shared) {
+        assert(group == &noah_lighting_workspace.capture.group);
+        noah_lighting_subject_t subject;
+        noah_lighting_subject_init(&subject, group->thing_kind, group->thing, group->slot);
+        subject.outcome = group->outcome; subject.sides = group->sides; subject.has_keys = group->has_keys;
+        memcpy(subject.keys, group->owners, sizeof subject.keys);
+        noah_lighting_batch_writer_t writer;
+        noah_lighting_batch_write_begin(&writer, noah_lighting_workspace.capture.encoded, sizeof noah_lighting_workspace.capture.encoded);
+        assert(noah_lighting_batch_write(&writer, &subject));
+        // Qualification facts and output coexist, including max owners. No
+        // dead-facts assumption or later filter requalification is required.
+        assert(!memcmp(&capture_source, &noah_lighting_workspace.capture.facts, sizeof capture_source));
+        assert(!memcmp(&capture_retained, group, sizeof capture_retained));
+        noah_lighting_batch_reader_t reader;
+        noah_lighting_subject_t decoded;
+        assert(noah_lighting_batch_read_begin(&reader, writer.bytes, writer.used, group->thing_kind, group->thing));
+        assert(noah_lighting_batch_read(&reader, &decoded));
+        assert(!memcmp(&decoded, &subject, sizeof decoded));
+    }
     capture_retains++;
 }
 static void check_occurrence(FILE *file, const char *name, const noah_profile_lighting_v1_program_t *program, noah_lighting_facts_t *facts) {
@@ -253,6 +274,22 @@ static void check_occurrence(FILE *file, const char *name, const noah_profile_li
     memset(&scratch_group, 0x55, sizeof scratch_group);
     if (result) assert(!memcmp(&capture_retained, &group, sizeof group));
     assert(storage_reads == reads);
+    // The same engine workspace alternates synchronous render and capture.
+    // Resolved caller facts/frame are independent and survive either use.
+    noah_lighting_frame_t frame_before = {0}, frame_after = {0};
+    noah_lighting_resolve_info_t info;
+    noah_lighting_scene_t scene = {.program = program, .facts = facts, .keymap_generation = keymap_generation};
+    noah_lighting_resolve(&scene, NOAH_LIGHTING_ALL_LEDS, capture_time, true, &frame_before, &info);
+    collected = capture_collects; retained = capture_retains;
+    capture_shared = true;
+    captured = noah_lighting_event_capture_shared(program, &event, (uint64_t)order, capture_time, capture_collect, capture_retain, &capture_retained);
+    capture_shared = false;
+    assert(captured == result && capture_collects == collected + 1u && capture_retains == retained + (result ? 1u : 0u));
+    if (result) assert(!memcmp(&capture_retained, &group, sizeof group));
+    memset(&noah_lighting_workspace, 0xa5, sizeof noah_lighting_workspace);
+    noah_lighting_resolve(&scene, NOAH_LIGHTING_ALL_LEDS, capture_time, false, &frame_after, &info);
+    assert(!memcmp(&frame_before, &frame_after, sizeof frame_before));
+    assert(!memcmp(&before, facts, sizeof before));
 
     if (!strcmp(expected, "-")) { assert(!result); return; }
     assert(result);

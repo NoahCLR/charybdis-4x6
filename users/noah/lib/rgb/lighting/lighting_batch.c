@@ -10,7 +10,7 @@ bool noah_lighting_batch_write(noah_lighting_batch_writer_t *writer, const noah_
     if (!writer || !writer->bytes || !writer->size || !subject || subject->sides > 3u || writer->count >= NOAH_LIGHTING_BATCH_SUBJECTS) return false;
     unsigned key_count=0u;
     uint8_t key=0u;
-    for (unsigned i=0u;i<64u;i++) if (subject->keys[i/8u] & (1u << (i%8u))) {key_count++;key=(uint8_t)i;}
+    for (unsigned i=0u;i<KEY_ORIGIN_BITMAP_SIZE*8u;i++) if (subject->keys[i/8u] & (1u << (i%8u))) {key_count++;key=(uint8_t)i;}
     uint8_t owner=key_count==0u ? OWNER_NONE : key_count==1u ? OWNER_KEY : OWNER_BITMAP;
     bool same=subject->slot==writer->slot && subject->outcome==writer->outcome;
     size_t length=1u+(same?0u:2u)+(owner==OWNER_NONE?0u:owner==OWNER_KEY?1u:KEY_ORIGIN_BITMAP_SIZE);
@@ -43,7 +43,7 @@ bool noah_lighting_batch_read(noah_lighting_batch_reader_t *reader, noah_lightin
     noah_lighting_subject_init(subject,reader->thing_kind,reader->thing,slot);
     subject->outcome=outcome;subject->has_keys=!!(flags&4u);subject->sides=flags&3u;
     if (owner==OWNER_KEY) {
-        uint8_t key=reader->bytes[offset++];if(key>=64u)return false;
+        uint8_t key=reader->bytes[offset++];if(key>=KEY_ORIGIN_BITMAP_SIZE*8u)return false;
         subject->keys[key/8u]|=1u<<(key%8u);
     } else if (owner==OWNER_BITMAP) {memcpy(subject->keys,reader->bytes+offset,KEY_ORIGIN_BITMAP_SIZE);offset+=KEY_ORIGIN_BITMAP_SIZE;}
     reader->offset=offset;reader->remaining--;reader->slot=slot;reader->outcome=outcome;
