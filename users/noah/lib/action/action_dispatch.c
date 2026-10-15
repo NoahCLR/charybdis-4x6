@@ -54,7 +54,7 @@ void noah_emit_action_tap(uint16_t action, noah_emit_policy_t policy) {
     noah_emit_run(action, noah_action_tap, policy);
 }
 
-void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy) {
+__attribute__((noinline)) void noah_emit_action_tap_at(keypos_t key_pos, uint16_t action, noah_emit_policy_t policy) {
     noah_emit_run_at(key_pos, action, noah_action_tap_at, policy);
 }
 

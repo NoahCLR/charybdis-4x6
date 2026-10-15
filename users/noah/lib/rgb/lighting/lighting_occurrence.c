@@ -35,18 +35,9 @@ bool noah_lighting_event_qualify(const noah_profile_lighting_v1_program_t *progr
         if ((rule[1] & NOAH_PROFILE_LIGHTING_V1_RULE_DISABLED) || at >= end || (at[0] >> 5u) != NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION || noah_lighting_fact_role(at[1]) != NOAH_LIGHTING_FACT_EVENT) continue;
         noah_lighting_subject_t subject;
         if (!noah_lighting_event_match(at[1], event, at + 2u, &subject)) continue;
-        at += 2u + (at[0] & 31u);
-        bool holds = true;
-        while (at < end && (at[0] >> 5u) <= NOAH_PROFILE_LIGHTING_V1_SLOT_NEGATED) {
-            uint16_t cursor = 0u;
-            noah_lighting_subject_t filter_subject;
-            bool any = noah_lighting_fact_next(at[1], facts, at + 2u, &cursor, &filter_subject);
-            if ((at[0] >> 5u) == NOAH_PROFILE_LIGHTING_V1_SLOT_NEGATED ? any : !any) { holds = false; break; }
-            at += 2u + (at[0] & 31u);
-        }
-        if (!holds) continue;
-        // Every matching rule sees this same captured thing/footprint/slot.
-        // Copy borrowed producer owners before returning to that producer.
+        // Matching event modules describe the same captured occurrence. Stage
+        // its one payload before reusing the local subject for state filters;
+        // only qualified bits commit membership. A false result is unusable.
         group->thing_kind = subject.thing_kind;
         group->thing = subject.thing;
         group->slot = subject.slot;
@@ -54,6 +45,15 @@ bool noah_lighting_event_qualify(const noah_profile_lighting_v1_program_t *progr
         group->sides = subject.sides;
         group->has_keys = subject.has_keys;
         memcpy(group->owners, subject.keys, sizeof subject.keys);
+        at += 2u + (at[0] & 31u);
+        bool holds = true;
+        while (at < end && (at[0] >> 5u) <= NOAH_PROFILE_LIGHTING_V1_SLOT_NEGATED) {
+            uint16_t cursor = 0u;
+            bool any = noah_lighting_fact_next(at[1], facts, at + 2u, &cursor, &subject);
+            if ((at[0] >> 5u) == NOAH_PROFILE_LIGHTING_V1_SLOT_NEGATED ? any : !any) { holds = false; break; }
+            at += 2u + (at[0] & 31u);
+        }
+        if (!holds) continue;
         group->qualified[index / 8u] |= 1u << (index % 8u);
         qualified = true;
     }
