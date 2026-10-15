@@ -63,9 +63,15 @@
 // - base runtime-visible state (automouse / pd / preview)
 // - combo feedback locality
 // - truthful key-feedback semantics and tap branch state
+// - qualified occurrence groups when the actual event consumer is enabled
 // - durable committed VIA-storage reconciliation
 // so both halves render layer-owned RGB from the same runtime and keymap data.
-#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_LIGHTING_FACTS_SYNC, PUT_VIA_KEYMAP_SYNC, PUT_VIA_KEYMAP_MIRROR, PUT_PROFILE_SPLIT_SYNC
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+#        define NOAH_LIGHTING_EVENT_TRANSACTION_ID , PUT_SPLIT_LIGHTING_EVENTS_SYNC
+#    else
+#        define NOAH_LIGHTING_EVENT_TRANSACTION_ID
+#    endif
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_LIGHTING_FACTS_SYNC, PUT_VIA_KEYMAP_SYNC, PUT_VIA_KEYMAP_MIRROR, PUT_PROFILE_SPLIT_SYNC NOAH_LIGHTING_EVENT_TRANSACTION_ID
 
 // Dynamic key-local placement for PD-mode RGB overlays.
 // Required only when a pd_mode_colors[] row uses RGB_KEY_HALF or

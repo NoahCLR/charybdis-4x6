@@ -577,8 +577,11 @@ against its caller-supplied coherent occurrence frame, copies borrowed owners
 synchronously and returns the qualified255-rule mask plus captured subject.
 A false qualification does not authorize erasing a previous qualified marker.
 It performs no profile-reader I/O and does not mutate the input fact frame.
-Runtime capture of that coherent frame and retained histories remain separate
-integration requirements. In the immediate combo-output path, origin/cache
+The capture pipeline sequences caller-owned collection, qualification and
+synchronous retention, and neither keeps producer pointers nor provides a
+queue. Its collector/retainer must stay in main, without input reentry or
+profile publication during the call. Actual runtime hooks/workspace ownership
+and retained histories remain separate integration requirements. In the immediate combo-output path, origin/cache
 publication and record normalization precede observation; the output action
 itself executes afterwards. A scan-first fired completion can be observed
 before delayed output has published an active output owner, so filters see
@@ -657,6 +660,25 @@ elapsed time. It reports batch replace/keep/release-render and the next local
 wake boundary. Releasing an expired rendering reference never authorizes
 freeing an unacknowledged delivery marker. The history owner must retain those
 references independently until ACK or the defined fresh-session reset.
+
+`lighting_batch` serializes each thing's whole natural-order subject batch
+without caching LEDs or final pixels. The cell owns the common thing kind/id;
+each member stores its slot/outcome, actual sides/has-keys flag and exact owner
+keys. Consecutive equal slot/outcome fields are omitted. Owner encoding is
+empty, one key index, or the existing8-byte bitmap. Order and multiplicity
+remain explicit; equal-looking subjects are never merged, because dimming and
+background composition can observe repeated paints. A same-paint64-key batch
+uses129 bytes; the exact maximum per batch is705 bytes (64 members, each with
+one flag, two paint fields and eight owner bytes, plus count). Sixty-four is
+the existing registry/matrix subject bound, not an added profile restriction.
+Writes refuse insufficient caller workspace atomically rather than keeping a
+partial batch. The history owner must supply the proved complete workspace;
+this codec supplies no bank, eviction or overflow acceptance policy. Frozen
+bytes own no producer pointers, preserve departed slots/outcomes and remain
+usable by current keymap-derived targets after remapping. The shared render
+harness also round-trips actual fact-walker batches across its accepted cases.
+This per-batch bound does not bound the number of independently filtered live,
+lingering or unacknowledged event batches.
 
 This cell is a transition component, not a fixed global reservation or a
 complete retained-history representation. The full ordered owner/slot/outcome
@@ -797,6 +819,20 @@ publishes nothing and the next pass resends every chunk. Heartbeats and
 transport back-off are the ones the runtime sync already uses.
 
 ### Qualified event groups (internal split protocol)
+
+`qmk_lighting_event_transport` binds the portable sender/receiver to actual
+`transaction_register_rpc` / `transaction_rpc_exec` with at most one bounded
+RPC per master step. The callback validates/stages only; slave main invokes
+the consumer. Its role-selected link is initialized and registration kept
+closed before readiness publication; wrong-role and registration-time calls
+cannot overwrite a packet arm. The master offer workspace ends before the
+synchronous RPC call. Enabled builds add their transaction id through the
+shared config; disabled capture adds no id, instance or callback. A two-instance
+host seam exercises these actual calls with normal and sanitized builds.
+The history owner must still supply the fair next/consume/reset/ACK operations,
+exact effective-profile identity and main/init hooks before production capture
+is enabled. This adapter alone does not advertise or implement that owner.
+
 
 Event transport is separate from the coherent state-fact frame. The portable
 codec/session component below is implemented; the occurrence qualifier,

@@ -693,7 +693,8 @@ These values come from the keymap config and the shared userspace config. When t
 | `SPLIT_RUNTIME_SYNC_RETRY_MAX_MS` | `1000u` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_LAYER_STATE_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_ACTIVITY_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
-| `SPLIT_TRANSACTION_IDS_USER` | `PUT_SPLIT_RUNTIME_BASE_SYNC,PUT_SPLIT_LIGHTING_FACTS_SYNC,PUT_VIA_KEYMAP_SYNC,PUT_VIA_KEYMAP_MIRROR,PUT_PROFILE_SPLIT_SYNC` | [users/noah/config.h](../users/noah/config.h) |
+| `NOAH_LIGHTING_EVENT_TRANSACTION_ID` | `defined` | [users/noah/config.h](../users/noah/config.h) |
+| `SPLIT_TRANSACTION_IDS_USER` | `PUT_SPLIT_RUNTIME_BASE_SYNC,PUT_SPLIT_LIGHTING_FACTS_SYNC,PUT_VIA_KEYMAP_SYNC,PUT_VIA_KEYMAP_MIRROR,PUT_PROFILE_SPLIT_SYNCNOAH_LIGHTING_EVENT_TRANSACTION_ID` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_PD_MODE_ACTIVE_HALF_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `MATRIX_IO_DELAY` | `10` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_MATRIX_LED_COUNT` | `58` | [users/noah/config.h](../users/noah/config.h) |

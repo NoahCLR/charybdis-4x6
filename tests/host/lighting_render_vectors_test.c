@@ -11,6 +11,8 @@
 
 #include "users/noah/lib/rgb/lighting/lighting_engine.h"
 #include "users/noah/lib/rgb/lighting/lighting_occurrence.h"
+#include "users/noah/lib/rgb/lighting/lighting_event_capture.h"
+#include "users/noah/lib/rgb/lighting/lighting_batch.h"
 #include "users/noah/lib/rgb/lighting/lighting_keymap.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/profile/runtime/effective_combo_runtime.h"
@@ -204,6 +206,16 @@ static keypos_t key_at(unsigned index) {
     return (keypos_t){.row = (uint8_t)(index / MATRIX_COLS), .col = (uint8_t)(index % MATRIX_COLS)};
 }
 
+static noah_lighting_facts_t capture_source;
+static noah_lighting_event_group_t capture_retained;
+static unsigned capture_collects, capture_retains;
+static uint32_t capture_time;
+static void capture_collect(noah_lighting_facts_t *facts) { *facts = capture_source; capture_collects++; }
+static void capture_retain(void *context, const noah_lighting_event_group_t *group, uint32_t now) {
+    assert(context == &capture_retained && now == capture_time);
+    capture_retained = *group;
+    capture_retains++;
+}
 static void check_occurrence(FILE *file, const char *name, const noah_profile_lighting_v1_program_t *program, noah_lighting_facts_t *facts) {
     unsigned long long order;
     unsigned kind, thing, branch, slot, outcome, key, has_owners, layers, locks, macro, mods, armed;
@@ -227,6 +239,21 @@ static void check_occurrence(FILE *file, const char *name, const noah_profile_li
     uint32_t reads = storage_reads;
     bool result = noah_lighting_event_qualify(program, facts, &event, (uint64_t)order, &group);
     assert(storage_reads == reads && !memcmp(&before, facts, sizeof before));
+    // Exercise the actual collect->qualify->retain consumer pipeline as well
+    // as the independent qualifier. The retained copy survives scratch reuse.
+    capture_source = *facts;
+    capture_time = 1234u;
+    unsigned collected = capture_collects, retained = capture_retains;
+    noah_lighting_facts_t scratch;
+    noah_lighting_event_group_t scratch_group;
+    bool captured = noah_lighting_event_capture(program, &event, (uint64_t)order, capture_time, &scratch, &scratch_group, capture_collect, capture_retain, &capture_retained);
+    assert(captured == result && capture_collects == collected + 1u && capture_retains == retained + (result ? 1u : 0u));
+    if (result) assert(!memcmp(&capture_retained, &group, sizeof group));
+    memset(&scratch, 0x55, sizeof scratch);
+    memset(&scratch_group, 0x55, sizeof scratch_group);
+    if (result) assert(!memcmp(&capture_retained, &group, sizeof group));
+    assert(storage_reads == reads);
+
     if (!strcmp(expected, "-")) { assert(!result); return; }
     assert(result);
     memset(owners, 0x55, sizeof owners); // Borrowed producer data has expired.
@@ -236,6 +263,33 @@ static void check_occurrence(FILE *file, const char *name, const noah_profile_li
         unsigned value;
         assert(sscanf(expected + 2u*i, "%2x", &value) == 1);
         if (wire[i] != value) { fprintf(stderr, "occurrence %s byte%u: expected%02x got%02x\n",name,i,value,wire[i]); exit(1); }
+    }
+}
+
+static void check_actual_fact_batches(const noah_profile_lighting_v1_program_t *program, const noah_lighting_facts_t *facts) {
+    static noah_lighting_subject_t originals[64];
+    uint8_t bytes[NOAH_LIGHTING_BATCH_BYTES];
+    for (unsigned r=0;r<program->rule_count;r++) {
+        const uint8_t *part=program->bytes+program->rules[r]+3u;
+        if ((part[0]>>5u)!=NOAH_PROFILE_LIGHTING_V1_SLOT_CONDITION || noah_lighting_fact_role(part[1])==NOAH_LIGHTING_FACT_EVENT) continue;
+        uint16_t cursor=0;
+        unsigned count=0;
+        while (count<64 && noah_lighting_fact_next(part[1],facts,part+2,&cursor,&originals[count])) count++;
+        for(unsigned member=0;member<count;member++) {
+            bool first=true;
+            for(unsigned before=0;before<member;before++) if(originals[before].thing==originals[member].thing)first=false;
+            if(!first)continue;
+            noah_lighting_batch_writer_t writer;
+            noah_lighting_batch_write_begin(&writer,bytes,sizeof bytes);
+            for(unsigned j=member;j<count;j++) if(originals[j].thing==originals[member].thing) assert(noah_lighting_batch_write(&writer,&originals[j]));
+            noah_lighting_batch_reader_t reader;
+            assert(noah_lighting_batch_read_begin(&reader,bytes,writer.used,originals[member].thing_kind,originals[member].thing));
+            for(unsigned j=member;j<count;j++) if(originals[j].thing==originals[member].thing) {
+                noah_lighting_subject_t restored;assert(noah_lighting_batch_read(&reader,&restored));
+                assert(!memcmp(&restored,&originals[j],sizeof restored));
+            }
+            assert(!reader.remaining && reader.offset==writer.used);
+        }
     }
 }
 
@@ -404,6 +458,7 @@ int main(int argc, char **argv) {
         noah_lighting_scene_t        scene = {.program = &program, .facts = &facts, .keymap_generation = keymap_generation};
         noah_lighting_resolve_info_t info;
         memset(&frame, 0, sizeof(frame));
+        check_actual_fact_batches(&program, &facts);
         noah_lighting_facts_t original_facts = facts;
         uint32_t reads_before_walk=storage_reads;
         noah_lighting_resolve(&scene, NOAH_LIGHTING_ALL_LEDS, (uint32_t)now, true, &frame, &info);

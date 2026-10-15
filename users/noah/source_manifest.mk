@@ -135,10 +135,13 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/core/rgb_runtime.c \
     lib/rgb/lighting/lighting_dispatch.c \
     lib/rgb/lighting/lighting_event_protocol.c \
+    lib/compat/qmk_lighting_event_transport.c \
     lib/rgb/lighting/lighting_event_receiver.c \
     lib/rgb/lighting/lighting_event_sender.c \
     lib/rgb/lighting/lighting_occurrence.c \
+    lib/rgb/lighting/lighting_event_capture.c \
     lib/rgb/lighting/lighting_lifetime.c \
+    lib/rgb/lighting/lighting_batch.c \
     lib/rgb/lighting/kinds/event_layer_locked.c \
     lib/rgb/lighting/kinds/event_layer_unlocked.c \
     lib/rgb/lighting/kinds/event_oneshot_used.c \

@@ -1458,7 +1458,9 @@ component uses explicit63-byte requests,27-byte HELLO,9-byte CONFIRM and
 10-byte replies inside the existing128/32 QMK allocation. Immutable retries,
 main-before-ACK consumption and fresh-session reset are specified in the
 lighting split contract. The portable component allocates no history and does
-not yet enable event capabilities; its runtime consumer/adapter still follow. Keys-that target8 and what-it-does
+not yet enable event capabilities. The QMK adapter now binds the portable
+component to actual registration/RPC and main-consumption calls; the retained
+history owner, effective-identity/main hooks and capture enablement still follow. Keys-that target8 and what-it-does
 paint9 share a finite per-layer native/behaviour basis; queries compose from
 that cache and existing resident combo rows, with no reader I/O during the
 render walk. This implements the plan's cache intent without one bitmap per

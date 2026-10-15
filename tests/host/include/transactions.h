@@ -18,6 +18,7 @@ enum {
     PUT_VIA_KEYMAP_SYNC                  = 3,
     PUT_VIA_KEYMAP_MIRROR                = 4,
     PUT_PROFILE_SPLIT_SYNC               = 5,
+    PUT_SPLIT_LIGHTING_EVENTS_SYNC       = 6,
 };
 
 void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback);
