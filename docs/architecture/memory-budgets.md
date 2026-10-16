@@ -747,3 +747,8 @@ and changed caller frames require fresh linked accounting; these source sizes
 are not an approved static-policy increase or a runtime high-water result.
 The scoped247808/core4096/main1920/slave768 policies remain unchanged. Exact
 raw/physical ownership and supported target guards live in the lighting spec.
+The pinned enabled candidate with this repair links5292B `.data` plus242360B
+`.bss` per half (247652B static,156B policy margin), with14480B boot
+core-memory span. The net92B static change includes compiler layout, not just
+the89B declared cache/controls. These are linked figures for the recorded
+configuration, not runtime availability or hardware high-water evidence.

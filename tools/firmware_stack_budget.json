@@ -141,6 +141,12 @@
         }
       ],
       "paths": [
+        {"name": "BASIC complete effect raw local capture projection", "functions": ["main", "rgb_matrix_task", "rgb_matrix_led_index"]},
+        {"name": "BASIC complete effect raw local pixel capture", "functions": ["main", "rgb_matrix_task", "memcpy"]},
+        {"name": "post-flush housekeeping raw effect ownership restore", "functions": ["main", "rgb_matrix_led_index"]},
+        {"name": "suspend synchronous NONE flush replaces pending raw ownership", "functions": ["main", "rgb_matrix_set_suspend_state", "rgb_task_render"]},
+        {"name": "physical flush copies composed pixels before raw restoration", "functions": ["main", "rgb_matrix_task", "rgb_task_flush", "ws2812_flush", "chSchGoSleepTimeoutS", "chSchGoSleepS", "__port_switch"]},
+        {"name": "BASIC compiled behavior action decode deepest direct leaf", "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_keymap_refresh", "key_behavior_view_build", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_hold", "read_action", "decode_action_bytes", "noah_profile_action_v1_decode", "clear_error", "noah_profile_candidate_v1_no_error", "memcpy"]},
         {"name": "delta source collector ownership leaf 1", "functions": ["main", "matrix_scan", "noah_lighting_runtime_task", "noah_lighting_facts_collect_delta", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner", "key_origin_registry_get_bitmap", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]},
         {"name": "delta source collector ownership leaf 2", "functions": ["main", "matrix_scan", "noah_lighting_runtime_task", "noah_lighting_facts_collect_delta", "noah_lighting_slice_behaviour_state_collect", "key_feedback_semantic_for_token", "timer_read32", "chSysRestoreStatusX", "chSchRescheduleS", "chSchDoPreemption", "__port_switch"]},
         {"name": "delta source collector ownership leaf 3", "functions": ["main", "matrix_scan", "noah_lighting_runtime_task", "noah_lighting_facts_collect_delta", "key_feedback_lighting_map", "key_feedback_lighting_apply", "key_runtime_core_flashing_feedback_visible_at", "timer_read32", "chSysRestoreStatusX", "chSchRescheduleS", "chSchDoPreemption", "__port_switch"]},
@@ -196,7 +202,7 @@
         },
         {
           "name": "RGB coherent remote staging and commit",
-          "functions": ["main", "rgb_matrix_task", "split_runtime_sync_remote_collect_lighting"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "split_runtime_sync_remote_collect_lighting"]
         },
         {
           "name": "RGB module idle comparison",
@@ -204,31 +210,31 @@
         },
         {
           "name": "RGB timing selected-signature preparation",
-          "functions": ["main", "rgb_matrix_task", "prepare_rule_clocks", "prepare_timing_index"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "prepare_rule_clocks", "prepare_timing_index"]
         },
         {
           "name": "RGB timing subject refresh",
-          "functions": ["main", "rgb_matrix_task", "prepare_rule_clocks", "refresh_presence", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "prepare_rule_clocks", "refresh_presence", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
         },
         {
           "name": "RGB timing aggregate gesture refresh",
-          "functions": ["main", "rgb_matrix_task", "prepare_rule_clocks", "refresh_presence", "noah_lighting_fact_next", "gesture", "key_feedback_tap_branch_map_get", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "prepare_rule_clocks", "refresh_presence", "noah_lighting_fact_next", "gesture", "key_feedback_tap_branch_map_get", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "RGB timing filter refresh",
-          "functions": ["main", "rgb_matrix_task", "prepare_rule_clocks", "fact_holds", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "prepare_rule_clocks", "fact_holds", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
         },
         {
           "name": "RGB timing shared-presence lookup",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "rule_presence_tracker"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "rule_presence_tracker"]
         },
         {
           "name": "RGB timing dense-age rank",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "gate_amount", "clock_rank"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "gate_amount", "clock_rank"]
         },
         {
           "name": "RGB timing next change",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "gate_amount"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "gate_amount"]
         },
         {
           "name": "press observation materialization",
@@ -312,23 +318,23 @@
         },
         {
           "name": "RGB frame fact collection",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_facts_collect_changed", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_facts_collect_changed", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner"]
         },
         {
           "name": "RGB frame behaviour subjects",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "noah_lighting_fact_next", "gesture", "key_feedback_tap_branch_map_get", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "noah_lighting_fact_next", "gesture", "key_feedback_tap_branch_map_get", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "RGB query native basis refresh",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_keymap_refresh", "keycode_at_keymap_location", "nvm_dynamic_keymap_read_keycode", "eeprom_read_byte", "wear_leveling_read"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_keymap_refresh", "keycode_at_keymap_location", "nvm_dynamic_keymap_read_keycode", "eeprom_read_byte", "wear_leveling_read"]
         },
         {
           "name": "RGB frame paint over the effect",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "paint_owned_subject", "noah_lighting_paint", "noah_lighting_below", "noah_lighting_effect_colour"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "paint_owned_subject", "noah_lighting_paint", "noah_lighting_below", "rgb_matrix_led_index"]
         },
         {
           "name": "RGB frame palette colour",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "paint_owned_subject", "noah_lighting_paint", "noah_lighting_palette_rgb", "hsv_to_rgb"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "paint_owned_subject", "noah_lighting_paint", "noah_lighting_palette_rgb", "hsv_to_rgb"]
         },
         {
           "name": "boot USB name reader",
@@ -356,19 +362,19 @@
         },
         {
           "name": "RGB frame individual behaviour capture",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_facts_collect_changed", "key_feedback_lighting_map", "key_feedback_lighting_apply", "key_runtime_core_flashing_feedback_visible_at", "noah_setting"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_facts_collect_changed", "key_feedback_lighting_map", "key_feedback_lighting_apply", "key_runtime_core_flashing_feedback_visible_at", "noah_setting"]
         },
         {
           "name": "RGB frame behaviour outcome capture",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_facts_collect_changed", "key_feedback_lighting_map", "key_feedback_lighting_hold_outcome", "noah_action_describe"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_facts_collect_changed", "key_feedback_lighting_map", "key_feedback_lighting_hold_outcome", "noah_action_describe"]
         },
         {
           "name": "RGB frame individual combo subjects",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
         },
         {
           "name": "RGB frame outcome identity paint",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "paint_owned_subject", "noah_lighting_paint", "noah_profile_lighting_v1_program_thing_field"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "paint_owned_subject", "noah_lighting_paint", "noah_profile_lighting_v1_program_thing_field"]
         },
         {
           "name": "matrix scan macro text press",
@@ -500,35 +506,35 @@
         },
         {
           "name": "RGB query live behaviour identity refresh",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_keymap_refresh", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_keymap_refresh", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "RGB query compiled fallback refresh",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_keymap_refresh", "key_behavior_view_build", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_keymap_refresh", "key_behavior_view_build", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "RGB query combo membership",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "noah_lighting_target", "combo_matches"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "noah_lighting_target", "combo_matches"]
         },
         {
           "name": "RGB query LED mapping",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "noah_lighting_target", "noah_lighting_key_leds", "rgb_matrix_map_row_column_to_led"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "noah_lighting_target", "noah_lighting_key_leds", "rgb_matrix_map_row_column_to_led"]
         },
         {
           "name": "RGB direct action identity paint",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "paint_owned_subject", "noah_lighting_paint", "noah_lighting_keymap_identity"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "paint_owned_subject", "noah_lighting_paint", "noah_lighting_keymap_identity"]
         },
         {
           "name": "RGB retained whole-batch observation",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_working_observe", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_working_observe", "noah_lighting_fact_next", "key_origin_bitmap_side_mask"]
         },
         {
           "name": "RGB retained lifecycle advance",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_working_advance", "rule_info", "noah_lighting_history_rule"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_working_advance", "rule_info", "noah_lighting_history_rule"]
         },
         {
           "name": "RGB retained whole-batch paint",
-          "functions": ["main", "rgb_matrix_task", "apply_rules", "working_paint", "paint_owned_subject", "noah_lighting_paint", "noah_lighting_palette_rgb", "hsv_to_rgb"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "apply_rules", "working_paint", "paint_owned_subject", "noah_lighting_paint", "noah_lighting_palette_rgb", "hsv_to_rgb"]
         },
         {
           "name": "main snapshot source coherent collection",
@@ -560,7 +566,7 @@
         },
         {
           "name": "RGB admitted generation layout validation",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_runtime_sync_role", "noah_lighting_runtime_publish", "noah_profile_lighting_v1_decode", "noah_profile_lighting_v1_validation_step", "read_at", "noah_profile_reader_read"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_runtime_sync_role", "noah_lighting_runtime_publish", "noah_profile_lighting_v1_decode", "noah_profile_lighting_v1_validation_step", "read_at", "noah_profile_reader_read"]
         },
         {
           "name": "event capture scan streaming delayed drain nested fallback",
@@ -832,7 +838,7 @@
         },
         {
           "name": "aggregate gesture RGB retained whole-batch observation",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_working_observe", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_working_observe", "noah_lighting_fact_next", "gesture", "key_origin_bitmap_add_keypos", "handled_key_keypos_in_bounds"]
         },
         {
           "name": "aggregate gesture main snapshot state qualification",
@@ -840,7 +846,7 @@
         },
         {
           "name": "full layout validation RGB admitted generation layout validation",
-          "functions": ["main", "rgb_matrix_task", "noah_lighting_runtime_sync_role", "noah_lighting_runtime_publish", "noah_profile_lighting_v1_decode", "noah_profile_lighting_v1_validation_step", "check_parts", "finish_rule", "reject"]
+          "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_runtime_sync_role", "noah_lighting_runtime_publish", "noah_profile_lighting_v1_decode", "noah_profile_lighting_v1_validation_step", "check_parts", "finish_rule", "reject"]
         },
         {
           "name": "complete behaviour collection event capture scan streaming delayed drain nested fallback",
