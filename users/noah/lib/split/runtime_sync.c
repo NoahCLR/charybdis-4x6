@@ -231,7 +231,7 @@ static int8_t split_runtime_sync_broadcast_base(const split_runtime_base_sync_pa
         return 1;
     }
     if (!noah_split_service_ready(NOAH_SPLIT_SERVICE_BASE)) return -1;
-    uint32_t before = timer_read32();
+    uint32_t before = noah_split_service_clock();
     bool sent;
 #    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
     if (noah_lighting_runtime_shared_scene()) {
@@ -308,7 +308,7 @@ static bool split_runtime_sync_broadcast_lighting(bool force, uint32_t now) {
     size_t                                offset = (size_t)chunk * SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES;
     size_t                                length = NOAH_LIGHTING_SYNCED_BYTES - offset < SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES ? NOAH_LIGHTING_SYNCED_BYTES - offset : SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES;
     memcpy(packet.bytes, split_runtime_lighting_built + offset, length);
-    uint32_t before = timer_read32();
+    uint32_t before = noah_split_service_clock();
     bool     sent   = transaction_rpc_send(PUT_SPLIT_LIGHTING_FACTS_SYNC, sizeof packet, &packet);
     noah_split_service_complete(NOAH_SPLIT_SERVICE_LEGACY, before, sent, false);
     if (!sent) {
@@ -322,7 +322,7 @@ static bool split_runtime_sync_broadcast_lighting(bool force, uint32_t now) {
         memcpy(split_runtime_lighting_sent, split_runtime_lighting_built, NOAH_LIGHTING_SYNCED_BYTES);
         split_runtime_lighting_sent_once  = true;
         split_runtime_lighting_resend_all = false;
-        split_runtime_lighting_last_send  = timer_read32();
+        split_runtime_lighting_last_send  = now;
         split_lighting_transfer.active    = false;
     }
     return true;
