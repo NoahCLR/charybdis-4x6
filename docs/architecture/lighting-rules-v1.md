@@ -1358,6 +1358,201 @@ holds its exact bytes as `standard`):
 with the auto-mouse fade over **Every layer** and the tap-commit flash on.
 Layer 0 has no colour, so the matrix effect shows wherever no rule paints.
 
+## Local understanding and editable presets
+
+The existing version-5 contract supplies the firmware support for local
+Inspector explanations, gesture illustrations, look overviews, Review and
+editable presets. These consumers require **no additional firmware kind,
+capability, trace command or buffer**. They derive results from the selected
+profile, native keymap and explicit local situation/history using the same
+simulator that renders the board. This is not live keyboard telemetry. Live
+fact readback and temporary device frames need their own future contract;
+the internal split snapshot and base readiness byte are not host APIs.
+
+### Readiness and evidence
+
+Paths below are relative to this repository. They identify implementation and
+regression evidence, not files a running client may read from a checkout.
+The shared fixtures are `tests/fixtures/lighting_contract_v1.json` and
+`tests/fixtures/lighting_vectors_v1.json` (called contract and vectors below).
+Firmware module paths share `users/noah/lib/rgb/lighting/`.
+
+| Consumer | Existing support | Source and fixture evidence | Boundary |
+| --- | --- | --- | --- |
+| Inspector | Ordered subjects, filters, target/paint/background, brightness and timing composition | `lighting_engine.c`: `apply_rules`, `paint_owned_subject`, `noah_lighting_resolve`; `tools/lighting_reference.py`: `Renderer.walk`; vectors `render`: `below-composition`, `paint-clear`, `paint-dim`, `paint-tint`, `rule-brightness-background`, `painting-map-outcome-clear-off` | Explain the local situation and all contributors; unknown kinds make the result incomplete. |
+| Gesture timeline | State facts 5/8/12/14, events 25–27, show-after/linger/flash and captured branch/slot/outcome/owners | `lighting.h`, `kinds/fact_behaviour_phase.c`, `lighting_working.c`; vectors `render` `behaviour-phase-0` through `behaviour-phase-4`, `occurrences`, `lifetimes`, `historyObservations`, `historyEvents`, `retainedOrdering` | A local fact/event illustration; key-runtime planning and physical delivery are separate contracts. |
+| Overview | Layer/mode/combo thing tables, facts 1/3/7/9–11 and native shown-layer queries | `lighting_keymap.c`: `noah_lighting_shown_layer`, `noah_lighting_keymap_matches`; contract `registries`, vectors `render` `layer-status-*`, `combo-identity-*`, `keys-that-*` | Use real configured ids and labelled situations; an absent/disabled identity is not an active subject. |
+| Review | Strict saved-domain validation, brightness limit, conservative working admission and known render semantics | `users/noah/lib/profile/schema/profile_lighting_v1.c`: validator, `noah_profile_lighting_v1_working_cost`, `noah_profile_lighting_v1_working_admit`; contract `workingMemory`, vectors `codec`, `workingMemory`, `lifetimes` | Reachability, universal shadowing and colour similarity are client analyses with the proof limits below. |
+| Standard | Existing compiled v4 conversion, exact Standard bytes and retired-stage parity oracle | `users/noah/lib/profile/schema/profile_rgb_compiled_v1.c`, `profile_lighting_v1_convert.c` in the same directory; `tools/lighting_reference.py`: `convert_v4`; vectors `conversion.standard`, `codec.valid` | Preserve the exact conversion, including extensions and capability-dependent omissions. |
+| Minimal / Teaching | Existing layer rules; target8 queries10/15; paint9 direct-action identity and paint2 palette colour | `lighting_keymap.c`, `kinds/target_keys_that.c`, `kinds/paint_what_it_does.c`; vectors `render` `keys-that-10-*`, `keys-that-15-*`, `what-it-does` | Construct editable ordinary rules as below; no preset runtime mode. |
+
+These are existing regression surfaces, not a claim of new test execution:
+`tests/host/run_lighting_render_vectors_tests.sh`,
+`run_lighting_keymap_tests.sh`, `run_lighting_working_tests.sh`,
+`run_lighting_retained_ordering_tests.sh`, `run_profile_lighting_v1_tests.sh`
+and `run_lighting_parity_tests.sh` in the same directory. In particular,
+`lighting_working_ordering_test.c` covers shipping admitted ordering; synthetic
+reference ties and reduced-geometry cases retain the qualifications in
+[Subjects](#subjects). No preset-specific shared vectors are asserted here.
+
+### Explanations and local situations
+
+Stored order determines rule priority, not specificity or an editor's bands.
+Within a rule a positive first condition yields subjects; a negated first
+condition or no conditions gives the board subject. Other conditions are
+existential filters, not joins that replace a subject's identity or keys.
+Natural subject priority precedes full-match-entry recency; continuous refresh
+does not renew entry order. Timing, retained owners, slot and outcome follow
+the existing D1/D2 rules in [Timings](#timings).
+
+For one LED, distinguish a rule that is disabled, unmatched, filtered out,
+not yet shown, expired, clear, covered, or contributing. A target miss is not
+necessarily a miss of the whole rule: the background also runs when a targeted
+paint returns clear. Off is opaque black. Dim, tint, timing blends and the
+auto-mouse fade can depend on several lower contributions, including the
+matrix effect. A single opaque winner is only the simple case. Diagnostics
+and RGB sleep retain their [outer precedence](#outside-the-registries).
+
+"What if this rule were clear?" is a local counterfactual on the same situation
+and history. State whether it clears a selected map cell, foreground paint,
+or the entire rule: a clear foreground can still expose that rule's background.
+Replay local history when a counterfactual changes matching/timing; do not
+reuse stale rule-indexed histories after changing the list. This analysis
+needs no host trace and makes no draft change until the user edits. A client
+that cannot interpret a kind/extension preserves its bytes and marks dependent
+explanations incomplete; it cannot assume that unknown paint is clear.
+
+Overview thumbnails each start from an isolated explicit situation/history.
+Label the chosen layer, mode, combo role, owners and time rather than presenting
+one canonical look for every possible combination. Layer subjects query their
+own native layer; other subjects use the highest active layer, including the
+synthetic fade destination. `KC_TRNS` does not resolve to a lower action in
+target8/paint9. Native HID categories do not predict host characters.
+Geometry follows the vectors' matrix-to-LED map: LED55 associates with matrix56;
+matrix59 (the physical-layout thumb),24,54,58 have no association. Explain an
+unassociated key; keep fixed LED55 painting unchanged. This does not establish
+physical wiring or justify remapping QMK.
+
+### Gesture illustration inputs
+
+[The feedback story](../rgbflow.md) and
+[the interaction model](../INTERACTION_MODEL.md) govern branch selection,
+fallbacks and the four hold modes. The behaviour domain already supplies the
+row's enabled/allowed-layer policy, populated tap indices, actions, hold modes,
+repeat rates and timing overrides ([Profile Wire](profile-wire-v1.md#key-behavior-domain)).
+Settings v7 scalars0–3 supply default tapping/tap-hold/long-hold/multi-tap terms;
+scalar15 supplies the feedback flash half-period
+([settings](portable-profile-v1.md#settings-domain-0x40-version-7)). Zero row
+terms inherit defaults; authored LT rows inherit the dual-role tapping term
+for tap-hold, while other custom rows inherit the custom tap-hold default.
+Do not hard-code the illustrative150/400/150/200ms values in `rgbflow.md`.
+The existing implementation seams are
+`users/noah/lib/key/runtime/planning/scan_planner.c` for tier thresholds and
+`users/noah/lib/key/runtime/feedback.c` for feedback/phase projection; these
+do not turn the lighting simulator into the key planner.
+
+Press selects a candidate branch, not a tap-fired event. Tap2 requires a first
+qualifying press/release then an on-time second press; the released gap includes
+equality with the multi-tap term. Double hold is that second press held.
+Hold/long-hold ages start at the current physical press, not the first tap.
+Only a materialized tier creates its threshold: a long-hold-only branch does
+not acquire an invented hold transition. Tap emission waits for release/series
+settlement; pending multi-tap timeout closes strictly after the term. Authored
+branch cycling, omitted versus transparent fields and immediate/default holds
+must follow the interaction model, not a generic four-step animation.
+
+Drive the local renderer with selected facts, coherent occurrences and logical
+time. Event triggers remain positive first conditions with explicit flash;
+filters qualify at occurrence, qualifying repeats replace and nonqualifying
+repeats preserve. State linger retains the last eligible whole ordered batch;
+unmatured show-after produces no tail and full re-entry starts a new match.
+Do not turn every threshold into a fired event: tap-on-release and held/repeat
+modes have different lifecycles. Label unsupported or conditional paths when
+transparent lower-tier resolution, participation, pointer interception, combo
+arbitration or foreign-key/QMK buffering is not modelled. Missing configuration
+is unknown, not permission to invent a default. This illustration is neither a
+complete physical-input emulator nor measured keyboard timing.
+
+### Review proof limits
+
+A rule is universally shadowed only when every situation in which it can
+paint is covered by an opaque higher contribution on every affected LED.
+Include backgrounds, subject order, clear/none identities, query-layer basis,
+timing and below-reading composition in that proof. A rule hidden in one
+thumbnail is not necessarily never visible. A known show-after longer than
+its event flash window is a justified never-visible example. Unreachable-fact
+warnings need an actual reachability proof from the existing action/participation
+analysis; an unknown action or unsupported kind is not impossible.
+
+Check palette values and rule brightness against the reported cap using the
+existing validator semantics. Similar identity colours may merit advice in a
+declared colour comparison space; screen similarity does not calibrate physical
+LEDs. Report saved bytes against8192 separately from model1 working admission:
+fixed8220 capacity, registry worst-case thing/member bounds and `2S + W`, without
+sharing, duration, filter or rate discounts. Unknown cost inputs are unknown,
+not zero or assumed full capacity. Disabled retained rules have no working
+charge; preserve over-budget drafts rather than silently dropping rules.
+
+### Preset construction
+
+Presets replace lighting with editable starting data in one explicit reviewed
+draft operation. Preserve unrelated domains and explain any intentional
+replacement of opaque lighting bytes; never silently discard them. Validate
+encoded size, references, brightness, all required capability bits and working
+admission before offering the result for activation. Optional modules remain
+owned by `users/noah/source_manifest.mk` and the open registry in
+`users/noah/lib/profile/schema/profile_lighting_kinds_v1.h`; there is no new
+preset bit or per-kind engine branch.
+
+- **Standard:** use the existing factory conversion and exact
+  [Standard rule set](#standard-lighting), not an approximation from currently
+  edited colours. The `conversion.standard` fixture pins this build's bytes;
+  reduced-module conversion follows the existing conversion contract.
+- **Minimal:** retain only Standard's layer looks (Every layer and layer
+  accent rules, with their required palette/places/key sets). Omit preview,
+  mode, combo and behaviour feedback rules and both fade/tap-commit extensions.
+  The matrix effect remains below clear layer looks; RGB sleep still applies.
+- **Teaching:** use Minimal below passive learning accents. One layer-key rule
+  uses fact9 `(any, top=0)`, target8 `(query10, any)` and paint9, with no
+  background or timing. Thus the top-layer subject selects that exact native
+  layer and direct layer-action keys show their target layer's slot-zero identity.
+  Supported native actions are exactly `noah_lighting_keymap_identity`'s
+  MO/TO/TG/OSL/TT/LM/LT/userspace-lock cases. This does not inspect behaviour
+  branches or resolve transparent keys; raw DF/PDF are not inferred.
+
+For Teaching combo accents, emit one rule per enabled combo C above the
+layer-key rule: fact9 `(any, top=0)`, target8 `(query15, C)`, paint2 with a
+snapshot of the resolved combo C slot-zero colour. Target8 itself checks enabled row,
+allowed shown layer and exact native input equality; it does not prove chord
+reachability or incorporate every runtime participation veto. Describe these
+as configured combo inputs, not a guarantee they fire. Lower combo row id goes
+first, so it wins overlaps; combo accents win over layer-key accents. A `none`
+combo identity emits no accent, while a black palette entry remains opaque.
+
+This explicit colour reference is necessary: paint3 would use the **layer**
+subject's identity, and fact7 would require the combo to be held. Resolve
+default/inherited combo colour when constructing the preset; missing tables or
+`none` produce no invented colour. Copy the colour into the preset palette
+without sharing its entry with a retained combo identity reference. Snapshot
+accents may share entries with each other. This creation-time copy is the
+selected preset policy: the client must say **Teaching copies current combo
+colours; recreate the preset to refresh them**. Later combo identity changes
+do not recolour these hints; direct hint rule/palette edits are independent.
+Do not persist hidden provenance or add automatic recolouring. Account for
+copied palette entries within the128-entry and8192-byte limits. No fake
+always-active combo fact or dynamic cross-subject paint is implied. Require
+fact9, target8, paint9/2 and the relevant thing tables; if unavailable, explain
+that construction is unsupported instead of silently substituting other colours.
+
+All local explanations retain the existing hardware limits in
+[Wire cost and timing limits](#wire-cost-and-timing-limits): useful8220/200ms
+48RPC/~137ms blocking model, ordinary facts5RPC/~20ms, quiet peer detection up
+to the existing1s heartbeat plus ~946ms cold resync model. These are projections,
+not measured pointing cadence, oscillator drift, global/interrupt-stack or
+allocator high-water evidence. No resource-policy change or new RAM claim
+follows from client-side analysis; [memory budgets](memory-budgets.md) still
+govern per-half linked accounting and physical acceptance remains pending.
+
 ## Modularity walkthroughs
 
 Each walkthrough adds one entry to the version-5 engine. Each touches one
