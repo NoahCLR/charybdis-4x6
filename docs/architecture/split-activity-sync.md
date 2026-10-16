@@ -144,62 +144,61 @@ asynchronous transport, are not built. Measure with the recorders below before
 building either. No 1 kHz claim or acceptance is implied by the activity
 implementation or calculated byte savings.
 
-
 ## Shared main-context optional bus service
 
 When the complete Lighting Live consumer is enabled, userspace's optional split
 RPCs share one main-owned admission record: base state, retained snapshots,
-preview, profile reconciliation, durable VIA, mirror and the legacy facts
-fallback. QMK's mandatory matrix/pointing transport remains outside this budget.
-Main starts one admission pass before durable I/O and key processing. At most
-one userspace RPC completes per pass. A round-robin wanted mask survives denied
-attempts and removes inactive demand within two passes; clients do not advance
-sequence, clear a pending cut or report transport failure merely for deferral.
+preview, profile reconciliation, durable VIA, the VIA mirror and the legacy
+facts fallback. QMK's mandatory matrix and pointing transport stays outside
+this budget. Main opens one admission pass per matrix scan, before durable I/O
+and key processing, and at most one userspace RPC completes per pass. A
+round-robin wanted mask survives denied attempts and drops inactive demand
+within two passes. A client asks before any state side effect, so deferral
+never advances a sequence, clears a pending cut or counts as transport failure.
 
-Every actual completion reserves quiet time AFTER the measured transaction:
-`4 * (elapsed_ms + 1)` milliseconds for CURRENT-only, preview and durable work,
-capped at1000 ms for a transaction lasting250 ms or more. Existing qualified
-history cuts and cold coherent synchronization receive a1 ms opportunity so
-short retained feedback remains useful. This priority never bypasses one RPC
-per pass, fairness or the shared outage cooldown. Repeated PENDING is not
-progress: a second consecutive PENDING for a retained packet gets ordinary
-quiet time; stale ACKs, REJECT and NEED_HELLO do not earn prompt service.
-The first failure reserves at least50 ms, doubling to1000 ms across senders;
-success ends outage backoff but still reserves completion-relative quiet time.
-No new idle heartbeat or busy wait is introduced. Local receiver/store progress,
-lease expiry and local END release continue while sends are denied.
+Every actual completion reserves quiet time after the measured transaction:
+`4 * (elapsed_ms + 1)` ms for CURRENT-only, preview and durable work, capped at
+1,000 ms for a transaction of 250 ms or more. Qualified history cuts and cold
+coherent synchronization get a 1 ms opportunity instead, so short retained
+feedback stays useful. That priority never bypasses one RPC per pass, fairness
+or the shared outage cooldown. Repeated PENDING is not progress: a second
+consecutive PENDING for the same retained packet gets ordinary quiet time, and
+stale ACKs, REJECT and NEED_HELLO never earn prompt service. A failure from any
+client reserves at least 50 ms, doubling to 1,000 ms; success ends the outage
+backoff but still reserves its quiet time. No idle heartbeat or busy wait is
+added. Receivers, local stores, lease expiry and local END release keep running
+while sends are denied.
 
-CURRENT producers keep advancing while an immutable cut is in flight. Only the
-collector freezes latest CURRENT state after that cut's actual main ACK; old
-ACKs cannot clear a newer qualified history. The legacy facts fallback also
-holds its existing built bank immutable and sends one admitted changed chunk
-per pass, committing the full cut with its final chunk. It allocates control
-bits/cursors, not another facts bank. Builds without the complete live consumer
-retain their previous paths and resource selectors.
+CURRENT producers keep advancing while an immutable cut is in flight; the
+collector takes the latest CURRENT state only after that cut's actual main
+ACK, and an old ACK cannot clear a newer qualified history. The legacy facts
+fallback likewise holds its existing built bank as the cut and sends one
+admitted changed chunk per pass, committing with the final chunk; it adds
+control bits and cursors, not another facts bank. Builds without the complete
+live consumer keep their previous send paths and resource selectors.
 
-Ordinary VIA mirroring remains best effort. An owned32-byte outgoing report
-plus length/pending preserves one exact command; it is independent of the peer
-mailbox. Later accepted CURRENT storage changes restart the canonical digest
-and coalesce through authoritative full reconciliation. Queueing does not prove
-remote storage or convergence. Role/init, the inactive logical-bank guard and
-VIA generation changes invalidate an old queued command before it could undo
-newer authoritative convergence. Logical transaction operations and qualified
-lighting histories never use this best-effort coalescing path.
+VIA mirroring stays best effort. The master owns one exact outgoing command
+(32-byte report, length, pending), separate from the peer's incoming mailbox.
+Accepted storage changes made while it waits restart the canonical digest and
+converge through authoritative full reconciliation. Queueing does not imply
+remote storage or convergence. A role change, the inactive logical-bank guard
+or a VIA generation change drops the queued command, so it cannot undo newer
+authoritative state. Logical transaction operations and qualified lighting
+histories never use this coalescing path.
 
-The charged230400/8N1 plus pinned PIO-wait host regression enforces max12 ms
-service gap, one RPC per pass and <=25% duty/100 RPC/s for its ordinary CURRENT
-scenarios. Its unpaced negative control reproduces266 RPC/s and734/1000 blocked
-main time; admission reduces the same continuous producer to66/181. Actual
-base/retained/preview/profile/VIA/mirror consumers under the production durable
-scheduler achieve151 calls over3 s,170/1000 blocked, max6122 us and burst1,
-complete preview with two renewals/END, then exact storage/digest/CURRENT
-convergence within2 s after quiescence. Outage injection gives seven attempts
-in3 s with bounded quiet intervals. These are named executable schedules, not
-physical service guarantees or evidence of real packet loss.
-
-Qualified input every50 ms is a separate stress regime:151 RPC/s,423/1000
-blocked, max4559 us and burst1 in the same model. The prompt-history policy
-preserves the existing200 ms positive/expiry assertions; there is NO global25%
-duty claim under arbitrary qualified input. Physical pointing cadence/freezing,
-oscillator drift, global IRQ/allocator/stack high-water and sustained hardware
-load remain acceptance work. No model or green gate waives a reported stall.
+`tests/host/run_split_service_tests.sh` charges 230,400 baud 8N1 plus the pinned
+PIO waits on one clock and gates ordinary CURRENT scenarios at a 12 ms maximum
+service gap, one RPC per pass, and at most 25% blocked main time and 100 RPC/s.
+Its unpaced negative control must still reproduce the original 266 RPC/s and
+734/1000 blocked time; admission brings the same continuous producer to
+66 RPC/s and 180/1000. With all six consumers under the production durable-I/O
+scheduler, including a preview BEGIN, publish, two renewals and END, the model
+gives 149 calls in 3 s, 170/1000 blocked, a 6,122 us maximum gap and bursts of
+one, then exact storage, digest and CURRENT convergence within 2 s of
+quiescence. An all-client outage gives seven attempts in 3 s. Qualified input
+every 50 ms is a separate stress case at 152 RPC/s and 427/1000 blocked: prompt
+history service keeps the existing 200 ms positive and expiry assertions, and
+there is no 25% claim under arbitrary qualified input. These are executable
+schedules, not physical guarantees or evidence of real packet loss; pointing
+cadence under load, drift, high-water and sustained hardware load remain
+acceptance work.

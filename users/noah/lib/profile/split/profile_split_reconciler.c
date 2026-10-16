@@ -63,6 +63,11 @@ static noah_profile_split_reconciler_state_t prepared_payload_complete_state(con
     return reconciler && reconciler->prepared_push_active ? NOAH_PROFILE_SPLIT_RECONCILER_PUSH_DURABLE : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT;
 }
 
+__attribute__((weak)) bool noah_profile_split_exchange_admitted(void *transport_context) {
+    (void)transport_context;
+    return true;
+}
+
 static bool deadline_reached(uint32_t now, uint32_t deadline) {
     return (int32_t)(now - deadline) >= 0;
 }
@@ -1670,7 +1675,9 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
     if (!reconciler->attempt_immediate && !deadline_reached(now_ms, reconciler->next_attempt_at)) {
         return false;
     }
-    if (reconciler->config.exchange_ready && !reconciler->config.exchange_ready(reconciler->config.transport_context)) return false;
+    if (!noah_profile_split_exchange_admitted(reconciler->config.transport_context)) {
+        return false;
+    }
     reconciler->attempt_immediate = false;
     if (mode == NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY && reconciler->state >= NOAH_PROFILE_SPLIT_RECONCILER_PULL_BEGIN && reconciler->state <= NOAH_PROFILE_SPLIT_RECONCILER_PULL_COMMIT_STEP) {
         reconciler->last_status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;

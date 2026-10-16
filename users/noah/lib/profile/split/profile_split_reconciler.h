@@ -83,7 +83,6 @@ typedef bool (*noah_profile_split_local_read_fn)(void *context, const noah_profi
 typedef bool (*noah_profile_split_local_binding_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t *via_generation, uint32_t *via_digest);
 // Sends one request of request_length bytes (32 up to the largest frame) and
 // receives the peer's 32-byte reply.
-typedef bool (*noah_profile_split_exchange_ready_fn)(void *context);
 typedef bool (*noah_profile_split_exchange_fn)(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);
 
 // A range of a prepared copy the peer can fill from its own active profile:
@@ -106,7 +105,6 @@ typedef struct {
     noah_profile_split_local_binding_fn    local_binding;
     void                                  *transport_context;
     noah_profile_split_exchange_fn         exchange;
-    noah_profile_split_exchange_ready_fn   exchange_ready; // optional main-owned bus admission
     noah_profile_peer_store_backend_t     *peer_store;
     // Optional. A prepared push asks it which ranges the peer can copy from
     // its own active profile and sends PAYLOAD_REUSE for those instead of
@@ -256,6 +254,11 @@ typedef struct {
 } noah_profile_split_reconciler_t;
 
 void noah_profile_split_reconciler_init(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_reconciler_config_t *config);
+// Asked immediately before each outbound attempt, after local and mailbox
+// progress. A refusal defers the attempt with its request and counters intact.
+// The weak default admits every attempt; an integration that shares the split
+// bus with other senders overrides it. No per-instance state is stored.
+bool noah_profile_split_exchange_admitted(void *transport_context);
 
 // QMK RPC/callback side. It performs strict frame decode, at most one bounded
 // mailbox copy, and a cached response copy. EEPROM, validation, and provider

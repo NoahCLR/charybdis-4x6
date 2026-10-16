@@ -24,10 +24,13 @@ static void noah_qmk_profile_split_rpc(uint8_t request_size, const void *request
     }
 }
 
-static bool profile_service_ready(void *context) {
-    (void)context;
+// Overrides the reconciler's weak admission hook: profile exchanges share the
+// main-owned split bus admission with the other optional userspace senders.
+bool noah_profile_split_exchange_admitted(void *transport_context) {
+    (void)transport_context;
     return noah_split_service_ready(NOAH_SPLIT_SERVICE_PROFILE);
 }
+
 bool noah_qmk_profile_split_transport_init(noah_profile_split_reconciler_t *reconciler) {
     if (!reconciler || !noah_profile_split_reconciler_authority(reconciler)) {
         return false;
@@ -35,7 +38,6 @@ bool noah_qmk_profile_split_transport_init(noah_profile_split_reconciler_t *reco
     if (noah_qmk_profile_split_reconciler) {
         return noah_qmk_profile_split_reconciler == reconciler;
     }
-    reconciler->config.exchange_ready = profile_service_ready;
     noah_qmk_profile_split_reconciler = reconciler;
     transaction_register_rpc(PUT_PROFILE_SPLIT_SYNC, noah_qmk_profile_split_rpc);
     return true;

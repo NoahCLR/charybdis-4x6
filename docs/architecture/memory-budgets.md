@@ -818,21 +818,35 @@ or loop stalls/sleep do not provide a wall-clock lease extinction guarantee.
 
 ## Shared optional split admission ownership
 
-The main-owned admission record adds16 bytes (two u32 timestamps, u16 failure
-backoff, three one-byte masks/cursors and three bool flags). Snapshot repeated-
-PENDING tracking adds one byte. The existing reconciler config gains one optional
-function pointer (4 bytes on this Cortex-M0+ ABI); the adapter installs it after
-owner initialization. It checks admission after local/receiver/store work and
-before outbound request/counter/sequence changes. The owned outgoing mirror
-report adds34 bytes plus one role byte and a4-byte existing VIA-generation
-stamp. It does not reuse the incoming mailbox. The legacy facts fallback adds
-`ceil(SPLIT_RUNTIME_SYNC_FACTS_CHUNKS/8)+3` control bytes and freezes its existing
-built bank through final-chunk completion; no additional facts bank is allocated.
+Shared split admission (see
+[split-activity-sync](split-activity-sync.md#shared-main-context-optional-bus-service))
+is part of the complete Lighting Live selector above and is funded inside the
+same fixed 249,344 B ceiling; it adds no policy. Its linked objects per half:
 
-These declarations coexist with the full1272-byte Lighting Live state and all
-prior histories/raw/staged-program storage. Compiler placement/padding and the
-complete linked delta require fresh per-half ELF accounting. The fixed249344
-static,4096 core-span floor,1920/768 reviewed-path stack and270336 physical SRAM
-policies remain unchanged. The shared scheduler's paths, optional reconciler
-callback and queued mirror/legacy send/reset/error/deferral paths must join both
-tracked stack manifests; a faster host model does not excuse a resource failure.
+| Object | Bytes |
+| --- | ---: |
+| Admission record (`service`: two u32 times, u16 backoff, three u8 masks/cursor, three flags) | 16 |
+| Owned outgoing VIA mirror report (32 B frame, length, pending) | 34 |
+| Mirror role and VIA-generation stamp | 1 + 4 |
+| Legacy facts transfer control (3 B chunk mask, cursor, last, active) | 6 |
+| Snapshot repeated-PENDING streak | 1 |
+| Total symbols | 62 |
+
+Both halves at the pinned BK commit and build image link 5,304 B `.data` plus
+243,704 B `.bss`: 249,008 B static, 336 B below the 249,344 B policy. That is
+72 B above the 248,936 B Lighting Live basis: the 62 B above plus 10 B of
+section alignment. The SRAM0–3 prefix is 249,016 B and the boot core-memory
+span 13,128 B (floor 4,096 B); neither is runtime-free memory. No facts bank,
+mailbox or transport buffer is added: the legacy fallback holds its existing
+built bank as the in-flight cut.
+
+The added admission, completion, cancellation, queued-mirror send, legacy chunk
+send and profile-admission paths join both tracked stack manifests (583
+ordinary and 515 owner scenarios, every earlier scenario and indirect assertion
+retained). Main/slave maxima stay 1,896/304 B ordinary and 1,912/624 B owner
+under the unchanged 1,920/768 B ceilings. Profile admission is a weak
+reconciler hook rather than a reconciler-config field on purpose: a 4-byte
+config field shifted every later member of the profile owner, and the relink
+grew the owner scan frame from 208 to 224 B, taking the reviewed
+peer-candidate-write path to 1,928 B. These reports prove the named paths only,
+not global or interrupt maxima.

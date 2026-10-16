@@ -415,9 +415,9 @@ new idle heartbeat. Existing ordinary facts/history synchronization continues.
 One call per live main step adds synchronous work to existing scan work; neither
 host wire projections nor passing stack paths prove physical pointing cadence.
 
-
-The QMK adapter may install a main-owned outbound-admission predicate in the
-reconciler config. It is checked after local storage, receiver mailbox and
-lease progress, immediately before outbound attempts. Denial preserves the
-request/sequence/counters and is not transport loss. The shared userspace bus
-scheduler accounts each actual completion; no wire fields or statuses change.
+Before each outbound attempt, after local storage, receiver mailbox and lease
+progress, the reconciler asks `noah_profile_split_exchange_admitted()`. Its
+weak default admits; the QMK adapter overrides it with the shared main-owned
+split admission. A refusal keeps the request, sequence and counters and is not
+transport loss. The shared scheduler accounts each actual completion; no wire
+fields or statuses change.

@@ -314,8 +314,8 @@ last-success snapshots change only after that domain succeeds. Failure and
 recovery are traced, but suppressed scans are intentionally silent.
 
 For the complete Lighting Live build, [shared optional bus admission](split-activity-sync.md#shared-main-context-optional-bus-service)
-additionally limits actual sends across base, lighting, preview and durable
-profile/VIA work. Deferred clients preserve their request state; receiver/main
+additionally limits actual sends across base, lighting, preview, durable
+profile/VIA and mirror work. Deferred clients preserve their request state; receiver/main
 progress and local preview expiry/release still run. Last-success data is updated
 only after actual transport completion, not an admission denial.
 
