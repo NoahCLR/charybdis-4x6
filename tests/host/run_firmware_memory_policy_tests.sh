@@ -7,7 +7,7 @@ trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 check() {
     expected="$1"
     printf '%s\n' "$2" > "$BUILD_DIR/cflags.txt"
-    actual="$(noah_firmware_static_ram_policy "$BUILD_DIR/cflags.txt" "${3:-yes}" "${4:-no}")"
+    actual="$(noah_firmware_static_ram_policy "$BUILD_DIR/cflags.txt" "${3:-yes}" "${4:-no}" "${5:-no}")"
     if [ "$actual" != "$expected" ]; then
         echo "memory policy: expected $expected, got $actual for $2" >&2
         exit 1
@@ -52,3 +52,14 @@ check 226304 "$profile -UNOAH_LIGHTING_TARGET_KEYS_THAT -UNOAH_LIGHTING_PAINT_WH
 check 57344 "$profile -D NOAH_PD_PROFILE_ENABLE=0"
 check 229376 "$profile -U NOAH_PD_PROFILE_ENABLE -D NOAH_PD_PROFILE_ENABLE"
 echo 'firmware memory artifact policies: query increment scoped; unrelated and disabled-cache limits preserved'
+
+live="$profile -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DNOAH_LIGHTING_LIVE_ENABLE=1"
+check 249344 "$live" yes yes yes
+check 247808 "$live" yes yes no
+check 229376 "$live" yes no yes
+check 226304 "$live" no yes yes
+check 247808 "$profile -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1" yes yes yes
+check 247808 "$live -DNOAH_LIGHTING_LIVE_ENABLE=0" yes yes yes
+check 247808 "$live -UNOAH_LIGHTING_LIVE_ENABLE" yes yes yes
+check 247808 "$live -DNOAH_LIGHTING_LIVE_ENABLE=unknown" yes yes yes
+python3 "$ROOT/tests/host/firmware_memory_configuration_test.py"

@@ -52,7 +52,12 @@ RETAINED_CONFIGURATION=no
 if (cd "$QMK_ROOT" && "$PYTHON" "$ROOT/tools/firmware_memory_configuration.py" "$CFLAGS_FILE"); then
     RETAINED_CONFIGURATION=yes
 fi
-STATIC_RAM_POLICY="$(noah_firmware_static_ram_policy "$CFLAGS_FILE" "$QUERY_CACHE_LINKED" "$RETAINED_CONFIGURATION")"
+LIVE_CONFIGURATION=no
+if (cd "$QMK_ROOT" && "$PYTHON" "$ROOT/tools/firmware_memory_configuration.py" "$CFLAGS_FILE" \
+    --lighting-live-elf "$ELF" --nm "${NM:-arm-none-eabi-nm}"); then
+    LIVE_CONFIGURATION=yes
+fi
+STATIC_RAM_POLICY="$(noah_firmware_static_ram_policy "$CFLAGS_FILE" "$QUERY_CACHE_LINKED" "$RETAINED_CONFIGURATION" "$LIVE_CONFIGURATION")"
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \
     --elf "$ELF" \

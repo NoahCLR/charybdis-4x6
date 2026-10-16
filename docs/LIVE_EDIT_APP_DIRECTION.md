@@ -71,8 +71,8 @@ has a scoped247808-byte static policy for this storage; core and stack policies
 are unchanged (D-F26). None of it has run on hardware.
 
 The Lighting Live candidate adds coherent sampled main facts and a separate
-leased complete-frame override (D-F27); integration/resource acceptance remains
-pending. It never saves a preview or claims a full event/contribution trace.
+leased complete-frame override (D-F27), with a scoped249344-byte static
+policy for the complete linked default configuration. It never saves a preview or claims a full event/contribution trace.
 
 The keyboard's name lives in settings v7 and is its USB product string
 (D-F25): read before USB starts, and taken up after a rename by one USB
@@ -1588,10 +1588,16 @@ the pinned raw-effect ownership seam, including a preview already awaiting flush
 Reset/role/profile/clock/suspend invalidates sessions and samples. Volatile
 owner/token correlation is not durable anti-replay or authentication.
 
-The candidate's explicit1272B fixed representation is authorized for measurement
-under unchanged resource policies, not an allocation-policy rise or physical
-acceptance. [Memory accounting](architecture/memory-budgets.md#lighting-live-candidate-accounting)
-requires both-half links and complete reviewed paths. The client follow-up must
+The complete linked default GCC15.2.0/60-key/four-combo/58-LED/29-left
+implementation has a fixed249344B static policy, a scoped1536B amendment.
+Measured per-half static248936B comprises the prior247652B plus1272B owned
+state and12B appended split descriptor;408B is regression-policy margin.
+Compiler/forced-header and complete linked-state/consumer proof is required;
+flags or filenames alone cannot grant this ceiling. Other selectors, physical
+270336B/core floor4096/main1920/slave768 remain unchanged.
+[Memory accounting](architecture/memory-budgets.md#lighting-live-candidate-accounting)
+records exact ELF/provenance, section alignment, complete four-path coverage and
+combined-work models; none is runtime-free RAM or physical acceptance. The client follow-up must
 adopt exact fixtures/capabilities, pin this completed firmware and present live
 samples as read-only with explicit preview opt-in, END on exit and lease recovery
 on lost exit. First physical release, cadence, drift and high-water remain open.

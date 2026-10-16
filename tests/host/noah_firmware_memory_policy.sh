@@ -1,7 +1,8 @@
 # Select an artifact policy from its recorded flags, never its target filename.
+# Argument4 additionally requires complete linked live state/consumer and compiler proof.
 # Argument3 requires the compiler's separate GCC/geometry assertion to pass.
 noah_firmware_static_ram_policy() {
-    python3 - "$1" "${2:-no}" "${3:-no}" <<'PY'
+    python3 - "$1" "${2:-no}" "${3:-no}" "${4:-no}" <<'PY'
 import pathlib
 import re
 import shlex
@@ -37,6 +38,8 @@ elif (sys.argv[2] == 'yes' and enabled('NOAH_PORTABLE_PROFILE_ENABLE')
       and (enabled('NOAH_LIGHTING_TARGET_KEYS_THAT', True)
            or enabled('NOAH_LIGHTING_PAINT_WHAT_IT_DOES', True))):
     policy = 247808 if sys.argv[3] == 'yes' and enabled('NOAH_LIGHTING_EVENT_CAPTURE_ENABLE') else 229376
+    if policy == 247808 and sys.argv[4] == 'yes' and enabled('NOAH_LIGHTING_LIVE_ENABLE'):
+        policy = 249344
 else:
     policy = 226304
 print(policy)
