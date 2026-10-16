@@ -414,3 +414,10 @@ consumption polls at5ms. No RPC when no live/staging/cleanup work exists, and no
 new idle heartbeat. Existing ordinary facts/history synchronization continues.
 One call per live main step adds synchronous work to existing scan work; neither
 host wire projections nor passing stack paths prove physical pointing cadence.
+
+
+The QMK adapter may install a main-owned outbound-admission predicate in the
+reconciler config. It is checked after local storage, receiver mailbox and
+lease progress, immediately before outbound attempts. Denial preserves the
+request/sequence/counters and is not transport loss. The shared userspace bus
+scheduler accounts each actual completion; no wire fields or statuses change.

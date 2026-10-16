@@ -18,7 +18,7 @@ for variant in normal sanitized; do
       -c "$SOURCE" -o "$BUILD_DIR/peer.o"
     # shellcheck disable=SC2086
     cc $flags $san -DQMK_KEYBOARD_H='"qmk_stub.h"' -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
-      "$ROOT/tests/host/lighting_live_test.c" "$SOURCE" "$BUILD_DIR/peer.o" -o "$BUILD_DIR/probe"
+      "$ROOT/tests/host/lighting_live_test.c" "$SOURCE" "$ROOT/users/noah/lib/compat/qmk_split_service.c" "$BUILD_DIR/peer.o" -o "$BUILD_DIR/probe"
     "$BUILD_DIR/probe" "$BUILD_DIR/vectors"
     for namespace in 1 2 3 4; do "$BUILD_DIR/probe" "$BUILD_DIR/vectors" "$namespace"; done
 done

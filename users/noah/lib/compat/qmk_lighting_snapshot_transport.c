@@ -2,6 +2,7 @@
 #if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE && defined(SPLIT_TRANSACTION_IDS_USER)
 #    include "../rgb/lighting/lighting_snapshot.h"
 #    include "transactions.h"
+#    include "qmk_split_service.h"
 #    include "atomic_util.h"
 #    include <string.h>
 static noah_lighting_snapshot_t snapshot;
@@ -15,6 +16,7 @@ static noah_lighting_snapshot_t snapshot;
 #    endif
 _Static_assert(SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS > 0u && SPLIT_RUNTIME_SYNC_RETRY_MAX_MS >= SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS && SPLIT_RUNTIME_SYNC_RETRY_MAX_MS <= UINT32_MAX / 2u, "bounded existing failure backoff");
 static uint32_t last_failure, retry_delay;
+static uint8_t  pending_streak;
 void noah_qmk_lighting_snapshot_changed(void) { snapshot.dirty = true; }
 uint8_t *noah_qmk_lighting_snapshot_fact_changes(void) { return snapshot.fact_dirty; }
 _Static_assert(NOAH_LIGHTING_SNAPSHOT_REQUEST <= RPC_M2S_BUFFER_SIZE, "snapshot request allocation unchanged");
@@ -35,7 +37,8 @@ static void snapshot_rpc(uint8_t request_size, const void *request, uint8_t resp
 }
 void noah_qmk_lighting_snapshot_init(noah_lighting_working_t *working, const uint8_t profile[22]) {
     noah_qmk_lighting_snapshot_close();
-    retry_delay = 0u;
+    retry_delay    = 0u;
+    pending_streak = 0;
     noah_lighting_snapshot_begin(&snapshot, working, is_keyboard_master(), profile);
     transaction_register_rpc(PUT_SPLIT_LIGHTING_EVENTS_SYNC, snapshot_rpc);
 }
@@ -56,18 +59,34 @@ bool noah_qmk_lighting_snapshot_step(void) {
         return changed;
     }
     if (retry_delay && now - last_failure < retry_delay) return false;
+    if (!noah_split_service_ready(NOAH_SPLIT_SERVICE_LIGHTING)) return false;
     uint8_t length = noah_lighting_snapshot_request(&snapshot, now);
-    if (!length) return false;
+    if (!length) {
+        noah_split_service_cancel(NOAH_SPLIT_SERVICE_LIGHTING);
+        return false;
+    }
     uint8_t  reply[NOAH_LIGHTING_SNAPSHOT_REPLY] = {0};
     uint32_t before = timer_read32();
     if (!transaction_rpc_exec(PUT_SPLIT_LIGHTING_EVENTS_SYNC, length, snapshot.link.packet.outgoing, sizeof reply, reply) ||
         reply[0] != (NOAH_LIGHTING_EVENT_REPLY | 0xa0u) || reply[1] < NOAH_LIGHTING_EVENT_PENDING || reply[1] > NOAH_LIGHTING_EVENT_HELLO_READY || reply[1] == NOAH_LIGHTING_EVENT_PROFILE_MISMATCH) {
+        noah_split_service_complete(NOAH_SPLIT_SERVICE_LIGHTING, before, false, false);
         last_failure = timer_read32();
         retry_delay = !retry_delay ? SPLIT_RUNTIME_SYNC_RETRY_INITIAL_MS : retry_delay >= SPLIT_RUNTIME_SYNC_RETRY_MAX_MS / 2u ? SPLIT_RUNTIME_SYNC_RETRY_MAX_MS : retry_delay * 2u;
         return false;
     }
+    if (reply[1] == NOAH_LIGHTING_EVENT_PENDING) {
+        if (pending_streak < 2u) pending_streak++;
+    } else
+        pending_streak = 0;
+    bool history     = !snapshot.have_baseline || !snapshot.facts_only;
+    bool correlated  = noah_lighting_event_get_u32(reply + 2) == snapshot.link.epoch && noah_lighting_event_get_u32(reply + 6) == snapshot.link.next_sequence;
     retry_delay = 0u;
     uint32_t after = timer_read32();
-    return noah_lighting_snapshot_reply(&snapshot, reply, before, after);
+    bool     changed = noah_lighting_snapshot_reply(&snapshot, reply, before, after);
+    // NEED_HELLO/REJECT and stale ACKs are not forward progress. A second
+    // PENDING for the immutable packet also receives ordinary quiet time.
+    bool urgent = history && ((changed && (reply[1] == NOAH_LIGHTING_EVENT_ACK || reply[1] == NOAH_LIGHTING_EVENT_HELLO_READY)) || (correlated && reply[1] == NOAH_LIGHTING_EVENT_PENDING && pending_streak < 2u));
+    noah_split_service_complete(NOAH_SPLIT_SERVICE_LIGHTING, before, true, urgent);
+    return changed;
 }
 #endif

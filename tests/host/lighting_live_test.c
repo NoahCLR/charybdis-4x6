@@ -1,5 +1,10 @@
 #include "users/noah/lib/compat/qmk_lighting_live.h"
 #include "transactions.h"
+#include "users/noah/lib/compat/qmk_split_service.h"
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+static void service_live_main(void) {noah_split_service_begin();noah_lighting_live_task();}
+#define noah_lighting_live_task service_live_main
+#endif
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>

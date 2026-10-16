@@ -24,6 +24,7 @@
 #    include "../rgb/lighting/lighting_runtime.h"
 #    include "../compat/qmk_lighting_snapshot_transport.h"
 #    include "runtime_sync_dirty.h"
+#    include "../compat/qmk_split_service.h"
 #    include "transactions.h" // QMK
 
 split_runtime_sync_remote_t             split_runtime_sync_remote    = SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT;
@@ -221,14 +222,16 @@ static bool split_runtime_sync_heartbeat_due(bool sent_once, uint32_t last_send,
     return !sent_once || split_runtime_sync_elapsed_since(now, last_send) >= heartbeat_ms;
 }
 
-static bool split_runtime_sync_broadcast_base(const split_runtime_base_sync_packet_t *pkt, bool force, uint32_t now) {
+static int8_t split_runtime_sync_broadcast_base(const split_runtime_base_sync_packet_t *pkt, bool force, uint32_t now) {
     bool unchanged = split_runtime_base_sent_once && memcmp(&split_runtime_base_last_sent, pkt, sizeof(*pkt)) == 0;
     bool active    = split_runtime_base_packet_is_active(pkt);
 
     if (!force && unchanged && !split_runtime_sync_heartbeat_due(split_runtime_base_sent_once, split_runtime_base_last_send, active, now)) {
-        return true;
+        noah_split_service_cancel(NOAH_SPLIT_SERVICE_BASE);
+        return 1;
     }
-
+    if (!noah_split_service_ready(NOAH_SPLIT_SERVICE_BASE)) return -1;
+    uint32_t before = timer_read32();
     bool sent;
 #    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
     if (noah_lighting_runtime_shared_scene()) {
@@ -242,6 +245,7 @@ static bool split_runtime_sync_broadcast_base(const split_runtime_base_sync_pack
     } else
 #    endif
         sent = transaction_rpc_send(PUT_SPLIT_RUNTIME_BASE_SYNC, sizeof(*pkt), pkt);
+    noah_split_service_complete(NOAH_SPLIT_SERVICE_BASE, before, sent, false);
     if (sent) {
         split_runtime_base_last_sent = *pkt;
         split_runtime_base_sent_once = true;
@@ -261,6 +265,69 @@ static bool split_runtime_lighting_frame_active(const uint8_t *frame) {
 // Sends the chunks that changed, or every chunk on a heartbeat, the first
 // pass, a forced pass or after a failure. The last chunk sent commits the
 // pass; a failure part-way publishes nothing and the next pass resends all.
+// With Lighting Live the shared split service admits one chunk per pass, so
+// the collected built[] cut is held until its final chunk commits.
+#        if NOAH_LIGHTING_LIVE_AVAILABLE
+static struct {
+    uint8_t send[(SPLIT_RUNTIME_SYNC_FACTS_CHUNKS + 7u) / 8u];
+    uint8_t cursor, last;
+    bool    active;
+} split_lighting_transfer;
+static bool split_runtime_sync_broadcast_lighting(bool force, uint32_t now) {
+    if (!noah_split_service_ready(NOAH_SPLIT_SERVICE_LEGACY)) return true;
+    if (!split_lighting_transfer.active) {
+        bool active    = split_runtime_lighting_sent_once && split_runtime_lighting_frame_active(split_runtime_lighting_sent);
+        bool heartbeat = split_runtime_sync_heartbeat_due(split_runtime_lighting_sent_once, split_runtime_lighting_last_send, active, now);
+        bool refresh   = force || heartbeat || split_runtime_sync_lighting_facts_is_dirty() || (split_runtime_lighting_sent_once && noah_lighting_facts_active(split_runtime_lighting_sent, true));
+        bool all       = force || heartbeat || split_runtime_lighting_resend_all || !split_runtime_lighting_sent_once;
+        noah_lighting_facts_build_synced(split_runtime_lighting_built, refresh);
+        memset(split_lighting_transfer.send, 0, sizeof split_lighting_transfer.send);
+        split_lighting_transfer.last = SPLIT_RUNTIME_SYNC_FACTS_CHUNKS;
+        for (uint8_t chunk = 0; chunk < SPLIT_RUNTIME_SYNC_FACTS_CHUNKS; chunk++) {
+            size_t offset = (size_t)chunk * SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES;
+            size_t length = NOAH_LIGHTING_SYNCED_BYTES - offset < SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES ? NOAH_LIGHTING_SYNCED_BYTES - offset : SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES;
+            if (all || memcmp(split_runtime_lighting_built + offset, split_runtime_lighting_sent + offset, length)) {
+                split_lighting_transfer.send[chunk / 8u] |= (uint8_t)(1u << (chunk % 8u));
+                split_lighting_transfer.last = chunk;
+            }
+        }
+        if (split_lighting_transfer.last == SPLIT_RUNTIME_SYNC_FACTS_CHUNKS) {
+            noah_split_service_cancel(NOAH_SPLIT_SERVICE_LEGACY);
+            return true;
+        }
+        // The existing built[] bank is now an immutable CURRENT cut. New
+        // producer dirtiness survives until the next collection; no new bank.
+        split_lighting_transfer.cursor = 0;
+        split_lighting_transfer.active = true;
+        split_runtime_lighting_sequence++;
+    }
+    uint8_t chunk = split_lighting_transfer.cursor;
+    while (!(split_lighting_transfer.send[chunk / 8u] & (1u << (chunk % 8u))))
+        chunk++;
+    split_runtime_lighting_facts_packet_t packet = {.sequence = split_runtime_lighting_sequence, .chunk = (uint8_t)(chunk | (chunk == split_lighting_transfer.last ? SPLIT_RUNTIME_SYNC_FACTS_COMMIT : 0u))};
+    size_t                                offset = (size_t)chunk * SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES;
+    size_t                                length = NOAH_LIGHTING_SYNCED_BYTES - offset < SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES ? NOAH_LIGHTING_SYNCED_BYTES - offset : SPLIT_RUNTIME_SYNC_FACTS_CHUNK_BYTES;
+    memcpy(packet.bytes, split_runtime_lighting_built + offset, length);
+    uint32_t before = timer_read32();
+    bool     sent   = transaction_rpc_send(PUT_SPLIT_LIGHTING_FACTS_SYNC, sizeof packet, &packet);
+    noah_split_service_complete(NOAH_SPLIT_SERVICE_LEGACY, before, sent, false);
+    if (!sent) {
+        split_lighting_transfer.active    = false;
+        split_runtime_lighting_resend_all = true;
+        return false;
+    }
+    if (split_lighting_transfer.cursor == 0u) split_runtime_sync_clear_lighting_facts_dirty();
+    split_lighting_transfer.cursor = chunk + 1u;
+    if (chunk == split_lighting_transfer.last) {
+        memcpy(split_runtime_lighting_sent, split_runtime_lighting_built, NOAH_LIGHTING_SYNCED_BYTES);
+        split_runtime_lighting_sent_once  = true;
+        split_runtime_lighting_resend_all = false;
+        split_runtime_lighting_last_send  = timer_read32();
+        split_lighting_transfer.active    = false;
+    }
+    return true;
+}
+#        else
 static bool split_runtime_sync_broadcast_lighting(bool force, uint32_t now) {
     bool    active    = split_runtime_lighting_sent_once && split_runtime_lighting_frame_active(split_runtime_lighting_sent);
     bool    heartbeat = split_runtime_sync_heartbeat_due(split_runtime_lighting_sent_once, split_runtime_lighting_last_send, active, now);
@@ -300,6 +367,8 @@ static bool split_runtime_sync_broadcast_lighting(bool force, uint32_t now) {
     split_runtime_lighting_last_send  = now;
     return true;
 }
+
+#        endif
 
 static void split_runtime_sync_slave_lighting_rpc(uint8_t initiator2target_buffer_size, const void *initiator2target_buffer, uint8_t target2initiator_buffer_size, void *target2initiator_buffer) {
     if (!split_runtime_sync_initialized || split_runtime_sync_master_role || is_keyboard_master()) return;
@@ -410,6 +479,9 @@ void split_runtime_sync_init(void) {
     split_runtime_lighting_sent_once        = false;
     split_runtime_lighting_resend_all       = true;
     split_runtime_lighting_staging_open     = false;
+#    if NOAH_LIGHTING_LIVE_AVAILABLE && NOAH_LIGHTING_HAS_SYNCED_FACTS
+    split_lighting_transfer.active = false;
+#    endif
     split_runtime_sync_transport            = (split_runtime_sync_transport_t){0};
     split_runtime_sync_dirty_reset();
     now                                     = timer_read32();
@@ -455,7 +527,9 @@ static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force
     }
 
     split_runtime_base_sync_packet_t base_packet = split_runtime_sync_build_base_packet(raw_elapsed);
-    if (!split_runtime_sync_broadcast_base(&base_packet, force || recovery_probe, now)) {
+    int8_t                           base_result = split_runtime_sync_broadcast_base(&base_packet, force || recovery_probe, now);
+    if (base_result < 0) return;
+    if (!base_result) {
         split_runtime_sync_note_failure(PUT_SPLIT_RUNTIME_BASE_SYNC, now);
         return;
     }
@@ -464,6 +538,12 @@ static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force
     }
 
 #    if NOAH_LIGHTING_HAS_SYNCED_FACTS
+#        if NOAH_LIGHTING_LIVE_AVAILABLE
+    if (noah_lighting_runtime_shared_scene()) {
+        split_lighting_transfer.active = false;
+        noah_split_service_cancel(NOAH_SPLIT_SERVICE_LEGACY);
+    }
+#        endif
     if (!noah_lighting_runtime_shared_scene() && !split_runtime_sync_broadcast_lighting(force, now)) {
         split_runtime_sync_note_failure(PUT_SPLIT_LIGHTING_FACTS_SYNC, now);
         return;

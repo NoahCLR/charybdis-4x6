@@ -1,6 +1,7 @@
 #include "users/noah/lib/compat/qmk_lighting_snapshot_transport.h"
 #include "users/noah/lib/rgb/lighting/lighting_snapshot.h"
 #include "transactions.h"
+#include "users/noah/lib/compat/qmk_split_service.h"
 #include "users/noah/lib/compat/qmk_lighting_live.h"
 #include "users/noah/lib/split/runtime_sync.h"
 #include "users/noah/lib/rgb/lighting/kinds/fact_layer_active.h"
@@ -19,7 +20,7 @@ static unsigned zero_response_base, legacy_fact_calls;
 static unsigned base_calls, base_wire;
 static int readiness_override = -1;
 static bool lose_base, omit_base_reply;
-static slave_callback_t base_callback;
+static slave_callback_t base_callback,legacy_callback;
 bool noah_lighting_runtime_shared_scene(void) {return shared_scene;}
 // The legacy fact broadcaster is forbidden in retained-scene tests. These
 // builders are required only for role initialization/disabled branch linkage.
@@ -75,7 +76,13 @@ bool is_keyboard_master(void){return master;}
 uint32_t timer_read32(void){return clocks[master];}
 bool noah_lighting_fact_next(uint8_t kind,const noah_lighting_facts_t *f,const uint8_t *p,uint16_t *c,noah_lighting_subject_t *s){if(kind==1)return noah_lighting_fact_layer_active_next(f,p,c,s);assert(!"unexpected fixture walker");return false;}
 layer_state_t layer_state;
+#ifdef NOAH_SPLIT_SERVICE_COMBINED_TEST
+static slave_callback_t *service_mirror_callback_slot(void);
+#endif
 void transaction_register_rpc(int8_t id,slave_callback_t cb) {
+#ifdef NOAH_SPLIT_SERVICE_COMBINED_TEST
+    if(id==PUT_VIA_KEYMAP_MIRROR){if(!master)*service_mirror_callback_slot()=cb;return;}
+#endif
 #if NOAH_LIGHTING_LIVE_AVAILABLE
     if(id==PUT_SPLIT_LIGHTING_LIVE_SYNC){if(!master)live_callback=cb;return;}
 #endif
@@ -87,7 +94,8 @@ void transaction_register_rpc(int8_t id,slave_callback_t cb) {
         if(!master)base_callback=cb;
         return;
     }
-    if(id==PUT_SPLIT_LIGHTING_FACTS_SYNC)return;
+    if(id==PUT_SPLIT_LIGHTING_FACTS_SYNC){if(!master)legacy_callback=cb;return;}
+    if(id==PUT_PROFILE_SPLIT_SYNC || id==PUT_VIA_KEYMAP_SYNC)return;
     assert(id==PUT_SPLIT_LIGHTING_EVENTS_SYNC);
     uint8_t request[27]={0x81},reply[14];memset(reply,0xff,sizeof reply);
     cb(sizeof request,request,sizeof reply,reply);
@@ -147,7 +155,9 @@ bool transaction_rpc_send(int8_t id,uint8_t n,const void *p) {
     if(id==PUT_SPLIT_RUNTIME_BASE_SYNC) {
         assert(n==sizeof(split_runtime_base_sync_packet_t));zero_response_base++;
         master=false;base_callback(n,p,0,NULL);master=true;
-    } else {assert(id==PUT_SPLIT_LIGHTING_FACTS_SYNC);legacy_fact_calls++;}
+    } else {assert(id==PUT_SPLIT_LIGHTING_FACTS_SYNC);legacy_fact_calls++;
+        if(legacy_callback) {master=false;legacy_callback(n,p,0,NULL);master=true;}
+    }
     return true;
 }
 #if NOAH_LIGHTING_LIVE_AVAILABLE
@@ -161,7 +171,7 @@ static uint8_t live_status(void) {
 }
 #endif
 static void scan(void) {
-    master=true;noah_lighting_working_advance(&banks[1],clocks[1]);
+    master=true;noah_split_service_begin();noah_lighting_working_advance(&banks[1],clocks[1]);
     if(pending_input && !banks[1].snapshot_ready) {
         pending_input=false;staged[1].layer_active[0]=input_layers;staged[1].key_pressed[0]=input_keys;
         noah_lighting_facts_dirty_range(noah_qmk_lighting_snapshot_fact_changes(),offsetof(noah_lighting_facts_t,layer_active),2);
@@ -235,7 +245,10 @@ static void normal_feedback(unsigned duration, bool mixed) {
     for(unsigned i=0;i<100 && published.key_pressed[0];i++)scan();
     assert(!published.key_pressed[0] && full_begins==full && facts_begins>facts);
     printf("ordinary key update after settle: %u RPC/%u wireB/%ums source-to-commit,8 fact bytes, unchanged history not transferred\n",rpc_calls-calls,wire_bytes-wire,clocks[1]-start);
-    scan();scan();
+    // Production holds the source cut immutable through the actual COMMIT ACK.
+    // Pacing makes a fixed number of scans insufficient to establish that seam.
+    for(unsigned i=0;i<1000 && banks[1].snapshot_ready;i++)scan();
+    assert(!banks[1].snapshot_ready);
 }
 static void standard_pulse(void) {
     // A retained profile is active, but this is Standard's unchanged serialized
@@ -415,7 +428,10 @@ static void quiet_reboot_recovery(void) {
     // Capture-enabled capability alone does not add a response: a program
     // without retained constructions takes the original base/fact path.
     unsigned no_response=zero_response_base,old_facts=legacy_fact_calls;
-    shared_scene=false;master=true;split_runtime_sync();
+    shared_scene=false;master=true;
+    for(unsigned i=0;i<2000 && (zero_response_base==no_response || legacy_fact_calls==old_facts);i++) {
+        noah_split_service_begin();split_runtime_sync_tick();advance_us(1000u);
+    }
     assert(zero_response_base==no_response+1u && legacy_fact_calls>old_facts);
     shared_scene=true;
     use_base=false;
@@ -472,7 +488,8 @@ int main(void) {
         for(unsigned i=0;i<400 && published.layer_previewing[0]!=(uint8_t)(0x70+fault);i++)scan();
         assert(!bad_offset && !bad_commit && rejections>rejected);
         assert(published.layer_previewing[0]==(uint8_t)(0x70+fault));
-        scan();scan(); // finish the immutable COMMIT ACK before the next injected transaction
+        for(unsigned i=0;i<1000 && banks[1].snapshot_ready;i++)scan();
+        assert(!banks[1].snapshot_ready); // exact COMMIT ACK before the next cut
     }
     printf("two-instance real621 facts: idle0 RPC, compact complete/facts-only baseline, stage+commit rejection/resync; %u RPC / %u wire bytes (host schedule)\n",rpc_calls,wire_bytes);
     // A different published profile never consumes a staged old scene. Restore
@@ -506,7 +523,7 @@ int main(void) {
     for(unsigned i=0;i<100 && live_status()!=2;i++)scan();master=true;assert(live_status()==2);
     for(unsigned offset=0;offset<sizeof frame;offset+=8){memset(p,0,32);p[4]=3;memset(p+5,0x55,8);noah_lighting_event_put_u32(p+13,live_token);noah_lighting_event_put_u32(p+17,1);p[21]=offset;p[23]=sizeof frame-offset>8?8:sizeof frame-offset;memcpy(p+24,frame+offset,p[23]);live_host(p);}
     memset(p,0,32);p[4]=4;memset(p+5,0x55,8);noah_lighting_event_put_u32(p+13,live_token);noah_lighting_event_put_u32(p+17,1);live_host(p);
-    for(unsigned i=0;i<100 && live_status()!=6;i++){scan();master=true;}assert(live_status()==6);
+    for(unsigned i=0,start=clocks[1];i<2000 && clocks[1]-start<2000u && live_status()!=6;i++){scan();master=true;}assert(live_status()==6);
     unsigned prior_calls=live_calls,prior_wire=live_wire;uint64_t prior_blocking=blocking_us;
     normal_feedback(200,true);normal_feedback(500,true);
     printf("COMBINED retained real621/8220 + live preview renewals: added%u liveRPC/%uwireB, total%llu us charged blocking over both scenarios; no physical cadence claim\n",live_calls-prior_calls,live_wire-prior_wire,(unsigned long long)(blocking_us-prior_blocking));

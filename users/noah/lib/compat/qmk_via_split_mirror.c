@@ -16,6 +16,8 @@
 #    include "../rgb/core/rgb_runtime.h"
 #    include "qmk_via_split_sync.h"
 #    include "qmk_via_storage_contract.h"
+#    include "qmk_split_service.h"
+#    include "qmk_via_sync_state.h"
 #    include "transactions.h" // QMK
 
 _Static_assert(NOAH_QMK_VIA_SPLIT_MIRROR_FRAME_MAX <= RPC_M2S_BUFFER_SIZE, "a mirrored VIA frame must fit QMK's RPC buffer");
@@ -27,6 +29,11 @@ typedef struct {
 } noah_qmk_via_split_mirror_mailbox_t;
 
 static noah_qmk_via_split_mirror_mailbox_t noah_qmk_via_split_mirror_mailbox;
+#    if NOAH_LIGHTING_LIVE_AVAILABLE
+static noah_qmk_via_split_mirror_mailbox_t mirror_outgoing;
+static bool                                mirror_role;
+static uint32_t                            mirror_generation;
+#    endif
 
 static void noah_qmk_via_split_mirror_apply_effects(uint8_t command_id) {
     uint8_t effects = noah_qmk_via_command_effects(command_id);
@@ -129,13 +136,36 @@ void noah_qmk_via_split_mirror_init(void) {
     ATOMIC_BLOCK_RESTORESTATE {
         noah_qmk_via_split_mirror_mailbox = (noah_qmk_via_split_mirror_mailbox_t){0};
     }
+#    if NOAH_LIGHTING_LIVE_AVAILABLE
+    mirror_outgoing.pending = false;
+    mirror_role             = is_keyboard_master();
+#    endif
     transaction_register_rpc(PUT_VIA_KEYMAP_MIRROR, noah_qmk_via_split_mirror_rpc);
 }
 
 bool noah_qmk_via_split_mirror_matrix_scan_step(void) {
     uint8_t frame[NOAH_QMK_VIA_SPLIT_MIRROR_FRAME_MAX];
     uint8_t length = 0u;
-
+#    if NOAH_LIGHTING_LIVE_AVAILABLE
+    bool master = is_keyboard_master();
+    if (master != mirror_role) {
+        mirror_outgoing.pending = false;
+        mirror_role             = master;
+    }
+    if (master && mirror_outgoing.pending) {
+        if (!noah_qmk_via_logical_mirror_allowed() || mirror_generation != noah_qmk_via_sync_state_snapshot().metadata.generation) {
+            mirror_outgoing.pending = false;
+            noah_split_service_cancel(NOAH_SPLIT_SERVICE_MIRROR);
+            return false;
+        }
+        if (!noah_split_service_ready(NOAH_SPLIT_SERVICE_MIRROR)) return false;
+        uint32_t before = noah_split_service_clock();
+        bool     sent   = transaction_rpc_send(PUT_VIA_KEYMAP_MIRROR, mirror_outgoing.length, mirror_outgoing.frame);
+        noah_split_service_complete(NOAH_SPLIT_SERVICE_MIRROR, before, sent, false);
+        if (sent) mirror_outgoing.pending = false;
+        return true;
+    }
+#    endif
     if (!noah_qmk_via_logical_mirror_allowed()) {
         // A normal VIA frame may have been queued just before the logical
         // stage began. It cannot be replayed after the peer becomes the
@@ -166,7 +196,23 @@ void noah_qmk_via_split_mirror_command(const uint8_t *data, uint8_t length) {
 
     // Best effort by design. A dropped or mailbox-busy mirror leaves the
     // halves briefly out of step and durable reconciliation repairs it.
+#    if NOAH_LIGHTING_LIVE_AVAILABLE
+    uint8_t effects = 0;
+    if (!noah_qmk_via_classify_mutation(data, length, &effects) || !(effects & NOAH_QMK_VIA_COMMAND_EFFECT_SPLIT_MIRROR)) return;
+    if (!mirror_outgoing.pending) {
+        memcpy(mirror_outgoing.frame, data, length);
+        mirror_outgoing.length  = length;
+        mirror_generation       = noah_qmk_via_sync_state_snapshot().metadata.generation;
+        mirror_outgoing.pending = true;
+    } else {
+        // The ordered queued command remains intact. Further CURRENT storage
+        // changes coalesce through the existing authoritative full reconciler,
+        // exactly as when the best-effort peer mailbox was already occupied.
+        noah_qmk_via_split_sync_note_local_storage_changed();
+    }
+#    else
     (void)transaction_rpc_send(PUT_VIA_KEYMAP_MIRROR, length, data);
+#    endif
 }
 
 #endif // defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)

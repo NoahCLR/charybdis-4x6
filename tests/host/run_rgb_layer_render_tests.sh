@@ -49,7 +49,7 @@ build_scene() {
         "$ROOT/tests/host/${RENDER_TEST_SOURCE:-rgb_layer_render_test.c}" \
         "$ROOT/users/noah/lib/compat/qmk_contract.c" \
         "$ROOT/users/noah/lib/compat/qmk_lighting_snapshot_transport.c" \
-        "$ROOT/users/noah/lib/compat/qmk_lighting_live.c" \
+        "$ROOT/users/noah/lib/compat/qmk_lighting_live.c" "$ROOT/users/noah/lib/compat/qmk_split_service.c" \
         "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
         "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
         $PROFILE_SOURCES $LIGHTING_SOURCES \

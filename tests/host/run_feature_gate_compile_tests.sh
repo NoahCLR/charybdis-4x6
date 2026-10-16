@@ -364,7 +364,7 @@ compile_variant "tests/host/include/noah_compile_config.h" "-DCOMBO_ENABLE $POIN
 # importing real QMK types into that independent readback host fixture.
 LIGHTING_ENABLED_SOURCES=""
 for src in $COMMON_SOURCES; do
-    case "$src" in users/noah/lib/rgb/lighting/*|users/noah/lib/rgb/core/rgb_runtime.c|users/noah/lib/compat/qmk_lighting_snapshot_transport.c|users/noah/lib/compat/qmk_lighting_live.c|users/noah/lib/profile/schema/profile_lighting_v1.c|users/noah/lib/profile/runtime/effective_rgb_runtime.c|users/noah/runtime_init.c) LIGHTING_ENABLED_SOURCES="$LIGHTING_ENABLED_SOURCES $src" ;; esac
+    case "$src" in users/noah/lib/rgb/lighting/*|users/noah/lib/rgb/core/rgb_runtime.c|users/noah/lib/compat/qmk_lighting_snapshot_transport.c|users/noah/lib/compat/qmk_lighting_live.c|users/noah/lib/compat/qmk_split_service.c|users/noah/lib/profile/schema/profile_lighting_v1.c|users/noah/lib/profile/runtime/effective_rgb_runtime.c|users/noah/runtime_init.c) LIGHTING_ENABLED_SOURCES="$LIGHTING_ENABLED_SOURCES $src" ;; esac
 done
 compile_variant "tests/host/include/noah_compile_config.h" "-DCOMBO_ENABLE -DSPLIT_KEYBOARD -DVIA_ENABLE -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DNOAH_PORTABLE_PROFILE_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$LIGHTING_ENABLED_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DNOAH_PD_PROFILE_ENABLE -DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"

@@ -29,6 +29,7 @@
 #include "lib/profile/runtime/effective_pd_runtime.h"
 #include "lib/rgb/core/rgb_runtime.h"
 #include "lib/compat/qmk_lighting_live.h"
+#include "lib/compat/qmk_split_service.h"
 #include "lib/rgb/lighting/lighting_runtime.h"
 #include "lib/state/diagnostics/runtime_diag.h"
 #include "lib/state/shared/runtime_reset.h"
@@ -59,6 +60,7 @@ void noah_eeconfig_init_user(void) {
 }
 
 void noah_matrix_scan_user(void) {
+    noah_split_service_begin();
     noah_lighting_runtime_sync_role();
 #if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)
     noah_runtime_cadence_note_matrix_scan();

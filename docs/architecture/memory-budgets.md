@@ -814,3 +814,25 @@ These executable schedules are not physical cadence, pointing, RTT, drift or
 simultaneous output measurements. No allocator/stack high-water, global IRQ,
 physical appearance/geometry or first-release acceptance is inferred. Hardware
 or loop stalls/sleep do not provide a wall-clock lease extinction guarantee.
+
+
+## Shared optional split admission ownership
+
+The main-owned admission record adds16 bytes (two u32 timestamps, u16 failure
+backoff, three one-byte masks/cursors and three bool flags). Snapshot repeated-
+PENDING tracking adds one byte. The existing reconciler config gains one optional
+function pointer (4 bytes on this Cortex-M0+ ABI); the adapter installs it after
+owner initialization. It checks admission after local/receiver/store work and
+before outbound request/counter/sequence changes. The owned outgoing mirror
+report adds34 bytes plus one role byte and a4-byte existing VIA-generation
+stamp. It does not reuse the incoming mailbox. The legacy facts fallback adds
+`ceil(SPLIT_RUNTIME_SYNC_FACTS_CHUNKS/8)+3` control bytes and freezes its existing
+built bank through final-chunk completion; no additional facts bank is allocated.
+
+These declarations coexist with the full1272-byte Lighting Live state and all
+prior histories/raw/staged-program storage. Compiler placement/padding and the
+complete linked delta require fresh per-half ELF accounting. The fixed249344
+static,4096 core-span floor,1920/768 reviewed-path stack and270336 physical SRAM
+policies remain unchanged. The shared scheduler's paths, optional reconciler
+callback and queued mirror/legacy send/reset/error/deferral paths must join both
+tracked stack manifests; a faster host model does not excuse a resource failure.

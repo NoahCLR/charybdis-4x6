@@ -83,6 +83,7 @@ typedef bool (*noah_profile_split_local_read_fn)(void *context, const noah_profi
 typedef bool (*noah_profile_split_local_binding_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t *via_generation, uint32_t *via_digest);
 // Sends one request of request_length bytes (32 up to the largest frame) and
 // receives the peer's 32-byte reply.
+typedef bool (*noah_profile_split_exchange_ready_fn)(void *context);
 typedef bool (*noah_profile_split_exchange_fn)(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);
 
 // A range of a prepared copy the peer can fill from its own active profile:
@@ -105,6 +106,7 @@ typedef struct {
     noah_profile_split_local_binding_fn    local_binding;
     void                                  *transport_context;
     noah_profile_split_exchange_fn         exchange;
+    noah_profile_split_exchange_ready_fn   exchange_ready; // optional main-owned bus admission
     noah_profile_peer_store_backend_t     *peer_store;
     // Optional. A prepared push asks it which ranges the peer can copy from
     // its own active profile and sends PAYLOAD_REUSE for those instead of

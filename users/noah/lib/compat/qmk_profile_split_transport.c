@@ -8,6 +8,7 @@
 
 #    include <string.h>
 
+#    include "qmk_split_service.h"
 #    include "transactions.h" // QMK
 
 static noah_profile_split_reconciler_t *noah_qmk_profile_split_reconciler;
@@ -23,6 +24,10 @@ static void noah_qmk_profile_split_rpc(uint8_t request_size, const void *request
     }
 }
 
+static bool profile_service_ready(void *context) {
+    (void)context;
+    return noah_split_service_ready(NOAH_SPLIT_SERVICE_PROFILE);
+}
 bool noah_qmk_profile_split_transport_init(noah_profile_split_reconciler_t *reconciler) {
     if (!reconciler || !noah_profile_split_reconciler_authority(reconciler)) {
         return false;
@@ -30,6 +35,7 @@ bool noah_qmk_profile_split_transport_init(noah_profile_split_reconciler_t *reco
     if (noah_qmk_profile_split_reconciler) {
         return noah_qmk_profile_split_reconciler == reconciler;
     }
+    reconciler->config.exchange_ready = profile_service_ready;
     noah_qmk_profile_split_reconciler = reconciler;
     transaction_register_rpc(PUT_PROFILE_SPLIT_SYNC, noah_qmk_profile_split_rpc);
     return true;
@@ -45,7 +51,11 @@ void noah_qmk_profile_split_transport_reset_for_test(void) {
 // lengths, so the other split RPCs keep sending their small frames.
 bool noah_qmk_profile_split_transport_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
     (void)context;
-    return request && response && request_length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && request_length <= NOAH_PROFILE_SPLIT_V1_FRAME_MAX && transaction_rpc_exec(PUT_PROFILE_SPLIT_SYNC, request_length, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response);
+    if (!request || !response || request_length < NOAH_PROFILE_SPLIT_V1_FRAME_SIZE || request_length > NOAH_PROFILE_SPLIT_V1_FRAME_MAX) return false;
+    uint32_t before = noah_split_service_clock();
+    bool     sent   = transaction_rpc_exec(PUT_PROFILE_SPLIT_SYNC, request_length, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response);
+    noah_split_service_complete(NOAH_SPLIT_SERVICE_PROFILE, before, sent, false);
+    return sent;
 }
 
 #endif

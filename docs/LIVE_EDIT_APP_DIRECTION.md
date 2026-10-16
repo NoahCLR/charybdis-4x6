@@ -1600,4 +1600,11 @@ records exact ELF/provenance, section alignment, complete four-path coverage and
 combined-work models; none is runtime-free RAM or physical acceptance. The client follow-up must
 adopt exact fixtures/capabilities, pin this completed firmware and present live
 samples as read-only with explicit preview opt-in, END on exit and lease recovery
-on lost exit. First physical release, cadence, drift and high-water remain open.
+on lost exit. Optional userspace traffic shares completion-relative main service and round-robin
+admission, with shared50..1000 ms outage backoff. CURRENT-only/preview/durable
+work reserves4*(elapsed+1) ms; qualified histories/cold coherent sync retain1 ms
+service opportunities and all prior200 ms positive/expiry assertions. Repeated
+PENDING does not earn prompt priority. The [service contract](architecture/split-activity-sync.md#shared-main-context-optional-bus-service)
+distinguishes ordinary pressure gates from heavy qualified input; no global25%
+duty or physical stall repair is inferred. First physical release, cadence,
+drift and high-water remain open.

@@ -15,6 +15,11 @@
 #undef transaction_rpc_exec
 
 #include "users/noah/lib/compat/qmk_lighting_live.h"
+#include "users/noah/lib/compat/qmk_split_service.h"
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+static void service_live_main(void) {noah_split_service_begin();noah_lighting_live_task();}
+#define noah_lighting_live_task service_live_main
+#endif
 #if NOAH_LIGHTING_LIVE_AVAILABLE
 static slave_callback_t live_callback;
 uint8_t dynamic_keymap_macro_get_count(void) {return 128;}

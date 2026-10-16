@@ -19,6 +19,7 @@
 #    include "qmk_via_sync_metadata.h"
 #    include "qmk_via_sync_protocol.h"
 #    include "qmk_via_sync_state.h"
+#    include "qmk_split_service.h"
 #    include "transactions.h" // QMK
 
 #    ifndef VIA_SPLIT_SYNC_RETRY_INITIAL_MS
@@ -717,10 +718,12 @@ static bool noah_qmk_via_rpc_exchange(const noah_qmk_via_sync_frame_t *request, 
     uint8_t request_wire[NOAH_QMK_VIA_SYNC_FRAME_SIZE];
     uint8_t response_wire[NOAH_QMK_VIA_SYNC_FRAME_SIZE] = {0};
 
-    if (!noah_qmk_via_sync_frame_encode(request, request_wire) || !transaction_rpc_exec(PUT_VIA_KEYMAP_SYNC, sizeof(request_wire), request_wire, sizeof(response_wire), response_wire)) {
-        return false;
-    }
-    return noah_qmk_via_sync_frame_decode(response_wire, sizeof(response_wire), response);
+    if (!noah_qmk_via_sync_frame_encode(request, request_wire)) return false;
+    uint32_t before = noah_split_service_clock();
+    bool     sent   = transaction_rpc_exec(PUT_VIA_KEYMAP_SYNC, sizeof(request_wire), request_wire, sizeof(response_wire), response_wire);
+    bool     valid  = sent && noah_qmk_via_sync_frame_decode(response_wire, sizeof(response_wire), response);
+    noah_split_service_complete(NOAH_SPLIT_SERVICE_VIA, before, valid, false);
+    return valid;
 }
 
 static void noah_qmk_via_start_push(noah_qmk_via_sync_state_snapshot_t state) {
@@ -1270,6 +1273,7 @@ static bool noah_qmk_via_logical_boot_recovery_tick(bool master) {
     if (!master) {
         return false;
     }
+    if (!noah_split_service_ready(NOAH_SPLIT_SERVICE_VIA)) return false;
     request = (noah_qmk_via_sync_frame_t){.kind = NOAH_QMK_VIA_SYNC_MESSAGE_LOGICAL_STAGE_ACCEPT, .generation = generation, .digest = digest};
     if (!noah_qmk_via_rpc_exchange(&request, &response) || response.kind != NOAH_QMK_VIA_SYNC_MESSAGE_ACK || response.status != NOAH_QMK_VIA_SYNC_STATUS_OK || response.generation != generation || response.digest != digest) {
         return true;
@@ -1359,6 +1363,7 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
         return false;
     }
     if (master && noah_qmk_via_logical.status.pending) {
+        if (!noah_split_service_ready(NOAH_SPLIT_SERVICE_VIA)) return false;
         noah_qmk_via_sync_frame_t response;
 
         if (!noah_qmk_via_rpc_exchange(&noah_qmk_via_logical.request, &response) || response.status == NOAH_QMK_VIA_SYNC_STATUS_BUSY) {
@@ -1442,6 +1447,7 @@ bool noah_qmk_via_split_sync_matrix_scan_step(void) {
     if (!noah_qmk_via_time_reached(now, noah_qmk_via_next_attempt_at)) {
         return false;
     }
+    if (!noah_split_service_ready(NOAH_SPLIT_SERVICE_VIA)) return false;
     switch (noah_qmk_via_tx_phase) {
         case NOAH_QMK_VIA_TX_METADATA:
             noah_qmk_via_master_metadata_tick(now);

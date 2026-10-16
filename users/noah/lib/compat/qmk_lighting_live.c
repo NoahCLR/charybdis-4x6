@@ -5,6 +5,7 @@
 #    include "../rgb/core/rgb_runtime.h"
 #    include "../state/diagnostics/runtime_diag.h"
 #    include "transactions.h"
+#    include "qmk_split_service.h"
 #    include <string.h>
 
 #define BARRIER() __asm__ __volatile__("" ::: "memory")
@@ -325,14 +326,19 @@ static LEAF bool live_prepare_rpc(void) {
     live_split.phase=p[1];return true;
 }
 static LEAF void live_send_main(uint32_t now) {
-    if(!live_split.phase && !live_prepare_rpc())return;
+    if(!live_split.phase && (live_control.state==IDLE || live_control.state==LIVE || live_control.state==UPLOAD)) {
+        noah_split_service_cancel(NOAH_SPLIT_SERVICE_LIVE);return;
+    }
     if(now-live_split.last_failure < (live_split.retry_delay?live_split.retry_delay:5u))return;
+    if(!noah_split_service_ready(NOAH_SPLIT_SERVICE_LIVE))return;
+    if(!live_split.phase && !live_prepare_rpc()) {noah_split_service_cancel(NOAH_SPLIT_SERVICE_LIVE);return;}
     live_split.last_failure=now;
     bool sent=transaction_rpc_exec(PUT_SPLIT_LIGHTING_LIVE_SYNC,live_packet_length(live_split.packet),live_split.packet,24,live_split.reply);
     now=timer_read32();
     const uint8_t *r=live_split.reply;const uint8_t *p=live_split.packet;
     bool correlated=sent && r[0]==0xb2 && !memcmp(r+2,p+2,2) && !memcmp(r+8,p+8,16) &&
         ((p[1]==RPC_CLEAR && live_u32(r+4)) || (p[1]!=RPC_CLEAR && live_u32(r+4)==live_control.peer_epoch));
+    noah_split_service_complete(NOAH_SPLIT_SERVICE_LIVE,live_split.last_failure,correlated,false);
     if(!correlated) {
         live_split.retry_delay=!live_split.retry_delay?50u:live_split.retry_delay>=500u?1000u:live_split.retry_delay*2u;
         // A lost renewal/publish acknowledgement does not authorize local

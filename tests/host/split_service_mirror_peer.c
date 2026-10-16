@@ -1,0 +1,5 @@
+#define noah_qmk_via_split_mirror_init service_mirror_peer_init
+#define noah_qmk_via_split_mirror_matrix_scan_step service_mirror_peer_step
+#define noah_qmk_via_split_mirror_command service_mirror_peer_command
+#define noah_qmk_via_split_sync_note_local_storage_changed service_mirror_peer_changed
+#include "users/noah/lib/compat/qmk_via_split_mirror.c"

@@ -143,3 +143,63 @@ A dedicated runtime exchange replacing the four-transaction RPC, and an
 asynchronous transport, are not built. Measure with the recorders below before
 building either. No 1 kHz claim or acceptance is implied by the activity
 implementation or calculated byte savings.
+
+
+## Shared main-context optional bus service
+
+When the complete Lighting Live consumer is enabled, userspace's optional split
+RPCs share one main-owned admission record: base state, retained snapshots,
+preview, profile reconciliation, durable VIA, mirror and the legacy facts
+fallback. QMK's mandatory matrix/pointing transport remains outside this budget.
+Main starts one admission pass before durable I/O and key processing. At most
+one userspace RPC completes per pass. A round-robin wanted mask survives denied
+attempts and removes inactive demand within two passes; clients do not advance
+sequence, clear a pending cut or report transport failure merely for deferral.
+
+Every actual completion reserves quiet time AFTER the measured transaction:
+`4 * (elapsed_ms + 1)` milliseconds for CURRENT-only, preview and durable work,
+capped at1000 ms for a transaction lasting250 ms or more. Existing qualified
+history cuts and cold coherent synchronization receive a1 ms opportunity so
+short retained feedback remains useful. This priority never bypasses one RPC
+per pass, fairness or the shared outage cooldown. Repeated PENDING is not
+progress: a second consecutive PENDING for a retained packet gets ordinary
+quiet time; stale ACKs, REJECT and NEED_HELLO do not earn prompt service.
+The first failure reserves at least50 ms, doubling to1000 ms across senders;
+success ends outage backoff but still reserves completion-relative quiet time.
+No new idle heartbeat or busy wait is introduced. Local receiver/store progress,
+lease expiry and local END release continue while sends are denied.
+
+CURRENT producers keep advancing while an immutable cut is in flight. Only the
+collector freezes latest CURRENT state after that cut's actual main ACK; old
+ACKs cannot clear a newer qualified history. The legacy facts fallback also
+holds its existing built bank immutable and sends one admitted changed chunk
+per pass, committing the full cut with its final chunk. It allocates control
+bits/cursors, not another facts bank. Builds without the complete live consumer
+retain their previous paths and resource selectors.
+
+Ordinary VIA mirroring remains best effort. An owned32-byte outgoing report
+plus length/pending preserves one exact command; it is independent of the peer
+mailbox. Later accepted CURRENT storage changes restart the canonical digest
+and coalesce through authoritative full reconciliation. Queueing does not prove
+remote storage or convergence. Role/init, the inactive logical-bank guard and
+VIA generation changes invalidate an old queued command before it could undo
+newer authoritative convergence. Logical transaction operations and qualified
+lighting histories never use this best-effort coalescing path.
+
+The charged230400/8N1 plus pinned PIO-wait host regression enforces max12 ms
+service gap, one RPC per pass and <=25% duty/100 RPC/s for its ordinary CURRENT
+scenarios. Its unpaced negative control reproduces266 RPC/s and734/1000 blocked
+main time; admission reduces the same continuous producer to66/181. Actual
+base/retained/preview/profile/VIA/mirror consumers under the production durable
+scheduler achieve151 calls over3 s,170/1000 blocked, max6122 us and burst1,
+complete preview with two renewals/END, then exact storage/digest/CURRENT
+convergence within2 s after quiescence. Outage injection gives seven attempts
+in3 s with bounded quiet intervals. These are named executable schedules, not
+physical service guarantees or evidence of real packet loss.
+
+Qualified input every50 ms is a separate stress regime:151 RPC/s,423/1000
+blocked, max4559 us and burst1 in the same model. The prompt-history policy
+preserves the existing200 ms positive/expiry assertions; there is NO global25%
+duty claim under arbitrary qualified input. Physical pointing cadence/freezing,
+oscillator drift, global IRQ/allocator/stack high-water and sustained hardware
+load remain acceptance work. No model or green gate waives a reported stall.
