@@ -32,6 +32,7 @@ static void chunk_event(void) {
     noah_lighting_event_t event={.kind=NOAH_LIGHTING_EVENT_MACRO_PLAYED,.thing=127,.key={MATRIX_ROWS,MATRIX_COLS}};
     noah_lighting_event_emit(&event);
 }
+#ifndef RGB_NATIVE_EFFECT_FIXTURE
 static void chunk_case(bool left, unsigned scenario) {
     test_reset();fake_is_left=left;fake_is_master=true;runtime_fixture.time32=100;
     memset(&chunk_profile,0,sizeof chunk_profile);
@@ -76,3 +77,5 @@ int main(void) {
     for(unsigned half=0;half<2;half++)for(unsigned scenario=0;scenario<7;scenario++)chunk_case(half==0,scenario);
     puts("production chunk composition: both halves, 4 frames, dim/tint/auto-mouse fade/inactive timed rule/main/event/expiry/publication/remap PASS");
 }
+
+#endif // legacy direct advanced-entry fixture

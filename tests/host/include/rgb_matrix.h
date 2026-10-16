@@ -11,10 +11,12 @@
 
 typedef struct {
     uint8_t matrix_co[MATRIX_ROWS][MATRIX_COLS];
+    uint8_t flags[256]; // host native-effect fixtures use the real flag tests
 } led_config_t;
 
 extern led_config_t g_led_config;
 
+bool rgb_matrix_get_suspend_state(void);
 void    rgb_matrix_set_color(int index, uint8_t red, uint8_t green, uint8_t blue);
 int     rgb_matrix_led_index(int index);
 uint8_t rgb_matrix_map_row_column_to_led(uint8_t row, uint8_t column, uint8_t *led_i);

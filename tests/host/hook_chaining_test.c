@@ -23,6 +23,7 @@ report_mouse_t pointing_device_task_user(report_mouse_t mouse_report);
 void           pointing_device_init_user(void);
 bool           is_mouse_record_user(uint16_t keycode, keyrecord_t *record);
 bool           rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max);
+bool           rgb_matrix_indicators_user(void);
 
 layer_state_t layer_state;
 
@@ -46,6 +47,7 @@ typedef struct {
     unsigned pointing_init_calls;
     unsigned mouse_record_calls;
     unsigned rgb_calls;
+    unsigned rgb_basic_calls;
 
     uint16_t       pre_process_keycode;
     keyrecord_t   *pre_process_record;
@@ -95,6 +97,7 @@ typedef struct {
     unsigned                   pointing_init_calls;
     unsigned                   mouse_record_calls;
     unsigned                   rgb_calls;
+    unsigned                   rgb_basic_calls;
     bool                       hold_force_true;
     bool                       pre_process_keep_processing;
     bool                       process_keep_processing;
@@ -218,6 +221,11 @@ bool noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record) {
     return noah_hook_stub_state.mouse_record_return_value;
 }
 
+bool noah_rgb_matrix_indicators_user(void) {
+    noah_hook_stub_state.rgb_basic_calls++;
+    return noah_hook_stub_state.rgb_return_value;
+}
+
 bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     noah_hook_stub_state.rgb_calls++;
     noah_hook_stub_state.rgb_led_min = led_min;
@@ -335,6 +343,10 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     hook_override_state.rgb_calls++;
     return noah_rgb_matrix_indicators_advanced_user(led_min, led_max) || hook_override_state.rgb_force_true;
 }
+bool rgb_matrix_indicators_user(void) {
+    hook_override_state.rgb_basic_calls++;
+    return noah_rgb_matrix_indicators_user() || hook_override_state.rgb_force_true;
+}
 #endif
 
 static keyrecord_t test_record(uint8_t row, uint8_t col, bool pressed) {
@@ -435,6 +447,8 @@ static void test_weak_defaults_use_expected_shared_behavior(void) {
     CHECK(noah_hook_stub_state.mouse_record_record == &record);
 
     CHECK(!rgb_matrix_indicators_advanced_user(3, 9));
+    CHECK(!rgb_matrix_indicators_user());
+    CHECK(noah_hook_stub_state.rgb_basic_calls == 1);
     CHECK(noah_hook_stub_state.rgb_calls == 1);
     CHECK(noah_hook_stub_state.rgb_led_min == 3);
     CHECK(noah_hook_stub_state.rgb_led_max == 9);
@@ -549,6 +563,9 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     CHECK(noah_hook_stub_state.mouse_record_record == &record);
 
     CHECK(rgb_matrix_indicators_advanced_user(2, 7));
+    CHECK(rgb_matrix_indicators_user());
+    CHECK(hook_override_state.rgb_basic_calls == 1);
+    CHECK(noah_hook_stub_state.rgb_basic_calls == 1);
     CHECK(hook_override_state.rgb_calls == 1);
     CHECK(noah_hook_stub_state.rgb_calls == 1);
     CHECK(noah_hook_stub_state.rgb_led_min == 2);

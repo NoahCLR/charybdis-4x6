@@ -124,6 +124,9 @@ void noah_runtime_shared_state_post_init(void) {
     test_log_stage("runtime_shared_state_post_init");
 }
 
+void noah_rgb_runtime_housekeeping(void) {test_log_stage("rgb_runtime_housekeeping");}
+void noah_rgb_runtime_suspend(void) {test_log_stage("rgb_runtime_suspend");}
+
 void noah_rgb_runtime_post_init(void) {
     test_log_stage("rgb_runtime_post_init");
 }
@@ -222,6 +225,7 @@ static void test_keyboard_pre_init_order(void) {
 
 static void test_housekeeping_order(void) {
     static const char *const expected[] = {
+        "rgb_runtime_housekeeping",
         "held_repeat_tick",
         "runtime_diag_heartbeat",
         "qmk_usb_product_name_task",
@@ -236,7 +240,7 @@ static void test_suspend_power_down_feeds_watchdog_only(void) {
     // QMK's USB-suspend loop never reaches housekeeping_task(); the suspend
     // hook must keep the restart watchdog fed without running key work.
     static const char *const expected[] = {
-        "runtime_diag_heartbeat",
+        "rgb_runtime_suspend", "runtime_diag_heartbeat",
     };
 
     test_log_reset();

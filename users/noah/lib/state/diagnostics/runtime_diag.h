@@ -32,7 +32,7 @@ typedef enum {
     NOAH_RUNTIME_DIAG_STAGE_QMK_TASKS,
     // process_record_user and its finalize, wherever they run.
     NOAH_RUNTIME_DIAG_STAGE_PROCESS_RECORD,
-    // The lighting render in rgb_matrix_indicators_advanced_user.
+    // Lighting composition at basic effect completion (legacy advanced entry also scoped).
     NOAH_RUNTIME_DIAG_STAGE_RGB_RENDER,
     // The pointing driver's report read.
     NOAH_RUNTIME_DIAG_STAGE_SENSOR_READ,

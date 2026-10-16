@@ -737,3 +737,13 @@ unknown expressions cannot grant a larger artifact allowance. The separate
 compiler/geometry assertion remains required for247808. New exact-head links
 must account for this control and actual stack paths under the fixed policies;
 the historical initial sizes above are not a pass for later corrections.
+
+
+The persistent-native-effect repair owns one local raw WS2812 pixel cache,
+sized to the larger physical half:87B at29/29 RGB, plus one phase byte and one
+basic/advanced suppression flag. It is fixed module state outside the8220
+history pool, with no sharing assumption or heap allocation. Compiler alignment
+and changed caller frames require fresh linked accounting; these source sizes
+are not an approved static-policy increase or a runtime high-water result.
+The scoped247808/core4096/main1920/slave768 policies remain unchanged. Exact
+raw/physical ownership and supported target guards live in the lighting spec.

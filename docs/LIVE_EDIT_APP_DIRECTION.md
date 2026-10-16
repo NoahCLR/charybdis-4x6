@@ -1460,7 +1460,10 @@ Gate lifetimes and wake deadlines use each half's local observation clock;
 split-synced time is reserved for paint animation. Backward sync adjustments
 cannot mature show-after. Fade destination active layers and top-layer facts
 share the same synthetic scene; actual ownership stays intact. Main owns one
-resolved fact frame through synchronous final-local-chunk composition, and transport buffers share storage
+resolved fact frame through synchronous basic-indicator effect-completion composition.
+A local raw-effect cache and the pinned post-flush housekeeping ownership seam
+keep partially updated native effects separate from composed physical output;
+NONE/suspend and control cancellation preserve that ownership. Transport buffers share storage
 only across initialized, callback-guarded master/slave roles. The detailed
 lifetime and module-idle contracts live in the lighting spec. The enabled retained-timing candidate uses a direct, fixed8220-byte pool with
 registry-owned conservative admission before activation. It owns current and

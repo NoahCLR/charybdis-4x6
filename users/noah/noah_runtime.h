@@ -32,4 +32,5 @@ layer_state_t  noah_layer_state_set_user(layer_state_t state);
 report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report);
 void           noah_pointing_device_init_user(void);
 bool           noah_is_mouse_record_user(uint16_t keycode, keyrecord_t *record);
+bool           noah_rgb_matrix_indicators_user(void);
 bool           noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max);

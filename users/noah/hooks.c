@@ -80,6 +80,10 @@ __attribute__((weak)) bool is_mouse_record_user(uint16_t keycode, keyrecord_t *r
     return noah_is_mouse_record_user(keycode, record);
 }
 
+__attribute__((weak)) bool rgb_matrix_indicators_user(void) {
+    return noah_rgb_matrix_indicators_user();
+}
+
 __attribute__((weak)) bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     return noah_rgb_matrix_indicators_advanced_user(led_min, led_max);
 }

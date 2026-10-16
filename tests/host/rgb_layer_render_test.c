@@ -742,6 +742,10 @@ uint8_t pd_mode_display_active_index(void) {
     return PD_MODE_COUNT;
 }
 
+#ifndef RGB_NATIVE_EFFECT_FIXTURE
+bool rgb_matrix_get_suspend_state(void) {return false;}
+#endif
+
 void rgb_matrix_set_color(int index, uint8_t red, uint8_t green, uint8_t blue) {
     if (index < 0 || index >= RGB_MATRIX_LED_COUNT) {
         test_fail("rgb_matrix_set_color index in range", __FILE__, __LINE__);

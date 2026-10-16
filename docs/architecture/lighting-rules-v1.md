@@ -883,7 +883,7 @@ uses only that prepared generation and synchronously collects, qualifies and
 retains an occurrence; it never lazily loads/decodes a program or defers filters.
 The pinned split role is fixed at split_pre_init. An explicit role reinitialization
 runs at a shallow main boundary before producers, closes callback readiness and
-rebuilds the selected role before publication. A synchronous final-chunk composition reads the latest complete generation;
+rebuilds the selected role before publication. Synchronous basic-indicator composition at actual effect completion reads the latest complete generation;
 partial split transfer keeps the last committed scene. Command-mutation and collection
 scratch return before later capture/qualification phases where their lifetimes
 are disjoint; outer planning storage remains live during synchronous drains.
@@ -1034,6 +1034,57 @@ meet that inequality under the equal-rate model. Saturation/unknown intervals
 do not prove a restart. Departure/reentry that is entirely unobserved and not
 provable from these intervals remains observationally indistinguishable; no
 claim of perfect restart detection is made.
+
+#### Raw effect storage and physical output ownership
+
+The pinned RP2040/ChibiOS vendor WS2812 target composes the complete local
+scene from QMK's **basic** indicator callback, which runs after actual effect
+completion and before the advanced callback. This covers chunked effects and
+whole-frame Digital Rain; the advanced range is not a completion signal.
+The immediate advanced call is suppressed before range checks, including a
+right-half iter0 range outside that half. The public advanced entry retains
+its independent legacy range behavior, but production uses basic completion.
+There are no project keymap/basic/advanced overrides or configured indicator
+modules that bypass this order or write over the composed output afterward.
+Any new override must preserve the owned completion/restore lifecycle and
+explicitly document its indicator priority.
+
+Before any owned paint, diagnostics or sleep-black override, capture **all**
+local raw driver pixels. Native Raindrops/Jellybean preserve untouched pixels
+between frames, so the composed buffer cannot become their next raw input.
+One owned cache uses max(leftCount,rightCount) native WS2812 pixels (87B for
+29/29 RGB), plus a phase byte and basic/advanced suppression flag. It is not a
+history bank, an RGB-equality inference or a working-admission discount.
+Indexing uses QMK's actual global-to-driver projection; asymmetric halves are
+covered, with compile-time geometry bounds. Published resolved facts and the
+immutable outgoing scene remain separately owned.
+
+The two-state restore phase is derived from this **specific pinned loop**:
+keyboard_task calls rgb_matrix_task once on each role, then main calls
+housekeeping once. Same-loop housekeeping only arms restoration. The following
+RGB step normally FLUSHES: ws2812_flush first copies all driver pixels into its
+separate WS2812_BUFFER, then starts DMA. Housekeeping can restore raw driver
+storage while the physical transfer consumes the separate composed copy.
+Mode/enable/toggle setters can replace FLUSHING by STARTING; STARTING performs
+no effect writes, so restoration then precedes the next render and cannot erase
+new pixels. It is not a generic scan-count or elapsed-time flush heuristic.
+
+USB suspension stalls the ordinary pair. Its userspace power-down hook cancels
+pending restoration before QMK synchronously renders/flushes NONE black, even
+if resume precedes housekeeping. On the slave, transactions_slave applies at
+most one synchronous suspend observation per matrix pass before RGB; observing
+suspended state in housekeeping discards the superseded cache. RPC callbacks
+stage state, not raw RGB. NONE does not call basic indicators; its black flush
+and subsequent init never inherit a stale restore. Profile/remap/publication
+changes leave pending raw ownership intact; fresh keyboard/driver initialization
+is a separate quiescent boundary. The runtime's actual output writers are its
+owned composition/diagnostics/timeout and QMK's documented effect/control paths.
+Production drivers/loops outside the reviewed RP2040/ChibiOS vendor WS2812
+with RGB sleep configuration fail compilation pending a new ownership proof;
+host fixtures are explicitly test backends. Raw storage is not a physical RGB
+or cadence measurement. The source-backed native fixture compiles the pinned
+effect bodies and task/control code and checks raw storage separately from the
+physical-transfer copy under normal and sanitized builds.
 
 #### Wire cost and timing limits
 
