@@ -71,9 +71,16 @@ matches at another key while its key0 member leaves and returns, a newer B
 key0 tail can remain above A's older, still-live full match. Partial member
 changes do not create new full-match entries or independent linger clocks.
 The shared `retainedOrdering` traces pin pixel, complete member order and entry
-tokens through these cases, show-after maturation and timer boundaries. They
-exercise the owned-record/ordered-batch/merge seam; they do not substitute for
-the production admission model and linked resource checks below.
+recency through these cases, show-after maturation and timer boundaries. The
+original owned-record/merge assertions remain reference checks. Production
+counterparts in `lighting_working_ordering_test.c` use admitted profiles, actual
+registry walkers, relative entry ranks and `scene.working` whole/half painting.
+Broad behaviour cases use declared2×1-key geometry; the default10×6 rejects
+those reservations and admits the layer control. The mixed-kind/same-id and
+duplicate-owner comparator fixture is explicitly synthetic. Reachable same-kind
+simultaneous/partial-refresh controls exercise production ties instead; the
+different-per-thing show durations use a faithful uniform-rule counterpart.
+These checks do not substitute for linked resource or hardware acceptance.
 
 A subject carries what targets and paints may ask about it: its thing kind
 and id (for its identity colour and place), the keys it concerns, and the
@@ -1114,6 +1121,14 @@ may take longer than a short pulse. Capacity and conservative expiry are not a
 promise that every event is observable remotely. Physical pointing cadence,
 clock drift and allocator/stack high-water remain unproved.
 
+The quantitative hardware-pending ledger includes the useful8220/200ms host
+scenario:48RPC and approximately137ms charged synchronous blocking across its
+trace; an ordinary fact delta takes5RPC/approximately20ms. Quiet peer reboot
+can wait for the existing1000ms heartbeat, followed by approximately946ms for
+the cold full-scene stress resync model. These are software wire/scheduling
+projections, not measured physical latency or pointing cadence; suppression
+at the original expiry still applies, without a restarted visibility window.
+
 ### Qualified event groups (internal split protocol) — legacy component
 
 The following paragraphs describe the superseded **test-only** group protocol
@@ -1228,6 +1243,15 @@ bitmap prefix `be ff ff 1f` (ids 1–5, 7–28); builds without the
 retention consumer omit ids19–28 (`be ff 07`); the paint page is registry 2,
 bitmap prefix `7f 01` (ids 0–6, 8). Target prefix becomes `ff 01` (ids0–8); paint prefix `7f 03` adds paint9.
 Thing kinds now include 5–7, giving the low-id thing bitmap `fe`.
+The timing low-id page is page7 (registry3, first id0): payload prefix
+`03 00 0e`, with bitmap `0e` for show-after1, linger2 and flash3. The remaining
+15 bitmap bytes are zero. Each timing module contributes only its own bit:
+disabling `NOAH_LIGHTING_TIMING_SHOW_AFTER`, `NOAH_LIGHTING_TIMING_LINGER` or
+`NOAH_LIGHTING_TIMING_FLASH` removes respectively `02`, `04` or `08`.
+Without the retained consumer (`NOAH_LIGHTING_EVENT_CAPTURE_ENABLE=0`), linger
+and flash default off, leaving timing bitmap `02` when show-after is enabled;
+explicitly enabling retained timing/event modules without that consumer fails
+compilation. Schema-only all-kind test builds are not consumer capabilities.
 The rest of each 16-byte bitmap is zero. Disabling
 `NOAH_LIGHTING_FACT_COMBO_HELD`, `NOAH_LIGHTING_FACT_BEHAVIOUR` or
 `NOAH_LIGHTING_PAINT_OUTCOME` removes only its kind/bit and rejects that kind
