@@ -143,6 +143,7 @@ NOAH_COMMON_SOURCES := \
     lib/rgb/lighting/lighting_snapshot.c \
     lib/rgb/lighting/lighting_runtime.c \
     lib/compat/qmk_lighting_snapshot_transport.c \
+    lib/compat/qmk_lighting_live.c \
     lib/rgb/lighting/lighting_history_index.c \
     lib/rgb/lighting/kinds/event_layer_locked.c \
     lib/rgb/lighting/kinds/event_layer_unlocked.c \

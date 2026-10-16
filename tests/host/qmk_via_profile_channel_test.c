@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "via.h"
+#include "users/noah/lib/compat/qmk_lighting_live.h"
 
 #include "users/noah/lib/profile/protocol/profile_wire_v1.h"
 #include "users/noah/lib/profile/storage/profile_storage_layout.h"
@@ -709,7 +710,12 @@ static void test_lighting_capability_read(void) {
     assert(frame[7] == 1u && read_u16(frame+8u) == 8220u && frame[10] == 8u && frame[11] == 12u && frame[12] == 12u && frame[13] == 5u && frame[14] == 4u);
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 24u, 16u);
     via_custom_value_command_kb(frame, sizeof(frame));
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+    uint8_t live[25];assert(noah_lighting_live_capability(live)==25);
+    assert(frame[5]==0 && frame[6]==25 && !memcmp(frame+7,live,25));
+#else
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE && frame[6] == 0u);
+#endif
     // A request without an id, or with reserved bytes set, is malformed.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_LIGHTING, 0u, 0u);
     via_custom_value_command_kb(frame, sizeof(frame));
@@ -718,6 +724,36 @@ static void test_lighting_capability_read(void) {
     frame[31] = 1u;
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED && frame[31] == 0u);
+}
+#endif
+
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+#    include "transactions.h"
+uint32_t timer_read32(void) {return 100;}
+bool is_keyboard_master(void) {return true;}
+uint32_t noah_effective_lighting_generation(void) {return 1;}
+bool noah_effective_lighting_identity(uint8_t p[22]) {memset(p,0,22);return true;}
+uint32_t noah_lighting_keymap_generation(void) {return 1;}
+void noah_lighting_facts_collect(noah_lighting_facts_t *p,bool a,bool b) {(void)a;(void)b;memset(p,0,sizeof *p);}
+bool rgb_matrix_get_suspend_state(void) {return false;}
+uint8_t rgb_matrix_is_enabled(void) {return 1;}
+uint8_t rgb_matrix_get_mode(void) {return 2;}
+bool noah_runtime_diag_indicator_active(void) {return false;}
+void noah_rgb_runtime_live_release(void) {}
+void transaction_register_rpc(int8_t id,slave_callback_t fn) {(void)id;(void)fn;}
+bool transaction_rpc_exec(int8_t id,uint8_t n,const void *p,uint8_t size,void *r) {(void)id;(void)n;(void)p;(void)size;(void)r;return false;}
+static void test_live_router(void) {
+    uint8_t p[32];noah_lighting_live_task();
+    make_request(p,0x0e,51,0);via_custom_value_command_kb(p,32);assert(p[5]==5 && !p[6]);
+    make_request(p,0x1d,52,1);p[0]=7;via_custom_value_command_kb(p,32);assert(p[5]==4 && !p[6]);
+    noah_lighting_live_task();
+    make_request(p,0x1d,52,1);p[0]=7;via_custom_value_command_kb(p,32);assert(p[5]==0 && !p[6]);
+    make_request(p,0x0e,53,0);p[5]=1;via_custom_value_command_kb(p,32);assert(p[5]==0 && p[6]==25 && p[7]==1 && p[11]==1);
+    make_request(p,0x0f,54,0);via_custom_value_command_kb(p,32);assert(p[5]==0 && p[6]==25 && p[11]==1 && p[12]==1);
+    make_request(p,0x0f,55,1);via_custom_value_command_kb(p,32);assert(p[5]==1 && !p[6]);
+#    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
+    assert(mutation_receive_count==1); // only the pre-existing candidate test
+#    endif
 }
 #endif
 
@@ -746,6 +782,9 @@ int main(void) {
     test_combo_read_route_without_combo_feature();
 #ifdef RGB_MATRIX_ENABLE
     test_lighting_capability_read();
+#endif
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+    test_live_router();
 #endif
     puts("qmk VIA Profile Wire channel tests passed");
     return 0;

@@ -1,6 +1,7 @@
 #include "users/noah/lib/compat/qmk_lighting_snapshot_transport.h"
 #include "users/noah/lib/rgb/lighting/lighting_snapshot.h"
 #include "transactions.h"
+#include "users/noah/lib/compat/qmk_lighting_live.h"
 #include "users/noah/lib/split/runtime_sync.h"
 #include "users/noah/lib/rgb/lighting/kinds/fact_layer_active.h"
 #include <assert.h>
@@ -45,15 +46,39 @@ static uint32_t serial_us(unsigned bytes) {return (bytes*10u*1000000u+230399u)/2
 static uint32_t send_wait_us(unsigned sends) {return sends*(1000000u*11u/230400u);}
 
 static slave_callback_t callback;
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+void peer_live_task(void);
+static slave_callback_t live_callback;
+static bool combined_live;
+static unsigned live_calls,live_wire;
+static uint32_t live_renew_at,live_token;
+static uint8_t live_request_id;
+static const uint8_t live_profile[22]={0x44};
+uint32_t noah_effective_lighting_generation(void) {return 1;}
+bool noah_effective_lighting_identity(uint8_t p[22]) {memcpy(p,live_profile,22);return true;}
+uint32_t noah_lighting_keymap_generation(void) {return 1;}
+bool rgb_matrix_get_suspend_state(void) {return false;}
+uint8_t rgb_matrix_is_enabled(void) {return 1;}
+uint8_t rgb_matrix_get_mode(void) {return 2;}
+bool noah_runtime_diag_indicator_active(void) {return false;}
+void noah_rgb_runtime_live_release(void) {}
+#endif
+
 static noah_lighting_working_t banks[2];
 static noah_lighting_facts_t staged[2],published;
 static uint8_t memory[2][NOAH_LIGHTING_WORKING_CAPACITY];
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+void noah_lighting_facts_collect(noah_lighting_facts_t *p,bool local,bool synced) {(void)local;(void)synced;*p=staged[1];}
+#endif
 static noah_profile_lighting_v1_program_t program;
 bool is_keyboard_master(void){return master;}
 uint32_t timer_read32(void){return clocks[master];}
 bool noah_lighting_fact_next(uint8_t kind,const noah_lighting_facts_t *f,const uint8_t *p,uint16_t *c,noah_lighting_subject_t *s){if(kind==1)return noah_lighting_fact_layer_active_next(f,p,c,s);assert(!"unexpected fixture walker");return false;}
 layer_state_t layer_state;
 void transaction_register_rpc(int8_t id,slave_callback_t cb) {
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+    if(id==PUT_SPLIT_LIGHTING_LIVE_SYNC){if(!master)live_callback=cb;return;}
+#endif
     if(id==PUT_SPLIT_RUNTIME_BASE_SYNC) {
         uint8_t response=255;
         split_runtime_base_sync_packet_t packet={0};
@@ -70,6 +95,15 @@ void transaction_register_rpc(int8_t id,slave_callback_t cb) {
     if(!master)callback=cb;
 }
 bool transaction_rpc_exec(int8_t id,uint8_t length,const void *request,uint8_t response_size,void *response) {
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+    if(id==PUT_SPLIT_LIGHTING_LIVE_SYNC) {
+        assert(master && live_callback && length<=64 && response_size==24);
+        live_calls++;live_wire+=length+41u;
+        uint32_t outward=serial_us(length+14u)+send_wait_us(9u),returning=serial_us(27u)+send_wait_us(3u);
+        blocking_us+=outward+returning;advance_us(outward);master=false;
+        live_callback(length,request,response_size,response);master=true;advance_us(returning);return true;
+    }
+#endif
     if(id==PUT_SPLIT_RUNTIME_BASE_SYNC) {
         assert(master && base_callback && response_size==1 && length==sizeof(split_runtime_base_sync_packet_t));
         base_calls++;base_wire+=length+18u;
@@ -116,6 +150,16 @@ bool transaction_rpc_send(int8_t id,uint8_t n,const void *p) {
     } else {assert(id==PUT_SPLIT_LIGHTING_FACTS_SYNC);legacy_fact_calls++;}
     return true;
 }
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+static void live_host(uint8_t p[32]) {
+    p[0]=7;p[2]=0x1d;p[3]=++live_request_id;if(!p[3])p[3]=++live_request_id;
+    assert(noah_lighting_live_handle(p,32)&&p[5]==4);noah_lighting_live_task();
+}
+static uint8_t live_status(void) {
+    uint8_t p[32]={8,0,0xf,1};assert(noah_lighting_live_handle(p,32)&&p[5]==0);
+    live_token=noah_lighting_event_get_u32(p+18);return p[15];
+}
+#endif
 static void scan(void) {
     master=true;noah_lighting_working_advance(&banks[1],clocks[1]);
     if(pending_input && !banks[1].snapshot_ready) {
@@ -126,8 +170,20 @@ static void scan(void) {
     }
     if(use_base)split_runtime_sync_tick();
     (void)noah_qmk_lighting_snapshot_step();
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+    if(combined_live) {
+        if(clocks[1]-live_renew_at>=500u && live_status()==6) {
+            uint8_t p[32]={0};p[4]=5;memset(p+5,0x55,8);noah_lighting_event_put_u32(p+13,live_token);noah_lighting_event_put_u32(p+17,1);
+            noah_lighting_event_put_u32(p+21,clocks[1]);live_host(p);live_renew_at=clocks[1];
+        }
+        noah_lighting_live_task();
+    }
+#endif
     advance_us(1000u); // explicit host main scheduling, not measured target time
     master=false;noah_lighting_working_advance(&banks[0],clocks[0]);(void)peer_step();
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+    if(combined_live)peer_live_task();
+#endif
 }
 static void normal_feedback(unsigned duration, bool mixed) {
     uint8_t bytes[]={5,0,58,0,0,0,0,3,
@@ -440,6 +496,22 @@ int main(void) {
     assert(noah_lighting_working_visible(noah_lighting_working_slot(&banks[1],false,&r,127),&timing));
     normal_feedback(500,false);normal_feedback(200,true);normal_feedback(500,true);standard_pulse();useful_mix(65535);useful_mix(500);
     quiet_reboot_recovery();
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+    // Real retained snapshot endpoints plus both real live endpoints share the
+    // same charged230400/8N1 RPC and main schedule; no summing isolated models.
+    master=false;peer_live_task();master=true;noah_lighting_live_task();combined_live=true;live_renew_at=clocks[1];
+    uint8_t frame[174];memset(frame,40,sizeof frame);uint32_t crc=UINT32_MAX;
+    for(unsigned i=0;i<sizeof frame;i++){crc^=frame[i];for(unsigned b=0;b<8;b++)crc=(crc>>1)^((crc&1)?0xedb88320u:0);}crc=~crc;
+    uint8_t p[32]={0};p[4]=2;memset(p+5,0x55,8);noah_lighting_event_put_u32(p+13,1);p[21]=174;noah_lighting_event_put_u32(p+23,crc);live_host(p);
+    for(unsigned i=0;i<100 && live_status()!=2;i++)scan();master=true;assert(live_status()==2);
+    for(unsigned offset=0;offset<sizeof frame;offset+=8){memset(p,0,32);p[4]=3;memset(p+5,0x55,8);noah_lighting_event_put_u32(p+13,live_token);noah_lighting_event_put_u32(p+17,1);p[21]=offset;p[23]=sizeof frame-offset>8?8:sizeof frame-offset;memcpy(p+24,frame+offset,p[23]);live_host(p);}
+    memset(p,0,32);p[4]=4;memset(p+5,0x55,8);noah_lighting_event_put_u32(p+13,live_token);noah_lighting_event_put_u32(p+17,1);live_host(p);
+    for(unsigned i=0;i<100 && live_status()!=6;i++){scan();master=true;}assert(live_status()==6);
+    unsigned prior_calls=live_calls,prior_wire=live_wire;uint64_t prior_blocking=blocking_us;
+    normal_feedback(200,true);normal_feedback(500,true);
+    printf("COMBINED retained real621/8220 + live preview renewals: added%u liveRPC/%uwireB, total%llu us charged blocking over both scenarios; no physical cadence claim\n",live_calls-prior_calls,live_wire-prior_wire,(unsigned long long)(blocking_us-prior_blocking));
+    combined_live=false;noah_lighting_live_close();
+#endif
     peer_close();master=true;noah_qmk_lighting_snapshot_close();
     puts("actual two-half QMK snapshot adapter: strong registration guards/stage-only callbacks/main commit/lost request+reply/causal nonzero asymmetric RTT/both-half positive/show/expiry/no late resurrection PASS (host logical clock model, not hardware)");
     return 0;

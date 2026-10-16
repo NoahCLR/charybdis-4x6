@@ -1,5 +1,9 @@
 // Real pinned native effects/state machine; hardware transfer is an explicit
 // copy, matching RP2040 ws2812_flush before DMA. Raw and physical RGB differ.
+#ifdef NOAH_LIGHTING_LIVE_ENABLE
+#    define transaction_register_rpc fixture_register_rpc
+#    define transaction_rpc_exec fixture_rpc_exec
+#endif
 #define rgb_matrix_set_color fixture_old_set_color
 #define rgb_matrix_led_index fixture_old_led_index
 #define rgb_matrix_get_limits fixture_old_get_limits
@@ -7,6 +11,32 @@
 #undef rgb_matrix_set_color
 #undef rgb_matrix_led_index
 #undef rgb_matrix_get_limits
+#undef transaction_register_rpc
+#undef transaction_rpc_exec
+
+#include "users/noah/lib/compat/qmk_lighting_live.h"
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+static slave_callback_t live_callback;
+uint8_t dynamic_keymap_macro_get_count(void) {return 128;}
+uint16_t dynamic_keymap_macro_get_buffer_size(void) {return 0;}
+void dynamic_keymap_macro_get_buffer(uint16_t offset,uint16_t size,uint8_t *data) {(void)offset;memset(data,0,size);}
+bool via_macro_provider_start(uint16_t action) {(void)action;return false;}
+bool via_macro_provider_try_play(uint16_t action) {(void)action;return false;}
+void transaction_register_rpc(int8_t id,slave_callback_t callback) {
+    if(id==PUT_SPLIT_LIGHTING_LIVE_SYNC)live_callback=callback;
+}
+// This fixture isolates real native-effect/output ownership. The independent
+// live two-instance runner proves receiver main-before-ACK; this sink supplies
+// a correlated successful remote result without duplicating its state machine.
+bool transaction_rpc_exec(int8_t id,uint8_t n,const void *p,uint8_t m,void *r) {
+    if(id!=PUT_SPLIT_LIGHTING_LIVE_SYNC)return false;
+    CHECK(n>=24 && m==24);memcpy(r,p,24);((uint8_t *)r)[0]=0xb2;((uint8_t *)r)[1]=0;
+    if(((const uint8_t *)p)[1]==1) {((uint8_t *)r)[4]=1;((uint8_t *)r)[5]=((uint8_t *)r)[6]=((uint8_t *)r)[7]=0;}
+    return true;
+}
+uint8_t rgb_matrix_is_enabled(void);
+uint8_t rgb_matrix_get_mode(void);
+#endif
 
 static bool compact_driver = true;
 static uint32_t input_idle;
@@ -104,6 +134,7 @@ static void rgb_matrix_indicators_advanced_kb(uint8_t a,uint8_t b) {
 
 // Actual QMK task once, followed by actual userspace housekeeping boundary.
 static void loop(void) {
+    noah_lighting_live_task();
     runtime_fixture.time32++; // every actual main loop advances logical time
     unsigned completed=compositions,flushed=flushes;
     // NONE owns a new black raw buffer and never calls the basic indicator.
@@ -134,6 +165,65 @@ static void frame(void) {
     for(unsigned i=0;i<64 && flushes==count;i++)loop();
     CHECK(flushes==count+1);
 }
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+static void live16(uint8_t *p,uint16_t v){p[0]=(uint8_t)v;p[1]=(uint8_t)(v>>8u);}
+static void live32(uint8_t *p,uint32_t v){for(unsigned i=0;i<4;i++)p[i]=(uint8_t)(v>>(8*i));}
+static uint32_t live_word(const uint8_t *p){return p[0]|((uint32_t)p[1]<<8)|((uint32_t)p[2]<<16)|((uint32_t)p[3]<<24);}
+static uint8_t live_id;
+static void live_host(uint8_t p[32]) {
+    p[0]=7;p[2]=0x1d;p[3]=++live_id;if(!p[3])p[3]=++live_id;
+    CHECK(noah_lighting_live_handle(p,32));CHECK(p[5]==4);noah_lighting_live_task();
+}
+static unsigned live_sequence;
+static uint32_t live_peer_epoch, live_token;
+static void live_peer(uint8_t op,const uint8_t *data,unsigned n) {
+    uint8_t p[64]={0xb1,op},r[24];live16(p+2,++live_sequence);live32(p+4,op==1?0:live_peer_epoch);
+    memset(p+8,0x5a,8);live32(p+16,live_token);live32(p+20,1);memcpy(p+24,data,n);
+    CHECK(live_callback);live_callback(24+n,p,24,r);CHECK(r[1]==4);noah_lighting_live_task();
+    live_callback(24+n,p,24,r);CHECK(r[1]==0);if(op==1)live_peer_epoch=live_word(r+4);
+}
+static void live_start(void) {
+    noah_lighting_live_task();
+    uint8_t bytes[3*RGB_MATRIX_LED_COUNT],p[32]={0},profile[22];
+    for(unsigned i=0;i<sizeof bytes;i+=3){bytes[i]=128;bytes[i+1]=0;bytes[i+2]=64;}
+    uint32_t crc=UINT32_MAX;for(unsigned i=0;i<sizeof bytes;i++){crc^=bytes[i];for(unsigned b=0;b<8;b++)crc=(crc>>1)^((crc&1)?0xedb88320u:0); }crc=~crc;
+    CHECK(noah_effective_lighting_identity(profile));
+    if(fake_is_master) {
+        p[4]=2;memset(p+5,0x5a,8);live32(p+13,1);live32(p+17,live_word(profile+8));live16(p+21,sizeof bytes);live32(p+23,crc);live_host(p);
+        for(unsigned i=0;i<4;i++){runtime_fixture.time32+=5;noah_lighting_live_task();}
+        memset(p,0,32);p[0]=8;p[2]=0xf;p[3]=1;CHECK(noah_lighting_live_handle(p,32));CHECK(p[15]==2);live_token=live_word(p+18);
+        for(unsigned offset=0;offset<sizeof bytes;offset+=8){
+            memset(p,0,32);p[4]=3;memset(p+5,0x5a,8);live32(p+13,live_token);live32(p+17,1);live16(p+21,offset);p[23]=sizeof bytes-offset>8?8:sizeof bytes-offset;memcpy(p+24,bytes+offset,p[23]);live_host(p);
+        }
+        memset(p,0,32);p[4]=4;memset(p+5,0x5a,8);live32(p+13,live_token);live32(p+17,1);live_host(p);
+        for(unsigned i=0;i<16;i++){runtime_fixture.time32+=5;noah_lighting_live_task();}
+    } else {
+        live_sequence=0;live_token++;live_peer(1,profile,22);uint8_t data[40]={0};live16(data,sizeof bytes);live32(data+2,crc);live_peer(2,data,6);
+        for(unsigned offset=0;offset<sizeof bytes;offset+=37){live16(data,offset);data[2]=sizeof bytes-offset>37?37:sizeof bytes-offset;memcpy(data+3,bytes+offset,data[2]);live_peer(3,data,3+data[2]);}
+        live_peer(4,data,0);
+    }
+    rgb_t colour;CHECK(noah_lighting_live_colour(0,&colour));CHECK(colour.r==128&&colour.b==64);
+}
+static void live_native_release(void) {
+    live_start();frame();
+    for(unsigned i=0;i<RGB_MATRIX_LED_COUNT;i++) {int at=rgb_matrix_led_index(i);if(at>=0)CHECK(physical[at].r==128&&!physical[at].g&&physical[at].b==64);}
+    // Current histories change under preview, then end exactly while composed
+    // bytes wait in FLUSHING. Compare against an independent ordinary resolve
+    // from the saved raw base, and the actual subsequent transfer copy.
+    unsigned old=compositions;for(unsigned i=0;i<64&&old==compositions;i++)loop();CHECK(rgb_task_state==FLUSHING);
+    chunk_event();
+    if(fake_is_master){uint8_t p[32]={0};p[4]=6;memset(p+5,0x5a,8);live32(p+13,live_token);live32(p+17,1);live_host(p);}
+    else {uint8_t data[1]={0};live_peer(6,data,0);}
+    memcpy(composed,ws2812_leds,sizeof composed);memcpy(ws2812_leds,raw_before,sizeof raw_before);
+    (void)noah_rgb_matrix_indicators_advanced_user(0,RGB_MATRIX_LED_COUNT);memcpy(fresh_oracle,ws2812_leds,sizeof fresh_oracle);
+    CHECK(!memcmp(composed,fresh_oracle,sizeof composed));memcpy(ws2812_leds,composed,sizeof composed);
+    loop();CHECK(!memcmp(physical,composed,sizeof physical));CHECK(!memcmp(ws2812_leds,raw_before,sizeof raw_before));
+    live_start();frame();noah_rgb_runtime_suspend();rgb_matrix_set_suspend_state(true);
+    for(unsigned i=0;i<RGB_MATRIX_LED_COUNT;i++){int at=rgb_matrix_led_index(i);if(at>=0)CHECK(!physical[at].r&&!physical[at].g&&!physical[at].b);}
+    rgb_matrix_set_suspend_state(false);noah_lighting_live_task();
+}
+#endif
+
 static void native_case(bool left,bool master_role,unsigned effect,unsigned scenario) {
     oracle_scenario=0;input_idle=0;
     test_reset();fake_is_left=left;fake_is_master=master_role;runtime_fixture.time32=100;
@@ -215,6 +305,9 @@ static void native_case(bool left,bool master_role,unsigned effect,unsigned scen
     // Public advanced legacy entry still composes when called independently.
     noah_rgb_runtime_post_init();for(unsigned i=0;i<WS2812_LED_COUNT;i++)ws2812_leds[i]=(ws2812_led_t){.b=200};
     CHECK(noah_rgb_matrix_indicators_advanced_user(0,RGB_MATRIX_LED_COUNT));
+#if NOAH_LIGHTING_LIVE_AVAILABLE
+    live_native_release();
+#endif
     chunk_profile.profile.domain_mask=0;noah_effective_rgb_runtime_invalidate(&chunk_runtime,1000,chunk_profile.identity,chunk_profile.identity,&chunk_profile);noah_effective_rgb_runtime_uninstall(&chunk_runtime);
 }
 int main(void) {

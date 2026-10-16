@@ -51,6 +51,7 @@ build_hook_and_run() {
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
         "$ROOT/tests/host/qmk_via_profile_channel_test.c" \
         "$ROOT/users/noah/lib/compat/qmk_via_profile_channel.c" \
+        "$ROOT/users/noah/lib/compat/qmk_lighting_live.c" \
         "$ROOT/users/noah/lib/compat/qmk_via_logical_profile.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
@@ -69,3 +70,6 @@ build_hook_and_run via_split_rgb -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATR
 build_hook_and_run via_owner_split_rgb -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
 build_hook_and_run via_mutation_owner_split_rgb -DNOAH_LIVE_PROFILE_MUTATION_ENABLE -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
 build_hook_and_run via_cadence -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
+
+build_hook_and_run via_live -DNOAH_LIGHTING_LIVE_ENABLE=1 -DNOAH_LIVE_PROFILE_MUTATION_ENABLE -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812
+build_hook_and_run via_live_sanitized -DNOAH_LIGHTING_LIVE_ENABLE=1 -DNOAH_LIVE_PROFILE_MUTATION_ENABLE -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DSPLIT_KEYBOARD -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812 -fsanitize=address,undefined -fno-omit-frame-pointer

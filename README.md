@@ -38,6 +38,9 @@ any C and you don't reflash.
   by the layer or pointing mode it enters, and make rules for held or locked
   layers, modifiers and host lock LEDs. Select keys by what they do on the
   shown layer, following remaps, or colour their direct layer/mode/macro target.
+- **Live lighting with a supporting client.** Read a coherent sample of the
+  keyboard's current lighting facts or explicitly try a temporary complete
+  colour frame. The preview is unsaved and expires when renewal stops.
 - **Two halves that act like one keyboard.** Layers, modes, combos, lighting
   and saved edits stay in sync across the cable.
 - **Your keyboard, your name.** Name it in Ark and your computer, Chrome's

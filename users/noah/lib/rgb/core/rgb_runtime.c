@@ -12,6 +12,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "rgb_runtime.h"
+#include "../../compat/qmk_lighting_live.h"
 #include "rgb_helpers.h"
 #include "rgb_validation.h"
 #include "../../state/diagnostics/runtime_diag.h"
@@ -278,6 +279,14 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
     }
 
     for (uint8_t led = led_min; led < led_max; led++) {
+#    if NOAH_LIGHTING_LIVE_AVAILABLE
+        rgb_t temporary;
+        if (noah_lighting_live_colour(led, &temporary)) {
+            rgb_set_led_color(led, led_min, led_max, temporary);
+            painted = true;
+            continue;
+        }
+#    endif
         if ((rgb_runtime_frame.painted & NOAH_LIGHTING_LED_BIT(led)) == 0u) continue;
         rgb_set_led_color(led, led_min, led_max, rgb_runtime_frame.colour[led]);
         painted = true;
@@ -325,7 +334,28 @@ void noah_rgb_runtime_post_init(void) {
 #endif
 }
 
+__attribute__((noinline)) void noah_rgb_runtime_live_release(void) {
+#if defined(RGB_MATRIX_ENABLE) && NOAH_RGB_RAW_OWNER
+    if (!rgb_runtime_raw_phase || rgb_matrix_get_suspend_state()) return;
+    // No native effect can run between these main-context operations. Put raw
+    // base pixels back before the ordinary resolver reads them, then replace
+    // the whole pending composition. Keep its existing flush/restore phase.
+    uint8_t first = 0, count = RGB_MATRIX_LED_COUNT;
+#    ifdef RGB_MATRIX_SPLIT
+    first = is_keyboard_left() ? 0u : RGB_LEFT_LED_COUNT;
+    count = is_keyboard_left() ? RGB_LEFT_LED_COUNT : RGB_MATRIX_LED_COUNT - RGB_LEFT_LED_COUNT;
+#    endif
+    for (uint8_t i = 0; i < count; i++) {
+        int index = rgb_matrix_led_index(first + i);
+        if (index < 0 || index >= WS2812_LED_COUNT) __builtin_trap();
+        ws2812_leds[index] = rgb_runtime_raw[i];
+    }
+    (void)rgb_runtime_render_range(0, RGB_MATRIX_LED_COUNT);
+#endif
+}
+
 void noah_rgb_runtime_suspend(void) {
+    noah_lighting_live_close();
 #if defined(RGB_MATRIX_ENABLE) && NOAH_RGB_RAW_OWNER
     // Pinned suspend_power_down_quantum calls the userspace hook BEFORE its
     // synchronous NONE render/flush. That complete black write supersedes the

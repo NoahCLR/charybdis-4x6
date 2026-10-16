@@ -141,6 +141,13 @@
         }
       ],
       "paths": [
+        {"name": "lighting live main session timer", "functions": ["main", "matrix_scan", "noah_lighting_live_task", "timer_read32", "chSysRestoreStatusX", "chSchRescheduleS", "chSchDoPreemption", "__port_switch"]},
+        {"name": "lighting live actual facts capture", "functions": ["main", "matrix_scan", "noah_lighting_live_task", "live_host_command", "live_capture", "noah_lighting_facts_collect", "noah_lighting_slice_behaviour_state_collect", "key_feedback_apply_semantic_for_owner"]},
+        {"name": "lighting live send correlated main ACK", "functions": ["main", "matrix_scan", "noah_lighting_live_task", "live_send_main", "transaction_rpc_exec", "transport_execute_transaction"]},
+        {"name": "lighting live peer main stage publish", "functions": ["main", "matrix_scan", "noah_lighting_live_task", "live_receive_main", "live_peer_command", "memcpy"]},
+        {"name": "lighting live complete stage CRC check", "functions": ["main", "matrix_scan", "noah_lighting_live_task", "live_host_command", "live_crc32"]},
+        {"name": "lighting live current ordinary release", "functions": ["main", "matrix_scan", "noah_lighting_live_task", "noah_rgb_runtime_live_release", "rgb_runtime_render_range", "noah_lighting_resolve"]},
+        {"name": "lighting live final output selection", "functions": ["main", "rgb_matrix_task", "rgb_runtime_render_range", "noah_lighting_live_colour"]},
         {"name": "BASIC complete effect raw local capture projection", "functions": ["main", "rgb_matrix_task", "rgb_matrix_led_index"]},
         {"name": "BASIC complete effect raw local pixel capture", "functions": ["main", "rgb_matrix_task", "memcpy"]},
         {"name": "post-flush housekeeping raw effect ownership restore", "functions": ["main", "rgb_matrix_led_index"]},
@@ -1658,6 +1665,7 @@
         }
       },
       "indirect_edges": [
+        {"caller":"slave_rpc_exec_callback","callee":"live_rpc","reason":"The enabled Lighting Live module registers this bounded decode/mailbox callback for the appended PUT_SPLIT_LIGHTING_LIVE_SYNC; main owns semantic state and frame publication."},
         {
           "caller": "SlaveThread",
           "callee": "slave_rpc_exec_callback",
@@ -1691,6 +1699,7 @@
       ],
       "cycle_bounds": [],
       "paths": [
+        {"name":"lighting live bounded callback request copy", "functions":["SlaveThread","slave_rpc_exec_callback","live_rpc","memcpy"]},
         {"name": "snapshot callback clock restoration", "functions": ["SlaveThread", "slave_rpc_exec_callback", "snapshot_rpc", "timer_read32", "chSysRestoreStatusX", "chSchRescheduleS", "chSchDoPreemption", "__port_switch"]},
         {"name": "base readiness existing callback ownership projection", "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_base_rpc", "key_origin_bitmap_copy"]},
         {

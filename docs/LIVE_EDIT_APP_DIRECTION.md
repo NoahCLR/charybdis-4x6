@@ -70,6 +70,10 @@ default60-key/four-combo GCC15.2.0 artifact
 has a scoped247808-byte static policy for this storage; core and stack policies
 are unchanged (D-F26). None of it has run on hardware.
 
+The Lighting Live candidate adds coherent sampled main facts and a separate
+leased complete-frame override (D-F27); integration/resource acceptance remains
+pending. It never saves a preview or claims a full event/contribution trace.
+
 The keyboard's name lives in settings v7 and is its USB product string
 (D-F25): read before USB starts, and taken up after a rename by one USB
 restart of the half on USB once nothing is in flight.
@@ -1562,3 +1566,32 @@ The340-byte initial regression margin is not runtime-free memory. Other artifact
 geometry limits, physical270336 per half, core floor4096 and reviewed main/slave
 1920/768 remain unchanged. Source stack corrections require fresh measurements;
 this amendment is no automatic pool or policy growth and no hardware acceptance.
+
+## D-F27 — Sampled lighting facts and leased complete-frame previews
+
+Lighting Live adds capability GET0D/page16 and independently gated coherent
+master-main facts reads GET0E plus volatile frame controls SET1D/statusGET0F.
+[The exact wire](architecture/profile-wire-v1.md#lighting-live-v1--volatile-read-and-frame-surface)
+and [ownership contract](architecture/lighting-rules-v1.md#lighting-live-ownership)
+define versioned identities, canonical bounded pages and2000ms local staging/
+output leases. Feature7 and the full32-bit feature word keep their old meanings.
+Current samples are not event journals, retained-tail explanations or physical
+pixel measurements. Frames never enter Apply, candidate or persistent storage.
+
+Each half owns two complete RGB frames. CLEAR-old main acknowledgement precedes
+replacement; peer main publication precedes sender selection. Loss may leave
+ordinary lighting beside one preview until recovery/independent expiry, never a
+claim of simultaneous physical publication. Strictly new matching renewal can
+extend only a live identity; stale messages cannot resurrect it. Ordinary/native
+lighting keeps advancing, and release recomposes CURRENT ordinary pixels with
+the pinned raw-effect ownership seam, including a preview already awaiting flush.
+Reset/role/profile/clock/suspend invalidates sessions and samples. Volatile
+owner/token correlation is not durable anti-replay or authentication.
+
+The candidate's explicit1272B fixed representation is authorized for measurement
+under unchanged resource policies, not an allocation-policy rise or physical
+acceptance. [Memory accounting](architecture/memory-budgets.md#lighting-live-candidate-accounting)
+requires both-half links and complete reviewed paths. The client follow-up must
+adopt exact fixtures/capabilities, pin this completed firmware and present live
+samples as read-only with explicit preview opt-in, END on exit and lease recovery
+on lost exit. First physical release, cadence, drift and high-water remain open.

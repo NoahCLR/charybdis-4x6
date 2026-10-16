@@ -84,12 +84,32 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 
 "$BUILD_DIR/contract_probe" >"$BUILD_DIR/pages.json"
 
+# The authored-profile probe above intentionally uses its stable 8x8 host LAYOUT.
+# Lighting facts have real matrix-sized slices; its new descriptor must use the
+# selected target geometry instead of that unrelated introspection fixture.
+python3 - "$QMK_ROOT/keyboards/bastardkb/charybdis/4x6/keyboard.json" "$BUILD_DIR/live_geometry.h" <<'GEOMETRY'
+import json,pathlib,sys
+board=json.loads(pathlib.Path(sys.argv[1]).read_text())
+rows=2*len(board['matrix_pins']['rows']);cols=len(board['matrix_pins']['cols'])
+leds=len(board['rgb_matrix']['layout']);left=board['rgb_matrix']['split_count'][0]
+pathlib.Path(sys.argv[2]).write_text(f'#define MATRIX_ROWS {rows}\n#define MATRIX_COLS {cols}\n#define RGB_MATRIX_LED_COUNT {leds}\n#define RGB_LEFT_LED_COUNT {left}\n')
+GEOMETRY
+cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+    -DCOMBO_ENABLE -DPOINTING_DEVICE_ENABLE -DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812 \
+    -DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_LIGHTING_LIVE_ENABLE=1 \
+    -DNOAH_PORTABLE_PROFILE_ENABLE -DNOAH_PD_PROFILE_ENABLE -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 \
+    -DQMK_STUB_SUPPRESS_LAYER_COUNT -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+    -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" -include "$BUILD_DIR/live_geometry.h" -include "$CONFIG" \
+    "$ROOT/tests/host/lighting_live_capability_probe.c" -o "$BUILD_DIR/live_probe"
+"$BUILD_DIR/live_probe" > "$BUILD_DIR/live.hex"
+
 python3 - "$ROOT" "$BUILD_DIR/pages.json" "${OUTPUT:-}" <<'PY'
 import hashlib, json, subprocess, sys
 from pathlib import Path
 
 root, pages, output = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
 report = json.loads(pages.read_text())
+report["lightingLiveCapability"] = (pages.parent / "live.hex").read_text().strip()
 capability_pages = [bytes.fromhex(page) for page in report["capabilityPages"]]
 assert len(capability_pages) == capability_pages[0][1], "Contract probe must report every advertised capability page"
 assert all(len(page) == 25 for page in capability_pages), "Capability pages must be complete Raw HID payloads"

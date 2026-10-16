@@ -752,3 +752,27 @@ The pinned enabled candidate with this repair links5292B `.data` plus242360B
 core-memory span. The net92B static change includes compiler layout, not just
 the89B declared cache/controls. These are linked figures for the recorded
 configuration, not runtime availability or hardware high-water evidence.
+
+## Lighting Live candidate accounting
+
+The live candidate owns an additional frozen main facts sample, two complete RGB
+frames and separate bounded control/HID/split endpoint state. At default geometry
+and enabled17 slices the declared fixed total per half is1272B: sample664
+(facts621 plus profile22, fouru32 and four flags/padding), RGB348 (two174B frames),
+control76, split112 (role-disjoint64B request/mailbox plus24B cached reply and
+control), HID72 (32B request,32B cached reply and completion/guards). All coexist;
+no savings are credited from existing histories, staged program, raw87B cache or
+source621B fact cut. No heap, third history bank, EEPROM/candidate buffer or
+lifetime scratch reuse funds this state. Slice/page encoding writes directly to
+bounded caller output and excludes the facts struct's final sentinel.
+
+This is a declared representation, NOT a linked fit or policy amendment. The
+scoped247808 static ceiling,4096 boot core-span floor and1920/768 reviewed stack
+policies remain unchanged. Fresh enabled links on BOTH halves must account for
+compiler padding and generated paths before any amendment is selected. The
+historical247652+1272 projection is248924,1116 above static policy; its hypothetical
+13208B boot core-memory span is not runtime-free memory or high-water evidence.
+Physical SRAM remains270336B per half. All previous reviewed paths and indirect
+assertions remain required alongside new main capture/wire/mailbox/split/session/
+expiry/current-ordinary release paths. Global/interrupt maxima, allocator and
+stack high-water, cadence/drift/appearance remain physical acceptance work.

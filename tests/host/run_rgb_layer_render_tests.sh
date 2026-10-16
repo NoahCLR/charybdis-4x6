@@ -49,6 +49,7 @@ build_scene() {
         "$ROOT/tests/host/${RENDER_TEST_SOURCE:-rgb_layer_render_test.c}" \
         "$ROOT/users/noah/lib/compat/qmk_contract.c" \
         "$ROOT/users/noah/lib/compat/qmk_lighting_snapshot_transport.c" \
+        "$ROOT/users/noah/lib/compat/qmk_lighting_live.c" \
         "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
         "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
         $PROFILE_SOURCES $LIGHTING_SOURCES \
@@ -130,7 +131,7 @@ def function(text,name):
     return text[begin:end]+'\n'
 # Exact selected primary-source definitions; the fixture supplies hardware,
 # scheduling and seeded randomness, not altered effect/task implementations.
-names=['rgb_matrix_get_limits','rgb_matrix_none','rgb_task_timers','rgb_task_sync','rgb_task_start','rgb_task_render','rgb_task_flush','rgb_matrix_task','rgb_matrix_indicators','rgb_matrix_indicators_advanced','rgb_matrix_set_suspend_state','rgb_matrix_get_suspend_state','rgb_matrix_toggle_eeprom_helper','rgb_matrix_enable_noeeprom','rgb_matrix_disable_noeeprom','rgb_matrix_mode_eeprom_helper']
+names=['rgb_matrix_get_limits','rgb_matrix_none','rgb_task_timers','rgb_task_sync','rgb_task_start','rgb_task_render','rgb_task_flush','rgb_matrix_task','rgb_matrix_indicators','rgb_matrix_indicators_advanced','rgb_matrix_set_suspend_state','rgb_matrix_get_suspend_state','rgb_matrix_is_enabled','rgb_matrix_get_mode','rgb_matrix_toggle_eeprom_helper','rgb_matrix_enable_noeeprom','rgb_matrix_disable_noeeprom','rgb_matrix_mode_eeprom_helper']
 (out/'native_rgb_tasks.inc').write_text('\n'.join(function(src,n) for n in names))
 (out/'native_rgb_limits.inc').write_text(function((qmk/'quantum/rgb_matrix/rgb_matrix.h').read_text(),'rgb_matrix_check_finished_leds'))
 (out/'rgb_matrix_effects.inc').write_text('RGB_MATRIX_EFFECT(RAINDROPS, 0)\nRGB_MATRIX_EFFECT(JELLYBEAN_RAINDROPS, 0)\nRGB_MATRIX_EFFECT(DIGITAL_RAIN, 0)\n')
@@ -158,5 +159,8 @@ for variant in normal sanitized; do
         esac
         RENDER_TEST_SOURCE=rgb_effect_owner_test.c build_scene "native_${geometry}_$variant" -I"$BUILD_DIR" -DNOAH_PORTABLE_PROFILE_ENABLE -DNOAH_LIGHTING_FACT_LAYER_STATUS=0 -DNOAH_LIGHTING_FACT_MACRO_PLAYING=0 -DNOAH_LIGHTING_FACT_KEY_PRESSED=0 -DNOAH_LIGHTING_FACT_HOST_LOCK=0 -DNOAH_LIGHTING_FACT_POINTER=0 -DRGB_NATIVE_EFFECT_FIXTURE '-DRGB_MATRIX_SPLIT={RGB_LEFT_LED_COUNT,RGB_MATRIX_LED_COUNT-RGB_LEFT_LED_COUNT}' $bounds -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DNOAH_LIGHTING_FACT_MACRO_PLAYED=1 -DNOAH_LIGHTING_TIMING_FLASH=1 -DNOAH_LIGHTING_TIMING_LINGER=1 -DNOAH_LIGHTING_TARGET_KEYS_THAT=1 -DRPC_M2S_BUFFER_SIZE=128 $flags
         "$BUILD_DIR/native_${geometry}_$variant"
+        RENDER_TEST_SOURCE=rgb_effect_owner_test.c build_scene "live_native_${geometry}_$variant" -I"$BUILD_DIR" -DNOAH_PORTABLE_PROFILE_ENABLE -DNOAH_LIGHTING_FACT_LAYER_STATUS=0 -DNOAH_LIGHTING_FACT_MACRO_PLAYING=0 -DNOAH_LIGHTING_FACT_KEY_PRESSED=0 -DNOAH_LIGHTING_FACT_HOST_LOCK=0 -DNOAH_LIGHTING_FACT_POINTER=0 -DRGB_NATIVE_EFFECT_FIXTURE '-DRGB_MATRIX_SPLIT={RGB_LEFT_LED_COUNT,RGB_MATRIX_LED_COUNT-RGB_LEFT_LED_COUNT}' $bounds -DNOAH_LIGHTING_EVENT_CAPTURE_ENABLE=1 -DNOAH_LIGHTING_FACT_MACRO_PLAYED=1 -DNOAH_LIGHTING_TIMING_FLASH=1 -DNOAH_LIGHTING_TIMING_LINGER=1 -DNOAH_LIGHTING_TARGET_KEYS_THAT=1 -DRPC_M2S_BUFFER_SIZE=128 -DNOAH_LIGHTING_LIVE_ENABLE=1 -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DVIA_ENABLE -DSPLIT_KEYBOARD $flags
+        "$BUILD_DIR/live_native_${geometry}_$variant"
+
     done
 done

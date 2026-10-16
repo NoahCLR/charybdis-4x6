@@ -598,3 +598,19 @@ flowchart TD
     usb_name["USB product name"] --> usb_name_tests["qmk_usb_product_name, profile_store_runtime, profile_owner"]
     all["Whole userspace"] --> full["run_all_host_tests.sh and qmk compile"]
 ```
+
+
+## Lighting Live main and receive paths
+
+`runtime_init.c` advances the independently gated live module after ordinary
+lighting main work on both roles. VIA SET only decodes/queues a32B command;
+the new split callback validates/copies at most64B and returns a cached24B reply.
+Neither callback runs rendering, profile/candidate or EEPROM operations. Main
+captures actual facts directly into an owned immutable sample, advances frame
+stage/CRC/CLEAR/publication/renewal/expiry and sends at most one split RPC.
+GET reads an identified immutable sample or versioned status; no live pointer
+escapes. Final completed local RGB composition may select the temporary frame;
+ordinary rules/native state still advance. Main release replaces any waiting
+preview flush with CURRENT ordinary composition over the raw base, retaining
+postflush cache ownership. Suspend closes before synchronous NONE black.
+The exact lifecycle and limits are D-F27 and the Lighting Live wire/split specs.

@@ -381,3 +381,36 @@ host arbitration while keeping payload mutation fenced.
 Background repair follows the same rule. A newer local committed record pushes
 its stored binding; pulling a newer peer first requests its binding with
 LOGICAL_BIND_REQUEST (kind 11). There is no unbound prepared-push path.
+
+## Temporary Lighting Live RPC
+
+This surface is independent of durable profile reconciliation. Appended
+`PUT_SPLIT_LIGHTING_LIVE_SYNC` is separately gated, never reorders previous IDs,
+and stays within existing128/32-byte QMK allocations. Request discriminator`b1`,
+reply`b2` identify version1; retained snapshot`a1..a4` remains unchanged.
+
+Requests use tag0, operation1, nonzero monotonic sequenceLE16 at2, peer epochLE32
+at4 (zero only for CLEAR), owner64 at8, tokenLE32 at16, revisionLE32 at20. Exact
+sizes are CLEAR46 (active profile22 at24), BEGIN30 (RGB length16 at24,CRC32 at26),
+CHUNK`27+n` (offset16 at24,length8 at26,`1..37` bytes at27), PUBLISH24, RENEW28
+(new renewal32 at24), END24. Operations are CLEAR1,BEGIN2,CHUNK3,PUBLISH4,RENEW5,
+END6. Complete RGB is174 bytes for58LEDs; actual compiled geometry is required.
+Replies are exactly24: tag`b2`, Lighting Live status, then sequence/epoch/owner/
+token/revision at the same offsets. Wrong size/discriminator/range/identity,
+unknown epoch or old sequence never advances main state.
+
+Callback only validates/copies one bounded mailbox request and returns PENDING
+or that exact request's cached main result. Main owns CLEAR/reset/session,
+staging/CRC/publication/expiry/renew. CLEAR increments the receiver epoch in main
+and acknowledges only after old output is released. One immutable request stays
+in flight; retry bytes match exactly. PUBLISH becomes OK only after main selected
+the whole validated frame. Sender waits for this correlated result before
+selecting its local frame. A failed main result cannot be mistaken for progress.
+
+The [Lighting Live ownership contract](lighting-rules-v1.md#lighting-live-ownership)
+defines the allowed ordinary-plus-one-preview failure asymmetry, independent local
+leases, reset and release. Failed transport backs off50..1000ms; pending main
+consumption polls at5ms. No RPC when no live/staging/cleanup work exists, and no
+new idle heartbeat. Existing ordinary facts/history synchronization continues.
+One call per live main step adds synchronous work to existing scan work; neither
+host wire projections nor passing stack paths prove physical pointing cadence.

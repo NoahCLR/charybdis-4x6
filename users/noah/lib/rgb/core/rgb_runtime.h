@@ -12,6 +12,8 @@ bool noah_rgb_matrix_indicators_user(void);
 void noah_rgb_runtime_post_init(void);
 void noah_rgb_runtime_housekeeping(void);
 void noah_rgb_runtime_suspend(void);
+// Main-only: replace a waiting composed flush using CURRENT ordinary lighting.
+void noah_rgb_runtime_live_release(void);
 void noah_rgb_runtime_invalidate_layer_maps(void);
 
 #ifdef RGB_RUNTIME_RENDER_TEST_BACKEND

@@ -1608,3 +1608,54 @@ This document governs the bytes and their meaning. Transport and activation
 are specified by [Profile Wire](profile-wire-v1.md) and the
 [logical transaction contract](logical-profile-transaction-v1.md); RAM policy
 by [memory budgets](memory-budgets.md).
+
+## Lighting Live ownership
+
+The additive [Lighting Live wire](profile-wire-v1.md#lighting-live-v1--volatile-read-and-frame-surface)
+provides coherent read-only main samples and a separate temporary complete RGB
+frame. Both compile behind `NOAH_LIGHTING_LIVE_ENABLE` and the RGB/VIA/split/live
+profile owner prerequisites; disabled builds advertise neither. Facts use actual
+producer slices, copied directly into owned storage by master main. The client
+must label a captured sample and its source/generation; current facts cannot
+reconstruct already departed flash or linger tails. Preview pixels never alter
+candidate/profile storage, rule acceptance,8220 histories or event lifetime.
+
+Each half owns current and staged complete RGB frames. Ordinary facts, histories,
+rules and native effects keep advancing internally; only final completed local
+composition selects override pixels. Diagnostics and sleep still win, NONE and
+disable do not implicitly enable RGB. Raw87B local cache remains native-effect
+state. Release recomposes CURRENT ordinary lighting over that raw base; it never
+restores a saved ordinary screenshot. When composed preview bytes already wait
+for FLUSHING, main restores the raw driver base, resolves the current ordinary
+scene once, and replaces the pending composed driver pixels while preserving the
+existing postflush raw-restore phase. It does not invoke BASIC capture twice.
+QMK's next flush copies the new ordinary composition into the separate DMA buffer.
+Mode/enable setters may instead cancel FLUSHING through STARTING, which writes
+no effect pixels. Suspend closes the live session before synchronous NONE black;
+while suspended main cannot reopen it. Native chunked/full Raindrops, Jellybean
+and Digital Rain use the same exact pinned loop/effect bodies in host coverage.
+
+A finite2000ms local output lease begins on each half's publication; staging
+also has a2000ms inactivity lease. A strictly new correlated renewal extends only
+a still-live matching session after peer main acknowledgement. Cached retries,
+old ACKs and duplicate renewal do not extend deadlines or resurrect expired state.
+A lost link releases local output and retries a bounded clear; a peer independently
+expires while its main loop runs. No wall-clock extinction under stalled main,
+USB suspension or physical sleep is claimed. Suspend/reset/role/profile/clock
+change closes frame/staging/mailbox/sample state; fresh BEGIN plus a full upload
+is required after expiry. Namespace exhaustion closes rather than wraps live IDs.
+
+CLEAR of the prior preview is main-acknowledged before a new revision may publish.
+Receiver main publishes a complete validated RGB frame, then ACKs; sender selects
+its matching current frame only after the correlated ACK. Failure can produce
+ordinary lighting on one half and ONE preview on the other until retry/expiry.
+Two deliberately different preview revisions and simultaneous physical commit
+are not promised. Unknown/mixed peers and unresolved epoch/clear never authorize
+publication or indefinite one-sided renewal. END drops local preview immediately
+at main consumption; peer cleanup is best effort plus its independent lease.
+
+Owner64/client nonce, device token32, revision32 and serialized bounded transport
+correlate volatile sessions; these are not cryptographic authentication or durable
+anti-replay state. Old chunks/end/renew/ACK cannot target a newer live identity.
+After reboot an arbitrarily replayed complete old BEGIN/upload is not distinguishable
+from a newly submitted one; no durable counter or invented entropy source exists.

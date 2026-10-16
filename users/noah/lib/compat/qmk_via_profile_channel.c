@@ -1,4 +1,5 @@
 #include "qmk_split_diagnostics.h"
+#include "qmk_lighting_live.h"
 #include "../profile/runtime/effective_pd_runtime.h"
 // ───────────────────────────────────────────────────────────────────────────────
 // QMK VIA Live Profile Custom Channel
@@ -224,7 +225,7 @@ static bool noah_profile_channel_handle_lighting_get(uint8_t *data, uint8_t leng
         data[5] = NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED;
         return true;
     }
-    data[6] = noah_profile_lighting_v1_capability_page(&limits, data[4], &data[7]);
+    data[6] = data[4] == 16u ? noah_lighting_live_capability(&data[7]) : noah_profile_lighting_v1_capability_page(&limits, data[4], &data[7]);
     data[5] = data[6] ? NOAH_PROFILE_WIRE_V1_STATUS_OK : NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE;
     return true;
 #    else
@@ -331,6 +332,7 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
 }
 
 NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
+    if (noah_lighting_live_handle(data, length)) return;
     if (noah_split_diagnostics_command(data, length)) return;
     if (noah_qmk_combo_readback_get(data, length)) return;
 #    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE

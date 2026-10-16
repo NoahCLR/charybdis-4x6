@@ -1155,3 +1155,111 @@ value, backup field or part of the profile fingerprint. Detection may be wrong
 or change after USB setup, particularly with switches/KVMs. Do not infer an OS
 from the computer running the client. The retired `0x09` remains unsupported;
 `0x0A` remains the diagnostic capture route.
+
+## Lighting Live v1 — volatile read and frame surface
+
+Lighting capability GET `0x0D`, page16, independently advertises sampled facts
+and temporary RGB frames. Require feature31 and that exact descriptor before
+using GET `0x0E` (facts), GET `0x0F` (status) or SET `0x1D` (controls). Feature7
+keeps its former reserved volatile-preview meaning and remains unset. No save,
+candidate, persistent profile, domain5 or registry-layout change is implied.
+Unsupported builds retain UNKNOWN_PAGE for page16 and unhandled new values.
+
+All requests/replies are exactly32 bytes, custom channel0, nonzero request ID.
+Replies echo bytes0..4; status5, length6, payload7..31, canonical zero padding.
+New-value statuses are OK0, MALFORMED1, UNKNOWN_PAGE2, UNAVAILABLE3, PENDING4,
+STALE5, BUSY6, RANGE7, CONFLICT8, PROFILE_CHANGED9, PEER_UNAVAILABLE10. Error and
+PENDING replies contain no payload. These values do not extend old decoders.
+
+Page16 has exactly25 payload bytes:
+
+| Byte | Meaning |
+| ---: | --- |
+| 0 | descriptor version1 |
+| 1 | bit0 facts, bit1 frame; remaining bits zero |
+| 2,3 | facts format1, frame format1 |
+| 4,5,6 | GET0E, GET0F, SET1D |
+| 7 | host RGB chunk maximum8 |
+| 8,9 | actual total LED count, left count |
+| 10..11 | complete RGB byte length, `3*LEDcount` LE16 |
+| 12..13 | local output lease2000ms LE16 |
+| 14..15 | typed fact-slice bytes including TLV headers, LE16 |
+| 16 | metadata bytes48 |
+| 17 | source/validity encoding version1 |
+| 18..19 | staging inactivity lease2000ms LE16 |
+| 20..21 | recommended host renewal500ms LE16 |
+| 22..24 | zero |
+
+SET1D uses byte4 operation; a bounded mailbox returns PENDING, and an exact
+retry returns that command's cached main result. One command may be outstanding.
+Main status also identifies the request and result; never correlate solely by
+VIA command. The fresh client owner nonce is eight nonzero-as-a-whole bytes,
+an identity rather than a security token. Fields below begin at report byte5.
+
+| Op | Request fields; all following unused bytes zero |
+| ---: | --- |
+| 1 CAPTURE | all27 bytes zero |
+| 2 BEGIN | owner64 at5, revision32 at13 nonzero, expected profile payload digest32 at17, exact RGB bytes16 at21, CRC32 at23 |
+| 3 CHUNK | owner64 at5, device token32 at13, revision32 at17, offset16 at21, length8 at23 (`1..8`), RGB bytes24..31; unused RGB bytes zero |
+| 4 PUBLISH | owner/token/revision at5/13/17;21..31 zero |
+| 5 RENEW | owner/token/revision, strictly increasing nonzero renewal sequence32 at21;25..31 zero |
+| 6 END | owner/token/revision;21..31 zero |
+
+BEGIN assigns a new device token, drops local old preview, then crosses the
+peer CLEAR/main-ACK barrier. Wait for UPLOAD status before sending RGB chunks.
+Sequential chunks advance the offset; fully repeated identical earlier bytes
+succeed without refreshing staging inactivity. Gaps, partial overlap and
+conflicting bytes reject. PUBLISH requires every byte and exact CRC32. It repeats the CLEAR/main-ACK
+barrier before peer upload: an active host upload can legitimately outlast the
+peer's earlier staging lease, and the old barrier is not evidence of a live stage.
+RGB is
+literal global-index order `R,G,B`, without changing QMK matrix associations.
+Colours are not automatically scaled or saved. Native diagnostics, sleep,
+NONE/disable and suspension retain their output precedence.
+
+GET0E/0F request byte4 is page,5..8 expected identity LE32,9..31 zero. GET0E
+requires the nonzero completed capture identity on every page. GET0F permits
+identity0 only for page0, to discover the status revision; all later pages
+require that exact revision. A changed identity returns STALE, never substitutes
+another generation. All status pages contain25 bytes, first4 the status revision.
+
+| Status page | Remaining21 bytes (offsets relative to byte11 of report) |
+| ---: | --- |
+| 0 | layout1 at0, last op1, requestID2, result3, local state4, RPC phase5, suppression/output flags6, token32 at7, frame revision32 at11, staged offset16 at15, RGB bytes16 at17, peer/error result19, guard flags20 |
+| 1 | owner64 at0, lease/staging start32 at8, renewal32 at12, frame CRC32 at16, role20 |
+| 2 | snapshotID32 at0, snapshot ready4, profile payload digest32 at5, runtime lighting generation32 at9, sample capture timer32 at13, peer epoch32 at17 |
+
+Local states: IDLE0,CLEAR1,UPLOAD2,SEND_BEGIN3,SEND_CHUNK4,SEND_PUBLISH5,LIVE6,
+RENEW7,CLOSE8. RPC phases use the split op numbers below;0 means none pending.
+Flags6 bit1 diagnostics suppressed, bit2 native disabled/NONE, bit4 ordinary
+sleep timeout, bit3 logical local
+frame ready. Logical readiness is not proof that physical LEDs displayed it.
+Role1 is USB/master,0 peer. Guard bit1 is a
+closed exhausted namespace; other bits are reserved zero. Deadlines are local logical start samples, not host
+wall clocks. A client may report2000ms minus local elapsed only with an explicit
+clock observation; no instantaneous physical lease countdown is supplied.
+
+Facts payload per page is snapshotID32 followed by up to21 stream bytes; last
+page returns only the remaining bytes and zero padding. The48-byte metadata is:
+
+| Stream byte | Meaning |
+| ---: | --- |
+| 0..3 | format1, source1 MASTER_MAIN_SAMPLE, role1, validity1 coherent sample |
+| 4..7 | snapshot identity32 |
+| 8..11 | main capture timer32 |
+| 12..15 | runtime lighting publication generation32 |
+| 16..19 | keymap generation32 |
+| 20..41 | complete22-byte active profile identity (generation/CRC32/payload digest/compiled digest/action ABI, eachLE32, then kind/origin) |
+| 42..43 | total stream bytes LE16 |
+| 44..47 | slice count,total LEDs,left LEDs,matrix positions |
+
+Typed slices follow in ascending stable state-fact ID, each `id8,length16,data`.
+Lengths/bytes come from actual enabled producer slices. There is no native struct
+padding or sentinel: default17 slices contain620 semantic bytes and51 header
+bytes,671 TLV bytes,719 including metadata,35 pages. Slice IDs/field meanings
+are the [lighting facts contract](lighting-rules-v1.md#facts-on-the-split-link)
+and `lighting_live_reference.py`/`lighting_live_v1.json`. The serialized sample
+owns its bytes until another capture, profile/role/remap/reset/clock invalidation
+or close; readers reject a remap rather than rename old data. Capture does not
+emit events or modify histories. A sampled current fact is not an event journal,
+retained-tail explanation, rendered contribution trace or physical pixel read.

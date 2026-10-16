@@ -1,6 +1,7 @@
 #include "lighting_runtime.h"
 #if defined(RGB_MATRIX_ENABLE) && NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
 #    include "lighting_workspace.h"
+#    include "../../compat/qmk_lighting_live.h"
 #    include "lighting_occurrence.h"
 #    include "../../profile/runtime/effective_rgb_runtime.h"
 #    include "../../compat/qmk_lighting_snapshot_transport.h"
@@ -12,6 +13,7 @@ static uint32_t                revision;
 static bool                    role, initialized;
 __attribute__((noinline)) void noah_lighting_runtime_publish(const noah_profile_lighting_v1_program_t *program, uint32_t generation, const uint8_t identity[22]) {
     bool master = is_keyboard_master();
+    noah_lighting_live_close();
     noah_qmk_lighting_snapshot_close();
     // Activation preflight has already admitted and copied this exact program.
     // No input producer can run recursively here or from a collector/renderer.
