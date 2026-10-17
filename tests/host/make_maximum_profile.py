@@ -3,8 +3,9 @@
 
 Every table at its simultaneous maximum in one schema 3.0 blob: RGB v4 with
 sixteen groups, sixteen layer colours and 32 group rows; 128 behaviour rows of
-five full steps (640 steps); 128 combos of sixteen inputs; settings v7 with
-every one of its 273 names at 32 bytes of UTF-8; and 32 pointing slots, each
+five full steps (640 steps); 128 combos of sixteen inputs; settings v8 with
+a shortcut on every custom key and every one of its 273 names at 32 bytes of
+UTF-8; and 32 pointing slots, each
 named with 32 bytes. Values reach the edges the plan names: layers 7, 8 and
 15, combo rows 31, 32, 63, 64 and 127, macros and custom keys 0, 63, 64 and
 127. It is test evidence built from the byte specs, not from firmware code.
@@ -122,6 +123,21 @@ def combos() -> bytes:
     return bytes(out)
 
 
+def shortcuts() -> bytes:
+    """Settings v8 (D-F26): a modifier mask and a key for each custom key.
+
+    Slot 0 mixes sides (Left Ctrl + Right Alt + K), 63 holds modifiers alone
+    (Hyper), 64 a mouse button alone, 127 every modifier and the last basic
+    key; the rest cycle through the key vocabulary.
+    """
+    records = [((slot * 37) & 0xFF, 0x04 + slot % 0xA1) for slot in range(128)]
+    records[0] = (0x41, 0x0E)
+    records[63] = (0x0F, 0x00)
+    records[64] = (0x00, 0xD1)
+    records[127] = (0xFF, 0xA4)
+    return b"".join(bytes(record) for record in records)
+
+
 def settings() -> bytes:
     scalars = [0] * 31
     scalars[0:4] = [200, 220, 600, 180]  # tapping, tap/hold, long hold, multi tap
@@ -136,18 +152,19 @@ def settings() -> bytes:
     scalars[24] = 0
     scalars[25:27] = [100, 8]
     scalars[28:31] = [1, 0xFF7F, 0x7FFF]  # behaviours off on layer 7, combos off on 15
-    out = bytearray([7, LAYERS, 31, 128, 128, 0, 0, 0])
+    out = bytearray([8, LAYERS, 31, 128, 128, 0, 128, 0])
     out += b"".join(struct.pack("<I", v) for v in scalars)
     for layer in range(LAYERS):
         reference = (layer + 1) % LAYERS
         bypass = (1 << (layer % 60)) | (1 << 59)
         exclusion = (1 << ((3 * layer) % 60)) if layer % 2 else 0
         out += bytes([reference]) + struct.pack("<QQ", bypass, exclusion)
+    out += shortcuts()
     names = [f"Layer {n} " for n in range(LAYERS)] + [f"Macro {n} " for n in range(128)] + [f"Key {n} " for n in range(128)] + ["Keyboard "]
     for label in names:
         encoded = name(label)
         out += bytes([len(encoded)]) + encoded
-    assert len(out) == 9413
+    assert len(out) == 9669
     return bytes(out)
 
 
@@ -164,7 +181,7 @@ def pointing() -> bytes:
 
 
 def blob() -> tuple[bytes, list[tuple[int, int, bytes]]]:
-    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 7, settings()), (0x50, 3, pointing())]
+    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 8, settings()), (0x50, 3, pointing())]
     out = bytearray(b"NLP1" + bytes([3, 0, len(domains), 1]))
     for domain_id, version, payload in domains:
         out += bytes([domain_id, version]) + struct.pack("<H", len(payload)) + payload

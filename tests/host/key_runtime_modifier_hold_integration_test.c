@@ -6,16 +6,34 @@
 #include "key_runtime_integration_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/custom_key_shortcut.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/lib/state/shared/runtime_reset.h"
+#include "noah_keymap_ids.h"
 
 enum {
     TEST_MULTI_TAP_KEY = SAFE_RANGE + 0x70,
+    // Custom keys with a shortcut and no row (D-F26): Left Ctrl + Right Alt +
+    // K, and Left Ctrl + J.
+    TEST_SHORTCUT_KEY          = CUSTOM_KEY_5,
+    TEST_OTHER_SHORTCUT_KEY    = CUSTOM_KEY_6,
+    TEST_SHORTCUT_MODS         = 0x41u,
+    TEST_OTHER_SHORTCUT_MODS   = 0x01u,
+    TEST_REPORT_EVENT_CAPACITY = 16,
 };
+
+typedef struct {
+    uint8_t keycode;
+    bool    down;
+    uint8_t mods; // the modifiers in the report when the usage changed
+} test_report_event_t;
+
+static test_report_event_t report_events[TEST_REPORT_EVENT_CAPACITY];
+static uint8_t             report_event_count;
 
 static uint16_t fake_time;
 static uint8_t  fake_mods;
@@ -73,6 +91,7 @@ static void test_reset_state(void) {
     delayed_action_count       = 0;
     last_delayed_action        = KC_NO;
     last_delayed_mods          = (delayed_action_mods_t){0};
+    report_event_count         = 0;
     noah_runtime_reset_for_test();
     send_keyboard_report_count = 0;
 }
@@ -145,12 +164,23 @@ void send_keyboard_report(void) {
     send_keyboard_report_count++;
 }
 
+static void test_record_report_event(uint8_t keycode, bool down) {
+    CHECK(report_event_count < TEST_REPORT_EVENT_CAPACITY);
+    report_events[report_event_count++] = (test_report_event_t){.keycode = keycode, .down = down, .mods = fake_mods};
+}
+
 void register_code(uint8_t keycode) {
-    (void)keycode;
+    test_record_report_event(keycode, true);
 }
 
 void unregister_code(uint8_t keycode) {
-    (void)keycode;
+    test_record_report_event(keycode, false);
+}
+
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    if (slot == (uint8_t)(TEST_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = TEST_SHORTCUT_MODS, .key = KC_K};
+    if (slot == (uint8_t)(TEST_OTHER_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = TEST_OTHER_SHORTCUT_MODS, .key = KC_J};
+    return (noah_custom_key_shortcut_t){0};
 }
 
 void register_code16(uint16_t keycode) {
@@ -188,7 +218,7 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         .keycode            = keycode,
         .handled            = true,
         .has_multi_tap      = keycode == TEST_MULTI_TAP_KEY,
-        .authored_tap_depth = keycode == TEST_MULTI_TAP_KEY ? 3u : 1u,
+        .authored_tap_depth = keycode == TEST_MULTI_TAP_KEY ? 3u : (NOAH_KEYCODE_IS_CUSTOM_KEY(keycode) ? 0u : 1u),
         .tap_hold_term      = keycode == TEST_MULTI_TAP_KEY ? 120 : 0,
         .longer_hold_term   = keycode == TEST_MULTI_TAP_KEY ? 240 : 0,
         .multi_tap_term     = keycode == TEST_MULTI_TAP_KEY ? 150 : 0,
@@ -409,7 +439,94 @@ static void test_third_tap_hold_modifier_keeps_processed_child_immediate(uint16_
     CHECK(delayed_action_count == 0);
 }
 
+static void test_check_report_event(uint8_t index, uint8_t keycode, bool down, uint8_t mods) {
+    CHECK(index < report_event_count);
+    CHECK(report_events[index].keycode == keycode);
+    CHECK(report_events[index].down == down);
+    CHECK(report_events[index].mods == mods);
+}
+
+static void test_assert_shortcut_ledger_empty(void) {
+    CHECK(owned_keycode_managed_usage_count() == 0u);
+    CHECK(get_mods() == 0u);
+    CHECK(test_snapshot_real_mods() == 0u);
+}
+
+// A custom key with a shortcut and no row holds it from the press: the
+// modifiers go down before the key, and on release the key leaves before the
+// modifiers, with nothing left in the ledger (D-F26).
+static void test_custom_key_holds_its_shortcut_until_release(void) {
+    keypos_t key_pos = test_keypos(2, 1);
+
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, true));
+    CHECK(report_event_count == 1u);
+    test_check_report_event(0, KC_K, true, TEST_SHORTCUT_MODS);
+    CHECK(get_mods() == TEST_SHORTCUT_MODS);
+
+    key_runtime_integration_advance(&fake_time, 400);
+    key_runtime_integration_scan();
+    CHECK(report_event_count == 1u);
+    CHECK(get_mods() == TEST_SHORTCUT_MODS);
+
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, false));
+    CHECK(report_event_count == 2u);
+    test_check_report_event(1, KC_K, false, TEST_SHORTCUT_MODS);
+    CHECK(emitted_action_count == 0u);
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(key_pos);
+}
+
+// A quick tap is the same press and release, never a second tap after it.
+static void test_custom_key_quick_tap_sends_its_shortcut_once(void) {
+    keypos_t key_pos = test_keypos(2, 2);
+
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, true));
+    key_runtime_integration_advance(&fake_time, 20);
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, false));
+    key_runtime_integration_advance(&fake_time, 400);
+    key_runtime_integration_scan();
+
+    CHECK(report_event_count == 2u);
+    test_check_report_event(0, KC_K, true, TEST_SHORTCUT_MODS);
+    test_check_report_event(1, KC_K, false, TEST_SHORTCUT_MODS);
+    CHECK(emitted_action_count == 0u);
+    CHECK(delayed_action_count == 0u);
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(key_pos);
+}
+
+// Two held shortcuts sharing Left Ctrl: releasing one keeps the modifier the
+// other still owns, and drops only its own Right Alt.
+static void test_overlapping_shortcuts_keep_a_shared_modifier(void) {
+    keypos_t first  = test_keypos(2, 3);
+    keypos_t second = test_keypos(2, 4);
+
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, first, true));
+    CHECK(!key_runtime_integration_process_record(TEST_OTHER_SHORTCUT_KEY, second, true));
+    CHECK(get_mods() == (TEST_SHORTCUT_MODS | TEST_OTHER_SHORTCUT_MODS));
+
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, first, false));
+    CHECK(get_mods() == TEST_OTHER_SHORTCUT_MODS);
+    CHECK(owned_keycode_managed_usage_count() == 1u);
+
+    CHECK(!key_runtime_integration_process_record(TEST_OTHER_SHORTCUT_KEY, second, false));
+    CHECK(report_event_count == 4u);
+    test_check_report_event(0, KC_K, true, TEST_SHORTCUT_MODS);
+    test_check_report_event(1, KC_J, true, TEST_SHORTCUT_MODS | TEST_OTHER_SHORTCUT_MODS);
+    test_check_report_event(2, KC_K, false, TEST_SHORTCUT_MODS | TEST_OTHER_SHORTCUT_MODS);
+    test_check_report_event(3, KC_J, false, TEST_OTHER_SHORTCUT_MODS);
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(first);
+    test_assert_runtime_quiescent(second);
+}
+
 int main(void) {
+    test_custom_key_holds_its_shortcut_until_release();
+    test_custom_key_quick_tap_sends_its_shortcut_once();
+    test_overlapping_shortcuts_keep_a_shared_modifier();
     test_pending_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_SHIFT, MOD_BIT(KC_LEFT_SHIFT));
     test_pending_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_GUI, MOD_BIT(KC_LEFT_GUI));
     test_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_SHIFT, MOD_BIT(KC_LEFT_SHIFT));

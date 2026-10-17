@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // This translation unit owns the authored keymap data:
-//   - CUSTOM_KEYS(KEY), each custom key's name
+//   - CUSTOM_KEYS(KEY, SHORTCUT), each custom key's name and shortcut
 //   - VIA_MACROS(MACRO), with each macro's name
 //   - COMBOS(COMBO, COMBO_WINDOW)
 //   - key_behaviors[]
@@ -18,16 +18,25 @@
 #include "noah_keymap.h"
 
 // ─── Custom Keys ────────────────────────────────────────────────────────────
-// CUSTOM_KEY_0–127 are named keys that do only what their key_behaviors[] row
-// says: place one on a layer or emit it from a combo. Without a row it does
-// nothing, and a behaviour step cannot send one. All 128 slots are listed here
-// so the slot limit stays visible in keymap.c.
-// Each row is:
-//   KEY(CUSTOM_KEY_n, "name")
+// CUSTOM_KEY_0–127 are named keys: place one on a layer or emit it from a
+// combo. A custom key's shortcut is its own action, the way an ordinary key's
+// keycode is: held while the key is held, tapped when it is tapped. Its
+// key_behaviors[] row, if any, works on top of that. Without either it does
+// nothing. A behaviour step on another key may send a custom key; it sends
+// only its shortcut. All 128 slots are listed here so the slot limit stays
+// visible in keymap.c.
+// Each row is one of:
+//   KEY(CUSTOM_KEY_n, "name")                       no shortcut
+//   SHORTCUT(CUSTOM_KEY_n, "name", mods, key)       a shortcut
 // The name is what Charybdis Ark shows for the key: at most 32 bytes of
-// UTF-8. Use an empty string for an unused slot. A profile saved
-// from Charybdis Ark keeps its own names.
-#define CUSTOM_KEYS(KEY)             \
+// UTF-8. Use an empty string for an unused slot. A shortcut is one key plus
+// any modifiers, left and right mixed: `mods` is SHORTCUT_MODS() of modifier
+// keys (SHORTCUT_NO_MODS for none; never a QMK MOD_* constant) and `key` a
+// basic key (KC_A–KC_EXSEL, no modifier keys) or a mouse button
+// (MS_BTN1–MS_BTN8), or KC_NO for modifiers alone, e.g.
+//   SHORTCUT(CUSTOM_KEY_4, "Hyper K", SHORTCUT_MODS(KC_LCTL, KC_RALT), KC_K)
+// A profile saved from Charybdis Ark keeps its own names and shortcuts.
+#define CUSTOM_KEYS(KEY, SHORTCUT)   \
     KEY(CUSTOM_KEY_0, "Right Thumb") \
     KEY(CUSTOM_KEY_1, "Left Thumb")  \
     KEY(CUSTOM_KEY_2, "Click Spam")  \

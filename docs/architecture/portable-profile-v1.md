@@ -1,7 +1,7 @@
 # Portable keyboard profile v1
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v7 and sparse PD v3;
+> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
 > a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
 > binds a nonzero VIA generation and digest. HID and split framing remain v1.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
@@ -101,11 +101,11 @@ the target bank, which it has just proved both halves hold. A reviewed snapshot
 without those bytes is not reused: Apply reads the keyboard again. The
 interrupted-capture path already carries the raw bank it read.
 
-## Settings domain `0x40`, version 7
+## Settings domain `0x40`, version 8
 
 Capability domain-mask bit 3 advertises this domain. An ordinary profile may
 omit it; a complete portable file includes it. Firmware accepts only version
-7, with the envelope version equal to the payload's first byte. Older settings
+8, with the envelope version equal to the payload's first byte. Older settings
 must be translated by the client before Apply; firmware never preserves or
 executes retired user-macro instruction records.
 
@@ -113,15 +113,19 @@ All multibyte fields are little-endian:
 
 | Offset | Bytes | Contents |
 | ---: | ---: | --- |
-| 0 | 8 | `[7, 16, 31, 128, 128, flags, 0, 0]`: version, layer count, scalar count, macro-name count, custom-key-name count, flags, reserved zeros |
+| 0 | 8 | `[8, 16, 31, 128, 128, flags, 128, 0]`: version, layer count, scalar count, macro-name count, custom-key-name count, flags, custom-key-shortcut count, a reserved zero |
 | 8 | 124 | 31 uint32 scalar values |
 | 132 | 272 | 16 layer records of 17 bytes, layer 0 first: byte 0 the layer's combo reference layer (below 16); bytes 1–8 its behaviour-bypass placement bitmap; bytes 9–16 its combo-exclusion placement bitmap |
-| 404 | variable | 273 counted names: 16 layer names, then 128 VIA macro names, then 128 custom-key names, then the keyboard name; each a uint8 length `0..32`, then that many bytes of UTF-8 |
+| 404 | 256 | 128 custom-key shortcuts of 2 bytes, custom key 0 first (D-F26): byte 0 the modifier mask in HID report order (bit 0 Left Ctrl, 1 Left Shift, 2 Left Alt, 3 Left GUI, 4 Right Ctrl, 5 Right Shift, 6 Right Alt, 7 Right GUI; any combination); byte 1 the key, `0x00` for none, a basic key `0x04..0xa4` or a mouse button `0xd1..0xd8`. Both zero means no shortcut |
+| 660 | variable | 273 counted names: 16 layer names, then 128 VIA macro names, then 128 custom-key names, then the keyboard name; each a uint8 length `0..32`, then that many bytes of UTF-8 |
 
-The minimum is 677 bytes (every name empty) and the maximum 9,413 bytes (every
+The minimum is 933 bytes (every name empty) and the maximum 9,669 bytes (every
 name 32 bytes). The complete profile shares the 53,216-byte ceiling and
 rejects excess without trimming. Names are profile data for the client. Macro
-content belongs to the bound VIA bank; custom keys execute their behavior rows.
+content belongs to the bound VIA bank; a custom key's shortcut is its own
+action and its behaviour row works on top of it (D-F26). Firmware does not
+check that a step naming a custom key has a shortcut; one without sends
+nothing.
 Validation reads at most 20 settings bytes per step, in one read. Retired per-mode DPI
 scalars 10–14 must be zero; mode tuning is in domain `0x50`.
 
@@ -190,8 +194,11 @@ layer refers combos to itself, every bitmap is zero, layers 8–15 are
 unnamed and so is the keyboard. So a profile that never sets the participation controls behaves as
 version 5 did.
 
-Version 6 translates in the client, never in firmware: the keyboard name is
-appended empty (one zero byte) and the version byte becomes 7. Version 5
+Version 7 translates in the client, never in firmware: 256 zero bytes (no
+custom key has a shortcut) are inserted at offset 404, after the layer
+records, header byte 6 becomes 128 and the version byte becomes 8. Version 6
+translates to version 7 first: the keyboard name is appended empty (one zero
+byte) and the version byte becomes 7. Version 5
 translates to version 6 first, also in the client: scalars 0–26 are
 copied; scalar 27's eight nibbles become the reference layers of layers 0–7
 (layer `n` from bits `4n..4n+3`) and layers 8–15 refer to themselves; scalar

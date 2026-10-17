@@ -4,13 +4,14 @@
 #include "profile_reader.h"
 #include "profile_versions.h"
 #include "profile_name_v1.h"
+#include "../../action/custom_key_shortcut.h"
 
-// Settings v7 (D-F14, D-F25) stores, in order: an eight-byte header, the
-// scalar policy, one fixed record per layer (its combo reference layer and its
-// two placement bitmaps), then every name counted: a length byte and at most
-// 32 bytes of UTF-8, the layers' first, then the VIA macros', then the custom
-// keys', then the keyboard's own name. The fixed part comes first so its
-// fields sit at known offsets.
+// Settings v8 (D-F14, D-F25, D-F26) stores, in order: an eight-byte header,
+// the scalar policy, one fixed record per layer (its combo reference layer and
+// its two placement bitmaps), one two-byte shortcut per custom key, then every
+// name counted: a length byte and at most 32 bytes of UTF-8, the layers'
+// first, then the VIA macros', then the custom keys', then the keyboard's own
+// name. The fixed part comes first so its fields sit at known offsets.
 enum {
     NOAH_SETTINGS_VERSION              = NOAH_PROFILE_SETTINGS_VERSION,
     NOAH_SETTINGS_HEADER_SIZE          = 8,
@@ -22,6 +23,9 @@ enum {
     NOAH_SETTINGS_LAYERS               = 16,
     NOAH_SETTINGS_MACRO_NAMES          = 128,
     NOAH_SETTINGS_CUSTOM_KEY_NAMES     = 128,
+    // Header byte 6 counts the custom-key shortcut records (D-F26).
+    NOAH_SETTINGS_SHORTCUT_COUNT_OFFSET = 6,
+    NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS = 128,
     // The keyboard name the USB product string carries; empty means the
     // firmware's built-in name (D-F25).
     NOAH_SETTINGS_KEYBOARD_NAMES       = 1,
@@ -33,7 +37,9 @@ enum {
     NOAH_SETTINGS_LAYER_RECORD_SIZE    = 1 + 2 * NOAH_SETTINGS_PLACEMENT_BYTES,
     NOAH_SETTINGS_SCALARS_OFFSET       = NOAH_SETTINGS_HEADER_SIZE,
     NOAH_SETTINGS_LAYER_RECORDS_OFFSET = NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTINGS_COUNT * 4,
-    NOAH_SETTINGS_FIXED_SIZE           = NOAH_SETTINGS_LAYER_RECORDS_OFFSET + NOAH_SETTINGS_LAYERS * NOAH_SETTINGS_LAYER_RECORD_SIZE,
+    NOAH_SETTINGS_SHORTCUTS_OFFSET     = NOAH_SETTINGS_LAYER_RECORDS_OFFSET + NOAH_SETTINGS_LAYERS * NOAH_SETTINGS_LAYER_RECORD_SIZE,
+    NOAH_SETTINGS_SHORTCUT_SIZE        = NOAH_CUSTOM_KEY_SHORTCUT_SIZE,
+    NOAH_SETTINGS_FIXED_SIZE           = NOAH_SETTINGS_SHORTCUTS_OFFSET + NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS * NOAH_SETTINGS_SHORTCUT_SIZE,
     NOAH_SETTINGS_NAME_COUNT           = NOAH_SETTINGS_LAYERS + NOAH_SETTINGS_MACRO_NAMES + NOAH_SETTINGS_CUSTOM_KEY_NAMES + NOAH_SETTINGS_KEYBOARD_NAMES,
     NOAH_SETTINGS_KEYBOARD_NAME_RECORD = NOAH_SETTINGS_NAME_COUNT - 1,
     NOAH_SETTINGS_MIN_SIZE             = NOAH_SETTINGS_FIXED_SIZE + NOAH_SETTINGS_NAME_COUNT,

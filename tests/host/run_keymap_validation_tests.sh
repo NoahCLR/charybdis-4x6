@@ -31,3 +31,37 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -o "$BIN"
 
 "$BIN"
+
+# CUSTOM_KEYS shortcut rows (D-F26): good rows compile into the table, and
+# each bad row is a compile error.
+shortcut_rows() {
+    cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
+        -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+        -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        -I"$ROOT" \
+        -I"$ROOT/users/noah" \
+        -I"$ROOT/tests/host/include" \
+        -include "$ROOT/tests/host/include/noah_compile_config.h" \
+        "$@" \
+        "$ROOT/tests/host/keymap_custom_key_shortcut_rows.c" \
+        -o "$BUILD_DIR/shortcut_rows"
+}
+shortcut_rows
+"$BUILD_DIR/shortcut_rows"
+for bad in \
+    'SHORTCUT(CUSTOM_KEY_9, "", MOD_RALT, KC_A)' \
+    'SHORTCUT(CUSTOM_KEY_9, "", MOD_BIT(KC_LCTL), KC_A)' \
+    'SHORTCUT(CUSTOM_KEY_9, "", 0, KC_A)' \
+    'SHORTCUT(CUSTOM_KEY_9, "", SHORTCUT_MODS(KC_A), KC_B)' \
+    'SHORTCUT(CUSTOM_KEY_9, "", SHORTCUT_MODS(KC_LCTL, KC_A), KC_B)' \
+    'SHORTCUT(CUSTOM_KEY_9, "", SHORTCUT_NO_MODS, KC_LCTL)' \
+    'SHORTCUT(CUSTOM_KEY_9, "", SHORTCUT_NO_MODS, KC_AUDIO_MUTE)' \
+    'SHORTCUT(CUSTOM_KEY_9, "", SHORTCUT_NO_MODS, MS_UP)' \
+    'SHORTCUT(CUSTOM_KEY_9, "", SHORTCUT_NO_MODS, KC_NO)' \
+    'SHORTCUT(VIA_MACRO_0, "", SHORTCUT_NO_MODS, KC_A)'; do
+    if shortcut_rows "-DSHORTCUT_ROW_BAD(SHORTCUT)=$bad" 2>/dev/null; then
+        echo "a bad CUSTOM_KEYS shortcut row compiled: $bad" >&2
+        exit 1
+    fi
+done
+echo "keymap custom key shortcut rows: bad rows refused"

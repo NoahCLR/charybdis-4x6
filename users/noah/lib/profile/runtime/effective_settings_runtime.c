@@ -27,6 +27,14 @@ uint8_t noah_setting_layer_record(uint8_t layer, uint8_t field) {
     uint16_t offset = (uint16_t)(NOAH_SETTINGS_LAYER_RECORDS_OFFSET + layer * NOAH_SETTINGS_LAYER_RECORD_SIZE + field);
     return settings_length ? settings[offset] : noah_profile_settings_defaults_byte(offset);
 }
+// A custom key's shortcut record (D-F26). Before any settings are live, the
+// keymap's own.
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    if (slot >= NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS) return (noah_custom_key_shortcut_t){0};
+    uint16_t offset = (uint16_t)(NOAH_SETTINGS_SHORTCUTS_OFFSET + slot * NOAH_SETTINGS_SHORTCUT_SIZE);
+    if (settings_length) return (noah_custom_key_shortcut_t){.mods = settings[offset + NOAH_CUSTOM_KEY_SHORTCUT_MODS], .key = settings[offset + NOAH_CUSTOM_KEY_SHORTCUT_KEY]};
+    return (noah_custom_key_shortcut_t){.mods = noah_profile_settings_defaults_byte(offset + NOAH_CUSTOM_KEY_SHORTCUT_MODS), .key = noah_profile_settings_defaults_byte(offset + NOAH_CUSTOM_KEY_SHORTCUT_KEY)};
+}
 // The whole current settings domain stays cached for name readback.
 uint16_t noah_effective_settings_length(void) {
     return settings_length;
@@ -68,5 +76,12 @@ void noah_effective_settings_invalidate(void *context, uint32_t publication, noa
         }
     }
     if (apply && settings_length && apply_settings) apply_settings();
+}
+#else
+#    include "noah_keymap_ids.h"
+// Without portable settings a custom key keeps the keymap's shortcut.
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    if (slot >= CUSTOM_KEY_SLOT_COUNT) return (noah_custom_key_shortcut_t){0};
+    return (noah_custom_key_shortcut_t){.mods = custom_key_shortcuts[slot][NOAH_CUSTOM_KEY_SHORTCUT_MODS], .key = custom_key_shortcuts[slot][NOAH_CUSTOM_KEY_SHORTCUT_KEY]};
 }
 #endif

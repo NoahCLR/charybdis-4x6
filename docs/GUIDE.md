@@ -71,8 +71,9 @@ use behaviours** controls all combo outputs while leaving physical-key
 behaviours eligible. Both start on, and the existing behaviour master remains
 a veto. Disabling the combo itself still stops the chord entirely.
 
-An ordinary keycode keeps its normal action when bypassed. A custom key has
-no native action, so bypassing it produces nothing. Output permission uses the
+An ordinary keycode keeps its normal action when bypassed. A custom key's
+normal action is its shortcut, so bypassing it sends the shortcut, or nothing
+if it has none. Output permission uses the
 output behaviour's allowed-layer mask on the last declared input's captured
 source layer; the layer behaviour switch remains physical-only. An output
 already completed keeps its decision through queued delivery and release.
@@ -97,6 +98,28 @@ stopped talking to it for a second; the other half never switches its USB on.
 Installing firmware with this feature changes the profile format, so export a
 backup in Ark first and restore it afterwards.
 
+## Custom keys and their shortcuts
+
+A custom key is a key of your own: you name it, place it on a layer or send
+it from a combo, and decide what it does. It can carry a **shortcut**: one
+key plus any modifiers, left and right mixed, such as Left Ctrl + Right Alt +
+K, or modifiers alone (a held Hyper), or a key or mouse button alone.
+
+The shortcut is the key's own action. Hold the custom key and the shortcut
+stays held until you let go; tap it and the shortcut is tapped. That is the
+difference from a macro, which plays and finishes. Modifiers you hold on other
+keys stay down when you let go of it.
+
+A behaviour on the custom key works on top of the shortcut, as it does on any
+key: the taps and holds the behaviour leaves out send the shortcut, and so
+does the key when its behaviour is bypassed. A behaviour on another key can
+send a custom key too; it sends that key's shortcut only, never its
+behaviour. A custom key with no shortcut and no behaviour does nothing.
+
+Shortcuts are stored in the profile and need an Ark version that edits them.
+Installing firmware with this feature changes the profile format, so export a
+backup in Ark first and restore it afterwards.
+
 ## Authoring the profile in C
 
 Edit compiled defaults directly in `keymap.c`, `config.h`, and `rgb_config.c`
@@ -110,7 +133,7 @@ profile is the source of truth; edit it with Charybdis Ark.
 ### The keymap model
 
 The authored defaults live in the four keymap files. `keymap.c` holds the
-layouts and layer names, each custom key's name, each macro's name beside its
+layouts and layer names, each custom key's name and shortcut, each macro's name beside its
 payload, the combos with any window of their own (`COMBO_WINDOW`), and the
 behaviours; `config.h` the timing and policy values; `pd_config.c` the
 pointing modes; `rgb_config.c` the lighting, including LED groups kept for
@@ -125,7 +148,7 @@ Use it for:
 - the physical layer layout
 - combos
 - VIA macro defaults
-- custom keys and their names
+- custom keys, their names and shortcuts
 - `key_behaviors[]`
 - pointing-mode key placement and richer mode gestures
 
@@ -188,11 +211,26 @@ vocabulary; the list below shows the other helpers you can use.
 In that example, `CUSTOM_KEY_0` can be placed directly on a layer or emitted by a
 combo. Either way, the behavior row is the same.
 
-`CUSTOM_KEY_0` through `CUSTOM_KEY_63` are custom keys: named keys that do only
-what their behavior row says. Each is named in the `CUSTOM_KEYS(KEY)` table in
-`keymap.c` (at most 20 printable ASCII characters, `""` for an unused slot).
-Without a row a custom key does nothing, and no behavior step can send one;
-keymap validation and Charybdis Ark both refuse that.
+`CUSTOM_KEY_0` through `CUSTOM_KEY_127` are custom keys: named keys of your
+own. Each is named in the `CUSTOM_KEYS(KEY, SHORTCUT)` table in `keymap.c` (at
+most 32 bytes of UTF-8, `""` for an unused slot).
+
+A custom key can also carry a **shortcut**: one key plus any modifiers, left
+and right mixed, such as Left Ctrl + Right Alt + K. Write that slot's row as
+`SHORTCUT(CUSTOM_KEY_4, "name", SHORTCUT_MODS(KC_LCTL, KC_RALT), KC_K)`.
+Name the modifier keys in `SHORTCUT_MODS(...)`, or write `SHORTCUT_NO_MODS`
+for none; a QMK `MOD_*` constant does not compile, since `MOD_RALT` would mean
+other keys here. Use `KC_NO` for modifiers alone; the key is a basic
+key or a mouse button (`MS_BTN1`–`MS_BTN8`). The shortcut is the key's own
+action, as `KC_K` is `KC_K`'s: holding the custom key holds the shortcut until
+you let go, and tapping it taps it. A behavior row on the key works on top of
+that, exactly as on an ordinary key: the taps and holds the row leaves out
+send the shortcut. Unlike a macro, a shortcut stays held; unlike `C(A(KC_K))`,
+its modifiers can come from both sides.
+
+Without a shortcut or a row a custom key does nothing. A behavior step on
+another key may send a custom key: it sends that key's shortcut only, never
+its behavior, and nothing if it has no shortcut.
 
 The double-tap `.hold` uses the release-based helper because that branch also
 has a later `.long_hold`. The single-tap layer hold and the media long-holds use

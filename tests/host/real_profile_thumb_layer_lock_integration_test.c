@@ -678,6 +678,14 @@ void owned_keycode_tap_literal(uint16_t keycode) {
     tap_code16(keycode);
 }
 
+// The keymap gives no custom key a shortcut (D-F26); this only satisfies the
+// link.
+bool owned_keycode_tap_parts(uint8_t mods, uint8_t basic) {
+    (void)mods;
+    (void)basic;
+    return false;
+}
+
 void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;

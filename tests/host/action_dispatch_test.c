@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/custom_key_shortcut.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
@@ -537,13 +538,14 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supports_fallback_hold(macro_action));
     CHECK(noah_action_desc_default_tap_action(macro_action) == KC_NO);
 
-    // A custom key is a row's own keycode and a combo output, never a step.
+    // A custom key is a row's own keycode, a combo output and, sending only
+    // its shortcut, a step (D-F26).
     CHECK(custom.kind == NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_desc_supported_as_behavior_keycode(custom));
     CHECK(noah_action_desc_supported_as_combo_output(custom));
-    CHECK(!noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_TAP));
-    CHECK(!noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
-    CHECK(!noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
+    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_TAP));
+    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_action_desc_supported_as_authored_action(custom, NOAH_ACTION_AUTHORED_USE_HOLD_OTHER));
     CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY && noah_action_describe(PD_SLOT_0).kind != NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_desc_uses_held_lifecycle_for_press_and_hold(custom));
     CHECK(!noah_action_desc_default_tap_uses_action_keycode(custom));
@@ -769,8 +771,8 @@ static void test_via_macro_bank_ends_at_127(void) {
     CHECK(!IS_QK_MACRO(QK_MACRO_MAX + 1u));
 }
 
-// Custom keys 0..127 at 0x7f00 (D-F14): each is a key and a combo output,
-// never a behaviour step, and maps to and from the profile by slot; slot 128
+// Custom keys 0..127 at 0x7f00 (D-F14): each is a key, a combo output and a
+// behaviour step (D-F26), and maps to and from the profile by slot; slot 128
 // is refused.
 static void test_custom_key_block_holds_128(void) {
     static const uint8_t slots[] = {0, 63, 64, 127};
@@ -782,8 +784,8 @@ static void test_custom_key_block_holds_128(void) {
         CHECK(NOAH_KEYCODE_IS_CUSTOM_KEY(key));
         CHECK(noah_action_supported_at(key, NOAH_ACTION_PLACEMENT_KEY));
         CHECK(noah_action_supported_at(key, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
-        CHECK(!noah_action_supported_at(key, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
-        CHECK(!noah_action_supported_at(key, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
+        CHECK(noah_action_supported_at(key, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
+        CHECK(noah_action_supported_at(key, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
         CHECK(noah_profile_action_runtime_v1_from_native(key, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
         CHECK(action.kind == NOAH_PROFILE_ACTION_V1_CUSTOM_KEY && action.operand == slots[i]);
         CHECK(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && native == key);
@@ -795,6 +797,35 @@ static void test_custom_key_block_holds_128(void) {
     noah_profile_action_v1_t old;
     CHECK(!NOAH_KEYCODE_IS_CUSTOM_KEY(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE) && !NOAH_KEYCODE_IS_CUSTOM_KEY(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + 63));
     CHECK(noah_profile_action_runtime_v1_from_native(NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE, &old) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK || old.kind != NOAH_PROFILE_ACTION_V1_CUSTOM_KEY);
+}
+
+// The live shortcuts, as the settings runtime would report them.
+static noah_custom_key_shortcut_t test_shortcuts[CUSTOM_KEY_SLOT_COUNT];
+
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    return slot < CUSTOM_KEY_SLOT_COUNT ? test_shortcuts[slot] : (noah_custom_key_shortcut_t){0};
+}
+
+// A custom key with a shortcut stands where an ordinary key's own keycode
+// does (D-F26): its default tap, its fallback hold, and a runtime-handled key
+// without a row. Without one it keeps having no native action.
+static void test_custom_key_shortcut_is_its_native_action(void) {
+    memset(test_shortcuts, 0, sizeof(test_shortcuts));
+    test_shortcuts[9] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), .key = KC_K};
+    test_shortcuts[10] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_RIGHT_GUI)};
+
+    noah_action_desc_t with    = noah_action_describe(CUSTOM_KEY_9);
+    noah_action_desc_t mods    = noah_action_describe(CUSTOM_KEY_10);
+    noah_action_desc_t without = noah_action_describe(CUSTOM_KEY_11);
+
+    CHECK(noah_custom_key_has_shortcut(CUSTOM_KEY_9) && noah_custom_key_has_shortcut(CUSTOM_KEY_10) && !noah_custom_key_has_shortcut(CUSTOM_KEY_11));
+    CHECK(!noah_custom_key_has_shortcut(KC_A));
+    CHECK(noah_action_desc_default_tap_uses_action_keycode(with) && noah_action_desc_default_tap_action(with) == CUSTOM_KEY_9);
+    CHECK(noah_action_desc_supports_fallback_hold(with) && noah_action_desc_is_runtime_handled_keycode(with));
+    CHECK(noah_action_desc_default_tap_action(mods) == CUSTOM_KEY_10 && noah_action_desc_supports_fallback_hold(mods));
+    CHECK(!noah_action_desc_default_tap_uses_action_keycode(without) && noah_action_desc_default_tap_action(without) == KC_NO);
+    CHECK(!noah_action_desc_supports_fallback_hold(without) && !noah_action_desc_is_runtime_handled_keycode(without));
+    memset(test_shortcuts, 0, sizeof(test_shortcuts));
 }
 
 // A userspace code no block assigns does nothing and goes nowhere: not a
@@ -843,6 +874,15 @@ static void test_saved_profile_placement_matches_the_rules(void) {
     CHECK(noah_profile_action_placement_v1_supported(&oneshot, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
     CHECK(noah_profile_action_placement_v1_supported(&oneshot, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
     CHECK(!noah_profile_action_placement_v1_supported(&invalid, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+
+    // A saved profile may name a custom key in any step (D-F26), with or
+    // without a shortcut: the validator does not look across domains.
+    const noah_profile_action_v1_t custom = {.kind = NOAH_PROFILE_ACTION_V1_CUSTOM_KEY, .operand = 127};
+    CHECK(noah_profile_action_placement_v1_supported(&custom, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY));
+    CHECK(noah_profile_action_placement_v1_supported(&custom, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
+    CHECK(noah_profile_action_placement_v1_supported(&custom, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
+    CHECK(noah_profile_action_placement_v1_supported(&custom, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER));
+    CHECK(noah_profile_action_placement_v1_supported(&custom, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT));
 }
 
 // A click keeps the modifiers it may keep, and hides the rest only around the
@@ -905,6 +945,7 @@ int main(void) {
     test_last_layer_actions();
     test_via_macro_bank_ends_at_127();
     test_custom_key_block_holds_128();
+    test_custom_key_shortcut_is_its_native_action();
     test_action_descriptor_classifies_common_actions();
     test_action_dispatch_keeps_runtime_default_policy();
     test_explicit_action_emit_can_skip_fallback_hold_settlement();

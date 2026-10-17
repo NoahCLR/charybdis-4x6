@@ -76,7 +76,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 ### `action/`
 
 - Boundary files: `action_dispatch.c/h`, `action_lifecycle.c/h`,
-  `owned_keycode.c/h`, `synthetic_record.c/h`
+  `owned_keycode.c/h`, `synthetic_record.c/h`, `custom_key_shortcut.h`
 - Metadata files: `action_kind.c`, `action_kind_dispatch.c`,
   `action_kind_dispatch_internal.h`, `action_kind_internal.h`,
   `action_kind_registry_list.h`
@@ -252,8 +252,8 @@ semantics without taking another platform timer sample.
 The authored profile boundary is intentionally outside `users/noah/lib/`:
 
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c` owns layers,
-  combos, VIA macro defaults, key behaviors, and custom-key names
-  (`CUSTOM_KEYS`).
+  combos, VIA macro defaults, key behaviors, and custom-key names and
+  shortcuts (`CUSTOM_KEYS`).
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h` owns keymap-facing
   timing, layer ids, pointer tuning, and RGB feature flags.
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c` owns authored

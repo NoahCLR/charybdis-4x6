@@ -199,6 +199,37 @@ bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
     return true;
 }
 
+bool owned_keycode_acquire_parts(uint8_t mods, uint8_t basic, owned_keycode_lease_t *lease) {
+    owned_keycode_lease_t candidate = {.mods = mods, .basic = basic, .has_basic = basic != KC_NO};
+
+    if (!lease || lease->active) {
+        return false;
+    }
+    *lease = (owned_keycode_lease_t){0};
+    if ((candidate.has_basic && (IS_MODIFIER_KEYCODE(basic) || !owned_keycode_is_report_usage(basic))) || (!candidate.has_basic && mods == 0u)) {
+        owned_keycode_note_unsupported();
+        return false;
+    }
+    if (!owned_keycode_acquire_components(&candidate)) {
+        return false;
+    }
+    candidate.active = true;
+    *lease           = candidate;
+    return true;
+}
+
+bool owned_keycode_tap_parts(uint8_t mods, uint8_t basic) {
+    owned_keycode_lease_t lease = {0};
+    uint16_t              delay = (basic == KC_CAPS_LOCK) ? TAP_HOLD_CAPS_DELAY : TAP_CODE_DELAY;
+
+    if (!owned_keycode_acquire_parts(mods, basic, &lease)) {
+        return false;
+    }
+    wait_ms(delay);
+    (void)owned_keycode_release(&lease);
+    return true;
+}
+
 bool owned_keycode_release(owned_keycode_lease_t *lease) {
     bool released;
 

@@ -367,7 +367,7 @@ static noah_profile_validator_v1_result_t validate_settings(noah_profile_validat
     size_t                                 offset = v->payload.offset + state->offset;
     uint16_t                               count  = v->payload.length - state->offset;
     // One read of up to a step's bytes, consumed one at a time: a maximum
-    // settings domain takes about 471 steps rather than 9,413.
+    // settings domain takes about 484 steps rather than 9,669.
     if (count > sizeof(bytes)) count = sizeof(bytes);
     if (read_blob(v, offset, bytes, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
     for (uint16_t i = 0; i < count; i++)

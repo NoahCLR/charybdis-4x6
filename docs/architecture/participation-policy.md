@@ -75,9 +75,11 @@ A physical press uses its keycode's behaviour row only if all of these hold:
 
 Otherwise the press takes its **normal action**: the keycode as if it had no
 behaviour row, with the usual modifier, layer and pointing ownership. Native
-`LT()` and `MT()` keep native QMK tap-hold timing. A custom key has no native
-action, so a bypassed custom-key press does nothing; Ark explains this, and a
-layer that needs output there maps a plain keycode. There is no separate
+`LT()` and `MT()` keep native QMK tap-hold timing. A custom key's normal
+action is its shortcut (D-F26), held from the press until the release; a
+bypassed custom key without a shortcut does nothing, Ark explains this, and a
+layer that needs output there maps a plain keycode or gives the key a
+shortcut. There is no separate
 fallback-action field.
 
 One `KC_W` row is shared by every `KC_W` placement. Bypassing W on one layer
@@ -160,8 +162,8 @@ The layer behaviour switch and physical placement bypass bits do not apply.
 The combo master, layer combo switches and the combo's chord allowed-layer
 mask still govern whether the chord fires; disabling output behaviour changes
 none of them. A veto sends an ordinary keycode's normal action, with its native
-tap-hold timing and modifier/layer/pointing ownership. A custom key has no
-native action and produces nothing. Other combos with the same output, and
+tap-hold timing and modifier/layer/pointing ownership. A custom key sends its
+shortcut (D-F26), or nothing without one. Other combos with the same output, and
 physical placements of that output, keep their own permissions.
 
 The origin layer remains the captured source layer of the last declared

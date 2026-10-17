@@ -4,6 +4,9 @@
 
 #include "handled_key_internal.h"
 
+#include "noah_keymap_ids.h"
+#include "../../action/custom_key_shortcut.h"
+
 __attribute__((weak)) key_behavior_step_t key_behavior_step_lookup(uint16_t keycode, uint8_t tap_count) {
     (void)keycode;
     (void)tap_count;
@@ -83,7 +86,20 @@ bool handled_key_resolution_uses_deferred_stacked_pd_hold(const handled_key_reso
     return resolution && resolution->tap_count == 1 && resolution->pd_mode != 0 && resolution->step.tap.present && key_behavior_future_tap_path_has_foreign_pd_mode(resolution->keycode, resolution->tap_count, resolution->pd_mode);
 }
 
+// A pressed custom key with a shortcut and no authored row of its own, or a
+// bypassed one, is a native key (D-F26): the runtime holds its shortcut from
+// the press until the release, so a quick tap is a press and a release, never
+// a second tap after it. Read through a transparent cell it is the lower key's
+// keycode, as an ordinary key is: its shortcut is the tap, and its hold is the
+// fallback hold.
+static bool handled_key_resolution_holds_custom_shortcut_natively(const handled_key_resolution_t *resolution) {
+    return resolution && resolution->tap_count == 1 && resolution->authored_tap_depth == 0u && !resolution->step.hold.present && (resolution->flags & HANDLED_KEY_FLAG_TRANSPARENT_SOURCE) == 0u && NOAH_KEYCODE_IS_CUSTOM_KEY(resolution->keycode) && noah_custom_key_has_shortcut(resolution->keycode);
+}
+
 static uint16_t handled_key_default_tap_action(const handled_key_resolution_t *resolution) {
+    if (handled_key_resolution_holds_custom_shortcut_natively(resolution)) {
+        return KC_NO;
+    }
     return resolution ? noah_action_desc_default_tap_action(noah_action_describe(resolution->keycode)) : KC_NO;
 }
 
@@ -113,6 +129,14 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
     }
 
     if (resolution->tap_count == 1 && resolution->pd_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
+        return (hold_behavior_t){
+            .present = true,
+            .action  = resolution->keycode,
+            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        };
+    }
+
+    if (handled_key_resolution_holds_custom_shortcut_natively(resolution)) {
         return (hold_behavior_t){
             .present = true,
             .action  = resolution->keycode,
@@ -184,6 +208,9 @@ key_runtime_slot_hold_strategy_t handled_key_hold_strategy_behavior(const handle
         return KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
     }
     if (resolution && resolution->tap_count == 1 && !resolution->step.hold.present && noah_action_keycode_is_layer_mod(resolution->keycode)) {
+        return KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
+    }
+    if (handled_key_resolution_holds_custom_shortcut_natively(resolution)) {
         return KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
     }
 

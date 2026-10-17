@@ -723,13 +723,29 @@ def extract_rgb_led_group_table_body(text: str, table_name: str) -> str:
     return text[paren_start + 1 : paren_end]
 
 
+def parse_shortcut_mods(row: list[str]) -> list[str]:
+    # SHORTCUT_MODS(KC_LCTL, ...) or SHORTCUT_NO_MODS; keymap_materialize.h
+    # refuses any other form.
+    if row[2] == "SHORTCUT_NO_MODS":
+        return []
+    match = re.fullmatch(r"SHORTCUT_MODS\((.*)\)", row[2])
+    if match is None:
+        die(f"unexpected CUSTOM_KEYS SHORTCUT modifiers: {row!r}")
+    return [normalize_expr(part) for part in split_top_level(match.group(1))]
+
+
 def parse_custom_keys(text: str) -> list[dict[str, str]]:
+    # KEY(keycode, "name") or SHORTCUT(keycode, "name", mods, key) (D-F26).
     keys: list[dict[str, str]] = []
-    for row in parse_macro_table(text, "CUSTOM_KEYS", "KEY"):
-        if len(row) != 2 or not (row[1].startswith('"') and row[1].endswith('"')):
-            die(f"unexpected CUSTOM_KEYS row: {row!r}")
-        if row[1][1:-1]:
-            keys.append({"keycode": row[0], "name": row[1][1:-1]})
+    for invocation, row in parse_macro_rows(text, "CUSTOM_KEYS", ("KEY", "SHORTCUT")):
+        expected = 2 if invocation == "KEY" else 4
+        if len(row) != expected or not (row[1].startswith('"') and row[1].endswith('"')):
+            die(f"unexpected CUSTOM_KEYS {invocation} row: {row!r}")
+        key = {"keycode": row[0], "name": row[1][1:-1]}
+        if invocation == "SHORTCUT":
+            key["shortcut"] = " + ".join(parse_shortcut_mods(row) + ([] if row[3] == "KC_NO" else [row[3]]))
+        if key["name"] or "shortcut" in key:
+            keys.append(key)
     return keys
 
 
@@ -2201,7 +2217,7 @@ def render_reference_section(profile: dict[str, object]) -> str:
         "### Shared Keycode Surfaces",
         "",
         f"- Layers: {', '.join(f'`{layer}`' for layer in config['layers'])}",
-        "- Named custom keys: " + (", ".join(f"`{key['keycode']}` ({key['name']})" for key in profile["custom_keys"]) or "`none`"),
+        "- Named custom keys: " + (", ".join(f"`{key['keycode']}` ({key['name'] or 'unnamed'}" + (f"; shortcut `{key['shortcut']}`" if "shortcut" in key else "") + ")" for key in profile["custom_keys"]) or "`none`"),
     ]
     if features["rgb_pd_mode_feedback_enabled"]:
         pd_color_modes = ", ".join(f"`{row['pointing_mode']}`" for row in rgb["pd_mode_colors"]) or "`none`"

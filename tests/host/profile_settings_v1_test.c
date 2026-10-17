@@ -41,7 +41,7 @@ static uint16_t layer_record(uint8_t layer, uint8_t field) {
 static void named(uint8_t size, char fill) {
     const uint32_t values[NOAH_SETTINGS_COUNT] = {200, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff};
     memset(bytes, 0, sizeof(bytes));
-    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {7, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
+    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {8, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
     memcpy(bytes, header, sizeof(header));
     for (uint8_t i = 0; i < NOAH_SETTINGS_COUNT; i++)
         set_scalar(i, values[i]);
@@ -86,7 +86,7 @@ static void test_header_and_versions(void) {
         bytes[0] = version;
         assert(valid() == (version == NOAH_SETTINGS_VERSION));
     }
-    assert(NOAH_SETTINGS_VERSION == 7);
+    assert(NOAH_SETTINGS_VERSION == 8);
     for (uint8_t at = 1; at < NOAH_SETTINGS_HEADER_SIZE; at++) {
         defaults();
         bytes[at]++;
@@ -171,6 +171,40 @@ static void test_layer_records(void) {
     defaults();
     assert(!valid_with(NOAH_SETTINGS_LAYERS, 65));
 }
+static uint16_t shortcut_record(uint8_t slot, uint8_t field) {
+    return (uint16_t)(NOAH_SETTINGS_SHORTCUTS_OFFSET + slot * NOAH_SETTINGS_SHORTCUT_SIZE + field);
+}
+// v8 (D-F26): one modifier mask and one key per custom key, between the layer
+// records and the names. Any mask is valid; the key is a basic key, a mouse
+// button, or none.
+static void test_shortcuts(void) {
+    assert(NOAH_SETTINGS_SHORTCUTS_OFFSET == NOAH_SETTINGS_LAYER_RECORDS_OFFSET + NOAH_SETTINGS_LAYERS * NOAH_SETTINGS_LAYER_RECORD_SIZE);
+    assert(NOAH_SETTINGS_FIXED_SIZE == NOAH_SETTINGS_SHORTCUTS_OFFSET + 256);
+    assert(NOAH_SETTINGS_SHORTCUT_COUNT_OFFSET == 6);
+    for (unsigned mods = 0; mods <= 255; mods++) {
+        defaults();
+        bytes[shortcut_record(127, NOAH_CUSTOM_KEY_SHORTCUT_MODS)] = (uint8_t)mods;
+        assert(valid());
+    }
+    for (unsigned key = 0; key <= 255; key++) {
+        defaults();
+        bytes[shortcut_record(0, NOAH_CUSTOM_KEY_SHORTCUT_KEY)] = (uint8_t)key;
+        bool expected = key == 0 || (key >= 0x04 && key <= 0xa4) || (key >= 0xd1 && key <= 0xd8);
+        assert(valid() == expected);
+        assert(noah_custom_key_shortcut_key_valid((uint8_t)key) == expected);
+    }
+    // Modifier keys belong in the mask, media keys and mouse movement nowhere.
+    assert(!noah_custom_key_shortcut_key_valid(0xe0) && !noah_custom_key_shortcut_key_valid(0xe7));
+    assert(!noah_custom_key_shortcut_key_valid(0xa5) && !noah_custom_key_shortcut_key_valid(0xcd) && !noah_custom_key_shortcut_key_valid(0xd9));
+    assert(!noah_custom_key_shortcut_key_valid(0x01) && !noah_custom_key_shortcut_key_valid(0x03));
+    // The header counts 128 shortcut records and nothing else.
+    defaults();
+    bytes[NOAH_SETTINGS_SHORTCUT_COUNT_OFFSET] = 0;
+    assert(!valid());
+    defaults();
+    bytes[NOAH_SETTINGS_SHORTCUT_COUNT_OFFSET] = 64;
+    assert(!valid());
+}
 static void test_names(void) {
     // 32 bytes is the limit for every name, layers, macros and custom keys.
     named(NOAH_SETTINGS_NAME_MAX, 'A');
@@ -209,7 +243,7 @@ static void test_names(void) {
     // the last custom key's and 272 the keyboard's; a name in any is read in
     // order.
     assert(NOAH_SETTINGS_NAME_COUNT == 273 && NOAH_SETTINGS_KEYBOARD_NAME_RECORD == 272);
-    assert(NOAH_SETTINGS_MIN_SIZE == 677 && NOAH_SETTINGS_MAX_SIZE == 9413);
+    assert(NOAH_SETTINGS_MIN_SIZE == 933 && NOAH_SETTINGS_MAX_SIZE == 9669);
     defaults();
     put_name(272, "Keyboard", 8);
     put_name(271, "Last custom", 11);
@@ -273,6 +307,10 @@ static void test_publication(void) {
     put_name(0, "Base", 4);
     bytes[layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE)] = 2;
     bytes[layer_record(9, NOAH_SETTINGS_LAYER_BYPASS + 7)] = 0x08;
+    bytes[shortcut_record(4, NOAH_CUSTOM_KEY_SHORTCUT_MODS)] = 0x41; // Left Ctrl + Right Alt
+    bytes[shortcut_record(4, NOAH_CUSTOM_KEY_SHORTCUT_KEY)]  = 0x0e; // K
+    bytes[shortcut_record(5, NOAH_CUSTOM_KEY_SHORTCUT_MODS)] = 0x0f; // Hyper alone
+    bytes[shortcut_record(127, NOAH_CUSTOM_KEY_SHORTCUT_KEY)] = 0xd1; // a mouse button alone
     assert(valid());
     noah_profile_keyboard_name_t name = {.length = 1};
     noah_effective_settings_keyboard_name(&name);
@@ -291,6 +329,11 @@ static void test_publication(void) {
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_BYPASS + 7) == 0x08);
     assert(noah_setting_layer_record(15, NOAH_SETTINGS_LAYER_REFERENCE) == 15);
     assert(noah_setting_layer_record(16, NOAH_SETTINGS_LAYER_REFERENCE) == 0);
+    assert(noah_custom_key_shortcut(4).mods == 0x41 && noah_custom_key_shortcut(4).key == 0x0e);
+    assert(noah_custom_key_shortcut(5).mods == 0x0f && noah_custom_key_shortcut(5).key == 0);
+    assert(noah_custom_key_shortcut(127).mods == 0 && noah_custom_key_shortcut(127).key == 0xd1);
+    assert(!noah_custom_key_shortcut_present(noah_custom_key_shortcut(6)));
+    assert(!noah_custom_key_shortcut_present(noah_custom_key_shortcut(128)));
     for (uint16_t i = 0; i < length; i++)
         assert(noah_effective_settings_byte(i) == bytes[i]);
     assert(noah_effective_settings_byte(length) == 0);
@@ -310,6 +353,7 @@ static void test_publication(void) {
     assert(name.length == 0);
     assert(noah_setting_combo_output_behaviors());
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE) == 0xA5u);
+    assert(noah_custom_key_shortcut(4).mods == 0xA5u && noah_custom_key_shortcut(4).key == 0xA5u);
     // The largest domain publishes whole.
     named(NOAH_SETTINGS_NAME_MAX, 'z');
     view = settings_view();
@@ -337,6 +381,7 @@ int main(void) {
     assert(!noah_profile_setting_v1_valid(27, UINT32_C(0x00008000), 16));
     assert(noah_host_layout_id(UINT32_C(0x01090103)) == 9u);
     test_layer_records();
+    test_shortcuts();
     test_names();
     test_keyboard_name();
     test_publication();

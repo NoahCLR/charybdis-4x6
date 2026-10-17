@@ -500,8 +500,9 @@ on both physical halves remain hardware acceptance evidence.
 The macro expansion repartitions the existing 140 KiB logical EEPROM per half:
 36 KiB belongs to VIA (34,903 macro bytes), followed by two 52 KiB custom-profile
 slots. The SRAM0–3 EEPROM mirror remains 143,360 bytes, and flash backing
-remains 286,720 bytes. Each 53,216-byte payload still holds the 37,700-byte
-maximum profile with 15,516 bytes spare, retaining the 12 KiB future reserve.
+remains 286,720 bytes. Each 53,216-byte payload still holds the maximum
+profile, 37,956 bytes since custom-key shortcuts (D-F26), with 15,260 bytes
+spare, retaining the 12 KiB future reserve.
 
 Stored playback reuses the 516-byte linked IR window. Added provider state is
 one 20-byte cursor, one 16-byte provider, a one-byte slot and a six-byte VIA
@@ -530,3 +531,37 @@ in the split-slave thread. Macro startup decoding reaches 1,460 bytes and
 scan-time refill 556 bytes. These are reviewed-path bounds only; interrupt and
 global stack maxima, full-bank startup timing, cancellation, restore and
 wear-level consolidation pauses remain acceptance on the physical keyboard.
+
+## Custom-key shortcuts — D-F26, 2026-10-17
+
+Settings v8 adds 128 two-byte shortcut records, so the effective settings
+cache (`settings`) grows by 256 bytes to its 9,669-byte maximum, on each half.
+Fresh resource builds of the pinned image (`NOAH_RESOURCE_CHECKS=yes`
+`tools/build-firmware-pair.sh`, GCC 15.2.0, BK `d280a4471e`), against `dev` at
+`86ef5553` built the same way:
+
+| Half (build) | SRAM0–3 `.data + .bss` | `dev` | Below the 209,920-byte tripwire |
+| --- | --- | --- | --- |
+| Right (`FORCE_MASTER`) | 208,336 bytes | 208,080 | 1,584 bytes |
+| Left (`FORCE_SLAVE`) | 208,336 bytes | 208,080 | 1,584 bytes |
+
+These are link-time values, not runtime high-water. The keymap's shortcut
+table is `const` and stays in flash. Profile storage grows by the same 256
+bytes; the maximum profile is 37,956 bytes with 15,260 spare in its slot.
+
+The reviewed stack paths are link-time estimates from the same builds. Every
+path in `tools/firmware_stack_budget.json` and
+`tools/firmware_stack_budget_live_profile_owner.json` gives the same figure on
+both halves as `dev`'s build: none grows. `process_record_user` is kept out of
+line in every build (`users/noah/hooks.c`), since LTO began inlining it once
+custom-key dispatch stopped replaying records, so the flashed firmware has the
+call shape the paths measure. Three paths cover the shortcut itself, on both
+halves: a held shortcut's press (1,288 bytes), a behaviour step tapping one
+(1,408) and its release (1,360), all within the 1,920-byte main-process budget.
+
+Both builds, `dev`'s included, fail the reviewed-path gate in the same way:
+the same six `main_process` paths over 1,920 bytes (worst 2,104, handled press
+projection with fallback settlement), the missing
+`noah_dispatch_synthetic_qmk_tap` and the unlinked `io_read` adjacency of
+boot discovery. That predates this change; it is an open issue in
+[the direction](../LIVE_EDIT_APP_DIRECTION.md#open-issues).

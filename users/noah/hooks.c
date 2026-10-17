@@ -24,7 +24,10 @@ __attribute__((weak)) bool pre_process_record_user(uint16_t keycode, keyrecord_t
     return noah_pre_process_record_user(keycode, record);
 }
 
-__attribute__((weak)) bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+// The reviewed stack paths run through process_record_user; keep it a frame
+// of its own, whatever LTO would inline, so the firmware anyone flashes has
+// the call shape those paths measure.
+__attribute__((weak, noinline)) bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     bool keep_processing = noah_process_record_user(keycode, record);
 
     if (!keep_processing) {

@@ -96,9 +96,31 @@ before preflight, whichever mode is active by then, and finalizes the token.
 The release of a press the mode did not take is never offered to the mode; it
 stays with the behavior that owns what that press started.
 
-A custom key (`CUSTOM_KEY_0`–`63`) does only what its `key_behaviors[]` row
-says. One without a row reaches the key runtime's last process stage,
-`idle_custom_key`, which consumes its press so the keycode never reaches QMK.
+A custom key (`CUSTOM_KEY_0`–`127`) does what its shortcut and its
+`key_behaviors[]` row say (D-F26). Its shortcut, read from the live settings
+domain (`noah_custom_key_shortcut()`), is its own action, where an ordinary
+key's keycode would be:
+
+- With a shortcut and no row, or with its row bypassed, the key is a
+  runtime-handled key whose hold is `PRESS_IMMEDIATELY_UNTIL_RELEASE` of
+  itself and whose tap is nothing, so a quick tap is a press and a release.
+- With a row, the shortcut is the tap of the cells the row leaves unauthored
+  (`noah_action_desc_default_tap_action()`) and the key's fallback hold.
+- Holding it goes through `held_action_register()`, which takes one
+  `owned_keycode_acquire_parts()` lease per owner: the 8-bit modifier mask,
+  left and right mixed, then the key, with a mouse button's settle window.
+  The lease records the parts it registered, so the release lets go of exactly
+  those even if the shortcut changed while held; modifiers another owner
+  holds stay down. The lease is owned output, so a profile does not activate
+  while the key is held.
+- Sent by a step on another key, a custom key sends its shortcut only:
+  `owned_keycode_tap_parts()` for a tap, the held lease for press-and-hold.
+  Its own row is never consulted, so steps never chain. Generic press and
+  release dispatch, which has no owner to keep a lease, sends nothing.
+
+One with neither a shortcut nor a row reaches the key runtime's last process
+stage, `idle_custom_key`, which consumes its press so the keycode never
+reaches QMK.
 
 Literal taps go through the ownership ledger (`owned_keycode_tap_literal()`),
 never straight to QMK's `tap_code16()`, whose final unregister would clear a

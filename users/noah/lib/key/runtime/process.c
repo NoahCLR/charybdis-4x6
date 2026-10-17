@@ -283,11 +283,12 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_native_over
     return KEY_RUNTIME_PROCESS_RETURN_FALSE;
 }
 
-// A custom key without a behaviour does nothing. Its press is consumed so the
-// keycode never reaches QMK.
+// A custom key with neither a behaviour nor a shortcut does nothing. Its press
+// is consumed so the keycode never reaches QMK. One with a shortcut is a
+// runtime-handled key even without a row (D-F26) and never gets here.
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_idle_custom_key(key_runtime_process_ctx_t *ctx) {
     if (ctx->record->event.pressed && NOAH_KEYCODE_IS_CUSTOM_KEY(ctx->keycode)) {
-        key_runtime_trace_message("process:idle_custom_key", "custom key without a behaviour consumed");
+        key_runtime_trace_message("process:idle_custom_key", "custom key without a behaviour or shortcut consumed");
         return KEY_RUNTIME_PROCESS_RETURN_FALSE;
     }
 

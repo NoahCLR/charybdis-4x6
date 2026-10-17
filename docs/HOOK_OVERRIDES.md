@@ -183,8 +183,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 ```
 
-Custom keys never reach that `switch`: the shared path consumes one that has
-no behaviour row. Give a key of your own a behaviour row instead; see
+Custom keys never reach that `switch`: the shared path owns them, and consumes
+one with neither a shortcut nor a behaviour row. Give a key of your own a
+shortcut or a behaviour row instead; see
 [Custom Keys](#custom-keys).
 
 If you also override the post-process hook, keep the shared finalize path:
@@ -313,15 +314,18 @@ layers never moves another keycode:
 | `CUSTOM_KEY_0`–`127` | `0x7f00`–`0x7f7f` | 128 |
 | unassigned | `0x7f80`–`0x7fff` | |
 
-Name the key in the `CUSTOM_KEYS(KEY)` table in
+Name the key in the `CUSTOM_KEYS(KEY, SHORTCUT)` table in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c),
-one row per slot (at most 32 bytes of UTF-8, `""` for an unused
-slot), then give it what it does as a `key_behaviors[]` row:
+one row per slot (at most 32 bytes of UTF-8, `""` for an unused slot). A
+`SHORTCUT` row also gives it a shortcut, its own action (D-F26): one key plus
+any modifiers, left and right mixed, held while the custom key is held. Then
+give it more as a `key_behaviors[]` row, which works on top of the shortcut:
 
 ```c
-#define CUSTOM_KEYS(KEY)             \
-    KEY(CUSTOM_KEY_0, "Right Thumb") \
-    KEY(CUSTOM_KEY_1, "My Key")      \
+#define CUSTOM_KEYS(KEY, SHORTCUT)                                              \
+    KEY(CUSTOM_KEY_0, "Right Thumb")                                            \
+    KEY(CUSTOM_KEY_1, "My Key")                                                 \
+    SHORTCUT(CUSTOM_KEY_2, "Hyper K", SHORTCUT_MODS(KC_LCTL, KC_RALT), KC_K)    \
     ...
 
 {
@@ -333,11 +337,11 @@ slot), then give it what it does as a `key_behaviors[]` row:
 },
 ```
 
-Place the key on a layer or make it a combo output. Without a behaviour row it
-does nothing: the shared process path consumes its press, so it never reaches a
-`process_record_user()` override. A behaviour step (`TAP_SENDS(...)`,
-`PRESS_AND_HOLD_UNTIL_RELEASE(...)` and the other helpers) cannot send a
-custom key; firmware keymap validation and Charybdis Ark both refuse that.
-Charybdis Ark edits the same keys on its **Custom keys** screen; names it
-saves are stored on the keyboard, and a keyboard with none stored reports the
-names in `CUSTOM_KEYS`.
+Place the key on a layer or make it a combo output. Without a shortcut or a
+behaviour row it does nothing: the shared process path consumes its press, so
+it never reaches a `process_record_user()` override. A behaviour step
+(`TAP_SENDS(...)`, `PRESS_AND_HOLD_UNTIL_RELEASE(...)` and the other helpers)
+on another key may send a custom key; it sends that key's shortcut only, never
+its behaviour. Charybdis Ark edits the same keys on its **Custom keys** screen;
+names and shortcuts it saves are stored on the keyboard, and a keyboard with
+none stored reports those in `CUSTOM_KEYS`.

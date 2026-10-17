@@ -715,6 +715,83 @@ static void test_modded_modifier_keeps_both_components(void) {
     }
 }
 
+// A custom key's shortcut (D-F26) is parts no keycode can name: Left Ctrl and
+// Right Alt with K. They go down as one lease, modifiers first, and come back
+// up in reverse.
+static void test_parts_lease_holds_mixed_side_modifiers_and_a_key(void) {
+    owned_keycode_lease_t lease = {0};
+
+    test_reset_stubs();
+
+    CHECK(owned_keycode_acquire_parts(MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), KC_K, &lease));
+    CHECK(lease.active && lease.has_basic && lease.basic == KC_K && lease.mods == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)));
+    CHECK(register_mods_count == 1 && register_mods_calls[0] == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)));
+    CHECK(register_code_count == 1 && register_code_calls[0] == KC_K);
+    CHECK(register_mods_seq[0] < register_code_seq[0]);
+    CHECK(wait_call_count == 0);
+
+    CHECK(owned_keycode_release(&lease));
+    CHECK(!lease.active);
+    CHECK(unregister_code_count == 1 && unregister_code_calls[0] == KC_K);
+    CHECK(unregister_mods_count == 1 && unregister_mods_calls[0] == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)));
+    CHECK(unregister_code_seq[0] < unregister_mods_seq[0]);
+}
+
+// Modifiers alone and a key alone are both shortcuts; a modifier ahead of a
+// mouse button gets the button's settle window, as a modded click does.
+static void test_parts_lease_takes_modifiers_alone_a_key_alone_and_clicks(void) {
+    owned_keycode_lease_t lease = {0};
+
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire_parts(0xffu, KC_NO, &lease));
+    CHECK(!lease.has_basic && register_code_count == 0 && register_mods_calls[0] == 0xffu);
+    CHECK(owned_keycode_release(&lease));
+    CHECK(unregister_mods_count == 1 && unregister_mods_calls[0] == 0xffu);
+
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire_parts(0u, KC_EXSEL, &lease));
+    CHECK(register_mods_count == 0 && register_code_count == 1 && register_code_calls[0] == KC_EXSEL);
+    CHECK(owned_keycode_release(&lease));
+
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire_parts(MOD_BIT(KC_RIGHT_GUI), MS_BTN1, &lease));
+    CHECK(register_mods_seq[0] < register_code_seq[0]);
+    CHECK(wait_call_count == 1 && wait_calls[0] == OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS);
+    CHECK(owned_keycode_release(&lease));
+}
+
+// Nothing, a modifier key as the key, or a code that is no report usage is
+// refused with nothing held.
+static void test_parts_lease_refuses_what_is_not_a_shortcut(void) {
+    static const uint8_t refused[] = {KC_LEFT_CTRL, KC_RIGHT_GUI, 0x01u};
+    owned_keycode_lease_t lease    = {0};
+
+    test_reset_stubs();
+    CHECK(!owned_keycode_acquire_parts(0u, KC_NO, &lease) && !lease.active);
+    for (uint8_t i = 0; i < ARRAY_SIZE(refused); i++) {
+        CHECK(!owned_keycode_acquire_parts(MOD_BIT(KC_LEFT_SHIFT), refused[i], &lease) && !lease.active);
+    }
+    CHECK(register_mods_count == 0 && register_code_count == 0);
+    lease.active = true;
+    CHECK(!owned_keycode_acquire_parts(0u, KC_A, &lease));
+}
+
+// A tap holds the parts for one tap delay and lets go of what it took only:
+// a modifier another owner holds stays down.
+static void test_parts_tap_releases_only_what_it_took(void) {
+    owned_keycode_lease_t other = {0};
+
+    test_reset_stubs();
+    CHECK(owned_keycode_acquire(KC_LEFT_CTRL, &other));
+    CHECK(owned_keycode_tap_parts(MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_SHIFT), KC_J));
+    CHECK(register_code_count == 1 && register_code_calls[0] == KC_J);
+    CHECK(unregister_code_count == 1 && unregister_code_calls[0] == KC_J);
+    CHECK(wait_call_count == 1 && wait_calls[0] == TAP_CODE_DELAY);
+    CHECK(other.active);
+    CHECK(owned_keycode_release(&other));
+    CHECK(!owned_keycode_tap_parts(0u, KC_NO));
+}
+
 int main(void) {
     test_modded_modifier_keeps_both_components();
     test_plain_key_registers_and_unregisters_directly();
@@ -748,6 +825,10 @@ int main(void) {
     test_literal_tap_never_releases_another_owners_usage();
     test_click_never_releases_a_physically_held_button();
     test_literal_tap_keeps_qmk_for_keycodes_the_ledger_cannot_hold();
+    test_parts_lease_holds_mixed_side_modifiers_and_a_key();
+    test_parts_lease_takes_modifiers_alone_a_key_alone_and_clicks();
+    test_parts_lease_refuses_what_is_not_a_shortcut();
+    test_parts_tap_releases_only_what_it_took();
 
     puts("owned_keycode host tests passed");
     return 0;

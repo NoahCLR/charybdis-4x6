@@ -12,6 +12,35 @@
 #define _KEYMAP_CUSTOM_KEY_NAME_CHECK(keycode_, name_)                                                                         \
     _Static_assert(NOAH_KEYCODE_IS_CUSTOM_KEY(keycode_), #keycode_ ": CUSTOM_KEYS rows name custom keys");                      \
     _Static_assert(sizeof(name_) <= NOAH_MACRO_NAME_SIZE, #keycode_ ": a custom key name holds at most 32 bytes of UTF-8");
+// SHORTCUT(keycode, name, mods, key) also gives the key its shortcut (D-F26):
+// modifiers written as SHORTCUT_MODS(...) or SHORTCUT_NO_MODS, then a key from
+// the shortcut vocabulary. SHORTCUT_MODS names modifier keys, left and right
+// mixed, and builds the 8-bit report mask from them. A bare number or a QMK
+// MOD_* constant is refused: QMK's right-hand MOD_RALT (0x14) reads as Right
+// Ctrl + Left Alt in a report mask, so it would compile to the wrong keys.
+#define _KEYMAP_SHORTCUT_MODS_TAG 0x100
+#define _KEYMAP_SHORTCUT_NOT_A_MOD 0x200
+#define _KEYMAP_SHORTCUT_MOD_BIT(key_) (IS_MODIFIER_KEYCODE(key_) ? MOD_BIT(key_) : _KEYMAP_SHORTCUT_NOT_A_MOD)
+#define _KEYMAP_SHORTCUT_MODS_1(a_) _KEYMAP_SHORTCUT_MOD_BIT(a_)
+#define _KEYMAP_SHORTCUT_MODS_2(a_, ...) (_KEYMAP_SHORTCUT_MOD_BIT(a_) | _KEYMAP_SHORTCUT_MODS_1(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_MODS_3(a_, ...) (_KEYMAP_SHORTCUT_MOD_BIT(a_) | _KEYMAP_SHORTCUT_MODS_2(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_MODS_4(a_, ...) (_KEYMAP_SHORTCUT_MOD_BIT(a_) | _KEYMAP_SHORTCUT_MODS_3(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_MODS_5(a_, ...) (_KEYMAP_SHORTCUT_MOD_BIT(a_) | _KEYMAP_SHORTCUT_MODS_4(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_MODS_6(a_, ...) (_KEYMAP_SHORTCUT_MOD_BIT(a_) | _KEYMAP_SHORTCUT_MODS_5(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_MODS_7(a_, ...) (_KEYMAP_SHORTCUT_MOD_BIT(a_) | _KEYMAP_SHORTCUT_MODS_6(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_MODS_8(a_, ...) (_KEYMAP_SHORTCUT_MOD_BIT(a_) | _KEYMAP_SHORTCUT_MODS_7(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_MODS_PICK(a1_, a2_, a3_, a4_, a5_, a6_, a7_, a8_, count_, ...) _KEYMAP_SHORTCUT_MODS_##count_
+#define SHORTCUT_MODS(...) (_KEYMAP_SHORTCUT_MODS_TAG | _KEYMAP_SHORTCUT_MODS_PICK(__VA_ARGS__, 8, 7, 6, 5, 4, 3, 2, 1, 0)(__VA_ARGS__))
+#define SHORTCUT_NO_MODS _KEYMAP_SHORTCUT_MODS_TAG
+#define _KEYMAP_CUSTOM_KEY_SHORTCUT_NAME_ENTRY(keycode_, name_, mods_, key_) _KEYMAP_CUSTOM_KEY_NAME_ENTRY(keycode_, name_)
+#define _KEYMAP_CUSTOM_KEY_SHORTCUT_CHECK(keycode_, name_, mods_, key_)                                                         \
+    _KEYMAP_CUSTOM_KEY_NAME_CHECK(keycode_, name_)                                                                              \
+    _Static_assert(((mods_) & ~0xff) == _KEYMAP_SHORTCUT_MODS_TAG,                                                              \
+                   #keycode_ ": write a shortcut's modifiers as SHORTCUT_MODS(KC_LCTL, ...) of modifier keys, or SHORTCUT_NO_MODS"); \
+    _Static_assert(NOAH_CUSTOM_KEY_SHORTCUT_KEY_VALID(key_), #keycode_ ": a shortcut's key is a basic key or a mouse button");   \
+    _Static_assert(((mods_) & 0xff) != 0 || (key_) != KC_NO, #keycode_ ": a SHORTCUT row holds a shortcut; use KEY for none");
+#define _KEYMAP_CUSTOM_KEY_NO_SHORTCUT(keycode_, name_) [((keycode_) - CUSTOM_KEY_0)] = {0u, 0u},
+#define _KEYMAP_CUSTOM_KEY_SHORTCUT_ENTRY(keycode_, name_, mods_, key_) [((keycode_) - CUSTOM_KEY_0)] = {(uint8_t)(mods_), (uint8_t)(key_)},
 #define _KEYMAP_STRIP_PARENS(...) __VA_ARGS__
 // COMBO(result, keys) follows COMBO_TERM; COMBO_WINDOW(result, keys, ms) has
 // its own window.
@@ -67,8 +96,9 @@
 
 #define MATERIALIZE_KEYMAP_DATA()                                                                                               \
     _Static_assert(sizeof(keymaps) / sizeof(keymaps[0]) == LAYER_COUNT, "keymaps[] lists every layer of the bank, transparent or not"); \
-    CUSTOM_KEYS(_KEYMAP_CUSTOM_KEY_NAME_CHECK)                                                                                  \
-    const char custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {CUSTOM_KEYS(_KEYMAP_CUSTOM_KEY_NAME_ENTRY)};     \
+    CUSTOM_KEYS(_KEYMAP_CUSTOM_KEY_NAME_CHECK, _KEYMAP_CUSTOM_KEY_SHORTCUT_CHECK)                                                \
+    const char custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {CUSTOM_KEYS(_KEYMAP_CUSTOM_KEY_NAME_ENTRY, _KEYMAP_CUSTOM_KEY_SHORTCUT_NAME_ENTRY)}; \
+    const uint8_t custom_key_shortcuts[CUSTOM_KEY_SLOT_COUNT][NOAH_CUSTOM_KEY_SHORTCUT_SIZE] = {CUSTOM_KEYS(_KEYMAP_CUSTOM_KEY_NO_SHORTCUT, _KEYMAP_CUSTOM_KEY_SHORTCUT_ENTRY)}; \
     VIA_MACROS(_KEYMAP_VIA_MACRO_NAME_CHECK)                                                                                    \
     const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT]                 = {VIA_MACROS(_KEYMAP_VIA_MACRO_PAYLOAD_ENTRY)}; \
     const char        via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {VIA_MACROS(_KEYMAP_VIA_MACRO_NAME_ENTRY)}; \

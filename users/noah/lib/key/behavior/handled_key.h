@@ -34,6 +34,9 @@ typedef enum {
     HANDLED_KEY_FLAG_FALLBACK_HOLD   = (1u << 3),
     HANDLED_KEY_FLAG_MOMENTARY_LAYER = (1u << 4),
     HANDLED_KEY_FLAG_LAYER_TAP       = (1u << 5),
+    // A lower layer's key that a transparent cell reads through: the pressed
+    // key's own row governs, so the lower key is never a native key.
+    HANDLED_KEY_FLAG_TRANSPARENT_SOURCE = (1u << 6),
 } handled_key_flag_t;
 
 typedef enum {

@@ -58,6 +58,31 @@ static bool noah_action_keycode_is_pure_modifier_literal(uint16_t action) {
     }
 }
 
+// The firmware always links the live lookup (effective_settings_runtime.c),
+// which falls back to the keymap's shortcuts before a profile is live. This
+// default, no shortcuts, only serves host tests that link neither; a test
+// that needs shortcuts defines its own.
+__attribute__((weak)) noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    (void)slot;
+    return (noah_custom_key_shortcut_t){0};
+}
+
+noah_custom_key_shortcut_t noah_custom_key_shortcut_for_keycode(uint16_t keycode) {
+    return NOAH_KEYCODE_IS_CUSTOM_KEY(keycode) ? noah_custom_key_shortcut((uint8_t)(keycode - CUSTOM_KEY_0)) : (noah_custom_key_shortcut_t){0};
+}
+
+bool noah_custom_key_has_shortcut(uint16_t keycode) {
+    return noah_custom_key_shortcut_present(noah_custom_key_shortcut_for_keycode(keycode));
+}
+
+// A custom key with a shortcut stands where an ordinary key's own keycode
+// does (D-F26): it is its default tap and its fallback hold, and without a
+// row of its own the runtime holds it from the press. Without a shortcut it
+// has no native action, as before.
+static bool noah_action_desc_is_custom_key_with_shortcut(noah_action_desc_t desc) {
+    return desc.kind == NOAH_ACTION_KIND_CUSTOM_KEY && noah_custom_key_has_shortcut(desc.action);
+}
+
 bool noah_action_kind_metadata_defined(noah_action_kind_t kind) {
     const noah_action_kind_def_t *def = noah_action_kind_def(kind);
     return def && def->defined;
@@ -69,7 +94,7 @@ bool noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t 
 }
 
 bool noah_action_desc_is_runtime_handled_keycode(noah_action_desc_t desc) {
-    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_RUNTIME_HANDLED_KEYCODE);
+    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_RUNTIME_HANDLED_KEYCODE) || noah_action_desc_is_custom_key_with_shortcut(desc);
 }
 
 bool noah_action_desc_is_momentary_layer_keycode(noah_action_desc_t desc) {
@@ -93,7 +118,7 @@ bool noah_action_desc_default_tap_uses_layer_tap_keycode(noah_action_desc_t desc
 }
 
 bool noah_action_desc_default_tap_uses_action_keycode(noah_action_desc_t desc) {
-    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_DEFAULT_TAP_USES_ACTION_KEYCODE);
+    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_DEFAULT_TAP_USES_ACTION_KEYCODE) || noah_action_desc_is_custom_key_with_shortcut(desc);
 }
 
 bool noah_action_desc_is_pure_modifier_literal(noah_action_desc_t desc) {
@@ -109,7 +134,7 @@ bool noah_action_desc_source_sets_layer_tap_flag(noah_action_desc_t desc) {
 }
 
 bool noah_action_desc_supports_fallback_hold(noah_action_desc_t desc) {
-    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_SUPPORTS_FALLBACK_HOLD);
+    return noah_action_desc_has_policy_flag(desc, NOAH_ACTION_POLICY_SUPPORTS_FALLBACK_HOLD) || noah_action_desc_is_custom_key_with_shortcut(desc);
 }
 
 bool noah_action_desc_source_layer_uses_desc_layer(noah_action_desc_t desc) {
