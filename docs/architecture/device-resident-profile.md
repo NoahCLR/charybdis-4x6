@@ -82,9 +82,9 @@ activation and reboot recovery require the bound VIA identity to converge.
 
 Remaining product work is physical interruption acceptance across each durable
 boundary, adoption or conflict reporting for writes made by external VIA
-clients, guided recovery, the known one-half reconnect transition, broad
-hardware acceptance, and standalone distribution. Until the interruption
-matrix is recorded, Apply continues to create a recovery file.
+clients, guided recovery, broad hardware acceptance, and standalone
+distribution. Until the interruption matrix is recorded, Apply continues to
+create a recovery file.
 
 ## Required Device-First Operations
 
