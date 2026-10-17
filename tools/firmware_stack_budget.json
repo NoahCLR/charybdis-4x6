@@ -238,7 +238,7 @@
         },
         {
           "name": "matrix scan live-profile boot discovery",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_profile_store_boot_select_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
         },
         {
           "name": "matrix scan VIA metadata and snapshot RPC",
@@ -277,8 +277,12 @@
           "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "owned_keycode_tap_literal", "register_code16", "register_code"]
         },
         {
-          "name": "pointing task directional QMK-function tap",
-          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_dispatch_synthetic_qmk_tap", "noah_dispatch_synthetic_qmk_record", "process_record"]
+          "name": "pointing task directional VIA macro window decode held sequence",
+          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "via_macro_provider_start", "macro_slot_provider_load_window", "via_macro_provider_load_ir", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
+        },
+        {
+          "name": "pointing task directional VIA macro window storage read",
+          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "via_macro_provider_start", "macro_slot_provider_load_window", "via_macro_provider_load_ir", "via_macro_provider_read_byte", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
         },
         {
           "name": "physical press participation indexed behavior lookup",

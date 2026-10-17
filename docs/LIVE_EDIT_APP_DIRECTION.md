@@ -96,14 +96,6 @@ input cadence remain unmeasured for this path.
   the key (unauthored taps and press-and-hold), bypass it as a combo output,
   and apply a profile while it is held with nothing left stuck.
 
-- **The reviewed-path stack gate fails on `dev`.** A resource build
-  (`NOAH_RESOURCE_CHECKS=yes`) fails `tools/firmware_stack_budget.json` on both
-  halves: six `main_process` paths through fallback settlement exceed the
-  1,920-byte budget (worst 2,104 bytes), `noah_dispatch_synthetic_qmk_tap` is no
-  longer linked, and boot discovery's `io_read` adjacency is not a linked edge.
-  Bring the paths back under budget or re-derive the budget, and refresh the
-  stale paths ([memory budgets](architecture/memory-budgets.md)).
-
 - **The keyboard name needs broader hardware acceptance (D-F25).** Check
   Chrome's HID chooser, the system device list and Ark individually; that a
   held key or a running macro delays the restart; that the half without USB
