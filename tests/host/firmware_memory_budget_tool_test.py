@@ -188,17 +188,6 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
             stderr,
         )
 
-    def test_legacy_policy_flag_aliases_remain_supported(self):
-        result, _, stderr = self.run_main(
-            "--max-static-ram",
-            "49823",
-            "--min-heap",
-            "212313",
-        )
-        self.assertEqual(result, 1)
-        self.assertIn(".data + .bss policy span 49824 exceeds 49823 B", stderr)
-        self.assertIn("newlib arena 212312 B is below the 212313 B safety floor", stderr)
-
     def test_section_split_is_not_gated_unless_requested(self):
         # 25524 B of .bss would fail the retired 26000 B default only if the
         # split were still enforced by default.

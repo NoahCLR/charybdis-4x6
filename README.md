@@ -65,8 +65,8 @@ any C and you don't reflash.
    and open it with the keyboard connected.
 
 Only this side-specific pair works with Ark. A plain `qmk compile` image
-doesn't. Firmware accepts current-format profiles; keep a backup before an
-upgrade, and use Ark's import translation for older backups.
+doesn't. Firmware accepts current-format profiles only: a backup made with
+older firmware won't restore onto a release that changed the format.
 
 ## Configure it in C (optional)
 

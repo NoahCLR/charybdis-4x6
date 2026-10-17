@@ -216,7 +216,7 @@ int main(int argc, char **argv) {
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_BEHAVIORS_ENABLED * 4) == 1);
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LAYER_BEHAVIORS * 4) == 0xffff);
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LAYER_COMBOS * 4) == 0xffff);
-    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_RETIRED_COMBO_REFERENCES * 4) == 0);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_UNICODE_HOST_MODE * 4) == 0);
     // Each layer refers combos to itself and bypasses or excludes nothing.
     uint8_t expected[NOAH_SETTINGS_MAX_SIZE] = {0};
     for (uint8_t layer = 0; layer < NOAH_SETTINGS_LAYERS; layer++) {

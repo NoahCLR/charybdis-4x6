@@ -13,8 +13,8 @@ Ark owns `tests/integration/` and its `npm run test:compat` command. Those five
 runners compile probes from an explicitly selected firmware checkout and compare
 them with the selected Ark codecs. Their build recipes must follow firmware
 source/build changes. Firmware does not invoke or require these runners, even
-for its ordinary full-suite CI. Protocol changes should document the changed
-contract and retained compatibility; Ark tests that contract before merging
+for its ordinary full-suite CI. Protocol changes document the changed
+contract; Ark tests that contract before merging
 its corresponding implementation. A firmware-only developer can complete the
 firmware gates without installing Ark. Joint work runs both suites and Ark's
 optional cross-repository integration gate.
@@ -26,10 +26,14 @@ These firmware paths are Ark's inputs, and changing them does not fail any
 firmware gate:
 
 - Ark's `tests/integration/` runners compile the probes
-  `tests/host/{profile_compiled_defaults_v1,profile_pd_v1,qmk_portable_editor,qmk_portable_profile}_test.c`
-  and `tests/host/macro_program_size_probe.c` with sources under
-  `users/noah/lib/{profile,macro,action,compat}/`, headers under
-  `tests/host/include/`, and `tests/host/noah_host_qmk_env.sh`.
+  `tests/host/{profile_compiled_defaults_v1,profile_pd_v1,qmk_portable_editor,qmk_portable_profile,qmk_via_storage_regions}_test.c`
+  and Ark's own probes with sources under `users/noah/lib/`, headers under
+  `tests/host/include/`, the keymap and `tests/host/noah_host_qmk_env.sh`. They
+  read `tests/fixtures/compiled_profile_pd_v2.fixture` and the old-format
+  rejection vector `tests/fixtures/client-regression/portable.bin.pd5` from the
+  checkout.
+- Ark's agreement check runs `tests/host/run_contract_probe.sh`, which states
+  the capability pages, the BK pin and every fixture's hash.
 - Ark's `upstream/` snapshot pins wire fixtures under `tests/fixtures/` and the
   wire, domain, transaction and resource specs under `docs/architecture/`.
 
@@ -84,8 +88,10 @@ binding.
 The legacy GET 9 page and its feature bit are removed. Ark must require binding
 in `candidateMetadataForBlob`, update codec/rejection expectations and its
 integration probe recipes, refresh imported fixtures/specs and repin after the
-firmware lands. Frozen legacy inputs in `client-regression/` remain rejection
-and record-rule evidence; they are not accepted firmware formats.
+firmware lands. Neither side translates a backup in an earlier format; it is
+refused. In `client-regression/`, `portable.bin.pd5` is the one frozen
+old-format profile, kept as rejection evidence, and the frozen PD corpus checks
+the current record rules; neither is an accepted firmware format.
 
 ## Domain modules (D-F13)
 

@@ -5,7 +5,7 @@
 > a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
 > binds a nonzero VIA generation and digest. HID and split framing remain v1.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
-> Backup translation belongs to the client, before a current-format Apply.
+> A backup in an earlier format is refused, not translated.
 
 A profile export is the effective configuration read from the keyboard. Flashed
 and committed data have the same representation. An absent live domain is
@@ -28,48 +28,10 @@ versions fail validation. Files are limited to 100,000 bytes.
 | `profile` | Canonical base64 NLP1 payload, at most 4,064 bytes; domains `0x10`, `0x20`, `0x30`, `0x40`, in that order |
 | `macros` | Exactly 128 canonical base64 VIA macro streams, excluding their zero terminators |
 
-The temporary bridge also exports five-layer documents. Import into the
-standard image recognizes the deployed `0xdcb00959` action vocabulary, adds
-three transparent layers, and translates native user triggers from `0x7e61`
-upward by three positions. The eight-layer vocabulary is `0xeb80829c`; the
-schema-2 pointing vocabulary `0x61072732`. Firmware with the userspace keycode
-blocks uses `0x1d3fcacc`, and import into it translates a `0x61072732`
-document key by key: pointing holds, locks and layer locks move to their
-blocks, the keymap's own keys from `0x7e64` become custom keys 0, 1, 2… (a
-behaviour target or combo output among them becomes action kind 7), and a key
-holding a retired user macro is emptied. A retired user macro that a behaviour
-or combo sends, or a user keycode with no counterpart, refuses the import.
-
-Firmware with 32 pointing slots (D-F09) uses `0xf79c6151`: the same blocks,
-now filled (`PD_SLOT_n` = `0x7e80 + n` and `PD_SLOT_n_LOCK` = `0x7ea0 + n` for
-`n = 0..31`), with each mode flag digested at 32 bits. Import of a `0x1d3fcacc`
-document into it is a key-by-key identity translation: every native keycode
-and every action kind 4/5 operand `0..7` keeps its value. Its profile domains
-change in two places. The PD domain goes from version 1 to version 2: drop
-each disabled record without a name and write the header `02 20 60 nn 00 00
-00 00`. The RGB domain goes from version 2 to version 3: set format byte 0 to
-3 and header byte 7 to 32, and add after slot 7's PD colour row the rows
-`n 00 00 00 02` (black, right half) for `n = 8..31`, as the 6 → 8 upgrade
-added rows for slots 6 and 7. Every other byte is kept. The result grows by
-120 − 96 × (dropped records) bytes and must still fit the 5,088-byte ceiling;
-if it does not, the import is refused with that reason, never trimmed. A
-`0x61072732` document translates to the blocks first, then the same way.
-Other legacy vocabularies are rejected. A legacy macro bank must fit the current
-34,903-byte bank with every slot's terminator ([runtime flow](runtime-flow.md)).
-
-Firmware after D-F14 has a new action-ABI digest (it covers the layer, macro
-and custom-key counts and the custom-key block). Import of a document from the
-preceding eight-layer firmware translates key by key: every native keycode
-keeps its value except a custom key, which moves from `0x7e40 + n` to
-`0x7f00 + n` (its slot is kept); layers 8–15 are added as 60 `KC_TRNS` each;
-and the 64 macro streams are followed by 64 empty ones. Action operands in the
-profile keep their values. The NLP1 schema byte becomes 3 and each domain
-moves one version: RGB 3 → 4 ([RGB domain](rgb-domain-v1.md)), key behaviours
-1 → 2, combos 2 → 3 ([Profile Wire](profile-wire-v1.md)), settings 5 → 6
-(below) and pointing 2 → 3 ([PD-mode domain](pd-mode-domain-v1.md)). The
-result must fit the 53,216-byte ceiling. `tests/host/translate_eight_slot_profile.py`
-is the firmware's executable reference for these domain steps; the firmware
-itself never translates.
+A document is restorable only onto firmware with the same action-ABI digest,
+profile schema and domain versions (the summary above). A document exported
+from earlier firmware is refused, never translated: neither the firmware nor
+its client keeps a path from an older vocabulary or format.
 
 RGB and behaviour domains come from the effective committed domain or the
 keyboard's compiled readback. Combo rows come from effective native readback;
@@ -94,7 +56,7 @@ carry them and export stays canonical. Differential transfer therefore never
 compares against a bank rebuilt from a document. A capture keeps the exact
 layout and macro bytes it read, beside the storage identity it verified, and an
 Apply compares staging and local roll-forward against those. Optional
-[macro read maps](profile-wire-v1.md#sparse-via-macro-read-map--optional-get-value-0x0c)
+[macro read maps](profile-wire-v1.md#sparse-via-macro-read-map--get-value-0x0c)
 let a capture reconstruct firmware-confirmed zero blocks while reading every
 nonzero block and verifying the same full-store identity. Its result keeps
 the target bank, which it has just proved both halves hold. A reviewed snapshot
@@ -105,9 +67,8 @@ interrupted-capture path already carries the raw bank it read.
 
 Capability domain-mask bit 3 advertises this domain. An ordinary profile may
 omit it; a complete portable file includes it. Firmware accepts only version
-8, with the envelope version equal to the payload's first byte. Older settings
-must be translated by the client before Apply; firmware never preserves or
-executes retired user-macro instruction records.
+8, with the envelope version equal to the payload's first byte, and refuses
+earlier versions.
 
 All multibyte fields are little-endian:
 
@@ -141,8 +102,7 @@ zero. Require capability feature bit 30 before setting it. Zero means **Combo
 outputs use behaviours** is on, preserving existing profiles and compiled
 defaults. The corresponding per-combo switch is combo v3 row flag bit 4;
 [participation policy](participation-policy.md#combo-output-behaviour-permission)
-defines their vetoes, origin context and release pairing. An older backup's
-translation leaves both flags zero. An export preserves them; importing to a
+defines their vetoes, origin context and release pairing. An export preserves them; importing to a
 keyboard without feature bit 30 must refuse nonzero flags instead of dropping
 them. Neither extension changes domain versions, offsets or the action ABI.
 
@@ -194,20 +154,6 @@ layer refers combos to itself, every bitmap is zero, layers 8–15 are
 unnamed and so is the keyboard. So a profile that never sets the participation controls behaves as
 version 5 did.
 
-Version 7 translates in the client, never in firmware: 256 zero bytes (no
-custom key has a shortcut) are inserted at offset 404, after the layer
-records, header byte 6 becomes 128 and the version byte becomes 8. Version 6
-translates to version 7 first: the keyboard name is appended empty (one zero
-byte) and the version byte becomes 7. Version 5
-translates to version 6 first, also in the client: scalars 0–26 are
-copied; scalar 27's eight nibbles become the reference layers of layers 0–7
-(layer `n` from bits `4n..4n+3`) and layers 8–15 refer to themselves; scalar
-27 becomes 0, 28 becomes 1, and 29 and 30 become `0xffff`; bitmaps are zero;
-layer names 0–7 are version 5's 24-byte fields up to their first zero byte and
-8–15 are empty; the 64 macro names copy unchanged followed by 64 empty ones,
-and the 64 custom-key names likewise, since version 5's printable-ASCII names
-of at most 20 bytes are valid here.
-
 At publication the settings invalidator copies the bounded domain into a cold
 runtime cache using reads of at most 20 bytes. Key, RGB, pointer and macro
 execution use the cache, without EEPROM reads. The settings module owns immutable factory scalars and authored names, also
@@ -249,11 +195,7 @@ the custom-profile owner retains its separate status and generation.
 GET value `0x08`, page 1 is optional editor metadata: exactly two bytes,
 version `1` and the device's actual RGB maximum brightness (uint8, including
 zero). The firmware reports `RGB_MATRIX_MAXIMUM_BRIGHTNESS`; it does not
-change LED state. Earlier firmware rejects this page with status `2`. The app
-treats only that canonical, correlated rejection as absent metadata; malformed
-or other failed replies remain errors. Without the limit, the Defaults brightness
-field is read-only. Other settings and existing export/import stay available.
-With a reported limit, Defaults and full-profile restore reject an excessive
+change LED state. A failed reply is an error. With the reported limit, Defaults and full-profile restore reject an excessive
 brightness before writing. This metadata is not configuration, is not exported,
 and does not alter the portable profile fingerprint or payload schema.
 
@@ -341,10 +283,9 @@ Physical power-loss acceptance at each durable boundary remains required.
 ## Upgrade and acceptance
 
 Current firmware has sixteen-layer VIA geometry (a 1,920-byte keymap) and
-synchronization metadata schema 5 with a 34,903-byte macro bank; an older bank is reset, not misread. Older geometry or action vocabulary is incompatible. The old bridge
-is not built or served here: export with matching old firmware, then translate
-the complete backup in the client before restoring through current logical
-Apply. Firmware does not interpret old storage in place.
+synchronization metadata schema 5 with a 34,903-byte macro bank; an older bank is reset, not misread. Older geometry, action vocabulary and
+storage are refused: firmware does not interpret old storage in place, and a
+backup from earlier firmware cannot be restored.
 
 Host tests validate the app-generated populated payload using the compatibility
 rules of firmware compiled with no behaviours or combos. Tests also cover
