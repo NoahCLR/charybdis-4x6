@@ -88,28 +88,20 @@ input cadence remain unmeasured for this path.
 
 ## Open Issues
 
-- **Custom key shortcuts need an Ark follow-up and hardware acceptance
-  (D-F26).** Ark must read and write settings v8, translate v7 backups by
-  adding empty shortcuts, edit the shortcut on the Custom keys screen and
-  offer custom keys as behaviour steps. Then on both halves: hold a
-  mixed-side shortcut, tap it, hold a modifier-only one, put a behaviour on
-  the key (unauthored taps and press-and-hold), bypass it as a combo output,
-  and apply a profile while it is held with nothing left stuck.
+- **Custom key shortcuts need hardware acceptance (D-F26).** On both halves:
+  hold a mixed-side shortcut, tap it, hold a modifier-only one, put a
+  behaviour on the key (unauthored taps and press-and-hold), bypass it as a
+  combo output, and apply a profile while it is held with nothing left stuck.
 
 - **The keyboard name needs broader hardware acceptance (D-F25).** Check
   Chrome's HID chooser, the system device list and Ark individually; that a
   held key or a running macro delays the restart; that the half without USB
   stays off USB; and that unplugging and restarting under the saved name
-  enumerates without a second restart. Ark clients must support the current
-  settings version (v8 since D-F26),
-  the editor and expected reconnect; older backups need v6 translation.
+  enumerates without a second restart.
 
-- **Combo output permissions need an Ark follow-up and hardware acceptance
-  (D-F24).** Ark must adopt capability bit 30, settings header flags and combo
-  output flags before reading this firmware. Add both editor controls,
-  backup/restore gating, reachability and compatibility coverage after the
-  firmware contract lands. Then try shared outputs with opposite permissions,
-  global bypass and held releases on both halves.
+- **Combo output permissions need hardware acceptance (D-F24).** Try shared
+  outputs with opposite permissions, global bypass and held releases on both
+  halves.
 
 - **Pointing-mode macros need hardware acceptance (D-F23).** Run delayed and
   mouse-click macros from directions under both output policies and from a
@@ -177,14 +169,12 @@ input cadence remain unmeasured for this path.
 - **The macro expansion has not run on hardware** (D-F14). Export a backup
   before flashing: schema-5 VIA recovery and `NT` profile headers reset older
   storage. Accept full-bank playback, cancellation, backup restore, macro-127
-  startup time and consolidation pauses on both halves. The Ark follow-up
-  must adopt streaming feature bit 27 and the new storage geometry first.
+  startup time and consolidation pauses on both halves.
 
 - **Pointing-mode clicks have not run on hardware** (D-F22). Accept buttons 3
   and 4 from ball motion, every step and once per movement, with held
   modifiers, with the same button physically held, and with the cursor held
-  still; record what the host receives. The Ark follow-up must adopt feature
-  bit 28 first.
+  still; record what the host receives.
 
 ## Remaining Load-Bearing Contracts
 
@@ -426,7 +416,7 @@ their introspection and memory-gate requirements are gone. Settings readback
 streams from the effective settings cache instead of a second copy, saving
 1,400 bytes of static RAM per half; see
 [memory budgets](architecture/memory-budgets.md#retired-user-macros-and-streamed-settings-readback--2026-09-23)
-and [portable profile](architecture/portable-profile-v1.md#version-3-via-macro-names-instead-of-user-macros).
+and [portable profile](architecture/portable-profile-v1.md#settings-domain-0x40-version-8).
 D-L42 later renumbered every userspace keycode and gave action kind 7 to custom
 keys, under a new action ABI digest; the `MACRO_n` numbers are gone.
 

@@ -94,9 +94,10 @@ is my right thumb key, slightly trimmed:
 },
 ```
 
-To build it yourself, use my
-[BastardKB QMK fork](https://github.com/NoahCLR/bastardkb-qmk), set
-`QMK_USERSPACE` to this repo and run `sh tools/build-firmware-pair.sh`. The
+To build it yourself, start Docker, check out my
+[BastardKB QMK fork](https://github.com/NoahCLR/bastardkb-qmk) beside this
+repo at the commit [`qmk-pin.json`](qmk-pin.json) names (or point `QMK_ROOT`
+at it) and run `sh tools/build-firmware-pair.sh`. The
 [firmware guide](docs/GUIDE.md) has the full behaviour vocabulary, the
 lighting model, split sync and the build details.
 
