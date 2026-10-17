@@ -79,7 +79,8 @@ typedef enum {
     NOAH_SETTING_KEYMAP_OPTIONS,
     NOAH_SETTING_AUTO_MOUSE_DELAY,
     NOAH_SETTING_AUTO_MOUSE_THRESHOLD,
-    // Scalar 27 was reserved zero in v6; feature bit 21 adds Host settings.
+    // Host settings (feature bit 21): bits 0..1 select Auto/macOS/Windows/
+    // Linux and bit 8 enables Unicode entry; zero is Auto with Unicode off.
     NOAH_SETTING_UNICODE_HOST_MODE,
     // Participation (participation-policy.md): the behaviour master, then one
     // bit per layer for its behaviours and for its combos.
@@ -113,8 +114,3 @@ typedef struct {
 // are not a current domain whose last record is a valid name ending the domain.
 bool noah_profile_settings_v1_keyboard_name(const noah_profile_reader_t *reader, size_t offset, size_t length, noah_profile_keyboard_name_t *name);
 bool noah_profile_keyboard_name_equal(const noah_profile_keyboard_name_t *a, const noah_profile_keyboard_name_t *b);
-
-// Scalar 27 was reserved zero after combo references moved into layer records.
-// Bits 0..1 select Auto/macOS/Windows/Linux; bit 8 enables Unicode entry.
-// Zero remains Auto with Unicode off.
-#define NOAH_SETTING_RETIRED_COMBO_REFERENCES NOAH_SETTING_UNICODE_HOST_MODE

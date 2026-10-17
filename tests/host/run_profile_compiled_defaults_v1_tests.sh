@@ -21,20 +21,16 @@ noah_host_export_qmk_cpath "$ROOT"
     printf '#include "%s/users/noah/config.h"\n' "$ROOT"
     printf '#include "%s/config.h"\n' "$KEYMAP_PATH"
 } >"$CONFIG"
-cp "$ROOT/tests/fixtures/client-regression/portable.bin.fixture" "$BUILD_DIR/portable.bin"
-# The frozen populated profiles carry eight pointing slots (RGB v2, PD v1).
-# This firmware refuses them as they are and accepts their documented
-# current translation (schema 3, RGB v4, sparse PD v3).
-for suffix in .pd .pd3 .pd4 .pd5; do
-    cp "$ROOT/tests/fixtures/client-regression/portable.bin$suffix" "$BUILD_DIR/portable.bin$suffix"
-done
-# Keep the integrated populated fixture on the one accepted settings version.
-python3 "$ROOT/tests/host/translate_eight_slot_profile.py" "$BUILD_DIR/portable.bin.pd5" "$BUILD_DIR/portable32.bin.pd5"
-python3 - "$ROOT/tests/fixtures/maximum_profile_v3.fixture" "$BUILD_DIR/maximum.bin" <<'PYTHON'
+# A profile from before the current format (eight pointing slots, schema 2)
+# is refused as it is; the firmware never translates one.
+cp "$ROOT/tests/fixtures/client-regression/portable.bin.pd5" "$BUILD_DIR/old.bin"
+for fixture in populated maximum; do
+    python3 - "$ROOT/tests/fixtures/${fixture}_profile_v3.fixture" "$BUILD_DIR/$fixture.bin" <<'PYTHON'
 import pathlib, sys
 fields = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if "=" in line)
 pathlib.Path(sys.argv[2]).write_bytes(bytes.fromhex(fields["profile.hex"]))
 PYTHON
+done
 
 build_and_run() {
     name="$1"
@@ -82,16 +78,14 @@ build_and_run() {
         -o "$bin"
     if [ "$name" = configured ] || [ "$name" = configured_sanitized ]; then
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" ${NOAH_WRITE_PD_FIXTURE:+--write-fixture}
-        for suffix in .pd .pd3 .pd4 .pd5; do
-            "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --reject-profile "$BUILD_DIR/portable.bin$suffix"
-        done
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable32.bin.pd5"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --reject-profile "$BUILD_DIR/old.bin"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/populated.bin"
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/maximum.bin"
         if [ -n "${NOAH_TEST_PD_IMPORT:-}" ]; then
             "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$NOAH_TEST_PD_IMPORT"
         fi
     elif [ "$name" = empty ]; then
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --empty-profile "$BUILD_DIR/portable32.bin.pd5"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --empty-profile "$BUILD_DIR/populated.bin"
     fi
 }
 

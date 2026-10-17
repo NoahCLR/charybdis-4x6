@@ -447,9 +447,9 @@ static void validate_portable_import(const noah_profile_compiled_v1_t *compiled,
     for (; result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && validation_steps < 20000; validation_steps++)
         result = noah_profile_validator_v1_step(&validator, 20, &error);
     if (!expect_valid) {
-        // An older backup (schema 2) is refused at its header, before any
-        // domain; Ark translates it before it reaches the keyboard.
-        if (result != NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA) fprintf(stderr, "legacy import result %u domain=%u\n", result, error.domain_id);
+        // A profile from an earlier format (schema 2) is refused at its
+        // header, before any domain; the firmware never translates one.
+        if (result != NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA) fprintf(stderr, "old-format import result %u domain=%u\n", result, error.domain_id);
         assert(result == NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA);
         return;
     }
@@ -489,11 +489,11 @@ int main(int argc, char **argv) {
         assert(profile.metadata.action_abi_digest == fixture_u32("profile.action_abi", 16));
         if (strcmp(argv[2], "--reject-profile") == 0) {
             validate_portable_import(&profile, argv[3], false);
-            puts("firmware refuses an untranslated eight-slot profile");
+            puts("firmware refuses a profile in an earlier format");
             return 0;
         }
         validate_portable_import(&profile, argv[3], true);
-        puts("firmware accepts the app's complete populated profile and preserves its action ABI");
+        puts("firmware accepts a complete populated profile and preserves its action ABI");
         return 0;
     }
     fixture_path = argv[1];

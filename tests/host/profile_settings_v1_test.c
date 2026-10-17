@@ -108,8 +108,8 @@ static void test_scalars(void) {
         assert(!valid());
         set_scalar(id, 0);
     }
-    // The v5 combo reference scalar is retired.
-    set_scalar(NOAH_SETTING_RETIRED_COMBO_REFERENCES, 0x76543210u);
+    // Scalar 27 holds host settings; anything outside its fields is invalid.
+    set_scalar(NOAH_SETTING_UNICODE_HOST_MODE, 0x76543210u);
     assert(!valid());
     defaults();
     set_scalar(NOAH_SETTING_BEHAVIORS_ENABLED, 0);

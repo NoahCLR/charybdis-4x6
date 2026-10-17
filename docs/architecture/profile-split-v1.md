@@ -6,7 +6,7 @@
 > binds a nonzero VIA generation and digest. HID framing remains v1; split
 > framing is version 2 (sized payload chunks and reuse ranges, D-F19).
 > Older profile/store formats and the legacy GET 9 source page are rejected.
-> Backup translation belongs to the client, before a current-format Apply.
+> A backup in an earlier format is refused, not translated.
 
 Status: accepted internal split foundation and distributed commit barrier with
 gated owner registration; normal mutation exposure and hardware acceptance

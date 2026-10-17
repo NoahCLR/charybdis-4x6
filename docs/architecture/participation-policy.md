@@ -29,7 +29,7 @@ and window. Re-enabling restores them unchanged. Every control is stored,
 read back, and carried through reboot, backup, restore and both-half commit
 like the rest of the profile.
 
-Fresh compiled defaults and translated older backups allow everything: both
+Fresh compiled defaults allow everything: both
 masters on, every layer bit set, every definition enabled with every bank
 layer allowed, and every placement bitmap zero (no bypass, no exclusion).
 So a profile that never touches these controls behaves exactly as before.
@@ -188,7 +188,7 @@ it; it never borrows another definition's permission.
 Capability feature bit 30 advertises this extension. The stored switches are
 inverted: settings header byte 5 bit 0 bypasses all combo output behaviours;
 combo v3 row flag bit 4 bypasses that row's output behaviour. Zero preserves
-existing profiles, compiled defaults and translated older backups, without a
+existing profiles and compiled defaults, without a
 domain-version or action-ABI change. Older firmware rejects either new bit.
 Clients must require bit 30 before writing the extension, preserve the flags
 through unrelated edits, and refuse a downgrade that would erase a bypass.

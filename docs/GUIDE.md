@@ -495,8 +495,8 @@ incompatible with current firmware, so retain the old pair and its backups if
 you still use it. The old five-layer and six-mode readback bridges are retired:
 this repository no longer provides a firmware path for extracting and migrating
 a profile from an old-geometry keyboard, and flashing current firmware over
-that geometry does not preserve its committed profile. Backups from schema-2
-firmware restore through Ark's import translation.
+that geometry does not preserve its committed profile. A backup made with
+earlier firmware cannot be restored onto this one.
 
 Executable custom combo hooks and unsupported macro content cannot be
 represented as profile data; export reports these explicitly instead of
@@ -539,8 +539,8 @@ than ordinary key taps. Stored macros share 34,903 bytes of memory across 128
 slots; one macro can use all the free space, with no separate playback-length
 limit. Writing or resetting the macro memory cancels a playing macro and
 releases its held keys. This storage layout resets older on-keyboard data on
-first flash: export a backup before upgrading, then restore it using a client
-that supports the new storage sizes.
+first flash, and a backup made with earlier firmware cannot be restored onto
+it.
 Uninterruptible playback defaults on when Unicode entry is needed, and you can
 force it On or Off per macro in Ark. Protected playback starts immediately:
 already-held ordinary keys stop repeating, and only the macro's keyboard output

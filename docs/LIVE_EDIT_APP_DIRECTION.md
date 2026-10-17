@@ -33,7 +33,7 @@ included, over Profile Wire, and publishes a complete profile to both halves as
 one atomic logical generation that recovers from interruption and a lost peer
 (D-L21, D-L22, D-L27, D-L39). The app's surface-by-surface status is in Ark's
 direction. Firmware accepts only current formats and every save binds VIA
-(D-F10); old backups require client translation before restore. Compiled defaults
+(D-F10); a backup in an earlier format is refused, not translated. Compiled defaults
 contain every enabled domain and use domain-seeking reads (D-F12).
 
 Macro text is typed through a selected host layout (D-F16), with Unicode
@@ -134,14 +134,12 @@ input cadence remain unmeasured for this path.
   it should make each half refuse its stored profile by action ABI digest,
   reset its VIA bank (sync metadata schema 3) and run the compiled defaults,
   which reproduce the captured profile with the thumbs, Click Spam and Drag
-  Window on custom keys 0–3. Confirm that on both halves, that the halves
-  converge, and that the pre-migration backup imports through the key-by-key
-  translation, before relying on it.
+  Window on custom keys 0–3. Confirm that on both halves and that the halves
+  converge before relying on it.
 - **The 32-slot upgrade has not run on hardware** (D-F09). Flashing it should
   make each half refuse its eight-slot stored profile by action ABI digest
-  and run the compiled defaults; confirm that, that an eight-slot backup
-  imports through the translation, and that slot 31 holds, locks and colours
-  on both halves.
+  and run the compiled defaults; confirm that, and that slot 31 holds, locks
+  and colours on both halves.
 - **The faster VIA checksum has not run on hardware** (D-F20). Time an
   unchanged re-Apply and a VIA edit against the previous pair, and check typing
   and pointing on both halves while stage verification runs. The local
@@ -166,9 +164,9 @@ input cadence remain unmeasured for this path.
   typing, pointing and lighting with a maximum profile, a sixteen-key chord
   across both halves, and every participation control.
 
-- **The macro expansion has not run on hardware** (D-F14). Export a backup
-  before flashing: schema-5 VIA recovery and `NT` profile headers reset older
-  storage. Accept full-bank playback, cancellation, backup restore, macro-127
+- **The macro expansion has not run on hardware** (D-F14). Flashing it resets
+  older storage (schema-5 VIA recovery and `NT` profile headers), and a backup
+  from earlier firmware cannot be restored onto it. Accept full-bank playback, cancellation, backup restore, macro-127
   startup time and consolidation pauses on both halves.
 
 - **Pointing-mode clicks have not run on hardware** (D-F22). Accept buttons 3
@@ -357,11 +355,8 @@ decision is ignored at boot, so the previous generation remains authority;
 boot starts with VIA reconciliation fenced and recovers a decided target from
 the local stage or the peer.
 
-Historical decision, superseded for accepted formats by D-F10: storage format 2 keeps the 32-byte header and 4,064-byte payload; a distinct
-`NQ` header stores the VIA binding and still carries the compiled-default and
-action-ABI digests. Format-1 `NP` records stay readable and migrate on the next
-Apply. Schema 2 (PD slots) uses format 3 `NR`; see
-[PD-mode domain v1](architecture/pd-mode-domain-v1.md). The app requires the
+The stored record binds the VIA identity and carries the compiled-default and
+action-ABI digests; only the current storage format is accepted (D-F10). The app requires the
 atomic capability for complete Apply and keeps the recovery file, stale-base
 check and exact final readback. A failure the app sees before the decision
 requests the custom-candidate abort, which the keyboard carries out for both
@@ -587,8 +582,7 @@ snapshot-bridge option are rejected instead of quietly producing old firmware.
 This removes the in-repository extraction path for an already deployed old
 storage geometry. Retain old firmware and backups outside this build if they
 are still needed; flashing the schema-2 pair does not migrate an old committed
-profile in place. Historical profile readers and portable migration remain for
-files that already carry the required source evidence. The active pointing
+profile in place. The active pointing
 contract is [PD-mode domain v1](architecture/pd-mode-domain-v1.md).
 
 ### D-L41 — Pointing keycodes name slots, not factory presets
@@ -597,8 +591,7 @@ The eight configurable pointing modes use one keycode vocabulary: `PD_SLOT_n`
 for hold and `PD_SLOT_n_LOCK` for toggle. The original six factory preset
 names are no longer firmware keycode symbols. Slot assignment is stable; the
 keycodes' numeric values moved to their fixed block with D-L42. Charybdis Ark
-reads each slot's current name and behavior from the device and keeps former
-preset expressions as import aliases for older portable files. See the
+reads each slot's current name and behavior from the device. See the
 [PD-mode domain contract](architecture/pd-mode-domain-v1.md) for the fixed
 native values.
 
@@ -634,10 +627,10 @@ keys only on the known digest (Profile Wire feature bit 16), in their own
 screen and picker section. Renumbering was a deliberate migration: firmware
 refuses an older stored profile by digest and resets its VIA layout bank
 (sync metadata schema 3), falling back to compiled defaults that reproduce
-the profile; the app translates an older backup key by key on import. See
+the profile. See
 [PD-mode domain](architecture/pd-mode-domain-v1.md) for the blocks and
 [portable profile](architecture/portable-profile-v1.md) for the settings
-domain and the translation.
+domain.
 
 ### D-L43 — Split activity optimization, at QMK's default baud
 
@@ -713,7 +706,7 @@ for LT, or the modifiers for MT/OSM, only once held past its tap-hold term, as
 native QMK decides. A tap never turns the layer or modifiers on; the first tap
 is unchanged. An authored LT row is therefore not a momentary layer: its layer
 is not on from the press, and an interrupting key does not cancel its tap. The existing fork hook needs no new QMK changes. Feature bit 18 lets clients distinguish this from bit 17's
-LT-only exemption; older strict clients must recognize it before connecting.
+LT-only exemption.
 
 The real QMK pipeline tests held output thresholds for all four added families,
 delivery into intrinsic layer ownership, and preservation of native tapping.
@@ -897,9 +890,7 @@ publication, so pointing never reads storage.
 `pd_mode_mask_t` is 32 bits. The split runtime sync carries mode ids, not
 masks, and is unchanged. The action ABI digest, which now digests each mode
 flag at 32 bits, is `0xf79c6151`; firmware therefore refuses a stored eight-slot
-profile by digest and falls back to its compiled defaults, and the app imports
-an eight-slot backup (`0x1d3fcacc`) by the key-by-key identity translation plus
-PD v1 → v2 and RGB v2 → v3 ([portable profile](architecture/portable-profile-v1.md)).
+profile by digest and falls back to its compiled defaults.
 The static RAM tripwire gains a 4 KiB feature increment
 ([memory budgets](architecture/memory-budgets.md)). See
 [PD-mode domain](architecture/pd-mode-domain-v1.md) and
@@ -914,7 +905,9 @@ settings v6 and format 4 (`NS`), refusing the earlier ones the same way.
 Settings v2–4, combo v1, schema 1, custom-only `NP` format 1 and logical `NQ`
 format 2 are refused. There is no firmware migration path, legacy GET 9 source
 page, feature bit 13 or legacy PD envelope validator.
-Old backup translation belongs to the client before Apply.
+A backup in an earlier format is refused, not translated: the client keeps no
+translation path either, so an old backup restores only onto the firmware that
+made it. Frozen old profiles in the host tests are rejection evidence.
 
 Every save is a logical generation, including edits that change only custom
 domains. Profile Wire BEGIN requires the current format and nonzero VIA
@@ -1046,8 +1039,8 @@ The expansion keeps logical EEPROM, its SRAM0–3 mirror and flash backing
 unchanged. VIA sync metadata schema 5 refuses the prior bank and recovers
 defaults; logical store format 5 (`NT`) refuses old `NS` profile headers.
 Moving the slots therefore resets saved data even though the flash base stays
-put. Export a backup before flashing and restore through a client supporting
-the new geometry; firmware does not migrate old storage.
+put. Firmware does not migrate old storage, and a backup from earlier firmware
+cannot be restored onto it.
 
 Formats: profile schema 3.0 with RGB v4, key behaviours v2, combos v3,
 settings v6 and pointing v3; logical store format 5 (`NT`); VIA sync metadata
@@ -1057,8 +1050,6 @@ fewer bytes. Readback pages, capability fields and storage addresses are wide
 where the new sizes need it (capability layout 2, feature bit 19). Older
 firmware refuses the new formats and the new firmware refuses the old ones;
 geometry moves the flash base, so old storage is reset, never reinterpreted.
-Backup translation (eight layers to sixteen, 64-slot banks to 128, old custom
-keys by stable slot) belongs to the client, as before (D-F10).
 
 Custom keys leave `0x7e40–0x7e7f`, which pointing holds box in, for an aligned
 block `0x7f00–0x7f7f`; the old block is retired and inert. Pointing holds,
@@ -1092,11 +1083,10 @@ unnamed and inactive. One supported tap depth (five) bounds behaviour steps,
 step capacity and the extra tap-branch colours; formats are counted so a
 later firmware can raise it.
 
-Client follow-up: Ark adopts streaming feature bit 27, store format 5 and both
-old and new macro-bank geometry, removes the 512-byte check for streaming
-firmware, and pads older backup banks on restore. Ark adopts every format above, derives its limits from the
-capability pages instead of constants, adds the controls, and translates older
-backups; pin the landed firmware.
+Client follow-up: Ark adopts streaming feature bit 27, store format 5 and the
+macro-bank geometry, adopts every format above, derives its limits from the
+capability pages instead of constants and adds the controls; pin the landed
+firmware.
 
 ## D-F15 — Unicode macro entry preserves live ownership
 
@@ -1256,7 +1246,7 @@ Stale tail bytes and interrupted-write markers remain data. A client downloads
 marked blocks, reconstructs zero blocks, checks metadata again and verifies the
 whole-store digest; the existing complete-capture coherence checks still apply.
 
-The governing [read-map contract](architecture/profile-wire-v1.md#sparse-via-macro-read-map--optional-get-value-0x0c)
+The governing [read-map contract](architecture/profile-wire-v1.md#sparse-via-macro-read-map--get-value-0x0c)
 adds no capability bit or storage format. Older clients retain full reads;
 supporting clients fall back for unsupported or initially unavailable maps and
 fail malformed or changed reads. The client follow-up implements this reader
@@ -1320,7 +1310,7 @@ bypassed custom key does: nothing without a shortcut, its shortcut with one
 (D-F26). Feature bit 30 advertises
 reserved-bit extensions in settings v6 and combo v3, preserving existing
 profile bytes, domain versions and action ABI. Ark must adopt the capability,
-codecs, editor, backup translation and reachability model after this firmware
+codecs, editor and reachability model after this firmware
 lands; current Ark rejects unknown capability bits.
 
 ## D-F25 — The keyboard's name is its USB product string
@@ -1339,8 +1329,7 @@ name differs from the enumerated one, the half on USB restarts USB once the
 owner is settled on both halves, nothing is held or running, VIA is idle and
 the host has been quiet for a second. The half without USB never restarts it.
 The [runtime flow](architecture/runtime-flow.md#usb-product-name) owns the
-rules. Settings v7 is a new domain version: firmware refuses v6, and clients
-translate an older document by appending an empty keyboard name. Ark clients
+rules. Settings v7 is a new domain version: firmware refuses v6. Ark clients
 must support v7, the editor, its labels and the expected reconnect. Earlier
 clients that accept only settings v6 refuse this format.
 
@@ -1387,9 +1376,8 @@ Settings v8 stores the shortcuts as 128 two-byte records (modifier mask, then
 key) between the layer records and the names, and header byte 6 counts them
 (128). Feature bits stay as they are: bit 31 is still free. The action ABI
 digest is unchanged: it covers action identities, and a custom key's code and
-kind did not change. Firmware refuses settings v7; clients translate an older
-document by adding 256 zero bytes after the layer records and setting byte 6,
-and an older client refuses v8 rather than misreading it. The keymap authors
+kind did not change. Firmware refuses settings v7, and an older client refuses
+v8 rather than misreading it. The keymap authors
 shortcuts in `CUSTOM_KEYS` with `SHORTCUT(...)` rows, whose modifiers name
 modifier keys in `SHORTCUT_MODS(...)`: a QMK `MOD_*` constant does not
 compile, since its right-hand values mean other keys in a report mask. The
