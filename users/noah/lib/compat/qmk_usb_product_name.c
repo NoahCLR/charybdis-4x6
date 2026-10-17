@@ -94,7 +94,11 @@ static void serve(const noah_profile_keyboard_name_t *name) {
     enumerated = *name;
 }
 
-void noah_qmk_usb_product_name_pre_init(void) {
+// LTO inlines a function called once into its caller, and both entry points
+// are reached from main. Each keeps a frame of its own, so the boot name read
+// and the restart checks' snapshots never sit under main's key paths
+// (memory-budgets.md).
+__attribute__((noinline)) void noah_qmk_usb_product_name_pre_init(void) {
     noah_profile_keyboard_name_t name;
 
     served     = NULL;
@@ -107,7 +111,7 @@ void noah_qmk_usb_product_name_pre_init(void) {
     }
 }
 
-void noah_qmk_usb_product_name_task(void) {
+__attribute__((noinline)) void noah_qmk_usb_product_name_task(void) {
     if (!is_keyboard_master()) {
         return;
     }
