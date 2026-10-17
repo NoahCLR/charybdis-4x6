@@ -48,9 +48,15 @@ tap overrides (D-F23), with inherited modifiers and busy triggers dropped.
 Combo outputs can bypass their shared behaviours globally or per combo
 (D-F24), independently of chord admission; both switches default on.
 
-The keyboard's name lives in settings v7 and is its USB product string
+The keyboard's name lives in the settings domain and is its USB product string
 (D-F25): read before USB starts, and taken up after a rename by one USB
 restart of the half on USB once nothing is in flight.
+
+A custom key can carry a shortcut, one key plus any modifiers from either side,
+stored in settings v8 (D-F26). It is the key's own action: held while the key
+is held, tapped when it is tapped, and what its behaviour row falls back to.
+Behaviour steps on other keys may send a custom key, which sends its shortcut
+only. Hardware acceptance is pending.
 
 Firmware work remaining before the product is complete:
 
@@ -82,11 +88,28 @@ input cadence remain unmeasured for this path.
 
 ## Open Issues
 
+- **Custom key shortcuts need an Ark follow-up and hardware acceptance
+  (D-F26).** Ark must read and write settings v8, translate v7 backups by
+  adding empty shortcuts, edit the shortcut on the Custom keys screen and
+  offer custom keys as behaviour steps. Then on both halves: hold a
+  mixed-side shortcut, tap it, hold a modifier-only one, put a behaviour on
+  the key (unauthored taps and press-and-hold), bypass it as a combo output,
+  and apply a profile while it is held with nothing left stuck.
+
+- **The reviewed-path stack gate fails on `dev`.** A resource build
+  (`NOAH_RESOURCE_CHECKS=yes`) fails `tools/firmware_stack_budget.json` on both
+  halves: six `main_process` paths through fallback settlement exceed the
+  1,920-byte budget (worst 2,104 bytes), `noah_dispatch_synthetic_qmk_tap` is no
+  longer linked, and boot discovery's `io_read` adjacency is not a linked edge.
+  Bring the paths back under budget or re-derive the budget, and refresh the
+  stale paths ([memory budgets](architecture/memory-budgets.md)).
+
 - **The keyboard name needs broader hardware acceptance (D-F25).** Check
   Chrome's HID chooser, the system device list and Ark individually; that a
   held key or a running macro delays the restart; that the half without USB
   stays off USB; and that unplugging and restarting under the saved name
-  enumerates without a second restart. Ark clients must support settings v7,
+  enumerates without a second restart. Ark clients must support the current
+  settings version (v8 since D-F26),
   the editor and expected reconnect; older backups need v6 translation.
 
 - **Combo output permissions need an Ark follow-up and hardware acceptance
@@ -152,7 +175,7 @@ input cadence remain unmeasured for this path.
   resets each half's storage (the flash base moves), and the stored profile
   is refused by action ABI digest. Before relying on them, measure on both
   halves: allocator and stack high-water with the 140 KiB EEPROM mirror; how
-  long the maximum profile's validation (7,432 owner scans), boot (9,916)
+  long the maximum profile's validation (7,458 owner scans), boot (9,981)
   and the peer's prepare take in real time against the 60-second no-progress
   window; how long a 140 KiB wear-leveling consolidation pauses; and how long
   macro 127 takes to start on a full 34,903-byte macro bank. Also check
@@ -614,7 +637,10 @@ what its behaviour row says, like a macro slot without a payload. Without a
 row it does nothing. It goes on a layer or out of a combo; a behaviour step
 cannot send one, because the synthetic record a step sends bypasses behaviour
 lookup and would silently do nothing, so the firmware's keymap validation and
-the app refuse it rather than implying chaining. Action kind 7, which named
+the app refuse it rather than implying chaining. *Revised by D-F26:* a custom
+key may carry a shortcut, which is its own action, and a step may send a
+custom key; it sends that shortcut only, never the key's behaviour, so steps
+still never chain. Action kind 7, which named
 the retired user macros, now names a custom key; the change came with a new
 action ABI digest (`0x1d3fcacc`), so nothing decodes an old kind 7 as a
 custom key.
@@ -1076,6 +1102,8 @@ boots and publishes whole on one half and prepares and commits on the peer;
 settings validation reads 20 bytes per step, like the other domains, so the
 whole profile validates in 7,432 owner scans
 ([storage baseline](architecture/storage-and-resource-baseline.md#schema-3-ceilings-and-the-maximum-profile)).
+*Revised by D-F26:* custom-key shortcuts add 256 bytes, so the maximum is
+37,956 bytes, leaving 15,260, and validates in 7,458 owner scans.
 
 The authored layout keeps its eight layers; layers 8–15 are transparent,
 unnamed and inactive. One supported tap depth (five) bounds behaviour steps,
@@ -1305,8 +1333,9 @@ origin layer. Physical layer behaviour switches and placement bits remain
 physical-only, and no independent combo output layer mask is added.
 
 The governing [participation policy](architecture/participation-policy.md#combo-output-behaviour-permission)
-defines completion snapshots, queued delivery, release ownership and the
-no-native-action consequence for custom keys. Feature bit 30 advertises
+defines completion snapshots, queued delivery, release ownership and what a
+bypassed custom key does: nothing without a shortcut, its shortcut with one
+(D-F26). Feature bit 30 advertises
 reserved-bit extensions in settings v6 and combo v3, preserving existing
 profile bytes, domain versions and action ABI. Ark must adopt the capability,
 codecs, editor, backup translation and reachability model after this firmware
@@ -1332,3 +1361,55 @@ rules. Settings v7 is a new domain version: firmware refuses v6, and clients
 translate an older document by appending an empty keyboard name. Ark clients
 must support v7, the editor, its labels and the expected reconnect. Earlier
 clients that accept only settings v6 refuse this format.
+
+## D-F26 — A custom key can carry a shortcut, and that is its own action
+
+A custom key was a name and a behaviour row: without a row, or bypassed, it
+did nothing. Each of the 128 custom keys may now carry a **shortcut**: one key
+plus any of the eight modifiers, left and right mixed (Left Ctrl + Right Alt +
+K). Modifiers alone (a held Hyper) and a key alone are shortcuts too. A full
+chord of several non-modifier keys is not; it would be a new version.
+
+The shortcut is the custom key's own action, the way an ordinary key's keycode
+is. Without a row the runtime holds it from the press until the release, so a
+tap is a press and a release. With a row it is what the row's unauthored cells
+tap, the key's fallback hold, and what the key does with its row bypassed: by
+participation, by the behaviour master switch or as a bypassed combo output.
+A custom key without a shortcut behaves as before. Only the pressed key holds
+its shortcut from the press. Read through a higher layer's transparent cell,
+a custom key is that cell's lower key, as an ordinary key is: its shortcut is
+the tap, and the pressed key's own row decides the hold.
+
+It is neither a macro, which plays and finishes and cannot stay held, nor a
+QMK modified keycode, whose modifiers must all sit on one side. It is held
+through the same owned output as a literal modified keycode: one lease per
+owner records the exact modifiers and key it registered, modifiers go down
+before the key (and get a mouse button's settle window) and come up after it,
+modifiers other keys hold stay down, and the release lets go of exactly what
+was taken even if the shortcut changed meanwhile. A held shortcut is owned
+output, so a profile waits to activate until the key is released, as it does
+for any held key.
+
+The key is a basic key `KC_A`–`KC_EXSEL` (`0x04`–`0xa4`) or a mouse button
+`MS_BTN1`–`MS_BTN8` (`0xd1`–`0xd8`); modifier keys belong in the mask, and
+media, system, mouse movement, layer, macro, pointing and custom keys are
+refused. Behaviour steps on other keys may send a custom key as a tap, a
+press-and-hold, a repeat or any other hold mode (tap at the threshold, tap on
+release, press immediately), as they may a literal; it sends the shortcut
+only, never that key's behaviour, so a step never recurses. A step naming a
+custom key without a shortcut sends nothing; the capability belongs to the
+kind, not to whether a shortcut is set, since the firmware does not check
+across domains, and Ark warns about it.
+
+Settings v8 stores the shortcuts as 128 two-byte records (modifier mask, then
+key) between the layer records and the names, and header byte 6 counts them
+(128). Feature bits stay as they are: bit 31 is still free. The action ABI
+digest is unchanged: it covers action identities, and a custom key's code and
+kind did not change. Firmware refuses settings v7; clients translate an older
+document by adding 256 zero bytes after the layer records and setting byte 6,
+and an older client refuses v8 rather than misreading it. The keymap authors
+shortcuts in `CUSTOM_KEYS` with `SHORTCUT(...)` rows, whose modifiers name
+modifier keys in `SHORTCUT_MODS(...)`: a QMK `MOD_*` constant does not
+compile, since its right-hand values mean other keys in a report mask. The
+four named keys have none. The [portable profile](architecture/portable-profile-v1.md) owns the
+bytes and the [runtime flow](architecture/runtime-flow.md) the behaviour.

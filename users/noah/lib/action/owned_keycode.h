@@ -38,6 +38,14 @@ typedef struct {
 } owned_keycode_debug_snapshot_t;
 
 bool     owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease);
+// One lease for parts no single keycode can name: `mods` is an 8-bit report
+// modifier mask, left and right mixable, and `basic` a basic keycode or KC_NO
+// (a custom key's shortcut, D-F26). The modifiers go down before the usage
+// and, ahead of a mouse button, get its head start; owned_keycode_release()
+// takes them back in reverse. False, with nothing held, when the ledger is
+// saturated or `basic` is not a report usage.
+bool     owned_keycode_acquire_parts(uint8_t mods, uint8_t basic, owned_keycode_lease_t *lease);
+bool     owned_keycode_tap_parts(uint8_t mods, uint8_t basic);
 bool     owned_keycode_release(owned_keycode_lease_t *lease);
 bool     owned_keycode_is_supported(uint16_t keycode);
 bool     owned_keycode_register(uint16_t keycode);

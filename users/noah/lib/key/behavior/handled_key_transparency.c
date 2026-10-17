@@ -115,6 +115,7 @@ bool handled_key_transparent_source_at_position(const handled_key_resolution_t *
             continue;
         }
 
+        out->flags |= HANDLED_KEY_FLAG_TRANSPARENT_SOURCE;
         return true;
     }
 

@@ -66,6 +66,7 @@ _Static_assert(NOAH_LAYER_NAME_SIZE == NOAH_SETTINGS_NAME_MAX + 1u, "A layer nam
 _Static_assert(VIA_MACRO_SLOT_COUNT == NOAH_SETTINGS_MACRO_NAMES, "Settings name every VIA macro");
 _Static_assert(NOAH_MACRO_NAME_SIZE == NOAH_SETTINGS_NAME_MAX + 1u, "A macro or custom-key name is at most 32 bytes");
 _Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_SETTINGS_CUSTOM_KEY_NAMES, "Settings name every custom key");
+_Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, "Settings hold every custom key's shortcut");
 _Static_assert(MATRIX_ROWS * MATRIX_COLS <= NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS, "A placement bitmap covers the whole matrix");
 static uint8_t name_length(const char *name) {
     uint8_t length = 0;
@@ -94,13 +95,18 @@ uint8_t noah_profile_settings_defaults_byte(uint16_t offset) {
         return noah_profile_settings_default(id) >> (8u * ((offset - NOAH_SETTINGS_SCALARS_OFFSET) % 4u));
     }
     // No profile settings are live: the current version with the keymap's
-    // layer, macro and custom-key names and no keyboard name.
-    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
+    // layer, macro and custom-key names and shortcuts and no keyboard name.
+    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
     if (offset < NOAH_SETTINGS_HEADER_SIZE) return header[offset];
-    if (offset < NOAH_SETTINGS_FIXED_SIZE) {
+    if (offset < NOAH_SETTINGS_SHORTCUTS_OFFSET) {
         // Each layer refers combos to itself and bypasses or excludes nothing.
         uint16_t record = offset - NOAH_SETTINGS_LAYER_RECORDS_OFFSET;
         return record % NOAH_SETTINGS_LAYER_RECORD_SIZE == NOAH_SETTINGS_LAYER_REFERENCE ? (uint8_t)(record / NOAH_SETTINGS_LAYER_RECORD_SIZE) : 0u;
+    }
+    if (offset < NOAH_SETTINGS_FIXED_SIZE) {
+        // The keymap's shortcuts (CUSTOM_KEYS), checked when it compiles.
+        uint16_t record = offset - NOAH_SETTINGS_SHORTCUTS_OFFSET;
+        return custom_key_shortcuts[record / NOAH_SETTINGS_SHORTCUT_SIZE][record % NOAH_SETTINGS_SHORTCUT_SIZE];
     }
     offset -= NOAH_SETTINGS_FIXED_SIZE;
     // Reads run forward, so resume from the record the last byte was in; the

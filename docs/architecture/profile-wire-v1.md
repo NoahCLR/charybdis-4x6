@@ -52,7 +52,7 @@ Accepted domains (`users/noah/lib/profile/schema/profile_domain_registry.h`):
 | `0x10` | RGB | 4 |
 | `0x20` | Key behaviors | 2 |
 | `0x30` | Combo overrides | 3 |
-| `0x40` | Settings, layer records, layer names, VIA macro names, custom-key names and the keyboard name | 7 |
+| `0x40` | Settings, layer records, custom-key shortcuts, layer names, VIA macro names, custom-key names and the keyboard name | 8 |
 | `0x50` | Sparse pointing-mode slots | 3 |
 
 ### Firmware domain ownership
@@ -125,7 +125,7 @@ Initial action kinds:
 | 4 | stable PD-mode id, momentary: `0..31` on 32-slot firmware (native `PD_SLOT_n` = `0x7e80 + n`) |
 | 5 | stable PD-mode id, lock: `0..31` on 32-slot firmware (native `PD_SLOT_n_LOCK` = `0x7ea0 + n`) |
 | 6 | VIA macro slot |
-| 7 | custom key `0..127` (`CUSTOM_KEY_n`, native `0x7f00 + n` since D-F14; before it `0..63` at `0x7e40 + n`, now inert); under earlier action vocabularies this kind named the retired user macros, and a digest mismatch keeps the two apart |
+| 7 | custom key `0..127` (`CUSTOM_KEY_n`, native `0x7f00 + n` since D-F14; before it `0..63` at `0x7e40 + n`, now inert); under earlier action vocabularies this kind named the retired user macros, and a digest mismatch keeps the two apart. Valid as a key, a combo output and, since D-F26, a behaviour step's tap, press-and-hold or other hold, where it sends the custom key's shortcut only |
 
 Userspace-owned actions are never encoded as raw custom-keycode enum values.
 Unsupported action kinds or operands reject the complete candidate.
@@ -489,7 +489,7 @@ Capability feature bits are:
 | 13 | retired, never advertised |
 | 14 | owned layer keys: `TG()`, `TO()`, `TT()` and `OSL()` act through userspace layer ownership, so a host may offer them in behaviours and combos where the placement rules allow (`TT()` and `OSL()` joined the bit on the same unreleased branch; every flashed build that sets it has all four) |
 | 15 | behaviour QMK functions: a behaviour sends QMK and keyboard keycodes past the layer keycodes and below the user range (the Charybdis DPI and sniping keys, RGB Matrix, Magic, `QK_BOOT`…) as a synthetic QMK record, so they run as they do on a key, and a key whose own keycode is one keeps a plain key's fallback hold; a host may offer them in a behaviour's target, tap and hold. Without it, the engine sends them as report keys, keeping only the low byte, and a host must refuse them there |
-| 16 | custom keys and keycode blocks: userspace keycodes sit in fixed blocks (pointing holds `0x7e80`, pointing locks `0x7ea0`, layer locks `0x7ec0`, custom keys `0x7f00` since D-F14, each reserved beyond what is supported), action kind 7 is a custom key, and the settings domain names the 128 custom keys. It comes with its own action ABI digest; a host knowing that digest may offer custom keys as keys and combo outputs, never as behaviour steps |
+| 16 | custom keys and keycode blocks: userspace keycodes sit in fixed blocks (pointing holds `0x7e80`, pointing locks `0x7ea0`, layer locks `0x7ec0`, custom keys `0x7f00` since D-F14, each reserved beyond what is supported), action kind 7 is a custom key, and the settings domain names the 128 custom keys. It comes with its own action ABI digest; a host knowing that digest may offer custom keys as keys and combo outputs. With settings v8 (D-F26) a custom key may also be a behaviour step, sending its shortcut only; a host that writes settings v8 may offer that |
 
 | 17 | physical gesture timing: handled physical keys measure holds from physical press and repeats from physical release to next press; eligible records buffered by combo/tapping retain their series. Authored `LT()` rows bypass native QMK tapping; plain `LT()` keys retain it. An authored `LT()` row's layer is its hold: without an authored first hold it holds `MO()` from the tap-hold term, never from the press (joined the bit on the same unreleased branch). Combo outputs retain their delivery/origin timing contract. This is a runtime capability, not a profile format change |
 
@@ -1163,7 +1163,7 @@ unavailable and exposes zero definitions rather than a partially decoded table.
 
 ## Portable Settings And Complete Readback
 
-Domain `0x40` v7 and GET values `0x07`/`0x08` are specified in
+Domain `0x40` v8 and GET values `0x07`/`0x08` are specified in
 [portable-profile-v1.md](portable-profile-v1.md). The canonical envelope now
 permits five known domains; an unknown domain still rejects the candidate.
 The settings validator uses the existing bounded reader and safe publication

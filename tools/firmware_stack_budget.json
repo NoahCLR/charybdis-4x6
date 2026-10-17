@@ -48,6 +48,11 @@
           "reason": "GCC 15 inlines emission and action tap dispatch into noah_emit_action_tap_at; its literal tap branch calls through the action-kind operations table."
         },
         {
+          "caller": "noah_emit_action_tap_at",
+          "callee": "noah_action_tap_custom_key",
+          "reason": "GCC 15 inlines emission and action tap dispatch into noah_emit_action_tap_at; a step that sends a custom key taps its shortcut through the action-kind operations table (D-F26)."
+        },
+        {
           "caller": "io_read",
           "callee": "noah_qmk_profile_eeprom_read",
           "reason": "the read-only profile store invokes the QMK EEPROM adapter through its injected storage IO callback"
@@ -134,6 +139,18 @@
         {
           "name": "handled release literal action projection",
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_tap_literal", "owned_keycode_tap_literal", "register_code16", "register_code"]
+        },
+        {
+          "name": "handled press custom-key shortcut hold",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "owned_keycode_acquire_parts", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
+        },
+        {
+          "name": "handled press custom-key shortcut tap",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_tap_custom_key", "owned_keycode_acquire_parts", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
+        },
+        {
+          "name": "handled release custom-key shortcut release",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "held_action_unregister", "held_action_or_modifier_release_owned_by_key", "held_action_remove_slot", "owned_keycode_release", "owned_keycode_release_components", "unregister_code", "send_6kro_report"]
         },
         {
           "name": "handled release bounded deferred fallback settlement",

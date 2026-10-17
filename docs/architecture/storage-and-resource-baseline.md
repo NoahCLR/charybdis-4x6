@@ -293,16 +293,17 @@ remaining space without a separate compiled-program limit (feature bit 27).
 Unlike the V1 ceilings above, every one of these is reachable at once.
 `tests/fixtures/maximum_profile_v3.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table at
-its maximum and every name at 32 bytes: 37,700 bytes (RGB 591, behaviours
-13,828, combos 9,736, settings 9,413, pointing 4,104, plus 28 bytes of
-header and envelopes). That leaves 15,516 bytes of the slot, more than the
+its maximum and every name at 32 bytes: 37,956 bytes (RGB 591, behaviours
+13,828, combos 9,736, settings 9,669 with every custom-key shortcut (D-F26),
+pointing 4,104, plus 28 bytes of header and envelopes). That leaves 15,260
+bytes of the slot, more than the
 12 KiB reserved for future payload. The fixture is the maximum for the
 encodings, not a limit the firmware checks: a larger profile is refused only
 by a table's own ceiling or the slot.
 
 The owner validates one step a matrix scan, each step one read of at most 20
-bytes. The maximum profile validates in 7,432 scans, a boot that adopts it
-publishes after 9,916, and a peer's prepared copy spends 9,504 scans
+bytes. The maximum profile validates in 7,458 scans, a boot that adopts it
+publishes after 9,981, and a peer's prepared copy spends 9,374 scans
 validating and preparing without transfer progress (its steps read 20 bytes
 like the owner's; they read the 14-byte split chunk size before framing
 version 2), which the split harness's conservative

@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "users/noah/lib/action/custom_key_shortcut.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/behavior/handled_key.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
@@ -176,7 +177,21 @@ const key_behavior_t key_behaviors[] = {
                 [0] = {.tap = TAP_SENDS(KC_A)},
             },
     },
+    {
+        .keycode = CUSTOM_KEY_100,
+        .tap_counts =
+            {
+                [1] = {.tap = TAP_SENDS(KC_B)},
+            },
+    },
 };
+
+// CUSTOM_KEY_100 (with a row) and CUSTOM_KEY_101 (without) have shortcuts;
+// CUSTOM_KEY_102 has neither (D-F26).
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    if (slot == 100u || slot == 101u) return (noah_custom_key_shortcut_t){.mods = 0x41u, .key = KC_K};
+    return (noah_custom_key_shortcut_t){0};
+}
 
 const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
 
@@ -901,7 +916,86 @@ static void test_live_profile_full_table_through_the_row_index(void) {
     noah_effective_key_behavior_runtime_uninstall(&runtime);
 }
 
+// A custom key with a shortcut and no row is a native key: it holds the
+// shortcut from the press until the release and taps nothing after (D-F26).
+static void test_custom_key_shortcut_without_a_row_holds_from_the_press(void) {
+    keypos_t                   key_pos = test_keypos(2, 0);
+    handled_key_resolution_t   resolution;
+    handled_key_materialized_t materialized;
+
+    test_reset_keymap();
+    test_set_keymap_key(0, key_pos, CUSTOM_KEY_101);
+    layer_state = 1u;
+
+    resolution = handled_key_lookup(CUSTOM_KEY_101);
+    CHECK(handled_key_resolution_is_handled(resolution));
+    materialized = test_materialize(resolution, key_pos);
+    CHECK(materialized.tap_action == KC_NO);
+    CHECK(materialized.hold.present && materialized.hold.action == CUSTOM_KEY_101);
+    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
+    CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT);
+
+    // Without a shortcut or a row it stays out of the handled runtime.
+    CHECK(!handled_key_resolution_is_handled(handled_key_lookup(CUSTOM_KEY_102)));
+}
+
+// With a row, the shortcut is what an ordinary key's keycode is: the tap of a
+// cell the row leaves unauthored, and its fallback hold.
+static void test_custom_key_shortcut_fills_unauthored_cells_of_its_row(void) {
+    keypos_t                   key_pos = test_keypos(2, 1);
+    handled_key_materialized_t materialized;
+
+    test_reset_keymap();
+    test_set_keymap_key(0, key_pos, CUSTOM_KEY_100);
+    layer_state = 1u;
+
+    materialized = test_materialize(handled_key_lookup(CUSTOM_KEY_100), key_pos);
+    CHECK(materialized.tap_action == CUSTOM_KEY_100);
+    CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_FALLBACK);
+    materialized = test_materialize(handled_key_lookup_tap_count(CUSTOM_KEY_100, 2u), key_pos);
+    CHECK(materialized.tap_action == KC_B);
+
+    // Bypassed (participation, the behaviour switch, a bypassed combo output),
+    // the row is not read and the key holds its shortcut natively.
+    handled_key_resolution_t bypassed;
+    handled_key_lookup_row_tap_count_into(CUSTOM_KEY_100, 1u, false, &bypassed);
+    CHECK(handled_key_resolution_is_handled(bypassed));
+    materialized = test_materialize(bypassed, key_pos);
+    CHECK(materialized.tap_action == KC_NO);
+    CHECK(materialized.hold.present && materialized.hold.action == CUSTOM_KEY_100);
+    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
+}
+
+// Read through a transparent cell, a custom key with a shortcut is the lower
+// key's keycode, as an ordinary key is: its tap sends the shortcut, and a
+// transparent hold gives no hold from the press (D-F26).
+static void test_transparent_cell_reads_a_custom_key_shortcut_as_its_keycode(void) {
+    keypos_t                   key_pos = test_keypos(2, 2);
+    handled_key_materialized_t materialized;
+    handled_key_materialized_t literal;
+
+    test_reset_keymap();
+    test_set_keymap_key(0, key_pos, CUSTOM_KEY_101);
+    test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_KEY);
+    layer_state = ((layer_state_t)1u << 0) | ((layer_state_t)1u << 2);
+
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_KEY), key_pos);
+    CHECK(materialized.tap_action == CUSTOM_KEY_101);
+    CHECK(materialized.tap_repeat_count == 1);
+
+    test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_HOLD_KEY);
+    materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
+    test_set_keymap_key(0, key_pos, KC_V);
+    literal = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
+    CHECK(!materialized.hold.present);
+    CHECK(materialized.hold_strategy != KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT);
+    CHECK(materialized.hold.present == literal.hold.present);
+}
+
 int main(void) {
+    test_custom_key_shortcut_without_a_row_holds_from_the_press();
+    test_custom_key_shortcut_fills_unauthored_cells_of_its_row();
+    test_transparent_cell_reads_a_custom_key_shortcut_as_its_keycode();
     test_bare_lt_falls_back_to_qmk();
     test_authored_lt_uses_custom_runtime();
     test_momentary_layer_stays_handled();

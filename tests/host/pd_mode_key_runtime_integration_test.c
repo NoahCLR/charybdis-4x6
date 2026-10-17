@@ -676,6 +676,20 @@ bool owned_keycode_release(owned_keycode_lease_t *lease) {
     return false;
 }
 
+// No custom key here has a shortcut (D-F26); these only satisfy the link.
+bool owned_keycode_acquire_parts(uint8_t mods, uint8_t basic, owned_keycode_lease_t *lease) {
+    (void)mods;
+    (void)basic;
+    (void)lease;
+    return false;
+}
+
+bool owned_keycode_tap_parts(uint8_t mods, uint8_t basic) {
+    (void)mods;
+    (void)basic;
+    return false;
+}
+
 void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
@@ -2859,8 +2873,9 @@ static void test_qmk_bypassed_authored_layer_tap_is_native(void) {
     CHECK((layer_state & test_layer_mask(TEST_LAYER_NAV)) == 0);
     CHECK(noah_runtime_debug_active_slot_count() == 0 && noah_runtime_debug_pending_multi_tap_slot_count() == 0);
 }
-// A custom key has no native action: bypassed at its placement, its row's
-// tap never runs and nothing else does; the same press using its row sends it.
+// A custom key without a shortcut has no native action: bypassed at its
+// placement, its row's tap never runs and nothing else does; the same press
+// using its row sends it.
 static void test_qmk_bypassed_custom_key_does_nothing(void) {
     for (unsigned bypassed = 0; bypassed < 2; bypassed++) {
         test_reset_state(); fake_time = 16000; gesture_second_code = TEST_HANDLED_TAP_KEY; gesture_out_count = 0;

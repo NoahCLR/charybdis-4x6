@@ -52,6 +52,12 @@ static bool layer_record_byte(uint8_t b, uint16_t offset, uint8_t layers, uint8_
     return used >= 8u || !(b >> used);
 }
 
+// A shortcut record is its report modifier mask, any eight bits, then its
+// key, from the shortcut vocabulary (custom_key_shortcut.h).
+static bool shortcut_byte(uint8_t b, uint16_t offset) {
+    return (offset - NOAH_SETTINGS_SHORTCUTS_OFFSET) % NOAH_SETTINGS_SHORTCUT_SIZE != NOAH_CUSTOM_KEY_SHORTCUT_KEY || noah_custom_key_shortcut_key_valid(b);
+}
+
 static bool name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
     if (s->name >= NOAH_SETTINGS_NAME_COUNT) return false;
     if (!s->in_name) {
@@ -75,7 +81,7 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
     if (!s || layers != NOAH_SETTINGS_LAYERS || positions > NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS || length < NOAH_SETTINGS_MIN_SIZE || length > NOAH_SETTINGS_MAX_SIZE || s->offset >= length) return false;
     uint16_t offset = s->offset++;
     if (offset < NOAH_SETTINGS_HEADER_SIZE) {
-        static const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
+        static const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
         return offset == NOAH_SETTINGS_FLAGS_OFFSET ? !(b & (uint8_t)~NOAH_SETTINGS_KNOWN_FLAGS) : b == header[offset];
     }
     if (offset < NOAH_SETTINGS_LAYER_RECORDS_OFFSET) {
@@ -91,7 +97,8 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
         }
         return true;
     }
-    if (offset < NOAH_SETTINGS_FIXED_SIZE) return layer_record_byte(b, offset, layers, positions);
+    if (offset < NOAH_SETTINGS_SHORTCUTS_OFFSET) return layer_record_byte(b, offset, layers, positions);
+    if (offset < NOAH_SETTINGS_FIXED_SIZE) return shortcut_byte(b, offset);
     return name_byte(s, b);
 }
 

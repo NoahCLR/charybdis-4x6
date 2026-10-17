@@ -118,6 +118,9 @@ _Static_assert(sizeof(NAME_32) == 33, "NAME_32 is the longest name");
 const char via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {[5] = "Drag Screenshot", [63] = NAME_32};
 const char layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE]              = {"Base", [7] = "\xc3\x89t\xc3\xa9", [15] = NAME_32};
 const char custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {[0] = "Right Thumb", [63] = "Last"};
+// The keymap's shortcuts (D-F26): mixed sides with a key, modifiers alone, a
+// mouse button alone.
+const uint8_t custom_key_shortcuts[CUSTOM_KEY_SLOT_COUNT][NOAH_CUSTOM_KEY_SHORTCUT_SIZE] = {[1] = {0x41, 0x0e}, [63] = {0x0f, 0x00}, [127] = {0x00, 0xd1}};
 
 static uint8_t frame[32];
 static void    get(uint16_t page) {
@@ -202,8 +205,8 @@ int main(int argc, char **argv) {
     length = read_all(bytes, named);
     if (named) assert(fclose(named) == 0);
     assert(length == NOAH_SETTINGS_MIN_SIZE + 4 + 5 + 32 + 15 + 32 + 11 + 4);
-    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
-    assert(NOAH_SETTINGS_VERSION == 7u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
+    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
+    assert(NOAH_SETTINGS_VERSION == 8u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
     keyrecord_t record = {0};
     assert(get_tapping_term(0, &record) == TAPPING_TERM && get_quick_tap_term(0, &record) == TAPPING_TERM);
@@ -219,6 +222,11 @@ int main(int argc, char **argv) {
     for (uint8_t layer = 0; layer < NOAH_SETTINGS_LAYERS; layer++) {
         expected[NOAH_SETTINGS_LAYER_RECORDS_OFFSET + layer * NOAH_SETTINGS_LAYER_RECORD_SIZE + NOAH_SETTINGS_LAYER_REFERENCE] = layer;
         assert(combo_ref_from_layer(layer) == layer);
+    }
+    // Then each custom key's shortcut, the keymap's until a profile has its own.
+    for (uint8_t slot = 0; slot < CUSTOM_KEY_SLOT_COUNT; slot++) {
+        memcpy(expected + NOAH_SETTINGS_SHORTCUTS_OFFSET + slot * NOAH_SETTINGS_SHORTCUT_SIZE, custom_key_shortcuts[slot], NOAH_SETTINGS_SHORTCUT_SIZE);
+        assert(noah_custom_key_shortcut(slot).mods == custom_key_shortcuts[slot][0] && noah_custom_key_shortcut(slot).key == custom_key_shortcuts[slot][1]);
     }
     // Then every name counted: the layers', each macro's, each custom key's,
     // and the keyboard's, which is empty until someone names it.
@@ -245,7 +253,7 @@ int main(int argc, char **argv) {
     // A live current domain reads back as stored, with its values overlaid by the
     // live QMK owners, and without a second copy held for the read.
     const uint32_t values[NOAH_SETTINGS_COUNT] = {180, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0x7fff};
-    const uint8_t  current_header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, 0, 0};
+    const uint8_t  current_header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
     memcpy(stored, current_header, sizeof(current_header));
     for (uint8_t id = 0; id < NOAH_SETTINGS_COUNT; id++)
         for (uint8_t j = 0; j < 4; j++)

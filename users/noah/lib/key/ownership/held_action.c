@@ -11,6 +11,8 @@
 #include "../../action/action_dispatch.h"
 #include "../../action/action_lifecycle.h"
 #include "../../action/owned_keycode.h"
+#include "../../action/custom_key_shortcut.h"
+#include "noah_keymap_ids.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/shared/runtime_context_internal.h"
 #include "held_action.h"
@@ -245,6 +247,19 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
         .action  = action,
     };
 
+    if (NOAH_KEYCODE_IS_CUSTOM_KEY(action)) {
+        // A custom key holds its shortcut (D-F26) through this binding's lease,
+        // which records the parts it registered: a shortcut changed while held
+        // still releases exactly those. Without a shortcut it holds nothing.
+        noah_custom_key_shortcut_t shortcut = noah_custom_key_shortcut_for_keycode(action);
+
+        held_action_slot_set_uses_lease(state, (uint16_t)slot, true);
+        if (noah_custom_key_shortcut_present(shortcut)) {
+            (void)owned_keycode_acquire_parts(shortcut.mods, shortcut.key, &state->action_leases[slot]);
+        }
+        return true;
+    }
+
     if (owned_keycode_is_supported(action)) {
         held_action_slot_set_uses_lease(state, (uint16_t)slot, true);
         (void)owned_keycode_acquire(action, &state->action_leases[slot]);
@@ -300,7 +315,7 @@ void held_action_register(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    if (owned_keycode_is_supported(action)) {
+    if (owned_keycode_is_supported(action) || NOAH_KEYCODE_IS_CUSTOM_KEY(action)) {
         return;
     }
 
@@ -317,7 +332,7 @@ void held_action_unregister(keypos_t key_pos, uint16_t action) {
         return;
     }
 
-    if (owned_keycode_is_supported(action)) {
+    if (owned_keycode_is_supported(action) || NOAH_KEYCODE_IS_CUSTOM_KEY(action)) {
         return;
     }
 

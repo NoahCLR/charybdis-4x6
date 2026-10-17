@@ -169,6 +169,13 @@ bool owned_keycode_release(owned_keycode_lease_t *lease) {
     return true;
 }
 
+// No custom key here has a shortcut (D-F26); this only satisfies the link.
+bool owned_keycode_tap_parts(uint8_t mods, uint8_t basic) {
+    (void)mods;
+    (void)basic;
+    return false;
+}
+
 bool owned_keycode_register(uint16_t keycode) {
     owned_keycode_lease_t lease = {0};
 

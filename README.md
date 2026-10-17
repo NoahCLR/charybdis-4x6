@@ -42,6 +42,11 @@ any C and you don't reflash.
 - **Room to grow.** It has 16 layers, 128 named macros and 128 custom keys you
   can name and give behaviours to. The macros share 34,903 bytes; one can use
   all the free space.
+- **Shortcuts that stay held.** A custom key can hold a shortcut, any
+  modifiers from either side plus one key (Left Ctrl + Right Alt + K), for as
+  long as you hold the key, and tap it when you tap. Behaviours work on top
+  (requires a supporting Ark version); see the
+  [guide](docs/GUIDE.md#custom-keys-and-their-shortcuts).
 
 > **Heads-up:** this is an opinionated firmware, not a copy-paste QMK keymap.
 > I've reshaped some QMK ideas into a Charybdis-specific runtime with its own

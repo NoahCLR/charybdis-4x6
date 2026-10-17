@@ -13,6 +13,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "lib/pointing/defs/pd_mode_manifest.h"
+#include "lib/action/custom_key_shortcut.h"
 
 // ─── Layers ─────────────────────────────────────────────────────────────────
 //
@@ -186,9 +187,10 @@ _Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA mac
 // pointing holds. Their old codes are never reread as anything else; a
 // client translates an old layout's custom keys by slot.
 //
-// A custom key does nothing by itself: give it a key_behaviors[] row and place
-// it on a layer or as a combo output. Its name comes from CUSTOM_KEYS in
-// keymap.c until Charybdis Ark renames it. A behaviour step cannot send one.
+// A custom key does what its shortcut and its key_behaviors[] row say (D-F26):
+// without either it does nothing. Place it on a layer or as a combo output. Its
+// name and shortcut come from CUSTOM_KEYS in keymap.c until Charybdis Ark
+// changes them. A behaviour step may send one; it sends only its shortcut.
 // PD_SLOT_n holds a configurable pointing slot; add a key_behaviors[] row for
 // explicit tap, hold, longer-hold or multi-tap behavior on top of that default.
 // LOCK_LAYER(n) toggles a layer lock from actions authored in key_behaviors[].
@@ -366,6 +368,9 @@ _Static_assert(NOAH_KEYCODE_USERSPACE_END - 1 <= QK_USER_MAX, "userspace keycode
 extern const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT];
 extern const char        via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
 extern const char        custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
+// Each custom key's authored shortcut, as settings v8 stores it: the report
+// modifier mask, then the key; both zero for none.
+extern const uint8_t custom_key_shortcuts[CUSTOM_KEY_SLOT_COUNT][NOAH_CUSTOM_KEY_SHORTCUT_SIZE];
 extern const char        layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE];
 #ifdef COMBO_ENABLE
 extern combo_t       key_combos[];

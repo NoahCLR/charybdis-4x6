@@ -52,6 +52,9 @@ static bool pd_press_result;
 static bool pd_release_result;
 static bool owned_register_result;
 static bool owned_unregister_result;
+static uint8_t                    shortcut_tap_calls;
+static noah_custom_key_shortcut_t shortcut_tap_parts;
+static noah_custom_key_shortcut_t test_custom_shortcut; // TEST_CUSTOM_ACTION's
 
 static const pd_mode_def_t test_pd_mode_def = {
     .mode_flag   = PD_MODE_ARROW,
@@ -87,6 +90,9 @@ static void test_reset_stubs(void) {
     layer_oneshot_call        = (test_call_t){0};
     layer_press_call          = (test_call_t){0};
     layer_release_call        = (test_call_t){0};
+    shortcut_tap_calls        = 0;
+    shortcut_tap_parts        = (noah_custom_key_shortcut_t){0};
+    test_custom_shortcut      = (noah_custom_key_shortcut_t){0};
     synthetic_tap_call        = (test_call_t){0};
     synthetic_qmk_tap_call    = (test_call_t){0};
     synthetic_record_call     = (test_call_t){0};
@@ -237,6 +243,16 @@ bool owned_keycode_register(uint16_t keycode) {
 bool owned_keycode_unregister(uint16_t keycode) {
     owned_unregister_call.keycode = keycode;
     return owned_unregister_result;
+}
+
+bool owned_keycode_tap_parts(uint8_t mods, uint8_t basic) {
+    shortcut_tap_calls++;
+    shortcut_tap_parts = (noah_custom_key_shortcut_t){.mods = mods, .key = basic};
+    return true;
+}
+
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    return slot == TEST_CUSTOM_ACTION - CUSTOM_KEY_0 ? test_custom_shortcut : (noah_custom_key_shortcut_t){0};
 }
 
 // A literal tap goes through the ownership ledger, never straight to QMK's
@@ -412,8 +428,20 @@ static void test_tap_at_preserves_pd_lock_origin_key_pos(void) {
 static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
     test_reset_stubs();
 
+    // A custom key sent as an action sends its shortcut alone, never a replay
+    // of its own record (D-F26); one without a shortcut sends nothing.
     noah_action_tap(TEST_CUSTOM_ACTION);
-    CHECK(synthetic_tap_call.keycode == TEST_CUSTOM_ACTION);
+    CHECK(shortcut_tap_calls == 0);
+    CHECK(synthetic_tap_call.keycode == KC_NO && synthetic_record_call.keycode == KC_NO);
+    CHECK(literal_tap_call.keycode == KC_NO);
+
+    test_reset_stubs();
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), .key = KC_K};
+
+    noah_action_tap(TEST_CUSTOM_ACTION);
+    CHECK(shortcut_tap_calls == 1);
+    CHECK(shortcut_tap_parts.mods == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)) && shortcut_tap_parts.key == KC_K);
+    CHECK(synthetic_tap_call.keycode == KC_NO && synthetic_record_call.keycode == KC_NO);
     CHECK(literal_tap_call.keycode == KC_NO);
 
     test_reset_stubs();
@@ -473,9 +501,13 @@ static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
 
     test_reset_stubs();
 
+    // A held custom key is owned by its held-action lease; generic press
+    // dispatch has no owner for it and sends nothing.
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.key = KC_K};
     noah_action_press(key_pos, TEST_CUSTOM_ACTION);
-    CHECK(synthetic_record_call.keycode == TEST_CUSTOM_ACTION);
-    CHECK(synthetic_record_call.pressed);
+    noah_action_release(key_pos, TEST_CUSTOM_ACTION);
+    CHECK(synthetic_record_call.keycode == KC_NO);
+    CHECK(shortcut_tap_calls == 0);
     CHECK(register_code16_call.keycode == KC_NO);
 
     test_reset_stubs();
@@ -547,9 +579,11 @@ static void test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plai
 
     test_reset_stubs();
 
+    // A held custom key's shortcut is released by its held-action lease
+    // (D-F26); generic release dispatch sends nothing.
     noah_action_release(key_pos, TEST_CUSTOM_ACTION);
-    CHECK(synthetic_record_call.keycode == TEST_CUSTOM_ACTION);
-    CHECK(!synthetic_record_call.pressed);
+    CHECK(synthetic_record_call.keycode == KC_NO);
+    CHECK(shortcut_tap_calls == 0);
     CHECK(unregister_code16_call.keycode == KC_NO);
 
     test_reset_stubs();

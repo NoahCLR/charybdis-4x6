@@ -164,9 +164,10 @@ The base-layer punctuation keys follow the same pattern on hold:
 
 The custom keys `CUSTOM_KEY_1` (Left Thumb) and `CUSTOM_KEY_0` (Right Thumb)
 carry the thumb behaviours. Their names are authored in the `CUSTOM_KEYS`
-table; everything they do comes from their `key_behaviors[]` rows. A custom
-key without a row does nothing, and a behaviour step cannot send one, so they
-live on layers and as combo outputs.
+table; neither has a shortcut, so everything they do comes from their
+`key_behaviors[]` rows, and they live on layers and as combo outputs. A custom
+key with neither a row nor a shortcut does nothing; a behaviour step on
+another key may send one, which sends only its shortcut (D-F26).
 
 Left Thumb selects a layer by tap count: single for Symbol, double for Number,
 triple for Function (`LAYER_EXTRA_1`), and quadruple for Game (`LAYER_EXTRA_2`).

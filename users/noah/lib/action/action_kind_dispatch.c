@@ -157,21 +157,31 @@ static void noah_action_release_owned_momentary_layer(noah_action_desc_t desc, k
     (void)layer_ownership_momentary_release(key_pos);
 }
 
-// Replays a custom key's own record. Behaviour steps cannot send one (the kind
-// has no authored capability), so only generic dispatch reaches these.
+// A custom key sent as an action sends only its shortcut (D-F26), never its
+// own behaviour, so a step can never recurse into another key's row. One
+// without a shortcut sends nothing. A tap holds the shortcut through one lease
+// for the tap's length. A held shortcut is owned by the key holding it:
+// held_action.c keeps its lease, recording exactly what it registered, so a
+// shortcut changed or removed while held still releases what it took. These
+// generic press and release paths have no owner to keep that lease, so they
+// send nothing; every held custom key goes through held_action.c.
 static void noah_action_tap_custom_key(noah_action_desc_t desc, keypos_t key_pos) {
+    noah_custom_key_shortcut_t shortcut = noah_custom_key_shortcut_for_keycode(desc.action);
+
     (void)key_pos;
-    noah_dispatch_synthetic_tap(desc.action);
+    if (noah_custom_key_shortcut_present(shortcut)) {
+        (void)owned_keycode_tap_parts(shortcut.mods, shortcut.key);
+    }
 }
 
 static void noah_action_press_custom_key(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)desc;
     (void)key_pos;
-    noah_dispatch_synthetic_record(desc.action, true);
 }
 
 static void noah_action_release_custom_key(noah_action_desc_t desc, keypos_t key_pos) {
+    (void)desc;
     (void)key_pos;
-    noah_dispatch_synthetic_record(desc.action, false);
 }
 
 static void noah_action_tap_qmk_behavior(noah_action_desc_t desc, keypos_t key_pos) {
