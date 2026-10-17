@@ -2,12 +2,13 @@
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
 > schema 3.0; a 53,216-byte custom payload; and logical store format 5
-> (`NT`). Every save binds a nonzero VIA generation and digest. HID and split
-> framing remain v1. Older profile/store formats and the legacy GET 9 source
+> (`NT`). Every save binds a nonzero VIA generation and digest. HID framing remains v1; split
+> framing is version 2. Older profile/store formats and the legacy GET 9 source
 > page are rejected. Backup translation belongs to the client, before a
 > current-format Apply.
 
-Status: accepted Stage 00 wire contract
+Status: implemented current-format contract; hardware acceptance is tracked in
+[firmware direction](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 
 All multi-byte integers use little-endian byte order. All reserved bytes and
 reserved flag bits must be zero. Encoders emit one canonical representation;
@@ -43,7 +44,7 @@ Schema 3.0 is capped at 53,216 bytes, one 52 KiB slot less its 32-byte header
 Domains appear once, in ascending id order, with no padding or trailing bytes.
 Unknown required domains reject the candidate. Unknown optional domains are
 allowed only after a future schema-minor rule explicitly defines skippability;
-v1.0 rejects every unknown domain.
+Schema 3.0 rejects every unknown domain.
 
 Accepted domains (`users/noah/lib/profile/schema/profile_domain_registry.h`):
 
@@ -163,9 +164,9 @@ The exact row encoding is:
 | ---: | --- |
 | 2 | row-body length; excludes this length field |
 | 4 | target semantic action |
-| 2 | `tap_hold_term`; zero selects the compiled default |
-| 2 | `longer_hold_term`; zero selects the compiled default |
-| 2 | `multi_tap_term`; zero selects the compiled default |
+| 2 | `tap_hold_term`; zero selects the effective policy default |
+| 2 | `longer_hold_term`; zero selects the effective policy default |
+| 2 | `multi_tap_term`; zero selects the effective policy default |
 | 1 | flags; bit 0 keeps auto mouse anchored, bit 1 disabled; other bits zero |
 | 1 | populated-step count for this row, at most `d` |
 | 4 | allowed layers, `u32`, one bit per layer; bits at or above the layer count zero, an empty mask allowed |
@@ -278,9 +279,9 @@ are pending `0`, committed `1`, hold `2`, long hold `3`, and all `0xff`.
 Layer modes are all keys `0` and mapped keys only `1`. Locality is both `0`,
 left `1`, right `2`, key half `3`, or keys only `4`. Auto-mouse modes are real
 destination `0`, end color only at base-effect positions `1`, or end color on
-all keys `2`. Tap-commit policy is off `0` or non-base taps `1`. Stable PD ids
-are drag-scroll `0`, volume `1`, brightness `2`, zoom `3`, arrow `4`, and
-pinch `5`.
+all keys `2`. Tap-commit policy is off `0` or non-base taps `1`. Stable PD ids are slots `0..31`. Factory presets use drag-scroll `0`,
+volume `1`, brightness `2`, zoom `3`, arrow `4`, pinch `5` and Undo/Redo `6`;
+those labels are defaults, not fixed slot behavior.
 
 Stage-enable bits are valid only for features advertised as compiled. The
 key-feedback tap-commit policy is behavior-affecting and therefore uses the
@@ -391,7 +392,8 @@ this flag, an identity reference uses the effective key from the active stack.
 
 Clients read metadata, the reference page, both pages of every row, then
 metadata again. Accept only equal metadata and a matching digest, with at most
-two complete attempts (134 GETs at this firmware's 32 rows). This detects
+two complete attempts. Each attempt uses `2 × row_count + 3` GETs: at the
+128-row ceiling, 259 per attempt and 518 for two attempts. This detects
 ordinary changes, not an atomic snapshot or an active layer stack. Failure clears prior combo rows without discarding
 independent profile or base-lighting reads. Firmware uses a bounded cold-path
 table scan and a 50-byte row scratch buffer; it allocates no persistent cache.
@@ -505,8 +507,8 @@ Capability feature bits are:
 | 29 | pointing-mode VIA macros: direction, diagonal and button tap overrides may start slots 0–127 (`0x7700..0x777f`), inherit policy and zero mask only. Require this bit before writing one. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 30 | combo output behaviour permissions: settings header byte 5 bit 0 bypasses all combo output behaviours; combo v3 row flag bit 4 bypasses one output. Both zero means allowed. Native combo readback v3 row flag bit 5 reports the per-combo bypass. Require this bit before writing either extension. See [participation policy](participation-policy.md#combo-output-behaviour-permission) |
 
-Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
-settings respectively. RGB and behavior domain bits must agree exactly with
+Supported-domain-mask bits 0–4 are RGB, key behaviors, combos, portable
+settings and PD respectively. RGB and behavior domain bits must agree exactly with
 their schema feature bits. Candidate chunk capacity is
 zero exactly when candidate writes are absent and otherwise is `1..20`.
 Commit, runtime activation, candidate reuse and streaming chunks require candidate writes. RGB preview also
@@ -517,9 +519,10 @@ before it offers a live operation.
 Status also uses two pages. Page 0 reports state flags and source, compiled,
 active, pending, and committed digests. Page 1 reports active, committed, and
 peer generation identities plus transaction, conflict, validation, and error
-state. Until the store and generated compiled digest land, firmware truthfully
-reports `compiled-only` with `digests unavailable`; zero is not presented as a
-real digest.
+state. Before discovery and compiled-default initialization complete, status
+may report `digests unavailable`; zero must not be treated as a verified digest.
+The side-specific owner publishes its coherent compiled and stored identities
+after validation.
 
 State flags (page 0, bytes 2–3). Bits 9–15 are reserved and must be zero.
 
@@ -671,7 +674,7 @@ Begin candidate uses this complete layout:
 | ---: | ---: | --- |
 | 5 | 1 | schema major |
 | 6 | 1 | schema minor |
-| 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings, and schema-2 bit 4 PD |
+| 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings, and 4 PD |
 | 8 | 1 | flags, initially zero |
 | 9 | 2 | canonical blob length, `8..53216`, schema 3.0 only |
 | 11 | 4 | CRC32 of the exact canonical blob |
@@ -688,9 +691,11 @@ before storage work begins.
 
 A repeated BEGIN for the same transaction is idempotent only when every field
 matches the original, including store format and bound VIA generation/digest.
-A changed field rejects and poisons the candidate with `CONFLICTING_RETRY`;
-it cannot replace the original binding or restart storage work. Repeating the
-original BEGIN afterward does not revive the poisoned candidate.
+Before commit, a changed field rejects and poisons the candidate with
+`CONFLICTING_RETRY`; repeating the original BEGIN cannot revive it. Once in
+`COMMITTING`, `CONVERGING_PEER`, `ACTIVATING` or `AUTHORITY_FAILED`, the
+conflicting operation is rejected without replacing or poisoning the durable
+decision. In neither case may it replace the binding or restart storage work.
 
 Candidate chunk uses this complete layout:
 
@@ -774,9 +779,10 @@ incrementally from scan context.
 
 Commit is admitted only for the matching validated transaction. The scan owner
 writes and reads back the non-marker header, streams one payload readback,
-checks canonical top-level shape, writes the two-byte commit marker last, reads
-that marker back, and only then requests provider activation. Each scan step
-performs exactly one EEPROM operation of at most 20 bytes. Behavior activation
+checks canonical top-level shape, and writes and verifies one-byte prepared
+and committed markers in the [logical transaction order](logical-profile-transaction-v1.md).
+Activation also requires the bound VIA identity and peer barrier. Each store
+step performs at most one EEPROM operation of at most 20 bytes. Behavior activation
 may remain in the activating state until the safe-boundary predicate clears;
 the prior generation remains active meanwhile. A duplicate commit for the same
 transaction is a no-op while commit/activation is progressing and after final
@@ -1005,6 +1011,7 @@ unhandled reply.
 | custom get | `0x09` | retired; unsupported | — |
 | custom get/set | `0x0A` | bounded split transaction capture, diagnostic builds only | [Split activity sync](split-activity-sync.md) |
 | custom get | `0x0B` | detected host OS | Host OS Readback, below |
+| custom get | `0x0C` | optional sparse VIA macro read map | [Macro read map](#sparse-via-macro-read-map--optional-get-value-0x0c) |
 | custom set | `0x10` | candidate begin | this document |
 | custom set | `0x11` | candidate chunk | this document |
 | custom set | `0x12` | candidate validate/prepare | this document |
@@ -1072,7 +1079,7 @@ adopted, the other half's committed record arriving as a peer candidate, and
 the compiled defaults are not, so a profile saved before a rule existed still
 loads and still syncs between the halves.
 
-## Golden Fixtures Required Before Stage 02 Completion
+## Golden fixture coverage
 
 - empty header with zero domains;
 - representative full RGB domain;

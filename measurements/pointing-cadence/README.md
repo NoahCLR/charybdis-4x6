@@ -32,19 +32,21 @@ cannot reveal after the fact.
 1. Commit the change being measured. `git status --short` must show no changes
    under `users/`, `keyboards/` or `tools/`. Note the commit
    (`git rev-parse --short HEAD`).
-2. Note the QMK commit and whether its tree is dirty:
-   `git -C ../bastardkb-qmk log --oneline -1` and
-   `git -C ../bastardkb-qmk status --short`.
+2. Select the QMK checkout with `QMK_ROOT` and an artifact folder with
+   `BUILD_ROOT` (absolute paths; worktrees need not have the main sibling layout).
+   Record `git -C "$QMK_ROOT" rev-parse HEAD` and
+   `git -C "$QMK_ROOT" status --short`; the pair must use the pin.
 3. Build the side-specific pair with both recorders:
 
    ```sh
+   QMK_ROOT="$QMK_ROOT" BUILD_ROOT="$BUILD_ROOT" \
    NOAH_SPLIT_DIAGNOSTICS=yes NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes \
      sh tools/build-firmware-pair.sh
    ```
 
    Add only the variable under test, for example
    `NOAH_SPLIT_ACTIVITY_COALESCE=no`. The artifacts land in
-   `../builds/<branch>/` as `<n>_charybdis_right_diagnostic_cadence.uf2` and
+   `$BUILD_ROOT/<branch>/` as `<n>_charybdis_right_diagnostic_cadence.uf2` and
    `<n>_charybdis_left_diagnostic_cadence.uf2`; note `<n>`.
 
 ### 2. Prepare the keyboard and host
@@ -58,9 +60,9 @@ cannot reveal after the fact.
    dock or KVM. Record the host and its OS.
 4. Quit Charybdis Ark, VIA and anything else that opens the keyboard's raw HID
    interface. Their traffic runs inside the loop being measured.
-5. Leave the lighting as the profile sets it, and awake. The lighting sleeps
-   after 15 minutes without input and its render is about a sixth of the
-   loop; if the LEDs have gone dark, nudge the ball before capturing.
+5. Keep lighting configuration and awake/asleep state identical across captures.
+   Record the saved idle timeout; it is profile data, not a fixed 15 minutes.
+   If the LEDs have gone dark, wake them before capturing an awake workload.
 6. Wait at least 30 seconds after the halves boot, or after any replug. Boot
    runs profile reconciliation and VIA sync between the halves, and the
    recorder needs complete windows.
@@ -69,6 +71,7 @@ cannot reveal after the fact.
 
 ### 3. Capture
 
+Install this repository's HID dependency with `npm ci --prefix tools`.
 Run one capture per workload and run, writing straight into the set folder:
 
 ```sh
@@ -128,8 +131,9 @@ data; note it in the set record.
 
 - Compare sets that differ in one thing: the firmware change under test, or a
   build flag. Name it in both set records.
-- Compare the same recorder format. Stage timing (format 2) costs 8–10% of the
-  poll rate, so format 2 rates read low against format 1 rates.
+- Compare the same recorder format. Stage timing adds measurement overhead;
+  quantify it with matching instrumented and ordinary builds before attributing
+  a difference between formats to the firmware change.
 - The split frame CRC is on by default; a `_no_crc` pair is a different build.
   Its transaction table's attempted bytes include each frame's CRC byte, and
   CRC failures appear per transaction.
@@ -168,7 +172,10 @@ A runtime or durable RPC appears as one each of 11–14. To regenerate the
 table for a build with different split features:
 
 ```sh
-qmk compile --compiledb -kb bastardkb/charybdis/4x6 -km noah
+QMK_HOME="$QMK_ROOT" QMK_USERSPACE="$PWD" \
+qmk --config-file /dev/null compile --compiledb -kb bastardkb/charybdis/4x6 -km noah \
+  -e NOAH_PHYSICAL_HALF=right -e FORCE_MASTER=yes \
+  -e NOAH_SPLIT_DIAGNOSTICS=yes -e NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes
 python3 tools/split-transaction-ids.py
 ```
 

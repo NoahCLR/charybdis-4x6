@@ -122,8 +122,8 @@ backup in Ark first and restore it afterwards.
 
 ## Authoring the profile in C
 
-Edit compiled defaults directly in `keymap.c`, `config.h`, and `rgb_config.c`
-under `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/`. Validate authored
+Edit compiled defaults directly in `keymap.c`, `config.h`, `rgb_config.c` and
+`pd_config.c` under `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/`. Validate authored
 changes with the firmware host tests and regenerate their read-only overview
 with `python3 tools/profile_introspect.py --keymap <name> --write`.
 For the default profile, see [KEYMAP-OVERVIEW.md](KEYMAP-OVERVIEW.md) and
@@ -173,7 +173,7 @@ Combos can enter that same table too. If a combo emits a keycode that has a
 multi-tap behavior as a physical key.
 
 Here is the shape of one authored row, based on the `CUSTOM_KEY_0` (Right Thumb) row in
-[`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c#L478).
+[`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c).
 The lines between the keycode and `.tap_counts` are optional row-local
 settings, shown here at their default values: three timing overrides and one
 policy flag. The snippet shows one useful helper mix, not the full helper
@@ -292,7 +292,7 @@ base such as a game layer, order that layer just above Base and use
 matching tap, hold, or long-hold behavior here."
 
 The matching key-behavior RGB config in
-[`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c#L319)
+[`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
 follows that same model. You do not need every field in every profile; this
 example shows the vocabulary.
 
@@ -356,9 +356,10 @@ If you want to adapt the profile, start here:
 | [`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c) | layers, combos, macros, custom keys, and `key_behaviors[]` |
 | [`rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c) | layer colors, LED groups, pointing-mode colors, combo feedback, key feedback, and auto-mouse fade |
 | [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) | layer enum, timing defaults, auto-mouse settings, RGB feedback toggles, and pointer policy |
+| [`pd_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c) | factory pointing-slot records |
 | [`users/noah/config.h`](../users/noah/config.h) | split transport, LED geometry, pointing-device hardware settings, and shared board-level QMK overrides |
 
-Most profile work should stay in the first three files. The shared runtime
+Most profile work should stay in the four keymap files. The shared runtime
 under [`users/noah/`](../users/noah/) exists so those authored files can stay
 small and data-driven.
 
@@ -412,7 +413,7 @@ left before the board returns to normal.
 A Charybdis has one controller per half, so runtime state cannot just live on
 whichever half saw the key first. QMK's normal split settings cover the active
 layer set and activity timer; this userspace adds custom split RPCs in
-[`users/noah/config.h`](../users/noah/config.h#L54) and
+[`users/noah/config.h`](../users/noah/config.h) and
 [`runtime_sync.h`](../users/noah/lib/split/runtime_sync.h):
 
 - `PUT_SPLIT_RUNTIME_BASE_SYNC`: auto-mouse RGB progress, active or locked
@@ -446,47 +447,33 @@ storage has committed.
 
 ## Building from source
 
-This userspace is updated for QMK `0.34.6` and builds
-against my [BastardKB QMK fork](https://github.com/NoahCLR/bastardkb-qmk)
-rather than the older `bkb-master`-based setup, at exactly the commit
-[`qmk-pin.json`](../qmk-pin.json) names. Releases use the fork's released
-[`noah-userspace-contracts`](https://github.com/NoahCLR/bastardkb-qmk/tree/noah-userspace-contracts)
-branch at that commit, tagged with the same version as this repository. On
-top of QMK it carries the RP2040 Charybdis 4x6 board definition and a few small
-hooks this userspace uses: the auto-mouse timer getter, for the auto-mouse RGB
-timeout fade and split-synced progress; the split activity hooks, for activity
-coalescing; the split frame CRC, which refuses garbled split messages; and the
-physical event queues and record admission hook, for gesture timing.
-
-Use that firmware fork, point `QMK_USERSPACE` at this repo,
-and build with:
+Build the **left/right pair** with Docker running and the
+[BastardKB QMK fork](https://github.com/NoahCLR/bastardkb-qmk) checked out at
+exactly the commit in [`qmk-pin.json`](../qmk-pin.json), including its submodules.
+From this firmware checkout:
 
 ```sh
-qmk compile -kb bastardkb/charybdis/4x6 -km noah
-```
-
-That single command builds a generic image **without** the live-profile
-owner, because the owner needs a provisioned physical half. The firmware you
-flash is the side-specific pair. Build it with the VS Code task
-`Build Firmware Pair (flashable)`, or from a shell:
-
-```sh
+QMK_ROOT=/absolute/path/to/bastardkb-qmk \
+BUILD_ROOT=/absolute/path/to/builds \
 sh tools/build-firmware-pair.sh
 ```
 
-That writes numbered left and right images into `../builds/<branch>/`. Add
-`--no-owner` for the comparison pair without the live-profile owner.
-It builds in Docker, in the same image CI builds releases in
-(`tools/build-image`), so the pair you flash and the pair a release publishes
-come from the same compiler and are byte-identical for the same commit. Docker
-must be running. A note beside each pair (`N_charybdis.build.txt`) records the
-firmware and BK commits, the compiler and both files' SHA-256.
+The paths above are placeholders; choose your QMK checkout and artifact folder.
+In the main sibling layout the script can discover both defaults. In a task
+worktree select them explicitly. It writes numbered images and a
+`N_charybdis.build.txt` note under `BUILD_ROOT/<branch>/`, recording commits,
+compiler and SHA-256 values. Flash the matching left and right files.
 
-All current builds use the 32-slot engine and schema-3 EEPROM geometry (D-F14). Use
-`sh tools/build-firmware-pair.sh` for the flashable side-specific pair. The
-right build uses `NOAH_PHYSICAL_HALF=right` and `FORCE_MASTER=yes`; the left uses
-`NOAH_PHYSICAL_HALF=left` and `FORCE_SLAVE=yes`. A plain `qmk compile` produces
-a 32-slot factory-only image without the live profile owner.
+The pair includes the live-profile owner and mutation support. The right image
+has physical identity `right` and is forced master; the left has identity
+`left` and is forced slave. A generic `qmk compile` image lacks that identity
+and the live-profile owner, so it is not the pair used with Ark.
+
+The builder uses the pinned image in [`tools/build-image`](../tools/build-image),
+also used by release CI; it never falls back to the host compiler. Reproducible
+pairs require matching firmware inputs, BK pin and build options. For required
+checks, worktree setup, comparison builds and release mechanics, see
+[Development](DEVELOPMENT.md).
 
 ## Old firmware and profile limits
 

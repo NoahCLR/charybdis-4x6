@@ -2,7 +2,7 @@
 
 This document defines the ownership model for live editing with Charybdis Ark
 (the independent app repository in the
-[local workspace map](../DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
+[local workspace map](../DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the four keymap
 authoring files must remain the only source of truth during a live editing
 session.
 
@@ -18,7 +18,8 @@ the editable values represented by:
 
 - `config.h` profile policy;
 - `keymap.c` layers, behaviors, combos, and macros;
-- `rgb_config.c` colors, feedback policy, and LED groups.
+- `rgb_config.c` colors, feedback policy, and LED groups;
+- `pd_config.c` pointing-mode slots and engine configuration.
 
 Ark connects to the keyboard, reads that logical profile, edits a
 local draft based on its exact generation, commits a replacement safely to both
@@ -33,7 +34,7 @@ to reproduce the supported behavior.
 ## Authority Model
 
 On a connected keyboard, the active committed device generation is the live
-authority. The three C files remain:
+authority. The four keymap files remain:
 
 - compiled factory defaults and the recovery fallback;
 - the human-reviewable and version-controlled representation, edited directly
@@ -55,8 +56,7 @@ The user should see one profile even while firmware continues to use established
 QMK storage owners internally:
 
 - standard VIA dynamic storage for layout keys and VIA macros;
-- the versioned custom profile store for RGB, custom behaviors, and future
-  profile-policy domains.
+- the versioned custom profile store for RGB, behaviors, combos, settings and pointing slots.
 
 This is an intentional boundary, not the user model. The app reads both stores
 into one generation-aware document and coordinates writes and verification
@@ -72,19 +72,15 @@ and recoverable; the product must not claim a complete commit. Connected-half
 VIA readback is not equivalent to proof that both halves hold the same complete
 logical profile.
 
-## Current Implementation Gap
+## Current implementation and remaining acceptance
 
-Ark now reads the complete supported configuration from the keyboard,
-edits all current domains, exports/imports a materialized snapshot of the whole layer bank,
-and applies one custom/VIA logical generation without consulting repository
-sources. Both custom halves are durably prepared before the decision marker;
-activation and reboot recovery require the bound VIA identity to converge.
-
-Remaining product work is physical interruption acceptance across each durable
-boundary, adoption or conflict reporting for writes made by external VIA
-clients, guided recovery, the known one-half reconnect transition, broad
-hardware acceptance, and standalone distribution. Until the interruption
-matrix is recorded, Apply continues to create a recovery file.
+The firmware implements one logical custom/VIA generation. Both custom halves
+are durably prepared before the decision marker; activation and reboot recovery
+require the bound VIA identity to converge. External VIA adoption/conflict
+handling remains implementation work. Physical interruption, reconnect and broad
+hardware acceptance remain open; host tests do not establish those results.
+See [Current Firmware Status](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status)
+for the acceptance boundary and Ark's own documentation for client status.
 
 ## Required Device-First Operations
 
@@ -161,7 +157,7 @@ and recover the same editable values without consulting the C files.
 
 ## Current-format admission
 
-Firmware accepts only its current schema 3.0 domain versions and `NS` format-4
+Firmware accepts only its current schema 3.0 domain versions and `NT` format-5
 storage (D-F10, D-F14). Every save binds VIA generation/digest, including custom-only
 edits. Legacy storage is refused at boot; older backup translation belongs to
 the client. See [Profile Wire](profile-wire-v1.md) and

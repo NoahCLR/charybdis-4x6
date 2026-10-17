@@ -52,8 +52,8 @@ If you do nothing, the weak hooks in [`users/noah/hooks.c`](../users/noah/hooks.
 - `is_mouse_record_user()`
 - `rgb_matrix_indicators_advanced_user()`
 
-If you override one of those in your keymap and do not call the matching
-`noah_*` helper, you fully replace the shared behavior for that hook. The
+If an integration translation unit overrides one of those without calling the
+matching `noah_*` helper, it fully replaces the shared behavior for that hook. The
 exception is `get_hold_on_other_key_press()`: the weak default returns `false`
 directly because the shared userspace has no hold-preference policy.
 
@@ -122,7 +122,8 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 ```
 
 There is no `noah_get_hold_on_other_key_press()` helper. The shared userspace
-does not own hold-preference behavior.
+does not delegate its runtime-owned tap/hold decisions to this QMK hook.
+This override affects native QMK tapping only.
 
 For mouse-record classification, a keymap in this repo does not need this hook
 at all, and cannot use the chaining pattern anyway: chaining requires
@@ -281,6 +282,8 @@ This pattern applies to:
 | QMK hook | Shared helper | What the helper currently owns |
 | --- | --- | --- |
 | `eeconfig_init_user()` | `noah_eeconfig_init_user()` | VIA macro seeding after EEPROM init |
+| `keyboard_pre_init_user()` | `noah_keyboard_pre_init_user()` | saved USB product name before enumeration |
+| `process_record_admit_user()` | `noah_record_admission_admit()` in the compat header | bounded admission behind undecided keys and combo-output permission |
 | `get_hold_on_other_key_press()` | none | weak default returns `false`; define the QMK hook directly for keymap-specific hold preference |
 | `pre_process_record_user()` | `noah_pre_process_record_user()` | physical-key tracking for keyboard modifier ownership before the main process path |
 | `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, non-handled release cleanup, direct actions, macros, and process-entry tracing |
@@ -320,7 +323,7 @@ If you change hook wiring or override behavior, run:
 - `sh tests/host/run_runtime_init_order_tests.sh`
 - `sh tests/host/run_feature_gate_compile_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
-- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tools/build-firmware-pair.sh`
 
 ## Custom Keys
 

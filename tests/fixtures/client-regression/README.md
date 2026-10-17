@@ -34,9 +34,9 @@ exceeding 512 program bytes, 600 letters and 171 taps, are now accepted at 606
 and 513 bytes; only those two expectations changed.
 
 Thirty-two sparse pointing slots (D-F09) made PD domain version 2 and RGB
-version 3 the only ones the firmware accepts. The PD corpus is unchanged: it is
-version 1, and its runner checks it with the retired version-1 validator, whose
-record rules version 2 shares. The populated `.pd*` profiles are unchanged too:
+version 3 the only ones the firmware accepts. The frozen PD corpus remains version 1. Its runner extracts each record,
+translates it to the current 128-byte version-3 record representation and checks
+the current validator. No retired envelope validator is built. The populated `.pd*` profiles are unchanged too:
 their runner checks that the firmware refuses them as they are, and accepts
 their documented translation (`tests/host/translate_eight_slot_profile.py`).
 

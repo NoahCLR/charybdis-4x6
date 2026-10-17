@@ -1,6 +1,6 @@
 # Live-Profile Field Classification
 
-This matrix classifies every user-relevant value represented by the three
+This matrix classifies every user-relevant value represented by the four keymap
 authoring files. It is the scope boundary between live data, standard VIA
 state, compiled ceilings, and executable firmware.
 
@@ -11,45 +11,46 @@ behavior. The UI must explain every intentional non-live boundary.
 
 ## `keymap.c`
 
-| Surface | Classification | Initial stage | Runtime or validation owner |
-| --- | --- | ---: | --- |
-| `key_behaviors[].keycode` | Milestone A behavior identity | 04 | profile behavior validator/provider |
-| Row timing overrides | Milestone A behavior policy | 04 | profile behavior validator/provider |
-| `keeps_auto_mouse_anchored` | Milestone A behavior policy | 04 | key runtime and auto-mouse bridge |
-| Tap-count index and presence | Milestone A behavior policy | 04 | behavior validator/provider |
-| Tap action | Milestone A behavior action | 04 | action-schema validator and key runtime |
-| Hold/long-hold action | Milestone A behavior action | 04 | action-schema validator and key runtime |
-| Hold mode and repeat rate | Milestone A behavior policy | 04 | behavior validator and lifecycle runtime |
-| `keymaps[][]` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic keymap/VIA reconciliation |
-| `VIA_MACROS` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic macro storage |
-| Macro names | Portable settings domain `0x40` v8, 128 counted UTF-8 names of at most 32 bytes each; replaces the retired user macros | 06 | profile schema |
-| Custom-key names | Portable settings domain `0x40` v8, 128 counted UTF-8 names of at most 32 bytes each after the macro names; `CUSTOM_KEYS` in C is the compiled default | 06 | profile schema |
-| `COMBOS` | GET `0x06` readout; optional live domain `0x30` for rows, timing and matching flags | 07 | combo validator/provider |
-| Logical layer names/order | Sixteen-layer bank (IDs 0–15; the authored keymap fills 0–7, and 8–15 are transparent, unnamed and inactive); counted UTF-8 names in settings v8 and reference-preserving order | 07 | whole-profile cross-reference validator |
-| Custom-key shortcuts | Portable settings domain `0x40` v8, a modifier mask and a key per custom key (D-F26); `SHORTCUT` rows in `CUSTOM_KEYS` are the compiled default | 06 | profile schema |
-| Userspace keycode blocks and the 128 custom-key slots | Executable firmware/action ABI; what a custom key does is its shortcut and its `key_behaviors[]` row | flash required | firmware build |
+| Surface | Classification | Runtime or validation owner |
+| --- | --- | --- |
+| `key_behaviors[].keycode` | Live behavior identity | profile behavior validator/provider |
+| Row participation flags and layer mask | Live behavior policy | participation resolver and profile validator |
+| Row timing overrides | Live behavior policy | profile behavior validator/provider |
+| `keeps_auto_mouse_anchored` | Live behavior policy | key runtime and auto-mouse bridge |
+| Tap-count index and presence | Live behavior policy | behavior validator/provider |
+| Tap action | Live behavior action | action-schema validator and key runtime |
+| Hold/long-hold action | Live behavior action | action-schema validator and key runtime |
+| Hold mode and repeat rate | Live behavior policy | behavior validator and lifecycle runtime |
+| `keymaps[][]` | Standard VIA-owned state; C is compiled default | QMK dynamic keymap/VIA reconciliation |
+| `VIA_MACROS` | Standard VIA-owned state; C is compiled default | QMK dynamic macro storage |
+| Macro names | Portable settings domain `0x40` v8, 128 counted UTF-8 names of at most 32 bytes each; replaces the retired user macros | profile schema |
+| Custom-key names | Portable settings domain `0x40` v8, 128 counted UTF-8 names of at most 32 bytes each after the macro names; `CUSTOM_KEYS` in C is the compiled default | profile schema |
+| `COMBOS` | GET `0x06` readout; optional live domain `0x30` for rows, timing and matching flags | combo validator/provider |
+| Logical layer names/order | Sixteen-layer bank (IDs 0–15; the authored keymap fills 0–7, and 8–15 are transparent, unnamed and inactive); counted UTF-8 names in settings v8 and reference-preserving order | whole-profile cross-reference validator |
+| Custom-key shortcuts | Portable settings domain `0x40` v8, a modifier mask and a key per custom key (D-F26); `SHORTCUT` rows in `CUSTOM_KEYS` are the compiled default | profile schema |
+| Userspace keycode blocks and the 128 custom-key slots | Executable firmware/action ABI; what a custom key does is its shortcut and its `key_behaviors[]` row | firmware build |
 
 ## `rgb_config.c`
 
-Every row below is Milestone A data when its feature is compiled. A live
+Every row below is live data when its feature is compiled. A live
 enable bit may disable a compiled stage, but live data cannot introduce a stage
 that firmware did not compile.
 
 | Surface | Semantic fields | Cache or lifecycle invalidation |
 | --- | --- | --- |
-| Layer colors | layer id, HSV, render mode | rebuild derived layer colors/maps at frame boundary |
-| Layer LED groups | selector, inherit/literal HSV, reusable group id | rebuild inactive RGB cache |
-| Auto-mouse fade | mode, end HSV | rebuild inactive automouse cache |
-| PD-mode colors | stable mode id, HSV, locality | rebuild inactive PD cache |
-| PD-mode LED groups | selector, inherit/literal HSV, group id | rebuild inactive PD cache |
-| Combo feedback | HSV, locality | rebuild inactive combo cache |
-| Combo LED groups | inherit/literal HSV, group id | rebuild inactive combo cache |
-| Tap-branch feedback colors | ordered HSV list | rebuild inactive key-feedback cache |
-| Tap-committed/hold/long-hold colors | HSV values | rebuild inactive key-feedback cache |
+| Layer colors | layer id, HSV, render mode | publish a generation-consistent RGB view |
+| Layer LED groups | selector, inherit/literal HSV, reusable group id | publish a generation-consistent RGB view |
+| Auto-mouse fade | mode, end HSV | publish a generation-consistent RGB view |
+| PD-mode colors | stable mode id, HSV, locality | publish a generation-consistent RGB view |
+| PD-mode LED groups | selector, inherit/literal HSV, group id | publish a generation-consistent RGB view |
+| Combo feedback | HSV, locality | publish a generation-consistent RGB view |
+| Combo LED groups | inherit/literal HSV, group id | publish a generation-consistent RGB view |
+| Tap-branch feedback colors | ordered HSV list | publish a generation-consistent RGB view |
+| Tap-committed/hold/long-hold colors | HSV values | publish a generation-consistent RGB view |
 | Tap-commit policy | enum | strict activation boundary because key planning reads it |
 | Key-feedback locality | enum | RGB frame boundary |
-| Key-feedback LED groups | semantic, inherit/literal HSV, group id | rebuild inactive key-feedback cache |
-| Reusable LED groups | stable profile-local id and 58-bit bitmap | rebuild every referring stage cache |
+| Key-feedback LED groups | semantic, inherit/literal HSV, group id | publish a generation-consistent RGB view |
+| Reusable LED groups | stable profile-local id and 58-bit bitmap | publish a generation-consistent RGB view |
 | Stage enable states | one bit per compiled RGB stage | RGB frame boundary unless field affects key planning |
 
 Source macro names and formatting are source-only metadata. The device stores
@@ -71,7 +72,8 @@ the following settings:
 - default RGB effect, HSV value, and idle timeout;
 - the keyboard name, served as the USB product string (D-F25); empty keeps
   QMK's built-in `keyboard_name`;
-- key-feedback flash period and auto-mouse RGB dead time.
+- key-feedback flash period and auto-mouse RGB dead time;
+- host layout and Unicode-entry policy for text macros (scalar 27).
 
 The [portable settings contract](portable-profile-v1.md) supplies a bounded
 runtime cache and QMK setters. It also includes debounce, activation delay,
@@ -90,7 +92,7 @@ and sixteen user-facing layer names are portable.
 - `RGB_AUTOMOUSE_GRADIENT_ENABLE`
 - VIA, combo, RGB Matrix, pointing-device, and split feature gates
 
-Milestone A adds runtime enable bits for compiled RGB feedback stages. Turning
+The RGB domain provides runtime enable bits for compiled RGB feedback stages. Turning
 on a feature omitted from the firmware still requires flashing.
 
 ### Compiled Capacity Ceiling
@@ -124,10 +126,10 @@ Safety ceilings can bound live values but cannot themselves be raised live.
 
 These require source changes and a firmware build.
 
-## Configurable PD Slots
+## `pd_config.c`: configurable PD slots
 
 The [PD-mode domain contract](pd-mode-domain-v1.md) covers configuration that
-formerly lived partly outside the authored profile files. Schema 2 carries
+formerly lived partly outside the authored profile files. Schema 3 carries
 32 stable PD identities (eight before D-F09). Retired settings scalars 10–14 are canonical zero;
 per-slot records are the single owner of mode DPI.
 
@@ -145,7 +147,7 @@ per-slot records are the single owner of mode DPI.
 
 - Standard QMK keycodes may use a 16-bit operand only when the stored
   action-ABI digest matches the connected firmware.
-- Layer, PD-mode, VIA-macro, hardcoded-macro, and userspace-owned actions use
+- Layer, PD-mode, VIA-macro and userspace-owned actions use
   semantic action kinds plus bounded operands. They are not persisted as raw
   custom-keycode enum values.
 - PD identities come from the manifest's stable semantic id, not its current

@@ -2,7 +2,9 @@
 
 Open the parent `charybdis.code-workspace` for the firmware, independent Ark
 app, upstream QMK checkout and build artifacts together. Folder tasks bind their
-working directory explicitly to this firmware repository.
+working directory explicitly to this firmware repository. These tasks assume
+the main sibling checkout layout; from another worktree use the explicit
+`QMK_ROOT`/`BUILD_ROOT` commands in [Development](../docs/DEVELOPMENT.md#local-repositories-and-worktrees).
 
 - **Build Firmware Pair (flashable)** is the default build task. It uses
   `tools/build-firmware-pair.sh`, which sets both transport role and durable

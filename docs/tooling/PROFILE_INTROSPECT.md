@@ -4,7 +4,9 @@ This doc explains the authored-profile introspector in
 [`tools/profile_introspect.py`](../../tools/profile_introspect.py).
 
 Use it when you want to regenerate or verify the visual profile report that
-this repo derives from the authored keymap and RGB sources.
+this repo derives from the authored keymap and RGB sources. It does not read
+the keyboard, reflect saved live overrides, or parse the engine records in
+`pd_config.c`; PD reachability and colors are not a complete slot export.
 
 ## What The Script Reads
 

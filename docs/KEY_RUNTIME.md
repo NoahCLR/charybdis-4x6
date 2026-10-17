@@ -98,7 +98,7 @@ layer," not "old runtime plus new runtime running side by side."
 | [`deferred_release.h`](../users/noah/lib/key/runtime/deferred_release.h), [`deferred_release.c`](../users/noah/lib/key/runtime/deferred_release.c) | Adapter that defers blocked release dispatch effects into the core pending-release queue and drains queued dispatches after release/scan execution. |
 | [`keyboard_mod_policy.h`](../users/noah/lib/state/modifiers/keyboard_mod_policy.h), [`keyboard_mod_policy.c`](../users/noah/lib/state/modifiers/keyboard_mod_policy.c) | Shared modifier snapshot, filtering, preservation-window, masked-emit, action-replay, and real-mod masking policy used by action dispatch, key-runtime processing, tap-series capture, deferred release, and PD mode modifier masking. |
 | [`process.c`](../users/noah/lib/key/runtime/process.c) | `process_record_user()` entry flow, preflight ordering, release-keycode recovery, and non-handled release finalization. |
-| [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Cross-key interruption and default-suppression work before the current press proceeds, while unrelated pending multi-tap chains stay position-owned until timeout or same-key reuse. |
+| [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Cross-key interruption, default suppression and foreign-key tap-series settlement before the current press proceeds. |
 | [`press.c`](../users/noah/lib/key/runtime/press.c), [`release.c`](../users/noah/lib/key/runtime/release.c), [`scan.c`](../users/noah/lib/key/runtime/scan.c) | Thin press/release/scan orchestration around reducer-owned effect plans. |
 | [`transition.c`](../users/noah/lib/key/runtime/transition.c), [`transition.h`](../users/noah/lib/key/runtime/transition.h) | Effect-plan transport between reducer decisions and concrete effect projection through `projection/projection.c`. |
 | [`planning/effect.h`](../users/noah/lib/key/runtime/planning/effect.h), [`planning/effect_queue.h`](../users/noah/lib/key/runtime/planning/effect_queue.h) | Shared runtime effect vocabulary and queue helper. |
@@ -241,7 +241,7 @@ This is a visual filter only: their origins still match releases and their
 layer ownership remains intact. Pending behavior outputs keep combo feedback
 until their resolved hold establishes a binding; locks and armed one-shots
 alone do not qualify. Filtering precedes footprint union so overlapping active
-combos keep their own lighting. See [the feedback model](rgbflow.md#combo-identity-during-a-layer-hold).
+combos keep their own lighting. See [the feedback model](rgbflow.md#the-surface-underneath-feedback).
 
 Coverage for this contract lives in `run_qmk_combo_origin_tests.sh`: reference
 layer lookup, stable combo owner selection, active and pending combo bitmaps,
@@ -268,9 +268,11 @@ observes every physical event into `key_runtime_core` first.
 
 That observation step gives the reducer position-stable press/release identity
 before any QMK path, macro path, or pd-mode path narrows the event.
-The pre-process hook also updates physical literal-key and modifier ownership
-before QMK can mutate its report, which lets preflight suppress a duplicate
-press or premature release when a managed lease already owns that component.
+Pre-process observes physical modifier state for masking policy. Native report
+ownership is credited later, after behavior and pointing interception: finalize
+credits native presses and retires releases; the late native-overlap stage
+credits a shared usage while suppressing its duplicate report edge. A consumed
+press must never gain a native report lease.
 
 ### 2. Preflight
 
@@ -280,16 +282,14 @@ does the cross-key work that must happen before the current press resolves:
 - suppress default literal-key or modifier handling when aggregate ownership
   requires it
 - interrupt other active handled keys on foreign press
-- leave unrelated pending multi-tap chains live until their own timeout or
-  same-key continuation resolves them
+- settle foreign pending tap series before an unhandled press
+- for a handled press, settle foreign dual-role tap series while other independent
+  handled series may continue
 
-Behavior change note: the preflight path changed on `2026-04-20`. Before that
-change, a foreign press explicitly flushed unrelated pending multi-tap chains.
-The current runtime intentionally keeps those chains position-owned until they
-resolve themselves. If that behavior changes later, treat it as a regression
-unless the tests and docs are updated together; the locking checks are
-`sh tests/host/run_key_runtime_scenario_tests.sh` and
-`sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh`.
+Settlement also respects physically queued continuations. Before resolving an
+unhandled press, admission settles pending layer-changing taps so lookup uses
+the resulting layer. See the [physical timing contract](INTERACTION_MODEL.md#physical-gestures-and-buffered-delivery)
+and `run_qmk_gesture_pipeline_tests.sh` for the actual QMK queue boundary.
 
 ### 3. Press routing
 
@@ -423,7 +423,7 @@ Use the current runners that match the current core-owned runtime:
 - `sh tests/host/run_firmware_stack_budget_tool_tests.sh`
 - `sh tests/host/run_firmware_memory_budget_tool_tests.sh`
 - `sh tests/host/run_all_host_tests.sh`
-- `qmk compile -kb bastardkb/charybdis/4x6 -km noah`
+- `sh tools/build-firmware-pair.sh` after the required host checks
 - `sh tests/host/run_firmware_memory_budget_checks.sh`
 - `sh tests/host/run_firmware_stack_budget_checks.sh`
 

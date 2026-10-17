@@ -8,7 +8,9 @@ the [firmware guide](./GUIDE.md) and [INTERACTION_MODEL.md](./INTERACTION_MODEL.
 userspace can do; this file explains how the current profile uses those
 capabilities.
 
-These are current profile choices, not guarantees of the shared runtime.
+These are checked-in compiled defaults, not a readback of a connected
+keyboard. Saved device profiles may differ. The shared runtime supports other
+choices.
 
 This profile is tuned for my personal macOS workflow. Many choices assume
 Command-based shortcuts, macOS system conventions, and Mac-first editing and
@@ -37,7 +39,11 @@ trackball control get packed into the right side and the thumbs.
 | `LAYER_NUM` | right-hand numpad layer | numpad on the right half, `MO(LAYER_NAV)` retained on the left side for fast access back into navigation |
 | `LAYER_SYM` | symbols and DPI layer | DPI controls on the left, bracket and quote families on the right, and a lower-left shortcut cluster anchored by five VIA macros |
 | `LAYER_NAV` | navigation, media, system control, mouse buttons | arrow cluster, media, volume, brightness, direct macOS shortcuts, mouse buttons, `PD_SLOT_0`, and current auto-sniping |
-| `LAYER_POINTER` | auto-mouse pointer surface | `PD_SLOT_2`, `PD_SLOT_5`, `PD_SLOT_1`, `PD_SLOT_0`, mouse buttons, and `LT(LAYER_NUM, KC_SPC)` on the thumb cluster |
+| `LAYER_POINTER` | auto-mouse pointer surface | `PD_SLOT_2`, `PD_SLOT_5`, `PD_SLOT_1`, `PD_SLOT_0`, mouse buttons, and the custom thumb keys |
+| `LAYER_EXTRA_1` | Function | authored function-key overlay |
+| `LAYER_EXTRA_2` | Game | authored gaming layer |
+| `LAYER_EXTRA_3` | Extra | named spare layer |
+| `LAYER_EXTRA_4`–`LAYER_EXTRA_11` | remaining bank slots | transparent, unnamed defaults |
 
 The keymap currently sets:
 
@@ -71,6 +77,7 @@ There are also current per-key exceptions:
 
 - `LT(LAYER_NAV, KC_SLSH)` uses `.tap_hold_term = 100`
 - `CUSTOM_KEY_2` (Click Spam) uses `.tap_hold_term = 1`
+- `MS_BTN3` and `CUSTOM_KEY_3` (Drag Window) use 100 ms tap-hold and multi-tap terms
 
 ## Base Layer Highlights
 
@@ -423,7 +430,7 @@ key." It is more opinionated than that.
 
 The profile's macros are VIA macro slots:
 
-- VIA exposes `VIA_MACRO_0` through `VIA_MACRO_63`, each of which can carry a
+- VIA exposes `VIA_MACRO_0` through `VIA_MACRO_127`, each of which can carry a
   name
 - `VIA_MACRO_0` through `VIA_MACRO_10` currently have source defaults in
   `VIA_MACROS(MACRO)`
@@ -437,10 +444,9 @@ the first keeps running, and it must be triggered again later if desired.
 
 The engine validates the complete payload before output, owns exact leases for
 every synthetic key it retains, and releases those leases on completion,
-cancellation, or runtime failure. VIA edits invalidate the cache immediately,
-but the bytes of an already running slot remain pinned until it finishes; the
-edited payload is loaded on the next trigger. EEPROM reset requests cancellation
-and cleanup before the active cache entry can be reused. Timing is scan-granular:
+cancellation, or runtime failure. Stored macro writes and resets cancel playback
+and release its outputs before changing the bytes it reads. Cache invalidation
+then makes the next trigger validate the edited payload. Timing is scan-granular:
 each operation runs on the first scan at or after its configured interval.
 
 But a lot of the current shortcut surface is not implemented through macro
@@ -481,9 +487,9 @@ while others are just my current app-launcher or utility bindings:
 | `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | current shortcut for the VS Code command palette |
 | `VIA_MACRO_10` | `{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}` | select all, short wait, then copy |
 
-`VIA_MACRO_11` through `VIA_MACRO_63` are empty by default. The RP2040
-wear-leveling region is enlarged for this profile, leaving roughly 15 KB of
-shared VIA macro buffer space after dynamic layer storage.
+`VIA_MACRO_11` through `VIA_MACRO_127` are empty by default. The RP2040
+macro bank is 34,903 bytes shared by all 128 slots, including their terminators
+and the bank validity byte; it is not a separate allocation per macro.
 
 Prefer chord payloads such as `{KC_LGUI,KC_C}` for self-contained shortcuts.
 Explicit key-down/key-up payloads such as `{+KC_LSFT}` and `{-KC_LSFT}` must
@@ -493,8 +499,9 @@ end. Invalid balance is rejected before playback, so a macro cannot release
 another producer's key or leave its own key registered.
 
 VIA text supports canonical UTF-8 with Profile Wire feature bit 21. Select the
-host setup in the saved profile before playing non-ASCII text; ASCII-only mode
-remains the default. See [runtime flow](architecture/runtime-flow.md) for the
+host layout in the saved profile before playing text. The default US layout
+supports ASCII; configured layouts supply their supported characters, and
+Unicode entry handles characters outside that layout when configured. See [runtime flow](architecture/runtime-flow.md) for the
 encoding, program limit, ownership and host-entry requirements. Malformed
 slots produce no partial typing and remain cached invalid until a mutation.
 

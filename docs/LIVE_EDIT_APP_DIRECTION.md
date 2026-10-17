@@ -73,10 +73,11 @@ Firmware work remaining before the product is complete:
 
 Differential host uploads can reuse identified active bytes and stream bounded
 batches (D-F18), while full validation and both-half publication remain in place.
-Transfer timing and interruption acceptance for this path have not run on hardware.
 The copy to the other half reuses the same ranges from that half's own active
-profile and sends the rest in chunks of up to 110 bytes (D-F19); it has not run
-on hardware either.
+profile and sends the rest in chunks of up to 110 bytes (D-F19).
+[Baseline captures](../measurements/peer-copy/2026-10-11-pair-51/README.md)
+record a limited steady-state run consistent with reuse. Timing after the
+polling correction, byte fallback and interruption acceptance remain open.
 
 VIA full-bank checksums use bounded 224-byte RAM-mirror batches on both halves
 (D-F20), reducing each pass from 2,634 to 167 granted checksum steps. Timing and
@@ -147,7 +148,8 @@ input cadence remain unmeasured for this path.
   and pointing on both halves while stage verification runs. The local
   roll-forward keeps its existing output fence until the full target identity
   is ready; host tests and linked resource gates do not establish scan cadence.
-- **The faster copy to the other half has not run on hardware** (D-F19).
+- **The faster peer copy still needs full hardware acceptance** (D-F19).
+  The recorded baseline is limited to its named build and steady-state workload.
   Before relying on it, time an Apply of a one-key edit and of a full profile
   against the previous firmware (candidate status page 1 reports copy progress and
   retries), watch for split transport failures with 128-byte frames at
@@ -257,7 +259,7 @@ App decision; its text is in Ark's direction.
 
 Profile Wire GET `0x06` exposes the native combo table the connected half runs,
 with effective per-combo timing and rules, global enable and layer-reference
-mapping: up to 32 rows of four inputs, with a metadata digest to detect
+mapping: initially up to 32 rows of four inputs, with a metadata digest to detect
 mid-read changes. The default window, the hold threshold and which combos
 follow the default came with readout version 2; readout version 3 (D-F14)
 adds each combo's enable and allowed layers, a counted reference page for the
@@ -274,24 +276,19 @@ trigger predicates.
 A save patches the verified device payload, keeps every untouched domain, and
 checks the original generation, digest and origin before staging and again
 after acquiring the candidate lease; the app then requires byte-equal
-readback. Combos are optional canonical domain `0x30` v1: absent means compiled
-fallback, an explicit empty table means no combos. Both halves validate
-actions, references, duplicate inputs and the shared hold threshold before
-persistence, and the app checks the firmware-advertised row, step and
-action-reference limits before upload. At publication the combo invalidator copies at most 32 rows /
-896 bytes once into owner-held native records, so typing and readback do no
-profile reads. Combo timing follows QMK: every combo has its own window or
-follows one default window (`COMBO_TERM`), and the hold/tap wait
-(`COMBO_HOLD_TERM`) is one value for all combos. Domain `0x30` version 2
-stores the default window and the hold threshold once, so both exist without
-combos and are edited in Settings · Combos. A new combo starts on the default,
-shown filled in; typing a window makes it the combo's own, and Use default
-makes it follow again. Review compares a following combo as following, so a
-changed default is one Combo timing change. Version 1 — every window explicit,
-the threshold repeated on each row — is still read; a draft holding it takes
-the keyboard's default on its first combo edit. Custom trigger/release hooks,
-callback outputs and disabled combo timing are not editable through this
-format.
+readback. Combos are optional canonical domain `0x30`: absent means compiled
+fallback, an explicit empty table means no combos. Current firmware accepts
+version 3 only, with up to 128 rows of 2–16 inputs. Both halves validate actions,
+references, duplicate inputs and timing before persistence. Publication
+materializes native combo records once, so typing and readback do not decode
+profile bytes.
+
+A combo has its own window or follows the domain's default window; the hold/tap
+threshold is shared. Both timing values are stored once and exist even with no
+combos. Earlier version-1 and version-2 layouts are client translation inputs,
+not current admission formats. Custom trigger/release hooks, callback outputs
+and disabled combo timing are not editable through this format. The byte
+contract is in [Profile Wire](architecture/profile-wire-v1.md).
 
 The per-domain save paths this introduced were replaced by the shared draft
 (D-L19) and atomic Apply (D-L21); the generation binding and readback rules
@@ -366,8 +363,9 @@ atomic capability for complete Apply and keeps the recovery file, stale-base
 check and exact final readback. A failure the app sees before the decision
 requests the custom-candidate abort, which the keyboard carries out for both
 stores (D-L39); once the decision is made the keyboard refuses it, even if the
-host never saw the decision, and finishes the generation. On hardware an unchanged Apply takes about
-6.6 s, spent in keyboard-side validation and durable publication.
+host never saw the decision, and finishes the generation. Apply duration depends
+on payload, build and workload; use recorded measurement sets rather than an
+unqualified latency estimate.
 
 ### D-L22 — A cancelled save ends in bounded time, and says why it ended
 
@@ -548,7 +546,10 @@ the setting (`qmk_portable_profile.c`); the compiled `TAPPING_TERM` is its
 default and applies until settings are live. Quick tap follows the tapping term
 as it does in QMK by default. The one term is global: the app offers no
 per-key tapping term, and a behaviour row's own tap / hold timing still governs
-that row in the runtime.
+that row in the runtime. D-F02 subsequently moved eligible authored
+LT/MT/OSM and intrinsic TT/OSL classification into userspace; the QMK hook
+continues to govern native tapping. See the
+[interaction model](INTERACTION_MODEL.md#physical-gestures-and-buffered-delivery).
 
 ### D-L39 — Only the keyboard ends a staging, together with its candidate
 
@@ -578,7 +579,8 @@ decision nothing cancels, whatever the host saw. See
 
 The per-preset Volume, Brightness, Zoom, Arrow and Pinch C handlers and the
 old-geometry firmware bridge builds are retired. Every firmware build uses the
-schema-2 slot engine (eight slots then; 32 since D-F09). The ordinary side-specific pair owns a live profile;
+slot engine (schema 2 at this decision; current schema 3 since D-F14,
+with 32 slots since D-F09). The ordinary side-specific pair owns a live profile;
 an owner-free generic or comparison image warms the same engine from validated
 compiled slot records. The mode registry keeps deployed hold and lock keycode
 identities, but no per-preset callbacks. `NOAH_PD_PROFILE=no` and the five-layer
@@ -586,14 +588,14 @@ snapshot-bridge option are rejected instead of quietly producing old firmware.
 
 This removes the in-repository extraction path for an already deployed old
 storage geometry. Retain old firmware and backups outside this build if they
-are still needed; flashing the schema-2 pair does not migrate an old committed
+are still needed; flashing a newer-geometry pair does not migrate an old committed
 profile in place. Historical profile readers and portable migration remain for
 files that already carry the required source evidence. The active pointing
 contract is [PD-mode domain v1](architecture/pd-mode-domain-v1.md).
 
 ### D-L41 — Pointing keycodes name slots, not factory presets
 
-The eight configurable pointing modes use one keycode vocabulary: `PD_SLOT_n`
+The configurable pointing modes (originally eight, now 32) use one keycode vocabulary: `PD_SLOT_n`
 for hold and `PD_SLOT_n_LOCK` for toggle. The original six factory preset
 names are no longer firmware keycode symbols. Slot assignment is stable; the
 keycodes' numeric values moved to their fixed block with D-L42. Charybdis Ark
@@ -628,7 +630,7 @@ action ABI digest (`0x1d3fcacc`), so nothing decodes an old kind 7 as a
 custom key.
 
 Names live on the keyboard in the settings domain (version 5 then, version 6
-since D-F14), beside the macro names, and
+at D-F14, now version 8 after D-F25/D-F26), beside the macro names, and
 the keymap authors the defaults inline (`CUSTOM_KEYS`). The app offers custom
 keys only on the known digest (Profile Wire feature bit 16), in their own
 screen and picker section. Renumbering was a deliberate migration: firmware
@@ -911,6 +913,9 @@ The running firmware has one accepted profile/storage contract. At this cut it
 was schema 2.0, RGB v3, key behaviors v1, combos v2, settings v5, sparse PD v2
 and logical store format 3 (`NR`); D-F14 moved it to schema 3.0, RGB v4,
 settings v6 and format 4 (`NS`), refusing the earlier ones the same way.
+The current contract is schema 3.0, RGB v4, key behaviors v2, combos v3,
+settings v8, sparse PD v3 and format 5 (`NT`); the domain registry and
+`profile_versions.h` define the accepted versions.
 Settings v2–4, combo v1, schema 1, custom-only `NP` format 1 and logical `NQ`
 format 2 are refused. There is no firmware migration path, legacy GET 9 source
 page, feature bit 13 or legacy PD envelope validator.
@@ -952,8 +957,9 @@ follow-up still applies.
 Opening compiled defaults retains each enabled domain's payload offset and
 length in registry order. Reads emit only intersecting envelopes and payloads,
 including reads across their seams; no domain depends on being last. The
-complete standard profile contains RGB 3, key behaviours 1, combos 2, settings
-5 and sparse PD 2. The same stream defines its checksums and its readback.
+complete standard profile contains all five domains at the versions in the
+shared registry (originally RGB 3, key behaviours 1, combos 2, settings 5 and
+sparse PD 2 at this decision). The same stream defines its checksums and its readback.
 
 The settings module owns authored names and immutable factory scalars. A
 compat adapter supplies pinned QMK factory constants and injects the settings
@@ -1223,7 +1229,8 @@ is handled internally by byte fallback. Ark needs its imported contract docs
 refreshed after the firmware lands; its runtime needs no change to try this
 pair. Page 2 is optional diagnostics and leaves page 1 byte-identical.
 [Baseline peer-copy captures](../measurements/peer-copy/2026-10-11-pair-51/README.md)
-confirm whole-profile reuse in the measured steady state. Timing after the
+are consistent with whole-profile reuse in the measured steady state; page 1
+alone does not prove exact reused-byte counts. Timing after the
 polling correction and interruption acceptance remain outstanding (Open Issues).
 
 ## D-F20 — VIA checksum work is independent of split frame size

@@ -10,7 +10,7 @@ multi-tap model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the
 [firmware guide](./GUIDE.md#authoring-the-profile-in-c).
 
 The [PD-mode domain contract](architecture/pd-mode-domain-v1.md) specifies the
-32 configurable slots and the remaining hardware acceptance checks. Side-specific schema-2 firmware exposes 32 slots in
+32 configurable slots and the remaining hardware acceptance checks. Side-specific schema-3 firmware exposes 32 slots in
 Charybdis Ark → Pointing modes. The six defaults below are records in those
 slots, followed by Undo / Redo in slot 6 and empty slots 7–31; their names do not
 select special code. Undo / Redo uses horizontal motion at 100 DPI and a
@@ -19,33 +19,16 @@ The `PD_SLOT_n` keycodes select slots, while the named behavior in this
 document describes the shipped factory profile. Editing a slot can change
 that behavior without changing its keycode.
 
-Use an empty slot to create directional key/shortcut actions or a scrolling
-mode, or duplicate an existing slot. The normal path is name, movement type,
-a DPI preset (including normal pointer speed), then either an axis choice and
-the relevant direction actions or scroll direction/modifiers. Direction
-actions and mouse-button shortcuts use the same keycode picker as Layout, so a
-plain key or modified key such as `G(KC_Z)` can be selected instead of typed.
-They can also click a mouse button 1–8, such as buttons 3 and 4 from a
-left/right movement, on firmware that advertises it (feature bit 28).
-Choose **Keep mode**, assign the mode's hold or toggle action in Layout, set
-its color under RGB → Pointing modes, then review and
-Apply the draft. The layout key picker reads populated slots from the current
-draft, so a newly named mode appears immediately with its canonical hold and
-toggle actions.
+An empty slot can become a directional or scrolling mode. Its record controls
+DPI, axes and thresholds, outputs, modifier policy, pointer-layer policy and
+mouse-button overrides. Directions may emit plain or modified keys, mouse
+buttons 1–8 (feature bit 28), or VIA macros (feature bit 29). Mouse buttons
+1–3 can pass through, be consumed, tap an action or hold modifiers.
 
-**Advanced** holds pointer-layer policy, active axes and thresholds (with the
-ball movement each threshold is at the mode's DPI), what each direction's
-shortcut does with held modifiers (inherit them, leave chosen ones out, or send
-exactly the shortcut), scroll gesture ratios/timing and mouse-button overrides.
-A mouse-button shortcut keeps the modifier handling it was stored with.
-A shortcut never releases a keyboard key another key or macro is holding;
-that usage stays down until its last owner releases it.
-Volume, brightness, zoom, arrow navigation, history shortcuts and
-modifier-assisted scrolling use the same facilities. Mouse buttons 1–3 can pass
-through, be consumed, tap a shortcut or hold modifiers. Choose what a button
-does first; its shortcut field or modifier switches then appear, and the
-override is staged once it has a shortcut or at least one modifier. A slot
-with existing bindings must be unbound before clearing it.
+A shortcut never releases a key another producer still owns. Empty slots are
+valid even when keys still reference them; those bindings are inert until the
+slot is configured. For editor controls, drafts and Apply, use
+[Ark's guide](https://github.com/NoahCLR/charybdis-ark/blob/main/docs/GUIDE.md).
 
 A click is one balanced press and release. It does not run the clicked
 button's own behaviour or the mode's button overrides, and a button that is

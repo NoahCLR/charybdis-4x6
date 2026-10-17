@@ -243,3 +243,23 @@ explicitly and take effect once a release has promoted the workflow.
 through pull requests, and published `v*` release tags cannot be moved or
 deleted (rulesets without bypass). Merge commits take the pull request's title
 and body, so a release's notes are its promotion's commit message.
+
+## Maintaining documentation
+
+The [documentation index](README.md) routes readers to user guides, runtime
+explanations and contracts. Keep facts in their owning document; preserve the
+architecture spec paths consumed by Ark. Its imported specs need a refresh
+from the published firmware commit after contract-documentation changes land,
+even when the wire bytes did not change.
+
+Check claims against the selected source and QMK pin. Distinguish authored
+defaults from device readback, current formats from historical examples, and
+implemented behavior from requirements awaiting implementation or hardware
+acceptance. Keep dated raw evidence in `measurements/`.
+
+For documentation-only changes, run `git diff --check`, check local file and
+heading links, and check generated reports with
+`python3 tools/profile_introspect.py --check` when relevant. The full host suite
+and firmware pair may be skipped under `AGENTS.md`'s docs-only exception;
+state that explicitly in the handoff. A protocol fixture or contract probe can
+provide targeted evidence for a disputed claim without changing runtime code.

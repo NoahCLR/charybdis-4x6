@@ -26,17 +26,21 @@ flowchart TD
     init --> held_repeat["key/ownership/held_repeat.c"]
 ```
 
-Keymap-local hook overrides may replace the QMK hook, but they must call the
-matching `noah_*` helper when they still want shared userspace behavior.
+Integration hook overrides must call the matching `noah_*` helper to retain
+shared userspace behavior. Keep these outside keymap-owned translation units,
+which cannot include `noah_runtime.h`; see [hook overrides](../HOOK_OVERRIDES.md).
 
 ## Key Press Flow
 
 ```mermaid
 flowchart TD
     physical["Physical key press"] --> pre_user["pre_process_record_user"]
+    pre_user --> participation["Capture placement participation before QMK queues"]
     pre_user --> origin["Compatibility: qmk_combo_origin observes physical member"]
     pre_user --> mod_track["Projected: keyboard modifier ownership tracks physical mods"]
-    physical --> process_user["process_record_user"]
+    participation --> qmk["QMK combo/tapping delivery"]
+    qmk --> admission["Record admission: defer behind an undecided key"]
+    admission --> process_user["process_record_user"]
     process_user --> normalize["Compatibility: combo origin normalizes event key"]
     normalize --> observe["Authoritative: reducer observes physical event"]
     observe --> preflight["Planned: preflight interrupts and protects shared modifier releases"]
@@ -50,7 +54,7 @@ flowchart TD
     projection --> layer["Layer ownership"]
     projection --> pd["PD mode state"]
     projection --> feedback["Feedback pulse state"]
-    physical --> finalize["process_record_user finalize"]
+    process_user --> finalize["process_record_user finalize"]
     finalize --> report_track["Applied: owned_keycode and modifier report ownership settle on the final event result"]
 ```
 
@@ -209,16 +213,14 @@ RPC registration, and profile/VIA receiver mailbox processing on the slave.
 
 The profile store exposes a one-read-per-step boot selector and the candidate
 backend exposes bounded whole-profile adoption of its exact selected record.
-Ordinary firmware retains the read-only discovery shell. The side-specific
-engineering artifact replaces that scheduler entry with the single profile
-owner, which incrementally validates compiled defaults, selects and adopts a
-durable record, fully reconciles a boot-selected record before requesting its
-activation, and then rotates at most one host, split, or peer-activation step.
-Its coherent owner status is routed into the VIA channel. When the separate
-`NOAH_LIVE_PROFILE_MUTATION=yes` engineering gate is also enabled, the channel
-truthfully advertises and routes candidate status, candidate writes, persistent
-commit, runtime activation, and peer reconciliation as one coupled surface.
-Ordinary firmware and owner-only engineering firmware remain read-only.
+The side-specific pair installs the single profile owner, which incrementally
+validates compiled defaults, selects and adopts a durable record, reconciles
+its custom/VIA identity before activation, and rotates bounded host, split and
+peer-activation work. Both `NOAH_LIVE_PROFILE_OWNER` and
+`NOAH_LIVE_PROFILE_MUTATION` default to `yes` for those builds. The VIA channel
+advertises their coupled write/commit/activation/peer capabilities only when
+available. Generic builds retain the read-only shell; explicitly disabling
+mutation makes an owner-only comparison build.
 
 Combo-origin reconciliation runs before key-runtime scan projection. It removes
 QMK-disabled candidates immediately and expires inactive candidates only after
@@ -517,9 +519,11 @@ already held can interfere and should be released before playback.
 Playback is scan-driven and single-active. Each logical slot stores one byte of
 unchecked/valid/invalid metadata. A valid slot is decoded into one shared IR
 when invoked; invalid slots do not reparse until invalidated. Busy triggers are
-consumed before that shared IR can be changed. The active IR remains pinned
-across VIA invalidation, and completion or cancellation applies deferred
-invalidation. Text, chord, and persistent-key output use exact owner-scoped
+consumed before that shared IR can be changed. The shared IR remains pinned
+through its playback cleanup. Stored macro
+writes and resets cancel playback before changing its backing bytes; ordinary
+cache invalidation alone defers reuse of an active IR until cleanup. Text,
+chord, and persistent-key output use exact owner-scoped
 leases; reset and runtime failure release retained leases through bounded
 cleanup. One engine transition runs per scan, and delay deadlines use wrap-safe
 32-bit elapsed time.
@@ -529,10 +533,10 @@ cleanup. One engine transition runs per scan, and delay deadlines use wrap-safe
 ```mermaid
 flowchart LR
     scan["Current-master scan"] --> metadata["Exchange durable metadata"]
-    metadata --> compare["D-014 authority compare"]
+    metadata --> compare["durable authority compare"]
     compare -->|local newer| push["Read one local chunk, then push"]
     compare -->|peer newer| pull["Request one peer chunk, then stage locally"]
-    compare -->|live candidate| prepare["Stage peer, pause before markers"]
+    compare -->|live candidate| prepare["Prepare both, pause before commit markers"]
     push --> mailbox["Sibling callback mailbox"]
     pull --> mailbox
     prepare --> mailbox
@@ -553,20 +557,18 @@ USB role never decides durable authority. Disconnect, malformed response, role
 change, or passive-peer timeout invalidates peer evidence; conflict,
 corruption, and incompatibility stop without overwriting either record.
 
-For a host live deployment, D-022 treats `PREPARE_BEGIN` as provisional. The
+For a host live deployment, the coordinator treats `PREPARE_BEGIN` as provisional. The
 sender pauses after the peer has every byte, commits local then peer, and
 requires fresh exact durable convergence before provider activation. Prepared
 candidate correlation survives role changes by restarting the provisional
 handshake; simultaneous provisional writers are resolved by generation and
-stable physical origin before either marker.
+stable physical origin before either committed marker.
 
-Ordinary firmware compiles but does not register this path. The side-specific
-engineering owner consumes the flash identity, completes compiled-profile
-validation, installs transport arbitration, and registers it exactly once.
-That artifact remains non-production because its BSS and combined-data policy
-checks fail and the real two-half safety matrix is open. The separate mutation
-engineering artifact now advertises and routes the complete write capability
-set for hardware testing; it does not change the ordinary build.
+The side-specific profile owner consumes the flash identity, completes
+compiled-profile validation, installs transport arbitration and registers the
+adapter exactly once. This is the normal pair build. Generic images leave the
+adapter unregistered. The open hardware acceptance matrix is tracked in
+[firmware direction](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 
 ## USB Product Name
 
@@ -618,5 +620,5 @@ flowchart TD
     split["Split transport"] --> split_tests["split_runtime_sync, qmk_via_split_sync, profile_split_reconciler"]
     hooks["Hooks and boundaries"] --> boundary_tests["hook_chaining, feature_gate_compile, qmk_contract"]
     usb_name["USB product name"] --> usb_name_tests["qmk_usb_product_name, profile_store_runtime, profile_owner"]
-    all["Whole userspace"] --> full["run_all_host_tests.sh and qmk compile"]
+    all["Whole userspace"] --> full["run_all_host_tests.sh and build-firmware-pair.sh"]
 ```

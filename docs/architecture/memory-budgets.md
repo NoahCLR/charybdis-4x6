@@ -4,6 +4,19 @@ This document is the canonical memory terminology for this repository. Report
 all firmware values per keyboard half: each half has its own RP2040 and runs its
 own copy of the firmware.
 
+## Current policy and how to read the checkpoints
+
+The schema-3 static-data tripwire is 209,920 bytes per half; the minimum
+SRAM0–3 core-memory span at boot is 4,096 bytes. BSS alone is informational
+unless explicitly bounded. Reviewed main-process and split-slave path policies
+are 1,920 and 768 bytes respectively. These are regression policies, not
+physical RAM limits or runtime high-water results.
+
+The dated checkpoints below explain changes to those policies and representations.
+They are historical linked evidence, not fresh accounting for the current HEAD.
+Use the [per-half resource workflow](../DEVELOPMENT.md#per-half-resource-acceptance)
+to assess a new build.
+
 ## Physical Memory
 
 The RP2040 contains 264 KiB, or 270,336 bytes, of SRAM.
@@ -367,8 +380,8 @@ from the ELF's recorded `NOAH_PD_PROFILE_ENABLE` flag. As with the eight-slot
 increment, this is a regression policy, not a statement of capacity: the
 boot span still leaves 198,400 bytes of SRAM0–3 to the core allocator, and an
 ELF analysis on 2026-10-06 found that the only runtime allocation from it is
-newlib `rand()`'s one-time state, so SRAM0–3 beyond the boot prefix is free at
-runtime. These are linked measurements, not runtime high-water.
+newlib `rand()`'s one-time state. That static analysis does not establish unused
+runtime memory; allocator high-water still requires measurement.
 
 The live-owner stack gate's PD cache paths grow by 64–80 bytes (compiled cache
 initialization 816 bytes, published EEPROM read 1,128, record validation 1,120,

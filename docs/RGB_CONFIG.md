@@ -555,6 +555,10 @@ static const key_behavior_feedback_led_group_t key_behavior_feedback_led_groups_
 
 [`rgb_runtime.c`](../users/noah/lib/rgb/core/rgb_runtime.c) applies RGB in a deliberate order:
 
+A boot/diagnostic indicator can take over before normal composition. Otherwise
+QMK supplies the base effect and the configured base-layer color/groups form
+the persistent userspace underlay. Then:
+
 1. active non-base layers compose from low to high:
    full-board layer colors wash the whole board, and mapped-only layers paint
    only the LEDs owned by that layer's non-transparent keys

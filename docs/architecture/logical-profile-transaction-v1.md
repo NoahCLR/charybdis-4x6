@@ -3,7 +3,7 @@
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
 > schema 3.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
 > a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
-> binds a nonzero VIA generation and digest. HID and split framing remain v1.
+> binds a nonzero VIA generation and digest. HID framing remains v1; split framing is version 2.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > Backup translation belongs to the client, before a current-format Apply.
 
@@ -14,9 +14,9 @@ Profile Wire payload, VIA keymap, and VIA macro bank. A reset or loss of power
 may leave recovery work, but normal key output must observe either the complete
 old generation or the complete new generation. It must never observe a mixture.
 
-This contract replaces the current recovery-file-only boundary between the
-dual-slot custom store and the in-place VIA store. It retains standard VIA
-storage and does not add a second 8 KiB EEPROM cache.
+This implemented coordinator binds the dual-slot custom store and VIA store.
+A client recovery file remains an additional safeguard while physical
+interruption acceptance is incomplete.
 
 ## Identity
 
@@ -53,11 +53,11 @@ progress, and owner error states do not fence output.
 
 ## Why The Peer Is The VIA Staging Copy
 
-The 18 KiB logical EEPROM is fully partitioned. Adding an 8 KiB inactive VIA
-bank by doubling the RP2040 wear-level backing would also add a 16 KiB RAM cache
-on every half. The physical SRAM can hold that increase, but the current linked
-`.data + .bss` regression policy cannot, and no runtime allocator high-water
-evidence justifies changing that policy yet.
+Current logical EEPROM is 140 KiB per half: a 36 KiB QMK/VIA allocation and
+two 52 KiB custom slots. The design uses the existing two VIA replicas for
+staging, without another whole-bank copy. This is a storage/ordering choice,
+not a claim that RP2040 physical RAM cannot hold another representation. See
+[resource accounting](memory-budgets.md) before evaluating alternatives.
 
 The split already has two durable VIA copies. During a transaction the non-USB
 half becomes the inactive VIA staging copy while the USB half continues serving
@@ -250,11 +250,14 @@ barrier; command errors and transaction status changes cannot lift it.
 
 ## External VIA Writers
 
-Ordinary VIA writes remain supported outside a logical transaction. Firmware
-first converges VIA storage on both halves, then adopts its new VIA identity as
-a new logical manifest generation bound to the unchanged custom digest. Until
-adoption finishes, the live client reports an external-change transition and refuses a
-stale Apply.
+External VIA adoption is **required but not yet implemented**. Ordinary VIA
+storage writes and split replication exist, but they must not be described as
+publishing a fresh complete logical manifest today.
+
+The required behavior is to converge the changed VIA store, then bind its new
+identity and the unchanged custom digest in a new logical generation, or expose
+an explicit conflict. A client must refuse a stale whole-profile Apply.
+Track this gap in [Open Issues](../LIVE_EDIT_APP_DIRECTION.md#open-issues).
 
 ## Performance Contract
 

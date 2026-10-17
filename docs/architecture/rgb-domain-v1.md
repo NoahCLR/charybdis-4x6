@@ -31,8 +31,9 @@ The payload starts with this fixed 16-byte header:
 | 14 | 2 | reserved, zero |
 
 The aggregate of the four group-row counts at offsets 6, 8, 9, and 11 is at
-most 32. The maximum RGB payload is 65,492 bytes, so its envelope still fits
-the 53,216-byte canonical profile blob with the blob header.
+most 32. With the current counts and five-tap ceiling, the largest RGB
+payload is 591 bytes (the accounting is below). The enclosing profile, including
+all domain headers and payloads, must fit the 53,216-byte whole-blob ceiling.
 
 Stage-enable bits are:
 

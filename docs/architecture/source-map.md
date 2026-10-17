@@ -8,8 +8,9 @@ without turning this document into a per-function encyclopedia.
 
 This is a lookup index, not a narrative guide. Use the first table to find
 top-level runtime and tooling entry points, the source-to-doc matrix to route a
-change by subsystem, and the file coverage sections when you need to check
-whether a package inventory still matches the tree.
+change by subsystem, and the package sections for selected entry points. The
+source manifest owns the complete compiled file list; these lists are navigation,
+not a second build manifest.
 
 For behavior flow, use [runtime-flow.md](./runtime-flow.md). For "where should I
 edit this?" decisions, use [change-guide.md](./change-guide.md).
@@ -24,7 +25,7 @@ for this pack because they define how QMK reaches the runtime.
 | `users/noah/source_manifest.mk` | Firmware source list for userspace runtime files | Build wiring | `run_feature_gate_compile_tests.sh`, full host suite, firmware compile |
 | `users/noah/runtime_init.c` | Userspace init, scan, and housekeeping orchestration | Integration order | `run_runtime_init_order_tests.sh`, runtime debug/diag/trace tests |
 | `users/noah/hooks.c` | Weak QMK hook defaults that call `noah_*` helpers | Hook integration | `run_hook_chaining_tests.sh`, feature gate compile |
-| `users/noah/noah_runtime.h` | Public userspace entry surface for keymap hook chaining | Boundary contract | hook chaining and compile gates |
+| `users/noah/noah_runtime.h` | Public userspace entry surface for integration hook chaining (not included by keymap-owned translation units) | Boundary contract | hook chaining and compile gates |
 | `users/noah/config.h` | Shared userspace config defaults and feature knobs | Configuration input | profile introspection and real-profile validation when relevant |
 
 ## Tooling And Generated Docs
@@ -35,7 +36,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | Surface | Responsibility | Writes | Primary checks |
 | --- | --- | --- | --- |
 | `tools/profile_introspect.py` | Parse selected authored profile inputs and render generated visual profile reports | default `docs/KEYMAP-OVERVIEW.md` plus optional `docs/profiles/<name>/KEYMAP-OVERVIEW.md` and matching SVG assets | `python3 tools/profile_introspect.py --check`, `python3 tools/profile_introspect.py --keymap <name> --check`, `run_profile_introspection_checks.sh`, full host suite |
-| `tools/via_to_qmk_layout.py` | Convert VIA export JSON back into selected source-owned keymap blocks | optionally selected profile `keymap.c` `VIA_MACROS(MACRO)` and `keymaps[][]` | script preview/write review, real-profile validation, full host suite when source changes |
+| `tools/via_to_qmk_layout.py` | Deprecated historical VIA-to-C converter | obsolete keymap block format; do not use for current authoring | outside required checks; see [retirement notice](../tooling/VIA_TO_QMK.md) |
 | `tools/check_firmware_stack_budget.py` and `tools/firmware_stack_budget.json` | Reconcile target stack symbols/artifacts and enforce reviewed stack contexts, call edges, indirect edges, and reserves | read-only report; no source output | `run_firmware_stack_budget_tool_tests.sh`; fresh instrumented target build plus `run_firmware_stack_budget_checks.sh` |
 | `tools/host_layouts/build.py` | Derive each host layout's character table from the raw sources in `tools/host_layouts/sources/` (read by `extract_macos.swift`, `extract_xkb.sh` and `--import-qmk`) and generate the C tables | `tests/fixtures/host_layouts_v1.json`, `users/noah/lib/macro/host_layout_tables.c` | `run_host_layout_tests.sh` (`--check`) |
 | `tools/check_firmware_memory_budget.py` | Report RP2040 per-bank linked accounting and enforce compact macro symbols plus explicit SRAM0–3 `.bss`, `.data + .bss`, and boot core-memory-span regression policies defined in [memory-budgets.md](./memory-budgets.md) against a fresh ordinary target ELF | read-only report; no source output | `run_firmware_memory_budget_tool_tests.sh`; fresh ordinary target build plus `run_firmware_memory_budget_checks.sh` |
@@ -60,8 +61,8 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `pointing/modes/` | Configured directional engine and shared dragscroll algorithm | Validated effective slot records | Mouse reports and mode lifecycle transitions | Transformed reports and bounded synthetic actions | `run_pd_mode_handlers_tests.sh`, `run_pd_mode_tests.sh` | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/policy/` | Pointer layer and PD policy rules | Policy helper | Layer state, keycodes, PD traits | Pointer layer activation, mouse-record classification | `run_pointer_layer_policy_tests.sh`, PD/key-runtime integration tests | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/runtime/` | PD mode state, snapshots, lifecycle, key bridge | Authoritative PD state | PD key events, key-runtime effects, pointer reports, split snapshots | Local/display/remote PD state, active handler routing, DPI sync | PD runtime/mode/bridge integration tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [runtime-flow](./runtime-flow.md) |
-| `profile/runtime/` | Effective-profile publication, semantic-action translation, generation-owned behavior/RGB views, activation safety, and the gated single-owner composition | Pending/active profile generation plus activation wait evidence; complete owner only in a side-specific engineering artifact | Compiled/validated snapshots, candidate and peer leases, authoritative runtime activity, provisional/durable split convergence | Incremental boot/adoption, distributed prepare/commit fencing, coherent generation publication, behavior/RGB view swaps, bounded host/split scheduling, stale-token refusal | `run_profile_owner_tests.sh`, `run_profile_owner_via_integration_tests.sh`, effective-provider/RGB/activation tests, feature and engineering stack gates | active live-edit architecture review |
-| `profile/split/` | Canonical live-profile sibling frames, D-014 authority, and D-022 distributed commit reconciliation | Caller-owned reconciler; registered only by the gated engineering profile owner | Durable local/peer descriptors, provisional prepare intent, staged or durable bounded payload reader, exact peer store, one-frame QMK exchange | Strict push/pull/prepare frames (32-byte replies, chunks up to 110 bytes, reuse ranges filled from the receiver's active profile), prepared pause/abort/authorization, one callback mailbox, full or convergence-only arbitration, coherent authority snapshots, fail-closed activation peer count | `run_profile_split_foundation_tests.sh`, `run_profile_split_reconciler_tests.sh`, `run_qmk_profile_split_transport_tests.sh`, engineering stack gate | active live-edit architecture review and `profile-split-v1.md` |
+| `profile/runtime/` | Effective-profile publication, semantic-action translation, generation-owned behavior/RGB views, activation safety, and single-owner composition | Pending/active profile generation plus activation wait evidence; complete owner in the side-specific flashable pair | Compiled/validated snapshots, candidate and peer leases, authoritative runtime activity, provisional/durable split convergence | Incremental boot/adoption, distributed prepare/commit fencing, coherent generation publication, behavior/RGB view swaps, bounded host/split scheduling, stale-token refusal | `run_profile_owner_tests.sh`, `run_profile_owner_via_integration_tests.sh`, effective-provider/RGB/activation tests, feature and live-owner stack gates | [profile contract](device-resident-profile.md) |
+| `profile/split/` | Canonical live-profile sibling frames, durable authority and distributed commit reconciliation | Caller-owned reconciler; registered by the side-specific profile owner | Durable local/peer descriptors, provisional prepare intent, staged or durable bounded payload reader, exact peer store, one-frame QMK exchange | Strict push/pull/prepare frames (32-byte replies, chunks up to 110 bytes, reuse ranges filled from the receiver's active profile), prepared pause/abort/authorization, one callback mailbox, full or convergence-only arbitration, coherent authority snapshots, fail-closed activation peer count | `run_profile_split_foundation_tests.sh`, `run_profile_split_reconciler_tests.sh`, `run_qmk_profile_split_transport_tests.sh`, live-owner stack gate | [profile contract](device-resident-profile.md) and `profile-split-v1.md` |
 | `rgb/automouse/` | Auto-mouse RGB fade support | Projected UI | Effective fade destination, auto-mouse timing, and layer state | Generation-consistent fade frame and progress quantization | RGB layer render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
 | `rgb/core/` | RGB orchestration, effective-config adapters, helpers, validation | Render pipeline owner | One captured effective RGB frame, compiled fallbacks, runtime snapshots | LED frame application, bounded reads for every RGB family and key-feedback tap policy, validation, map invalidation | `run_effective_rgb_runtime_tests.sh`, `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` | [RGB_CONFIG](../RGB_CONFIG.md) |
 | `rgb/stages/` | Individual RGB overlays | Projected UI | Effective layer, pointing, combo, and key-feedback profile data; layer state, combo bitmaps, key feedback, PD snapshots | Generation-consistent stage composition and LED painting | RGB render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
@@ -100,7 +101,7 @@ source trace because they rewrite or verify human-facing firmware docs.
   boundaries the cadence recorder's stage timing needs)
 
 Combo-origin pending entries are compatibility candidates, not runtime press
-ownership. There is one per combo index (up to the 32-combo Profile Wire bound),
+ownership. There is one per combo index (up to the 128-combo Profile Wire bound),
 carrying its physical completion generation. A combo completes again only after
 a member release, which makes QMK fire or drop the earlier completion, so the
 newer generation replaces it; a burst of chords cannot crowd a candidate out.
@@ -125,13 +126,11 @@ callback only forwards exact frames (up to 128 bytes, at QMK's per-call RPC
 length) into the caller-owned profile reconciler and returns cached 32-byte
 replies; scan context owns every profile read,
 write, validation, and marker-last commit step. The transaction id is appended
-after the existing userspace ids. Ordinary firmware leaves the adapter
-unregistered. A side-specific engineering artifact registers it through the
-single owner after compiled-profile validation and graph initialization. That
-artifact exposes coherent owner capabilities and status through the VIA
-channel. Adding the explicit mutation gate couples candidate status and host
-mutation routing to the complete write/commit/activation/peer capability set;
-ordinary and owner-only firmware remain read-only.
+after the existing userspace ids. Generic firmware leaves the adapter unregistered. The flashable side-specific
+pair registers it through the owner after compiled-profile validation and graph
+initialization. Owner and mutation default on for the pair; capabilities and
+mutation routing are published together. Explicitly disabling mutation leaves
+an owner-only read-only comparison build.
 
 Auto-mouse elapsed time is also fork-specific. Split runtime passes its one
 sampled tick timestamp through `qmk_auto_mouse_contract.h`; the compatibility
@@ -203,14 +202,19 @@ semantics without taking another platform timer sample.
 
 ### `profile/`
 
-- Runtime publication and consumers: `runtime/effective_profile_provider.c/h`,
-  `runtime/effective_key_behavior_runtime.c/h`,
-  `runtime/effective_rgb_runtime.c/h`, and
-  `runtime/profile_activation_policy.c/h`
-- Split protocol foundation: `split/profile_split_authority.c/h` and
-  `split/profile_split_protocol_v1.c/h`. These files define decisions and
-  framing only; they do not own QMK RPC, EEPROM transfer, or production
-  activation.
+| Package | Responsibility | Contract |
+| --- | --- | --- |
+| `schema/` | Domain registry, versions, canonical codecs, compiled writer, range-seeking reader and incremental whole-profile validation | [Profile Wire](profile-wire-v1.md), [RGB](rgb-domain-v1.md), [PD](pd-mode-domain-v1.md), [settings](portable-profile-v1.md) |
+| `protocol/` | HID read and candidate command encoding, capability and status frames | [Profile Wire](profile-wire-v1.md) |
+| `storage/` | EEPROM geometry, checksums, slot selection, candidate transaction and peer backend | [storage](storage-and-resource-baseline.md), [logical transactions](logical-profile-transaction-v1.md) |
+| `runtime/` | Single profile owner, effective generation, behavior/combo/settings/RGB/PD consumers, semantic actions and activation policy | [authority](authority-state-table.md), [runtime flow](runtime-flow.md) |
+| `split/` | Sibling framing, descriptor comparator, bounded mailbox and scan-owned reconciliation | [Profile Split](profile-split-v1.md) |
+
+These share the domain registry; no consumer should maintain a parallel domain
+list. `profile_owner.c` composes the host candidate, store, split and provider
+interfaces. QMK integration remains under `compat/`: `qmk_profile_eeprom.*`,
+`qmk_via_profile_channel.c`, `qmk_via_logical_profile.*`, `qmk_portable_profile.*`
+and `qmk_profile_split_transport.*`. `qmk_durable_io.*` arbitrates scan-owned I/O.
 
 ### `rgb/`
 
@@ -256,11 +260,14 @@ The authored profile boundary is intentionally outside `users/noah/lib/`:
   shortcuts (`CUSTOM_KEYS`).
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h` owns keymap-facing
   timing, layer ids, pointer tuning, and RGB feature flags.
+- `keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c` owns factory
+  pointing-slot records, validated through the profile codec.
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c` owns authored
   RGB colors, LED groups, and render-stage configuration.
 
-Changes to these authored inputs must run profile introspection and real-profile
-validation as described in [change-guide.md](./change-guide.md).
+Changes require the matching authored-profile validation. Regenerate
+introspection when one of its declared inputs changes (`pd_config.c` is not
+currently parsed by that tool), as described in [change-guide.md](./change-guide.md).
 
 ## Host Test Runner Inventory
 
@@ -278,5 +285,6 @@ Use the runner that matches the behavior touched while iterating, then use
 | RGB and split | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh`, `run_split_runtime_sync_tests.sh` |
 | Runtime diagnostics and tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |
 | Firmware resource budget tooling | `run_firmware_stack_budget_tool_tests.sh` (host fixtures), `run_firmware_stack_budget_checks.sh` (fresh instrumented target artifacts), `run_firmware_memory_budget_tool_tests.sh` (host fixtures), `run_firmware_memory_budget_checks.sh` (fresh ordinary target ELF) |
+| Profile owner and protocols | `run_profile_owner_tests.sh`, `run_profile_owner_via_integration_tests.sh`, `run_profile_domain_owner_round_trip_tests.sh`, `run_profile_split_reconciler_tests.sh`, `run_contract_probe.sh` |
 | Full host suite | `run_all_host_tests.sh` |
 | All-profile firmware compile | `run_all_profile_compile_tests.sh` |

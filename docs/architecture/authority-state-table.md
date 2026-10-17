@@ -9,7 +9,7 @@
 | Compiled defaults | canonical digest and action-ABI digest | recovery fallback |
 | Device commit | `{counter, origin_half}` plus canonical digest | deployed runtime authority |
 | RGB preview | transaction id, base generation, digest | volatile overlay only |
-| Peer half | committed version tuple and digest | must converge before milestone success |
+| Peer half | committed version tuple and digest | must converge before successful Apply |
 
 Only a successful durable device commit advances the device counter. Source and
 draft changes never manufacture device generations.
@@ -22,18 +22,26 @@ draft changes never manufacture device generations.
   conflict.
 - Equal counter with different origins is a disconnected concurrent commit;
   stop and require explicit user resolution.
-- Reset commits an override-disabled record with a new generation.
-- Applying an unchanged canonical payload is a no-op.
+- Reset to compiled defaults is a required future operation, not an exposed
+  durable reset endpoint.
+- Exact command retries are idempotent. An unchanged payload in a new
+  transaction is not guaranteed to be a no-op; clients should avoid needless
+  Applies.
 
 The origin half is a stable physical-half id, not current USB role.
 
 ## Distributed Commit Phases
 
+This table summarizes custom-profile authority. Every current save also binds
+VIA: the [logical transaction contract](logical-profile-transaction-v1.md)
+defines prepared markers on both halves, the decision marker, VIA ACCEPT and
+recovery. A prepared marker is durable recovery evidence, not committed authority.
+
 | Phase | USB/local half | Peer half | Durable authority | Activation |
 | --- | --- | --- | --- | --- |
 | validated | inactive candidate validated | unchanged | prior committed descriptor | prior generation stays active |
-| `PREPARING_PEER` | HOST lease retained; no marker | exact bytes staged under PEER lease; no marker | unchanged | forbidden |
-| peer prepared | pauses in `PUSH_PREPARED` | complete inactive candidate | unchanged | forbidden |
+| `PREPARING_PEER` | HOST lease retained; no committed marker | exact bytes staged and validated under PEER lease | unchanged | forbidden |
+| both durably prepared | local candidate durably prepared; decision still pending | complete inactive candidate with prepared marker | unchanged | forbidden |
 | local committing | marker-last advances locally | prepared and fenced | prior descriptor until local marker succeeds | forbidden |
 | `CONVERGING_PEER` | new descriptor durable and published | marker-last commit authorized | local newer, transfer pending | forbidden |
 | exact converged | exact new descriptor | exact new descriptor | `COMMITTED_CONVERGED`, no transfer | eligible for normal safe-boundary activation |
@@ -41,9 +49,9 @@ The origin half is a stable physical-half id, not current USB role.
 
 `PREPARE_BEGIN` intent is provisional and never replaces durable peer metadata.
 If both halves hold provisional host candidates, higher generation wins before
-either marker. Equal generation is ordered by the lower stable physical-origin
+either committed marker. Equal generation is ordered by the lower stable physical-origin
 id; the loser aborts peer staging first and then reports
-`PEER_PREPARE_YIELDED`. Once either marker is durable, D-014 ordering applies
+`PEER_PREPARE_YIELDED`. Once either committed marker is durable, the durable ordering above applies
 without a tiebreaker: equal-generation/different-origin records are an explicit
 conflict.
 
@@ -55,7 +63,7 @@ end while that prepared push is active. The `ABORT` is bounded by
 `NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS` (15 s). If the peer stays
 silent or answers `BUSY` past it, the USB half releases its own side: the host
 transaction ends, and durable authority on both halves is unchanged because no
-marker exists. The peer may still hold its provisional lease, so the USB half
+committed marker exists. The peer may still hold its provisional lease, so the USB half
 reports peer cleanup pending, retries the same `ABORT` about once a second in
 idle slots, keeps polling metadata, and starts no prepared push or ordinary
 transfer until the peer acknowledges it. A refused cancel (the peer reports
@@ -87,6 +95,10 @@ sat unprocessed in the candidate mailbox until a power cycle.
 
 ## User Operations
 
+These are product requirements. Open/read, backup/restore and Apply are backed
+by current firmware. Volatile RGB preview/rollback and durable reset are not
+exposed operations; external VIA adoption/conflict reporting remains unfinished.
+
 | Operation | Source | USB half | Peer half | Required visible result |
 | --- | --- | --- | --- | --- |
 | Open from keyboard | unchanged | read complete supported profile | prove matching peer or expose drift | generation-bound editable draft |
@@ -107,11 +119,14 @@ Apply ordering follows the [logical transaction contract](logical-profile-transa
 
 ## RGB Preview Rules
 
+These rules constrain a future volatile preview endpoint. Capability bit 7
+remains clear; they do not describe an implemented preview service.
+
 - Preview is device-only, volatile, debounced, and replaceable atomically.
 - It is tied to the committed base generation that produced it.
 - Only RGB fields that do not affect key planning use the frame boundary.
 - Tap-commit policy uses strict behavior activation.
-- Cancel, Reload Source, profile switch, panel disposal, timeout, disconnect,
+- Cancel, refresh, profile switch, panel disposal, timeout, disconnect,
   reboot, or explicit rollback removes the preview.
 - A preview never writes either durable slot and never wins reconciliation.
 
@@ -153,20 +168,21 @@ status read cannot observe counts from two evaluations. A missing peer observer
 is intentionally unsafe. One exception is bounded: while a host Apply is
 `ACTIVATING` the record this owner already saw the peer durably commit (and,
 for a logical record, whose VIA ACCEPT the peer acknowledged), the peer reason
-is satisfied by that confirmation instead of a second live observation. The predicate is installed by the gated D-021 owner
-together with the behavior and RGB invalidators and exact split peer observer.
-Ordinary firmware still allocates only the read-only shell. The D-022
-distributed barrier enforces postcommit authority in the gated owner. The
-separate engineering-mutation gate now couples routing with the complete,
-truthful write/commit/activation/peer capability set for hardware testing;
-resource policy and the hardware matrix still block ordinary exposure.
+is satisfied by that confirmation instead of a second live observation.
+
+The predicate is installed by the profile owner with behavior and RGB
+invalidators and the exact split peer observer. Side-specific pair builds
+include that owner and mutation support by default. Generic and explicit
+owner-only comparison builds remain read-only. Hardware acceptance is a
+separate obligation from exposing these implemented capabilities.
 
 ## Connection Status Shown By the Ark Client
 
 At minimum:
 
 - disconnected, discovering, compatible, incompatible, busy, or contended;
-- source, compiled-default, active, committed, preview, and peer digests;
+- compiled-default, active, committed and peer digests; preview identity if
+  a future preview capability is advertised;
 - active, pending, committed, and peer version tuples;
 - candidate transaction and validation result;
 - safe-boundary wait reasons;

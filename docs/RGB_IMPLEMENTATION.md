@@ -1,9 +1,7 @@
 # RGB Implementation
 
-What the code actually does, as distinct from what it is meant to do.
-[rgbflow.md](./rgbflow.md) is the intended language; this is the machinery behind
-it, including the places the two do not line up. For authoring colors, locality
-and LED groups see [RGB_CONFIG.md](./RGB_CONFIG.md).
+This is the machinery behind the [feedback language](./rgbflow.md). For
+authoring colors, locality and LED groups see [RGB_CONFIG.md](./RGB_CONFIG.md).
 
 ## Where the key-behavior stage sits
 
@@ -43,8 +41,8 @@ stage's group rows, the auto-mouse fade mode and end color, combo-feedback
 color/locality, and key-feedback colors, ordered tap branches, locality, and
 tap-commit policy are read through
 [`rgb_effective_config.c`](../users/noah/lib/rgb/core/rgb_effective_config.c),
-which selects either a validated live view or the compiled tables in
-`rgb_config.c`.
+which reads the effective generation: stored RGB when present, otherwise the
+compiled RGB serialized through the same domain format.
 
 A token becomes stale as soon as a later profile generation is published.
 Every renderer family then refuses a stale token instead of reading part of
@@ -54,14 +52,12 @@ result. The mapped-key LED map is generation-independent; colors, modes,
 locality, groups, and feedback policy are resolved as render-local state, so
 they cannot remain cached after a profile switch.
 
-Ordinary firmware still selects the compiled tables. The side-specific
-engineering artifact installs the complete effective-profile owner and all
-renderer invalidators. A separate explicit mutation gate now makes this path
-writeable for the first two-half hardware test while resource-policy and
-hardware validation remain open.
-Its distributed split barrier already prepares both halves before local
-durability and requires exact durable convergence before activation. All
-current renderer families are behind the effective adapter.
+The flashable side-specific pair installs the effective-profile owner and all
+renderer invalidators, with live mutation enabled by default. Its logical
+transaction prepares both halves before the decision and requires the bound
+custom/VIA identities before activation. Generic builds without a physical-half
+identity use compiled defaults. Hardware acceptance remains separate from the
+implemented render and publication contracts.
 
 ## How truth reaches the LEDs
 
@@ -213,8 +209,8 @@ momentary layer does not.
 
 Pulses are a separate one-shot channel lasting one
 `FEEDBACK_FLASH_HALF_PERIOD_MS`, with a queue slot so a second pulse arriving
-during the first re-arms rather than being dropped. `TAP_COMMITTED` renders green,
-`HOLD` renders as steady hold colour, `LONG_HOLD` as steady long-hold colour.
+during the first re-arms rather than being dropped. `TAP_COMMITTED` renders
+the configured tap-committed color (white in the authored defaults), `HOLD` renders as steady hold colour, `LONG_HOLD` as steady long-hold colour.
 
 ## Precedence
 

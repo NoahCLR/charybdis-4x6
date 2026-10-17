@@ -3,7 +3,7 @@
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
 > schema 3.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
 > a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
-> binds a nonzero VIA generation and digest. HID and split framing remain v1.
+> binds a nonzero VIA generation and digest. HID framing remains v1; split framing is version 2.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > Backup translation belongs to the client, before a current-format Apply.
 
@@ -16,7 +16,8 @@ motion and temporary layer activation are not configuration.
 ## Portable document
 
 The UTF-8 JSON file has exactly these fields. Unknown fields and unsupported
-versions fail validation. Files are limited to 100,000 bytes.
+versions fail validation. File-level limits and import UX belong to Ark; the
+firmware bounds below apply to the decoded device payload.
 
 | Field | Meaning |
 | --- | --- |
@@ -25,10 +26,16 @@ versions fail validation. Files are limited to 100,000 bytes.
 | `keyboard` | `charybdis-4x6` |
 | `actionAbiDigest` | Nonzero uint32 engine vocabulary identity |
 | `layers` | Sixteen arrays of 60 uint16 native keycodes, in matrix row/column order, including unused physical matrix positions |
-| `profile` | Canonical base64 NLP1 payload, at most 4,064 bytes; domains `0x10`, `0x20`, `0x30`, `0x40`, in that order |
+| `profile` | Canonical base64 NLP1 payload, at most 53,216 bytes; domains `0x10`, `0x20`, `0x30`, `0x40`, `0x50`, in that order |
 | `macros` | Exactly 128 canonical base64 VIA macro streams, excluding their zero terminators |
 
-The temporary bridge also exports five-layer documents. Import into the
+### Historical backup translations
+
+The following records earlier client translation steps, not formats accepted
+by current firmware or a promise that a given Ark release imports every old
+backup. The current firmware requires schema 3.0 and current domain versions.
+
+The retired temporary bridge exported five-layer documents. Import into the
 standard image recognizes the deployed `0xdcb00959` action vocabulary, adds
 three transparent layers, and translates native user triggers from `0x7e61`
 upward by three positions. The eight-layer vocabulary is `0xeb80829c`; the
@@ -82,13 +89,13 @@ safety ceilings remain firmware capabilities.
 
 VIA streams support capability-gated canonical UTF-8 text (feature bit 21), tap/down/up instructions and decimal delay
 instructions. Held keys must balance. The bank is reconstructed with zero
-padding and a final zero validity byte. Both macro banks are independent:
-64 VIA slots and 16 user macro slots retain their existing key identities.
+padding and a final zero validity byte. The current bank contains 128 VIA
+macros; the separate user-macro bank is retired.
 
 See [Unicode macro playback](runtime-flow.md) for encoding, compiled size, host setup and cancellation.
 
 The reconstructed bank is the document's, not necessarily the keyboard's. A
-valid bank may hold nonzero bytes after its 64th terminator, for instance after
+valid bank may hold nonzero bytes after its 128th terminator, for instance after
 a writer shortened the macros without clearing the rest; the document cannot
 carry them and export stays canonical. Differential transfer therefore never
 compares against a bank rebuilt from a document. A capture keeps the exact
@@ -232,7 +239,7 @@ byte at request byte 4 and its high byte at byte 5 (feature bit 19). Page 0's
 12-byte payload is version `1`, chunk size `25`, uint16 length, CRC32, and
 FNV-1a digest of the bytes as they are at that moment. Pages 1 onward return
 successive 25-byte chunks with an exact short final chunk, streamed from the
-live domain rather than a snapshot; the largest domain needs 376 chunk pages.
+live domain rather than a snapshot; the largest domain needs 387 chunk pages.
 The host reads page 0 again after the chunks and requires identity and both
 checksums to match, so a change during the read fails it. The complete export also
 rechecks settings after reading the VIA banks, so changing RGB or DPI during a
@@ -316,8 +323,9 @@ matrix LT/LM/MO/TO/TG/DF/PDF/OSL/TT and userspace lock actions, behaviour target
 and branches, combo inputs/outputs/reference mapping, RGB rows/groups,
 auto-mouse/auto-sniping targets, the persistent default-layer bitmask and the
 layer behaviour and combo masks. Names and layer records (combo reference and
-placement bitmaps) move with their layers. Save/discard other pending edits before reordering or
-importing; stale layout drafts must not be applied to a new layer order.
+placement bitmaps) move with their layers. Reordering belongs to the same
+generation-bound draft as other edits; stale coordinates must never be applied
+to a newly ordered layer bank.
 
 Restore validates the file, captures a coherent current state, shows a review,
 and saves a local recovery file before staging. After acquiring the profile
@@ -327,8 +335,10 @@ only changed VIA blocks to the non-USB half while that copy is inactive, then
 firmware validates and durably prepares the custom record on both halves with
 the exact target VIA generation and digest. The USB-side custom marker is the
 logical decision. Firmware commits the peer custom record, accepts its staged
-VIA copy, copies the target VIA state back to the USB half, and activates only
-after both identities converge.
+VIA copy, and keeps output fenced while the host writes changed ranges to
+the USB half. Firmware pulls the complete peer copy if host roll-forward
+stalls. Activation requires both identities to converge; see the transaction
+contract for the timeout and recovery ordering.
 
 A timeout after the decision is reported as incomplete and retains the recovery
 path. On reboot, a committed logical record fences normal VIA reconciliation
@@ -346,33 +356,12 @@ is not built or served here: export with matching old firmware, then translate
 the complete backup in the client before restoring through current logical
 Apply. Firmware does not interpret old storage in place.
 
-Host tests validate the app-generated populated payload using the compatibility
-rules of firmware compiled with no behaviours or combos. Tests also cover
-empty overrides, migration, reference rewrites, macro invalidation/retry,
-review conflicts, recovery-file failures and readback mismatches. Browser
-checks exercise naming, moving, saving and reviewing an import. The current side-specific pair is the supported build. The user reports that the new workflow appears to work
-on their keyboard. Physical bridge/export/upgrade/import, restoration onto
-firmware without authored behaviours or combos, reboot, power loss and USB-role
-changes still require a recorded acceptance matrix. Ark's macro
-builder now reads and edits both device banks through this complete-profile
-restore path. Defaults controls use that path too. Physical acceptance remains
-separate product work.
+Firmware host checks cover domain translation, native settings application,
+logical transactions and stored macro lifecycle. The client owns its import,
+review and UI checks. Physical upgrade, restore, reboot, interruption and
+reconnect acceptance remains open; see the [firmware status](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 
-## Defaults editor
-
-Ark's section controls receive effective scalar values from the
-complete snapshot. Section saves preserve both macro banks, layer names and
-all unedited profile bytes, use the complete-profile recovery/restore path, and
-acknowledge only verified readback. Drafts are keyed by device and section and
-retain their original complete-profile fingerprint. Failed saves and re-reads
-keep drafts; external changes block stale saves until discard. Verified macro
-and settings edits can advance unrelated drafts from their exact common base.
-
-Dedicated controls cover all 28 settings, subject to advertised capabilities:
-timing and pointer policies, all four bytes of lighting setting 21, HSV (22),
-startup layers (23), supported native key options (24), and per-layer combo
-references (27). Unedited bytes and unknown native bits remain intact. Startup
-layers require a nonzero final mask; combo references use the reported names.
+## Native settings activation
 
 The firmware applies native lighting while temporarily enabled because QMK
 ignores mode/HSV setters when disabled. At the existing safe activation boundary
@@ -381,24 +370,12 @@ enabled state. The renderer cannot run between these operations. This permits
 editing saved colours/effects while lighting stays off and restoring a profile
 whose lighting state differs from the current state.
 
-## Shared editor draft
+## Client draft and backup ownership
 
-For a complete profile snapshot, the session owns a base fingerprint and a
-validated target document. All editor messages stage through the existing pure
-editors; layer moves and imports stage whole documents. Undo/redo retains up to
-100 transitions. Messages carry both a unique draft instance ID and revision;
-Apply additionally requires review of that exact revision and the original device.
-
-The semantic review compares layout, names, actions, macros, RGB and settings.
-Re-reading preserves a dirty target. If the saved fingerprint differs, editing
-and Apply are blocked until the user explicitly reviews against the new read.
-This rebases the complete target without merging conflicting external changes.
-A failed/interrupted restore retains the target; an incomplete recovery read
-uses its diagnostic fingerprint and clearly states that a full comparison is
-unavailable.
-
-Apply invokes one existing complete-profile restore, with recovery storage before
-writes and target fingerprint verification before resetting history. Current
-firmware publishes the custom and VIA stores as one logical generation. Export
-still captures saved state. Drafts are window-local; unkept forms and kept
-changes are not crash-persistent backups.
+Ark owns the portable JSON codec, import support, draft/review behavior and
+recovery-file UX. Its [guide](https://github.com/NoahCLR/charybdis-ark/blob/main/docs/GUIDE.md)
+and repository contracts govern those details. Firmware owns the decoded
+formats and capabilities documented here. A complete capture must bind custom
+and VIA identities and verify readback; Apply must preserve every unedited
+supported field and refuse stale identity. Neither a draft nor compiled-source
+introspection is evidence of what both halves durably store.

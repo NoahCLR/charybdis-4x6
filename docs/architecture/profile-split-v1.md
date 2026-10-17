@@ -8,9 +8,9 @@
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > Backup translation belongs to the client, before a current-format Apply.
 
-Status: accepted internal split foundation and distributed commit barrier with
-gated owner registration; normal mutation exposure and hardware acceptance
-remain open
+Status: implemented in the side-specific flashable pair. Physical interruption
+and broad hardware acceptance remain open; see the
+[firmware status](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 
 This is a dedicated sibling protocol for the durable live profile. It does not
 extend the VIA region reconciler. Byte 0 of every frame is the framing version,
@@ -68,12 +68,12 @@ Metadata, prepare begin, prepare commit, and abort use this layout:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | protocol version, `1` |
+| 0 | 1 | protocol version, `2` |
 | 1 | 1 | frame kind |
 | 2 | 1 | status |
 | 3 | 1 | bit 0 has committed profile; bit 1 metadata readable; bit 2 logical record (required for a committed profile) |
-| 4 | 1 | schema major, exactly Profile Wire v1 major |
-| 5 | 1 | schema minor, exactly Profile Wire v1 minor |
+| 4 | 1 | schema major, exactly current profile schema major (`3`) |
+| 5 | 1 | schema minor, exactly current profile schema minor (`0`) |
 | 6 | 1 | persistent profile flags |
 | 7 | 1 | stable physical origin half, `0` or `1` |
 | 8 | 2 | canonical payload length |
@@ -98,7 +98,7 @@ whole-profile validation before commit.
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | protocol version, `1` |
+| 0 | 1 | protocol version, `2` |
 | 1 | 1 | frame kind |
 | 2 | 1 | status |
 | 3 | 1 | reserved zero |
@@ -118,7 +118,7 @@ retains the complete origin, CRC, flags, schema, and compatibility identity.
 
 `PREPARE_BEGIN` may describe either an already durable sender record during
 normal repair or a semantically validated but still provisional host candidate
-during D-022 deployment. Receiving it records provisional intent separately;
+during a host deployment. Receiving it records provisional intent separately;
 it never overwrites the last durable `peer_descriptor` or publishes the intent
 as peer authority. Once every byte is acknowledged, a provisional sender pauses
 in `PUSH_PREPARED`. Only a later owner authorization may send
@@ -221,7 +221,7 @@ receive/write paths. The owner reads them in its main-context HID status query.
 
 ## Authority And Activation
 
-The comparator follows D-014:
+The comparator in `profile_split_authority.c` applies these rules:
 
 - unreadable, malformed, unsupported, or incompatible metadata fails closed;
 - no committed profile on either compatible half means compiled convergence;
@@ -238,7 +238,7 @@ treats as unresolved.
 For a peer-required live deployment, exact convergence is a two-phase barrier:
 
 1. transfer the validated local candidate into the peer inactive slot and
-   pause before either marker;
+   pause before either committed marker;
 2. commit the local marker, immediately publish that exact durable descriptor,
    then authorize the peer marker;
 3. exchange fresh metadata and require both durable descriptors to equal the
@@ -250,7 +250,7 @@ owner's current committed descriptor. A stale previously converged publication
 therefore cannot authorize a newly durable generation. Higher-generation
 simultaneous provisional candidates win before durability; equal generations
 use stable physical origin as the deterministic precommit tiebreaker. Durable
-equal-generation/different-origin records remain D-014 conflicts and are never
+equal-generation/different-origin records remain durable conflicts and are never
 silently overwritten.
 
 ## Durable Peer Receiver
@@ -273,10 +273,10 @@ The store now treats compiled-default digest as boot and candidate
 compatibility, derives the domain mask from the checksummed canonical payload,
 and latches an unconfirmed final marker as reconciliation-required. No later
 prepare can invalidate either slot until a conclusive boot selection clears
-that latch. The gated owner does not publish a boot-discovered exact record
+that latch. The owner does not publish a boot-discovered exact record
 until it has also advanced the bounded whole-profile adoption validator for
-that exact selected record; the ordinary shell remains read-only and never
-activates the record.
+that exact selected record. Generic builds without a physical-half identity
+retain a read-only shell and do not activate stored records.
 
 ## Scan-Owned Reconciler And QMK Adapter
 
@@ -347,27 +347,21 @@ staged candidate no longer exists.
 The reconciler preserves `origin_half`; it never derives it from current USB
 role. On this `MASTER_RIGHT` board, upstream QMK falls back to
 `is_keyboard_left() == !is_keyboard_master()` without a hand pin or `EE_HANDS`,
-so that fallback is not a durable physical identity. D-018 now builds left
-with `FORCE_SLAVE` plus `NOAH_PHYSICAL_HALF=left` and right with `FORCE_MASTER`
-plus `NOAH_PHYSICAL_HALF=right`. The physical setting overrides handedness in
-  flash independently of transport role. Production live mutation remains off.
-  The side-specific D-021 engineering owner consumes that fail-closed identity
-  boundary and registers the split transport exactly once. The additional
-  mutation gate exposes the path only in labeled hardware-test artifacts.
+so that fallback is not a durable physical identity. The pair builder sets
+`FORCE_SLAVE` plus `NOAH_PHYSICAL_HALF=left`, and `FORCE_MASTER` plus
+`NOAH_PHYSICAL_HALF=right`. Flash identity is independent of the transport-role
+query. The side-specific owner consumes that identity and registers the split
+transport exactly once; mutation is enabled by default in the flashable pair.
 
-## Remaining Exposure And Acceptance Pieces
+## Remaining hardware acceptance
 
 - allocator/stack high-water evidence on both physical halves;
-- the USB-orientation, reconnect, role-swap, interruption, and contention
-  hardware matrix;
-- real-device recovery evidence for `AUTHORITY_FAILED` after an injected
-  postcommit fence loss;
-- promotion of mutation routing and write/commit/activation/peer capability
-  advertising beyond the explicit engineering gate.
+- reconnect, applicable USB/role configurations, interruption and contention;
+- real-device recovery for `AUTHORITY_FAILED` after a postcommit fence loss.
 
-Until those pieces pass, mutation, activation, and peer-reconciliation
-capability bits remain disabled in ordinary firmware. The engineering mutation
-pair advertises them together for the two-half acceptance matrix.
+These remain open acceptance obligations. They do not mean the ordinary pair
+omits mutation, activation or peer reconciliation; its capabilities advertise
+the implemented paths together. See [firmware status](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 
 ## Mandatory logical binding
 

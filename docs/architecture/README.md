@@ -1,5 +1,7 @@
 # Userspace Architecture
 
+For user guides and tooling, start at the [documentation index](../README.md).
+
 This is the maintainer and agent entry point for the userspace architecture. It
 is for changes that touch runtime ownership, source layout, QMK integration,
 split sync, RGB rendering, profile tooling, or the tests that enforce those
@@ -27,8 +29,8 @@ default activity policy and opt-in diagnostics; recorded captures live under
 - Use [memory-budgets.md](./memory-budgets.md) before interpreting target RAM,
   allocator, EEPROM-cache, or stack numbers.
 - Use [profile-wire-v1.md](./profile-wire-v1.md) and
-  [profile-split-v1.md](./profile-split-v1.md) for the HID and split protocols
-  Ark speaks.
+  [profile-split-v1.md](./profile-split-v1.md) for the host HID protocol and the firmware-internal sibling protocol,
+  respectively. Ark communicates through HID; the halves speak the split protocol.
 - Use [authority-state-table.md](./authority-state-table.md) for source, device,
   and split authority plus safe activation.
 - Use

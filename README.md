@@ -64,15 +64,15 @@ any C and you don't reflash.
 3. [Install Charybdis Ark](https://github.com/NoahCLR/charybdis-ark#install)
    and open it with the keyboard connected.
 
-Only this side-specific pair works with Ark. A plain `qmk compile` image
-doesn't. Firmware accepts current-format profiles; keep a backup before an
-upgrade, and use Ark's import translation for older backups.
+Use both files from that release. Firmware accepts current-format profiles;
+keep a backup before an upgrade, and use Ark's import translation for older backups.
 
 ## Configure it in C (optional)
 
 With Ark you don't have to. But the compiled defaults are plain data in
 [`keymap.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c),
-[`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c)
+[`rgb_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c),
+[`pd_config.c`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c)
 and [`config.h`](./keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h),
 and the shared runtime in [`users/noah/`](./users/noah/) handles the rest. This
 is my right thumb key, slightly trimmed:
@@ -94,14 +94,12 @@ is my right thumb key, slightly trimmed:
 },
 ```
 
-To build it yourself, start Docker, check out my
-[BastardKB QMK fork](https://github.com/NoahCLR/bastardkb-qmk) beside this
-repo at the commit [`qmk-pin.json`](qmk-pin.json) names (or point `QMK_ROOT`
-at it) and run `sh tools/build-firmware-pair.sh`. The
-[firmware guide](docs/GUIDE.md) has the full behaviour vocabulary, the
-lighting model, split sync and the build details.
+For building from source and the full behaviour vocabulary, see the
+[firmware guide](docs/GUIDE.md).
 
 ## Docs
+
+Start with the [documentation index](docs/README.md) to find a guide or contract.
 
 - [Firmware guide](docs/GUIDE.md): the long version of this page
 - [My keymap](docs/KEYMAP.md) and its

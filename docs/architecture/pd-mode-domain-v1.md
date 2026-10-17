@@ -1,18 +1,19 @@
 # PD-mode domain v1
 
-Implemented in schema-2 builds: domain codec, incremental validation, immutable
+Implemented in schema-3 builds: domain codec, incremental validation, immutable
 effective cache, shared engines, persistence/split writers, portable profiles
 and live editor. Side-specific builds own committed profiles; the generic build
-loads the 32 compiled factory slots without a profile owner. Domain version 2
-(D-F09, 2026-10-06) stores 32 slots sparsely; version 1 below is its record
-layout and the retired fixed eight-slot domain.
+loads the 32 compiled factory slots without a profile owner.
+Current domain version 3 stores up to 32 sparse 128-byte records. The older
+version-1 fixed bank and version-2 sparse 96-byte records below are historical
+translation inputs, not accepted firmware formats.
 Physical upgrade and release acceptance remain pending; see
 [Hardware acceptance](#hardware-acceptance).
 
 ## Scope
 
 The keyboard owns 32 pointing-mode slots, stable IDs `0..31` shown as slots
-1–32, and 32 matching PD RGB rows keyed by the same IDs (RGB domain v3). The app reads, edits
+1–32, and 32 matching PD RGB rows keyed by the same IDs (RGB domain v4). The app reads, edits
 and saves them in the ordinary draft, review and logical Apply; reboot, backup
 and restore preserve them without the repository.
 
@@ -109,7 +110,7 @@ non-empty name; an omitted slot is disabled with an empty name. A present
 record that is disabled with an empty name is noncanonical and rejected
 (`NONCANONICAL`), as are a count above 32 or a wrong version, capacity or
 record size (`INVALID_HEADER`), nonzero header bytes 4..7 (`RESERVED`), a
-length other than `8 + 96 × nn` (`INVALID_LENGTH`), and a repeated,
+length other than `8 + 128 × nn` (`INVALID_LENGTH`), and a repeated,
 out-of-order or out-of-range ID (`INVALID_ID`). Version 3 is version 2 with
 the name moved to the shared counted rule: bytes 0..7 and 32..95 keep their
 meaning, so the pointing engine reads the same 96 bytes it always has.
@@ -120,7 +121,7 @@ bytes. RGB remains in its own domain; RGB v4 holds 32 ID/HSV/locality rows,
 one per slot whether or not the slot is stored here.
 
 Retired version 1 was fixed: 776 bytes, the header `01 08 60 00 00 00 00 00`
-then eight records in ID order `0..7`, disabled slots included. No schema-2
+then eight records in ID order `0..7`, disabled slots included. No current
 firmware with 32 slots accepts it. An importer converts it by dropping each
 disabled record without a name and writing the version-2 header; record bytes
 are unchanged.
@@ -150,7 +151,8 @@ are unchanged.
 | 96 | 32 | UTF-8 name, `length` bytes, the rest zero |
 
 Eight-direction records (kind `1`, axis `3`, added 2026-09-23) reuse bytes
-70..90, which every other directional record leaves zero:
+70..85 for their diagonal outputs. Bytes 86 and 87 apply to every directional
+record; bytes 88..95 remain reserved zero:
 
 | Record offset | Bytes | Meaning |
 | --- | --- | --- |
@@ -160,7 +162,7 @@ Eight-direction records (kind `1`, axis `3`, added 2026-09-23) reuse bytes
 | 88 | 2 | Reserved, zero |
 
 Firmware and apps that predate axis `3` reject it as an unknown axis policy,
-so the domain version stays `1`: an older reader refuses such a profile rather
+so that historical addition did not change the domain version: an older reader refuses such a profile rather
 than misreading it. Byte 87 (added 2026-10-05) follows the same rule: older
 readers reject a nonzero value as reserved.
 
@@ -244,7 +246,7 @@ shortcut `2`. Mask is nonzero only for policy 1. Modifier masks use the normal
 eight left/right HID modifier bits. Exact emission temporarily isolates the
 shortcut, then restores other owners' modifiers.
 
-The allowlist is tied to the audited QMK 0.0.8 native ABI:
+The allowlist is tied to the pinned QMK native ABI and the advertised action-ABI digest:
 
 - Plain `0x0004..0x00c2`: keyboard `0x04..0xa4`, system `0xa5..0xa7`,
   consumer `0xa8..0xc2`.
@@ -375,7 +377,8 @@ bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ`, `NR` and `NS`
 headers are rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
 
 Synchronous validation, bounded boot scanning and commit shape validation
-share the current version rules in `profile_versions.h`: RGB v4, key behaviors
+share domain versions in `profile_domain_registry.h` and schema/store rules in
+`profile_versions.h`: RGB v4, key behaviors
 v2, combos v3, settings v8 and sparse PD v3. Blob magic remains `NLP1`; schema
 bytes must be 3.0. Domain bodies also require semantic validation. Store tests
 cover all mask/origin/flag combinations, both boot paths, old-header rejection,
@@ -398,16 +401,17 @@ Current sparse PD and its record rules remain the readback/validation contract.
 The effective PD cache reads only on initialization/publication, in chunks of
 at most 20 bytes: the header, then each stored record into its slot's row,
 validating each; omitted slots are materialized disabled with an empty name,
-so the cache always holds 32 rows (3,072 bytes) before becoming ready. A
+so the cache always holds 32 rows (4,096 bytes) before becoming ready. A
 failed read or validation leaves it unavailable; the owner fails closed and
 status does not advertise an active compiled fallback. Motion performs no
 profile storage reads. Activation waits for held/locked modes and intercepted
 button releases, using the existing persistent-intent reason bit.
 
-The compiled reader must service PD-only reads directly from the final PD
-payload, whose compiled size the authored slots fix, using the same encoder and validators as full serialization. A
+The compiled reader seeks directly to the requested domain using its recorded
+range and the same writer used for full serialization. PD-only reads do not
+replay preceding RGB or behavior domains. A
 20-byte read limit alone does not bound CPU work: replaying the preceding RGB
-and cubic behavior canonicalization for all 39 cache reads caused 1,443 row
+and cubic behavior canonicalization during the original eight-slot cache warmup caused 1,443 row
 sorts in one startup scan on the authored profile. The compiled-cache integration
 test requires zero behavior-row sorts during warming and checks every PD byte
 boundary against the full golden serialization. The fix does not rely on the
@@ -457,7 +461,7 @@ Hardware acceptance remains distinct from codec and runtime parity tests.
 | --- | --- |
 | New app, old firmware | Existing supported editing continues; slot editing is visibly unavailable |
 | Old app, new firmware or profile | Incompatibility handling refuses destructive writes |
-| New firmware, old stored record | Recognized version or identity migration, or explicit recovery; never silent default replacement |
+| New firmware, old stored record | Incompatible stored records are refused; compiled defaults remain the fallback. Translate a backup in the client and Apply a current-format profile; firmware does not migrate old records |
 | New app, old export | Migrates only with verified source PD data; otherwise keeps the file and names what is missing |
 | New app and firmware, new export | Exact 32-slot round trip including named disabled slots, RGB and references |
 | 32-slot firmware, eight-slot backup (`0x1d3fcacc`) | Imported through the key-by-key action translation plus PD v1 → v2 and RGB v2 → v3 ([portable profiles](portable-profile-v1.md)) |
