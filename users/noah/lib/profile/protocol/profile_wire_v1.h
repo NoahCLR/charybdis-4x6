@@ -72,8 +72,8 @@ enum {
     // Payload, compiled and settings readbacks (GET 0x04, 0x05, 0x07) take a
     // 16-bit page: request byte 4 is its low byte and byte 5 its high byte.
     NOAH_PROFILE_FEATURE_WIDE_PAGES = 1u << 19,
-    // Behaviour and combo participation controls (participation-policy.md).
-    NOAH_PROFILE_FEATURE_PARTICIPATION = 1u << 20,
+    // Bit 20 is reserved and never advertised: participation controls come
+    // with the current settings and combo domain versions (participation-policy.md).
     NOAH_PROFILE_FEATURE_UNICODE_MACROS = 1u << 21,
     NOAH_PROFILE_FEATURE_HOST_LAYOUTS = 1u << 22,
     NOAH_PROFILE_FEATURE_MACRO_PROTECTION = 1u << 23,

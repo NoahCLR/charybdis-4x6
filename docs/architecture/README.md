@@ -36,10 +36,23 @@ default activity policy and opt-in diagnostics; recorded captures live under
   EEPROM maps, storage ceilings, and the measured resource baseline.
 - Use [field-classification.md](./field-classification.md) for which settings
   are live-editable, structurally bounded, or compiled-only.
-- Use [pd-mode-domain-v1.md](./pd-mode-domain-v1.md) for the eight
-  configurable PD slots: scope, factory presets, runtime publication rules,
-  the schema-2 codec, validation, capacity evidence, storage/ABI contract, the
-  verified legacy-backup migration path and the remaining hardware acceptance.
+- Use [pd-mode-domain-v1.md](./pd-mode-domain-v1.md) for the 32
+  configurable pointing slots: scope, factory presets, runtime publication
+  rules, the sparse domain codec (version 3), validation, capacity evidence,
+  storage/ABI contract, the verified legacy-backup migration path and the
+  remaining hardware acceptance.
+- Use [rgb-domain-v1.md](./rgb-domain-v1.md) for the RGB domain's encoding.
+- Use [portable-profile-v1.md](./portable-profile-v1.md) for the portable
+  profile document: the settings domain, readback commands, layer order and
+  the backup translations clients apply before a restore.
+- Use [participation-policy.md](./participation-policy.md) for when a press
+  uses its shared behaviour or joins a combo, and when a combo output uses
+  its behaviour.
+- Use [logical-profile-transaction-v1.md](./logical-profile-transaction-v1.md)
+  for the atomic both-halves Apply: the commit decision, the output fence,
+  power-loss outcomes and cancellation.
+- Use [ark-compatibility.md](./ark-compatibility.md) for firmware's
+  independence from Ark and what Ark consumes from this repository.
 - Use [device-resident-profile.md](./device-resident-profile.md) for the live
   app's authority, readback, device operations, and performance contracts.
 - The complete user experience and first-grade control-software completion

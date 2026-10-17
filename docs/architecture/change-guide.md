@@ -93,5 +93,7 @@ source manifest, build wiring, or generated firmware input changed.
 - Targeted host tests pass for the area touched.
 - `run_feature_gate_compile_tests.sh` passes when source boundaries, manifests,
   or include rules changed.
-- `run_all_host_tests.sh` and `run_all_profile_compile_tests.sh` pass for
-  runtime, authored profile, build, or firmware-behavior changes.
+- `run_all_host_tests.sh` passes and `sh tools/build-firmware-pair.sh` builds
+  the flashable pair for runtime, authored profile, build, or
+  firmware-behavior changes; a plain `qmk compile` is not the firmware anyone
+  flashes (D-L08).

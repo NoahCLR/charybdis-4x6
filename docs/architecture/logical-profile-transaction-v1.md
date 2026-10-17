@@ -131,9 +131,14 @@ SRAM accounting per half; the workspace is not enlarged.
    generations. Entering the fence at a safe boundary matters because
    activation needs the same boundary and fenced keys could not release a
    hold or unlock a layer. A press made during the fence also loses its
-   release. Boot, discovery and owner error states keep typing on the loaded
-   keymap, except while a restart left the local VIA bank suspect (see
-   Identity).
+   release. Before ACCEPT, boot, discovery and owner error states keep typing
+   on the loaded keymap, except while a restart left the local VIA bank
+   suspect (see Identity). From ACCEPT only complete activation lifts the
+   fence (Cancellation And Lease Ownership, below): an Apply that fails after
+   ACCEPT, with post-commit authority lost or a concurrent commit, leaves the
+   USB half fenced until it restarts and boot recovery makes its bank one
+   generation (Power-Loss Outcomes). A client should tell the user to
+   reconnect the keyboard.
 8. After the decision is observable, the host waits for the peer VIA accept and
    writes only the changed VIA ranges to the USB half. A custom-only change uses
    one verified no-op keycode write to advance the bound VIA generation. The
@@ -255,7 +260,7 @@ stale Apply.
 
 The host reads a complete snapshot once for review and recovery. After acquiring
 the candidate lease, it checks custom identity, VIA identity, and settings digest
-without rereading the 7,191-byte macro bank. It transfers only changed 28-byte
+without rereading the 34,903-byte macro bank. It transfers only changed 28-byte
 VIA blocks. With Profile Wire bits 24 and 25, custom uploads also reuse exact
 active-source ranges and verify bounded batches of streamed chunks; the copy to
 the other half reuses the same ranges from its own active profile and sends

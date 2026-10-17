@@ -446,7 +446,7 @@ storage has committed.
 
 ## Building from source
 
-This userspace is updated for QMK `0.32.5` and builds
+This userspace is updated for QMK `0.34.6` and builds
 against my [BastardKB QMK fork](https://github.com/NoahCLR/bastardkb-qmk)
 rather than the older `bkb-master`-based setup, at exactly the commit
 [`qmk-pin.json`](../qmk-pin.json) names. Releases use the fork's released
@@ -482,7 +482,7 @@ come from the same compiler and are byte-identical for the same commit. Docker
 must be running. A note beside each pair (`N_charybdis.build.txt`) records the
 firmware and BK commits, the compiler and both files' SHA-256.
 
-All current builds use the 32-slot engine and schema-2 EEPROM geometry. Use
+All current builds use the 32-slot engine and schema-3 EEPROM geometry (D-F14). Use
 `sh tools/build-firmware-pair.sh` for the flashable side-specific pair. The
 right build uses `NOAH_PHYSICAL_HALF=right` and `FORCE_MASTER=yes`; the left uses
 `NOAH_PHYSICAL_HALF=left` and `FORCE_SLAVE=yes`. A plain `qmk compile` produces
@@ -494,9 +494,9 @@ Old five-layer firmware is no longer built here. Its storage geometry is
 incompatible with current firmware, so retain the old pair and its backups if
 you still use it. The old five-layer and six-mode readback bridges are retired:
 this repository no longer provides a firmware path for extracting and migrating
-a profile from an old-geometry keyboard, and flashing schema-2 firmware over
-that geometry does not preserve its committed profile. Existing schema-2
-backups still restore through Ark.
+a profile from an old-geometry keyboard, and flashing current firmware over
+that geometry does not preserve its committed profile. Backups from schema-2
+firmware restore through Ark's import translation.
 
 Executable custom combo hooks and unsupported macro content cannot be
 represented as profile data; export reports these explicitly instead of

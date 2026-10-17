@@ -19,6 +19,9 @@ The target definition is
 linker map is
 `../bastardkb-qmk/platforms/chibios/boards/common/ld/RP2040_FLASH_TIMECRIT.ld`.
 
+The dated sections below record each change's linked measurements in order;
+the newest is last.
+
 ## Historical Ordinary Checkpoint — 2026-09-03
 
 Freshly remeasured on 2026-09-03 at the first testable engineering live-edit
@@ -75,7 +78,7 @@ GNU `size` reports the linker-reserved `.heap` section and stack reservations
 inside its aggregate BSS number. Do not add that aggregate BSS value to the
 separate `.data`, `.bss`, core-memory-span, or stack figures.
 
-## Current Portable-Profile Checkpoint — 2026-09-08
+## Portable-Profile Checkpoint — 2026-09-08
 
 The eight-layer left artifact was built by `sh tools/build-firmware-pair.sh`
 with `NOAH_PHYSICAL_HALF=left` and `FORCE_SLAVE=yes`. The owner and portable
@@ -113,7 +116,7 @@ Repartitioning the existing 16 KiB logical EEPROM does not enlarge its linked
 wear-level cache. Increasing logical EEPROM does increase that cache roughly
 byte-for-byte and therefore requires a fresh linked measurement.
 
-## Current Atomic-Apply Checkpoint — 2026-09-15
+## Atomic-Apply Checkpoint — 2026-09-15
 
 The normal eight-layer, owner-enabled left image from
 `sh tools/build-firmware-pair.sh` links the `runtime_owner` at exactly 4,096
@@ -167,16 +170,19 @@ Every memory report must name:
   runtime high-water;
 - the exact fresh build and command that produced it.
 
-Use:
+Measure the instrumented pair, built as the firmware anyone flashes (from a
+task worktree, with `QMK_ROOT` and `BUILD_ROOT` set):
 
 ```sh
-qmk compile -kb bastardkb/charybdis/4x6 -km noah
-sh tests/host/run_firmware_memory_budget_checks.sh
-sh tests/host/run_firmware_stack_budget_checks.sh
+NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh
 ```
 
-The stack runner performs its own clean instrumented build. Its PASS result is
-explicitly limited to the paths in `tools/firmware_stack_budget.json`.
+It runs `tests/host/run_firmware_memory_budget_checks.sh` and both
+reviewed-path manifests on each half and keeps the ELF, map, flags and reports
+beside the pair. A PASS covers only the paths in `tools/firmware_stack_budget.json`
+and `tools/firmware_stack_budget_live_profile_owner.json`. The standalone
+`tests/host/run_firmware_stack_budget_checks.sh` compiles a plain `qmk compile`
+image without the live-profile owner (D-L08), not the flashed pair.
 
 ## Portable-Profile Stack Acceptance — 2026-09-08
 

@@ -81,8 +81,10 @@ prefer bounded indexes and derived caches where that keeps ownership simple.
 
 ## Logical EEPROM Address Map
 
-`WEAR_LEVELING_BACKING_SIZE` is 32,768 bytes. RP2040 wear leveling exposes
-half of that as 16,384 bytes of logical EEPROM.
+`WEAR_LEVELING_BACKING_SIZE` is 286,720 bytes. RP2040 wear leveling exposes
+half of that as 140 KiB of logical EEPROM; the current map is
+[Schema-3 geometry (D-F14)](#schema-3-geometry-d-f14). The two maps below are
+historical, from the 32,768-byte backing and its 16,384 logical bytes.
 
 ### Historical Map Before The Profile Partition
 
@@ -94,8 +96,8 @@ half of that as 16,384 bytes of logical EEPROM.
 | `0x0029–0x0280` | 600 | Dynamic keymap: 5 × 10 × 6 × 2 |
 | `0x0281–0x3FFF` | 15,743 | VIA macro region |
 
-Current authored VIA macro defaults use approximately 258 bytes including
-slot terminators.
+The authored VIA macro defaults used approximately 258 bytes including slot
+terminators.
 
 ### Original Eight-Layer Profile Partition
 
@@ -112,9 +114,10 @@ slot terminators.
 `VIA_EEPROM_CUSTOM_CONFIG_SIZE`, because that would move existing dynamic
 keymap addresses and mix unrelated storage ownership.
 
-Repartitioning the existing logical EEPROM does not grow the wear-level cache.
-Increasing logical EEPROM is rejected for v1 because QMK allocates a RAM cache
-equal to the logical EEPROM size.
+Repartitioning the existing logical EEPROM did not grow the wear-level cache.
+Increasing logical EEPROM was rejected for v1 because QMK allocates a RAM cache
+equal to the logical EEPROM size; D-F14 later grew it to 140 KiB within the
+measured SRAM budget ([memory budgets](memory-budgets.md#bigger-profile-storage--d-f14)).
 
 ## Slot Contract
 
@@ -254,7 +257,7 @@ Format-5 `NT` keeps the `NR` header layout: identity byte 2 holds domain bits
 because a slot payload is at most 53,216 bytes. Storage addresses are 32 bits
 (`noah_profile_storage_address_t`), since slot B ends at `0x22FFF`. Format 5
 binds schema 3.0 and accepts only RGB v4, key-behavior v2, combo v3, settings
-v6 and sparse PD v3.
+v8 (v6 when it landed; D-F25 and D-F26 each added one) and sparse PD v3.
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |

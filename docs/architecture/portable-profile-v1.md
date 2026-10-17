@@ -54,8 +54,8 @@ added rows for slots 6 and 7. Every other byte is kept. The result grows by
 120 − 96 × (dropped records) bytes and must still fit the 5,088-byte ceiling;
 if it does not, the import is refused with that reason, never trimmed. A
 `0x61072732` document translates to the blocks first, then the same way.
-Other legacy vocabularies are rejected. Large legacy macro banks must fit the new
-7,191-byte capacity, including 64 terminators and the final validity byte.
+Other legacy vocabularies are rejected. A legacy macro bank must fit the current
+34,903-byte bank with every slot's terminator ([runtime flow](runtime-flow.md)).
 
 Firmware after D-F14 has a new action-ABI digest (it covers the layer, macro
 and custom-key counts and the custom-key block). Import of a document from the

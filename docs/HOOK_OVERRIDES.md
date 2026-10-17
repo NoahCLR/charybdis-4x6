@@ -36,6 +36,7 @@ If you do nothing, the weak hooks in [`users/noah/hooks.c`](../users/noah/hooks.
 
 - `eeconfig_init_user()`
 - `get_hold_on_other_key_press()`
+- `process_record_admit_user()`, the BK fork's admission hook
 - `pre_process_record_user()`
 - `process_record_user()`
 - `post_process_record_user()`
@@ -43,6 +44,7 @@ If you do nothing, the weak hooks in [`users/noah/hooks.c`](../users/noah/hooks.
 - `matrix_slave_scan_user()` on split keyboards
 - `housekeeping_task_user()`
 - `suspend_power_down_user()`
+- `keyboard_pre_init_user()`
 - `keyboard_post_init_user()`
 - `layer_state_set_user()`
 - `pointing_device_task_user()`
@@ -85,8 +87,14 @@ This pattern applies to:
 - `matrix_slave_scan_user()` -> `noah_matrix_slave_scan_user()`
 - `housekeeping_task_user()` -> `noah_housekeeping_task_user()`
 - `suspend_power_down_user()` -> `noah_suspend_power_down_user()`
+- `keyboard_pre_init_user()` -> `noah_keyboard_pre_init_user()`
 - `keyboard_post_init_user()` -> `noah_keyboard_post_init_user()`
 - `pointing_device_init_user()` -> `noah_pointing_device_init_user()`
+
+`keyboard_pre_init_user()` runs before USB starts and serves the saved
+keyboard name as the USB product string (D-F25). An override that skips the
+helper enumerates under the built-in name, then restarts USB once after boot
+to take up the saved one.
 
 ### Filter Hooks
 
@@ -157,6 +165,25 @@ The shared userspace splits record handling across three hooks:
   and macro path
 - `post_process_record_user()` finalizes process-return tracing and keyboard
   event modifier masking when the main process path returns `true`
+
+Before them, at the top of QMK's `process_record`, the BK fork's
+`process_record_admit_user()` decides whether a record runs now. Its shared
+helper, `noah_record_admission_admit()`, holds records back behind an
+undecided runtime-owned LT/MT/OSM key and attaches each combo output's
+behaviour permission; an override that drops it breaks both. The helper is
+declared in `users/noah/lib/compat/qmk_record_admission.h`, not
+`noah_runtime.h`, so only a translation unit outside the keymap can chain it,
+and it must ask the helper first:
+
+```c
+bool process_record_admit_user(keyrecord_t *record) {
+    if (!noah_record_admission_admit(record)) {
+        return false;
+    }
+
+    return true;
+}
+```
 
 If you override the main process hook, keep the shared return/finalize
 contract intact:

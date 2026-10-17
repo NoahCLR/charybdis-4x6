@@ -6,7 +6,7 @@ combo decision at the physical press, the behaviour decision when the press
 takes effect.
 This document is the contract for that decision (D-F14). The stored fields
 live in the settings, key-behaviour and combo domains; their bytes are in
-[Portable Profile V1](portable-profile-v1.md#settings-domain-0x40-version-7)
+[Portable Profile V1](portable-profile-v1.md#settings-domain-0x40-version-8)
 and [Profile Wire V1](profile-wire-v1.md).
 
 ## Scopes
