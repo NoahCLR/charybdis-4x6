@@ -135,6 +135,9 @@ static uint32_t      gesture_row_layers[12];
 static uint64_t      gesture_excluded[LAYER_COUNT];
 static bool gesture_combo_output_behaviors = true;
 static uint8_t gesture_combo_flags[12];
+// The origin footprint of the last combo output press the record path ran,
+// which may be a replay from record admission.
+static uint8_t       gesture_last_combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 bool noah_setting_combo_output_behaviors(void) { return gesture_combo_output_behaviors; }
 uint8_t noah_effective_combo_flags(uint16_t index) { return gesture_combo_flags[index]; }
 uint32_t noah_setting(uint8_t id, uint32_t fallback) {
@@ -746,6 +749,7 @@ bool process_record(keyrecord_t *record) {
     pass = noah_process_record_user(code, record);
     noah_process_record_user_finalize(code, record, pass);
 #ifdef NOAH_TEST_QMK_GESTURES
+    if (record->event.type == COMBO_EVENT && record->event.pressed && !noah_synthetic_record_active()) CHECK(noah_qmk_combo_origin_event_bitmap(record, gesture_last_combo_bitmap));
     if (pass && record->event.pressed) {
         if (noah_synthetic_record_active() && record->tap.count != 0u) {
             gesture_out_add('T', code);
@@ -2426,14 +2430,12 @@ uint16_t gesture_keycode(uint8_t row, uint8_t col) {
 }
 static uint16_t gesture_combo_outputs[32];
 static uint8_t gesture_combo_output_count;
-static uint8_t gesture_last_combo_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 void gesture_deliver(uint16_t code, uint8_t row, uint8_t col, bool down, uint16_t time, uint8_t taps, bool combo, uint8_t context, uint16_t record_keycode) {
     gesture_sync_combos();
     if (down) { gesture_delivered_press = code; gesture_delivered_taps = taps; }
     if (combo && down) { CHECK(gesture_combo_output_count < ARRAY_SIZE(gesture_combo_outputs)); gesture_combo_outputs[gesture_combo_output_count++] = code; }
     keyrecord_t r = {.user_data = context, .event = {.key={row,col}, .pressed=down, .type=combo ? COMBO_EVENT : KEY_EVENT, .time=time}, .tap={.count=taps}, .keycode=record_keycode};
     process_record(&r);
-    if (combo && down) CHECK(noah_qmk_combo_origin_event_bitmap(&r, gesture_last_combo_bitmap));
 }
 static void gesture_advance(uint16_t ms) {
     // Mirrors noah_matrix_scan_user: combo-origin housekeeping, then key runtime.
@@ -2883,6 +2885,74 @@ static void test_qmk_combo_output_gui_behaviour(void) {
             test_assert_button_quiescent(test_keypos(0, 0));
         }
     }
+}
+
+static void gesture_check_quiescent(void);
+static void gesture_out_dump(const char *name);
+// Two chords with the same output fire while LT(2, A), with an empty row, is
+// undecided, so both outputs wait in record admission: N + M and Button 1 +
+// Volume, as the profile's two GUI chords, here both sending the custom key.
+// Each output keeps its own chord's permission, taken at completion, and its
+// own footprint: only an allowed chord types J, flipping both permissions once the chords fired changes nothing, and no
+// slot is left active. The chords fire together, held through the replay or
+// let go before it, or one after the other with the first still held or let
+// go.
+static void test_qmk_same_output_chords_wait_together(void) {
+    const uint16_t alpha_output = gesture_engine_combo_output(7), mouse_output = gesture_engine_combo_output(8);
+    gesture_engine_combo_output_set(7, TEST_HANDLED_TAP_KEY);
+    gesture_engine_combo_output_set(8, TEST_HANDLED_TAP_KEY);
+    for (unsigned global = 0; global < 2; global++)
+    for (unsigned allowed = 0; allowed < 4; allowed++) // bit 0: N + M, bit 1: Button 1 + Volume
+    for (unsigned timeline = 0; timeline < 4; timeline++) {
+        const unsigned expected = global ? (allowed & 1u) + (allowed >> 1) : 0u;
+        test_reset_state(); fake_time = 52000;
+        gesture_out_count = gesture_combo_output_count = 0;
+        gesture_live_row = true;
+        gesture_empty_row = LT(TEST_LAYER_SYM, KC_A);
+        gesture_source_layers[5][0] = gesture_source_layers[5][5] = 3;
+        gesture_combo_output_behaviors = global;
+        gesture_combo_flags[7] = allowed & 1u ? 0 : NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        gesture_combo_flags[8] = allowed & 2u ? 0 : NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        gesture_at(4,4,true); gesture_advance(5);
+        gesture_at(5,2,true); gesture_at(5,0,true);
+        if (timeline < 2) {
+            // Both chords complete inside one combo window and fire together.
+            gesture_advance(10); gesture_at(4,1,true); gesture_at(5,5,true); gesture_advance(110);
+            if (timeline == 1) { gesture_at(5,2,false); gesture_at(5,0,false); gesture_at(5,5,false); gesture_at(4,1,false); }
+        } else {
+            // N + M fires first; Button 1 + Volume fires as Button 1 is let
+            // go, while N + M is still held or after it was let go.
+            gesture_advance(105);
+            if (timeline == 3) { gesture_at(5,2,false); gesture_at(5,0,false); }
+            gesture_advance(10); gesture_at(4,1,true); gesture_at(5,5,true);
+            gesture_advance(10); gesture_at(4,1,false);
+        }
+        CHECK(gesture_combo_output_count == 2);
+        CHECK(noah_record_admission_held_count() >= 2);
+        gesture_combo_output_behaviors = !global;
+        gesture_combo_flags[7] ^= NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        gesture_combo_flags[8] ^= NOAH_PROFILE_COMBO_V3_FLAG_OUTPUT_BYPASS;
+        gesture_advance(5); gesture_at(4,4,false); gesture_advance(10);
+        if (timeline == 0 || timeline == 2) { gesture_at(5,0,false); gesture_at(5,2,false); }
+        if (timeline == 0) gesture_at(4,1,false);
+        if (timeline != 1) gesture_at(5,5,false);
+        gesture_advance(500);
+        if (gesture_tap_count(KC_J) != expected || noah_runtime_debug_active_slot_count() != 0) {
+            fprintf(stderr, "same-output chords: global=%u allowed=%u timeline=%u taps=%u slots=%u\n", global, allowed, timeline, gesture_tap_count(KC_J), (unsigned)noah_runtime_debug_active_slot_count());
+            gesture_out_dump("same-output chords");
+        }
+        CHECK(gesture_tap_count(KC_A) == 1);
+        CHECK(gesture_tap_count(KC_J) == expected);
+        // Button 1 + Volume's output is dispatched last, with its own footprint.
+        CHECK(key_origin_bitmap_has_keypos(gesture_last_combo_bitmap, test_keypos(4,1)));
+        CHECK(key_origin_bitmap_has_keypos(gesture_last_combo_bitmap, test_keypos(5,5)));
+        CHECK(!key_origin_bitmap_has_keypos(gesture_last_combo_bitmap, test_keypos(5,0)));
+        CHECK(!key_origin_bitmap_has_keypos(gesture_last_combo_bitmap, test_keypos(5,2)));
+        gesture_check_quiescent();
+        CHECK(layer_state == test_layer_mask(TEST_LAYER_BASE));
+    }
+    gesture_engine_combo_output_set(7, alpha_output);
+    gesture_engine_combo_output_set(8, mouse_output);
 }
 
 // A row that authors only a repeated tap keeps the key's own first tap and
@@ -4148,6 +4218,7 @@ int main(int argc, char **argv) {
     test_qmk_keys_wait_for_undecided_dual_role();
     test_qmk_symbol_key_rolls_type_in_order();
     test_qmk_symbol_key_combo_member();
+    test_qmk_same_output_chords_wait_together();
     test_qmk_keys_wait_for_mode_and_modifier_holds();
     test_qmk_modifier_release_waits_for_undecided_key();
     test_qmk_modifier_release_waits_behind_each_undecided_key();
