@@ -58,6 +58,12 @@ is held, tapped when it is tapped, and what its behaviour row falls back to.
 Behaviour steps on other keys may send a custom key, which sends its shortcut
 only. Hardware acceptance is pending.
 
+A key pressed while a handled key is undecided meets it by what that key's
+hold does (D-F27): a hold that changes other keys makes it wait, a fallback
+modifier registers, and any other key is settled as a tap first, so rolls out
+of the number row, punctuation, Enter, Esc and the Nav arrows keep their
+order. Hardware acceptance is pending.
+
 Firmware work remaining before the product is complete:
 
 - physical interruption acceptance at every durable boundary;
@@ -87,6 +93,10 @@ preserving exact full-bank bytes and identity (D-F21). Hardware read timing and
 input cadence remain unmeasured for this path.
 
 ## Open Issues
+
+- **Roll order needs hardware acceptance (D-F27).** Type `, `, `. `, `1e` and
+  Enter into a letter fast; hold a symbol key into a letter; roll Shift into a
+  letter; double-tap-hold GUI into a key; roll the thumbs and `/` as before.
 
 - **Custom key shortcuts need hardware acceptance (D-F26).** On both halves:
   hold a mixed-side shortcut, tap it, hold a modifier-only one, put a
@@ -1383,3 +1393,43 @@ modifier keys in `SHORTCUT_MODS(...)`: a QMK `MOD_*` constant does not
 compile, since its right-hand values mean other keys in a report mask. The
 four named keys have none. The [portable profile](architecture/portable-profile-v1.md) owns the
 bytes and the [runtime flow](architecture/runtime-flow.md) the behaviour.
+
+## D-F27 — What a key's hold does decides how a later key meets it
+
+Extends D-F02 and D-F03. A handled key that is down and has not reached its
+hold falls into one of three classes when another key is pressed, by what its
+hold at the current tap count does, not by its keycode family:
+
+1. **Its hold changes other keys: later keys wait** (D-F03). LT/MT/OSM rows,
+   a layer held until release, and now any key whose first hold tier (its
+   hold, or its long hold when it has none) is a layer action, modifiers only
+   or a pointing mode. A pointing mode can mask modifiers and take over
+   buttons, so a key pressed under one is not independent of it.
+2. **Its fallback hold is its own modifier: the later press registers it**,
+   as before.
+3. **Anything else: the later press settles it as a tap.** Its hold is an
+   output of its own, or it has none. Preflight types its tap, its pending
+   repeated taps included, before the later press goes out, and its release
+   then sends nothing. Past its hold time it is a hold: a threshold hold has
+   already gone out, and a hold that waits for release
+   (`TAP_ON_RELEASE_AFTER_HOLD`) is committed at the later press. Keys a
+   pointing mode owns are left to it.
+
+Before this, class 3 sent the later key at once and this key's tap only on
+its release, so `, ` typed as ` ,`. Chosen over making class 3 wait as well,
+which would delay every key typed after a symbol by up to the tap-hold term
+for a hold that cannot change it; and over settling every class on the next
+press, which D-F03 rejected for layers and modifiers. The cost is that a
+class-3 key's hold needs the key held alone past its hold time: rolling into
+another key before then is a tap. The class is read from the press token at
+the other key's press time, so a press replayed from admission is judged at
+its physical time. Combo members reach the runtime only once QMK has decided
+their combo, so combo timing is unchanged.
+
+A released key's pending repeated taps keep their D-F03 rule: a tap/hold
+key's are settled by any other press, other handled keys keep their series.
+The release decision for a single key, and with it the release-interval rule
+the release matrix pins for Ark's timing analysis, is unchanged. Profile
+bytes and feature bits are unchanged: bit 18 already advertises that keys
+wait for an undecided key, and this narrows only what a later key meets. See
+[the contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided).
