@@ -40,9 +40,10 @@ enum charybdis_keymap_layers {
 
 // ─── Timing ────────────────────────────────────────────────────────────────
 
-// QMK's dual-role keys (LT, MT, TT, OSL, OSM) use TAPPING_TERM. It is the
-// default for the live profile's dual-role setting, which replaces it once
-// a profile's settings are live (users/noah/lib/compat/qmk_live_tapping_config.h).
+// QMK's dual-role keys (LT, MT, TT, OSL, OSM) hold at TAPPING_TERM, with or
+// without a behaviour row; the key runtime decides all of them (D-F27). It is
+// the default for the live profile's dual-role setting, which replaces it once
+// a profile's settings are live.
 #define TAPPING_TERM 200
 
 // How close together a combo's keys must be pressed. The compiled combos use
@@ -50,7 +51,7 @@ enum charybdis_keymap_layers {
 #define COMBO_TERM 50
 
 // Custom key behavior system (process_record_user / matrix_scan_user).
-// These are distinct from QMK's TAPPING_TERM — checked manually at runtime.
+// Every behaviour row except a dual-role key's uses these.
 //
 // Single key timeline:
 //   < CUSTOM_TAP_HOLD_TERM                         = tap (send plain key)

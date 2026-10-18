@@ -89,6 +89,10 @@ enum {
     // Global and per-combo permission to use the output's shared behaviour.
     NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS = 1u << 30,
 };
+// Every LT, MT and OSM key is decided by the key runtime, row or not, and
+// dual-role keys hold at the dual-role setting (D-F27). Bit 31 is the last
+// bit of the word; it is a macro because an enumerator must fit in an int.
+#define NOAH_PROFILE_FEATURE_UNIFIED_TAPPING (1u << 31)
 
 // A wide-page request: [command, channel, value, request id, page low, page
 // high], then 26 reserved zero bytes. The response echoes bytes 0..4 only,

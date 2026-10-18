@@ -29,7 +29,7 @@ and window. Re-enabling restores them unchanged. Every control is stored,
 read back, and carried through reboot, backup, restore and both-half commit
 like the rest of the profile.
 
-Fresh compiled defaults and translated older backups allow everything: both
+Fresh compiled defaults allow everything: both
 masters on, every layer bit set, every definition enabled with every bank
 layer allowed, and every placement bitmap zero (no bypass, no exclusion).
 So a profile that never touches these controls behaves exactly as before.
@@ -74,8 +74,10 @@ A physical press uses its keycode's behaviour row only if all of these hold:
 4. the placement's bypass bit is clear.
 
 Otherwise the press takes its **normal action**: the keycode as if it had no
-behaviour row, with the usual modifier, layer and pointing ownership. Native
-`LT()` and `MT()` keep native QMK tap-hold timing. A custom key's normal
+behaviour row, with the usual modifier, layer and pointing ownership. An
+`LT()`, `MT()` or `OSM()` key stays the runtime's with its default, as without
+a row (D-F27): `LT()` holds its layer, `MT()` and `OSM()` their modifiers, past
+the dual-role time. A custom key's normal
 action is its shortcut (D-F26), held from the press until the release; a
 bypassed custom key without a shortcut does nothing, Ark explains this, and a
 layer that needs output there maps a plain keycode or gives the key a
@@ -161,8 +163,8 @@ allow it:
 The layer behaviour switch and physical placement bypass bits do not apply.
 The combo master, layer combo switches and the combo's chord allowed-layer
 mask still govern whether the chord fires; disabling output behaviour changes
-none of them. A veto sends an ordinary keycode's normal action, with its native
-tap-hold timing and modifier/layer/pointing ownership. A custom key sends its
+none of them. A veto sends an ordinary keycode's default action, with
+runtime-owned dual-role timing and modifier/layer/pointing ownership (D-F27). A custom key sends its
 shortcut (D-F26), or nothing without one. Other combos with the same output, and
 physical placements of that output, keep their own permissions.
 
@@ -174,13 +176,15 @@ does not replace layer 1 as the output context. Remapping the chord to match
 reference layer 0 also leaves layer 1 as the output context.
 
 The completed chord snapshots the permission together with its origin,
-before QMK can queue its generated output behind native tapping. QMK can
-enqueue an output without asking its tap classification until later, so
-classification alone is too late to take this snapshot. The generated press
-record carries the decision through tapping and admission, and the pending
-completion and active owner retain it for release. Changing either switch,
-the definition or active layers cannot reclassify an already completed
-output or lose its matching release. Suppressed completions discard their
+before generated delivery and admission can delay its dispatch. The snapshot
+belongs to completion, not a later classification or lookup. The generated press
+record carries the decision through QMK delivery and admission, and the pending
+completion and active owner retain it for release. Each delivered output takes
+the oldest fired completion not yet delivered, so two chords with one output
+that wait together keep their own decisions
+([pairing](../KEY_RUNTIME.md#combo-origin-compatibility-contract)). Changing
+either switch, the definition or active layers cannot reclassify an already
+completed output or lose its matching release. Suppressed completions discard their
 snapshots. If origin reconstruction is unresolved, dispatch conservatively
 bypasses behaviour whenever any combo definition sharing that output bypasses
 it; it never borrows another definition's permission.
@@ -188,7 +192,7 @@ it; it never borrows another definition's permission.
 Capability feature bit 30 advertises this extension. The stored switches are
 inverted: settings header byte 5 bit 0 bypasses all combo output behaviours;
 combo v3 row flag bit 4 bypasses that row's output behaviour. Zero preserves
-existing profiles, compiled defaults and translated older backups, without a
+existing profiles and compiled defaults, without a
 domain-version or action-ABI change. Older firmware rejects either new bit.
 Clients must require bit 30 before writing the extension, preserve the flags
 through unrelated edits, and refuse a downgrade that would erase a bypass.
@@ -202,7 +206,7 @@ the combo-origin tracker already chooses for release matching and feedback.
 A chord whose members came from different source layers therefore uses its
 owner press's layer, never a union or intersection of the others. The origin
 tracker retains that layer through delayed output delivery. Generated permission
-is captured with completion before native tapping and admission queues; origin normalization remains at dispatch
+is captured with completion before QMK delivery and admission queues; origin normalization remains at dispatch
 and does not consume a pending origin merely to classify tapping.
 
 Origin reconstruction uses only occurrences eligible for that combo: the
@@ -227,8 +231,9 @@ storage, and costs one masked bit test per scope on an ordinary press.
   decisions, retaining the physical press's context for its release. The
   source layer and both decisions are copied into BK's optional opaque
   `keyrecord_t.user_data` byte (`KEYRECORD_USER_DATA`). The keycode is not
-  frozen in the record. Native tapping, combo buffering and userspace
-  admission copy that context with each record. A later press at the same
+  frozen in the record. Combo buffering and userspace admission copy that
+  context with each record; the retained QMK tapping path does too, though
+  it classifies no record since D-F27. A later press at the same
   position cannot rewrite earlier queued records. QMK's synthesized tapping
   releases preserve the tapping press's context too.
 - **At delivery.** `noah_participation_record_deliver()` settles a physical
@@ -246,9 +251,10 @@ storage, and costs one masked bit test per scope on an ordinary press.
 - **Tap-hold.** QMK decides whether a record is a tap-hold through BK's
   `is_tap_record_user()`, a per-record weak hook given QMK's own answer and
   `is_tap_keycode_user()`'s. The userspace override keeps the keycode hook's
-  answer for a press that uses its row and QMK's for one that bypasses it, so an
-  authored behaviour on an `LT()` or `MT()` key that a placement bypasses
-  returns to native QMK tap-hold timing.
+  answer for a press that uses its row, and for one that bypasses it answers
+  as the key does without a row. Every `LT()`, `MT()` and `OSM()` key is the
+  runtime's either way (D-F27), so neither answer lets QMK's tapping engine
+  classify it.
 - **Combos.** `combo_key_record_allowed()` in
   `users/noah/lib/compat/qmk_combo_origin.c` vetoes a member press unless its
   stored combo decision and the combo row both allow it on its source layer.

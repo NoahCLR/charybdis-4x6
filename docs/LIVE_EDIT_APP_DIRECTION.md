@@ -33,7 +33,7 @@ included, over Profile Wire, and publishes a complete profile to both halves as
 one atomic logical generation that recovers from interruption and a lost peer
 (D-L21, D-L22, D-L27, D-L39). The app's surface-by-surface status is in Ark's
 direction. Firmware accepts only current formats and every save binds VIA
-(D-F10); old backups require client translation before restore. Compiled defaults
+(D-F10); a backup in an earlier format is refused, not translated. Compiled defaults
 contain every enabled domain and use domain-seeking reads (D-F12).
 
 Macro text is typed through a selected host layout (D-F16), with Unicode
@@ -57,6 +57,22 @@ stored in settings v8 (D-F26). It is the key's own action: held while the key
 is held, tapped when it is tapped, and what its behaviour row falls back to.
 Behaviour steps on other keys may send a custom key, which sends its shortcut
 only. Hardware acceptance is pending.
+
+A key pressed while a handled key is undecided meets it by what that key's
+hold does (D-F27): a hold that changes other keys makes it wait, a fallback
+modifier registers, and any other key is settled as a tap first, so rolls out
+of the number row, punctuation, Enter, Esc and the Nav arrows keep their
+order. A modifier or layer key let go before a key it was pressed for still
+applies to that key: it waits for a key that makes others wait, and settles
+any other key as a tap first, so Cmd released before F types Cmd+F and before
+`,` types Cmd+,. Hardware acceptance is pending.
+
+Every `LT`, `MT` and `OSM` key is decided by the key runtime, with or without a
+behaviour row, and a key without a row behaves exactly as with an empty one
+(D-F27, Profile Wire bit 31). QMK's tapping engine classifies no record.
+Dual-role keys hold at the dual-role setting, other rows at the tap/hold
+setting. A row without steps is no row: a plain key with one stays QMK's, and
+`TT()` keeps its own taps. Hardware acceptance is pending.
 
 Firmware work remaining before the product is complete:
 
@@ -89,6 +105,15 @@ input cadence remain unmeasured for this path.
 
 ## Open Issues
 
+- **Roll order needs hardware acceptance (D-F27).** Type `, `, `. `, `1e` and
+  Enter into a letter fast; hold a symbol key into a letter; roll Shift into a
+  letter; double-tap-hold GUI into a key; roll the thumbs and `/` as before.
+  Roll Cmd+F, Cmd+/, Shift+F, Cmd+, and Shift+Enter off the modifier first,
+  hold shortcuts the usual way, and type fast over F and the number row.
+  Type normally on F, J and Z and use their layers; tap, then hold J and Z;
+  roll Cmd+Z and Shift+J off the modifier; fire combo C0 (D + F). Hold Delete
+  (its live row is empty): it repeats, and combo C11 still fires.
+
 - **Custom key shortcuts need hardware acceptance (D-F26).** On both halves:
   hold a mixed-side shortcut, tap it, hold a modifier-only one, put a
   behaviour on the key (unauthored taps and press-and-hold), bypass it as a
@@ -102,7 +127,9 @@ input cadence remain unmeasured for this path.
 
 - **Combo output permissions need hardware acceptance (D-F24).** Try shared
   outputs with opposite permissions, global bypass and held releases on both
-  halves.
+  halves, including the two GUI chords (N + M, Button 1 + Volume) fired
+  together and one after the other while F is held undecided, so both outputs
+  wait; each keeps its own permission and nothing stays held.
 
 - **Pointing-mode macros need hardware acceptance (D-F23).** Run delayed and
   mouse-click macros from directions under both output policies and from a
@@ -112,12 +139,6 @@ input cadence remain unmeasured for this path.
   refresh and export timing with mostly empty and full banks, including after
   shortening a macro. Check typing and pointing during reads. Host transfer
   counts establish byte savings, not USB timing or scan cadence.
-
-- **Unified gesture ownership.** Native LT/MT/OSM remain a compatibility
-  boundary; adding a row can still change classification semantics. Runtime-owned
-  LT/MT/OSM rows now follow QMK's default overlapping rule (D-F03). The
-  intended direction is explicit defaults and one owner, without silently
-  changing the current layout; it is not designed or implemented.
 
 - **Physical gesture acceptance (D-F01).** The buffered-repeat defect is
   reproduced and fixed through the real QMK combo/tapping path. Acceptance on
@@ -135,14 +156,12 @@ input cadence remain unmeasured for this path.
   it should make each half refuse its stored profile by action ABI digest,
   reset its VIA bank (sync metadata schema 3) and run the compiled defaults,
   which reproduce the captured profile with the thumbs, Click Spam and Drag
-  Window on custom keys 0–3. Confirm that on both halves, that the halves
-  converge, and that the pre-migration backup imports through the key-by-key
-  translation, before relying on it.
+  Window on custom keys 0–3. Confirm that on both halves and that the halves
+  converge before relying on it.
 - **The 32-slot upgrade has not run on hardware** (D-F09). Flashing it should
   make each half refuse its eight-slot stored profile by action ABI digest
-  and run the compiled defaults; confirm that, that an eight-slot backup
-  imports through the translation, and that slot 31 holds, locks and colours
-  on both halves.
+  and run the compiled defaults; confirm that, and that slot 31 holds, locks
+  and colours on both halves.
 - **The faster VIA checksum has not run on hardware** (D-F20). Time an
   unchanged re-Apply and a VIA edit against the previous pair, and check typing
   and pointing on both halves while stage verification runs. The local
@@ -168,9 +187,9 @@ input cadence remain unmeasured for this path.
   typing, pointing and lighting with a maximum profile, a sixteen-key chord
   across both halves, and every participation control.
 
-- **The macro expansion has not run on hardware** (D-F14). Export a backup
-  before flashing: schema-5 VIA recovery and `NT` profile headers reset older
-  storage. Accept full-bank playback, cancellation, backup restore, macro-127
+- **The macro expansion has not run on hardware** (D-F14). Flashing it resets
+  older storage (schema-5 VIA recovery and `NT` profile headers), and a backup
+  from earlier firmware cannot be restored onto it. Accept full-bank playback, cancellation, backup restore, macro-127
   startup time and consolidation pauses on both halves.
 
 - **Pointing-mode clicks have not run on hardware** (D-F22). Accept buttons 3
@@ -285,8 +304,8 @@ profile bytes.
 
 A combo has its own window or follows the domain's default window; the hold/tap
 threshold is shared. Both timing values are stored once and exist even with no
-combos. Earlier version-1 and version-2 layouts are client translation inputs,
-not current admission formats. Custom trigger/release hooks, callback outputs
+combos. Earlier version-1 and version-2 layouts are refused by both firmware
+and client; there is no backup translation path. Custom trigger/release hooks, callback outputs
 and disabled combo timing are not editable through this format. The byte
 contract is in [Profile Wire](architecture/profile-wire-v1.md).
 
@@ -354,11 +373,8 @@ decision is ignored at boot, so the previous generation remains authority;
 boot starts with VIA reconciliation fenced and recovers a decided target from
 the local stage or the peer.
 
-Historical decision, superseded for accepted formats by D-F10: storage format 2 keeps the 32-byte header and 4,064-byte payload; a distinct
-`NQ` header stores the VIA binding and still carries the compiled-default and
-action-ABI digests. Format-1 `NP` records stay readable and migrate on the next
-Apply. Schema 2 (PD slots) uses format 3 `NR`; see
-[PD-mode domain v1](architecture/pd-mode-domain-v1.md). The app requires the
+The stored record binds the VIA identity and carries the compiled-default and
+action-ABI digests; only the current storage format is accepted (D-F10). The app requires the
 atomic capability for complete Apply and keeps the recovery file, stale-base
 check and exact final readback. A failure the app sees before the decision
 requests the custom-candidate abort, which the keyboard carries out for both
@@ -536,20 +552,19 @@ App decision; its text is in Ark's direction.
 
 The "Dual-role tap / hold" setting (settings id 0) only reached the runtime:
 `LT()` behaviour rows left on the default, the `OSL()` double tap and the
-runtime's hold bookkeeping. QMK's tapping engine, which decides tap or hold for
-every `LT()`, `MT()`, `TT()`, `OSL()` and `OSM()` key before the runtime sees
-it, kept the compiled `TAPPING_TERM`, so editing the setting changed almost
-nothing a person could feel. With a portable profile the firmware now enables
+runtime's hold bookkeeping. At that point QMK's tapping engine decided every
+`LT()`, `MT()`, `TT()`, `OSL()` and `OSM()` key using the compiled
+`TAPPING_TERM`, so editing the setting changed almost nothing a person could
+feel. With a portable profile the firmware now enables
 `TAPPING_TERM_PER_KEY` and `QUICK_TAP_TERM_PER_KEY`
 (`users/noah/lib/compat/qmk_live_tapping_config.h`) and answers both hooks with
 the setting (`qmk_portable_profile.c`); the compiled `TAPPING_TERM` is its
 default and applies until settings are live. Quick tap follows the tapping term
 as it does in QMK by default. The one term is global: the app offers no
 per-key tapping term, and a behaviour row's own tap / hold timing still governs
-that row in the runtime. D-F02 subsequently moved eligible authored
-LT/MT/OSM and intrinsic TT/OSL classification into userspace; the QMK hook
-continues to govern native tapping. See the
-[interaction model](INTERACTION_MODEL.md#physical-gestures-and-buffered-delivery).
+that row in the runtime. Since D-F27 ("Every dual-role key") the runtime decides
+every dual-role key and reads the setting itself; the QMK hooks no longer
+decide any key.
 
 ### D-L39 — Only the keyboard ends a staging, together with its candidate
 
@@ -583,14 +598,14 @@ slot engine (schema 2 at this decision; current schema 3 since D-F14,
 with 32 slots since D-F09). The ordinary side-specific pair owns a live profile;
 an owner-free generic or comparison image warms the same engine from validated
 compiled slot records. The mode registry keeps deployed hold and lock keycode
-identities, but no per-preset callbacks. `NOAH_PD_PROFILE=no` and the five-layer
-snapshot-bridge option are rejected instead of quietly producing old firmware.
+identities, but no per-preset callbacks. The `NOAH_PD_PROFILE` and five-layer
+snapshot-bridge build options no longer select a firmware variant; all builds
+use the slot engine.
 
 This removes the in-repository extraction path for an already deployed old
 storage geometry. Retain old firmware and backups outside this build if they
 are still needed; flashing a newer-geometry pair does not migrate an old committed
-profile in place. Historical profile readers and portable migration remain for
-files that already carry the required source evidence. The active pointing
+profile in place. The active pointing
 contract is [PD-mode domain v1](architecture/pd-mode-domain-v1.md).
 
 ### D-L41 — Pointing keycodes name slots, not factory presets
@@ -599,8 +614,7 @@ The configurable pointing modes (originally eight, now 32) use one keycode vocab
 for hold and `PD_SLOT_n_LOCK` for toggle. The original six factory preset
 names are no longer firmware keycode symbols. Slot assignment is stable; the
 keycodes' numeric values moved to their fixed block with D-L42. Charybdis Ark
-reads each slot's current name and behavior from the device and keeps former
-preset expressions as import aliases for older portable files. See the
+reads each slot's current name and behavior from the device. See the
 [PD-mode domain contract](architecture/pd-mode-domain-v1.md) for the fixed
 native values.
 
@@ -636,10 +650,10 @@ keys only on the known digest (Profile Wire feature bit 16), in their own
 screen and picker section. Renumbering was a deliberate migration: firmware
 refuses an older stored profile by digest and resets its VIA layout bank
 (sync metadata schema 3), falling back to compiled defaults that reproduce
-the profile; the app translates an older backup key by key on import. See
+the profile. See
 [PD-mode domain](architecture/pd-mode-domain-v1.md) for the blocks and
 [portable profile](architecture/portable-profile-v1.md) for the settings
-domain and the translation.
+domain.
 
 ### D-L43 — Split activity optimization, at QMK's default baud
 
@@ -694,7 +708,10 @@ latency must not consume a repeated-tap window or extend a released hold.
 Userspace queries existing QMK queues to preserve eligible continuations and
 suppress scan-time holds after physical release. Authored `LT()` rows bypass
 native tapping so one engine decides their behaviour; plain native dual-role
-keys retain QMK semantics. No authored layout, combo or default timing changes.
+keys retained QMK semantics until D-F27 moved every `LT`/`MT`/`OSM` key to the
+runtime (bit 31). Since then QMK's tapping queue holds no record, and an
+eligible press waiting in record admission continues its series as one in the
+combo buffer does. No authored layout, combo or default timing changes.
 
 Output still waits for arbitration. Winning combos suppress their constituent
 keys, and synthetic combo outputs retain their delivery/origin contract. See
@@ -709,30 +726,32 @@ connecting to this build. Physical acceptance remains in Open Issues.
 Extend D-F01's authored LT exemption to all runtime-handled keycodes. Authored
 MT/OSM rows and intrinsic TT/OSL ownership must not wait for a separate QMK
 tapping classification before their owning runtime receives them. Unhandled
-LT/MT/OSM remain native. Bypassing native tapping must not change when the
+LT/MT/OSM remained native; since D-F27 ("Every dual-role key") there are none.
+Bypassing native tapping must not change when the
 key's own first hold starts: an authored row without a first hold holds `MO()`
 for LT, or the modifiers for MT/OSM, only once held past its tap-hold term, as
 native QMK decides. A tap never turns the layer or modifiers on; the first tap
 is unchanged. An authored LT row is therefore not a momentary layer: its layer
 is not on from the press, and an interrupting key does not cancel its tap. The existing fork hook needs no new QMK changes. Feature bit 18 lets clients distinguish this from bit 17's
-LT-only exemption; older strict clients must recognize it before connecting.
+LT-only exemption.
 
 The real QMK pipeline tests held output thresholds for all four added families,
-delivery into intrinsic layer ownership, and preservation of native tapping.
+delivery into intrinsic layer ownership, and, since D-F27, the absence of native tapping classifications.
 The release matrix also pins the empty release-interval rule consumed by Ark's
 timing analysis. Physical acceptance remains open under D-F01.
 
 Runtime-owned MT one-shot consumption follows the owner's release TAP decision,
 including a tap whose output waits for multi-tap disambiguation. The selected
-press-layer action remains fixed. Native MTs use QMK's resolved tap count;
-holds and modifier-only tap output leave the one-shot armed. Output dispatch
+press-layer action remains fixed. Native MTs used QMK's resolved tap count
+until D-F27 made every MT the runtime's; holds and modifier-only tap output
+leave the one-shot armed. Output dispatch
 does not consume again. See the [one-shot interaction rule](INTERACTION_MODEL.md)
 and [release authority](KEY_RUNTIME.md#4-release-routing). This uses the existing
 layer-ownership bridge and changes no physical timestamps or admission timing.
 
 ## D-F03 — Keys wait for an undecided tap/hold key
 
-Keys pressed while a runtime-owned tap/hold key (authored LT/MT/OSM row) is down
+Keys pressed while a runtime-owned tap/hold key (any LT/MT/OSM key since D-F27) is down
 and undecided wait for its decision, then replay in order: its tap first on a
 release, its layer or modifiers first on a hold. This is QMK's default tapping
 rule, so rolls keep their order and a key tapped under a held layer resolves on
@@ -751,7 +770,8 @@ Other handled keys keep independent series alive, as before. Chosen over
 turning the layer on at the press when every outcome agrees (a per-key special
 case, dropped).
 
-Records are held after combos and native tapping, before every QMK feature,
+Records are held after the QMK combo/tapping delivery path (whose tapping
+classifier handles no record since D-F27), before every QMK feature,
 through the fork's `process_record_admit_user()` hook, and replayed through
 `process_record()` like QMK's own tapping queue
 ([contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)).
@@ -764,10 +784,10 @@ one. This preserves FIFO and causal press/release delivery without dropping
 records or increasing capacity. The oldest record may run before the tap/hold
 decision, on the layer and modifiers active then; all remaining records keep
 the normal waiting rule. Physical timestamps and record metadata remain intact.
-Releases whose presses were already delivered still pass through. This is an
+Releases whose presses were already delivered still pass through, except the
+modifier and layer releases D-F27 holds. This is an
 overload exception to the tap-first/hold-first ordering above, local to record
-admission; gesture ownership and native QMK tapping stay with their existing
-engines.
+admission; it does not transfer gesture ownership away from the runtime.
 
 ## D-F04 — Firmware pins its BK commit; `main` is a released, agreeing stack
 
@@ -899,9 +919,7 @@ publication, so pointing never reads storage.
 `pd_mode_mask_t` is 32 bits. The split runtime sync carries mode ids, not
 masks, and is unchanged. The action ABI digest, which now digests each mode
 flag at 32 bits, is `0xf79c6151`; firmware therefore refuses a stored eight-slot
-profile by digest and falls back to its compiled defaults, and the app imports
-an eight-slot backup (`0x1d3fcacc`) by the key-by-key identity translation plus
-PD v1 → v2 and RGB v2 → v3 ([portable profile](architecture/portable-profile-v1.md)).
+profile by digest and falls back to its compiled defaults.
 The static RAM tripwire gains a 4 KiB feature increment
 ([memory budgets](architecture/memory-budgets.md)). See
 [PD-mode domain](architecture/pd-mode-domain-v1.md) and
@@ -919,7 +937,9 @@ settings v8, sparse PD v3 and format 5 (`NT`); the domain registry and
 Settings v2–4, combo v1, schema 1, custom-only `NP` format 1 and logical `NQ`
 format 2 are refused. There is no firmware migration path, legacy GET 9 source
 page, feature bit 13 or legacy PD envelope validator.
-Old backup translation belongs to the client before Apply.
+A backup in an earlier format is refused, not translated: the client keeps no
+translation path either, so an old backup restores only onto the firmware that
+made it. Frozen old profiles in the host tests are rejection evidence.
 
 Every save is a logical generation, including edits that change only custom
 domains. Profile Wire BEGIN requires the current format and nonzero VIA
@@ -1052,8 +1072,8 @@ The expansion keeps logical EEPROM, its SRAM0–3 mirror and flash backing
 unchanged. VIA sync metadata schema 5 refuses the prior bank and recovers
 defaults; logical store format 5 (`NT`) refuses old `NS` profile headers.
 Moving the slots therefore resets saved data even though the flash base stays
-put. Export a backup before flashing and restore through a client supporting
-the new geometry; firmware does not migrate old storage.
+put. Firmware does not migrate old storage, and a backup from earlier firmware
+cannot be restored onto it.
 
 Formats: profile schema 3.0 with RGB v4, key behaviours v2, combos v3,
 settings v6 and pointing v3; logical store format 5 (`NT`); VIA sync metadata
@@ -1063,8 +1083,6 @@ fewer bytes. Readback pages, capability fields and storage addresses are wide
 where the new sizes need it (capability layout 2, feature bit 19). Older
 firmware refuses the new formats and the new firmware refuses the old ones;
 geometry moves the flash base, so old storage is reset, never reinterpreted.
-Backup translation (eight layers to sixteen, 64-slot banks to 128, old custom
-keys by stable slot) belongs to the client, as before (D-F10).
 
 Custom keys leave `0x7e40–0x7e7f`, which pointing holds box in, for an aligned
 block `0x7f00–0x7f7f`; the old block is retired and inert. Pointing holds,
@@ -1075,17 +1093,18 @@ profiles from earlier firmware are refused by digest.
 Behaviours and combos gain participation controls at four scopes (master,
 layer, definition, placement), decided once per press against the press's
 source layer; see [participation policy](architecture/participation-policy.md).
-A bypassed `LT()` or `MT()` placement must return to native tap-hold timing,
-which needs QMK to ask per record rather than per keycode, so BK gains a weak
+Originally a bypassed `LT()` or `MT()` placement returned to native tap-hold
+timing, requiring QMK to ask per record rather than per keycode, so BK gained a weak
 `is_tap_record_user()` hook beside `is_tap_keycode_user()`. BK also preserves
 an optional opaque byte of press context through its queues and synthesized
 tapping releases, and provides a combo member-record gate before state updates.
 The context keeps repeated buffered presses independent; the gate makes an
-excluded duplicate inert to an eligible chord's member state.
+excluded duplicate inert to an eligible chord's member state. Since D-F27 a
+bypass ignores the row while retaining runtime-owned default tap/hold behavior.
 Defaults allow everything, so a profile that never uses them is unchanged.
 
 `tests/fixtures/maximum_profile_v3.fixture` holds every table at its maximum
-at once: 37,700 bytes, leaving 15,516 bytes of the slot. It validates, commits,
+at once: 37,956 bytes, leaving 15,260 bytes of payload capacity. It validates, commits,
 boots and publishes whole on one half and prepares and commits on the peer;
 settings validation reads 20 bytes per step, like the other domains, so the
 whole profile validates in 7,432 owner scans
@@ -1098,11 +1117,10 @@ unnamed and inactive. One supported tap depth (five) bounds behaviour steps,
 step capacity and the extra tap-branch colours; formats are counted so a
 later firmware can raise it.
 
-Client follow-up: Ark adopts streaming feature bit 27, store format 5 and both
-old and new macro-bank geometry, removes the 512-byte check for streaming
-firmware, and pads older backup banks on restore. Ark adopts every format above, derives its limits from the
-capability pages instead of constants, adds the controls, and translates older
-backups; pin the landed firmware.
+Client follow-up: Ark adopts streaming feature bit 27, store format 5 and the
+macro-bank geometry, adopts every format above, derives its limits from the
+capability pages instead of constants and adds the controls; pin the landed
+firmware.
 
 ## D-F15 — Unicode macro entry preserves live ownership
 
@@ -1263,7 +1281,7 @@ Stale tail bytes and interrupted-write markers remain data. A client downloads
 marked blocks, reconstructs zero blocks, checks metadata again and verifies the
 whole-store digest; the existing complete-capture coherence checks still apply.
 
-The governing [read-map contract](architecture/profile-wire-v1.md#sparse-via-macro-read-map--optional-get-value-0x0c)
+The governing [read-map contract](architecture/profile-wire-v1.md#sparse-via-macro-read-map--get-value-0x0c)
 adds no capability bit or storage format. Older clients retain full reads;
 supporting clients fall back for unsupported or initially unavailable maps and
 fail malformed or changed reads. The client follow-up implements this reader
@@ -1327,7 +1345,7 @@ bypassed custom key does: nothing without a shortcut, its shortcut with one
 (D-F26). Feature bit 30 advertises
 reserved-bit extensions in settings v6 and combo v3, preserving existing
 profile bytes, domain versions and action ABI. Ark must adopt the capability,
-codecs, editor, backup translation and reachability model after this firmware
+codecs, editor and reachability model after this firmware
 lands; current Ark rejects unknown capability bits.
 
 ## D-F25 — The keyboard's name is its USB product string
@@ -1346,8 +1364,7 @@ name differs from the enumerated one, the half on USB restarts USB once the
 owner is settled on both halves, nothing is held or running, VIA is idle and
 the host has been quiet for a second. The half without USB never restarts it.
 The [runtime flow](architecture/runtime-flow.md#usb-product-name) owns the
-rules. Settings v7 is a new domain version: firmware refuses v6, and clients
-translate an older document by appending an empty keyboard name. Ark clients
+rules. Settings v7 is a new domain version: firmware refuses v6. Ark clients
 must support v7, the editor, its labels and the expected reconnect. Earlier
 clients that accept only settings v6 refuse this format.
 
@@ -1394,11 +1411,120 @@ Settings v8 stores the shortcuts as 128 two-byte records (modifier mask, then
 key) between the layer records and the names, and header byte 6 counts them
 (128). Feature bits stay as they are: bit 31 is still free. The action ABI
 digest is unchanged: it covers action identities, and a custom key's code and
-kind did not change. Firmware refuses settings v7; clients translate an older
-document by adding 256 zero bytes after the layer records and setting byte 6,
-and an older client refuses v8 rather than misreading it. The keymap authors
+kind did not change. Firmware refuses settings v7, and an older client refuses
+v8 rather than misreading it. The keymap authors
 shortcuts in `CUSTOM_KEYS` with `SHORTCUT(...)` rows, whose modifiers name
 modifier keys in `SHORTCUT_MODS(...)`: a QMK `MOD_*` constant does not
 compile, since its right-hand values mean other keys in a report mask. The
 four named keys have none. The [portable profile](architecture/portable-profile-v1.md) owns the
 bytes and the [runtime flow](architecture/runtime-flow.md) the behaviour.
+
+## D-F27 — What a key's hold does decides how a later key meets it
+
+Extends D-F02 and D-F03. A handled key that is down and has not reached its
+hold falls into one of three classes when another key is pressed, by what its
+hold at the current tap count does, not by its keycode family:
+
+1. **Its hold changes other keys: later keys wait** (D-F03). Every LT/MT/OSM
+   key, row or not ("Every dual-role key" below),
+   a layer held until release, and now any key whose first hold tier (its
+   hold, or its long hold when it has none) is a layer action, modifiers only
+   or a pointing mode. A pointing mode can mask modifiers and take over
+   buttons, so a key pressed under one is not independent of it.
+2. **Its fallback hold is its own modifier: the later press registers it**,
+   as before.
+3. **Anything else: the later press settles it as a tap.** Its hold is an
+   output of its own, or it has none. Preflight types its tap, its pending
+   repeated taps included, before the later press goes out, and its release
+   then sends nothing. Past its hold time it is a hold: a threshold hold has
+   already gone out, and a hold that waits for release
+   (`TAP_ON_RELEASE_AFTER_HOLD`) is committed at the later press. Keys a
+   pointing mode owns are left to it.
+
+Before this, class 3 sent the later key at once and this key's tap only on
+its release, so `, ` typed as ` ,`. Chosen over making class 3 wait as well,
+which would delay every key typed after a symbol by up to the tap-hold term
+for a hold that cannot change it; and over settling every class on the next
+press, which D-F03 rejected for layers and modifiers. The cost is that a
+class-3 key's hold needs the key held alone past its hold time: rolling into
+another key before then is a tap. The class is read from the press token at
+the other key's press time, so a press replayed from admission is judged at
+its physical time. Combo members reach the runtime only once QMK has decided
+their combo, so combo timing is unchanged.
+
+A released key's pending repeated taps keep their D-F03 rule: a tap/hold
+key's are settled by any other press, other handled keys keep their series.
+The release decision for a single key, and with it the release-interval rule
+the release matrix pins for Ark's timing analysis, is unchanged. Profile
+bytes are unchanged and the three classes need no feature bit: bit 18
+already advertises that keys wait for an undecided key, and they narrow only
+what a later key meets ("Every dual-role key" below takes bit 31). See
+[the contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided).
+
+**Releases that wait.** A key pressed before a class-1 key and released while
+that key is undecided waits for its decision when it is a modifier or layer
+key, as QMK keeps such a release in its tapping buffer. A key the runtime
+handles counts by what it holds at that moment (a layer, or real modifiers
+from a hold or a registered fallback); any other key by QMK's rule for its
+keycode (a modifier, a mods-only key, `MO`, `LT`, `LM`, or an `MT` or `OSM`
+released as a hold; since every `LT`, `MT` and `OSM` is handled, in practice a
+plain modifier or a mods-only key). The undecided key's tap or hold then goes out under that
+modifier or layer, and the release follows, so Cmd let go before F still types
+Cmd+F. Every other release goes at once, as in QMK. A waiting release replays
+in order and waits behind each replayed key that is undecided in turn. It
+counts as queued for the hold gate, so its key reaches no later hold tier
+after its physical release; the key admission is waiting for is the
+exception, since overload can replay that key's press ahead of its own
+release. Combo outputs' releases go at once: their runtime position is known
+only after admission, so they could not be told from the undecided key's own.
+Chosen over passing every earlier key's release through, which typed the bare
+key whenever the modifier came up first and made a native LT/MT key behave
+differently once it had a row.
+
+**Releases that settle.** The same releases settle a class-3 key as a tap,
+as another key's press does: its tap goes out at the modifier's or layer
+key's release, while that is still on, so Cmd let go before `1` types Cmd+1,
+which is what the key sends at its press without a row. Past its hold time
+the class-3 key is a hold, as at a press. Chosen over holding the release
+back until the class-3 key decides, which would make class-3 keys hold
+records back and send Cmd+! for `1` kept down after Cmd. The cost: once the
+modifier is let go, keeping the key down no longer reaches its hold. Class-2
+keys are unchanged.
+
+**Every dual-role key.** Every `LT`, `MT` and `OSM` key is handled by the
+runtime, with or without a row, and a key without a row behaves exactly as with
+an empty row: its tap is its own, `LT` holds its layer as `MO`, `MT` and `OSM`
+hold their modifiers, it makes later keys wait (class 1), and its interrupted
+tap is still typed (D-F02). QMK's tapping engine classifies no record, physical
+or combo output, with behaviours on or off. Behaviours switched off (the
+master, a layer's switch, a row's enable or allowed layers) or a placement
+bypass ignore the row only: the key keeps this default, and so does a combo
+output that is an `MT` or `OSM`. Tap, then press and hold again at once, is a
+new hold after the dual-role time, not QMK's repeated tap; an `OSM` double tap
+is two one-shot taps. A dual-role key (`LT`, `MT`, `OSM`, `TT`, `OSL`) holds at
+the dual-role setting (settings id 0, compiled `TAPPING_TERM`) unless its row
+sets its own time; every other row holds at the tap/hold setting. Before this,
+`MT`/`OSM`/`TT`/`OSL` rows held at the tap/hold setting, and a row, even an
+empty one, decided which engine a key got, so F (empty row) and J (none) felt
+different. Chosen (Noah, 2026-10-18) over keeping QMK's tapping for keys
+without a row, which kept two engines and QMK's tap-hold options; and over a
+native fallback for switched-off or bypassed keys: QMK too makes keys wait
+behind an undecided key, and recovery from an engine fault is reflashing an
+older release. The cost is QMK's tap-hold options (permissive hold, hold on
+other key press, Flow Tap, Chordal Hold) and the quick-tap repeat on these
+keys. Profile Wire feature bit 31 advertises it; profile bytes are unchanged.
+Clients that refuse unknown bits must learn bit 31 before connecting.
+
+**Rows without steps.** A row without steps is no row for a key's taps and
+for whether the runtime handles the key. A plain key with an empty row, or
+with a row that only sets hold times, stays QMK's and goes down at its press:
+alone, behind an undecided key and as a combo member. `TT()` keeps its own
+taps, so its `TAPPING_TOGGLE`-th tap still locks. The row's hold times apply
+only to a key the runtime handles anyway (dual-role, layer and pd-mode keys,
+custom keys with a shortcut). Its enable and allowed layers gate only those
+times, and its auto-mouse flag applies as before. Before this, any row made a
+plain key the runtime's: its tap went out at its release, so held it typed
+once and never repeated, and an empty `TT()` row took away its lock. Chosen
+(Noah, 2026-10-18): a key with nothing on it behaves like a normal key, so a
+client can drop an empty row without changing the key, and adding one cannot
+slow a key down. Bit 31 advertises this too.

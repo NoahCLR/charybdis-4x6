@@ -107,7 +107,10 @@ a member release, which makes QMK fire or drop the earlier completion, so the
 newer generation replaces it; a burst of chords cannot crowd a candidate out.
 Each is reconciled against the pinned QMK active/disabled layout at the scan
 boundary, and either promoted exactly once, suppressed, expired after the legal
-buffered-output window, or reset.
+buffered-output window, or reset. Delivered presses take the oldest fired
+completion not yet delivered; releases retain their delivery order. This keeps
+chords with the same output separate while both wait in record admission.
+See the [combo-origin contract](../KEY_RUNTIME.md#combo-origin-compatibility-contract).
 
 Inbound VIA commands are classified and marked dirty before QMK applies them,
 but are never replayed on the slave. `qmk_via_split_sync.c` exchanges only

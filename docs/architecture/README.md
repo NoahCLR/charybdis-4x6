@@ -41,12 +41,10 @@ default activity policy and opt-in diagnostics; recorded captures live under
 - Use [pd-mode-domain-v1.md](./pd-mode-domain-v1.md) for the 32
   configurable pointing slots: scope, factory presets, runtime publication
   rules, the sparse domain codec (version 3), validation, capacity evidence,
-  storage/ABI contract, the verified legacy-backup migration path and the
-  remaining hardware acceptance.
+  storage/ABI contract and the remaining hardware acceptance.
 - Use [rgb-domain-v1.md](./rgb-domain-v1.md) for the RGB domain's encoding.
 - Use [portable-profile-v1.md](./portable-profile-v1.md) for the portable
-  profile document: the settings domain, readback commands, layer order and
-  the backup translations clients apply before a restore.
+  profile document: the settings domain, readback commands and layer order.
 - Use [participation-policy.md](./participation-policy.md) for when a press
   uses its shared behaviour or joins a combo, and when a combo output uses
   its behaviour.

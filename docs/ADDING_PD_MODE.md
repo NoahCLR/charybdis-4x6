@@ -13,7 +13,7 @@ in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c`.
 
 A slot beyond the 32-slot bank or a new engine capability is a firmware capability change. It needs a
 new domain/version and capability contract, validation in firmware and the app,
-portable-profile migration, runtime implementation, host tests, and hardware
+current-format backup/restore validation, runtime implementation, host tests, and hardware
 acceptance. Preserve the deployed hold and lock action identities when changing
 the registry. Shared engine code belongs under `users/noah/lib/pointing/`; the
 keymap should continue to hold authored data rather than per-preset handlers.

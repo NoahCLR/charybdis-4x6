@@ -158,10 +158,10 @@ flowchart TD
     style RA fill:#DDE3EA,stroke:#5A6673,color:#1A1F26
 ```
 
-A release before the hold threshold does not resolve anything on a multi-tap row:
-it preserves the chain so the multi-tap window can run out, which is what gives
-every authored depth — the deepest included — the same visible window before its
-action lands. `terminal_tap_only_feedback_window` in the release planner is the
+If the series has not already settled, a release before the hold threshold
+preserves a multi-tap chain until its window runs out. Every authored depth,
+the deepest included, gets that window; cross-key settlement can end it early
+under the [interaction rules](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided). `terminal_tap_only_feedback_window` in the release planner is the
 condition that extends that to terminal branches.
 
 ## Tier semantics are decided in order

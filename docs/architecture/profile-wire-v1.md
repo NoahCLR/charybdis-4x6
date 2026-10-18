@@ -4,8 +4,7 @@
 > schema 3.0; a 53,216-byte custom payload; and logical store format 5
 > (`NT`). Every save binds a nonzero VIA generation and digest. HID framing remains v1; split
 > framing is version 2. Older profile/store formats and the legacy GET 9 source
-> page are rejected. Backup translation belongs to the client, before a
-> current-format Apply.
+> page are rejected. A backup in an earlier format is refused, not translated.
 
 Status: implemented current-format contract; hardware acceptance is tracked in
 [firmware direction](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
@@ -173,10 +172,8 @@ The exact row encoding is:
 
 A disabled row keeps its steps, timing and allowed layers; a press takes the
 key's normal action while it is disabled or its source layer is not allowed
-([participation policy](participation-policy.md)). Compiled defaults and
-translated version-1 rows are enabled and allowed on every bank layer.
-Translation from version 1 moves the step count to bytes 2–3 and inserts
-`ff ff 00 00` after each row's step count, growing its body length by four.
+([participation policy](participation-policy.md)). Compiled default rows are
+enabled and allowed on every bank layer.
 
 Rows are sorted lexicographically by the target action's four canonical bytes.
 Duplicate targets reject the domain.
@@ -324,8 +321,7 @@ This optional read uses the envelope below. It reports the connected half's
 effective native combo definitions. It observes the active `0x30` override when
 present, otherwise the compiled table. Its digest also covers transient global
 enable state, so it is separate from canonical profile identity.
-Older firmware returns VIA unhandled (`0xff`); clients must show unsupported
-rather than infer an empty table. Firmware built without combos reports a
+Firmware built without combos reports a
 valid disabled empty table. No SET or SAVE operation exists for this value.
 
 The request takes a 16-bit page, its low byte at request byte 4 and its high
@@ -492,8 +488,8 @@ Capability feature bits are:
 | 14 | owned layer keys: `TG()`, `TO()`, `TT()` and `OSL()` act through userspace layer ownership, so a host may offer them in behaviours and combos where the placement rules allow (`TT()` and `OSL()` joined the bit on the same unreleased branch; every flashed build that sets it has all four) |
 | 15 | behaviour QMK functions: a behaviour sends QMK and keyboard keycodes past the layer keycodes and below the user range (the Charybdis DPI and sniping keys, RGB Matrix, Magic, `QK_BOOT`…) as a synthetic QMK record, so they run as they do on a key, and a key whose own keycode is one keeps a plain key's fallback hold; a host may offer them in a behaviour's target, tap and hold. Without it, the engine sends them as report keys, keeping only the low byte, and a host must refuse them there |
 | 16 | custom keys and keycode blocks: userspace keycodes sit in fixed blocks (pointing holds `0x7e80`, pointing locks `0x7ea0`, layer locks `0x7ec0`, custom keys `0x7f00` since D-F14, each reserved beyond what is supported), action kind 7 is a custom key, and the settings domain names the 128 custom keys. It comes with its own action ABI digest; a host knowing that digest may offer custom keys as keys and combo outputs. With settings v8 (D-F26) a custom key may also be a behaviour step, sending its shortcut only; a host that writes settings v8 may offer that |
-| 17 | physical gesture timing: handled physical keys measure holds from physical press and repeats from physical release to next press; eligible records buffered by combo/tapping retain their series. Authored `LT()` rows bypass native QMK tapping; plain `LT()` keys retain it. An authored `LT()` row's layer is its hold: without an authored first hold it holds `MO()` from the tap-hold term, never from the press (joined the bit on the same unreleased branch). Combo outputs retain their delivery/origin timing contract. This is a runtime capability, not a profile format change |
-| 18 | runtime-owned tapping: every key handled by userspace bypasses native QMK tapping, including authored MT/OSM rows and intrinsic TT/OSL ownership. An authored MT/OSM row without a first hold keeps the key's modifier hold past the tap-hold term, and keys pressed while such a runtime-owned LT/MT/OSM key is undecided wait for its tap or hold (both joined the bit on the same unreleased branch). Unhandled LT/MT/OSM keep native QMK tapping. Extends bit 17 without changing its physical timestamp contract or profile bytes |
+| 17 | physical gesture timing: handled physical keys measure holds from physical press and repeats from physical release to next press; eligible records buffered by combo/tapping retain their series. Authored `LT()` rows bypass native QMK tapping; bit 31 extends that ownership to every `LT()` key. An authored `LT()` row's layer is its hold: without an authored first hold it holds `MO()` from the tap-hold term, never from the press (joined the bit on the same unreleased branch). Combo outputs retain their delivery/origin timing contract. This is a runtime capability, not a profile format change |
+| 18 | runtime-owned tapping: every key handled by userspace bypasses native QMK tapping, including authored MT/OSM rows and intrinsic TT/OSL ownership. An authored MT/OSM row without a first hold keeps the key's modifier hold past the tap-hold term, and keys pressed while such a runtime-owned LT/MT/OSM key is undecided wait for its tap or hold (both joined the bit on the same unreleased branch). Bit 31 extends runtime ownership to LT/MT/OSM even without a row. Extends bit 17 without changing its physical timestamp contract or profile bytes |
 | 19 | wide pages: the payload, compiled, combo and settings readbacks (GET `0x04`, `0x05`, `0x06`, `0x07`) take a 16-bit page, request byte 4 its low byte and byte 5 its high byte, with bytes 6–31 reserved; their responses echo bytes 0–4 and the request id correlates them |
 | 20 | reserved, never advertised: participation controls ([participation policy](participation-policy.md)) come with the current settings and combo domain versions, so no bit announces them |
 | 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](runtime-flow.md) |
@@ -502,10 +498,14 @@ Capability feature bits are:
 | 24 | candidate reuse: copy bounded ranges from an identified active profile into the inactive candidate (`SET 0x1B`, below) |
 | 25 | candidate streaming chunks: admit sequential chunks and prove bounded batches through status (`SET 0x1C`, below) |
 | 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](runtime-flow.md) |
-| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised VIA macro bank (34,903 bytes in this layout). Without this bit, retain the legacy 512-byte program ceiling. See [runtime flow](runtime-flow.md) |
+| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised VIA macro bank (34,903 bytes in this layout). See [runtime flow](runtime-flow.md) |
 | 28 | pointing-mode clicks: a direction or button-override tap in the PD domain may be a plain mouse button 1–8 (`0x00d1..0x00d8`). Require this bit before writing one; older firmware rejects it as `INVALID_ACTION`. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 29 | pointing-mode VIA macros: direction, diagonal and button tap overrides may start slots 0–127 (`0x7700..0x777f`), inherit policy and zero mask only. Require this bit before writing one. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 30 | combo output behaviour permissions: settings header byte 5 bit 0 bypasses all combo output behaviours; combo v3 row flag bit 4 bypasses one output. Both zero means allowed. Native combo readback v3 row flag bit 5 reports the per-combo bypass. Require this bit before writing either extension. See [participation policy](participation-policy.md#combo-output-behaviour-permission) |
+| 31 | unified tapping: every `LT()`, `MT()` and `OSM()` key is decided by the key runtime with or without a behaviour row, and a key without a row behaves exactly as with an empty one; behaviours switched off or bypassed ignore the row only. QMK's tapping engine classifies no record, physical or combo output. A dual-role key (`LT`, `MT`, `OSM`, `TT`, `OSL`) holds at the dual-role setting (settings id 0) unless its row sets its own time; every other row holds at the tap/hold setting. Tapped and then held again at once, such a key starts a new hold rather than repeating its tap. A row without steps is no row for a key's taps and for whether the runtime handles it: a plain key with one stays native, `TT()` keeps its own taps, and its hold times apply only to a key the runtime handles anyway (both joined the bit on the same unreleased branch). Extends bits 17 and 18 (D-F27) without changing profile bytes |
+
+Bit 31 is the last bit of the 32-bit feature word: the word is full, so a
+further capability needs a new field or a protocol change, not a bit.
 
 Supported-domain-mask bits 0–4 are RGB, key behaviors, combos, portable
 settings and PD respectively. RGB and behavior domain bits must agree exactly with
@@ -547,19 +547,16 @@ peer acknowledges the retried ABORT, the keyboard starts no new save or split
 transfer; a peer that never does needs a restart. A decoder that predates the
 bit rejects the status while it is set, as it rejects any unknown flag.
 
-### Sparse VIA Macro Read Map — Optional GET Value `0x0c`
+### Sparse VIA Macro Read Map — GET Value `0x0c`
 
 Channel 0, value `0x0c`, uses the ordinary byte page and nonzero request ID;
-request bytes 5–31 are reserved zero. It is optional without a new capability
-bit, so existing clients remain compatible. Unsupported firmware returns its
-unhandled echo or UNKNOWN_PAGE; a bank without a completed clean local checksum
-returns UNAVAILABLE. The map also returns UNAVAILABLE unless the checksum worker
+request bytes 5–31 are reserved zero. It has no capability bit; current
+firmware always serves it. A bank without a completed clean local checksum returns UNAVAILABLE. The map also returns UNAVAILABLE unless the checksum worker
 hashed the standard board's exact two-byte VIA config `[1,0]` (valid EEPROM,
 zero layout options). QMK permits another client to set nonzero layout options;
 that clean state remains readable through the full VIA path. Compatibility is
 recorded in the same completed cursor as the hash and bitmap, rather than
-sampling current config during GET. A client may use the full VIA read when page 0 is unavailable
-or unsupported. Once a map is accepted, an unavailable or malformed later page
+sampling current config during GET. A client may use the full VIA read when page 0 is unavailable. Once a map is accepted, an unavailable or malformed later page
 fails that read rather than substituting data from another generation.
 
 Page 0 has exactly 13 bytes, with multibyte integers little-endian:
@@ -881,9 +878,7 @@ peer is ready. Builds with the live-profile owner answer it; others answer
 | 21 | 1 | who held the peer's storage admission in its last BUSY: `0` none, `1` host, `2` peer |
 | 22 | 3 | reserved, zero |
 
-Page 2 is a read-only peer-copy diagnostic. Older firmware answers
-`UNKNOWN_PAGE`; existing pages and their reserved bytes are unchanged. Its
-25-byte payload is:
+Page 2 is a read-only peer-copy diagnostic. Its 25-byte payload is:
 
 | Payload offset | Size | Field |
 | ---: | ---: | --- |
@@ -916,8 +911,7 @@ that follows it, is waiting for this half to go idle: no held key, pending
 tap, locked layer or pointer mode, one-shot, macro or combo. Input still works
 in this state, so the user can release or unlock what holds it. If it does not
 clear before the 60 s pre-decision no-progress timeout, the save is cancelled
-with `TIMEOUT` and nothing changes; after the decision the save simply waits. Hosts that predate the bit reject the page as
-incompatible; page 1 is advisory, so their Apply is unaffected.
+with `TIMEOUT` and nothing changes; after the decision the save simply waits.
 
 Busy reasons are `0` unspecified, `1` admitted (queued; the answer comes on a
 retry), `2` mailbox full (an earlier request is still unprocessed, which, if it
@@ -932,8 +926,7 @@ owners are `0` none, `1` receiving a remote push, `2` pulling. Bytes 19–21
 come from every BUSY, including the routine admission reply, so they describe
 the peer as it is now; byte 18 keeps the last reason that was not admission.
 All of them reset when a copy starts. The host reports these when a copy
-stalls; no decision depends on them. Bytes 16–21 were reserved zero before
-2026-09-24, so the older app refuses this page.
+stalls; no decision depends on them.
 
 Peer phases are `0` idle, `1` binding the staged VIA copy, `2` beginning, `3`
 sending, `4` the peer validating and writing its prepared copy, `5` the peer
@@ -1011,7 +1004,7 @@ unhandled reply.
 | custom get | `0x09` | retired; unsupported | — |
 | custom get/set | `0x0A` | bounded split transaction capture, diagnostic builds only | [Split activity sync](split-activity-sync.md) |
 | custom get | `0x0B` | detected host OS | Host OS Readback, below |
-| custom get | `0x0C` | optional sparse VIA macro read map | [Macro read map](#sparse-via-macro-read-map--optional-get-value-0x0c) |
+| custom get | `0x0C` | sparse VIA macro read map | [Macro read map](#sparse-via-macro-read-map--get-value-0x0c) |
 | custom set | `0x10` | candidate begin | this document |
 | custom set | `0x11` | candidate chunk | this document |
 | custom set | `0x12` | candidate validate/prepare | this document |
@@ -1141,9 +1134,7 @@ writing it. The completed chord snapshots output permission and origin for
 queued delivery and release; see the [participation policy](participation-policy.md#combo-output-behaviour-permission).
 Incremental validation reads the header in one step, a row's fixed part in
 one, then its inputs four at a time (16 bytes), preserving the one-read /
-20-byte scan bound. Translation from version 2 keeps each 28-byte row's count,
-flags, window and output, drops its four reserved bytes and unused input slots,
-and allows every layer (`ff ff 00 00`).
+20-byte scan bound.
 
 QMK runs these through its long-combo representation (`EXTRA_LONG_COMBOS`): a
 16-bit member state, sixteen-member combos and a sixteen-key press buffer. Its

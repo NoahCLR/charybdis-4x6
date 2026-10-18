@@ -211,20 +211,36 @@ origin:
   suppression retirement and a two-observation deadline rule that leaves
   `combo_task()` one final legal emission opportunity. QMK marks a fired combo
   both active and disabled, so only a disabled completion that was never seen
-  active counts as suppressed
+  active counts as suppressed. A completion not fired yet counts its deadline
+  from the latest physical press, not its own: QMK restarts its combo timer at
+  every combo key press, so a chord that completed first legally waits out a
+  later chord's window and both fire together
 - conservative capacity refusal and snapshot diagnostics; a full cache never
   overwrites a still-awaiting origin
 - fallback owner recovery from the latest or last physical combo member, using a
   full-keyboard bitmap when no exact footprint can be proven
 
 The adapter targets the BK revision pinned in `qmk-pin.json`. That QMK activates
-a combo before emitting its press; pending candidates are selected through
-those active indices. It does not support forks that emit before exposing
-active state. QMK's tapping queue can deliver a fired combo's press after its
-release has deactivated it (the chord was tapped while a native LT/MT was
-undecided). A completion seen firing therefore keeps its exact footprint until
-its press arrives: a press with no active candidate pairs with the oldest fired
-completion for that keycode, since queued outputs leave QMK in firing order.
+a combo before emitting its press and emits fired outputs in firing order,
+which is completion order. It does not support forks that emit before exposing
+active state. QMK hands an output record over (delivery) before the runtime
+processes it (dispatch), and in between it can wait in record admission
+behind an undecided runtime tap/hold key (D-F03), possibly after its chord was
+let go and QMK deactivated the combo. Two chords with one output keycode can both wait. Pairing therefore
+follows the records, never only the chords still held:
+
+- a delivered press pairs with the oldest completion QMK fired (active, or
+  seen active before it was let go) whose press it has not delivered yet, and
+  takes that completion's output permission;
+- a dispatched press pairs with the oldest completion whose press was
+  delivered: both queues keep delivery order;
+- a delivered release pairs with the completion holding the member whose
+  physical release QMK is processing, dispatched or not, else the oldest, and
+  is numbered in delivery order; a dispatched release pairs with the lowest
+  number.
+
+A completion seen firing therefore keeps its exact footprint, owner and
+permission until its press is dispatched, and its owner until its release is.
 A fired completion that never arrives retires one tapping term after it was
 seen firing, the longest a tap-hold decision queued ahead of it can take.
 Conservative owner recovery remains only for a completion never seen firing.
@@ -248,7 +264,9 @@ layer lookup, stable combo owner selection, active and pending combo bitmaps,
 pending output after member release, suppressed overlap, deadline boundaries
 and timer wrap, capacity refusal/recovery, exact same-output generations,
 cached release footprints, fired outputs delivered after deactivation (in
-firing order, retired after one tapping term), cross-half and three-key combos,
+firing order, retired after one tapping term), same-output presses and
+releases delivered before either dispatches, an unfired completion waiting
+from the latest press, cross-half and three-key combos,
 reset diagnostics,
 and preview/PD owner partitioning and quiet-owner exclusion for RGB
 underlay/overlay feedback. The runner
@@ -256,8 +274,8 @@ executes normal and `EXTRA_SHORT_COMBOS` layouts and compile-checks the timerles
 branch. `run_qmk_contract_checks.sh` compares both combo layouts with the pinned
 fork and enforces the upstream pre-hook, matrix-scan, and `combo_task()` order.
 `run_qmk_gesture_pipeline_tests.sh` drives the real QMK combo and tapping
-engines through a chord tapped behind an undecided native LT and requires the
-exact two-key footprint.
+engines through a chord tapped behind an undecided LT without a row and
+requires the exact two-key footprint.
 
 ## End-To-End Flow
 
@@ -267,7 +285,10 @@ exact two-key footprint.
 observes every physical event into `key_runtime_core` first.
 
 That observation step gives the reducer position-stable press/release identity
-before any QMK path, macro path, or pd-mode path narrows the event.
+before the remaining QMK, macro or pd-mode processing narrows the event.
+A modifier or layer release first settles active keys whose holds are their
+own output, while that modifier or layer is still owned; then the reducer
+observes the release (D-F27).
 Pre-process observes physical modifier state for masking policy. Native report
 ownership is credited later, after behavior and pointing interception: finalize
 credits native presses and retires releases; the late native-overlap stage
@@ -281,10 +302,12 @@ does the cross-key work that must happen before the current press resolves:
 
 - suppress default literal-key or modifier handling when aggregate ownership
   requires it
-- interrupt other active handled keys on foreign press
+- interrupt other active handled keys on foreign press: register a fallback
+  hold, and settle a key whose hold is an output of its own as a tap (or send
+  its release-time hold, once due) before the press goes out (D-F27)
 - settle foreign pending tap series before an unhandled press
 - for a handled press, settle foreign dual-role tap series while other independent
-  handled series may continue
+  released series may continue
 
 Settlement also respects physically queued continuations. Before resolving an
 unhandled press, admission settles pending layer-changing taps so lookup uses
@@ -342,8 +365,9 @@ and the existing `key_runtime_core_layer_oneshot_set()` bridge. This occurs on
 release, including a release preserving a pending multi-tap chain, before any
 tap dispatch. The press-layer action is already materialized and stays fixed.
 Hold outcomes never plan consumption; scan, deferred and synthetic emission
-never repeat it. `process.c` settles native MT presses from QMK's tap count and
-leaves runtime-owned MTs to their planner. The compatibility helper in
+never repeat it. Every MT is runtime-owned (D-F27), so its planner settles it;
+`process.c`'s rule for an MT that QMK decided, from QMK's tap count, serves no
+physical key any more. The compatibility helper in
 `compat/qmk_oneshot_contract.h` qualifies selected output, not gesture timing.
 The layer-lock integration regression and real QMK gesture pipeline cover
 consumption, transparency, repeats, modifier-only output and new one-shots
@@ -381,15 +405,15 @@ names Ctrl/Shift/Alt/GUI and bit 4 selects the right-hand bank. Thus
 The existing `compat/qmk_mod_contract.h` owns that conversion through
 `noah_qmk_mods_to_report_mask()`, shared by the shadow lease path and applied
 mod-tap physical tracking. It interprets encoding only; QMK still owns Magic
-remapping and native tapping policy.
+remapping; the key runtime owns every dual-role decision (D-F27).
 
 `run_key_runtime_physical_ownership_integration_tests.sh` compares shadow
 report/managed masks with the real applied modifier ledger for every nonempty
 left/right modifier subset, native taps/holds and authored holds, through
 release and quiescence. Its synchronous delivery timestamps require scan-time
-hold promotion. `run_qmk_gesture_pipeline_tests.sh` covers native delayed
-QMK tapping delivery and sparse authored rows that retain their intrinsic MT
-hold. That gesture harness stubs the applied ledger; it proves delivery and
+hold promotion. `run_qmk_gesture_pipeline_tests.sh` covers delayed combo and
+admission delivery, default MT holds and sparse authored rows that retain
+their intrinsic MT hold, with no QMK tapping classifications. That gesture harness stubs the applied ledger; it proves delivery and
 shadow state, while the physical-ownership runner proves ledger agreement.
 `run_qmk_contract_checks.sh` compares all 32 MT fields with the pinned QMK
 action representation, including empty fields. These checks establish shadow
@@ -442,8 +466,11 @@ the reducer-owned debug/projection surfaces described above.
 
 The timing contract is in [INTERACTION_MODEL.md](INTERACTION_MODEL.md#physical-gestures-and-buffered-delivery).
 `lib/compat/qmk_gesture_timing.h` reads physical `KEY_EVENT` timestamps and
-queries the selected QMK fork's existing combo and tapping queues. The queues
-remain QMK-owned; userspace stores no shadow input queue. Queries match physical
+queries the selected QMK fork's existing combo and tapping queues, and record
+admission's own queue for a press it holds back behind an undecided key, so
+that press continues its key's tap series too. The QMK queues remain
+QMK-owned; userspace stores no shadow input queue. Since every `LT`/`MT`/`OSM`
+key is the runtime's (D-F27), QMK's tapping queue holds nothing. Queries match physical
 position, event direction and the unsigned 16-bit interval. Consumed combo
 members cease to reserve a key's series. Combo outputs keep their origin-based
 protection and delivery timestamps.
@@ -456,18 +483,34 @@ continuations. Hold progress has one gate,
 already queued cannot advance toward a hold. Phase refresh and every scan-time
 hold planner go through it; `run_qmk_gesture_pipeline_tests.sh` rejects any other
 queued-release query. QMK queues such a release only for a modifier or layer
-key released during another key's tapping term. This separates gesture eligibility from permission to emit
+key released during another key's tapping term, and record admission holds the
+same releases (below); the gate counts a release admission holds except for
+the key admission is waiting for, whose press overload may have replayed ahead
+of its release. This separates gesture eligibility from permission to emit
 output without rewinding shared time.
 
 `lib/compat/qmk_record_admission.c` holds records back behind an undecided
 tap/hold key ([the contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)).
 The fork's `process_record_admit_user()` offers every record at the top of
-`process_record()`, after combos and native tapping and before every QMK feature,
+`process_record()`, after QMK's combo/tapping delivery path and before every QMK feature,
 so a held record is processed once, on replay. `noah_matrix_scan_user` runs the
 replay after the key runtime scan, so a hold reached that scan applies first;
 `key_runtime_core_undecided_dual_role_key_pos()` is the only decision it reads.
-It counts LT/MT/OSM rows and keys whose hold is a layer held until release
-(the token's hold preview layer). Before a press is resolved, physically or
+It counts the keys whose hold changes other keys,
+`key_runtime_core_press_token_hold_changes_other_keys()`: all LT/MT/OSM keys, keys
+whose hold is a layer held until release (the token's hold preview layer), and
+keys whose first hold tier is any layer action, modifiers only or a pointing
+mode. Preflight settles every other handled key on the next press instead
+(D-F27). A release is held when its press was, or when a key is undecided and
+the release is a modifier's or layer key's (D-F27, "Releases that wait"): for
+a handled key, `key_runtime_core_holds_layer_or_mods_at()`, whether it holds a
+layer or real modifiers now; for any other key, QMK's rule for its keycode.
+Replay stops before such a release, as before a press, while a replayed key is
+undecided. The rule is `key_runtime_core_release_is_mods_or_layer()`. The
+record path applies it too, before the reducer takes in the release and drops
+the key's leases: a release that passes it settles every class-3 key first,
+at the release's physical time, through the same settle as another key's
+press (`key_runtime_preflight_settle_before_release()`). Before a press is resolved, physically or
 on replay, `noah_key_runtime_settle_layer_taps_before_press()` settles other
 keys' pending layer-changing taps when the press is of a key without a
 behaviour; it costs no lookup unless such a tap is pending.
@@ -475,20 +518,26 @@ At capacity (eight records by default), capture removes and replays exactly the
 oldest held record through `process_record()` before appending the incoming
 record. This bounded overload path may deliver that oldest record before an
 undecided key resolves; it never drops a record or lets a release bypass its
-buffered press. A replay guard prevents recapture, and the record's physical
+buffered press. Every combo output with one keycode is one key to admission,
+so two of its presses can be held before either release: a held release
+closes the earliest held press still open, and a release waits while one is. A replay guard prevents recapture, and the record's physical
 timestamp, keycode, event type and tap metadata survive unchanged. The remaining
 queue follows normal scan replay, including pausing for a newly undecided key.
 The real QMK pipeline covers saturation, smaller capacities, nested decisions,
 combo outputs, repeated taps, timer wrap and final runtime quiescence.
 
 The fork's `is_tap_keycode_user` hook exempts all runtime-handled keys from native
-tapping. Lookup includes authored MT/OSM rows and intrinsic TT/OSL ownership.
-Unhandled keys retain QMK policy; the pipeline tests each family and native
-controls. QMK then gives `is_tap_record_user` the last word per record, with
-its own answer and the keycode hook's; its default keeps the keycode hook's.
-Userspace answers from the press's participation decision, so a placement that bypasses its behaviour row is
-native QMK tap-hold again
-([participation policy](architecture/participation-policy.md)). Feature bit 18 distinguishes this broader ownership rule from bit 17. Queue queries and
+tapping. Every `LT()`, `MT()` and `OSM()` key is runtime-handled with or
+without a row (D-F27), as are `TT()`/`OSL()` by intrinsic ownership, so QMK's
+tapping engine classifies no physical record or combo output; the pipeline
+counts its classifications and requires none. QMK then gives
+`is_tap_record_user` the last word per record, with its own answer and the
+keycode hook's. Userspace answers from the press's participation decision; a
+placement that bypasses its behaviour row ignores the row, and the key is still
+the runtime's with its default
+([participation policy](architecture/participation-policy.md)). Feature bit 18
+distinguishes this broader ownership rule from bit 17, and bit 31 extends it to
+keys without a row. Queue queries and
 the hook are fork contracts pinned by `run_qmk_contract_checks.sh`;
 `run_qmk_gesture_pipeline_tests.sh` runs the actual selected QMK combo/tapping
 engines with userspace, including delayed records and timer wrap. The ordinary

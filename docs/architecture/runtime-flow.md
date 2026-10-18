@@ -38,7 +38,7 @@ flowchart TD
     pre_user --> participation["Capture placement participation before QMK queues"]
     pre_user --> origin["Compatibility: qmk_combo_origin observes physical member"]
     pre_user --> mod_track["Projected: keyboard modifier ownership tracks physical mods"]
-    participation --> qmk["QMK combo/tapping delivery"]
+    participation --> qmk["QMK combo delivery (tapping classifier bypassed)"]
     qmk --> admission["Record admission: defer behind an undecided key"]
     admission --> process_user["process_record_user"]
     process_user --> normalize["Compatibility: combo origin normalizes event key"]

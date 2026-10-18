@@ -6,7 +6,7 @@ and live editor. Side-specific builds own committed profiles; the generic build
 loads the 32 compiled factory slots without a profile owner.
 Current domain version 3 stores up to 32 sparse 128-byte records. The older
 version-1 fixed bank and version-2 sparse 96-byte records below are historical
-translation inputs, not accepted firmware formats.
+formats only; current firmware and clients refuse them without translation.
 Physical upgrade and release acceptance remain pending; see
 [Hardware acceptance](#hardware-acceptance).
 
@@ -113,10 +113,7 @@ record size (`INVALID_HEADER`), nonzero header bytes 4..7 (`RESERVED`), a
 length other than `8 + 128 × nn` (`INVALID_LENGTH`), and a repeated,
 out-of-order or out-of-range ID (`INVALID_ID`). Version 3 is version 2 with
 the name moved to the shared counted rule: bytes 0..7 and 32..95 keep their
-meaning, so the pointing engine reads the same 96 bytes it always has.
-Translation from version 2 moves the 24-byte name field's text (up to its
-terminator) to bytes 96..127, writes its length to byte 8 and zeroes bytes
-9..31. The surrounding profile domain envelope adds four
+meaning, so the pointing engine reads the same 96 bytes it always has. The surrounding profile domain envelope adds four
 bytes. RGB remains in its own domain; RGB v4 holds 32 ID/HSV/locality rows,
 one per slot whether or not the slot is stored here.
 
@@ -363,9 +360,8 @@ Current firmware uses one geometry:
 | `0x16000..0x22fff` | 53,248 | Profile slot B, same layout |
 
 Logical EEPROM is 143,360 bytes; RP2040 wear-level backing is 286,720 bytes
-(D-F14). Older layouts are not interpreted in place. Keep a complete backup and
-its matching old firmware pair before an upgrade; restore a client-translated
-current profile through logical Apply after both halves run compatible firmware.
+(D-F14). Older layouts are not interpreted in place, and a backup from earlier
+firmware cannot be restored here; keep it with its matching firmware pair.
 Physical geometry migration acceptance remains outstanding. Resource accounting
 belongs to [memory budgets](memory-budgets.md).
 
@@ -388,7 +384,7 @@ acceptance.
 
 The current action-ABI digest is the one capability page 0 reports; it covers
 the layer count, so the sixteen-layer bank changed it (D-F14). Older action
-vocabularies require client translation before a current-format Apply.
+vocabularies are refused.
 Candidate metadata, owner, peer storage and background stale-peer repair all
 use format 5 and require a
 correlated VIA bind before PREPARE_BEGIN. Retry preserves the bind for that exact
@@ -425,9 +421,8 @@ family owns one fixed, aligned block (`users/noah/noah_keymap_ids.h`), reserved
 beyond what is supported, so adding pointing slots or layers renumbers nothing:
 slot `n` holds at `0x7e80 + n` and toggles at `0x7ea0 + n`. A slot keycode
 selects its numbered slot; the mode's name and behavior come from the active
-profile. Former names such as `DRAGSCROLL` and `VOLUME_MODE` identify factory
-presets only and remain compatibility aliases for older portable profile
-expressions. They are not firmware keycode symbols.
+profile. Former preset names such as `DRAGSCROLL` and `VOLUME_MODE` are not
+firmware keycode symbols.
 
 | Native action | Block | Supported |
 | --- | --- | --- |
@@ -442,33 +437,19 @@ expressions. They are not firmware keycode symbols.
 Profiles store pointing and layer-lock actions by slot (action kinds 2–5), so
 the blocks change only raw keycodes: VIA layouts and custom keys. The blocks
 came with a new action ABI digest and VIA sync metadata schema 3, so firmware
-never adopts an older stored profile or layout bank, and the app translates an
-older backup key by key on import (portable-profile-v1.md). Before the blocks,
-holds 0–5 were `0x7e50 + n`, locks 0–5 `0x7e56 + n`, slots 6 and 7
-`0x7ef0..0x7ef3` interleaved, layer locks `0x7e5c + n`, the keymap's own keys
-followed from `0x7e64`, and the retired user macros held `0x7e40..0x7e4f`;
-historical five-layer profiles used a custom-action base of `0x7e61`.
-
-Old backups lack compiled thresholds and modifier/scroll policies. Action ABI
-alone cannot recover that tuning. The retired bridge once supplied the source
-domain; this repository no longer builds it. Only backups that already carry
-verified source PD data can migrate through the current portable importer.
-Hardware acceptance remains distinct from codec and runtime parity tests.
+never adopts an older stored profile or layout bank.
 
 ## Compatibility
 
 | Combination | Required behavior |
 | --- | --- |
-| New app, old firmware | Existing supported editing continues; slot editing is visibly unavailable |
-| Old app, new firmware or profile | Incompatibility handling refuses destructive writes |
-| New firmware, old stored record | Incompatible stored records are refused; compiled defaults remain the fallback. Translate a backup in the client and Apply a current-format profile; firmware does not migrate old records |
-| New app, old export | Migrates only with verified source PD data; otherwise keeps the file and names what is missing |
-| New app and firmware, new export | Exact 32-slot round trip including named disabled slots, RGB and references |
-| 32-slot firmware, eight-slot backup (`0x1d3fcacc`) | Imported through the key-by-key action translation plus PD v1 → v2 and RGB v2 → v3 ([portable profiles](portable-profile-v1.md)) |
+| Client and firmware on the current formats | Exact 32-slot round trip including named disabled slots, RGB and references |
+| Client and firmware on different formats or action ABIs | Refused before any write; draft and recovery file kept |
+| Current firmware, older stored record | Refused by format or action-ABI digest; the keyboard runs its compiled defaults and reports nothing committed |
+| Backup from earlier firmware | Refused, never translated |
 | Mismatched halves or unknown ABI | Apply refused before mutation; draft and recovery file kept |
 
-Never restore a 32-slot document into eight-slot firmware by dropping slots;
-downgrade restores the old backup.
+A downgrade restores a backup made with that firmware.
 
 ## Hardware acceptance
 

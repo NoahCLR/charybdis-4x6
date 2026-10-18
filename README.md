@@ -64,8 +64,8 @@ any C and you don't reflash.
 3. [Install Charybdis Ark](https://github.com/NoahCLR/charybdis-ark#install)
    and open it with the keyboard connected.
 
-Use both files from that release. Firmware accepts current-format profiles;
-keep a backup before an upgrade, and use Ark's import translation for older backups.
+Use both files from that release. Firmware accepts current-format profiles only: a backup made with
+older firmware won't restore onto a release that changed the format.
 
 ## Configure it in C (optional)
 

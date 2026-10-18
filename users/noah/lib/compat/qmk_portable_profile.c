@@ -24,8 +24,9 @@ void noah_qmk_portable_storage_init(void) {
     // interpret it, even when both builds happen on the same date.
     if ((word >> 28) != NOAH_QMK_VIA_SYNC_METADATA_SCHEMA) via_eeprom_set_valid(false);
 }
-// The dual-role setting is QMK's tapping term. Quick tap follows it, as it
-// does by default, so a second press within the term still auto-repeats.
+// The dual-role setting is QMK's tapping term, and quick tap follows it. The
+// key runtime decides every dual-role key (D-F27) and reads the setting
+// itself, so QMK's tapping engine asks these for no key any more.
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;

@@ -13,9 +13,10 @@ there; its cross-language runner bodies were moved unchanged into Ark's
 - `macro-corpus.json.gz`: 3,022 seeded macro inputs, each with `hex` input and
   `expected` C program length summed over the windows it plays in, or -1 for a
   macro the firmware refuses.
-- `portable.bin.fixture`, `.pd`, `.pd3`, `.pd4`, `.pd5`: historical and populated
-  profile imports, including worst-case macro/custom-key names. The `.fixture`
-  suffix on the first file avoids the repository's generated `.bin` ignore rule.
+- `portable.bin.pd5`: a populated profile from eight-slot firmware (schema 2,
+  RGB v2, PD v1). The firmware refuses it as it is; it is the one vector for
+  refusing an earlier format. Its current-format counterpart, with the same
+  worst-case macro and custom-key names, is `tests/fixtures/populated_profile_v3.fixture`.
 
 The firmware suite decompresses/loads these local inputs using Python or shell,
 then exercises the existing C tests in their normal and sanitizer variants.
@@ -34,17 +35,16 @@ exceeding 512 program bytes, 600 letters and 171 taps, are now accepted at 606
 and 513 bytes; only those two expectations changed.
 
 Thirty-two sparse pointing slots (D-F09) made PD domain version 2 and RGB
-version 3 the only ones the firmware accepts. The frozen PD corpus remains version 1. Its runner extracts each record,
-translates it to the current 128-byte version-3 record representation and checks
-the current validator. No retired envelope validator is built. The populated `.pd*` profiles are unchanged too:
-their runner checks that the firmware refuses them as they are, and accepts
-their documented translation (`tests/host/translate_eight_slot_profile.py`).
+version 3 the only ones the firmware accepts. The PD corpus is unchanged: it is
+version 1, and its runner moves each frozen record into the current record
+layout and checks it with the current record validator.
 
 Do not regenerate expected results just to make a changed validator pass.
 Review intentional contract changes and extend firmware-owned vectors alongside
 the C tests. Ark can independently propose vectors from its integration corpus;
 review and import those bytes, record provenance and update the manifest in the
-same change. Retain historical vectors when backward compatibility is required.
+same change. Only current formats are accepted, so a historical vector stays only
+as evidence that the firmware refuses it.
 The independence runner checks the manifest hashes. Running Ark's integration
 suite verifies its current implementation rather than these frozen expectations.
 

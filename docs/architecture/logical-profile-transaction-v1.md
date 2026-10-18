@@ -5,7 +5,7 @@
 > a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
 > binds a nonzero VIA generation and digest. HID framing remains v1; split framing is version 2.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
-> Backup translation belongs to the client, before a current-format Apply.
+> A backup in an earlier format is refused, not translated.
 
 ## Purpose
 

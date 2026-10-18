@@ -159,7 +159,7 @@ and recover the same editable values without consulting the C files.
 
 Firmware accepts only its current schema 3.0 domain versions and `NT` format-5
 storage (D-F10, D-F14). Every save binds VIA generation/digest, including custom-only
-edits. Legacy storage is refused at boot; older backup translation belongs to
-the client. See [Profile Wire](profile-wire-v1.md) and
+edits. Legacy storage is refused at boot, and a backup in an earlier format is
+refused, not translated. See [Profile Wire](profile-wire-v1.md) and
 [logical transactions](logical-profile-transaction-v1.md) for admission and
 recovery rules.

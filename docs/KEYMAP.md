@@ -68,6 +68,10 @@ The keymap currently sets these defaults in
 - `CUSTOM_MULTI_TAP_TERM = 150`
 - `COMBO_TERM = 50`
 
+Every `LT()`/`MT()`/`OSM()`/`TT()`/`OSL()` holds at the dual-role setting
+(default `TAPPING_TERM`), with or without a behavior row, unless the row
+overrides it. Other rows use `CUSTOM_TAP_HOLD_TERM`.
+
 Eight of the ten compiled combos follow `COMBO_TERM`; the two four-key Cmd+N
 chords are `COMBO_WINDOW` rows with their own 100 ms window. The combo hold
 threshold is `TAPPING_TERM`. The two-button mouse chord emits mouse button 6,

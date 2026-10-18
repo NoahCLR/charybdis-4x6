@@ -26,16 +26,37 @@ static bool record_admission_same_key(const keyrecord_t *lhs, const keyrecord_t 
     return lhs->event.type == rhs->event.type && lhs->event.key.row == rhs->event.key.row && lhs->event.key.col == rhs->event.key.col && lhs->keycode == rhs->keycode;
 }
 
-// Whether this release belongs to a press still held back.
+// Whether this release belongs to a press still held back. Every combo output
+// with one keycode is the same key here, so two such presses can both be held
+// before either release: each held release pairs with the earliest held press
+// still open, and one whose press already went is skipped.
 static bool record_admission_press_is_held(const keyrecord_t *release) {
-    bool held = false;
+    uint8_t open = 0;
 
     for (uint8_t index = 0; index < record_admission_held_count; index++) {
         if (record_admission_same_key(&record_admission_held[index], release)) {
-            held = record_admission_held[index].event.pressed;
+            if (record_admission_held[index].event.pressed) {
+                open++;
+            } else if (open) {
+                open--;
+            }
         }
     }
-    return held;
+    return open != 0u;
+}
+
+// Whether this release waits behind the undecided key at undecided. QMK
+// keeps a modifier's or a layer key's release in its tapping buffer while
+// another key is undecided, so that key's tap or hold still gets them; any
+// other release goes at once (action_tapping.c, "Modifier/Layer should be
+// retained till end of this tapping"). Only physical keys: a combo's runtime
+// position is known only once its record is admitted, so a combo's release
+// could not be told from the undecided key's.
+static bool record_admission_release_waits(keyrecord_t *release, keypos_t undecided) {
+    if (release->event.type != KEY_EVENT || (release->event.key.row == undecided.row && release->event.key.col == undecided.col)) {
+        return false;
+    }
+    return key_runtime_core_release_is_mods_or_layer(release->keycode ? release->keycode : get_record_keycode(release, false), release);
 }
 
 // Replays a held record through process_record. A press ends other keys'
@@ -80,7 +101,8 @@ bool noah_record_admission_admit(keyrecord_t *record) {
     }
 
     if (!record->event.pressed) {
-        return !(record_admission_held_count && record_admission_press_is_held(record)) || record_admission_capture(record);
+        bool waits = (record_admission_held_count && record_admission_press_is_held(record)) || (key_runtime_core_undecided_dual_role_key_pos(&undecided) && record_admission_release_waits(record, undecided));
+        return !waits || record_admission_capture(record);
     }
 
     if (record_admission_held_count) {
@@ -95,7 +117,8 @@ bool noah_record_admission_admit(keyrecord_t *record) {
 }
 
 void noah_record_admission_task(void) {
-    uint8_t replayed = 0u;
+    uint8_t  replayed = 0u;
+    keypos_t undecided;
 
     if (!record_admission_held_count || key_runtime_core_undecided_dual_role_key_pos(NULL)) {
         return;
@@ -105,9 +128,10 @@ void noah_record_admission_task(void) {
     while (replayed < record_admission_held_count) {
         keyrecord_t record = record_admission_held[replayed];
 
-        // A replayed tap/hold key can itself be undecided; later presses wait
-        // for it in turn, while releases of already replayed keys go ahead.
-        if (replayed > 0u && record.event.pressed && key_runtime_core_undecided_dual_role_key_pos(NULL)) {
+        // A replayed tap/hold key can itself be undecided; later presses and
+        // modifier or layer releases wait for it in turn, while other
+        // releases of already replayed keys go ahead.
+        if (replayed > 0u && key_runtime_core_undecided_dual_role_key_pos(&undecided) && (record.event.pressed || record_admission_release_waits(&record, undecided))) {
             break;
         }
         replayed++;
@@ -125,6 +149,25 @@ void noah_record_admission_reset(void) {
     noah_macro_input_guard_reset();
     record_admission_held_count = 0u;
     record_admission_replaying  = false;
+}
+
+static bool record_admission_event_pending(keypos_t pos, bool pressed, uint16_t since, uint16_t term) {
+    for (uint8_t index = 0; index < record_admission_held_count; index++) {
+        const keyevent_t *event = &record_admission_held[index].event;
+
+        if (event->type == KEY_EVENT && event->pressed == pressed && event->key.row == pos.row && event->key.col == pos.col && (uint16_t)(event->time - since) <= term) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool noah_record_admission_press_pending(keypos_t pos, uint16_t since, uint16_t term) {
+    return record_admission_event_pending(pos, true, since, term);
+}
+
+bool noah_record_admission_release_pending(keypos_t pos, uint16_t since, uint16_t term) {
+    return record_admission_event_pending(pos, false, since, term);
 }
 
 uint8_t noah_record_admission_held_count(void) {

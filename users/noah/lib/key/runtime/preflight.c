@@ -10,6 +10,22 @@
 #include "reducer/state_query.h"
 #include "reducer/ownership_state.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
+#include "../../compat/qmk_gesture_timing.h"
+
+// Runs before the runtime observes the release, while the key still holds
+// its layer or modifiers: a key that another key's press would settle as a
+// tap is settled now, so its tap still gets them (D-F27).
+void key_runtime_preflight_settle_before_release(uint16_t keycode, keyrecord_t *record) {
+    key_runtime_transition_plan_t plan;
+
+    if (record->event.pressed || !key_runtime_core_has_other_active_press_token(record->event.key) || !key_runtime_core_release_is_mods_or_layer(keycode, record)) {
+        return;
+    }
+    key_runtime_transition_plan_init(&plan);
+    key_runtime_transition_settle_active_keys_on_other_release(record->event.key, noah_qmk_gesture_event_time(record), &plan);
+    key_runtime_trace_plan("preflight:settle_on_mods_or_layer_release", &plan);
+    key_runtime_transition_execute_plan(&plan);
+}
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record, bool press_is_handled) {
     const press_token_t *token = key_runtime_core_press_token_at(record->event.key);

@@ -264,6 +264,20 @@ The helper vocabulary is:
 - `TAP_ON_RELEASE_AFTER_HOLD(action)`: qualify the hold at the threshold, then
   send `action` on release unless a longer hold replaces it
 
+What a hold does decides what happens when you press another key before it
+starts. A hold that is a layer, modifiers or a pointing mode makes that key
+wait, so it lands on the layer or gets the modifier if you keep holding. Any
+other hold, such as `S(KC_1)` on `KC_1`, is the key's own output, so the
+other key's press types this key's tap first: rolls keep their order, and
+for the hold you hold the key on its own. A hold that waits for release is
+sent at that press if its hold time has passed. While a key that makes
+others wait is undecided, letting go of a modifier or layer key you pressed
+before it waits as well, as in QMK: Cmd released just before F still types
+Cmd+F. For any other key, letting go of the modifier types its tap at once,
+so Cmd released just before `,` types Cmd+,. The
+[interaction model](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)
+has the details.
+
 `action` can be a normal keycode, a modified keycode such as `S(KC_1)`, a VIA
 macro, a supported QMK behavior keycode such as `OSM()` or
 `MT()`, a generated pointing-mode lock such as `PD_SLOT_0_LOCK`, or a layer
@@ -275,16 +289,20 @@ combo output. For custom momentary layer holds, use
 `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))` so the userspace owns the layer
 state. `TT(layer)` holds its layer like `MO(layer)`, and its
 `TAPPING_TOGGLE`-th tap (QMK's default, 5) sends `LOCK_LAYER(layer)`; an
-authored row on a `TT()` key replaces those taps. `OSL(layer)` holds its layer
-while down, and a tap turns it on for exactly the next key press (modifiers and
-`OSM()` do not use it up; as with QMK, a long press on its own also arms it
-and a quick second tap cancels it; with one-shot keys off it is only a hold).
+authored row with steps on a `TT()` key replaces those taps. `OSL(layer)` holds
+its layer while down, and a tap turns it on for exactly the next key press
+(modifiers and `OSM()` do not use it up; as with QMK, a long press on its own
+also arms it and a quick second tap cancels it; with one-shot keys off it is
+only a hold).
 A runtime-owned `MT()` consumes it on a qualifying tap release, even when the
 tap output waits for repeated taps; its selected action keeps the press layer.
 Holds and modifier-only taps leave it armed, and synthetic output never uses
-it up again. A plain `LT(layer, kc)` without an authored row keeps
-QMK's own tap/hold timing; only its hold goes through the userspace layer
-ownership, so releasing it no longer turns off a locked layer. `LM(layer,
+it up again. Every `LT()`, `MT()` and `OSM()` key is decided by the firmware,
+with or without a row, exactly as with an empty row: held past the dual-role
+time, `LT(layer, kc)` holds its layer through the userspace layer ownership (so
+releasing it no longer turns off a locked layer) and `MT()`/`OSM()` hold their
+modifiers. Tapped and then pressed and held again at once, such a key starts a
+new hold rather than repeating its tap as QMK did. `LM(layer,
 mods)` holds its layer and its modifiers from press to release. `DF()` and
 `PDF()` are refused: this firmware keeps layer 0 as the base. For a switchable
 base such as a game layer, order that layer just above Base and use
@@ -482,8 +500,8 @@ incompatible with current firmware, so retain the old pair and its backups if
 you still use it. The old five-layer and six-mode readback bridges are retired:
 this repository no longer provides a firmware path for extracting and migrating
 a profile from an old-geometry keyboard, and flashing current firmware over
-that geometry does not preserve its committed profile. Backups from schema-2
-firmware restore through Ark's import translation.
+that geometry does not preserve its committed profile. A backup made with
+earlier firmware cannot be restored onto this one.
 
 Executable custom combo hooks and unsupported macro content cannot be
 represented as profile data; export reports these explicitly instead of
@@ -526,8 +544,8 @@ than ordinary key taps. Stored macros share 34,903 bytes of memory across 128
 slots; one macro can use all the free space, with no separate playback-length
 limit. Writing or resetting the macro memory cancels a playing macro and
 releases its held keys. This storage layout resets older on-keyboard data on
-first flash: export a backup before upgrading, then restore it using a client
-that supports the new storage sizes.
+first flash, and a backup made with earlier firmware cannot be restored onto
+it.
 Uninterruptible playback defaults on when Unicode entry is needed, and you can
 force it On or Off per macro in Ark. Protected playback starts immediately:
 already-held ordinary keys stop repeating, and only the macro's keyboard output

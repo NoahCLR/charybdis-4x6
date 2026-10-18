@@ -21,9 +21,13 @@ noah_host_export_qmk_cpath "$ROOT"
     printf '#include "%s/users/noah/config.h"\n' "$ROOT"
     printf '#include "%s/config.h"\n' "$KEYMAP_PATH"
 } >"$CONFIG"
-# The populated combo/settings fixture is translated to current wire domains;
-# RGB, key behaviors and pointing content come from the real authored writer.
-python3 "$ROOT/tests/host/translate_eight_slot_profile.py" "$ROOT/tests/fixtures/client-regression/portable.bin.pd5" "$BUILD_DIR/portable32.bin.pd5"
+# Combos and settings come from the populated fixture; RGB, key behaviors and
+# pointing content come from the real authored writer.
+python3 - "$ROOT/tests/fixtures/populated_profile_v3.fixture" "$BUILD_DIR/populated.bin" <<'PYTHON'
+import pathlib, sys
+fields = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if "=" in line)
+pathlib.Path(sys.argv[2]).write_bytes(bytes.fromhex(fields["profile.hex"]))
+PYTHON
 
 # The maximum profile fixture must match its generator.
 python3 "$ROOT/tests/host/make_maximum_profile.py" --check
@@ -86,7 +90,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_peer_store_backend.c" \
         -o "$bin"
-    "$bin" "$BUILD_DIR/portable32.bin.pd5" "$ROOT/tests/fixtures/maximum_profile_v3.fixture"
+    "$bin" "$BUILD_DIR/populated.bin" "$ROOT/tests/fixtures/maximum_profile_v3.fixture"
 }
 build_and_run normal -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
 build_and_run sanitized -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer

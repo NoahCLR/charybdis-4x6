@@ -37,14 +37,25 @@ That makes patterns like these possible:
   double-tap behavior
 
 Plain keys without an authored row keep their normal QMK behavior, except the
-layer keys the runtime owns: `MO(layer)` holds its layer, `TT(layer)` holds it
-too and locks it on its `TAPPING_TOGGLE`-th tap (QMK's default, 5),
+layer keys the runtime owns and QMK's dual-role keys. A row without steps is no
+row (D-F27): an empty one, or one that only sets hold times, leaves a plain key
+QMK's and `TT()` its own taps. `MO(layer)` holds its layer, `TT(layer)` holds
+it too and locks it on its `TAPPING_TOGGLE`-th tap (QMK's default, 5),
 `OSL(layer)` holds it too and on a tap turns it on for the next key press,
-`LM(layer, mods)` holds it together with its modifiers,
-`TG(layer)` is `LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone. A
-plain `LT(layer, kc)` keeps QMK's own tap/hold decision and `TAPPING_TERM`;
-only the layer its hold turns on is owned, so releasing it leaves a locked
-layer on.
+`LM(layer, mods)` holds it together with its modifiers, `TG(layer)` is
+`LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone.
+
+Every `LT()`, `MT()` and `OSM()` key is decided by the runtime, with or without
+a row (D-F27), and a key without a row behaves exactly as with an empty one:
+its tap is its own tap, and held past the dual-role time `LT(layer, kc)` holds
+its layer as `MO(layer)` (owned, so releasing it leaves a locked layer on),
+`MT()` and `OSM()` hold their modifiers. Tap one, then press and hold it again
+at once, and the second press is a new hold after the dual-role time, not a
+repeated tap: QMK's quick-tap repeat of the letter is gone. Switching
+behaviours off (the master switch, a layer's switch, a row's own enable or
+allowed layers) or bypassing a placement ignores the row only; the key keeps
+this default. QMK's own tap-hold options (permissive hold, hold on other key
+press, Flow Tap, Chordal Hold) do not apply to these keys.
 
 A one-shot layer follows QMK's rule for what uses it up: any key press except a
 modifier, a one-shot modifier, a mod-tap still held, or `OSL()` itself. The
@@ -74,12 +85,11 @@ Default timing lives in the active keymap
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 That keymap chooses:
 
-- `TAPPING_TERM` for native QMK dual-role keys. Eligible authored `LT()`,
-  `MT()` and `OSM()` rows, plus intrinsic `TT()`/`OSL()`, use the userspace
-  classifier described below; unhandled or bypassed native dual-role keys
-  retain QMK tapping. Live settings reach native QMK through
-  `get_tapping_term()` and `get_quick_tap_term()` (D-L38)
-- `CUSTOM_TAP_HOLD_TERM`
+- `TAPPING_TERM` for QMK's dual-role keys: `LT()`, `MT()`, `TT()`, `OSL()`
+  and `OSM()`. The runtime decides their tap or hold; QMK's tapping engine
+  classifies none of them. With a live profile the dual-role setting
+  (settings id 0) replaces it (D-L38)
+- `CUSTOM_TAP_HOLD_TERM`, the tap/hold setting, for every other row
 - `CUSTOM_LONGER_HOLD_TERM`
 - `CUSTOM_MULTI_TAP_TERM`
 
@@ -135,14 +145,14 @@ window and shows its branch color for the same length of time. Inherited
 normal-tap repeats from branches that omit `.tap` still show the branch color, but
 they skip tap-commit feedback.
 
-Tap actions are release-settled. Reaching a tap-count branch on press selects the
-candidate branch, but `TAP_SENDS(...)` is selected by release and emitted when the
-pending tap series flushes. For terminal tap-only multi-tap branches, this means
-the final press can identify the branch before the action has actually been sent.
+Without cross-key settlement, tap actions are release-settled. Reaching a
+tap-count branch on press selects the candidate branch, but `TAP_SENDS(...)`
+is selected by release and emitted when the pending tap series flushes. For
+terminal tap-only multi-tap branches, this means the final press can identify the branch before the action has actually been sent.
 
-Holding is the one thing that resolves early. Crossing a hold threshold enters the
-branch there and then, so the hold tier claims the key without waiting out the
-multi-tap window.
+Crossing a hold threshold enters the branch there and then, without waiting
+out the multi-tap window. Another key can also settle an output tap or a
+release-time hold early, under the cross-key rules below.
 
 The tap index cycles through the authored branches rather than ending the gesture
 at the deepest one. A row with four branches answers a fifth tap with branch one
@@ -151,8 +161,9 @@ exactly one action. The consequence is that tapping cannot repeat an action insi
 one multi-tap window: to send the same branch twice you have to let the window
 close between them.
 
-Those pending multi-tap windows are tracked per physical key. Other handled
-keys can keep independent series alive. An unhandled key can settle pending
+Those pending multi-tap windows are tracked per physical key. Once a key is
+released, other handled keys can keep its series alive; while it is still
+down, the next press settles it by its class (below). An unhandled key can settle pending
 taps to preserve typing order, but cannot discard an on-time continuation
 already buffered in QMK. A tap/hold key's series (an authored `LT()`, `MT()` or
 `OSM()` row) is settled by any other key's press, so its tap is typed first.
@@ -163,23 +174,64 @@ types on the locked layer, without waiting for the multi-tap window to close.
 
 ### Keys pressed while a tap/hold key is undecided
 
-While a runtime-owned tap/hold key is down and has not reached its hold, keys
-pressed after it wait, as QMK's tapping engine holds keys behind a tapping key.
-That is an authored `LT()`, `MT()` or `OSM()` row, or an authored key whose
-hold is a layer held until release (`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`,
-previewed or not), at the tap count it is on:
+A handled key that is down and has not reached its hold meets a key pressed
+after it in one of three ways, decided by what its hold does at the tap count
+it is on (D-F27). Either way the earlier key's output comes first.
 
-- released before the tap-hold term, it is a tap: its tap is typed, then the
-  waiting keys, so rolling `/` into `,` types `/,`;
-- held past the term, its hold starts (layer or modifiers), then the waiting
-  keys run on it, so `/` held with an arrow tapped meanwhile sends the Nav arrow.
-  A waiting key types the key the hold's layer gives it and follows that
-  layer's behaviour settings, as if it had been pressed after the hold began.
+1. **Its hold changes other keys: later keys wait.** That is any `LT()`,
+   `MT()` or `OSM()` key, with or without a row, or a key whose first hold tier is a layer
+   (`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`, previewed or not, or any other
+   layer action), modifiers only (`KC_LEFT_ALT`, `C(KC_NO)`) or a pointing
+   mode. Keys pressed after it wait, as QMK's tapping engine holds keys behind
+   a tapping key:
+   - released before the tap-hold term, it is a tap: its tap is typed, then
+     the waiting keys, so rolling `/` into `,` types `/,`;
+   - held past the term, its hold starts (layer, modifiers or mode), then the
+     waiting keys run on it, so `/` held with an arrow tapped meanwhile sends
+     the Nav arrow. A waiting key types the key the hold's layer gives it and
+     follows that layer's behaviour settings, as if it had been pressed after
+     the hold began.
+2. **Its fallback hold is its own modifier: the later press registers it.** A
+   modifier with only a tap authored (Shift with Caps Lock on tap) holds
+   itself as soon as another key is pressed, so Shift rolled into a letter
+   types the capital at once.
+3. **Anything else: the later press settles it as a tap.** Its hold is an
+   output of its own (the number row's symbols, Shift+Enter, the Nav arrows'
+   Alt+Left), or it has no hold at all. The later key's press types its tap
+   first, then the later key goes out at once, so rolling `,` into a space
+   types `, `. Its own release sends nothing more. A repeated tap still
+   pending is typed at the count reached: Esc pressed a second time and
+   rolled into a letter types its double tap, then the letter. Held past its
+   hold time it is a hold, not a tap: a hold that fires at its threshold has
+   already gone out (`1` held into `e` types `!e`), and a hold that waits for
+   release (`TAP_ON_RELEASE_AFTER_HOLD`) is sent at the later press instead
+   of at its own release. Keys a pointing mode has taken over stay with the
+   mode. A combo member reaches the runtime only once QMK has decided its
+   combo, so combo timing is unchanged and a formed combo never sees it.
 
-Waiting keys replay in order with their physical timestamps. The release of a
-key pressed before the tap/hold key is not held back, as in QMK. The wait is at
+Waiting keys replay in order with their physical timestamps. The wait is at
 most the tap-hold term; a fast roll gains no delay beyond the tap/hold key's
-release. Plain `MO()`, `TT()`, `OSL()`, `LM()` keys and plain keys do not hold
+release.
+
+A key pressed before a class-1 key and released while it is undecided waits
+too when it is a modifier or layer key, as QMK keeps it in its tapping buffer:
+a modifier key, plain or with its own row (Left GUI), a mods-only key
+(`C(KC_NO)`), `MO()`, `LT()`, `LM()`, an `MT()` or `OSM()` held as its
+modifier, or a handled key holding a layer or modifiers at that moment (a
+thumb held for its layer, Shift holding itself). The undecided key's tap or
+hold goes out with that modifier or layer still on, then the release follows:
+press Cmd, press F, let go of Cmd, then F, and it types Cmd+F; let go of the
+thumb before a key pressed on its layer and that key still taps on the layer.
+The release of any other key pressed earlier goes at once, as in QMK. While it
+waits, a released key reaches no later hold tier. A combo output's release
+goes at once.
+
+The same releases settle a class-3 key, as another key's press does: its tap
+goes out at that release, with the modifier or layer still on, then the
+release. Press Cmd, press `,`, let go of Cmd, then `,`, and it types Cmd+,, as
+the key does without a row; Shift let go before Enter types Shift+Enter.
+Once the modifier is let go, keeping the key down types its tap, not its
+hold; held past its hold time before that, it has already sent its hold. Plain `MO()`, `TT()`, `OSL()`, `LM()` keys and plain keys do not hold
 keys back; they act on their press.
 
 The waiting queue is bounded (eight records by default). If a record that must
@@ -188,8 +240,9 @@ new record takes its place at the tail. Only one record replays for that
 arrival. Under this overload, that oldest key may run before the deciding
 key's tap or hold, using the layer and modifiers active at delivery. The rest
 still wait; records retain their timestamps and no release overtakes its own
-press. Releases of keys already delivered, including the deciding key, continue
-to pass through. Normal rolls and hold timing below capacity keep the rules above.
+press. A waiting modifier or layer release counts as a record that must wait.
+Other releases of keys already delivered, including the deciding key's,
+continue to pass through. Normal rolls and hold timing below capacity keep the rules above.
 
 ### Physical gestures and buffered delivery
 
@@ -200,7 +253,8 @@ completed taps followed by a third press. The first press must qualify as a tap.
 A combo can postpone output while it decides which action owns the input; it
 does not shorten the allowed physical gap or restart a hold's clock.
 
-An on-time press waiting in QMK keeps its tap series alive. If it wins a combo,
+An on-time press waiting in QMK's combo buffer, or in record admission behind
+an undecided key, keeps its tap series alive. If it wins a combo,
 the constituent does not run; if delivered as a key, it continues the series.
 A queued physical release prevents scans from inventing a longer hold while
 delivery is delayed. Release settlement uses the actual press/release interval
@@ -208,25 +262,29 @@ and the existing balanced action lifecycle. Synthetic combo outputs still start
 their hold clock on delivery and use the existing combo-origin continuation
 protection; there is no single constituent press that defines their hold.
 
-A runtime-owned key is classified once, by userspace. This includes authored
-`LT()`, `MT()` and `OSM()` rows, and `TT()`/`OSL()` which already have intrinsic
-userspace layer ownership. An unhandled `LT()`, `MT()` or `OSM()` still uses native
-QMK tapping. A row that does not author a first hold keeps the key's own, which
+A runtime-owned key is classified once, by userspace. This includes every
+`LT()`, `MT()` and `OSM()` key, row or not, and `TT()`/`OSL()` which already
+have intrinsic userspace layer ownership; QMK's tapping engine classifies no
+record, physical or combo output (feature bit 31). A row that does not author
+a first hold, or no row, keeps the key's own, which
 starts only once the key is held past the tap-hold term: `LT()` holds its layer
 as `MO()`, `MT()` and `OSM()` hold their modifiers. A tap never turns that layer
 or those modifiers on, and a hold sends no tap or one-shot on release. The first
 tap stays the key's own tap, so adding a repeated-tap branch cannot remove the
 hold. A transparent hold over a lower `LT()` inherits the same threshold hold.
 The broader bypass is advertised by feature bit 18; bit 17 alone only promises
-the authored LT bypass. Pointer-mode interception remains earlier than authored
+the authored LT bypass, and bit 31 extends both to keys without a row. Pointer-mode interception remains earlier than authored
 mouse behaviour: Arrow's button remapping can intentionally consume Button 3.
 These rules are advertised by Profile Wire feature bit 17. Older builds can
 lose a physically on-time repeat during buffering; increasing timing values
 can mask that defect while also delaying normal actions.
 
-One important nuance: inside `key_behaviors[]`, an omitted `.tap_hold_term`
-inherits `TAPPING_TERM` for `LT()` rows, but `CUSTOM_TAP_HOLD_TERM` for other
-custom rows.
+Hold-time defaults: a dual-role key (`LT()`, `MT()`, `OSM()`, `TT()`,
+`OSL()`) holds at the dual-role setting (compiled `TAPPING_TERM`), row or not,
+unless its row sets its own `.tap_hold_term`. Every other row holds at the
+tap/hold setting (compiled `CUSTOM_TAP_HOLD_TERM`). An empty row changes
+neither, and a row without steps sets hold times only for a key the runtime
+handles anyway.
 
 ## Normal Tap And Hold Fallbacks
 

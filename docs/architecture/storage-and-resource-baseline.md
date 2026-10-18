@@ -213,8 +213,8 @@ measured SRAM budget ([memory budgets](memory-budgets.md#bigger-profile-storage-
 Each slot contains a 32-byte storage header followed by at most 4,064 bytes of
 canonical Profile Wire payload.
 
-The retired format-1 header was readable in its original firmware and is independent of compiler
-struct layout:
+Format 1 (`NP`) was the first header; current firmware refuses it. It was
+independent of compiler struct layout:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |

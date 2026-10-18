@@ -54,8 +54,8 @@ directory and the existing domain docs.
   again. `LM(n, mods)` holds like `MO(n)` plus a built-in immediate hold of its
   mods-only keycode; `TG(n)` is `LOCK_LAYER(n)`; `TO(n)` is
   `layer_ownership_goto(n)`). `DF()` and `PDF()` stay refused: layer 0 is the
-  base throughout the firmware and the app. A plain `LT()` with no authored row keeps QMK's tap/hold decision;
-  only its hold (tap count 0) goes through layer ownership. Where an action may
+  base throughout the firmware and the app. Every `LT()` is the runtime's, row
+  or not (D-F27); its hold goes through layer ownership. Where an action may
   be placed is one rule, `noah_action_supported_at()`: `keymap.c` validation
   and the keyboard's check of a profile it is asked to save both ask it, and
   Ark mirrors it in `placementProblem()`. A new owned layer keycode is a

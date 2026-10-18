@@ -123,7 +123,8 @@ bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
 
 There is no `noah_get_hold_on_other_key_press()` helper. The shared userspace
 does not delegate its runtime-owned tap/hold decisions to this QMK hook.
-This override affects native QMK tapping only.
+Since D-F27 every dual-role key is runtime-owned, so this hook currently
+changes no key's tap/hold decision.
 
 For mouse-record classification, a keymap in this repo does not need this hook
 at all, and cannot use the chaining pattern anyway: chaining requires
@@ -284,7 +285,7 @@ This pattern applies to:
 | `eeconfig_init_user()` | `noah_eeconfig_init_user()` | VIA macro seeding after EEPROM init |
 | `keyboard_pre_init_user()` | `noah_keyboard_pre_init_user()` | saved USB product name before enumeration |
 | `process_record_admit_user()` | `noah_record_admission_admit()` in the compat header | bounded admission behind undecided keys and combo-output permission |
-| `get_hold_on_other_key_press()` | none | weak default returns `false`; define the QMK hook directly for keymap-specific hold preference |
+| `get_hold_on_other_key_press()` | none | weak default returns `false`; unused for runtime-owned dual-role decisions (D-F27) |
 | `pre_process_record_user()` | `noah_pre_process_record_user()` | physical-key tracking for keyboard modifier ownership before the main process path |
 | `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, non-handled release cleanup, direct actions, macros, and process-entry tracing |
 | `post_process_record_user()` | `noah_post_process_record_user()` | process-return finalization, including keyboard-event modifier-mask teardown and process trace result emission |
