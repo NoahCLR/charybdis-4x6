@@ -279,7 +279,9 @@ does the cross-key work that must happen before the current press resolves:
 
 - suppress default literal-key or modifier handling when aggregate ownership
   requires it
-- interrupt other active handled keys on foreign press
+- interrupt other active handled keys on foreign press: register a fallback
+  hold, and settle a key whose hold is an output of its own as a tap (or send
+  its release-time hold, once due) before the press goes out (D-F27)
 - leave unrelated pending multi-tap chains live until their own timeout or
   same-key continuation resolves them
 
@@ -466,8 +468,12 @@ The fork's `process_record_admit_user()` offers every record at the top of
 so a held record is processed once, on replay. `noah_matrix_scan_user` runs the
 replay after the key runtime scan, so a hold reached that scan applies first;
 `key_runtime_core_undecided_dual_role_key_pos()` is the only decision it reads.
-It counts LT/MT/OSM rows and keys whose hold is a layer held until release
-(the token's hold preview layer). Before a press is resolved, physically or
+It counts the keys whose hold changes other keys,
+`key_runtime_core_press_token_hold_changes_other_keys()`: LT/MT/OSM rows, keys
+whose hold is a layer held until release (the token's hold preview layer), and
+keys whose first hold tier is any layer action, modifiers only or a pointing
+mode. Preflight settles every other handled key on the next press instead
+(D-F27). Before a press is resolved, physically or
 on replay, `noah_key_runtime_settle_layer_taps_before_press()` settles other
 keys' pending layer-changing taps when the press is of a key without a
 behaviour; it costs no lookup unless such a tap is pending.

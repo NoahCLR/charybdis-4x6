@@ -144,6 +144,18 @@ static void test_configure_tap_release_key(uint16_t keycode, uint16_t tap_action
     key_runtime_scenario_add_behavior_view(behavior);
 }
 
+// A later press settles an earlier key whose hold is an output of its own
+// (D-F27), so only a key whose hold changes other keys, here a modifier, is
+// still undecided with a later sibling down. Admission holds that sibling back
+// unless it overflows; this harness delivers it at once.
+static void test_configure_modifier_hold_tap_key(uint16_t keycode, uint16_t tap_action) {
+    key_behavior_view_t behavior = test_pressable_handled_key(keycode);
+
+    behavior.single.tap  = (tap_behavior_t)TAP_SENDS(tap_action);
+    behavior.single.hold = (hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_SHIFT);
+    key_runtime_scenario_add_behavior_view(behavior);
+}
+
 static void test_configure_multi_tap_tap_key(uint16_t keycode, uint16_t tap_action) {
     key_behavior_view_t behavior = test_pressable_handled_key(keycode);
 
@@ -574,10 +586,14 @@ static void test_release_with_live_tap_release_sibling_defers_dispatch(void) {
 }
 
 static void test_release_with_live_held_sibling_dispatches_immediately(void) {
-    static const char                       *case_name     = "release with live held sibling dispatches immediately";
+    static const char *case_name = "release with live held sibling dispatches immediately";
+    // The sibling holds before the key goes down: a sibling pressed later
+    // would settle the key as a tap at its press (D-F27).
     static const key_runtime_scenario_step_t setup_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
+        KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_ACTIVE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
         KEY_RUNTIME_SCENARIO_SCAN(),
     };
@@ -625,7 +641,7 @@ static void test_release_dispatch_is_deferred_until_tap_release_sibling_clears(v
     };
 
     key_runtime_scenario_reset();
-    test_configure_tap_release_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
+    test_configure_modifier_hold_tap_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
     test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
 
     key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
@@ -666,7 +682,7 @@ static void test_release_dispatch_drains_when_last_blocker_clears_on_release(voi
     };
 
     key_runtime_scenario_reset();
-    test_configure_tap_release_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
+    test_configure_modifier_hold_tap_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
     test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
 
     key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
@@ -704,7 +720,7 @@ static void test_release_dispatch_drains_after_sibling_delayed_action_in_same_sc
     };
 
     key_runtime_scenario_reset();
-    test_configure_tap_release_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
+    test_configure_modifier_hold_tap_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
     test_configure_multi_tap_tap_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
 
     key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
@@ -909,7 +925,9 @@ static void test_release_with_interrupted_consumed_pd_lock_does_not_relock(void)
 static void test_pending_multi_tap_release_with_live_tap_release_sibling_keeps_held_lifecycle_immediate(void) {
     static const char                       *case_name     = "pending multi-tap release with live tap-release sibling keeps held lifecycle immediate";
     static const key_runtime_scenario_step_t setup_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 2, 3), KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
+        // Held past its hold time before the sibling goes down, which would
+        // otherwise settle the chain as a tap (D-F27).
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 2), KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS), KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 2, 3),
     };
     static const key_runtime_scenario_step_t release_chain[] = {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 2),

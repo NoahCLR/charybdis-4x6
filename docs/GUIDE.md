@@ -264,6 +264,16 @@ The helper vocabulary is:
 - `TAP_ON_RELEASE_AFTER_HOLD(action)`: qualify the hold at the threshold, then
   send `action` on release unless a longer hold replaces it
 
+What a hold does decides what happens when you press another key before it
+starts. A hold that is a layer, modifiers or a pointing mode makes that key
+wait, so it lands on the layer or gets the modifier if you keep holding. Any
+other hold, such as `S(KC_1)` on `KC_1`, is the key's own output, so the
+other key's press types this key's tap first: rolls keep their order, and
+for the hold you hold the key on its own. A hold that waits for release is
+sent at that press if its hold time has passed. The
+[interaction model](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)
+has the details.
+
 `action` can be a normal keycode, a modified keycode such as `S(KC_1)`, a VIA
 macro, a supported QMK behavior keycode such as `OSM()` or
 `MT()`, a generated pointing-mode lock such as `PD_SLOT_0_LOCK`, or a layer

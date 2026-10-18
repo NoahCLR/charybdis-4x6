@@ -151,8 +151,9 @@ exactly one action. The consequence is that tapping cannot repeat an action insi
 one multi-tap window: to send the same branch twice you have to let the window
 close between them.
 
-Those pending multi-tap windows are tracked per physical key. Other handled
-keys can keep independent series alive. An unhandled key can settle pending
+Those pending multi-tap windows are tracked per physical key. Once a key is
+released, other handled keys can keep its series alive; while it is still
+down, the next press settles it by its class (below). An unhandled key can settle pending
 taps to preserve typing order, but cannot discard an on-time continuation
 already buffered in QMK. A tap/hold key's series (an authored `LT()`, `MT()` or
 `OSM()` row) is settled by any other key's press, so its tap is typed first.
@@ -163,18 +164,40 @@ types on the locked layer, without waiting for the multi-tap window to close.
 
 ### Keys pressed while a tap/hold key is undecided
 
-While a runtime-owned tap/hold key is down and has not reached its hold, keys
-pressed after it wait, as QMK's tapping engine holds keys behind a tapping key.
-That is an authored `LT()`, `MT()` or `OSM()` row, or an authored key whose
-hold is a layer held until release (`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`,
-previewed or not), at the tap count it is on:
+A handled key that is down and has not reached its hold meets a key pressed
+after it in one of three ways, decided by what its hold does at the tap count
+it is on (D-F27). Either way the earlier key's output comes first.
 
-- released before the tap-hold term, it is a tap: its tap is typed, then the
-  waiting keys, so rolling `/` into `,` types `/,`;
-- held past the term, its hold starts (layer or modifiers), then the waiting
-  keys run on it, so `/` held with an arrow tapped meanwhile sends the Nav arrow.
-  A waiting key types the key the hold's layer gives it and follows that
-  layer's behaviour settings, as if it had been pressed after the hold began.
+1. **Its hold changes other keys: later keys wait.** That is an authored
+   `LT()`, `MT()` or `OSM()` row, or a key whose first hold tier is a layer
+   (`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`, previewed or not, or any other
+   layer action), modifiers only (`KC_LEFT_ALT`, `C(KC_NO)`) or a pointing
+   mode. Keys pressed after it wait, as QMK's tapping engine holds keys behind
+   a tapping key:
+   - released before the tap-hold term, it is a tap: its tap is typed, then
+     the waiting keys, so rolling `/` into `,` types `/,`;
+   - held past the term, its hold starts (layer, modifiers or mode), then the
+     waiting keys run on it, so `/` held with an arrow tapped meanwhile sends
+     the Nav arrow. A waiting key types the key the hold's layer gives it and
+     follows that layer's behaviour settings, as if it had been pressed after
+     the hold began.
+2. **Its fallback hold is its own modifier: the later press registers it.** A
+   modifier with only a tap authored (Shift with Caps Lock on tap) holds
+   itself as soon as another key is pressed, so Shift rolled into a letter
+   types the capital at once.
+3. **Anything else: the later press settles it as a tap.** Its hold is an
+   output of its own (the number row's symbols, Shift+Enter, the Nav arrows'
+   Alt+Left), or it has no hold at all. The later key's press types its tap
+   first, then the later key goes out at once, so rolling `,` into a space
+   types `, `. Its own release sends nothing more. A repeated tap still
+   pending is typed at the count reached: Esc pressed a second time and
+   rolled into a letter types its double tap, then the letter. Held past its
+   hold time it is a hold, not a tap: a hold that fires at its threshold has
+   already gone out (`1` held into `e` types `!e`), and a hold that waits for
+   release (`TAP_ON_RELEASE_AFTER_HOLD`) is sent at the later press instead
+   of at its own release. Keys a pointing mode has taken over stay with the
+   mode. A combo member reaches the runtime only once QMK has decided its
+   combo, so combo timing is unchanged and a formed combo never sees it.
 
 Waiting keys replay in order with their physical timestamps. The release of a
 key pressed before the tap/hold key is not held back, as in QMK. The wait is at

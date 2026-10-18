@@ -112,6 +112,8 @@ static uint8_t       gesture_source_layers[MATRIX_ROWS][MATRIX_COLS];
 static uint8_t       gesture_layer_cache[MATRIX_ROWS][MATRIX_COLS];
 static bool          gesture_live_row;
 static uint32_t      gesture_live_row_layers;
+// A published row on this keycode whose hold is its shifted symbol.
+static uint16_t      gesture_symbol_row;
 // Effective policy views used by the production pre-process/member gates.
 // This harness models published settings and rows without EEPROM I/O.
 static uint32_t      gesture_combo_layers = UINT32_MAX;
@@ -169,6 +171,11 @@ const key_behavior_t key_behaviors[] = {
     // Sparse rows: only a repeated tap is authored.
     {.keycode = MT(MOD_LSFT | MOD_LGUI, KC_S), .tap_hold_term = 100, .tap_counts[1] = {.tap = TAP_SENDS(KC_X)}},
     {.keycode = OSM(MOD_LALT), .tap_hold_term = 100, .tap_counts[1] = {.tap = TAP_SENDS(KC_Y)}},
+    // Rows whose hold is an output of their own, as the profile's number row,
+    // Esc (on Insert, which no combo outputs) and Nav arrows author them.
+    {.keycode = KC_1, .tap_hold_term = 150, .tap_counts[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXLM)}},
+    {.keycode = KC_INSERT, .tap_hold_term = 150, .tap_counts = {[0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_ESCAPE))}, [1] = {.tap = TAP_SENDS(S(KC_GRAVE))}}},
+    {.keycode = KC_LEFT, .tap_hold_term = 150, .tap_counts[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}},
 #endif
     {
         .keycode        = KC_RIGHT_ALT,
@@ -418,6 +425,7 @@ static void test_reset_state(void) {
     memset(gesture_layer_cache, 0, sizeof(gesture_layer_cache));
     gesture_live_row        = false;
     gesture_live_row_layers = 1u << 3;
+    gesture_symbol_row      = KC_NO;
     gesture_combo_layers = UINT32_MAX;
     gesture_combo_output_behaviors = true;
     memset(gesture_combo_flags, 0, sizeof(gesture_combo_flags));
@@ -2477,6 +2485,14 @@ static void gesture_at_participating(uint8_t row, uint8_t col, bool down, bool b
 }
 // Model a published row without coupling the gesture harness to EEPROM.
 noah_effective_key_behavior_result_t noah_effective_key_behavior_lookup(uint16_t keycode, noah_effective_key_behavior_row_t *row) {
+    if (gesture_symbol_row != KC_NO && keycode == gesture_symbol_row) {
+        memset(row, 0, sizeof(*row));
+        row->allowed_layers = UINT32_MAX;
+        row->authored_tap_depth = 1;
+        row->tap_hold_term = 150;
+        row->single = (key_behavior_step_t){.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(keycode))};
+        return NOAH_EFFECTIVE_KEY_BEHAVIOR_OK;
+    }
     if (!gesture_live_row || keycode != TEST_HANDLED_TAP_KEY) return NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK;
     memset(row, 0, sizeof(*row));
     row->allowed_layers = gesture_live_row_layers;
@@ -2927,6 +2943,124 @@ static void test_qmk_keys_wait_for_undecided_dual_role(void) {
     CHECK(noah_record_admission_held_count() == 0);
     gesture_advance(30); gesture_at(3, 0, false); gesture_advance(400);
     CHECK(gesture_out_is("KT", (const uint16_t[]){KC_E, KC_B}));
+}
+
+static void gesture_assert_admission_quiescent(void);
+// A key whose hold is an output of its own is settled as a tap by the next
+// key's press (D-F27): its tap is typed first, the later key goes at once.
+// Held past its hold time it has already sent its hold.
+static void test_qmk_symbol_key_rolls_type_in_order(void) {
+    const gesture_step_t quick[] = {{0,3,0,true}, {30,3,1,true}, {50,3,0,false}, {80,3,1,false}};
+    const gesture_step_t slow[]  = {{0,3,0,true}, {30,3,1,true}, {130,3,0,false}, {160,3,1,false}};
+    const gesture_step_t held[]  = {{0,3,0,true}, {200,3,1,true}, {220,3,1,false}, {260,3,0,false}};
+    const gesture_step_t own_row[] = {{0,3,0,true}, {30,3,3,true}, {50,3,0,false}, {80,3,3,false}};
+
+    gesture_run(KC_1, quick, ARRAY_SIZE(quick), 500);
+    if (!gesture_out_is("TK", (const uint16_t[]){KC_1, KC_E})) gesture_out_dump("symbol quick roll");
+    CHECK(gesture_out_is("TK", (const uint16_t[]){KC_1, KC_E}));
+    CHECK(gesture_out[0].at == 40030 && gesture_out[1].at == 40030);
+    gesture_assert_admission_quiescent();
+
+    gesture_run(KC_1, slow, ARRAY_SIZE(slow), 500);
+    if (!gesture_out_is("TK", (const uint16_t[]){KC_1, KC_E})) gesture_out_dump("symbol slow roll");
+    CHECK(gesture_out_is("TK", (const uint16_t[]){KC_1, KC_E}));
+    gesture_assert_admission_quiescent();
+
+    gesture_run(KC_1, held, ARRAY_SIZE(held), 500);
+    if (!gesture_out_is("RK", (const uint16_t[]){KC_EXLM, KC_E})) gesture_out_dump("symbol held");
+    CHECK(gesture_out_is("RK", (const uint16_t[]){KC_EXLM, KC_E}));
+    gesture_assert_admission_quiescent();
+
+    // The later key has a row of its own.
+    gesture_second_code = TEST_HANDLED_TAP_KEY;
+    gesture_run(KC_1, own_row, ARRAY_SIZE(own_row), 500);
+    if (!gesture_out_is("TT", (const uint16_t[]){KC_1, KC_J})) gesture_out_dump("symbol into row");
+    CHECK(gesture_out_is("TT", (const uint16_t[]){KC_1, KC_J}));
+    gesture_second_code = KC_NO;
+    gesture_assert_admission_quiescent();
+
+    // A key whose first press could still become a double tap (Esc).
+    gesture_run(KC_INSERT, quick, ARRAY_SIZE(quick), 500);
+    if (!gesture_out_is("TK", (const uint16_t[]){KC_INSERT, KC_E})) gesture_out_dump("multi-tap roll");
+    CHECK(gesture_out_is("TK", (const uint16_t[]){KC_INSERT, KC_E}));
+    gesture_assert_admission_quiescent();
+    // Its second press, rolled into the next key, is the double tap.
+    const gesture_step_t second[] = {{0,3,0,true}, {20,3,0,false}, {60,3,0,true}, {90,3,1,true}, {110,3,0,false}, {130,3,1,false}};
+    gesture_run(KC_INSERT, second, ARRAY_SIZE(second), 600);
+    if (!gesture_out_is("TK", (const uint16_t[]){S(KC_GRAVE), KC_E})) gesture_out_dump("multi-tap second roll");
+    CHECK(gesture_out_is("TK", (const uint16_t[]){S(KC_GRAVE), KC_E}));
+    gesture_assert_admission_quiescent();
+
+    // A hold that waits for release (Nav arrows): rolled, it is a tap; held
+    // past its hold time, the next press commits the hold first.
+    gesture_run(KC_LEFT, quick, ARRAY_SIZE(quick), 500);
+    if (!gesture_out_is("TK", (const uint16_t[]){KC_LEFT, KC_E})) gesture_out_dump("arrow roll");
+    CHECK(gesture_out_is("TK", (const uint16_t[]){KC_LEFT, KC_E}));
+    gesture_assert_admission_quiescent();
+    const gesture_step_t arrow_held[] = {{0,3,0,true}, {200,3,1,true}, {220,3,1,false}, {260,3,0,false}};
+    gesture_run(KC_LEFT, arrow_held, ARRAY_SIZE(arrow_held), 600);
+    if (!gesture_out_is("TK", (const uint16_t[]){A(KC_LEFT), KC_E})) gesture_out_dump("arrow held");
+    CHECK(gesture_out_is("TK", (const uint16_t[]){A(KC_LEFT), KC_E}));
+    gesture_assert_admission_quiescent();
+}
+
+// A hold that changes other keys makes later keys wait for its decision, as
+// D-F03's do: a pointing mode, which can take over buttons and mask
+// modifiers, and a modifier (GUI's double-tap hold is Alt).
+static void test_qmk_keys_wait_for_mode_and_modifier_holds(void) {
+    test_reset_state(); fake_time = 46000; gesture_test_code = TEST_PD_HOLD_KEY; gesture_out_count = 0;
+    gesture_at(3, 0, true); gesture_advance(30);
+    gesture_at(3, 1, true); gesture_advance(1);
+    CHECK(noah_record_admission_held_count() == 1);
+    CHECK(gesture_out_count == 0);
+    gesture_advance(TEST_PD_TAP_HOLD_TERM);
+    CHECK(noah_record_admission_held_count() == 0);
+    gesture_at(3, 1, false); gesture_advance(10);
+    gesture_at(3, 0, false); gesture_advance(500);
+    gesture_assert_admission_quiescent();
+
+    test_reset_state(); fake_time = 47000; gesture_test_code = KC_LEFT_GUI; gesture_out_count = 0;
+    gesture_at(3, 0, true); gesture_advance(20); gesture_at(3, 0, false); gesture_advance(40);
+    gesture_at(3, 0, true); gesture_advance(30);
+    gesture_at(3, 1, true); gesture_advance(1);
+    CHECK(noah_record_admission_held_count() == 1);
+    gesture_advance(118);
+    CHECK(noah_record_admission_held_count() == 1);
+    gesture_advance(1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(test_keypos(3, 0)) == KC_LEFT_ALT);
+    CHECK(noah_record_admission_held_count() == 0);
+    if (!gesture_out_is("K", (const uint16_t[]){KC_E})) gesture_out_dump("gui double-tap hold");
+    CHECK(gesture_out_is("K", (const uint16_t[]){KC_E}));
+    gesture_at(3, 1, false); gesture_advance(10);
+    gesture_at(3, 0, false); gesture_advance(500);
+    gesture_assert_admission_quiescent();
+}
+
+// A symbol key that is a combo member forms its combo on the same timing as
+// without its row; when the combo does not form, its tap is typed first.
+static void test_qmk_symbol_key_combo_member(void) {
+    const uint16_t gaps[] = {10, 49, 51, 80};
+    for (uint8_t gap = 0; gap < ARRAY_SIZE(gaps); gap++) {
+        unsigned combos[2];
+        for (uint8_t with_row = 0; with_row < 2; with_row++) {
+            test_reset_state(); fake_time = 44000; gesture_out_count = gesture_combo_output_count = 0;
+            gesture_symbol_row = with_row ? KC_N : KC_NO;
+            gesture_at(5, 2, true); gesture_advance(gaps[gap]); // N
+            gesture_at(5, 0, true); gesture_advance(30);        // M
+            gesture_at(5, 2, false); gesture_advance(10);
+            gesture_at(5, 0, false); gesture_advance(500);
+            combos[with_row] = gesture_combo_output_count;
+            if (gesture_combo_output_count) {
+                CHECK(gesture_combo_outputs[0] == KC_LGUI && gesture_tap_count(KC_N) == 0);
+            } else if (with_row) {
+                if (!gesture_out_is("TK", (const uint16_t[]){KC_N, KC_M})) gesture_out_dump("symbol combo member");
+                CHECK(gesture_out_is("TK", (const uint16_t[]){KC_N, KC_M}));
+            }
+            gesture_assert_admission_quiescent();
+        }
+        CHECK(combos[0] == combos[1]);
+        CHECK(combos[0] == (gaps[gap] < 50 ? 1u : 0u));
+    }
 }
 
 // Exercise the shadow decoder after real pinned QMK tapping delivery. The
@@ -3712,6 +3846,9 @@ int main(int argc, char **argv) {
     test_qmk_sparse_dual_role_rows_keep_intrinsic_hold();
     test_qmk_authored_layer_tap_layer_waits_for_hold();
     test_qmk_keys_wait_for_undecided_dual_role();
+    test_qmk_symbol_key_rolls_type_in_order();
+    test_qmk_symbol_key_combo_member();
+    test_qmk_keys_wait_for_mode_and_modifier_holds();
     test_qmk_admission_overload();
     test_qmk_admission_replay_waits_for_nested_decision();
     test_qmk_waiting_key_uses_hold_layer();
