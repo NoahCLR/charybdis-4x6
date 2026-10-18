@@ -3358,26 +3358,36 @@ static void test_oneshot_layer_serves_the_next_key(void) {
     test_assert_thumb_runtime_quiescent(oneshot_pos);
 }
 
-// A plain LT() with no authored row keeps QMK's tap/hold decision, which
-// arrives as the record's tap count. Its hold goes through layer ownership, so
-// releasing it no longer turns a locked layer off; its tap still goes to QMK.
-static void test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks(void) {
+// A plain LT() with no authored row is the runtime's too (D-F27): held past
+// the dual-role time, its layer goes through layer ownership, so releasing it
+// no longer turns a locked layer off, and a tap types its tap keycode. (This
+// pinned QMK's tap/hold decision, arriving as the record's tap count, before.)
+static void test_plain_layer_tap_is_the_runtimes(void) {
     keypos_t lt_pos  = {.row = 2, .col = 5};
     keypos_t tg_pos  = {.row = 2, .col = 6};
     uint16_t keycode = LT(LAYER_NAV, KC_F);
 
     test_reset_state();
+    CHECK(key_behavior_lookup(keycode).handled);
 
-    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, true, 0u));
-    CHECK(test_layer_active(LAYER_NAV));
-    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, false, 0u));
+    CHECK(!key_runtime_integration_process_record(keycode, lt_pos, true));
+    key_runtime_integration_advance(&fake_time, TAPPING_TERM - 1u);
+    key_runtime_integration_scan();
     CHECK(!test_layer_active(LAYER_NAV));
+    key_runtime_integration_advance(&fake_time, 1u);
+    key_runtime_integration_scan();
+    CHECK(test_layer_active(LAYER_NAV));
+    CHECK(!key_runtime_integration_process_record(keycode, lt_pos, false));
+    CHECK(!test_layer_active(LAYER_NAV));
+    CHECK(test_last_tap_code16 == KC_NO);
 
     key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, true);
     key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, false);
     CHECK(test_layer_locked(LAYER_NAV));
-    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, true, 0u));
-    CHECK(!key_runtime_integration_process_tap_record(keycode, lt_pos, false, 0u));
+    CHECK(!key_runtime_integration_process_record(keycode, lt_pos, true));
+    key_runtime_integration_advance(&fake_time, TAPPING_TERM);
+    key_runtime_integration_scan();
+    CHECK(!key_runtime_integration_process_record(keycode, lt_pos, false));
     CHECK(test_layer_locked(LAYER_NAV));
     CHECK(test_layer_active(LAYER_NAV));
 
@@ -3385,9 +3395,8 @@ static void test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks(void) {
     key_runtime_integration_process_record(TG(LAYER_NAV), tg_pos, false);
     CHECK(!test_layer_active(LAYER_NAV));
 
-    CHECK(key_runtime_integration_process_tap_record(keycode, lt_pos, true, 1u));
-    CHECK(!test_layer_active(LAYER_NAV));
-    CHECK(key_runtime_integration_process_tap_record(keycode, lt_pos, false, 1u));
+    test_tap_key(keycode, lt_pos);
+    CHECK(test_last_tap_code16 == KC_F);
     CHECK(!test_layer_active(LAYER_NAV));
     test_assert_thumb_runtime_quiescent(lt_pos);
 }
@@ -3952,7 +3961,7 @@ int main(void) {
     test_combo_behavior_layer_hold_keeps_feedback_until_resolved();
     test_combo_layer_hold_preserves_overlapping_combo_feedback_and_owners();
     test_combo_oneshot_and_tap_toggle_are_owned();
-    test_plain_layer_tap_hold_is_owned_and_its_tap_is_qmks();
+    test_plain_layer_tap_is_the_runtimes();
     test_to_pointer_then_to_base_leaves_the_pointer_layer_free();
     test_pointer_layer_key_runs_as_itself_then_closes_the_layer();
     test_pointer_layer_lock_holds_auto_mouse_until_unlocked();

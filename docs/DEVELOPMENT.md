@@ -193,15 +193,14 @@ Wire feature bit 17. The current layout and timing defaults are unchanged.
 
 Runtime-owned tapping now also covers authored MT/OSM rows and intrinsic TT/OSL
 keys (Profile Wire bit 18). Keys pressed while such a key is undecided wait for
-its tap or hold, as QMK's tapping does, so rolls keep their order. Native
-unhandled dual-role keys remain native. The
+its tap or hold, as QMK's tapping does, so rolls keep their order. The
 [release timing contract](INTERACTION_MODEL.md#release-intervals-and-timing-advice)
 also defines the impossible release interval Ark reports.
 
-Native LT/MT/OSM remain a compatibility boundary. Moving every key to one
-classifier is not designed yet; it is an
-[open issue](LIVE_EDIT_APP_DIRECTION.md#open-issues), and combo-output
-behaviours are a required acceptance case for it.
+Every LT/MT/OSM key, with or without a row, is now the runtime's too, and QMK's
+tapping engine classifies no record (D-F27, Profile Wire bit 31). Ark refuses
+unknown feature bits, so it must recognise bit 31 before it connects to such a
+build.
 
 ## Open release gates
 

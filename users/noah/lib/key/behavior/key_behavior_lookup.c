@@ -67,8 +67,8 @@ _Static_assert(NOAH_QMK_TAPPING_TOGGLE <= KEY_BEHAVIOR_MAX_TAP_COUNT, "TT() lock
 
 // A TT(n) key with no authored row holds its layer like MO(n), and its
 // TAPPING_TOGGLE-th tap sends LOCK_LAYER(n), so the lock is the same one TG(n)
-// and LOCK_LAYER(n) toggle. An authored row replaces this, as it would any
-// key's default taps.
+// and LOCK_LAYER(n) toggle. An authored row with steps replaces this, as it
+// would any key's default taps.
 static uint8_t key_behavior_tap_toggle_depth(uint16_t keycode) {
     return noah_action_keycode_is_layer_tap_toggle(keycode) ? (uint8_t)NOAH_QMK_TAPPING_TOGGLE : 0u;
 }
@@ -248,35 +248,47 @@ bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t 
     return false;
 }
 
+// QMK's dual-role keys: LT(), MT(), OSM(), TT() and OSL(). They hold at the
+// dual-role setting unless a row sets its own time; every other row holds at
+// the tap/hold setting.
+static bool key_behavior_keycode_is_dual_role(uint16_t keycode) {
+    return noah_action_keycode_dual_role_hold(keycode) != KC_NO || noah_action_keycode_is_layer_tap_toggle(keycode) || noah_action_keycode_is_layer_oneshot(keycode);
+}
+
 // use_row false resolves the key as if it had no authored row: the normal
 // action a participation bypass gives a press (participation-policy.md).
+// An LT(), MT() or OSM() key is handled either way, so the runtime decides
+// its tap or hold with its own default and QMK's tapping engine never does
+// (D-F27); an LT() then holds its layer. A row without steps is no row for
+// the key's taps and for whether the runtime handles it; only its hold times
+// apply, on a key the runtime handles anyway.
 static key_behavior_view_t key_behavior_view_build(uint16_t keycode, bool use_row) {
-    noah_effective_key_behavior_row_t    live         = {0};
-    noah_effective_key_behavior_result_t live_result  = use_row ? noah_effective_key_behavior_lookup(keycode, &live) : NOAH_EFFECTIVE_KEY_BEHAVIOR_NOT_FOUND;
-    const key_behavior_t                *config       = use_row && live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK ? key_behavior_config_lookup(keycode) : NULL;
-    bool                                 has_authored = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK || config;
-    noah_action_desc_t                   desc         = noah_action_describe(keycode);
-    bool                                 custom_lt    = has_authored && noah_action_desc_uses_authored_layer_tap_contract(desc);
+    noah_effective_key_behavior_row_t    live        = {0};
+    noah_effective_key_behavior_result_t live_result = use_row ? noah_effective_key_behavior_lookup(keycode, &live) : NOAH_EFFECTIVE_KEY_BEHAVIOR_NOT_FOUND;
+    const key_behavior_t                *config      = use_row && live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK ? key_behavior_config_lookup(keycode) : NULL;
+    uint8_t                              row_depth   = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.authored_tap_depth : key_behavior_authored_tap_depth_in_config(config);
+    bool                                 row_steps   = row_depth > 0u;
+    noah_action_desc_t                   desc        = noah_action_describe(keycode);
+    bool                                 dual_role   = noah_action_keycode_dual_role_hold(keycode) != KC_NO;
+    bool                                 custom_lt   = dual_role && noah_action_desc_uses_authored_layer_tap_contract(desc);
 
-    uint16_t tap_term = noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM);
+    uint16_t tap_term = key_behavior_keycode_is_dual_role(keycode) ? noah_setting(NOAH_SETTING_TAPPING_TERM, TAPPING_TERM) : noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM);
     if (live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.tap_hold_term) {
         tap_term = live.tap_hold_term;
     } else if (config && config->tap_hold_term) {
         tap_term = config->tap_hold_term;
-    } else if (custom_lt) {
-        tap_term = noah_setting(NOAH_SETTING_TAPPING_TERM, TAPPING_TERM);
     }
 
     uint16_t longer_term = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.longer_hold_term ? live.longer_hold_term : (config && config->longer_hold_term ? config->longer_hold_term : noah_setting(NOAH_SETTING_LONG_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM));
     uint16_t multi_term  = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.multi_tap_term ? live.multi_tap_term : (config && config->multi_tap_term ? config->multi_tap_term : noah_setting(NOAH_SETTING_MULTI_TAP_TERM, CUSTOM_MULTI_TAP_TERM));
-    uint8_t  tap_depth   = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.authored_tap_depth : (config ? key_behavior_authored_tap_depth_in_config(config) : key_behavior_tap_toggle_depth(keycode));
+    uint8_t  tap_depth   = row_steps ? row_depth : key_behavior_tap_toggle_depth(keycode);
     return (key_behavior_view_t){
-        .config             = config,
+        .config             = row_steps ? config : NULL,
         .source_epoch       = live.epoch,
         .keycode            = keycode,
         .source_row         = live.row_index,
-        .source_is_live     = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK,
-        .handled            = has_authored || noah_action_desc_is_runtime_handled_keycode(desc),
+        .source_is_live     = row_steps && live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK,
+        .handled            = row_steps || dual_role || noah_action_desc_is_runtime_handled_keycode(desc),
         .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc),
         .is_layer_tap       = custom_lt,
         .has_multi_tap      = tap_depth > 1u,
@@ -284,7 +296,7 @@ static key_behavior_view_t key_behavior_view_build(uint16_t keycode, bool use_ro
         .tap_hold_term      = tap_term,
         .longer_hold_term   = longer_term,
         .multi_tap_term     = multi_term,
-        .single             = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.single : (config ? config->tap_counts[0] : key_behavior_tap_toggle_step(keycode, 1u)),
+        .single             = row_steps ? (live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.single : config->tap_counts[0]) : key_behavior_tap_toggle_step(keycode, 1u),
     };
 }
 

@@ -3,8 +3,9 @@
 #include QMK_KEYBOARD_H
 #include "../macro/macro_input_guard.h"
 
-// Holds key records back while a runtime-owned tap/hold key (an authored LT,
-// MT or OSM row) is down and undecided, as QMK's tapping engine holds keys
+// Holds key records back while a tap/hold key whose hold changes other keys
+// (any LT, MT or OSM key, a layer or modifier hold: D-F27) is down and
+// undecided, as QMK's tapping engine holds keys
 // behind its tapping key. Once that key is decided (released: tap; held past
 // its tap-hold term: hold) the records replay in order through QMK's
 // process_record, keeping their physical timestamps, so "/" then "," types
@@ -29,6 +30,10 @@ bool noah_record_admission_admit(keyrecord_t *record);
 // before the records it held back.
 void noah_record_admission_task(void);
 
+// Whether a held-back press of the physical key at pos happened within term
+// ms of since; a tap series waiting for its next press counts it as pending,
+// as it does a press in QMK's combo buffer (D-F01).
+bool    noah_record_admission_press_pending(keypos_t pos, uint16_t since, uint16_t term);
 // Whether a held-back release of the physical key at pos happened within
 // term ms of since; the key runtime's hold gate counts it as queued.
 bool    noah_record_admission_release_pending(keypos_t pos, uint16_t since, uint16_t term);

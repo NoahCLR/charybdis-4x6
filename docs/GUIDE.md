@@ -289,16 +289,20 @@ combo output. For custom momentary layer holds, use
 `PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))` so the userspace owns the layer
 state. `TT(layer)` holds its layer like `MO(layer)`, and its
 `TAPPING_TOGGLE`-th tap (QMK's default, 5) sends `LOCK_LAYER(layer)`; an
-authored row on a `TT()` key replaces those taps. `OSL(layer)` holds its layer
-while down, and a tap turns it on for exactly the next key press (modifiers and
-`OSM()` do not use it up; as with QMK, a long press on its own also arms it
-and a quick second tap cancels it; with one-shot keys off it is only a hold).
+authored row with steps on a `TT()` key replaces those taps. `OSL(layer)` holds
+its layer while down, and a tap turns it on for exactly the next key press
+(modifiers and `OSM()` do not use it up; as with QMK, a long press on its own
+also arms it and a quick second tap cancels it; with one-shot keys off it is
+only a hold).
 A runtime-owned `MT()` consumes it on a qualifying tap release, even when the
 tap output waits for repeated taps; its selected action keeps the press layer.
 Holds and modifier-only taps leave it armed, and synthetic output never uses
-it up again. A plain `LT(layer, kc)` without an authored row keeps
-QMK's own tap/hold timing; only its hold goes through the userspace layer
-ownership, so releasing it no longer turns off a locked layer. `LM(layer,
+it up again. Every `LT()`, `MT()` and `OSM()` key is decided by the firmware,
+with or without a row, exactly as with an empty row: held past the dual-role
+time, `LT(layer, kc)` holds its layer through the userspace layer ownership (so
+releasing it no longer turns off a locked layer) and `MT()`/`OSM()` hold their
+modifiers. Tapped and then pressed and held again at once, such a key starts a
+new hold rather than repeating its tap as QMK did. `LM(layer,
 mods)` holds its layer and its modifiers from press to release. `DF()` and
 `PDF()` are refused: this firmware keeps layer 0 as the base. For a switchable
 base such as a game layer, order that layer just above Base and use

@@ -459,7 +459,9 @@ bool key_runtime_core_press_token_hold_changes_other_keys(const press_token_t *t
 }
 
 // QMK's rule for a key it handles: a modifier key, a mods-only key, MO, LT or
-// LM, or an MT or OSM released as a hold.
+// LM, or an MT or OSM released as a hold. Every LT, MT and OSM key is the
+// runtime's (D-F27), so a physical key reaching this is a plain modifier or a
+// mods-only key.
 static bool key_runtime_core_query_keycode_release_is_mods_or_layer(uint16_t keycode, const keyrecord_t *release) {
     if (noah_qmk_real_mods_for_keycode(keycode) != 0u || IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode) || IS_QK_LAYER_MOD(keycode)) {
         return true;

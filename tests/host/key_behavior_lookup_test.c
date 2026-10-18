@@ -184,6 +184,9 @@ const key_behavior_t key_behaviors[] = {
                 [1] = {.tap = TAP_SENDS(KC_B)},
             },
     },
+    // Rows without steps, with hold times of their own.
+    {.keycode = KC_DELETE, .tap_hold_term = 120},
+    {.keycode = TT(4), .tap_hold_term = 120, .multi_tap_term = 180},
 };
 
 // CUSTOM_KEY_100 (with a row) and CUSTOM_KEY_101 (without) have shortcuts;
@@ -339,13 +342,27 @@ uint8_t get_oneshot_locked_mods(void) {
     return 0;
 }
 
-static void test_bare_lt_falls_back_to_qmk(void) {
-    key_behavior_view_t behavior = key_behavior_lookup(TEST_BARE_LAYER_TAP);
+// Every LT/MT/OSM key is the runtime's, row or not (D-F27): a bare LT() holds
+// its layer past the dual-role time, like an empty row. It fell back to QMK
+// before. Without its row (a participation bypass) an authored one is the same.
+static void test_bare_dual_role_keys_use_the_runtime_default(void) {
+    const uint16_t bare[] = {TEST_BARE_LAYER_TAP, MT(MOD_LCTL, KC_B), OSM(MOD_RSFT)};
 
-    CHECK(!behavior.handled);
-    CHECK(!behavior.is_momentary_layer);
-    CHECK(!behavior.is_layer_tap);
-    CHECK(behavior.tap_hold_term == CUSTOM_TAP_HOLD_TERM);
+    for (uint8_t i = 0; i < ARRAY_SIZE(bare); i++) {
+        key_behavior_view_t behavior = key_behavior_lookup(bare[i]);
+
+        CHECK(behavior.handled);
+        CHECK(!behavior.is_momentary_layer);
+        CHECK(behavior.is_layer_tap == (i == 0u));
+        CHECK(behavior.tap_hold_term == TAPPING_TERM);
+        CHECK(!key_behavior_step_present(behavior.single));
+    }
+
+    key_behavior_view_t bypassed = key_behavior_lookup_without_row(TEST_AUTHORED_LAYER_TAP);
+    CHECK(bypassed.handled && bypassed.is_layer_tap && !bypassed.has_multi_tap);
+    CHECK(bypassed.tap_hold_term == TAPPING_TERM);
+    CHECK(key_behavior_lookup(TT(3)).tap_hold_term == TAPPING_TERM);
+    CHECK(key_behavior_lookup(OSL(3)).tap_hold_term == TAPPING_TERM);
 }
 
 static void test_authored_lt_uses_custom_runtime(void) {
@@ -407,6 +424,21 @@ static void test_tap_toggle_layer_defers_to_an_authored_row_and_the_layer_count(
     CHECK(!outside.handled);
     CHECK(!outside.is_momentary_layer);
     CHECK(outside.authored_tap_depth == 0u);
+}
+
+// A row without steps is no row for the key's taps and for whether the
+// runtime handles it (D-F27): a plain key stays QMK's, and TT() keeps its
+// built-in taps. Its hold times apply to a key the runtime handles anyway.
+static void test_row_without_steps_is_no_row(void) {
+    key_behavior_view_t plain = key_behavior_lookup(KC_DELETE);
+    CHECK(!plain.handled);
+    CHECK(plain.authored_tap_depth == 0u && !key_behavior_step_present(plain.single));
+
+    key_behavior_view_t toggle = key_behavior_lookup(TT(4));
+    CHECK(toggle.handled && toggle.is_momentary_layer);
+    CHECK(toggle.authored_tap_depth == 5u && toggle.has_multi_tap);
+    CHECK(key_behavior_view_step(&toggle, 5u).tap.action == LOCK_LAYER(4));
+    CHECK(toggle.tap_hold_term == 120u && toggle.multi_tap_term == 180u);
 }
 
 static void test_plain_pd_mode_key_is_handled_without_authored_behavior(void) {
@@ -843,8 +875,9 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
 
     // A live behavior domain is a complete replacement: an omitted compiled
     // row is removed rather than silently leaking through from source data.
+    // The LT() is still the runtime's, with its default (D-F27).
     behavior = key_behavior_lookup(TEST_AUTHORED_LAYER_TAP);
-    CHECK(!behavior.source_is_live && behavior.config == NULL && !behavior.handled);
+    CHECK(!behavior.source_is_live && behavior.config == NULL && !behavior.has_multi_tap && behavior.authored_tap_depth == 0u);
 
     CHECK(noah_effective_key_behavior_lookup(TEST_MULTI_TAP_KEY, &token) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK);
     active.generation = 8u;
@@ -996,11 +1029,12 @@ int main(void) {
     test_custom_key_shortcut_without_a_row_holds_from_the_press();
     test_custom_key_shortcut_fills_unauthored_cells_of_its_row();
     test_transparent_cell_reads_a_custom_key_shortcut_as_its_keycode();
-    test_bare_lt_falls_back_to_qmk();
+    test_bare_dual_role_keys_use_the_runtime_default();
     test_authored_lt_uses_custom_runtime();
     test_momentary_layer_stays_handled();
     test_tap_toggle_layer_holds_and_locks_on_its_toggle_tap();
     test_tap_toggle_layer_defers_to_an_authored_row_and_the_layer_count();
+    test_row_without_steps_is_no_row();
     test_plain_pd_mode_key_is_handled_without_authored_behavior();
     test_handled_resolution_searches_authored_rows_once();
     test_pd_mode_lock_stays_out_of_handled_key_runtime();
