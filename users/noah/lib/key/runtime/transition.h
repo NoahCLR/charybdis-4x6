@@ -33,6 +33,7 @@ void key_runtime_transition_flush_foreign_dual_role_multi_tap(uint16_t keycode, 
 bool key_runtime_transition_flush_foreign_layer_multi_tap(keypos_t key_pos, key_runtime_transition_plan_t *plan);
 void key_runtime_transition_flush_active_keys_except(keypos_t key_pos, key_runtime_transition_plan_t *plan);
 void key_runtime_transition_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_transition_plan_t *plan);
+void key_runtime_transition_settle_active_keys_on_other_release(keypos_t key_pos, uint16_t released_at, key_runtime_transition_plan_t *plan);
 bool key_runtime_transition_handled_key_press(uint16_t keycode, keypos_t key_pos, key_runtime_transition_plan_t *plan);
 bool key_runtime_transition_handled_key_release(uint16_t keycode, keyrecord_t *record, const handled_key_resolution_t *resolution, key_runtime_transition_plan_t *plan);
 void key_runtime_transition_scan(key_runtime_transition_plan_t *plan);

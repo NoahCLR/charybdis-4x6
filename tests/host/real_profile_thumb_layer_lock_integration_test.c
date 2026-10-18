@@ -2390,18 +2390,18 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_taps_immediate_across_relea
 
         test_press_resolved(child_pos);
 
+        // The arrow types once, immediately: at its own release, or at the
+        // release of GUI's Alt hold or the Nav thumb if one comes first, which
+        // settles it while its modifier or layer is still on (D-F27).
+        bool child_typed = false;
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
-            switch (release_order->order[release_index]) {
-                case TEST_RELEASE_TARGET_CHILD: {
-                    uint16_t previous_tap_count     = test_tap_code16_count;
-                    uint16_t previous_delayed_count = test_delayed_action_count;
+            uint16_t previous_tap_count     = test_tap_code16_count;
+            uint16_t previous_delayed_count = test_delayed_action_count;
 
+            switch (release_order->order[release_index]) {
+                case TEST_RELEASE_TARGET_CHILD:
                     test_release_resolved(child_pos);
-                    CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
-                    CHECK(test_last_tap_code16 == KC_LEFT);
-                    CHECK(test_delayed_action_count == previous_delayed_count);
                     break;
-                }
                 case TEST_RELEASE_TARGET_PARENT:
                     test_release_resolved(parent_pos);
                     break;
@@ -2409,6 +2409,10 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_taps_immediate_across_relea
                     test_release_resolved(gui_pos);
                     break;
             }
+            CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + (child_typed ? 0u : 1u)));
+            CHECK(test_last_tap_code16 == KC_LEFT);
+            CHECK(test_delayed_action_count == previous_delayed_count);
+            child_typed = true;
         }
 
         key_runtime_integration_scan();
@@ -2440,18 +2444,18 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_hold_release_immediate_acro
         test_press_resolved(child_pos);
         key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
 
+        // The arrow types once, immediately: at its own release, or at the
+        // release of GUI's Alt hold or the Nav thumb if one comes first, which
+        // settles it while its modifier or layer is still on (D-F27).
+        bool child_typed = false;
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
-            switch (release_order->order[release_index]) {
-                case TEST_RELEASE_TARGET_CHILD: {
-                    uint16_t previous_tap_count     = test_tap_code16_count;
-                    uint16_t previous_delayed_count = test_delayed_action_count;
+            uint16_t previous_tap_count     = test_tap_code16_count;
+            uint16_t previous_delayed_count = test_delayed_action_count;
 
+            switch (release_order->order[release_index]) {
+                case TEST_RELEASE_TARGET_CHILD:
                     test_release_resolved(child_pos);
-                    CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
-                    CHECK(test_last_tap_code16 == A(KC_LEFT));
-                    CHECK(test_delayed_action_count == previous_delayed_count);
                     break;
-                }
                 case TEST_RELEASE_TARGET_PARENT:
                     test_release_resolved(parent_pos);
                     break;
@@ -2459,6 +2463,10 @@ static void test_gui_double_tap_hold_keeps_nav_arrow_hold_release_immediate_acro
                     test_release_resolved(gui_pos);
                     break;
             }
+            CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + (child_typed ? 0u : 1u)));
+            CHECK(test_last_tap_code16 == A(KC_LEFT));
+            CHECK(test_delayed_action_count == previous_delayed_count);
+            child_typed = true;
         }
 
         key_runtime_integration_scan();
@@ -2539,17 +2547,17 @@ static void test_gui_pending_double_tap_hold_keeps_nav_arrow_hold_release_immedi
         test_press_resolved(child_pos);
         test_commit_pending_gui_double_tap_alt_hold(gui_pos);
 
+        // The arrow's release hold goes out once, immediately: at its own
+        // release, or at the release of GUI's Alt hold or the Nav thumb if one
+        // comes first (D-F27).
+        bool child_typed = false;
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
-            switch (release_order->order[release_index]) {
-                case TEST_RELEASE_TARGET_CHILD: {
-                    uint16_t previous_tap_count = test_tap_code16_count;
+            uint16_t previous_tap_count = test_tap_code16_count;
 
+            switch (release_order->order[release_index]) {
+                case TEST_RELEASE_TARGET_CHILD:
                     test_release_resolved(child_pos);
-                    CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + 1));
-                    CHECK(test_last_tap_code16 == A(KC_LEFT));
-                    CHECK(test_delayed_action_count == 0);
                     break;
-                }
                 case TEST_RELEASE_TARGET_PARENT:
                     test_release_resolved(parent_pos);
                     break;
@@ -2557,6 +2565,10 @@ static void test_gui_pending_double_tap_hold_keeps_nav_arrow_hold_release_immedi
                     test_release_resolved(gui_pos);
                     break;
             }
+            CHECK(test_tap_code16_count == (uint16_t)(previous_tap_count + (child_typed ? 0u : 1u)));
+            CHECK(test_last_tap_code16 == A(KC_LEFT));
+            CHECK(test_delayed_action_count == 0);
+            child_typed = true;
         }
 
         key_runtime_integration_scan();

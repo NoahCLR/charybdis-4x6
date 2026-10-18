@@ -35,6 +35,7 @@
 #    include "users/noah/lib/profile/runtime/effective_combo_runtime.h"
 #endif
 #include "users/noah/lib/compat/qmk_record_admission.h"
+#include "users/noah/lib/compat/qmk_mod_contract.h"
 
 #ifndef KC_J
 #    define KC_J 0x000Du
@@ -80,11 +81,14 @@ enum {
 layer_state_t        layer_state = 0;
 #ifdef NOAH_TEST_QMK_GESTURES
 // What reached the host, in order: 'K' a key QMK would register, 'T' a runtime
-// tap, 'R' a runtime register, 'L' a layer turned on.
+// tap, 'R' a runtime register, 'L' a layer turned on. Each carries the host
+// report's modifiers and the layer state when it went out.
 typedef struct {
-    char     kind;
-    uint16_t code;
-    uint16_t at;
+    char          kind;
+    uint16_t      code;
+    uint16_t      at;
+    uint8_t       mods;
+    layer_state_t layers;
 } gesture_out_t;
 static gesture_out_t gesture_out[32];
 static uint8_t       gesture_out_count;
@@ -114,6 +118,16 @@ static bool          gesture_live_row;
 static uint32_t      gesture_live_row_layers;
 // A published row on this keycode whose hold is its shifted symbol.
 static uint16_t      gesture_symbol_row;
+// A published row on this keycode with nothing authored in it.
+static uint16_t      gesture_empty_row;
+// A published row on this keycode that holds Sym, then taps X on a long hold.
+static uint16_t      gesture_layer_long_row;
+// Real modifiers QMK registered for delivered keys and runtime registers.
+static uint8_t       gesture_host_mods;
+// A delayed tap replays with the modifiers saved for it, as
+// keyboard_mod_policy_begin_action_replay() applies them.
+static bool          gesture_replaying;
+static uint8_t       gesture_replay_mods;
 // Effective policy views used by the production pre-process/member gates.
 // This harness models published settings and rows without EEPROM I/O.
 static uint32_t      gesture_combo_layers = UINT32_MAX;
@@ -138,8 +152,9 @@ uint32_t noah_effective_combo_allowed_layers(uint16_t index) { return gesture_ro
 bool noah_effective_combo_enabled(uint16_t index) { (void)index; return true; }
 static uint16_t      gesture_qmk_tap;
 static unsigned      gesture_qmk_tap_count;
+static uint8_t       gesture_report_mods(void);
 static void          gesture_out_add(char kind, uint16_t code) {
-    if (gesture_out_count < ARRAY_SIZE(gesture_out)) gesture_out[gesture_out_count++] = (gesture_out_t){kind, code, fake_time};
+    if (gesture_out_count < ARRAY_SIZE(gesture_out)) gesture_out[gesture_out_count++] = (gesture_out_t){kind, code, fake_time, gesture_report_mods(), layer_state};
 }
 #endif
 static uint16_t      test_keymap[LAYER_COUNT][MATRIX_ROWS][MATRIX_COLS];
@@ -426,6 +441,9 @@ static void test_reset_state(void) {
     gesture_live_row        = false;
     gesture_live_row_layers = 1u << 3;
     gesture_symbol_row      = KC_NO;
+    gesture_empty_row       = KC_NO;
+    gesture_layer_long_row  = KC_NO;
+    gesture_host_mods       = 0;
     gesture_combo_layers = UINT32_MAX;
     gesture_combo_output_behaviors = true;
     memset(gesture_combo_flags, 0, sizeof(gesture_combo_flags));
@@ -588,6 +606,11 @@ void del_mods(uint8_t mods) {
 }
 
 void send_keyboard_report(void) {}
+#ifdef NOAH_TEST_QMK_GESTURES
+static uint8_t gesture_report_mods(void) {
+    return gesture_replaying ? gesture_replay_mods : (uint8_t)(gesture_host_mods | fake_mods | fake_weak_mods);
+}
+#endif
 
 void tap_code16(uint16_t keycode) {
 #ifdef NOAH_TEST_QMK_GESTURES
@@ -613,6 +636,7 @@ void register_code16(uint16_t keycode) {
 #ifdef NOAH_TEST_QMK_GESTURES
     gesture_out_add('R', keycode);
     gesture_registered = keycode;
+    gesture_host_mods |= noah_qmk_real_mods_for_keycode(keycode);
 #endif
     (void)keycode;
 }
@@ -620,6 +644,7 @@ void register_code16(uint16_t keycode) {
 void unregister_code16(uint16_t keycode) {
 #ifdef NOAH_TEST_QMK_GESTURES
     gesture_unregistered = keycode;
+    gesture_host_mods &= (uint8_t)~noah_qmk_real_mods_for_keycode(keycode);
 #endif
     (void)keycode;
 }
@@ -727,10 +752,12 @@ bool process_record(keyrecord_t *record) {
             gesture_qmk_tap = code;
             gesture_qmk_tap_count++;
         } else {
+            gesture_host_mods |= noah_qmk_real_mods_for_keycode(code);
             gesture_out_add('K', code);
         }
         if (!noah_synthetic_record_active() && record->event.type == KEY_EVENT) gesture_processed_press = code;
     }
+    if (pass && !record->event.pressed && !noah_synthetic_record_active()) gesture_host_mods &= (uint8_t)~noah_qmk_real_mods_for_keycode(code);
 #endif
     return pass;
 }
@@ -921,7 +948,14 @@ void dispatch_delayed_action(uint16_t action, delayed_action_mods_t mods) {
     delayed_action_count++;
     last_delayed_action = action;
     last_delayed_mods   = mods;
+#ifdef NOAH_TEST_QMK_GESTURES
+    gesture_replaying   = true;
+    gesture_replay_mods = (uint8_t)(mods.real | mods.weak);
+#endif
     action_dispatch(action);
+#ifdef NOAH_TEST_QMK_GESTURES
+    gesture_replaying = false;
+#endif
 }
 
 void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_action_mods_t mods) {
@@ -2051,25 +2085,31 @@ static void test_gui_double_tap_hold_with_authored_pd_hold_keeps_processed_child
 
         CHECK(!key_runtime_integration_process_record(TEST_HANDLED_TAP_KEY, child_pos, true));
 
+        // The child types once, immediately: at its own release, or at the
+        // release of GUI's Alt hold if that comes first (D-F27).
+        bool child_typed = false;
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
-            switch (release_order->order[release_index]) {
-                case TEST_RELEASE_TARGET_CHILD: {
-                    uint16_t previous_tap_count     = tap_code16_count;
-                    uint16_t previous_delayed_count = delayed_action_count;
+            uint16_t previous_tap_count     = tap_code16_count;
+            uint16_t previous_delayed_count = delayed_action_count;
 
+            switch (release_order->order[release_index]) {
+                case TEST_RELEASE_TARGET_CHILD:
                     CHECK(!key_runtime_integration_process_record(TEST_HANDLED_TAP_KEY, child_pos, false));
-                    CHECK(tap_code16_count == (uint16_t)(previous_tap_count + 1));
-                    CHECK(last_tap_code16 == KC_J);
-                    CHECK(delayed_action_count == previous_delayed_count);
+                    CHECK(tap_code16_count == (uint16_t)(previous_tap_count + (child_typed ? 0u : 1u)));
+                    child_typed = true;
                     break;
-                }
                 case TEST_RELEASE_TARGET_PARENT:
                     CHECK(!key_runtime_integration_process_record(TEST_PD_HOLD_KEY, hold_pos, false));
+                    CHECK(tap_code16_count == previous_tap_count);
                     break;
                 case TEST_RELEASE_TARGET_GUI:
                     CHECK(!key_runtime_integration_process_record(KC_LEFT_GUI, gui_pos, false));
+                    CHECK(tap_code16_count == (uint16_t)(previous_tap_count + (child_typed ? 0u : 1u)));
+                    child_typed = true;
                     break;
             }
+            CHECK(last_tap_code16 == KC_J || !child_typed);
+            CHECK(delayed_action_count == previous_delayed_count);
         }
 
         key_runtime_integration_scan();
@@ -2485,6 +2525,20 @@ static void gesture_at_participating(uint8_t row, uint8_t col, bool down, bool b
 }
 // Model a published row without coupling the gesture harness to EEPROM.
 noah_effective_key_behavior_result_t noah_effective_key_behavior_lookup(uint16_t keycode, noah_effective_key_behavior_row_t *row) {
+    if (gesture_layer_long_row != KC_NO && keycode == gesture_layer_long_row) {
+        memset(row, 0, sizeof(*row));
+        row->allowed_layers = UINT32_MAX;
+        row->authored_tap_depth = 1;
+        row->tap_hold_term = 100;
+        row->longer_hold_term = 300;
+        row->single = (key_behavior_step_t){.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_LAYER_SYM)), .long_hold = TAP_AT_HOLD_THRESHOLD(KC_X)};
+        return NOAH_EFFECTIVE_KEY_BEHAVIOR_OK;
+    }
+    if (gesture_empty_row != KC_NO && keycode == gesture_empty_row) {
+        memset(row, 0, sizeof(*row));
+        row->allowed_layers = UINT32_MAX;
+        return NOAH_EFFECTIVE_KEY_BEHAVIOR_OK;
+    }
     if (gesture_symbol_row != KC_NO && keycode == gesture_symbol_row) {
         memset(row, 0, sizeof(*row));
         row->allowed_layers = UINT32_MAX;
@@ -2897,14 +2951,17 @@ static void gesture_out_dump(const char *name) {
     fprintf(stderr, "\n");
 }
 typedef struct { uint16_t at; uint8_t row, col; bool down; } gesture_step_t;
-static void gesture_run(uint16_t code, const gesture_step_t *steps, uint8_t count, uint16_t until) {
-    test_reset_state(); fake_time = 40000; gesture_test_code = code; gesture_out_count = 0;
-    gesture_momentary_layer = UINT8_MAX;
+static void gesture_play(const gesture_step_t *steps, uint8_t count, uint16_t until) {
     uint8_t next = 0;
     for (uint16_t ms = 0; ms <= until; ms++) {
         while (next < count && steps[next].at == ms) { gesture_at(steps[next].row, steps[next].col, steps[next].down); next++; }
         gesture_advance(1);
     }
+}
+static void gesture_run(uint16_t code, const gesture_step_t *steps, uint8_t count, uint16_t until) {
+    test_reset_state(); fake_time = 40000; gesture_test_code = code; gesture_out_count = 0;
+    gesture_momentary_layer = UINT8_MAX;
+    gesture_play(steps, count, until);
 }
 static void test_qmk_keys_wait_for_undecided_dual_role(void) {
     const uint16_t lt = LT(TEST_LAYER_NAV, KC_B), mt = MT(MOD_LSFT | MOD_LGUI, KC_S);
@@ -3001,6 +3058,248 @@ static void test_qmk_symbol_key_rolls_type_in_order(void) {
     gesture_run(KC_LEFT, arrow_held, ARRAY_SIZE(arrow_held), 600);
     if (!gesture_out_is("TK", (const uint16_t[]){A(KC_LEFT), KC_E})) gesture_out_dump("arrow held");
     CHECK(gesture_out_is("TK", (const uint16_t[]){A(KC_LEFT), KC_E}));
+    gesture_assert_admission_quiescent();
+}
+
+// A modifier or layer key released while a tap/hold key is undecided waits
+// for its decision, as QMK keeps it in its tapping buffer: the tap goes out
+// with the modifier or layer still on, and the release follows it. Here the
+// tap/hold key is LT(Sym,J) with an empty row, so the firmware decides it.
+static void gesture_run_empty_row(uint16_t earlier, const gesture_step_t *steps, uint8_t count) {
+    test_reset_state(); fake_time = 40000; gesture_out_count = 0;
+    gesture_test_code = gesture_empty_row = LT(TEST_LAYER_SYM, KC_J);
+    gesture_second_code = earlier; gesture_track_admission = true;
+    gesture_play(steps, count, 600);
+    gesture_second_code = KC_NO;
+}
+static bool gesture_tap_went_out_with(uint16_t tap, uint8_t mods, uint8_t layer) {
+    for (uint8_t i = 0; i < gesture_out_count; i++) {
+        if (gesture_out[i].kind == 'T' && gesture_out[i].code == tap) {
+            return gesture_out[i].mods == mods && (layer == UINT8_MAX || layer_state_cmp(gesture_out[i].layers, layer));
+        }
+    }
+    return false;
+}
+static void test_qmk_modifier_release_waits_for_undecided_key(void) {
+    const uint8_t        ctrl   = MOD_BIT(KC_LEFT_CTRL);
+    const gesture_step_t roll[] = {{0,3,3,true}, {20,3,0,true}, {40,3,3,false}, {60,3,0,false}};
+
+    gesture_run_empty_row(KC_LEFT_CTRL, roll, ARRAY_SIZE(roll));
+    if (!(gesture_out_is("KT", (const uint16_t[]){KC_LEFT_CTRL, KC_J}) && gesture_tap_went_out_with(KC_J, ctrl, UINT8_MAX))) gesture_out_dump("ctrl rolled off");
+    CHECK(gesture_out_is("KT", (const uint16_t[]){KC_LEFT_CTRL, KC_J}));
+    CHECK(gesture_tap_went_out_with(KC_J, ctrl, UINT8_MAX));
+    CHECK(gesture_report_mods() == 0);
+    gesture_assert_admission_quiescent();
+
+    // The release waits in the queue until the key decides, then follows it.
+    test_reset_state(); fake_time = 40000; gesture_out_count = 0;
+    gesture_test_code = gesture_empty_row = LT(TEST_LAYER_SYM, KC_J);
+    gesture_second_code = KC_LEFT_CTRL; gesture_track_admission = true;
+    gesture_at(3, 3, true); gesture_advance(20);
+    gesture_at(3, 0, true); gesture_advance(20);
+    gesture_at(3, 3, false);
+    CHECK(noah_record_admission_held_count() == 1);
+    CHECK(gesture_report_mods() == ctrl);
+    gesture_advance(20);
+    CHECK(noah_record_admission_held_count() == 1);
+    gesture_at(3, 0, false); gesture_advance(1);
+    CHECK(noah_record_admission_held_count() == 0);
+    CHECK(gesture_report_mods() == 0);
+    gesture_advance(500);
+    gesture_second_code = KC_NO;
+    gesture_assert_admission_quiescent();
+
+    // Held past its hold time, the layer goes on before the release.
+    const gesture_step_t hold[] = {{0,3,3,true}, {20,3,0,true}, {40,3,3,false}, {300,3,0,false}};
+    gesture_run_empty_row(KC_LEFT_CTRL, hold, ARRAY_SIZE(hold));
+    if (!(gesture_out_is("KL", (const uint16_t[]){KC_LEFT_CTRL, TEST_LAYER_SYM}) && gesture_out[1].mods == ctrl)) gesture_out_dump("ctrl rolled off a hold");
+    CHECK(gesture_out_is("KL", (const uint16_t[]){KC_LEFT_CTRL, TEST_LAYER_SYM}));
+    CHECK(gesture_out[1].mods == ctrl);
+    gesture_assert_admission_quiescent();
+
+    // Left GUI has its own row: J's press registers its fallback hold, and
+    // GUI's release waits like Ctrl's.
+    const gesture_step_t gui[] = {{0,3,2,true}, {20,3,0,true}, {40,3,2,false}, {60,3,0,false}};
+    gesture_run_empty_row(KC_NO, gui, ARRAY_SIZE(gui));
+    if (!gesture_tap_went_out_with(KC_J, MOD_BIT(KC_LEFT_GUI), UINT8_MAX)) gesture_out_dump("gui rolled off");
+    CHECK(gesture_tap_went_out_with(KC_J, MOD_BIT(KC_LEFT_GUI), UINT8_MAX));
+    CHECK(gesture_report_mods() == 0);
+    gesture_assert_admission_quiescent();
+
+    // Only modifier and layer releases wait: E, pressed before J, is
+    // released at once, while Ctrl's release waits for J.
+    test_reset_state(); fake_time = 40000; gesture_out_count = 0;
+    gesture_test_code = gesture_empty_row = LT(TEST_LAYER_SYM, KC_J);
+    gesture_second_code = KC_LEFT_CTRL; gesture_track_admission = true;
+    gesture_at(3, 3, true); gesture_advance(10);
+    gesture_at(3, 1, true); gesture_advance(10);
+    gesture_at(3, 0, true); gesture_advance(10);
+    gesture_at(3, 1, false);
+    CHECK(noah_record_admission_held_count() == 0);
+    gesture_advance(10); gesture_at(3, 3, false);
+    CHECK(noah_record_admission_held_count() == 1);
+    gesture_advance(20); gesture_at(3, 0, false); gesture_advance(500);
+    gesture_second_code = KC_NO;
+    if (!(gesture_out_is("KKT", (const uint16_t[]){KC_LEFT_CTRL, KC_E, KC_J}) && gesture_tap_went_out_with(KC_J, ctrl, UINT8_MAX))) gesture_out_dump("ctrl and e rolled off");
+    CHECK(gesture_out_is("KKT", (const uint16_t[]){KC_LEFT_CTRL, KC_E, KC_J}));
+    CHECK(gesture_tap_went_out_with(KC_J, ctrl, UINT8_MAX));
+    gesture_assert_admission_quiescent();
+}
+
+// A held release replays in order: when the key it waited for decides and
+// the next replayed press is undecided in turn, it waits for that one too,
+// as QMK's tapping buffer keeps it behind each new tapping key.
+static void test_qmk_modifier_release_waits_behind_each_undecided_key(void) {
+    const uint8_t gui = MOD_BIT(KC_LEFT_GUI);
+
+    test_reset_state(); fake_time = 48000; gesture_test_code = LT(TEST_LAYER_NAV, KC_B);
+    gesture_second_code = MT(MOD_LSFT | MOD_LGUI, KC_S);
+    gesture_track_admission = true; gesture_out_count = 0;
+    gesture_at(3, 2, true); gesture_advance(10);  // GUI
+    gesture_at(3, 0, true); gesture_advance(10);  // LT
+    gesture_at(3, 3, true); gesture_advance(10);  // MT, behind LT
+    gesture_at(3, 2, false); gesture_advance(10); // GUI's release, behind MT
+    CHECK(noah_record_admission_held_count() == 2);
+    gesture_at(3, 0, false); gesture_advance(1);
+    CHECK(key_runtime_core_undecided_dual_role_key_pos(NULL));
+    CHECK(noah_record_admission_held_count() == 1); // GUI's release waits for MT.
+    CHECK(gesture_report_mods() == gui);
+    gesture_advance(19); gesture_at(3, 3, false); gesture_advance(500);
+    gesture_second_code = KC_NO;
+    if (!gesture_out_is("TT", (const uint16_t[]){KC_B, MT(MOD_LSFT | MOD_LGUI, KC_S)})) gesture_out_dump("gui behind nested keys");
+    CHECK(gesture_out_is("TT", (const uint16_t[]){KC_B, MT(MOD_LSFT | MOD_LGUI, KC_S)}));
+    CHECK(gesture_out[0].mods == gui && gesture_out[1].mods == gui);
+    CHECK(gesture_report_mods() == 0);
+    gesture_assert_admission_quiescent();
+}
+
+// A layer key released while a tap/hold key is undecided waits too: the tap
+// resolves with the layer still on. Both a plain MO() and a key whose row
+// holds the layer.
+static void test_qmk_layer_release_waits_for_undecided_key(void) {
+    const gesture_step_t mo[] = {{0,3,3,true}, {20,3,0,true}, {40,3,3,false}, {60,3,0,false}};
+    gesture_run_empty_row(MO(TEST_LAYER_SYM), mo, ARRAY_SIZE(mo));
+    if (!gesture_tap_went_out_with(KC_J, 0, TEST_LAYER_SYM)) gesture_out_dump("mo rolled off");
+    CHECK(gesture_tap_went_out_with(KC_J, 0, TEST_LAYER_SYM));
+    gesture_assert_admission_quiescent();
+
+    const gesture_step_t row[] = {{0,3,3,true}, {TEST_PD_TAP_HOLD_TERM + 10,3,0,true}, {TEST_PD_TAP_HOLD_TERM + 30,3,3,false}, {TEST_PD_TAP_HOLD_TERM + 50,3,0,false}};
+    gesture_run_empty_row(TEST_LAYER_HOLD_KEY, row, ARRAY_SIZE(row));
+    if (!gesture_tap_went_out_with(KC_J, 0, TEST_LAYER_NAV)) gesture_out_dump("layer row rolled off");
+    CHECK(gesture_tap_went_out_with(KC_J, 0, TEST_LAYER_NAV));
+    gesture_assert_admission_quiescent();
+}
+
+// A modifier's or layer key's release settles a key whose hold is an output
+// of its own as a tap first, as another key's press does (D-F27), so the tap
+// still gets the modifier or layer: Ctrl rolled off `1` types Ctrl+1, as the
+// key would without its row.
+static void test_qmk_modifier_release_settles_own_output_key(void) {
+    const uint8_t        ctrl   = MOD_BIT(KC_LEFT_CTRL);
+    const gesture_step_t roll[] = {{0,3,3,true}, {20,3,0,true}, {40,3,3,false}, {60,3,0,false}};
+
+    gesture_second_code = KC_LEFT_CTRL;
+    gesture_run(KC_1, roll, ARRAY_SIZE(roll), 500);
+    if (!(gesture_out_is("KT", (const uint16_t[]){KC_LEFT_CTRL, KC_1}) && gesture_tap_went_out_with(KC_1, ctrl, UINT8_MAX))) gesture_out_dump("ctrl rolled off 1");
+    CHECK(gesture_out_is("KT", (const uint16_t[]){KC_LEFT_CTRL, KC_1}));
+    CHECK(gesture_tap_went_out_with(KC_1, ctrl, UINT8_MAX));
+    CHECK(gesture_out[1].at == 40040); // At Ctrl's release, not 1's.
+    CHECK(gesture_report_mods() == 0);
+    gesture_assert_admission_quiescent();
+
+    // Enter whose hold is Shift+Enter, rolled off Shift.
+    test_reset_state(); fake_time = 40000; gesture_out_count = 0;
+    gesture_test_code = gesture_symbol_row = KC_ENTER; gesture_second_code = KC_LEFT_SHIFT; gesture_track_admission = true;
+    gesture_play(roll, ARRAY_SIZE(roll), 500);
+    if (!gesture_tap_went_out_with(KC_ENTER, MOD_BIT(KC_LEFT_SHIFT), UINT8_MAX)) gesture_out_dump("shift rolled off enter");
+    CHECK(gesture_tap_went_out_with(KC_ENTER, MOD_BIT(KC_LEFT_SHIFT), UINT8_MAX));
+    CHECK(gesture_tap_count(KC_ENTER) == 1);
+    gesture_assert_admission_quiescent();
+
+    // Kept down past its hold time after Ctrl's release, it stays the tap.
+    gesture_second_code = KC_LEFT_CTRL;
+    const gesture_step_t kept[] = {{0,3,3,true}, {20,3,0,true}, {40,3,3,false}, {300,3,0,false}};
+    gesture_run(KC_1, kept, ARRAY_SIZE(kept), 600);
+    if (!gesture_out_is("KT", (const uint16_t[]){KC_LEFT_CTRL, KC_1})) gesture_out_dump("ctrl rolled off 1, kept");
+    CHECK(gesture_out_is("KT", (const uint16_t[]){KC_LEFT_CTRL, KC_1}));
+    CHECK(gesture_tap_went_out_with(KC_1, ctrl, UINT8_MAX));
+    gesture_assert_admission_quiescent();
+
+    // Held past its hold time before Ctrl's release, its hold has gone out
+    // with Ctrl and the release adds nothing.
+    const gesture_step_t held[] = {{0,3,3,true}, {20,3,0,true}, {200,3,3,false}, {220,3,0,false}};
+    gesture_run(KC_1, held, ARRAY_SIZE(held), 600);
+    if (!(gesture_out_is("KR", (const uint16_t[]){KC_LEFT_CTRL, KC_EXLM}) && gesture_out[1].mods == ctrl)) gesture_out_dump("ctrl over held 1");
+    CHECK(gesture_out_is("KR", (const uint16_t[]){KC_LEFT_CTRL, KC_EXLM}));
+    gesture_assert_admission_quiescent();
+
+    // Another key's release settles nothing: 1 types at its own release.
+    const gesture_step_t plain[] = {{0,3,1,true}, {20,3,0,true}, {40,3,1,false}, {60,3,0,false}};
+    gesture_run(KC_1, plain, ARRAY_SIZE(plain), 500);
+    CHECK(gesture_out_is("KT", (const uint16_t[]){KC_E, KC_1}));
+    CHECK(gesture_out[1].at == 40060);
+    gesture_assert_admission_quiescent();
+
+    // A layer key's release: the tap goes out on the layer.
+    gesture_second_code = MO(TEST_LAYER_SYM);
+    gesture_run(KC_1, roll, ARRAY_SIZE(roll), 500);
+    if (!gesture_tap_went_out_with(KC_1, 0, TEST_LAYER_SYM)) gesture_out_dump("mo rolled off 1");
+    CHECK(gesture_tap_went_out_with(KC_1, 0, TEST_LAYER_SYM));
+    gesture_assert_admission_quiescent();
+
+    // A key whose row holds the layer, judged by its hold before the runtime
+    // takes in its release.
+    const gesture_step_t row[] = {{0,3,3,true}, {TEST_PD_TAP_HOLD_TERM + 10,3,0,true}, {TEST_PD_TAP_HOLD_TERM + 30,3,3,false}, {TEST_PD_TAP_HOLD_TERM + 50,3,0,false}};
+    gesture_second_code = TEST_LAYER_HOLD_KEY;
+    gesture_run(KC_1, row, ARRAY_SIZE(row), 600);
+    if (!(gesture_tap_went_out_with(KC_1, 0, TEST_LAYER_NAV) && gesture_tap_count(KC_1) == 1)) gesture_out_dump("layer row rolled off 1");
+    CHECK(gesture_tap_went_out_with(KC_1, 0, TEST_LAYER_NAV));
+    CHECK(gesture_tap_count(KC_1) == 1);
+    gesture_assert_admission_quiescent();
+    gesture_second_code = KC_NO;
+}
+
+// A key whose release waits cannot reach a later hold tier meanwhile: it
+// was released before its long hold, so the long hold never fires.
+static void test_qmk_waiting_release_stops_later_hold_tiers(void) {
+    const gesture_step_t steps[] = {{0,3,3,true}, {250,3,0,true}, {280,3,3,false}, {500,3,0,false}};
+    test_reset_state(); fake_time = 40000; gesture_out_count = 0;
+    gesture_test_code = gesture_empty_row = LT(TEST_LAYER_NAV, KC_J);
+    gesture_layer_long_row = gesture_second_code = KC_G; gesture_track_admission = true;
+    gesture_play(steps, ARRAY_SIZE(steps), 900);
+    gesture_second_code = KC_NO;
+    if (gesture_tap_count(KC_X) != 0) gesture_out_dump("waiting release long hold");
+    CHECK(gesture_tap_count(KC_X) == 0);
+    CHECK(gesture_out_count >= 1 && gesture_out[0].kind == 'L' && gesture_out[0].code == TEST_LAYER_SYM);
+    gesture_assert_admission_quiescent();
+}
+
+// At capacity a held modifier release is the oldest record, so it is
+// replayed to make room (D-F03's overload rule): it may go out before the
+// decision, never before its own press, and nothing is left behind.
+static void test_qmk_modifier_release_at_admission_capacity(void) {
+    test_reset_state(); fake_time = 40000; gesture_out_count = 0;
+    gesture_test_code = gesture_empty_row = LT(TEST_LAYER_SYM, KC_J);
+    gesture_second_code = KC_LEFT_CTRL; gesture_track_admission = true;
+    gesture_at(3, 3, true); gesture_advance(10);
+    gesture_at(3, 0, true); gesture_advance(10);
+    gesture_at(3, 3, false); gesture_advance(1);
+    for (uint8_t col = 0; col + 1u < NOAH_RECORD_ADMISSION_CAPACITY; col++) {
+        gesture_at(2, col, true); gesture_advance(1);
+    }
+    CHECK(noah_record_admission_held_count() == NOAH_RECORD_ADMISSION_CAPACITY);
+    CHECK(gesture_report_mods() == MOD_BIT(KC_LEFT_CTRL));
+    gesture_at(2, NOAH_RECORD_ADMISSION_CAPACITY - 1u, true);
+    CHECK(noah_record_admission_held_count() == NOAH_RECORD_ADMISSION_CAPACITY);
+    CHECK(gesture_report_mods() == 0); // Overload replayed the oldest: Ctrl's release.
+    CHECK(gesture_out_count == 1);    // J is still undecided; nothing else went out.
+    gesture_advance(10); gesture_at(3, 0, false); gesture_advance(10);
+    for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY; col++) gesture_at(2, col, false);
+    gesture_advance(500);
+    gesture_second_code = KC_NO;
+    CHECK(gesture_out_count == 2u + NOAH_RECORD_ADMISSION_CAPACITY);
+    CHECK(gesture_out[1].kind == 'T' && gesture_out[1].code == KC_J);
+    for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY; col++) CHECK(gesture_out[2 + col].kind == 'K' && gesture_out[2 + col].code == KC_E + col);
     gesture_assert_admission_quiescent();
 }
 
@@ -3303,6 +3602,7 @@ static void test_qmk_admission_overload(void) {
     test_qmk_admission_buffered_authored_repeat_keeps_physical_gap();
     test_qmk_admission_nested_undecided_keys();
     test_qmk_admission_overload_combo_release();
+    test_qmk_modifier_release_at_admission_capacity();
 }
 
 static void test_qmk_admission_replay_waits_for_nested_decision(void) {
@@ -3849,6 +4149,11 @@ int main(int argc, char **argv) {
     test_qmk_symbol_key_rolls_type_in_order();
     test_qmk_symbol_key_combo_member();
     test_qmk_keys_wait_for_mode_and_modifier_holds();
+    test_qmk_modifier_release_waits_for_undecided_key();
+    test_qmk_modifier_release_waits_behind_each_undecided_key();
+    test_qmk_layer_release_waits_for_undecided_key();
+    test_qmk_waiting_release_stops_later_hold_tiers();
+    test_qmk_modifier_release_settles_own_output_key();
     test_qmk_admission_overload();
     test_qmk_admission_replay_waits_for_nested_decision();
     test_qmk_waiting_key_uses_hold_layer();

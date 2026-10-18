@@ -458,7 +458,10 @@ continuations. Hold progress has one gate,
 already queued cannot advance toward a hold. Phase refresh and every scan-time
 hold planner go through it; `run_qmk_gesture_pipeline_tests.sh` rejects any other
 queued-release query. QMK queues such a release only for a modifier or layer
-key released during another key's tapping term. This separates gesture eligibility from permission to emit
+key released during another key's tapping term, and record admission holds the
+same releases (below); the gate counts a release admission holds except for
+the key admission is waiting for, whose press overload may have replayed ahead
+of its release. This separates gesture eligibility from permission to emit
 output without rewinding shared time.
 
 `lib/compat/qmk_record_admission.c` holds records back behind an undecided
@@ -473,7 +476,16 @@ It counts the keys whose hold changes other keys,
 whose hold is a layer held until release (the token's hold preview layer), and
 keys whose first hold tier is any layer action, modifiers only or a pointing
 mode. Preflight settles every other handled key on the next press instead
-(D-F27). Before a press is resolved, physically or
+(D-F27). A release is held when its press was, or when a key is undecided and
+the release is a modifier's or layer key's (D-F27, "Releases that wait"): for
+a handled key, `key_runtime_core_holds_layer_or_mods_at()`, whether it holds a
+layer or real modifiers now; for any other key, QMK's rule for its keycode.
+Replay stops before such a release, as before a press, while a replayed key is
+undecided. The rule is `key_runtime_core_release_is_mods_or_layer()`. The
+record path applies it too, before the reducer takes in the release and drops
+the key's leases: a release that passes it settles every class-3 key first,
+at the release's physical time, through the same settle as another key's
+press (`key_runtime_preflight_settle_before_release()`). Before a press is resolved, physically or
 on replay, `noah_key_runtime_settle_layer_taps_before_press()` settles other
 keys' pending layer-changing taps when the press is of a key without a
 behaviour; it costs no lookup unless such a tap is pending.

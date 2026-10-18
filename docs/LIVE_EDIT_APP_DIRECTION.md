@@ -62,7 +62,10 @@ A key pressed while a handled key is undecided meets it by what that key's
 hold does (D-F27): a hold that changes other keys makes it wait, a fallback
 modifier registers, and any other key is settled as a tap first, so rolls out
 of the number row, punctuation, Enter, Esc and the Nav arrows keep their
-order. Hardware acceptance is pending.
+order. A modifier or layer key let go before a key it was pressed for still
+applies to that key: it waits for a key that makes others wait, and settles
+any other key as a tap first, so Cmd released before F types Cmd+F and before
+`,` types Cmd+,. Hardware acceptance is pending.
 
 Firmware work remaining before the product is complete:
 
@@ -97,6 +100,8 @@ input cadence remain unmeasured for this path.
 - **Roll order needs hardware acceptance (D-F27).** Type `, `, `. `, `1e` and
   Enter into a letter fast; hold a symbol key into a letter; roll Shift into a
   letter; double-tap-hold GUI into a key; roll the thumbs and `/` as before.
+  Roll Cmd+F, Cmd+/, Shift+F, Cmd+, and Shift+Enter off the modifier first,
+  hold shortcuts the usual way, and type fast over F and the number row.
 
 - **Custom key shortcuts need hardware acceptance (D-F26).** On both halves:
   hold a mixed-side shortcut, tap it, hold a modifier-only one, put a
@@ -765,7 +770,8 @@ one. This preserves FIFO and causal press/release delivery without dropping
 records or increasing capacity. The oldest record may run before the tap/hold
 decision, on the layer and modifiers active then; all remaining records keep
 the normal waiting rule. Physical timestamps and record metadata remain intact.
-Releases whose presses were already delivered still pass through. This is an
+Releases whose presses were already delivered still pass through, except the
+modifier and layer releases D-F27 holds. This is an
 overload exception to the tap-first/hold-first ordering above, local to record
 admission; gesture ownership and native QMK tapping stay with their existing
 engines.
@@ -1433,3 +1439,32 @@ the release matrix pins for Ark's timing analysis, is unchanged. Profile
 bytes and feature bits are unchanged: bit 18 already advertises that keys
 wait for an undecided key, and this narrows only what a later key meets. See
 [the contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided).
+
+**Releases that wait.** A key pressed before a class-1 key and released while
+that key is undecided waits for its decision when it is a modifier or layer
+key, as QMK keeps such a release in its tapping buffer. A key the runtime
+handles counts by what it holds at that moment (a layer, or real modifiers
+from a hold or a registered fallback); any other key by QMK's rule for its
+keycode (a modifier, a mods-only key, `MO`, `LT`, `LM`, or an `MT` or `OSM`
+released as a hold). The undecided key's tap or hold then goes out under that
+modifier or layer, and the release follows, so Cmd let go before F still types
+Cmd+F. Every other release goes at once, as in QMK. A waiting release replays
+in order and waits behind each replayed key that is undecided in turn. It
+counts as queued for the hold gate, so its key reaches no later hold tier
+after its physical release; the key admission is waiting for is the
+exception, since overload can replay that key's press ahead of its own
+release. Combo outputs' releases go at once: their runtime position is known
+only after admission, so they could not be told from the undecided key's own.
+Chosen over passing every earlier key's release through, which typed the bare
+key whenever the modifier came up first and made a native LT/MT key behave
+differently once it had a row.
+
+**Releases that settle.** The same releases settle a class-3 key as a tap,
+as another key's press does: its tap goes out at the modifier's or layer
+key's release, while that is still on, so Cmd let go before `1` types Cmd+1,
+which is what the key sends at its press without a row. Past its hold time
+the class-3 key is a hold, as at a press. Chosen over holding the release
+back until the class-3 key decides, which would make class-3 keys hold
+records back and send Cmd+! for `1` kept down after Cmd. The cost: once the
+modifier is let go, keeping the key down no longer reaches its hold. Class-2
+keys are unchanged.

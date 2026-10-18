@@ -270,7 +270,11 @@ wait, so it lands on the layer or gets the modifier if you keep holding. Any
 other hold, such as `S(KC_1)` on `KC_1`, is the key's own output, so the
 other key's press types this key's tap first: rolls keep their order, and
 for the hold you hold the key on its own. A hold that waits for release is
-sent at that press if its hold time has passed. The
+sent at that press if its hold time has passed. While a key that makes
+others wait is undecided, letting go of a modifier or layer key you pressed
+before it waits as well, as in QMK: Cmd released just before F still types
+Cmd+F. For any other key, letting go of the modifier types its tap at once,
+so Cmd released just before `,` types Cmd+,. The
 [interaction model](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)
 has the details.
 

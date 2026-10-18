@@ -467,6 +467,7 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     ctx.use_row = key_runtime_process_record_uses_row(keycode, record);
 
     if (!noah_synthetic_record_active()) {
+        key_runtime_preflight_settle_before_release(keycode, record);
         key_runtime_core_observe_process_record_event_with_row(keycode, record, ctx.use_row);
     }
 
