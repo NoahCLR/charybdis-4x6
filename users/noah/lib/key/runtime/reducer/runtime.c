@@ -1026,12 +1026,88 @@ static void key_runtime_core_tap_series_update_for_press(key_runtime_core_state_
     (void)token_key_pos;
 }
 
+// A down key whose hold is an output of its own: not a fallback hold, not a
+// hold that changes other keys (those wait, D-F03), and nothing a pointing
+// mode owns. Another key's press decides it (D-F27).
+static bool key_runtime_core_press_token_settles_on_other_press(const press_token_t *token, keypos_t token_key_pos) {
+    return token->handled_key && token->interaction.pd_mode == 0 && !key_runtime_slot_interaction_uses_fallback_hold(token->interaction) && !key_runtime_slot_interaction_uses_implicit_hold(token->interaction) && !key_runtime_core_press_token_hold_changes_other_keys(token) && !noah_action_desc_is_pd_mode_action(noah_action_describe(token->interaction.binding.tap_action)) && !key_runtime_core_press_offered_to_mode(token_key_pos);
+}
+
+// The release action a hold that waits for release would send now, if its
+// hold time has passed.
+static uint16_t key_runtime_core_press_token_release_hold_action(const press_token_t *token, uint16_t elapsed) {
+    const key_runtime_slot_interaction_t *interaction = &token->interaction;
+
+    if (interaction->contract.long_hold.release_action != KC_NO && elapsed >= interaction->binding.longer_hold_term) {
+        return interaction->contract.long_hold.release_action;
+    }
+    if (interaction->contract.hold.release_action != KC_NO && elapsed >= interaction->binding.tap_hold_term) {
+        return interaction->contract.hold.release_action;
+    }
+    return KC_NO;
+}
+
+// Settles a key that settles on another key's press, before that press goes
+// out: short of its hold time it is a tap, its pending repeated taps
+// included; past it, a hold that waits for release sends that hold. A hold
+// that fires at its threshold has already gone out. The key's own release
+// then sends nothing.
+static void key_runtime_core_settle_on_other_press(key_runtime_core_state_t *state, press_token_t *token, keypos_t token_key_pos, uint16_t other_pressed_at, key_runtime_core_effect_plan_t *plan) {
+    tap_series_t         *series = key_runtime_core_tap_series_state(state, token_key_pos);
+    uint16_t              elapsed = key_runtime_core_elapsed(token->pressed_at, other_pressed_at);
+    uint16_t              first_hold_term;
+    uint16_t              action;
+    uint8_t               repeat_count;
+    delayed_action_mods_t mods;
+    bool                  tap_pending;
+
+    if (!key_runtime_core_press_token_settles_on_other_press(token, token_key_pos)) {
+        return;
+    }
+
+    if (!(series && series->active && series->keycode == token->resolved_keycode && !series->resolved)) {
+        series = NULL;
+    }
+    first_hold_term = token->interaction.binding.hold.present ? token->interaction.binding.tap_hold_term : token->interaction.binding.longer_hold_term;
+    tap_pending     = (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE && series)) && !((token->interaction.binding.hold.present || token->interaction.binding.long_hold.present) && elapsed >= first_hold_term);
+
+    if (tap_pending && series) {
+        if (key_runtime_core_tap_series_take_flush(series, &action, &repeat_count, &mods)) {
+            key_runtime_core_effect_plan_push_delayed_action(plan, token_key_pos, action, mods, repeat_count);
+            if (key_runtime_core_tap_series_has_authored_tap_branch(series)) {
+                key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, token_key_pos, action, series->tap_count);
+            }
+        }
+        key_runtime_core_tap_series_clear(state, series);
+    } else if (tap_pending) {
+        key_runtime_core_effect_plan_push_dispatch_action(plan, token_key_pos, token->interaction.binding.tap_action);
+        key_runtime_core_effect_plan_push_tap_commit_feedback_pulse(plan, token_key_pos, token->interaction.binding.tap_action, token->interaction.selection.tap_count);
+    } else if (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING) {
+        action = key_runtime_core_press_token_release_hold_action(token, elapsed);
+        if (action == KC_NO) {
+            return;
+        }
+        key_runtime_core_effect_plan_push_dispatch_action(plan, token_key_pos, action);
+        (void)key_runtime_core_reset_pending_multi_tap(token_key_pos);
+    } else {
+        return;
+    }
+    token->slot_phase = KEY_RUNTIME_SLOT_PHASE_IDLE;
+}
+
 void key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_state_t *state = key_runtime_core_state();
+    const press_token_t      *other;
+    uint16_t                  other_pressed_at;
 
     if (!(state && plan)) {
         return;
     }
+
+    // The press's own time, which a delivery held back behind another key
+    // keeps; the runtime has already begun its token.
+    other            = key_runtime_core_press_token_state(state, key_pos);
+    other_pressed_at = other && other->active ? other->pressed_at : state->current_time;
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
         press_token_t *token = &state->press_tokens[index];
@@ -1043,6 +1119,7 @@ void key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key
         }
 
         key_runtime_core_plan_fallback_hold_activation(state, token, plan);
+        key_runtime_core_settle_on_other_press(state, token, token_key_pos, other_pressed_at, plan);
         token->other_press_interrupted = true;
         if (token->interaction.contract.suppress_tap_on_layer_interrupt) {
             token->momentary_layer_tap_interrupted = true;
