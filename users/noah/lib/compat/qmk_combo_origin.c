@@ -39,6 +39,9 @@ typedef struct {
     bool     output_behavior;
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
     bool     active;
+    // When QMK delivered this output's release (combo_origin_next_delivery()),
+    // or 0 while it has not.
+    uint16_t release_delivered;
 } combo_origin_active_cache_entry_t;
 
 typedef struct {
@@ -51,11 +54,17 @@ typedef struct {
     uint8_t  origin_layer;
     bool     output_behavior;
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    bool     active;
+    bool     active : 1;
     // QMK fired this completion: its output press is delivered now or queued
     // behind an undecided tap-hold key, possibly after the chord is released.
-    bool     applied;
-    bool     deadline_crossed;
+    bool     applied : 1;
+    bool     deadline_crossed : 1;
+    // QMK delivered its output press, which can wait behind an undecided
+    // tap-hold key before dispatch.
+    bool     press_delivered : 1;
+    // When QMK delivered its output release while the press still waited, as
+    // in the active cache, or 0.
+    uint16_t release_delivered;
 } combo_origin_pending_output_entry_t;
 
 static combo_origin_physical_key_state_t physical_key_states[MATRIX_ROWS * MATRIX_COLS];
@@ -74,6 +83,8 @@ static combo_origin_active_cache_entry_t      combo_active_cache[COMBO_BUFFER_LE
 static combo_origin_pending_output_entry_t    combo_pending_output_cache[COMBO_ORIGIN_PENDING_CAPACITY];
 static noah_qmk_combo_origin_debug_snapshot_t combo_origin_diagnostics;
 static uint32_t                               combo_origin_press_sequence        = 0;
+static uint16_t                               combo_origin_delivery_sequence     = 0;
+static uint16_t                               combo_origin_last_pressed_at       = 0;
 static keypos_t                               combo_origin_last_pressed_key_pos  = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
 static keypos_t                               combo_origin_last_released_key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS};
 
@@ -128,6 +139,17 @@ static uint32_t combo_origin_allocate_press_sequence(void) {
     } while (combo_origin_generation_is_live(combo_origin_press_sequence));
 
     return combo_origin_press_sequence;
+}
+
+// Orders the output releases QMK delivers. They leave its tapping queue and
+// record admission in this order, so dispatch pairs each with its completion.
+// Only a few are ever waiting, so sixteen bits compare without ambiguity.
+static uint16_t combo_origin_next_delivery(void) {
+    combo_origin_delivery_sequence++;
+    if (combo_origin_delivery_sequence == 0u) {
+        combo_origin_delivery_sequence++;
+    }
+    return combo_origin_delivery_sequence;
 }
 
 static uint16_t combo_origin_combo_keycode_for_record(keyrecord_t *record) {
@@ -317,38 +339,45 @@ static combo_origin_active_cache_entry_t *combo_origin_cache_entry_for_store(uin
     return NULL;
 }
 
-static bool combo_origin_cache_store(uint16_t combo_index, uint32_t generation, uint16_t keycode, keypos_t owner_key_pos, uint16_t complete_at, uint8_t origin_layer, bool output_behavior, const uint8_t *bitmap) {
+static combo_origin_active_cache_entry_t *combo_origin_cache_store(uint16_t combo_index, uint32_t generation, uint16_t keycode, keypos_t owner_key_pos, uint16_t complete_at, uint8_t origin_layer, bool output_behavior, const uint8_t *bitmap) {
     combo_origin_active_cache_entry_t *entry = combo_origin_cache_entry_for_store(combo_index, generation, keycode);
 
     if (!entry) {
-        return false;
+        return NULL;
     }
 
-    entry->active          = true;
-    entry->generation      = generation;
-    entry->combo_index     = combo_index;
-    entry->keycode         = keycode;
-    entry->complete_at     = complete_at;
-    entry->owner_key_pos   = owner_key_pos;
-    entry->origin_layer    = origin_layer;
-    entry->output_behavior = output_behavior;
+    entry->active            = true;
+    entry->generation        = generation;
+    entry->combo_index       = combo_index;
+    entry->keycode           = keycode;
+    entry->complete_at       = complete_at;
+    entry->owner_key_pos     = owner_key_pos;
+    entry->origin_layer      = origin_layer;
+    entry->output_behavior   = output_behavior;
+    entry->release_delivered = 0;
     key_origin_bitmap_copy(entry->bitmap, bitmap);
-    return true;
+    return entry;
 }
 
+// QMK releases a combo while it processes a member's physical release.
+static bool combo_origin_bitmap_has_released_key(const uint8_t *bitmap) {
+    return key_origin_keypos_valid(combo_origin_last_released_key_pos) && key_origin_bitmap_has_keypos(bitmap, combo_origin_last_released_key_pos);
+}
+
+// The dispatched completion whose release QMK delivers now.
 static combo_origin_active_cache_entry_t *combo_origin_cache_entry_for_release(uint16_t keycode) {
     combo_origin_active_cache_entry_t *fallback = NULL;
 
     for (uint8_t index = 0; index < ARRAY_SIZE(combo_active_cache); index++) {
         combo_origin_active_cache_entry_t *entry = &combo_active_cache[index];
 
-        if (!(entry->active && entry->keycode == keycode)) {
+        if (!(entry->active && entry->keycode == keycode && !entry->release_delivered)) {
             continue;
         }
         if (!fallback) {
             fallback = entry;
         }
-        if (key_origin_keypos_valid(combo_origin_last_released_key_pos) && key_origin_bitmap_has_keypos(entry->bitmap, combo_origin_last_released_key_pos)) {
+        if (combo_origin_bitmap_has_released_key(entry->bitmap)) {
             return entry;
         }
     }
@@ -390,18 +419,20 @@ static bool combo_origin_pending_output_store(uint16_t combo_index, uint32_t gen
         return true;
     }
 
-    entry->active           = true;
-    entry->applied          = false;
-    entry->deadline_crossed = false;
-    entry->generation       = generation;
-    entry->combo_index      = combo_index;
-    entry->keycode          = keycode;
-    entry->owner_key_pos    = owner_key_pos;
-    entry->origin_layer     = physical_key_states[key_origin_keypos_index(owner_key_pos)].source_layer;
+    entry->active            = true;
+    entry->applied           = false;
+    entry->deadline_crossed  = false;
+    entry->press_delivered   = false;
+    entry->release_delivered = 0;
+    entry->generation        = generation;
+    entry->combo_index       = combo_index;
+    entry->keycode           = keycode;
+    entry->owner_key_pos     = owner_key_pos;
+    entry->origin_layer      = physical_key_states[key_origin_keypos_index(owner_key_pos)].source_layer;
     // Snapshot at completion: QMK can queue a generated output without
     // asking its tapping classification until a previous tap-hold resolves.
-    entry->output_behavior  = noah_participation_combo_output(combo_index, keycode, entry->origin_layer);
-    entry->complete_at      = complete_at;
+    entry->output_behavior   = noah_participation_combo_output(combo_index, keycode, entry->origin_layer);
+    entry->complete_at       = complete_at;
     key_origin_bitmap_copy(entry->bitmap, bitmap);
     pending_count = combo_origin_pending_count();
     if (pending_count > combo_origin_diagnostics.pending_high_water) {
@@ -485,7 +516,10 @@ static void combo_origin_pending_output_reconcile(bool observe_deadline) {
             continue;
         }
 #    ifndef COMBO_NO_TIMER
-        if (observe_deadline && !active && (entry->applied ? (uint16_t)(now - entry->applied_at) > combo_origin_applied_wait_ms() : (uint16_t)(now - entry->complete_at) > combo_origin_latest_legal_wait_ms())) {
+        // QMK restarts its combo timer at every combo key press, so a
+        // completion not fired yet can legally wait from the latest press,
+        // which is never earlier than its own completing press.
+        if (observe_deadline && !active && (entry->applied ? (uint16_t)(now - entry->applied_at) > combo_origin_applied_wait_ms() : (uint16_t)(now - combo_origin_last_pressed_at) > combo_origin_latest_legal_wait_ms())) {
             if (!entry->deadline_crossed) {
                 entry->deadline_crossed = true;
             } else {
@@ -578,55 +612,82 @@ static bool combo_origin_generation_before(uint32_t lhs, uint32_t rhs) {
     return (int32_t)(lhs - rhs) < 0;
 }
 
-static combo_origin_pending_output_entry_t *combo_origin_pending_newest_for_combo(uint16_t combo_index, uint16_t keycode) {
+static bool combo_origin_delivery_before(uint16_t lhs, uint16_t rhs) {
+    return (int16_t)(uint16_t)(lhs - rhs) < 0;
+}
+
+// The completion whose output press QMK delivers now. QMK does not put the
+// combo index in COMBO_EVENT; it delivers fired outputs in firing order, which
+// is completion order. So: the oldest completion QMK has fired (its combo is
+// active, or was seen active before its chord was let go) whose press it has
+// not delivered yet. Two chords with the same output can both be delivered
+// before either is dispatched, behind an undecided tap-hold key.
+static combo_origin_pending_output_entry_t *combo_origin_pending_entry_for_delivery(uint16_t keycode) {
     combo_origin_pending_output_entry_t *selected = NULL;
 
     for (uint8_t index = 0; index < ARRAY_SIZE(combo_pending_output_cache); index++) {
         combo_origin_pending_output_entry_t *entry = &combo_pending_output_cache[index];
 
-        if (!(entry->active && entry->combo_index == combo_index && entry->keycode == keycode)) {
+        if (!(entry->active && entry->keycode == keycode && !entry->press_delivered && (entry->applied || combo_origin_combo_is_active(combo_origin_combo_get(entry->combo_index))))) {
             continue;
         }
-        if (!selected || combo_origin_generation_before(selected->generation, entry->generation)) {
+        if (!selected || combo_origin_generation_before(entry->generation, selected->generation)) {
             selected = entry;
         }
     }
     return selected;
 }
 
-static combo_origin_pending_output_entry_t *combo_origin_pending_entry_for_press(uint16_t keycode) {
+// The completion whose output press is dispatched now: delivered presses are
+// dispatched in delivery order, which is completion order, and a press not
+// delivered yet takes the completion its delivery would.
+static combo_origin_pending_output_entry_t *combo_origin_pending_entry_for_dispatch(uint16_t keycode) {
     combo_origin_pending_output_entry_t *selected = NULL;
 
-    // QMK does not put the combo index in COMBO_EVENT. Active combo state gives
-    // us the exact compatible indices; buffer order follows completion order.
-    for (uint16_t combo_index = 0; combo_index < noah_qmk_combo_count(); combo_index++) {
-        combo_t                             *combo = combo_origin_combo_get(combo_index);
-        combo_origin_pending_output_entry_t *candidate;
-
-        if (!(combo && combo->keycode == keycode && combo_origin_combo_is_active(combo))) {
-            continue;
-        }
-        candidate = combo_origin_pending_newest_for_combo(combo_index, keycode);
-        if (candidate && (!selected || combo_origin_generation_before(candidate->generation, selected->generation))) {
-            selected = candidate;
-        }
-    }
-    if (selected) {
-        return selected;
-    }
-
-    // A fired output queued behind a tap-hold decision can arrive after its
-    // chord was released and QMK deactivated the combo. Fired outputs leave
-    // QMK's queue in firing order, so the oldest fired completion with this
-    // keycode is the one being delivered.
     for (uint8_t index = 0; index < ARRAY_SIZE(combo_pending_output_cache); index++) {
         combo_origin_pending_output_entry_t *entry = &combo_pending_output_cache[index];
 
-        if (entry->active && entry->applied && entry->keycode == keycode && (!selected || combo_origin_generation_before(entry->generation, selected->generation))) {
+        if (entry->active && entry->keycode == keycode && entry->press_delivered && (!selected || combo_origin_generation_before(entry->generation, selected->generation))) {
+            selected = entry;
+        }
+    }
+    return selected ? selected : combo_origin_pending_entry_for_delivery(keycode);
+}
+
+// The completion whose release QMK delivers now while its press still waits to
+// be dispatched: the one holding the released member, else the oldest.
+static combo_origin_pending_output_entry_t *combo_origin_pending_entry_for_release(uint16_t keycode) {
+    combo_origin_pending_output_entry_t *selected = NULL;
+
+    for (uint8_t index = 0; index < ARRAY_SIZE(combo_pending_output_cache); index++) {
+        combo_origin_pending_output_entry_t *entry = &combo_pending_output_cache[index];
+
+        if (!(entry->active && entry->keycode == keycode && entry->press_delivered && !entry->release_delivered)) {
+            continue;
+        }
+        if (combo_origin_bitmap_has_released_key(entry->bitmap)) {
+            return entry;
+        }
+        if (!selected || combo_origin_generation_before(entry->generation, selected->generation)) {
             selected = entry;
         }
     }
     return selected;
+}
+
+// The dispatched completion whose release is dispatched now: delivered
+// releases are dispatched in delivery order.
+static combo_origin_active_cache_entry_t *combo_origin_cache_entry_for_release_dispatch(uint16_t keycode) {
+    combo_origin_active_cache_entry_t *selected = NULL;
+
+    for (uint8_t index = 0; index < ARRAY_SIZE(combo_active_cache); index++) {
+        combo_origin_active_cache_entry_t *entry = &combo_active_cache[index];
+
+        if (entry->active && entry->keycode == keycode && entry->release_delivered && (!selected || combo_origin_delivery_before(entry->release_delivered, selected->release_delivered))) {
+            selected = entry;
+        }
+    }
+    return selected ? selected : combo_origin_cache_entry_for_release(keycode);
 }
 
 static bool combo_origin_active_cache_has_combo(uint16_t combo_index) {
@@ -664,6 +725,8 @@ static bool combo_origin_collect_untracked_active_combo(uint16_t keycode, uint16
 
 void noah_qmk_combo_origin_reset(void) {
     combo_origin_press_sequence        = 0;
+    combo_origin_delivery_sequence     = 0;
+    combo_origin_last_pressed_at       = 0;
     combo_origin_last_pressed_key_pos  = (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
     combo_origin_last_released_key_pos = (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
     combo_origin_diagnostics           = (noah_qmk_combo_origin_debug_snapshot_t){0};
@@ -712,6 +775,7 @@ void noah_qmk_combo_origin_observe_physical_key_event(uint16_t keycode, keyrecor
         entry->combo_keycode               = combo_origin_combo_keycode_for_record(record);
         entry->pressed_at                  = timer_read();
         entry->press_sequence              = combo_origin_allocate_press_sequence();
+        combo_origin_last_pressed_at       = entry->pressed_at;
         combo_origin_last_pressed_key_pos  = record->event.key;
         combo_origin_last_released_key_pos = (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
         combo_origin_note_completed_pressed_combos();
@@ -726,7 +790,7 @@ void noah_qmk_combo_origin_observe_physical_key_event(uint16_t keycode, keyrecor
 
 uint8_t noah_qmk_combo_origin_record_source_layer(uint16_t keycode, const keyrecord_t *record) {
     if (record && record->event.pressed) {
-        combo_origin_pending_output_entry_t *pending = combo_origin_pending_entry_for_press(keycode);
+        combo_origin_pending_output_entry_t *pending = combo_origin_pending_entry_for_delivery(keycode);
         if (pending) return pending->origin_layer;
     } else {
         combo_origin_active_cache_entry_t *active = combo_origin_cache_entry_for_release(keycode);
@@ -739,17 +803,26 @@ void noah_qmk_combo_origin_capture_record(uint16_t keycode, keyrecord_t *record)
     if (!record || record->event.type != COMBO_EVENT || noah_participation_record_generated_captured(record)) return;
     if (!record->event.pressed) {
         combo_origin_active_cache_entry_t *active = combo_origin_cache_entry_for_release(keycode);
+        // A release can reach tapping before the matching queued press reaches
+        // dispatch. Its pending completion already holds that press's decision.
+        combo_origin_pending_output_entry_t *pending = combo_origin_pending_entry_for_release(keycode);
+        if (pending && (!active || (combo_origin_bitmap_has_released_key(pending->bitmap) && !combo_origin_bitmap_has_released_key(active->bitmap)))) {
+            pending->release_delivered = combo_origin_next_delivery();
+            noah_participation_record_generated_permission(record, pending->origin_layer, pending->output_behavior);
+            return;
+        }
         if (active) {
+            active->release_delivered = combo_origin_next_delivery();
             noah_participation_record_generated_permission(record, active->origin_layer, active->output_behavior);
             return;
         }
-    }
-    // A release can reach tapping before the matching queued press reaches
-    // dispatch. Its pending completion already holds that press's decision.
-    combo_origin_pending_output_entry_t *pending = combo_origin_pending_entry_for_press(keycode);
-    if (pending) {
-        noah_participation_record_generated_permission(record, pending->origin_layer, pending->output_behavior);
-        return;
+    } else {
+        combo_origin_pending_output_entry_t *pending = combo_origin_pending_entry_for_delivery(keycode);
+        if (pending) {
+            pending->press_delivered = true;
+            noah_participation_record_generated_permission(record, pending->origin_layer, pending->output_behavior);
+            return;
+        }
     }
     uint8_t layer = noah_qmk_combo_origin_record_source_layer(keycode, record);
     noah_participation_record_generated_permission(record, layer, noah_participation_combo_output(UINT16_MAX, keycode, layer));
@@ -758,11 +831,12 @@ void noah_qmk_combo_origin_capture_record(uint16_t keycode, keyrecord_t *record)
 // Retire origin reconstruction's bitmap/workspace before the process stage
 // can recursively project held actions. Keep this boundary in ordinary builds.
 __attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *record) {
-    uint16_t combo_index   = UINT16_MAX;
-    uint16_t complete_at   = 0;
-    uint32_t generation    = 0;
-    keypos_t owner_key_pos = {0};
-    uint8_t  origin_layer  = 0;
+    uint16_t combo_index       = UINT16_MAX;
+    uint16_t complete_at       = 0;
+    uint32_t generation        = 0;
+    uint16_t release_delivered = 0;
+    keypos_t owner_key_pos     = {0};
+    uint8_t  origin_layer      = 0;
     uint8_t  bitmap[KEY_ORIGIN_BITMAP_SIZE];
     bool     matched = false;
 
@@ -771,15 +845,16 @@ __attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t k
     }
 
     if (record->event.pressed) {
-        combo_origin_pending_output_entry_t *pending = combo_origin_pending_entry_for_press(keycode);
+        combo_origin_pending_output_entry_t *pending = combo_origin_pending_entry_for_dispatch(keycode);
 
         if (pending) {
             noah_qmk_combo_origin_capture_record(keycode, record);
-            combo_index   = pending->combo_index;
-            generation    = pending->generation;
-            complete_at   = pending->complete_at;
-            owner_key_pos = pending->owner_key_pos;
-            origin_layer  = pending->origin_layer;
+            combo_index       = pending->combo_index;
+            generation        = pending->generation;
+            complete_at       = pending->complete_at;
+            release_delivered = pending->release_delivered;
+            owner_key_pos     = pending->owner_key_pos;
+            origin_layer      = pending->origin_layer;
             key_origin_bitmap_copy(bitmap, pending->bitmap);
             combo_origin_pending_output_entry_clear(pending);
             matched = true;
@@ -795,8 +870,13 @@ __attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t k
         if (matched && key_origin_keypos_valid(owner_key_pos)) {
             record->event.key = owner_key_pos;
             key_origin_registry_set_bitmap(owner_key_pos, key_origin_bitmap_has_any(bitmap) ? bitmap : NULL);
-            if (combo_index != UINT16_MAX && !combo_origin_cache_store(combo_index, generation, keycode, owner_key_pos, complete_at, origin_layer, noah_participation_record_behavior(record), bitmap)) {
-                combo_origin_increment_counter(&combo_origin_diagnostics.unmatched_delayed_output_count);
+            if (combo_index != UINT16_MAX) {
+                combo_origin_active_cache_entry_t *active = combo_origin_cache_store(combo_index, generation, keycode, owner_key_pos, complete_at, origin_layer, noah_participation_record_behavior(record), bitmap);
+                if (active) {
+                    active->release_delivered = release_delivered;
+                } else {
+                    combo_origin_increment_counter(&combo_origin_diagnostics.unmatched_delayed_output_count);
+                }
             }
         } else if (combo_origin_fallback_owner_keypos(&owner_key_pos)) {
             // No completion was seen firing (for example, it fired and was
@@ -813,16 +893,17 @@ __attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t k
         return;
     }
 
-    combo_origin_active_cache_entry_t *active = combo_origin_cache_entry_for_release(keycode);
+    // Captured here unless QMK's tapping engine or record admission did, while
+    // the released member is still known.
+    noah_qmk_combo_origin_capture_record(keycode, record);
+    combo_origin_active_cache_entry_t *active = combo_origin_cache_entry_for_release_dispatch(keycode);
     if (active) {
-        if (!noah_participation_record_generated_captured(record)) noah_participation_record_generated_permission(record, active->origin_layer, active->output_behavior);
         record->event.key = active->owner_key_pos;
         origin_layer = active->origin_layer;
         key_origin_registry_set_bitmap(active->owner_key_pos, key_origin_bitmap_has_any(active->bitmap) ? active->bitmap : NULL);
         combo_origin_cache_entry_clear(active);
         split_runtime_sync_notify_combo_dirty();
     }
-    if (!noah_participation_record_generated_captured(record)) noah_qmk_combo_origin_capture_record(keycode, record);
     noah_participation_record_generated_normalize(record, keycode, origin_layer);
     combo_origin_last_released_key_pos = (keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS};
 }

@@ -211,20 +211,37 @@ origin:
   suppression retirement and a two-observation deadline rule that leaves
   `combo_task()` one final legal emission opportunity. QMK marks a fired combo
   both active and disabled, so only a disabled completion that was never seen
-  active counts as suppressed
+  active counts as suppressed. A completion not fired yet counts its deadline
+  from the latest physical press, not its own: QMK restarts its combo timer at
+  every combo key press, so a chord that completed first legally waits out a
+  later chord's window and both fire together
 - conservative capacity refusal and snapshot diagnostics; a full cache never
   overwrites a still-awaiting origin
 - fallback owner recovery from the latest or last physical combo member, using a
   full-keyboard bitmap when no exact footprint can be proven
 
 The adapter targets the BK revision pinned in `qmk-pin.json`. That QMK activates
-a combo before emitting its press; pending candidates are selected through
-those active indices. It does not support forks that emit before exposing
-active state. QMK's tapping queue can deliver a fired combo's press after its
-release has deactivated it (the chord was tapped while a native LT/MT was
-undecided). A completion seen firing therefore keeps its exact footprint until
-its press arrives: a press with no active candidate pairs with the oldest fired
-completion for that keycode, since queued outputs leave QMK in firing order.
+a combo before emitting its press and emits fired outputs in firing order,
+which is completion order. It does not support forks that emit before exposing
+active state. QMK hands an output record over (delivery) before the runtime
+processes it (dispatch), and in between it can wait: in QMK's tapping queue
+behind a native LT/MT, or in record admission behind an undecided runtime
+tap/hold key (D-F03), possibly after its chord was let go and QMK deactivated
+the combo. Two chords with one output keycode can both wait. Pairing therefore
+follows the records, never only the chords still held:
+
+- a delivered press pairs with the oldest completion QMK fired (active, or
+  seen active before it was let go) whose press it has not delivered yet, and
+  takes that completion's output permission;
+- a dispatched press pairs with the oldest completion whose press was
+  delivered: both queues keep delivery order;
+- a delivered release pairs with the completion holding the member whose
+  physical release QMK is processing, dispatched or not, else the oldest, and
+  is numbered in delivery order; a dispatched release pairs with the lowest
+  number.
+
+A completion seen firing therefore keeps its exact footprint, owner and
+permission until its press is dispatched, and its owner until its release is.
 A fired completion that never arrives retires one tapping term after it was
 seen firing, the longest a tap-hold decision queued ahead of it can take.
 Conservative owner recovery remains only for a completion never seen firing.
@@ -248,7 +265,9 @@ layer lookup, stable combo owner selection, active and pending combo bitmaps,
 pending output after member release, suppressed overlap, deadline boundaries
 and timer wrap, capacity refusal/recovery, exact same-output generations,
 cached release footprints, fired outputs delivered after deactivation (in
-firing order, retired after one tapping term), cross-half and three-key combos,
+firing order, retired after one tapping term), same-output presses and
+releases delivered before either dispatches, an unfired completion waiting
+from the latest press, cross-half and three-key combos,
 reset diagnostics,
 and preview/PD owner partitioning and quiet-owner exclusion for RGB
 underlay/overlay feedback. The runner
@@ -493,7 +512,9 @@ At capacity (eight records by default), capture removes and replays exactly the
 oldest held record through `process_record()` before appending the incoming
 record. This bounded overload path may deliver that oldest record before an
 undecided key resolves; it never drops a record or lets a release bypass its
-buffered press. A replay guard prevents recapture, and the record's physical
+buffered press. Every combo output with one keycode is one key to admission,
+so two of its presses can be held before either release: a held release
+closes the earliest held press still open, and a release waits while one is. A replay guard prevents recapture, and the record's physical
 timestamp, keycode, event type and tap metadata survive unchanged. The remaining
 queue follows normal scan replay, including pausing for a newly undecided key.
 The real QMK pipeline covers saturation, smaller capacities, nested decisions,

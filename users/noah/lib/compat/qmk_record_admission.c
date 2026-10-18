@@ -26,16 +26,23 @@ static bool record_admission_same_key(const keyrecord_t *lhs, const keyrecord_t 
     return lhs->event.type == rhs->event.type && lhs->event.key.row == rhs->event.key.row && lhs->event.key.col == rhs->event.key.col && lhs->keycode == rhs->keycode;
 }
 
-// Whether this release belongs to a press still held back.
+// Whether this release belongs to a press still held back. Every combo output
+// with one keycode is the same key here, so two such presses can both be held
+// before either release: each held release pairs with the earliest held press
+// still open, and one whose press already went is skipped.
 static bool record_admission_press_is_held(const keyrecord_t *release) {
-    bool held = false;
+    uint8_t open = 0;
 
     for (uint8_t index = 0; index < record_admission_held_count; index++) {
         if (record_admission_same_key(&record_admission_held[index], release)) {
-            held = record_admission_held[index].event.pressed;
+            if (record_admission_held[index].event.pressed) {
+                open++;
+            } else if (open) {
+                open--;
+            }
         }
     }
-    return held;
+    return open != 0u;
 }
 
 // Whether this release waits behind the undecided key at undecided. QMK

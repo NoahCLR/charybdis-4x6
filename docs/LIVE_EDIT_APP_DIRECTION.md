@@ -116,7 +116,9 @@ input cadence remain unmeasured for this path.
 
 - **Combo output permissions need hardware acceptance (D-F24).** Try shared
   outputs with opposite permissions, global bypass and held releases on both
-  halves.
+  halves, including the two GUI chords (N + M, Button 1 + Volume) fired
+  together and one after the other while F is held undecided, so both outputs
+  wait; each keeps its own permission and nothing stays held.
 
 - **Pointing-mode macros need hardware acceptance (D-F23).** Run delayed and
   mouse-click macros from directions under both output policies and from a

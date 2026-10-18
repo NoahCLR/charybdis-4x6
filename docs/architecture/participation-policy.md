@@ -178,9 +178,12 @@ before QMK can queue its generated output behind native tapping. QMK can
 enqueue an output without asking its tap classification until later, so
 classification alone is too late to take this snapshot. The generated press
 record carries the decision through tapping and admission, and the pending
-completion and active owner retain it for release. Changing either switch,
-the definition or active layers cannot reclassify an already completed
-output or lose its matching release. Suppressed completions discard their
+completion and active owner retain it for release. Each delivered output takes
+the oldest fired completion not yet delivered, so two chords with one output
+that wait together keep their own decisions
+([pairing](../KEY_RUNTIME.md#combo-origin-compatibility-contract)). Changing
+either switch, the definition or active layers cannot reclassify an already
+completed output or lose its matching release. Suppressed completions discard their
 snapshots. If origin reconstruction is unresolved, dispatch conservatively
 bypasses behaviour whenever any combo definition sharing that output bypasses
 it; it never borrows another definition's permission.
