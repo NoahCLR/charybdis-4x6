@@ -369,11 +369,12 @@
 //
 // timing defaults currently set in config.h:
 //   - TAPPING_TERM = 200 ms
-//     used by built-in QMK LT()/MT()/TT()/OSL()/OSM() keys and by LT() rows
-//     here when .tap_hold_term is omitted; the live profile's dual-role
-//     setting replaces it once live
+//     the hold time of every dual-role key (LT()/MT()/OSM()/TT()/OSL()), with
+//     or without a row here, when .tap_hold_term is omitted; the runtime
+//     decides all of them (D-F27), and the live profile's dual-role setting
+//     replaces it once live
 //   - CUSTOM_TAP_HOLD_TERM = 150 ms
-//     default first hold threshold for custom key_behavior rows
+//     default first hold threshold for every other key_behavior row
 //   - CUSTOM_LONGER_HOLD_TERM = 400 ms
 //     default longer-hold threshold
 //   - CUSTOM_MULTI_TAP_TERM = 150 ms
@@ -386,8 +387,8 @@
 //   - .longer_hold_term overrides the longer-hold threshold
 //   - .multi_tap_term overrides the max gap between taps
 //   - omit them (or leave them 0) to use the defaults above
-//   - for LT() rows, omitted .tap_hold_term falls back to TAPPING_TERM (or
-//     the live dual-role setting);
+//   - for LT()/MT()/OSM()/TT()/OSL() rows, omitted .tap_hold_term falls back
+//     to TAPPING_TERM (or the live dual-role setting);
 //     all other rows fall back to CUSTOM_TAP_HOLD_TERM
 //
 // per-key policy flags, omit them (or leave them false) for ordinary keys:

@@ -9,6 +9,7 @@
 bool combo_key_event_pending(uint8_t row, uint8_t col, bool pressed, uint16_t since, uint16_t term);
 bool tapping_key_event_pending(uint8_t row, uint8_t col, bool pressed, uint16_t since, uint16_t term);
 // Record admission's own queue (qmk_record_admission.h).
+bool noah_record_admission_press_pending(keypos_t pos, uint16_t since, uint16_t term);
 bool noah_record_admission_release_pending(keypos_t pos, uint16_t since, uint16_t term);
 #endif
 
@@ -31,7 +32,12 @@ static inline bool noah_qmk_gesture_event_pending(keypos_t pos, bool pressed, ui
     return false;
 }
 
+// A press waiting in QMK's queues or in record admission, behind an undecided
+// key (D-F03), still continues its key's tap series.
 static inline bool noah_qmk_gesture_press_pending(keypos_t pos, uint16_t since, uint16_t term) {
+#if !defined(NOAH_HOST_TEST_ENV) || defined(NOAH_TEST_QMK_GESTURES)
+    if (noah_record_admission_press_pending(pos, since, term)) return true;
+#endif
     return noah_qmk_gesture_event_pending(pos, true, since, term);
 }
 static inline bool noah_qmk_gesture_release_pending(keypos_t pos, uint16_t since, uint16_t now) {

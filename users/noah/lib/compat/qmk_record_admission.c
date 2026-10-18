@@ -151,15 +151,23 @@ void noah_record_admission_reset(void) {
     record_admission_replaying  = false;
 }
 
-bool noah_record_admission_release_pending(keypos_t pos, uint16_t since, uint16_t term) {
+static bool record_admission_event_pending(keypos_t pos, bool pressed, uint16_t since, uint16_t term) {
     for (uint8_t index = 0; index < record_admission_held_count; index++) {
         const keyevent_t *event = &record_admission_held[index].event;
 
-        if (event->type == KEY_EVENT && !event->pressed && event->key.row == pos.row && event->key.col == pos.col && (uint16_t)(event->time - since) <= term) {
+        if (event->type == KEY_EVENT && event->pressed == pressed && event->key.row == pos.row && event->key.col == pos.col && (uint16_t)(event->time - since) <= term) {
             return true;
         }
     }
     return false;
+}
+
+bool noah_record_admission_press_pending(keypos_t pos, uint16_t since, uint16_t term) {
+    return record_admission_event_pending(pos, true, since, term);
+}
+
+bool noah_record_admission_release_pending(keypos_t pos, uint16_t since, uint16_t term) {
+    return record_admission_event_pending(pos, false, since, term);
 }
 
 uint8_t noah_record_admission_held_count(void) {

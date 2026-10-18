@@ -221,6 +221,7 @@ int main(int argc, char **argv) {
     assert(NOAH_PROFILE_FEATURE_POINTING_CLICKS == (1u << 28));
     assert(NOAH_PROFILE_FEATURE_POINTING_MACROS == (1u << 29));
     assert(NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS == (1u << 30));
+    assert(NOAH_PROFILE_FEATURE_UNIFIED_TAPPING == (1u << 31));
     assert(NOAH_PROFILE_FEATURE_CANDIDATE_REUSE == (1u << 24));
     assert(NOAH_PROFILE_FEATURE_CANDIDATE_STREAM == (1u << 25));
     assert(argc == 2);

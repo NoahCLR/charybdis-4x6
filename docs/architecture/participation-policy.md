@@ -74,8 +74,10 @@ A physical press uses its keycode's behaviour row only if all of these hold:
 4. the placement's bypass bit is clear.
 
 Otherwise the press takes its **normal action**: the keycode as if it had no
-behaviour row, with the usual modifier, layer and pointing ownership. Native
-`LT()` and `MT()` keep native QMK tap-hold timing. A custom key's normal
+behaviour row, with the usual modifier, layer and pointing ownership. An
+`LT()`, `MT()` or `OSM()` key stays the runtime's with its default, as without
+a row (D-F27): `LT()` holds its layer, `MT()` and `OSM()` their modifiers, past
+the dual-role time. A custom key's normal
 action is its shortcut (D-F26), held from the press until the release; a
 bypassed custom key without a shortcut does nothing, Ark explains this, and a
 layer that needs output there maps a plain keycode or gives the key a
@@ -249,9 +251,10 @@ storage, and costs one masked bit test per scope on an ordinary press.
 - **Tap-hold.** QMK decides whether a record is a tap-hold through BK's
   `is_tap_record_user()`, a per-record weak hook given QMK's own answer and
   `is_tap_keycode_user()`'s. The userspace override keeps the keycode hook's
-  answer for a press that uses its row and QMK's for one that bypasses it, so an
-  authored behaviour on an `LT()` or `MT()` key that a placement bypasses
-  returns to native QMK tap-hold timing.
+  answer for a press that uses its row, and for one that bypasses it answers
+  as the key does without a row. Every `LT()`, `MT()` and `OSM()` key is the
+  runtime's either way (D-F27), so neither answer lets QMK's tapping engine
+  classify it.
 - **Combos.** `combo_key_record_allowed()` in
   `users/noah/lib/compat/qmk_combo_origin.c` vetoes a member press unless its
   stored combo decision and the combo row both allow it on its source layer.

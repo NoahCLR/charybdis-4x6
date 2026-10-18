@@ -237,11 +237,11 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_non_handled
     return KEY_RUNTIME_PROCESS_NEXT;
 }
 
-// A plain LT() with no authored row keeps QMK's own tap/hold decision: QMK's
-// tapping engine resolves it before this record arrives and marks a hold with
-// tap.count 0. Only that hold, which QMK would turn into layer_on() and
-// layer_off(), goes through layer ownership; a tap still reaches QMK and sends
-// the tap keycode.
+// An LT() that QMK's tapping engine decided arrives with tap.count 0 for a
+// hold. Only that hold, which QMK would turn into layer_on() and layer_off(),
+// goes through layer ownership; a tap still reaches QMK and sends the tap
+// keycode. Every LT() is the runtime's now (D-F27), so no physical key comes
+// this way; the stage is removed with the rest of QMK's tapping paths.
 static bool key_runtime_process_is_plain_layer_tap_hold(uint16_t keycode, const keyrecord_t *record) {
     return IS_QK_LAYER_TAP(keycode) && QK_LAYER_TAP_GET_LAYER(keycode) < LAYER_COUNT && record->tap.count == 0u && record->event.type == KEY_EVENT;
 }
@@ -384,9 +384,9 @@ static bool key_runtime_process_record_uses_row(uint16_t keycode, const keyrecor
 
 // QMK's tapping engine gives this the last word on every record (BK's
 // is_tap_record_user), after is_tap_keycode_user below has answered for the
-// keycode. A key whose press bypassed its row is a native key again here: only
-// intrinsic TT/OSL ownership keeps it from QMK, so a bypassed LT() or MT()
-// keeps QMK's own tap/hold timing.
+// keycode. A press that bypassed its row answers as the key does without one:
+// every LT(), MT() and OSM() key is the runtime's either way (D-F27), as are
+// TT() and OSL(), so QMK classifies none of them.
 bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) {
     uint16_t keycode = get_record_keycode(record, false);
     if (record->event.type == KEY_EVENT && !noah_synthetic_record_active()) {
@@ -514,7 +514,8 @@ static bool key_runtime_process_press_uses_oneshot_layer(uint16_t keycode, const
 
     if (IS_QK_MOD_TAP(keycode)) {
         // Runtime-owned MT taps are settled by their planner, including a
-        // delayed multi-tap. Native MTs arrive with QMK's tap/hold decision.
+        // delayed multi-tap. Every MT is runtime-owned (D-F27); this answers for
+        // one that QMK decided, which no physical key is any more.
         return !(key_runtime_process_record_uses_row(keycode, record) ? key_behavior_lookup(keycode) : key_behavior_lookup_without_row(keycode)).handled && record->tap.count != 0u && noah_qmk_contract_tap_uses_oneshot_layer(keycode);
     }
     return true;

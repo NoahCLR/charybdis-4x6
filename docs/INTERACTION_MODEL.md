@@ -37,14 +37,25 @@ That makes patterns like these possible:
   double-tap behavior
 
 Plain keys without an authored row keep their normal QMK behavior, except the
-layer keys the runtime owns: `MO(layer)` holds its layer, `TT(layer)` holds it
-too and locks it on its `TAPPING_TOGGLE`-th tap (QMK's default, 5),
+layer keys the runtime owns and QMK's dual-role keys. A row without steps is no
+row (D-F27): an empty one, or one that only sets hold times, leaves a plain key
+QMK's and `TT()` its own taps. `MO(layer)` holds its layer, `TT(layer)` holds
+it too and locks it on its `TAPPING_TOGGLE`-th tap (QMK's default, 5),
 `OSL(layer)` holds it too and on a tap turns it on for the next key press,
-`LM(layer, mods)` holds it together with its modifiers,
-`TG(layer)` is `LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone. A
-plain `LT(layer, kc)` keeps QMK's own tap/hold decision and `TAPPING_TERM`;
-only the layer its hold turns on is owned, so releasing it leaves a locked
-layer on.
+`LM(layer, mods)` holds it together with its modifiers, `TG(layer)` is
+`LOCK_LAYER(layer)`, and `TO(layer)` locks that layer alone.
+
+Every `LT()`, `MT()` and `OSM()` key is decided by the runtime, with or without
+a row (D-F27), and a key without a row behaves exactly as with an empty one:
+its tap is its own tap, and held past the dual-role time `LT(layer, kc)` holds
+its layer as `MO(layer)` (owned, so releasing it leaves a locked layer on),
+`MT()` and `OSM()` hold their modifiers. Tap one, then press and hold it again
+at once, and the second press is a new hold after the dual-role time, not a
+repeated tap: QMK's quick-tap repeat of the letter is gone. Switching
+behaviours off (the master switch, a layer's switch, a row's own enable or
+allowed layers) or bypassing a placement ignores the row only; the key keeps
+this default. QMK's own tap-hold options (permissive hold, hold on other key
+press, Flow Tap, Chordal Hold) do not apply to these keys.
 
 A one-shot layer follows QMK's rule for what uses it up: any key press except a
 modifier, a one-shot modifier, a mod-tap still held, or `OSL()` itself. The
@@ -75,11 +86,10 @@ Default timing lives in the active keymap
 That keymap chooses:
 
 - `TAPPING_TERM` for QMK's dual-role keys: `LT()`, `MT()`, `TT()`, `OSL()`
-  and `OSM()`. Except for `LT()` keys with an authored behaviour row, QMK's
-  tapping engine resolves their tap or hold before the runtime sees the press. With a live profile the dual-role setting replaces
-  it through `get_tapping_term()` and `get_quick_tap_term()`, so the edited
-  term reaches QMK itself, not only the runtime (D-L38)
-- `CUSTOM_TAP_HOLD_TERM`
+  and `OSM()`. The runtime decides their tap or hold; QMK's tapping engine
+  classifies none of them. With a live profile the dual-role setting
+  (settings id 0) replaces it (D-L38)
+- `CUSTOM_TAP_HOLD_TERM`, the tap/hold setting, for every other row
 - `CUSTOM_LONGER_HOLD_TERM`
 - `CUSTOM_MULTI_TAP_TERM`
 
@@ -168,8 +178,8 @@ A handled key that is down and has not reached its hold meets a key pressed
 after it in one of three ways, decided by what its hold does at the tap count
 it is on (D-F27). Either way the earlier key's output comes first.
 
-1. **Its hold changes other keys: later keys wait.** That is an authored
-   `LT()`, `MT()` or `OSM()` row, or a key whose first hold tier is a layer
+1. **Its hold changes other keys: later keys wait.** That is any `LT()`,
+   `MT()` or `OSM()` key, with or without a row, or a key whose first hold tier is a layer
    (`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`, previewed or not, or any other
    layer action), modifiers only (`KC_LEFT_ALT`, `C(KC_NO)`) or a pointing
    mode. Keys pressed after it wait, as QMK's tapping engine holds keys behind
@@ -243,7 +253,8 @@ completed taps followed by a third press. The first press must qualify as a tap.
 A combo can postpone output while it decides which action owns the input; it
 does not shorten the allowed physical gap or restart a hold's clock.
 
-An on-time press waiting in QMK keeps its tap series alive. If it wins a combo,
+An on-time press waiting in QMK's combo buffer, or in record admission behind
+an undecided key, keeps its tap series alive. If it wins a combo,
 the constituent does not run; if delivered as a key, it continues the series.
 A queued physical release prevents scans from inventing a longer hold while
 delivery is delayed. Release settlement uses the actual press/release interval
@@ -251,25 +262,29 @@ and the existing balanced action lifecycle. Synthetic combo outputs still start
 their hold clock on delivery and use the existing combo-origin continuation
 protection; there is no single constituent press that defines their hold.
 
-A runtime-owned key is classified once, by userspace. This includes authored
-`LT()`, `MT()` and `OSM()` rows, and `TT()`/`OSL()` which already have intrinsic
-userspace layer ownership. An unhandled `LT()`, `MT()` or `OSM()` still uses native
-QMK tapping. A row that does not author a first hold keeps the key's own, which
+A runtime-owned key is classified once, by userspace. This includes every
+`LT()`, `MT()` and `OSM()` key, row or not, and `TT()`/`OSL()` which already
+have intrinsic userspace layer ownership; QMK's tapping engine classifies no
+record, physical or combo output (feature bit 31). A row that does not author
+a first hold, or no row, keeps the key's own, which
 starts only once the key is held past the tap-hold term: `LT()` holds its layer
 as `MO()`, `MT()` and `OSM()` hold their modifiers. A tap never turns that layer
 or those modifiers on, and a hold sends no tap or one-shot on release. The first
 tap stays the key's own tap, so adding a repeated-tap branch cannot remove the
 hold. A transparent hold over a lower `LT()` inherits the same threshold hold.
 The broader bypass is advertised by feature bit 18; bit 17 alone only promises
-the authored LT bypass. Pointer-mode interception remains earlier than authored
+the authored LT bypass, and bit 31 extends both to keys without a row. Pointer-mode interception remains earlier than authored
 mouse behaviour: Arrow's button remapping can intentionally consume Button 3.
 These rules are advertised by Profile Wire feature bit 17. Older builds can
 lose a physically on-time repeat during buffering; increasing timing values
 can mask that defect while also delaying normal actions.
 
-One important nuance: inside `key_behaviors[]`, an omitted `.tap_hold_term`
-inherits `TAPPING_TERM` for `LT()` rows, but `CUSTOM_TAP_HOLD_TERM` for other
-custom rows.
+Hold-time defaults: a dual-role key (`LT()`, `MT()`, `OSM()`, `TT()`,
+`OSL()`) holds at the dual-role setting (compiled `TAPPING_TERM`), row or not,
+unless its row sets its own `.tap_hold_term`. Every other row holds at the
+tap/hold setting (compiled `CUSTOM_TAP_HOLD_TERM`). An empty row changes
+neither, and a row without steps sets hold times only for a key the runtime
+handles anyway.
 
 ## Normal Tap And Hold Fallbacks
 
