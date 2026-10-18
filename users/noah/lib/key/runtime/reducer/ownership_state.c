@@ -1196,6 +1196,40 @@ uint16_t key_runtime_core_held_action_keycode_at(keypos_t key_pos) {
     return key_runtime_core_key_pos_held_action_keycode(key_runtime_core_state(), key_pos);
 }
 
+bool key_runtime_core_holds_layer_or_mods_at(keypos_t key_pos) {
+    const key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (!(state && key_runtime_core_keypos_valid(key_pos))) {
+        return false;
+    }
+
+    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
+        const lease_t *lease = &state->leases[index];
+
+        if (!(lease->active && key_runtime_core_lease_owner_keypos_equal(lease, key_pos))) {
+            continue;
+        }
+        switch (key_runtime_core_lease_kind(lease)) {
+            case LEASE_KIND_LAYER:
+                return true;
+            case LEASE_KIND_MODIFIER:
+                if (lease->data.modifier.modifiers) {
+                    return true;
+                }
+                break;
+            case LEASE_KIND_HELD_ACTION:
+                if (noah_qmk_real_mods_for_keycode(lease->data.action) != 0u || noah_action_desc_is_layer_action(noah_action_describe(lease->data.action))) {
+                    return true;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    return false;
+}
+
 bool key_runtime_core_repeat_active_at(keypos_t key_pos) {
     return key_runtime_core_key_pos_repeat_active(key_runtime_core_state(), key_pos);
 }

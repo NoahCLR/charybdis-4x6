@@ -199,10 +199,29 @@ it is on (D-F27). Either way the earlier key's output comes first.
    mode. A combo member reaches the runtime only once QMK has decided its
    combo, so combo timing is unchanged and a formed combo never sees it.
 
-Waiting keys replay in order with their physical timestamps. The release of a
-key pressed before the tap/hold key is not held back, as in QMK. The wait is at
+Waiting keys replay in order with their physical timestamps. The wait is at
 most the tap-hold term; a fast roll gains no delay beyond the tap/hold key's
-release. Plain `MO()`, `TT()`, `OSL()`, `LM()` keys and plain keys do not hold
+release.
+
+A key pressed before a class-1 key and released while it is undecided waits
+too when it is a modifier or layer key, as QMK keeps it in its tapping buffer:
+a modifier key, plain or with its own row (Left GUI), a mods-only key
+(`C(KC_NO)`), `MO()`, `LT()`, `LM()`, an `MT()` or `OSM()` held as its
+modifier, or a handled key holding a layer or modifiers at that moment (a
+thumb held for its layer, Shift holding itself). The undecided key's tap or
+hold goes out with that modifier or layer still on, then the release follows:
+press Cmd, press F, let go of Cmd, then F, and it types Cmd+F; let go of the
+thumb before a key pressed on its layer and that key still taps on the layer.
+The release of any other key pressed earlier goes at once, as in QMK. While it
+waits, a released key reaches no later hold tier. A combo output's release
+goes at once.
+
+The same releases settle a class-3 key, as another key's press does: its tap
+goes out at that release, with the modifier or layer still on, then the
+release. Press Cmd, press `,`, let go of Cmd, then `,`, and it types Cmd+,, as
+the key does without a row; Shift let go before Enter types Shift+Enter.
+Once the modifier is let go, keeping the key down types its tap, not its
+hold; held past its hold time before that, it has already sent its hold. Plain `MO()`, `TT()`, `OSL()`, `LM()` keys and plain keys do not hold
 keys back; they act on their press.
 
 The waiting queue is bounded (eight records by default). If a record that must
@@ -211,8 +230,9 @@ new record takes its place at the tail. Only one record replays for that
 arrival. Under this overload, that oldest key may run before the deciding
 key's tap or hold, using the layer and modifiers active at delivery. The rest
 still wait; records retain their timestamps and no release overtakes its own
-press. Releases of keys already delivered, including the deciding key, continue
-to pass through. Normal rolls and hold timing below capacity keep the rules above.
+press. A waiting modifier or layer release counts as a record that must wait.
+Other releases of keys already delivered, including the deciding key's,
+continue to pass through. Normal rolls and hold timing below capacity keep the rules above.
 
 ### Physical gestures and buffered delivery
 

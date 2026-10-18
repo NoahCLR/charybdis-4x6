@@ -1127,6 +1127,24 @@ void key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key
     }
 }
 
+void key_runtime_core_settle_active_keys_on_other_release(keypos_t key_pos, uint16_t released_at, key_runtime_core_effect_plan_t *plan) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (!(state && plan)) {
+        return;
+    }
+
+    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
+        press_token_t *token = &state->press_tokens[index];
+        keypos_t       token_key_pos;
+
+        token_key_pos = key_runtime_core_press_token_resolve_key_pos(state, token);
+        if (token->active && !key_runtime_core_keypos_equal(token_key_pos, key_pos)) {
+            key_runtime_core_settle_on_other_press(state, token, token_key_pos, released_at, plan);
+        }
+    }
+}
+
 void key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 
