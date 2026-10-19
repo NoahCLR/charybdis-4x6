@@ -58,14 +58,14 @@ is held, tapped when it is tapped, and what its behaviour row falls back to.
 Behaviour steps on other keys may send a custom key, which sends its shortcut
 only. Hardware acceptance is pending.
 
-A key pressed while a handled key is undecided meets it by what that key's
-hold does (D-F27): a hold that changes other keys makes it wait, a fallback
-modifier registers, and any other key is settled as a tap first, so rolls out
-of the number row, punctuation, Enter, Esc and the Nav arrows keep their
-order. A modifier or layer key let go before a key it was pressed for still
-applies to that key: it waits for a key that makes others wait, and settles
-any other key as a tap first, so Cmd released before F types Cmd+F and before
-`,` types Cmd+,. Hardware acceptance is pending.
+A key pressed while a handled key is undecided meets it by what that key's hold
+does (D-F27): a hold that changes other keys makes it wait, a fallback modifier
+registers, and any other key is settled as a tap first, so rolls out of the
+number row, punctuation, Enter, Esc and the Nav arrows keep their order. A
+modifier or layer key, or a chord or custom key holding one, let go before a key
+it was pressed for still applies to that key: it waits for a key that makes
+others wait, and settles any other key as a tap first, so Cmd released before F
+types Cmd+F and before `,` types Cmd+,. Hardware acceptance is pending.
 
 Every `LT`, `MT` and `OSM` key is decided by the key runtime, with or without a
 behaviour row, and a key without a row behaves exactly as with an empty one
@@ -112,7 +112,26 @@ input cadence remain unmeasured for this path.
   hold shortcuts the usual way, and type fast over F and the number row.
   Type normally on F, J and Z and use their layers; tap, then hold J and Z;
   roll Cmd+Z and Shift+J off the modifier; fire combo C0 (D + F). Hold Delete
-  (its live row is empty): it repeats, and combo C11 still fires.
+  (its live row is empty): it repeats, and combo C11 still fires. Roll the
+  GUI chord N + M off J and F (GUI+J, GUI+F), and a custom key whose shortcut
+  is modifiers alone off J and `1`. Click right after pressing Dragscroll,
+  Volume or Pinch: the click is not delayed. Hold `1` for `!` while F is still
+  undecided, then type a letter: `!` comes first.
+
+- **A held shifted symbol shifts the next key.** `1` held past its hold time
+  sends `!` by holding Shift and 1 until it is released, so a letter typed
+  meanwhile gets Shift too (`!E`); QMK clears such weak modifiers at the next
+  press. Whether the next press drops every modifier a held output carries,
+  or only a shifted symbol's, is parked with Noah.
+
+- **The reviewed-path stack gate fails on `dev`.** The resource build's stack
+  manifests carry adjacencies the linker no longer makes and miss indirect
+  call sites from `process_record_user`, so the gate fails on `dev` itself;
+  the last passing figures in
+  [memory budgets](architecture/memory-budgets.md) predate this. The
+  manifests need a review against the current linked callers, which should
+  also measure the press and release preflight paths that now plan a waiting
+  key's missed scans (D-F27).
 
 - **A held mod-tap is hidden under a pointing mode that holds its modifier
   (D-F27).** A pointing mode that holds a modifier (a scroll mode's, such as
@@ -521,18 +540,18 @@ App decision; its text is in Ark's direction.
 
 ### D-L34 — Layer keycodes are owned in the firmware, and the app follows
 
-QMK ran `TG()`/`TO()` behind the userspace's layer ownership, so a toggled
-layer turned off when an `MO()` of it was released and `TO()` left stale locks.
-The fix is in the firmware: `TG(n)` is `LOCK_LAYER(n)`, `TO(n)` is "lock only
-n" (`layer_ownership_goto`), `TT(n)` is `MO(n)` with a built-in
-`LOCK_LAYER(n)` on its `TAPPING_TOGGLE`-th tap, and `OSL(n)` holds like `MO(n)`
-while its tap arms a one-shot owner the next qualifying press uses up. All act
-the same on a plain key, in a behaviour and as a combo output. Profile Wire
-feature bit 14 advertises this; the app accepts them in behaviours only when a
-keyboard reports it: `OSL()` as a tap, `TT()` as a "Press and hold until
-release" branch. A plain `LT()` hold (tap count 0) goes through layer
-ownership; its tap still reaches QMK. `LM(n, mods)` holds layer n and its
-modifiers through modifier ownership, as a key or combo, not a behaviour step.
+QMK ran `TG()`/`TO()` behind the userspace's layer ownership, so a toggled layer
+turned off when an `MO()` of it was released and `TO()` left stale locks. The
+fix is in the firmware: `TG(n)` is `LOCK_LAYER(n)`, `TO(n)` is "lock only n"
+(`layer_ownership_goto`), `TT(n)` is `MO(n)` with a built-in `LOCK_LAYER(n)` on
+its `TAPPING_TOGGLE`-th tap, and `OSL(n)` holds like `MO(n)` while its tap arms
+a one-shot owner the next qualifying press uses up. All act the same on a plain
+key, in a behaviour and as a combo output. Profile Wire feature bit 14
+advertises this; the app accepts them in behaviours only when a keyboard reports
+it: `OSL()` as a tap, `TT()` as a "Press and hold until release" branch. Every
+`LT()` key is decided by the key runtime (D-F27), which holds its layer through
+layer ownership. `LM(n, mods)` holds layer n and its modifiers through modifier
+ownership, as a key or combo, not a behaviour step.
 
 The keyboard holds a candidate it is asked to save to where its actions are
 placed, by the rules `keymap.c` validation uses; a committed record still loads,
@@ -769,7 +788,8 @@ rule, so rolls keep their order and a key tapped under a held layer resolves on
 it. A tap/hold key's pending taps are settled by any other key's press. Chosen
 over emitting the next key at once (swapped order in rolls) and over settling a
 tap on the next press (breaks quick chords under a held layer); the cost is a
-wait of at most the tap-hold term for keys pressed during an undecided key.
+wait, for keys pressed during an undecided key, of at most its hold time (its
+first hold tier's, D-F27).
 
 Extended 2026-10-10 to authored keys whose hold is a layer held until release
 (`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`, such as the thumb keys whose tap
@@ -1414,7 +1434,7 @@ across domains, and Ark warns about it.
 
 Settings v8 stores the shortcuts as 128 two-byte records (modifier mask, then
 key) between the layer records and the names, and header byte 6 counts them
-(128). Feature bits stay as they are: bit 31 is still free. The action ABI
+(128). No feature bit gates it; settings v8 does. The action ABI
 digest is unchanged: it covers action identities, and a custom key's code and
 kind did not change. Firmware refuses settings v7, and an older client refuses
 v8 rather than misreading it. The keymap authors
@@ -1435,7 +1455,11 @@ hold at the current tap count does, not by its keycode family:
    a layer held until release, and now any key whose first hold tier (its
    hold, or its long hold when it has none) is a layer action, modifiers only
    or a pointing mode. A pointing mode can mask modifiers and take over
-   buttons, so a key pressed under one is not independent of it.
+   buttons, so a key pressed under one is not independent of it. A hold that
+   goes on at the key's own press (`LM()`'s modifiers, a pointing key's own
+   mode when its row authors no hold) leaves nothing to decide: another
+   key's press already cancels its quick tap, so keys pressed meanwhile go at
+   once.
 2. **Its fallback hold is its own modifier: the later press registers it**,
    as before.
 3. **Anything else: the later press settles it as a tap.** Its hold is an
@@ -1443,8 +1467,14 @@ hold at the current tap count does, not by its keycode family:
    repeated taps included, before the later press goes out, and its release
    then sends nothing. Past its hold time it is a hold: a threshold hold has
    already gone out, and a hold that waits for release
-   (`TAP_ON_RELEASE_AFTER_HOLD`) is committed at the later press. Keys a
-   pointing mode owns are left to it.
+   (`TAP_ON_RELEASE_AFTER_HOLD`) is committed at the later press. A key
+   whose own press waited behind an undecided key is a hold too once it was
+   held past its hold time: held records replay without a scan between them,
+   so preflight first reaches the hold thresholds it crossed before the next
+   replayed event, or its own release, at their physical times (D-F01). Keys
+   a pointing mode owns are left to it, and a momentary layer key (`MO`,
+   `TT`, `OSL`, `LM`) is not settled: its layer is on from the press, and
+   another key's press cancels its quick tap, even one its row authors.
 
 Before this, class 3 sent the later key at once and this key's tap only on
 its release, so `, ` typed as ` ,`. Chosen over making class 3 wait as well,
@@ -1467,24 +1497,25 @@ what a later key meets ("Every dual-role key" below takes bit 31). See
 [the contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided).
 
 **Releases that wait.** A key pressed before a class-1 key and released while
-that key is undecided waits for its decision when it is a modifier or layer
-key, as QMK keeps such a release in its tapping buffer. A key the runtime
-handles counts by what it holds at that moment (a layer, or real modifiers
-from a hold or a registered fallback); any other key by QMK's rule for its
-keycode (a modifier, a mods-only key, `MO` or `LM`; `LT`, `MT` and `OSM` are
-always handled, so in practice a plain modifier or a mods-only key). The
-undecided key's tap or hold then goes out under that
+that key is undecided waits for its decision when it is a modifier or layer key,
+as QMK keeps such a release in its tapping buffer. A key the runtime handles
+counts by what it holds at that moment (a layer, or real modifiers from a hold,
+a registered fallback or a custom key's shortcut of modifiers alone); any other
+key by QMK's rule for its keycode (a modifier, a mods-only key, `MO` or `LM`;
+`LT`, `MT` and `OSM` are always handled, so in practice a plain modifier or a
+mods-only key). The undecided key's tap or hold then goes out under that
 modifier or layer, and the release follows, so Cmd let go before F still types
 Cmd+F. Every other release goes at once, as in QMK. A waiting release replays
 in order and waits behind each replayed key that is undecided in turn. It
-counts as queued for the hold gate, so its key reaches no later hold tier
-after its physical release; the key admission is waiting for is the
-exception, since overload can replay that key's press ahead of its own
-release. Combo outputs' releases go at once: their runtime position is known
-only after admission, so they could not be told from the undecided key's own.
-Chosen over passing every earlier key's release through, which typed the bare
-key whenever the modifier came up first and made a native LT/MT key behave
-differently once it had a row.
+counts as queued for the hold gate, so its key reaches no later hold tier after
+its physical release; the key admission is waiting for is the exception, since
+overload can replay that key's press ahead of its own release. A combo output's
+release counts the same way, judged where the runtime holds that output, its
+chord's owner key, so the GUI chord N + M let go before J still types GUI+J; an
+output that is the undecided key itself decides on its own release. Chosen over
+passing every earlier key's release through, which typed the bare key whenever
+the modifier came up first and made a native LT/MT key behave differently once
+it had a row.
 
 **Releases that settle.** The same releases settle a class-3 key as a tap,
 as another key's press does: its tap goes out at the modifier's or layer

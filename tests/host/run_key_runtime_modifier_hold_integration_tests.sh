@@ -28,6 +28,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/key_runtime_modifier_hold_integration_test.c" \
     $MODIFIER_HOLD_SUPPORT_SOURCES \
+    "$ROOT/users/noah/lib/profile/runtime/profile_activation_policy.c" \
     -o "$BIN"
 
 "$BIN"

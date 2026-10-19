@@ -424,6 +424,9 @@ void                           key_runtime_core_flush_multi_tap(key_runtime_core
 // A modifier's or layer key's release, at its physical time, settles the keys
 // another key's press would settle (D-F27), so their tap gets it.
 void                           key_runtime_core_settle_active_keys_on_other_release(keypos_t key_pos, uint16_t released_at, key_runtime_core_effect_plan_t *plan);
+// A key's own release, at its physical time, first reaches any hold it was
+// due before then while its press waited in record admission (D-F01).
+void                           key_runtime_core_plan_missed_scans_before_release(keypos_t key_pos, uint16_t released_at, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 bool                           key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 bool                           key_runtime_core_handle_handled_key_release(uint16_t keycode, keypos_t key_pos, const handled_key_resolution_t *resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan);

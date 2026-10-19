@@ -95,8 +95,10 @@ renames the keyboard, the half the cable is plugged into disconnects from USB
 for a moment and reconnects under the new name. It waits until nothing is
 held, no macro is running, both halves have the new profile and Ark has
 stopped talking to it for a second; the other half never switches its USB on.
-Installing firmware with this feature changes the profile format, so export a
-backup in Ark first and restore it afterwards.
+Installing firmware with this feature changes the profile format: the keyboard
+starts from its compiled defaults, and a backup made with earlier firmware
+cannot be restored onto it, only onto the firmware that made it. Keep the
+earlier firmware and its backup if you may want to go back.
 
 ## Custom keys and their shortcuts
 
@@ -117,8 +119,10 @@ send a custom key too; it sends that key's shortcut only, never its
 behaviour. A custom key with no shortcut and no behaviour does nothing.
 
 Shortcuts are stored in the profile and need an Ark version that edits them.
-Installing firmware with this feature changes the profile format, so export a
-backup in Ark first and restore it afterwards.
+Installing firmware with this feature changes the profile format: the keyboard
+starts from its compiled defaults, and a backup made with earlier firmware
+cannot be restored onto it, only onto the firmware that made it. Keep the
+earlier firmware and its backup if you may want to go back.
 
 ## Authoring the profile in C
 
@@ -266,14 +270,17 @@ The helper vocabulary is:
 
 What a hold does decides what happens when you press another key before it
 starts. A hold that is a layer, modifiers or a pointing mode makes that key
-wait, so it lands on the layer or gets the modifier if you keep holding. Any
+wait, so it lands on the layer or gets the modifier if you keep holding; a
+hold that is already on from the press, such as `LM()` or a pointing key with
+no hold of its own, makes nothing wait. Any
 other hold, such as `S(KC_1)` on `KC_1`, is the key's own output, so the
 other key's press types this key's tap first: rolls keep their order, and
 for the hold you hold the key on its own. A hold that waits for release is
 sent at that press if its hold time has passed. While a key that makes
 others wait is undecided, letting go of a modifier or layer key you pressed
 before it waits as well, as in QMK: Cmd released just before F still types
-Cmd+F. For any other key, letting go of the modifier types its tap at once,
+Cmd+F. A chord or custom key that holds modifiers counts as a modifier key
+here. For any other key, letting go of the modifier types its tap at once,
 so Cmd released just before `,` types Cmd+,. The
 [interaction model](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)
 has the details.

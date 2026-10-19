@@ -222,7 +222,9 @@ Ordinary firmware and owner-only engineering firmware remain read-only.
 
 Combo-origin reconciliation runs before key-runtime scan projection. It removes
 QMK-disabled candidates immediately and expires inactive candidates only after
-the first crossed-deadline scan has been followed by a `combo_task()` cycle.
+the first crossed-deadline scan has been followed by a `combo_task()` cycle; a
+candidate whose output press QMK has delivered stays until that press is
+dispatched.
 Scan also owns hold threshold promotion, long-hold promotion, pending multi-tap
 expiry, pending release draining, split heartbeats, and held repeat ticking.
 
