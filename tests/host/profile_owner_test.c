@@ -6,6 +6,7 @@
 
 #include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
 #include "users/noah/lib/profile/runtime/profile_owner.h"
+#include "users/noah/lib/profile/runtime/effective_keymap_macros_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 
 static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
@@ -984,6 +985,65 @@ static void test_prepare_uses_extended_no_progress_timeout(void) {
     assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
 
+// The other half waiting to erase until its keyboard is quiet is not a stall
+// (D-F32): its storage step does not run, it answers BUSY_STORAGE_PAUSED,
+// and neither half's deadlines count the wait, however long the typing goes on.
+static bool right_storage_paused;
+static bool storage_paused_flag(void *context) {
+    return *(bool *)context;
+}
+
+static void test_waiting_for_a_quiet_keyboard_never_ends_a_save(void) {
+    static noah_profile_owner_t left;
+    static noah_profile_owner_t right;
+    static memory_t             left_memory;
+    static memory_t             right_memory;
+    split_link_t                left_link  = {.peer = &right};
+    split_link_t                right_link = {.peer = &left};
+    uint8_t                     frame[32];
+    uint32_t                    now = 300000u;
+    uint32_t                    right_now;
+
+    memset(&left_memory, 0, sizeof(left_memory));
+    memset(&right_memory, 0, sizeof(right_memory));
+    memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
+    memset(right_memory.bytes, 0xff, sizeof(right_memory.bytes));
+    right_storage_paused = false;
+    assert(noah_profile_owner_init(&left, &(noah_profile_owner_config_t){.store_io = {.read = memory_read, .write = memory_write, .context = &left_memory}, .split_exchange = split_exchange, .split_transport_context = &left_link, .origin_half = 0u, .peer_required = true}));
+    assert(noah_profile_owner_init(&right, &(noah_profile_owner_config_t){.store_io = {.read = memory_read, .write = memory_write, .context = &right_memory}, .split_exchange = split_exchange, .split_transport_context = &right_link, .origin_half = 1u, .peer_required = true, .storage_paused = storage_paused_flag, .storage_paused_context = &right_storage_paused}));
+    for (uint32_t guard = 0u; guard < 4096u && (left.state != NOAH_PROFILE_OWNER_READY_COMPILED || right.state != NOAH_PROFILE_OWNER_READY_COMPILED); guard++) {
+        scan_pair(&left, &right, &now);
+    }
+    stage_valid_candidate_pair(&left, &right, 160u, &now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 160u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    for (uint32_t guard = 0u; guard < 64u && !left.host_barrier_started; guard++) {
+        scan_pair(&left, &right, &now);
+    }
+    assert(left.host_barrier_started && left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
+    // The other half's storage stops for 90 s (twice its own lease, half
+    // again the copy's no-progress window): its owner gets no scans and its
+    // clock stands still; the USB half keeps asking.
+    right_storage_paused = true;
+    right_now            = now;
+    for (uint32_t elapsed = 0u; elapsed < 90000u; elapsed += 50u) {
+        (void)noah_profile_owner_scan(&left, true, now);
+        now += 50u;
+        assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && !left.host_cancel_pending);
+    }
+    assert(left.reconciler.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED);
+    // Quiet again: the copy finishes and both halves commit.
+    right_storage_paused = false;
+    for (uint32_t guard = 0u; guard < 8192u && (left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || right.committed_descriptor.generation != 1u || left.state != NOAH_PROFILE_OWNER_READY_VALIDATED || right.state != NOAH_PROFILE_OWNER_READY_VALIDATED); guard++) {
+        (void)noah_profile_owner_scan(&right, false, right_now);
+        (void)noah_profile_owner_scan(&left, true, now);
+        right_now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+        now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+    }
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && left.host_transaction.last_committed_transaction_id == 160u);
+    assert(left.committed_descriptor.generation == 1u && right.committed_descriptor.generation == 1u);
+}
+
 // A matching peer may cross the old 60-second whole-prepare duration while
 // advancing from validation to durable preparation. Only a new phase extends
 // the no-progress deadline; repeated BUSY never keeps a stalled copy alive.
@@ -1788,7 +1848,293 @@ static void test_decided_commit_is_never_cancelled(void) {
     finish_commit(&left, &right, &now);
 }
 
+// ── Live edits and Save (D-F32) ─────────────────────────────────────────────
+
+typedef struct {
+    noah_profile_owner_t *peer;
+    uint32_t              exchanges;
+} working_link_t;
+
+static uint8_t left_working[NOAH_PROFILE_PAYLOAD_MAX];
+static uint8_t right_working[NOAH_PROFILE_PAYLOAD_MAX];
+enum { KEYMAP_LENGTH = 16u * 64u * 2u };
+
+static bool working_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
+    working_link_t *link = context;
+
+    link->exchanges++;
+    return link->peer && noah_profile_owner_working_receive(link->peer, request, request_length, response, response_length);
+}
+
+static void erased_memory(memory_t *memory) {
+    memset(memory, 0, sizeof(*memory));
+    memset(memory->bytes, 0xFF, sizeof(memory->bytes));
+}
+
+static void boot_live_pair(noah_profile_owner_t *left, memory_t *left_memory, noah_profile_owner_t *right, memory_t *right_memory, split_link_t *left_link, split_link_t *right_link, working_link_t *left_working_link, working_link_t *right_working_link, uint32_t session, uint32_t *now) {
+    assert(noah_profile_owner_init(left, &(noah_profile_owner_config_t){
+                                             .store_io                  = {.read = memory_read, .write = memory_write, .context = left_memory},
+                                             .split_exchange            = split_exchange,
+                                             .split_transport_context   = left_link,
+                                             .origin_half               = 0u,
+                                             .peer_required             = true,
+                                             .working_bytes             = left_working,
+                                             .working_capacity          = sizeof(left_working),
+                                             .working_session           = session,
+                                             .working_exchange          = working_exchange,
+                                             .working_transport_context = left_working_link,
+                                         }));
+    assert(noah_profile_owner_init(right, &(noah_profile_owner_config_t){
+                                              .store_io                  = {.read = memory_read, .write = memory_write, .context = right_memory},
+                                              .split_exchange            = split_exchange,
+                                              .split_transport_context   = right_link,
+                                              .origin_half               = 1u,
+                                              .peer_required             = true,
+                                              .working_bytes             = right_working,
+                                              .working_capacity          = sizeof(right_working),
+                                              .working_session           = session ^ 0xFFFFu,
+                                              .working_exchange          = working_exchange,
+                                              .working_transport_context = right_working_link,
+                                          }));
+    for (uint32_t guard = 0u; guard < 8192u && (left->state < NOAH_PROFILE_OWNER_READY_COMPILED || left->state > NOAH_PROFILE_OWNER_READY_VALIDATED || right->state < NOAH_PROFILE_OWNER_READY_COMPILED || right->state > NOAH_PROFILE_OWNER_READY_VALIDATED); guard++) {
+        scan_pair(left, right, now);
+    }
+    assert(left->working_ready && right->working_ready);
+}
+
+static bool both_halves_converged(noah_profile_owner_t *left) {
+    noah_profile_owner_working_status_t status;
+
+    return noah_profile_owner_working_status(left, &status) && status.peer_converged && !status.edits_blocked;
+}
+
+static void scan_until_converged(noah_profile_owner_t *left, noah_profile_owner_t *right, uint32_t *now) {
+    for (uint32_t guard = 0u; guard < 20000u && !both_halves_converged(left); guard++) {
+        scan_pair(left, right, now);
+    }
+    assert(both_halves_converged(left));
+}
+
+static noah_profile_working_result_t live_edit(noah_profile_owner_t *left, noah_profile_owner_t *right, uint16_t transaction, const noah_profile_working_splice_t *splice, const uint8_t *bytes, uint32_t length, uint32_t *now) {
+    noah_profile_working_result_t result = noah_profile_owner_edit_begin(left, transaction, left->working.session, left->working.revision, 1u, length, 0u);
+
+    if (result != NOAH_PROFILE_WORKING_OK) return result;
+    assert(noah_profile_owner_edit_splice(left, transaction, 0u, splice) == NOAH_PROFILE_WORKING_OK);
+    for (uint32_t offset = 0u; offset < length; offset += 22u) {
+        uint32_t count = length - offset < 22u ? length - offset : 22u;
+        assert(noah_profile_owner_edit_data(left, transaction, offset, bytes + offset, count) == NOAH_PROFILE_WORKING_OK);
+    }
+    assert(noah_profile_owner_edit_commit(left, transaction, crc_of(bytes, length)) == NOAH_PROFILE_WORKING_QUEUED);
+    for (uint32_t guard = 0u; guard < 4096u && noah_profile_working_copy_busy(&left->working); guard++) {
+        scan_pair(left, right, now);
+    }
+    return (noah_profile_working_result_t)left->working.last_result;
+}
+
+// Reads the active profile 20 bytes at a time, as the store's I/O allows.
+static void read_active(noah_profile_owner_t *owner, uint8_t *bytes, uint32_t length) {
+    for (uint32_t offset = 0u; offset < length; offset += 20u) {
+        uint32_t count = length - offset < 20u ? length - offset : 20u;
+        assert(noah_profile_owner_working_read(owner, offset, bytes + offset, count));
+    }
+}
+
+static void assert_same_active(noah_profile_owner_t *left, noah_profile_owner_t *right, const uint8_t *expected, uint32_t length) {
+    static uint8_t                      bytes[NOAH_PROFILE_PAYLOAD_MAX];
+    noah_profile_owner_working_status_t status;
+
+    assert(noah_profile_owner_working_status(left, &status) && status.local.length == length);
+    read_active(left, bytes, length);
+    assert(memcmp(bytes, expected, length) == 0);
+    assert(noah_profile_owner_working_status(right, &status) && status.local.length == length);
+    read_active(right, bytes, length);
+    assert(memcmp(bytes, expected, length) == 0);
+}
+
+static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
+    static noah_profile_owner_t left;
+    static noah_profile_owner_t right;
+    static memory_t             left_memory;
+    static memory_t             right_memory;
+    static uint8_t              keymap[KEYMAP_LENGTH];
+    static uint8_t              expected[NOAH_PROFILE_PAYLOAD_MAX];
+    split_link_t                left_link          = {.peer = &right};
+    split_link_t                right_link         = {.peer = &left};
+    working_link_t              left_working_link  = {.peer = &right};
+    working_link_t              right_working_link = {.peer = &left};
+    noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    noah_profile_working_splice_t key    = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .offset = 130u, .remove = 2u, .insert = 2u};
+    const uint8_t                 kc_b[2] = {0x05u, 0x00u};
+    noah_profile_candidate_v1_peer_status_t transfer;
+    noah_profile_owner_working_status_t     status;
+    noah_effective_profile_status_t         provider;
+    uint32_t                                now    = 1000u;
+    uint32_t                                length = sizeof(compiled_blob) + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE + KEYMAP_LENGTH;
+
+    erased_memory(&left_memory);
+    erased_memory(&right_memory);
+    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0xA1B2C3D4u, &now);
+    scan_until_converged(&left, &right, &now);
+    assert(right.working.session == 0xA1B2C3D4u);
+
+    // A first edit creates the keymap domain: in RAM on both halves, nothing
+    // written to flash on either.
+    for (uint32_t i = 0u; i < KEYMAP_LENGTH; i += 2u) keymap[i] = (uint8_t)(4u + i % 20u);
+    {
+        uint32_t left_writes = left_memory.writes, right_writes = right_memory.writes;
+        assert(live_edit(&left, &right, 1u, &create, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
+        scan_until_converged(&left, &right, &now);
+        assert(left_memory.writes == left_writes && right_memory.writes == right_writes);
+    }
+    memcpy(expected, compiled_blob, sizeof(compiled_blob));
+    expected[6] = 1u;
+    expected[8] = NOAH_PROFILE_DOMAIN_V1_KEYMAP;
+    expected[9] = NOAH_PROFILE_DOMAIN_VERSION_KEYMAP;
+    write_u32(&expected[10], KEYMAP_LENGTH);
+    memcpy(&expected[14], keymap, KEYMAP_LENGTH);
+    assert_same_active(&left, &right, expected, length);
+    assert(left.working.active && right.working.active && right.working.revision == left.working.revision);
+    // The keyboard reads keys from the working copy.
+    {
+        uint8_t cell[2];
+        assert(noah_effective_keymap_is_live() && noah_effective_keymap_read(130u, cell) && cell[0] == keymap[130]);
+    }
+    // A stale edit is refused and says where the working copy is.
+    assert(noah_profile_owner_edit_begin(&left, 2u, left.working.session, left.working.revision - 1u, 1u, 2u, 0u) == NOAH_PROFILE_WORKING_STALE);
+
+    // Save: the ordinary candidate path, every byte REUSE from the working
+    // copy, so the other half copies its own working copy too.
+    assert(noah_profile_owner_save(&left, 40u, left.working.session, left.working.revision - 1u) == NOAH_PROFILE_WORKING_STALE);
+    assert(noah_profile_owner_save(&left, 40u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
+    assert(noah_profile_owner_edit_begin(&left, 41u, left.working.session, left.working.revision, 1u, 2u, 0u) == NOAH_PROFILE_WORKING_BUSY);
+    {
+        uint32_t revision = left.working.revision;
+        for (uint32_t guard = 0u; guard < 20000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; guard++) scan_pair(&left, &right, &now);
+        assert(left.save.phase == NOAH_PROFILE_OWNER_SAVE_IDLE && left.save.last_result == NOAH_PROFILE_WORKING_OK && left.save.last_transaction_id == 40u);
+        assert(left.host_transaction.last_committed_transaction_id == 40u);
+        assert(left.committed_descriptor.generation == 1u && right.committed_descriptor.generation == 1u);
+        assert(left.committed_descriptor.payload_length == length && left.committed_descriptor.payload_digest == digest_of(expected, length));
+        assert(noah_profile_owner_peer_transfer(&left, &transfer) && transfer.reused_bytes == length);
+        scan_until_converged(&left, &right, &now);
+        // Same content: no unsaved edits, and the revision did not move.
+        assert(!left.working.active && !right.working.active && left.working.revision == revision && right.working.revision == revision);
+        assert(noah_effective_profile_provider_status(&left.provider, &provider) == NOAH_EFFECTIVE_PROFILE_OK && provider.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE && provider.active.generation == 1u);
+    }
+    assert_same_active(&left, &right, expected, length);
+    // Nothing unsaved: Save answers at once and writes nothing.
+    {
+        uint32_t writes = left_memory.writes;
+        assert(noah_profile_owner_save(&left, 42u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_OK && left_memory.writes == writes);
+    }
+
+    // An unsaved edit, then a replug: both halves boot the saved profile.
+    assert(live_edit(&left, &right, 43u, &key, kc_b, sizeof(kc_b), &now) == NOAH_PROFILE_WORKING_OK);
+    scan_until_converged(&left, &right, &now);
+    assert(noah_profile_owner_working_status(&left, &status) && status.local.active);
+    left_working_link.exchanges = 0u;
+    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0x0BADF00Du, &now);
+    scan_until_converged(&left, &right, &now);
+    assert(!left.working.active && !right.working.active && left.working.session == 0x0BADF00Du && right.working.session == 0x0BADF00Du);
+    assert_same_active(&left, &right, expected, length);
+
+    // Revert on the USB half: the other half follows; flash untouched.
+    assert(live_edit(&left, &right, 44u, &key, kc_b, sizeof(kc_b), &now) == NOAH_PROFILE_WORKING_OK);
+    scan_until_converged(&left, &right, &now);
+    {
+        uint32_t writes = left_memory.writes + right_memory.writes;
+        assert(noah_profile_owner_revert(&left, 45u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
+        scan_until_converged(&left, &right, &now);
+        assert(left_memory.writes + right_memory.writes == writes && !left.working.active && !right.working.active);
+    }
+    assert_same_active(&left, &right, expected, length);
+
+    // The edit mode is stored outside the profile and refused with unsaved edits.
+    assert(noah_profile_owner_set_edit_mode(&left, NOAH_PROFILE_EDIT_MODE_APPLY) == NOAH_PROFILE_WORKING_READ_ERROR); // no storage in this harness
+    assert(live_edit(&left, &right, 46u, &key, kc_b, sizeof(kc_b), &now) == NOAH_PROFILE_WORKING_OK);
+    assert(noah_profile_owner_set_edit_mode(&left, NOAH_PROFILE_EDIT_MODE_APPLY) == NOAH_PROFILE_WORKING_NOT_CLEAN);
+    puts("a live edit reaches both halves without flash; Save writes both by reuse; a replug boots the saved profile; Revert follows on both");
+}
+
+static void test_apply_while_editing_waits_and_a_save_refuses_apart_halves(void) {
+    static noah_profile_owner_t left;
+    static noah_profile_owner_t right;
+    static memory_t             left_memory;
+    static memory_t             right_memory;
+    static uint8_t              keymap[KEYMAP_LENGTH];
+    split_link_t                left_link          = {.peer = &right};
+    split_link_t                right_link         = {.peer = &left};
+    working_link_t              left_working_link  = {.peer = &right};
+    working_link_t              right_working_link = {.peer = &left};
+    noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    uint8_t                       frame[32];
+    uint32_t                      now = 5000u;
+
+    erased_memory(&left_memory);
+    erased_memory(&right_memory);
+    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 7u, &now);
+    // Before the other half is heard, edits and Save wait.
+    assert(noah_profile_owner_edit_begin(&left, 1u, left.working.session, left.working.revision, 1u, KEYMAP_LENGTH, 0u) == NOAH_PROFILE_WORKING_BUSY);
+    scan_until_converged(&left, &right, &now);
+    // An Apply's BEGIN while an edit is being received is answered BUSY.
+    assert(noah_profile_owner_edit_begin(&left, 2u, left.working.session, left.working.revision, 1u, KEYMAP_LENGTH, 0u) == NOAH_PROFILE_WORKING_OK);
+    begin_frame(frame, 9u);
+    assert(noah_profile_owner_receive(&left, frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
+    assert(noah_profile_owner_edit_abort(&left, 2u) == NOAH_PROFILE_WORKING_OK);
+    // An Apply in progress holds edits off; once it lands it replaced the
+    // working copy and moved the revision.
+    assert(live_edit(&left, &right, 3u, &create, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
+    scan_until_converged(&left, &right, &now);
+    {
+        uint32_t revision = left.working.revision;
+        stage_valid_candidate_pair(&left, &right, 10u, &now);
+        assert(noah_profile_owner_edit_begin(&left, 4u, left.working.session, left.working.revision, 1u, 2u, 0u) == NOAH_PROFILE_WORKING_BUSY);
+        commit_valid_candidate_pair(&left, &right, 10u, 1u, &now);
+        scan_until_converged(&left, &right, &now);
+        assert(!left.working.active && !right.working.active && left.working.revision == revision + 1u && right.working.revision == left.working.revision);
+    }
+    puts("Apply and live edits never overlap; an Apply replaces the working copy");
+}
+
+static void test_an_abandoned_edit_is_aborted_and_revert_ends_one(void) {
+    static noah_profile_owner_t left;
+    static noah_profile_owner_t right;
+    static memory_t             left_memory;
+    static memory_t             right_memory;
+    split_link_t                left_link          = {.peer = &right};
+    split_link_t                right_link         = {.peer = &left};
+    working_link_t              left_working_link  = {.peer = &right};
+    working_link_t              right_working_link = {.peer = &left};
+    uint8_t                     frame[32];
+    uint32_t                    now = 5000u;
+    uint32_t                    started;
+
+    erased_memory(&left_memory);
+    erased_memory(&right_memory);
+    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 7u, &now);
+    scan_until_converged(&left, &right, &now);
+    // Revert is the way out of an edit the host began and never finished.
+    assert(noah_profile_owner_edit_begin(&left, 1u, left.working.session, left.working.revision, 1u, 2u, 0u) == NOAH_PROFILE_WORKING_OK);
+    assert(noah_profile_owner_revert(&left, 2u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_OK);
+    assert(left.working.phase == NOAH_PROFILE_WORKING_PHASE_IDLE);
+    scan_until_converged(&left, &right, &now);
+    // A host that quits mid-edit: the edit is aborted after the host
+    // timeout on the owner's clock, and Apply is admitted again.
+    assert(noah_profile_owner_edit_begin(&left, 3u, left.working.session, left.working.revision, 1u, 2u, 0u) == NOAH_PROFILE_WORKING_OK);
+    started = now;
+    for (uint32_t guard = 0u; guard < 20000u && left.working.phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING; guard++) {
+        scan_pair(&left, &right, &now);
+    }
+    assert(left.working.phase == NOAH_PROFILE_WORKING_PHASE_IDLE && left.working.last_result == NOAH_PROFILE_WORKING_ABORTED);
+    assert(now - started >= NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS && now - started < NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS + 1000u);
+    begin_frame(frame, 9u);
+    assert(noah_profile_owner_receive(&left, frame, sizeof(frame)) && frame[5] != NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
+    puts("an abandoned edit ends at the host timeout, and Revert ends one at once");
+}
+
 int main(void) {
+    test_live_edit_reaches_both_halves_and_save_writes_both();
+    test_apply_while_editing_waits_and_a_save_refuses_apart_halves();
+    test_an_abandoned_edit_is_aborted_and_revert_ends_one();
     test_partial_runtime_install_rolls_back();
     test_failed_factory_rgb_cache_refuses_graph_install();
     test_clean_idle_scans_do_not_repeat_host_session_cleanup();
@@ -1810,6 +2156,7 @@ int main(void) {
     test_barrier_mailbox_retries_and_postcommit_abort_do_not_starve();
     test_local_known_commit_failure_aborts_prepared_peer_first();
     test_prepare_uses_extended_no_progress_timeout();
+    test_waiting_for_a_quiet_keyboard_never_ends_a_save();
     test_prepare_phase_progress_extends_only_once();
     test_peer_store_write_failure_retries_then_fails_fast();
     test_unexpected_newer_postcommit_authority_never_activates();

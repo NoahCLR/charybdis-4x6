@@ -150,7 +150,7 @@ typedef struct {
     uint32_t generation;
     uint32_t digest;
     uint32_t crc32;
-    uint8_t  kind; // Profile Wire active kind: compiled (0) or committed (1).
+    uint8_t  kind; // compiled (0), committed (1) or the working copy (2, D-F32).
     uint8_t  origin;
 } noah_profile_candidate_v1_source_t;
 

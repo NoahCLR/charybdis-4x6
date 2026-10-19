@@ -337,13 +337,15 @@ static void test_publication(void) {
     for (uint16_t i = 0; i < length; i++)
         assert(noah_effective_settings_byte(i) == bytes[i]);
     assert(noah_effective_settings_byte(length) == 0);
-    // A profile without settings keeps the compiled snapshot's cache.
+    // A profile without settings keeps the compiled snapshot's cache, and
+    // those settings are pushed into QMK: the profile owns them (D-F32).
     noah_effective_profile_snapshot_t compiled = view;
     compiled.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
     noah_effective_profile_snapshot_t partial = {0};
     partial.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE;
     noah_effective_settings_invalidate(&compiled, 2, partial.identity, partial.identity, &partial);
-    assert(applied == 1 && noah_effective_settings_length() == length && noah_setting(NOAH_SETTING_TAPPING_TERM, 0) == 200);
+    assert(applied == 2 && noah_effective_settings_length() == length && noah_setting(NOAH_SETTING_TAPPING_TERM, 0) == 200);
+    applied = 1;
     // A missing domain returns ownership to defaults.
     view.profile.domain_mask = 0;
     noah_effective_settings_invalidate(NULL, 3, view.identity, view.identity, &view);

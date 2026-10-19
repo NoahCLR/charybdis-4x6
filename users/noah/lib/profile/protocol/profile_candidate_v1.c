@@ -168,7 +168,10 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
         if (command->payload.reuse.source_offset > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE - length) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 9u);
         }
-        if (frame[29] > 1u || (frame[29] == 0u && (command->payload.reuse.source.generation != 0u || frame[30] != UINT8_MAX)) || (frame[29] == 1u && (command->payload.reuse.source.generation == 0u || frame[30] > 1u))) {
+        bool committed_base = command->payload.reuse.source.generation != 0u && frame[30] <= 1u;
+        bool compiled_base  = command->payload.reuse.source.generation == 0u && frame[30] == UINT8_MAX;
+        // Kind 2 is the working copy (D-F32), over either base.
+        if (frame[29] > 2u || (frame[29] == 0u && !compiled_base) || (frame[29] == 1u && !committed_base) || (frame[29] == 2u && !committed_base && !compiled_base)) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 29u);
         }
         return require_zero(frame, 31u, NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);

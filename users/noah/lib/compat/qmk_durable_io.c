@@ -16,7 +16,11 @@
 // firmware has the call shape the reviewed stack paths name
 // (tools/firmware_stack_budget*.json).
 static __attribute__((noinline)) bool noah_qmk_durable_io_profile_step(void) {
-    return noah_qmk_profile_flash_may_write() && noah_profile_store_runtime_matrix_scan_step();
+    bool may_write = noah_qmk_profile_flash_may_write();
+
+    // Time the step may not run is not the owner's time (D-F32).
+    noah_profile_store_runtime_note_storage_paused(!may_write);
+    return may_write && noah_profile_store_runtime_matrix_scan_step();
 }
 
 void noah_qmk_durable_io_init(void) {}

@@ -23,8 +23,9 @@ void noah_effective_combo_runtime_invalidate(void *context, uint32_t publication
     noah_effective_combo_runtime_t *runtime = context;
     (void)publication_count;
     (void)previous;
-    (void)active;
     if (!runtime) return;
+    // An edit to other domains (D-F32) leaves the materialized table as it is.
+    if (view && active.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY && !(view->changed_domain_mask & NOAH_PROFILE_DOMAIN_MASK_COMBOS)) return;
     const noah_effective_profile_snapshot_t *compiled = runtime->compiled_defaults;
     memset(runtime, 0, sizeof(*runtime));
     runtime->compiled_defaults = compiled;

@@ -28,6 +28,8 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_macros_compiled_v1.c \
     lib/profile/runtime/profile_action_runtime_v1.c \
     lib/profile/runtime/effective_profile_provider.c \
+    lib/profile/runtime/profile_working_copy.c \
+    lib/profile/split/profile_working_sync.c \
     lib/profile/runtime/effective_keymap_macros_runtime.c \
     lib/compat/qmk_profile_keymap.c \
     lib/macro/profile_macro_provider.c \
@@ -60,6 +62,8 @@ NOAH_COMMON_SOURCES := \
     lib/compat/qmk_physical_half.c \
     lib/compat/qmk_profile_split_transport.c \
     lib/compat/qmk_profile_channel.c \
+    lib/compat/qmk_profile_edit_channel.c \
+    lib/compat/qmk_profile_working.c \
     lib/compat/qmk_combo_readback.c \
     lib/compat/qmk_effective_combos.c \
     lib/compat/qmk_mod_contract.c \

@@ -29,6 +29,19 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/key_runtime_modifier_hold_integration_test.c" \
     $MODIFIER_HOLD_SUPPORT_SOURCES \
     "$ROOT/users/noah/lib/profile/runtime/profile_activation_policy.c" \
+    "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+    "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
     -o "$BIN"
 
 "$BIN"

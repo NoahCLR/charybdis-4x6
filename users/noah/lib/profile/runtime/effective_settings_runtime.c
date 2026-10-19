@@ -53,7 +53,14 @@ bool noah_setting_combo_output_behaviors(void) {
     return !(noah_effective_settings_byte(NOAH_SETTINGS_FLAGS_OFFSET) & NOAH_SETTINGS_FLAG_COMBO_OUTPUT_BYPASS);
 }
 void noah_effective_settings_invalidate(void *context, uint32_t publication, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *view) {
-    bool apply = view && (view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS) && active.kind != NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
+    // An edit to other domains (D-F32) leaves the cached settings, and what
+    // they projected into QMK, as they are.
+    if (settings_length && view && active.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY && !(view->changed_domain_mask & NOAH_PROFILE_DOMAIN_MASK_SETTINGS)) return;
+    // The compiled defaults are projected too: QMK's EEPROM owns none of
+    // these values any more (D-F32). Only the boot's first look at them waits:
+    // a saved profile may be about to activate, and the owner projects the
+    // compiled defaults once it knows none will.
+    bool apply = view != NULL && !(booting && active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS);
     if (view && !(view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS) && context) view = context;
     (void)publication;
     (void)previous;

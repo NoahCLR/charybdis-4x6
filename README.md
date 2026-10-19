@@ -16,7 +16,10 @@ any C and you don't reflash.
   on both halves while the keyboard still validates and saves the complete
   result. Keys and macros are part of that profile too. The VIA app is not
   supported: I dropped it so the whole configuration lives in one store that
-  Ark edits.
+  Ark edits. The firmware can also take each edit live, on both halves at once,
+  and keep it until you save, while a replug goes back to what you saved
+  ([guide](docs/GUIDE.md#live-edits-save-and-what-a-replug-does)); Ark's side
+  of that is still to come.
 - **Text macros in your layout.** Macros type through your computer's keyboard
   layout (US, Dutch, German, French, UK and more on macOS, Windows and Linux),
   accents included, with Unicode entry for emoji. Protected playback suspends

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "users/noah/lib/compat/qmk_durable_io.h"
+#include "users/noah/lib/profile/storage/profile_paused_clock.h"
 
 // The profile store is the scheduler's only owner (D-F31): every scan opens
 // one flash grant, then gives the store one step unless its flash says wait.
@@ -12,6 +13,13 @@ static unsigned grants;
 static unsigned profile_steps;
 static bool     flash_may_write = true;
 static bool     grant_open;
+static unsigned paused_notes;
+static bool     last_paused;
+
+void noah_profile_store_runtime_note_storage_paused(bool paused) {
+    paused_notes++;
+    last_paused = paused;
+}
 
 static void check(bool condition, const char *message) {
     if (!condition) {
@@ -52,14 +60,36 @@ static void test_a_waiting_profile_step_does_not_run(void) {
     flash_may_write = false;
     noah_qmk_durable_io_matrix_scan();
     check(profile_steps == steps, "a waiting profile step must not run");
+    check(last_paused, "a waiting step is told to the owner's clock");
     flash_may_write = true;
     noah_qmk_durable_io_matrix_scan();
     check(profile_steps == steps + 1u, "the profile step runs once its flash allows");
+    check(!last_paused && paused_notes >= 2u, "every grant tells the clock");
+}
+
+// The owner's clock does not count grants its step could not run (D-F32):
+// a save waiting 20 s for a quiet keyboard is 20 s no timer of the owner sees.
+static void test_the_owner_clock_stands_still_while_paused(void) {
+    noah_profile_paused_clock_t clock = {0};
+
+    noah_profile_paused_clock_note(&clock, false, 1000u);
+    check(noah_profile_paused_clock_now(&clock, 1500u) == 1500u, "an unpaused clock is the scan clock");
+    noah_profile_paused_clock_note(&clock, true, 2000u);
+    check(noah_profile_paused_clock_now(&clock, 2000u) == 2000u && noah_profile_paused_clock_now(&clock, 22000u) == 2000u, "a paused clock stands still");
+    noah_profile_paused_clock_note(&clock, true, 22000u);
+    noah_profile_paused_clock_note(&clock, false, 22000u);
+    check(noah_profile_paused_clock_now(&clock, 22500u) == 2500u, "it runs on from where it stopped");
+    // Wrapping millisecond counters keep their differences.
+    clock = (noah_profile_paused_clock_t){0};
+    noah_profile_paused_clock_note(&clock, true, UINT32_MAX - 10u);
+    noah_profile_paused_clock_note(&clock, false, 20u);
+    check(noah_profile_paused_clock_now(&clock, 30u) == UINT32_MAX - 10u + 10u, "pauses across the counter's wrap");
 }
 
 int main(void) {
     test_every_scan_opens_one_grant_and_one_profile_step();
     test_a_waiting_profile_step_does_not_run();
+    test_the_owner_clock_stands_still_while_paused();
     puts("qmk durable-I/O scheduler tests passed");
     return 0;
 }

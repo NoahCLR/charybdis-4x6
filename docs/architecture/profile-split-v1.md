@@ -73,6 +73,20 @@ Its offset is the receiver's progress only when the store holds the requested
 copy, and `0` otherwise: another copy's offset past the request's length
 cannot be encoded, and turned a busy reply into an invalid frame.
 
+Busy reason `9`, **storage paused** (D-F32), replaces mailbox full when the
+receiver's storage step is not running: a save there waits for a quiet
+keyboard before its next erase (D-F29), or the scan's flash time is spent.
+That wait is not a stall. The receiver's own timers do not count it (its
+owner's clock stands still while its storage step may not run), and the
+sender counts each storage-paused reply as progress toward the save's
+no-progress and host deadlines, however long the typing goes on. Candidate
+status page 1 reports it as reason `5` (store working), within the reasons
+clients know.
+
+Payload reuse also names the working copy as its source (kind `2`, D-F32),
+so Save's copy to the other half is filled from that half's own working copy
+(Payload Reuse, below).
+
 ## Descriptor Frame
 
 Metadata, prepare begin, prepare commit, and abort use this layout:
@@ -375,6 +389,78 @@ plus `NOAH_PHYSICAL_HALF=right`. The physical setting overrides handedness in
   The side-specific D-021 engineering owner consumes that fail-closed identity
   boundary and registers the split transport exactly once. The additional
   mutation gate exposes the path only in labeled hardware-test artifacts.
+
+## Working copy sync (D-F32)
+
+Live edits change each half's working copy in RAM (see
+[Profile Wire](profile-wire-v1.md#live-edits)); nothing on this path writes
+flash or touches a slot, so it has a split RPC of its own,
+`PUT_PROFILE_WORKING_SYNC` (QMK id 7), separate from the durable reconciler,
+and its own one-frame mailbox. The USB half is the only initiator. On the
+other half the RPC callback only copies a request into the mailbox and
+answers from the last published reply; its scan does the work and publishes
+the next reply. A request is retried with the same sequence number every
+2 ms until a reply for it arrives (`0xFE` admitted and `0xFF` busy are not
+replies).
+
+Request frames are 32 bytes, a data frame longer (up to 128): byte 0 kind,
+1–2 sequence, 3–4 the edit's transaction on the receiving half, 5–8 session,
+9–12 revision, then the kind's fields, and a CRC-16 (CCITT) of everything
+before it in the last two bytes.
+
+| Kind | Id | Fields from byte 13 |
+| --- | ---: | --- |
+| status | `1` | none |
+| begin | `2` | splice count, flags, inserted bytes (4); session and revision are the base |
+| splice | `3` | index, domain id, flags, offset (4), removed (4), inserted (4) |
+| data | `4` | offset (4), count (1–108), the bytes |
+| commit | `5` | CRC-32 of the inserted stream |
+| abort | `6` | none; the transaction names the edit |
+| revert | `7` | none; the receiver discards its working copy, whatever it was |
+| adopt | `8` | saved generation (4), origin, compiled flag; session and revision are the identity to take |
+| mode | `9` | counter (4), mode |
+
+Every reply is 32 bytes: byte 0 kind with bit 7 set, 1–2 the sequence, 3 the
+result (the working copy's codes, Profile Wire), then the receiver's state:
+4–7 session, 8–11 revision, 12 phase, 13 last result, 14–15 transaction (in
+progress, else last), 16 flags (bit 0 unsaved edits, 1 its saved profile is
+the compiled defaults), 17–20 saved generation, 21 saved origin, 22–25 mode
+counter, 26 mode, 30–31 CRC-16.
+
+The USB half polls every 100 ms while the halves differ or an edit is on its
+way, every second while they agree, and forgets the other half after 3 s
+without a reply. After each edit it publishes it sends the same edit (begin,
+splices, data, commit) and polls until the other half reports the same
+session and revision; the other half checks it with the other half's own
+rules (a saved record's, not a host candidate's) and publishes it at its own
+safe boundary. That is sent as an edit only when the halves were last seen
+agreeing at the revision just before it. That agreement is forgotten
+whenever the USB half sends revert or adopt, or forgets the other half (3 s
+without a reply): both reset the other half's bytes to its saved profile, so
+an identity it held before no longer says what bytes it holds. In every
+other disagreement it brings the other half back: revert a working copy that
+is not its own, adopt its session and revision over the same saved profile,
+or adopt the revision before it and receive the whole working copy as a
+replacement. A Revert, an Apply or a newer profile on the USB half ends an
+edit on its way at once; the other half's unfinished edit is aborted.
+
+An edit the other half refuses is not sent again: the USB half sends the
+whole working copy instead, once (reverting and adopting the other half
+first). If that is refused too, the halves stay apart until a Revert or an
+Apply: Save answers BUSY meanwhile, and Profile Wire's edit status says so
+(flag bit 11), so the client can offer Revert. Until the saved profiles
+agree, which the durable reconciler sees to, nothing is sent. New edits on
+the USB half wait until the other half holds the same session and revision
+(Profile Wire's BUSY), so at most one edit is ever behind; Revert does not
+wait.
+
+The mode record travels both ways on the same RPC: each reply carries the
+other half's counter and mode, the USB half adopts a higher one and sends a
+lower one its own. A half takes a new record at once and writes it later,
+when its keyboard is quiet (no key held and the matrix unchanged for 50 ms,
+the rule before a slot erase, D-F29), because QMK's EEPROM is wear-levelled
+flash that may erase. A failed write is tried again after 1 s, the wait
+doubling to 64 s, and reported (edit status flag bit 12) until one succeeds.
 
 ## Remaining Exposure And Acceptance Pieces
 

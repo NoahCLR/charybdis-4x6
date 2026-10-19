@@ -53,6 +53,22 @@ bool noah_profile_store_runtime_boot_keyboard_name(noah_profile_keyboard_name_t 
 // The keyboard name of the profile `store` would boot, through its IO and
 // compatibility. The boot read above and tests use it.
 bool noah_profile_store_runtime_read_keyboard_name(noah_profile_store_t *store, noah_profile_keyboard_name_t *name);
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+// Live edits, Save, Revert and the edit mode (D-F32), for the Profile Wire
+// channel; see profile_owner.h. INVALID_STATE without a working owner.
+noah_profile_working_result_t noah_profile_store_runtime_edit_begin(uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags);
+noah_profile_working_result_t noah_profile_store_runtime_edit_splice(uint16_t transaction_id, uint8_t index, const noah_profile_working_splice_t *splice);
+noah_profile_working_result_t noah_profile_store_runtime_edit_data(uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint32_t count);
+noah_profile_working_result_t noah_profile_store_runtime_edit_commit(uint16_t transaction_id, uint32_t crc32);
+noah_profile_working_result_t noah_profile_store_runtime_edit_abort(uint16_t transaction_id);
+noah_profile_working_result_t noah_profile_store_runtime_revert(uint16_t transaction_id, uint32_t session, uint32_t revision);
+noah_profile_working_result_t noah_profile_store_runtime_save(uint16_t transaction_id, uint32_t session, uint32_t revision);
+noah_profile_working_result_t noah_profile_store_runtime_set_edit_mode(uint8_t mode);
+bool                          noah_profile_store_runtime_working_status(noah_profile_owner_working_status_t *status);
+// Reads the profile now active: the working copy, or the saved profile.
+bool noah_profile_store_runtime_read_working(uint32_t offset, uint8_t *target, uint32_t length);
+#endif
+
 // The owner's USB restart check (noah_profile_owner_usb_restart_safe); false
 // without a working owner.
 bool noah_profile_store_runtime_usb_restart_safe(void);

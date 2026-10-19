@@ -579,6 +579,13 @@ State flags (page 0, bytes 2–3). Bits 10–15 are reserved and must be zero.
 | 8 | peer cleanup pending |
 | 9 | a slot was refused as an earlier store format or test layout |
 
+Page 0 byte 24 is the active kind: compiled defaults `0`, committed `1`,
+pending `3` (pointing caches not ready), or the working copy `4` (D-F32:
+unsaved live edits). For the working copy, page 1's active generation and
+origin are its saved base's (zero and `255` over the compiled defaults) and
+page 0's active digest carries its revision, not a digest; GET `0x21` page 0
+has its session too, for a REUSE naming it (source kind `2`).
+
 Peer cleanup pending (added 2026-09-23) means a cancelled save's split ABORT
 was never acknowledged, so the USB half released its own side after
 `NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS` (see the
@@ -719,7 +726,7 @@ REUSE uses the same transaction header as CHUNK:
 | 17 | 4 | source generation |
 | 21 | 4 | source FNV-1a digest |
 | 25 | 4 | source CRC32 |
-| 29 | 1 | source active kind: compiled `0`, committed `1` |
+| 29 | 1 | source active kind: compiled `0`, committed `1`, working copy `2` (D-F32: generation and origin its base's, digest its revision, CRC32 its session) |
 | 30 | 1 | source origin: compiled `255`, committed `0..1` |
 | 31 | 1 | reserved, zero |
 
@@ -1030,6 +1037,17 @@ unhandled reply (command byte `0xFF`).
 | custom set | `0x1A` | retired with VIA (logical staging abort); unhandled | D-F31 |
 | custom set | `0x1B` | candidate reuse | Differential candidate transfer, above |
 | custom set | `0x1C` | candidate streaming chunk | Differential candidate transfer, above |
+| custom set | `0x20` | edit begin | Live Edits, below (D-F32) |
+| custom get | `0x20` | edit status pages 0–2 | Live Edits, below |
+| custom set | `0x21` | edit splice | Live Edits, below |
+| custom get | `0x21` | the active profile (the working copy, or the saved profile), paged | Live Edits, below |
+| custom set | `0x22` | edit data (inserted bytes) | Live Edits, below |
+| custom get | `0x22` | runtime overrides and QMK's live values | Live Edits, below |
+| custom set | `0x23` | edit commit | Live Edits, below |
+| custom set | `0x24` | edit abort | Live Edits, below |
+| custom set | `0x25` | save the working copy | Live Edits, below |
+| custom set | `0x26` | revert the working copy | Live Edits, below |
+| custom get/set | `0x27` | edit mode | Live Edits, below |
 
 Every mutating operation includes a nonzero transaction id. Candidate begin
 declares schema, length, CRC, digest, and requested domain mask. Chunks include
@@ -1191,8 +1209,268 @@ The complete compiled bytes change its compiled-default digest, while its
 action-ABI digest stays the same. Store admission still requires the current
 compiled-default digest; earlier records therefore fall back to factory
 configuration and require a client restore. Full export continues to read
-current combo enable state and QMK-owned settings through device readback;
-immutable factory values never substitute for those live values.
+the stored settings, not QMK's copies of them (D-F32); QMK's live values and
+the toggles' overrides read back through GET `0x22` (Live Edits, above).
+
+## Live Edits
+
+An edit takes effect on both halves at once, without a save (D-F32). Each
+half keeps a **working copy** of its active profile in RAM, one slot payload
+in size (capability page 2's slot payload, 130,048 bytes). While nothing is
+edited the keyboard runs its saved profile (a committed slot, or the compiled
+defaults when nothing is saved) and the working copy is unused; the first
+edit starts it from the saved profile, and from then until Save, Revert, an
+Apply or a replug the keyboard runs the working copy: it has **unsaved
+edits**. A replug always boots the saved profile.
+
+### Identity: session and revision
+
+The working copy is named by a **session**, a 32-bit value chosen afresh at
+every boot, and a **revision**, which starts at zero each boot and advances
+by one with every change to the working copy's bytes: each published edit,
+each Revert, and each profile activated from outside it (an Apply, or a newer
+profile the other half supplied). Save does not advance it: the saved bytes
+are the working copy's. Every edit, Save and Revert names the session and
+revision it was made against; anything else is refused STALE, and the reply
+carries the current pair. The pair never repeats within a boot; a client that
+sees a different session knows the keyboard restarted and its unsaved edits
+are gone.
+
+The keyboard's adjustment keys (DPI, RGB) do not touch the working copy yet;
+once they do (a later firmware change), they advance the revision too,
+and a client's next edit learns of them as STALE.
+
+### An edit
+
+An edit is up to eight **splices**, applied together as one revision or not
+at all. A splice names a domain id, an offset into that domain's payload, a
+count of bytes removed there and a count of bytes inserted; the inserted
+bytes come after it, in splice order, as one stream. Splices are in domain
+order, then offset order, and do not overlap. A splice may instead
+**create** an absent domain (offset and removal zero, the whole payload
+inserted; the firmware writes the domain header in canonical order) or
+**drop** one (offset zero, removal its whole length, nothing inserted; a
+required domain cannot be dropped). The blob header and every domain header
+are the firmware's to write: lengths follow from the splices.
+
+The inserted bytes are staged at the top of the working copy, above both the
+current and the resulting profile, so an edit fits when its inserted bytes
+plus the larger of the two profiles fit the slot payload. Anything larger is
+refused CAPACITY_EXCEEDED before any byte arrives. A **replacement** (an
+import) has no splices: its stream is a whole new profile, written straight
+into the working copy, so it needs the saved profile active (no unsaved
+edits; NOT_CLEAN otherwise: Save or Revert first).
+
+Each domain an edit touches is checked on its own, exactly as a whole-profile
+validation checks it, action references and placements included, and held
+to what a host's candidate is held to; no other domain is read, and the
+whole profile is not checksummed. The resulting profile must keep every
+required domain and fit the payload ceiling. A replacement is checked whole
+(envelope and every domain), still without a checksum. An edit that fails
+changes nothing.
+
+A checked edit is published at a safe boundary, the same one activation
+waits for (held keys, taps in progress, locks, one-shots, macros): until then
+the edit status says WAITING_SAFE and typing goes on. Its bytes are rewritten
+inside the publication, then the runtimes that read the changed domains are
+rebuilt; a domain the edit did not touch keeps its tables, and its settings
+are not projected into QMK again.
+
+### SET reports
+
+Command `0x07`, channel `0`, value at byte 2, transaction id (nonzero,
+little-endian) at bytes 3–4; every byte after a value's fields must be zero.
+Multi-byte fields are little-endian.
+
+| Value | Bytes 5… |
+| --- | --- |
+| `0x20` begin | 5–8 session, 9–12 revision, 13 splice count (1–8, or 0 for a replacement), 14 flags (bit 0 replacement), 15–18 inserted bytes in total |
+| `0x21` splice | 5 index (in order from 0), 6 domain id, 7 flags (bit 0 create, bit 1 drop), 8–11 offset, 12–15 removed, 16–19 inserted |
+| `0x22` data | 5–8 offset in the inserted stream, 9 count (1–22), 10… the bytes |
+| `0x23` commit | 5–8 CRC-32 of the whole inserted stream |
+| `0x24` abort | nothing; the edit in progress with this transaction is dropped (OK when none is) |
+| `0x25` save | 5–8 session, 9–12 revision |
+| `0x26` revert | 5–8 session, 9–12 revision |
+| `0x27` edit mode | 5 mode: `0` Apply, `1` Live, `2` Live + review |
+
+Splices and data arrive in order; a repeated report whose answer was lost is
+accepted again when it matches what was taken (a data report's bytes are
+compared), and refused OUT_OF_ORDER when it does not. Commit checks that every
+splice and byte arrived and that the CRC matches, then answers QUEUED; the
+outcome is the edit status's last result for that transaction.
+
+Every SET is answered in place: bytes 0–4 echoed, then
+
+| Byte | Field |
+| ---: | --- |
+| 5 | result |
+| 6 | working copy phase |
+| 7–10 | session |
+| 11–14 | revision |
+| 15–16 | edit status flags (page 0) |
+
+Results: `0` OK, `1` QUEUED (the outcome comes later), `2` STALE, `3` BUSY
+(another edit, a save, an Apply, a publication waiting, or the other half not
+yet holding the same working copy), `4` INVALID_ARGUMENT (a malformed report
+too), `5` INVALID_STATE, `6` WRONG_TRANSACTION, `7` OUT_OF_ORDER, `8`
+CAPACITY_EXCEEDED, `9` CHECKSUM_MISMATCH, `10` UNSUPPORTED_DOMAIN, `11`
+INVALID_SPLICE, `12` VALIDATION_REJECTED (page 2 says where), `13` NOT_CLEAN,
+`14` READ_ERROR (also: this half has nowhere to store the edit mode), `15`
+ABORTED (a save, an Apply or the other half's newer profile replaced the
+profile the edit was made against, or the edit was left unfinished: a
+Revert, or no accepted report for 15 s), `16` PUBLICATION_FAILED. Phases: `0` idle, `1`
+receiving, `2` loading (the first edit copying the saved profile), `3`
+validating, `4` waiting for a safe boundary, `5` reverting.
+
+A new edit, Save and a mode change are BUSY while anything else holds the
+profile and until the other half holds the same session and revision; an
+edit that has begun carries on. Revert never waits for the other half, which
+follows. An edit being received (phase `1`) holds a lease: with no accepted
+begin, splice or data report for 15 s on the keyboard's clock (which, as for
+an Apply, stops while storage waits for a quiet keyboard), the keyboard
+aborts it, last result ABORTED. A client that lost track of its edit can
+also Revert: Revert aborts an edit being received, then reverts. While an edit is being received or checked, or a save runs, a
+candidate's begin, chunk, reuse, validate and commit are answered BUSY; abort
+is not.
+
+### Save
+
+Save writes the working copy as a new generation through the ordinary
+candidate path: a candidate made entirely of REUSE from the working copy, so
+nothing is uploaded and the other half copies its own working copy too
+(source kind `2`, below), with the same validation, durable preparation on
+both halves, marker-last decision and convergence as any Apply, and the same
+power-loss guarantees. Its transaction is the candidate's: candidate status
+(GET `0x18`) follows it exactly as it follows an Apply. With no unsaved edits
+Save answers OK at once and writes nothing. When it lands, the saved profile
+holds the working copy's bytes: no unsaved edits, the same revision. A save
+the keyboard cannot finish is reported as an Apply's would be, and the
+working copy is left as it was. A save waits for a quiet keyboard before each
+flash erase (D-F29); that wait counts toward no timeout on either half.
+
+**REUSE from the working copy.** Candidate REUSE (`0x1B`) and the split
+PAYLOAD_REUSE name a source by kind, generation, origin, digest and CRC. Kind
+`2` is the working copy: its generation and origin are its saved base's
+(`0` and `255` over the compiled defaults), its digest field carries its
+revision and its CRC field its session. A host may use it too, for an Apply
+that keeps most of the working copy.
+
+**Apply** still works and replaces the working copy: unsaved edits are gone
+once it activates, and the revision advances.
+
+### Revert
+
+Revert discards the working copy at the next safe boundary on both halves
+and runs the saved profile again; no flash is written. With no unsaved edits
+it answers OK and changes nothing.
+
+### GET reports
+
+Command `0x08`, channel `0`, the usual nonzero request id at byte 3; a
+malformed request answers status `1`, an unknown page status `2`, an owner
+not ready status `3`.
+
+**`0x20` edit status**, byte 4 the page, 25-byte payloads:
+
+| Page 0 offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | layout, `1` |
+| 1 | 1 | phase |
+| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply; Save is BUSY), 12 writing the edit mode failed and is being retried; 13–15 zero |
+| 4 | 4 | session |
+| 8 | 4 | revision |
+| 12 | 4 | saved generation (`0`: compiled defaults) |
+| 16 | 1 | saved origin half |
+| 17 | 1 | last result |
+| 18 | 2 | last finished transaction |
+| 20 | 2 | transaction in progress |
+| 22 | 1 | edit mode |
+| 23 | 1 | splices received |
+| 24 | 1 | reserved, `0` |
+
+| Page 1 offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | the other half's phase |
+| 1 | 1 | its last result |
+| 2 | 2 | its transaction (in progress, else last) |
+| 4 | 4 | its session |
+| 8 | 4 | its revision |
+| 12 | 1 | its flags: bit 0 unsaved edits, 1 its saved profile is the compiled defaults |
+| 13 | 1 | save phase (`0` idle) |
+| 14 | 1 | last save's result |
+| 15 | 1 | last save's candidate error id (`0` none) |
+| 16 | 2 | save transaction in progress |
+| 18 | 2 | last save's transaction |
+| 20 | 4 | inserted bytes received |
+| 24 | 1 | the other half's edit mode |
+
+| Page 2 offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | last refused edit: validator result |
+| 1 | 1 | domain id |
+| 2 | 1 | table id |
+| 3 | 2 | row |
+| 5 | 1 | step |
+| 6 | 1 | field |
+| 7 | 4 | byte offset in the resulting profile |
+| 11 | 1 | detail kind |
+| 12 | 2 | detail code |
+| 14 | 4 | safe-boundary reasons now |
+| 18 | 4 | length of the profile now active |
+| 22 | 3 | reserved, `0` |
+
+**`0x21` the active profile**, a wide page at bytes 4–5, paged like the
+saved profile (GET `0x04`): page 0 is metadata, pages 1… carry 25 bytes each.
+Page 0: layout `1`, page size `25`, length (4), session (4), revision (4),
+saved generation (4), saved origin (1), domain mask (1), flags (1: bit 0
+unsaved edits). Reading page 0 again after the bytes and finding the same
+session and revision proves they are one revision. GET `0x04` still reads the
+saved profile and `0x05` the compiled defaults, so a client can compare the
+working copy with what is saved.
+
+**`0x22` runtime**, page 0, 24 bytes: combos master (stored), combos
+override (QMK's flag), behaviours master (stored), behaviours override, then
+QMK's live values: default DPI (2), sniping DPI (2), RGB mode word (4), RGB
+colour word (4), default layers (4), keymap options (4), in the settings
+scalars' encodings.
+
+**`0x27` edit mode**, page 0, 11 bytes: this half's mode and counter (4),
+the other half's mode and counter (4), flags (bit 0 the other half answers,
+1 the two disagree at the same counter, 2 both hold the same record).
+
+### Edit mode
+
+How the client's edits reach this keyboard: `0` Apply, `1` Live, `2` Live +
+review. A keyboard never set is in Live + review. It is stored outside every
+profile, in QMK's EEPROM user datablock on each half, never in a profile, a
+backup or a review: two 16-byte records (magic `EM`, layout `1`, mode, three
+zero bytes, a counter, CRC-32 of the first twelve), the newer valid one
+counting, a write going to the other and read back. A change takes a counter
+above both halves'; the USB half sends it to the other half, and on
+reconnect the higher counter wins. Equal counters that disagree are a
+conflict the next change resolves. A change is refused NOT_CLEAN with unsaved
+edits: the client asks Save or Revert first. A change is answered OK at
+once and takes effect at once; each half writes it to its EEPROM when its
+keyboard is quiet (no key held, the matrix unchanged for 50 ms), and a failed
+write is retried with a growing wait and reported by status flag 12 until it
+succeeds. The firmware records and reports the mode; it does not yet save on
+its own in Live.
+
+### Toggles and the settings QMK holds
+
+The profile is the only durable owner of the settings QMK holds (base RGB
+mode and colour, default layers, keymap options, DPI, auto-mouse): they are
+pushed into QMK at boot (the compiled defaults' once discovery finds nothing
+saved), on activation and on a settings edit, always with QMK's setters that
+do not write its EEPROM, and settings readback (GET `0x07`) reports the
+stored values. A **toggle** is a runtime override beside its stored master,
+never an edit: combos run only while the stored master and QMK's combo flag
+(its override, flipped by QMK's combo keys) both allow; behaviours only while
+the stored master and the firmware's behaviours override both allow. An
+override starts allowed at boot, is never saved or reviewed, and reads back
+through GET `0x22` beside its master. Adjustment keys (DPI, RGB) still move
+QMK's values, which GET `0x22` shows, and still write QMK's EEPROM, which no
+longer wins at boot; they become edits in a later firmware change.
 
 ## Flash pauses — GET value `0x0D`
 
