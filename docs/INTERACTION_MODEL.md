@@ -264,8 +264,8 @@ protection; there is no single constituent press that defines their hold.
 
 A runtime-owned key is classified once, by userspace. This includes every
 `LT()`, `MT()` and `OSM()` key, row or not, and `TT()`/`OSL()` which already
-have intrinsic userspace layer ownership; QMK's tapping engine classifies no
-record, physical or combo output (feature bit 31). A row that does not author
+have intrinsic userspace layer ownership; QMK's tapping engine classifies
+none of them, physical or combo output (feature bit 31). A row that does not author
 a first hold, or no row, keeps the key's own, which
 starts only once the key is held past the tap-hold term: `LT()` holds its layer
 as `MO()`, `MT()` and `OSM()` hold their modifiers. A tap never turns that layer

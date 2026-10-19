@@ -400,17 +400,17 @@ report masks. QMK's MT modifier field is a five-bit encoding: the low nibble
 names Ctrl/Shift/Alt/GUI and bit 4 selects the right-hand bank. Thus
 `MT(MOD_RCTL, KC_Q)` encodes `0x11` but holds report bit `0x10`.
 The existing `compat/qmk_mod_contract.h` owns that conversion through
-`noah_qmk_mods_to_report_mask()`, shared by the shadow lease path and applied
-mod-tap physical tracking. It interprets encoding only; QMK still owns Magic
-remapping and native tapping policy.
+`noah_qmk_mods_to_report_mask()` for the shadow lease path. It interprets
+encoding only; QMK still owns Magic remapping.
 
 `run_key_runtime_physical_ownership_integration_tests.sh` compares shadow
 report/managed masks with the real applied modifier ledger for every nonempty
-left/right modifier subset, native taps/holds and authored holds, through
-release and quiescence. Its synchronous delivery timestamps require scan-time
-hold promotion. `run_qmk_gesture_pipeline_tests.sh` covers native delayed
-QMK tapping delivery and sparse authored rows that retain their intrinsic MT
-hold. That gesture harness stubs the applied ledger; it proves delivery and
+left/right modifier subset, taps and holds, through release and quiescence.
+Every MT is the runtime's (D-F27), so its hold is a managed owner, never a
+physical one. Its synchronous delivery timestamps require scan-time
+hold promotion. `run_qmk_gesture_pipeline_tests.sh` covers delayed delivery
+through QMK's combo engine and record admission, row-less MTs and sparse
+authored rows that retain their intrinsic MT hold. That gesture harness stubs the applied ledger; it proves delivery and
 shadow state, while the physical-ownership runner proves ledger agreement.
 `run_qmk_contract_checks.sh` compares all 32 MT fields with the pinned QMK
 action representation, including empty fields. These checks establish shadow
@@ -466,8 +466,9 @@ The timing contract is in [INTERACTION_MODEL.md](INTERACTION_MODEL.md#physical-g
 queries the selected QMK fork's existing combo and tapping queues, and record
 admission's own queue for a press it holds back behind an undecided key, so
 that press continues its key's tap series too. The QMK queues remain
-QMK-owned; userspace stores no shadow input queue. Since every `LT`/`MT`/`OSM`
-key is the runtime's (D-F27), QMK's tapping queue holds nothing. Queries match physical
+QMK-owned; userspace stores no shadow input queue. Every `LT`/`MT`/`OSM` key is
+the runtime's (D-F27), so QMK's tapping queue fills only behind the one tap key
+QMK still decides (below). Queries match physical
 position, event direction and the unsigned 16-bit interval. Consumed combo
 members cease to reserve a key's series. Combo outputs keep their origin-based
 protection and delivery timestamps.
@@ -526,13 +527,25 @@ combo outputs, repeated taps, timer wrap and final runtime quiescence.
 The fork's `is_tap_keycode_user` hook exempts all runtime-handled keys from native
 tapping. Every `LT()`, `MT()` and `OSM()` key is runtime-handled with or
 without a row (D-F27), as are `TT()`/`OSL()` by intrinsic ownership, so QMK's
-tapping engine classifies no physical record or combo output; the pipeline
-counts its classifications and requires none. QMK then gives
-`is_tap_record_user` the last word per record, with its own answer and the
-keycode hook's. Userspace answers from the press's participation decision; a
-placement that bypasses its behaviour row ignores the row, and the key is still
-the runtime's with its default
-([participation policy](architecture/participation-policy.md)). Feature bit 18
+tapping engine classifies no physical record or combo output of a key the
+firmware supports; the pipeline counts its classifications and requires none.
+QMK then gives `is_tap_record_user` the last word per record, with its own
+answer and the keycode hook's. Userspace keeps the keycode hook's answer: a
+placement that bypasses a key's behaviour row ignores the row, and the key is
+still the runtime's with its default
+([participation policy](architecture/participation-policy.md)). The record
+hook stays for what it settles as a record leaves the queue: a waiting press's
+participation and a combo output's origin. No userspace path reads a tap
+decision of QMK's.
+
+The one tap key QMK still decides is `TT()` or `OSL()` to a layer from 16 to
+31. The firmware refuses those wherever it validates a keymap (the compiled
+layout and Profile Wire), but an external VIA client can still write one; the
+runtime does not handle it, so QMK's tapping engine classifies it, and the
+pipeline pins that. For it alone the firmware keeps QMK's per-key tapping and
+quick-tap terms on the dual-role setting (`get_tapping_term()`,
+`get_quick_tap_term()`, `compat/qmk_live_tapping_config.h`) and the
+tapping-queue query above. Feature bit 18
 distinguishes this broader ownership rule from bit 17, and bit 31 extends it to
 keys without a row. Queue queries and
 the hook are fork contracts pinned by `run_qmk_contract_checks.sh`;

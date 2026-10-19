@@ -219,8 +219,10 @@ static void key_runtime_core_tap_series_active_set(key_runtime_core_state_t *sta
     }
 }
 
-static uint16_t key_runtime_core_default_hold_term(uint16_t keycode) {
-    return (IS_QK_LAYER_TAP(keycode) || IS_QK_MOD_TAP(keycode)) ? noah_setting(NOAH_SETTING_TAPPING_TERM, TAPPING_TERM) : noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM);
+// A press the runtime does not handle. Every dual-role key is handled and takes
+// its hold time from its resolution (D-F27), so this is the tap/hold setting.
+static uint16_t key_runtime_core_default_hold_term(void) {
+    return noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM);
 }
 
 static uint16_t key_runtime_core_default_longer_hold_term(void) {
@@ -516,7 +518,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
     handled_key_lookup_row_tap_count_into(event->keycode, tap_count, !event->bypass_row, &resolution);
     handled = handled_key_resolution_is_handled(resolution);
     handled_key_materialized_default_into(&resolution, &materialized);
-    hold_term_ms        = key_runtime_core_default_hold_term(event->keycode);
+    hold_term_ms        = key_runtime_core_default_hold_term();
     longer_hold_term_ms = key_runtime_core_default_longer_hold_term();
 
     if (handled) {
@@ -610,7 +612,7 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     authored_tap_depth = 0u;
     hold               = hold_behavior_none();
     long_hold          = hold_behavior_none();
-    tap_hold_term_ms   = key_runtime_core_default_hold_term(token->resolved_keycode);
+    tap_hold_term_ms   = key_runtime_core_default_hold_term();
     tap_term_ms        = key_runtime_core_default_multi_tap_term();
     tap_count          = reuse_existing ? key_runtime_core_tap_series_next_tap_count(series) : 1u;
     saved_mod_state    = reuse_existing ? series->saved_mod_state : keyboard_mod_policy_current_state();
