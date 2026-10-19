@@ -5,8 +5,11 @@
 
 #if defined(RGB_MATRIX_ENABLE)
 extern const layer_color_config_t                  layer_colors[LAYER_COUNT];
-__attribute__((weak)) const rgb_led_group_t *const saved_led_groups      = NULL;
-__attribute__((weak)) const uint8_t                saved_led_group_count = 0;
+// The weak defaults live in rgb_config_defaults.c: GCC folds a weak const
+// object's initializer into the file that defines it, which here dropped the
+// keymap's saved groups from the flashed defaults (tests/host/weak_const_default_test.py).
+extern const rgb_led_group_t *const saved_led_groups;
+extern const uint8_t                saved_led_group_count;
 extern const layer_led_group_t *const              layer_led_groups;
 extern const uint8_t                               layer_led_group_count;
 

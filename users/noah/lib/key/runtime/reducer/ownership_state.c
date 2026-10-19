@@ -9,6 +9,7 @@
 #include "../feedback.h"
 #include "../../../action/action_dispatch.h"
 #include "../../../compat/qmk_mod_contract.h"
+#include "../../../action/custom_key_shortcut.h"
 
 static bool key_runtime_core_ownership_keypos_equal(keypos_t lhs, keypos_t rhs) {
     return lhs.row == rhs.row && lhs.col == rhs.col;
@@ -1196,6 +1197,15 @@ uint16_t key_runtime_core_held_action_keycode_at(keypos_t key_pos) {
     return key_runtime_core_key_pos_held_action_keycode(key_runtime_core_state(), key_pos);
 }
 
+// A custom key held for its shortcut holds real modifiers like a mods-only
+// keycode when the shortcut is modifiers alone (D-F26). A profile waits to
+// activate while it is held, so the shortcut it holds is the current one.
+static bool key_runtime_core_custom_key_holds_mods_only(uint16_t action) {
+    noah_custom_key_shortcut_t shortcut = noah_custom_key_shortcut_for_keycode(action);
+
+    return shortcut.mods != 0u && shortcut.key == 0u;
+}
+
 bool key_runtime_core_holds_layer_or_mods_at(keypos_t key_pos) {
     const key_runtime_core_state_t *state = key_runtime_core_state();
 
@@ -1218,7 +1228,7 @@ bool key_runtime_core_holds_layer_or_mods_at(keypos_t key_pos) {
                 }
                 break;
             case LEASE_KIND_HELD_ACTION:
-                if (noah_qmk_real_mods_for_keycode(lease->data.action) != 0u || noah_action_desc_is_layer_action(noah_action_describe(lease->data.action))) {
+                if (noah_qmk_real_mods_for_keycode(lease->data.action) != 0u || key_runtime_core_custom_key_holds_mods_only(lease->data.action) || noah_action_desc_is_layer_action(noah_action_describe(lease->data.action))) {
                     return true;
                 }
                 break;

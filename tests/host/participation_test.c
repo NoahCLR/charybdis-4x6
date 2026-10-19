@@ -51,7 +51,9 @@ static void defaults(void) {
     memset(scalars, 0, sizeof(scalars));
     memset(records, 0, sizeof(records));
     scalars[NOAH_SETTING_BEHAVIORS_ENABLED] = 1u;
+    scalars[NOAH_SETTING_COMBOS_ENABLED]    = 1u;
     scalars[NOAH_SETTING_LAYER_BEHAVIORS]   = 0xffffu;
+    noah_participation_set_behaviors_override(true);
     scalars[NOAH_SETTING_LAYER_COMBOS]      = 0xffffu;
     w_row                                   = (noah_effective_key_behavior_row_t){.allowed_layers = 0xffffu};
     combo_enabled[0] = combo_enabled[1] = true;
@@ -101,6 +103,24 @@ static void test_master_and_definition(void) {
     // A lower scope's on cannot override an off master or layer.
     scalars[NOAH_SETTING_LAYER_BEHAVIORS] = 0xffffu & ~(1u << 4);
     assert(!noah_participation_behavior(KC_W, 4, A));
+}
+
+// Toggles are runtime overrides beside the stored masters (D-F32): a feature
+// runs only when both allow it, and the override never changes the master.
+static void test_overrides_beside_the_masters(void) {
+    defaults();
+    noah_participation_set_behaviors_override(false);
+    assert(!noah_participation_behaviors_override() && !noah_participation_behaviors_allowed());
+    assert(!noah_participation_behavior(KC_W, 0, A) && !noah_participation_behavior_generated(KC_W, 0));
+    assert(scalars[NOAH_SETTING_BEHAVIORS_ENABLED] == 1u);
+    assert(noah_participation_combo_press(0, A)); // combos are independent
+    noah_participation_set_behaviors_override(true);
+    scalars[NOAH_SETTING_BEHAVIORS_ENABLED] = 0u;
+    assert(noah_participation_behaviors_override() && !noah_participation_behaviors_allowed() && !noah_participation_behavior(KC_W, 0, A));
+    defaults();
+    scalars[NOAH_SETTING_COMBOS_ENABLED] = 0u;
+    assert(!noah_participation_combos_allowed() && !noah_participation_combo_press(0, A));
+    assert(noah_participation_behavior(KC_W, 0, A));
 }
 
 // One KC_W row serves every W placement: bypassing W at A on layer 3 leaves W
@@ -193,6 +213,7 @@ int main(void) {
     test_defaults_allow_everything();
     test_source_layer_decides();
     test_master_and_definition();
+    test_overrides_beside_the_masters();
     test_placement();
     test_generated_outputs();
     test_combo_output_permissions();

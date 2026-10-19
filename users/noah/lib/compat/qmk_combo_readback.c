@@ -2,7 +2,7 @@
 
 #include "qmk_combo_readback.h"
 
-#ifdef VIA_ENABLE
+#ifdef RAW_ENABLE
 #    include <string.h>
 #    include "qmk_effective_combos.h"
 #    include "../profile/protocol/profile_wire_v1.h"

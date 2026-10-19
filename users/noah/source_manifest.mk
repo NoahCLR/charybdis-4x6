@@ -13,6 +13,8 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/profile_settings_v1.c \
     lib/profile/schema/profile_settings_defaults.c \
     lib/profile/schema/profile_pd_v1.c \
+    lib/profile/schema/profile_keymap_v1.c \
+    lib/profile/schema/profile_macros_v1.c \
     lib/profile/schema/profile_reader.c \
     lib/profile/schema/key_behavior_domain_v1.c \
     lib/profile/schema/profile_rgb_v1.c \
@@ -22,8 +24,15 @@ NOAH_COMMON_SOURCES := \
     lib/profile/schema/key_behavior_compiled_v1.c \
     lib/profile/schema/profile_combo_compiled_v1.c \
     lib/profile/schema/profile_pd_compiled_v1.c \
+    lib/profile/schema/profile_keymap_compiled_v1.c \
+    lib/profile/schema/profile_macros_compiled_v1.c \
     lib/profile/runtime/profile_action_runtime_v1.c \
     lib/profile/runtime/effective_profile_provider.c \
+    lib/profile/runtime/profile_working_copy.c \
+    lib/profile/split/profile_working_sync.c \
+    lib/profile/runtime/effective_keymap_macros_runtime.c \
+    lib/compat/qmk_profile_keymap.c \
+    lib/macro/profile_macro_provider.c \
     lib/profile/runtime/effective_key_behavior_runtime.c \
     lib/profile/runtime/effective_rgb_runtime.c \
     lib/profile/runtime/effective_combo_runtime.c \
@@ -38,6 +47,7 @@ NOAH_COMMON_SOURCES := \
     lib/profile/storage/profile_storage_layout.c \
     lib/profile/storage/profile_checksum.c \
     lib/profile/storage/profile_store.c \
+    lib/profile/storage/profile_flash_store.c \
     lib/profile/storage/profile_store_runtime.c \
     lib/profile/storage/profile_candidate_transaction.c \
     lib/profile/storage/profile_candidate_store_backend.c \
@@ -48,22 +58,16 @@ NOAH_COMMON_SOURCES := \
     lib/compat/qmk_split_diagnostics.c \
     lib/compat/qmk_split_transport_crc.c \
     lib/compat/qmk_loop_stages.c \
-    lib/compat/qmk_profile_eeprom.c \
+    lib/compat/qmk_profile_flash.c \
     lib/compat/qmk_physical_half.c \
     lib/compat/qmk_profile_split_transport.c \
-    lib/compat/qmk_via_profile_channel.c \
+    lib/compat/qmk_profile_channel.c \
+    lib/compat/qmk_profile_edit_channel.c \
+    lib/compat/qmk_profile_working.c \
+    lib/compat/qmk_profile_adjustments.c \
     lib/compat/qmk_combo_readback.c \
     lib/compat/qmk_effective_combos.c \
-    lib/compat/qmk_contract.c \
     lib/compat/qmk_mod_contract.c \
-    lib/compat/qmk_via_contract.c \
-    lib/compat/qmk_via_storage_regions.c \
-    lib/compat/qmk_via_sync_metadata.c \
-    lib/compat/qmk_via_sync_protocol.c \
-    lib/compat/qmk_via_sync_state.c \
-    lib/compat/qmk_via_logical_profile.c \
-    lib/compat/qmk_via_split_mirror.c \
-    lib/compat/qmk_via_split_sync.c \
     lib/compat/qmk_usb_product_name.c \
     lib/action/action_kind.c \
     lib/action/action_kind_dispatch.c \
@@ -105,8 +109,6 @@ NOAH_COMMON_SOURCES := \
     lib/macro/host_layout.c \
     lib/macro/host_layout_tables.c \
     lib/macro/macro_payload_encode.c \
-    lib/macro/via_macro_provider.c \
-    lib/macro/via_macro_defaults.c \
     lib/key/runtime/feedback.c \
     lib/state/modifiers/keyboard_mod_state.c \
     lib/state/modifiers/keyboard_mod_policy.c \

@@ -4,7 +4,6 @@
 
 #include "handled_key_internal.h"
 
-#include "keymap_introspection.h" // QMK
 
 static bool handled_key_keypos_in_bounds(keypos_t key_pos) {
     return key_pos.row < MATRIX_ROWS && key_pos.col < MATRIX_COLS;
@@ -73,7 +72,7 @@ static int8_t handled_key_transparent_origin_layer(const handled_key_resolution_
             continue;
         }
 
-        if (keycode_at_keymap_location((uint8_t)layer, ctx->key_pos.row, ctx->key_pos.col) == resolution->keycode) {
+        if (keymap_key_to_keycode((uint8_t)layer, ctx->key_pos) == resolution->keycode) {
             return layer;
         }
     }
@@ -105,7 +104,7 @@ bool handled_key_transparent_source_at_position(const handled_key_resolution_t *
             continue;
         }
 
-        keycode = keycode_at_keymap_location((uint8_t)layer, ctx->key_pos.row, ctx->key_pos.col);
+        keycode = keymap_key_to_keycode((uint8_t)layer, ctx->key_pos);
         if (keycode == KC_TRNS) {
             continue;
         }

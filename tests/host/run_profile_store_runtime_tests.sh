@@ -18,9 +18,8 @@ trap cleanup EXIT INT TERM
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DQMK_STUB_SUPPRESS_LAYER_COUNT \
-    -DVIA_ENABLE \
     -DNOAH_PORTABLE_PROFILE_ENABLE \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
@@ -32,7 +31,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_store.c" \
     "$ROOT/users/noah/lib/profile/storage/profile_store_runtime.c" \
-    "$ROOT/users/noah/lib/compat/qmk_profile_eeprom.c" \
+    "$ROOT/users/noah/lib/profile/storage/profile_flash_store.c" \
+    "$ROOT/users/noah/lib/compat/qmk_profile_flash.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
     -o "$BIN"
 

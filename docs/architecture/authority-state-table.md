@@ -7,12 +7,13 @@
 | Ark draft | device base generation/digest | none until an explicit device apply |
 | Source files | canonical digest plus file revision | compiled-default representation |
 | Compiled defaults | canonical digest and action-ABI digest | recovery fallback |
-| Device commit | `{counter, origin_half}` plus canonical digest | deployed runtime authority |
+| Device commit | `{counter, origin_half}` plus canonical digest | durable authority and reboot source |
+| Working copy | base identity plus working revision and digest | volatile active profile after a live edit |
 | RGB preview | transaction id, base generation, digest | volatile overlay only |
 | Peer half | committed version tuple and digest | must converge before successful Apply |
 
-Only a successful durable device commit advances the device counter. Source and
-draft changes never manufacture device generations.
+Only a successful durable device commit advances the device counter. Source, draft and
+working-copy changes never manufacture durable device generations.
 
 ## Version Ordering
 
@@ -24,6 +25,8 @@ draft changes never manufacture device generations.
   stop and require explicit user resolution.
 - Reset to compiled defaults is a required future operation, not an exposed
   durable reset endpoint.
+- Saving a working copy byte-identical to the saved profile finishes at the
+  safe boundary without writing flash or advancing the durable generation.
 - Exact command retries are idempotent. An unchanged payload in a new
   transaction is not guaranteed to be a no-op; clients should avoid needless
   Applies.
@@ -32,10 +35,9 @@ The origin half is a stable physical-half id, not current USB role.
 
 ## Distributed Commit Phases
 
-This table summarizes custom-profile authority. Every current save also binds
-VIA: the [logical transaction contract](logical-profile-transaction-v1.md)
-defines prepared markers on both halves, the decision marker, VIA ACCEPT and
-recovery. A prepared marker is durable recovery evidence, not committed authority.
+This table summarizes durable profile authority. The
+[logical transaction contract](logical-profile-transaction-v1.md) defines
+prepared markers on both halves, the decision marker and recovery. A prepared marker is durable recovery evidence, not committed authority.
 
 | Phase | USB/local half | Peer half | Durable authority | Activation |
 | --- | --- | --- | --- | --- |
@@ -97,7 +99,8 @@ sat unprocessed in the candidate mailbox until a power cycle.
 
 These are product requirements. Open/read, backup/restore and Apply are backed
 by current firmware. Volatile RGB preview/rollback and durable reset are not
-exposed operations; external VIA adoption/conflict reporting remains unfinished.
+exposed operations. Live edits, Save and Revert use the working-copy protocol
+below; they are distinct from the proposed RGB-only preview service.
 
 | Operation | Source | USB half | Peer half | Required visible result |
 | --- | --- | --- | --- | --- |
@@ -109,7 +112,6 @@ exposed operations; external VIA adoption/conflict reporting remains unfinished.
 | Roll back preview | unchanged | committed profile | committed profile | preview cleared |
 | Apply draft to keyboard | unchanged | compare base generation, validate, then commit | prepare then converge | device persisted and exact payload read back |
 | Reset device | unchanged | commit override-disabled generation | converge reset generation | compiled defaults active; source unchanged |
-| Reconcile external VIA change | unchanged | detect changed VIA digest and refuse stale logical generation | prove peer VIA state or expose drift | adopted new logical generation or explicit conflict; never silent divergence |
 
 ## Source and device separation
 
@@ -119,8 +121,7 @@ Apply ordering follows the [logical transaction contract](logical-profile-transa
 
 ## RGB Preview Rules
 
-These rules constrain a future volatile preview endpoint. Capability bit 7
-remains clear; they do not describe an implemented preview service.
+These rules constrain a future volatile preview endpoint. Profile Wire 2 has no RGB-preview capability; they do not describe an implemented preview service.
 
 - Preview is device-only, volatile, debounced, and replaceable atomically.
 - It is tied to the committed base generation that produced it.
@@ -163,18 +164,30 @@ The landed predicate freezes the following firmware reason bits:
 | `10` | peer | unresolved or unreadable peer-convergence state |
 | `30` | internal | missing or invalid local policy state |
 
-The predicate snapshot uses bounded generation publication so an extension-host
-status read cannot observe counts from two evaluations. A missing peer observer
-is intentionally unsafe. One exception is bounded: while a host Apply is
-`ACTIVATING` the record this owner already saw the peer durably commit (and,
-for a logical record, whose VIA ACCEPT the peer acknowledged), the peer reason
-is satisfied by that confirmation instead of a second live observation.
+The predicate snapshot uses bounded generation publication so a status read
+cannot observe counts from two evaluations. A missing peer observer is unsafe.
+While a host Apply is `ACTIVATING` a record this owner already saw the peer
+durably commit, that confirmation satisfies the peer reason. The side-specific
+pair installs the complete owner and enables mutation by default; generic
+builds retain the read-only shell. Hardware acceptance is tracked separately
+in [firmware direction](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 
-The predicate is installed by the profile owner with behavior and RGB
-invalidators and the exact split peer observer. Side-specific pair builds
-include that owner and mutation support by default. Generic and explicit
-owner-only comparison builds remain read-only. Hardware acceptance is a
-separate obligation from exposing these implemented capabilities.
+## Working-copy authority
+
+A live edit validates and publishes a volatile working revision at each half's
+own safe boundary, then proves peer convergence. The halves may temporarily
+report different working revisions; a successful local edit alone does not
+prove peer agreement. Revert reloads the saved profile. Save makes the working
+copy durable through the distributed transaction above. A restart loses edits
+not yet saved.
+
+Edit mode is local persistent keyboard configuration, outside the portable
+profile: Apply saves adjustment-only edits, Live also autosaves live edits
+after a three-second quiet period, and Live + review leaves client edits for
+explicit Save. Held keys restart the quiet period. A failed automatic save is
+not retried for the same revision until a new edit or explicit Save. See
+[working-copy commands](profile-wire-v1.md#live-edits) for the
+wire identities and mode rules.
 
 ## Connection Status Shown By the Ark Client
 

@@ -617,7 +617,7 @@ void wait_ms(uint16_t ms) {
     (void)ms;
 }
 
-bool noah_qmk_contract_try_play_via_macro(uint16_t action) {
+bool noah_profile_macro_try_play(uint16_t action) {
     (void)action;
     return false;
 }
@@ -704,11 +704,6 @@ bool keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_
 }
 
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-}
-
-void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
 }
@@ -3096,7 +3091,8 @@ static void test_preview_shows_only_where_every_outcome_lands(void) {
     CHECK(key_runtime_core_undecided_dual_role_key_pos(NULL));
     // No key-local hold colour replaces it: the layer's own light is the cue.
     CHECK(test_feedback_semantic_for_key(slash) == KEY_FEEDBACK_SEMANTIC_NONE);
-    key_runtime_integration_advance(&fake_time, 120); key_runtime_integration_scan();
+    // Past the row's 150 ms hold term.
+    key_runtime_integration_advance(&fake_time, 160); key_runtime_integration_scan();
     CHECK(test_layer_active(LAYER_NAV));
     CHECK(key_feedback_preview_layer() == UINT8_MAX);
     CHECK(test_feedback_semantic_for_key(slash) == KEY_FEEDBACK_SEMANTIC_NONE);
@@ -4025,4 +4021,8 @@ int main(void) {
 
     puts("real_profile_thumb_layer_lock integration tests passed");
     return 0;
+}
+
+uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
+    return keycode_at_keymap_location(layer, key.row, key.col);
 }

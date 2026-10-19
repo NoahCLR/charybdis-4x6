@@ -32,10 +32,6 @@
 #include "users/noah/lib/state/diagnostics/runtime_trace.h"
 #include "users/noah/noah_runtime.h"
 
-bool noah_profile_store_runtime_output_ready(void) {
-    return true;
-}
-
 enum {
     TEST_ACTION                = CUSTOM_KEY_0 + 0x10,
     TEST_SECOND_ACTION         = CUSTOM_KEY_0 + 0x11,
@@ -3614,4 +3610,8 @@ uint8_t layer_switch_get_layer(keypos_t key) {
 uint16_t get_record_keycode(keyrecord_t *record, bool update_layer_cache) {
     (void)update_layer_cache;
     return record ? record->keycode : KC_NO;
+}
+
+uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
+    return keycode_at_keymap_location(layer, key.row, key.col);
 }

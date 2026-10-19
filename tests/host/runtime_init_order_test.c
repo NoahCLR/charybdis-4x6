@@ -49,24 +49,6 @@ static void test_expect_sequence(const char *const *expected, uint8_t count) {
     }
 }
 
-void noah_via_macro_defaults_eeconfig_init(void) {
-    test_log_stage("via_macro_defaults_eeconfig_init");
-}
-
-bool noah_via_macro_defaults_last_seed_succeeded(void) {
-    test_log_stage("via_macro_defaults_last_seed_succeeded");
-    return true;
-}
-
-void noah_qmk_via_sync_state_reset_after_defaults(bool defaults_committed) {
-    CHECK(defaults_committed);
-    test_log_stage("qmk_via_sync_state_reset_after_defaults");
-}
-
-void noah_via_macro_defaults_matrix_scan(void) {
-    test_log_stage("via_macro_defaults_matrix_scan");
-}
-
 void noah_qmk_durable_io_matrix_scan(void) {
     test_log_stage("qmk_durable_io_matrix_scan");
 }
@@ -108,8 +90,8 @@ void held_repeat_tick(void) {
     test_log_stage("held_repeat_tick");
 }
 
-void noah_via_macro_defaults_keyboard_post_init(void) {
-    test_log_stage("via_macro_defaults_keyboard_post_init");
+void noah_qmk_profile_flash_pre_init(void) {
+    test_log_stage("qmk_profile_flash_pre_init");
 }
 
 void noah_profile_store_runtime_init(void) {
@@ -132,14 +114,6 @@ void split_runtime_sync_init(void) {
     test_log_stage("split_runtime_sync_init");
 }
 
-void noah_qmk_via_split_sync_init(void) {
-    test_log_stage("qmk_via_split_sync_init");
-}
-
-void noah_qmk_via_split_mirror_init(void) {
-    test_log_stage("qmk_via_split_mirror_init");
-}
-
 void noah_qmk_durable_io_init(void) {
     test_log_stage("qmk_durable_io_init");
 }
@@ -152,6 +126,10 @@ void noah_qmk_usb_product_name_pre_init(void) {
 
 void noah_qmk_usb_product_name_task(void) {
     test_log_stage("qmk_usb_product_name_task");
+}
+
+void noah_qmk_profile_flash_housekeeping(void) {
+    test_log_stage("qmk_profile_flash_housekeeping");
 }
 
 void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
@@ -167,9 +145,6 @@ void noah_runtime_diag_heartbeat(void) {
 static void test_eeconfig_init_order(void) {
     static const char *const expected[] = {
         "macro_payload_engine_cancel",
-        "via_macro_defaults_eeconfig_init",
-        "via_macro_defaults_last_seed_succeeded",
-        "qmk_via_sync_state_reset_after_defaults",
     };
 
     test_log_reset();
@@ -179,7 +154,7 @@ static void test_eeconfig_init_order(void) {
 
 static void test_matrix_scan_order(void) {
     static const char *const expected[] = {
-        "via_macro_defaults_matrix_scan", "qmk_durable_io_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "record_admission_task", "macro_payload_engine_scan", "split_runtime_sync_tick",
+        "qmk_durable_io_matrix_scan", "qmk_combo_origin_scan", "key_runtime_scan", "record_admission_task", "macro_payload_engine_scan", "split_runtime_sync_tick",
     };
 
     test_log_reset();
@@ -201,7 +176,7 @@ static void test_keyboard_post_init_order(void) {
     static const char *const expected[] = {
         // Core defaults must land before any stage can observe key runtime
         // core state.
-        "runtime_shared_state_post_init", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "via_macro_defaults_keyboard_post_init", "profile_store_runtime_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_via_split_sync_init", "qmk_via_split_mirror_init", "qmk_durable_io_init",
+        "runtime_shared_state_post_init", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "profile_store_runtime_init", "rgb_runtime_post_init", "split_runtime_sync_init", "qmk_durable_io_init",
     };
 
     test_log_reset();
@@ -209,9 +184,11 @@ static void test_keyboard_post_init_order(void) {
     test_expect_sequence(expected, ARRAY_SIZE(expected));
 }
 
-// Before USB starts, only the USB product name (D-F25) is set up.
+// Before USB starts: an EEPROM reset forgets the saved profiles (D-F29),
+// then the USB product name (D-F25) is read from what remains.
 static void test_keyboard_pre_init_order(void) {
     static const char *const expected[] = {
+        "qmk_profile_flash_pre_init",
         "qmk_usb_product_name_pre_init",
     };
 
@@ -225,6 +202,7 @@ static void test_housekeeping_order(void) {
         "held_repeat_tick",
         "runtime_diag_heartbeat",
         "qmk_usb_product_name_task",
+        "qmk_profile_flash_housekeeping",
     };
 
     test_log_reset();

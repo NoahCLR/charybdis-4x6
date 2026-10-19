@@ -21,18 +21,11 @@
 // in the keymap's config.h as an enum. LAYER_COUNT is the sentinel last value
 // and is derived automatically — no manual count to keep in sync.
 
-#ifdef VIA_ENABLE
-_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update the keymap config.h");
-#endif
-
 #define VIA_MACRO_SLOT_COUNT 128
 // The names Charybdis Ark shows until a layer, macro or custom key is renamed
 // there: each holds at most 32 bytes of UTF-8, followed by its terminator.
 #define NOAH_LAYER_NAME_SIZE 33
 #define NOAH_MACRO_NAME_SIZE 33
-#ifdef VIA_ENABLE
-_Static_assert(VIA_MACRO_SLOT_COUNT == DYNAMIC_KEYMAP_MACRO_COUNT, "VIA_MACRO_SLOT_COUNT and DYNAMIC_KEYMAP_MACRO_COUNT are out of sync");
-#endif
 
 // VIA_MACRO_0–63 are authored aliases for VIA's dynamic macro slots.
 // The QMK-specific base keycodes stay here so keymap.c can stay declarative.
@@ -180,12 +173,12 @@ _Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA mac
 //   0x7ea0–0x7ebf  PD_SLOT_n_LOCK       toggle pointing slot n  (32, all used)
 //   0x7ec0–0x7edf  LOCK_LAYER(n)        toggle layer n's lock   (32 reserved)
 //   0x7ee0–0x7eff  unassigned: inert, refused as a step or combo output
-//   0x7f00–0x7f7f  CUSTOM_KEY_0–127     named keys that do what their behaviour says
+//   0x7f00–0x7f7f  CUSTOM_KEY_0–127     named keys: their shortcut and behaviour
 //   0x7f80–0x7fff  unassigned: inert, refused as a step or combo output
 //
 // Custom keys moved to their own block in D-F14: 128 do not fit beside the
-// pointing holds. Their old codes are never reread as anything else; a
-// client translates an old layout's custom keys by slot.
+// pointing holds. Their old codes are never reread as anything else: they
+// stay inert, and nothing translates an old layout to the new block (D-F10).
 //
 // A custom key does what its shortcut and its key_behaviors[] row say (D-F26):
 // without either it does nothing. Place it on a layer or as a combo output. Its
@@ -366,6 +359,10 @@ _Static_assert(NOAH_KEYCODE_USERSPACE_END - 1 <= QK_USER_MAX, "userspace keycode
 #define NOAH_KEYCODE_IS_CUSTOM_KEY(keycode_) ((keycode_) >= CUSTOM_KEY_0 && (keycode_) <= CUSTOM_KEY_127)
 
 extern const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT];
+// The same macros already in the bank encoding, generated at build time, so
+// writing the compiled defaults copies bytes instead of compiling macros.
+extern const uint8_t  authored_macro_bank[];
+extern const uint16_t authored_macro_bank_size;
 extern const char        via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
 extern const char        custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
 // Each custom key's authored shortcut, as settings v8 stores it: the report

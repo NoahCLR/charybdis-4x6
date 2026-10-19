@@ -19,7 +19,7 @@ flowchart TD
     runtime --> pointing["pointing/runtime/pd_runtime.c pointing hook"]
     runtime --> rgb["rgb/core/rgb_runtime.c RGB hook"]
     runtime --> layer["pointing runtime + layer ownership hook"]
-    init --> via_defaults["macro/via_macro_defaults.c"]
+    init --> durable_io["compat/qmk_durable_io.c profile store step"]
     init --> combo_scan["compat/qmk_combo_origin.c lifecycle reconciliation"]
     init --> key_scan["key/runtime/scan.c"]
     init --> split_sync["split/runtime_sync.c"]
@@ -73,12 +73,12 @@ modifiers before a physical press, and that cleared state must reach the host
 without another basic usage edge. Report emission retains QMK's one-shot
 modifier consumption.
 Pre-process still tracks which physical modifier keys are down, which is the
-separate question masking policy asks. A QMK mod-tap is a physically held
-modifier too, once QMK has resolved it as a hold: pre-process runs before QMK's
-tapping engine and cannot see that, so the finalize step counts it, from the
-record with tap count 0 that QMK's default action took. Its modifiers are also
-managed owners, because QMK registers them through `register_mods()`, so
-teardown is unchanged. A tapped mod-tap never held a modifier.
+separate question masking policy asks. A mod-tap is not one: every `MT()` is
+the runtime's (D-F27), and its hold is a managed owner of its modifiers, as
+any behaviour's hold is, so a pointing mode that holds the same modifier
+masks it (see Open Issues in
+[LIVE_EDIT_APP_DIRECTION](../LIVE_EDIT_APP_DIRECTION.md#open-issues)). A
+tapped mod-tap never holds a modifier.
 
 Physical modifier-only combinations (`KC_MEH`, `KC_HYPR`, or a modifier
 wrapped in `QK_MODS`, such as `S(KC_LEFT_CTRL)`) count every real modifier they
@@ -170,11 +170,8 @@ or drain effects but must not re-decide release semantics.
 flowchart TD
     master_scan["master: matrix_scan_user"] --> init["runtime_init.c"]
     slave_scan["slave: matrix_slave_scan_user"] --> init
-    init --> via["Master-only VIA macro default scan seeding"]
-    init --> durable["Both halves: rotating durable-I/O grant"]
-    durable --> discovery["Live-profile boot discovery"]
-    durable --> mirror["Queued VIA write-through mirror"]
-    durable --> via_sync["VIA digest, storage, or reconciliation step"]
+    init --> durable["Both halves: durable-I/O grant"]
+    durable --> discovery["Profile store: boot discovery, owner and split copy step"]
     init --> combo["Master-only: retire suppressed/expired combo origins"]
     init --> key_scan["Master-only: key/runtime/scan.c"]
     key_scan --> reducer_scan["Authoritative reducer scan state"]
@@ -199,32 +196,36 @@ the master while a host read the 32-slot firmware's compiled profile. Its
 reader now seeks by domain (D-F12), emitting only intersecting domain payloads
 for each chunk; effective caches warm through that same representation.
 
-Split RPC callbacks for the VIA mirror and durable VIA reconciliation only
-validate, queue, and return bounded responses. They never access EEPROM. The
-durable-I/O scheduler starts from a rotating owner and grants at most one
-profile-discovery, mirror, or VIA-reconciliation step per matrix scan; idle
-owners are skipped without losing round-robin fairness.
+The profile split RPC callback only validates, queues and returns bounded
+responses; it never touches flash. The durable-I/O scheduler opens one flash
+grant per matrix scan. While the store is busy it repeats local steps, at most
+32 per grant, checking a 1,000 µs budget between steps. An erase, page program
+or split RPC ends repetition; at most one erase or program occurs per grant.
+This is a scheduling budget, not a measured maximum scan duration. The profile
+store is the only durable owner (D-F31).
 
 QMK routes master and slave scans through different user hooks. The master
 uses `matrix_scan_user()` and runs the complete runtime pipeline; the slave
 uses `matrix_slave_scan_user()` and runs only the durable-I/O scheduler. This
 second path is required for incremental profile-owner initialization, profile
-RPC registration, and profile/VIA receiver mailbox processing on the slave.
+RPC registration, and profile receiver mailbox processing on the slave.
 
 The profile store exposes a one-read-per-step boot selector and the candidate
 backend exposes bounded whole-profile adoption of its exact selected record.
 The side-specific pair installs the single profile owner, which incrementally
 validates compiled defaults, selects and adopts a durable record, reconciles
-its custom/VIA identity before activation, and rotates bounded host, split and
+its profile identity with the peer before activation, and rotates bounded host, split and
 peer-activation work. Both `NOAH_LIVE_PROFILE_OWNER` and
-`NOAH_LIVE_PROFILE_MUTATION` default to `yes` for those builds. The VIA channel
+`NOAH_LIVE_PROFILE_MUTATION` default to `yes` for those builds. The Raw HID channel
 advertises their coupled write/commit/activation/peer capabilities only when
 available. Generic builds retain the read-only shell; explicitly disabling
 mutation makes an owner-only comparison build.
 
 Combo-origin reconciliation runs before key-runtime scan projection. It removes
 QMK-disabled candidates immediately and expires inactive candidates only after
-the first crossed-deadline scan has been followed by a `combo_task()` cycle.
+the first crossed-deadline scan has been followed by a `combo_task()` cycle; a
+candidate whose output press QMK has delivered stays until that press is
+dispatched.
 Scan also owns hold threshold promotion, long-hold promotion, pending multi-tap
 expiry, pending release draining, split heartbeats, and held repeat ticking.
 
@@ -337,45 +338,35 @@ base, combo, semantic, then branch order. Dirty state and per-domain
 last-success snapshots change only after that domain succeeds. Failure and
 recovery are traced, but suppressed scans are intentionally silent.
 
-## Macro And VIA Flow
+## Macro Flow
 
 ```mermaid
 flowchart TD
-    keymap["keymap.c VIA_MACROS"] --> via_defaults["via_macro_defaults seeding"]
-    action["Action lifecycle"] --> via_play["VIA macro provider"]
-    via_play --> provider["Compact slot metadata and shared IR"]
+    keymap["keymap.c VIA_MACROS"] --> compiled["Compiled macro domain"]
+    saved["Saved profile macro domain"] --> provider_src["profile_macro_provider"]
+    compiled --> provider_src
+    action["Action lifecycle"] --> provider_src
+    provider_src --> provider["Compact slot metadata and shared IR"]
     provider --> payload["Validated macro IR"]
     payload --> engine["One-active scan engine"]
     scan["Matrix scan after key runtime"] --> engine
     engine --> leases["Owner-scoped key leases"]
     engine --> finish["Completion or bounded cleanup"]
     finish --> provider
-    via_defaults --> storage["QMK dynamic macro EEPROM"]
-    via_command["VIA command"] --> dirty["Persist dirty before QMK apply"]
-    dirty --> committed["Post-apply canonical readback and digest"]
-    committed --> via_split["Versioned snapshot reconciliation"]
-    via_split --> callback["Peer callback mailbox + BUSY/cached reply"]
-    callback --> scheduler["Peer durable-I/O scan grant"]
-    scheduler --> slave["Peer keymap/encoder/macro/config storage"]
-    slave --> verify["Full digest and generation acknowledgement"]
-    verify --> rgb_invalidate["Post-commit RGB and macro cache invalidation"]
+    publish["Profile publication"] --> invalidate["Macro cache invalidation at a no-macro boundary"]
 ```
 
-VIA macros are QMK dynamic macro slots with source-authored defaults and
-durable split reconciliation. Macro reset does not publish until the authored
-defaults have seeded successfully. A transfer is limited to one storage chunk,
-one checksum step (up to 224 RAM-mirror bytes through a 14-byte workspace), or
-one RPC per scan
-([checksum work contract](logical-profile-transaction-v1.md#via-checksum-work-per-scan)),
-and a clean generation is replicated only after the
-receiving half verifies and acknowledges the full snapshot. The best-effort
-write-through mirror uses the same callback-mailbox boundary: the split thread
-copies at most one frame, and scan context performs the QMK dynamic-keymap or
-macro storage mutation. A full mailbox may drop a mirror frame because durable
-reconciliation remains the repair path.
+Macros are the profile's macro domain (D-F30): 128 slots in the bank
+encoding QMK's dynamic macros use, with source-authored defaults in the
+compiled profile (`VIA_MACROS` in `keymap.c`, a historical name). Playback
+reads the active profile; with no saved macro domain it copies the generated
+`authored_macro_bank.h` bytes. Profile publication switches the bank with the
+rest of the profile, and
+the provider's slot cache is invalidated before the next playback. VIA and its
+dynamic macro storage are gone (D-F31).
 
 Macro text uses canonical UTF-8 for non-ASCII characters, without normalization.
-Zero terminates a VIA slot and byte 1 starts the existing QMK command grammar;
+Zero terminates a macro slot and byte 1 starts the existing QMK command grammar;
 command operands remain unsigned bytes. Malformed, truncated, overlong,
 surrogate and out-of-range UTF-8, including C1 controls, is rejected before
 playback. Legacy nonzero ASCII bytes retain their existing contract. Text IR
@@ -383,29 +374,27 @@ runs contain ASCII bytes, at most 255 per run with a two-byte header; each
 non-ASCII scalar uses opcode 6 and three little-endian scalar bytes (four IR
 bytes total). Scalars never cross an IR text-chunk boundary. The program
 window remains 512 bytes, but a stored macro has no separate program ceiling.
-Feature bit 27 advertises this contract: the encoded slot and all terminators
+The encoded slot and all terminators
 must fit the shared 34,903-byte bank. Decode and playback preflight visit every
 window before any output, carrying held-key balance and Unicode requirements
 across windows. Playback refills the same static window from its saved storage
 cursor; slot lookup is reused, so each refill does not walk earlier slots.
 A malformed or truncated tail is rejected before the first output, and the slot
-is negatively cached until mutation. Every macro-bank write or reset cancels
-active stored playback before changing bytes; cleanup releases all held keys
-and records cancellation, including when the final window is already loaded.
-Authored C defaults still compile into one window; their source grammar and
-512-byte compilation buffer are unchanged. A structurally
+is negatively cached until mutation. Profile publication waits for the macro-safe boundary; cache invalidation
+never changes the bytes of running playback. Reset requests cancellation and
+cleanup, releasing all held keys even when the final window is already loaded.
+The source macro compiler retains a 512-byte compilation buffer; the
+introspector uses it to generate the compiled default bank before the build. A structurally
 valid slot rejected because the host is unknown, Unicode is off or the layout
 cannot type it remains retryable without a macro mutation.
 
-Profile Wire feature bit 21 advertises UTF-8 text and Host settings in scalar
-27: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables
-Unicode playback. All other bits must be zero. The settings-v6 shape and zero
-defaults are unchanged: Auto with Unicode off. Clients require bit 21 before
-writing non-ASCII bytes or nonzero scalar 27. Older firmware rejects them.
-Feature bit 22 adds the host layout to scalar 27: bits 16–23 name a layout
-from the [host layout catalogue](host-layouts-v1.md), 0 (US) by default, and
-bit 24 says macOS classified the keyboard as ISO. An ID past the catalogue and
-any other bit are rejected. Clients require bit 22 before writing bits 16–24.
+Host settings live in settings scalar 27: bits 0..1 select Auto (0), macOS
+(1), Windows (2), Linux (3); bit 8 enables Unicode entry; bits 16–23 select a
+[host layout](host-layouts-v1.md); bit 24 says macOS classified the keyboard
+as ISO. Unknown layouts and all other bits are rejected. These facilities are
+part of the Profile Wire 2 base contract. The authored defaults select macOS,
+Dutch layout (2), Unicode entry off and ANSI classification; the shared fallback
+without authored overrides is Auto, US layout, Unicode off and ANSI.
 
 Auto translates QMK’s USB OS guess; unknown and iOS resolve to unknown rather
 than choosing an entry method. A manual override always wins. Unicode playback
@@ -448,8 +437,8 @@ Entry settles for 10 ms once it has started, as QMK's `UNICODE_TYPE_DELAY`
 does: after Option goes down on macOS, after Right Alt then U on WinCompose,
 and after Ctrl+Shift+U on Linux. Every other entry tap, the neutral report that
 commits entry and the report restoring live modifiers go at the macro's text
-pace: `TAP_CODE_DELAY` for a plain program, `DYNAMIC_KEYMAP_MACRO_DELAY` for a
-VIA slot, both 0 unless the build sets them. Each press and release is still a
+pace: `TAP_CODE_DELAY` for a plain program, `NOAH_MACRO_SLOT_DELAY` (which
+defaults to it) for a macro slot, both 0 unless the build sets them. Each press and release is still a
 report of its own. Cancellation's Escape, Caps Lock and neutral steps keep a
 10 ms pace. One bounded transition runs per scan, with no blocking waits. The QMK
 report-only modifier override masks outgoing modifiers without changing live
@@ -475,8 +464,8 @@ an application inserted the text. Exact scalar emission does not promise a
 font contains its glyph or an application preserves it. Physical acceptance
 on each configured host remains required.
 
-Feature bit 23 advertises per-macro input protection. An optional canonical VIA
-prefix `01 05 01` forces protection on, and `01 05 02` forces it off. It must
+Profile Wire 2 includes per-macro input protection. An optional canonical
+bank prefix `01 05 01` forces protection on, and `01 05 02` forces it off. It must
 occur once at the beginning; zero, unknown policies, a truncated prefix or a
 prefix after executable content are rejected. Without a prefix, protection is
 automatic: preflight enables it when any scalar needs host Unicode entry under
@@ -491,7 +480,7 @@ whose presses preceded playback remain admitted; macro synthetic output remains
 admitted too. Reset clears the bitmap. Protection remains active through cleanup
 and ends on completion, cancellation or failure. It does not disable cleanup or
 reset, freeze pointing, or protect against input from another host device.
-Feature bit 26 additionally advertises immediate keyboard-output isolation.
+Protected playback also isolates keyboard output immediately.
 At protected start an outgoing neutral report releases previously reported
 ordinary keys and masks live modifiers, followed by a nonblocking 10 ms settle.
 Playback reports contain only the macro's own leased keyboard usages and
@@ -512,18 +501,14 @@ press after release works normally. Subsequent macro output can reuse a
 suppressed usage without releasing another owner's state. Reset clears this
 suppression with the ordinary runtime reset. Pointing, consumer/system reports
 and another keyboard remain outside this keyboard-report protection; future
-scheduled actions after playback are not a deferred typing queue. Without bit
-26, bit 23 denotes the earlier press-admission protection only: ordinary keys
-already held can interfere and should be released before playback.
+scheduled actions after playback are not a deferred typing queue.
 
 Playback is scan-driven and single-active. Each logical slot stores one byte of
 unchecked/valid/invalid metadata. A valid slot is decoded into one shared IR
 when invoked; invalid slots do not reparse until invalidated. Busy triggers are
-consumed before that shared IR can be changed. The shared IR remains pinned
-through its playback cleanup. Stored macro
-writes and resets cancel playback before changing its backing bytes; ordinary
-cache invalidation alone defers reuse of an active IR until cleanup. Text,
-chord, and persistent-key output use exact owner-scoped
+consumed before that shared IR can be changed. The active IR remains pinned
+across a macro cache invalidation, and completion or cancellation applies deferred
+invalidation. Text, chord, and persistent-key output use exact owner-scoped
 leases; reset and runtime failure release retained leases through bounded
 cleanup. One engine transition runs per scan, and delay deadlines use wrap-safe
 32-bit elapsed time.
@@ -549,10 +534,11 @@ flowchart LR
 ```
 
 The RPC callback only validates/copies one exact request (32 bytes, or up to
-128 for a payload chunk) and returns a cached 32-byte response. EEPROM access,
-whole-profile validation, and commit remain in matrix scan. Each half performs
-at most one RPC, one received chunk or reuse step of at most 110 bytes, or one
-validator/commit step per scan. A newer slave is pulled explicitly, so current
+128 for a payload chunk) and returns a cached response (32 bytes, or up to 128
+for a pulled chunk). Flash access, whole-profile validation, and commit remain
+in matrix scan. Each store invocation performs a bounded receive, reuse, validation or commit
+step. The durable-I/O grant may repeat local work under the limits above, but
+stops after a split RPC or physical flash operation. A newer slave is pulled explicitly, so current
 USB role never decides durable authority. Disconnect, malformed response, role
 change, or passive-peer timeout invalidates peer evidence; conflict,
 corruption, and incompatibility stop without overwriting either record.
@@ -570,6 +556,37 @@ adapter exactly once. This is the normal pair build. Generic images leave the
 adapter unregistered. The open hardware acceptance matrix is tracked in
 [firmware direction](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 
+## Live Edits
+
+```mermaid
+flowchart LR
+    hid["Raw HID: begin, splices, data, commit"] --> stage["Stage inserted bytes above the profile"]
+    stage --> load["First edit: copy the saved profile into the working copy"]
+    load --> check["Check each touched domain on the resulting bytes"]
+    check --> wait["Wait for the activation safe boundary"]
+    wait --> publish["Rewrite the working copy inside the publication"]
+    publish --> rebind["Rebuild the changed domains' runtimes"]
+    rebind --> forward["USB half sends the same edit to the other half"]
+    forward --> peer["Other half: stage, check, publish at its own boundary"]
+```
+
+An edit (D-F32) arrives over Raw HID in the main loop: each report is admitted
+synchronously (a bounded copy into the top of the working copy's buffer). On
+commit the owner's scan loads the saved profile into the buffer if this is the
+first edit (1 KiB per load step), then runs the touched domains' validators over
+the bytes the edit would produce, up to 64 bounded validator steps per owner
+validation invocation, reading
+the RAM buffer and the staged bytes only. A checked edit is published through
+the provider's in-place publication at the same safe boundary activation
+waits for: the bytes move inside the publication, then each runtime's
+invalidator runs and those whose domain did not change keep what they built.
+The USB half's scan then sends the same edit to the other half on
+`PUT_PROFILE_WORKING_SYNC`, one RPC a scan; the other half's callback only
+fills a mailbox, and its scan runs the same steps. Save drives the candidate
+transaction from the scan with REUSE from the working copy, so its durable
+path is the reconciliation above. Nothing on this path touches flash until
+Save.
+
 ## USB Product Name
 
 The settings domain's keyboard name (D-F25) is the USB product string,
@@ -583,7 +600,9 @@ Hosts read the string when they enumerate the keyboard, which QMK starts in
 reads the committed profile's name first: QMK has initialized EEPROM by then,
 and the read borrows the store the runtime has not started, so it costs no
 RAM. Boot selection checks the record's checksum and compatibility, not the
-peer. Both halves do this before either knows its role; on the half without
+peer. With no committed name to read the keyboard runs its compiled defaults,
+so it serves their name (`NOAH_KEYBOARD_NAME` in the keymap's `config.h`)
+and needs no restart to take it. Both halves do this before either knows its role; on the half without
 USB the name only sits in memory.
 
 The activated profile is authoritative. When its name differs from the one
@@ -595,7 +614,6 @@ driver (`restart_usb_driver`, about 50 ms off the bus) once all of these hold:
   in flight, both halves hold the same profile and nothing is held or running
   on either half (`noah_profile_owner_usb_restart_safe`, the activation safe
   boundary);
-- VIA has no logical save, local write or replication in flight;
 - no Raw HID frame has arrived for a second, so a client finishes the reads
   that follow its Apply;
 - USB is enumerated and not suspended.
@@ -612,12 +630,12 @@ the role, so its USB stays off.
 
 ```mermaid
 flowchart TD
-    action["Action and macro dispatch"] --> action_tests["action, delayed_action, lifecycle, macro, VIA tests"]
+    action["Action and macro dispatch"] --> action_tests["action, delayed_action, lifecycle, macro tests"]
     key_behavior["Authored key behavior"] --> behavior_tests["key_behavior, keymap, real_profile tests"]
     key_runtime["Key runtime reducer/planner/projection"] --> runtime_tests["release matrix, scenario, integration harness, modifier hold, layer lock"]
     pd["Pointing and PD runtime"] --> pd_tests["pd_mode, pd_runtime, handlers, key-runtime integration, pointer layer policy"]
     rgb["RGB rendering"] --> rgb_tests["rgb_validation, rgb_layer_render"]
-    split["Split transport"] --> split_tests["split_runtime_sync, qmk_via_split_sync, profile_split_reconciler"]
+    split["Split transport"] --> split_tests["split_runtime_sync, profile_split_reconciler, qmk_profile_split_transport"]
     hooks["Hooks and boundaries"] --> boundary_tests["hook_chaining, feature_gate_compile, qmk_contract"]
     usb_name["USB product name"] --> usb_name_tests["qmk_usb_product_name, profile_store_runtime, profile_owner"]
     all["Whole userspace"] --> full["run_all_host_tests.sh and build-firmware-pair.sh"]

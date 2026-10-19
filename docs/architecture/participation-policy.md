@@ -7,13 +7,13 @@ takes effect.
 This document is the contract for that decision (D-F14). The stored fields
 live in the settings, key-behaviour and combo domains; their bytes are in
 [Portable Profile V1](portable-profile-v1.md#settings-domain-0x40-version-8)
-and [Profile Wire V1](profile-wire-v1.md).
+and [Profile Wire](profile-wire-v1.md).
 
 ## Scopes
 
 | Scope | Behaviours | Combos | Stored in |
 | --- | --- | --- | --- |
-| Global | master enable | master enable (QMK's combo enable, scalar 20) | settings scalars 28 and 20 |
+| Global | master enable | stored master enable (scalar 20) | settings scalars 28 and 20 |
 | Layer | all authored behaviours on/off | all combos on/off | settings scalars 29 and 30, one bit per layer |
 | Definition | each behaviour row: enabled, allowed layers | each combo row: enabled, allowed layers | behaviour row and combo row |
 | Placement | use the shared behaviour, or bypass to the normal action | participate in combos, or stay out | per-layer bitmaps in the settings domain |
@@ -25,9 +25,10 @@ other.
 
 Disabling keeps everything it disables: a disabled behaviour row keeps its
 steps, timing and allowed layers; a disabled combo keeps its inputs, output
-and window. Re-enabling restores them unchanged. Every control is stored,
-read back, and carried through reboot, backup, restore and both-half commit
-like the rest of the profile.
+and window. Re-enabling restores them unchanged. These profile controls are stored and carried through reboot, backup, restore
+and both-half commit. The separate behaviour and QMK combo runtime toggles
+are volatile vetoes (D-F32): they are not exported and reset on reboot. GET
+`0x22` reports stored masters and runtime overrides separately.
 
 Fresh compiled defaults allow everything: both
 masters on, every layer bit set, every definition enabled with every bank
@@ -68,7 +69,7 @@ that placement's controls.
 
 A physical press uses its keycode's behaviour row only if all of these hold:
 
-1. the behaviour master is on (scalar 28);
+1. the stored behaviour master (scalar 28) and its volatile runtime override are on;
 2. the source layer's bit is set in scalar 29;
 3. the row is enabled and its allowed-layer mask has the source layer's bit;
 4. the placement's bypass bit is clear.
@@ -119,7 +120,7 @@ QMK calls BK's `combo_key_record_allowed()` for every member record of every com
 contains the press's (reference-remapped) keycode. A press counts towards a
 combo only if all of these hold:
 
-1. combos are enabled (scalar 20, QMK's own enable);
+1. the stored combo master (scalar 20) and QMK's volatile combo flag are both on;
 2. the press's source layer has its bit in scalar 30;
 3. the combo row is enabled and its allowed-layer mask has the source layer's
    bit;
@@ -189,13 +190,14 @@ snapshots. If origin reconstruction is unresolved, dispatch conservatively
 bypasses behaviour whenever any combo definition sharing that output bypasses
 it; it never borrows another definition's permission.
 
-Capability feature bit 30 advertises this extension. The stored switches are
+Every Profile Wire 2 firmware accepts this extension (feature bit 30 advertised
+it before D-F28). The stored switches are
 inverted: settings header byte 5 bit 0 bypasses all combo output behaviours;
 combo v3 row flag bit 4 bypasses that row's output behaviour. Zero preserves
 existing profiles and compiled defaults, without a
 domain-version or action-ABI change. Older firmware rejects either new bit.
-Clients must require bit 30 before writing the extension, preserve the flags
-through unrelated edits, and refuse a downgrade that would erase a bypass.
+Clients require the current protocol/schema, preserve these flags through
+unrelated edits, and refuse a downgrade that would erase a bypass.
 Native combo readback v3 reports the row bypass as flag bit 5; settings
 readback carries its header byte unchanged.
 
@@ -251,10 +253,9 @@ storage, and costs one masked bit test per scope on an ordinary press.
 - **Tap-hold.** QMK decides whether a record is a tap-hold through BK's
   `is_tap_record_user()`, a per-record weak hook given QMK's own answer and
   `is_tap_keycode_user()`'s. The userspace override keeps the keycode hook's
-  answer for a press that uses its row, and for one that bypasses it answers
-  as the key does without a row. Every `LT()`, `MT()` and `OSM()` key is the
-  runtime's either way (D-F27), so neither answer lets QMK's tapping engine
-  classify it.
+  answer for every record. Every `LT()`, `MT()` and `OSM()` key is the
+  runtime's with its row or without it (D-F27), so a press that bypasses its
+  row answers the same, and QMK's tapping engine classifies none of them.
 - **Combos.** `combo_key_record_allowed()` in
   `users/noah/lib/compat/qmk_combo_origin.c` vetoes a member press unless its
   stored combo decision and the combo row both allow it on its source layer.

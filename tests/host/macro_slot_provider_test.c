@@ -90,7 +90,7 @@ macro_payload_start_result_t macro_payload_start_ir(const macro_payload_ir_t *ir
     CHECK(ir != NULL);
     CHECK(text_output == MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED);
     CHECK(interval == 7u);
-    CHECK(source == MACRO_PAYLOAD_SOURCE_VIA);
+    CHECK(source == MACRO_PAYLOAD_SOURCE_SLOT);
     CHECK(slot == 0u);
     captured_finish  = finish;
     captured_context = context;
@@ -135,7 +135,7 @@ static void test_active_invalidation_and_busy_start_preserve_shared_ir(void) {
     captured_context = NULL;
     captured_ir      = NULL;
 
-    CHECK(macro_slot_provider_start(&provider, first, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_slot_provider_start(&provider, first, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
     CHECK(first[0].state == MACRO_SLOT_CACHE_VALID);
     CHECK(load_call_count == 1u);
     CHECK(captured_ir != NULL);
@@ -144,7 +144,7 @@ static void test_active_invalidation_and_busy_start_preserve_shared_ir(void) {
     source_byte = 'B';
     macro_slot_provider_invalidate(&provider, first, 0u);
     CHECK(first[0].state == MACRO_SLOT_CACHE_VALID);
-    CHECK(macro_slot_provider_start(&provider, second, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_BUSY);
+    CHECK(macro_slot_provider_start(&provider, second, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_BUSY);
     CHECK(second[0].state == MACRO_SLOT_CACHE_UNCHECKED);
     CHECK(load_call_count == 1u);
     CHECK(captured_ir->bytes[2] == 'A');
@@ -152,7 +152,7 @@ static void test_active_invalidation_and_busy_start_preserve_shared_ir(void) {
     test_finish_active();
     CHECK(first[0].state == MACRO_SLOT_CACHE_UNCHECKED);
 
-    CHECK(macro_slot_provider_start(&provider, first, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_slot_provider_start(&provider, first, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
     CHECK(load_call_count == 2u);
     CHECK(captured_ir->bytes[2] == 'B');
     test_finish_active();
@@ -167,7 +167,7 @@ static void test_engine_busy_start_keeps_valid_metadata_without_pinning(void) {
     load_succeeds   = true;
     start_result    = MACRO_PAYLOAD_START_BUSY;
     engine_active   = false;
-    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_BUSY);
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_BUSY);
     CHECK(metadata[0].state == MACRO_SLOT_CACHE_VALID);
     CHECK(load_call_count == 1u);
 }
@@ -177,10 +177,10 @@ static void test_playback_preflight_rejection_is_retried(void) {
     macro_slot_metadata_t metadata[1] = {0};
     source_byte = 'A'; load_succeeds = true; load_call_count = 0; engine_active = false;
     start_result = MACRO_PAYLOAD_START_INVALID;
-    CHECK(macro_slot_provider_start(&provider, metadata, 0, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(macro_slot_provider_start(&provider, metadata, 0, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_INVALID);
     CHECK(metadata[0].state == MACRO_SLOT_CACHE_VALID);
     start_result = MACRO_PAYLOAD_START_STARTED;
-    CHECK(macro_slot_provider_start(&provider, metadata, 0, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_slot_provider_start(&provider, metadata, 0, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
     CHECK(load_call_count == 2);
     test_finish_active();
 }
@@ -226,7 +226,7 @@ static void test_long_macro_checks_every_window_then_plays_from_the_first(void) 
 
     test_reset();
     window_count = 3u;
-    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
     CHECK(preflight_window_calls == 3u);
     CHECK(load_call_count == 4u);
     CHECK(metadata[0].state == MACRO_SLOT_CACHE_VALID);
@@ -246,14 +246,14 @@ static void test_rejected_later_window_types_nothing(void) {
     test_reset();
     window_count          = 3u;
     preflight_fail_window = 2u;
-    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_INVALID);
     CHECK(captured_ir == NULL);
     CHECK(metadata[0].state != MACRO_SLOT_CACHE_INVALID);
 
     // Playback checks depend on host settings, so the next press checks again.
     preflight_fail_window  = UINT8_MAX;
     preflight_window_calls = 0u;
-    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
     test_finish_active();
 }
 
@@ -262,14 +262,14 @@ static void test_storage_change_cancels_any_active_stored_macro(void) {
     macro_slot_metadata_t       metadata[1] = {0};
 
     test_reset();
-    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
     macro_slot_provider_storage_changing();
     CHECK(cancel_calls == 1u);
     test_finish_active();
 
     test_reset();
     window_count = 2u;
-    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
     macro_slot_provider_storage_changing();
     CHECK(cancel_calls == 1u);
     // Cleanup may still scan before finish; it must never read the new bytes.
@@ -280,7 +280,7 @@ static void test_storage_change_cancels_any_active_stored_macro(void) {
     // Deferred invalidation reaching a macro still reading storage also stops it.
     test_reset();
     window_count = 2u;
-    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
     macro_slot_provider_invalidate_all(&provider, metadata);
     CHECK(cancel_calls == 1u);
     test_finish_active();

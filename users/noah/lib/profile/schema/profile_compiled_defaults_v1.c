@@ -82,8 +82,8 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, noa
     emit_u8(&writer, PD_MODE_COUNT);
     emit_u8(&writer, VIA_MACRO_SLOT_COUNT);
     emit_u8(&writer, NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS);
-#ifdef VIA_FIRMWARE_VERSION
-    emit_u32(&writer, VIA_FIRMWARE_VERSION);
+#ifdef NOAH_FIRMWARE_VERSION
+    emit_u32(&writer, NOAH_FIRMWARE_VERSION);
 #else
     emit_u32(&writer, 0u);
 #endif
@@ -117,9 +117,9 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, noa
     return NOAH_PROFILE_COMPILED_V1_OK;
 }
 
-static bool emit_domain_header(compiled_writer_t *writer, uint8_t id, uint16_t length) {
+static bool emit_domain_header(compiled_writer_t *writer, uint8_t id, uint32_t length) {
     const noah_profile_domain_shape_t *shape = noah_profile_domain_find(id);
-    return shape && emit_u8(writer, shape->id) && emit_u8(writer, shape->version) && emit_u16(writer, length);
+    return shape && emit_u8(writer, shape->id) && emit_u8(writer, shape->version) && emit_u32(writer, length);
 }
 
 // Each registry row's encoder, called directly so the linked stack contexts
@@ -158,12 +158,12 @@ static noah_profile_compiled_v1_result_t layout(noah_profile_compiled_v1_t *prof
         if (!length) continue;
         offset += NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE;
         if (offset > NOAH_PROFILE_BLOB_V1_MAX_SIZE || length > NOAH_PROFILE_BLOB_V1_MAX_SIZE - offset) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, UINT8_MAX, UINT8_MAX);
-        profile->domains[i].offset = (uint16_t)offset;
-        profile->domains[i].length = (uint16_t)length;
+        profile->domains[i].offset = (uint32_t)offset;
+        profile->domains[i].length = (uint32_t)length;
         profile->metadata.domain_mask |= noah_profile_domain_at(i)->mask;
         offset += length;
     }
-    profile->metadata.byte_length = (uint16_t)offset;
+    profile->metadata.byte_length = (uint32_t)offset;
     return NOAH_PROFILE_COMPILED_V1_OK;
 }
 
@@ -199,9 +199,9 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_com
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
     result = write_blob(profile, &writer, error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
-    if (writer.offset > UINT16_MAX || writer.offset > NOAH_PROFILE_BLOB_V1_MAX_SIZE) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, UINT8_MAX, UINT8_MAX);
+    if (writer.offset > NOAH_PROFILE_BLOB_V1_MAX_SIZE) return fail(error, NOAH_PROFILE_COMPILED_V1_CAPACITY_EXCEEDED, NOAH_PROFILE_COMPILED_V1_SURFACE_NONE, UINT8_MAX, UINT8_MAX);
     profile->metadata = (noah_profile_compiled_v1_metadata_t){
-        .byte_length       = (uint16_t)writer.offset,
+        .byte_length       = (uint32_t)writer.offset,
         .crc32             = noah_profile_crc32_finish(sink.crc32),
         .digest            = sink.digest,
         .action_abi_digest = action_abi,
@@ -296,4 +296,5 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     return true;
 }
 
-_Static_assert(sizeof(noah_profile_compiled_v1_t) <= 40u, "compiled-profile handle retains metadata and five ranges only");
+// Metadata and one 32-bit offset/length pair per domain (D-F28), nothing more.
+_Static_assert(sizeof(noah_profile_compiled_v1_t) == sizeof(noah_profile_compiled_v1_metadata_t) + NOAH_PROFILE_DOMAIN_REGISTRY_COUNT * 2u * sizeof(uint32_t) && sizeof(noah_profile_compiled_v1_t) <= 76u, "compiled-profile handle retains metadata and seven ranges only");

@@ -20,6 +20,8 @@ static inline uint16_t noah_qmk_gesture_event_time(const keyrecord_t *record) {
     return timer_read();
 }
 
+// QMK's tapping queue fills only behind TT() or OSL() to layers 16-31, the one
+// tap key QMK still decides (is_tap_keycode_user in key/runtime/process.c).
 static inline bool noah_qmk_gesture_event_pending(keypos_t pos, bool pressed, uint16_t since, uint16_t term) {
 #if !defined(NOAH_HOST_TEST_ENV) || defined(NOAH_TEST_QMK_GESTURES)
 #    if defined(COMBO_ENABLE) || defined(NOAH_TEST_QMK_GESTURES)

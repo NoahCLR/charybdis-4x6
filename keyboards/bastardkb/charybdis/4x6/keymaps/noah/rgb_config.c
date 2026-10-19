@@ -100,7 +100,7 @@ const layer_color_config_t layer_colors[LAYER_COUNT] = {
         },
     [LAYER_EXTRA_1] = {.color = HSV(96, 255, 200), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
     [LAYER_EXTRA_2] = {.color = HSV(140, 255, 200), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
-    [LAYER_EXTRA_3] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
+    [LAYER_EXTRA_3] = {.color = HSV(209, 255, 200), .mode = ALL_KEYS},
     [LAYER_EXTRA_4] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
     [LAYER_EXTRA_5] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},
     [LAYER_EXTRA_6] = {.color = HSV(0, 0, 0), .mode = KEYS_MAPPED_ON_THIS_LAYER_ONLY},

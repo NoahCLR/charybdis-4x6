@@ -1,8 +1,7 @@
 # Live-Profile Field Classification
 
-This matrix classifies every user-relevant value represented by the four keymap
-authoring files. It is the scope boundary between live data, standard VIA
-state, compiled ceilings, and executable firmware.
+This matrix classifies every user-relevant value represented by the four
+authoring files. It is the scope boundary between live data, compiled ceilings, and executable firmware.
 
 The first-grade product goal requires this to be a complete inventory. A missing field is not implicitly out of
 scope: it must be added here and classified as live data, runtime-applicable
@@ -14,15 +13,14 @@ behavior. The UI must explain every intentional non-live boundary.
 | Surface | Classification | Runtime or validation owner |
 | --- | --- | --- |
 | `key_behaviors[].keycode` | Live behavior identity | profile behavior validator/provider |
-| Row participation flags and layer mask | Live behavior policy | participation resolver and profile validator |
 | Row timing overrides | Live behavior policy | profile behavior validator/provider |
 | `keeps_auto_mouse_anchored` | Live behavior policy | key runtime and auto-mouse bridge |
 | Tap-count index and presence | Live behavior policy | behavior validator/provider |
 | Tap action | Live behavior action | action-schema validator and key runtime |
 | Hold/long-hold action | Live behavior action | action-schema validator and key runtime |
 | Hold mode and repeat rate | Live behavior policy | behavior validator and lifecycle runtime |
-| `keymaps[][]` | Standard VIA-owned state; C is compiled default | QMK dynamic keymap/VIA reconciliation |
-| `VIA_MACROS` | Standard VIA-owned state; C is compiled default | QMK dynamic macro storage |
+| `keymaps[][]` | Profile keymap domain `0x60` v1; C is compiled default | profile keymap validator and `keymap_key_to_keycode` override |
+| `VIA_MACROS` | Profile macro domain `0x70` v1; C is compiled default, also generated in the bank encoding as `authored_macro_bank.h` | profile bank validator, windowed macro provider, real-profile validation (stale bank) |
 | Macro names | Portable settings domain `0x40` v8, 128 counted UTF-8 names of at most 32 bytes each; replaces the retired user macros | profile schema |
 | Custom-key names | Portable settings domain `0x40` v8, 128 counted UTF-8 names of at most 32 bytes each after the macro names; `CUSTOM_KEYS` in C is the compiled default | profile schema |
 | `COMBOS` | GET `0x06` readout; optional live domain `0x30` for rows, timing and matching flags | combo validator/provider |
@@ -53,6 +51,10 @@ that firmware did not compile.
 | Reusable LED groups | stable profile-local id and 58-bit bitmap | publish a generation-consistent RGB view |
 | Stage enable states | one bit per compiled RGB stage | RGB frame boundary unless field affects key planning |
 
+These classifications describe which fields can change, not a separate
+RGB-preview endpoint. Current Apply and live edits publish through the strict
+activation boundary; the proposed RGB-only preview remains unimplemented.
+
 Source macro names and formatting are source-only metadata. The device stores
 profile-local numeric group ids and LED bitmaps, not C preprocessor names.
 
@@ -60,8 +62,8 @@ profile-local numeric group ids and LED bitmaps, not C preprocessor names.
 
 ### Portable Live Policy
 
-Complete profile export/import and the device-backed Defaults editors now carry
-the following settings:
+The firmware profile represents the following settings. Client editor coverage
+is tracked in Ark:
 
 - `TAPPING_TERM`, `COMBO_TERM`, `CUSTOM_TAP_HOLD_TERM`,
   `CUSTOM_LONGER_HOLD_TERM`, and `CUSTOM_MULTI_TAP_TERM`;
@@ -80,7 +82,7 @@ runtime cache and QMK setters. It also includes debounce, activation delay,
 movement threshold, combo enable/reference policy, behaviour and combo
 participation (master, per-layer masks and placement bitmaps), RGB
 speed/flags, persistent default-layer state and QMK keymap options. Combo
-timing is materialized in the combo domain. The 128 VIA macros with their names
+timing is materialized in the combo domain. The 128 macros with their names
 and sixteen user-facing layer names are portable.
 
 ### Compiled Capability Or Feature Inclusion
@@ -90,7 +92,7 @@ and sixteen user-facing layer names are portable.
 - `RGB_COMBO_FEEDBACK_ENABLE`
 - `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`
 - `RGB_AUTOMOUSE_GRADIENT_ENABLE`
-- VIA, combo, RGB Matrix, pointing-device, and split feature gates
+- Raw HID, combo, RGB Matrix, pointing-device, and split feature gates (VIA is not supported, D-F31)
 
 The RGB domain provides runtime enable bits for compiled RGB feedback stages. Turning
 on a feature omitted from the firmware still requires flashing.
@@ -99,7 +101,7 @@ on a feature omitted from the firmware still requires flashing.
 
 - `LAYER_COUNT` and `DYNAMIC_KEYMAP_LAYER_COUNT`
 - `KEY_BEHAVIOR_MAX_TAP_COUNT`
-- dynamic macro count
+- profile macro-slot count
 - RGB Matrix LED count and split geometry
 - profile row, group, action, and payload limits
 
@@ -107,7 +109,7 @@ on a feature omitted from the firmware still requires flashing.
 
 - `RGB_MATRIX_MAXIMUM_BRIGHTNESS`
 - `RGB_MATRIX_LED_FLUSH_LIMIT`
-- wear-level backing size and EEPROM partition
+- profile flash region, wear-level backing size and logical EEPROM allocation
 - physical SRAM-bank, linked-section, allocator, stack, and regression-policy
   budgets
 - repeat-rate maximum
@@ -129,7 +131,7 @@ These require source changes and a firmware build.
 ## `pd_config.c`: configurable PD slots
 
 The [PD-mode domain contract](pd-mode-domain-v1.md) covers configuration that
-formerly lived partly outside the authored profile files. Schema 3 carries
+formerly lived partly outside the authored profile files. Schema 4 carries
 32 stable PD identities (eight before D-F09). Retired settings scalars 10–14 are canonical zero;
 per-slot records are the single owner of mode DPI.
 
@@ -147,9 +149,10 @@ per-slot records are the single owner of mode DPI.
 
 - Standard QMK keycodes may use a 16-bit operand only when the stored
   action-ABI digest matches the connected firmware.
-- Layer, PD-mode, VIA-macro and userspace-owned actions use
-  semantic action kinds plus bounded operands. They are not persisted as raw
-  custom-keycode enum values.
+- Behaviour and combo actions use semantic kinds plus bounded operands for
+  layers, PD modes, macros and custom keys. The keymap domain and PD tap
+  records deliberately store native 16-bit keycodes instead, admitted against
+  the matching action ABI; see their domain contracts.
 - PD identities come from the manifest's stable semantic id, not its current
   bit position.
 - Layer references use logical layer ids validated against the candidate's

@@ -34,8 +34,8 @@
         },
         {
           "caller": "macro_slot_provider_load_window",
-          "callee": "via_macro_provider_load_ir",
-          "reason": "The active provider copies VIA's load callback, which decodes a stored window; authored defaults do not use this path."
+          "callee": "profile_macro_provider_load_ir",
+          "reason": "The active provider supplies the profile load callback; stored banks decode a bounded window and compiled defaults compile the authored payload into the same window."
         },
         {
           "caller": "macro_payload_finish",
@@ -54,23 +54,8 @@
         },
         {
           "caller": "io_read",
-          "callee": "noah_qmk_profile_eeprom_read",
-          "reason": "the read-only profile store invokes the QMK EEPROM adapter through its injected storage IO callback"
-        },
-        {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_profile_store_runtime_matrix_scan_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches profile discovery through its rotating step table"
-        },
-        {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_qmk_via_split_mirror_matrix_scan_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches the VIA mirror mailbox through its rotating step table"
-        },
-        {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_qmk_via_split_sync_matrix_scan_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches durable VIA reconciliation through its rotating step table"
+          "callee": "flash_read",
+          "reason": "the profile store reads the slot flash region in place through its injected flash backend (D-F29)"
         },
         {
           "caller": "noah_profile_reader_read",
@@ -79,8 +64,23 @@
         },
         {
           "caller": "staged_reader_read",
-          "callee": "noah_qmk_profile_eeprom_read",
-          "reason": "The committed-slot reader invokes the installed EEPROM cache adapter; physical flash is not read on this path."
+          "callee": "flash_read",
+          "reason": "the staged profile reader reads the slot flash region in place through the installed flash backend (D-F29)"
+        },
+        {
+          "caller": "read_flash",
+          "callee": "rp2040_read",
+          "reason": "the flash backend reads through its driver's XIP read (D-F29)"
+        },
+        {
+          "caller": "noah_effective_macro_read_byte",
+          "callee": "staged_reader_read",
+          "reason": "Macro window decoding reads the published committed slot through the active reader's callback, inside the range found at publication."
+        },
+        {
+          "caller": "noah_effective_macro_bank_read",
+          "callee": "staged_reader_read",
+          "reason": "The macro slot search reads the published committed slot through the active reader's callback, inside the range found at publication."
         }
       ],
       "cycle_bounds": [
@@ -205,64 +205,36 @@
           "functions": ["main", "matrix_scan", "macro_payload_finish", "macro_slot_provider_finish"]
         },
         {
-          "name": "handled VIA macro IR preflight",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "via_macro_provider_start", "macro_payload_ir_next"]
+          "name": "handled profile macro IR preflight",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_payload_ir_next"]
         },
         {
-          "name": "handled VIA macro window decode held sequence",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "via_macro_provider_start", "macro_slot_provider_load_window", "via_macro_provider_load_ir", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
+          "name": "handled profile macro window decode held sequence",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
         },
         {
-          "name": "handled VIA macro window storage read",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "via_macro_provider_start", "macro_slot_provider_load_window", "via_macro_provider_load_ir", "via_macro_provider_read_byte", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
+          "name": "handled profile macro slot search",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "profile_macro_provider_find_slot", "noah_effective_macro_bank_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "handled profile macro window storage read",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_effective_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "matrix scan macro window refill held sequence",
-          "functions": ["main", "matrix_scan", "macro_slot_provider_load_next", "macro_slot_provider_load_window", "via_macro_provider_load_ir", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
+          "functions": ["main", "matrix_scan", "macro_slot_provider_load_next", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
         },
         {
           "name": "matrix scan macro window refill storage read",
-          "functions": ["main", "matrix_scan", "macro_slot_provider_load_next", "macro_slot_provider_load_window", "via_macro_provider_load_ir", "via_macro_provider_read_byte", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "macro_slot_provider_load_next", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_effective_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "matrix scan macro persistent hold owned press",
           "functions": ["main", "matrix_scan", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
         },
         {
-          "name": "matrix scan VIA default macro seed",
-          "functions": ["main", "matrix_scan", "apply_via_default_macros", "seed_via_default_macros", "macro_payload_compile", "macro_payload_lookup_keycode", "strlen"]
-        },
-        {
-          "name": "matrix scan VIA canonical digest read",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_storage_digest_step", "noah_qmk_via_storage_region_read", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
-        },
-        {
           "name": "matrix scan live-profile boot discovery",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_profile_store_boot_select_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
-        },
-        {
-          "name": "matrix scan VIA metadata and snapshot RPC",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_rpc_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
-        },
-        {
-          "name": "matrix scan VIA pulled macro fragment write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_storage_region_write", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan VIA verified generation commit",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_sync_state_complete_mutation", "noah_qmk_via_sync_state_persist", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan VIA two-dirty default recovery",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "eeconfig_init_via", "dynamic_keymap_reset", "nvm_dynamic_keymap_update_keycode", "eeprom_update_byte", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan queued VIA mirror keymap write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_mirror_matrix_scan_step", "nvm_dynamic_keymap_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan queued VIA mirror macro write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_mirror_matrix_scan_step", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_profile_store_boot_select_step", "io_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "pointing task dragscroll accumulation",
@@ -277,28 +249,28 @@
           "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "owned_keycode_tap_literal", "register_code16", "register_code"]
         },
         {
-          "name": "pointing task directional VIA macro window decode held sequence",
-          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "via_macro_provider_start", "macro_slot_provider_load_window", "via_macro_provider_load_ir", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
+          "name": "pointing task directional profile macro window decode held sequence",
+          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "macro_payload_flush_pending_qmk_sequence", "macro_payload_ir_write_key_action", "macro_payload_hold_balance_note_down"]
         },
         {
-          "name": "pointing task directional VIA macro window storage read",
-          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "via_macro_provider_start", "macro_slot_provider_load_window", "via_macro_provider_load_ir", "via_macro_provider_read_byte", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
+          "name": "pointing task directional profile macro window storage read",
+          "functions": ["main", "pointing_device_task", "directional_drain", "emit_tap", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_decode_qmk_window", "noah_effective_macro_read_byte", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "physical press participation indexed behavior lookup",
-          "functions": ["main", "action_exec", "noah_participation_behavior", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "action_exec", "noah_participation_behavior", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "native tapping indexed behavior lookup",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "is_tap_record", "key_behavior_view_build", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "is_tap_record", "key_behavior_view_build", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "completed chord output behavior permission",
-          "functions": ["main", "action_exec", "noah_participation_combo_output", "noah_participation_behavior_generated", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "action_exec", "noah_participation_combo_output", "noah_participation_behavior_generated", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "generated output captured behavior permission",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "is_tap_record", "noah_qmk_combo_origin_capture_record", "noah_participation_combo_output", "noah_participation_behavior_generated", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "is_tap_record", "noah_qmk_combo_origin_capture_record", "noah_participation_combo_output", "noah_participation_behavior_generated", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "generated output origin reconstruction",
@@ -319,6 +291,14 @@
         {
           "name": "generated origin reconstruction combo allowed layer",
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "noah_qmk_combo_origin_normalize_record", "combo_origin_combo_build_from_pressed_keys", "noah_participation_combo_row", "noah_effective_combo_allowed_layers"]
+        },
+        {
+          "name": "handled compiled-default macro parse",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_profile_macro_start", "macro_slot_provider_load_window", "profile_macro_provider_load_ir", "macro_payload_compile", "macro_payload_ir_write_text"]
+        },
+        {
+          "name": "physical key profile lookup",
+          "functions": ["main", "action_exec", "keymap_key_to_keycode", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         }
       ]
     },
@@ -362,16 +342,6 @@
           "caller": "slave_rpc_exec_callback",
           "callee": "split_runtime_sync_slave_key_feedback_branch_rpc",
           "reason": "local split RPC registry branch-feedback callback"
-        },
-        {
-          "caller": "slave_rpc_exec_callback",
-          "callee": "noah_qmk_via_split_sync_rpc",
-          "reason": "local split RPC registry dispatches the durable VIA reconciliation callback"
-        },
-        {
-          "caller": "slave_rpc_exec_callback",
-          "callee": "noah_qmk_via_split_mirror_rpc",
-          "reason": "local split RPC registry dispatches the best-effort VIA mirror callback"
         }
       ],
       "cycle_bounds": [],
@@ -391,18 +361,6 @@
         {
           "name": "branch-feedback RPC",
           "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_key_feedback_branch_rpc"]
-        },
-        {
-          "name": "VIA durable request mailbox admission",
-          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_rpc", "noah_qmk_via_sync_frame_decode", "noah_qmk_via_sync_crc8"]
-        },
-        {
-          "name": "VIA mirror mailbox admission",
-          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_mirror_rpc"]
-        },
-        {
-          "name": "VIA structured acknowledgement encode",
-          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_rpc", "noah_qmk_via_respond_status", "noah_qmk_via_encode_response", "noah_qmk_via_sync_frame_encode", "noah_qmk_via_sync_crc8"]
         }
       ]
     }

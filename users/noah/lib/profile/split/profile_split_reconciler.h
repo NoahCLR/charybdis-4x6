@@ -10,6 +10,7 @@
 #include "profile_split_authority.h"
 #include "profile_split_protocol_v1.h"
 #include "../storage/profile_peer_store_backend.h"
+#include "../storage/profile_storage_layout.h"
 
 enum {
     NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS = 50u,
@@ -29,9 +30,10 @@ enum {
     // correlated STORE_WORKING reply is expected work, not a lost mailbox.
     // Collect completion promptly without spending an RPC every 5 ms.
     NOAH_PROFILE_SPLIT_STORE_POLL_MS = 25u,
-    // The receiver writes at most one full chunk's worth of bytes in a scan,
-    // whether they arrived in a chunk or are copied for PAYLOAD_REUSE.
-    NOAH_PROFILE_SPLIT_PEER_SCAN_BYTES = NOAH_PROFILE_SPLIT_V1_CHUNK_MAX,
+    // The receiver copies at most a flash page of a PAYLOAD_REUSE range in a
+    // scan, in writes of at most a candidate chunk, so a scan programs at
+    // most one page (D-F29, "Pacing"). A chunk that arrives is written whole.
+    NOAH_PROFILE_SPLIT_PEER_SCAN_BYTES = NOAH_PROFILE_STORAGE_PAGE_SIZE,
     NOAH_PROFILE_SPLIT_POLL_MS         = 1000u,
     // A passive half cannot actively probe the link. Missing three normal
     // master polls invalidates its peer observation and therefore activation.
@@ -52,14 +54,15 @@ enum {
     // releasing never changes durable authority.
     NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS = 15000u,
     // Firmware-state regression policy, not an RP2040 SRAM-capacity claim.
-    NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT = 896u,
+    // It rose from 896 when the cached reply grew from 32 to 128 bytes, the
+    // size of a pulled chunk's frame (D-F28).
+    NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT = 1024u,
 };
 
 typedef enum {
     NOAH_PROFILE_SPLIT_RECONCILER_UNINITIALIZED = 0u,
     NOAH_PROFILE_SPLIT_RECONCILER_PASSIVE,
     NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER,
-    NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BIND,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_READ,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_SEND,
@@ -68,7 +71,6 @@ typedef enum {
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT,
     NOAH_PROFILE_SPLIT_RECONCILER_PUSH_ABORT,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_BEGIN,
-    NOAH_PROFILE_SPLIT_RECONCILER_PULL_BIND,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_REQUEST,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_WRITE,
     NOAH_PROFILE_SPLIT_RECONCILER_PULL_COMMIT_BEGIN,
@@ -79,30 +81,30 @@ typedef enum {
 } noah_profile_split_reconciler_state_t;
 
 typedef bool (*noah_profile_split_local_descriptor_fn)(void *context, noah_profile_split_descriptor_t *descriptor);
-typedef bool (*noah_profile_split_local_read_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length);
-typedef bool (*noah_profile_split_local_binding_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t *via_generation, uint32_t *via_digest);
+typedef bool (*noah_profile_split_local_read_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, uint8_t *bytes, uint8_t length);
 // Sends one request of request_length bytes (32 up to the largest frame) and
-// receives the peer's 32-byte reply.
-typedef bool (*noah_profile_split_exchange_fn)(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);
+// receives the peer's reply into response_length bytes, the request's
+// noah_profile_split_v1_reply_capacity (32, or up to the largest frame for a
+// PAYLOAD_REQUEST).
+typedef bool (*noah_profile_split_exchange_fn)(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length);
 
 // A range of a prepared copy the peer can fill from its own active profile:
 // destination `offset` in the copy, `source_offset` in the named source.
 typedef struct {
     noah_profile_split_v1_source_t source;
-    uint16_t                       offset;
-    uint16_t                       source_offset;
-    uint16_t                       length;
+    uint32_t                       offset;
+    uint32_t                       source_offset;
+    uint32_t                       length;
 } noah_profile_split_reuse_range_t;
 
 // Returns the first reuse range of the copy that ends after `offset`, or
 // false when none does. Called with the prepared source's context.
-typedef bool (*noah_profile_split_reuse_plan_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, noah_profile_split_reuse_range_t *range);
+typedef bool (*noah_profile_split_reuse_plan_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, noah_profile_split_reuse_range_t *range);
 
 typedef struct {
     void                                  *local_context;
     noah_profile_split_local_descriptor_fn local_descriptor;
     noah_profile_split_local_read_fn       local_read;
-    noah_profile_split_local_binding_fn    local_binding;
     void                                  *transport_context;
     noah_profile_split_exchange_fn         exchange;
     noah_profile_peer_store_backend_t     *peer_store;
@@ -110,15 +112,20 @@ typedef struct {
     // its own active profile and sends PAYLOAD_REUSE for those instead of
     // their bytes. Background repair always sends bytes.
     noah_profile_split_reuse_plan_fn prepared_reuse_plan;
+    // Optional. Whether this half's storage step is not running just now
+    // (profile_store_runtime.c): a request it cannot take yet is then answered
+    // BUSY_STORAGE_PAUSED, not MAILBOX_FULL. Called from the RPC callback.
+    bool (*storage_paused)(void *context);
+    void *storage_paused_context;
 } noah_profile_split_reconciler_config_t;
 
 typedef struct {
     noah_profile_split_reconciler_state_t state;
     noah_profile_split_v1_status_t        last_status;
-    uint16_t                              transfer_offset;
-    uint16_t                              transfer_length;
+    uint32_t                              transfer_offset;
+    uint32_t                              transfer_length;
     // Bytes of the current copy the peer filled from its own profile.
-    uint16_t                              reused_bytes;
+    uint32_t                              reused_bytes;
     uint32_t                              transport_failure_count;
     uint32_t                              retry_count;
     // The last ACK/BUSY the peer sent: why, and what its store held. With the
@@ -137,6 +144,8 @@ typedef struct {
     // starts, and a peer that never answers needs a restart.
     bool peer_cleanup_pending;
     bool prepared_push_active;
+    // Highest correlated peer work phase for this copy; repetitions are not progress.
+    uint8_t prepare_progress_phase;
 } noah_profile_split_reconciler_status_t;
 
 typedef enum {
@@ -188,17 +197,11 @@ typedef struct {
     volatile uint8_t                       published_store_state;
     volatile uint8_t                       published_owner;
     volatile uint8_t                       published_admission;
-    uint32_t                               prepared_via_generation;
-    uint32_t                               prepared_via_digest;
     // While a prepared push is cancelled, when it is released without the
     // peer's ABORT acknowledgement; after that, when the ABORT is next retried.
     uint32_t                               abort_deadline;
-    uint32_t                               incoming_via_generation;
-    uint32_t                               incoming_via_digest;
-    uint32_t                               incoming_profile_generation;
-    uint32_t                               incoming_profile_digest;
-    uint16_t                               transfer_offset;
-    uint16_t                               reused_bytes;
+    uint32_t                               transfer_offset;
+    uint32_t                               reused_bytes;
     // Prepared-push diagnostics, reset on a new push and retained afterward.
     // Scans count reconciler invocations, not every QMK matrix scan.
     uint32_t                               prepared_scans;
@@ -209,18 +212,20 @@ typedef struct {
     uint8_t                                outbound_chunk[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX];
     // The next frame is PAYLOAD_REUSE for this range rather than a chunk.
     noah_profile_split_reuse_range_t outbound_reuse;
-    uint16_t                         outbound_reuse_progress; // the peer's offset in it so far
+    uint32_t                         outbound_reuse_progress; // the peer's offset in it so far
     // A receiver's PAYLOAD_REUSE range it copies over several scans: where
     // the request started in the copy and in the source, and where it ends.
     noah_profile_split_v1_source_t         incoming_reuse_source;
-    uint16_t                               incoming_reuse_offset;
-    uint16_t                               incoming_reuse_source_offset;
-    uint16_t                               incoming_reuse_end;
+    uint32_t                               incoming_reuse_offset;
+    uint32_t                               incoming_reuse_source_offset;
+    uint32_t                               incoming_reuse_end;
     uint8_t                                mailbox_length;
     uint8_t                                cached_request_length;
+    uint8_t                                cached_response_length;
     uint8_t                                mailbox_wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
     uint8_t                                cached_request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
-    uint8_t                                cached_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    // A pulled chunk's reply is as large as a pushed chunk's request.
+    uint8_t                                cached_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
     uint8_t                                metadata_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
     noah_runtime_publication_generation_t  mailbox_sequence;
     noah_runtime_publication_generation_t  response_sequence;
@@ -244,20 +249,22 @@ typedef struct {
     // A released push's ABORT is still unacknowledged. `transfer_descriptor`
     // keeps naming it: no other transfer starts until the peer confirms.
     bool                                   orphan_pending;
-    bool                                   incoming_logical_binding;
     bool                                   attempt_immediate;
     bool                                   outbound_reuse_pending;
     // The peer refused a PAYLOAD_REUSE source; send the rest of this copy as
     // bytes.
     bool                                   reuse_unavailable;
     bool incoming_reuse_active;
+    uint8_t prepare_progress_phase;
 } noah_profile_split_reconciler_t;
 
 void noah_profile_split_reconciler_init(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_reconciler_config_t *config);
 
 // QMK RPC/callback side. It performs strict frame decode, at most one bounded
 // mailbox copy, and a cached response copy. EEPROM, validation, and provider
-// operations are deliberately absent from this path.
+// operations are deliberately absent from this path. `response_length` is the
+// reply buffer the requester asked for (FRAME_SIZE up to FRAME_MAX); the reply
+// frame starts it and the rest is zero.
 bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reconciler, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length);
 
 // Matrix-scan side. Each call performs at most one RPC, one payload read/write,
@@ -269,7 +276,7 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
 // Starts a provisional outbound transfer from caller-owned staged storage.
 // The reconciler transfers and ACKs every payload byte, then pauses in
 // PUSH_PREPARED until the owner explicitly authorizes the peer commit.
-bool noah_profile_split_reconciler_prepared_push_begin_logical(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read, uint32_t via_generation, uint32_t via_digest);
+bool noah_profile_split_reconciler_prepared_push_begin(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor, void *source_context, noah_profile_split_local_read_fn source_read);
 bool noah_profile_split_reconciler_prepared_push_ready(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_descriptor_t *descriptor);
 bool noah_profile_split_reconciler_prepared_push_authorize_commit(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor);
 // Cancellation is scan-owned: once the peer admitted PREPARE_BEGIN, this
@@ -289,6 +296,9 @@ bool noah_profile_split_reconciler_refresh_authority(noah_profile_split_reconcil
 
 const noah_profile_split_authority_t *noah_profile_split_reconciler_authority(const noah_profile_split_reconciler_t *reconciler);
 bool                                  noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_reconciler_status_t *status);
+// The two fields a host save watches for peer progress, without copying the
+// whole status onto the scan path's stack.
+bool noah_profile_split_reconciler_progress(const noah_profile_split_reconciler_t *reconciler, uint32_t *transfer_offset, uint8_t *prepare_progress_phase);
 
 #ifdef NOAH_PROFILE_SPLIT_TEST_HOOKS
 void noah_profile_split_test_local_validation(void);

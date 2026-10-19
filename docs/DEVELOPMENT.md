@@ -128,7 +128,7 @@ by a release, to exactly the pinned commit.
 Re-pin with `sh tools/pin-qmk.sh [REV]` (default: the published BK dev head).
 It lists the BK commits since the old pin and what changed by area: hooks and
 core, keycode numbering, VIA, RGB matrix, the Charybdis board and submodules.
-Keycode, VIA or RGB changes need an Ark follow-up.
+Keycode or RGB changes need an Ark follow-up; this firmware does not build BK's VIA code (D-F31).
 
 ## The firmware contract
 
@@ -137,7 +137,7 @@ client: the exact Profile Wire capability pages the keyboard answers once its
 live-profile owner is up (versions, feature flags, capacities, the action-ABI
 digest and the compiled-default digest), the BK pin, and the SHA-256 of every
 fixture under `tests/fixtures`. It builds them from the code the keyboard
-runs: the VIA channel and the probe share `lib/compat/qmk_via_profile_capabilities.h`,
+runs: the Raw HID channel and the probe share `lib/compat/qmk_profile_capabilities.h`,
 the digests come from the compiled-defaults code the owner uses, and the bytes
 from the Profile Wire encoder. The host suite runs it; a release's `Pair build`
 produces it as `firmware-contract.json`, which the release publishes. Firmware only states the contract; the
@@ -188,19 +188,22 @@ compare; recorded sets live under [`measurements/`](../measurements/README.md).
 Handled keys preserve physical gesture timing across combo/tapping buffering;
 authored layer-tap behaviours use one tap/hold decision. See the
 [timing contract](INTERACTION_MODEL.md#physical-gestures-and-buffered-delivery).
-This requires the paired QMK fork changes and an Ark client recognizing Profile
-Wire feature bit 17. The current layout and timing defaults are unchanged.
+This requires the paired QMK fork changes. The current layout and timing
+defaults are unchanged.
 
 Runtime-owned tapping now also covers authored MT/OSM rows and intrinsic TT/OSL
-keys (Profile Wire bit 18). Keys pressed while such a key is undecided wait for
+keys. Keys pressed while such a key is undecided wait for
 its tap or hold, as QMK's tapping does, so rolls keep their order. The
 [release timing contract](INTERACTION_MODEL.md#release-intervals-and-timing-advice)
 also defines the impossible release interval Ark reports.
 
 Every LT/MT/OSM key, with or without a row, is now the runtime's too, and QMK's
-tapping engine classifies no record (D-F27, Profile Wire bit 31). Ark refuses
-unknown feature bits, so it must recognise bit 31 before it connects to such a
-build.
+tapping engine classifies no record (D-F27).
+
+The new base (D-F28) moves Profile Wire to 2.0, the profile schema to 4.0 and
+the store to format 6, with 32-bit profile lengths and offsets everywhere, and
+retires the feature bits these timing changes were once advertised by. Only an
+Ark on the new base can drive such a build.
 
 ## Open release gates
 

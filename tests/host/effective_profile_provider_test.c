@@ -13,12 +13,12 @@ enum {
     REASON_MACRO_BUSY = 1u << 3,
 };
 
-static const uint8_t canonical_empty_profile[]    = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
-static const uint8_t canonical_behavior_profile[] = "\x4e\x4c\x50\x31\x03\x00\x01\x01\x20\x02\x42\x00\x02\x00\x03\x00"
-                                                    "\x24\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02\xff\xff"
-                                                    "\x00\x00\x00\x02\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00\x0a\x00"
-                                                    "\x02\x00\x03\x00\x03\x00\x16\x00\x04\x00\x02\x00\x00\x00\x00\x00"
-                                                    "\x00\x00\x02\x01\x05\x00\x00\x00\x01\x01\x07\x00\x02\x00";
+static const uint8_t canonical_empty_profile[]    = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
+static const uint8_t canonical_behavior_profile[] = "\x4e\x4c\x50\x31\x04\x00\x01\x01\x20\x02\x42\x00\x00\x00\x02\x00"
+                                                    "\x03\x00\x24\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02"
+                                                    "\xff\xff\x00\x00\x00\x02\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00"
+                                                    "\x0a\x00\x02\x00\x03\x00\x03\x00\x16\x00\x04\x00\x02\x00\x00\x00"
+                                                    "\x00\x00\x00\x00\x02\x01\x05\x00\x00\x00\x01\x01\x07\x00\x02\x00";
 
 typedef struct {
     uint8_t prefix[5];
@@ -98,7 +98,7 @@ static void invalidate(void *context, uint32_t publication_count, noah_effective
     invalidation->saw_reentrant_guard     = noah_effective_profile_provider_request_compiled_fallback(invalidation->provider) == NOAH_EFFECTIVE_PROFILE_REENTRANT;
 }
 
-static noah_profile_validator_v1_profile_t validate_profile(const noah_profile_reader_t *reader, size_t base_offset, uint16_t byte_length, uint8_t domain_mask) {
+static noah_profile_validator_v1_profile_t validate_profile(const noah_profile_reader_t *reader, size_t base_offset, uint32_t byte_length, uint8_t domain_mask) {
     noah_profile_validator_v1_compatibility_t compatibility = noah_profile_validator_v1_default_compatibility(ACTION_ABI_DIGEST);
     noah_profile_validator_v1_declaration_t   declaration;
     noah_profile_validator_v1_error_t         error = noah_profile_validator_v1_no_error();
@@ -570,7 +570,40 @@ static void test_backing_reuse_requires_explicit_active_aware_reservation(void) 
     assert(noah_effective_profile_provider_request_validated(&provider, &compiled_as_live) == NOAH_EFFECTIVE_PROFILE_ACTIVE_BACKING_PINNED);
 }
 
+static void test_keymap_and_macro_publication_requires_safe_boundary(void) {
+    const uint8_t ids[] = {NOAH_PROFILE_DOMAIN_V1_KEYMAP, NOAH_PROFILE_DOMAIN_V1_MACROS};
+    const uint8_t masks[] = {NOAH_PROFILE_DOMAIN_MASK_KEYMAP, NOAH_PROFILE_DOMAIN_MASK_MACROS};
+    for (size_t domain = 0; domain < 2; domain++) {
+        uint8_t bytes[14 + 2048] = {0};
+        uint16_t payload_length = domain == 0 ? 2048 : 128;
+        memcpy(bytes, "NLP1\4\0\1\1", 8);
+        bytes[8] = ids[domain]; bytes[9] = 1;
+        bytes[10] = (uint8_t)payload_length; bytes[11] = (uint8_t)(payload_length >> 8);
+        noah_profile_reader_t reader = noah_profile_reader_from_memory(bytes, 14 + payload_length);
+        noah_profile_validator_v1_profile_t profile = validate_profile(&reader, 0, 14 + payload_length, masks[domain]);
+        backing_t backing;
+        init_backing(&backing, 0);
+        noah_effective_profile_snapshot_t compiled = make_compiled(&backing), live;
+        assert(noah_effective_profile_snapshot_make_validated(&profile, &reader, 0, 1, 0, compiled.identity.payload_digest, &live) == NOAH_EFFECTIVE_PROFILE_OK);
+        noah_effective_profile_provider_t provider;
+        assert(noah_effective_profile_provider_init(&provider, &compiled, NULL, NULL, NULL, 0) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(noah_effective_profile_provider_request_validated(&provider, &live) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_SAFE_BOUNDARY_REQUIRED);
+        safe_boundary_reason_mask = REASON_KEYS_HELD | REASON_MACRO_BUSY;
+        assert(noah_effective_profile_provider_init(&provider, &compiled, safe_boundary, &safe_boundary_reason_mask, NULL, 0) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(noah_effective_profile_provider_request_validated(&provider, &live) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_WAITING);
+        safe_boundary_reason_mask = 0;
+        assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
+        // Removing a domain changes output too, even though the fallback is empty.
+        provider.safe_boundary = NULL;
+        assert(noah_effective_profile_provider_request_compiled_fallback(&provider) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_SAFE_BOUNDARY_REQUIRED);
+    }
+}
+
 int main(void) {
+    test_keymap_and_macro_publication_requires_safe_boundary();
     test_initial_compiled_snapshot_and_fail_closed_copies();
     test_nested_domain_views_must_stay_inside_blob();
     test_safe_boundary_reentrancy_and_missing_behavior_predicate();

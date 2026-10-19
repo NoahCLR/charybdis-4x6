@@ -36,146 +36,147 @@
 // (MS_BTN1–MS_BTN8), or KC_NO for modifiers alone, e.g.
 //   SHORTCUT(CUSTOM_KEY_4, "Hyper K", SHORTCUT_MODS(KC_LCTL, KC_RALT), KC_K)
 // A profile saved from Charybdis Ark keeps its own names and shortcuts.
-#define CUSTOM_KEYS(KEY, SHORTCUT)   \
-    KEY(CUSTOM_KEY_0, "Right Thumb") \
-    KEY(CUSTOM_KEY_1, "Left Thumb")  \
-    KEY(CUSTOM_KEY_2, "Click Spam")  \
-    KEY(CUSTOM_KEY_3, "Drag Window") \
-    KEY(CUSTOM_KEY_4, "")            \
-    KEY(CUSTOM_KEY_5, "")            \
-    KEY(CUSTOM_KEY_6, "")            \
-    KEY(CUSTOM_KEY_7, "")            \
-    KEY(CUSTOM_KEY_8, "")            \
-    KEY(CUSTOM_KEY_9, "")            \
-    KEY(CUSTOM_KEY_10, "")           \
-    KEY(CUSTOM_KEY_11, "")           \
-    KEY(CUSTOM_KEY_12, "")           \
-    KEY(CUSTOM_KEY_13, "")           \
-    KEY(CUSTOM_KEY_14, "")           \
-    KEY(CUSTOM_KEY_15, "")           \
-    KEY(CUSTOM_KEY_16, "")           \
-    KEY(CUSTOM_KEY_17, "")           \
-    KEY(CUSTOM_KEY_18, "")           \
-    KEY(CUSTOM_KEY_19, "")           \
-    KEY(CUSTOM_KEY_20, "")           \
-    KEY(CUSTOM_KEY_21, "")           \
-    KEY(CUSTOM_KEY_22, "")           \
-    KEY(CUSTOM_KEY_23, "")           \
-    KEY(CUSTOM_KEY_24, "")           \
-    KEY(CUSTOM_KEY_25, "")           \
-    KEY(CUSTOM_KEY_26, "")           \
-    KEY(CUSTOM_KEY_27, "")           \
-    KEY(CUSTOM_KEY_28, "")           \
-    KEY(CUSTOM_KEY_29, "")           \
-    KEY(CUSTOM_KEY_30, "")           \
-    KEY(CUSTOM_KEY_31, "")           \
-    KEY(CUSTOM_KEY_32, "")           \
-    KEY(CUSTOM_KEY_33, "")           \
-    KEY(CUSTOM_KEY_34, "")           \
-    KEY(CUSTOM_KEY_35, "")           \
-    KEY(CUSTOM_KEY_36, "")           \
-    KEY(CUSTOM_KEY_37, "")           \
-    KEY(CUSTOM_KEY_38, "")           \
-    KEY(CUSTOM_KEY_39, "")           \
-    KEY(CUSTOM_KEY_40, "")           \
-    KEY(CUSTOM_KEY_41, "")           \
-    KEY(CUSTOM_KEY_42, "")           \
-    KEY(CUSTOM_KEY_43, "")           \
-    KEY(CUSTOM_KEY_44, "")           \
-    KEY(CUSTOM_KEY_45, "")           \
-    KEY(CUSTOM_KEY_46, "")           \
-    KEY(CUSTOM_KEY_47, "")           \
-    KEY(CUSTOM_KEY_48, "")           \
-    KEY(CUSTOM_KEY_49, "")           \
-    KEY(CUSTOM_KEY_50, "")           \
-    KEY(CUSTOM_KEY_51, "")           \
-    KEY(CUSTOM_KEY_52, "")           \
-    KEY(CUSTOM_KEY_53, "")           \
-    KEY(CUSTOM_KEY_54, "")           \
-    KEY(CUSTOM_KEY_55, "")           \
-    KEY(CUSTOM_KEY_56, "")           \
-    KEY(CUSTOM_KEY_57, "")           \
-    KEY(CUSTOM_KEY_58, "")           \
-    KEY(CUSTOM_KEY_59, "")           \
-    KEY(CUSTOM_KEY_60, "")           \
-    KEY(CUSTOM_KEY_61, "")           \
-    KEY(CUSTOM_KEY_62, "")           \
-    KEY(CUSTOM_KEY_63, "")           \
-    KEY(CUSTOM_KEY_64, "")           \
-    KEY(CUSTOM_KEY_65, "")           \
-    KEY(CUSTOM_KEY_66, "")           \
-    KEY(CUSTOM_KEY_67, "")           \
-    KEY(CUSTOM_KEY_68, "")           \
-    KEY(CUSTOM_KEY_69, "")           \
-    KEY(CUSTOM_KEY_70, "")           \
-    KEY(CUSTOM_KEY_71, "")           \
-    KEY(CUSTOM_KEY_72, "")           \
-    KEY(CUSTOM_KEY_73, "")           \
-    KEY(CUSTOM_KEY_74, "")           \
-    KEY(CUSTOM_KEY_75, "")           \
-    KEY(CUSTOM_KEY_76, "")           \
-    KEY(CUSTOM_KEY_77, "")           \
-    KEY(CUSTOM_KEY_78, "")           \
-    KEY(CUSTOM_KEY_79, "")           \
-    KEY(CUSTOM_KEY_80, "")           \
-    KEY(CUSTOM_KEY_81, "")           \
-    KEY(CUSTOM_KEY_82, "")           \
-    KEY(CUSTOM_KEY_83, "")           \
-    KEY(CUSTOM_KEY_84, "")           \
-    KEY(CUSTOM_KEY_85, "")           \
-    KEY(CUSTOM_KEY_86, "")           \
-    KEY(CUSTOM_KEY_87, "")           \
-    KEY(CUSTOM_KEY_88, "")           \
-    KEY(CUSTOM_KEY_89, "")           \
-    KEY(CUSTOM_KEY_90, "")           \
-    KEY(CUSTOM_KEY_91, "")           \
-    KEY(CUSTOM_KEY_92, "")           \
-    KEY(CUSTOM_KEY_93, "")           \
-    KEY(CUSTOM_KEY_94, "")           \
-    KEY(CUSTOM_KEY_95, "")           \
-    KEY(CUSTOM_KEY_96, "")           \
-    KEY(CUSTOM_KEY_97, "")           \
-    KEY(CUSTOM_KEY_98, "")           \
-    KEY(CUSTOM_KEY_99, "")           \
-    KEY(CUSTOM_KEY_100, "")          \
-    KEY(CUSTOM_KEY_101, "")          \
-    KEY(CUSTOM_KEY_102, "")          \
-    KEY(CUSTOM_KEY_103, "")          \
-    KEY(CUSTOM_KEY_104, "")          \
-    KEY(CUSTOM_KEY_105, "")          \
-    KEY(CUSTOM_KEY_106, "")          \
-    KEY(CUSTOM_KEY_107, "")          \
-    KEY(CUSTOM_KEY_108, "")          \
-    KEY(CUSTOM_KEY_109, "")          \
-    KEY(CUSTOM_KEY_110, "")          \
-    KEY(CUSTOM_KEY_111, "")          \
-    KEY(CUSTOM_KEY_112, "")          \
-    KEY(CUSTOM_KEY_113, "")          \
-    KEY(CUSTOM_KEY_114, "")          \
-    KEY(CUSTOM_KEY_115, "")          \
-    KEY(CUSTOM_KEY_116, "")          \
-    KEY(CUSTOM_KEY_117, "")          \
-    KEY(CUSTOM_KEY_118, "")          \
-    KEY(CUSTOM_KEY_119, "")          \
-    KEY(CUSTOM_KEY_120, "")          \
-    KEY(CUSTOM_KEY_121, "")          \
-    KEY(CUSTOM_KEY_122, "")          \
-    KEY(CUSTOM_KEY_123, "")          \
-    KEY(CUSTOM_KEY_124, "")          \
-    KEY(CUSTOM_KEY_125, "")          \
-    KEY(CUSTOM_KEY_126, "")          \
+#define CUSTOM_KEYS(KEY, SHORTCUT)                                              \
+    KEY(CUSTOM_KEY_0, "Right Thumb")                                            \
+    KEY(CUSTOM_KEY_1, "Left Thumb")                                             \
+    KEY(CUSTOM_KEY_2, "Click Spam")                                             \
+    KEY(CUSTOM_KEY_3, "Vorssaint Radial")                                       \
+    SHORTCUT(CUSTOM_KEY_4, "VoiceInk", SHORTCUT_MODS(KC_LCTL, KC_LALT), KC_SPC) \
+    KEY(CUSTOM_KEY_5, "")                                                       \
+    KEY(CUSTOM_KEY_6, "")                                                       \
+    KEY(CUSTOM_KEY_7, "")                                                       \
+    KEY(CUSTOM_KEY_8, "")                                                       \
+    KEY(CUSTOM_KEY_9, "")                                                       \
+    KEY(CUSTOM_KEY_10, "")                                                      \
+    KEY(CUSTOM_KEY_11, "")                                                      \
+    KEY(CUSTOM_KEY_12, "")                                                      \
+    KEY(CUSTOM_KEY_13, "")                                                      \
+    KEY(CUSTOM_KEY_14, "")                                                      \
+    KEY(CUSTOM_KEY_15, "")                                                      \
+    KEY(CUSTOM_KEY_16, "")                                                      \
+    KEY(CUSTOM_KEY_17, "")                                                      \
+    KEY(CUSTOM_KEY_18, "")                                                      \
+    KEY(CUSTOM_KEY_19, "")                                                      \
+    KEY(CUSTOM_KEY_20, "")                                                      \
+    KEY(CUSTOM_KEY_21, "")                                                      \
+    KEY(CUSTOM_KEY_22, "")                                                      \
+    KEY(CUSTOM_KEY_23, "")                                                      \
+    KEY(CUSTOM_KEY_24, "")                                                      \
+    KEY(CUSTOM_KEY_25, "")                                                      \
+    KEY(CUSTOM_KEY_26, "")                                                      \
+    KEY(CUSTOM_KEY_27, "")                                                      \
+    KEY(CUSTOM_KEY_28, "")                                                      \
+    KEY(CUSTOM_KEY_29, "")                                                      \
+    KEY(CUSTOM_KEY_30, "")                                                      \
+    KEY(CUSTOM_KEY_31, "")                                                      \
+    KEY(CUSTOM_KEY_32, "")                                                      \
+    KEY(CUSTOM_KEY_33, "")                                                      \
+    KEY(CUSTOM_KEY_34, "")                                                      \
+    KEY(CUSTOM_KEY_35, "")                                                      \
+    KEY(CUSTOM_KEY_36, "")                                                      \
+    KEY(CUSTOM_KEY_37, "")                                                      \
+    KEY(CUSTOM_KEY_38, "")                                                      \
+    KEY(CUSTOM_KEY_39, "")                                                      \
+    KEY(CUSTOM_KEY_40, "")                                                      \
+    KEY(CUSTOM_KEY_41, "")                                                      \
+    KEY(CUSTOM_KEY_42, "")                                                      \
+    KEY(CUSTOM_KEY_43, "")                                                      \
+    KEY(CUSTOM_KEY_44, "")                                                      \
+    KEY(CUSTOM_KEY_45, "")                                                      \
+    KEY(CUSTOM_KEY_46, "")                                                      \
+    KEY(CUSTOM_KEY_47, "")                                                      \
+    KEY(CUSTOM_KEY_48, "")                                                      \
+    KEY(CUSTOM_KEY_49, "")                                                      \
+    KEY(CUSTOM_KEY_50, "")                                                      \
+    KEY(CUSTOM_KEY_51, "")                                                      \
+    KEY(CUSTOM_KEY_52, "")                                                      \
+    KEY(CUSTOM_KEY_53, "")                                                      \
+    KEY(CUSTOM_KEY_54, "")                                                      \
+    KEY(CUSTOM_KEY_55, "")                                                      \
+    KEY(CUSTOM_KEY_56, "")                                                      \
+    KEY(CUSTOM_KEY_57, "")                                                      \
+    KEY(CUSTOM_KEY_58, "")                                                      \
+    KEY(CUSTOM_KEY_59, "")                                                      \
+    KEY(CUSTOM_KEY_60, "")                                                      \
+    KEY(CUSTOM_KEY_61, "")                                                      \
+    KEY(CUSTOM_KEY_62, "")                                                      \
+    KEY(CUSTOM_KEY_63, "")                                                      \
+    KEY(CUSTOM_KEY_64, "")                                                      \
+    KEY(CUSTOM_KEY_65, "")                                                      \
+    KEY(CUSTOM_KEY_66, "")                                                      \
+    KEY(CUSTOM_KEY_67, "")                                                      \
+    KEY(CUSTOM_KEY_68, "")                                                      \
+    KEY(CUSTOM_KEY_69, "")                                                      \
+    KEY(CUSTOM_KEY_70, "")                                                      \
+    KEY(CUSTOM_KEY_71, "")                                                      \
+    KEY(CUSTOM_KEY_72, "")                                                      \
+    KEY(CUSTOM_KEY_73, "")                                                      \
+    KEY(CUSTOM_KEY_74, "")                                                      \
+    KEY(CUSTOM_KEY_75, "")                                                      \
+    KEY(CUSTOM_KEY_76, "")                                                      \
+    KEY(CUSTOM_KEY_77, "")                                                      \
+    KEY(CUSTOM_KEY_78, "")                                                      \
+    KEY(CUSTOM_KEY_79, "")                                                      \
+    KEY(CUSTOM_KEY_80, "")                                                      \
+    KEY(CUSTOM_KEY_81, "")                                                      \
+    KEY(CUSTOM_KEY_82, "")                                                      \
+    KEY(CUSTOM_KEY_83, "")                                                      \
+    KEY(CUSTOM_KEY_84, "")                                                      \
+    KEY(CUSTOM_KEY_85, "")                                                      \
+    KEY(CUSTOM_KEY_86, "")                                                      \
+    KEY(CUSTOM_KEY_87, "")                                                      \
+    KEY(CUSTOM_KEY_88, "")                                                      \
+    KEY(CUSTOM_KEY_89, "")                                                      \
+    KEY(CUSTOM_KEY_90, "")                                                      \
+    KEY(CUSTOM_KEY_91, "")                                                      \
+    KEY(CUSTOM_KEY_92, "")                                                      \
+    KEY(CUSTOM_KEY_93, "")                                                      \
+    KEY(CUSTOM_KEY_94, "")                                                      \
+    KEY(CUSTOM_KEY_95, "")                                                      \
+    KEY(CUSTOM_KEY_96, "")                                                      \
+    KEY(CUSTOM_KEY_97, "")                                                      \
+    KEY(CUSTOM_KEY_98, "")                                                      \
+    KEY(CUSTOM_KEY_99, "")                                                      \
+    KEY(CUSTOM_KEY_100, "")                                                     \
+    KEY(CUSTOM_KEY_101, "")                                                     \
+    KEY(CUSTOM_KEY_102, "")                                                     \
+    KEY(CUSTOM_KEY_103, "")                                                     \
+    KEY(CUSTOM_KEY_104, "")                                                     \
+    KEY(CUSTOM_KEY_105, "")                                                     \
+    KEY(CUSTOM_KEY_106, "")                                                     \
+    KEY(CUSTOM_KEY_107, "")                                                     \
+    KEY(CUSTOM_KEY_108, "")                                                     \
+    KEY(CUSTOM_KEY_109, "")                                                     \
+    KEY(CUSTOM_KEY_110, "")                                                     \
+    KEY(CUSTOM_KEY_111, "")                                                     \
+    KEY(CUSTOM_KEY_112, "")                                                     \
+    KEY(CUSTOM_KEY_113, "")                                                     \
+    KEY(CUSTOM_KEY_114, "")                                                     \
+    KEY(CUSTOM_KEY_115, "")                                                     \
+    KEY(CUSTOM_KEY_116, "")                                                     \
+    KEY(CUSTOM_KEY_117, "")                                                     \
+    KEY(CUSTOM_KEY_118, "")                                                     \
+    KEY(CUSTOM_KEY_119, "")                                                     \
+    KEY(CUSTOM_KEY_120, "")                                                     \
+    KEY(CUSTOM_KEY_121, "")                                                     \
+    KEY(CUSTOM_KEY_122, "")                                                     \
+    KEY(CUSTOM_KEY_123, "")                                                     \
+    KEY(CUSTOM_KEY_124, "")                                                     \
+    KEY(CUSTOM_KEY_125, "")                                                     \
+    KEY(CUSTOM_KEY_126, "")                                                     \
     KEY(CUSTOM_KEY_127, "")
 
-// ─── VIA Macros ─────────────────────────────────────────────────────────────
-// VIA_MACRO_0–127 are the authored aliases for VIA's dynamic macro slots.
+// ─── Macros ─────────────────────────────────────────────────────────────────
+// VIA_MACRO_0–127 are the authored aliases for the 128 macro slots (the name
+// is historical; VIA is not supported, D-F31).
 // All 128 slots are listed here so the slot limit stays visible in keymap.c.
 // Each row is:
 //   MACRO(VIA_MACRO_n, "name", "payload")
 // The name is what Charybdis Ark shows for the macro: at most 32 bytes of
-// UTF-8. Use empty strings for an unused slot. The firmware seeds
-// VIA's dynamic macro EEPROM defaults from the payloads on init/reset.
-// Workflow: author defaults here -> compile/flash -> reset EEPROM to re-seed
-// them. A profile saved from Charybdis Ark keeps its own names and payloads.
+// UTF-8. Use empty strings for an unused slot. The payloads are the macro
+// domain of the compiled default profile, which a keyboard with no saved
+// profile plays. A profile saved from Charybdis Ark keeps its own names and
+// payloads.
 // Payload syntax:
 //   - text {hello} sends "hello" one key at a time
 //   - {KC_A} tap one key, {KC_LGUI,KC_SPC} tap a chord
@@ -183,134 +184,134 @@
 //   - {250} wait 250 ms before the next macro step
 //     e.g. {KC_A}{250}{KC_B} pauses between A and B; other keys pressed
 //     during the delay are queued
-#define VIA_MACROS(MACRO)                                                        \
-    MACRO(VIA_MACRO_0, "Spotlight", "{KC_LGUI,KC_SPC}")                          \
-    MACRO(VIA_MACRO_1, "AI Chat", "{KC_LALT,KC_SPC}")                            \
-    MACRO(VIA_MACRO_2, "Warp Terminal", "{KC_LALT,KC_LGUI,KC_SPC}")              \
-    MACRO(VIA_MACRO_3, "OCR Copy", "{KC_LCTL,KC_LALT,KC_LGUI,KC_C}")             \
-    MACRO(VIA_MACRO_4, "Drag Screenshot", "{KC_LCTL,KC_LALT,KC_LGUI,KC_X}")      \
-    MACRO(VIA_MACRO_5, "Emoji", "{KC_LCTL,KC_LGUI,KC_SPC}")                      \
-    MACRO(VIA_MACRO_6, "Zoom Screen", "{KC_LALT,KC_LGUI,KC_8}")                  \
-    MACRO(VIA_MACRO_7, "Clipboard History", "{KC_LCTL,KC_LALT,KC_LGUI,KC_V}")    \
-    MACRO(VIA_MACRO_8, "VS Code Preview MD", "{KC_LSFT,KC_LGUI,KC_V}")           \
-    MACRO(VIA_MACRO_9, "VS Code Run Task", "{KC_LSFT,KC_LGUI,KC_P}")             \
-    MACRO(VIA_MACRO_10, "Select All + Copy", "{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}") \
-    MACRO(VIA_MACRO_11, "", "")                                                  \
-    MACRO(VIA_MACRO_12, "", "")                                                  \
-    MACRO(VIA_MACRO_13, "", "")                                                  \
-    MACRO(VIA_MACRO_14, "", "")                                                  \
-    MACRO(VIA_MACRO_15, "", "")                                                  \
-    MACRO(VIA_MACRO_16, "", "")                                                  \
-    MACRO(VIA_MACRO_17, "", "")                                                  \
-    MACRO(VIA_MACRO_18, "", "")                                                  \
-    MACRO(VIA_MACRO_19, "", "")                                                  \
-    MACRO(VIA_MACRO_20, "", "")                                                  \
-    MACRO(VIA_MACRO_21, "", "")                                                  \
-    MACRO(VIA_MACRO_22, "", "")                                                  \
-    MACRO(VIA_MACRO_23, "", "")                                                  \
-    MACRO(VIA_MACRO_24, "", "")                                                  \
-    MACRO(VIA_MACRO_25, "", "")                                                  \
-    MACRO(VIA_MACRO_26, "", "")                                                  \
-    MACRO(VIA_MACRO_27, "", "")                                                  \
-    MACRO(VIA_MACRO_28, "", "")                                                  \
-    MACRO(VIA_MACRO_29, "", "")                                                  \
-    MACRO(VIA_MACRO_30, "", "")                                                  \
-    MACRO(VIA_MACRO_31, "", "")                                                  \
-    MACRO(VIA_MACRO_32, "", "")                                                  \
-    MACRO(VIA_MACRO_33, "", "")                                                  \
-    MACRO(VIA_MACRO_34, "", "")                                                  \
-    MACRO(VIA_MACRO_35, "", "")                                                  \
-    MACRO(VIA_MACRO_36, "", "")                                                  \
-    MACRO(VIA_MACRO_37, "", "")                                                  \
-    MACRO(VIA_MACRO_38, "", "")                                                  \
-    MACRO(VIA_MACRO_39, "", "")                                                  \
-    MACRO(VIA_MACRO_40, "", "")                                                  \
-    MACRO(VIA_MACRO_41, "", "")                                                  \
-    MACRO(VIA_MACRO_42, "", "")                                                  \
-    MACRO(VIA_MACRO_43, "", "")                                                  \
-    MACRO(VIA_MACRO_44, "", "")                                                  \
-    MACRO(VIA_MACRO_45, "", "")                                                  \
-    MACRO(VIA_MACRO_46, "", "")                                                  \
-    MACRO(VIA_MACRO_47, "", "")                                                  \
-    MACRO(VIA_MACRO_48, "", "")                                                  \
-    MACRO(VIA_MACRO_49, "", "")                                                  \
-    MACRO(VIA_MACRO_50, "", "")                                                  \
-    MACRO(VIA_MACRO_51, "", "")                                                  \
-    MACRO(VIA_MACRO_52, "", "")                                                  \
-    MACRO(VIA_MACRO_53, "", "")                                                  \
-    MACRO(VIA_MACRO_54, "", "")                                                  \
-    MACRO(VIA_MACRO_55, "", "")                                                  \
-    MACRO(VIA_MACRO_56, "", "")                                                  \
-    MACRO(VIA_MACRO_57, "", "")                                                  \
-    MACRO(VIA_MACRO_58, "", "")                                                  \
-    MACRO(VIA_MACRO_59, "", "")                                                  \
-    MACRO(VIA_MACRO_60, "", "")                                                  \
-    MACRO(VIA_MACRO_61, "", "")                                                  \
-    MACRO(VIA_MACRO_62, "", "")                                                  \
-    MACRO(VIA_MACRO_63, "", "")                                                  \
-    MACRO(VIA_MACRO_64, "", "")                                                  \
-    MACRO(VIA_MACRO_65, "", "")                                                  \
-    MACRO(VIA_MACRO_66, "", "")                                                  \
-    MACRO(VIA_MACRO_67, "", "")                                                  \
-    MACRO(VIA_MACRO_68, "", "")                                                  \
-    MACRO(VIA_MACRO_69, "", "")                                                  \
-    MACRO(VIA_MACRO_70, "", "")                                                  \
-    MACRO(VIA_MACRO_71, "", "")                                                  \
-    MACRO(VIA_MACRO_72, "", "")                                                  \
-    MACRO(VIA_MACRO_73, "", "")                                                  \
-    MACRO(VIA_MACRO_74, "", "")                                                  \
-    MACRO(VIA_MACRO_75, "", "")                                                  \
-    MACRO(VIA_MACRO_76, "", "")                                                  \
-    MACRO(VIA_MACRO_77, "", "")                                                  \
-    MACRO(VIA_MACRO_78, "", "")                                                  \
-    MACRO(VIA_MACRO_79, "", "")                                                  \
-    MACRO(VIA_MACRO_80, "", "")                                                  \
-    MACRO(VIA_MACRO_81, "", "")                                                  \
-    MACRO(VIA_MACRO_82, "", "")                                                  \
-    MACRO(VIA_MACRO_83, "", "")                                                  \
-    MACRO(VIA_MACRO_84, "", "")                                                  \
-    MACRO(VIA_MACRO_85, "", "")                                                  \
-    MACRO(VIA_MACRO_86, "", "")                                                  \
-    MACRO(VIA_MACRO_87, "", "")                                                  \
-    MACRO(VIA_MACRO_88, "", "")                                                  \
-    MACRO(VIA_MACRO_89, "", "")                                                  \
-    MACRO(VIA_MACRO_90, "", "")                                                  \
-    MACRO(VIA_MACRO_91, "", "")                                                  \
-    MACRO(VIA_MACRO_92, "", "")                                                  \
-    MACRO(VIA_MACRO_93, "", "")                                                  \
-    MACRO(VIA_MACRO_94, "", "")                                                  \
-    MACRO(VIA_MACRO_95, "", "")                                                  \
-    MACRO(VIA_MACRO_96, "", "")                                                  \
-    MACRO(VIA_MACRO_97, "", "")                                                  \
-    MACRO(VIA_MACRO_98, "", "")                                                  \
-    MACRO(VIA_MACRO_99, "", "")                                                  \
-    MACRO(VIA_MACRO_100, "", "")                                                 \
-    MACRO(VIA_MACRO_101, "", "")                                                 \
-    MACRO(VIA_MACRO_102, "", "")                                                 \
-    MACRO(VIA_MACRO_103, "", "")                                                 \
-    MACRO(VIA_MACRO_104, "", "")                                                 \
-    MACRO(VIA_MACRO_105, "", "")                                                 \
-    MACRO(VIA_MACRO_106, "", "")                                                 \
-    MACRO(VIA_MACRO_107, "", "")                                                 \
-    MACRO(VIA_MACRO_108, "", "")                                                 \
-    MACRO(VIA_MACRO_109, "", "")                                                 \
-    MACRO(VIA_MACRO_110, "", "")                                                 \
-    MACRO(VIA_MACRO_111, "", "")                                                 \
-    MACRO(VIA_MACRO_112, "", "")                                                 \
-    MACRO(VIA_MACRO_113, "", "")                                                 \
-    MACRO(VIA_MACRO_114, "", "")                                                 \
-    MACRO(VIA_MACRO_115, "", "")                                                 \
-    MACRO(VIA_MACRO_116, "", "")                                                 \
-    MACRO(VIA_MACRO_117, "", "")                                                 \
-    MACRO(VIA_MACRO_118, "", "")                                                 \
-    MACRO(VIA_MACRO_119, "", "")                                                 \
-    MACRO(VIA_MACRO_120, "", "")                                                 \
-    MACRO(VIA_MACRO_121, "", "")                                                 \
-    MACRO(VIA_MACRO_122, "", "")                                                 \
-    MACRO(VIA_MACRO_123, "", "")                                                 \
-    MACRO(VIA_MACRO_124, "", "")                                                 \
-    MACRO(VIA_MACRO_125, "", "")                                                 \
-    MACRO(VIA_MACRO_126, "", "")                                                 \
+#define VIA_MACROS(MACRO)                                                          \
+    MACRO(VIA_MACRO_0, "Spotlight", "{KC_LGUI,KC_SPC}")                            \
+    MACRO(VIA_MACRO_1, "AI Chat", "{KC_LALT,KC_SPC}")                              \
+    MACRO(VIA_MACRO_2, "Warp Terminal", "{KC_LALT,KC_LGUI,KC_SPC}")                \
+    MACRO(VIA_MACRO_3, "OCR Copy", "{KC_LCTL,KC_LALT,KC_LGUI,KC_C}")               \
+    MACRO(VIA_MACRO_4, "Drag Screenshot", "{KC_LCTL,KC_LALT,KC_LGUI,KC_X}")        \
+    MACRO(VIA_MACRO_5, "Emoji", "{KC_LCTL,KC_LGUI,KC_SPC}")                        \
+    MACRO(VIA_MACRO_6, "Zoom Screen", "{KC_LALT,KC_LGUI,KC_8}")                    \
+    MACRO(VIA_MACRO_7, "Clipboard History", "{KC_LCTL,KC_LALT,KC_LGUI,KC_V}")      \
+    MACRO(VIA_MACRO_8, "VS Code Preview MD", "{KC_LSFT,KC_LGUI,KC_V}")             \
+    MACRO(VIA_MACRO_9, "VS Code Run Task", "{KC_LSFT,KC_LGUI,KC_P}")               \
+    MACRO(VIA_MACRO_10, "Select All + Copy", "{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}")   \
+    MACRO(VIA_MACRO_11, "Select All", "{KC_LGUI,KC_A}")                            \
+    MACRO(VIA_MACRO_12, "Copy", "{KC_LGUI,KC_C}")                                  \
+    MACRO(VIA_MACRO_13, "Paste", "{KC_LGUI,KC_V}")                                 \
+    MACRO(VIA_MACRO_14, "Cut", "{KC_LGUI,KC_X}")                                   \
+    MACRO(VIA_MACRO_15, "Undo", "{KC_LGUI,KC_Z}")                                  \
+    MACRO(VIA_MACRO_16, "Redo", "{KC_LSFT,KC_LGUI,KC_Z}")                          \
+    MACRO(VIA_MACRO_17, "", "")                                                    \
+    MACRO(VIA_MACRO_18, "", "")                                                    \
+    MACRO(VIA_MACRO_19, "T3 Code", "{+KC_LGUI}{KC_TAB}{120}t3 code{-KC_LGUI}")     \
+    MACRO(VIA_MACRO_20, "", "")                                                    \
+    MACRO(VIA_MACRO_21, "", "")                                                    \
+    MACRO(VIA_MACRO_22, "", "")                                                    \
+    MACRO(VIA_MACRO_23, "", "")                                                    \
+    MACRO(VIA_MACRO_24, "", "")                                                    \
+    MACRO(VIA_MACRO_25, "", "")                                                    \
+    MACRO(VIA_MACRO_26, "", "")                                                    \
+    MACRO(VIA_MACRO_27, "", "")                                                    \
+    MACRO(VIA_MACRO_28, "", "")                                                    \
+    MACRO(VIA_MACRO_29, "", "")                                                    \
+    MACRO(VIA_MACRO_30, "", "")                                                    \
+    MACRO(VIA_MACRO_31, "", "")                                                    \
+    MACRO(VIA_MACRO_32, "", "")                                                    \
+    MACRO(VIA_MACRO_33, "", "")                                                    \
+    MACRO(VIA_MACRO_34, "", "")                                                    \
+    MACRO(VIA_MACRO_35, "", "")                                                    \
+    MACRO(VIA_MACRO_36, "", "")                                                    \
+    MACRO(VIA_MACRO_37, "", "")                                                    \
+    MACRO(VIA_MACRO_38, "", "")                                                    \
+    MACRO(VIA_MACRO_39, "", "")                                                    \
+    MACRO(VIA_MACRO_40, "", "")                                                    \
+    MACRO(VIA_MACRO_41, "", "")                                                    \
+    MACRO(VIA_MACRO_42, "", "")                                                    \
+    MACRO(VIA_MACRO_43, "", "")                                                    \
+    MACRO(VIA_MACRO_44, "", "")                                                    \
+    MACRO(VIA_MACRO_45, "", "")                                                    \
+    MACRO(VIA_MACRO_46, "", "")                                                    \
+    MACRO(VIA_MACRO_47, "", "")                                                    \
+    MACRO(VIA_MACRO_48, "", "")                                                    \
+    MACRO(VIA_MACRO_49, "", "")                                                    \
+    MACRO(VIA_MACRO_50, "", "")                                                    \
+    MACRO(VIA_MACRO_51, "", "")                                                    \
+    MACRO(VIA_MACRO_52, "", "")                                                    \
+    MACRO(VIA_MACRO_53, "", "")                                                    \
+    MACRO(VIA_MACRO_54, "", "")                                                    \
+    MACRO(VIA_MACRO_55, "", "")                                                    \
+    MACRO(VIA_MACRO_56, "", "")                                                    \
+    MACRO(VIA_MACRO_57, "", "")                                                    \
+    MACRO(VIA_MACRO_58, "", "")                                                    \
+    MACRO(VIA_MACRO_59, "", "")                                                    \
+    MACRO(VIA_MACRO_60, "", "")                                                    \
+    MACRO(VIA_MACRO_61, "", "")                                                    \
+    MACRO(VIA_MACRO_62, "", "")                                                    \
+    MACRO(VIA_MACRO_63, "", "")                                                    \
+    MACRO(VIA_MACRO_64, "", "")                                                    \
+    MACRO(VIA_MACRO_65, "", "")                                                    \
+    MACRO(VIA_MACRO_66, "", "")                                                    \
+    MACRO(VIA_MACRO_67, "", "")                                                    \
+    MACRO(VIA_MACRO_68, "", "")                                                    \
+    MACRO(VIA_MACRO_69, "", "")                                                    \
+    MACRO(VIA_MACRO_70, "", "")                                                    \
+    MACRO(VIA_MACRO_71, "", "")                                                    \
+    MACRO(VIA_MACRO_72, "", "")                                                    \
+    MACRO(VIA_MACRO_73, "", "")                                                    \
+    MACRO(VIA_MACRO_74, "", "")                                                    \
+    MACRO(VIA_MACRO_75, "", "")                                                    \
+    MACRO(VIA_MACRO_76, "", "")                                                    \
+    MACRO(VIA_MACRO_77, "", "")                                                    \
+    MACRO(VIA_MACRO_78, "", "")                                                    \
+    MACRO(VIA_MACRO_79, "", "")                                                    \
+    MACRO(VIA_MACRO_80, "", "")                                                    \
+    MACRO(VIA_MACRO_81, "", "")                                                    \
+    MACRO(VIA_MACRO_82, "", "")                                                    \
+    MACRO(VIA_MACRO_83, "", "")                                                    \
+    MACRO(VIA_MACRO_84, "", "")                                                    \
+    MACRO(VIA_MACRO_85, "", "")                                                    \
+    MACRO(VIA_MACRO_86, "", "")                                                    \
+    MACRO(VIA_MACRO_87, "", "")                                                    \
+    MACRO(VIA_MACRO_88, "", "")                                                    \
+    MACRO(VIA_MACRO_89, "", "")                                                    \
+    MACRO(VIA_MACRO_90, "", "")                                                    \
+    MACRO(VIA_MACRO_91, "", "")                                                    \
+    MACRO(VIA_MACRO_92, "", "")                                                    \
+    MACRO(VIA_MACRO_93, "", "")                                                    \
+    MACRO(VIA_MACRO_94, "", "")                                                    \
+    MACRO(VIA_MACRO_95, "", "")                                                    \
+    MACRO(VIA_MACRO_96, "", "")                                                    \
+    MACRO(VIA_MACRO_97, "", "")                                                    \
+    MACRO(VIA_MACRO_98, "", "")                                                    \
+    MACRO(VIA_MACRO_99, "", "")                                                    \
+    MACRO(VIA_MACRO_100, "", "")                                                   \
+    MACRO(VIA_MACRO_101, "", "")                                                   \
+    MACRO(VIA_MACRO_102, "", "")                                                   \
+    MACRO(VIA_MACRO_103, "", "")                                                   \
+    MACRO(VIA_MACRO_104, "", "")                                                   \
+    MACRO(VIA_MACRO_105, "", "")                                                   \
+    MACRO(VIA_MACRO_106, "", "")                                                   \
+    MACRO(VIA_MACRO_107, "", "")                                                   \
+    MACRO(VIA_MACRO_108, "", "")                                                   \
+    MACRO(VIA_MACRO_109, "", "")                                                   \
+    MACRO(VIA_MACRO_110, "", "")                                                   \
+    MACRO(VIA_MACRO_111, "", "")                                                   \
+    MACRO(VIA_MACRO_112, "", "")                                                   \
+    MACRO(VIA_MACRO_113, "", "")                                                   \
+    MACRO(VIA_MACRO_114, "", "")                                                   \
+    MACRO(VIA_MACRO_115, "", "")                                                   \
+    MACRO(VIA_MACRO_116, "", "")                                                   \
+    MACRO(VIA_MACRO_117, "", "")                                                   \
+    MACRO(VIA_MACRO_118, "", "")                                                   \
+    MACRO(VIA_MACRO_119, "", "")                                                   \
+    MACRO(VIA_MACRO_120, "", "")                                                   \
+    MACRO(VIA_MACRO_121, "", "")                                                   \
+    MACRO(VIA_MACRO_122, "", "")                                                   \
+    MACRO(VIA_MACRO_123, "", "")                                                   \
+    MACRO(VIA_MACRO_124, "", "")                                                   \
+    MACRO(VIA_MACRO_125, "", "")                                                   \
+    MACRO(VIA_MACRO_126, "", "")                                                   \
     MACRO(VIA_MACRO_127, "", "")
 
 // ─── Combos ─────────────────────────────────────────────────────────────────
@@ -323,8 +324,9 @@
 // COMBO follows COMBO_TERM; COMBO_WINDOW gives that combo its own window.
 //
 // Valid combo outputs include plain keycodes, custom keys (CUSTOM_KEY_n),
-// VIA macros (VIA_MACRO_n), LOCK_LAYER(...), explicit pd-mode lock keycodes
-// such as PD_SLOT_4_LOCK, and keycodes that also have rows in key_behaviors[].
+// VIA macros (VIA_MACRO_n), MO(layer) (the layer stays on while the combo is
+// held), LOCK_LAYER(...), explicit pd-mode lock keycodes such as
+// PD_SLOT_4_LOCK, and keycodes that also have rows in key_behaviors[].
 //
 // If a combo emits a keycode that also has a row in key_behaviors[],
 // that emitted key can reuse the same custom behavior handling.
@@ -334,8 +336,8 @@
 // physical combo footprint. Cross-half combos therefore broaden locality to
 // both halves instead of guessing one side.
 //
-// Combo origin tracking follows the live resolved keycodes QMK sees, so VIA /
-// dynamic keymap changes stay authoritative. Keep each combo row's member
+// Combo origin tracking follows the live resolved keycodes QMK sees, so the
+// active profile's keymap stays authoritative. Keep each combo row's member
 // keycodes unique so that footprint tracking can disambiguate the chord.
 // Overlap-suppressed candidates are retired from feedback at the next compat
 // reconciliation boundary; delayed legitimate outputs retain their exact
@@ -344,17 +346,22 @@
 // The default window is COMBO_TERM in config.h (currently 50 ms); the hold
 // threshold is TAPPING_TERM. A live profile stores its own default window and
 // hold threshold, set in Charybdis Ark.
-#define COMBOS(COMBO, COMBO_WINDOW)                                                   \
-    COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))                                        \
-    COMBO(CUSTOM_KEY_2, (PD_SLOT_5, MS_BTN3))                                         \
-    COMBO(KC_LGUI, (KC_N, KC_M))                                                      \
-    COMBO_WINDOW(G(KC_N), (KC_M, KC_COMM, KC_DOT, LT(LAYER_NAV, KC_SLSH)), 100)       \
-    COMBO_WINDOW(G(KC_N), (MS_BTN1, MS_BTN2, PD_SLOT_0, LT(LAYER_NAV, KC_SLSH)), 100) \
-    COMBO(KC_LGUI, (MS_BTN1, PD_SLOT_1))                                              \
-    COMBO(G(KC_A), (G(KC_C), G(KC_V)))                                                \
-    COMBO(G(KC_T), (MS_BTN1, MS_BTN2, PD_SLOT_0))                                     \
-    COMBO(G(KC_T), (KC_M, KC_COMM, KC_DOT))                                           \
-    COMBO(MS_BTN6, (MS_BTN1, MS_BTN2))
+#define COMBOS(COMBO, COMBO_WINDOW)                                                                       \
+    COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))                                                            \
+    COMBO(CUSTOM_KEY_2, (PD_SLOT_5, MS_BTN3))                                                             \
+    COMBO(KC_LGUI, (KC_N, KC_M))                                                                          \
+    COMBO(G(KC_N), (KC_M, KC_COMM, KC_DOT, LT(LAYER_NAV, KC_SLSH)))                                       \
+    COMBO(G(KC_N), (MS_BTN1, MS_BTN2, PD_SLOT_0, LT(LAYER_NAV, KC_SLSH)))                                 \
+    COMBO(KC_LGUI, (MS_BTN1, PD_SLOT_1))                                                                  \
+    COMBO(G(KC_A), (G(KC_C), G(KC_V)))                                                                    \
+    COMBO(G(KC_T), (MS_BTN1, MS_BTN2, PD_SLOT_0))                                                         \
+    COMBO(G(KC_T), (KC_M, KC_COMM, KC_DOT))                                                               \
+    COMBO(MS_BTN6, (MS_BTN1, MS_BTN2))                                                                    \
+    COMBO(MO(LAYER_EXTRA_1), (CUSTOM_KEY_1, KC_BSPC))                                                     \
+    COMBO(MO(LAYER_NUM), (KC_SPC, KC_DEL))                                                                \
+    COMBO(KC_ESC, (LT(LAYER_SYM, KC_Z), KC_X, KC_C, KC_V, KC_M, KC_COMM, KC_DOT, LT(LAYER_NAV, KC_SLSH))) \
+    COMBO(MO(LAYER_EXTRA_1), (CUSTOM_KEY_0, KC_BSPC))                                                     \
+    COMBO(CUSTOM_KEY_4, (KC_BSPC, KC_ENT))
 
 // ─── Key Behavior Tables ────────────────────────────────────────────────────
 //
@@ -562,10 +569,12 @@ const key_behavior_t
             {.keycode = KC_LEFT_SHIFT, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_CAPS)}}},
             {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(PD_SLOT_4_LOCK)}, [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_6)}}},
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
+            {.keycode = KC_DEL},
             {.keycode = KC_LEFT_GUI, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)}, [2] = {.tap = TAP_SENDS(OSM(MOD_LSFT))}}},
 
             // ─── Layer-Tap Keys ──────────────────────────────────────────────────────────────
-            {.keycode = LT(LAYER_NAV, KC_SLSH), .tap_hold_term = 100, .tap_counts = {[1] = {.hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))}}},
+            {.keycode = LT(LAYER_NAV, KC_F)},
+            {.keycode = LT(LAYER_NAV, KC_SLSH), .tap_hold_term = 150, .multi_tap_term = 100},
 
             // ─── Navigation-Layer Overrides ─────────────────────────────────────────────────
             {.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}},
@@ -601,21 +610,20 @@ const key_behavior_t
             // ─── Custom Keys ─────────────────────────────────────────────────────────────────
             // Left Thumb
             {
-                .keycode       = CUSTOM_KEY_1,
-                .tap_hold_term = 150,
+                .keycode = CUSTOM_KEY_1,
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_SYM)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))},
                         [1] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_NUM)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NUM))},
                         [2] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_1)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_1))},
                         [3] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_2)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_2))},
+                        [4] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_POINTER)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_POINTER))},
                     },
             },
 
             // Right Thumb
             {
-                .keycode       = CUSTOM_KEY_0,
-                .tap_hold_term = 150,
+                .keycode = CUSTOM_KEY_0,
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(LOCK_LAYER(LAYER_NAV)), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))},
@@ -625,15 +633,13 @@ const key_behavior_t
                     },
             },
 
-            // Drag Window
+            // Vorssaint Radial
             {
                 .keycode                   = CUSTOM_KEY_3,
-                .multi_tap_term            = 100,
-                .tap_hold_term             = 100,
                 .keeps_auto_mouse_anchored = true,
                 .tap_counts =
                     {
-                        [0] = {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)},
+                        [0] = {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(LCAG(KC_SPC))},
                     },
             },
 
@@ -740,11 +746,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
                   _______,           _______,           _______,       VIA_MACRO_7,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           G(KC_Q),           G(KC_W),           G(KC_A),           _______,           _______,          VIA_MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           _______,           _______,
+                  _______,           G(KC_Q),           G(KC_W),      VIA_MACRO_11,           _______,           _______,          VIA_MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-            KC_LEFT_SHIFT,        S(G(KC_Z)),           _______,           G(KC_C),           _______,           _______,          VIA_MACRO_1,           KC_LEFT,           KC_DOWN,          KC_RIGHT,           _______,           _______,
+            KC_LEFT_SHIFT,      VIA_MACRO_16,           _______,      VIA_MACRO_12,           _______,           _______,          VIA_MACRO_1,           KC_LEFT,           KC_DOWN,          KC_RIGHT,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-              KC_LEFT_ALT,           G(KC_Z),           G(KC_X),           G(KC_V),           _______,           _______,          VIA_MACRO_0,           MS_BTN1,           MS_BTN2,         PD_SLOT_0,           _______,           _______,
+              KC_LEFT_ALT,      VIA_MACRO_15,      VIA_MACRO_14,      VIA_MACRO_13,           _______,           _______,          VIA_MACRO_0,           MS_BTN1,           MS_BTN2,         PD_SLOT_0,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                            _______,           _______,           _______,              _______,           _______,
                                                                                               _______,           _______,              _______
@@ -757,7 +763,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,            PD_SLOT_2,         PD_SLOT_5,           MS_BTN3,      CUSTOM_KEY_3,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,            PD_SLOT_2,         PD_SLOT_5,           MS_BTN3,      CUSTOM_KEY_3,         PD_SLOT_7,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,            PD_SLOT_1,           MS_BTN1,           MS_BTN2,         PD_SLOT_0,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -770,11 +776,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
                   _______,             KC_F1,             KC_F2,             KC_F3,             KC_F4,             KC_F5,                KC_F6,             KC_F7,             KC_F8,             KC_F9,            KC_F10,            KC_F11,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,          VIA_MACRO_2,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,              G(KC_U),           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,         VIA_MACRO_19,           G(KC_1),           G(KC_2),           G(KC_3),           G(KC_4),           G(KC_5),
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                            _______,           _______,           _______,              _______,           _______,
                                                                                               _______,           _______,              _______
@@ -787,7 +793,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,              KC_Q,              KC_W,              KC_E,              KC_R,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,              KC_A,              KC_S,              KC_D,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
+                  _______,           _______,              KC_A,              KC_S,              KC_D,              KC_F,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
@@ -932,6 +938,10 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     ),
     // clang-format on
 };
+
+// VIA_MACROS() above in the bank encoding; tools/profile_introspect.py --write
+// regenerates it.
+#include "authored_macro_bank.h"
 
 // Expand the authored macro tables, combo table, and derived counts above
 // into the runtime symbols expected by the userspace runtime and QMK.

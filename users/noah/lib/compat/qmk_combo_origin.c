@@ -141,8 +141,9 @@ static uint32_t combo_origin_allocate_press_sequence(void) {
     return combo_origin_press_sequence;
 }
 
-// Orders the output releases QMK delivers. They leave its tapping queue and
-// record admission in this order, so dispatch pairs each with its completion.
+// Orders the output releases QMK delivers. They leave record admission (and
+// QMK's tapping queue, behind a TT() or OSL() to layers 16-31) in this order,
+// so dispatch pairs each with its completion.
 // Only a few are ever waiting, so sixteen bits compare without ambiguity.
 static uint16_t combo_origin_next_delivery(void) {
     combo_origin_delivery_sequence++;
@@ -470,9 +471,11 @@ static uint16_t combo_origin_latest_legal_wait_ms(void) {
     return wait_ms;
 }
 
-// A fired combo's output waits only behind tap-hold decisions queued before it
-// fired, and each of those resolves within its own tapping term. Every key
-// shares the live dual-role term (get_tapping_term), so this bounds delivery.
+// A fired combo whose output press QMK has not delivered yet can only be
+// waiting in QMK's tapping queue, behind a tap key QMK decides itself (a TT()
+// or OSL() to layers 16-31), which resolves within QMK's tapping term: the
+// dual-role setting (get_tapping_term). A delivered press has no deadline
+// (combo_origin_pending_output_reconcile).
 static uint16_t combo_origin_applied_wait_ms(void) {
 #        ifdef NO_ACTION_TAPPING
     return 0;
@@ -518,8 +521,12 @@ static void combo_origin_pending_output_reconcile(bool observe_deadline) {
 #    ifndef COMBO_NO_TIMER
         // QMK restarts its combo timer at every combo key press, so a
         // completion not fired yet can legally wait from the latest press,
-        // which is never earlier than its own completing press.
-        if (observe_deadline && !active && (entry->applied ? (uint16_t)(now - entry->applied_at) > combo_origin_applied_wait_ms() : (uint16_t)(now - combo_origin_last_pressed_at) > combo_origin_latest_legal_wait_ms())) {
+        // which is never earlier than its own completing press. A delivered
+        // press waits in record admission for as long as the key ahead of it
+        // is undecided, which no one setting bounds (a row's own hold time, a
+        // long hold: D-F27), and admission always dispatches it, so its
+        // completion stays until then.
+        if (observe_deadline && !active && !entry->press_delivered && (entry->applied ? (uint16_t)(now - entry->applied_at) > combo_origin_applied_wait_ms() : (uint16_t)(now - combo_origin_last_pressed_at) > combo_origin_latest_legal_wait_ms())) {
             if (!entry->deadline_crossed) {
                 entry->deadline_crossed = true;
             } else {
@@ -828,6 +835,27 @@ void noah_qmk_combo_origin_capture_record(uint16_t keycode, keyrecord_t *record)
     noah_participation_record_generated_permission(record, layer, noah_participation_combo_output(UINT16_MAX, keycode, layer));
 }
 
+bool noah_qmk_combo_origin_release_owner(uint16_t keycode, keypos_t *out) {
+    combo_origin_active_cache_entry_t *entry = combo_origin_cache_entry_for_release_dispatch(keycode);
+
+    if (!(out && entry && key_origin_keypos_valid(entry->owner_key_pos))) {
+        return false;
+    }
+    *out = entry->owner_key_pos;
+    return true;
+}
+
+bool noah_qmk_combo_origin_release_delivered_at(keypos_t owner_key_pos) {
+    for (uint8_t index = 0; index < ARRAY_SIZE(combo_active_cache); index++) {
+        const combo_origin_active_cache_entry_t *entry = &combo_active_cache[index];
+
+        if (entry->active && entry->release_delivered && entry->owner_key_pos.row == owner_key_pos.row && entry->owner_key_pos.col == owner_key_pos.col) {
+            return true;
+        }
+    }
+    return false;
+}
+
 // Retire origin reconstruction's bitmap/workspace before the process stage
 // can recursively project held actions. Keep this boundary in ordinary builds.
 __attribute__((noinline)) void noah_qmk_combo_origin_normalize_record(uint16_t keycode, keyrecord_t *record) {
@@ -1070,6 +1098,11 @@ void noah_qmk_combo_origin_debug_snapshot(noah_qmk_combo_origin_debug_snapshot_t
 bool combo_key_record_allowed(uint16_t combo_index, combo_t *combo, uint16_t keycode, keyrecord_t *record) {
     (void)combo;
     (void)keycode;
+    // The stored master holds generated input too (D-F32); QMK's own flag,
+    // the override, it checks itself.
+    if (!noah_participation_combos_allowed()) {
+        return false;
+    }
     if (!record || record->event.type != KEY_EVENT) {
         return true;
     }
@@ -1080,6 +1113,8 @@ bool combo_key_record_allowed(uint16_t combo_index, combo_t *combo, uint16_t key
 
 uint8_t noah_qmk_combo_origin_record_source_layer(uint16_t keycode, const keyrecord_t *record) { (void)keycode; (void)record; return 0; }
 void noah_qmk_combo_origin_capture_record(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; }
+bool noah_qmk_combo_origin_release_owner(uint16_t keycode, keypos_t *out) { (void)keycode; (void)out; return false; }
+bool noah_qmk_combo_origin_release_delivered_at(keypos_t owner_key_pos) { (void)owner_key_pos; return false; }
 
 void noah_qmk_combo_origin_init(void) {}
 void noah_qmk_combo_origin_reset(void) {}

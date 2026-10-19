@@ -14,7 +14,9 @@
     X(KEY_BEHAVIORS, key_behaviors, 0x20u, 2u) \
     X(COMBOS,        combos,        0x30u, 3u) \
     X(SETTINGS,      settings,      0x40u, 8u) \
-    X(PD,            pd,            0x50u, 3u)
+    X(PD,            pd,            0x50u, 3u) \
+    X(KEYMAP,        keymap,        0x60u, 1u) \
+    X(MACROS,        macros,        0x70u, 1u)
 
 enum {
 #define NOAH_DOMAIN_INDEX(NAME, module, id, version) NOAH_PROFILE_DOMAIN_INDEX_##NAME,
@@ -52,7 +54,7 @@ typedef struct {
 // A domain's payload inside one blob: offset from the blob start, zero length
 // when the blob omits the domain. Recorded once by the envelope walk.
 typedef struct {
-    uint16_t offset, length;
+    uint32_t offset, length;
 } noah_profile_domain_range_t;
 
 // The registry describes the wire vocabulary even in feature-gate builds.

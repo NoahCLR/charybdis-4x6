@@ -16,7 +16,7 @@ RGB_SOURCES="$(noah_source_manifest_raw_paths "$ROOT" NOAH_RGB_KEYMAP_SOURCES)"
 COMMON_SOURCES="$COMMON_SOURCES $(noah_source_manifest_raw_paths "$ROOT" NOAH_PROFILE_KEYMAP_SOURCES)"
 AUTOMOUSE_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_AUTOMOUSE_SOURCES)"
 PROFILE_KEYMAP_PATHS="$(charybdis_profile_keymap_paths "$ROOT")"
-PROFILE_WIRE_COMPILE_SOURCES="users/noah/lib/profile/runtime/profile_owner.c users/noah/lib/profile/runtime/profile_action_placement_v1.c users/noah/lib/profile/storage/profile_store_runtime.c users/noah/lib/profile/storage/profile_candidate_transaction.c users/noah/lib/profile/storage/profile_candidate_store_backend.c users/noah/lib/profile/storage/profile_peer_store_backend.c users/noah/lib/profile/split/profile_split_authority.c users/noah/lib/profile/split/profile_split_protocol_v1.c users/noah/lib/profile/split/profile_split_reconciler.c users/noah/lib/profile/protocol/profile_wire_v1.c users/noah/lib/profile/protocol/profile_candidate_v1.c users/noah/lib/compat/qmk_profile_eeprom.c users/noah/lib/compat/qmk_profile_split_transport.c users/noah/lib/compat/qmk_via_profile_channel.c users/noah/lib/compat/qmk_combo_readback.c"
+PROFILE_WIRE_COMPILE_SOURCES="users/noah/lib/profile/runtime/profile_owner.c users/noah/lib/profile/runtime/profile_action_placement_v1.c users/noah/lib/profile/storage/profile_store_runtime.c users/noah/lib/profile/storage/profile_candidate_transaction.c users/noah/lib/profile/storage/profile_candidate_store_backend.c users/noah/lib/profile/storage/profile_peer_store_backend.c users/noah/lib/profile/split/profile_split_authority.c users/noah/lib/profile/split/profile_split_protocol_v1.c users/noah/lib/profile/split/profile_split_reconciler.c users/noah/lib/profile/protocol/profile_wire_v1.c users/noah/lib/profile/protocol/profile_candidate_v1.c users/noah/lib/profile/storage/profile_flash_store.c users/noah/lib/compat/qmk_profile_flash.c users/noah/lib/compat/qmk_profile_split_transport.c users/noah/lib/compat/qmk_profile_channel.c users/noah/lib/compat/qmk_combo_readback.c users/noah/lib/compat/qmk_profile_adjustments.c"
 
 POINTING_TEST_FLAGS="-DPOINTING_DEVICE_ENABLE -DNOAH_PD_PROFILE_ENABLE"
 RGB_TEST_FLAGS="-DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812"
@@ -338,17 +338,20 @@ compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "$POINTI
 compile_variant "tests/host/include/noah_compile_config_no_automouse.h" "-DSPLIT_KEYBOARD $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES $AUTOMOUSE_SOURCES"
 
-# The normal matrix above proves the VIA-off source-manifest path. These named
-# variants make the live-profile VIA hook's real preprocessor body part of the
-# compile gate across RGB and split feature combinations.
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DNOAH_RUNTIME_DIAG_TEST_BACKEND -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE" "$PROFILE_WIRE_COMPILE_SOURCES users/noah/lib/state/diagnostics/runtime_diag.c"
-compile_variant_must_fail "tests/host/include/noah_compile_config.h" "-DVIA_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE" "users/noah/lib/compat/qmk_via_profile_channel.c"
+# The normal matrix above proves the source manifest without Raw HID. These
+# named variants make the Raw HID Profile Wire channel's real preprocessor body
+# part of the compile gate across RGB and split feature combinations.
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DSPLIT_KEYBOARD" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DSPLIT_KEYBOARD $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DNOAH_RUNTIME_DIAG_TEST_BACKEND -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE" "$PROFILE_WIRE_COMPILE_SOURCES users/noah/lib/state/diagnostics/runtime_diag.c"
+compile_variant_must_fail "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DNOAH_LIVE_PROFILE_MUTATION_ENABLE" "users/noah/lib/compat/qmk_profile_channel.c"
+# The Raw HID endpoint size must be checked even when QMK's descriptor header
+# was not already included by another header.
+compile_variant_must_fail "tests/host/include/noah_compile_config.h" "-DRAW_ENABLE -DRAW_EPSIZE=64" "users/noah/lib/compat/qmk_profile_channel.c"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT" "users/noah/lib/compat/qmk_physical_half.c"
 compile_variant "tests/host/include/noah_compile_config.h" "-DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_RIGHT" "users/noah/lib/compat/qmk_physical_half.c"
 
@@ -358,4 +361,4 @@ check_dragscroll_config_surface
 check_runtime_sealing_boundaries
 
 compile_variant "tests/host/include/noah_compile_config.h" "-DCOMBO_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$COMMON_SOURCES $POINTING_SOURCES $RGB_SOURCES $AUTOMOUSE_SOURCES"
-compile_variant "tests/host/include/noah_compile_config.h" "-DNOAH_PD_PROFILE_ENABLE -DVIA_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"
+compile_variant "tests/host/include/noah_compile_config.h" "-DNOAH_PD_PROFILE_ENABLE -DRAW_ENABLE -DSPLIT_KEYBOARD -DNOAH_PHYSICAL_HALF_LEFT -DNOAH_LIVE_PROFILE_OWNER_ENABLE $POINTING_TEST_FLAGS $RGB_TEST_FLAGS" "$PROFILE_WIRE_COMPILE_SOURCES"

@@ -59,10 +59,6 @@ static uint16_t                              key_runtime_scenario_unregister_cod
 
 layer_state_t layer_state;
 
-bool noah_profile_store_runtime_output_ready(void) {
-    return true;
-}
-
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
     return layer < LAYER_COUNT && (state & ((layer_state_t)1u << layer)) != 0;
 }
@@ -409,11 +405,6 @@ bool noah_synthetic_record_active(void) {
 }
 
 void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-}
-
-void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
 }
@@ -813,4 +804,8 @@ __attribute__((weak)) uint16_t get_record_keycode(keyrecord_t *record, bool upda
 // row-less view is never asked for beyond linking.
 key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode) {
     return key_behavior_lookup(keycode);
+}
+
+uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
+    return keycode_at_keymap_location(layer, key.row, key.col);
 }

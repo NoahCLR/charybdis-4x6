@@ -67,7 +67,7 @@ static uint16_t macro_start_action;
 static uint8_t macro_start_count;
 static bool macro_start_result;
 
-bool noah_qmk_contract_start_via_macro(uint16_t action) {
+bool noah_profile_macro_start(uint16_t action) {
     macro_start_action = action;
     macro_start_count++;
     return macro_start_result;

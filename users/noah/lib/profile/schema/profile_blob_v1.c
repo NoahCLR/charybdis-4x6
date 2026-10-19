@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────
-// Canonical Live-Profile Blob And Semantic Actions — Profile Wire v1.0
+// Canonical Live-Profile Blob And Semantic Actions — schema 4.0
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "profile_blob_v1.h"
@@ -18,6 +18,17 @@ static void write_u16(uint8_t *target, uint16_t value) {
 
 static uint16_t read_u16(const uint8_t *source) {
     return (uint16_t)source[0] | ((uint16_t)source[1] << 8u);
+}
+
+static void write_u32(uint8_t *target, uint32_t value) {
+    target[0] = (uint8_t)value;
+    target[1] = (uint8_t)(value >> 8u);
+    target[2] = (uint8_t)(value >> 16u);
+    target[3] = (uint8_t)(value >> 24u);
+}
+
+static uint32_t read_u32(const uint8_t *source) {
+    return (uint32_t)source[0] | ((uint32_t)source[1] << 8u) | ((uint32_t)source[2] << 16u) | ((uint32_t)source[3] << 24u);
 }
 
 static void clear_error(noah_profile_codec_v1_error_t *error) {
@@ -63,12 +74,12 @@ noah_profile_codec_v1_result_t noah_profile_envelope_begin(noah_profile_envelope
     if (header[7] != NOAH_PROFILE_BLOB_V1_CANONICAL_FLAG) return fail(error, NOAH_PROFILE_CODEC_V1_NONCANONICAL, 7, UINT8_MAX, 0);
     if (header[6] > NOAH_PROFILE_DOMAIN_REGISTRY_COUNT) return fail(error, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, 6, UINT8_MAX, 0);
     walk->offset = NOAH_PROFILE_BLOB_V1_HEADER_SIZE;
-    walk->byte_length = (uint16_t)length;
+    walk->byte_length = (uint32_t)length;
     walk->count = header[6];
     return NOAH_PROFILE_CODEC_V1_OK;
 }
 
-noah_profile_codec_v1_result_t noah_profile_envelope_next(noah_profile_envelope_t *walk, const uint8_t header[4], noah_profile_domain_record_t *record, noah_profile_codec_v1_error_t *error) {
+noah_profile_codec_v1_result_t noah_profile_envelope_next(noah_profile_envelope_t *walk, const uint8_t header[6], noah_profile_domain_record_t *record, noah_profile_codec_v1_error_t *error) {
     clear_error(error);
     if (!walk || !header || !record || walk->index >= walk->count || walk->offset > walk->byte_length) return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0, UINT8_MAX, 0);
     size_t remaining = walk->byte_length - walk->offset;
@@ -78,10 +89,10 @@ noah_profile_codec_v1_result_t noah_profile_envelope_next(noah_profile_envelope_
     if (header[1] != shape->version) return fail(error, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION, walk->offset + 1u, walk->index, header[0]);
     if (walk->index && header[0] == walk->prior_id) return fail(error, NOAH_PROFILE_CODEC_V1_DUPLICATE_DOMAIN, walk->offset, walk->index, header[0]);
     if (walk->index && header[0] < walk->prior_id) return fail(error, NOAH_PROFILE_CODEC_V1_DOMAIN_ORDER, walk->offset, walk->index, header[0]);
-    uint16_t length = read_u16(header + 2);
+    uint32_t length = read_u32(header + 2);
     if (length > remaining - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE) return fail(error, NOAH_PROFILE_CODEC_V1_TRUNCATED, walk->offset + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE, walk->index, header[0]);
-    *record = (noah_profile_domain_record_t){shape, (uint16_t)(walk->offset + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE), length};
-    walk->offset = (uint16_t)(record->offset + length);
+    *record = (noah_profile_domain_record_t){shape, walk->offset + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE, length};
+    walk->offset = record->offset + length;
     walk->prior_id = shape->id;
     walk->mask |= shape->mask;
     walk->index++;
@@ -125,7 +136,7 @@ static noah_profile_codec_v1_result_t validate_domain(const noah_profile_domain_
     if (!domain_version_is_known(domain->id, domain->version)) {
         return fail(error, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION, 1u, domain_index, domain->id);
     }
-    if (domain->payload_length > UINT16_MAX) {
+    if (domain->payload_length > NOAH_PROFILE_BLOB_V1_MAX_SIZE) {
         return fail(error, NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED, 2u, domain_index, domain->id);
     }
     return NOAH_PROFILE_CODEC_V1_OK;
@@ -161,7 +172,7 @@ noah_profile_codec_v1_result_t noah_profile_domain_v1_encode(const noah_profile_
 
     output[0] = domain->id;
     output[1] = domain->version;
-    write_u16(&output[2], (uint16_t)domain->payload_length);
+    write_u32(&output[2], (uint32_t)domain->payload_length);
     if (domain->payload_length != 0u) {
         memcpy(&output[NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE], domain->payload, domain->payload_length);
     }
@@ -193,7 +204,7 @@ noah_profile_codec_v1_result_t noah_profile_domain_v1_read(const uint8_t *bytes,
         return fail(error, NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION, offset + 1u, UINT8_MAX, domain->id);
     }
 
-    payload_length = read_u16(&bytes[offset + 2u]);
+    payload_length = read_u32(&bytes[offset + 2u]);
     if (payload_length > remaining - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE) {
         return fail(error, NOAH_PROFILE_CODEC_V1_TRUNCATED, offset + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE, UINT8_MAX, domain->id);
     }
@@ -273,7 +284,7 @@ noah_profile_codec_v1_result_t noah_profile_blob_v1_encode(const noah_profile_do
             }
             output[output_offset]      = domains[input_index].id;
             output[output_offset + 1u] = domains[input_index].version;
-            write_u16(&output[output_offset + 2u], (uint16_t)domains[input_index].payload_length);
+            write_u32(&output[output_offset + 2u], (uint32_t)domains[input_index].payload_length);
             encoded_length = NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE + domains[input_index].payload_length;
             if (domains[input_index].payload_length != 0u) {
                 memcpy(&output[output_offset + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE], domains[input_index].payload, domains[input_index].payload_length);
@@ -419,6 +430,4 @@ noah_profile_codec_v1_result_t noah_profile_action_v1_decode(const uint8_t *byte
 _Static_assert(NOAH_PROFILE_BLOB_V1_HEADER_SIZE + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE <= NOAH_PROFILE_BLOB_V1_MAX_SIZE, "Profile blob envelope must fit the payload ceiling");
 _Static_assert(NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS == NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS, "action and storage layer ceilings drifted");
 _Static_assert(NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS == NOAH_PROFILE_WIRE_V1_MAX_CUSTOM_KEYS, "action and storage macro ceilings drifted");
-#ifdef VIA_ENABLE
 _Static_assert(NOAH_PROFILE_BLOB_V1_MAX_SIZE == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX, "canonical blob must fit exactly within a profile slot payload");
-#endif

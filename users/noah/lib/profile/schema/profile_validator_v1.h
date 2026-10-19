@@ -12,6 +12,8 @@
 #include "profile_combo_v1.h"
 #include "profile_settings_v1.h"
 #include "profile_pd_v1.h"
+#include "profile_keymap_v1.h"
+#include "profile_macros_v1.h"
 
 enum {
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB           = NOAH_PROFILE_DOMAIN_MASK_RGB,
@@ -19,14 +21,17 @@ enum {
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS      = NOAH_PROFILE_DOMAIN_MASK_SETTINGS,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS        = NOAH_PROFILE_DOMAIN_MASK_COMBOS,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD = NOAH_PROFILE_ENABLED_PD_MASK,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEYMAP        = NOAH_PROFILE_DOMAIN_MASK_KEYMAP,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MACROS        = NOAH_PROFILE_DOMAIN_MASK_MACROS,
     NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS = NOAH_PROFILE_ENABLED_DOMAIN_MASK,
     NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX        = 20u,
     NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX   = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
     // Regression policy for the payload-independent 32-bit scan state. This
     // is not a hardware SRAM-capacity claim; target resource gates account
     // for the linked instance separately. D-F14's 128-byte pointing records
-    // make the PD iterator the largest domain state: 372 bytes on Cortex-M0+.
-    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 384u,
+    // make the PD iterator the largest domain state; D-F28's 32-bit blob
+    // lengths and offsets add 20 bytes: 392 bytes on Cortex-M0+.
+    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 400u,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8      = 0xffu,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16     = 0xffffu,
 };
@@ -87,7 +92,7 @@ typedef struct {
     uint8_t  schema_minor;
     uint8_t  domain_mask;
     uint8_t  flags;
-    uint16_t byte_length;
+    uint32_t byte_length;
     uint32_t crc32;
     uint32_t digest;
     uint32_t action_abi_digest;
@@ -99,6 +104,8 @@ typedef enum {
     NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD,
     NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER,
     NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT,
+    // A keymap keycode, passed as a QMK_KEYCODE action.
+    NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_KEYMAP,
 } noah_profile_validator_v1_placement_t;
 
 // Checks the schema cannot make on its own, supplied by the firmware runtime.
@@ -115,7 +122,7 @@ typedef struct {
 typedef struct {
     uint8_t  required_domain_mask;
     uint8_t  allowed_domain_mask;
-    uint16_t max_blob_size;
+    uint32_t max_blob_size;
     uint32_t action_abi_digest;
 
     // Exact compiled identities used by behavior cross-reference validation.
@@ -137,7 +144,7 @@ typedef struct {
 typedef struct {
     uint8_t                         domain_mask;
     uint8_t                         domain_count;
-    uint16_t                        byte_length;
+    uint32_t                        byte_length;
     uint32_t                        crc32;
     uint32_t                        digest;
     uint32_t                        action_abi_digest;
@@ -157,7 +164,18 @@ typedef union {
     noah_profile_combo_v1_validation_t       combos;
     noah_profile_rgb_v1_validation_t         rgb;
     noah_key_behavior_domain_v1_validation_t key_behaviors;
+    noah_profile_keymap_v1_validation_t      keymap;
+    noah_profile_macros_v1_validation_t      macros;
 } noah_profile_validator_v1_domain_validation_t;
+
+// What begin asked for: a whole profile against its declared checksum, a
+// whole profile whose bytes are already trusted (no checksum: a working copy
+// built from validated pieces), or one domain's payload on its own.
+typedef enum {
+    NOAH_PROFILE_VALIDATOR_V1_MODE_WHOLE = 0u,
+    NOAH_PROFILE_VALIDATOR_V1_MODE_STRUCTURE,
+    NOAH_PROFILE_VALIDATOR_V1_MODE_DOMAIN,
+} noah_profile_validator_v1_mode_t;
 
 // Caller-owned, payload-independent state. Treat fields after phase as
 // private; they are public only so firmware can allocate the object statically.
@@ -174,9 +192,10 @@ typedef struct {
     uint32_t                                      digest_state;
     noah_profile_envelope_t                       envelope;
     noah_profile_domain_range_t                   payload;         // the domain being decoded
-    uint16_t                                      checksum_offset; // a blob is at most 53,216 bytes
+    uint32_t                                      checksum_offset;
     uint8_t                                       domain;          // its registry index
     bool                                          has_reference_error;
+    uint8_t                                       mode;            // noah_profile_validator_v1_mode_t
     noah_profile_validator_v1_domain_validation_t domain_validation;
     size_t                                        reference_error_offset;
     uint16_t                                      reference_error_row;
@@ -190,6 +209,17 @@ noah_profile_validator_v1_error_t         noah_profile_validator_v1_no_error(voi
 // begin performs compatibility/capacity checks but no reader I/O. A successful
 // begin returns IN_PROGRESS. base_offset allows validating a slot-bounded view.
 noah_profile_validator_v1_result_t noah_profile_validator_v1_begin(noah_profile_validator_v1_t *validator, const noah_profile_reader_t *reader, size_t base_offset, const noah_profile_validator_v1_declaration_t *declaration, const noah_profile_validator_v1_compatibility_t *compatibility, noah_profile_validator_v1_error_t *error);
+
+// A whole profile without its checksum (D-F32): the envelope and every domain
+// as begin checks them, with the domain mask taken from the envelope. The
+// resulting profile's crc32 and digest are zero; the caller owns its identity.
+noah_profile_validator_v1_result_t noah_profile_validator_v1_begin_structure(noah_profile_validator_v1_t *validator, const noah_profile_reader_t *reader, size_t base_offset, uint32_t byte_length, uint32_t action_abi_digest, const noah_profile_validator_v1_compatibility_t *compatibility, noah_profile_validator_v1_error_t *error);
+
+// One domain's payload, `range` from base_offset, with exactly the checks a
+// whole-profile validation makes of it (action references and placements
+// included), and nothing else: no checksum, no envelope (D-F32). A valid RGB
+// or key-behaviour domain leaves its view in the profile.
+noah_profile_validator_v1_result_t noah_profile_validator_v1_begin_domain(noah_profile_validator_v1_t *validator, const noah_profile_reader_t *reader, size_t base_offset, uint8_t domain_id, noah_profile_domain_range_t range, const noah_profile_validator_v1_compatibility_t *compatibility, noah_profile_validator_v1_error_t *error);
 
 // Every call performs at most one reader operation and reads at most
 // NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX newly observed bytes. CHECKSUM also

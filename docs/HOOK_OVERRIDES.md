@@ -16,6 +16,15 @@ If you still want the shared `noah` userspace behavior, call the matching
 `noah_*` helper from
 [`users/noah/noah_runtime.h`](../users/noah/noah_runtime.h).
 
+Weak default *data* (a table the keymap may define, such as the RGB LED-group
+tables) lives in a file that only defines it, such as
+[`users/noah/lib/rgb/core/rgb_config_defaults.c`](../users/noah/lib/rgb/core/rgb_config_defaults.c);
+its readers see an `extern` declaration. GCC folds a weak `const` object's
+initializer into the code of the file that defines it, so a reader there never
+sees the keymap's table. The host compilers do not, so only
+`tests/host/weak_const_default_test.py` catches it: the flashed firmware once
+lost a saved LED group this way while every host test passed.
+
 One important process-chain detail:
 
 - if your override returns `false` after calling
@@ -92,7 +101,8 @@ This pattern applies to:
 - `pointing_device_init_user()` -> `noah_pointing_device_init_user()`
 
 `keyboard_pre_init_user()` runs before USB starts and serves the saved
-keyboard name as the USB product string (D-F25). An override that skips the
+keyboard name, or with nothing saved the compiled defaults' name, as the USB
+product string (D-F25). An override that skips the
 helper enumerates under the built-in name, then restarts USB once after boot
 to take up the saved one.
 
@@ -168,10 +178,11 @@ The shared userspace splits record handling across three hooks:
 - `post_process_record_user()` finalizes process-return tracing and keyboard
   event modifier masking when the main process path returns `true`
 
-Before them, at the top of QMK's `process_record`, the BK fork's
+After physical pre-processing and QMK combo delivery, at the top of
+`process_record`, the BK fork's
 `process_record_admit_user()` decides whether a record runs now. Its shared
 helper, `noah_record_admission_admit()`, holds records back behind an
-undecided runtime-owned LT/MT/OSM key and attaches each combo output's
+undecided key whose hold changes other keys and attaches each combo output's
 behaviour permission; an override that drops it breaks both. The helper is
 declared in `users/noah/lib/compat/qmk_record_admission.h`, not
 `noah_runtime.h`, so only a translation unit outside the keymap can chain it,
@@ -282,18 +293,16 @@ This pattern applies to:
 
 | QMK hook | Shared helper | What the helper currently owns |
 | --- | --- | --- |
-| `eeconfig_init_user()` | `noah_eeconfig_init_user()` | VIA macro seeding after EEPROM init |
-| `keyboard_pre_init_user()` | `noah_keyboard_pre_init_user()` | saved USB product name before enumeration |
-| `process_record_admit_user()` | `noah_record_admission_admit()` in the compat header | bounded admission behind undecided keys and combo-output permission |
-| `get_hold_on_other_key_press()` | none | weak default returns `false`; unused for runtime-owned dual-role decisions (D-F27) |
+| `eeconfig_init_user()` | `noah_eeconfig_init_user()` | cancelling a running macro on EEPROM reset (the saved profiles are forgotten at boot, D-F29) |
+| `get_hold_on_other_key_press()` | none | weak default returns `false`; define the QMK hook directly for keymap-specific hold preference |
 | `pre_process_record_user()` | `noah_pre_process_record_user()` | physical-key tracking for keyboard modifier ownership before the main process path |
 | `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, non-handled release cleanup, direct actions, macros, and process-entry tracing |
 | `post_process_record_user()` | `noah_post_process_record_user()` | process-return finalization, including keyboard-event modifier-mask teardown and process trace result emission |
-| `matrix_scan_user()` | `noah_matrix_scan_user()` | VIA macro default reseeding, one rotating scan-owned durable-I/O grant across profile discovery/VIA mirroring/VIA reconciliation, key runtime scanning, and split shared-state sync ticks |
-| `matrix_slave_scan_user()` | `noah_matrix_slave_scan_user()` | the slave half's rotating durable-I/O grant, including live-profile initialization and profile/VIA split receiver mailboxes; QMK never routes the slave through `matrix_scan_user()` |
+| `matrix_scan_user()` | `noah_matrix_scan_user()` | one scan-owned durable-I/O grant for the profile store, key runtime scanning, and split shared-state sync ticks |
+| `matrix_slave_scan_user()` | `noah_matrix_slave_scan_user()` | the slave half's durable-I/O grant, including live-profile initialization and the profile split receiver mailbox; QMK never routes the slave through `matrix_scan_user()` |
 | `housekeeping_task_user()` | `noah_housekeeping_task_user()` | held-repeat ticking, watchdog refresh, and runtime boot-indicator expiry |
 | `suspend_power_down_user()` | `noah_suspend_power_down_user()` | watchdog refresh while the host has USB suspended; QMK's suspend loop never reaches `housekeeping_task()`, so an override that drops this chain lets the watchdog reset the master about 2 s after the host sleeps |
-| `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | VIA macro default seeding, profile-store discovery setup, durable-I/O scheduler setup, RGB runtime init, and split shared-state init |
+| `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | the settings apply hook, profile-store discovery setup, durable-I/O scheduler setup, RGB runtime init, and split shared-state init |
 | `layer_state_set_user()` | `noah_layer_state_set_user()` | pointer-layer policy, auto-sniping layer state, and queueing scan-time pd-mode DPI policy after layer-owned sniping changes |
 | `pointing_device_task_user()` | `noah_pointing_device_task_user()` | pointer-mode mouse-report transforms and pointing idle-noise suppression |
 | `pointing_device_init_user()` | `noah_pointing_device_init_user()` | auto-mouse init |
@@ -307,8 +316,7 @@ outright with no chaining helper and no compile gate to notice.
 
 | QMK hook | Defined in | What it owns |
 | --- | --- | --- |
-| `via_init_kb()` | `users/noah/lib/macro/via_macro_defaults.c` | arms VIA macro default seeding for the first post-init scan |
-| `via_command_kb()` | `users/noah/lib/macro/via_macro_defaults.c` | VIA mutation classification, macro reseeding, and split-mirror marking; replacing it silently drops all three, so storage changes without the digest or the peer learning about it |
+| `raw_hid_receive()` | `users/noah/lib/compat/qmk_profile_channel.c` | every Raw HID report: Profile Wire dispatch and its reply (D-F31); replacing it cuts Charybdis Ark off the keyboard |
 | `is_keyboard_master_impl()` | `users/noah/lib/compat/split_role.c` | forced split role under `FORCE_MASTER`/`FORCE_SLAVE`; empty otherwise |
 | `is_keyboard_left_impl()` | `users/noah/lib/compat/qmk_physical_half.c` | flash-provisioned handedness under `NOAH_PHYSICAL_HALF=left/right`; empty for generic firmware |
 

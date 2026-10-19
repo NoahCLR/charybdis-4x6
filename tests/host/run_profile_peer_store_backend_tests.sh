@@ -20,8 +20,7 @@ build_and_run() {
     cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
-        -DVIA_ENABLE \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \
@@ -35,6 +34,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \

@@ -35,7 +35,7 @@ typedef struct {
     uint32_t payload_digest;
     uint32_t compiled_default_digest;
     uint32_t action_abi_digest;
-    uint16_t payload_length;
+    uint32_t payload_length;
     uint8_t  schema_major;
     uint8_t  schema_minor;
     uint8_t  domain_mask;
@@ -43,7 +43,6 @@ typedef struct {
     uint8_t  origin_half;
     bool     readable : 1;
     bool     has_profile : 1;
-    bool     logical : 1;
 } noah_profile_split_descriptor_t;
 
 typedef struct {

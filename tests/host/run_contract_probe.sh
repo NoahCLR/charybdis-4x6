@@ -6,7 +6,7 @@
 # tests/fixtures. Firmware only states what it is; the agreement check that
 # judges it lives with the client. Built with the production feature set
 # (users/noah/rules.mk defaults: live-profile owner and mutation, PD profile,
-# split, VIA, combos, RGB matrix, pointing device).
+# split, Raw HID, combos, RGB matrix, pointing device).
 #
 #   sh tests/host/run_contract_probe.sh [--output FILE]
 
@@ -39,11 +39,10 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DPOINTING_DEVICE_ENABLE \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
-    -DVIA_ENABLE \
     -DSPLIT_KEYBOARD \
     -DMCU_RP \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
-    -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x1000u \
+    -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DNOAH_LIVE_PROFILE_OWNER_ENABLE \
     -DNOAH_LIVE_PROFILE_MUTATION_ENABLE \
     -DNOAH_PORTABLE_PROFILE_ENABLE \
@@ -65,6 +64,11 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/schema/key_behavior_compiled_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_combo_compiled_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_placement_v1.c" \
@@ -75,6 +79,8 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
     "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \

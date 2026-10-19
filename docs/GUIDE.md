@@ -26,7 +26,7 @@ when a mode is renamed or reconfigured in Charybdis Ark:
   output that uses the behavior table to repeat left-click while held
 - window drags: also not a pointing mode, but hold branches that hold an extra
   mouse button so the ball resizes the window under the pointer (`MS_BTN3`
-  double-tap hold, button 7) or moves it (`CUSTOM_KEY_3` (Drag Window) hold,
+  double-tap hold, button 7) or moves it (`MS_BTN1` + `MS_BTN2` combo,
   button 6); an app binds those buttons to window management (see
   [Third-party apps in my setup](MY_SETUP.md))
 - auto-mouse and auto-sniping layers that keep pointer work available
@@ -43,19 +43,17 @@ Those are capabilities, not a fixed layout prescription. `keymap.c` decides
 where these ideas live. Pointing-mode keys can be simple momentary holds, locks,
 or richer tap/hold keys using the same behavior table as the rest of the board.
 
-Charybdis Ark has **Pointing modes** with 32 slots and 32 matching
-RGB configurations. Dragscroll, Volume, Brightness, Zoom, Arrow and Pinch occupy
-the first six slots; slot 6 provides Undo / Redo and slots 7–31 start empty
-(`PD_SLOT_0`…`PD_SLOT_31` hold a slot, `PD_SLOT_n_LOCK` locks it). Only the
-slots in use take space in the saved profile. Create directional key,
-shortcut, macro or mouse-button click actions with the shared keycode picker, duplicate a mode, or configure
-scrolling with optional held modifiers. The everyday flow shows name, movement,
-DPI and actions; pointer policy, thresholds, timing, modifier rules and mouse
-buttons are under **Advanced**. Keep changes in the shared draft, bind its
-hold/toggle action, set RGB, then review and Apply. See
-[Pointer modes](POINTER_MODES.md).
+The firmware has 32 pointing slots and matching RGB configurations.
+Dragscroll, Volume, Brightness, Zoom, Arrow and Pinch occupy the first six;
+slot 6 provides Undo / Redo, slot 7 Back/Forward, and slots 8–31 start empty.
+`PD_SLOT_0`…`PD_SLOT_31` hold a slot; `PD_SLOT_n_LOCK` locks it. Only configured
+slots take space in the sparse pointing domain. Slots can send keys, shortcuts,
+macros or mouse-button clicks, or scroll with optional held modifiers. See
+[Pointer modes](POINTER_MODES.md) for firmware behaviour and
+[Ark's guide](https://github.com/NoahCLR/charybdis-ark/blob/main/docs/GUIDE.md)
+for its editing controls.
 
-A direction, diagonal or button tap override can start a VIA macro. Triggers
+A direction, diagonal or button tap override can start a macro. Triggers
 while another macro is playing are dropped, never queued. **Every step** is
 allowed; **Once per movement** usually fits a longer macro better. An empty
 macro sends nothing and leaves the movement unspent. Macro outputs inherit
@@ -88,15 +86,18 @@ Name the keyboard in Ark's Settings and your computer lists it under that
 name: Chrome's HID chooser, the system's device list and Ark's keyboard menu.
 It is stored in the profile, so it travels with backups. Left empty, the
 keyboard keeps its built-in name, `keyboard_name` in the QMK fork's
-`keyboard.json`.
+`keyboard.json`. A keyboard with no saved profile uses the name its firmware
+was built with, `NOAH_KEYBOARD_NAME` in the keymap's `config.h`.
 
 Computers read a USB device's name only when it connects. After an Apply that
 renames the keyboard, the half the cable is plugged into disconnects from USB
 for a moment and reconnects under the new name. It waits until nothing is
 held, no macro is running, both halves have the new profile and Ark has
 stopped talking to it for a second; the other half never switches its USB on.
-Installing firmware with this feature changes the profile format, so export a
-backup in Ark first and restore it afterwards.
+Installing firmware with this feature changes the profile format: the keyboard
+starts from its compiled defaults, and a backup made with earlier firmware
+cannot be restored onto it, only onto the firmware that made it. Keep the
+earlier firmware and its backup if you may want to go back.
 
 ## Custom keys and their shortcuts
 
@@ -117,8 +118,10 @@ send a custom key too; it sends that key's shortcut only, never its
 behaviour. A custom key with no shortcut and no behaviour does nothing.
 
 Shortcuts are stored in the profile and need an Ark version that edits them.
-Installing firmware with this feature changes the profile format, so export a
-backup in Ark first and restore it afterwards.
+Installing firmware with this feature changes the profile format: the keyboard
+starts from its compiled defaults, and a backup made with earlier firmware
+cannot be restored onto it, only onto the firmware that made it. Keep the
+earlier firmware and its backup if you may want to go back.
 
 ## Authoring the profile in C
 
@@ -147,7 +150,7 @@ Use it for:
 
 - the physical layer layout
 - combos
-- VIA macro defaults
+- macro defaults (`VIA_MACRO_n`, a historical name)
 - custom keys, their names and shortcuts
 - `key_behaviors[]`
 - pointing-mode key placement and richer mode gestures
@@ -249,7 +252,7 @@ The vocabulary is:
 - `.keeps_auto_mouse_anchored = true` marks the row as a mouse gesture, so
   pressing it keeps the pointer layer up instead of letting auto mouse reset on
   it. Needed for keys that drive the mouse without being mouse keycodes or
-  pointer-mode keys, such as `CUSTOM_KEY_3` (Drag Window) and `CUSTOM_KEY_2`
+  pointer-mode keys, such as `CUSTOM_KEY_3` (Vorssaint Radial) and `CUSTOM_KEY_2`
   (Click Spam)
 
 The helper vocabulary is:
@@ -266,19 +269,22 @@ The helper vocabulary is:
 
 What a hold does decides what happens when you press another key before it
 starts. A hold that is a layer, modifiers or a pointing mode makes that key
-wait, so it lands on the layer or gets the modifier if you keep holding. Any
+wait, so it lands on the layer or gets the modifier if you keep holding; a
+hold that is already on from the press, such as `LM()` or a pointing key with
+no hold of its own, makes nothing wait. Any
 other hold, such as `S(KC_1)` on `KC_1`, is the key's own output, so the
 other key's press types this key's tap first: rolls keep their order, and
 for the hold you hold the key on its own. A hold that waits for release is
 sent at that press if its hold time has passed. While a key that makes
 others wait is undecided, letting go of a modifier or layer key you pressed
 before it waits as well, as in QMK: Cmd released just before F still types
-Cmd+F. For any other key, letting go of the modifier types its tap at once,
+Cmd+F. A chord or custom key that holds modifiers counts as a modifier key
+here. For any other key, letting go of the modifier types its tap at once,
 so Cmd released just before `,` types Cmd+,. The
 [interaction model](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)
 has the details.
 
-`action` can be a normal keycode, a modified keycode such as `S(KC_1)`, a VIA
+`action` can be a normal keycode, a modified keycode such as `S(KC_1)`, a
 macro, a supported QMK behavior keycode such as `OSM()` or
 `MT()`, a generated pointing-mode lock such as `PD_SLOT_0_LOCK`, or a layer
 lock through `LOCK_LAYER(layer)`. QMK's `TG(layer)` is the same lock as
@@ -442,26 +448,79 @@ layer set and activity timer; this userspace adds custom split RPCs in
 - `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` and
   `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC`: key-feedback flash visibility, semantic
   state, broad owner groups, and tap-branch colors
-- `PUT_VIA_KEYMAP_SYNC`: durable reconciliation of committed VIA keymap,
-  encoder, macro, validity, and layout-option storage
+- `PUT_PROFILE_SPLIT_SYNC`: the saved profile, copied and committed on both
+  halves together
+- `PUT_PROFILE_WORKING_SYNC`: live edits that are not saved yet, and the edit
+  mode
 
 You can forget those packet names immediately. The point is that both halves
 know the same layers, keys, combos, pointing modes, and feedback state, so the
 board behaves and lights up like one device instead of two disconnected halves.
 
-VIA edits use a stricter path than transient lighting and pointing state. The
-receiving half never trusts or replays an inbound VIA command. Instead, the
-firmware marks local storage dirty before QMK changes it, reads back the
-committed storage afterward, and reconciles a versioned snapshot with the
-other half. Transfers are CRC-checked, range-checked, retried with bounded
-backoff, and considered complete only after the receiver verifies the complete
-digest and acknowledges it. Full-bank checksum work runs in small RAM-read
-batches on both halves, so even a tiny edit keeps the same complete verification
-with fewer scans spent waiting for it. Boot, reconnect, and USB-role changes always
-exchange metadata again. A newer clean generation wins; if equal generations
-have different contents, the current USB master wins deterministically and
-publishes a new generation. RGB and VIA-macro caches refresh only after local
-storage has committed.
+Saved edits use a stricter path than transient lighting and pointing state.
+A save reaches both halves as one profile generation: each half validates its
+copy and keeps it as a prepared record, the half on USB commits first, and the
+new profile becomes active only once the other half holds it too. Transfers
+are CRC-checked, range-checked and retried with bounded backoff. Boot,
+reconnect and USB-role changes always exchange the saved profile's identity
+again, and the newer one wins.
+
+## Live edits, Save and what a replug does
+
+The keyboard keeps a working copy of its profile in RAM on each half. In a
+live mode, an edit takes effect locally at a safe boundary, then the other
+half follows at its own boundary. The keyboard waits while a key or layer is
+held, so nothing changes under your fingers; status reports when both halves
+have the same revision. Each keyboard remembers its edit mode outside the profile,
+so a backup or review never changes that choice. The default is Live + review.
+
+- **Apply:** Ark keeps edits in its draft until you review and Apply. Apply
+  saves the complete profile on both halves and replaces any working copy.
+- **Live:** the keyboard saves its working copy after **3 seconds without an
+  edit and without a held key**. It does this even after Ark closes or loses
+  its connection. Holding a key restarts the quiet interval; it waits a full
+  quiet interval after release. Each edited revision gets at most one
+  automatic save attempt. A failed save keeps the working copy unsaved and
+  reports the failure; Save can retry it.
+- **Live + review:** edits work immediately, and stay unsaved until you review
+  and **Save**. The keyboard never saves them on its own. **Revert** returns to
+  the saved profile without writing flash.
+
+A replug always starts from the saved profile. In Live, unplugging before the
+quiet interval and save finish loses the unsaved edits, usually the last few
+seconds. In Live + review it loses every edit since Save. Status distinguishes
+unsaved edits, a save in progress, a failed save and a completed keyboard save;
+wait for completion before unplugging if you need to keep an edit. A matching
+Ark client is required; its guide owns the available controls and indicators.
+
+**DPI and RGB adjustment keys are edits too.** They change the current value
+immediately and join the working copy on both halves at a safe boundary. In
+Apply and Live the keyboard saves them after the same quiet interval; in Live
++ review they appear in review and wait for Save. Repeated presses coalesce
+while another edit or save is in progress. An adjustment during a save becomes
+a subsequent edit, never a change to the profile already being written. In
+Apply, a working copy containing a posted client edit is never automatically
+saved just because an adjustment joined it. While an adjustment waits to be
+applied (a moment), a new Apply from the app is told the keyboard is busy and
+tries again; an Apply already under way finishes first, and an adjustment made
+during it follows it. A profile that has no settings of its own (it uses the
+built-in ones) gets them, unchanged apart from your adjustment, the first time
+you adjust.
+
+The profile owns lighting mode and colour, default layers, keymap options and
+DPI. QMK's EEPROM is never written by the adjustment keys and never wins over
+the profile at boot. Participation toggles (combos and behaviours on/off) are
+RAM overrides beside the stored choice: never saved, never reviewed, cleared
+by a replug. RGB's on/off key changes the stored lighting setting like other
+RGB adjustments.
+
+A Save whose bytes already match the saved profile finishes at the safe
+boundary without writing flash or advancing its generation. Other saves,
+automatic or explicit, use the same marker-last storage path on both halves: a power cut leaves a complete old or new saved profile, never a
+mixture. Erases wait for no held key and no matrix change for 50 ms; a key
+pressed during a paced save can make it wait longer. A press and release
+entirely inside a flash pause can still be missed. Pause diagnostics on both
+halves are available for the first keyboard checks.
 
 ## Building from source
 
@@ -494,6 +553,10 @@ checks, worktree setup, comparison builds and release mechanics, see
 [Development](DEVELOPMENT.md).
 
 ## Old firmware and profile limits
+
+The VIA app is not supported (decided 2026-10-19). The firmware answers only
+Charybdis Ark's Profile Wire, keys and macros live in the saved profile, and a
+VIA client finds nothing it can read or write. Use Ark for everything.
 
 Old five-layer firmware is no longer built here. Its storage geometry is
 incompatible with current firmware, so retain the old pair and its backups if

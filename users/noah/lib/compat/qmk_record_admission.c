@@ -49,14 +49,24 @@ static bool record_admission_press_is_held(const keyrecord_t *release) {
 // keeps a modifier's or a layer key's release in its tapping buffer while
 // another key is undecided, so that key's tap or hold still gets them; any
 // other release goes at once (action_tapping.c, "Modifier/Layer should be
-// retained till end of this tapping"). Only physical keys: a combo's runtime
-// position is known only once its record is admitted, so a combo's release
-// could not be told from the undecided key's.
+// retained till end of this tapping"). A combo output's release is judged
+// where the runtime holds that output, its chord's owner key, which tells it
+// from the undecided key's own release when the output is that key.
 static bool record_admission_release_waits(keyrecord_t *release, keypos_t undecided) {
-    if (release->event.type != KEY_EVENT || (release->event.key.row == undecided.row && release->event.key.col == undecided.col)) {
+    uint16_t    keycode = release->keycode ? release->keycode : get_record_keycode(release, false);
+    keyrecord_t at_owner;
+
+    if (release->event.type == COMBO_EVENT) {
+        at_owner = *release;
+        if (!noah_qmk_combo_origin_release_owner(keycode, &at_owner.event.key)) {
+            return false;
+        }
+        release = &at_owner;
+    }
+    if (release->event.key.row == undecided.row && release->event.key.col == undecided.col) {
         return false;
     }
-    return key_runtime_core_release_is_mods_or_layer(release->keycode ? release->keycode : get_record_keycode(release, false), release);
+    return key_runtime_core_release_is_mods_or_layer(keycode, release);
 }
 
 // Replays a held record through process_record. A press ends other keys'
@@ -166,8 +176,19 @@ bool noah_record_admission_press_pending(keypos_t pos, uint16_t since, uint16_t 
     return record_admission_event_pending(pos, true, since, term);
 }
 
+// A combo output's release held here stands at its chord's owner key, where
+// the runtime holds that output.
+static bool record_admission_combo_release_held(void) {
+    for (uint8_t index = 0; index < record_admission_held_count; index++) {
+        if (record_admission_held[index].event.type == COMBO_EVENT && !record_admission_held[index].event.pressed) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool noah_record_admission_release_pending(keypos_t pos, uint16_t since, uint16_t term) {
-    return record_admission_event_pending(pos, false, since, term);
+    return record_admission_event_pending(pos, false, since, term) || (record_admission_combo_release_held() && noah_qmk_combo_origin_release_delivered_at(pos));
 }
 
 uint8_t noah_record_admission_held_count(void) {

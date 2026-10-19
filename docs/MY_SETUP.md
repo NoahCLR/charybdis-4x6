@@ -8,7 +8,7 @@ send, the computer just does less with it.
 | App | What it does for the keyboard | Used by |
 | --- | --- | --- |
 | [BetterMouse](https://better-mouse.com/) | Turns command-scroll into pinch-style zoom | the Pinch pointing mode (`PD_SLOT_5`) |
-| [Rectangle Pro](https://rectangleapp.com/pro) | Binds mouse buttons 6 and 7 to moving and resizing the window under the pointer | the window drags: `CUSTOM_KEY_3` (Drag Window) hold and `MS_BTN3` double-tap hold |
+| [Rectangle Pro](https://rectangleapp.com/pro) | Binds mouse buttons 6 and 7 to moving and resizing the window under the pointer | the window drags: `MS_BTN1` + `MS_BTN2` combo and `MS_BTN3` double-tap hold |
 
 Without BetterMouse, Pinch is still command-modified scrolling; the Zoom mode
 (`PD_SLOT_3`, `Cmd+=` and `Cmd+-`) needs no app. Without Rectangle Pro the

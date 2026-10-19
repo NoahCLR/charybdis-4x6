@@ -28,15 +28,18 @@
 #    undef SERIAL_USART_TIMEOUT
 #    define SERIAL_USART_TIMEOUT 5
 
-// Profile Apply copies the profile to the other half in split RPC frames.
-// QMK sends each RPC's own length, so this raises the ceiling for the profile
-// copy's payload chunks only (up to 110 profile bytes a frame instead of 14);
-// every other split RPC keeps its 32-byte frames. The cost is 96 bytes more
-// of the shared RPC buffer and the transport CRC's staging buffer on each
-// half. A full request alone takes about 5.6 ms on the 230,400-baud link,
-// before its reply and handshake.
-// Replies stay at QMK's 32-byte default.
+// Profile Apply copies the profile to the other half in split RPC frames, and
+// the USB half pulls the other half's newer profile in them. QMK sends each
+// RPC's own request and reply lengths, so these raise the ceiling for the
+// profile copy's payload chunks only (up to 106 profile bytes a frame, pushed
+// or pulled, instead of 10); every other split RPC keeps its 32-byte frames.
+// Each costs 96 bytes of its shared RPC buffer on each half; the transport
+// CRC's staging buffer, sized by the larger of the two, adds 96 once. A full
+// frame alone takes about 5.6 ms on the 230,400-baud link, before the rest of
+// its RPC; QMK's serial timeout applies to each wait for the FIFO, not the
+// whole frame.
 #    define RPC_M2S_BUFFER_SIZE 128
+#    define RPC_S2M_BUFFER_SIZE 128
 
 // A failed userspace runtime RPC stops the current send pass. Retry probes use
 // a short exponential backoff so an unplugged half cannot spend every scan in
@@ -62,9 +65,11 @@
 // - base runtime-visible state (automouse / pd / preview)
 // - combo feedback locality
 // - truthful key-feedback semantics and tap branch state
-// - durable committed VIA-storage reconciliation
+// - the profile copy and commit between halves
+// - the profile store's flash timing on the other half (diagnostics only)
+// - the working copy's live edits and the edit mode (D-F32)
 // so both halves render layer-owned RGB from the same runtime and keymap data.
-#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_VIA_KEYMAP_SYNC, PUT_VIA_KEYMAP_MIRROR, PUT_PROFILE_SPLIT_SYNC
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_PROFILE_SPLIT_SYNC, PUT_PROFILE_FLASH_DIAGNOSTICS, PUT_PROFILE_WORKING_SYNC
 
 // Dynamic key-local placement for PD-mode RGB overlays.
 // Required only when a pd_mode_colors[] row uses RGB_KEY_HALF or
@@ -76,6 +81,16 @@
 #    endif
 
 #endif // SPLIT_KEYBOARD
+
+// ─── Edit mode ─────────────────────────────────────────────────────────────
+//
+// The edit mode (Apply, Live, Live + review; D-F32) lives in QMK's EEPROM
+// user datablock on each half, outside every profile: two 16-byte records,
+// so a write cut short leaves the previous one (qmk_profile_working.c). The
+// version is this layout's, so a datablock QMK formatted for anything else
+// reads as never set.
+#define EECONFIG_USER_DATA_SIZE 32
+#define EECONFIG_USER_DATA_VERSION 0x4E450132u
 
 // ─── Matrix scan ───────────────────────────────────────────────────────────
 //
@@ -194,31 +209,14 @@
 
 #endif // POINTING_DEVICE_ENABLE
 
-// ─── VIA ────────────────────────────────────────────────────────────────────
+// ─── Firmware identity and EEPROM ─────────────────────────────────────────
 
-#ifdef VIA_ENABLE
-// Profile Wire v1-capable firmware. Standard VIA reports this numeric value in
-// big-endian byte order while the custom Profile Wire capability page encodes
-// the same uint32 value little-endian; clients compare the decoded values.
-#    define VIA_FIRMWARE_VERSION 0x00010000u
-#    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
-#    define DYNAMIC_KEYMAP_MACRO_COUNT 128
-// RP2040 wear-leveling exposes half of this backing region as logical EEPROM.
-// Firmware uses 140 KiB of logical EEPROM (D-F14). VIA owns the lower 36 KiB,
-// most of it the shared macro bank; the upper 104 KiB holds two last-known-good
-// live-profile slots of 52 KiB.
-// QMK mirrors logical EEPROM in RAM, so this sizes a 140 KiB cache per half.
-// The storage layout contract validates these exact inclusive address ranges
-// without reading or writing them.
-#    if defined(MCU_RP)
-#        define WEAR_LEVELING_BACKING_SIZE 286720
-#    endif
-#    define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR 0x8FFFu
-#    define NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR 0x9000u
-#    define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x15FFFu
-#    define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x16000u
-#    define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x22FFFu
-#endif
+// The firmware version the Profile Wire capability page reports (D-F31).
+#define NOAH_FIRMWARE_VERSION 0x00010000u
+// VIA is not supported (D-F31). QMK's logical EEPROM holds only its eeconfig,
+// with room for a user datablock: the wear-leveling backing is QMK's RP2040
+// default of 8 KiB, so the RAM mirror of logical EEPROM is 4 KiB per half. The
+// profile slots live in a flash region of their own (profile_storage_layout.h).
 
 // Preserve participation through native tapping/combo and userspace queues.
 #define KEYRECORD_USER_DATA

@@ -32,6 +32,8 @@ uint16_t charybdis_get_pointer_default_dpi(void);
 uint16_t charybdis_get_pointer_sniping_dpi(void);
 void     charybdis_cycle_pointer_default_dpi(bool forward);
 void     charybdis_cycle_pointer_sniping_dpi(bool forward);
+void     charybdis_cycle_pointer_default_dpi_noeeprom(bool forward);
+void     charybdis_cycle_pointer_sniping_dpi_noeeprom(bool forward);
 void     default_layer_set(uint32_t state);
 extern uint32_t default_layer_state;
 typedef union {

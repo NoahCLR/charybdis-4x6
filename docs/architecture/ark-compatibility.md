@@ -2,15 +2,15 @@
 
 Firmware builds and its full host suite require no Charybdis Ark checkout.
 The former in-tree app has been removed. There is no Ark-root selector or fallback
-in firmware runners. The five C test runners use firmware-owned fixtures; PD,
+in firmware runners. The firmware C test runners use firmware-owned fixtures; PD,
 macro-size and old-format rejection vectors live under
 `tests/fixtures/client-regression/`, with producer revision and checksum records.
-The current populated profile is `tests/fixtures/populated_profile_v3.fixture`.
+The current populated profile is `tests/fixtures/populated_profile_v4.fixture`.
 Portable editor/profile C tests assert their own emitted page contract.
 `run_firmware_client_independence_tests.sh` guards this boundary and fixture
 integrity. Firmware tooling checks no longer run the app's suite.
 
-Ark owns `tests/integration/` and its `npm run test:compat` command. Those five
+Ark owns `tests/integration/` and its `npm run test:compat` command. Its
 runners compile probes from an explicitly selected firmware checkout and compare
 them with the selected Ark codecs. Their build recipes must follow firmware
 source/build changes. Firmware does not invoke or require these runners, even
@@ -27,7 +27,8 @@ These firmware paths are Ark's inputs, and changing them does not fail any
 firmware gate:
 
 - Ark's `tests/integration/` runners compile the probes
-  `tests/host/{profile_compiled_defaults_v1,profile_pd_v1,qmk_portable_editor,qmk_portable_profile,qmk_via_storage_regions}_test.c`
+  `tests/host/{profile_compiled_defaults_v1,profile_pd_v1,qmk_portable_editor,qmk_portable_profile}_test.c`
+  (`qmk_via_storage_regions_test.c` left with VIA, D-F31)
   and Ark's own probes with sources under `users/noah/lib/`, headers under
   `tests/host/include/`, the keymap and `tests/host/noah_host_qmk_env.sh`. They
   read `tests/fixtures/compiled_profile_pd_v2.fixture` and the old-format
@@ -83,12 +84,15 @@ the interruption and keyboard acceptance procedures.
 
 ## Current-format cut (D-F10)
 
-Firmware accepts schema 3.0, RGB v4, key behaviors v2, combo v3, settings v8,
-sparse PD v3 and `NT` store format 5 only (D-F14). BEGIN requires a nonzero VIA
-binding.
-The legacy GET 9 page and its feature bit are removed. Ark must require binding
-in `candidateMetadataForBlob`, update codec/rejection expectations and its
-integration probe recipes, refresh imported fixtures/specs and repin after the
+Firmware accepts Profile Wire 2.0, schema 4.0, RGB v4, key behaviors v2,
+combo v3, settings v8, sparse PD v3, keymap v1, macros v1 and store format 6 only (D-F14, D-F28).
+BEGIN's bytes 24–31, the VIA binding until D-F31, must be zero. Every profile length and offset is 32 bits
+on the wire, the capability page is layout 3 and the feature word holds only
+split, saves and pointing (D-F28); the Ark follow-up moves to all of it.
+The legacy GET 9 page and its feature bit are removed. Since D-F31 there is no
+VIA: Ark must send a zero BEGIN tail from `candidateMetadataForBlob` and drop
+logical VIA staging and the VIA reads, update codec/rejection expectations and
+its integration probe recipes, refresh imported fixtures/specs and repin after the
 firmware lands. Neither side translates a backup in an earlier format; it is
 refused. In `client-regression/`, `portable.bin.pd5` is the one frozen
 old-format profile, kept as rejection evidence, and the frozen PD corpus checks
@@ -96,7 +100,8 @@ the current record rules; neither is an accepted firmware format.
 
 ## Domain modules (D-F13)
 
-Wire bytes, digests and fixtures' profile bytes are unchanged. Probe recipes
+D-F13 preserved wire bytes, digests and fixture profile bytes at that cut.
+Subsequent format and domain changes are listed above. Probe recipes
 that compile `profile_compiled_defaults_v1.c` also compile
 `key_behavior_compiled_v1.c`, `profile_combo_compiled_v1.c` and
 `profile_pd_compiled_v1.c`; any recipe compiling `profile_blob_v1.c` compiles

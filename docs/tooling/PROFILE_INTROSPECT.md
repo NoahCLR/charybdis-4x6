@@ -33,6 +33,8 @@ positions defined in source.
 In default `noah` `--write` mode, the script regenerates:
 
 - [`docs/KEYMAP-OVERVIEW.md`](../KEYMAP-OVERVIEW.md)
+- `authored_macro_bank.h` in the selected keymap directory: source macro
+  defaults encoded with the firmware C encoder, used by the compiled profile
 - SVG layer previews under
   [`docs/media/profile-introspection/`](../media/profile-introspection/)
 - SVG color swatches under
@@ -45,6 +47,12 @@ For non-`noah` profiles, the default outputs are profile-specific:
   `docs/media/profiles/<name>/profile-introspection/`
 
 Use `--output-dir <dir>` and `--asset-dir <dir>` to override those locations.
+
+The macro header always belongs to the selected keymap, even with custom
+documentation output directories. Its generation needs a host C compiler
+(`cc` on PATH), the selected QMK headers (`QMK_ROOT` in a worktree), and
+macro compiler inputs under `users/noah/`. It invokes the real-profile
+validation harness to check or generate that header.
 
 Those outputs are generated artifacts. If you changed one of the selected
 profile's authored inputs above, regenerate them in the same pass instead of
@@ -64,7 +72,7 @@ includes:
 - layer LED-group overlays in the per-layer previews
 - transparent-key visibility for partial layers
 - key-behavior markers and timing summaries
-- combos, macro inventory, and VIA macro defaults
+- combos, macro inventory, and profile macro defaults (`VIA_MACROS` in C)
 - pointer-mode reachability, mode colors, LED groups, and layer-local mode
   entry paths
 - auto-mouse, combo-feedback, and key-behavior feedback colors and policy with
@@ -80,7 +88,7 @@ includes comments next to `HSV(...)` arguments inside helper macros such as
 
 ## Commands
 
-Run from the repo root with Python 3.
+Run from the repo root with Python 3 and a host C compiler.
 
 Preview the rendered Markdown without rewriting files:
 
@@ -88,7 +96,7 @@ Preview the rendered Markdown without rewriting files:
 python3 tools/profile_introspect.py --print-markdown
 ```
 
-Regenerate the report and SVG assets:
+Regenerate the report, SVG assets and compiled macro bank:
 
 ```sh
 python3 tools/profile_introspect.py --write
@@ -164,4 +172,5 @@ compile.
 - editing generated docs by hand
 - changing runtime behavior on its own
 
-For the VIA round-trip workflow, see [VIA_TO_QMK.md](./VIA_TO_QMK.md).
+The historical VIA-to-C converter is retired; see
+[VIA_TO_QMK.md](./VIA_TO_QMK.md).

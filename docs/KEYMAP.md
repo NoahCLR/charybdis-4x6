@@ -2,6 +2,17 @@
 
 This is the prose profile doc for the current `noah` Charybdis 4x6 keymap.
 
+The active profile owns the matrix (`0x60` v1) and macro bank (`0x70` v1).
+The authored `keymaps[][][]` and `VIA_MACROS` below are compiled defaults.
+With no saved domain, those defaults type as before. Key lookup, combo origin,
+transparent fallthrough and RGB coverage all use the active matrix; macro
+playback uses its bank. VIA is not supported (D-F31): the profile is the only
+copy, and a client for the new base is required to edit these domains. The
+`VIA_MACRO_n` names are historical. After changing `VIA_MACROS`, run
+`tools/profile_introspect.py --write`: it also regenerates
+`authored_macro_bank.h`, the same macros already in the bank encoding, which
+the compiled defaults copy.
+
 If you want the fastest visual snapshot, start with
 [KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md). The top-level [README](../README.md),
 the [firmware guide](./GUIDE.md) and [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) explain what the shared
@@ -37,12 +48,12 @@ trackball control get packed into the right side and the thumbs.
 | --- | --- | --- |
 | `LAYER_BASE` | default typing layer | QWERTY, home-row layer access, custom thumbs, number-row symbol holds, signature `Esc`, `Enter`, `Shift`, and `Right Alt` behaviors |
 | `LAYER_NUM` | right-hand numpad layer | numpad on the right half, `MO(LAYER_NAV)` retained on the left side for fast access back into navigation |
-| `LAYER_SYM` | symbols and DPI layer | DPI controls on the left, bracket and quote families on the right, and a lower-left shortcut cluster anchored by five VIA macros |
-| `LAYER_NAV` | navigation, media, system control, mouse buttons | arrow cluster, media, volume, brightness, direct macOS shortcuts, mouse buttons, `PD_SLOT_0`, and current auto-sniping |
-| `LAYER_POINTER` | auto-mouse pointer surface | `PD_SLOT_2`, `PD_SLOT_5`, `PD_SLOT_1`, `PD_SLOT_0`, mouse buttons, and the custom thumb keys |
+| `LAYER_SYM` | symbols and DPI layer | DPI controls on the left, bracket and quote families on the right, and a lower-left shortcut cluster anchored by five macros |
+| `LAYER_NAV` | navigation, editing, system control, mouse buttons | arrow cluster, launcher/editing macros, direct macOS shortcuts, mouse buttons, `PD_SLOT_0`, and current auto-sniping |
+| `LAYER_POINTER` | auto-mouse pointer surface | `PD_SLOT_2`, `PD_SLOT_5`, `PD_SLOT_1`, `PD_SLOT_0`, `PD_SLOT_7`, mouse buttons, and the custom thumb keys |
 | `LAYER_EXTRA_1` | Function | authored function-key overlay |
 | `LAYER_EXTRA_2` | Game | authored gaming layer |
-| `LAYER_EXTRA_3` | Extra | named spare layer |
+| `LAYER_EXTRA_3` | Extra | pink full-board layer |
 | `LAYER_EXTRA_4`–`LAYER_EXTRA_11` | remaining bank slots | transparent, unnamed defaults |
 
 The keymap currently sets:
@@ -53,7 +64,7 @@ The keymap currently sets:
 Those settings live in
 [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h).
 
-Function and Game have green and cyan layer colours. Extra remains available.
+Function and Game have green and cyan layer colours; Extra is pink and lights all keys.
 Slot 6 is the horizontal Undo / Redo pointing mode at 100 DPI, with a threshold
 of 40 and Cmd+Z / Shift+Cmd+Z outputs.
 
@@ -72,16 +83,16 @@ Every `LT()`/`MT()`/`OSM()`/`TT()`/`OSL()` holds at the dual-role setting
 (default `TAPPING_TERM`), with or without a behavior row, unless the row
 overrides it. Other rows use `CUSTOM_TAP_HOLD_TERM`.
 
-Eight of the ten compiled combos follow `COMBO_TERM`; the two four-key Cmd+N
-chords are `COMBO_WINDOW` rows with their own 100 ms window. The combo hold
+All fifteen compiled combos follow `COMBO_TERM`; none currently overrides
+its window with `COMBO_WINDOW`. The combo hold
 threshold is `TAPPING_TERM`. The two-button mouse chord emits mouse button 6,
 while Pinch + mouse button 3 emits Click Spam.
 
 There are also current per-key exceptions:
 
-- `LT(LAYER_NAV, KC_SLSH)` uses `.tap_hold_term = 100`
+- `LT(LAYER_NAV, KC_SLSH)` uses `.tap_hold_term = 150` and `.multi_tap_term = 100`
 - `CUSTOM_KEY_2` (Click Spam) uses `.tap_hold_term = 1`
-- `MS_BTN3` and `CUSTOM_KEY_3` (Drag Window) use 100 ms tap-hold and multi-tap terms
+- `MS_BTN3` uses 100 ms tap-hold and multi-tap terms
 
 ## Base Layer Highlights
 
@@ -97,12 +108,12 @@ lot of the profile's structure:
 - `KC_RIGHT_ALT` is a profile-specific dual-use key: tap toggles
   `PD_SLOT_4_LOCK`, hold stays normal right `Alt`
 
-The ten-combo set includes these four utility chords:
+The fifteen-combo set includes these four utility chords:
 
 - `KC_D` + `LT(LAYER_NAV, KC_F)` -> `KC_TAB`
 - `PD_SLOT_5` + `MS_BTN3` -> `CUSTOM_KEY_2` (Click Spam)
 - `KC_N` + `KC_M` -> `KC_LEFT_GUI`
-- `PD_SLOT_1` + `MS_BTN1` -> `KC_LEFT_GUI`
+- `MS_BTN1` + `PD_SLOT_1` -> `KC_LEFT_GUI`
 
 That keeps the layout readable while still giving one easy chorded `Tab`, one
 pointer-specific utility chord, and two right-side paths to the authored
@@ -181,7 +192,8 @@ key with neither a row nor a shortcut does nothing; a behaviour step on
 another key may send one, which sends only its shortcut (D-F26).
 
 Left Thumb selects a layer by tap count: single for Symbol, double for Number,
-triple for Function (`LAYER_EXTRA_1`), and quadruple for Game (`LAYER_EXTRA_2`).
+triple for Function (`LAYER_EXTRA_1`), quadruple for Game (`LAYER_EXTRA_2`),
+and quintuple for Pointer.
 A tap locks that layer; holding the last press holds it only until release.
 
 Right Thumb taps to lock Navigation and holds to keep Navigation active.
@@ -193,14 +205,10 @@ Both thumbs use a 150 ms tap-hold term.
 
 ### Slash / Nav Key
 
-`LT(LAYER_NAV, KC_SLSH)` currently does three useful things:
-
-- tap -> `/`
-- hold -> `LAYER_NAV`
-- double-tap hold -> `LOCK_LAYER(LAYER_NAV)`
-
-This key also keeps a shorter `100 ms` tap-hold term so slash still feels close
-to a normal slash key when typing quickly.
+`LT(LAYER_NAV, KC_SLSH)` taps `/` and holds Navigation after 150 ms. Its
+behaviour row has no authored steps, so it uses the native dual-role fallback;
+there is no longer a double-tap layer-lock branch. The row's multi-tap term
+is 100 ms.
 
 ### Escape, Enter, Shift, And Right Alt
 
@@ -281,38 +289,23 @@ second.
 
 ### Window Drags
 
-`LAYER_POINTER` carries two window drags, split across two keys:
+The authored mouse gestures send extra buttons:
 
-- `MS_BTN3` tap -> middle click
-- `MS_BTN3` double-tap hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)`, resizing
-  the window under the pointer
-- `CUSTOM_KEY_3` (Drag Window) tap -> transparent, so it falls through to the
-  base-layer key under it
-- `CUSTOM_KEY_3` hold -> `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)`, moving the
-  window under the pointer
+- `MS_BTN1` + `MS_BTN2` combo -> button 6, held until the combo releases
+- `MS_BTN3` double-tap hold -> button 7, held until the key releases
+- `MS_BTN3` single tap -> ordinary middle click
 
-The point is to put a whole window drag under one finger. While the key is held
-the trackball is still live, so the ball drives the drag and releasing the key
-ends it.
+The trackball keeps moving while those buttons are held. My host bindings in
+[Rectangle Pro](https://rectangleapp.com/pro) turn button 6 into window move
+and button 7 into resize; firmware sends mouse buttons, not window commands.
+The resize row uses 100 ms tap-hold and multi-tap terms.
 
-The resize drag sits behind a double-tap because it shares a key with an
-ordinary middle click, and an accidental window drag rearranges whatever is
-under the pointer. The move drag has its own key, so it can afford a plain hold;
-both rows tighten `.multi_tap_term` to `100`, since these branches are entered
-from a deliberate burst rather than typing rhythm.
-
-`CUSTOM_KEY_3` is not a mouse keycode, so its row also sets
-`.keeps_auto_mouse_anchored = true`. Without that, auto mouse resets on the
-press and takes `LAYER_POINTER` with it, which both interrupts the drag surface
-and leaves the transparent tap tier with no layer to fall through from. See
-[POINTER_MODES.md](./POINTER_MODES.md) for the classification rule.
-
-Neither gesture means anything to macOS on its own: both are ordinary extra
-mouse buttons on the wire. For the current macOS setup, window move and resize
-are bound to buttons 6 and 7 in
-[Rectangle Pro](https://rectangleapp.com/pro), which is what turns them into
-window management. Without that binding the keys still send real button 6 and
-button 7 presses, which most apps ignore.
+`CUSTOM_KEY_3` is now named **Vorssaint Radial**. Its hold sends
+Ctrl+Alt+Cmd+Space; its tap falls through to the base key. Its row keeps
+`.keeps_auto_mouse_anchored = true`, so pressing it preserves the pointer layer
+and the transparent tap has a layer to fall through from. It uses the default
+150 ms hold threshold. **VoiceInk**, `CUSTOM_KEY_4`, has a Ctrl+Alt+Space
+shortcut and is the output of the Backspace + Enter combo.
 
 ## Layer Walkthrough
 
@@ -356,15 +349,14 @@ cluster attached.
 
 ### `LAYER_NAV`
 
-This is the densest current layer. It combines:
+This layer combines:
 
-- media playback
-- volume and brightness
+- launcher and editing shortcuts
 - an arrow cluster
 - direct macOS shortcuts
 - `MS_BTN1` and `MS_BTN2`
 - `PD_SLOT_0`
-- four VIA macros
+- launcher and editing macros
 
 It is also the current auto-sniping layer, so entering nav changes both keys
 and trackball feel.
@@ -383,7 +375,8 @@ side becomes a focused cluster for:
 - `MS_BTN1`
 - `MS_BTN2`
 - `MS_BTN3`, which also carries the resize drag described above
-- `CUSTOM_KEY_3` (Drag Window), the move drag described above
+- `CUSTOM_KEY_3` (Vorssaint Radial), whose hold sends Ctrl+Alt+Cmd+Space
+- `PD_SLOT_7`, Back/Forward once per movement
 
 The pointer layer retains the custom thumb behaviours. Layer access follows
 those authored thumb sequences, rather than a separate space layer-tap.
@@ -432,25 +425,25 @@ key." It is more opinionated than that.
 
 ## Macro And Shortcut Surfaces
 
-The profile's macros are VIA macro slots:
+The profile's macros retain their 128 macro-slot key identities:
 
-- VIA exposes `VIA_MACRO_0` through `VIA_MACRO_127`, each of which can carry a
-  name
-- `VIA_MACRO_0` through `VIA_MACRO_10` currently have source defaults in
+- The profile exposes `VIA_MACRO_0` through `VIA_MACRO_127`, each with a name
+- `VIA_MACRO_0` through `VIA_MACRO_16`, plus `VIA_MACRO_19`, have nonempty source defaults in
   `VIA_MACROS(MACRO)`
 
-VIA macros play through one scan-driven engine. Starting a
+Profile macros play through one scan-driven engine. Starting a
 macro does not wait inside the triggering key event: delays, text, chords, and
-key holds advance through later matrix scans, so pointing, RGB, VIA, split, and
+key holds advance through later matrix scans, so pointing, RGB, split, and
 normal key processing continue between macro operations. Playback has a
 deliberate one-active/no-queue policy. A second macro trigger is consumed while
 the first keeps running, and it must be triggered again later if desired.
 
 The engine validates the complete payload before output, owns exact leases for
 every synthetic key it retains, and releases those leases on completion,
-cancellation, or runtime failure. Stored macro writes and resets cancel playback
-and release its outputs before changing the bytes it reads. Cache invalidation
-then makes the next trigger validate the edited payload. Timing is scan-granular:
+cancellation, or runtime failure. Profile publication invalidates the cache at a
+no-macro boundary, so a running slot finishes on the bytes it started with;
+the new payload is loaded on the next trigger. EEPROM reset requests cancellation
+and cleanup before the active cache entry can be reused. Timing is scan-granular:
 each operation runs on the first scan at or after its configured interval.
 
 But a lot of the current shortcut surface is not implemented through macro
@@ -461,39 +454,17 @@ In practice, the profile is set up so those shortcuts are quick to reach from
 the base layer. `LT(LAYER_NAV, KC_F)` is one of the main access points, and
 `LT(LAYER_NAV, KC_SLSH)` provides a second nav entry on the right side.
 
-Direct macOS-standard shortcuts bound in layers include:
+Navigation combines direct Cmd+Q and Cmd+W with macro slots for Select All,
+Copy, Paste, Cut, Undo and Redo. The generated
+[macro inventory](KEYMAP-OVERVIEW.md#via-macros) lists each exact payload and
+placement; use it for the complete list rather than duplicating that table here.
+Slots 0–10 hold launcher, utility and editor shortcuts; 11–16 hold those six
+editing commands. Slot 19, T3 Code, holds Cmd, taps Tab, waits 120 ms, types
+`t3 code`, then releases Cmd. Slots 17–18 and 20–127 are empty.
 
-| Binding | Standard macOS meaning | Current layer |
-| --- | --- | --- |
-| `G(KC_Q)` | quit the current app | `LAYER_NAV` |
-| `G(KC_W)` | close the front window | `LAYER_NAV` |
-| `G(KC_A)` | select all | `LAYER_NAV` |
-| `G(KC_X)` | cut | `LAYER_NAV` |
-| `G(KC_C)` | copy | `LAYER_NAV` |
-| `G(KC_V)` | paste | `LAYER_NAV` |
-| `G(KC_Z)` | undo | `LAYER_NAV` |
-| `LSG(KC_Z)` | redo | `LAYER_NAV` |
-
-The VIA defaults are a smaller mixed set. Some are standard macOS shortcuts,
-while others are just my current app-launcher or utility bindings:
-
-| Slot | Payload | Meaning |
-| --- | --- | --- |
-| `VIA_MACRO_0` | `{KC_LGUI,KC_SPC}` | standard macOS Spotlight shortcut |
-| `VIA_MACRO_1` | `{KC_LALT,KC_SPC}` | current launcher shortcut for Claude or ChatGPT |
-| `VIA_MACRO_2` | `{KC_LALT,KC_LGUI,KC_SPC}` | current launcher shortcut for [Warp Terminal](https://www.warp.dev/) |
-| `VIA_MACRO_3` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_C}` | current OCR text-copy shortcut for [TextGrabber](https://apps.apple.com/us/app/textgrabber/id6451423640?mt=12) |
-| `VIA_MACRO_4` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` | current screenshot shortcut |
-| `VIA_MACRO_5` | `{KC_LCTL,KC_LGUI,KC_SPC}` | standard macOS Character Viewer shortcut |
-| `VIA_MACRO_6` | `{KC_LALT,KC_LGUI,KC_8}` | current shortcut for my [macOS Accessibility Zoom](https://support.apple.com/guide/mac-help/zoom-in-on-whats-onscreen-mh40579/mac) setup, used as a picture-in-picture looking glass |
-| `VIA_MACRO_7` | `{KC_LCTL,KC_LALT,KC_LGUI,KC_V}` | current shortcut for [Maccy](https://maccy.app/), my clipboard manager |
-| `VIA_MACRO_8` | `{KC_LSFT,KC_LGUI,KC_V}` | current shortcut for VS Code preview |
-| `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | current shortcut for the VS Code command palette |
-| `VIA_MACRO_10` | `{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}` | select all, short wait, then copy |
-
-`VIA_MACRO_11` through `VIA_MACRO_127` are empty by default. The RP2040
-macro bank is 34,903 bytes shared by all 128 slots, including their terminators
-and the bank validity byte; it is not a separate allocation per macro.
+The profile macro domain holds up to 34,903 bytes, including every slot's
+terminator. Its saved bank lives in the profile slots, outside the QMK
+wear-leveling region.
 
 Prefer chord payloads such as `{KC_LGUI,KC_C}` for self-contained shortcuts.
 Explicit key-down/key-up payloads such as `{+KC_LSFT}` and `{-KC_LSFT}` must
@@ -502,10 +473,10 @@ same key, duplicate key-downs are invalid, and no key may remain held at the
 end. Invalid balance is rejected before playback, so a macro cannot release
 another producer's key or leave its own key registered.
 
-VIA text supports canonical UTF-8 with Profile Wire feature bit 21. Select the
-host layout in the saved profile before playing text. The default US layout
-supports ASCII; configured layouts supply their supported characters, and
-Unicode entry handles characters outside that layout when configured. See [runtime flow](architecture/runtime-flow.md) for the
+Macro text supports canonical UTF-8. Select the
+host setup in the active profile before playing text. The authored default is
+macOS with the Dutch layout and Unicode entry off; characters available in that
+layout do not need Unicode entry. See [runtime flow](architecture/runtime-flow.md) for the
 encoding, program limit, ownership and host-entry requirements. Malformed
 slots produce no partial typing and remain cached invalid until a mutation.
 
@@ -513,10 +484,10 @@ slots produce no partial typing and remain cached invalid until a mutation.
 So the current profile uses both:
 
 - direct modded keycodes for many standard macOS editing and app shortcuts
-- VIA macros for a smaller set of macOS launcher/system shortcuts and
+- macros for a smaller set of macOS launcher/system shortcuts and
   personal utility bindings
 
-Some other shortcuts in the current profile, especially several VIA slots, are
+Some other shortcuts in the current profile, especially several macro slots, are
 simply personal shortcuts rather than standard macOS conventions.
 
 ## Verification
@@ -553,7 +524,7 @@ sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh
 - [INTERACTION_MODEL.md](./INTERACTION_MODEL.md): shared interaction semantics
 - [POINTER_MODES.md](./POINTER_MODES.md): raw pointing-device behavior after a
   mode is active
-- [tooling/VIA_TO_QMK.md](./tooling/VIA_TO_QMK.md): VIA export round-trip
-  workflow for the current keymap source
+- [tooling/VIA_TO_QMK.md](./tooling/VIA_TO_QMK.md): retirement notice for the
+  old VIA-to-C converter
 - [tooling/PROFILE_INTROSPECT.md](./tooling/PROFILE_INTROSPECT.md): how the
   generated overview and SVG assets are refreshed and verified

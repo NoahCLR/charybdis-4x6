@@ -54,8 +54,8 @@ they cannot remain cached after a profile switch.
 
 The flashable side-specific pair installs the effective-profile owner and all
 renderer invalidators, with live mutation enabled by default. Its logical
-transaction prepares both halves before the decision and requires the bound
-custom/VIA identities before activation. Generic builds without a physical-half
+transaction prepares both halves before the decision and requires exact
+profile convergence before activation. Generic builds without a physical-half
 identity use compiled defaults. Hardware acceptance remains separate from the
 implemented render and publication contracts.
 

@@ -41,11 +41,16 @@ static bool identity_equal(const noah_effective_profile_identity_t *left, const 
 }
 
 static bool snapshot_valid(const noah_effective_profile_snapshot_t *snapshot) {
-    if (!snapshot || !profile_view_valid(&snapshot->profile, &snapshot->reader, snapshot->base_offset) || snapshot->identity.payload_crc32 != snapshot->profile.crc32 || snapshot->identity.payload_digest != snapshot->profile.digest || snapshot->identity.action_abi_digest != snapshot->profile.action_abi_digest) {
+    bool working = snapshot && snapshot->identity.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY;
+
+    if (!snapshot || !profile_view_valid(&snapshot->profile, &snapshot->reader, snapshot->base_offset) || (!working && (snapshot->identity.payload_crc32 != snapshot->profile.crc32 || snapshot->identity.payload_digest != snapshot->profile.digest)) || snapshot->identity.action_abi_digest != snapshot->profile.action_abi_digest) {
         return false;
     }
     if (snapshot->identity.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS) {
         return snapshot->identity.generation == 0u && snapshot->identity.origin == NOAH_EFFECTIVE_PROFILE_ORIGIN_COMPILED && snapshot->identity.compiled_default_digest == snapshot->profile.digest;
+    }
+    if (snapshot->identity.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY) {
+        return snapshot->identity.generation == 0u ? snapshot->identity.origin == NOAH_EFFECTIVE_PROFILE_ORIGIN_COMPILED : snapshot->identity.origin <= 1u;
     }
     return snapshot->identity.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE && snapshot->identity.generation != 0u && snapshot->identity.origin <= 1u;
 }
@@ -70,9 +75,10 @@ static noah_effective_profile_result_t make_snapshot(const noah_profile_validato
         .origin                  = origin,
         .kind                    = (uint8_t)kind,
     };
-    result.reader      = *reader;
-    result.base_offset = base_offset;
-    result.profile     = *profile;
+    result.reader              = *reader;
+    result.base_offset         = base_offset;
+    result.profile             = *profile;
+    result.changed_domain_mask = NOAH_PROFILE_DOMAIN_MASK_ALL;
 
     // Every decoded domain view uses the copied generation reader rather than
     // retaining a pointer to an input snapshot or validator object.
@@ -95,6 +101,23 @@ noah_effective_profile_result_t noah_effective_profile_snapshot_make_compiled(co
 
 noah_effective_profile_result_t noah_effective_profile_snapshot_make_validated(const noah_profile_validator_v1_profile_t *profile, const noah_profile_reader_t *reader, size_t base_offset, uint32_t generation, uint8_t origin, uint32_t compiled_default_digest, noah_effective_profile_snapshot_t *snapshot) {
     return make_snapshot(profile, reader, base_offset, generation, origin, compiled_default_digest, NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE, snapshot);
+}
+
+noah_effective_profile_result_t noah_effective_profile_snapshot_make_working(const noah_profile_validator_v1_profile_t *profile, const noah_profile_reader_t *reader, size_t base_offset, const noah_effective_profile_identity_t *base, uint32_t session, uint32_t revision, noah_effective_profile_snapshot_t *snapshot) {
+    noah_effective_profile_result_t result;
+
+    if (!base || (base->kind != NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS && base->kind != NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE && base->kind != NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY)) {
+        if (snapshot) {
+            memset(snapshot, 0, sizeof(*snapshot));
+        }
+        return NOAH_EFFECTIVE_PROFILE_INVALID_ARGUMENT;
+    }
+    result = make_snapshot(profile, reader, base_offset, base->generation, base->origin, base->compiled_default_digest, NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY, snapshot);
+    if (result == NOAH_EFFECTIVE_PROFILE_OK) {
+        snapshot->identity.payload_crc32  = session;
+        snapshot->identity.payload_digest = revision;
+    }
+    return result;
 }
 
 bool noah_effective_profile_snapshot_read(const noah_effective_profile_snapshot_t *snapshot, size_t offset, uint8_t *target, size_t length) {
@@ -352,7 +375,7 @@ noah_effective_profile_result_t noah_effective_profile_provider_poll(noah_effect
     if (!provider->has_pending) {
         return NOAH_EFFECTIVE_PROFILE_NO_PENDING;
     }
-    if (!provider->safe_boundary && ((provider->pending.profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) || ((provider->pending.profile.domain_mask | provider->active_banks[provider->active_index].profile.domain_mask) & (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD)))) {
+    if (!provider->safe_boundary && ((provider->pending.profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) || ((provider->pending.profile.domain_mask | provider->active_banks[provider->active_index].profile.domain_mask) & (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEYMAP | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MACROS)))) {
         return NOAH_EFFECTIVE_PROFILE_SAFE_BOUNDARY_REQUIRED;
     }
     update_begin(provider);
@@ -390,6 +413,69 @@ noah_effective_profile_result_t noah_effective_profile_provider_poll(noah_effect
         provider->invalidators[invalidator_index].callback(provider->invalidators[invalidator_index].context, provider->publication_count, previous, active, &provider->active_banks[provider->active_index]);
     }
 
+    provider->publication_in_progress = false;
+    update_end(provider);
+    return NOAH_EFFECTIVE_PROFILE_PUBLISHED;
+}
+
+static uint32_t evaluate_safe_boundary(noah_effective_profile_provider_t *provider) {
+    uint32_t reason_mask;
+
+    update_begin(provider);
+    provider->safe_boundary_evaluation_in_progress = true;
+    update_end(provider);
+    reason_mask = provider->safe_boundary ? provider->safe_boundary(provider->safe_boundary_context) : 0u;
+    update_begin(provider);
+    provider->safe_boundary_evaluation_in_progress = false;
+    provider->safe_boundary_reason_mask            = reason_mask;
+    update_end(provider);
+    return reason_mask;
+}
+
+noah_effective_profile_result_t noah_effective_profile_provider_publish_in_place(noah_effective_profile_provider_t *provider, const noah_effective_profile_snapshot_t *snapshot, uint8_t changed_domain_mask, noah_effective_profile_mutate_fn mutate, void *mutate_context) {
+    noah_effective_profile_result_t   guard = mutation_guard(provider);
+    noah_effective_profile_identity_t previous;
+    noah_effective_profile_identity_t active;
+    uint8_t                           rollback_index;
+    uint8_t                           invalidator_index;
+
+    if (guard != NOAH_EFFECTIVE_PROFILE_OK) {
+        return guard;
+    }
+    if (!snapshot || !snapshot_valid(snapshot) || snapshot->identity.compiled_default_digest != provider->compiled_defaults.identity.payload_digest || snapshot->identity.action_abi_digest != provider->compiled_defaults.identity.action_abi_digest) {
+        return NOAH_EFFECTIVE_PROFILE_INVALID_SNAPSHOT;
+    }
+    previous = provider->active_banks[provider->active_index].identity;
+    // A working copy stays on its base; Revert returns to exactly that base.
+    if (previous.generation != snapshot->identity.generation || previous.origin != snapshot->identity.origin || (snapshot->identity.kind != NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY && previous.kind != NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY)) {
+        return NOAH_EFFECTIVE_PROFILE_STALE_GENERATION;
+    }
+    if (provider->has_pending) {
+        return NOAH_EFFECTIVE_PROFILE_BUSY;
+    }
+    if (evaluate_safe_boundary(provider) != 0u) {
+        return NOAH_EFFECTIVE_PROFILE_WAITING;
+    }
+
+    rollback_index = (uint8_t)(provider->active_index ^ 1u);
+    update_begin(provider);
+    provider->publication_in_progress = true;
+    if (mutate) {
+        mutate(mutate_context);
+    }
+    provider->active_banks[provider->active_index]                     = *snapshot;
+    provider->active_banks[provider->active_index].changed_domain_mask = changed_domain_mask;
+    // No rollback crosses a working copy: the other bank may name bytes the
+    // edit just rewrote, and Revert is the working copy's own operation.
+    memset(&provider->active_banks[rollback_index], 0, sizeof(provider->active_banks[rollback_index]));
+    provider->rollback_available = false;
+    if (provider->publication_count != UINT32_MAX) {
+        provider->publication_count++;
+    }
+    active = provider->active_banks[provider->active_index].identity;
+    for (invalidator_index = 0u; invalidator_index < provider->invalidator_count; invalidator_index++) {
+        provider->invalidators[invalidator_index].callback(provider->invalidators[invalidator_index].context, provider->publication_count, previous, active, &provider->active_banks[provider->active_index]);
+    }
     provider->publication_in_progress = false;
     update_end(provider);
     return NOAH_EFFECTIVE_PROFILE_PUBLISHED;

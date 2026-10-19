@@ -20,3 +20,8 @@ void rgb_matrix_mode(uint8_t mode);
 void rgb_matrix_set_speed(uint8_t speed);
 void rgb_matrix_set_flags(uint8_t flags);
 void rgb_matrix_sethsv(uint16_t hue, uint8_t saturation, uint8_t brightness);
+void rgb_matrix_disable_noeeprom(void);
+void rgb_matrix_mode_noeeprom(uint8_t mode);
+void rgb_matrix_set_speed_noeeprom(uint8_t speed);
+void rgb_matrix_set_flags_noeeprom(uint8_t flags);
+void rgb_matrix_sethsv_noeeprom(uint16_t hue, uint8_t saturation, uint8_t brightness);

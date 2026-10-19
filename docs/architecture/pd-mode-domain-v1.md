@@ -1,8 +1,8 @@
 # PD-mode domain v1
 
-Implemented in schema-3 builds: domain codec, incremental validation, immutable
+Implemented in schema-4 builds: domain codec, incremental validation, immutable
 effective cache, shared engines, persistence/split writers, portable profiles
-and live editor. Side-specific builds own committed profiles; the generic build
+and device live editing; client UI status belongs to Ark. Side-specific builds own committed profiles; the generic build
 loads the 32 compiled factory slots without a profile owner.
 Current domain version 3 stores up to 32 sparse 128-byte records. The older
 version-1 fixed bank and version-2 sparse 96-byte records below are historical
@@ -37,20 +37,21 @@ foreground-app switching and volatile device preview.
 
 The original factory records migrated the six pre-slot modes with two disabled
 slots. The current authored profile also configures slot 6 as horizontal Undo /
-Redo; slots 7–31 are disabled and unnamed, so the compiled domain stores seven
-records. Slot contents are profile data, not part of the
+Redo and slot 7 as Back/Forward; slots 8–31 are disabled and unnamed, so the
+compiled domain stores eight records. Slot contents are profile data, not part of the
 keycode allocation.
 
 | Slot | Name | Engine | Behavior preserved |
 | --- | --- | --- | --- |
 | 0 | Dragscroll | Scrolling | Local scroll algorithm, inversion, axis hysteresis, timing, CPI, lock-owned auto-mouse |
-| 1 | Volume | Directional, vertical | Volume down/up, threshold 60, inherited DPI, pointer-layer anchoring |
-| 2 | Brightness | Directional, vertical | Brightness down/up, threshold 60, inherited DPI, pointer-layer anchoring |
+| 1 | Volume | Directional, vertical | Volume down/up, threshold 60, DPI 400, pointer-layer anchoring |
+| 2 | Brightness | Directional, vertical | Brightness down/up, threshold 60, DPI 400, pointer-layer anchoring |
 | 3 | Zoom | Directional, vertical | Cmd-minus/Cmd-equals, threshold 80, DPI 400 |
 | 4 | Arrow | Directional, dominant axis | Arrows, X/Y thresholds 40/50, DPI 400, vertical Alt masking, BTN1 hold right Shift, BTN2 Cmd+C, BTN3 Cmd+V, typing-layer preference |
-| 5 | Pinch | Scrolling | Dragscroll's tuning plus owned left Cmd with managed-only modifier masking |
+| 5 | Pinch | Scrolling, vertical only | Dragscroll's tuning plus owned left Cmd with managed-only modifier masking |
 | 6 | Undo / Redo | Directional, horizontal | Cmd-Z / Shift-Cmd-Z, threshold 40, DPI 100 |
-| 7–31 | Empty | Disabled | Inert actions; not stored; retained, editable RGB row |
+| 7 | Back/Forward | Directional, horizontal | BTN4 / BTN5 once per movement, threshold 60, inherited DPI |
+| 8–31 | Empty | Disabled | Inert actions; not stored; retained, editable RGB row |
 
 Dragscroll and Pinch run this repository's
 [`pd_mode_dragscroll.c`](../../users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
@@ -87,7 +88,7 @@ Factory-only builds encode and validate their compiled slot records at startup;
 owner builds warm the cache from their published generation and fail closed if
 that read fails.
 
-Pointing polls never decode EEPROM or allocate. A cache-copy failure exposes an
+Pointing polls never decode profile storage or allocate. A cache-copy failure exposes an
 unavailable state, never a partial table or a mix of generations. Publication
 uses the strict activation boundary: Apply waits for every active or locked
 mode, held button override and owned modifier to clear, with a reason the app
@@ -113,15 +114,13 @@ record size (`INVALID_HEADER`), nonzero header bytes 4..7 (`RESERVED`), a
 length other than `8 + 128 × nn` (`INVALID_LENGTH`), and a repeated,
 out-of-order or out-of-range ID (`INVALID_ID`). Version 3 is version 2 with
 the name moved to the shared counted rule: bytes 0..7 and 32..95 keep their
-meaning, so the pointing engine reads the same 96 bytes it always has. The surrounding profile domain envelope adds four
-bytes. RGB remains in its own domain; RGB v4 holds 32 ID/HSV/locality rows,
+meaning, so the pointing engine reads the same 96 bytes it always has. The schema-4 profile domain envelope adds six bytes. RGB remains in its own domain; RGB v4 holds 32 ID/HSV/locality rows,
 one per slot whether or not the slot is stored here.
 
 Retired version 1 was fixed: 776 bytes, the header `01 08 60 00 00 00 00 00`
 then eight records in ID order `0..7`, disabled slots included. No current
-firmware with 32 slots accepts it. An importer converts it by dropping each
-disabled record without a name and writing the version-2 header; record bytes
-are unchanged.
+firmware with 32 slots accepts it. The historical version-2 conversion dropped disabled unnamed records;
+current firmware offers no conversion from either retired format.
 
 | Record offset | Bytes | Meaning |
 | --- | --- | --- |
@@ -250,12 +249,12 @@ The allowlist is tied to the pinned QMK native ABI and the advertised action-ABI
 - Modified keyboard taps: high byte `0x01..0x1f` with at least one of its low
   four modifier bits set, low byte `0x04..0xa4`.
 - Mouse-button clicks: plain `0x00d1..0x00d8`, buttons 1–8 (D-F22, added
-  2026-10-12). Capability feature bit 28 says the keyboard accepts them; a
-  client writes them only to a keyboard that sets it. Older firmware rejects
-  them as `INVALID_ACTION`, so the domain version is unchanged.
+  2026-10-12). Every Profile Wire 2 firmware accepts them (feature bit 28
+  advertised them before D-F28). Older firmware rejects them as
+  `INVALID_ACTION`, so the domain version is unchanged.
 
-- VIA macro triggers: plain `0x7700..0x777f`, slots 0–127 (D-F23). Feature
-  bit 29 advertises them. Their modifier policy must be inherit and their mask
+- Macro triggers: plain `0x7700..0x777f`, slots 0–127 (D-F23), part of the Profile Wire 2
+  base (formerly feature bit 29). Their modifier policy must be inherit and their mask
   zero; older firmware rejects them as `INVALID_ACTION` without a version change.
 
 Standalone modifiers, mouse movement, wheel and acceleration, modified mouse
@@ -286,7 +285,7 @@ apart from the keyboard's. QMK sends a button's report at once from the report
 the pointing task is building, which still holds that poll's motion; a click
 from motion clears that motion first, so it cannot move the held-still cursor.
 
-A macro starts through the existing VIA provider and runs across scans. A start
+A macro starts through the profile macro provider and runs across scans. A start
 counts as one output and spends a once-per-movement movement only if playback
 actually starts. Empty, invalid/unplayable or busy slots send nothing and leave
 it unspent. Every attempted direction still consumes the existing per-report
@@ -351,32 +350,34 @@ and prove that current readers reject legacy envelopes.
 
 ## Storage geometry
 
-Current firmware uses one geometry:
+Current firmware uses one geometry (D-F29, D-F31):
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
-| `0x00000..0x08fff` | 36,864 | QMK/VIA allocation |
-| `0x09000..0x15fff` | 53,248 | Profile slot A, 32-byte header + 53,216-byte payload |
-| `0x16000..0x22fff` | 53,248 | Profile slot B, same layout |
+| logical EEPROM `0x00000..0x00fff` | 4,096 | QMK eeconfig and its datablocks |
+| slot region `0x00000..0x1ffff` (flash `0x100000`) | 131,072 | Profile slot A, 1 KiB physical record (36-byte logical header and marker cells) + 130,048-byte payload |
+| slot region `0x20000..0x3ffff` (flash `0x120000`) | 131,072 | Profile slot B, same layout |
 
-Logical EEPROM is 143,360 bytes; RP2040 wear-level backing is 286,720 bytes
-(D-F14). Older layouts are not interpreted in place, and a backup from earlier
+Logical EEPROM is 4,096 bytes; RP2040 wear-level backing is QMK's default 8,192 bytes. The
+slots are a flash region of their own, read in place
+([storage baseline](storage-and-resource-baseline.md#profile-slot-flash-region-d-f29)). Older layouts are not interpreted in place, and a backup from earlier
 firmware cannot be restored here; keep it with its matching firmware pair.
 Physical geometry migration acceptance remains outstanding. Resource accounting
 belongs to [memory budgets](memory-budgets.md).
 
 ## Integration and identity gates
 
-Schema 3.0 includes domain `0x50`, advertised by domain-mask bit 4. Format 5
-(`NT`) stores five domain bits, origin in bit 5, flags in bit 6 and reserved
-bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ`, `NR` and `NS`
-headers are rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
+Schema 4.0 includes domain `0x50`, advertised by domain-mask bit 4. Store
+format 6 (D-F28, D-F30) stores seven domain bits in its header's first byte;
+origin and override flags have their own byte 5. The header is 36 bytes. It binds schema 4.0; bytes 22–32 are reserved zero
+(the VIA identity until D-F31). `NP`, `NQ`, `NR`, `NS` and `NT` headers are rejected. Header CRC,
+marker-last publication and bounded I/O remain unchanged.
 
 Synchronous validation, bounded boot scanning and commit shape validation
 share domain versions in `profile_domain_registry.h` and schema/store rules in
 `profile_versions.h`: RGB v4, key behaviors
-v2, combos v3, settings v8 and sparse PD v3. Blob magic remains `NLP1`; schema
-bytes must be 3.0. Domain bodies also require semantic validation. Store tests
+v2, combos v3, settings v8, sparse PD v3, keymap v1 and macros v1. Blob magic remains `NLP1`; schema
+bytes must be 4.0. Domain bodies also require semantic validation. Store tests
 cover all mask/origin/flag combinations, both boot paths, old-header rejection,
 reserved bits with repaired CRCs, incompatible versions, one-byte commit steps,
 durable prepare/abort and interrupted writes. These do not prove physical flash
@@ -386,9 +387,8 @@ The current action-ABI digest is the one capability page 0 reports; it covers
 the layer count, so the sixteen-layer bank changed it (D-F14). Older action
 vocabularies are refused.
 Candidate metadata, owner, peer storage and background stale-peer repair all
-use format 5 and require a
-correlated VIA bind before PREPARE_BEGIN. Retry preserves the bind for that exact
-generation/digest. Incompatible peers cannot Apply.
+use format 6 with no binding: PREPARE_BEGIN opens a copy (D-F31).
+Incompatible peers cannot Apply.
 
 GET subcommand 9 and feature bit 13 are retired. Firmware neither advertises nor
 serves legacy source definitions, and has no version-1 PD envelope validator.
@@ -435,9 +435,9 @@ firmware keycode symbols.
 | Unassigned | `0x7f80..0x7fff` | — |
 
 Profiles store pointing and layer-lock actions by slot (action kinds 2–5), so
-the blocks change only raw keycodes: VIA layouts and custom keys. The blocks
-came with a new action ABI digest and VIA sync metadata schema 3, so firmware
-never adopts an older stored profile or layout bank.
+the blocks affect native keycodes in matrix and PD output data. Compatibility
+is checked through the action ABI; older stored profiles are refused. VIA
+sync metadata was part of the earlier transition and is now retired.
 
 ## Compatibility
 
@@ -466,7 +466,7 @@ profile digest and both-half state for each case:
 4. Held or locked modes make Apply wait with a useful reason; no modifier or
    mouse button stays stuck.
 5. Power or link interruption on either side of the logical decision recovers
-   the old or new complete generation, with no mode, RGB or VIA mixture.
+   the old or new complete generation, with no mode or RGB mixture.
 6. Mixed-version halves, stale drafts and old clients refuse mutation without
    losing the prior configuration.
 7. Pointing cadence, save time and per-half memory and stack evidence.
@@ -475,7 +475,7 @@ profile digest and both-half state for each case:
    held while a mode clicks it; the cursor staying still. Record the events the
    host actually receives; do not infer Back or Forward from a button number.
 
-9. VIA macro outputs (D-F23): delayed and mouse-click macros from straight and
+9. Macro outputs (D-F23): delayed and mouse-click macros from straight and
    diagonal motion, Once per movement and Every step, and physical button tap
    overrides. Confirm triggers while busy are dropped, empty macros leave a
    movement unspent, held modifiers follow inherited playback and mouse clicks

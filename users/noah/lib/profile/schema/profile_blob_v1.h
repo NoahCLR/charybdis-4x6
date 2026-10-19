@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Canonical Live-Profile Blob And Semantic Actions — Profile Wire v1.0
+// Canonical Live-Profile Blob And Semantic Actions — schema 4.0
 // ───────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include "profile_reader.h"
@@ -10,7 +11,8 @@
 
 enum {
     NOAH_PROFILE_BLOB_V1_HEADER_SIZE            = 8u,
-    NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE     = 4u,
+    // Domain id, version and a 32-bit payload length (schema 4, D-F28).
+    NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE     = 6u,
     NOAH_PROFILE_BLOB_V1_ACTION_SIZE            = 4u,
     NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR           = NOAH_PROFILE_SCHEMA_MAJOR,
     NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR           = 0u,
@@ -26,6 +28,13 @@ enum {
     NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS  = 128u,
     NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS      = 128u,
 };
+
+// A size against its ceiling, through 32 bits: a domain's 16-bit size limit
+// may sit at a ceiling of 0xFFFF once slots outgrow 64 KiB (D-F29), where a
+// direct comparison is always true.
+static inline bool noah_profile_size_within(uint32_t size, uint32_t ceiling) {
+    return size <= ceiling;
+}
 
 typedef enum {
     NOAH_PROFILE_ACTION_V1_NONE              = 0u,
@@ -105,19 +114,19 @@ typedef struct {
 } noah_profile_blob_v1_t;
 
 // Bounded envelope traversal; callers supply one complete 8-byte blob header
-// or 4-byte domain header. No payload reads or semantic decoding happen here.
+// or 6-byte domain header. No payload reads or semantic decoding happen here.
 typedef struct {
-    uint16_t offset, byte_length;
+    uint32_t offset, byte_length;
     uint8_t count, index, prior_id, mask;
 } noah_profile_envelope_t;
 
 typedef struct {
     const noah_profile_domain_shape_t *shape;
-    uint16_t offset, length;
+    uint32_t offset, length;
 } noah_profile_domain_record_t;
 
 noah_profile_codec_v1_result_t noah_profile_envelope_begin(noah_profile_envelope_t *walk, const uint8_t header[8], size_t length, noah_profile_codec_v1_error_t *error);
-noah_profile_codec_v1_result_t noah_profile_envelope_next(noah_profile_envelope_t *walk, const uint8_t header[4], noah_profile_domain_record_t *record, noah_profile_codec_v1_error_t *error);
+noah_profile_codec_v1_result_t noah_profile_envelope_next(noah_profile_envelope_t *walk, const uint8_t header[6], noah_profile_domain_record_t *record, noah_profile_codec_v1_error_t *error);
 noah_profile_codec_v1_result_t noah_profile_envelope_finish(const noah_profile_envelope_t *walk, noah_profile_codec_v1_error_t *error);
 // Finds domain_id's payload in the blob of byte_length bytes at base_offset by
 // walking its envelope through the reader. A cold-path lookup for publication,

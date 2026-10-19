@@ -6,32 +6,56 @@
 #include "rgb_matrix.h"
 #include "users/noah/lib/compat/qmk_portable_editor.h"
 led_config_t   g_led_config = {{1, 4, 4}};
-static bool    enabled, saved_enabled;
-static uint8_t effect, speed, flags, h, s, v;
-void           rgb_matrix_enable_noeeprom(void) {
+// QMK's EEPROM-writing setters count durable writes; the profile owns these
+// values (D-F32), so lighting is applied with the no-EEPROM ones only.
+static bool     enabled;
+static uint8_t  effect, speed, flags, h, s, v;
+static unsigned durable_writes;
+void            rgb_matrix_enable_noeeprom(void) {
     enabled = true;
 }
+void rgb_matrix_disable_noeeprom(void) {
+    enabled = false;
+}
 void rgb_matrix_enable(void) {
-    enabled = saved_enabled = true;
+    enabled = true;
+    durable_writes++;
 }
 void rgb_matrix_disable(void) {
-    enabled = saved_enabled = false;
+    enabled = false;
+    durable_writes++;
+}
+void rgb_matrix_mode_noeeprom(uint8_t value) {
+    if (enabled) effect = value;
 }
 void rgb_matrix_mode(uint8_t value) {
-    if (enabled) effect = value;
+    rgb_matrix_mode_noeeprom(value);
+    durable_writes++;
+}
+void rgb_matrix_set_speed_noeeprom(uint8_t value) {
+    speed = value;
 }
 void rgb_matrix_set_speed(uint8_t value) {
     speed = value;
+    durable_writes++;
+}
+void rgb_matrix_set_flags_noeeprom(uint8_t value) {
+    flags = value;
 }
 void rgb_matrix_set_flags(uint8_t value) {
     flags = value;
+    durable_writes++;
 }
-void rgb_matrix_sethsv(uint16_t hue, uint8_t saturation, uint8_t brightness) {
+void rgb_matrix_sethsv_noeeprom(uint16_t hue, uint8_t saturation, uint8_t brightness) {
     if (enabled) {
         h = hue;
         s = saturation;
         v = brightness;
     }
+}
+void rgb_matrix_sethsv(uint16_t hue, uint8_t saturation, uint8_t brightness) {
+    rgb_matrix_sethsv_noeeprom(hue, saturation, brightness);
+    durable_writes++;
 }
 
 int main(int argc, char **argv) {
@@ -69,7 +93,7 @@ int main(int argc, char **argv) {
             enabled = before;
             effect = h = s = v = 0;
             noah_qmk_portable_apply_lighting(after | 1u << 8 | 35u << 16 | 5u << 24, 70u | 200u << 8 | 100u << 16);
-            assert(enabled == after && saved_enabled == after);
+            assert(enabled == after && durable_writes == 0u);
             assert(effect == 1 && speed == 35 && flags == 5 && h == 70 && s == 200 && v == 100);
         }
     if (argc > 1) {

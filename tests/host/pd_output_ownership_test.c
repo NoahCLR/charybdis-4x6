@@ -34,7 +34,7 @@ void pointer_layer_policy_note_action(uint16_t key, bool pressed) {}
 bool noah_key_runtime_settle_pending_fallback_hold(void) { return false; }
 void noah_action_tap(uint16_t key) { assert(false); }
 void noah_action_tap_at(keypos_t pos, uint16_t key) { assert(false); }
-bool noah_qmk_contract_start_via_macro(uint16_t key) { return false; }
+bool noah_profile_macro_start(uint16_t key) { return false; }
 report_mouse_t noah_pd_configured_scroll(const uint8_t *record, report_mouse_t report) { return report; }
 void reset_dragscroll_mode(void) {}
 report_mouse_t pointing_device_get_report(void) { return (report_mouse_t){0}; }

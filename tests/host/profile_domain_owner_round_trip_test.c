@@ -7,6 +7,7 @@
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 #include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "users/noah/lib/profile/runtime/effective_keymap_macros_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap.h"
@@ -26,8 +27,8 @@ pd_mode_mask_t pd_mode_for_keycode(uint16_t key) {
     return 0;
 }
 
-// Hardware eligibility and the independent VIA persistence adapter are the
-// injected seams. Domain writing, validation, storage and caches are real.
+// Hardware eligibility is the injected seam. Domain writing, validation,
+// storage and caches are real.
 void noah_profile_activation_policy_init(noah_profile_activation_policy_t *policy, noah_profile_activation_peer_observer_fn observer, void *context) {
     memset(policy, 0, sizeof(*policy));
     policy->peer_observer = observer;
@@ -38,41 +39,12 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
     (void)context;
     return 0;
 }
-static unsigned settings_applies, via_accepts, via_boots;
+static unsigned settings_applies;
 void            noah_qmk_portable_apply(void) {
     settings_applies++;
 }
-static bool via_command(void *context, uint16_t transaction, uint32_t generation, uint32_t digest) {
-    (void)context;
-    assert(transaction && generation == 6 && digest == 0xabcdef01u);
-    return true;
-}
-static bool via_accept(void *context, uint16_t transaction, uint32_t generation, uint32_t digest) {
-    via_accepts++;
-    return via_command(context, transaction, generation, digest);
-}
-static bool via_converged(void *context, uint32_t generation, uint32_t digest) {
-    (void)context;
-    assert(generation == 6 && digest == 0xabcdef01u);
-    return true;
-}
-static bool via_boot(void *context, uint32_t generation, uint32_t digest) {
-    via_boots++;
-    return via_converged(context, generation, digest);
-}
-static void via_release(void *context) {
-    (void)context;
-}
-static const noah_profile_logical_via_ops_t via = {
-    .ready        = via_command,
-    .accept       = via_accept,
-    .abort        = via_command,
-    .converged    = via_converged,
-    .boot_recover = via_boot,
-    .boot_release = via_release,
-};
 
-static uint8_t  eeprom[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+static uint8_t  eeprom[NOAH_PROFILE_STORAGE_REGION_SIZE];
 static uint32_t writes;
 // Power is lost before write number cut_at (counted from zero): it and every
 // later write never reach storage. UINT32_MAX never cuts.
@@ -80,13 +52,13 @@ static uint32_t cut_at = UINT32_MAX;
 static bool     power_lost(void) {
     return writes > cut_at;
 }
-static bool    memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
+static bool    memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     (void)context;
     assert(length <= 32 && (size_t)address + length <= sizeof(eeprom));
     memcpy(target, eeprom + address, length);
     return true;
 }
-static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
+static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length) {
     (void)context;
     assert(length <= 20 && (size_t)address + length <= sizeof(eeprom));
     if (writes++ >= cut_at) return true;
@@ -106,7 +78,7 @@ static void     until_state(noah_profile_owner_state_t state) {
     assert(owner.state == state);
 }
 static void initialize(void) {
-    noah_profile_owner_config_t config = {.store_io = {.read = memory_read, .write = memory_write}, .logical_via = &via};
+    noah_profile_owner_config_t config = {.store_io = {.read = memory_read, .write = memory_write}};
     assert(noah_profile_owner_init(&owner, &config));
 }
 static uint8_t compiled_bytes[NOAH_PROFILE_PAYLOAD_MAX], imported[NOAH_PROFILE_PAYLOAD_MAX], candidate[NOAH_PROFILE_PAYLOAD_MAX];
@@ -158,13 +130,10 @@ static uint8_t submit_transfer(size_t length, bool reuse) {
     frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN);
     frame[5] = NOAH_PROFILE_SCHEMA_MAJOR;
     frame[7] = NOAH_PROFILE_DOMAIN_MASK_ALL;
-    u16(frame + 9, (uint16_t)length);
-    u32(frame + 11, crc(candidate, length));
-    u32(frame + 15, digest(candidate, length));
-    u32(frame + 19, owner.compiled.metadata.action_abi_digest);
-    frame[23] = NOAH_PROFILE_LOGICAL_STORE_VERSION;
-    u32(frame + 24, 6);
-    u32(frame + 28, 0xabcdef01u);
+    u32(frame + 8, (uint32_t)length);
+    u32(frame + 12, crc(candidate, length));
+    u32(frame + 16, digest(candidate, length));
+    u32(frame + 20, owner.compiled.metadata.action_abi_digest);
     send(frame);
     for (size_t offset = 0; offset < length;) {
         if (reuse) {
@@ -183,14 +152,14 @@ static uint8_t submit_transfer(size_t length, bool reuse) {
             }
             if (equal >= 80) {
                 frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE);
-                u16(frame + 5, (uint16_t)offset);
-                u16(frame + 7, (uint16_t)offset);
-                u16(frame + 9, (uint16_t)equal);
-                u32(frame + 11, source.identity.generation);
-                u32(frame + 15, source.identity.payload_digest);
-                u32(frame + 19, source.identity.payload_crc32);
-                frame[23] = source.identity.kind - 1u;
-                frame[24] = source.identity.origin;
+                u32(frame + 5, (uint32_t)offset);
+                u32(frame + 9, (uint32_t)offset);
+                u32(frame + 13, (uint32_t)equal);
+                u32(frame + 17, source.identity.generation);
+                u32(frame + 21, source.identity.payload_digest);
+                u32(frame + 25, source.identity.payload_crc32);
+                frame[29] = source.identity.kind - 1u;
+                frame[30] = source.identity.origin;
                 send(frame);
                 assert(!owner.host_transaction.poisoned);
                 offset += equal;
@@ -200,9 +169,9 @@ static uint8_t submit_transfer(size_t length, bool reuse) {
         }
         frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK);
         uint8_t count = length - offset < 20 ? (uint8_t)(length - offset) : 20;
-        u16(frame + 5, (uint16_t)offset);
-        frame[7] = count;
-        memcpy(frame + 8, candidate + offset, count);
+        u32(frame + 5, (uint32_t)offset);
+        frame[9] = count;
+        memcpy(frame + 10, candidate + offset, count);
         send(frame);
         offset += count;
     }
@@ -264,6 +233,22 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
                 break;
             }
         assert(memcmp(bytes, domain->payload, domain->payload_length) == 0);
+        if (domain->id == NOAH_PROFILE_DOMAIN_V1_KEYMAP) {
+            assert(noah_effective_keymap_is_live() && domain->payload_length == 1920);
+            for (uint8_t layer = 0; layer < LAYER_COUNT; layer++)
+                for (uint8_t row = 0; row < MATRIX_ROWS; row++)
+                    for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+                        size_t at = ((size_t)layer * MATRIX_ROWS * MATRIX_COLS + row * MATRIX_COLS + col) * 2;
+                        uint16_t code = domain->payload[at] | (uint16_t)domain->payload[at + 1] << 8;
+                        assert(keymap_key_to_keycode(layer, (keypos_t){.row = row, .col = col}) == code);
+                    }
+        }
+        if (domain->id == NOAH_PROFILE_DOMAIN_V1_MACROS) {
+            uint8_t byte;
+            assert(noah_effective_macro_bank_is_live() && noah_effective_macro_bank_length() == domain->payload_length);
+            assert(noah_effective_macro_bank_read(0, &byte, 1u) && byte == domain->payload[0]);
+            assert(noah_effective_macro_bank_read(domain->payload_length - 1, &byte, 1u) && byte == 0);
+        }
         if (domain->id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) {
             assert(noah_effective_settings_length() == domain->payload_length);
             for (size_t j = 0; j < domain->payload_length; j++)
@@ -325,7 +310,7 @@ static void reboot(void) {
 
 // ─── The maximum profile (D-F14) ────────────────────────────────────────────
 //
-// tests/fixtures/maximum_profile_v3.fixture holds every table at its
+// tests/fixtures/maximum_profile_v4.fixture holds every table at its
 // simultaneous maximum (tests/host/make_maximum_profile.py). It must validate,
 // commit, boot and publish whole; mutated or truncated copies must be refused
 // without touching the active generation; and a save cut by lost power must
@@ -385,8 +370,9 @@ static void put_u16(uint8_t *p, uint16_t value) {
     p[1] = (uint8_t)(value >> 8);
 }
 static size_t domain_offset(uint8_t id) {
-    for (size_t at = 8; at < maximum_length; at += 4u + (size_t)(maximum[at + 2] | maximum[at + 3] << 8))
-        if (maximum[at] == id) return at + 4u;
+    // Schema 4 envelopes: id, version, then a 32-bit length (D-F28).
+    for (size_t at = 8; at < maximum_length; at += 6u + (size_t)((uint32_t)maximum[at + 2] | (uint32_t)maximum[at + 3] << 8 | (uint32_t)maximum[at + 4] << 16 | (uint32_t)maximum[at + 5] << 24))
+        if (maximum[at] == id) return at + 6u;
     assert(!"domain missing");
     return 0;
 }
@@ -398,7 +384,7 @@ typedef struct {
 
 static void test_maximum_profile(void) {
     noah_profile_blob_v1_t expected;
-    settings_applies = via_accepts = via_boots = 0;
+    settings_applies = 0;
     memset(eeprom, 0xff, sizeof(eeprom));
     initialize();
     until_state(NOAH_PROFILE_OWNER_READY_COMPILED);
@@ -408,13 +394,16 @@ static void test_maximum_profile(void) {
     // One validator step a scan, each one read of at most 20 bytes. The peer's
     // copy of this validation is the longest stretch a split prepare spends
     // without transfer progress, inside the owner's no-progress window.
-    assert(validation_scans < 8000u);
+    // Keep the prior table-work bound and add only the two bounded passes
+    // over the new domains (checksum and semantic decoding), plus envelopes.
+    const uint32_t extra_steps = (1920u + 34903u + 12u + 19u) / 20u + (1920u + 19u) / 20u + (34903u + 19u) / 20u + 2u;
+    assert(validation_scans < 8000u + extra_steps);
+    assert(validation_scans * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS < NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS);
     assert_published(maximum, &expected, 1);
     assert_maximum_edges();
     reboot();
     until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);
     printf("maximum profile: booted in %u scans\n", (unsigned)state_scans);
-    assert(via_boots == 1);
     assert_published(maximum, &expected, 1);
     assert_maximum_edges();
 
@@ -538,10 +527,13 @@ int main(int argc, char **argv) {
     test_maximum_save_interrupted(false);
     test_maximum_save_interrupted(true);
     for (unsigned use_imported = 0; use_imported < 2; use_imported++) {
-        settings_applies = via_accepts = via_boots = collected = 0;
+        settings_applies = collected = 0;
         memset(eeprom, 0xff, sizeof(eeprom));
         initialize();
         until_state(NOAH_PROFILE_OWNER_READY_COMPILED);
+        // Nothing saved: the compiled defaults' settings are pushed into QMK
+        // once discovery knows it (D-F32), not before.
+        assert(settings_applies == 1);
         assert(owner.compiled.metadata.domain_mask == NOAH_PROFILE_DOMAIN_MASK_ALL);
         assert(owner.combos.valid && owner.combos.live && owner.combos.count == noah_combo_count);
         for (uint16_t i = 0; i < noah_combo_count; i++) {
@@ -594,12 +586,11 @@ int main(int argc, char **argv) {
         assert(noah_profile_blob_v1_encode(domains, NOAH_PROFILE_DOMAIN_REGISTRY_COUNT, candidate, sizeof(candidate), &length, NULL) == NOAH_PROFILE_CODEC_V1_OK);
         assert(noah_profile_blob_v1_decode(candidate, length, &expected, NULL) == NOAH_PROFILE_CODEC_V1_OK);
         save(length);
-        assert(owner.store.committed.via_generation == 6 && owner.store.committed.via_digest == 0xabcdef01u);
         assert_published(candidate, &expected, 1);
         assert(noah_setting_combo_output_behaviors() == !use_imported);
         reboot();
         until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);
-        assert(via_boots == 1 && settings_applies == 2);
+        assert(settings_applies == 3); // compiled, the save's activation, the reboot's
         assert(noah_setting_combo_output_behaviors() == !use_imported);
         assert_published(candidate, &expected, 1);
         puts(use_imported ? "all current domains: populated imported combos/settings saved, booted and published through the owner" : "all current domains: complete compiled defaults saved, booted and published through the owner");

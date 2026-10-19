@@ -30,11 +30,41 @@ the keyboard rather than a client of the repository.
 
 The firmware serves the keyboard's complete configuration, compiled defaults
 included, over Profile Wire, and publishes a complete profile to both halves as
-one atomic logical generation that recovers from interruption and a lost peer
-(D-L21, D-L22, D-L27, D-L39). The app's surface-by-surface status is in Ark's
-direction. Firmware accepts only current formats and every save binds VIA
-(D-F10); a backup in an earlier format is refused, not translated. Compiled defaults
+one durable generation with recovery from interruption and a lost peer
+(D-L21, D-L22, D-L27, D-L39, D-F31). The app's surface-by-surface status is in Ark's
+direction. Firmware accepts only current formats (D-F10); a backup in an
+earlier format is refused, not translated. Compiled defaults
 contain every enabled domain and use domain-seeking reads (D-F12).
+
+The firmware is on a new base (D-F28): Profile Wire 2.0, profile schema 4.0
+and store format 6, in which every length and offset of a profile is 32 bits,
+in storage and on the wire. The two profile slots are a flash region of their
+own, 128 KiB each, read in place (D-F29), so a profile can reach 130,048 bytes
+and QMK's logical EEPROM is now 4 KiB, for eeconfig and datablocks (D-F31).
+The separate live working copy reserves 130,048 bytes of RAM per half (D-F32);
+see [memory budgets](architecture/memory-budgets.md) for linked accounting. Everything the base does is implied by those versions; the
+capability feature word holds only split, saves and pointing. A keyboard
+holding a format-5 profile starts from its compiled defaults and says so in
+its status. Clients must support this base and the VIA-free Raw HID channel;
+Ark owns the status of that integration.
+
+Live edits take effect without a save and then converge across the halves (D-F32). Each
+half keeps a working copy of its profile in RAM; an edit is checked domain by
+domain and published at a safe boundary, the other half following over a
+split RPC of its own; Save writes the working copy as a new generation through
+the ordinary candidate path, and a replug boots the saved profile. The edit
+mode (Apply, Live, Live + review) is stored on each half outside the profile;
+Live saves after 3 seconds without an edit or a held key, even with no client
+connected. DPI and RGB adjustments are working-copy edits, saved automatically
+in Apply and Live and held for Save in Live + review. The profile is the only durable
+owner of the settings QMK holds, and the combos and behaviours toggles are
+runtime overrides beside their stored masters. Hardware acceptance is pending.
+
+Keymap and macro domains own typing and playback (D-F30), and VIA is not
+supported (D-F31): the firmware answers Raw HID itself, Apply publishes one
+store with no VIA binding, staging or roll-forward, and QMK's logical EEPROM
+holds only its eeconfig, so its RAM mirror is 4 KiB per half, 32,768 bytes
+less.
 
 Macro text is typed through a selected host layout (D-F16), with Unicode
 entry for macOS, Windows and Linux as the fallback, protected automatically
@@ -42,7 +72,7 @@ from new physical presses with a per-macro override (D-F17); the encoding, owner
 and setup contract is in [runtime flow](architecture/runtime-flow.md).
 Physical host acceptance of each layout and entry method is pending.
 
-Pointing outputs can start VIA macros from directions, diagonals and button
+Pointing outputs can start macros from directions, diagonals and button
 tap overrides (D-F23), with inherited modifiers and busy triggers dropped.
 
 Combo outputs can bypass their shared behaviours globally or per combo
@@ -58,18 +88,19 @@ is held, tapped when it is tapped, and what its behaviour row falls back to.
 Behaviour steps on other keys may send a custom key, which sends its shortcut
 only. Hardware acceptance is pending.
 
-A key pressed while a handled key is undecided meets it by what that key's
-hold does (D-F27): a hold that changes other keys makes it wait, a fallback
-modifier registers, and any other key is settled as a tap first, so rolls out
-of the number row, punctuation, Enter, Esc and the Nav arrows keep their
-order. A modifier or layer key let go before a key it was pressed for still
-applies to that key: it waits for a key that makes others wait, and settles
-any other key as a tap first, so Cmd released before F types Cmd+F and before
-`,` types Cmd+,. Hardware acceptance is pending.
+A key pressed while a handled key is undecided meets it by what that key's hold
+does (D-F27): a hold that changes other keys makes it wait, a fallback modifier
+registers, and any other key is settled as a tap first, so rolls out of the
+number row, punctuation, Enter, Esc and the Nav arrows keep their order. A
+modifier or layer key, or a chord or custom key holding one, let go before a key
+it was pressed for still applies to that key: it waits for a key that makes
+others wait, and settles any other key as a tap first, so Cmd released before F
+types Cmd+F and before `,` types Cmd+,. Hardware acceptance is pending.
 
 Every `LT`, `MT` and `OSM` key is decided by the key runtime, with or without a
 behaviour row, and a key without a row behaves exactly as with an empty one
-(D-F27, Profile Wire bit 31). QMK's tapping engine classifies no record.
+(D-F27). QMK's tapping engine classifies no record of a
+key the firmware supports.
 Dual-role keys hold at the dual-role setting, other rows at the tap/hold
 setting. A row without steps is no row: a plain key with one stays QMK's, and
 `TT()` keeps its own taps. Hardware acceptance is pending.
@@ -77,7 +108,6 @@ setting. A row without steps is no row: a plain key with one stays QMK's, and
 Firmware work remaining before the product is complete:
 
 - physical interruption acceptance at every durable boundary;
-- adopting, or reporting as a conflict, writes by external VIA clients;
 - broad hardware acceptance, including blank-firmware restore and the
   [PD-mode hardware matrix](architecture/pd-mode-domain-v1.md#hardware-acceptance).
   USB role migration is untested: on the normal pair the left half exposes no
@@ -90,20 +120,48 @@ Firmware work remaining before the product is complete:
 Differential host uploads can reuse identified active bytes and stream bounded
 batches (D-F18), while full validation and both-half publication remain in place.
 The copy to the other half reuses the same ranges from that half's own active
-profile and sends the rest in chunks of up to 110 bytes (D-F19).
-[Baseline captures](../measurements/peer-copy/2026-10-11-pair-51/README.md)
-record a limited steady-state run consistent with reuse. Timing after the
-polling correction, byte fallback and interruption acceptance remain open.
-
-VIA full-bank checksums use bounded 224-byte RAM-mirror batches on both halves
-(D-F20), reducing each pass from 2,634 to 167 granted checksum steps. Timing and
-input cadence for this budget have not run on hardware.
-
-Optional macro read maps omit confirmed zero blocks from host transfers while
-preserving exact full-bank bytes and identity (D-F21). Hardware read timing and
-input cadence remain unmeasured for this path.
+profile and sends the rest in chunks of up to 106 bytes (D-F19, D-F28).
+Host coverage does not complete its hardware acceptance.
 
 ## Open Issues
+
+- **Client integration must match D-F32.** Edit, Save, Revert and edit-mode
+  commands, working-copy reads and runtime readback require a matching client;
+  current Ark implementation status belongs in Ark. Settings readback (GET `0x07`)
+  now reports stored values, and QMK's live ones moved to GET `0x22`.
+- **Automatic saves and adjustment keys need keyboard acceptance (D-F32).**
+  Edit/wait/replug kept; edit/unplug immediately lost; hold a key past the
+  deadline and release; close the client mid-edit; DPI across a replug;
+  longest erase and program pauses on both halves. Host tests are not this
+  acceptance.
+
+- **Live edits need keyboard acceptance (D-F32).** Edits in every domain
+  converging on both halves, Save surviving a replug, an unsaved edit reverting
+  on replug and typing through an edit undisturbed still need a recorded
+  acceptance matrix. Individual hardware checks do not close that matrix. The working copy is 130,048 bytes of static RAM per half;
+  allocator and stack high-water on both halves are owed.
+
+- **Client compatibility is explicit (D-F28, D-F31).** Profile Wire 1,
+  schema 3, store format 5 and VIA reads are refused. Use matching firmware
+  and client revisions; the [compatibility contract](architecture/ark-compatibility.md)
+  lists what Ark consumes.
+
+- **The VIA-free build needs complete hardware acceptance (D-F31).** Boot, typing
+  and macros on both halves; RAM per half (allocator and stack high-water);
+  that the first boot after flashing over the old 72 KiB EEPROM backing comes
+  up cleanly (it may reset QMK's EEPROM and so forget saved profiles, D-F29);
+  and an Apply using the matching client.
+
+- **Flash storage needs complete hardware acceptance (D-F29).** Boot and typing on
+  both halves, and RAM per half, can be checked at once. A save needs a matching client: then read each half's flash pauses (Profile Wire custom get
+  `0x0D`, page 0 the USB half, page 1 the other) after a save of a large
+  profile, watch typing, pointing and the split link during it (interrupts are
+  off for each sector erase, typically tens of milliseconds; erases wait for a
+  quiet keyboard, so check that a save finishes promptly once typing stops),
+  and cut power during a save on each half to confirm the previous profile
+  comes back. Hold the EEPROM-reset key (or bootmagic) and confirm the
+  keyboard comes back on its compiled defaults. The build assumes 2 MiB of
+  flash; the controller's real size is unmeasured.
 
 - **Roll order needs hardware acceptance (D-F27).** Type `, `, `. `, `1e` and
   Enter into a letter fast; hold a symbol key into a letter; roll Shift into a
@@ -112,7 +170,35 @@ input cadence remain unmeasured for this path.
   hold shortcuts the usual way, and type fast over F and the number row.
   Type normally on F, J and Z and use their layers; tap, then hold J and Z;
   roll Cmd+Z and Shift+J off the modifier; fire combo C0 (D + F). Hold Delete
-  (its live row is empty): it repeats, and combo C11 still fires.
+  (its live row is empty): it repeats, and combo C11 still fires. Roll the
+  GUI chord N + M off J and F (GUI+J, GUI+F), and a custom key whose shortcut
+  is modifiers alone off J and `1`. Click right after pressing Dragscroll,
+  Volume or Pinch: the click is not delayed. Hold `1` for `!` while F is still
+  undecided, then type a letter: `!` comes first.
+
+- **A held shifted symbol shifts the next key.** `1` held past its hold time
+  sends `!` by holding Shift and 1 until it is released, so a letter typed
+  meanwhile gets Shift too (`!E`); QMK clears such weak modifiers at the next
+  press. Whether the next press drops every modifier a held output carries,
+  or only a shifted symbol's, is parked with Noah.
+
+- **The reviewed-path stack gate fails on `dev`.** The resource build's stack
+  manifests carry adjacencies the linker no longer makes and miss indirect
+  call sites from `process_record_user`, so the gate fails on `dev` itself;
+  the last passing figures in
+  [memory budgets](architecture/memory-budgets.md) predate this. The
+  manifests need a review against the current linked callers, which should
+  also measure the press and release preflight paths that now plan a waiting
+  key's missed scans (D-F27).
+
+- **A held mod-tap is hidden under a pointing mode that holds its modifier
+  (D-F27).** A pointing mode that holds a modifier (a scroll mode's, such as
+  Pinch's Cmd) hides it from keys pressed meanwhile unless a physical key also
+  holds it. Every `MT()` is the runtime's, and its hold is a managed owner, not
+  a physical one, so holding `MT(Cmd, A)` in such a mode and pressing C types
+  `c`, not Cmd+C. An `MT()` with a behaviour row already did this; one without
+  a row did not before D-F27, when QMK decided it and its hold counted as
+  physical. The compiled layout has no `MT()` key.
 
 - **Custom key shortcuts need hardware acceptance (D-F26).** On both halves:
   hold a mixed-side shortcut, tap it, hold a modifier-only one, put a
@@ -135,26 +221,15 @@ input cadence remain unmeasured for this path.
   mouse-click macros from directions under both output policies and from a
   button override; confirm busy triggers drop and clicks reach the host.
 
-- **Sparse macro reads need hardware acceptance (D-F21).** Compare first read,
-  refresh and export timing with mostly empty and full banks, including after
-  shortening a macro. Check typing and pointing during reads. Host transfer
-  counts establish byte savings, not USB timing or scan cadence.
-
 - **Physical gesture acceptance (D-F01).** The buffered-repeat defect is
   reproduced and fixed through the real QMK combo/tapping path. Acceptance on
   both halves, pointing-mode routing and host Button 7 bindings remains open.
-- **One-half power-cycle recovery transition.** On 2026-09-12, after one half
-  lost power while the other stayed powered, the first complete read failed
-  with VIA storage flags 7 (dirty, recovery required) before settling to clean
-  flags about 20 seconds later with the exact original profile. A full
-  two-half power cycle was clean. The dirty transition is unexplained; do not
-  suppress the readiness error without establishing its cause.
 - **Why a peer stops acknowledging a push** (D-L22) and **why a peer flash
   write failed mid-copy** (D-L27) are both unknown. Both are now bounded and
   reported; the status fields D-L27 added should identify the cause next time.
 - **The keycode-block migration has not run on hardware** (D-L42). Flashing
-  it should make each half refuse its stored profile by action ABI digest,
-  reset its VIA bank (sync metadata schema 3) and run the compiled defaults,
+  it should make each half refuse its stored profile by action ABI digest
+  and run the compiled defaults,
   which reproduce the captured profile with the thumbs, Click Spam and Drag
   Window on custom keys 0–3. Confirm that on both halves and that the halves
   converge before relying on it.
@@ -162,13 +237,7 @@ input cadence remain unmeasured for this path.
   make each half refuse its eight-slot stored profile by action ABI digest
   and run the compiled defaults; confirm that, and that slot 31 holds, locks
   and colours on both halves.
-- **The faster VIA checksum has not run on hardware** (D-F20). Time an
-  unchanged re-Apply and a VIA edit against the previous pair, and check typing
-  and pointing on both halves while stage verification runs. The local
-  roll-forward keeps its existing output fence until the full target identity
-  is ready; host tests and linked resource gates do not establish scan cadence.
-- **The faster peer copy still needs full hardware acceptance** (D-F19).
-  The recorded baseline is limited to its named build and steady-state workload.
+- **The faster copy to the other half has not run on hardware** (D-F19).
   Before relying on it, time an Apply of a one-key edit and of a full profile
   against the previous firmware (candidate status page 1 reports copy progress and
   retries), watch for split transport failures with 128-byte frames at
@@ -179,16 +248,17 @@ input cadence remain unmeasured for this path.
 - **The bigger profiles have not run on hardware** (D-F14). Flashing them
   resets each half's storage (the flash base moves), and the stored profile
   is refused by action ABI digest. Before relying on them, measure on both
-  halves: allocator and stack high-water with the 140 KiB EEPROM mirror; how
+  halves: allocator and stack high-water (the EEPROM mirror is 4 KiB since
+  D-F31); how
   long the maximum profile's validation (7,458 owner scans), boot (9,981)
   and the peer's prepare take in real time against the 60-second no-progress
-  window; how long a 140 KiB wear-leveling consolidation pauses; and how long
+  window; how long a wear-leveling consolidation pauses; and how long
   macro 127 takes to start on a full 34,903-byte macro bank. Also check
   typing, pointing and lighting with a maximum profile, a sixteen-key chord
   across both halves, and every participation control.
 
 - **The macro expansion has not run on hardware** (D-F14). Flashing it resets
-  older storage (schema-5 VIA recovery and `NT` profile headers), and a backup
+  older storage (`NT` profile headers), and a backup
   from earlier firmware cannot be restored onto it. Accept full-bank playback, cancellation, backup restore, macro-127
   startup time and consolidation pauses on both halves.
 
@@ -203,12 +273,10 @@ input cadence remain unmeasured for this path.
   [portable-profile-v1.md](architecture/portable-profile-v1.md) specify the
   complete supported backup. Future schema migrations and hardware acceptance
   must preserve that artifact.
-- **One logical generation across two stores.** Standard VIA owns dynamic
-  layout and macros; the custom store owns everything else. D-L21 binds them;
-  a partial cross-store write must never be reported as a complete commit.
-- **External VIA writes.** Another VIA client can change the layout underneath
-  the app. Those changes must be adopted into a new generation or surfaced as a
-  conflict; they must not silently escape profile identity. Not yet built.
+- **One store, one generation.** Apply publishes one profile generation to
+  both halves (D-L21 as D-F31 restates it); nothing outside the profile is
+  part of a save, and a half reports a commit only once its own marker is
+  durable.
 
 ## Decisions
 
@@ -283,7 +351,7 @@ mid-read changes. The default window, the hold threshold and which combos
 follow the default came with readout version 2; readout version 3 (D-F14)
 adds each combo's enable and allowed layers, a counted reference page for the
 sixteen-layer bank, and two wide pages per row for up to sixteen inputs. Old
-firmware returns VIA unhandled and the app shows an update message without
+firmware returns unhandled and the app shows an update message without
 losing its other readback. Combo names are stable
 generated labels; firmware callback outputs and custom trigger/release hooks are
 shown as opaque. Board badges show where the selected layer over layer 0
@@ -356,32 +424,28 @@ App decision; its text is in Ark's direction.
 
 App decision; its text is in Ark's direction.
 
-### D-L21 — Apply publishes one atomic logical generation
+### D-L21 — Apply publishes one atomic generation
 
-Complete Apply treats the custom profile record and the standard VIA
-layout/macro store as one logical generation, per
-[logical-profile-transaction-v1.md](architecture/logical-profile-transaction-v1.md).
-The host binds the candidate to the next VIA generation and digest and sends
-only changed VIA ranges to the non-USB half, which verifies the staged copy
-before durable custom intent. Both custom slots reach a prepared marker before
-the USB-side marker becomes the decision record. The peer commits and accepts
-its VIA copy, then the host writes the changed ranges to the USB half as soon
-as the decision and peer accept are visible; the peer stays the complete
-recovery copy until the USB-side VIA identity is verified. Runtime activation
-waits for both custom and VIA convergence. A prepared marker without the USB
-decision is ignored at boot, so the previous generation remains authority;
-boot starts with VIA reconciliation fenced and recovers a decided target from
-the local stage or the peer.
+Since D-F31 the profile is the only store, and Apply publishes it as one
+generation on both halves, per
+[the one-store transaction](architecture/logical-profile-transaction-v1.md).
+The candidate is validated on the USB half and copied to the other half,
+which validates it and makes its copy durable as a prepared record. Both
+slots reach a prepared marker before the USB-side commit marker becomes the
+decision record. The other half then commits, and the new profile activates
+once it has been seen holding exactly that record, at the next safe boundary.
+A prepared marker without the USB decision is ignored at boot, so the
+previous generation remains authority; a decided target is recovered from the
+other half's prepared copy.
 
-The stored record binds the VIA identity and carries the compiled-default and
-action-ABI digests; only the current storage format is accepted (D-F10). The app requires the
-atomic capability for complete Apply and keeps the recovery file, stale-base
-check and exact final readback. A failure the app sees before the decision
-requests the custom-candidate abort, which the keyboard carries out for both
-stores (D-L39); once the decision is made the keyboard refuses it, even if the
-host never saw the decision, and finishes the generation. Apply duration depends
-on payload, build and workload; use recorded measurement sets rather than an
-unqualified latency estimate.
+The stored record carries the compiled-default and action-ABI digests; only
+the current storage format is accepted (D-F10). The app keeps the recovery
+file, stale-base check and exact final readback. A failure the app sees before
+the decision requests the candidate abort (D-L39); once the decision is made
+the keyboard refuses it, even if the host never saw the decision, and finishes
+the generation. Until D-F31 the record was bound to the standard VIA
+layout/macro store as a second store, staged, accepted and rolled forward
+under an input fence; on hardware an unchanged Apply then took about 6.6 s.
 
 ### D-L22 — A cancelled save ends in bounded time, and says why it ended
 
@@ -509,18 +573,18 @@ App decision; its text is in Ark's direction.
 
 ### D-L34 — Layer keycodes are owned in the firmware, and the app follows
 
-QMK ran `TG()`/`TO()` behind the userspace's layer ownership, so a toggled
-layer turned off when an `MO()` of it was released and `TO()` left stale locks.
-The fix is in the firmware: `TG(n)` is `LOCK_LAYER(n)`, `TO(n)` is "lock only
-n" (`layer_ownership_goto`), `TT(n)` is `MO(n)` with a built-in
-`LOCK_LAYER(n)` on its `TAPPING_TOGGLE`-th tap, and `OSL(n)` holds like `MO(n)`
-while its tap arms a one-shot owner the next qualifying press uses up. All act
-the same on a plain key, in a behaviour and as a combo output. Profile Wire
-feature bit 14 advertises this; the app accepts them in behaviours only when a
-keyboard reports it: `OSL()` as a tap, `TT()` as a "Press and hold until
-release" branch. A plain `LT()` hold (tap count 0) goes through layer
-ownership; its tap still reaches QMK. `LM(n, mods)` holds layer n and its
-modifiers through modifier ownership, as a key or combo, not a behaviour step.
+QMK ran `TG()`/`TO()` behind the userspace's layer ownership, so a toggled layer
+turned off when an `MO()` of it was released and `TO()` left stale locks. The
+fix is in the firmware: `TG(n)` is `LOCK_LAYER(n)`, `TO(n)` is "lock only n"
+(`layer_ownership_goto`), `TT(n)` is `MO(n)` with a built-in `LOCK_LAYER(n)` on
+its `TAPPING_TOGGLE`-th tap, and `OSL(n)` holds like `MO(n)` while its tap arms
+a one-shot owner the next qualifying press uses up. All act the same on a plain
+key, in a behaviour and as a combo output. Profile Wire feature bit 14
+advertises this; the app accepts them in behaviours only when a keyboard reports
+it: `OSL()` as a tap, `TT()` as a "Press and hold until release" branch. Every
+`LT()` key is decided by the key runtime (D-F27), which holds its layer through
+layer ownership. `LM(n, mods)` holds layer n and its modifiers through modifier
+ownership, as a key or combo, not a behaviour step.
 
 The keyboard holds a candidate it is asked to save to where its actions are
 placed, by the rules `keymap.c` validation uses; a committed record still loads,
@@ -563,8 +627,8 @@ default and applies until settings are live. Quick tap follows the tapping term
 as it does in QMK by default. The one term is global: the app offers no
 per-key tapping term, and a behaviour row's own tap / hold timing still governs
 that row in the runtime. Since D-F27 ("Every dual-role key") the runtime decides
-every dual-role key and reads the setting itself; the QMK hooks no longer
-decide any key.
+every dual-role key and reads the setting itself; the QMK hooks serve only
+`TT()` and `OSL()` to layers 16–31, the one tap key QMK still decides (D-F27).
 
 ### D-L39 — Only the keyboard ends a staging, together with its candidate
 
@@ -577,24 +641,19 @@ only complete target, was discarded. Conversely, a candidate that expired
 before COMMIT released its lease without ending its VIA staging, which kept
 reconciliation held and refused the next Apply until a restart.
 
-The logical VIA staging now belongs to the owner's candidate. The host may
-begin, fill and verify only the staging bound to the live candidate's
-transaction and VIA identity, and only until COMMIT; the host's VIA abort is
-refused. Every cancel before the decision (host abort, lease expiry,
-supersession, a failed copy) ends both stores, through one idempotent VIA
-cancel that also succeeds when nothing was staged. It does not wait for an
-absent peer: the candidate is released at once, the old USB-side bank was
-never touched, and the peer's ABORT completes when the link returns. Staging
-frames the keyboard admits count as the candidate's progress, so a long
-staging keeps its 15-second lease while status polls alone do not. After the
-decision nothing cancels, whatever the host saw. See
+Only the keyboard ends a candidate. Every cancel before the decision (host
+abort, lease expiry, supersession, a failed copy) releases the candidate and
+aborts the other half's prepared copy. It does not wait for an absent peer:
+the candidate is released at once and the peer's ABORT completes when the link
+returns. After the decision nothing cancels, whatever the host saw. Since
+D-F31 there is no VIA staging to end with it. See
 [Logical Profile Transaction V1](architecture/logical-profile-transaction-v1.md#cancellation-and-lease-ownership).
 
 ### D-L40 — Firmware builds use only the slot-based pointing engine
 
 The per-preset Volume, Brightness, Zoom, Arrow and Pinch C handlers and the
 old-geometry firmware bridge builds are retired. Every firmware build uses the
-slot engine (schema 2 at this decision; current schema 3 since D-F14,
+slot engine (schema 2 at this decision; schema 3 at D-F14 and 4 at D-F28,
 with 32 slots since D-F09). The ordinary side-specific pair owns a live profile;
 an owner-free generic or comparison image warms the same engine from validated
 compiled slot records. The mode registry keeps deployed hold and lock keycode
@@ -701,6 +760,14 @@ Ark consumes.
 
 App decision; its text is in Ark's direction.
 
+## Reading the firmware decisions
+
+The decisions below record the contract at each cut. Later decisions supersede
+older formats and limits: D-F28 replaces the feature word and schema, D-F29
+moves profiles to flash, D-F30 adds keymap/macros, D-F31 removes VIA, and D-F32
+adds the volatile working copy. Use the current specs for byte layouts and
+capability negotiation; old feature-bit numbers are historical references.
+
 ## D-F01 — Physical gesture eligibility survives QMK buffering
 
 Handled physical keys use press/release event timestamps; combo/tapping delivery
@@ -709,7 +776,8 @@ Userspace queries existing QMK queues to preserve eligible continuations and
 suppress scan-time holds after physical release. Authored `LT()` rows bypass
 native tapping so one engine decides their behaviour; plain native dual-role
 keys retained QMK semantics until D-F27 moved every `LT`/`MT`/`OSM` key to the
-runtime (bit 31). Since then QMK's tapping queue holds no record, and an
+runtime (bit 31). Since then QMK's tapping queue holds a record only behind a
+key the firmware does not support (D-F27), and an
 eligible press waiting in record admission continues its series as one in the
 combo buffer does. No authored layout, combo or default timing changes.
 
@@ -758,7 +826,8 @@ rule, so rolls keep their order and a key tapped under a held layer resolves on
 it. A tap/hold key's pending taps are settled by any other key's press. Chosen
 over emitting the next key at once (swapped order in rolls) and over settling a
 tap on the next press (breaks quick chords under a held layer); the cost is a
-wait of at most the tap-hold term for keys pressed during an undecided key.
+wait, for keys pressed during an undecided key, of at most its hold time (its
+first hold tier's, D-F27).
 
 Extended 2026-10-10 to authored keys whose hold is a layer held until release
 (`PRESS_AND_HOLD_UNTIL_RELEASE(MO(n))`, such as the thumb keys whose tap
@@ -931,8 +1000,8 @@ The running firmware has one accepted profile/storage contract. At this cut it
 was schema 2.0, RGB v3, key behaviors v1, combos v2, settings v5, sparse PD v2
 and logical store format 3 (`NR`); D-F14 moved it to schema 3.0, RGB v4,
 settings v6 and format 4 (`NS`), refusing the earlier ones the same way.
-The current contract is schema 3.0, RGB v4, key behaviors v2, combos v3,
-settings v8, sparse PD v3 and format 5 (`NT`); the domain registry and
+The current contract is Profile Wire 2.0, schema 4.0, RGB v4, key behaviors v2,
+combos v3, settings v8, sparse PD v3, keymap v1, macros v1 and store format 6; the domain registry and
 `profile_versions.h` define the accepted versions.
 Settings v2–4, combo v1, schema 1, custom-only `NP` format 1 and logical `NQ`
 format 2 are refused. There is no firmware migration path, legacy GET 9 source
@@ -941,17 +1010,14 @@ A backup in an earlier format is refused, not translated: the client keeps no
 translation path either, so an old backup restores only onto the firmware that
 made it. Frozen old profiles in the host tests are rejection evidence.
 
-Every save is a logical generation, including edits that change only custom
-domains. Profile Wire BEGIN requires the current format and nonzero VIA
-generation and digest. The owner always stages, prepares, accepts and converges the bound VIA
-identity before publishing. Prepared peer pushes require a correlated bind;
-background stale-peer repair fetches or sends the committed VIA identity too.
-A repeated BEGIN retains its generation/digest-correlated bind after BUSY or
-a lost reply. Convergence-only scans admit binding metadata so simultaneous
-hosts can arbitrate while payload mutation remains fenced.
+Every save is one generation of the one store (D-F31). Profile Wire BEGIN
+requires the current format, and its former VIA binding bytes must be zero.
+Convergence-only scans still admit metadata so simultaneous hosts can
+arbitrate while payload mutation remains fenced.
 
-Client follow-up: require binding in `candidateMetadataForBlob`, refresh tests
-and imported fixtures/specs, and repin the landed firmware revision. Firmware's
+Client follow-up: require current metadata in `candidateMetadataForBlob`
+(including a zero former binding tail), refresh tests and imported
+fixtures/specs, and repin the landed firmware revision. Firmware's
 required checks stay independent of the client checkout. This cut does not
 perform the later domain-registry deepening or claim hardware acceptance.
 
@@ -1103,14 +1169,18 @@ excluded duplicate inert to an eligible chord's member state. Since D-F27 a
 bypass ignores the row while retaining runtime-owned default tap/hold behavior.
 Defaults allow everything, so a profile that never uses them is unchanged.
 
-`tests/fixtures/maximum_profile_v3.fixture` holds every table at its maximum
-at once: 37,956 bytes, leaving 15,260 bytes of payload capacity. It validates, commits,
+`tests/fixtures/maximum_profile_v4.fixture` holds every table at its maximum
+at once: 37,700 bytes, leaving 15,516 bytes of the slot. It validates, commits,
 boots and publishes whole on one half and prepares and commits on the peer;
 settings validation reads 20 bytes per step, like the other domains, so the
 whole profile validates in 7,432 owner scans
-([storage baseline](architecture/storage-and-resource-baseline.md#schema-3-ceilings-and-the-maximum-profile)).
+([storage baseline](architecture/storage-and-resource-baseline.md#schema-4-ceilings-and-the-maximum-profile)).
 *Revised by D-F26:* custom-key shortcuts add 256 bytes, so the maximum is
 37,956 bytes, leaving 15,260, and validates in 7,458 owner scans.
+*Revised by D-F28:* schema 4's six-byte domain envelopes make it 37,966 bytes,
+leaving 15,250, validated in 7,459 owner scans.
+*Revised by D-F29:* the slots are 128 KiB in their own flash region, so it
+leaves 93,074 bytes, and logical EEPROM is the 36 KiB VIA region alone.
 
 The authored layout keeps its eight layers; layers 8–15 are transparent,
 unnamed and inactive. One supported tap depth (five) bounds behaviour steps,
@@ -1219,7 +1289,7 @@ version 2:
 - **Bigger chunks.** QMK's master-to-slave RPC buffer is 128 bytes, so a chunk
   carries up to 110 bytes. QMK sends each RPC's own lengths, so only this
   copy's chunk frames grow; every other split RPC, all replies and pulled
-  chunks keep their 32-byte frames. It costs 96 bytes more of the shared RPC
+  chunks keep their 32-byte frames (until D-F28 grows pulled replies too). It costs 96 bytes more of the shared RPC
   buffer and of the transport CRC's staging buffer on each half. A full
   request alone takes about 5.6 ms on the 230,400-baud link, before its reply
   and handshake; hardware acceptance must judge the whole exchange.
@@ -1228,7 +1298,7 @@ The receiver writes at most 110 bytes in a scan, in store writes of at most
 20, whether they arrived in a chunk or it copies them; its validator steps
 read 20 bytes like the owner's, where they read 14 before. The sender reads
 each chunk from its staged candidate or committed record in store reads of at
-most 32 bytes (`NOAH_PROFILE_STORE_IO_CHUNK_MAX`), the bound the QMK EEPROM
+most 32 bytes (`NOAH_PROFILE_STORE_IO_CHUNK_MAX`), the bound the flash
 adapter enforces; a chunk read whole fails on the keyboard as a storage error. While the receiver
 still holds the sender's request, the sender polls at the 5 ms admission pace
 up to eight times in a row without progress before its ordinary backoff, so
@@ -1253,6 +1323,8 @@ polling correction and interruption acceptance remain outstanding (Open Issues).
 
 ## D-F20 — VIA checksum work is independent of split frame size
 
+*Retired by D-F31: there is no VIA bank to checksum.*
+
 Every Apply that touches VIA still verifies the complete bank on the peer and
 recomputes the USB half's identity after its local writes, even for a no-op
 keycode write. The 14-byte split payload had also limited checksum work, making
@@ -1260,7 +1332,7 @@ the expanded macro bank require 2,634 checksum grants per pass. The worker now
 hashes at most 224 payload bytes per scan in sixteen reads through the same
 14-byte workspace, requiring 167 grants. Pinned QMK reads these bytes from its
 RAM mirror; no write or RPC occurs in the batch. The governing
-[checksum work contract](architecture/logical-profile-transaction-v1.md#via-checksum-work-per-scan)
+checksum work contract (removed from the transaction spec with D-F31)
 keeps scheduling, full-bank identity, mutation epochs and recovery unchanged.
 
 This budget bounds CPU work without growing stack storage or allocating a bank
@@ -1273,6 +1345,8 @@ should be refreshed after this firmware lands.
 
 ## D-F21 — Fresh reads omit only storage proven zero
 
+*Retired by D-F31: GET `0x0c` is unhandled; macros are read with the profile.*
+
 Optional Profile Wire GET `0x0c` serves a bitmap of nonzero 256-byte VIA macro
 blocks, bound to the completed local storage generation and full-store digest.
 The existing bounded checksum workers collect the bitmap while hashing and
@@ -1281,7 +1355,7 @@ Stale tail bytes and interrupted-write markers remain data. A client downloads
 marked blocks, reconstructs zero blocks, checks metadata again and verifies the
 whole-store digest; the existing complete-capture coherence checks still apply.
 
-The governing [read-map contract](architecture/profile-wire-v1.md#sparse-via-macro-read-map--get-value-0x0c)
+The governing read-map contract (removed from the wire spec with D-F31)
 adds no capability bit or storage format. Older clients retain full reads;
 supporting clients fall back for unsupported or initially unavailable maps and
 fail malformed or changed reads. The client follow-up implements this reader
@@ -1315,12 +1389,13 @@ so it cannot read this firmware until then.
 
 ## D-F23 — Pointing outputs start VIA macros
 
-Directions, diagonals and mouse-button tap overrides accept VIA macro triggers
+Directions, diagonals and mouse-button tap overrides accept macro triggers
 0–127. The record layout, PD domain version and action ABI digest stay unchanged:
 older validators reject the new keycodes, and capability bit 29 advertises the
 extension. A macro record must inherit modifiers with mask zero, because its
 playback continues after the tap returns. Other excluded actions stay excluded;
-VIA payloads cannot recurse into layers or modes.
+Macro payloads cannot recurse into layers or modes. (The heading's "VIA
+macros" are the profile's macro domain since D-F30 and D-F31.)
 
 The existing macro engine owns playback. Busy triggers are dropped; Every step
 is allowed. Only a successful start spends a once-per-movement movement. Empty,
@@ -1361,7 +1436,7 @@ Hosts read the string when they enumerate, so the name must be known before
 USB starts and a rename needs a new enumeration. `keyboard_pre_init` reads the
 committed profile's name; the activated profile stays authoritative. When its
 name differs from the enumerated one, the half on USB restarts USB once the
-owner is settled on both halves, nothing is held or running, VIA is idle and
+owner is settled on both halves, nothing is held or running and
 the host has been quiet for a second. The half without USB never restarts it.
 The [runtime flow](architecture/runtime-flow.md#usb-product-name) owns the
 rules. Settings v7 is a new domain version: firmware refuses v6. Ark clients
@@ -1409,7 +1484,7 @@ across domains, and Ark warns about it.
 
 Settings v8 stores the shortcuts as 128 two-byte records (modifier mask, then
 key) between the layer records and the names, and header byte 6 counts them
-(128). Feature bits stay as they are: bit 31 is still free. The action ABI
+(128). No feature bit gates it; settings v8 does. The action ABI
 digest is unchanged: it covers action identities, and a custom key's code and
 kind did not change. Firmware refuses settings v7, and an older client refuses
 v8 rather than misreading it. The keymap authors
@@ -1430,7 +1505,11 @@ hold at the current tap count does, not by its keycode family:
    a layer held until release, and now any key whose first hold tier (its
    hold, or its long hold when it has none) is a layer action, modifiers only
    or a pointing mode. A pointing mode can mask modifiers and take over
-   buttons, so a key pressed under one is not independent of it.
+   buttons, so a key pressed under one is not independent of it. A hold that
+   goes on at the key's own press (`LM()`'s modifiers, a pointing key's own
+   mode when its row authors no hold) leaves nothing to decide: another
+   key's press already cancels its quick tap, so keys pressed meanwhile go at
+   once.
 2. **Its fallback hold is its own modifier: the later press registers it**,
    as before.
 3. **Anything else: the later press settles it as a tap.** Its hold is an
@@ -1438,8 +1517,14 @@ hold at the current tap count does, not by its keycode family:
    repeated taps included, before the later press goes out, and its release
    then sends nothing. Past its hold time it is a hold: a threshold hold has
    already gone out, and a hold that waits for release
-   (`TAP_ON_RELEASE_AFTER_HOLD`) is committed at the later press. Keys a
-   pointing mode owns are left to it.
+   (`TAP_ON_RELEASE_AFTER_HOLD`) is committed at the later press. A key
+   whose own press waited behind an undecided key is a hold too once it was
+   held past its hold time: held records replay without a scan between them,
+   so preflight first reaches the hold thresholds it crossed before the next
+   replayed event, or its own release, at their physical times (D-F01). Keys
+   a pointing mode owns are left to it, and a momentary layer key (`MO`,
+   `TT`, `OSL`, `LM`) is not settled: its layer is on from the press, and
+   another key's press cancels its quick tap, even one its row authors.
 
 Before this, class 3 sent the later key at once and this key's tap only on
 its release, so `, ` typed as ` ,`. Chosen over making class 3 wait as well,
@@ -1462,24 +1547,25 @@ what a later key meets ("Every dual-role key" below takes bit 31). See
 [the contract](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided).
 
 **Releases that wait.** A key pressed before a class-1 key and released while
-that key is undecided waits for its decision when it is a modifier or layer
-key, as QMK keeps such a release in its tapping buffer. A key the runtime
-handles counts by what it holds at that moment (a layer, or real modifiers
-from a hold or a registered fallback); any other key by QMK's rule for its
-keycode (a modifier, a mods-only key, `MO`, `LT`, `LM`, or an `MT` or `OSM`
-released as a hold; since every `LT`, `MT` and `OSM` is handled, in practice a
-plain modifier or a mods-only key). The undecided key's tap or hold then goes out under that
+that key is undecided waits for its decision when it is a modifier or layer key,
+as QMK keeps such a release in its tapping buffer. A key the runtime handles
+counts by what it holds at that moment (a layer, or real modifiers from a hold,
+a registered fallback or a custom key's shortcut of modifiers alone); any other
+key by QMK's rule for its keycode (a modifier, a mods-only key, `MO` or `LM`;
+`LT`, `MT` and `OSM` are always handled, so in practice a plain modifier or a
+mods-only key). The undecided key's tap or hold then goes out under that
 modifier or layer, and the release follows, so Cmd let go before F still types
 Cmd+F. Every other release goes at once, as in QMK. A waiting release replays
 in order and waits behind each replayed key that is undecided in turn. It
-counts as queued for the hold gate, so its key reaches no later hold tier
-after its physical release; the key admission is waiting for is the
-exception, since overload can replay that key's press ahead of its own
-release. Combo outputs' releases go at once: their runtime position is known
-only after admission, so they could not be told from the undecided key's own.
-Chosen over passing every earlier key's release through, which typed the bare
-key whenever the modifier came up first and made a native LT/MT key behave
-differently once it had a row.
+counts as queued for the hold gate, so its key reaches no later hold tier after
+its physical release; the key admission is waiting for is the exception, since
+overload can replay that key's press ahead of its own release. A combo output's
+release counts the same way, judged where the runtime holds that output, its
+chord's owner key, so the GUI chord N + M let go before J still types GUI+J; an
+output that is the undecided key itself decides on its own release. Chosen over
+passing every earlier key's release through, which typed the bare key whenever
+the modifier came up first and made a native LT/MT key behave differently once
+it had a row.
 
 **Releases that settle.** The same releases settle a class-3 key as a tap,
 as another key's press does: its tap goes out at the modifier's or layer
@@ -1496,7 +1582,11 @@ runtime, with or without a row, and a key without a row behaves exactly as with
 an empty row: its tap is its own, `LT` holds its layer as `MO`, `MT` and `OSM`
 hold their modifiers, it makes later keys wait (class 1), and its interrupted
 tap is still typed (D-F02). QMK's tapping engine classifies no record, physical
-or combo output, with behaviours on or off. Behaviours switched off (the
+or combo output, with behaviours on or off, and the firmware has no path that
+reads a tap decision of QMK's. The one tap key QMK still decides is `TT()` or
+`OSL()` to a layer from 16 to 31, which the firmware refuses wherever it
+validates a keymap, and which nothing else writes since D-F31
+([implementation](KEY_RUNTIME.md#physical-event-timing-at-the-qmk-boundary)). Behaviours switched off (the
 master, a layer's switch, a row's enable or allowed layers) or a placement
 bypass ignore the row only: the key keeps this default, and so does a combo
 output that is an `MT` or `OSM`. Tap, then press and hold again at once, is a
@@ -1528,3 +1618,418 @@ once and never repeated, and an empty `TT()` row took away its lock. Chosen
 (Noah, 2026-10-18): a key with nothing on it behaves like a normal key, so a
 client can drop an empty row without changing the key, and adding one cannot
 slow a key down. Bit 31 advertises this too.
+
+## D-F28 — A new base: 32-bit profile lengths, and a feature word of build differences
+
+Opens a new major of all three formats a profile travels in: Profile Wire 2.0,
+profile schema 4.0 and logical store format 6, with split framing version 3 (version 4 since D-F31).
+In each, every length and offset of a profile is 32 bits: the blob's domain
+envelopes (now six bytes: id, version, length), the slot header's payload
+length, the store's read and write callbacks, the candidate wire's BEGIN
+length, CHUNK offset and REUSE ranges, candidate status, the split protocol's
+descriptor, chunk, request and reuse frames, payload readback metadata and the
+capability page's payload capacities. Domain versions keep their numbers: a
+domain's bytes are the same in schema 3.0 and 4.0. RGB and key behaviours keep
+their 16-bit internal offsets, so each of those domains stays within 65,535
+bytes. The slots stay 53,216-byte payloads in EEPROM; nothing else stops a
+profile at 64 KiB once they move to their own flash region. *Revised by
+D-F29:* they have, with a 130,048-byte payload. Host tests carry a
+70,000-byte payload through the codec, the candidate upload, the split frames
+and the store in a 128 KiB test geometry the firmware refuses.
+
+Where a 32-byte frame had no room, the layout changed rather than a field
+narrowing: the store header drops its `NT` magic and keys the format into its
+CRC16 and marker values; Profile Wire BEGIN drops its always-zero flags and
+its store-format byte, which the protocol version now implies; candidate status
+moves the error location to a new page 3; peer status page 1 packs the
+transfer owner and storage admission into one byte and page 2 leaves the
+transfer length to page 1; the split descriptor packs origin half and the
+override flag into its flags byte. The capability page is layout 3: byte-wide
+ceilings on page 1, wider ones on page 2. Split chunks shrink from 110 to 106
+bytes, and a pulled chunk now travels in a reply as large as a pushed one:
+QMK's slave-to-master RPC buffer rises to 128 bytes like the master-to-slave
+one, and a payload request asks for exactly its chunk's frame. A pulled chunk
+had carried 14 bytes, and the new offsets would have left 10, so pulling a
+maximum profile would have taken about 7,600 requests; it takes 718. Every
+other request still asks for a 32-byte reply.
+
+The feature word holds only what a build genuinely varies by, never a step in
+the firmware's history (Noah, 2026-10-19): bit 0 split keyboard, bit 1 saves
+(candidate writes, reuse, streaming, commit and activation, once the owner
+reports), bit 2 pointing device. Every Profile Wire 1 bit is retired, and what
+each meant is recorded once, in
+[Profile Wire](architecture/profile-wire-v1.md#the-profile-wire-1-feature-word-retired).
+No firmware behaviour depends on a bit. A later capability raises the minor
+version instead, and Ark requires the current one (Ark's D-L64).
+
+A slot written in format 5 is never read or converted: the keyboard starts
+from its compiled defaults, and Profile Wire state flag 9 says a slot holds an
+earlier format until a profile is saved. A backup from the old base is refused
+like any other earlier format; Noah's own profile crosses as authored defaults
+before the first release of the new base.
+
+Costs: 292 bytes of static state per half (the owner 260: its reconciler,
+candidate backend with sixteen reuse ranges, validator, store and status;
+the compiled handle 24), so the owner's engineering policy rises from 11,264
+to 11,520 bytes and the validator's from 384 to 400; and the shorter split
+chunks. The pulled-reply buffers add 184 bytes per half (QMK's slave-to-master
+RPC buffer and the reconciler's cached reply), leaving 1,068 below the
+209,920-byte tripwire; the reconciler's policy rises from 896 to 1,024 bytes. Chosen over a 24-bit length, which would have kept frames unchanged but
+set a new ceiling; and over keeping the old feature bits, which every current
+client already requires.
+
+Client follow-up: Ark moves to the new base (Profile Wire 2.0, schema 4.0, the
+new frames, capability layout 3 and feature word, status page 3 and state flag
+9) and refuses the old one.
+
+## D-F29 — Profile slots in their own flash region
+
+The two profile slots leave QMK's emulated EEPROM for a fixed region of flash
+and are read in place; replaces D-F14's EEPROM geometry. The region is
+256 KiB at flash offset 1 MiB (XIP `0x10100000`): slot A at region offset
+`0x00000`, slot B at `0x20000`, each 128 KiB: a 1 KiB record (the 36-byte
+header and the marker's cells) and a 130,048-byte payload (plan answer 6, the
+working size until a keyboard measures otherwise). It sits between the image (273,872 bytes) and the
+wear-leveling backing at the top of the 2 MiB the build assumes; the link
+fails if the image reaches it and the adapter does not compile if it reaches
+the backing. Logical EEPROM becomes the 36 KiB VIA region: backing 73,728
+bytes, and QMK's RAM mirror 106,496 bytes smaller per half
+([memory budgets](architecture/memory-budgets.md#profile-slots-in-their-own-flash-region--d-f29-2026-10-19)).
+
+No RAM buffer holds a slot: reads go through XIP, writes through one 256-byte
+page buffer. No page is programmed twice between erases, which is all the
+flash part promises: on flash the record is laid out by page (the header in
+page 0; the marker as three cells in pages 1 to 3, read as their bitwise AND,
+one cell programmed per step; the payload from page 4), and the store's
+addresses are mapped onto it. The markers are bit subsets of each other
+(erased `0xFF`, prepared `0x3C`, committed `0x18`, invalid `0x00`), so the
+AND of the cells is always the last step written; format 6 had committed with
+`0xC3` only while the slots were in EEPROM, unreleased, and the layout change
+needs no format bump. A save's reset names its target without touching flash;
+no write reaches the slot before its header sector is erased, so the slot
+stops being a boot candidate before anything is written to it. Pages are
+programmed when full, when a write moves on, or at a sync; the store syncs
+before its readback, after the prepared marker and after the commit marker,
+still written last. Today's guarantee holds: power lost anywhere in a save
+leaves the previous profile active, which host tests prove by cutting power at
+every erase and page program of a save, both before and halfway through the
+operation.
+
+Pauses: erase and program run with interrupts off while XIP is off, through
+pico-sdk's RAM-resident routines, as QMK's wear-leveling driver does; no BK
+change. A sector erase pauses the keyboard for tens of milliseconds (W25Q16JV:
+45 ms typical, 400 ms at worst), so it runs only at the start of a durable-I/O
+grant, at most one per grant, ahead of a save's writes, and only when no key
+is held and the matrix has been unchanged for 50 ms. The profile step runs in
+a grant only with at least a page of erased flash ahead of its writes and the
+grant's flash time under a 2 ms budget, which an erase always exceeds; a
+grant programs at most one page. A save therefore waits while the keyboard is busy, and one the keyboard
+never lets erase ends at Ark's or the split peer's time limit as a failed
+save; Live mode's quiet period avoids that. Erase suspend is not used. Each
+half measures its longest erase, longest program, most flash time in one
+grant and its last save, readable over Profile Wire custom get `0x0D` (page 0
+this half, page 1 the other, pulled once a second over split RPC
+`PUT_PROFILE_FLASH_DIAGNOSTICS`). These figures replace a separate measurement
+probe: the first keyboard session after a save reads the real pauses, and the
+slot size or pacing changes only if they say so.
+
+**Pacing (2026-10-19, after the first keyboard session).** The figures said
+so: flash was under 2 % of a save (a 6,423-byte save took 5.8 s on the USB
+half with 0.1 s of flash; a 37,139-byte one 28–35 s with 0.54 s), because the
+store copied and checked its bytes in 20-byte steps, one step per scan. Two
+rules follow.
+
+A grant repeats the store's steps while the half has storage work in progress
+(boot validation and discovery, its candidate, the copy it receives, the
+working copy loading or checking an edit): the subsystem whose step just worked
+goes again, until a step finds nothing to do, erases or programs (so a grant
+still erases at most one sector or programs at most one page), or uses the
+split link (the other half answers at its own pace), for at most 1 ms and 32
+steps (`qmk_durable_io.c`). An idle keyboard still gets one step per scan, and
+a scan grows by at most that millisecond while a save runs.
+
+A step works through up to a flash page of bytes. A timed build (per-step
+timers and the RP2040's XIP cache counters, same day) showed each step's fixed
+cost was what a save waited on, not its bytes: about 180 µs a step, more after
+a page program flushed the code cache, for 20 bytes. A REUSE step, Profile
+Wire's or the split receiver's, copies up to 256 bytes of its range in reads
+and writes of at most 20, so it still programs at most one page; a validation
+step takes up to twelve validator calls of at most 20 bytes each; the commit's
+payload readback reads up to 256 bytes a step. CRC-32 takes four bits at a time
+from a 16-entry table rather than one bit per loop, the same result for any
+bytes. In the owner's two-half host test a 2 KB save took 1,006 grants with
+one 20-byte step per scan; it takes 131 with page-sized steps, and 29 when they
+also repeat. On the keyboard a Save of the 6,432-byte profile now takes 1.0 s
+(0.9 s on the USB half, 0.5 s on the other) and a 37,232-byte one 4.6 s (4.5 s
+and 2.2 s), with the same flash time as before. Each half's copy of the large
+one takes 1.3–1.6 s, close to what the pauses allow: ten sector erases, each
+waiting for a quiet keyboard, and 145 page programs at one per scan.
+
+Each half keeps its own slots and the copy between halves is unchanged. Old
+EEPROM slots are not migrated: they held format 5, which is refused anyway. A
+firmware update leaves the slots alone. An EEPROM reset still returns the
+keyboard to its compiled defaults, as formatting logical EEPROM did while the
+slots lived there: QMK makes its EEPROM magic valid early in formatting,
+before any userspace hook runs, so `keyboard_pre_init` erases both header
+sectors whenever the magic is not valid, before QMK's keyboard init and before
+the boot name is read. A boot interrupted before, during or between those
+erases, or before QMK's magic write, forgets the slots again on the next.
+
+Chosen over keeping the slots in a larger emulated EEPROM, which mirrors every
+byte in RAM, and over erasing a whole slot up front, which would pause one
+scan for every sector at once. Programming the header page once per marker
+step was dropped because the part does not promise repeated programs of a
+page; the first kilobyte of each slot is the price.
+
+Client follow-up: the capability page now reports a 130,048-byte slot payload
+and profile payload; Ark takes its limits from it. Ark may show the
+flash pauses (`0x0D`) in a diagnostics view; nothing depends on them.
+
+## D-F30 — Keymap and macros belong to the profile
+
+Keymap domain `0x60` v1 holds sixteen layers × sixty little-endian uint16
+keycodes, and macro domain `0x70` v1 holds 128 streams in the existing bank
+encoding, up to 34,903 bytes. Existing domain versions do not change. Compiled
+defaults encode the authored matrix and the macro payloads previously seeded
+into VIA. Runtime reads use the active generation; absent domains use authored
+defaults without serializing them on key or playback paths. The keymap override
+also governs combo origin, handled-key transparency and RGB coverage.
+
+The 36-byte format-6 header keeps a full domain-mask byte and full 32-bit
+length, with separate origin/override flags. The exact layout belongs to
+[the storage contract](architecture/device-resident-profile.md#profile-domains-own-layout-and-macros).
+The maximum-profile generator includes both domains and checks the slot's
+payload ceiling with a 12,288-byte reserve. It reads that ceiling from the
+storage header instead of keeping a second size constant. The fixture is
+74,801 bytes; the 130,048-byte payload retains the 12,288-byte reserve with
+42,959 bytes still spare.
+
+VIA remained compiled in this additive slice, its binding and staging intact
+while its layout and macro copies no longer drove typing; D-F31 removes it.
+Moving Ark to the new base follows separately. Hardware acceptance owes typing,
+layers, combos and macro playback on both halves from flashed defaults;
+linked stack checks do not establish scan cadence or runtime high-water.
+
+## D-F31 — VIA is not supported: one store, and the firmware answers Raw HID itself
+
+The firmware no longer builds VIA. `VIA_ENABLE` is off and `RAW_ENABLE` on;
+`SEND_STRING_ENABLE` and `TRI_LAYER_ENABLE`, which VIA used to switch on, are
+set explicitly, and bootmagic comes from the keyboard's definition. There is
+no dynamic keymap: keys and macros come from the profile (D-F30). Losing the
+VIA app is accepted (the plan's first decision).
+
+**Raw HID.** `raw_hid_receive` in `users/noah/lib/compat/qmk_profile_channel.c`
+hands every report to the Profile Wire handlers and sends it back exactly once
+as the reply. A report none of them takes comes back with command byte `0xFF`,
+the value VIA used for unhandled, so a client probing for VIA reads an
+unhandled answer. The frame layout is unchanged and the keyboard is still
+found by usage page `0xFF60`. The keyboard identifies itself by the capability
+page alone: its firmware version (`NOAH_FIRMWARE_VERSION`, still
+`0x00010000`) replaces VIA's protocol-version and firmware-version reads.
+Retired with VIA: GET `0x0c` (the sparse VIA macro read map, D-F21) is
+unhandled, page 0 of GET `0x08` (the VIA store's sync state) is an unknown
+page, and capability page 2's macro count and macro bytes now describe the
+macro domain (128 slots, 34,903 bytes, the same values). The settings QMK
+holds (base RGB, default layers, keymap options and DPI in eeconfig; combos
+on/off and auto-mouse in RAM) read back through the settings readback as
+before; nothing reads them through VIA's lighting channel.
+
+**One store.** Apply publishes one profile generation; replaces D-L21's
+binding of the profile record to the VIA store. The candidate is validated on
+the USB half and copied to the other half, both halves hold a durable
+prepared copy, and the USB half's commit marker is the decision. The other
+half then commits, and once it has been seen holding exactly that record the
+new profile activates at the next safe boundary, with no second observation
+needed if the link drops meanwhile. Nothing is rewritten under the running
+keymap, so there is no input fence and no roll-forward; boot selects the
+committed record, reconciles with the other half and activates, with no VIA
+copy to recover. Every cancel before the decision releases the candidate and
+aborts the other half's prepared copy; after the decision nothing cancels.
+Every power-loss guarantee that was not about VIA holds unchanged
+([one-store transaction](architecture/logical-profile-transaction-v1.md)).
+
+The unreleased Profile Wire, schema and store versions stay unchanged. Split
+framing moves from 3 to 4 because removing the VIA split calls shifts the QMK
+call IDs by two; mixed builds must be refused. Candidate BEGIN bytes 24..31, which carried the VIA generation and digest,
+must be zero; split framing 4 refuses kinds 9 and 11 (the VIA bind and its
+request) and descriptor flag bit 2 (a VIA-bound record), and PREPARE_BEGIN is
+a copy's first exchange; candidate peer phase 1 (binding) is never reported;
+store format 6 keeps its 36-byte header with bytes 22..32 reserved and zero
+(22..29 held the VIA binding). Split RPC ids lose the two VIA transactions, so
+the profile copy and the flash diagnostics are ids 5 and 6; both halves run
+one build.
+
+**EEPROM.** QMK's logical EEPROM holds only its eeconfig, with room for the
+user datablock that will hold the edit mode (plan answer 9): the wear-leveling
+backing is QMK's RP2040 default of 8 KiB and its RAM mirror 4 KiB, 32,768
+bytes less per half
+([memory budgets](architecture/memory-budgets.md#via-removed-one-store--d-f31-2026-10-19)).
+An EEPROM reset still forgets the saved profiles (D-F29).
+
+Kept: the authored macro aliases `VIA_MACRO_0`–`VIA_MACRO_127`, the authored
+tables behind them and the action kind named after VIA macros. Renaming them
+would change authored data, introspection and Ark's mirrors without changing
+behaviour; the names are historical.
+
+Client follow-up (Ark on the new base): drop the VIA protocol and
+firmware-version reads and identify by the capability page; read macros and
+the keymap from the profile and base RGB through the settings readback; send
+BEGIN with a zero tail and no logical VIA staging.
+
+## D-F32 — Live edits: a working copy in RAM, Save, and the edit mode
+
+**Working copy.** Each half keeps one buffer the size of a slot's payload
+(130,048 bytes, static) for a working copy of its profile. While nothing is
+edited the provider runs the saved profile (a committed slot through XIP, or
+the compiled defaults) and the buffer is unused. The first edit copies the
+saved profile into it in bounded steps; from its publication until Save,
+Revert, an Apply or a replug, the buffer is the active profile, a provider
+snapshot of kind *working copy* that keeps its saved base's generation and
+origin and carries its session and revision in place of checksums. Revert
+publishes the saved snapshot again. A replug boots the saved profile; unsaved
+RAM never has authority at boot.
+
+**Edits.** An edit is up to eight splices into domain payloads (remove some
+bytes at an offset, insert others), applied together as one revision, so a
+compound change (several fields, several domains) is atomic. A splice may
+create or drop a whole optional domain. Inserted bytes are staged at the top
+of the buffer, above both the current and the resulting profile, so a refused
+edit leaves every byte as it was and no second profile-sized buffer exists;
+the price is a capacity rule (inserted bytes plus the larger profile within
+the payload), which every profile within today's maximum (74,801 bytes) meets
+for any single-domain replacement. Replacing the whole working copy (an
+import) streams into the buffer itself and therefore needs the saved profile
+active. Each touched domain is checked alone by the same domain code a
+whole-profile validation runs (the validator's domain mode), held to a host
+candidate's rules, with the profile's required domains and ceiling; no other
+domain is read and nothing is checksummed. The edit is published at the same
+safe boundary as an activation; its bytes are rewritten inside the
+publication (no reader sees them half moved), and the provider's in-place
+publication tells each runtime which domains changed, so settings, combos and
+pointing keep their tables and projections when theirs did not, while the
+keymap, macros, behaviours and RGB rebind their readers.
+
+**Session and revision.** A session per boot (the ring oscillator's random
+bit mixed with the boot time) and a revision that advances with every change
+to the working copy's bytes, including Revert and any profile activated from
+outside it, but not Save. Every edit, Save and Revert names both; a stale one
+is refused with the current pair. Keyboard adjustment keys advance the revision too, so a client learns of
+them the same way.
+
+**The other half.** Edits travel on their own split RPC, never through the
+durable prepare path: the USB half sends each published edit, the other half
+checks and publishes it at its own safe boundary, and in any other
+disagreement the USB half reverts the other half, gives it its identity over
+the same saved profile, or sends its whole working copy
+([split protocol](architecture/profile-split-v1.md#working-copy-sync-d-f32)).
+A new edit waits until the other half holds the same session and revision,
+so the status's "both halves at revision N" is one flag and at most one edit
+is ever behind. Considered: preparing the edit on both halves before either
+publishes (two-phase); rejected because both halves run one build and the
+same checks on the same bytes, so a refusal on the other half means a fault,
+and the extra round trip would slow every edit. A refused edit is followed by
+one whole-copy replacement; if that is refused too, the halves stay apart,
+reported, until a Revert or an Apply, and Save is refused meanwhile. The USB
+half forgets that the halves agreed whenever it reverts or adopts the other
+half or loses it for 3 s, so an edit is never sent onto bytes the other half
+no longer holds; a Save onto different bytes would fail anyway, as each
+slot's commit reads its payload back against the candidate's CRC-32 and
+digest.
+
+**Save** is today's Apply without the upload: the owner drives the ordinary
+candidate transaction with a candidate made entirely of REUSE from the
+working copy (reuse source kind 2), so the whole-profile validation with its
+checksum, both halves' durable preparation, the marker-last decision,
+convergence, activation and every power-loss guarantee are the same code,
+and the other half fills its copy from its own working copy, sending no
+profile bytes when the halves agree. The candidate is held to a saved
+record's rules, since its unedited domains came from one. When it lands the
+saved profile is the working copy's bytes, so the active profile becomes the
+new slot with the same revision. A working copy byte for byte the saved
+profile (edits undone, a value set back; "Unsaved edits match what is saved",
+keyboard check 2026-10-19) is not written again: Save compares it with the
+saved profile once its checksum matches, and the keyboard returns to the saved
+profile with nothing unsaved and the same revision, as Revert would but
+without a new revision, since nothing it runs changes. Live's own save does
+the same. An Apply still works and replaces the
+working copy; Apply frames are refused while an edit is mid-way or a save
+runs, and edits while a candidate is in progress.
+
+**Edit mode** (plan answer 9). Apply, Live or Live + review, default Live +
+review, stored on each half in QMK's EEPROM user datablock (32 bytes: two
+16-byte records with a counter and CRC-32, the newer valid one counting), never
+in a profile, backup or review. A change takes a counter above both halves';
+the higher counter wins on reconnect, and equal counters that disagree are
+reported until the next change. A change is refused with unsaved edits or pending adjustments; the client
+finishes Save/Revert first. QMK's EEPROM is wear-levelled flash that may erase, so a half writes a new record
+only when its keyboard is quiet, as before a slot erase (D-F29), never from
+a Profile Wire report or a split RPC; a failed write backs off and is
+reported.
+
+**The profile owns what QMK holds** (plan answer 10). Base RGB, default
+layers, keymap options, DPI and auto-mouse are pushed into QMK with its
+no-EEPROM setters at boot (the compiled defaults once discovery finds nothing
+saved), on activation and on a settings edit; QMK's EEPROM copies no longer
+win at boot, and settings readback reports the stored values. Toggles are
+runtime overrides beside the stored master, cleared by a replug and never an
+edit: combos run while the master and QMK's combo flag both allow (the master
+gates `combo_key_record_allowed` and press capture), behaviours while the
+master and the override in `participation.c` both allow, ready for a
+behaviours key. GET `0x22` reads masters, overrides and QMK's live values.
+DPI up/down and RGB keys use QMK's no-EEPROM setters for immediate local
+feedback and queue their resulting scalars as compound settings edits. The
+four latest scalar values coalesce while an edit, a save or the other half
+holds the profile. They publish at the ordinary safe boundary and advance
+revision; client edits are BUSY until pending adjustments publish and the
+halves agree, and so is a new Apply (BEGIN answered BUSY, edit status flag 13
+names the cause): an adjustment published after it would overwrite the Apply.
+An Apply already admitted finishes; an adjustment pressed during it publishes
+after it lands, on the profile it activated, and is saved as any adjustment.
+A profile without a settings domain gets one, created from the authored
+defaults with the adjusted scalars, by the adjustment's own edit. New adjustments during Save wait for the next revision; the
+bytes being saved stay immutable. Settings projection retains pending local
+values so a finishing save cannot undo newer key feedback. Participation
+toggles never enter this queue; RGB on/off is a lighting adjustment.
+
+**Automatic saves.** Live saves the working copy after one constant quiet
+interval of 3 seconds: no edit and no held key, with the matrix quiet gate
+(no matrix change for 50 ms) also required. The USB half schedules it, without
+a client heartbeat or connection, only once both halves agree. It drives the
+same Save path above; no second flash path or durability rule exists. Every
+published revision and every held-key scan restarts the interval. Live +
+review never saves automatically; Apply does so only for adjustment-only
+working copies (a client edit disqualifies the copy until Save/Revert/Apply).
+There is at most one automatic attempt per edited revision; failure is
+reported, leaves the working copy unsaved and needs explicit Save or another
+edit before retrying. This prevents an unattended retry/wear loop. Continuous
+edits closer than 3 seconds cause zero saves; even separated quiet intervals
+cannot cause more than 1,200 saves an hour (save/validation time reduces that).
+Status reports the automatic attempt, last save's source, and a counter plus
+revision and generation of completed keyboard saves, since this USB half's
+boot. A replug loses anything not yet durably saved, including an edit made
+less than 3 seconds earlier; a running save has the ordinary old-or-new
+power-loss result.
+
+**A save waiting for a quiet keyboard is not a stall.** The durable-I/O grant
+skips the owner while a save waits to erase (D-F29). The owner's clock now
+stops for those grants, so the host's 15 s, the copy's no-progress window and
+the receive lease do not count the wait, and a half whose storage is paused
+answers busy reason 9, which the other half counts as progress. The edit
+status tells the client which half waits (flags 9 and 10).
+
+**An unfinished edit holds a lease.** An edit being received is aborted after
+15 s without an accepted report on the owner's clock, as an abandoned Apply
+is, and Revert aborts one at once, so a client that quits mid-edit cannot
+leave Apply, Save, Revert and the other half refused BUSY until a replug.
+
+Wire: Profile Wire SET `0x20`–`0x27` and GET `0x20`–`0x22`, `0x27`, in
+[Profile Wire, Live Edits](architecture/profile-wire-v1.md#live-edits); the
+base is unreleased, so no version moves. Memory: the working copy and its
+state raise the static tripwire by one reviewed increment
+([memory budgets](architecture/memory-budgets.md#live-edits--d-f32)).
+
+Client follow-ups: Ark's live edits and Save; **Live mode in Ark**, including
+mode switching and the "saved by the keyboard" indication. Hardware acceptance owes edits
+in every domain on both halves, Save across a replug, an unsaved edit
+reverting on replug, typing through an edit, and RAM high-water on both
+halves.

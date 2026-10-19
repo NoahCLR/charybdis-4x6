@@ -23,7 +23,7 @@ noah_host_export_qmk_cpath "$ROOT"
 } >"$CONFIG"
 # Combos and settings come from the populated fixture; RGB, key behaviors and
 # pointing content come from the real authored writer.
-python3 - "$ROOT/tests/fixtures/populated_profile_v3.fixture" "$BUILD_DIR/populated.bin" <<'PYTHON'
+python3 - "$ROOT/tests/fixtures/populated_profile_v4.fixture" "$BUILD_DIR/populated.bin" <<'PYTHON'
 import pathlib, sys
 fields = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if "=" in line)
 pathlib.Path(sys.argv[2]).write_bytes(bytes.fromhex(fields["profile.hex"]))
@@ -41,10 +41,9 @@ build_and_run() {
         -DPOINTING_DEVICE_ENABLE \
         -DRGB_MATRIX_ENABLE \
         -DRGB_MATRIX_WS2812 \
-        -DVIA_ENABLE \
         -DMCU_RP \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
-        -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
+        -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
@@ -61,6 +60,11 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_action_placement_v1.c" \
@@ -71,10 +75,16 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_owner.c" \
+        "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
+        "$ROOT/users/noah/lib/profile/split/profile_working_sync.c" \
+        "$ROOT/users/noah/lib/profile/runtime/effective_keymap_macros_runtime.c" \
+        "$ROOT/users/noah/lib/compat/qmk_profile_keymap.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_key_behavior_runtime.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
@@ -90,7 +100,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_peer_store_backend.c" \
         -o "$bin"
-    "$bin" "$BUILD_DIR/populated.bin" "$ROOT/tests/fixtures/maximum_profile_v3.fixture"
+    "$bin" "$BUILD_DIR/populated.bin" "$ROOT/tests/fixtures/maximum_profile_v4.fixture"
 }
 build_and_run normal -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
 build_and_run sanitized -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer

@@ -458,18 +458,11 @@ bool key_runtime_core_press_token_hold_changes_other_keys(const press_token_t *t
     return key_runtime_core_query_hold_changes_other_keys(token->interaction.binding.hold.present ? token->interaction.binding.hold : token->interaction.binding.long_hold);
 }
 
-// QMK's rule for a key it handles: a modifier key, a mods-only key, MO, LT or
-// LM, or an MT or OSM released as a hold. Every LT, MT and OSM key is the
-// runtime's (D-F27), so a physical key reaching this is a plain modifier or a
-// mods-only key.
-static bool key_runtime_core_query_keycode_release_is_mods_or_layer(uint16_t keycode, const keyrecord_t *release) {
-    if (noah_qmk_real_mods_for_keycode(keycode) != 0u || IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP(keycode) || IS_QK_LAYER_MOD(keycode)) {
-        return true;
-    }
-    if (IS_QK_MOD_TAP(keycode)) {
-        return release->tap.count == 0u || IS_MODIFIER_KEYCODE(QK_MOD_TAP_GET_TAP_KEYCODE(keycode));
-    }
-    return IS_QK_ONE_SHOT_MOD(keycode) && release->tap.count == 0u;
+// QMK's rule for a key it handles: a modifier key, a mods-only key, MO or LM.
+// Every LT, MT and OSM key is the runtime's (D-F27), so none reaches this with
+// a tap decision of QMK's to read.
+static bool key_runtime_core_query_keycode_release_is_mods_or_layer(uint16_t keycode) {
+    return noah_qmk_real_mods_for_keycode(keycode) != 0u || IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_MOD(keycode);
 }
 
 bool key_runtime_core_release_is_mods_or_layer(uint16_t keycode, const keyrecord_t *release) {
@@ -478,14 +471,16 @@ bool key_runtime_core_release_is_mods_or_layer(uint16_t keycode, const keyrecord
     if (token && token->active && token->handled_key) {
         return key_runtime_core_holds_layer_or_mods_at(release->event.key);
     }
-    return key_runtime_core_query_keycode_release_is_mods_or_layer(keycode, release);
+    return key_runtime_core_query_keycode_release_is_mods_or_layer(keycode);
 }
 
 // A runtime-owned tap/hold key that is down, has not reached its hold yet and
 // whose hold changes other keys. Keys pressed meanwhile must wait for its
-// decision.
+// decision. A hold that goes on at the press (PRESS_HELD_WINDOW: LM()'s
+// modifiers, a pointing key's own mode) has nothing left to decide once
+// another key is pressed, since that press already cancels its quick tap.
 static bool key_runtime_core_query_press_token_undecided_dual_role(const press_token_t *token) {
-    return token->active && key_runtime_core_press_token_hold_changes_other_keys(token) && (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW);
+    return token->active && key_runtime_core_press_token_hold_changes_other_keys(token) && token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
 }
 
 bool key_runtime_core_undecided_dual_role_key_pos(keypos_t *out) {

@@ -70,7 +70,7 @@ noah_profile_rgb_v1_limits_t noah_profile_rgb_v1_default_limits(void) {
 
 static noah_profile_rgb_v1_result_t resolve_limits(const noah_profile_rgb_v1_limits_t *supplied, noah_profile_rgb_v1_limits_t *limits, noah_profile_rgb_v1_error_t *error) {
     *limits = supplied ? *supplied : noah_profile_rgb_v1_default_limits();
-    if ((limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) != 0u || limits->max_payload_size == 0u || limits->max_payload_size > NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE || limits->max_logical_layers > NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS || limits->logical_layer_count > limits->max_logical_layers || limits->tap_branch_color_count == 0u || limits->tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u) {
+    if ((limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) != 0u || limits->max_payload_size == 0u || !noah_profile_size_within(limits->max_payload_size, NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE) || limits->max_logical_layers > NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS || limits->logical_layer_count > limits->max_logical_layers || limits->tap_branch_color_count == 0u || limits->tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u) {
         return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
     }
     return NOAH_PROFILE_RGB_V1_OK;

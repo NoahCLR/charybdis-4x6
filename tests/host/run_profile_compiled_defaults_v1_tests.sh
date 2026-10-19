@@ -25,7 +25,7 @@ noah_host_export_qmk_cpath "$ROOT"
 # is refused as it is; the firmware never translates one.
 cp "$ROOT/tests/fixtures/client-regression/portable.bin.pd5" "$BUILD_DIR/old.bin"
 for fixture in populated maximum; do
-    python3 - "$ROOT/tests/fixtures/${fixture}_profile_v3.fixture" "$BUILD_DIR/$fixture.bin" <<'PYTHON'
+    python3 - "$ROOT/tests/fixtures/${fixture}_profile_v4.fixture" "$BUILD_DIR/$fixture.bin" <<'PYTHON'
 import pathlib, sys
 fields = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if "=" in line)
 pathlib.Path(sys.argv[2]).write_bytes(bytes.fromhex(fields["profile.hex"]))
@@ -42,10 +42,9 @@ build_and_run() {
         -DPOINTING_DEVICE_ENABLE \
         -DRGB_MATRIX_ENABLE \
         -DRGB_MATRIX_WS2812 \
-        -DVIA_ENABLE \
         -DMCU_RP \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
-        -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
+        -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
@@ -62,6 +61,11 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_action_placement_v1.c" \
@@ -72,6 +76,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
@@ -97,10 +103,9 @@ build_and_run empty -DNOAH_PD_PROFILE_ENABLE -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -
 # the canonical key-behavior domain alone and must remain warning-clean.
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_PD_PROFILE_ENABLE \
-    -DVIA_ENABLE \
     -DMCU_RP \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
-    -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
+    -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
@@ -112,6 +117,11 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/schema/key_behavior_compiled_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_combo_compiled_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c"
 
@@ -125,10 +135,14 @@ fields = dict(line.split("=", 1) for line in Path(sys.argv[1]).read_text().split
 blob = bytes.fromhex(fields["profile.full.hex"])
 offset, domains = 8, {}
 for _ in range(blob[6]):
-    length = struct.unpack_from("<H", blob, offset + 2)[0]
-    domains[blob[offset]] = (blob[offset + 1], blob[offset + 4 : offset + 4 + length])
-    offset += 4 + length
+    length = struct.unpack_from("<I", blob, offset + 2)[0]
+    domains[blob[offset]] = (blob[offset + 1], blob[offset + 6 : offset + 6 + length])
+    offset += 6 + length
 presets = next(case for case in json.loads(Path(sys.argv[2]).read_text())["valid"] if case["name"] == "presets")
 assert domains[0x50] == (3, bytes.fromhex(presets["hex"])), "compiled PD domain differs from the presets vector"
 assert domains[0x10][0] == 4 and domains[0x10][1][0] == 4 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32
 PY
+
+# The compiled defaults are Noah's keyboard profile, domain by domain, apart
+# from the differences its fixture lists.
+python3 "$ROOT/tests/host/folded_keyboard_profile_test.py" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" "$ROOT/tests/fixtures/folded_keyboard_profile.json"

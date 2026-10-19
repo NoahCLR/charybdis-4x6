@@ -10,7 +10,7 @@
 // the scalar policy, one fixed record per layer (its combo reference layer and
 // its two placement bitmaps), one two-byte shortcut per custom key, then every
 // name counted: a length byte and at most 32 bytes of UTF-8, the layers'
-// first, then the VIA macros', then the custom keys', then the keyboard's own
+// first, then the macros', then the custom keys', then the keyboard's own
 // name. The fixed part comes first so its fields sit at known offsets.
 enum {
     NOAH_SETTINGS_VERSION              = NOAH_PROFILE_SETTINGS_VERSION,
@@ -99,8 +99,8 @@ typedef struct {
 } noah_profile_settings_v1_validation_t;
 // One byte per call, permitting the whole-profile owner to retain its 20-byte
 // per-step I/O ceiling. False rejects the candidate before publication.
-bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *state, uint8_t byte, uint16_t length, uint8_t layers, uint8_t positions);
-bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *state, uint16_t length);
+bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *state, uint8_t byte, uint32_t length, uint8_t layers, uint8_t positions);
+bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *state, uint32_t length);
 bool noah_profile_setting_v1_valid(uint8_t id, uint32_t value, uint8_t layers);
 
 // The keyboard's own name, the domain's last name record (D-F25). Empty means

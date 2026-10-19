@@ -15,7 +15,7 @@ The payload starts with this fixed 16-byte header:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | payload format version, equal to the domain version: `4` in schema 3.0 |
+| 0 | 1 | payload format version, equal to the domain version: `4` in schemas 3.0 and 4.0 |
 | 1 | 1 | reserved, zero |
 | 2 | 2 | stage-enable mask |
 | 4 | 1 | reusable group count, `0..16` |
@@ -31,9 +31,9 @@ The payload starts with this fixed 16-byte header:
 | 14 | 2 | reserved, zero |
 
 The aggregate of the four group-row counts at offsets 6, 8, 9, and 11 is at
-most 32. With the current counts and five-tap ceiling, the largest RGB
-payload is 591 bytes (the accounting is below). The enclosing profile, including
-all domain headers and payloads, must fit the 53,216-byte whole-blob ceiling.
+most 32. The decoder's payload-size bound is 65,535 bytes, limited by its
+16-bit internal offsets; the current record-count ceilings bound an actual
+complete payload more tightly, to 591 bytes (below).
 
 Stage-enable bits are:
 
@@ -90,18 +90,15 @@ version 3's header byte 7 is 32 and the PD colour row at index `n` is slot
 
 Version 3 (D-F09) is version 2 with 32 PD colour rows instead of eight; PD
 group-row selectors are a slot below 32 or `0xff`. Every other byte is
-version 2's. Schema-2 firmware with 32 slots accepts only version 3: an
-importer turns a version-2 domain into version 3 by adding, after slot 7's
-row, rows `n 00 00 00 02` (black, right half) for slots 8..31, as the 6 → 8
-upgrade added rows for slots 6 and 7.
+version 2's. At the historical schema-2 cut, version 3 replaced version 2 by adding black,
+right-half rows for slots 8–31. Neither version is accepted today.
 
 Version 4 (D-F14) is version 3 with up to sixteen layer colours: the version
 byte (payload byte 0 and envelope) is 4, and layer-group selectors are a layer
-below 16 or `0xff`. Every other byte is version 3's. Schema-3 firmware accepts
-only version 4: an importer turns a version-3 domain into version 4 by setting
-the version to 4, adding after the last layer-colour row the rows
-`n 00 00 00 01` (black, keys mapped on this layer only) for each missing layer
-`n` up to 15, and setting header byte 5 to 16. A domain without layer colours
+below 16 or `0xff`. Every other byte is version 3's. Schema-3 and schema-4 firmware accept
+only version 4. Historically, converting version 3 added layer-colour rows
+`n 00 00 00 01` up to layer 15 and changed the version/count; this is not a
+current importer path. Current firmware and clients refuse older formats. A domain without layer colours
 keeps a count of zero. `tests/fixtures/rgb_domain_v4.json` holds the compiled
 domain and rejection vectors (versions 3 and 2, a missing PD row, 33 rows, an
 id of 32, out-of-order rows, a group selector of 32); version 3's vector file

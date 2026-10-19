@@ -9,20 +9,22 @@
 #include "profile_split_authority.h"
 
 enum {
-    // Framing version 2 added sized payload chunks and PAYLOAD_REUSE. Both
-    // halves run one build, so an older peer simply fails to decode.
-    NOAH_PROFILE_SPLIT_PROTOCOL_VERSION = 2u,
-    // Every reply, and every request except the two below, is this size.
+    // Framing version 2 added sized payload chunks and PAYLOAD_REUSE; version
+    // 3 widened every offset and length to 32 bits (D-F28); version 4
+    // removes VIA binding and changes the QMK split call IDs (D-F31).
+    // Both halves must run one build; older framing is refused.
+    NOAH_PROFILE_SPLIT_PROTOCOL_VERSION = 4u,
+    // Every frame except a payload chunk and a reuse request is this size,
+    // and so is the reply buffer of every request but PAYLOAD_REQUEST.
     NOAH_PROFILE_SPLIT_V1_FRAME_SIZE = 32u,
-    // The largest request: a full payload chunk. It sizes QMK's master-to-
-    // slave RPC buffer; replies keep the 32-byte slave-to-master buffer.
+    // The largest frame either way: a full payload chunk, pushed as a request
+    // or pulled as the reply to a PAYLOAD_REQUEST. It sizes both of QMK's RPC
+    // buffers.
     NOAH_PROFILE_SPLIT_V1_FRAME_MAX = 128u,
-    // A payload chunk frame is its 17-byte header, the chunk and the CRC.
-    NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD = 18u,
-    NOAH_PROFILE_SPLIT_V1_CHUNK_MAX      = NOAH_PROFILE_SPLIT_V1_FRAME_MAX - NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD,
-    // A chunk that answers a PAYLOAD_REQUEST travels in a 32-byte reply.
-    NOAH_PROFILE_SPLIT_V1_REPLY_CHUNK_MAX  = NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD,
-    NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE = 36u,
+    // A payload chunk frame is its 21-byte header, the chunk and the CRC.
+    NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD   = 22u,
+    NOAH_PROFILE_SPLIT_V1_CHUNK_MAX        = NOAH_PROFILE_SPLIT_V1_FRAME_MAX - NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD,
+    NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE = 44u,
 };
 
 typedef enum {
@@ -37,13 +39,11 @@ typedef enum {
     // pull a newer durable profile from the sibling without making USB role
     // part of authority. The response is a correlated PAYLOAD_CHUNK.
     NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST = 8u,
-    // Carries the VIA identity bound to a format-3 custom record. It is sent
-    // before PREPARE_BEGIN so the peer can write the exact same slot header.
-    NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND = 9u,
+    // Kinds 9 and 11 bound a copy to the VIA store's identity. They are
+    // retired with VIA (D-F31) and refused like any unknown kind.
     // Validates the received payload and persists only the prepared marker.
-    // PREPARE_COMMIT remains the later logical decision command.
-    NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE      = 10u,
-    NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST = 11u,
+    // PREPARE_COMMIT remains the later decision command.
+    NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE = 10u,
     // Asks the receiver to fill a range of the copy from its own active
     // profile, which it checks against the named source identity. It answers
     // like a payload chunk; SOURCE_UNAVAILABLE means "send these bytes".
@@ -68,8 +68,8 @@ typedef enum {
 } noah_profile_split_v1_status_t;
 
 // Why a receiver answered ACK/BUSY, carried in that reply's unused chunk
-// bytes so the sender can report it. Diagnostic only: no decision depends on
-// it, and 0 means the receiver did not say.
+// bytes. Correlated STORE_WORKING phase advances also refresh the owner
+// no-progress deadline; repeated phases do not. Zero means unspecified.
 typedef enum {
     NOAH_PROFILE_SPLIT_V1_BUSY_UNSPECIFIED      = 0u,
     NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED         = 1u, // queued; the answer comes on a retry
@@ -80,12 +80,19 @@ typedef enum {
     NOAH_PROFILE_SPLIT_V1_BUSY_PULLING          = 6u, // the receiver is pulling a profile itself
     NOAH_PROFILE_SPLIT_V1_BUSY_CONVERGENCE_ONLY = 7u, // the receiver only converges just now
     NOAH_PROFILE_SPLIT_V1_BUSY_COPYING          = 8u, // copying a PAYLOAD_REUSE range; offset is its progress
-    NOAH_PROFILE_SPLIT_V1_BUSY_REASON_MAX       = NOAH_PROFILE_SPLIT_V1_BUSY_COPYING,
+    // The receiver's storage step is not running: a save there waits for a
+    // quiet keyboard before it erases, or for the next grant's flash time.
+    // Waiting for quiet is not a stall (D-F32): the sender counts it as
+    // progress, as the receiver's own timers do not run meanwhile.
+    NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED   = 9u,
+    NOAH_PROFILE_SPLIT_V1_BUSY_REASON_MAX       = NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED,
 } noah_profile_split_v1_busy_reason_t;
 
 // The active profile a PAYLOAD_REUSE range is read from, as Profile Wire's
-// candidate REUSE names it: compiled (kind 0, generation 0, origin 255) or
-// committed (kind 1, nonzero generation, origin 0..1).
+// candidate REUSE names it: compiled (kind 0, generation 0, origin 255),
+// committed (kind 1, nonzero generation, origin 0..1), or the working copy
+// (kind 2, D-F32: its base's generation and origin, session in crc32 and
+// revision in digest).
 typedef struct {
     uint32_t generation;
     uint32_t digest;
@@ -100,18 +107,15 @@ typedef struct {
     noah_profile_split_descriptor_t descriptor;
     uint32_t                        generation;
     uint32_t                        payload_digest;
-    uint16_t                        offset;
-    uint16_t                        payload_length;
+    uint32_t                        offset;
+    uint32_t                        payload_length;
     uint8_t                         chunk_length;
     uint8_t                         chunk[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX];
     // PAYLOAD_REUSE only: fill `reuse_length` bytes at `offset` from the
     // source's bytes at `reuse_source_offset`.
-    uint16_t                        reuse_length;
-    uint16_t                        reuse_source_offset;
+    uint32_t                        reuse_length;
+    uint32_t                        reuse_source_offset;
     noah_profile_split_v1_source_t  reuse_source;
-    uint8_t                         store_format_version;
-    uint32_t                        via_generation;
-    uint32_t                        via_digest;
     // ACK/BUSY only; zero in every other frame.
     uint8_t                         busy_reason;
     uint8_t                         busy_store_state;
@@ -120,10 +124,22 @@ typedef struct {
 } noah_profile_split_v1_frame_t;
 
 // The frame's length on the wire: 32 bytes, a payload chunk's header plus
-// its chunk, or a reuse frame's 36. Zero for an invalid frame.
+// its chunk, or a reuse frame's 44. Zero for an invalid frame.
 uint8_t noah_profile_split_v1_frame_length(const noah_profile_split_v1_frame_t *frame);
 // Returns the encoded length, or zero when the frame is invalid or does not
 // fit `capacity`.
 uint8_t noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *frame, uint8_t *out, uint8_t capacity);
 // Accepts exactly one frame of its kind's length.
 bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noah_profile_split_v1_frame_t *frame);
+// The reply buffer a request asks QMK for. A PAYLOAD_REQUEST is answered with
+// the chunk at its offset, up to NOAH_PROFILE_SPLIT_V1_CHUNK_MAX bytes, so its
+// buffer is that chunk's frame; every other request's is FRAME_SIZE. Zero for
+// an invalid request.
+uint8_t noah_profile_split_v1_reply_capacity(const noah_profile_split_v1_frame_t *request);
+// The chunk a PAYLOAD_REQUEST for `offset` of `payload_length` bytes is
+// answered with: what remains, up to NOAH_PROFILE_SPLIT_V1_CHUNK_MAX.
+uint8_t noah_profile_split_v1_pulled_chunk_length(uint32_t offset, uint32_t payload_length);
+// Decodes a reply: one frame at the start of the `capacity`-byte buffer, the
+// rest zero. A BUSY or ERROR answering a PAYLOAD_REQUEST is a 32-byte frame
+// in that request's larger buffer.
+bool noah_profile_split_v1_reply_decode(const uint8_t *wire, uint8_t capacity, noah_profile_split_v1_frame_t *frame);

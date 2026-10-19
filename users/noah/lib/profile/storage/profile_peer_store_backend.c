@@ -6,14 +6,12 @@
 
 #include <string.h>
 
-#ifdef VIA_ENABLE
-
 static bool descriptor_equal(const noah_profile_split_descriptor_t *left, const noah_profile_split_descriptor_t *right) {
-    return left && right && left->generation == right->generation && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->payload_length == right->payload_length && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->profile_flags == right->profile_flags && left->origin_half == right->origin_half && left->readable == right->readable && left->has_profile == right->has_profile && left->logical == right->logical;
+    return left && right && left->generation == right->generation && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->payload_length == right->payload_length && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->profile_flags == right->profile_flags && left->origin_half == right->origin_half && left->readable == right->readable && left->has_profile == right->has_profile;
 }
 
 static bool record_matches_descriptor(const noah_profile_store_record_t *record, const noah_profile_split_descriptor_t *descriptor) {
-    return record && descriptor && record->slot != NOAH_PROFILE_SLOT_NONE && record->schema_major == descriptor->schema_major && record->schema_minor == descriptor->schema_minor && record->domain_mask == descriptor->domain_mask && record->flags == descriptor->profile_flags && record->payload_length == descriptor->payload_length && record->generation == descriptor->generation && record->origin_half == descriptor->origin_half && record->payload_crc32 == descriptor->payload_crc32 && record->payload_digest == descriptor->payload_digest && record->compiled_default_digest == descriptor->compiled_default_digest && record->action_abi_digest == descriptor->action_abi_digest && (record->format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION) == descriptor->logical;
+    return record && descriptor && record->slot != NOAH_PROFILE_SLOT_NONE && record->schema_major == descriptor->schema_major && record->schema_minor == descriptor->schema_minor && record->domain_mask == descriptor->domain_mask && record->flags == descriptor->profile_flags && record->payload_length == descriptor->payload_length && record->generation == descriptor->generation && record->origin_half == descriptor->origin_half && record->payload_crc32 == descriptor->payload_crc32 && record->payload_digest == descriptor->payload_digest && record->compiled_default_digest == descriptor->compiled_default_digest && record->action_abi_digest == descriptor->action_abi_digest && record->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION;
 }
 
 static bool record_same_tuple(const noah_profile_store_record_t *record, const noah_profile_split_descriptor_t *descriptor) {
@@ -144,23 +142,22 @@ void noah_profile_peer_store_backend_init(noah_profile_peer_store_backend_t *pee
     peer->validation_error = noah_profile_candidate_v1_no_error();
 }
 
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor, uint32_t via_generation, uint32_t via_digest) {
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor) {
     noah_profile_store_t          *store;
     noah_profile_store_candidate_t candidate;
     noah_profile_store_result_t    store_result;
 
-    if (!peer || !peer->backend || !peer->backend->store || !descriptor || !descriptor->logical || via_generation == 0u || via_digest == 0u) {
+    if (!peer || !peer->backend || !peer->backend->store || !descriptor) {
         return NOAH_PROFILE_PEER_STORE_INVALID_METADATA;
     }
     if (peer->state == NOAH_PROFILE_PEER_STORE_RECEIVING || peer->state == NOAH_PROFILE_PEER_STORE_VALIDATING || peer->state == NOAH_PROFILE_PEER_STORE_PREPARING || peer->state == NOAH_PROFILE_PEER_STORE_PREPARED || peer->state == NOAH_PROFILE_PEER_STORE_COMMITTING || peer->state == NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED) {
         if (!descriptor_equal(&peer->descriptor, descriptor)) return NOAH_PROFILE_PEER_STORE_BUSY;
-        if (peer->metadata.via_generation != via_generation || peer->metadata.via_digest != via_digest) return NOAH_PROFILE_PEER_STORE_CONFLICT;
         return state_result(peer);
     }
-    if (peer->state == NOAH_PROFILE_PEER_STORE_COMMITTED && descriptor && descriptor_equal(&peer->descriptor, descriptor)) {
-        return peer->metadata.via_generation == via_generation && peer->metadata.via_digest == via_digest ? NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED : NOAH_PROFILE_PEER_STORE_CONFLICT;
+    if (peer->state == NOAH_PROFILE_PEER_STORE_COMMITTED && descriptor_equal(&peer->descriptor, descriptor)) {
+        return NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED;
     }
-    if (!descriptor || !descriptor->logical || !descriptor->readable || !descriptor->has_profile || !noah_profile_split_descriptor_valid(descriptor)) {
+    if (!descriptor->readable || !descriptor->has_profile || !noah_profile_split_descriptor_valid(descriptor)) {
         return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, NOAH_PROFILE_PEER_STORE_INVALID_METADATA);
     }
 
@@ -170,12 +167,9 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(n
     }
     if (store->committed.slot != NOAH_PROFILE_SLOT_NONE) {
         if (record_matches_descriptor(&store->committed, descriptor)) {
-            if (store->committed.via_generation != via_generation || store->committed.via_digest != via_digest) return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, NOAH_PROFILE_PEER_STORE_CONFLICT);
             if (peer->backend->validation_complete && peer->backend->committed_available && record_matches_descriptor(&peer->backend->committed_record, descriptor) && validated_profile_matches_descriptor(&peer->backend->validated_profile, descriptor)) {
                 peer->descriptor = *descriptor;
-                peer->metadata.store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION;
-                peer->metadata.via_generation = via_generation;
-                peer->metadata.via_digest = via_digest;
+                peer->metadata.store_format_version = NOAH_PROFILE_STORE_FORMAT_VERSION;
                 peer->next_offset = descriptor->payload_length;
                 return set_terminal(peer, NOAH_PROFILE_PEER_STORE_COMMITTED, NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED);
             }
@@ -198,12 +192,10 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(n
         .crc32                = descriptor->payload_crc32,
         .digest               = descriptor->payload_digest,
         .action_abi_digest    = descriptor->action_abi_digest,
-        .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation       = via_generation,
-        .via_digest           = via_digest,
+        .store_format_version = NOAH_PROFILE_STORE_FORMAT_VERSION,
     };
     candidate = (noah_profile_store_candidate_t){
-        .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
+        .format_version          = NOAH_PROFILE_STORE_FORMAT_VERSION,
         .schema_major            = descriptor->schema_major,
         .schema_minor            = descriptor->schema_minor,
         .domain_mask             = descriptor->domain_mask,
@@ -215,8 +207,6 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(n
         .payload_digest          = descriptor->payload_digest,
         .compiled_default_digest = descriptor->compiled_default_digest,
         .action_abi_digest       = descriptor->action_abi_digest,
-        .via_generation          = via_generation,
-        .via_digest              = via_digest,
     };
     store_result = noah_profile_candidate_store_backend_begin_exact(peer->backend, &peer->metadata, &candidate);
     if (store_result != NOAH_PROFILE_STORE_OK) {
@@ -232,7 +222,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(n
     return NOAH_PROFILE_PEER_STORE_OK;
 }
 
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const uint8_t *bytes, uint8_t length) {
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint32_t offset, const uint8_t *bytes, uint8_t length) {
     uint8_t staged[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];
 
     if (!peer || peer->state != NOAH_PROFILE_PEER_STORE_RECEIVING) {
@@ -241,17 +231,17 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_prof
     if (!correlation_matches(peer, generation, payload_digest)) {
         return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_CONFLICT);
     }
-    if (!bytes || length == 0u || length > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX || (uint32_t)offset + length > peer->descriptor.payload_length) {
+    if (!bytes || length == 0u || length > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX || offset > peer->descriptor.payload_length || length > peer->descriptor.payload_length - offset) {
         return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_RANGE_ERROR);
     }
     if (offset < peer->next_offset) {
-        if ((uint32_t)offset + length > peer->next_offset) {
+        if (length > peer->next_offset - offset) {
             return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_RANGE_ERROR);
         }
         for (uint8_t done = 0u; done < length;) {
             uint8_t piece = (uint8_t)(length - done) < NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX ? (uint8_t)(length - done) : NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX;
 
-            if (peer->interface.read(peer->interface.context, (uint16_t)(offset + done), staged, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+            if (peer->interface.read(peer->interface.context, offset + done, staged, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
                 return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
             }
             if (memcmp(staged, &bytes[done], piece) != 0) {
@@ -270,13 +260,13 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_prof
         if (peer->interface.write(peer->interface.context, peer->next_offset, &bytes[done], piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
             return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
         }
-        peer->next_offset = (uint16_t)(peer->next_offset + piece);
+        peer->next_offset = peer->next_offset + piece;
         done              = (uint8_t)(done + piece);
     }
     return NOAH_PROFILE_PEER_STORE_OK;
 }
 
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_reuse(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const noah_profile_split_v1_source_t *source, uint16_t source_offset, uint16_t end, uint16_t byte_budget) {
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_reuse(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint32_t offset, const noah_profile_split_v1_source_t *source, uint32_t source_offset, uint32_t end, uint16_t byte_budget) {
     noah_profile_candidate_v1_source_t candidate_source;
     uint8_t                            bytes[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];
     uint16_t                           copied = 0u;
@@ -298,17 +288,17 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_reuse(noah_prof
         .origin     = source->origin,
     };
     while (peer->next_offset < end && copied < byte_budget) {
-        uint16_t left  = (uint16_t)(end - peer->next_offset) < (uint16_t)(byte_budget - copied) ? (uint16_t)(end - peer->next_offset) : (uint16_t)(byte_budget - copied);
+        uint32_t left  = end - peer->next_offset < (uint32_t)(byte_budget - copied) ? end - peer->next_offset : (uint32_t)(byte_budget - copied);
         uint8_t  piece = left < NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX ? (uint8_t)left : NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX;
-        uint32_t from  = (uint32_t)source_offset + (uint16_t)(peer->next_offset - offset);
+        uint32_t from  = source_offset + (peer->next_offset - offset);
 
-        if (from + piece > UINT16_MAX || noah_profile_candidate_store_backend_read_active(peer->backend, NOAH_PROFILE_STORAGE_ADMISSION_PEER, &candidate_source, (uint16_t)from, bytes, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+        if (from < source_offset || noah_profile_candidate_store_backend_read_active(peer->backend, NOAH_PROFILE_STORAGE_ADMISSION_PEER, &candidate_source, from, bytes, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
             return NOAH_PROFILE_PEER_STORE_SOURCE_UNAVAILABLE;
         }
         if (peer->interface.write(peer->interface.context, peer->next_offset, bytes, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
             return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
         }
-        peer->next_offset = (uint16_t)(peer->next_offset + piece);
+        peer->next_offset = peer->next_offset + piece;
         copied            = (uint16_t)(copied + piece);
     }
     return NOAH_PROFILE_PEER_STORE_OK;
@@ -467,7 +457,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_result(const no
     return peer ? peer->result : NOAH_PROFILE_PEER_STORE_INVALID_METADATA;
 }
 
-uint16_t noah_profile_peer_store_backend_next_offset(const noah_profile_peer_store_backend_t *peer) {
+uint32_t noah_profile_peer_store_backend_next_offset(const noah_profile_peer_store_backend_t *peer) {
     return peer ? peer->next_offset : 0u;
 }
 
@@ -477,5 +467,3 @@ const noah_profile_candidate_v1_error_t *noah_profile_peer_store_backend_validat
 
 _Static_assert((unsigned)NOAH_PROFILE_SPLIT_V1_CHUNK_MAX <= UINT8_MAX, "a split chunk is written in candidate-store pieces counted in a byte");
 _Static_assert(sizeof(noah_profile_peer_store_backend_t) <= NOAH_PROFILE_PEER_STORE_STATE_BUDGET_32BIT, "peer store state exceeded its payload-independent firmware regression policy");
-
-#endif

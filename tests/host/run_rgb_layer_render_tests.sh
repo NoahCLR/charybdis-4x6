@@ -46,6 +46,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_layer_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
     "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
@@ -76,6 +77,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/rgb_pd_effective_test.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_pd_mode_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
     "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
@@ -101,6 +103,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/rgb_combo_effective_test.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
     "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
@@ -126,6 +129,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/rgb_key_effective_test.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_key_feedback_stage.c" \
     "$ROOT/users/noah/lib/rgb/core/rgb_effective_config.c" \
+    "$ROOT/users/noah/lib/rgb/core/rgb_config_defaults.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
     "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
@@ -161,7 +165,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
@@ -213,7 +217,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
@@ -262,7 +266,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
@@ -312,7 +316,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
@@ -369,7 +373,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
@@ -418,7 +422,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
@@ -467,7 +471,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
@@ -516,7 +520,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
@@ -565,7 +569,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \
@@ -614,7 +618,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/rgb_layer_render_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse.c" \
     "$ROOT/users/noah/lib/rgb/automouse/rgb_automouse_stage.c" \
     "$ROOT/users/noah/lib/rgb/stages/rgb_combo_feedback_stage.c" \

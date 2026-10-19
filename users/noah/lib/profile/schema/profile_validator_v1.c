@@ -79,13 +79,13 @@ static noah_profile_validator_v1_result_t reject_simple(noah_profile_validator_v
 }
 
 static bool behavior_limits_are_valid(const noah_key_behavior_limits_v1_t *limits) {
-    return limits->max_rows != 0u && limits->max_rows <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS && limits->max_populated_steps != 0u && limits->max_populated_steps <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS && limits->max_tap_steps_per_row != 0u && limits->max_tap_steps_per_row <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW && limits->max_repeat_hz != 0u && limits->max_repeat_hz <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ && limits->max_payload_size != 0u && limits->max_payload_size <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE;
+    return limits->max_rows != 0u && limits->max_rows <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS && limits->max_populated_steps != 0u && limits->max_populated_steps <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS && limits->max_tap_steps_per_row != 0u && limits->max_tap_steps_per_row <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW && limits->max_repeat_hz != 0u && limits->max_repeat_hz <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ && limits->max_payload_size != 0u && noah_profile_size_within(limits->max_payload_size, NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE);
 }
 
 static bool rgb_limits_are_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
     const noah_profile_rgb_v1_limits_t *limits = &compatibility->rgb_limits;
 
-    return (limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) == 0u && limits->max_payload_size != 0u && limits->max_payload_size <= NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE && limits->max_logical_layers <= NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS && limits->logical_layer_count == compatibility->logical_layer_count && limits->logical_layer_count <= limits->max_logical_layers && limits->tap_branch_color_count != 0u && limits->tap_branch_color_count <= NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS && limits->supported_pd_mode_mask == compatibility->supported_pd_mode_mask && (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) == 0u;
+    return (limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) == 0u && limits->max_payload_size != 0u && noah_profile_size_within(limits->max_payload_size, NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE) && limits->max_logical_layers <= NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS && limits->logical_layer_count == compatibility->logical_layer_count && limits->logical_layer_count <= limits->max_logical_layers && limits->tap_branch_color_count != 0u && limits->tap_branch_color_count <= NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS && limits->supported_pd_mode_mask == compatibility->supported_pd_mode_mask && (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) == 0u;
 }
 
 static bool compatibility_is_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
@@ -137,6 +137,60 @@ noah_profile_validator_v1_result_t noah_profile_validator_v1_begin(noah_profile_
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }
 
+noah_profile_validator_v1_result_t noah_profile_validator_v1_begin_structure(noah_profile_validator_v1_t *validator, const noah_profile_reader_t *reader, size_t base_offset, uint32_t byte_length, uint32_t action_abi_digest, const noah_profile_validator_v1_compatibility_t *compatibility, noah_profile_validator_v1_error_t *error) {
+    const noah_profile_validator_v1_declaration_t declaration = {
+        .schema_major      = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
+        .schema_minor      = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR,
+        .byte_length       = byte_length,
+        .action_abi_digest = action_abi_digest,
+    };
+    noah_profile_validator_v1_result_t result = noah_profile_validator_v1_begin(validator, reader, base_offset, &declaration, compatibility, error);
+
+    if (result != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) {
+        return result;
+    }
+    validator->mode         = NOAH_PROFILE_VALIDATOR_V1_MODE_STRUCTURE;
+    validator->phase        = NOAH_PROFILE_VALIDATOR_V1_PHASE_BLOB_HEADER;
+    validator->crc32_state  = 0u;
+    validator->digest_state = 0u;
+    return result;
+}
+
+noah_profile_validator_v1_result_t noah_profile_validator_v1_begin_domain(noah_profile_validator_v1_t *validator, const noah_profile_reader_t *reader, size_t base_offset, uint8_t domain_id, noah_profile_domain_range_t range, const noah_profile_validator_v1_compatibility_t *compatibility, noah_profile_validator_v1_error_t *error) {
+    noah_profile_validator_v1_error_t  clear = noah_profile_validator_v1_no_error();
+    const noah_profile_domain_shape_t *shape = noah_profile_domain_find(domain_id);
+
+    copy_error(error, &clear);
+    if (!validator) {
+        if (error) {
+            error->code = NOAH_PROFILE_VALIDATOR_V1_INVALID_ARGUMENT;
+        }
+        return NOAH_PROFILE_VALIDATOR_V1_INVALID_ARGUMENT;
+    }
+    memset(validator, 0, sizeof(*validator));
+    validator->terminal_error = clear;
+    if (!reader || !reader->read || !compatibility || !compatibility_is_valid(compatibility) || base_offset > reader->length || range.offset > reader->length - base_offset || range.length > reader->length - base_offset - range.offset) {
+        return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_ARGUMENT, 0u, error);
+    }
+    if (!shape || !(shape->mask & compatibility->allowed_domain_mask)) {
+        return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN, range.offset, error);
+    }
+    validator->reader                        = *reader;
+    validator->base_offset                   = base_offset;
+    validator->compatibility                 = *compatibility;
+    validator->declaration.action_abi_digest = compatibility->action_abi_digest;
+    validator->mode                          = NOAH_PROFILE_VALIDATOR_V1_MODE_DOMAIN;
+    validator->domain                        = shape->index;
+    validator->payload                       = range;
+    // As if the envelope had just read this one domain's header: errors name
+    // its position as 0 and the reference check its mask.
+    validator->envelope.count = 1u;
+    validator->envelope.index = 1u;
+    validator->envelope.mask  = shape->mask;
+    validator->phase          = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE;
+    return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+}
+
 static noah_profile_validator_v1_result_t read_blob(noah_profile_validator_v1_t *validator, size_t offset, uint8_t *target, size_t length, noah_profile_validator_v1_error_t *error) {
     if (!noah_profile_reader_read(&validator->reader, validator->base_offset + offset, target, length)) {
         return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_READ_ERROR, offset, error);
@@ -161,7 +215,7 @@ static noah_profile_validator_v1_result_t checksum_step(noah_profile_validator_v
     }
     validator->crc32_state  = noah_profile_crc32_update(validator->crc32_state, bytes, chunk);
     validator->digest_state = noah_profile_fnv1a_update(validator->digest_state, bytes, chunk);
-    validator->checksum_offset = (uint16_t)(validator->checksum_offset + chunk);
+    validator->checksum_offset = validator->checksum_offset + (uint32_t)chunk;
     if (validator->checksum_offset != validator->declaration.byte_length) {
         return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     }
@@ -197,7 +251,7 @@ static noah_profile_validator_v1_result_t finish_domains(noah_profile_validator_
     if ((validator->compatibility.required_domain_mask & (uint8_t)~validator->envelope.mask) != 0u) {
         return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_MISSING_DOMAIN, validator->envelope.offset, error);
     }
-    if (validator->envelope.mask != validator->declaration.domain_mask) {
+    if (validator->mode == NOAH_PROFILE_VALIDATOR_V1_MODE_WHOLE && validator->envelope.mask != validator->declaration.domain_mask) {
         return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MASK_MISMATCH, validator->envelope.offset, error);
     }
 
@@ -332,7 +386,7 @@ static noah_profile_validator_v1_result_t validate_combos(noah_profile_validator
     noah_profile_action_v1_limits_t limits = noah_profile_action_v1_default_limits();
     uint8_t row_index = state->row_index;
     uint8_t phase = state->phase;
-    uint16_t read_offset = state->offset;
+    uint32_t read_offset = state->offset;
     noah_profile_combo_v1_iteration_t result = noah_profile_combo_v1_iteration_step(state, &validator->reader, validator->base_offset + offset, validator->payload.length, &limits, &header, &row, &detail);
     if (result == NOAH_PROFILE_COMBO_V1_HEADER || result == NOAH_PROFILE_COMBO_V1_ITERATING) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     if (result == NOAH_PROFILE_COMBO_V1_COMPLETE) return NOAH_PROFILE_VALIDATOR_V1_VALID;
@@ -365,12 +419,12 @@ static noah_profile_validator_v1_result_t validate_settings(noah_profile_validat
     noah_profile_settings_v1_validation_t *state = &v->domain_validation.settings;
     uint8_t                                bytes[NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX];
     size_t                                 offset = v->payload.offset + state->offset;
-    uint16_t                               count  = v->payload.length - state->offset;
+    uint32_t                               count  = v->payload.length - state->offset;
     // One read of up to a step's bytes, consumed one at a time: a maximum
     // settings domain takes about 484 steps rather than 9,669.
     if (count > sizeof(bytes)) count = sizeof(bytes);
     if (read_blob(v, offset, bytes, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
-    for (uint16_t i = 0; i < count; i++)
+    for (uint32_t i = 0; i < count; i++)
         if (!noah_profile_settings_v1_consume(state, bytes[i], v->payload.length, v->compatibility.logical_layer_count, v->compatibility.placement_positions)) return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset + i, error);
     offset += count - 1u;
     if (state->offset < v->payload.length) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
@@ -390,6 +444,50 @@ static noah_profile_validator_v1_result_t validate_pd(noah_profile_validator_v1_
 #endif
 }
 
+static noah_profile_validator_v1_result_t reject_record(noah_profile_validator_v1_t *v, size_t offset, uint8_t domain_id, uint8_t table_id, uint16_t row_index, noah_profile_validator_v1_error_t *error) {
+    return reject(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, (uint8_t)(v->envelope.index - 1u), domain_id, table_id, row_index, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_NONE, 0u, error);
+}
+
+// Ten keycodes a step. A rejected keycode names its layer (table) and matrix
+// position (row).
+static noah_profile_validator_v1_result_t validate_keymap(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
+    noah_profile_keymap_v1_validation_t *state     = &v->domain_validation.keymap;
+    uint8_t                              positions = v->compatibility.placement_positions;
+    uint8_t                              bytes[NOAH_PROFILE_KEYMAP_V1_STEP_BYTES];
+    uint32_t                             count = v->payload.length - state->offset;
+
+    if (state->offset == 0u && !noah_profile_keymap_v1_length_valid(v->payload.length, v->compatibility.logical_layer_count, positions)) return reject_record(v, v->payload.offset, NOAH_PROFILE_DOMAIN_V1_KEYMAP, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, error);
+    if (count > sizeof(bytes)) count = sizeof(bytes);
+    if (read_blob(v, v->payload.offset + state->offset, bytes, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
+    for (uint32_t i = 0; i < count; i += NOAH_PROFILE_KEYMAP_V1_KEYCODE_SIZE) {
+        noah_profile_action_v1_t keycode = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = (uint16_t)(bytes[i] | bytes[i + 1u] << 8u)};
+        uint32_t                 index   = (state->offset + i) / NOAH_PROFILE_KEYMAP_V1_KEYCODE_SIZE;
+        if (!placement_is_supported(v, &keycode, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_KEYMAP)) return reject_record(v, v->payload.offset + state->offset + i, NOAH_PROFILE_DOMAIN_V1_KEYMAP, (uint8_t)(index / positions), (uint16_t)(index % positions), error);
+    }
+    state->offset += count;
+    return state->offset < v->payload.length ? NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS : NOAH_PROFILE_VALIDATOR_V1_VALID;
+}
+
+// Up to twenty bytes a step, consumed one at a time. A rejection names the
+// macro (row) it falls in.
+static noah_profile_validator_v1_result_t validate_macros(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
+    noah_profile_macros_v1_validation_t *state  = &v->domain_validation.macros;
+    uint8_t                              slots  = v->compatibility.via_macro_slot_count;
+    uint32_t                             offset = state->offset;
+    uint8_t                              bytes[NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX];
+    uint32_t                             count  = v->payload.length - offset;
+
+    if (offset == 0u && !noah_profile_macros_v1_length_valid(v->payload.length, slots)) return reject_record(v, v->payload.offset, NOAH_PROFILE_DOMAIN_V1_MACROS, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, error);
+    if (count > sizeof(bytes)) count = sizeof(bytes);
+    if (read_blob(v, v->payload.offset + offset, bytes, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
+    for (uint32_t i = 0; i < count; i++)
+        if (!noah_profile_macros_v1_consume(state, bytes[i], slots)) return reject_record(v, v->payload.offset + offset + i, NOAH_PROFILE_DOMAIN_V1_MACROS, 0u, state->macros, error);
+    state->offset = offset + count;
+    if (state->offset < v->payload.length) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+    if (!noah_profile_macros_v1_complete(state, slots)) return reject_record(v, v->payload.offset + v->payload.length - 1u, NOAH_PROFILE_DOMAIN_V1_MACROS, 0u, state->macros, error);
+    return NOAH_PROFILE_VALIDATOR_V1_VALID;
+}
+
 // Each registry row's validator, called directly so the linked stack contexts
 // keep a direct edge to every domain.
 static noah_profile_validator_v1_result_t validate_domain(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
@@ -404,10 +502,24 @@ static noah_profile_validator_v1_result_t validate_domain(noah_profile_validator
     }
 }
 
+static noah_profile_validator_v1_result_t finish_single_domain(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
+    if (validator->has_reference_error) {
+        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_REFERENCE, validator->reference_error_offset, 0u, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, KEY_BEHAVIOR_TABLE_ROWS, validator->reference_error_row, validator->reference_error_step, validator->reference_error_field, NOAH_PROFILE_VALIDATOR_V1_DETAIL_NONE, 0u, error);
+    }
+    validator->profile.domain_mask       = validator->envelope.mask;
+    validator->profile.domain_count      = 1u;
+    validator->profile.byte_length       = validator->payload.length;
+    validator->profile.action_abi_digest = validator->compatibility.action_abi_digest;
+    validator->phase                     = NOAH_PROFILE_VALIDATOR_V1_PHASE_VALID;
+    validator->terminal_result           = NOAH_PROFILE_VALIDATOR_V1_VALID;
+    return NOAH_PROFILE_VALIDATOR_V1_VALID;
+}
+
 static noah_profile_validator_v1_result_t domain_decode_step(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
     noah_profile_validator_v1_result_t result = validate_domain(validator, error);
 
     if (result != NOAH_PROFILE_VALIDATOR_V1_VALID) return result;
+    if (validator->mode == NOAH_PROFILE_VALIDATOR_V1_MODE_DOMAIN) return finish_single_domain(validator, error);
     validator->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }

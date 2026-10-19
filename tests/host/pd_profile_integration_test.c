@@ -8,31 +8,32 @@
 
 static void test_candidate_capacity(void) {
     uint8_t frame[32] = {NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET, NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, 1, 0, NOAH_PROFILE_SCHEMA_MAJOR, 0, 31};
-    frame[23]         = NOAH_PROFILE_LOGICAL_STORE_VERSION;
-    frame[24]         = 6;
-    frame[28]         = 42;
     noah_profile_candidate_v1_command_t command;
     noah_profile_candidate_v1_frame_error_t error;
-    // Schema 3 advertises 53,216 bytes: admission must accept the whole range,
-    // including profiles above the old 5,088-byte ceiling (D-F14).
-    const uint16_t lengths[] = {5088, 5089, NOAH_PROFILE_PAYLOAD_MAX, NOAH_PROFILE_PAYLOAD_MAX + 1u, 65504, 65535};
+    // Schema 4 advertises a 131,040-byte slot payload (D-F29): admission must accept the whole range,
+    // including profiles above the old 5,088-byte ceiling (D-F14), and refuse
+    // a 32-bit length past it, however its low 16 bits read (D-F28).
+    const uint32_t lengths[] = {5088, 5089, NOAH_PROFILE_PAYLOAD_MAX, NOAH_PROFILE_PAYLOAD_MAX + 1u, 65504, 65535, 65536u + 5088u, UINT32_MAX};
     for (size_t i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
-        frame[9] = (uint8_t)lengths[i];
-        frame[10] = lengths[i] >> 8;
+        frame[8]  = (uint8_t)lengths[i];
+        frame[9]  = (uint8_t)(lengths[i] >> 8);
+        frame[10] = (uint8_t)(lengths[i] >> 16);
+        frame[11] = (uint8_t)(lengths[i] >> 24);
         assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) ==
                (lengths[i] <= NOAH_PROFILE_PAYLOAD_MAX ? NOAH_PROFILE_CANDIDATE_V1_DECODE_OK : NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED));
     }
     memset(frame + 5, 0, sizeof(frame) - 5);
     frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK;
     frame[5] = (uint8_t)(NOAH_PROFILE_PAYLOAD_MAX - 1u);
-    frame[6] = (NOAH_PROFILE_PAYLOAD_MAX - 1u) >> 8;
-    frame[7] = 1;
+    frame[6] = (uint8_t)((NOAH_PROFILE_PAYLOAD_MAX - 1u) >> 8);
+    frame[7] = (uint8_t)((NOAH_PROFILE_PAYLOAD_MAX - 1u) >> 16);
+    frame[9] = 1;
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
-    frame[7] = 2;
+    frame[9] = 2;
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED);
 }
 
-static uint8_t blob[12 + NOAH_PROFILE_PD_V1_MAX_SIZE + 1];
+static uint8_t blob[14 + NOAH_PROFILE_PD_V1_MAX_SIZE + 1];
 static size_t blob_length;
 static size_t calls, largest, failed_offset = SIZE_MAX;
 static bool read_bytes(void *context, size_t offset, uint8_t *target, size_t length) {
@@ -73,11 +74,11 @@ static noah_profile_validator_v1_result_t validate(void) {
 static size_t load_domain(const char *path) {
     FILE *file = fopen(path, "rb");
     assert(file);
-    size_t length = fread(blob + 12, 1, sizeof(blob) - 12, file);
+    size_t length = fread(blob + 14, 1, sizeof(blob) - 14, file);
     assert(feof(file));
     fclose(file);
-    memcpy(blob, (uint8_t[]){'N', 'L', 'P', '1', 3, 0, 1, 1, 0x50, NOAH_PROFILE_PD_V1_VERSION, (uint8_t)length, (uint8_t)(length >> 8)}, 12);
-    blob_length   = 12 + length;
+    memcpy(blob, (uint8_t[]){'N', 'L', 'P', '1', 4, 0, 1, 1, 0x50, NOAH_PROFILE_PD_V1_VERSION, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), 0}, 14);
+    blob_length   = 14 + length;
     reader.length = blob_length;
     return length;
 }
@@ -92,10 +93,10 @@ static void publish(noah_effective_profile_snapshot_t *snapshot) {
 // Stored slots appear in the cache as stored; every omitted slot reads as
 // disabled with an empty name, and none of them can be activated.
 static void assert_cache_matches_domain(void) {
-    uint8_t count = blob[12 + 3];
+    uint8_t count = blob[14 + 3];
     uint8_t next  = 0;
     for (uint8_t index = 0; index <= count; index++) {
-        uint8_t stored = index < count ? blob[12 + 8 + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE] : NOAH_PROFILE_PD_V1_SLOT_COUNT;
+        uint8_t stored = index < count ? blob[14 + 8 + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE] : NOAH_PROFILE_PD_V1_SLOT_COUNT;
         for (; next < stored; next++) {
             const uint8_t *record = noah_effective_pd_record(next);
             assert(record && record[0] == next);
@@ -103,7 +104,7 @@ static void assert_cache_matches_domain(void) {
             assert(!noah_effective_pd_for_mask(UINT32_C(1) << next));
         }
         if (index < count) {
-            assert(memcmp(noah_effective_pd_record(stored), blob + 12 + 8 + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE, NOAH_PROFILE_PD_V1_RECORD_SIZE) == 0);
+            assert(memcmp(noah_effective_pd_record(stored), blob + 14 + 8 + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE, NOAH_PROFILE_PD_V1_RECORD_SIZE) == 0);
             next = (uint8_t)(stored + 1u);
         }
     }
@@ -135,30 +136,31 @@ int main(int argc, char **argv) {
 
     noah_effective_profile_snapshot_t snapshot = {0};
     noah_effective_profile_identity_t identity = {0};
-    // The presets: seven stored records, slots 7..31 omitted.
+    // The presets: eight stored records, slots 8..31 omitted.
     size_t presets_length = load_domain(argv[1]);
-    assert(presets_length == 8 + 7 * NOAH_PROFILE_PD_V1_RECORD_SIZE);
+    assert(presets_length == 8 + 8 * NOAH_PROFILE_PD_V1_RECORD_SIZE);
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_VALID);
     noah_profile_domain_range_t pd;
-    assert(noah_profile_blob_v1_find_domain(&reader, 0, reader.length, NOAH_PROFILE_DOMAIN_V1_PD, &pd) && pd.offset == 12 && pd.length == presets_length && profile.domain_mask == 16);
+    assert(noah_profile_blob_v1_find_domain(&reader, 0, reader.length, NOAH_PROFILE_DOMAIN_V1_PD, &pd) && pd.offset == 14 && pd.length == presets_length && profile.domain_mask == 16);
     publish(&snapshot);
     assert(noah_effective_pd_ready());
     assert(noah_effective_pd_for_mask(1)[1] == 2);
     assert(noah_effective_pd_for_mask(16)[3] == 2);
     assert(noah_effective_pd_for_mask(64)[3] == 1);
-    assert(!noah_effective_pd_for_mask(128));
+    assert(noah_effective_pd_for_mask(128)[3] == 1);
+    assert(!noah_effective_pd_for_mask(256));
     assert(!noah_effective_pd_for_mask(3));
     assert_cache_matches_domain();
     // Every byte of the domain is rejected on read failure; no stale or
     // partly copied settings become available after a failed publication.
-    for (failed_offset = 12; failed_offset < blob_length; failed_offset++) {
+    for (failed_offset = 14; failed_offset < blob_length; failed_offset++) {
         noah_effective_pd_invalidate(NULL, 1, identity, identity, &snapshot);
         assert(!noah_effective_pd_ready());
     }
     failed_offset = SIZE_MAX;
     noah_effective_pd_invalidate(NULL, 2, identity, identity, &snapshot);
     assert(noah_effective_pd_ready());
-    for (uint8_t slot = 0; slot < 7; slot++) {
+    for (uint8_t slot = 0; slot < 8; slot++) {
         size_t offset = 20 + (size_t)slot * NOAH_PROFILE_PD_V1_RECORD_SIZE + 90;
         blob[offset] = 1;
         assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
@@ -187,12 +189,12 @@ int main(int argc, char **argv) {
     }
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_VALID);
     // A header naming more records than the payload holds.
-    blob[12 + 3] = 8;
+    blob[14 + 3] = 9;
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
-    blob[12 + 3] = 7;
-    blob[12] = 1;
+    blob[14 + 3] = 8;
+    blob[14] = 1;
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
-    blob[12] = 2;
+    blob[14] = 2;
     blob[9] = 1;
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
     blob[9] = 2;
@@ -207,10 +209,10 @@ int main(int argc, char **argv) {
     assert(noah_effective_pd_record(31)[8] != 0);
 
     // No slot stored: all 32 disabled, none activatable.
-    memcpy(blob + 12, (uint8_t[]){NOAH_PROFILE_PD_V1_VERSION, 32, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0, 0, 0, 0, 0}, 8);
+    memcpy(blob + 14, (uint8_t[]){NOAH_PROFILE_PD_V1_VERSION, 32, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0, 0, 0, 0, 0}, 8);
     blob[10] = 8;
-    blob[11] = 0;
-    blob_length = reader.length = 20;
+    blob[11] = blob[12] = blob[13] = 0;
+    blob_length = reader.length = 22;
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_VALID);
     publish(&snapshot);
     assert(noah_effective_pd_ready());

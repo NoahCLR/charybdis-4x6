@@ -1,7 +1,7 @@
 // Firmware's Profile Wire contract, stated from its own code: the capability
 // pages this keyboard answers once its live-profile owner has opened the
-// compiled defaults. The values come from the same header the VIA channel uses
-// (qmk_via_profile_capabilities.h), the digests and domain mask from the same
+// compiled defaults. The values come from the same header the Raw HID channel uses
+// (qmk_profile_capabilities.h), the digests and domain mask from the same
 // compiled-defaults code the owner runs, and the bytes from the same encoder.
 // run_contract_probe.sh builds it with the production feature set and adds the
 // BK pin and fixture hashes; the client's agreement check decodes the pages with
@@ -16,7 +16,7 @@
 #include "users/noah/lib/profile/storage/profile_storage_layout.h"
 #include "users/noah/lib/profile/schema/profile_compiled_defaults_v1.h"
 #include "users/noah/lib/profile/schema/profile_validator_v1.h"
-#include "users/noah/lib/compat/qmk_via_profile_capabilities.h"
+#include "users/noah/lib/compat/qmk_profile_capabilities.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 
 // The PD-mode table exactly as the pointing registry defines its rows

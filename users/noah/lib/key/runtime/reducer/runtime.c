@@ -219,8 +219,10 @@ static void key_runtime_core_tap_series_active_set(key_runtime_core_state_t *sta
     }
 }
 
-static uint16_t key_runtime_core_default_hold_term(uint16_t keycode) {
-    return (IS_QK_LAYER_TAP(keycode) || IS_QK_MOD_TAP(keycode)) ? noah_setting(NOAH_SETTING_TAPPING_TERM, TAPPING_TERM) : noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM);
+// A press the runtime does not handle. Every dual-role key is handled and takes
+// its hold time from its resolution (D-F27), so this is the tap/hold setting.
+static uint16_t key_runtime_core_default_hold_term(void) {
+    return noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM);
 }
 
 static uint16_t key_runtime_core_default_longer_hold_term(void) {
@@ -516,7 +518,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
     handled_key_lookup_row_tap_count_into(event->keycode, tap_count, !event->bypass_row, &resolution);
     handled = handled_key_resolution_is_handled(resolution);
     handled_key_materialized_default_into(&resolution, &materialized);
-    hold_term_ms        = key_runtime_core_default_hold_term(event->keycode);
+    hold_term_ms        = key_runtime_core_default_hold_term();
     longer_hold_term_ms = key_runtime_core_default_longer_hold_term();
 
     if (handled) {
@@ -610,7 +612,7 @@ static void key_runtime_core_tap_series_note_tap(key_runtime_core_state_t *state
     authored_tap_depth = 0u;
     hold               = hold_behavior_none();
     long_hold          = hold_behavior_none();
-    tap_hold_term_ms   = key_runtime_core_default_hold_term(token->resolved_keycode);
+    tap_hold_term_ms   = key_runtime_core_default_hold_term();
     tap_term_ms        = key_runtime_core_default_multi_tap_term();
     tap_count          = reuse_existing ? key_runtime_core_tap_series_next_tap_count(series) : 1u;
     saved_mod_state    = reuse_existing ? series->saved_mod_state : keyboard_mod_policy_current_state();
@@ -1027,10 +1029,12 @@ static void key_runtime_core_tap_series_update_for_press(key_runtime_core_state_
 }
 
 // A down key whose hold is an output of its own: not a fallback hold, not a
-// hold that changes other keys (those wait, D-F03), and nothing a pointing
-// mode owns. Another key's press decides it (D-F27).
+// hold that changes other keys (those wait, D-F03), not a momentary layer key
+// (MO, TT, OSL, LM: its layer is on from the press, and another key's press
+// cancels its quick tap), and nothing a pointing mode owns. Another key's
+// press decides it (D-F27).
 static bool key_runtime_core_press_token_settles_on_other_press(const press_token_t *token, keypos_t token_key_pos) {
-    return token->handled_key && token->interaction.pd_mode == 0 && !key_runtime_slot_interaction_uses_fallback_hold(token->interaction) && !key_runtime_slot_interaction_uses_implicit_hold(token->interaction) && !key_runtime_core_press_token_hold_changes_other_keys(token) && !noah_action_desc_is_pd_mode_action(noah_action_describe(token->interaction.binding.tap_action)) && !key_runtime_core_press_offered_to_mode(token_key_pos);
+    return token->handled_key && token->interaction.pd_mode == 0 && !token->interaction.contract.suppress_tap_on_layer_interrupt && !key_runtime_slot_interaction_uses_fallback_hold(token->interaction) && !key_runtime_slot_interaction_uses_implicit_hold(token->interaction) && !key_runtime_core_press_token_hold_changes_other_keys(token) && !noah_action_desc_is_pd_mode_action(noah_action_describe(token->interaction.binding.tap_action)) && !key_runtime_core_press_offered_to_mode(token_key_pos);
 }
 
 // The release action a hold that waits for release would send now, if its
@@ -1118,6 +1122,7 @@ void key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key
             continue;
         }
 
+        key_runtime_core_plan_missed_scans_for_token(state, token, other_pressed_at, plan);
         key_runtime_core_plan_fallback_hold_activation(state, token, plan);
         key_runtime_core_settle_on_other_press(state, token, token_key_pos, other_pressed_at, plan);
         token->other_press_interrupted = true;
@@ -1140,8 +1145,22 @@ void key_runtime_core_settle_active_keys_on_other_release(keypos_t key_pos, uint
 
         token_key_pos = key_runtime_core_press_token_resolve_key_pos(state, token);
         if (token->active && !key_runtime_core_keypos_equal(token_key_pos, key_pos)) {
+            key_runtime_core_plan_missed_scans_for_token(state, token, released_at, plan);
             key_runtime_core_settle_on_other_press(state, token, token_key_pos, released_at, plan);
         }
+    }
+}
+
+void key_runtime_core_plan_missed_scans_before_release(keypos_t key_pos, uint16_t released_at, key_runtime_core_effect_plan_t *plan) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    press_token_t            *token;
+
+    if (!(state && plan && key_runtime_core_keypos_valid(key_pos))) {
+        return;
+    }
+    token = key_runtime_core_press_token_state(state, key_pos);
+    if (token && token->active) {
+        key_runtime_core_plan_missed_scans_for_token(state, token, released_at, plan);
     }
 }
 

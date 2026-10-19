@@ -7,8 +7,8 @@ text on that layout, and clients use the same data to label keys and to judge
 which characters a macro can type.
 
 This document defines the catalogue, the fixture that carries it, the stroke
-encoding and how the data is derived. Settings scalar 27 selects a layout
-(feature bit 22); [runtime flow](runtime-flow.md) defines typing through it.
+encoding and how the data is derived. Settings scalar 27 selects a layout;
+[runtime flow](runtime-flow.md) defines typing through it.
 
 ## Catalogue
 
@@ -32,8 +32,9 @@ A layout is named by a stable one-byte ID. An ID is never reused or renumbered.
 | 13 | `linux-german` | German | Linux | XKB `de` |
 | 14 | `linux-french` | French | Linux | XKB `fr` |
 
-Layout 0 is the default and types exactly what playback typed before host
-layouts existed. On layout 3, Option enters hexadecimal Unicode, so the layout
+Layout 0 is the shared fallback and types exactly what playback typed before
+host layouts existed. The current `noah` authored profile selects layout 2
+(Dutch); a saved profile may choose any supported layout. On layout 3, Option enters hexadecimal Unicode, so the layout
 types no Option characters and carries the `HOST_LAYOUT_FLAG_UNICODE_HEX_INPUT`
 flag.
 

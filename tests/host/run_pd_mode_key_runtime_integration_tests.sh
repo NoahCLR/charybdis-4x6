@@ -33,7 +33,6 @@ compile_test() {
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/key_runtime_integration_harness.c" \
     "$ROOT/tests/host/pd_mode_key_runtime_integration_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
     "$ROOT/users/noah/lib/action/action_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/action/action_kind_dispatch.c" \
@@ -118,6 +117,7 @@ if [ "${NOAH_TEST_QMK_GESTURES:-0}" = 1 ]; then
 fi
 
 compile_test "$BUILD_DIR/configured" -DNOAH_PD_PROFILE_ENABLE \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \

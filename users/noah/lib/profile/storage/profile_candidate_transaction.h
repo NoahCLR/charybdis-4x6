@@ -8,12 +8,19 @@
 #include <stdint.h>
 
 #include "../protocol/profile_candidate_v1.h"
+#include "profile_storage_layout.h"
 
 enum {
     // The whole-profile validator guarantees one reader operation and at most
-    // this many newly observed bytes per scan call. Checksum reads also honor
-    // a smaller nonzero budget supplied by the owner.
+    // this many newly observed bytes per call. Checksum reads also honor a
+    // smaller nonzero budget supplied by the owner.
     NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET = NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX,
+    // A storage step works through up to a flash page of bytes, in reads and
+    // writes of at most the budget above: a REUSE step copies this much of
+    // its range, so it programs at most one page (D-F29, "Pacing").
+    NOAH_PROFILE_CANDIDATE_STEP_BYTES = NOAH_PROFILE_STORAGE_PAGE_SIZE,
+    // ...and a validation step takes this many validator calls.
+    NOAH_PROFILE_CANDIDATE_VALIDATION_CALLS = NOAH_PROFILE_CANDIDATE_STEP_BYTES / NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET,
 };
 
 typedef enum {
@@ -29,14 +36,14 @@ typedef enum {
 typedef struct {
     void *context;
     noah_profile_candidate_backend_result_t (*begin)(void *context, const noah_profile_candidate_v1_metadata_t *metadata);
-    noah_profile_candidate_backend_result_t (*write)(void *context, uint16_t offset, const uint8_t *bytes, uint8_t length);
-    noah_profile_candidate_backend_result_t (*read)(void *context, uint16_t offset, uint8_t *bytes, uint8_t length);
+    noah_profile_candidate_backend_result_t (*write)(void *context, uint32_t offset, const uint8_t *bytes, uint8_t length);
+    noah_profile_candidate_backend_result_t (*read)(void *context, uint32_t offset, uint8_t *bytes, uint8_t length);
     // Reads the immutable active source only when its entire supplied identity
     // still matches. Called from scan context, with at most 20 bytes.
-    noah_profile_candidate_backend_result_t (*read_source)(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint8_t *bytes, uint8_t length);
+    noah_profile_candidate_backend_result_t (*read_source)(void *context, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint8_t *bytes, uint8_t length);
     // Optional. Told each REUSE step that was copied: `length` bytes at
     // candidate `offset` came from `source` at `source_offset`.
-    void (*note_reuse)(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint16_t source_offset, uint8_t length);
+    void (*note_reuse)(void *context, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint32_t source_offset, uint8_t length);
     noah_profile_candidate_backend_result_t (*validation_begin)(void *context, const noah_profile_candidate_v1_metadata_t *metadata, noah_profile_candidate_v1_error_t *error);
     // Each step must return IN_PROGRESS, VALID, REJECTED, or IO_ERROR and obey
     // the per-step reader-work contract above. OK is deliberately not a
@@ -56,7 +63,7 @@ typedef struct {
     uint8_t  schema_major;
     uint8_t  schema_minor;
     uint8_t  supported_domain_mask;
-    uint16_t max_payload_length;
+    uint32_t max_payload_length;
     uint32_t action_abi_digest;
 } noah_profile_candidate_compatibility_t;
 
@@ -74,7 +81,6 @@ typedef struct {
     bool                                   has_candidate;
     bool                                   poisoned;
     bool                                   split_commit_authorization_required;
-    bool                                   reuse_read;
     uint16_t                               last_aborted_transaction_id;
     uint16_t                               last_committed_transaction_id;
     uint8_t                                reuse_bytes[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];
@@ -110,6 +116,11 @@ bool noah_profile_candidate_transaction_authorize_activation(noah_profile_candid
 // USB/callback side: exact decode plus one bounded mailbox copy only. A handled
 // frame is replaced in place with its immediate admission acknowledgement.
 bool noah_profile_candidate_transaction_receive(noah_profile_candidate_transaction_t *transaction, uint8_t *frame, size_t length);
+
+// Firmware side: queues one already decoded command, as receive would after
+// decoding it. Save (D-F32) drives a candidate made of REUSE from the working
+// copy this way. False while the mailbox holds a command.
+bool noah_profile_candidate_transaction_submit(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_v1_command_t *command);
 
 // Scan side: processes at most one mailbox item, validation step, commit step,
 // or activation step. Validation and commit obey the bounded-work contracts

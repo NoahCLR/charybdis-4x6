@@ -9,7 +9,7 @@ build_and_run() {
     name="$1"
     shift
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
-        -DVIA_ENABLE -DCOMBO_ENABLE -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        -DRAW_ENABLE -DCOMBO_ENABLE -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' "$@" \
         -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
         -include "$ROOT/tests/host/include/noah_compile_config.h" \

@@ -85,7 +85,7 @@ static noah_profile_codec_v1_result_t resolve_limits(const noah_key_behavior_lim
     *limits        = supplied ? *supplied : noah_key_behavior_domain_v1_default_limits();
     *action_limits = supplied_action ? *supplied_action : noah_profile_action_v1_default_limits();
 
-    if (limits->max_rows == 0u || limits->max_rows > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS || limits->max_populated_steps == 0u || limits->max_populated_steps > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS || limits->max_tap_steps_per_row == 0u || limits->max_tap_steps_per_row > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW || limits->max_repeat_hz == 0u || limits->max_repeat_hz > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ || limits->max_payload_size == 0u || limits->max_payload_size > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE) {
+    if (limits->max_rows == 0u || limits->max_rows > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS || limits->max_populated_steps == 0u || limits->max_populated_steps > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS || limits->max_tap_steps_per_row == 0u || limits->max_tap_steps_per_row > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW || limits->max_repeat_hz == 0u || limits->max_repeat_hz > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ || limits->max_payload_size == 0u || !noah_profile_size_within(limits->max_payload_size, NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE)) {
         return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, 0u, UINT8_MAX, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_HEADER);
     }
     if (action_limits->max_logical_layers > UINT32_C(0x10000) || action_limits->max_pd_modes > UINT32_C(0x10000) || action_limits->max_via_macro_slots > UINT32_C(0x10000) || action_limits->max_custom_keys > UINT32_C(0x10000)) {
@@ -1135,7 +1135,7 @@ noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_encode(const noah_key
 _Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS == NOAH_PROFILE_WIRE_V1_MAX_BEHAVIOR_ROWS, "behavior row ceilings drifted");
 _Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS == NOAH_PROFILE_WIRE_V1_MAX_POPULATED_BEHAVIOR_STEPS, "behavior aggregate step ceilings drifted");
 _Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW == NOAH_PROFILE_WIRE_V1_MAX_TAP_STEPS_PER_BEHAVIOR, "behavior tap-depth ceilings drifted");
-_Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE + NOAH_PROFILE_BLOB_V1_HEADER_SIZE + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE == NOAH_PROFILE_BLOB_V1_MAX_SIZE, "behavior payload and blob ceilings drifted");
+_Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE + NOAH_PROFILE_BLOB_V1_HEADER_SIZE + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE == NOAH_PROFILE_BLOB_V1_MAX_SIZE || NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE == 0xFFFFu, "behavior payload and blob ceilings drifted");
 _Static_assert(NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_READ_MAX, "incremental behavior validation read exceeds its scan budget");
 _Static_assert(sizeof(noah_key_behavior_domain_v1_t) <= 128u, "validated behavior domain handle exceeded its payload-independent representation policy");
 #if UINTPTR_MAX == UINT32_MAX

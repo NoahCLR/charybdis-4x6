@@ -34,8 +34,9 @@ void noah_record_admission_task(void);
 // ms of since; a tap series waiting for its next press counts it as pending,
 // as it does a press in QMK's combo buffer (D-F01).
 bool    noah_record_admission_press_pending(keypos_t pos, uint16_t since, uint16_t term);
-// Whether a held-back release of the physical key at pos happened within
-// term ms of since; the key runtime's hold gate counts it as queued.
+// Whether a held-back release of the key at pos happened within term ms of
+// since, or a held-back combo output release stands there (its chord's owner
+// key); the key runtime's hold gate counts it as queued.
 bool    noah_record_admission_release_pending(keypos_t pos, uint16_t since, uint16_t term);
 
 void    noah_record_admission_reset(void);

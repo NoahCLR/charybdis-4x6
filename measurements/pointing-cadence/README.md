@@ -54,7 +54,7 @@ cannot reveal after the fact.
 1. Flash both halves from the same build number. Plug the USB cable into the
    right half; it is the master and carries the sensor.
 2. Use the profile the firmware was built with. After flashing, make no Apply,
-   restore or VIA edit for the whole set. Record any other profile in the set
+   restore, live edit or DPI/RGB adjustment for the whole set. Record any other profile in the set
    record, and keep it for the whole set.
 3. Plug directly into the computer: the same port and cable every time, no hub,
    dock or KVM. Record the host and its OS.
@@ -64,7 +64,7 @@ cannot reveal after the fact.
    Record the saved idle timeout; it is profile data, not a fixed 15 minutes.
    If the LEDs have gone dark, wake them before capturing an awake workload.
 6. Wait at least 30 seconds after the halves boot, or after any replug. Boot
-   runs profile reconciliation and VIA sync between the halves, and the
+   runs profile reconciliation between the halves, and the
    recorder needs complete windows.
 7. Do not unplug, reflash or reset between the captures of a set. If you
    have to, start a new set.
@@ -147,7 +147,10 @@ data; note it in the set record.
 ## Split transaction ids
 
 Captures number transactions; the numbering follows the build's split
-features. For builds of this repository since `25dacb46` (22 transactions):
+features. The table below is historical: `25dacb46` had 22 transactions,
+including VIA. D-F31 removed those two VIA IDs and D-F32 added working-copy
+sync. Regenerate the table from the exact measured build before interpreting
+a current capture; do not apply this old numbering to it.
 
 | Id | Transaction |
 | ---: | --- |

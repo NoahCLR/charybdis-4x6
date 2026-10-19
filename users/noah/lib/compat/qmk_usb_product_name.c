@@ -10,8 +10,8 @@
 
 #if defined(USB_PRODUCT_STRING_USER) && defined(NOAH_LIVE_PROFILE_OWNER_ENABLE) && defined(NOAH_PORTABLE_PROFILE_ENABLE)
 #    define NOAH_QMK_USB_PRODUCT_NAME_ENABLE
-#    include "qmk_via_split_sync.h"
 #    include "../profile/runtime/effective_settings_runtime.h"
+#    include "../profile/schema/profile_settings_defaults.h"
 #    include "../profile/storage/profile_store_runtime.h"
 #    if defined(NOAH_HOST_QMK_STUB)
 // Host tests stand in for the USB driver.
@@ -105,8 +105,10 @@ __attribute__((noinline)) void noah_qmk_usb_product_name_pre_init(void) {
     live_known = host_frame_seen = false;
     memset(&enumerated, 0, sizeof(enumerated));
     // Both halves run this before either knows its role; the half without USB
-    // only keeps the name in memory.
-    if (noah_profile_store_runtime_boot_keyboard_name(&name)) {
+    // only keeps the name in memory. With no saved name to read the keyboard
+    // runs its compiled defaults, so it enumerates under their name instead of
+    // restarting USB to take it once their settings are live.
+    if (noah_profile_store_runtime_boot_keyboard_name(&name) || noah_profile_settings_defaults_keyboard_name(&name)) {
         serve(&name);
     }
 }
@@ -124,8 +126,7 @@ __attribute__((noinline)) void noah_qmk_usb_product_name_task(void) {
     if (noah_profile_keyboard_name_equal(&live, &enumerated) || !NOAH_USB_ACTIVE() || (host_frame_seen && timer_elapsed32(last_host_frame) < NOAH_QMK_USB_PRODUCT_NAME_QUIET_MS)) {
         return;
     }
-    noah_qmk_via_split_sync_debug_snapshot_t via = noah_qmk_via_split_sync_debug_snapshot();
-    if (!noah_qmk_via_logical_boot_output_ready() || via.local_dirty || via.replication_pending || via.receiver_active || !noah_profile_store_runtime_usb_restart_safe()) {
+    if (!noah_profile_store_runtime_usb_restart_safe()) {
         return;
     }
     serve(&live);

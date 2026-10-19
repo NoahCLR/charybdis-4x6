@@ -32,7 +32,10 @@ enum {
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS   = NOAH_PROFILE_BEHAVIOR_ROWS * NOAH_PROFILE_TAP_DEPTH,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW = NOAH_PROFILE_TAP_DEPTH,
     NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ         = 100u,
-    NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE      = NOAH_PROFILE_BLOB_V1_MAX_SIZE - NOAH_PROFILE_BLOB_V1_HEADER_SIZE - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE,
+    // Row offsets inside the domain are 16 bits (its format is unchanged by
+    // schema 4, D-F28), so its payload stays within 65,535 bytes whatever the
+    // blob's.
+    NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE      = NOAH_PROFILE_BLOB_V1_MAX_SIZE - NOAH_PROFILE_BLOB_V1_HEADER_SIZE - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE < 0xFFFFu ? NOAH_PROFILE_BLOB_V1_MAX_SIZE - NOAH_PROFILE_BLOB_V1_HEADER_SIZE - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE : 0xFFFFu,
     // An incremental validation step performs at most one reader call. The
     // current wire records need no more than the 12-byte fixed row read, but
     // the public budget remains 20 bytes to match the scan owner contract.

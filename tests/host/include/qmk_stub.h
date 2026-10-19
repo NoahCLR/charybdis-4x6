@@ -55,12 +55,6 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #ifndef TAP_HOLD_CAPS_DELAY
 #    define TAP_HOLD_CAPS_DELAY 80u
 #endif
-#ifndef DYNAMIC_KEYMAP_LAYER_COUNT
-#    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
-#endif
-#ifndef DYNAMIC_KEYMAP_MACRO_COUNT
-#    define DYNAMIC_KEYMAP_MACRO_COUNT 128u
-#endif
 
 #ifndef MOD_BIT
 #    define MOD_BIT(keycode_) (1u << ((keycode_) & 0x07u))
@@ -240,6 +234,8 @@ uint32_t                   timer_read32(void);
 uint32_t                   timer_elapsed32(uint32_t last);
 uint32_t                   last_input_activity_elapsed(void);
 uint32_t                   last_matrix_activity_elapsed(void);
+typedef uint8_t            matrix_row_t;
+matrix_row_t               matrix_get_row(uint8_t row);
 bool                       is_keyboard_master(void);
 bool                       is_keyboard_left(void);
 struct rgb_matrix_limits_t rgb_matrix_get_limits(uint8_t iter);
@@ -261,6 +257,7 @@ void                 layer_on(uint8_t layer);
 void                 layer_off(uint8_t layer);
 uint8_t              get_highest_layer(layer_state_t state);
 uint8_t              combo_ref_from_layer(uint8_t layer);
+bool                 is_combo_enabled(void);
 uint16_t             keymap_key_to_keycode(uint8_t layer, keypos_t key);
 uint16_t             get_record_keycode(keyrecord_t *record, bool update_layer_cache);
 uint8_t              read_source_layers_cache(keypos_t key);

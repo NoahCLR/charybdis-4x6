@@ -26,4 +26,5 @@ void key_runtime_core_press_token_mark_release_hold_pending(key_runtime_core_sta
 void key_runtime_core_press_token_refresh_slot_phase_for_scan(key_runtime_core_state_t *state, press_token_t *token, uint16_t now);
 void key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *state, press_token_t *token, key_runtime_core_effect_plan_t *plan);
 void key_runtime_core_plan_active_scan_for_token(key_runtime_core_state_t *state, press_token_t *token, key_runtime_core_effect_plan_t *plan);
+void key_runtime_core_plan_missed_scans_for_token(key_runtime_core_state_t *state, press_token_t *token, uint16_t at, key_runtime_core_effect_plan_t *plan);
 void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state_t *state, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);

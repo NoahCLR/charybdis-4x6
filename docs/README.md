@@ -51,13 +51,16 @@ that every format inside is version 1**. Current versions come from
 [`profile_domain_registry.h`](../users/noah/lib/profile/schema/profile_domain_registry.h)
 and [`profile_versions.h`](../users/noah/lib/profile/schema/profile_versions.h);
 [Profile Wire](architecture/profile-wire-v1.md) documents the advertised contract.
+For live editing, start with [working-copy commands](architecture/profile-wire-v1.md#live-edits),
+[authority](architecture/authority-state-table.md) and the
+[durable transaction](architecture/logical-profile-transaction-v1.md).
 Read [memory budgets](architecture/memory-budgets.md) before interpreting RAM or
 stack figures. Dated linked measurements apply only to their recorded builds.
 
 ## Documentation tooling
 
 [Profile introspection](tooling/PROFILE_INTROSPECT.md) explains how to regenerate
-and check `KEYMAP-OVERVIEW.md` and its SVGs. Do not edit generated output by hand.
+and check `KEYMAP-OVERVIEW.md`, its SVGs and the compiled macro bank. Do not edit generated output by hand.
 It covers selected authored inputs, not the complete device profile or the
 `pd_config.c` slot records. The [legacy VIA-to-C bridge](tooling/VIA_TO_QMK.md)
 is deprecated and is not a current editing workflow.

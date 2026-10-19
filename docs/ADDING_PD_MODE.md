@@ -7,7 +7,7 @@ editing them requires no C and no reflash. See [Pointer Modes](POINTER_MODES.md)
 and the [PD-mode domain contract](architecture/pd-mode-domain-v1.md).
 
 The first six slots hold the factory Dragscroll, Volume, Brightness, Zoom, Arrow
-and Pinch presets. Slot 6 (the seventh slot) holds Undo/Redo; slots 7–31 start empty. Changing or duplicating a
+and Pinch presets. Slot 6 (the seventh slot) holds Undo/Redo; slot 7 holds Back/Forward, and slots 8–31 start empty. Changing or duplicating a
 preset does not require another source file. The authored fallback records live
 in `keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c`.
 

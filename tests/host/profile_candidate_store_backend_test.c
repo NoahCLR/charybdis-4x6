@@ -11,40 +11,42 @@ enum {
     ACTION_ABI_DIGEST = 0x11223344u,
 };
 
-static uint8_t       eeprom_bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+static uint8_t       eeprom_bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
 static uint32_t      eeprom_read_calls;
 static uint32_t      eeprom_write_calls;
-static uint16_t      eeprom_last_read_length;
-static uint16_t      eeprom_last_write_length;
+static uint32_t      eeprom_last_read_length;
+static uint32_t      eeprom_largest_read_length;
+static uint32_t      eeprom_last_write_length;
 static uint32_t      safe_boundary_reasons;
-static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
-static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x03\x00\x01\x01\x20\x02\x42\x00\x02\x00\x03\x00"
-                                          "\x24\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02\xff\xff"
-                                          "\x00\x00\x00\x02\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00\x0a\x00"
-                                          "\x02\x00\x03\x00\x03\x00\x16\x00\x04\x00\x02\x00\x00\x00\x00\x00"
-                                          "\x00\x00\x02\x01\x05\x00\x00\x00\x01\x01\x07\x00\x02\x00";
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
+static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x04\x00\x01\x01\x20\x02\x42\x00\x00\x00\x02\x00"
+                                          "\x03\x00\x24\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02"
+                                          "\xff\xff\x00\x00\x00\x02\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00"
+                                          "\x0a\x00\x02\x00\x03\x00\x03\x00\x16\x00\x04\x00\x02\x00\x00\x00"
+                                          "\x00\x00\x00\x00\x02\x01\x05\x00\x00\x00\x01\x01\x07\x00\x02\x00";
 
 static uint32_t always_safe(void *context) {
     (void)context;
     return safe_boundary_reasons;
 }
 
-static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
+static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     uint8_t *bytes = context;
 
-    if (!target || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
+    if (!target || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_REGION_SIZE) {
         return false;
     }
     eeprom_read_calls++;
     eeprom_last_read_length = length;
+    if (length > eeprom_largest_read_length) eeprom_largest_read_length = length;
     memcpy(target, &bytes[address], length);
     return true;
 }
 
-static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
+static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length) {
     uint8_t *bytes = context;
 
-    if (!source || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
+    if (!source || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_REGION_SIZE) {
         return false;
     }
     eeprom_write_calls++;
@@ -53,13 +55,11 @@ static bool memory_write(void *context, noah_profile_storage_address_t address, 
     return true;
 }
 
-static noah_profile_candidate_v1_metadata_t metadata_for(const uint8_t *payload, uint16_t length) {
+static noah_profile_candidate_v1_metadata_t metadata_for(const uint8_t *payload, uint32_t length) {
     uint32_t crc = noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, payload, length);
 
     return (noah_profile_candidate_v1_metadata_t){
         .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation       = 6u,
-        .via_digest           = UINT32_C(0xabcdef01),
         .schema_major         = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
         .schema_minor         = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR,
         .requested_domains    = 0u,
@@ -90,21 +90,18 @@ static void transaction_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], u
     frame[2] = value;
     store_u16(&frame[3], transaction_id);
     if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN) {
+        // Profile Wire 2 (D-F28): a 32-bit length, no flags or store format.
         frame[5] = metadata->schema_major;
         frame[6] = metadata->schema_minor;
         frame[7] = metadata->requested_domains;
-        frame[8] = metadata->flags;
-        store_u16(&frame[9], metadata->payload_length);
-        store_u32(&frame[11], metadata->crc32);
-        store_u32(&frame[15], metadata->digest);
-        store_u32(&frame[19], metadata->action_abi_digest);
-        frame[23] = metadata->store_format_version;
-        store_u32(&frame[24], metadata->via_generation);
-        store_u32(&frame[28], metadata->via_digest);
+        store_u32(&frame[8], metadata->payload_length);
+        store_u32(&frame[12], metadata->crc32);
+        store_u32(&frame[16], metadata->digest);
+        store_u32(&frame[20], metadata->action_abi_digest);
     } else if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK) {
-        store_u16(&frame[5], 0u);
-        frame[7] = metadata->payload_length;
-        memcpy(&frame[8], empty_profile, metadata->payload_length);
+        store_u32(&frame[5], 0u);
+        frame[9] = (uint8_t)metadata->payload_length;
+        memcpy(&frame[10], empty_profile, metadata->payload_length);
     }
 }
 
@@ -528,9 +525,12 @@ static void test_reboot_adopts_committed_profile_through_bounded_validator(void)
     while (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
         uint32_t reads_before = eeprom_read_calls;
 
+        eeprom_largest_read_length = 0u;
         result = noah_profile_candidate_store_backend_adopt_committed_step(&rebooted_backend, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, &error);
-        assert(eeprom_read_calls == reads_before || eeprom_read_calls == reads_before + 1u);
-        if (eeprom_read_calls != reads_before) assert(eeprom_last_read_length <= NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
+        // A validation step takes up to a flash page's worth of validator
+        // calls, each one read of at most the budget.
+        assert(eeprom_read_calls - reads_before <= NOAH_PROFILE_CANDIDATE_VALIDATION_CALLS);
+        assert(eeprom_largest_read_length <= NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
         assert(++steps < 64u);
     }
     assert(result == NOAH_PROFILE_CANDIDATE_BACKEND_VALID);
@@ -589,8 +589,6 @@ static void test_only_staged_candidates_are_held_to_the_candidate_runtime(void) 
     // the compatibility's own runtime.
     noah_profile_store_candidate_t peer = {
         .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation          = 6u,
-        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -646,8 +644,6 @@ static void test_override_disabled_commit_activates_compiled_fallback(void) {
 
     reset = (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation          = 6u,
-        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -688,8 +684,6 @@ static void test_host_and_peer_share_one_explicit_admission_lease(void) {
     interface = noah_profile_candidate_store_backend_interface(&backend);
     exact     = (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation          = 6u,
-        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -735,8 +729,6 @@ static void test_owner_activation_api_checks_lease_and_exposes_exact_commit(void
     interface = noah_profile_candidate_store_backend_interface(&backend);
     exact     = (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation          = 6u,
-        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -796,7 +788,77 @@ static void test_reuse_source_checks_active_identity_and_lease(void) {
     assert(interface.abort(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
 }
 
+// A schema 4 blob of one RGB domain filling `length` bytes: its envelope and
+// checksums are sound, and the validator refuses the domain at its end, since
+// RGB keeps 16-bit internal offsets (D-F28).
+static void make_wide_rgb_blob(uint8_t *blob, uint32_t length) {
+    memcpy(blob, (const uint8_t[]){'N', 'L', 'P', '1', NOAH_PROFILE_SCHEMA_MAJOR, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
+    blob[10] = (uint8_t)(length - 14u);
+    blob[11] = (uint8_t)((length - 14u) >> 8u);
+    blob[12] = (uint8_t)((length - 14u) >> 16u);
+    blob[13] = 0u;
+    for (uint32_t index = 14u; index < length; index++) blob[index] = (uint8_t)(index * 13u + 7u);
+}
+
+// A host candidate past 65,535 bytes through the real validator (D-F28): one
+// byte changed past 64 KiB fails the checksum; intact, the candidate passes it
+// and is refused at the end of its RGB domain, a location past 64 KiB.
+static void test_candidate_validation_over_64_kib(void) {
+    enum { WIDE = 70000u };
+    static uint8_t                         blob[WIDE];
+    static uint8_t                         sent[WIDE];
+    noah_profile_store_t                   store;
+    noah_profile_candidate_store_backend_t backend;
+    noah_effective_profile_provider_t      provider;
+    noah_profile_candidate_backend_t       interface;
+    noah_profile_candidate_v1_metadata_t   metadata;
+    noah_profile_store_record_t            selected;
+
+    make_wide_rgb_blob(blob, WIDE);
+    metadata                   = metadata_for(blob, WIDE);
+    metadata.requested_domains = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+    for (uint8_t corrupt = 0u; corrupt < 2u; corrupt++) {
+        noah_profile_candidate_v1_error_t       error = noah_profile_candidate_v1_no_error();
+        noah_profile_candidate_backend_result_t result;
+        uint32_t                                steps = 0u;
+
+        noah_profile_validator_v1_compatibility_t compatibility = noah_profile_validator_v1_default_compatibility(ACTION_ABI_DIGEST);
+
+        memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
+        init_store(&store);
+        compatibility.required_domain_mask = 0u;
+        compatibility.allowed_domain_mask  = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+        noah_profile_candidate_store_backend_init(&backend, &store, &provider, &compatibility, init_provider(&provider), 1u);
+        interface = noah_profile_candidate_store_backend_interface(&backend);
+        memcpy(sent, blob, WIDE);
+        if (corrupt) sent[66000u] ^= 1u;
+        assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+        for (uint32_t offset = 0u; offset < WIDE;) {
+            uint8_t length = WIDE - offset < NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX ? (uint8_t)(WIDE - offset) : NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX;
+
+            assert(interface.write(interface.context, offset, &sent[offset], length) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+            offset += length;
+        }
+        result = interface.validation_begin(interface.context, &metadata, &error);
+        while (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
+            assert(++steps < 2u * WIDE / NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET + 64u);
+            result = interface.validation_step(interface.context, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, &error);
+        }
+        assert(result == NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED);
+        if (corrupt) {
+            assert(error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_CHECKSUM_MISMATCH);
+        } else {
+            assert(error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_VALIDATION_REJECTED);
+            assert(error.domain_id == NOAH_PROFILE_DOMAIN_V1_RGB && error.byte_offset == WIDE);
+        }
+        assert(interface.abort(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+        noah_profile_store_init(&store, store.io, store.compatibility);
+        assert(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    }
+}
+
 int main(void) {
+    test_candidate_validation_over_64_kib();
     test_reuse_source_checks_active_identity_and_lease();
     test_stage_validate_and_commit();
     test_validated_host_candidate_is_a_provisional_split_source();

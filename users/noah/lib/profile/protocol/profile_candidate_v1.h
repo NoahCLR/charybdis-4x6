@@ -33,7 +33,11 @@ enum {
     NOAH_PROFILE_CANDIDATE_V1_KNOWN_DOMAINS = NOAH_PROFILE_ENABLED_DOMAIN_MASK,
     NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U8    = 0xFFu,
     NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U16   = 0xFFFFu,
+    // Status page 0 carries progress; page 3 the rejected byte and its
+    // location (D-F28), since 32-bit offsets no longer fit one page.
+    NOAH_PROFILE_CANDIDATE_V1_STATUS_ERROR_PAGE   = 3u,
 };
+#define NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U32 UINT32_MAX
 
 typedef enum {
     NOAH_PROFILE_CANDIDATE_V1_DECODE_OK = 0u,
@@ -115,16 +119,16 @@ typedef struct {
     uint8_t  schema_major;
     uint8_t  schema_minor;
     uint8_t  requested_domains;
+    // Not on the wire since D-F28: always zero.
     uint8_t  flags;
-    uint16_t payload_length;
+    uint32_t payload_length;
     uint32_t crc32;
     uint32_t digest;
     uint32_t action_abi_digest;
-    // Format 3 is the only accepted store format. Every BEGIN binds the
-    // candidate to a nonzero VIA generation and digest in the report tail.
+    // Not on the wire since D-F28: the base's version implies store format
+    // 6, which the decoder fills in. The report tail that bound a candidate
+    // to the VIA store must be zero since D-F31.
     uint8_t  store_format_version;
-    uint32_t via_generation;
-    uint32_t via_digest;
 } noah_profile_candidate_v1_metadata_t;
 
 typedef struct {
@@ -139,14 +143,14 @@ typedef struct {
     uint16_t                             row_index;
     uint8_t                              tap_index;
     uint8_t                              field_id;
-    uint16_t                             byte_offset;
+    uint32_t                             byte_offset;
 } noah_profile_candidate_v1_error_t;
 
 typedef struct {
     uint32_t generation;
     uint32_t digest;
     uint32_t crc32;
-    uint8_t  kind; // Profile Wire active kind: compiled (0) or committed (1).
+    uint8_t  kind; // compiled (0), committed (1) or the working copy (2, D-F32).
     uint8_t  origin;
 } noah_profile_candidate_v1_source_t;
 
@@ -156,15 +160,15 @@ typedef struct {
     union {
         noah_profile_candidate_v1_metadata_t begin;
         struct {
-            uint16_t offset;
+            uint32_t offset;
             uint8_t  length;
             uint8_t  bytes[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];
         } chunk;
         struct {
             noah_profile_candidate_v1_source_t source;
-            uint16_t offset;
-            uint16_t source_offset;
-            uint16_t length;
+            uint32_t offset;
+            uint32_t source_offset;
+            uint16_t length; // at most NOAH_PROFILE_CANDIDATE_V1_REUSE_MAX
             uint16_t copied; // Scan-owned progress, never supplied by the host.
         } reuse;
     } payload;
@@ -175,11 +179,14 @@ typedef struct {
     noah_profile_candidate_v1_operation_t last_operation;
     uint8_t                               flags;
     uint16_t                              transaction_id;
-    uint16_t                              next_offset;
-    uint16_t                              payload_length;
+    uint32_t                              next_offset;
+    uint32_t                              payload_length;
     uint32_t                              digest;
     noah_profile_candidate_v1_error_t     error;
     uint16_t                              operation_sequence;
+    // Advances whenever `error` changes, including asynchronous validation
+    // results that no mailbox operation precedes; pages 0 and 3 both carry it.
+    uint16_t                              error_sequence;
 } noah_profile_candidate_v1_status_t;
 
 noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const uint8_t *frame, size_t length, noah_profile_candidate_v1_command_t *command, noah_profile_candidate_v1_frame_error_t *error);
@@ -188,8 +195,7 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
 // padding. The request and response may be the same 32-byte buffer.
 void noah_profile_candidate_v1_encode_ack(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], noah_profile_candidate_v1_admission_t admission, noah_profile_candidate_v1_error_id_t error, uint8_t frame_offset);
 
-// Handles only value 0x18. This standalone status codec is intentionally not
-// wired into the production VIA hook until candidate-write support is complete.
+// Handles value 0x18 pages 0 (progress) and 3 (the error's location).
 bool noah_profile_candidate_v1_handle_status_get(const noah_profile_candidate_v1_status_t *status, uint8_t *frame, size_t length);
 
 // Status page 1: how far a save's copy to the other half has got, and the
@@ -198,7 +204,7 @@ bool noah_profile_candidate_v1_handle_status_get(const noah_profile_candidate_v1
 // from the split reconciler's internal states by the owner.
 typedef enum {
     NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_IDLE = 0u,
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BINDING,    // binding the staged VIA copy
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BINDING,    // retired with VIA (D-F31), never reported
     NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BEGINNING,  // PREPARE_BEGIN not yet admitted
     NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING,    // payload bytes in flight
     NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_PREPARING,  // peer validating and writing its prepared copy
@@ -222,8 +228,8 @@ typedef struct {
     noah_profile_candidate_v1_peer_phase_t phase;
     uint8_t                                last_status; // noah_profile_split_v1_status_t of the last peer answer
     uint8_t                                flags;
-    uint16_t                               transfer_offset;
-    uint16_t                               transfer_length;
+    uint32_t                               transfer_offset;
+    uint32_t                               transfer_length;
     uint32_t                               retry_count;             // cumulative since boot
     uint32_t                               transport_failure_count; // cumulative since boot
     // The peer's last ACK/BUSY: BUSY replies in a row, why
@@ -235,7 +241,7 @@ typedef struct {
     uint8_t                                busy_owner;
     uint8_t                                busy_admission; // noah_profile_storage_admission_owner_t
     // Page 2: the current/last prepared push; page 1 stays byte-identical.
-    uint16_t                               reused_bytes;
+    uint32_t                               reused_bytes;
     uint16_t                               reuse_exchanges;
     uint16_t                               source_unavailable_replies;
     uint32_t                               prepared_scans;

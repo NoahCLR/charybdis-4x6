@@ -10,9 +10,9 @@ multi-tap model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the
 [firmware guide](./GUIDE.md#authoring-the-profile-in-c).
 
 The [PD-mode domain contract](architecture/pd-mode-domain-v1.md) specifies the
-32 configurable slots and the remaining hardware acceptance checks. Side-specific schema-3 firmware exposes 32 slots in
-Charybdis Ark → Pointing modes. The six defaults below are records in those
-slots, followed by Undo / Redo in slot 6 and empty slots 7–31; their names do not
+32 configurable slots and the remaining hardware acceptance checks. The side-specific pair exposes 32 slots over Profile Wire 2; a compatible
+Charybdis Ark client edits them. The six defaults below are records in those
+slots, followed by Undo / Redo in slot 6, Back/Forward in slot 7 and empty slots 8–31; their names do not
 select special code. Undo / Redo uses horizontal motion at 100 DPI and a
 threshold of 40 to send Cmd+Z or Shift+Cmd+Z. Right Alt double-tap hold activates it.
 The `PD_SLOT_n` keycodes select slots, while the named behavior in this
@@ -22,7 +22,7 @@ that behavior without changing its keycode.
 An empty slot can become a directional or scrolling mode. Its record controls
 DPI, axes and thresholds, outputs, modifier policy, pointer-layer policy and
 mouse-button overrides. Directions may emit plain or modified keys, mouse
-buttons 1–8 (feature bit 28), or VIA macros (feature bit 29). Mouse buttons
+buttons 1–8, or profile macros. These outputs are part of the Profile Wire 2 base contract. Mouse buttons
 1–3 can pass through, be consumed, tap an action or hold modifiers.
 
 A shortcut never releases a key another producer still owns. Empty slots are
@@ -77,7 +77,8 @@ to synthetic key taps. They share one overload policy:
   into another direction within a movement sends nothing, and a single stray
   report does not count as moving back. It is the record's output setting
   (`.direction_output = NOAH_PD_DIRECTION_OUTPUT_ONCE` in `pd_config.c`); the
-  factory slots send once per step
+  Back/Forward factory slot uses this setting; the other directional defaults
+  send once per step
 
 At the configured limits, a saturated backlog drains in no more than eight
 successful polls. `PD_SLOT_0` and `PD_SLOT_5` produce wheel reports through a
@@ -105,8 +106,8 @@ changes how the modes feel in practice.
 The same policy answers QMK's mouse-record question, which decides whether a
 key press keeps the pointer layer up or resets auto mouse. Mouse keycodes and
 pointer-mode keys are classified automatically. A key that drives the mouse
-without being either — the held window-drag button of `CUSTOM_KEY_3` (Drag
-Window), the repeated clicks of `CUSTOM_KEY_2` (Click Spam) — claims the same
+without being either — the held shortcut of `CUSTOM_KEY_3` (Vorssaint
+Radial), the repeated clicks of `CUSTOM_KEY_2` (Click Spam) — claims the same
 anchor from its authored row with
 `.keeps_auto_mouse_anchored = true`. That is not cosmetic: auto mouse tears the
 pointer layer down on the press otherwise, and a `TAP_SENDS(KC_TRNS)` tier on
@@ -174,8 +175,8 @@ While active:
 - a scrolling mode can be limited to **horizontal only** or **vertical only**
   (the record's scroll axes, `.axis = NOAH_PD_SCROLL_VERTICAL` in
   `pd_config.c`); a gesture on the other axis then does nothing, and its
-  drift does not turn into scrolling on the allowed axis. The factory slots
-  scroll both axes
+  drift does not turn into scrolling on the allowed axis. Dragscroll uses both axes; the factory Pinch slot
+  permits vertical scrolling only
 
 This is the base mode that scroll-like modes build on.
 
@@ -188,6 +189,7 @@ While active:
 - the cursor stays frozen
 - the same local dragscroll handler as `PD_SLOT_0` is active
 - left `Cmd` is held through the same owned real-mod path as other runtime modifiers
+- only vertical scrolling is enabled in the factory slot
 - the ball is effectively producing command-scroll input
 
 On macOS, [BetterMouse](https://better-mouse.com/) can turn that
@@ -259,8 +261,18 @@ While active:
 - motion is accumulated and emitted in discrete steps
 - large motion follows the shared bounded discrete-output policy
 
-A direction, diagonal or button tap override can start a VIA macro (D-F23),
+A direction, diagonal or button tap override can start a macro (D-F23),
 with inherited modifiers only. Busy triggers are dropped. Every step is allowed;
 Once per movement is useful for longer macros. Empty slots send nothing and do
 not spend a movement. Mouse clicks inside a macro bypass the mode's button
 overrides; see [the PD contract](architecture/pd-mode-domain-v1.md#taps-modifiers-and-buttons).
+
+## Undo / Redo and Back/Forward
+
+Slot 6 sends Cmd+Z / Shift+Cmd+Z from horizontal motion, at 100 DPI and a
+threshold of 40, once per step. Right Alt's double-tap hold enters it.
+
+Slot 7 sends mouse buttons 4 / 5 from horizontal motion, at a threshold of 60
+and the normal pointer DPI (its override is zero). It uses once per movement
+and is placed directly on the pointer layer. Host applications decide what
+those buttons do. Volume and Brightness both use a 400 DPI override.

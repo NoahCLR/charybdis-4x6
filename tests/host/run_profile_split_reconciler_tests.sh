@@ -21,9 +21,8 @@ build_and_run() {
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DNOAH_PROFILE_SPLIT_TEST_HOOKS \
-        -DVIA_ENABLE \
         -DNOAH_PD_PROFILE_ENABLE \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \
@@ -37,6 +36,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
@@ -50,7 +51,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_peer_store_backend.c" \
         -o "$BUILD_DIR/profile_split_reconciler_test_$name"
-    "$BUILD_DIR/profile_split_reconciler_test_$name" "$ROOT/tests/fixtures/maximum_profile_v3.fixture"
+    "$BUILD_DIR/profile_split_reconciler_test_$name" "$ROOT/tests/fixtures/maximum_profile_v4.fixture"
 }
 
 build_and_run normal

@@ -44,15 +44,15 @@ typedef struct {
     noah_profile_action_v1_t inputs[NOAH_PROFILE_COMBO_V1_MAX_INPUTS];
 } noah_profile_combo_v1_row_t;
 typedef struct {
-    uint16_t offset;     // the next byte to read, from the payload's start
-    uint16_t row_offset; // where the current row starts
+    uint32_t offset;     // the next byte to read, from the payload's start
+    uint32_t row_offset; // where the current row starts
     uint8_t  phase, row_index, row_count, inputs_read;
     uint8_t  bytes[NOAH_PROFILE_COMBO_V3_MAX_ROW_SIZE];
 } noah_profile_combo_v1_validation_t;
 
 // Header and row decoding consume only caller-supplied bytes; a row's bytes are
 // its fixed part and every input.
-noah_profile_codec_v1_result_t noah_profile_combo_v1_decode_header(const uint8_t *bytes, uint16_t payload_length, noah_profile_combo_v1_header_t *header);
+noah_profile_codec_v1_result_t noah_profile_combo_v1_decode_header(const uint8_t *bytes, uint32_t payload_length, noah_profile_combo_v1_header_t *header);
 noah_profile_codec_v1_result_t noah_profile_combo_v1_decode_row(const uint8_t *bytes, const noah_profile_action_v1_limits_t *limits, noah_profile_combo_v1_row_t *row);
 // Readers take the domain's validated payload range within the blob at
 // blob_base_offset. Rows vary in length, so read_row walks the rows before it;
@@ -71,4 +71,4 @@ typedef enum {
 // to four of its inputs (16 bytes). HEADER and ROW expose decoded values;
 // runtime reference and placement admission remain with the whole-profile
 // validator. COMPLETE requires the rows to end exactly at the payload's end.
-noah_profile_combo_v1_iteration_t noah_profile_combo_v1_iteration_step(noah_profile_combo_v1_validation_t *state, const noah_profile_reader_t *reader, size_t base, uint16_t length, const noah_profile_action_v1_limits_t *limits, noah_profile_combo_v1_header_t *header, noah_profile_combo_v1_row_t *row, noah_profile_codec_v1_result_t *detail);
+noah_profile_combo_v1_iteration_t noah_profile_combo_v1_iteration_step(noah_profile_combo_v1_validation_t *state, const noah_profile_reader_t *reader, size_t base, uint32_t length, const noah_profile_action_v1_limits_t *limits, noah_profile_combo_v1_header_t *header, noah_profile_combo_v1_row_t *row, noah_profile_codec_v1_result_t *detail);

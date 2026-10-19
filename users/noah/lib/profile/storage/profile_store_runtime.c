@@ -7,69 +7,63 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "../../compat/qmk_profile_eeprom.h"
+#include "../../compat/qmk_profile_flash.h"
 #include "../schema/profile_compiled_defaults_v1.h"
+#include "profile_paused_clock.h"
 
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
 #    include "../../compat/qmk_physical_half.h"
 #    include "../../compat/qmk_profile_split_transport.h"
-#    include "../../compat/qmk_via_logical_profile.h"
-#    include "../../compat/qmk_via_split_sync.h"
+#    include "../../compat/qmk_profile_working.h"
 #    include "../runtime/profile_owner.h"
+#    ifdef NOAH_PORTABLE_PROFILE_ENABLE
+#        include "../schema/profile_settings_defaults.h"
+#    endif
 #endif
 
 static noah_profile_store_runtime_state_t runtime_state;
 static noah_profile_store_result_t        discovery_result;
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+// The owner's clock stops while its storage step is not allowed to run.
+static noah_profile_paused_clock_t runtime_clock;
+static volatile bool               runtime_storage_paused;
 
-#if defined(VIA_ENABLE) && !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+// Out of line, as the registration below: both run inside the durable-I/O
+// step, whose frame every reviewed storage path carries.
+__attribute__((noinline)) void noah_profile_store_runtime_note_storage_paused(bool paused) {
+    runtime_storage_paused = paused;
+    noah_profile_paused_clock_note(&runtime_clock, paused, timer_read32());
+}
+
+static bool keyboard_quiet(void *context) {
+    (void)context;
+    return noah_qmk_profile_flash_keyboard_quiet();
+}
+
+static bool storage_paused(void *context) {
+    (void)context;
+    return runtime_storage_paused;
+}
+#else
+// A store without an owner keeps no timers.
+void noah_profile_store_runtime_note_storage_paused(bool paused) {
+    (void)paused;
+}
+#endif
+
+#if !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
 static noah_profile_store_t runtime_store;
 #endif
 
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
 static noah_profile_owner_t runtime_owner;
+// The working copy (D-F32): one slot payload of RAM per half, the largest
+// static claim in the firmware (docs/architecture/memory-budgets.md).
+static uint8_t              runtime_working_bytes[NOAH_PROFILE_PAYLOAD_MAX] __attribute__((aligned(4)));
 static bool                 runtime_owner_initialized;
+static bool                 runtime_working_transport_registered;
 static bool                 runtime_transport_registered;
 static bool                 runtime_integration_error;
-
-static bool runtime_logical_via_ready(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
-    (void)context;
-    return noah_qmk_via_logical_staged(transaction_id, generation, digest);
-}
-
-static bool runtime_logical_via_accept(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
-    (void)context;
-    return noah_qmk_via_logical_profile_accept(transaction_id, generation, digest);
-}
-
-static bool runtime_logical_via_abort(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest) {
-    (void)context;
-    return noah_qmk_via_logical_cancel(transaction_id, generation, digest);
-}
-
-static bool runtime_logical_via_converged(void *context, uint32_t generation, uint32_t digest) {
-    (void)context;
-    return noah_qmk_via_logical_converged(generation, digest);
-}
-
-static bool runtime_logical_via_boot_recover(void *context, uint32_t generation, uint32_t digest) {
-    (void)context;
-    return noah_qmk_via_logical_boot_recover(generation, digest);
-}
-
-static void runtime_logical_via_boot_release(void *context) {
-    (void)context;
-    noah_qmk_via_logical_boot_release();
-}
-
-static const noah_profile_logical_via_ops_t runtime_logical_via_ops = {
-    .ready        = runtime_logical_via_ready,
-    .accept       = runtime_logical_via_accept,
-    .abort        = runtime_logical_via_abort,
-    .converged    = runtime_logical_via_converged,
-    .boot_recover = runtime_logical_via_boot_recover,
-    .boot_release = runtime_logical_via_boot_release,
-    .context      = NULL,
-};
 #endif
 
 void noah_profile_store_runtime_init(void) {
@@ -78,16 +72,27 @@ void noah_profile_store_runtime_init(void) {
 
     runtime_owner_initialized    = false;
     runtime_transport_registered = false;
+    runtime_working_transport_registered = false;
     runtime_integration_error    = false;
     discovery_result             = NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
-#    if defined(VIA_ENABLE) && defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_USER)
+#    if defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_USER)
     if (!noah_qmk_physical_half_origin(&origin) || !noah_profile_owner_init(&runtime_owner, &(noah_profile_owner_config_t){
-                                                                                                .store_io                = noah_qmk_profile_eeprom_io(),
+                                                                                                .store_io                = noah_qmk_profile_flash_io(),
                                                                                                 .split_exchange          = noah_qmk_profile_split_transport_exchange,
                                                                                                 .split_transport_context = NULL,
                                                                                                 .origin_half             = origin,
                                                                                                 .peer_required           = true,
-                                                                                                .logical_via             = &runtime_logical_via_ops,
+                                                                                                .working_bytes           = runtime_working_bytes,
+                                                                                                .working_capacity        = sizeof(runtime_working_bytes),
+                                                                                                .working_session         = noah_qmk_profile_working_session(),
+                                                                                                .working_exchange        = noah_qmk_profile_working_transport_exchange,
+                                                                                                .edit_mode_storage       = noah_qmk_edit_mode_storage(),
+                                                                                                .storage_paused          = storage_paused,
+                                                                                                .keyboard_quiet          = keyboard_quiet,
+#        ifdef NOAH_PORTABLE_PROFILE_ENABLE
+                                                                                                .settings_defaults_length = noah_profile_settings_defaults_length,
+                                                                                                .settings_defaults_byte   = noah_profile_settings_defaults_byte,
+#        endif
                                                                                             })) {
         runtime_integration_error = true;
         runtime_state             = NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR;
@@ -100,7 +105,7 @@ void noah_profile_store_runtime_init(void) {
     runtime_integration_error = true;
     runtime_state             = NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR;
 #    endif
-#elif defined(VIA_ENABLE)
+#else
     noah_profile_compiled_v1_t compiled;
 
     if (noah_profile_compiled_v1_open(&compiled, NULL) != NOAH_PROFILE_COMPILED_V1_OK) {
@@ -108,7 +113,7 @@ void noah_profile_store_runtime_init(void) {
         runtime_state    = NOAH_PROFILE_STORE_RUNTIME_STORAGE_ERROR;
         return;
     }
-    noah_profile_store_init(&runtime_store, noah_qmk_profile_eeprom_read_only_io(),
+    noah_profile_store_init(&runtime_store, noah_qmk_profile_flash_read_only_io(),
                             (noah_profile_store_compatibility_t){
                                 .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
                                 .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
@@ -117,9 +122,54 @@ void noah_profile_store_runtime_init(void) {
                             });
     discovery_result = NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
     runtime_state    = NOAH_PROFILE_STORE_RUNTIME_DISCOVERY_PENDING;
+#endif
+}
+
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+static bool working_receive(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
+    return noah_profile_owner_working_receive(context, request, request_length, response, response_length);
+}
+#endif
+
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+// Once, as soon as the owner's reconciler exists: both split RPCs. False after
+// an integration error.
+static __attribute__((noinline)) bool register_transports(void) {
+    if (!runtime_transport_registered) {
+        noah_profile_split_reconciler_t *reconciler = noah_profile_owner_split_reconciler(&runtime_owner);
+
+        if (reconciler) {
+            runtime_transport_registered = noah_qmk_profile_split_transport_init(reconciler);
+            if (!runtime_transport_registered) {
+                runtime_integration_error = true;
+                runtime_state             = NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR;
+                return false;
+            }
+        }
+    }
+    if (!runtime_working_transport_registered) {
+        runtime_working_transport_registered = noah_qmk_profile_working_transport_init(working_receive, &runtime_owner);
+    }
+    return true;
+}
+#endif
+
+bool noah_profile_store_runtime_storage_busy(void) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_storage_busy(&runtime_owner);
 #else
-    discovery_result = NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
-    runtime_state    = NOAH_PROFILE_STORE_RUNTIME_COMPILED_FALLBACK;
+    // Boot discovery without an owner reads a slot once per grant.
+    return false;
+#endif
+}
+
+void noah_profile_store_runtime_scan_again(bool again) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    if (runtime_owner_initialized && !runtime_integration_error) {
+        noah_profile_owner_scan_again(&runtime_owner, again);
+    }
+#else
+    (void)again;
 #endif
 }
 
@@ -130,18 +180,9 @@ bool noah_profile_store_runtime_matrix_scan_step(void) {
     if (!runtime_owner_initialized || runtime_integration_error) {
         return false;
     }
-    worked = noah_profile_owner_scan(&runtime_owner, is_keyboard_master(), timer_read32());
-    if (!runtime_transport_registered) {
-        noah_profile_split_reconciler_t *reconciler = noah_profile_owner_split_reconciler(&runtime_owner);
-
-        if (reconciler) {
-            runtime_transport_registered = noah_qmk_profile_split_transport_init(reconciler);
-            if (!runtime_transport_registered) {
-                runtime_integration_error = true;
-                runtime_state             = NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR;
-                return true;
-            }
-        }
+    worked = noah_profile_owner_scan(&runtime_owner, is_keyboard_master(), noah_profile_paused_clock_now(&runtime_clock, timer_read32()));
+    if ((!runtime_transport_registered || !runtime_working_transport_registered) && !register_transports()) {
+        return true;
     }
     discovery_result = noah_profile_owner_discovery_result(&runtime_owner);
     switch (noah_profile_owner_state(&runtime_owner)) {
@@ -170,7 +211,7 @@ bool noah_profile_store_runtime_matrix_scan_step(void) {
             break;
     }
     return worked;
-#elif defined(VIA_ENABLE)
+#else
     if (runtime_state != NOAH_PROFILE_STORE_RUNTIME_DISCOVERY_PENDING) {
         return false;
     }
@@ -191,8 +232,6 @@ bool noah_profile_store_runtime_matrix_scan_step(void) {
             break;
     }
     return true;
-#else
-    return false;
 #endif
 }
 
@@ -204,16 +243,6 @@ noah_profile_store_runtime_state_t noah_profile_store_runtime_state(void) {
     return runtime_state;
 }
 
-bool noah_profile_store_runtime_output_ready(void) {
-#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
-    // A bank left mixed by a restart mid-save is fenced by the VIA layer until
-    // boot recovery makes it one generation; the owner fences a live Apply.
-    return noah_qmk_via_logical_boot_output_ready() && (!runtime_owner_initialized || runtime_integration_error || noah_profile_owner_output_ready(&runtime_owner));
-#else
-    return true;
-#endif
-}
-
 noah_profile_store_result_t noah_profile_store_runtime_discovery_result(void) {
     return discovery_result;
 }
@@ -221,15 +250,12 @@ noah_profile_store_result_t noah_profile_store_runtime_discovery_result(void) {
 const noah_profile_store_record_t *noah_profile_store_runtime_committed(void) {
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
     return runtime_owner_initialized && !runtime_integration_error ? noah_profile_owner_committed(&runtime_owner) : NULL;
-#elif defined(VIA_ENABLE)
-    return runtime_state == NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND ? &runtime_store.committed : NULL;
 #else
-    return NULL;
+    return runtime_state == NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND ? &runtime_store.committed : NULL;
 #endif
 }
 
-bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target, uint16_t length) {
-#if defined(VIA_ENABLE)
+bool noah_profile_store_runtime_read_committed(uint32_t offset, uint8_t *target, uint32_t length) {
     const noah_profile_store_record_t *record = noah_profile_store_runtime_committed();
     const noah_profile_store_t        *store;
     noah_profile_storage_address_t  payload_start;
@@ -245,7 +271,7 @@ bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target,
     }
     // Bounds first: offset and length arrive from the host, so a request that
     // runs past the committed payload is refused rather than clamped.
-    if ((uint32_t)offset + (uint32_t)length > (uint32_t)record->payload_length) {
+    if (offset > record->payload_length || length > record->payload_length - offset) {
         return false;
     }
     if (record->slot == NOAH_PROFILE_SLOT_A) {
@@ -256,12 +282,6 @@ bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target,
         return false;
     }
     return store->io.read(store->io.context, (payload_start + offset), target, length);
-#else
-    (void)offset;
-    (void)target;
-    (void)length;
-    return false;
-#endif
 }
 
 // Opened lazily on first use rather than in the scan path: computing the
@@ -292,12 +312,12 @@ bool noah_profile_store_runtime_compiled_metadata(noah_profile_compiled_v1_metad
     return true;
 }
 
-bool noah_profile_store_runtime_read_compiled(uint16_t offset, uint8_t *target, uint16_t length) {
+bool noah_profile_store_runtime_read_compiled(uint32_t offset, uint8_t *target, uint32_t length) {
     if (!target || length == 0u || !ensure_compiled_open() || !compiled_reader.read) {
         return false;
     }
     // Bounds first: offset and length arrive from the host.
-    if ((uint32_t)offset + (uint32_t)length > (uint32_t)compiled_profile.metadata.byte_length) {
+    if (offset > compiled_profile.metadata.byte_length || length > compiled_profile.metadata.byte_length - offset) {
         return false;
     }
     return compiled_reader.read(compiled_reader.context, offset, target, length);
@@ -346,26 +366,6 @@ bool noah_profile_store_runtime_candidate_receive(uint8_t *frame, size_t length)
 #endif
 }
 
-bool noah_profile_store_runtime_logical_via_admit(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
-#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
-    return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_logical_via_admit(&runtime_owner, transaction_id, generation, digest);
-#else
-    (void)transaction_id;
-    (void)generation;
-    (void)digest;
-    return false;
-#endif
-}
-
-void noah_profile_store_runtime_logical_via_progress(void) {
-#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
-    if (runtime_owner_initialized && !runtime_integration_error) {
-        noah_profile_owner_logical_via_progress(&runtime_owner);
-    }
-#endif
-}
-
-#if defined(VIA_ENABLE)
 typedef struct {
     const noah_profile_store_t    *store;
     noah_profile_storage_address_t start;
@@ -374,7 +374,7 @@ typedef struct {
 static bool boot_payload_read(void *context, size_t offset, uint8_t *target, size_t length) {
     const boot_payload_t *payload = context;
 
-    return length == 0u || (length <= UINT16_MAX && noah_profile_store_read_span(payload->store, (noah_profile_storage_address_t)(payload->start + offset), target, (uint16_t)length));
+    return length == 0u || (length <= NOAH_PROFILE_STORAGE_REGION_SIZE && noah_profile_store_read_span(payload->store, (noah_profile_storage_address_t)(payload->start + offset), target, (uint32_t)length));
 }
 
 bool noah_profile_store_runtime_read_keyboard_name(noah_profile_store_t *store, noah_profile_keyboard_name_t *name) {
@@ -396,10 +396,9 @@ bool noah_profile_store_runtime_read_keyboard_name(noah_profile_store_t *store, 
 
     return noah_profile_blob_v1_find_domain(&reader, 0u, record.payload_length, NOAH_PROFILE_DOMAIN_V1_SETTINGS, &settings) && noah_profile_settings_v1_keyboard_name(&reader, settings.offset, settings.length, name);
 }
-#endif
 
 bool noah_profile_store_runtime_boot_keyboard_name(noah_profile_keyboard_name_t *name) {
-#if defined(VIA_ENABLE) && defined(NOAH_PORTABLE_PROFILE_ENABLE)
+#if defined(NOAH_PORTABLE_PROFILE_ENABLE)
     // Borrow the store the runtime has not started yet: no RAM of its own and
     // nothing large on the boot stack.
 #    if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
@@ -415,7 +414,7 @@ bool noah_profile_store_runtime_boot_keyboard_name(noah_profile_keyboard_name_t 
     if (!name || !store || !ensure_compiled_open()) {
         return false;
     }
-    noah_profile_store_init(store, noah_qmk_profile_eeprom_read_only_io(),
+    noah_profile_store_init(store, noah_qmk_profile_flash_read_only_io(),
                             (noah_profile_store_compatibility_t){
                                 .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
                                 .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
@@ -432,6 +431,60 @@ bool noah_profile_store_runtime_boot_keyboard_name(noah_profile_keyboard_name_t 
     return false;
 #endif
 }
+
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+static noah_profile_owner_t *editor(void) {
+    return runtime_owner_initialized && !runtime_integration_error ? &runtime_owner : NULL;
+}
+
+bool noah_profile_store_runtime_pending_adjustment(uint8_t setting, uint32_t *value) {
+    return editor() && noah_profile_owner_pending_adjustment(editor(), setting, value);
+}
+
+bool noah_profile_store_runtime_adjust(uint8_t setting, uint32_t value) {
+    return editor() && noah_profile_owner_adjust(editor(), setting, value);
+}
+
+noah_profile_working_result_t noah_profile_store_runtime_edit_begin(uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags) {
+    return editor() ? noah_profile_owner_edit_begin(editor(), transaction_id, session, revision, splice_count, insert_total, flags) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_store_runtime_edit_splice(uint16_t transaction_id, uint8_t index, const noah_profile_working_splice_t *splice) {
+    return editor() ? noah_profile_owner_edit_splice(editor(), transaction_id, index, splice) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_store_runtime_edit_data(uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint32_t count) {
+    return editor() ? noah_profile_owner_edit_data(editor(), transaction_id, offset, bytes, count) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_store_runtime_edit_commit(uint16_t transaction_id, uint32_t crc32) {
+    return editor() ? noah_profile_owner_edit_commit(editor(), transaction_id, crc32) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_store_runtime_edit_abort(uint16_t transaction_id) {
+    return editor() ? noah_profile_owner_edit_abort(editor(), transaction_id) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_store_runtime_revert(uint16_t transaction_id, uint32_t session, uint32_t revision) {
+    return editor() ? noah_profile_owner_revert(editor(), transaction_id, session, revision) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_store_runtime_save(uint16_t transaction_id, uint32_t session, uint32_t revision) {
+    return editor() ? noah_profile_owner_save(editor(), transaction_id, session, revision) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_store_runtime_set_edit_mode(uint8_t mode) {
+    return editor() ? noah_profile_owner_set_edit_mode(editor(), mode) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+bool noah_profile_store_runtime_working_status(noah_profile_owner_working_status_t *status) {
+    return editor() && noah_profile_owner_working_status(editor(), status);
+}
+
+bool noah_profile_store_runtime_read_working(uint32_t offset, uint8_t *target, uint32_t length) {
+    return editor() && noah_profile_owner_working_read(editor(), offset, target, length);
+}
+#endif
 
 bool noah_profile_store_runtime_usb_restart_safe(void) {
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
