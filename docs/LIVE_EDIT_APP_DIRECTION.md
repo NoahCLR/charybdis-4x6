@@ -47,6 +47,9 @@ holding a format-5 profile starts from its compiled defaults and says so in
 its status. No Ark speaks the new base yet, so this firmware is for its own
 task checks only until Ark follows.
 
+Keymap and macro domains now own typing and playback (D-F30). VIA remains
+compiled with an unused matrix and macro copy until its removal follow-up.
+
 Macro text is typed through a selected host layout (D-F16), with Unicode
 entry for macOS, Windows and Linux as the fallback, protected automatically
 from new physical presses with a per-macro override (D-F17); the encoding, ownership
@@ -259,12 +262,12 @@ input cadence remain unmeasured for this path.
   [portable-profile-v1.md](architecture/portable-profile-v1.md) specify the
   complete supported backup. Future schema migrations and hardware acceptance
   must preserve that artifact.
-- **One logical generation across two stores.** Standard VIA owns dynamic
-  layout and macros; the custom store owns everything else. D-L21 binds them;
+- **One logical generation during VIA retirement.** Keymap and macro domains
+  now drive output (D-F30). D-L21 still binds VIA staging until its removal;
   a partial cross-store write must never be reported as a complete commit.
-- **External VIA writes.** Another VIA client can change the layout underneath
-  the app. Those changes must be adopted into a new generation or surfaced as a
-  conflict; they must not silently escape profile identity. Not yet built.
+- **External VIA writes during the transition.** VIA copies no longer drive
+  key lookup or macros. VIA removal and Ark's new-base codec must follow before
+  editing this firmware is supported.
 
 ## Decisions
 
@@ -1670,7 +1673,7 @@ new frames, capability layout 3 and feature word, status page 3 and state flag
 The two profile slots leave QMK's emulated EEPROM for a fixed region of flash
 and are read in place; replaces D-F14's EEPROM geometry. The region is
 256 KiB at flash offset 1 MiB (XIP `0x10100000`): slot A at region offset
-`0x00000`, slot B at `0x20000`, each 128 KiB: a 1 KiB record (the 32-byte
+`0x00000`, slot B at `0x20000`, each 128 KiB: a 1 KiB record (the 36-byte
 header and the marker's cells) and a 130,048-byte payload (plan answer 6, the
 working size until a keyboard measures otherwise). It sits between the image (273,872 bytes) and the
 wear-leveling backing at the top of the 2 MiB the build assumes; the link
@@ -1736,3 +1739,28 @@ page; the first kilobyte of each slot is the price.
 Client follow-up: the capability page now reports a 130,048-byte slot payload
 and profile payload; Ark takes its limits from it. Ark may show the
 flash pauses (`0x0D`) in a diagnostics view; nothing depends on them.
+
+## D-F30 — Keymap and macros belong to the profile
+
+Keymap domain `0x60` v1 holds sixteen layers × sixty little-endian uint16
+keycodes, and macro domain `0x70` v1 holds 128 streams in the existing bank
+encoding, up to 34,903 bytes. Existing domain versions do not change. Compiled
+defaults encode the authored matrix and the macro payloads previously seeded
+into VIA. Runtime reads use the active generation; absent domains use authored
+defaults without serializing them on key or playback paths. The keymap override
+also governs combo origin, handled-key transparency and RGB coverage.
+
+The 36-byte format-6 header keeps a full domain-mask byte and full 32-bit
+length, with separate origin/override flags. The exact layout belongs to
+[the storage contract](architecture/device-resident-profile.md#profile-domains-own-layout-and-macros).
+The maximum-profile generator includes both domains and checks the slot's
+payload ceiling with a 12,288-byte reserve. It reads that ceiling from the
+storage header instead of keeping a second size constant. The fixture is
+74,801 bytes; the 130,048-byte payload retains the 12,288-byte reserve with
+42,959 bytes still spare.
+
+VIA remains compiled in this additive slice. Its binding and staging remain,
+while its layout and macro copies no longer drive typing. Removing VIA and
+moving Ark to the new base follow separately. Hardware acceptance owes typing,
+layers, combos and macro playback on both halves from flashed defaults;
+linked stack checks do not establish scan cadence or runtime high-water.

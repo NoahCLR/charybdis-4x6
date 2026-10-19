@@ -3615,3 +3615,7 @@ uint16_t get_record_keycode(keyrecord_t *record, bool update_layer_cache) {
     (void)update_layer_cache;
     return record ? record->keycode : KC_NO;
 }
+
+uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
+    return keycode_at_keymap_location(layer, key.row, key.col);
+}

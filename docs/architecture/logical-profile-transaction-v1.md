@@ -1,8 +1,8 @@
 # Logical Profile Transaction V1
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
-> a 130,048-byte custom payload; and logical store format 6 (D-F28). Every save
+> schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8, sparse PD v3, keymap v1 and macros v1;
+> a slot-sized profile payload; and logical store format 6 (D-F28). Every save
 > binds a nonzero VIA generation and digest. Profile Wire is 2.0 and split
 > framing version 3, with 32-bit profile lengths and offsets throughout.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
@@ -33,19 +33,18 @@ and format-5 `NT` records are rejected at boot and admission; firmware does not
 migrate old storage, and status reports a format-5 slot (Profile Wire state
 flag 9).
 
-Format 6 (D-F28) keeps a 32-byte header with a 130,048-byte payload capacity
-(D-F29) and binds schema 4.0. It has no magic: byte 0 packs five domain bits
-(0–4), origin (5), profile flags (6) and a reserved zero bit (7), and bytes 1–4
-hold the 32-bit payload length. The header retains payload CRC32,
-compiled-default digest and action-ABI digest, and stores the bound VIA
-generation and digest. Validation derives the canonical payload digest again.
-CRC16 covers the format version and then bytes 0–28; byte 31 is the one-byte
-marker, prepared (`0x3C`), committed (`0x18`) or invalid (`0x00`), values format
-5 never wrote. On flash the marker is three cells in pages of their own, read as
-their bitwise AND, one cell programmed per step (D-F29). The full layout is in
-the [storage baseline](storage-and-resource-baseline.md#schema-4-geometry-d-f14-d-f28). This preserves
-firmware-update compatibility checks instead of treating the current firmware's
-identities as if they had been stored with the profile.
+Format 6 (D-F28, extended by D-F30) binds schema 4.0. Its 36-byte header
+stores the full seven-bit domain mask at byte 0 and a uint32 payload length
+at bytes 1–4. Origin and override flags have their own byte 5. Generation,
+payload CRC32, compiled-default digest, action ABI, VIA generation and VIA
+digest follow as uint32 fields at 6, 10, 14, 18, 22 and 26. Bytes 30–32 are
+reserved zero; CRC16 at 33 covers the format version and bytes 0–32; byte 35
+is the marker, published last. Validation derives the payload digest again.
+See [the storage contract](device-resident-profile.md#profile-domains-own-layout-and-macros).
+
+The keymap and macro domains now drive runtime output. VIA's separate copies
+remain bound and staged during this additive transition, until VIA removal;
+this does not restore compatibility with clients that still edit those copies.
 
 The effective-profile owner may publish a committed custom record only while
 the local VIA identity matches the record's bound VIA identity. A mismatch is a

@@ -283,7 +283,7 @@ static void test_blob_and_domain_rejections(const char *fixture_path) {
     assert(error.detail_code == NOAH_PROFILE_CODEC_V1_DOMAIN_ORDER && error.domain_index == 1u);
 
     memcpy(bytes, valid, length);
-    bytes[8]    = 0x60u;
+    bytes[8]    = 0x80u;
     declaration = declaration_for(bytes, length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
     expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN);
 
@@ -349,7 +349,7 @@ static void test_stable_action_cross_references(const char *fixture_path) {
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION);
 }
 
-static unsigned placement_seen[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT + 1u];
+static unsigned placement_seen[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_KEYMAP + 1u];
 static int      placement_refused = -1;
 
 static bool logging_placement(const noah_profile_action_v1_t *action, noah_profile_validator_v1_placement_t placement) {
@@ -598,6 +598,162 @@ static void test_combo_domain_v3(void) {
     expect_result(validate(bytes, sizeof(bytes), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
 }
 
+// A profile of one domain: the blob header, its 6-byte envelope, its payload.
+static size_t single_domain_profile(uint8_t *bytes, uint8_t id, uint8_t version, const uint8_t *payload, uint32_t length) {
+    const uint8_t head[] = {'N', 'L', 'P', '1', 4, 0, 1, 1, id, version, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), (uint8_t)(length >> 24)};
+    memcpy(bytes, head, sizeof(head));
+    memcpy(&bytes[sizeof(head)], payload, length);
+    return sizeof(head) + length;
+}
+
+static noah_profile_validator_v1_compatibility_t single_domain_compatibility(void) {
+    noah_profile_validator_v1_compatibility_t compatible = compatibility();
+    compatible.required_domain_mask                      = 0u;
+    compatible.logical_layer_count                       = 16u;
+    compatible.rgb_limits.logical_layer_count            = 16u;
+    compatible.placement_positions                       = 60u;
+    compatible.via_macro_slot_count                      = NOAH_PROFILE_MACROS_V1_SLOTS;
+    return compatible;
+}
+
+static uint16_t refused_keycode;
+static bool     keymap_placement(const noah_profile_action_v1_t *action, noah_profile_validator_v1_placement_t placement) {
+    placement_seen[placement]++;
+    return !(placement == NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_KEYMAP && action->kind == NOAH_PROFILE_ACTION_V1_QMK_KEYCODE && action->operand == refused_keycode);
+}
+
+// The keymap is layers × positions keycodes, nothing more. Every keycode of a
+// candidate goes to the keyboard's placement check, which names the layer and
+// position it refuses; without a runtime any keycode stands.
+static void test_keymap_domain(void) {
+    static uint8_t                            payload[16u * 60u * 2u + 2u], bytes[sizeof(payload) + 16u];
+    noah_profile_validator_v1_compatibility_t compatible = single_domain_compatibility();
+    noah_profile_validator_v1_runtime_t       runtime    = {.placement_supported = keymap_placement};
+    noah_profile_validator_v1_declaration_t   declaration;
+    noah_profile_validator_v1_error_t         error;
+    size_t                                    length;
+
+    assert(noah_profile_keymap_v1_length(16u, 60u) == 1920u && noah_profile_keymap_v1_offset(15u, 59u, 60u) == 1918u);
+    for (uint32_t index = 0u; index < 16u * 60u; index++) {
+        uint16_t keycode     = (uint16_t)(0x0004u + index * 37u);
+        payload[2u * index]      = (uint8_t)keycode;
+        payload[2u * index + 1u] = (uint8_t)(keycode >> 8u);
+    }
+    length      = single_domain_profile(bytes, NOAH_PROFILE_DOMAIN_V1_KEYMAP, NOAH_PROFILE_KEYMAP_V1_VERSION, payload, 1920u);
+    declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEYMAP);
+    expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+
+    compatible.runtime = &runtime;
+    reset_placement_log(-1);
+    refused_keycode = 0u;
+    expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+    assert(placement_seen[NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_KEYMAP] == 16u * 60u);
+
+    // Layer 9, position 33 (row 5, column 3 of a six-column matrix).
+    uint32_t index  = 9u * 60u + 33u;
+    refused_keycode = (uint16_t)(0x0004u + index * 37u);
+    expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.domain_id == NOAH_PROFILE_DOMAIN_V1_KEYMAP && error.table_id == 9u && error.row_index == 33u && error.byte_offset == 14u + 2u * index);
+    compatible.runtime = NULL;
+
+    // One keycode short, one keycode over, or a different geometry.
+    for (int delta = -2; delta <= 2; delta += 4) {
+        length      = single_domain_profile(bytes, NOAH_PROFILE_DOMAIN_V1_KEYMAP, NOAH_PROFILE_KEYMAP_V1_VERSION, payload, (uint32_t)(1920 + delta));
+        declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEYMAP);
+        expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+        assert(error.domain_id == NOAH_PROFILE_DOMAIN_V1_KEYMAP && error.byte_offset == 14u);
+    }
+    length      = single_domain_profile(bytes, NOAH_PROFILE_DOMAIN_V1_KEYMAP, NOAH_PROFILE_KEYMAP_V1_VERSION, payload, 1920u);
+    declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEYMAP);
+    compatible.placement_positions = 56u;
+    expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    compatible.placement_positions = 60u;
+    bytes[9] = NOAH_PROFILE_KEYMAP_V1_VERSION + 1u;
+    declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEYMAP);
+    expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+}
+
+// A macro bank of 128 terminated macros; `macros` is the text of the first
+// ones with '\0' separating them, the rest empty.
+static size_t macro_bank(uint8_t *out, const uint8_t *macros, size_t macros_length, uint8_t terminators) {
+    memcpy(out, macros, macros_length);
+    size_t   length = macros_length;
+    uint32_t ended  = 0u;
+    for (size_t i = 0; i < macros_length; i++) ended += macros[i] == 0u;
+    while (ended < terminators) {
+        out[length++] = 0u;
+        ended++;
+    }
+    return length;
+}
+
+static noah_profile_validator_v1_result_t validate_macro_bank(const uint8_t *macros, size_t macros_length, uint8_t terminators, noah_profile_validator_v1_error_t *error) {
+    static uint8_t                            payload[NOAH_PROFILE_MACROS_V1_MAX_SIZE + 64u], bytes[sizeof(payload) + 16u];
+    noah_profile_validator_v1_compatibility_t compatible  = single_domain_compatibility();
+    size_t                                    length      = single_domain_profile(bytes, NOAH_PROFILE_DOMAIN_V1_MACROS, NOAH_PROFILE_MACROS_V1_VERSION, payload, (uint32_t)macro_bank(payload, macros, macros_length, terminators));
+    noah_profile_validator_v1_declaration_t   declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MACROS);
+    memcpy(&bytes[14], payload, length - 14u);
+    declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MACROS);
+    return validate(bytes, length, &declaration, &compatible, error);
+}
+
+#define MACRO_BYTES(...) ((const uint8_t[]){__VA_ARGS__}), sizeof((const uint8_t[]){__VA_ARGS__})
+
+// The bank's encoding, byte by byte: what VIA's bank holds and the playback
+// decoder reads. A rejection names the macro it falls in.
+static void test_macro_domain(void) {
+    noah_profile_validator_v1_error_t error;
+
+    // 128 empty macros, and every token the encoding has.
+    expect_result(validate_macro_bank(MACRO_BYTES(0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+    expect_result(validate_macro_bank(MACRO_BYTES('h', 'i', 0, 1, 1, 0x04, 1, 2, 0xE1, 1, 1, 0x2C, 1, 3, 0xE1, 0, 1, 4, '2', '5', '0', '|', 'x', 0, 1, 4, '5', 0, 1, 5, 2, 'a', 0, 0xC3, 0xA9, 0xE2, 0x82, 0xAC, 0xF0, 0x9F, 0x98, 0x80, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+
+    // Missing macros fail; unused capacity after slot 127 is allowed.
+    expect_result(validate_macro_bank(MACRO_BYTES(0), 127u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.domain_id == NOAH_PROFILE_DOMAIN_V1_MACROS && error.row_index == 127u);
+    expect_result(validate_macro_bank(MACRO_BYTES(0), 129u, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+    expect_result(validate_macro_bank(MACRO_BYTES(0, 'a'), 127u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.row_index == 127u);
+
+    // Shortening VIA macros can leave old bytes beyond the final slot. Keep
+    // those exact bank bytes, but still require the final validity sentinel.
+    uint8_t padded[131] = {0};
+    padded[128] = 1; padded[129] = 0xff;
+    expect_result(validate_macro_bank(padded, sizeof(padded), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+    padded[130] = 'x';
+    expect_result(validate_macro_bank(padded, sizeof(padded), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+
+    // A code cut off by the terminator, an unknown code, a zero keycode, a
+    // protection level that is not the macro's start or not 1..2.
+    expect_result(validate_macro_bank(MACRO_BYTES(0, 'a', 1, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.row_index == 1u && error.byte_offset == 14u + 3u);
+    expect_result(validate_macro_bank(MACRO_BYTES(1, 1, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    expect_result(validate_macro_bank(MACRO_BYTES(1, 6, 'a', 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    expect_result(validate_macro_bank(MACRO_BYTES('a', 1, 5, 1, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    expect_result(validate_macro_bank(MACRO_BYTES(1, 5, 3, 'a', 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    expect_result(validate_macro_bank(MACRO_BYTES(1, 5, 1, 'a', 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+
+    // UTF-8 the decoder refuses: a bare continuation, an overlong form, a
+    // surrogate, a C1 control, a character cut off by the terminator.
+    expect_result(validate_macro_bank(MACRO_BYTES(0x80, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    expect_result(validate_macro_bank(MACRO_BYTES(0xC0, 0xAF, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    expect_result(validate_macro_bank(MACRO_BYTES(0xE0, 0x80, 0xAF, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    expect_result(validate_macro_bank(MACRO_BYTES(0xED, 0xA0, 0x80, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    expect_result(validate_macro_bank(MACRO_BYTES(0xC2, 0x85, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    expect_result(validate_macro_bank(MACRO_BYTES(0xE2, 0x82, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    expect_result(validate_macro_bank(MACRO_BYTES(0xF4, 0x90, 0x80, 0x80, 0), 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+
+    // The whole bank, and one byte more.
+    static uint8_t full[NOAH_PROFILE_MACROS_V1_MAX_SIZE + 1u];
+    memset(full, 'x', sizeof(full));
+    for (unsigned slot = 0u; slot < NOAH_PROFILE_MACROS_V1_SLOTS; slot++) full[NOAH_PROFILE_MACROS_V1_MAX_SIZE - 1u - slot] = 0u;
+    expect_result(validate_macro_bank(full, NOAH_PROFILE_MACROS_V1_MAX_SIZE, 128u, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+    full[0] = 'y';
+    memmove(&full[1], full, NOAH_PROFILE_MACROS_V1_MAX_SIZE);
+    expect_result(validate_macro_bank(full, NOAH_PROFILE_MACROS_V1_MAX_SIZE + 1u, 128u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.byte_offset == 14u);
+}
+
 int main(int argc, char **argv) {
     assert(argc == 2);
     test_golden_incremental_phases(argv[1]);
@@ -608,6 +764,8 @@ int main(int argc, char **argv) {
     test_read_failures(argv[1]);
     test_combo_domain();
     test_combo_domain_v3();
+    test_keymap_domain();
+    test_macro_domain();
     puts("profile validator v1 host tests passed");
     return 0;
 }

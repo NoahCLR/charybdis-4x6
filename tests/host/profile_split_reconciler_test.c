@@ -276,6 +276,8 @@ static void half_storage_init_compiled(half_t *half, const uint8_t *bytes, uint3
     noah_profile_validator_v1_profile_t       profile;
     noah_effective_profile_snapshot_t         compiled;
     noah_profile_validator_v1_compatibility_t compatibility = noah_profile_validator_v1_default_compatibility(ACTION_ABI_DIGEST);
+    // The maximum fixture contains the production 16 x 60 keymap.
+    compatibility.placement_positions = 60u;
     noah_profile_store_record_t               selected;
 
     memset(half, 0, sizeof(*half));
@@ -1075,6 +1077,7 @@ static void test_maximum_candidate_resolves_within_owner_no_progress_window(void
     uint32_t                        progress_at  = start_at;
     uint32_t                        longest_gap  = 0u;
     size_t                          last_reads   = 0u;
+    uint8_t last_phase = 0u;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -1092,7 +1095,8 @@ static void test_maximum_candidate_resolves_within_owner_no_progress_window(void
         resolved_at = start_at + scan * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS;
         assert_one_scan_budget(&right, true, resolved_at);
         assert_one_scan_budget(&left, false, resolved_at);
-        if (source.reads != last_reads) {
+        if (source.reads != last_reads || right.reconciler.prepare_progress_phase > last_phase) {
+            last_phase = right.reconciler.prepare_progress_phase;
             last_reads  = source.reads;
             progress_at = resolved_at;
         }
@@ -1143,6 +1147,7 @@ static void test_maximum_profile_prepares_and_commits_on_the_peer(void) {
     uint32_t                        progress_at = start_at;
     uint32_t                        longest_gap = 0u;
     size_t                          last_reads  = 0u;
+    uint8_t last_phase = 0u;
 
     half_storage_init(&left);
     half_storage_init(&right);
@@ -1159,7 +1164,8 @@ static void test_maximum_profile_prepares_and_commits_on_the_peer(void) {
         now = start_at + scan * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS;
         assert_one_scan_budget(&right, true, now);
         assert_one_scan_budget(&left, false, now);
-        if (source.reads != last_reads) {
+        if (source.reads != last_reads || right.reconciler.prepare_progress_phase > last_phase) {
+            last_phase = right.reconciler.prepare_progress_phase;
             last_reads  = source.reads;
             progress_at = now;
         }
@@ -2265,7 +2271,7 @@ static void test_descriptor_changes_are_validated_before_backoff(void) {
 // STORE_WORKING is quick only for a complete, correlated remote copy.
 // A stale tuple, short copy or different storage owner keeps the backoff.
 static void test_store_completion_polling_requires_the_matching_full_copy(void) {
-    for (unsigned variant = 0u; variant < 8u; variant++) {
+    for (unsigned variant = 0u; variant < 11u; variant++) {
         half_t left, right;
         staged_source_t source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
         half_storage_init(&left);
@@ -2294,9 +2300,13 @@ static void test_store_completion_polling_requires_the_matching_full_copy(void) 
             case 5u: right.link.injected.busy_store_state = NOAH_PROFILE_PEER_STORE_RECEIVING; break;
             case 6u: right.link.injected.busy_store_state = NOAH_PROFILE_PEER_STORE_PREPARING; break;
             case 7u: right.link.injected.busy_store_state = NOAH_PROFILE_PEER_STORE_COMMITTING; break;
+            case 8u: right.link.injected.payload_digest++; break;
+            case 9u: right.link.injected.payload_length++; break;
+            case 10u: right.link.injected.busy_owner = NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL; break;
         }
         assert_one_scan_budget(&right, true, 100000u);
-        bool working = variant == 0u || variant >= 6u;
+        bool working = variant == 0u || variant == 6u || variant == 7u;
+        assert(right.reconciler.prepare_progress_phase == (working ? right.link.injected.busy_store_state : 0u));
         assert(right.reconciler.next_attempt_at == 100000u + (working ? NOAH_PROFILE_SPLIT_STORE_POLL_MS : 100u));
         assert(right.reconciler.retry_ms == (working ? 100u : 200u));
     }
@@ -2509,16 +2519,12 @@ static void test_wide_reuse_through_the_reconciler(void) {
 int main(int argc, char **argv) {
     assert(argc == 2);
     load_maximum_profile(argv[1]);
-    // The wide build runs only the copies past 64 KiB: the rest of the suite
-    // sweeps faults over the maximum copy, which the wide geometry makes
-    // more than twice as long without testing anything new.
+    // Production slots now exercise both the wide copies and the full fault
+    // suite; no early return may hide the original coverage.
     make_wide_profile();
     test_wide_push_through_the_reconciler();
     test_wide_pull_through_the_reconciler();
     test_wide_reuse_through_the_reconciler();
-    test_maximum_profile_pull_is_bounded();
-    puts("profile split reconciler host tests passed (wide)");
-    return 0;
     test_maximum_profile_pull_is_bounded();
     test_maximum_profile_prepares_and_commits_on_the_peer();
     test_store_completion_polling_requires_the_matching_full_copy();

@@ -164,7 +164,7 @@ static void test_domain_envelopes(void) {
     for (size_t length = 0u; length < written; length++) {
         expect_result(noah_profile_domain_v1_decode(encoded, length, &decoded, &error), NOAH_PROFILE_CODEC_V1_TRUNCATED);
     }
-    encoded[0] = 0x60u;
+    encoded[0] = 0x80u;
     expect_result(noah_profile_domain_v1_decode(encoded, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN);
     encoded[0] = NOAH_PROFILE_DOMAIN_V1_RGB;
     encoded[1] = NOAH_PROFILE_DOMAIN_VERSION_RGB - 1u;
@@ -221,9 +221,9 @@ static void test_blob_rejections(const char *fixture_path) {
     expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_NONCANONICAL);
 
     memcpy(mutated, valid, valid_length);
-    mutated[8] = 0x60u;
+    mutated[8] = 0x80u;
     expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN);
-    assert(error.domain_index == 0u && error.domain_id == 0x60u);
+    assert(error.domain_index == 0u && error.domain_id == 0x80u);
     memcpy(mutated, valid, valid_length);
     mutated[9] = 2u;
     expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
@@ -268,7 +268,7 @@ static void test_blob_encoder_bounds(void) {
 
     expect_result(noah_profile_blob_v1_encode(domains, 2u, output, 19u, &written, &error), NOAH_PROFILE_CODEC_V1_OUTPUT_TOO_SMALL);
     expect_result(noah_profile_blob_v1_encode(domains, 3u, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_DUPLICATE_DOMAIN);
-    domains[1].id = 0x60u;
+    domains[1].id = 0x80u;
     expect_result(noah_profile_blob_v1_encode(domains, 2u, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN);
     domains[1].id      = NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS;
     domains[1].version = NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS + 1u;
@@ -403,7 +403,7 @@ static void test_current_domain_registry(void) {
     // Frozen wire identities: changing the registry cannot silently renumber
     // a domain/mask or broaden current-format admission.
     const noah_profile_domain_shape_t expected[] = {
-        {0x10, 0, 1, 4}, {0x20, 1, 2, 2}, {0x30, 2, 4, 3}, {0x40, 3, 8, 8}, {0x50, 4, 16, 3},
+        {0x10, 0, 1, 4}, {0x20, 1, 2, 2}, {0x30, 2, 4, 3}, {0x40, 3, 8, 8}, {0x50, 4, 16, 3}, {0x60, 5, 32, 1}, {0x70, 6, 64, 1},
     };
     assert(NOAH_PROFILE_DOMAIN_REGISTRY_COUNT == sizeof(expected) / sizeof(expected[0]));
     uint8_t mask = 0;
@@ -419,7 +419,7 @@ static void test_current_domain_registry(void) {
             expect_result(noah_profile_domain_v1_encode(&domain, encoded, sizeof(encoded), &written, NULL), version == expected[i].version ? NOAH_PROFILE_CODEC_V1_OK : NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
         }
     }
-    assert(mask == NOAH_PROFILE_DOMAIN_MASK_ALL && !noah_profile_domain_at(NOAH_PROFILE_DOMAIN_REGISTRY_COUNT) && !noah_profile_domain_find(0x60));
+    assert(mask == NOAH_PROFILE_DOMAIN_MASK_ALL && !noah_profile_domain_at(NOAH_PROFILE_DOMAIN_REGISTRY_COUNT) && !noah_profile_domain_find(0x80));
 }
 
 // Publication finds a domain by walking the envelope, so a validated profile

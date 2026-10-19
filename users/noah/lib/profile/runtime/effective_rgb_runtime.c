@@ -154,3 +154,7 @@ noah_effective_rgb_result_t noah_effective_rgb_frame_status(const noah_effective
 _Static_assert(sizeof(noah_effective_rgb_runtime_t) <= NOAH_EFFECTIVE_RGB_RUNTIME_STATE_BUDGET_32BIT, "effective RGB runtime state exceeded its 32-bit regression policy");
 _Static_assert(sizeof(noah_effective_rgb_frame_t) <= NOAH_EFFECTIVE_RGB_FRAME_BUDGET_32BIT, "effective RGB frame exceeded its 32-bit regression policy");
 #endif
+
+uint32_t noah_effective_rgb_publication_epoch(void) {
+    return installed_runtime ? installed_runtime->next_epoch : 0u;
+}

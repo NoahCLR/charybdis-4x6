@@ -8,7 +8,6 @@
 
 #    include <string.h>
 
-#    include "keymap_introspection.h" // QMK
 
 static bool layer_key_led_map_dirty = true;
 static bool layer_key_led_map[LAYER_COUNT][RGB_MATRIX_LED_COUNT];
@@ -61,6 +60,12 @@ static bool rgb_runtime_layer_stage_keycode_is_mapped(uint16_t keycode) {
 }
 
 static void rgb_runtime_layer_stage_rebuild_key_led_map(void) {
+    static uint32_t epoch;
+    uint32_t current = noah_effective_rgb_publication_epoch();
+    if (epoch != current) {
+        epoch = current;
+        layer_key_led_map_dirty = true;
+    }
     if (!layer_key_led_map_dirty) {
         return;
     }
@@ -70,7 +75,7 @@ static void rgb_runtime_layer_stage_rebuild_key_led_map(void) {
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
         for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
             for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-                uint16_t keycode = keycode_at_keymap_location(layer, row, col);
+                uint16_t keycode = keymap_key_to_keycode(layer, (keypos_t){.row = row, .col = col});
                 if (!rgb_runtime_layer_stage_keycode_is_mapped(keycode)) {
                     continue;
                 }

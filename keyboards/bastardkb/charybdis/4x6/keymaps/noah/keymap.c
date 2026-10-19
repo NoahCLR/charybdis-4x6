@@ -933,6 +933,10 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format on
 };
 
+// VIA_MACROS() above in the bank encoding; tools/profile_introspect.py --write
+// regenerates it.
+#include "authored_macro_bank.h"
+
 // Expand the authored macro tables, combo table, and derived counts above
 // into the runtime symbols expected by the userspace runtime and QMK.
 MATERIALIZE_KEYMAP_DATA();

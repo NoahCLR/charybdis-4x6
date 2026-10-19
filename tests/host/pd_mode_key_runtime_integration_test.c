@@ -147,6 +147,11 @@ static uint8_t       gesture_host_mods;
 // keyboard_mod_policy_begin_action_replay() applies them.
 static bool          gesture_replaying;
 static uint8_t       gesture_replay_mods;
+// This gesture harness has no macro bank. Macro-provider/engine integration
+// is exercised by the profile variant of the macro lifecycle suite.
+bool noah_profile_macro_start(uint16_t action) { (void)action; return false; }
+bool noah_profile_macro_try_play(uint16_t action) { return IS_QK_MACRO(action); }
+
 // Effective policy views used by the production pre-process/member gates.
 // This harness models published settings and rows without EEPROM I/O.
 static uint32_t      gesture_combo_layers = UINT32_MAX;

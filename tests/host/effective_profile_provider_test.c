@@ -570,7 +570,40 @@ static void test_backing_reuse_requires_explicit_active_aware_reservation(void) 
     assert(noah_effective_profile_provider_request_validated(&provider, &compiled_as_live) == NOAH_EFFECTIVE_PROFILE_ACTIVE_BACKING_PINNED);
 }
 
+static void test_keymap_and_macro_publication_requires_safe_boundary(void) {
+    const uint8_t ids[] = {NOAH_PROFILE_DOMAIN_V1_KEYMAP, NOAH_PROFILE_DOMAIN_V1_MACROS};
+    const uint8_t masks[] = {NOAH_PROFILE_DOMAIN_MASK_KEYMAP, NOAH_PROFILE_DOMAIN_MASK_MACROS};
+    for (size_t domain = 0; domain < 2; domain++) {
+        uint8_t bytes[14 + 2048] = {0};
+        uint16_t payload_length = domain == 0 ? 2048 : 128;
+        memcpy(bytes, "NLP1\4\0\1\1", 8);
+        bytes[8] = ids[domain]; bytes[9] = 1;
+        bytes[10] = (uint8_t)payload_length; bytes[11] = (uint8_t)(payload_length >> 8);
+        noah_profile_reader_t reader = noah_profile_reader_from_memory(bytes, 14 + payload_length);
+        noah_profile_validator_v1_profile_t profile = validate_profile(&reader, 0, 14 + payload_length, masks[domain]);
+        backing_t backing;
+        init_backing(&backing, 0);
+        noah_effective_profile_snapshot_t compiled = make_compiled(&backing), live;
+        assert(noah_effective_profile_snapshot_make_validated(&profile, &reader, 0, 1, 0, compiled.identity.payload_digest, &live) == NOAH_EFFECTIVE_PROFILE_OK);
+        noah_effective_profile_provider_t provider;
+        assert(noah_effective_profile_provider_init(&provider, &compiled, NULL, NULL, NULL, 0) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(noah_effective_profile_provider_request_validated(&provider, &live) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_SAFE_BOUNDARY_REQUIRED);
+        safe_boundary_reason_mask = REASON_KEYS_HELD | REASON_MACRO_BUSY;
+        assert(noah_effective_profile_provider_init(&provider, &compiled, safe_boundary, &safe_boundary_reason_mask, NULL, 0) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(noah_effective_profile_provider_request_validated(&provider, &live) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_WAITING);
+        safe_boundary_reason_mask = 0;
+        assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
+        // Removing a domain changes output too, even though the fallback is empty.
+        provider.safe_boundary = NULL;
+        assert(noah_effective_profile_provider_request_compiled_fallback(&provider) == NOAH_EFFECTIVE_PROFILE_OK);
+        assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_SAFE_BOUNDARY_REQUIRED);
+    }
+}
+
 int main(void) {
+    test_keymap_and_macro_publication_requires_safe_boundary();
     test_initial_compiled_snapshot_and_fail_closed_copies();
     test_nested_domain_views_must_stay_inside_blob();
     test_safe_boundary_reentrancy_and_missing_behavior_predicate();

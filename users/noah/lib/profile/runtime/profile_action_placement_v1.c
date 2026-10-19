@@ -17,6 +17,10 @@ bool noah_profile_action_placement_v1_supported(const noah_profile_action_v1_t *
     }
 
     switch (placement) {
+        case NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_KEYMAP:
+            // Empty and transparent matrix positions are valid keys.
+            if (native == KC_NO || native == KC_TRNS) return true;
+            return noah_action_supported_at(native, NOAH_ACTION_PLACEMENT_KEY);
         case NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_KEY:
             return noah_action_supported_at(native, NOAH_ACTION_PLACEMENT_KEY);
         case NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP:

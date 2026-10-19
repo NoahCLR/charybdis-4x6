@@ -6,7 +6,8 @@ sixteen groups, sixteen layer colours and 32 group rows; 128 behaviour rows of
 five full steps (640 steps); 128 combos of sixteen inputs; settings v8 with
 a shortcut on every custom key and every one of its 273 names at 32 bytes of
 UTF-8; and 32 pointing slots, each
-named with 32 bytes. Values reach the edges the plan names: layers 7, 8 and
+named with 32 bytes; the full 1,920-byte matrix and 34,903-byte macro bank.
+Values reach the edges the plan names: layers 7, 8 and
 15, combo rows 31, 32, 63, 64 and 127, macros and custom keys 0, 63, 64 and
 127. It is test evidence built from the byte specs, not from firmware code.
 
@@ -15,6 +16,8 @@ named with 32 bytes. Values reach the edges the plan names: layers 7, 8 and
 """
 
 import json
+import subprocess
+import tempfile
 import struct
 import sys
 import zlib
@@ -24,7 +27,15 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "tests/fixtures/maximum_profile_v4.fixture"
 LAYERS = 16
 DEPTH = 5
-PAYLOAD_MAX = 130048  # one 128 KiB slot less the kilobyte its header and marker take on flash (D-F29)
+def slot_payload_max() -> int:
+    with tempfile.TemporaryDirectory() as directory:
+        probe = Path(directory) / "slot"
+        source = '#include <stdio.h>\n#include "users/noah/lib/profile/storage/profile_storage_layout.h"\nint main(void) { printf("%u", (unsigned)NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX); }\n'
+        subprocess.run(["cc", "-x", "c", "-I", str(ROOT), "-o", str(probe), "-"], input=source, text=True, check=True)
+        return int(subprocess.check_output([str(probe)], text=True))
+
+
+PAYLOAD_MAX = slot_payload_max()
 ALLOWANCE = 12288  # reserved for future payload (per-key RGB and other additions)
 
 KIND_KEY, KIND_LAYER_MO, KIND_LAYER_LOCK, KIND_PD, KIND_PD_LOCK, KIND_MACRO, KIND_CUSTOM = 1, 2, 3, 4, 5, 6, 7
@@ -180,8 +191,17 @@ def pointing() -> bytes:
     return bytes(full)
 
 
+def keymap() -> bytes:
+    return b"".join(struct.pack("<H", basic_keycode(layer + position)) for layer in range(16) for position in range(60))
+
+
+def macros() -> bytes:
+    # One long stream and all 128 terminators fill today's bank exactly.
+    return b"a" * (34903 - 128) + b"\0" * 128
+
+
 def blob() -> tuple[bytes, list[tuple[int, int, bytes]]]:
-    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 8, settings()), (0x50, 3, pointing())]
+    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 8, settings()), (0x50, 3, pointing()), (0x60, 1, keymap()), (0x70, 1, macros())]
     out = bytearray(b"NLP1" + bytes([4, 0, len(domains), 1]))
     for domain_id, version, payload in domains:
         out += bytes([domain_id, version]) + struct.pack("<I", len(payload)) + payload

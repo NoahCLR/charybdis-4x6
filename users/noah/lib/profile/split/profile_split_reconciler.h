@@ -141,6 +141,8 @@ typedef struct {
     // starts, and a peer that never answers needs a restart.
     bool peer_cleanup_pending;
     bool prepared_push_active;
+    // Highest correlated peer work phase for this copy; repetitions are not progress.
+    uint8_t prepare_progress_phase;
 } noah_profile_split_reconciler_status_t;
 
 typedef enum {
@@ -257,6 +259,7 @@ typedef struct {
     // bytes.
     bool                                   reuse_unavailable;
     bool incoming_reuse_active;
+    uint8_t prepare_progress_phase;
 } noah_profile_split_reconciler_t;
 
 void noah_profile_split_reconciler_init(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_reconciler_config_t *config);
@@ -297,6 +300,9 @@ bool noah_profile_split_reconciler_refresh_authority(noah_profile_split_reconcil
 
 const noah_profile_split_authority_t *noah_profile_split_reconciler_authority(const noah_profile_split_reconciler_t *reconciler);
 bool                                  noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_reconciler_status_t *status);
+// The two fields a host save watches for peer progress, without copying the
+// whole status onto the scan path's stack.
+bool noah_profile_split_reconciler_progress(const noah_profile_split_reconciler_t *reconciler, uint32_t *transfer_offset, uint8_t *prepare_progress_phase);
 
 #ifdef NOAH_PROFILE_SPLIT_TEST_HOOKS
 void noah_profile_split_test_local_validation(void);

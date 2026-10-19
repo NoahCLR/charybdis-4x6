@@ -183,6 +183,14 @@
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
         },
         {
+          "name": "peer reuse compiled keymap materialization (writer inlined into write_domain)",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain"]
+        },
+        {
+          "name": "peer reuse compiled macros materialization (writer inlined into write_domain)",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain"]
+        },
+        {
           "name": "peer reuse candidate write",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "advance_incoming_reuse", "write_candidate", "io_write", "flash_write", "write_flash", "flush", "rp2040_program_page"]
         },
@@ -259,6 +267,14 @@
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
         },
         {
+          "name": "candidate reuse compiled keymap materialization (writer inlined into write_domain)",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain"]
+        },
+        {
+          "name": "candidate reuse compiled macros materialization (writer inlined into write_domain)",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "read_source", "noah_profile_candidate_store_backend_read_active", "noah_profile_reader_read", "compiled_reader_read", "write_domain"]
+        },
+        {
           "name": "engineering owner host validation step",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_transaction_scan", "validation_step", "noah_profile_validator_v1_step"]
         },
@@ -312,11 +328,11 @@
         },
         {
           "name": "Compiled RGB boot cache materialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_compiled_v1_write", "rgb_group_id", "rgb_group_is_first", "rgb_group_bitmap"]
         },
         {
           "name": "Compiled RGB boot cache validation",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_v1_validation_step", "read_bytes", "noah_profile_reader_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "noah_effective_rgb_runtime_invalidate", "noah_profile_rgb_compiled_v1_view", "noah_profile_rgb_v1_validation_step", "read_bytes", "noah_profile_reader_read"]
         },
         {
           "name": "Compiled RGB published fallback materialization",
@@ -332,7 +348,7 @@
         },
         {
           "name": "Compiled settings boot cache materialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_effective_settings_invalidate", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "noah_effective_settings_invalidate", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_settings_defaults_byte"]
         },
         {
           "name": "Compiled settings published fallback materialization",
@@ -340,7 +356,7 @@
         },
         {
           "name": "Compiled combo boot cache materialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_effective_combo_runtime_invalidate", "noah_profile_combo_v1_iteration_step", "read_at", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "noah_effective_combo_runtime_invalidate", "noah_profile_combo_v1_iteration_step", "read_at", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_compiled_v1_action"]
         },
         {
           "name": "Compiled combo published fallback materialization",

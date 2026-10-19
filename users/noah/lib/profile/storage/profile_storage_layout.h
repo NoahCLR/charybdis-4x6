@@ -47,12 +47,12 @@ typedef uint32_t noah_profile_storage_address_t;
 #define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x20000u
 #define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x3FFFFu
 #define NOAH_PROFILE_STORAGE_REGION_SIZE 0x40000u
-#define NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE 32u
+#define NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE 36u
 #define NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE 1u
 #define NOAH_PROFILE_STORAGE_SLOT_A_SIZE (NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR - NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + 1u)
 #define NOAH_PROFILE_STORAGE_SLOT_B_SIZE (NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR - NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + 1u)
 
-// Storage addresses are the store's view of a slot: its 32-byte header, the
+// Storage addresses are the store's view of a slot: its 36-byte header, the
 // commit marker as the header's last byte, then the payload. On flash no
 // 256-byte page is programmed twice between erases, so each part a save
 // programs on its own has a page of its own in the slot's first sector:

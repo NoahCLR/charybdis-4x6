@@ -102,6 +102,8 @@
     VIA_MACROS(_KEYMAP_VIA_MACRO_NAME_CHECK)                                                                                    \
     const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT]                 = {VIA_MACROS(_KEYMAP_VIA_MACRO_PAYLOAD_ENTRY)}; \
     const char        via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {VIA_MACROS(_KEYMAP_VIA_MACRO_NAME_ENTRY)}; \
+    const uint8_t     authored_macro_bank[]                                 = {NOAH_AUTHORED_MACRO_BANK};        \
+    const uint16_t    authored_macro_bank_size                              = sizeof(authored_macro_bank);      \
     _KEYMAP_COMBO_DATA()                                                                                                        \
     _KEYMAP_COMBO_COUNT_DATA();                                                                                                 \
     _KEYMAP_COMBO_OUTPUT_DATA();                                                                                                \

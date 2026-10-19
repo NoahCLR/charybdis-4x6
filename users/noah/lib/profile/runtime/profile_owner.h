@@ -28,8 +28,8 @@ enum {
     NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT = 11520u,
     // Ordinary host staging expires after 15 seconds without host-owned work.
     // Split preparation has a separate no-progress window: it bounds the
-    // longest stretch without transfer progress, not the whole copy, which for
-    // a maximum 53,216-byte profile spans thousands of request intervals.
+    // longest stretch without transfer or correlated peer-phase progress, not
+    // the whole copy. Repeated BUSY replies never extend the deadline.
     NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS             = 15000u,
     NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS = 60000u,
 };
@@ -113,6 +113,7 @@ typedef struct {
     uint32_t                             host_last_activity_at;
     uint32_t                             host_barrier_progress_offset;
     uint8_t                              scheduler_cursor;
+    uint8_t                              host_barrier_progress_phase;
     bool                                 boot_activation_started : 1;
     bool                                 peer_activation_started : 1;
     bool                                 host_activity_known : 1;

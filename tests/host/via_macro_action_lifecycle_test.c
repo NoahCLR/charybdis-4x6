@@ -52,6 +52,27 @@ static uint32_t    test_release_count;
 static uint32_t    test_press_digest;
 static uint32_t    fake_time;
 
+#ifdef NOAH_PROFILE_PROVIDER_TEST
+// Same engine/output fixture, with a profile-bank read seam in place of VIA.
+static uint32_t profile_epoch;
+static bool profile_bank_live = true;
+const char *const via_macro_payloads[128] = {[0] = "default"};
+uint32_t noah_setting(uint8_t id, uint32_t fallback) { (void)id; return fallback; }
+uint32_t noah_effective_keymap_macros_publication(void) { return profile_epoch; }
+bool noah_effective_macro_bank_is_live(void) { return profile_bank_live; }
+uint16_t noah_effective_macro_bank_length(void) { return fake_macro_buffer_size; }
+// Counts calls: the provider searches a chunk per read, decodes a byte per read.
+bool noah_effective_macro_bank_read(uint16_t offset, uint8_t *bytes, uint16_t length) {
+    if (offset > fake_macro_buffer_size || length > fake_macro_buffer_size - offset) return false;
+    macro_buffer_read_count++;
+    memcpy(bytes, &macro_buffer[offset], length);
+    return true;
+}
+bool noah_effective_macro_read_byte(uint16_t offset, uint8_t *byte, void *context) {
+    return noah_effective_macro_bank_read((uint16_t)(*(const uint16_t *)context + offset), byte, 1u);
+}
+#endif
+
 uint32_t timer_read32(void) {
     return fake_time;
 }
@@ -91,6 +112,9 @@ static void test_log_call(test_call_kind_t kind, uint16_t value, uint8_t interva
 }
 
 static void test_reset_state(void) {
+#ifdef NOAH_PROFILE_PROVIDER_TEST
+    profile_epoch++;
+#endif
     macro_payload_debug_snapshot_t snapshot;
 
     macro_payload_debug_snapshot(&snapshot);
@@ -936,6 +960,30 @@ static void test_pointing_macros_use_existing_engine(void) {
 }
 
 int main(void) {
+#ifdef NOAH_PROFILE_PROVIDER_TEST
+    test_pointing_macros_use_existing_engine();
+    test_qmk_tap_command_uses_scan_driven_owned_lease();
+    test_qmk_down_and_up_commands_use_owned_register_and_unregister();
+    test_delay_command_matches_upstream_parsing();
+    test_plain_text_uses_scan_driven_ascii_leases();
+    test_macro_slot_lookup_skips_null_terminated_entries();
+    test_last_slot_starts_on_a_full_pool();
+    test_slot_six_authored_alt_gui_8_chord_uses_owned_keycode_lifecycle();
+    test_slot_six_long_delay_heavy_payload_replays_from_via_buffer();
+    test_zero_sized_macro_buffer_is_ignored();
+    test_non_terminated_macro_buffer_is_ignored();
+    test_busy_via_trigger_is_consumed_without_restarting();
+    test_macro_filling_the_bank_plays_to_its_end();
+    test_single_macro_uses_all_free_bank_space();
+    test_invalid_byte_late_in_a_long_macro_types_nothing();
+    test_reset_state();
+    profile_bank_live = false;
+    CHECK(noah_qmk_contract_start_via_macro(QK_MACRO_0));
+    test_run_macro_to_idle();
+    CHECK(test_call_count > 0);
+    puts("profile macro provider and engine lifecycle tests passed");
+    return 0;
+#endif
     test_pointing_macros_use_existing_engine();
     test_qmk_tap_command_uses_scan_driven_owned_lease();
     test_qmk_down_and_up_commands_use_owned_register_and_unregister();

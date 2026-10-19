@@ -346,55 +346,26 @@ static void test_recovery_reseed_reports_completion_without_rgb_side_effect(void
     CHECK(!noah_via_macro_defaults_last_seed_succeeded());
 }
 
-static void test_macro_reset_command_defers_reseed_to_matrix_scan(void) {
-    uint8_t cmd[] = {id_dynamic_keymap_macro_reset};
+// Typing reads the profile's keymap and macro domains. VIA's keymap and macro
+// writes would change nothing, so each is refused with id_unhandled: nothing is
+// written, mirrored, reseeded or reconciled, and nothing looks saved.
+static void test_keymap_and_macro_writes_are_refused(void) {
+    static const uint8_t commands[] = {
+        id_dynamic_keymap_set_keycode, id_dynamic_keymap_set_buffer, id_dynamic_keymap_reset,
+        id_dynamic_keymap_macro_set_buffer, id_dynamic_keymap_macro_reset,
+    };
+    for (size_t command = 0u; command < sizeof(commands); command++) {
+        uint8_t frame[32] = {commands[command], 0, 0, 1, 4};
 
-    test_reset_state();
-
-    CHECK(!via_command_kb(cmd, (uint8_t)sizeof(cmd)));
-    CHECK(dynamic_keymap_set_buffer_calls == 0);
-    CHECK(split_sync_pending_count == 1u);
-    CHECK((split_sync_pending_effects & NOAH_QMK_VIA_COMMAND_EFFECT_RESEED_MACROS) != 0u);
-    CHECK(!noah_via_macro_defaults_last_seed_succeeded());
-
-    noah_via_macro_defaults_matrix_scan();
-
-    CHECK(dynamic_keymap_set_buffer_calls > 0);
-    CHECK(noah_via_macro_defaults_last_seed_succeeded());
-    CHECK(rgb_invalidate_count == 0);
-}
-
-static void test_keymap_reset_commands_invalidate_rgb_and_request_split_sync(void) {
-    uint8_t set_keycode_cmd[] = {id_dynamic_keymap_set_keycode, 1, 2, 3, 0, 4};
-    uint8_t reset_cmd[]       = {id_dynamic_keymap_reset};
-
-    test_reset_state();
-
-    CHECK(!via_command_kb(set_keycode_cmd, (uint8_t)sizeof(set_keycode_cmd)));
-    CHECK(!via_command_kb(reset_cmd, (uint8_t)sizeof(reset_cmd)));
-    CHECK(rgb_invalidate_count == 0u);
-    CHECK(split_sync_pending_count == 2u);
-    CHECK(dynamic_keymap_set_buffer_calls == 0);
-
-    noah_via_macro_defaults_matrix_scan();
-    CHECK(rgb_invalidate_count == 1u);
-}
-
-// A VIA edit has to reach the other half straight away. The durable
-// reconciliation exists to survive disconnects and power cycles, and a session
-// that is deferred or stalled leaves the slave rendering the old keycodes --
-// which is exactly what happened when the mirror was removed. Both must run.
-static void test_keymap_write_mirrors_immediately_and_still_reconciles(void) {
-    uint8_t set_keycode_cmd[] = {id_dynamic_keymap_set_keycode, 1, 2, 3, 0, 4};
-
-    test_reset_state();
-
-    CHECK(!via_command_kb(set_keycode_cmd, (uint8_t)sizeof(set_keycode_cmd)));
-
-    CHECK(split_mirror_count == 1u);
-    CHECK(split_mirror_last_command == id_dynamic_keymap_set_keycode);
-    CHECK(split_mirror_last_length == (uint8_t)sizeof(set_keycode_cmd));
-    CHECK(split_sync_pending_count == 1u);
+        test_reset_state();
+        raw_hid_send_calls = 0u;
+        CHECK(via_command_kb(frame, (uint8_t)sizeof(frame)));
+        CHECK(frame[0] == id_unhandled && raw_hid_send_calls == 1u && raw_hid_last_command == id_unhandled);
+        CHECK(split_mirror_count == 0u && split_sync_pending_count == 0u);
+        CHECK(dynamic_keymap_set_buffer_calls == 0);
+        noah_via_macro_defaults_matrix_scan();
+        CHECK(dynamic_keymap_set_buffer_calls == 0 && rgb_invalidate_count == 0u);
+    }
 }
 
 // A command that mutates nothing must not be mirrored either, so the mirror
@@ -509,7 +480,8 @@ static void test_native_buffer_commands_reject_malformed_lengths(void) {
                 native_buffer_calls = raw_hid_send_calls = 0u;
                 // Check admission first so a failing regression has a clear
                 // verdict before the unguarded native copy reaches memory.
-                bool malformed = length < 4u || size > (unsigned)(length - 4u);
+                bool writes    = commands[command] == id_dynamic_keymap_set_buffer || commands[command] == id_dynamic_keymap_macro_set_buffer;
+                bool malformed = writes || length < 4u || size > (unsigned)(length - 4u);
                 if (malformed) {
                     CHECK(via_command_kb(frame, length));
                     CHECK(frame[0] == id_unhandled);
@@ -522,16 +494,13 @@ static void test_native_buffer_commands_reject_malformed_lengths(void) {
                 CHECK(native_buffer_calls == (malformed ? 0u : 1u));
                 CHECK(raw_hid_send_calls == (malformed ? 2u : 1u));
                 if (!malformed) {
-                    bool writes = commands[command] == id_dynamic_keymap_set_buffer || commands[command] == id_dynamic_keymap_macro_set_buffer;
-                    CHECK(split_mirror_count == (writes ? 1u : 0u));
-                    CHECK(split_sync_pending_count == (writes ? 1u : 0u));
+                    CHECK(split_mirror_count == 0u && split_sync_pending_count == 0u);
                     CHECK(raw_hid_last_command == commands[command]);
                 }
             }
         }
     }
-    // Valid SET commands scheduled deferred invalidation through the real
-    // hook. Drain it so this regression leaves the next test's runtime clean.
+    // Drain any deferred hook work so the next test's runtime starts clean.
     noah_via_macro_defaults_matrix_scan();
 }
 
@@ -542,9 +511,7 @@ int main(void) {
     test_seed_needs_every_terminator();
     test_eeprom_init_reports_seed_failure();
     test_recovery_reseed_reports_completion_without_rgb_side_effect();
-    test_macro_reset_command_defers_reseed_to_matrix_scan();
-    test_keymap_reset_commands_invalidate_rgb_and_request_split_sync();
-    test_keymap_write_mirrors_immediately_and_still_reconciles();
+    test_keymap_and_macro_writes_are_refused();
     test_non_mutating_command_is_not_mirrored();
     test_eeprom_reset_invalidates_rgb_and_reseeds_on_scan();
     test_layout_options_reconciles_without_claiming_write_through();

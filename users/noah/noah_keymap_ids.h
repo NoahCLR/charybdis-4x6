@@ -366,6 +366,10 @@ _Static_assert(NOAH_KEYCODE_USERSPACE_END - 1 <= QK_USER_MAX, "userspace keycode
 #define NOAH_KEYCODE_IS_CUSTOM_KEY(keycode_) ((keycode_) >= CUSTOM_KEY_0 && (keycode_) <= CUSTOM_KEY_127)
 
 extern const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT];
+// The same macros already in the bank encoding, generated at build time, so
+// writing the compiled defaults copies bytes instead of compiling macros.
+extern const uint8_t  authored_macro_bank[];
+extern const uint16_t authored_macro_bank_size;
 extern const char        via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
 extern const char        custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
 // Each custom key's authored shortcut, as settings v8 stores it: the report

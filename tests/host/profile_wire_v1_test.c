@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "users/noah/lib/profile/protocol/profile_wire_v1.h"
+#include "users/noah/lib/profile/schema/profile_versions.h"
 
 static const noah_profile_wire_v1_read_service_t service = {
     .capabilities =
@@ -31,8 +32,8 @@ static const noah_profile_wire_v1_read_service_t service = {
             .custom_key_slots             = 128u,
             .via_macro_slots              = 128u,
             // Past 65,535: the capacities are 32 bits wide (D-F28).
-            .max_profile_payload          = 131040u,
-            .profile_slot_payload         = 131040u,
+            .max_profile_payload          = NOAH_PROFILE_PAYLOAD_MAX,
+            .profile_slot_payload         = NOAH_PROFILE_PAYLOAD_MAX,
             .profile_slot_size            = 131072u,
             .via_macro_bytes              = 70000u,
             .supported_domain_mask        = 3u,
@@ -156,8 +157,8 @@ static void test_capability_pages(void) {
     assert_success(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x45u, 2u);
     assert(frame[7] == 0x80u && frame[8] == 0x02u);
     assert(frame[9] == 0x00u && frame[10] == 0x00u && frame[11] == 0x02u && frame[12] == 0x00u);
-    assert(frame[13] == 0xE0u && frame[14] == 0xFFu && frame[15] == 0x01u && frame[16] == 0x00u);
-    assert(frame[17] == 0xE0u && frame[18] == 0xFFu && frame[19] == 0x01u && frame[20] == 0x00u);
+    assert(frame[13] == 0x00u && frame[14] == 0xFCu && frame[15] == 0x01u && frame[16] == 0x00u);
+    assert(frame[17] == 0x00u && frame[18] == 0xFCu && frame[19] == 0x01u && frame[20] == 0x00u);
     assert(frame[21] == 0x70u && frame[22] == 0x11u && frame[23] == 0x01u && frame[24] == 0x00u);
     for (uint8_t index = 25u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
 

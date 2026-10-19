@@ -1,8 +1,7 @@
 # Live-Profile Field Classification
 
 This matrix classifies every user-relevant value represented by the three
-authoring files. It is the scope boundary between live data, standard VIA
-state, compiled ceilings, and executable firmware.
+authoring files. It is the scope boundary between live data, compiled ceilings, and executable firmware.
 
 The first-grade product goal requires this to be a complete inventory. A missing field is not implicitly out of
 scope: it must be added here and classified as live data, runtime-applicable
@@ -20,8 +19,8 @@ behavior. The UI must explain every intentional non-live boundary.
 | Tap action | Milestone A behavior action | 04 | action-schema validator and key runtime |
 | Hold/long-hold action | Milestone A behavior action | 04 | action-schema validator and key runtime |
 | Hold mode and repeat rate | Milestone A behavior policy | 04 | behavior validator and lifecycle runtime |
-| `keymaps[][]` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic keymap/VIA reconciliation |
-| `VIA_MACROS` | Standard VIA-owned state; C is compiled default | 06 | QMK dynamic macro storage |
+| `keymaps[][]` | Profile keymap domain `0x60` v1; C is compiled default | 06 | profile keymap validator and `keymap_key_to_keycode` override |
+| `VIA_MACROS` | Profile macro domain `0x70` v1; C is compiled default, also generated in the bank encoding as `authored_macro_bank.h` | 06 | profile bank validator, windowed macro provider, real-profile validation (stale bank) |
 | Macro names | Portable settings domain `0x40` v8, 128 counted UTF-8 names of at most 32 bytes each; replaces the retired user macros | 06 | profile schema |
 | Custom-key names | Portable settings domain `0x40` v8, 128 counted UTF-8 names of at most 32 bytes each after the macro names; `CUSTOM_KEYS` in C is the compiled default | 06 | profile schema |
 | `COMBOS` | GET `0x06` readout; optional live domain `0x30` for rows, timing and matching flags | 07 | combo validator/provider |

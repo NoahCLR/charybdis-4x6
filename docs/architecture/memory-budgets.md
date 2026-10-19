@@ -708,3 +708,61 @@ No path fails that passed before. The new flash paths pass: erase ahead in a
 quiet grant 312 bytes, a write that erases first 1,016, the commit sync
 1,080, the boot forget 168. The resource build stops at the right half's first
 failing manifest, so the left half was not analysed.
+
+
+## Profile keymap and macro domains — D-F30
+
+The effective keymap/macro binding borrows one immutable reader and two domain
+ranges instead of copying the matrix or bank. Key lookup reads two bytes from
+the stored matrix, or directly reads authored const data for compiled fallback;
+it never copies a provider snapshot or serializes compiled defaults on a key
+path. Macro playback keeps the existing 516-byte IR window and decoder. Its
+new slot metadata (128 bytes) and cached bank offset/length (6 bytes) coexist
+with the VIA provider during this additive transition: the VIA provider is
+still linked (its load, byte reader and invalidation symbols are in the right
+ELF), so the named-macro subtotal includes both providers; the shared engine
+window is counted once.
+
+Writing the compiled defaults never compiles a macro: the authored macros are
+generated already in the bank encoding (`authored_macro_bank.h`, about 330
+bytes of flash), so the writer copies bytes. A save that reuses the macro
+domain while the compiled defaults are active therefore no longer holds a
+516-byte IR on the scan stack.
+
+An instrumented right-half pair at firmware `ba24d84d`, based on the reviewed
+D-F29 fixes at `1a8bdd5e`, uses GCC 15.2.0 in the pinned build image and BK
+`d280a4471e`. SRAM0–3 `.data` is 4,352 bytes and `.bss` 98,792: 103,144
+combined, 280 bytes below the unchanged 103,424-byte regression tripwire. The
+named-macro subtotal is 826 bytes. These are linked figures, not runtime free
+memory or high-water.
+
+Ordinary manifest, macro paths: physical key lookup 432 bytes, compiled-default
+macro parse 1,728, saved macro slot search 1,784, held-sequence decode 1,852 and
+saved macro storage read 1,904. The decoder reads through the runtime's own
+byte reader, which calls the published reader's callback for a range bounded
+at publication, so the storage read is two frames shorter. Deferring the first
+window to the scan refill was not taken: every window must pass preflight
+before the first key is typed, on the key press. The slot search reads the bank
+32 bytes at a time: host full-bank tests take 1,093 profile-bank reads to find
+and play slot 127 (VIA's provider: 34,803) and 36,686 for a long macro after a
+17,000-byte one (VIA: 69,624). Those are operation counts, not scan timings.
+
+The resource build passes the static gate, then stops at the ordinary
+manifest's six inherited key-runtime overruns (1,952–2,304 bytes), so it does
+not build an instrumented left image. The owner manifest, run separately on
+the preserved right ELF, fails only the two paths already over on D-F29: peer
+large chunk write 1,968 and repeated chunk read 1,960 (D-F29 base 2,024 and
+2,016). Everything else passes, including peer reuse mailbox admission and its
+rejected reply (1,848 each, previously 1,936), large chunk mailbox decode
+(1,840, previously 1,928), and the compiled keymap and macro reuse paths (peer
+1,672, candidate 1,464; both writers are inlined into `write_domain`). The
+review traced the earlier admission and decode overruns to two frames, not to
+the domain metadata. `noah_qmk_durable_io_profile_step` had grown 24 bytes by
+inlining `initialize_runtime_graph`, whose invalidator array had become the
+provider's maximum of eight. That function is now boot-only and out of line,
+with its array sized to the runtimes compiled in. `scan_running` copied the
+whole split reconciler status to read two fields; it now reads only the
+transfer offset and phase. No budgets or tests were weakened. The complete
+stack gate and scan-cadence acceptance remain unresolved. Both halves' typing,
+layers, combos and macros from flashed defaults, scan cadence and runtime
+high-water remain keyboard acceptance.

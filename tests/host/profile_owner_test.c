@@ -21,6 +21,8 @@ typedef struct {
 
 typedef struct {
     noah_profile_owner_t *peer;
+    bool inject_busy;
+    noah_profile_split_v1_frame_t injected;
 } split_link_t;
 
 static uint32_t compiled_reads;
@@ -232,6 +234,10 @@ static bool split_exchange(void *context, const uint8_t *request, uint8_t reques
     split_link_t                    *link = context;
     noah_profile_split_reconciler_t *peer_reconciler;
 
+    if (link && link->inject_busy) {
+        link->inject_busy = false;
+        return noah_profile_split_v1_frame_encode(&link->injected, response, response_length) == response_length;
+    }
     if (!link || !link->peer || !(peer_reconciler = noah_profile_owner_split_reconciler(link->peer))) {
         return false;
     }
@@ -842,6 +848,59 @@ static void test_prepare_uses_extended_no_progress_timeout(void) {
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
     assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+}
+
+// A matching peer may cross the old 60-second whole-prepare duration while
+// advancing from validation to durable preparation. Only a new phase extends
+// the no-progress deadline; repeated BUSY never keeps a stalled copy alive.
+static void test_prepare_phase_progress_extends_only_once(void) {
+    noah_profile_owner_t left, right;
+    memory_t left_memory = {0}, right_memory = {0};
+    split_link_t left_link = {.peer = &right}, right_link = {.peer = &left};
+    uint32_t now = 300000;
+    uint8_t frame[32];
+    memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
+    memset(right_memory.bytes, 0xff, sizeof(right_memory.bytes));
+    boot_empty_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+    stage_valid_candidate_pair(&left, &right, 151u, &now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 151u);
+    send_and_scan_pair(&left, &right, frame, &now);
+    for (unsigned guard = 0; guard < 64 && !left.host_barrier_started; guard++) scan_pair(&left, &right, &now);
+    assert(left.host_barrier_started);
+    uint32_t started = left.host_last_activity_at;
+    left.reconciler.state = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_DURABLE;
+    left.reconciler.transfer_offset = left.reconciler.transfer_descriptor.payload_length;
+    left.host_barrier_progress_offset = left.reconciler.transfer_offset;
+    left.reconciler.prepare_progress_phase = NOAH_PROFILE_PEER_STORE_VALIDATING;
+    left.host_barrier_progress_phase = NOAH_PROFILE_PEER_STORE_VALIDATING;
+    left_link.injected = (noah_profile_split_v1_frame_t){
+        .kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY,
+        .generation = left.reconciler.transfer_descriptor.generation,
+        .payload_digest = left.reconciler.transfer_descriptor.payload_digest,
+        .payload_length = left.reconciler.transfer_descriptor.payload_length,
+        .offset = left.reconciler.transfer_descriptor.payload_length,
+        .busy_reason = NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING,
+        .busy_store_state = NOAH_PROFILE_PEER_STORE_PREPARING,
+        .busy_owner = NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH,
+        .busy_admission = NOAH_PROFILE_STORAGE_ADMISSION_PEER,
+    };
+    now = started + 50000;
+    left_link.inject_busy = true;
+    left.reconciler.attempt_immediate = true;
+    left.scheduler_cursor = 1; // owner split scheduler
+    noah_profile_owner_scan(&left, true, now);
+    assert(left.host_last_activity_at == now && left.host_barrier_progress_phase == NOAH_PROFILE_PEER_STORE_PREPARING);
+    uint32_t progressed = now;
+    now = started + 70000; // beyond the old whole-copy deadline
+    left_link.inject_busy = true;
+    left.reconciler.attempt_immediate = true;
+    left.scheduler_cursor = 1;
+    noah_profile_owner_scan(&left, true, now);
+    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
+    assert(left.host_last_activity_at == progressed && !left.host_cancel_pending);
+    left.reconciler.next_attempt_at = progressed + NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS + 1000;
+    noah_profile_owner_scan(&left, true, progressed + NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS);
+    assert(left.host_cancel_pending || left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
 }
 
 // The other half fails to store its copy (one flash write). Up to the split
@@ -1814,6 +1873,7 @@ int main(void) {
     test_barrier_mailbox_retries_and_postcommit_abort_do_not_starve();
     test_local_known_commit_failure_aborts_prepared_peer_first();
     test_prepare_uses_extended_no_progress_timeout();
+    test_prepare_phase_progress_extends_only_once();
     test_peer_store_write_failure_retries_then_fails_fast();
     test_unexpected_newer_postcommit_authority_never_activates();
     test_boot_reconciles_different_generations_before_activation();

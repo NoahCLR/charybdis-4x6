@@ -256,22 +256,24 @@ paths only and are not runtime high-water evidence.
 
 ### Schema-4 geometry (D-F14, D-F28)
 
-Store format 6 (D-F28) gives the payload length 32 bits. Its 32-byte slot
-header has no room left for a magic, so the format is keyed into the header
+Store format 6 (D-F28) gives the payload length 32 bits. Its 36-byte slot
+header (D-F30) has no room left for a magic, so the format is keyed into the header
 instead:
 
 | Byte | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | identity: domain bits 0–4, origin bit 5, override bit 6, bit 7 zero |
+| 0 | 1 | domain mask, seven known bits |
 | 1 | 4 | payload length, uint32 |
-| 5 | 4 | generation |
-| 9 | 4 | payload CRC32 |
-| 13 | 4 | compiled-default digest |
-| 17 | 4 | action-ABI digest |
-| 21 | 4 | bound VIA generation |
-| 25 | 4 | bound VIA digest |
-| 29 | 2 | CRC16-CCITT over the format version (one byte, `6`) then bytes 0–28 |
-| 31 | 1 | marker: erased `0xFF`, prepared `0x3C`, committed `0x18`, invalid `0x00` |
+| 5 | 1 | origin bit 0, override bit 1; other bits zero |
+| 6 | 4 | generation |
+| 10 | 4 | payload CRC32 |
+| 14 | 4 | compiled-default digest |
+| 18 | 4 | action-ABI digest |
+| 22 | 4 | bound VIA generation |
+| 26 | 4 | bound VIA digest |
+| 30 | 3 | reserved zero |
+| 33 | 2 | CRC16-CCITT over the format version (one byte, `6`) then bytes 0–32 |
+| 35 | 1 | marker: erased `0xFF`, prepared `0x3C`, committed `0x18`, invalid `0x00` |
 
 Format 5 (`NT`) had a two-byte magic, identity at byte 2, a 16-bit length at
 byte 3, an unkeyed CRC and markers `0xA5`/`0x5A`. A slot with the `NT` magic
@@ -305,8 +307,8 @@ which reads as no marker this format writes. The header and every cell lie in
 the slot's first sector, so erasing it clears the record at once. The first
 kilobyte is the record's, so a slot holds at most 130,048 payload bytes. Format 6 binds schema 4.0 and
 accepts only RGB v4, key-behavior v2, combo v3, settings v8 (v6 when it
-landed; D-F25 and D-F26 each added one) and sparse PD v3: the domain versions
-are schema 3.0's (D-F28).
+landed; D-F25 and D-F26 each added one), sparse PD v3, keymap v1 and macros
+v1 (D-F30). Existing domain versions are unchanged.
 
 Nothing in the format, the wire or the split copy stops at 64 KiB: host
 tests carry a 70,000-byte payload through the blob codec, the candidate upload,
@@ -395,7 +397,8 @@ peer) then end it as a failed save, and the previous profile stays active.
 Live mode saves only after a quiet period, so it does not meet this. Erase
 suspend is not used. The pointing sensor keeps counting motion during a
 pause, so pointing stutters rather than loses movement. A save of the maximum
-profile erases 10 sectors and programs about 152 pages.
+profile erases 19 sectors and programs about 297 pages, with the header and
+marker cells each programmed on their own page.
 
 Each half measures its own pauses since boot: longest sector erase, longest
 page program, the most flash time in one grant, and the last save's duration
@@ -426,22 +429,22 @@ program, never both, and no erase on a busy keyboard.
 Unlike the V1 ceilings above, every one of these is reachable at once.
 `tests/fixtures/maximum_profile_v4.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table at
-its maximum and every name at 32 bytes: 37,966 bytes (RGB 591, behaviours
+its maximum and every name at 32 bytes: 74,801 bytes (RGB 591, behaviours
 13,828, combos 9,736, settings 9,669 with every custom-key shortcut (D-F26),
-pointing 4,104, plus 38 bytes of header and six-byte envelopes). That leaves
-93,074 bytes of the 128 KiB slot (D-F29), more than the
-12 KiB reserved for future payload. The fixture is the maximum for the
-encodings, not a limit the firmware checks: a larger profile is refused only
-by a table's own ceiling or the slot.
+pointing 4,104, keymap 1,920, macros 34,903, plus 50 bytes of blob header and
+six-byte envelopes). The slot payload is 130,048 bytes after the 1 KiB physical
+record, containing the 36-byte logical header and marker cells (D-F30), leaving 55,247 bytes. Keeping the 12,288-byte future reserve
+still leaves 42,959 bytes. The generator reads the payload ceiling from the
+storage contract and refuses a fixture that cannot retain that reserve.
+The fixture is the maximum for these encodings, not a separate firmware
+payload limit: a larger profile is refused by a table's ceiling or the slot.
 
-The owner validates one step a matrix scan, each step one read of at most 20
-bytes. The maximum profile validates in 7,459 scans, a boot that adopts it
-publishes after 9,983, and a peer's prepared copy spends 9,374 scans
-validating and preparing without transfer progress (its steps read 20 bytes
-like the owner's; they read the 14-byte split chunk size before framing
-version 2), which the split harness's conservative
-5 ms scan keeps inside the owner's 60-second no-progress window. Real
-durations depend on the scan rate and are hardware acceptance evidence.
+The owner validates one bounded step per matrix scan, reading at most twenty
+bytes in that step. The keymap and macro domains add checksum and semantic
+passes over their bytes, without a larger per-step workspace or read. The
+owner/save/reboot and split suites exercise this complete fixture; actual
+validation, prepare and boot duration depend on keyboard scan cadence and
+remain hardware acceptance evidence.
 
 Split framing version 3 retains bounded mailbox, duplicate-request and outbound
 chunk buffers of at most 128 bytes, plus reuse source/progress state; it never

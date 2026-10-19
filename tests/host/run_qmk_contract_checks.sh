@@ -182,6 +182,11 @@ if "init_usb_driver(" not in body((qmk / "tmk_core/protocol/chibios/chibios.c").
 if not re.search(r"void\s+restart_usb_driver\(USBDriver \*usbp\);", (qmk / "tmk_core/protocol/chibios/usb_main.h").read_text(encoding="utf-8")):
     raise SystemExit("QMK's ChibiOS USB no longer offers restart_usb_driver")
 
+# The profile owns runtime lookup through BK's explicitly replaceable hook.
+keymap_common = (qmk / "quantum/keymap_common.c").read_text(encoding="utf-8")
+if not re.search(r"__attribute__\(\(weak\)\)\s+uint16_t\s+keymap_key_to_keycode\(", keymap_common):
+    raise SystemExit("QMK keymap_key_to_keycode must remain weak for profile lookup")
+
 qmk_toggle = re.search(r"^\s*#\s*define\s+TAPPING_TOGGLE\s+(\d+)\s*$", action_tapping_header, re.MULTILINE)
 our_toggle = re.search(r"^\s*#\s*define\s+NOAH_QMK_TAPPING_TOGGLE\s+(\d+)\s*$", tapping_contract, re.MULTILINE)
 if not (qmk_toggle and our_toggle and qmk_toggle.group(1) == our_toggle.group(1)):
