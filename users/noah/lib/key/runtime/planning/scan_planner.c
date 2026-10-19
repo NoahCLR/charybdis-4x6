@@ -497,6 +497,39 @@ void key_runtime_core_plan_active_scan_for_token(key_runtime_core_state_t *state
     }
 }
 
+// The scans a key missed while its press waited in record admission: held
+// records replay back to back, so a hold threshold the key crossed before at,
+// the physical time of the next event replayed after it, is planned now, in
+// order, as the scan at that threshold would have planned it. The hold gate
+// is read at each threshold, so a release queued after it does not undo the
+// hold, and one queued before it still ends the gesture (D-F01). A key the
+// scans have kept up with gets the same answer again.
+void key_runtime_core_plan_missed_scans_for_token(key_runtime_core_state_t *state, press_token_t *token, uint16_t at, key_runtime_core_effect_plan_t *plan) {
+    uint16_t current_time;
+    uint16_t thresholds[2];
+
+    if (!(state && token && token->active && token->handled_key && plan)) {
+        return;
+    }
+    current_time  = state->current_time;
+    thresholds[0] = token->interaction.binding.tap_hold_term;
+    thresholds[1] = token->interaction.binding.longer_hold_term;
+    if (thresholds[1] < thresholds[0]) {
+        thresholds[0] = token->interaction.binding.longer_hold_term;
+        thresholds[1] = token->interaction.binding.tap_hold_term;
+    }
+    for (uint8_t index = 0; index < 2u; index++) {
+        uint16_t since_press = key_runtime_core_scan_elapsed(token->pressed_at, at);
+
+        if (since_press < thresholds[index] || since_press > key_runtime_core_scan_elapsed(token->pressed_at, current_time)) {
+            continue;
+        }
+        state->current_time = (uint16_t)(token->pressed_at + thresholds[index]);
+        key_runtime_core_plan_active_scan_for_token(state, token, plan);
+    }
+    state->current_time = current_time;
+}
+
 bool key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_state_t *state       = key_runtime_core_state();
     bool                      settled_any = false;

@@ -48,3 +48,11 @@ uint8_t noah_qmk_combo_origin_record_source_layer(uint16_t keycode, const keyrec
 // without consuming its pending origin. Release uses
 // the matching press's snapshot, even when that press is still queued.
 void noah_qmk_combo_origin_capture_record(uint16_t keycode, keyrecord_t *record);
+// Where the runtime holds the dispatched output whose release, of this
+// keycode, dispatch pairs next: its chord's owner key. Record admission
+// judges a captured release there (D-F27 "Releases that wait").
+bool noah_qmk_combo_origin_release_owner(uint16_t keycode, keypos_t *out);
+// Whether QMK has delivered the release of an output held at owner_key_pos
+// that has not been dispatched yet: it is queued, so that output reaches no
+// later hold tier.
+bool noah_qmk_combo_origin_release_delivered_at(keypos_t owner_key_pos);

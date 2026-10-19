@@ -214,7 +214,8 @@ origin:
   active counts as suppressed. A completion not fired yet counts its deadline
   from the latest physical press, not its own: QMK restarts its combo timer at
   every combo key press, so a chord that completed first legally waits out a
-  later chord's window and both fire together
+  later chord's window and both fire together. A completion whose output
+  press QMK has delivered has no deadline (below)
 - conservative capacity refusal and snapshot diagnostics; a full cache never
   overwrites a still-awaiting origin
 - fallback owner recovery from the latest or last physical combo member, using a
@@ -241,9 +242,14 @@ follows the records, never only the chords still held:
 
 A completion seen firing therefore keeps its exact footprint, owner and
 permission until its press is dispatched, and its owner until its release is.
-A fired completion that never arrives retires one tapping term after it was
-seen firing, the longest a tap-hold decision queued ahead of it can take.
-Conservative owner recovery remains only for a completion never seen firing.
+A delivered press waits in record admission for as long as the key ahead of
+it is undecided, which no one setting bounds (a row's own hold time, a
+tap/hold setting above the dual-role one, a long hold: D-F27), and admission
+dispatches every record it holds, so a delivered press's completion has no
+deadline. A fired completion whose press QMK has not delivered can only be
+waiting behind a tap key QMK decides itself (`TT()`/`OSL()` to layers 16–31),
+so it retires one dual-role term after it was seen firing. Conservative owner
+recovery remains only for a completion never seen firing.
 
 It must not create or mutate key-runtime press tokens, tap series, release
 decisions, leases, layer locks, modifier ownership, or PD mode ownership. Its
@@ -495,20 +501,34 @@ so a held record is processed once, on replay. `noah_matrix_scan_user` runs the
 replay after the key runtime scan, so a hold reached that scan applies first;
 `key_runtime_core_undecided_dual_role_key_pos()` is the only decision it reads.
 It counts the keys whose hold changes other keys,
-`key_runtime_core_press_token_hold_changes_other_keys()`: LT/MT/OSM rows, keys
-whose hold is a layer held until release (the token's hold preview layer), and
-keys whose first hold tier is any layer action, modifiers only or a pointing
-mode. Preflight settles every other handled key on the next press instead
-(D-F27). A release is held when its press was, or when a key is undecided and
-the release is a modifier's or layer key's (D-F27, "Releases that wait"): for
-a handled key, `key_runtime_core_holds_layer_or_mods_at()`, whether it holds a
-layer or real modifiers now; for any other key, QMK's rule for its keycode.
+`key_runtime_core_press_token_hold_changes_other_keys()`: every LT/MT/OSM key,
+keys whose hold is a layer held until release (the token's hold preview
+layer), and keys whose first hold tier is any layer action, modifiers only or
+a pointing mode, while that hold is still to come (`TAP_WINDOW`). A hold that
+went on at the press (`PRESS_HELD_WINDOW`: `LM()`'s modifiers, a pointing
+key's own mode) is not undecided. Preflight settles every other handled key on
+the next press instead (D-F27), except a momentary layer key, whose quick tap
+the press cancels. A release is held when its press was, or when a key is
+undecided and the release is a modifier's or layer key's (D-F27, "Releases
+that wait"): for a handled key, `key_runtime_core_holds_layer_or_mods_at()`,
+whether it holds a layer or real modifiers now (a custom key's shortcut of
+modifiers alone counts); for any other key, QMK's rule for its keycode. A
+combo output's release is judged where the runtime holds that output, its
+chord's owner key (`noah_qmk_combo_origin_release_owner()`), and counts as
+queued for the hold gate there while it waits.
 Replay stops before such a release, as before a press, while a replayed key is
 undecided. The rule is `key_runtime_core_release_is_mods_or_layer()`. The
 record path applies it too, before the reducer takes in the release and drops
 the key's leases: a release that passes it settles every class-3 key first,
 at the release's physical time, through the same settle as another key's
-press (`key_runtime_preflight_settle_before_release()`). Before a press is resolved, physically or
+press (`key_runtime_preflight_settle_before_release()`). Held records replay
+back to back, with no scan between them, so preflight first plans the scans a
+key missed while its press waited: before another key's press and before its
+own release, at their physical times, it reaches each hold threshold it
+crossed, with the hold gate read at that threshold
+(`key_runtime_core_plan_missed_scans_for_token()`); a combo output's times
+count from its dispatch, so its own release has none to catch up. Before a
+press is resolved, physically or
 on replay, `noah_key_runtime_settle_layer_taps_before_press()` settles other
 keys' pending layer-changing taps when the press is of a key without a
 behaviour; it costs no lookup unless such a tap is pending.

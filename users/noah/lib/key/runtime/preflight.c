@@ -12,17 +12,30 @@
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../compat/qmk_gesture_timing.h"
 
-// Runs before the runtime observes the release, while the key still holds
-// its layer or modifiers: a key that another key's press would settle as a
-// tap is settled now, so its tap still gets them (D-F27).
+// Runs before the runtime observes the release. A physical key first reaches
+// any hold it was due before its release while its press waited in record
+// admission (D-F01); a combo output's times count from its dispatch, so it
+// has none to catch up. Then, while the key still holds its layer or
+// modifiers, a key that another key's press would settle as a tap is
+// settled, so its tap still gets them (D-F27).
 void key_runtime_preflight_settle_before_release(uint16_t keycode, keyrecord_t *record) {
     key_runtime_transition_plan_t plan;
+    uint16_t                      released_at = noah_qmk_gesture_event_time(record);
 
-    if (record->event.pressed || !key_runtime_core_has_other_active_press_token(record->event.key) || !key_runtime_core_release_is_mods_or_layer(keycode, record)) {
+    if (record->event.pressed) {
+        return;
+    }
+    if (record->event.type == KEY_EVENT) {
+        key_runtime_transition_plan_init(&plan);
+        key_runtime_transition_plan_missed_scans_before_release(record->event.key, released_at, &plan);
+        key_runtime_trace_plan("preflight:missed_scans_before_release", &plan);
+        key_runtime_transition_execute_plan(&plan);
+    }
+    if (!key_runtime_core_has_other_active_press_token(record->event.key) || !key_runtime_core_release_is_mods_or_layer(keycode, record)) {
         return;
     }
     key_runtime_transition_plan_init(&plan);
-    key_runtime_transition_settle_active_keys_on_other_release(record->event.key, noah_qmk_gesture_event_time(record), &plan);
+    key_runtime_transition_settle_active_keys_on_other_release(record->event.key, released_at, &plan);
     key_runtime_trace_plan("preflight:settle_on_mods_or_layer_release", &plan);
     key_runtime_transition_execute_plan(&plan);
 }

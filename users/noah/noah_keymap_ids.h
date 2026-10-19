@@ -180,12 +180,12 @@ _Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA mac
 //   0x7ea0–0x7ebf  PD_SLOT_n_LOCK       toggle pointing slot n  (32, all used)
 //   0x7ec0–0x7edf  LOCK_LAYER(n)        toggle layer n's lock   (32 reserved)
 //   0x7ee0–0x7eff  unassigned: inert, refused as a step or combo output
-//   0x7f00–0x7f7f  CUSTOM_KEY_0–127     named keys that do what their behaviour says
+//   0x7f00–0x7f7f  CUSTOM_KEY_0–127     named keys: their shortcut and behaviour
 //   0x7f80–0x7fff  unassigned: inert, refused as a step or combo output
 //
 // Custom keys moved to their own block in D-F14: 128 do not fit beside the
-// pointing holds. Their old codes are never reread as anything else; a
-// client translates an old layout's custom keys by slot.
+// pointing holds. Their old codes are never reread as anything else: they
+// stay inert, and nothing translates an old layout to the new block (D-F10).
 //
 // A custom key does what its shortcut and its key_behaviors[] row say (D-F26):
 // without either it does nothing. Place it on a layer or as a combo output. Its

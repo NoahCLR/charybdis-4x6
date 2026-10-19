@@ -605,3 +605,8 @@ of 768. SRAM0–3 `.data + .bss` is 208,352 bytes per half, 1,568 below the
 209,920-byte tripwire: 16 bytes of LTO partition padding, no new state. These
 are link-time values for the named paths only, not runtime high-water or a
 global or interrupt-stack maximum.
+
+Later changes no longer pass the reviewed-path gate: the manifests carry
+adjacencies the linker no longer makes and miss indirect call sites from
+`process_record_user` (an [open issue](../LIVE_EDIT_APP_DIRECTION.md#open-issues)).
+Until they are reviewed, the figures above are the last ones the gate accepted.

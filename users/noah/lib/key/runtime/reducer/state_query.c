@@ -476,9 +476,11 @@ bool key_runtime_core_release_is_mods_or_layer(uint16_t keycode, const keyrecord
 
 // A runtime-owned tap/hold key that is down, has not reached its hold yet and
 // whose hold changes other keys. Keys pressed meanwhile must wait for its
-// decision.
+// decision. A hold that goes on at the press (PRESS_HELD_WINDOW: LM()'s
+// modifiers, a pointing key's own mode) has nothing left to decide once
+// another key is pressed, since that press already cancels its quick tap.
 static bool key_runtime_core_query_press_token_undecided_dual_role(const press_token_t *token) {
-    return token->active && key_runtime_core_press_token_hold_changes_other_keys(token) && (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || token->slot_phase == KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW);
+    return token->active && key_runtime_core_press_token_hold_changes_other_keys(token) && token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
 }
 
 bool key_runtime_core_undecided_dual_role_key_pos(keypos_t *out) {
