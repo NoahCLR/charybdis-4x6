@@ -111,6 +111,11 @@ bool noah_profile_candidate_transaction_authorize_activation(noah_profile_candid
 // frame is replaced in place with its immediate admission acknowledgement.
 bool noah_profile_candidate_transaction_receive(noah_profile_candidate_transaction_t *transaction, uint8_t *frame, size_t length);
 
+// Firmware side: queues one already decoded command, as receive would after
+// decoding it. Save (D-F32) drives a candidate made of REUSE from the working
+// copy this way. False while the mailbox holds a command.
+bool noah_profile_candidate_transaction_submit(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_v1_command_t *command);
+
 // Scan side: processes at most one mailbox item, validation step, commit step,
 // or activation step. Validation and commit obey the bounded-work contracts
 // above; provider activation remains a separate safe-boundary poll.

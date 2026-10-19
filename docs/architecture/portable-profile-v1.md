@@ -197,21 +197,24 @@ At publication the settings invalidator copies the bounded domain into a cold
 runtime cache using reads of at most 20 bytes. Key, RGB, pointer and macro
 execution use the cache, without EEPROM reads. The settings module owns immutable factory scalars and authored names, also
 included in the complete compiled profile. Compat injects the QMK apply hook;
-the settings runtime has no reverse call into compat. Explicit stored settings
-apply at the safe boundary. A missing settings domain warms the compiled
-fallback cache without applying factory values to native owners.
-Native RGB/DPI/default-layer/keymap settings retain their EEPROM ownership:
-boot preserves newer native values, and export reads their current values.
-Ordinary domain edits refresh these values before writing an existing settings
-domain, and bind that read before and after acquiring the candidate lease.
+the settings runtime has no reverse call into compat. Stored settings apply
+at the safe boundary; a missing settings domain warms the compiled fallback
+cache and applies its values. The profile is the only durable owner of the
+settings QMK holds (D-F32): RGB, DPI, default layers, keymap options and
+auto-mouse are pushed into QMK with setters that do not write its EEPROM, at
+boot (the compiled defaults' once discovery finds nothing saved), on
+activation and on a settings edit, and QMK's EEPROM copies never win at boot.
+Combos on/off is not pushed into QMK's flag, which is the runtime override
+beside the stored master. Export reads the stored values.
 
 ## Readback commands
 
 These use the existing Profile Wire custom GET envelope and request ID.
 
-GET value `0x07` reads the effective settings domain with its scalars overlaid
-by their live QMK owners. With no profile settings live it returns the current
-version named by the keymap: `layer_names[]`, the name in each `VIA_MACROS`
+GET value `0x07` reads the effective settings domain exactly as stored (D-F32:
+QMK's live values and the toggles' overrides read through GET `0x22`, see
+[Profile Wire](profile-wire-v1.md#live-edits)). With no profile settings live
+it returns the compiled defaults, named by the keymap: `layer_names[]`, the name in each `VIA_MACROS`
 row and in each `CUSTOM_KEYS` row. The request takes a 16-bit page, its low
 byte at request byte 4 and its high byte at byte 5. Page 0's
 12-byte payload is version `1`, chunk size `25`, uint16 length, CRC32, and
@@ -347,8 +350,8 @@ layers require a nonzero final mask; combo references use the reported names.
 
 The firmware applies native lighting while temporarily enabled because QMK
 ignores mode/HSV setters when disabled. At the existing safe activation boundary
-it synchronously applies all lighting values, then restores and saves the final
-enabled state. The renderer cannot run between these operations. This permits
+it synchronously applies all lighting values, then restores the final enabled
+state, all without writing QMK's EEPROM (D-F32). The renderer cannot run between these operations. This permits
 editing saved colours/effects while lighting stays off and restoring a profile
 whose lighting state differs from the current state.
 

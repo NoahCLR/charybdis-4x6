@@ -369,8 +369,12 @@ bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reco
         return true;
     }
     // A full mailbox means this half has not yet processed an earlier request;
-    // if the sender keeps seeing it, this half is not getting scan time.
-    return encode_busy_response(reconciler, &decoded, publish_mailbox(reconciler, request, request_length) ? NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED : NOAH_PROFILE_SPLIT_V1_BUSY_MAILBOX_FULL, response);
+    // if the sender keeps seeing it, this half is not getting scan time, or
+    // its storage is waiting for a quiet keyboard (STORAGE_PAUSED).
+    if (publish_mailbox(reconciler, request, request_length)) {
+        return encode_busy_response(reconciler, &decoded, NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED, response);
+    }
+    return encode_busy_response(reconciler, &decoded, reconciler->config.storage_paused && reconciler->config.storage_paused(reconciler->config.storage_paused_context) ? NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED : NOAH_PROFILE_SPLIT_V1_BUSY_MAILBOX_FULL, response);
 }
 
 static __attribute__((noinline)) void process_metadata(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request) {
@@ -812,7 +816,7 @@ static void retry_later(noah_profile_split_reconciler_t *reconciler, uint32_t no
 // The peer still holds this request: queued, behind a full mailbox it has not
 // reached yet, or copying a reuse range.
 static bool request_held(const noah_profile_split_v1_frame_t *response) {
-    return response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED || response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_MAILBOX_FULL || response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_COPYING;
+    return response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED || response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_MAILBOX_FULL || response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_COPYING || response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED;
 }
 
 static void retry_admitted_mailbox(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *response, uint32_t now) {

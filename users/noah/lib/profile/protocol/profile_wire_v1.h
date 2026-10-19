@@ -24,6 +24,21 @@ enum {
     // something, and this is it.
     NOAH_PROFILE_WIRE_V1_VALUE_COMPILED = 0x05u,
     NOAH_PROFILE_WIRE_V1_VALUE_COMBOS   = 0x06u,
+    // Live edits, Save, Revert and the edit mode (D-F32). SET values:
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_BEGIN  = 0x20u,
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_SPLICE = 0x21u,
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_DATA   = 0x22u,
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_COMMIT = 0x23u,
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_ABORT  = 0x24u,
+    NOAH_PROFILE_WIRE_V1_VALUE_SAVE        = 0x25u,
+    NOAH_PROFILE_WIRE_V1_VALUE_REVERT      = 0x26u,
+    // GET and SET: the edit mode.
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_MODE = 0x27u,
+    // GET values: edit status pages, the working copy (paged like PAYLOAD),
+    // and the runtime overrides and QMK's live values.
+    NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS = 0x20u,
+    NOAH_PROFILE_WIRE_V1_VALUE_WORKING     = 0x21u,
+    NOAH_PROFILE_WIRE_V1_VALUE_RUNTIME     = 0x22u,
     // Page 0 of a payload read is metadata; pages 1..N carry raw payload
     // bytes, a full report payload each.
     NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE = 0u,
@@ -95,6 +110,9 @@ typedef enum {
     NOAH_PROFILE_ACTIVE_COMMITTED     = 1u,
     NOAH_PROFILE_ACTIVE_PREVIEW       = 2u,
     NOAH_PROFILE_ACTIVE_PENDING       = 3u,
+    // Unsaved live edits (D-F32): generation and origin are the saved base's,
+    // the active digest field carries the working copy's revision.
+    NOAH_PROFILE_ACTIVE_WORKING = 4u,
 } noah_profile_active_kind_t;
 
 typedef struct {

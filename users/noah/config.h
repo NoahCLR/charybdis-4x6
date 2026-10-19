@@ -67,8 +67,9 @@
 // - truthful key-feedback semantics and tap branch state
 // - the profile copy and commit between halves
 // - the profile store's flash timing on the other half (diagnostics only)
+// - the working copy's live edits and the edit mode (D-F32)
 // so both halves render layer-owned RGB from the same runtime and keymap data.
-#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_PROFILE_SPLIT_SYNC, PUT_PROFILE_FLASH_DIAGNOSTICS
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_PROFILE_SPLIT_SYNC, PUT_PROFILE_FLASH_DIAGNOSTICS, PUT_PROFILE_WORKING_SYNC
 
 // Dynamic key-local placement for PD-mode RGB overlays.
 // Required only when a pd_mode_colors[] row uses RGB_KEY_HALF or
@@ -80,6 +81,16 @@
 #    endif
 
 #endif // SPLIT_KEYBOARD
+
+// ─── Edit mode ─────────────────────────────────────────────────────────────
+//
+// The edit mode (Apply, Live, Live + review; D-F32) lives in QMK's EEPROM
+// user datablock on each half, outside every profile: two 16-byte records,
+// so a write cut short leaves the previous one (qmk_profile_working.c). The
+// version is this layout's, so a datablock QMK formatted for anything else
+// reads as never set.
+#define EECONFIG_USER_DATA_SIZE 32
+#define EECONFIG_USER_DATA_VERSION 0x4E450132u
 
 // ─── Matrix scan ───────────────────────────────────────────────────────────
 //

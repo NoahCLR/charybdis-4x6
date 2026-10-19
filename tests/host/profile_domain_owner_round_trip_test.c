@@ -531,6 +531,9 @@ int main(int argc, char **argv) {
         memset(eeprom, 0xff, sizeof(eeprom));
         initialize();
         until_state(NOAH_PROFILE_OWNER_READY_COMPILED);
+        // Nothing saved: the compiled defaults' settings are pushed into QMK
+        // once discovery knows it (D-F32), not before.
+        assert(settings_applies == 1);
         assert(owner.compiled.metadata.domain_mask == NOAH_PROFILE_DOMAIN_MASK_ALL);
         assert(owner.combos.valid && owner.combos.live && owner.combos.count == noah_combo_count);
         for (uint16_t i = 0; i < noah_combo_count; i++) {
@@ -587,7 +590,7 @@ int main(int argc, char **argv) {
         assert(noah_setting_combo_output_behaviors() == !use_imported);
         reboot();
         until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);
-        assert(settings_applies == 2);
+        assert(settings_applies == 3); // compiled, the save's activation, the reboot's
         assert(noah_setting_combo_output_behaviors() == !use_imported);
         assert_published(candidate, &expected, 1);
         puts(use_imported ? "all current domains: populated imported combos/settings saved, booted and published through the owner" : "all current domains: complete compiled defaults saved, booted and published through the owner");

@@ -20,6 +20,14 @@
 // A physical press of keycode at key_pos, its resolved keycode from
 // source_layer: does it use the keycode's behaviour row? False means it takes
 // the normal action, as a key without a row always does.
+// The behaviours master in the stored settings AND the runtime override
+// (D-F32). The override starts allowed at boot and is never saved.
+void noah_participation_set_behaviors_override(bool allowed);
+bool noah_participation_behaviors_override(void);
+bool noah_participation_behaviors_allowed(void);
+// The combos master in the stored settings; QMK's combo flag is the override.
+bool noah_participation_combos_allowed(void);
+
 bool noah_participation_behavior(uint16_t keycode, uint8_t source_layer, keypos_t key_pos);
 // A custom key a combo emits has no placement: the master and the row's
 // enable decide, with the combo's origin layer as its layer context.

@@ -37,7 +37,10 @@ static void u32(uint8_t *p, uint32_t v) {
     for (uint8_t i = 0; i < 4; i++)
         p[i] = v >> (8 * i);
 }
-static uint32_t current_setting(uint8_t id) {
+// What QMK runs now for a setting it holds. Settings readback reports the
+// stored profile (D-F32); this is the runtime readback beside it, since
+// adjustment keys (DPI, RGB) still move QMK's values until they become edits.
+uint32_t noah_qmk_portable_live_setting(uint8_t id) {
     switch (id) {
         case NOAH_SETTING_AUTO_MOUSE_ENABLED:
             return get_auto_mouse_enable();
@@ -65,21 +68,13 @@ static uint32_t current_setting(uint8_t id) {
             return noah_profile_settings_default(id);
     }
 }
-static bool external_setting(uint8_t id) {
-    return (id >= NOAH_SETTING_AUTO_MOUSE_ENABLED && id <= NOAH_SETTING_AUTO_MOUSE_DEBOUNCE) || (id >= NOAH_SETTING_DEFAULT_DPI && id <= NOAH_SETTING_KEYMAP_OPTIONS);
-}
-
 static uint16_t settings_length(void) {
     uint16_t length = noah_effective_settings_length();
     return length ? length : noah_profile_settings_defaults_length();
 }
+// The profile is the only durable owner of the settings QMK holds (D-F32):
+// readback is the stored settings, never QMK's copy of them.
 static uint8_t settings_byte(uint16_t offset) {
-    if (offset >= NOAH_SETTINGS_SCALARS_OFFSET && offset < NOAH_SETTINGS_LAYER_RECORDS_OFFSET) {
-        uint8_t  id    = (offset - NOAH_SETTINGS_SCALARS_OFFSET) / 4u;
-        uint32_t value = current_setting(id);
-        if (!external_setting(id)) value = noah_setting(id, value);
-        return value >> (8u * ((offset - NOAH_SETTINGS_SCALARS_OFFSET) % 4u));
-    }
     return noah_effective_settings_length() ? noah_effective_settings_byte(offset) : noah_profile_settings_defaults_byte(offset);
 }
 // Up to 25 readback bytes of `kind` from `offset`; 0 past the end.
@@ -93,30 +88,25 @@ static uint8_t readback_fill(uint8_t kind, uint16_t offset, uint8_t *target) {
         target[i] = settings_byte(offset + i);
     return count;
 }
+// Pushes the active settings into QMK, at boot (compiled defaults included),
+// on activation and on a live settings edit (D-F32). The profile is the only
+// durable owner of these values, so QMK's EEPROM copies are never written
+// here and never win at boot. Combos on/off is not pushed: QMK's combo flag
+// is the runtime override beside the stored master (participation.c).
 void noah_qmk_portable_apply(void) {
     set_auto_mouse_enable(noah_setting(NOAH_SETTING_AUTO_MOUSE_ENABLED, get_auto_mouse_enable()));
     set_auto_mouse_layer(noah_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, get_auto_mouse_layer()));
     set_auto_mouse_timeout(noah_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, get_auto_mouse_timeout()));
     set_auto_mouse_debounce(noah_setting(NOAH_SETTING_AUTO_MOUSE_DEBOUNCE, get_auto_mouse_debounce()));
-    if (noah_setting(NOAH_SETTING_COMBOS_ENABLED, is_combo_enabled()))
-        combo_enable();
-    else
-        combo_disable();
-    // These values already have durable QMK owners. At boot retain their
-    // newer EEPROM state (for example a DPI key pressed after an import).
-    if (noah_effective_settings_is_booting()) return;
     uint16_t dpi = noah_setting(NOAH_SETTING_DEFAULT_DPI, charybdis_get_pointer_default_dpi());
     for (uint8_t i = 0; i < 16 && charybdis_get_pointer_default_dpi() != dpi; i++)
-        charybdis_cycle_pointer_default_dpi(true);
+        charybdis_cycle_pointer_default_dpi_noeeprom(true);
     dpi = noah_setting(NOAH_SETTING_SNIPING_DPI, charybdis_get_pointer_sniping_dpi());
     for (uint8_t i = 0; i < 4 && charybdis_get_pointer_sniping_dpi() != dpi; i++)
-        charybdis_cycle_pointer_sniping_dpi(true);
-    noah_qmk_portable_apply_lighting(noah_setting(NOAH_SETTING_RGB_MODE, current_setting(NOAH_SETTING_RGB_MODE)), noah_setting(NOAH_SETTING_RGB_COLOR, current_setting(NOAH_SETTING_RGB_COLOR)));
-    layer_state_t layers = noah_setting(NOAH_SETTING_DEFAULT_LAYERS, default_layer_state);
-    default_layer_set(layers);
-    eeconfig_update_default_layer(layers);
+        charybdis_cycle_pointer_sniping_dpi_noeeprom(true);
+    noah_qmk_portable_apply_lighting(noah_setting(NOAH_SETTING_RGB_MODE, noah_qmk_portable_live_setting(NOAH_SETTING_RGB_MODE)), noah_setting(NOAH_SETTING_RGB_COLOR, noah_qmk_portable_live_setting(NOAH_SETTING_RGB_COLOR)));
+    default_layer_set(noah_setting(NOAH_SETTING_DEFAULT_LAYERS, default_layer_state));
     keymap_config.raw = noah_setting(NOAH_SETTING_KEYMAP_OPTIONS, keymap_config.raw);
-    eeconfig_update_keymap(&keymap_config);
 }
 bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
     if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8 && frame[2] != 0x0b)) return false;

@@ -60,10 +60,10 @@ void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_c
     next.publication_count = publication_count;
     next.epoch             = runtime->next_epoch;
     next.valid             = callback_view && identity_equal(callback_view->identity, active);
-    if (next.valid && active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE && (callback_view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB) != 0u) {
+    if (next.valid && (active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE || active.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY) && (callback_view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB) != 0u) {
         next.view = callback_view->profile.rgb;
         next.live = true;
-    } else if (next.valid && (active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS || active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE)) {
+    } else if (next.valid && (active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS || active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE || active.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY)) {
 #ifdef RGB_MATRIX_ENABLE
         const noah_profile_rgb_v1_view_t *compiled = noah_profile_rgb_compiled_v1_view();
         next.valid                                 = compiled != NULL;

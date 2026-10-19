@@ -132,6 +132,18 @@ bool noah_profile_candidate_transaction_receive(noah_profile_candidate_transacti
     return true;
 }
 
+bool noah_profile_candidate_transaction_submit(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_v1_command_t *command) {
+    if (!transaction || !command || transaction->mailbox.pending || command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_NONE) {
+        return false;
+    }
+    transaction->mailbox.command = *command;
+    if (command->operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_REUSE) {
+        transaction->mailbox.command.payload.reuse.copied = 0u;
+    }
+    transaction->mailbox.pending = true;
+    return true;
+}
+
 static bool process_begin(noah_profile_candidate_transaction_t *transaction, const noah_profile_candidate_v1_command_t *command) {
     const noah_profile_candidate_v1_metadata_t *metadata = &command->payload.begin;
     noah_profile_candidate_backend_result_t     result;

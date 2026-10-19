@@ -137,6 +137,60 @@ noah_profile_validator_v1_result_t noah_profile_validator_v1_begin(noah_profile_
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }
 
+noah_profile_validator_v1_result_t noah_profile_validator_v1_begin_structure(noah_profile_validator_v1_t *validator, const noah_profile_reader_t *reader, size_t base_offset, uint32_t byte_length, uint32_t action_abi_digest, const noah_profile_validator_v1_compatibility_t *compatibility, noah_profile_validator_v1_error_t *error) {
+    const noah_profile_validator_v1_declaration_t declaration = {
+        .schema_major      = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
+        .schema_minor      = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR,
+        .byte_length       = byte_length,
+        .action_abi_digest = action_abi_digest,
+    };
+    noah_profile_validator_v1_result_t result = noah_profile_validator_v1_begin(validator, reader, base_offset, &declaration, compatibility, error);
+
+    if (result != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) {
+        return result;
+    }
+    validator->mode         = NOAH_PROFILE_VALIDATOR_V1_MODE_STRUCTURE;
+    validator->phase        = NOAH_PROFILE_VALIDATOR_V1_PHASE_BLOB_HEADER;
+    validator->crc32_state  = 0u;
+    validator->digest_state = 0u;
+    return result;
+}
+
+noah_profile_validator_v1_result_t noah_profile_validator_v1_begin_domain(noah_profile_validator_v1_t *validator, const noah_profile_reader_t *reader, size_t base_offset, uint8_t domain_id, noah_profile_domain_range_t range, const noah_profile_validator_v1_compatibility_t *compatibility, noah_profile_validator_v1_error_t *error) {
+    noah_profile_validator_v1_error_t  clear = noah_profile_validator_v1_no_error();
+    const noah_profile_domain_shape_t *shape = noah_profile_domain_find(domain_id);
+
+    copy_error(error, &clear);
+    if (!validator) {
+        if (error) {
+            error->code = NOAH_PROFILE_VALIDATOR_V1_INVALID_ARGUMENT;
+        }
+        return NOAH_PROFILE_VALIDATOR_V1_INVALID_ARGUMENT;
+    }
+    memset(validator, 0, sizeof(*validator));
+    validator->terminal_error = clear;
+    if (!reader || !reader->read || !compatibility || !compatibility_is_valid(compatibility) || base_offset > reader->length || range.offset > reader->length - base_offset || range.length > reader->length - base_offset - range.offset) {
+        return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_ARGUMENT, 0u, error);
+    }
+    if (!shape || !(shape->mask & compatibility->allowed_domain_mask)) {
+        return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN, range.offset, error);
+    }
+    validator->reader                        = *reader;
+    validator->base_offset                   = base_offset;
+    validator->compatibility                 = *compatibility;
+    validator->declaration.action_abi_digest = compatibility->action_abi_digest;
+    validator->mode                          = NOAH_PROFILE_VALIDATOR_V1_MODE_DOMAIN;
+    validator->domain                        = shape->index;
+    validator->payload                       = range;
+    // As if the envelope had just read this one domain's header: errors name
+    // its position as 0 and the reference check its mask.
+    validator->envelope.count = 1u;
+    validator->envelope.index = 1u;
+    validator->envelope.mask  = shape->mask;
+    validator->phase          = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_DECODE;
+    return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+}
+
 static noah_profile_validator_v1_result_t read_blob(noah_profile_validator_v1_t *validator, size_t offset, uint8_t *target, size_t length, noah_profile_validator_v1_error_t *error) {
     if (!noah_profile_reader_read(&validator->reader, validator->base_offset + offset, target, length)) {
         return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_READ_ERROR, offset, error);
@@ -197,7 +251,7 @@ static noah_profile_validator_v1_result_t finish_domains(noah_profile_validator_
     if ((validator->compatibility.required_domain_mask & (uint8_t)~validator->envelope.mask) != 0u) {
         return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_MISSING_DOMAIN, validator->envelope.offset, error);
     }
-    if (validator->envelope.mask != validator->declaration.domain_mask) {
+    if (validator->mode == NOAH_PROFILE_VALIDATOR_V1_MODE_WHOLE && validator->envelope.mask != validator->declaration.domain_mask) {
         return reject_simple(validator, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MASK_MISMATCH, validator->envelope.offset, error);
     }
 
@@ -448,10 +502,24 @@ static noah_profile_validator_v1_result_t validate_domain(noah_profile_validator
     }
 }
 
+static noah_profile_validator_v1_result_t finish_single_domain(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
+    if (validator->has_reference_error) {
+        return reject(validator, NOAH_PROFILE_VALIDATOR_V1_INVALID_REFERENCE, validator->reference_error_offset, 0u, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS, KEY_BEHAVIOR_TABLE_ROWS, validator->reference_error_row, validator->reference_error_step, validator->reference_error_field, NOAH_PROFILE_VALIDATOR_V1_DETAIL_NONE, 0u, error);
+    }
+    validator->profile.domain_mask       = validator->envelope.mask;
+    validator->profile.domain_count      = 1u;
+    validator->profile.byte_length       = validator->payload.length;
+    validator->profile.action_abi_digest = validator->compatibility.action_abi_digest;
+    validator->phase                     = NOAH_PROFILE_VALIDATOR_V1_PHASE_VALID;
+    validator->terminal_result           = NOAH_PROFILE_VALIDATOR_V1_VALID;
+    return NOAH_PROFILE_VALIDATOR_V1_VALID;
+}
+
 static noah_profile_validator_v1_result_t domain_decode_step(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
     noah_profile_validator_v1_result_t result = validate_domain(validator, error);
 
     if (result != NOAH_PROFILE_VALIDATOR_V1_VALID) return result;
+    if (validator->mode == NOAH_PROFILE_VALIDATOR_V1_MODE_DOMAIN) return finish_single_domain(validator, error);
     validator->phase = NOAH_PROFILE_VALIDATOR_V1_PHASE_DOMAIN_HEADER;
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 }

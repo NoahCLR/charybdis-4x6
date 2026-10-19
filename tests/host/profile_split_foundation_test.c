@@ -355,8 +355,13 @@ static void test_protocol_rejects_malformed_sized_frames(void) {
     wire[42] = 1u;
     refresh_crc_length(wire, length);
     assert(!noah_profile_split_v1_frame_decode(wire, length, &decoded));
+    // Kind 2 names the working copy over a committed base (D-F32); kind 3
+    // names nothing.
     (void)noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire));
     wire[40] = 2u;
+    refresh_crc_length(wire, length);
+    assert(noah_profile_split_v1_frame_decode(wire, length, &decoded) && decoded.reuse_source.kind == 2u);
+    wire[40] = 3u;
     refresh_crc_length(wire, length);
     assert(!noah_profile_split_v1_frame_decode(wire, length, &decoded));
 

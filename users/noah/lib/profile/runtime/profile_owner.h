@@ -13,7 +13,10 @@
 #include "effective_combo_runtime.h"
 #include "profile_activation_policy.h"
 #include "../schema/profile_compiled_defaults_v1.h"
+#include "profile_edit_mode.h"
+#include "profile_working_copy.h"
 #include "../split/profile_split_reconciler.h"
+#include "../split/profile_working_sync.h"
 #include "../storage/profile_candidate_store_backend.h"
 #include "../storage/profile_candidate_transaction.h"
 #include "../storage/profile_peer_store_backend.h"
@@ -25,7 +28,10 @@ enum {
     // authority for the concrete firmware artifact. D-F14's native combo
     // table (128 rows of sixteen inputs) links the owner at 10,552 bytes;
     // with D-F28's 32-bit profile offsets it links at 11,328.
-    NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT = 11520u,
+    // D-F32's working copy (its edit plan, validator and the saved snapshot
+    // Revert returns to), its split sync and the save that copies it to flash
+    // raise it by one reviewed increment to 16,384.
+    NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT = 16384u,
     // Ordinary host staging expires after 15 seconds without host-owned work.
     // Split preparation has a separate no-progress window: it bounds the
     // longest stretch without transfer or correlated peer-phase progress, not
@@ -58,7 +64,47 @@ typedef struct {
     void                                 *split_transport_context;
     uint8_t                               origin_half;
     bool                                  peer_required;
+    // The working copy's buffer (D-F32): a slot payload's worth of RAM. Live
+    // edits are refused without one.
+    uint8_t                              *working_bytes;
+    uint32_t                              working_capacity;
+    // Names this boot's working copy; any value that differs between boots.
+    uint32_t                              working_session;
+    // The working copy's own split RPC, from the USB half.
+    noah_profile_split_exchange_fn        working_exchange;
+    void                                 *working_transport_context;
+    noah_profile_edit_mode_storage_t      edit_mode_storage;
+    // Whether this half's storage step is not running just now (a save
+    // waiting for a quiet keyboard). Optional; told to the other half.
+    bool (*storage_paused)(void *context);
+    void *storage_paused_context;
 } noah_profile_owner_config_t;
+
+typedef enum {
+    NOAH_PROFILE_OWNER_SAVE_IDLE = 0u,
+    NOAH_PROFILE_OWNER_SAVE_CHECKSUM,
+    NOAH_PROFILE_OWNER_SAVE_BEGIN,
+    NOAH_PROFILE_OWNER_SAVE_REUSE,
+    NOAH_PROFILE_OWNER_SAVE_VALIDATE,
+    NOAH_PROFILE_OWNER_SAVE_COMMIT,
+    NOAH_PROFILE_OWNER_SAVE_WAIT,
+} noah_profile_owner_save_phase_t;
+
+// Save (D-F32): the working copy written as a new generation through the
+// ordinary candidate path, made entirely of REUSE from the working copy, so
+// the other half copies it from its own working copy too.
+typedef struct {
+    uint32_t offset;
+    uint32_t length;
+    uint32_t crc32;
+    uint32_t digest;
+    uint16_t transaction_id;
+    uint16_t last_transaction_id;
+    uint8_t  phase;
+    uint8_t  domain_mask;
+    uint8_t  last_result; // noah_profile_working_result_t
+    uint8_t  last_error;  // noah_profile_candidate_v1_error_id_t of a failed save
+} noah_profile_owner_save_t;
 
 // The compiled validator is needed only before the candidate backend exists,
 // so both lifetimes deliberately share one stable union. The backend address
@@ -87,6 +133,15 @@ typedef struct {
     noah_profile_candidate_transaction_t host_transaction;
     noah_profile_peer_store_backend_t    peer_store;
     noah_profile_split_reconciler_t      reconciler;
+    // Edits are held to what a host's candidate is held to.
+    noah_profile_validator_v1_compatibility_t edit_compatibility;
+    noah_profile_working_copy_t          working;
+    noah_profile_working_sync_t          working_sync;
+    noah_profile_owner_save_t            save;
+    uint32_t                             now_ms;
+    // The host's last frame of the edit it is sending: an edit not finished
+    // within the host timeout is aborted, as an abandoned Apply is.
+    uint32_t                             edit_activity_at;
     noah_profile_split_descriptor_t      committed_descriptor;
     noah_profile_split_descriptor_t      host_barrier_descriptor;
     noah_profile_candidate_v1_error_t    adoption_error;
@@ -110,6 +165,8 @@ typedef struct {
     bool                                 host_barrier_waiting_boundary : 1;
     bool                                 host_barrier_peer_confirmed : 1;
     bool                                 host_cancel_pending : 1;
+    bool                                 working_ready : 1;
+    bool                                 master : 1;
 } noah_profile_owner_t;
 
 // Protocol-neutral, caller-owned observation of the complete live-profile
@@ -172,6 +229,47 @@ bool                                  noah_profile_owner_status(const noah_profi
 // same profile, and nothing is held or running on either half (the boundary a
 // profile activates at).
 bool                                  noah_profile_owner_usb_restart_safe(noah_profile_owner_t *owner);
+
+// Live edits (D-F32), from the Profile Wire channel on the USB half. Each
+// admission is bounded; the work happens in later scans. A new edit, Save and
+// a mode change wait until nothing else holds the profile (an Apply, a save,
+// an activation) and the other half holds the same working copy.
+noah_profile_working_result_t noah_profile_owner_edit_begin(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags);
+noah_profile_working_result_t noah_profile_owner_edit_splice(noah_profile_owner_t *owner, uint16_t transaction_id, uint8_t index, const noah_profile_working_splice_t *splice);
+noah_profile_working_result_t noah_profile_owner_edit_data(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint32_t count);
+noah_profile_working_result_t noah_profile_owner_edit_commit(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t crc32);
+noah_profile_working_result_t noah_profile_owner_edit_abort(noah_profile_owner_t *owner, uint16_t transaction_id);
+noah_profile_working_result_t noah_profile_owner_revert(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision);
+// QUEUED, then candidate status (value 0x18) follows it as transaction_id,
+// as it follows an Apply. OK at once when nothing is unsaved.
+noah_profile_working_result_t noah_profile_owner_save(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision);
+noah_profile_working_result_t noah_profile_owner_set_edit_mode(noah_profile_owner_t *owner, uint8_t mode);
+
+typedef struct {
+    noah_profile_working_status_t   local;
+    noah_profile_working_peer_t     peer;
+    noah_profile_edit_mode_record_t mode;
+    noah_profile_owner_save_t       save;
+    uint32_t                        saved_generation;
+    uint32_t                        safe_boundary_reason_mask;
+    uint8_t                         saved_origin;
+    bool                            supported;      // this build and half can edit live
+    bool                            saved_compiled; // nothing saved: the compiled defaults
+    bool                            peer_required;
+    bool                            peer_converged;
+    bool                            mode_conflict;
+    bool                            edits_blocked;  // a new edit would be refused BUSY now
+    bool                            storage_paused; // a save here waits for a quiet keyboard
+    bool                            peer_storage_paused; // the other half's save waits for a quiet keyboard
+    bool                            peer_refused;        // the other half refused this working copy, whole
+    bool                            mode_store_failed;   // writing the edit mode failed; it is tried again
+} noah_profile_owner_working_status_t;
+
+bool noah_profile_owner_working_status(const noah_profile_owner_t *owner, noah_profile_owner_working_status_t *status);
+// Reads the profile now active (the working copy, or the saved profile).
+bool noah_profile_owner_working_read(const noah_profile_owner_t *owner, uint32_t offset, uint8_t *bytes, uint32_t length);
+// The other half's RPC callback for the working copy's sync.
+bool noah_profile_owner_working_receive(noah_profile_owner_t *owner, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length);
 
 #ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
 uint32_t noah_profile_owner_test_ready_refresh_count(void);

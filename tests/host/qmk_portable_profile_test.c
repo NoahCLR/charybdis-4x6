@@ -4,6 +4,7 @@
 #include "portable_profile_keyboard.h"
 #include "users/noah/lib/compat/qmk_portable_profile.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "users/noah/lib/profile/schema/profile_settings_defaults.h"
 #include "profile_test_blob.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/noah_keymap_ids.h"
@@ -15,7 +16,9 @@ static uint8_t  am_layer = 4, am_debounce = 25;
 static uint16_t am_timeout = 1200, default_dpi = 1200, sniping_dpi = 200;
 uint32_t        default_layer_state = 1;
 keymap_config_t keymap_config;
-static unsigned durable_writes;
+// QMK's EEPROM copies must never be written (D-F32); runtime projections are
+// counted apart.
+static unsigned durable_writes, projections;
 bool            get_auto_mouse_enable(void) {
     return am_enabled;
 }
@@ -84,6 +87,16 @@ void charybdis_cycle_pointer_sniping_dpi(bool forward) {
     (void)forward;
     durable_writes++;
 }
+void charybdis_cycle_pointer_default_dpi_noeeprom(bool forward) {
+    (void)forward;
+    default_dpi = (uint16_t)(default_dpi + 100u);
+    projections++;
+}
+void charybdis_cycle_pointer_sniping_dpi_noeeprom(bool forward) {
+    (void)forward;
+    sniping_dpi = (uint16_t)(sniping_dpi + 100u);
+    projections++;
+}
 void default_layer_set(uint32_t state) {
     default_layer_state = state;
 }
@@ -103,7 +116,7 @@ uint8_t noah_qmk_portable_editor_page(uint8_t page, uint8_t *payload) {
 void noah_qmk_portable_apply_lighting(uint32_t mode, uint32_t color) {
     (void)mode;
     (void)color;
-    durable_writes++;
+    projections++;
 }
 
 // The keymap's names, up to the 32-byte limit and in multibyte UTF-8.
@@ -211,7 +224,8 @@ int main(int argc, char **argv) {
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
     keyrecord_t record = {0};
     assert(get_tapping_term(0, &record) == TAPPING_TERM && get_quick_tap_term(0, &record) == TAPPING_TERM);
-    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 1200);
+    // The compiled defaults' own value, whatever QMK runs now.
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == noah_profile_settings_default(NOAH_SETTING_AUTO_MOUSE_TIMEOUT));
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_DRAGSCROLL_DPI * 4) == 0);
     // Every layer allows its behaviours and combos.
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_BEHAVIORS_ENABLED * 4) == 1);
@@ -251,8 +265,8 @@ int main(int argc, char **argv) {
     get(3);
     assert(!memcmp(frame + 7, bytes + 2 * 25, frame[6]));
 
-    // A live current domain reads back as stored, with its values overlaid by the
-    // live QMK owners, and without a second copy held for the read.
+    // A live current domain reads back exactly as stored (D-F32), and
+    // without a second copy held for the read.
     const uint32_t values[NOAH_SETTINGS_COUNT] = {180, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0x7fff};
     const uint8_t  current_header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
     memcpy(stored, current_header, sizeof(current_header));
@@ -279,20 +293,35 @@ int main(int argc, char **argv) {
     view.profile.domain_count = 1;
     view.profile.byte_length  = (uint16_t)total;
     noah_qmk_portable_storage_init(); // installs the real native apply hook
+    // The profile is the only durable owner of what QMK holds (D-F32): even
+    // the compiled defaults, even at boot, are pushed into QMK, and nothing
+    // reaches QMK's EEPROM. Combos on/off is not pushed: QMK's flag is the
+    // runtime override beside the stored master.
     view.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
-    am_timeout = 777;
-    noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
-    assert(am_timeout == 777 && durable_writes == 0);
-    // Stored boot settings may restore runtime controls, but native EEPROM
-    // values remain owned by QMK. An explicit publication writes them.
-    view.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE;
+    am_timeout         = 777;
+    default_dpi        = 900;
+    combos             = false;
+    // The boot's first look at the compiled defaults waits for discovery.
     noah_effective_settings_boot(true);
-    noah_effective_settings_invalidate(NULL, 2, view.identity, view.identity, &view);
-    assert(am_timeout == 1200 && durable_writes == 0);
+    noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
+    assert(am_timeout == 777 && projections == 0);
     noah_effective_settings_boot(false);
+    noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
+    assert(am_timeout == 1200 && default_dpi == 1200 && durable_writes == 0 && projections == 4 && !combos);
+    assert(default_layer_state == 1u);
+    view.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE;
+    noah_effective_settings_invalidate(NULL, 2, view.identity, view.identity, &view);
+    assert(durable_writes == 0 && projections == 5 && !combos);
+    // A working-copy edit that left settings alone projects nothing again.
+    view.identity.kind        = NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY;
+    view.changed_domain_mask = NOAH_PROFILE_DOMAIN_MASK_KEYMAP;
     noah_effective_settings_invalidate(NULL, 3, view.identity, view.identity, &view);
-    assert(durable_writes == 3); // lighting, default layers, keymap options
-    am_timeout = 900; // a live change after publication wins in readback
+    assert(projections == 5);
+    view.changed_domain_mask = NOAH_PROFILE_DOMAIN_MASK_SETTINGS;
+    noah_effective_settings_invalidate(NULL, 4, view.identity, view.identity, &view);
+    assert(projections == 6 && durable_writes == 0);
+    am_timeout = 900; // a key moving QMK's value shows in the runtime readback only
+    assert(noah_qmk_portable_live_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT) == 900 && noah_qmk_portable_live_setting(NOAH_SETTING_COMBOS_ENABLED) == 0u);
     FILE *responses = argc > 1 ? fopen(argv[1], "wb") : NULL;
     assert(argc < 2 || responses);
     length = read_all(bytes, responses);
@@ -301,7 +330,8 @@ int main(int argc, char **argv) {
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_TAPPING_TERM * 4) == 180);
     // QMK's own dual-role keys resolve on the live term.
     assert(get_tapping_term(0, &record) == 180 && get_quick_tap_term(0, &record) == 180);
-    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 900);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_AUTO_MOUSE_TIMEOUT * 4) == 1200);
+    assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_COMBOS_ENABLED * 4) == 1);
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LAYER_COMBOS * 4) == 0x7fff);
     assert(!memcmp(bytes + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, stored + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, names - NOAH_SETTINGS_LAYER_RECORDS_OFFSET));
     assert(combo_ref_from_layer(15) == 2 && combo_ref_from_layer(14) == 14 && combo_ref_from_layer(16) == 16);

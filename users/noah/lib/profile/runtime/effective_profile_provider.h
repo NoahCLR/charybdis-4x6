@@ -21,6 +21,11 @@ typedef enum {
     NOAH_EFFECTIVE_PROFILE_KIND_NONE = 0u,
     NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS,
     NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE,
+    // The working copy in RAM (D-F32): live edits over a saved base. Its
+    // generation and origin are that base's (zero and ORIGIN_COMPILED for the
+    // compiled defaults); its payload_crc32 and payload_digest fields carry
+    // the working session and revision, not checksums of its bytes.
+    NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY,
 } noah_effective_profile_kind_t;
 
 typedef enum {
@@ -61,6 +66,11 @@ typedef struct {
     noah_profile_reader_t               reader;
     size_t                              base_offset;
     noah_profile_validator_v1_profile_t profile;
+    // Publication metadata, not identity: the domains whose bytes the
+    // publication that made this snapshot active changed. Every domain for an
+    // activation; only the edited ones for a working-copy edit (D-F32), so a
+    // runtime whose domain did not change keeps what it projected.
+    uint8_t                             changed_domain_mask;
 } noah_effective_profile_snapshot_t;
 
 // Describes a generation's immutable backing range. Store integrations use
@@ -125,6 +135,10 @@ typedef struct {
 
 noah_effective_profile_result_t noah_effective_profile_snapshot_make_compiled(const noah_profile_validator_v1_profile_t *profile, const noah_profile_reader_t *reader, size_t base_offset, noah_effective_profile_snapshot_t *snapshot);
 noah_effective_profile_result_t noah_effective_profile_snapshot_make_validated(const noah_profile_validator_v1_profile_t *profile, const noah_profile_reader_t *reader, size_t base_offset, uint32_t generation, uint8_t origin, uint32_t compiled_default_digest, noah_effective_profile_snapshot_t *snapshot);
+// A working-copy snapshot (D-F32) over a profile validated piece by piece.
+// `base` is the saved snapshot the working copy began from, whose generation,
+// origin and digests it keeps; session and revision name its contents.
+noah_effective_profile_result_t noah_effective_profile_snapshot_make_working(const noah_profile_validator_v1_profile_t *profile, const noah_profile_reader_t *reader, size_t base_offset, const noah_effective_profile_identity_t *base, uint32_t session, uint32_t revision, noah_effective_profile_snapshot_t *snapshot);
 bool                            noah_effective_profile_snapshot_read(const noah_effective_profile_snapshot_t *snapshot, size_t offset, uint8_t *target, size_t length);
 
 noah_effective_profile_result_t noah_effective_profile_provider_init(noah_effective_profile_provider_t *provider, const noah_effective_profile_snapshot_t *compiled_defaults, noah_effective_profile_safe_boundary_fn safe_boundary, void *safe_boundary_context, const noah_effective_profile_invalidator_t *invalidators, size_t invalidator_count);
@@ -157,6 +171,17 @@ noah_effective_profile_result_t noah_effective_profile_provider_end_backing_reus
 // A behavior-bearing pending snapshot cannot publish without a predicate;
 // SAFE_BOUNDARY_REQUIRED leaves it pending and the prior generation active.
 noah_effective_profile_result_t noah_effective_profile_provider_poll(noah_effective_profile_provider_t *provider);
+
+// Working-copy publication (D-F32). Replaces the active snapshot in place at
+// a safe boundary, with no pending generation and no rollback: either a
+// working-copy snapshot over the same base (an edit, or the first edit over a
+// saved profile), or, while a working copy is active, the saved snapshot it
+// began from (Revert). `mutate`, when given, runs inside the publication,
+// after the safe boundary held and before any invalidator: the working copy
+// rewrites its bytes there, so no reader sees them half changed. A reason
+// mask from the predicate leaves everything as it was and returns WAITING.
+typedef void (*noah_effective_profile_mutate_fn)(void *context);
+noah_effective_profile_result_t noah_effective_profile_provider_publish_in_place(noah_effective_profile_provider_t *provider, const noah_effective_profile_snapshot_t *snapshot, uint8_t changed_domain_mask, noah_effective_profile_mutate_fn mutate, void *mutate_context);
 
 noah_effective_profile_result_t noah_effective_profile_provider_copy_active(const noah_effective_profile_provider_t *provider, noah_effective_profile_snapshot_t *snapshot);
 noah_effective_profile_result_t noah_effective_profile_provider_status(const noah_effective_profile_provider_t *provider, noah_effective_profile_status_t *status);

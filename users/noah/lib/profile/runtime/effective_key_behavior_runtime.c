@@ -61,10 +61,10 @@ void noah_effective_key_behavior_runtime_invalidate(void *context, uint32_t publ
     next.publication_count = publication_count;
     next.epoch             = runtime->next_epoch;
     next.valid             = callback_view && identity_equal(callback_view->identity, active);
-    if (next.valid && active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE && (callback_view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) != 0u) {
+    if (next.valid && (active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE || active.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY) && (callback_view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) != 0u) {
         next.domain = callback_view->profile.key_behaviors;
         next.live   = true;
-    } else if (next.valid && (active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS || active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE)) {
+    } else if (next.valid && (active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS || active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE || active.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY)) {
         // Compiled identities and validated RGB-only profiles use the direct
         // authored tables; the compiled virtual blob is never read here.
         next.live = false;

@@ -99,15 +99,38 @@ static bool behavior_definition(uint16_t keycode, uint8_t layer) {
     return enabled && layer_bit(allowed_layers, layer);
 }
 
+// Behaviours on/off is two switches (D-F32): the stored master in the
+// profile's settings, and a runtime override in RAM a toggle key flips,
+// never saved, cleared by a replug. Behaviours run only when both allow.
+static bool behaviors_override = true;
+
+void noah_participation_set_behaviors_override(bool allowed) {
+    behaviors_override = allowed;
+}
+
+bool noah_participation_behaviors_override(void) {
+    return behaviors_override;
+}
+
+bool noah_participation_behaviors_allowed(void) {
+    return noah_setting(NOAH_SETTING_BEHAVIORS_ENABLED, 1u) != 0u && behaviors_override;
+}
+
+// Combos likewise: the stored master here, and QMK's own combo flag as the
+// override (QK_COMBO_TOGGLE and friends), which QMK checks itself.
+bool noah_participation_combos_allowed(void) {
+    return noah_setting(NOAH_SETTING_COMBOS_ENABLED, 1u) != 0u;
+}
+
 bool noah_participation_behavior(uint16_t keycode, uint8_t source_layer, keypos_t key_pos) {
-    return noah_setting(NOAH_SETTING_BEHAVIORS_ENABLED, 1u) != 0u                                       // master
+    return noah_participation_behaviors_allowed()                                                     // master and override
            && layer_bit(noah_setting(NOAH_SETTING_LAYER_BEHAVIORS, UINT32_MAX), source_layer)          // layer
            && behavior_definition(keycode, source_layer)                                             // definition
            && !placement_bit(source_layer, NOAH_SETTINGS_LAYER_BYPASS, key_pos);                       // placement
 }
 
 bool noah_participation_behavior_generated(uint16_t keycode, uint8_t origin_layer) {
-    return noah_setting(NOAH_SETTING_BEHAVIORS_ENABLED, 1u) != 0u && behavior_definition(keycode, origin_layer);
+    return noah_participation_behaviors_allowed() && behavior_definition(keycode, origin_layer);
 }
 
 bool noah_participation_combo_output(uint16_t combo_index, uint16_t keycode, uint8_t origin_layer) {
@@ -127,7 +150,7 @@ bool noah_participation_combo_output(uint16_t combo_index, uint16_t keycode, uin
 }
 
 bool noah_participation_combo_press(uint8_t source_layer, keypos_t key_pos) {
-    return layer_bit(noah_setting(NOAH_SETTING_LAYER_COMBOS, UINT32_MAX), source_layer) && !placement_bit(source_layer, NOAH_SETTINGS_LAYER_EXCLUDE, key_pos);
+    return noah_participation_combos_allowed() && layer_bit(noah_setting(NOAH_SETTING_LAYER_COMBOS, UINT32_MAX), source_layer) && !placement_bit(source_layer, NOAH_SETTINGS_LAYER_EXCLUDE, key_pos);
 }
 
 bool noah_participation_combo_row(uint16_t combo_index, uint8_t source_layer) {

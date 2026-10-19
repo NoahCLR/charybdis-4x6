@@ -12,6 +12,8 @@
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/macro/macro_payload.h"
 #include "users/noah/lib/profile/runtime/profile_activation_policy.h"
+#include "users/noah/lib/profile/runtime/profile_working_copy.h"
+#include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/lib/state/shared/runtime_reset.h"
@@ -505,6 +507,78 @@ static void test_custom_key_holds_its_shortcut_until_release(void) {
     CHECK(noah_profile_activation_policy_safe_boundary(&policy) == 0u);
 }
 
+// A live edit (D-F32) committed while a key is held waits at the activation
+// boundary the real key runtime reports, and lands only once the key is
+// released: the shortcut types exactly as it would without the edit.
+static uint32_t live_edit_safe_boundary(void *context) {
+    return noah_profile_activation_policy_safe_boundary(context);
+}
+
+static void live_edit_invalidated(void *context, uint32_t publication, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *view) {
+    (void)publication;
+    (void)previous;
+    (void)view;
+    *(uint8_t *)context = active.kind;
+}
+
+static void test_live_edit_waits_for_a_held_key(void) {
+    static const uint8_t                 empty_profile[NOAH_PROFILE_BLOB_V1_HEADER_SIZE] = {'N', 'L', 'P', '1', NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR, NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR, 0u, NOAH_PROFILE_BLOB_V1_CANONICAL_FLAG};
+    static uint8_t                       working[8192];
+    static uint8_t                       keymap[16u * 64u * 2u];
+    static noah_effective_profile_provider_t provider;
+    static noah_profile_working_copy_t   copy;
+    noah_profile_validator_v1_compatibility_t rules = noah_profile_validator_v1_default_compatibility(0x1234u);
+    noah_profile_reader_t                reader      = noah_profile_reader_from_memory(empty_profile, sizeof(empty_profile));
+    noah_profile_validator_v1_profile_t  profile     = {
+        .byte_length       = sizeof(empty_profile),
+        .crc32             = noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, empty_profile, sizeof(empty_profile))),
+        .digest            = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, empty_profile, sizeof(empty_profile)),
+        .action_abi_digest = 0x1234u,
+    };
+    noah_effective_profile_snapshot_t    compiled;
+    noah_profile_activation_policy_t     policy;
+    uint8_t                              published_kind = 0u;
+    noah_effective_profile_invalidator_t invalidator   = {.callback = live_edit_invalidated, .context = &published_kind};
+    noah_profile_working_splice_t        create        = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = sizeof(keymap), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    keypos_t                             key_pos       = test_keypos(2, 1);
+
+    test_reset_state();
+    rules.required_domain_mask = 0u;
+    noah_profile_activation_policy_init(&policy, test_no_unresolved_peer, NULL);
+    CHECK(noah_effective_profile_snapshot_make_compiled(&profile, &reader, 0u, &compiled) == NOAH_EFFECTIVE_PROFILE_OK);
+    CHECK(noah_effective_profile_provider_init(&provider, &compiled, live_edit_safe_boundary, &policy, &invalidator, 1u) == NOAH_EFFECTIVE_PROFILE_OK);
+    noah_profile_working_copy_init(&copy, working, sizeof(working), &provider, &rules, &rules, 77u);
+
+    // Hold the shortcut, then send an edit that adds a keymap.
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, true));
+    CHECK(report_event_count == 1u);
+    CHECK(noah_profile_working_copy_begin(&copy, 1u, 77u, 0u, 1u, sizeof(keymap), 0u, false) == NOAH_PROFILE_WORKING_OK);
+    CHECK(noah_profile_working_copy_splice(&copy, 1u, 0u, &create) == NOAH_PROFILE_WORKING_OK);
+    for (uint32_t offset = 0u; offset < sizeof(keymap); offset += 22u) {
+        uint32_t count = sizeof(keymap) - offset < 22u ? sizeof(keymap) - offset : 22u;
+        CHECK(noah_profile_working_copy_data(&copy, 1u, offset, keymap + offset, count) == NOAH_PROFILE_WORKING_OK);
+    }
+    CHECK(noah_profile_working_copy_commit(&copy, 1u, noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, keymap, sizeof(keymap)))) == NOAH_PROFILE_WORKING_QUEUED);
+    for (uint32_t scan = 0u; scan < 400u; scan++) {
+        key_runtime_integration_advance(&fake_time, 1);
+        key_runtime_integration_scan();
+        (void)noah_profile_working_copy_scan(&copy);
+    }
+    CHECK(copy.phase == NOAH_PROFILE_WORKING_PHASE_WAITING_SAFE && !copy.active && published_kind == 0u);
+    CHECK(report_event_count == 1u && get_mods() == TEST_SHORTCUT_MODS);
+
+    // Release: the shortcut ends as it would have, then the edit lands.
+    CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, false));
+    CHECK(report_event_count == 2u);
+    test_check_report_event(1, KC_K, false, TEST_SHORTCUT_MODS);
+    for (uint32_t scan = 0u; scan < 16u && noah_profile_working_copy_busy(&copy); scan++) {
+        (void)noah_profile_working_copy_scan(&copy);
+    }
+    CHECK(copy.active && copy.revision == 1u && copy.last_result == NOAH_PROFILE_WORKING_OK && published_kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY);
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(key_pos);
+}
+
 // A quick tap is the same press and release, never a second tap after it.
 static void test_custom_key_quick_tap_sends_its_shortcut_once(void) {
     keypos_t key_pos = test_keypos(2, 2);
@@ -553,6 +627,7 @@ static void test_overlapping_shortcuts_keep_a_shared_modifier(void) {
 
 int main(void) {
     test_custom_key_holds_its_shortcut_until_release();
+    test_live_edit_waits_for_a_held_key();
     test_custom_key_quick_tap_sends_its_shortcut_once();
     test_overlapping_shortcuts_keep_a_shared_modifier();
     test_pending_third_tap_hold_modifier_keeps_processed_child_immediate(KC_LEFT_SHIFT, MOD_BIT(KC_LEFT_SHIFT));

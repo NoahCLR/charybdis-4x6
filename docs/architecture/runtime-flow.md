@@ -556,6 +556,36 @@ checks fail and the real two-half safety matrix is open. The separate mutation
 engineering artifact now advertises and routes the complete write capability
 set for hardware testing; it does not change the ordinary build.
 
+## Live Edits
+
+```mermaid
+flowchart LR
+    hid["Raw HID: begin, splices, data, commit"] --> stage["Stage inserted bytes above the profile"]
+    stage --> load["First edit: copy the saved profile into the working copy"]
+    load --> check["Check each touched domain on the resulting bytes"]
+    check --> wait["Wait for the activation safe boundary"]
+    wait --> publish["Rewrite the working copy inside the publication"]
+    publish --> rebind["Rebuild the changed domains' runtimes"]
+    rebind --> forward["USB half sends the same edit to the other half"]
+    forward --> peer["Other half: stage, check, publish at its own boundary"]
+```
+
+An edit (D-F32) arrives over Raw HID in the main loop: each report is admitted
+synchronously (a bounded copy into the top of the working copy's buffer). On
+commit the owner's scan loads the saved profile into the buffer if this is the
+first edit (1 KiB a scan), then runs the touched domains' validators over the
+bytes the edit would produce, up to 64 bounded validator steps a scan, reading
+the RAM buffer and the staged bytes only. A checked edit is published through
+the provider's in-place publication at the same safe boundary activation
+waits for: the bytes move inside the publication, then each runtime's
+invalidator runs and those whose domain did not change keep what they built.
+The USB half's scan then sends the same edit to the other half on
+`PUT_PROFILE_WORKING_SYNC`, one RPC a scan; the other half's callback only
+fills a mailbox, and its scan runs the same steps. Save drives the candidate
+transaction from the scan with REUSE from the working copy, so its durable
+path is the reconciliation above. Nothing on this path touches flash until
+Save.
+
 ## USB Product Name
 
 The settings domain's keyboard name (D-F25) is the USB product string,

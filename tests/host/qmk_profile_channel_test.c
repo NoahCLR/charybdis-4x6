@@ -22,6 +22,15 @@ void noah_qmk_usb_product_name_note_host_frame(void) {
     host_frames++;
 }
 
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+// Live edits have their own channel and test (qmk_profile_edit_channel_test.c).
+bool noah_qmk_profile_edit_channel(uint8_t *data, uint8_t length) {
+    (void)data;
+    (void)length;
+    return false;
+}
+#endif
+
 void raw_hid_send(uint8_t *data, uint8_t length) {
     sent_reports++;
     sent_data   = data;
@@ -378,6 +387,23 @@ static void test_status_surfaces_coherent_owner_snapshot(void) {
     assert(read_u16(&frame[WIRE_PAYLOAD + 17u]) == UINT16_C(0x5152));
     assert(frame[WIRE_PAYLOAD + 21u] == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
     assert(frame[WIRE_PAYLOAD + 22u] == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+
+    // Unsaved live edits (D-F32): the working copy over its saved base, its
+    // revision in the active digest, and never "compiled defaults".
+    {
+        noah_effective_profile_identity_t saved = live_owner_status.active;
+
+        live_owner_status.active.kind           = NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY;
+        live_owner_status.active.payload_digest = 12u;
+        make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x47u, 0u);
+        channel(frame, sizeof(frame));
+        assert(frame[WIRE_PAYLOAD + 24u] == NOAH_PROFILE_ACTIVE_WORKING && read_u32(&frame[WIRE_PAYLOAD + 12u]) == 12u);
+        assert(!(read_u16(&frame[WIRE_PAYLOAD + 2u]) & NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT));
+        make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x48u, 1u);
+        channel(frame, sizeof(frame));
+        assert(read_u32(&frame[WIRE_PAYLOAD]) == 99u && frame[WIRE_PAYLOAD + 4u] == saved.origin);
+        live_owner_status.active = saved;
+    }
 }
 #endif
 

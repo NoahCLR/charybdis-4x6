@@ -80,12 +80,19 @@ typedef enum {
     NOAH_PROFILE_SPLIT_V1_BUSY_PULLING          = 6u, // the receiver is pulling a profile itself
     NOAH_PROFILE_SPLIT_V1_BUSY_CONVERGENCE_ONLY = 7u, // the receiver only converges just now
     NOAH_PROFILE_SPLIT_V1_BUSY_COPYING          = 8u, // copying a PAYLOAD_REUSE range; offset is its progress
-    NOAH_PROFILE_SPLIT_V1_BUSY_REASON_MAX       = NOAH_PROFILE_SPLIT_V1_BUSY_COPYING,
+    // The receiver's storage step is not running: a save there waits for a
+    // quiet keyboard before it erases, or for the next grant's flash time.
+    // Waiting for quiet is not a stall (D-F32): the sender counts it as
+    // progress, as the receiver's own timers do not run meanwhile.
+    NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED   = 9u,
+    NOAH_PROFILE_SPLIT_V1_BUSY_REASON_MAX       = NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED,
 } noah_profile_split_v1_busy_reason_t;
 
 // The active profile a PAYLOAD_REUSE range is read from, as Profile Wire's
-// candidate REUSE names it: compiled (kind 0, generation 0, origin 255) or
-// committed (kind 1, nonzero generation, origin 0..1).
+// candidate REUSE names it: compiled (kind 0, generation 0, origin 255),
+// committed (kind 1, nonzero generation, origin 0..1), or the working copy
+// (kind 2, D-F32: its base's generation and origin, session in crc32 and
+// revision in digest).
 typedef struct {
     uint32_t generation;
     uint32_t digest;

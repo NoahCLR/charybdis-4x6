@@ -808,3 +808,64 @@ widened the provider's frame on the saved-macro storage read to 1,968 bytes.
 The decoder's byte reads are a direct call. The complete stack gate remains
 failing on the six inherited paths; no budget or test was weakened. Allocator
 and stack high-water on both physical halves remain keyboard acceptance.
+
+## Live edits — D-F32
+
+Each half holds a working copy of its profile in RAM, one slot payload:
+`runtime_working_bytes`, 130,048 bytes of `.bss` in SRAM0–3, the largest
+static claim in the firmware. It is static so the boot span says exactly what
+is left; the core allocator never holds it. The edit's state (its splice and
+piece tables, its own validator, the saved snapshot Revert returns to, the
+record of the last edit kept for the other half), the working-copy sync's
+request, mailbox and reply, and Save's state live in the owner, which links at
+13,860 bytes (11,368 before, inside the 16,384-byte policy that replaces
+11,520). The owner's paused clock adds 12 bytes and the working RPC's
+registration 8.
+
+An instrumented right-half resource build (`NOAH_RESOURCE_CHECKS=yes`
+`tools/build-firmware-pair.sh`, pinned GCC 15.2.0 image, BK `d280a4471e`),
+against D-F31's measurement of the same base:
+
+| | This change | D-F31 |
+| --- | ---: | ---: |
+| SRAM0–3 `.data` | 4,340 bytes | 4,332 |
+| SRAM0–3 `.bss` | 198,000 bytes | 65,440 |
+| SRAM0–3 `.data + .bss` | 202,340 bytes | 69,772 |
+| Static-data tripwire | 203,776 bytes | 70,656 |
+| Below it | 1,436 bytes | 884 |
+| Fixed linked prefix | 202,352 bytes | 69,784 |
+| Linker/core-memory span at boot | 59,792 bytes | 192,360 |
+
+The tripwire rises by one reviewed 130 KiB increment (133,120 bytes: the
+buffer, the owner's growth and room for review fixes) to 203,776
+(`tests/host/run_firmware_memory_budget_checks.sh`). It stays a regression
+policy. The real margin is what SRAM0–3 has left: 55,696 bytes past the linked
+prefix and the 4,096-byte arena floor, all of it the core allocator's boot
+span (59,792 bytes with the floor), against 192,360 before. ChibiOS and the
+split slave thread's working area are already in the linked prefix; what the
+allocator actually hands out at run time is keyboard evidence still owed,
+with stack high-water, on both halves. The left half links the same code and
+was not separately analysed: the resource build stops at the right half's
+first failing manifest (below).
+
+Stack (reviewed paths, same ELF). The owner manifest passes every path. The
+two chunk paths over budget on D-F29 and D-F30 stay inside it: peer large
+chunk write 1,904 and repeated read 1,896 bytes (D-F31: 1,896 and 1,888);
+reuse mailbox admission 1,784 (1,776), large chunk mailbox decode 1,760
+(1,752). Those eight bytes are `scan_running`'s, which now hands the working
+copy its scan grant; everything the live edits add there is out of line
+(`scan_working`, `save_step`, `observe_working`, the boot-time compiled
+projection, the transport registration, the paused clock), since each of
+these, inlined, widened the durable-I/O step every storage path carries by up
+to 48 bytes. New edit paths: Raw HID data admission 544, commit plan reading
+the saved envelope 776, status reply 856, domain validation step 1,224,
+loading the working copy from the saved slot 1,120, in-place rewrite 1,144,
+combo republication 1,432, settings republication 1,200, sync exchange 1,064,
+whole-copy read for the other half 1,328, save abandoning its candidate 1,104;
+the working RPC's slave-thread mailbox 80. Three existing paths follow the new
+call shape: settings readback reads the stored domain (it no longer asks QMK
+for live values), settings publication ends in the pointing CPI setter (it
+writes no EEPROM), and the boot PD cache is reached through
+`noah_effective_pd_invalidate` (`publish_pd_cache` is kept out of line). The
+ordinary manifest fails only on the six inherited handled-key paths
+(1,952–2,304 bytes, unchanged); every path that passed on D-F31 passes.

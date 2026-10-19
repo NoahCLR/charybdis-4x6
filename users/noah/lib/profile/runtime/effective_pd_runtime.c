@@ -39,7 +39,9 @@ const uint8_t *noah_effective_pd_for_mask(uint32_t mode) {
     return record && record[1] ? record : NULL;
 }
 
-static bool publish_pd_cache(const noah_effective_profile_snapshot_t *view) {
+// Out of line, so the reviewed stack paths can name it whatever the
+// invalidator around it does.
+static __attribute__((noinline)) bool publish_pd_cache(const noah_effective_profile_snapshot_t *view) {
     noah_profile_pd_v1_iterator_t iterator = {0};
     noah_profile_domain_range_t payload;
     if (!(view->profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD) || !noah_profile_blob_v1_find_domain(&view->reader, view->base_offset, view->profile.byte_length, NOAH_PROFILE_DOMAIN_V1_PD, &payload)) return false;
@@ -54,7 +56,9 @@ static bool publish_pd_cache(const noah_effective_profile_snapshot_t *view) {
 }
 
 void noah_effective_pd_invalidate(void *context, uint32_t publication, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *view) {
-    (void)context; (void)publication; (void)previous; (void)active;
+    (void)context; (void)publication; (void)previous;
+    // An edit to other domains (D-F32) keeps the cached records.
+    if (ready && view && active.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY && !(view->changed_domain_mask & NOAH_PROFILE_DOMAIN_MASK_PD)) return;
     ready = false;
     ready = view && publish_pd_cache(view);
 }

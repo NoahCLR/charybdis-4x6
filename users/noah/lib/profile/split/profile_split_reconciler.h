@@ -110,6 +110,11 @@ typedef struct {
     // its own active profile and sends PAYLOAD_REUSE for those instead of
     // their bytes. Background repair always sends bytes.
     noah_profile_split_reuse_plan_fn prepared_reuse_plan;
+    // Optional. Whether this half's storage step is not running just now
+    // (profile_store_runtime.c): a request it cannot take yet is then answered
+    // BUSY_STORAGE_PAUSED, not MAILBOX_FULL. Called from the RPC callback.
+    bool (*storage_paused)(void *context);
+    void *storage_paused_context;
 } noah_profile_split_reconciler_config_t;
 
 typedef struct {

@@ -1098,6 +1098,11 @@ void noah_qmk_combo_origin_debug_snapshot(noah_qmk_combo_origin_debug_snapshot_t
 bool combo_key_record_allowed(uint16_t combo_index, combo_t *combo, uint16_t keycode, keyrecord_t *record) {
     (void)combo;
     (void)keycode;
+    // The stored master holds generated input too (D-F32); QMK's own flag,
+    // the override, it checks itself.
+    if (!noah_participation_combos_allowed()) {
+        return false;
+    }
     if (!record || record->event.type != KEY_EVENT) {
         return true;
     }

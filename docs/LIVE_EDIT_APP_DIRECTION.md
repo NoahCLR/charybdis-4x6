@@ -47,6 +47,16 @@ holding a format-5 profile starts from its compiled defaults and says so in
 its status. No Ark speaks the new base yet, so this firmware is for its own
 task checks only until Ark follows.
 
+Live edits take effect on both halves at once, without a save (D-F32). Each
+half keeps a working copy of its profile in RAM; an edit is checked domain by
+domain and published at a safe boundary, the other half following over a
+split RPC of its own; Save writes the working copy as a new generation through
+the ordinary candidate path, and a replug boots the saved profile. The edit
+mode (Apply, Live, Live + review) is stored on each half outside the profile;
+the firmware does not yet save on its own. The profile is the only durable
+owner of the settings QMK holds, and the combos and behaviours toggles are
+runtime overrides beside their stored masters. Hardware acceptance is pending.
+
 Keymap and macro domains own typing and playback (D-F30), and VIA is not
 supported (D-F31): the firmware answers Raw HID itself, Apply publishes one
 store with no VIA binding, staging or roll-forward, and QMK's logical EEPROM
@@ -112,6 +122,22 @@ profile and sends the rest in chunks of up to 106 bytes (D-F19, D-F28); it has
 not run on hardware either.
 
 ## Open Issues
+
+- **No Ark drives live edits yet (D-F32).** The edit, Save, Revert and edit
+  mode commands, the working copy read and the runtime readback are in the
+  firmware only; the Ark side is its follow-up. Settings readback (GET `0x07`)
+  now reports stored values, and QMK's live ones moved to GET `0x22`.
+- **Adjustment keys are not yet edits (D-F32).** The DPI and RGB keys still
+  move QMK's values and write QMK's EEPROM, which no longer wins at boot. Any
+  settings edit, Revert, Save or Apply pushes the stored DPI and RGB into QMK
+  again, so a key adjustment is undone by the next of those, at once, and by
+  a replug, unless the profile is edited to match. They become working-copy
+  edits when the keyboard learns to save on its own.
+- **Live edits need keyboard acceptance (D-F32).** Edits in every domain
+  taking effect on both halves at once, Save surviving a replug, an unsaved
+  edit reverting on replug, and typing through an edit undisturbed have run
+  only in host tests. The working copy is 130,048 bytes of static RAM per half;
+  allocator and stack high-water on both halves are owed.
 
 - **No Ark drives the new base yet (D-F28, D-F31).** Ark speaks Profile Wire 1,
   schema 3.0 and store format 5, and reads through VIA; this firmware refuses
@@ -1806,3 +1832,122 @@ Client follow-up (Ark on the new base): drop the VIA protocol and
 firmware-version reads and identify by the capability page; read macros and
 the keymap from the profile and base RGB through the settings readback; send
 BEGIN with a zero tail and no logical VIA staging.
+
+## D-F32 — Live edits: a working copy in RAM, Save, and the edit mode
+
+**Working copy.** Each half keeps one buffer the size of a slot's payload
+(130,048 bytes, static) for a working copy of its profile. While nothing is
+edited the provider runs the saved profile (a committed slot through XIP, or
+the compiled defaults) and the buffer is unused. The first edit copies the
+saved profile into it in bounded steps; from its publication until Save,
+Revert, an Apply or a replug, the buffer is the active profile, a provider
+snapshot of kind *working copy* that keeps its saved base's generation and
+origin and carries its session and revision in place of checksums. Revert
+publishes the saved snapshot again. A replug boots the saved profile; unsaved
+RAM never has authority at boot.
+
+**Edits.** An edit is up to eight splices into domain payloads (remove some
+bytes at an offset, insert others), applied together as one revision, so a
+compound change (several fields, several domains) is atomic. A splice may
+create or drop a whole optional domain. Inserted bytes are staged at the top
+of the buffer, above both the current and the resulting profile, so a refused
+edit leaves every byte as it was and no second profile-sized buffer exists;
+the price is a capacity rule (inserted bytes plus the larger profile within
+the payload), which every profile within today's maximum (74,801 bytes) meets
+for any single-domain replacement. Replacing the whole working copy (an
+import) streams into the buffer itself and therefore needs the saved profile
+active. Each touched domain is checked alone by the same domain code a
+whole-profile validation runs (the validator's domain mode), held to a host
+candidate's rules, with the profile's required domains and ceiling; no other
+domain is read and nothing is checksummed. The edit is published at the same
+safe boundary as an activation; its bytes are rewritten inside the
+publication (no reader sees them half moved), and the provider's in-place
+publication tells each runtime which domains changed, so settings, combos and
+pointing keep their tables and projections when theirs did not, while the
+keymap, macros, behaviours and RGB rebind their readers.
+
+**Session and revision.** A session per boot (the ring oscillator's random
+bit mixed with the boot time) and a revision that advances with every change
+to the working copy's bytes, including Revert and any profile activated from
+outside it, but not Save. Every edit, Save and Revert names both; a stale one
+is refused with the current pair. Keyboard adjustment keys will advance the
+revision once they are edits, so a client learns of them the same way.
+
+**The other half.** Edits travel on their own split RPC, never through the
+durable prepare path: the USB half sends each published edit, the other half
+checks and publishes it at its own safe boundary, and in any other
+disagreement the USB half reverts the other half, gives it its identity over
+the same saved profile, or sends its whole working copy
+([split protocol](architecture/profile-split-v1.md#working-copy-sync-d-f32)).
+A new edit waits until the other half holds the same session and revision,
+so the status's "both halves at revision N" is one flag and at most one edit
+is ever behind. Considered: preparing the edit on both halves before either
+publishes (two-phase); rejected because both halves run one build and the
+same checks on the same bytes, so a refusal on the other half means a fault,
+and the extra round trip would slow every edit. A refused edit is followed by
+one whole-copy replacement; if that is refused too, the halves stay apart,
+reported, until a Revert or an Apply, and Save is refused meanwhile. The USB
+half forgets that the halves agreed whenever it reverts or adopts the other
+half or loses it for 3 s, so an edit is never sent onto bytes the other half
+no longer holds; a Save onto different bytes would fail anyway, as each
+slot's commit reads its payload back against the candidate's CRC-32 and
+digest.
+
+**Save** is today's Apply without the upload: the owner drives the ordinary
+candidate transaction with a candidate made entirely of REUSE from the
+working copy (reuse source kind 2), so the whole-profile validation with its
+checksum, both halves' durable preparation, the marker-last decision,
+convergence, activation and every power-loss guarantee are the same code,
+and the other half fills its copy from its own working copy, sending no
+profile bytes when the halves agree. The candidate is held to a saved
+record's rules, since its unedited domains came from one. When it lands the
+saved profile is the working copy's bytes, so the active profile becomes the
+new slot with the same revision. An Apply still works and replaces the
+working copy; Apply frames are refused while an edit is mid-way or a save
+runs, and edits while a candidate is in progress.
+
+**Edit mode** (plan answer 9). Apply, Live or Live + review, default Live +
+review, stored on each half in QMK's EEPROM user datablock (32 bytes: two
+16-byte records with a counter and CRC-32, the newer valid one counting), never
+in a profile, backup or review. A change takes a counter above both halves';
+the higher counter wins on reconnect, and equal counters that disagree are
+reported until the next change. A change is refused with unsaved edits. QMK's
+EEPROM is wear-levelled flash that may erase, so a half writes a new record
+only when its keyboard is quiet, as before a slot erase (D-F29), never from
+a Profile Wire report or a split RPC; a failed write backs off and is
+reported. In this decision the firmware never saves on its own.
+
+**The profile owns what QMK holds** (plan answer 10). Base RGB, default
+layers, keymap options, DPI and auto-mouse are pushed into QMK with its
+no-EEPROM setters at boot (the compiled defaults once discovery finds nothing
+saved), on activation and on a settings edit; QMK's EEPROM copies no longer
+win at boot, and settings readback reports the stored values. Toggles are
+runtime overrides beside the stored master, cleared by a replug and never an
+edit: combos run while the master and QMK's combo flag both allow (the master
+gates `combo_key_record_allowed` and press capture), behaviours while the
+master and the override in `participation.c` both allow, ready for a
+behaviours key. GET `0x22` reads masters, overrides and QMK's live values.
+Adjustment keys keep their behaviour for now (see Open Issues).
+
+**A save waiting for a quiet keyboard is not a stall.** The durable-I/O grant
+skips the owner while a save waits to erase (D-F29). The owner's clock now
+stops for those grants, so the host's 15 s, the copy's no-progress window and
+the receive lease do not count the wait, and a half whose storage is paused
+answers busy reason 9, which the other half counts as progress. The edit
+status tells the client which half waits (flags 9 and 10).
+
+**An unfinished edit holds a lease.** An edit being received is aborted after
+15 s without an accepted report on the owner's clock, as an abandoned Apply
+is, and Revert aborts one at once, so a client that quits mid-edit cannot
+leave Apply, Save, Revert and the other half refused BUSY until a replug.
+
+Wire: Profile Wire SET `0x20`–`0x27` and GET `0x20`–`0x22`, `0x27`, in
+[Profile Wire, Live Edits](architecture/profile-wire-v1.md#live-edits); the
+base is unreleased, so no version moves. Memory: the working copy and its
+state raise the static tripwire by one reviewed increment
+([memory budgets](architecture/memory-budgets.md#live-edits--d-f32)).
+
+Client follow-up: Ark's live edits and Save. Hardware acceptance owes edits
+in every domain on both halves, Save across a replug, an unsaved edit
+reverting on replug, typing through an edit, and RAM high-water on both
+halves.

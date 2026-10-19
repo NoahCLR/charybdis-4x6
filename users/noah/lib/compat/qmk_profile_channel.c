@@ -28,6 +28,7 @@
 #    include "raw_hid.h"
 #    include "usb_descriptor.h"
 #    include "qmk_combo_readback.h"
+#    include "qmk_profile_edit_channel.h"
 #    include "qmk_profile_flash_hooks.h"
 #    include "qmk_portable_profile.h"
 #    include "qmk_usb_product_name.h"
@@ -81,6 +82,9 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
         status->active_generation = owner->active.generation;
         if (owner->active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE) {
             status->active_kind        = NOAH_PROFILE_ACTIVE_COMMITTED;
+            status->active_origin_half = owner->active.origin;
+        } else if (owner->active.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY) {
+            status->active_kind        = NOAH_PROFILE_ACTIVE_WORKING;
             status->active_origin_half = owner->active.origin;
         } else {
             status->state_flags |= NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT;
@@ -313,6 +317,7 @@ NOAH_PROFILE_CHANNEL_STACK_BOUNDARY static void noah_profile_channel_dispatch(ui
     if (noah_split_diagnostics_command(data, length)) return;
     if (noah_qmk_combo_readback_get(data, length)) return;
     if (noah_qmk_profile_flash_wire_get(data, length)) return;
+    if (noah_qmk_profile_edit_channel(data, length)) return;
 #    ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
     if (noah_profile_channel_handle_cadence_get(data, length)) {
         return;

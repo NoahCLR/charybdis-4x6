@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "../storage/profile_checksum.h"
 #include "../storage/profile_storage_layout.h"
 
 #ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
@@ -22,7 +23,12 @@ enum {
     OWNER_SCHEDULE_HOST = 0u,
     OWNER_SCHEDULE_SPLIT,
     OWNER_SCHEDULE_PEER_ACTIVATION,
+    OWNER_SCHEDULE_WORKING,
     OWNER_SCHEDULE_COUNT,
+    // Save reads the working copy this much per scan for its checksums, and
+    // copies it into the candidate this much per REUSE.
+    OWNER_SAVE_CHECKSUM_BYTES = 1024u,
+    OWNER_SAVE_REUSE_BYTES    = NOAH_PROFILE_CANDIDATE_V1_REUSE_MAX,
 };
 
 static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_ms, bool activating_boot);
@@ -394,6 +400,15 @@ static __attribute__((noinline)) bool initialize_runtime_graph(noah_profile_owne
     if (!candidate_backend(owner)->reuse_guard_installed) {
         return false;
     }
+    // Live edits (D-F32) are held to a host candidate's rules; what the other
+    // half sends, and Save, to a saved record's.
+    owner->edit_compatibility         = owner->compatibility;
+    owner->edit_compatibility.runtime = &owner->candidate_runtime;
+    if (owner->config.working_bytes && owner->config.working_capacity) {
+        noah_profile_working_copy_init(&owner->working, owner->config.working_bytes, owner->config.working_capacity, &owner->provider, &owner->edit_compatibility, &owner->compatibility, owner->config.working_session);
+        noah_profile_working_sync_init(&owner->working_sync, &owner->working, owner->config.working_exchange, owner->config.working_transport_context, &owner->config.edit_mode_storage);
+        owner->working_ready = true;
+    }
     host_backend       = noah_profile_candidate_store_backend_interface(candidate_backend(owner));
     host_compatibility = (noah_profile_candidate_compatibility_t){
         .schema_major          = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
@@ -417,6 +432,8 @@ static __attribute__((noinline)) bool initialize_runtime_graph(noah_profile_owne
             .exchange            = owner->config.split_exchange,
             .peer_store          = &owner->peer_store,
             .prepared_reuse_plan = host_reuse_plan,
+            .storage_paused         = owner->config.storage_paused,
+            .storage_paused_context = owner->config.storage_paused_context,
         };
         noah_profile_split_reconciler_init(&owner->reconciler, &split_config);
         owner->split_initialized = noah_profile_split_reconciler_authority(&owner->reconciler) != NULL;
@@ -481,6 +498,17 @@ bool noah_profile_owner_init(noah_profile_owner_t *owner, const noah_profile_own
     return true;
 }
 
+// Nothing saved: the compiled defaults' settings are what QMK runs (D-F32),
+// whatever its EEPROM held. Boot-only and out of line: its by-value
+// identities would otherwise widen every scan's storage frame.
+static __attribute__((noinline)) void project_compiled_settings(noah_profile_owner_t *owner) {
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    noah_effective_settings_invalidate(&owner->compiled_snapshot, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
+#else
+    (void)owner;
+#endif
+}
+
 static bool scan_discovery(noah_profile_owner_t *owner) {
     noah_profile_store_record_t selected;
 
@@ -490,6 +518,7 @@ static bool scan_discovery(noah_profile_owner_t *owner) {
     }
     if (owner->discovery_result == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE) {
         publish_compiled_descriptor(owner);
+        project_compiled_settings(owner);
         owner->state = NOAH_PROFILE_OWNER_READY_COMPILED;
         return true;
     }
@@ -573,7 +602,7 @@ static bool scan_activation(noah_profile_owner_t *owner) {
     result = noah_profile_candidate_store_backend_activation_step(candidate_backend(owner), NOAH_PROFILE_STORAGE_ADMISSION_NONE);
     if (result == NOAH_PROFILE_CANDIDATE_BACKEND_OK && owner->boot_activation_started && noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner)) == NOAH_PROFILE_STORAGE_ADMISSION_NONE) {
         noah_effective_profile_status_t status;
-        owner->state = noah_effective_profile_provider_status(&owner->provider, &status) == NOAH_EFFECTIVE_PROFILE_OK && status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS ? NOAH_PROFILE_OWNER_READY_COMPILED : NOAH_PROFILE_OWNER_READY_VALIDATED;
+        owner->state = noah_effective_profile_provider_status(&owner->provider, &status) == NOAH_EFFECTIVE_PROFILE_OK && status.active.generation == 0u ? NOAH_PROFILE_OWNER_READY_COMPILED : NOAH_PROFILE_OWNER_READY_VALIDATED;
     } else if (result != NOAH_PROFILE_CANDIDATE_BACKEND_OK && result != NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
         owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
     }
@@ -613,7 +642,8 @@ static void refresh_ready_state(noah_profile_owner_t *owner) {
     if (!owner || noah_effective_profile_provider_status(&owner->provider, &status) != NOAH_EFFECTIVE_PROFILE_OK) {
         return;
     }
-    owner->state = status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE ? NOAH_PROFILE_OWNER_READY_VALIDATED : NOAH_PROFILE_OWNER_READY_COMPILED;
+    // A working copy over a saved profile still runs that saved generation.
+    owner->state = status.active.generation != 0u ? NOAH_PROFILE_OWNER_READY_VALIDATED : NOAH_PROFILE_OWNER_READY_COMPILED;
 }
 
 #ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
@@ -801,6 +831,13 @@ static void note_host_barrier_progress(noah_profile_owner_t *owner, uint32_t now
     uint32_t offset;
     uint8_t  phase;
 
+    // The other half waiting for a quiet keyboard before it can erase is not
+    // a stalled copy (D-F32): its BUSY_STORAGE_PAUSED keeps the save's
+    // deadlines, as its own clock stands still meanwhile.
+    if (owner && owner->reconciler.busy_streak != 0u && owner->reconciler.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED && owner->host_activity_known) {
+        owner->host_last_activity_at = now_ms;
+        return;
+    }
     if (!owner || !owner->host_barrier_started || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER || !noah_profile_split_reconciler_progress(&owner->reconciler, &offset, &phase) || (offset == owner->host_barrier_progress_offset && phase <= owner->host_barrier_progress_phase)) {
         return;
     }
@@ -880,10 +917,49 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
     return true;
 }
 
+static bool save_step(noah_profile_owner_t *owner);
+
+// The working copy's own scan grant (D-F32): Save, then the edit, then the
+// other half. Out of line, as is everything it calls into, so the scan's
+// shared frame (every durable path runs through scan_running) does not grow.
+static __attribute__((noinline)) bool scan_working(noah_profile_owner_t *owner, bool master, uint32_t now_ms) {
+    if (!owner->working_ready) {
+        return false;
+    }
+    if (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE && save_step(owner)) {
+        return true;
+    }
+    // An edit the host stopped sending: aborted, so Apply, Save, Revert and
+    // the other half are not held by it forever.
+    if (master && owner->working.phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING && elapsed_at_least(now_ms, owner->edit_activity_at, NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS)) {
+        (void)noah_profile_working_copy_abort(&owner->working, owner->working.transaction_id);
+        return true;
+    }
+    if (noah_profile_working_copy_scan(&owner->working)) {
+        return true;
+    }
+    if (noah_profile_working_sync_store_mode(&owner->working_sync, now_ms)) {
+        return true;
+    }
+    if (!owner->config.peer_required) {
+        return false;
+    }
+    return master ? noah_profile_working_sync_master_scan(&owner->working_sync, now_ms) : noah_profile_working_sync_peer_scan(&owner->working_sync);
+}
+
+static __attribute__((noinline)) void observe_working(noah_profile_owner_t *owner) {
+    (void)noah_profile_working_copy_observe(&owner->working, owner->save.phase == NOAH_PROFILE_OWNER_SAVE_WAIT);
+}
+
 static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_ms, bool activating_boot) {
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
     noah_effective_settings_boot(activating_boot);
 #endif
+    // Anything that published since the last scan (an Apply or a save
+    // activating, the other half's newer profile) ended any working copy.
+    if (owner->working_ready) {
+        observe_working(owner);
+    }
     noah_profile_storage_admission_owner_t admission = noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner));
     uint32_t                               host_timeout_ms;
 
@@ -963,8 +1039,10 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
             if (!activating_boot && supersede_host_precommit(owner)) {
                 return true;
             }
-        } else if (!activating_boot && admission != NOAH_PROFILE_STORAGE_ADMISSION_HOST) {
-            worked = scan_peer_activation(owner);
+        } else if (current == OWNER_SCHEDULE_PEER_ACTIVATION) {
+            worked = !activating_boot && admission != NOAH_PROFILE_STORAGE_ADMISSION_HOST && scan_peer_activation(owner);
+        } else {
+            worked = !activating_boot && scan_working(owner, master, now_ms);
         }
         if (worked) {
             return true;
@@ -979,6 +1057,8 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
     if (!owner) {
         return false;
     }
+    owner->now_ms = now_ms;
+    owner->master = master;
 #ifdef NOAH_PD_PROFILE_ENABLE
     if (owner->runtimes_installed && !noah_effective_pd_ready()) {
         owner->state = NOAH_PROFILE_OWNER_INTEGRATION_ERROR;
@@ -1012,7 +1092,17 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
     }
 }
 
+// Candidate frames that would start or feed a candidate while an edit or a
+// save holds the working copy are answered BUSY; ABORT and reads are not.
+static bool candidate_held_by_working_copy(const noah_profile_owner_t *owner, const uint8_t *frame, size_t length) {
+    return owner->working_ready && frame && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && frame[0] == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && frame[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && (frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK) && (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_profile_working_copy_busy(&owner->working));
+}
+
 bool noah_profile_owner_receive(noah_profile_owner_t *owner, uint8_t *frame, size_t length) {
+    if (owner && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED) && candidate_held_by_working_copy(owner, frame, length)) {
+        noah_profile_candidate_v1_encode_ack(frame, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY, NOAH_PROFILE_CANDIDATE_V1_ERROR_MAILBOX_BUSY, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U8);
+        return true;
+    }
     return owner && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED) && noah_profile_candidate_transaction_receive(&owner->host_transaction, frame, length);
 }
 
@@ -1101,6 +1191,10 @@ bool noah_profile_owner_usb_restart_safe(noah_profile_owner_t *owner) {
     if (!noah_profile_owner_status(owner, &status) || status.has_pending || status.transfer_pending || status.peer_cleanup_pending || (owner->config.peer_required && !status.peer_converged)) {
         return false;
     }
+    // A USB restart keeps the working copy, but not an edit or save mid-way.
+    if (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_profile_working_copy_busy(&owner->working)) {
+        return false;
+    }
     return noah_profile_activation_policy_safe_boundary(&owner->activation_policy) == 0u;
 }
 
@@ -1151,7 +1245,7 @@ bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_pr
         .busy_streak             = status.busy_streak,
         // Copying is internal split progress. Keep the host status vocabulary
         // compatible with clients that know only reasons 0..7.
-        .busy_reason      = status.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_COPYING ? NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING : status.last_busy_reason,
+        .busy_reason      = status.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_COPYING || status.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED ? NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING : status.last_busy_reason,
         .busy_store_state = status.last_busy_store_state,
         .busy_owner       = status.last_busy_owner,
         .busy_admission   = status.last_busy_admission,
@@ -1165,6 +1259,312 @@ bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_pr
         .reuse_unavailable = owner->reconciler.reuse_unavailable,
     };
     return true;
+}
+
+// ── Live edits (D-F32) ──────────────────────────────────────────────────────
+
+static bool owner_ready(const noah_profile_owner_t *owner) {
+    return owner && owner->working_ready && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED);
+}
+
+// Something else holds the profile: an Apply's candidate (or its cleanup),
+// a save, or a publication waiting for its boundary.
+static bool profile_held(const noah_profile_owner_t *owner) {
+    noah_effective_profile_status_t provider;
+
+    // A publication the working copy has not yet looked at (it does at the
+    // next scan) may have replaced it.
+    return !owner_ready(owner) || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || owner->host_transaction.has_candidate || owner->host_transaction.mailbox.pending || owner->host_cancel_pending || noah_profile_candidate_store_backend_admission_owner(&owner->staging.candidate_backend) != NOAH_PROFILE_STORAGE_ADMISSION_NONE || owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_effective_profile_provider_status(&owner->provider, &provider) != NOAH_EFFECTIVE_PROFILE_OK || provider.has_pending || provider.publication_count != owner->working.publication_count;
+}
+
+// The other half does not yet hold the same saved profile and working copy.
+static bool halves_apart(const noah_profile_owner_t *owner) {
+    uint8_t unresolved = 1u;
+
+    return owner->config.peer_required && (!noah_profile_working_sync_converged(&owner->working_sync, owner->now_ms) || !owner_peer_observer((void *)owner, &unresolved) || unresolved != 0u);
+}
+
+// Each frame the edit accepts restarts its lease, on the owner's clock.
+static noah_profile_working_result_t note_edit_activity(noah_profile_owner_t *owner, noah_profile_working_result_t result) {
+    if (result == NOAH_PROFILE_WORKING_OK) {
+        owner->edit_activity_at = owner->now_ms;
+    }
+    return result;
+}
+
+noah_profile_working_result_t noah_profile_owner_edit_begin(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags) {
+    if (!owner_ready(owner)) {
+        return NOAH_PROFILE_WORKING_INVALID_STATE;
+    }
+    // A repeated BEGIN of the edit already admitted is answered as before.
+    if ((profile_held(owner) || halves_apart(owner)) && !(owner->working.phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING && owner->working.transaction_id == transaction_id)) {
+        return session != owner->working.session || revision != owner->working.revision ? NOAH_PROFILE_WORKING_STALE : NOAH_PROFILE_WORKING_BUSY;
+    }
+    return note_edit_activity(owner, noah_profile_working_copy_begin(&owner->working, transaction_id, session, revision, splice_count, insert_total, flags, false));
+}
+
+noah_profile_working_result_t noah_profile_owner_edit_splice(noah_profile_owner_t *owner, uint16_t transaction_id, uint8_t index, const noah_profile_working_splice_t *splice) {
+    return owner_ready(owner) ? note_edit_activity(owner, noah_profile_working_copy_splice(&owner->working, transaction_id, index, splice)) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_owner_edit_data(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint32_t count) {
+    return owner_ready(owner) ? note_edit_activity(owner, noah_profile_working_copy_data(&owner->working, transaction_id, offset, bytes, count)) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_owner_edit_commit(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t crc32) {
+    return owner_ready(owner) ? noah_profile_working_copy_commit(&owner->working, transaction_id, crc32) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_owner_edit_abort(noah_profile_owner_t *owner, uint16_t transaction_id) {
+    return owner_ready(owner) ? noah_profile_working_copy_abort(&owner->working, transaction_id) : NOAH_PROFILE_WORKING_INVALID_STATE;
+}
+
+noah_profile_working_result_t noah_profile_owner_revert(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision) {
+    if (!owner_ready(owner)) {
+        return NOAH_PROFILE_WORKING_INVALID_STATE;
+    }
+    // Revert never waits for the other half: it follows (profile_working_sync.c).
+    if (profile_held(owner)) {
+        return NOAH_PROFILE_WORKING_BUSY;
+    }
+    // An edit still being sent is abandoned: Revert is the way out of one.
+    if (owner->working.phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING) {
+        (void)noah_profile_working_copy_abort(&owner->working, owner->working.transaction_id);
+    }
+    return noah_profile_working_copy_revert(&owner->working, transaction_id, session, revision);
+}
+
+static void finish_save(noah_profile_owner_t *owner, noah_profile_working_result_t result, noah_profile_candidate_v1_error_id_t error) {
+    noah_profile_candidate_store_backend_hold_candidates_to(candidate_backend(owner), &owner->candidate_runtime);
+    owner->save.last_transaction_id = owner->save.transaction_id;
+    owner->save.last_result         = (uint8_t)result;
+    owner->save.last_error          = (uint8_t)error;
+    owner->save.phase               = NOAH_PROFILE_OWNER_SAVE_IDLE;
+}
+
+noah_profile_working_result_t noah_profile_owner_save(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision) {
+    noah_effective_profile_snapshot_t active;
+
+    if (!owner_ready(owner) || transaction_id == 0u) {
+        return owner_ready(owner) ? NOAH_PROFILE_WORKING_INVALID_ARGUMENT : NOAH_PROFILE_WORKING_INVALID_STATE;
+    }
+    if (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE) {
+        return owner->save.transaction_id == transaction_id ? NOAH_PROFILE_WORKING_QUEUED : NOAH_PROFILE_WORKING_BUSY;
+    }
+    if (session != owner->working.session || revision != owner->working.revision) {
+        return NOAH_PROFILE_WORKING_STALE;
+    }
+    if (profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working)) {
+        return NOAH_PROFILE_WORKING_BUSY;
+    }
+    owner->save.transaction_id = transaction_id;
+    if (!owner->working.active) {
+        // Nothing unsaved: no new generation.
+        finish_save(owner, NOAH_PROFILE_WORKING_OK, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+        return NOAH_PROFILE_WORKING_OK;
+    }
+    if (noah_effective_profile_provider_copy_active(&owner->provider, &active) != NOAH_EFFECTIVE_PROFILE_OK || active.identity.kind != NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY || active.base_offset != 0u) {
+        return NOAH_PROFILE_WORKING_INVALID_STATE;
+    }
+    owner->save.phase       = NOAH_PROFILE_OWNER_SAVE_CHECKSUM;
+    owner->save.offset      = 0u;
+    owner->save.length      = (uint32_t)active.profile.byte_length;
+    owner->save.domain_mask = active.profile.domain_mask;
+    owner->save.crc32       = NOAH_PROFILE_CRC32_INITIAL;
+    owner->save.digest      = NOAH_PROFILE_FNV1A_INITIAL;
+    // Its unedited domains came from a saved profile, which is held to the
+    // rules of a saved record, not of a host candidate; edits already were.
+    noah_profile_candidate_store_backend_hold_candidates_to(candidate_backend(owner), NULL);
+    return NOAH_PROFILE_WORKING_QUEUED;
+}
+
+static bool fail_save(noah_profile_owner_t *owner) {
+    noah_profile_candidate_v1_error_id_t error = owner->host_transaction.status.error.code;
+
+    // A candidate that never reached its commit is let go, as an abandoned
+    // Apply would be.
+    if (owner->host_transaction.has_candidate && host_state_is_precommit(owner->host_transaction.status.state) && !owner->host_transaction.mailbox.pending) {
+        noah_profile_candidate_v1_command_t abort = {.operation = NOAH_PROFILE_CANDIDATE_V1_OPERATION_ABORT, .transaction_id = owner->save.transaction_id};
+
+        (void)noah_profile_candidate_transaction_submit(&owner->host_transaction, &abort);
+    }
+    finish_save(owner, error == NOAH_PROFILE_CANDIDATE_V1_ERROR_VALIDATION_REJECTED ? NOAH_PROFILE_WORKING_VALIDATION_REJECTED : NOAH_PROFILE_WORKING_PUBLICATION_FAILED, error == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE ? NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE : error);
+    return true;
+}
+
+// One step of Save. Commands go to the candidate transaction's mailbox as a
+// host's would; its own scan (the HOST slot) processes them.
+static __attribute__((noinline)) bool save_step(noah_profile_owner_t *owner) {
+    noah_profile_owner_save_t            *save        = &owner->save;
+    noah_profile_candidate_transaction_t *transaction = &owner->host_transaction;
+    noah_profile_candidate_v1_command_t   command;
+
+    memset(&command, 0, sizeof(command));
+    command.transaction_id = save->transaction_id;
+    if (save->phase != NOAH_PROFILE_OWNER_SAVE_CHECKSUM && transaction->mailbox.pending) {
+        return false;
+    }
+    if (save->phase >= NOAH_PROFILE_OWNER_SAVE_REUSE && (transaction->status.transaction_id != save->transaction_id || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED)) {
+        return fail_save(owner);
+    }
+    switch (save->phase) {
+        case NOAH_PROFILE_OWNER_SAVE_CHECKSUM: {
+            uint32_t count = save->length - save->offset;
+
+            if (!owner->working.active) {
+                finish_save(owner, NOAH_PROFILE_WORKING_ABORTED, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+                return true;
+            }
+            if (count > OWNER_SAVE_CHECKSUM_BYTES) {
+                count = OWNER_SAVE_CHECKSUM_BYTES;
+            }
+            save->crc32  = noah_profile_crc32_update(save->crc32, owner->working.bytes + save->offset, count);
+            save->digest = noah_profile_fnv1a_update(save->digest, owner->working.bytes + save->offset, count);
+            save->offset += count;
+            if (save->offset == save->length) {
+                save->crc32  = noah_profile_crc32_finish(save->crc32);
+                save->offset = 0u;
+                save->phase  = NOAH_PROFILE_OWNER_SAVE_BEGIN;
+            }
+            return true;
+        }
+        case NOAH_PROFILE_OWNER_SAVE_BEGIN:
+            command.operation     = NOAH_PROFILE_CANDIDATE_V1_OPERATION_BEGIN;
+            command.payload.begin = (noah_profile_candidate_v1_metadata_t){
+                .schema_major         = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
+                .schema_minor         = NOAH_PROFILE_STORE_SCHEMA_MINOR,
+                .requested_domains    = save->domain_mask,
+                .payload_length       = save->length,
+                .crc32                = save->crc32,
+                .digest               = save->digest,
+                .action_abi_digest    = owner->compiled.metadata.action_abi_digest,
+                .store_format_version = NOAH_PROFILE_STORE_FORMAT_VERSION,
+            };
+            if (!noah_profile_candidate_transaction_submit(transaction, &command)) {
+                return false;
+            }
+            save->phase = NOAH_PROFILE_OWNER_SAVE_REUSE;
+            return true;
+        case NOAH_PROFILE_OWNER_SAVE_REUSE:
+            if (!transaction->has_candidate) {
+                return fail_save(owner);
+            }
+            if (save->offset < save->length) {
+                const noah_effective_profile_identity_t *identity = &owner->working.saved.identity;
+                uint32_t                                  count    = save->length - save->offset;
+
+                if (count > OWNER_SAVE_REUSE_BYTES) {
+                    count = OWNER_SAVE_REUSE_BYTES;
+                }
+                command.operation             = NOAH_PROFILE_CANDIDATE_V1_OPERATION_REUSE;
+                command.payload.reuse.source  = (noah_profile_candidate_v1_source_t){
+                     .generation = identity->generation,
+                     .digest     = owner->working.revision,
+                     .crc32      = owner->working.session,
+                     .kind       = NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY - 1u,
+                     .origin     = identity->origin,
+                };
+                command.payload.reuse.offset        = save->offset;
+                command.payload.reuse.source_offset = save->offset;
+                command.payload.reuse.length        = (uint16_t)count;
+                if (!noah_profile_candidate_transaction_submit(transaction, &command)) {
+                    return false;
+                }
+                save->offset += count;
+                return true;
+            }
+            if (transaction->status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE) {
+                return transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING ? fail_save(owner) : false;
+            }
+            command.operation = NOAH_PROFILE_CANDIDATE_V1_OPERATION_VALIDATE;
+            if (!noah_profile_candidate_transaction_submit(transaction, &command)) {
+                return false;
+            }
+            save->phase = NOAH_PROFILE_OWNER_SAVE_VALIDATE;
+            return true;
+        case NOAH_PROFILE_OWNER_SAVE_VALIDATE:
+            if (transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING) {
+                return false;
+            }
+            if (transaction->status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED) {
+                return fail_save(owner);
+            }
+            command.operation = NOAH_PROFILE_CANDIDATE_V1_OPERATION_COMMIT;
+            if (!noah_profile_candidate_transaction_submit(transaction, &command)) {
+                return false;
+            }
+            save->phase = NOAH_PROFILE_OWNER_SAVE_WAIT;
+            return true;
+        case NOAH_PROFILE_OWNER_SAVE_WAIT:
+            if (transaction->status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || transaction->has_candidate) {
+                return false;
+            }
+            if (transaction->last_committed_transaction_id != save->transaction_id) {
+                return fail_save(owner);
+            }
+            finish_save(owner, NOAH_PROFILE_WORKING_OK, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+            return true;
+        default:
+            finish_save(owner, NOAH_PROFILE_WORKING_INVALID_STATE, NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE);
+            return true;
+    }
+}
+
+noah_profile_working_result_t noah_profile_owner_set_edit_mode(noah_profile_owner_t *owner, uint8_t mode) {
+    if (!owner_ready(owner)) {
+        return NOAH_PROFILE_WORKING_INVALID_STATE;
+    }
+    if (!noah_profile_edit_mode_valid(mode)) {
+        return NOAH_PROFILE_WORKING_INVALID_ARGUMENT;
+    }
+    // Leaving a mode with unsaved edits is the host's question to ask first
+    // (Save or Revert); the keyboard does not decide it.
+    if (owner->working.active) {
+        return NOAH_PROFILE_WORKING_NOT_CLEAN;
+    }
+    if (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_profile_working_copy_busy(&owner->working)) {
+        return NOAH_PROFILE_WORKING_BUSY;
+    }
+    return noah_profile_working_sync_set_mode(&owner->working_sync, mode) ? NOAH_PROFILE_WORKING_OK : NOAH_PROFILE_WORKING_READ_ERROR;
+}
+
+bool noah_profile_owner_working_status(const noah_profile_owner_t *owner, noah_profile_owner_working_status_t *status) {
+    noah_effective_profile_status_t provider;
+    const noah_effective_profile_identity_t *saved;
+
+    if (!owner || !status) {
+        return false;
+    }
+    memset(status, 0, sizeof(*status));
+    if (!owner->working_ready || !noah_profile_working_copy_status(&owner->working, &status->local) || noah_effective_profile_provider_status(&owner->provider, &provider) != NOAH_EFFECTIVE_PROFILE_OK) {
+        return false;
+    }
+    saved                             = owner->working.active ? &owner->working.saved.identity : &provider.active;
+    status->supported                 = true;
+    status->peer                      = owner->working_sync.peer;
+    status->mode                      = owner->working_sync.mode;
+    status->save                      = owner->save;
+    status->saved_generation          = saved->generation;
+    status->saved_origin              = saved->origin;
+    status->saved_compiled            = saved->generation == 0u;
+    status->safe_boundary_reason_mask = provider.safe_boundary_reason_mask;
+    status->peer_required             = owner->config.peer_required;
+    status->peer_converged            = !halves_apart(owner);
+    status->mode_conflict             = owner->working_sync.mode_conflict;
+    status->edits_blocked             = profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working);
+    status->storage_paused            = owner->config.storage_paused && owner->config.storage_paused(owner->config.storage_paused_context);
+    status->peer_storage_paused       = owner->reconciler.busy_streak != 0u && owner->reconciler.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED;
+    status->peer_refused              = noah_profile_working_sync_refused(&owner->working_sync);
+    status->mode_store_failed         = owner->working_sync.mode_store_failed;
+    return true;
+}
+
+bool noah_profile_owner_working_read(const noah_profile_owner_t *owner, uint32_t offset, uint8_t *bytes, uint32_t length) {
+    return owner && owner->working_ready && noah_profile_working_copy_read(&owner->working, offset, bytes, length);
+}
+
+bool noah_profile_owner_working_receive(noah_profile_owner_t *owner, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
+    return owner && owner->working_ready && noah_profile_working_sync_receive(&owner->working_sync, request, request_length, response, response_length);
 }
 
 #if UINTPTR_MAX == UINT32_MAX
