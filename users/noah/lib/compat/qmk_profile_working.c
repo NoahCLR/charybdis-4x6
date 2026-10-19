@@ -5,6 +5,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "qmk_profile_working.h"
+#include "qmk_durable_io.h"
 
 #include <string.h>
 
@@ -168,7 +169,12 @@ bool noah_qmk_profile_working_transport_init(noah_qmk_profile_working_receive_fn
 
 bool noah_qmk_profile_working_transport_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
     (void)context;
-    return request && response && request_length >= 32u && request_length <= RPC_M2S_BUFFER_SIZE && response_length >= 32u && response_length <= RPC_S2M_BUFFER_SIZE && transaction_rpc_exec(PUT_PROFILE_WORKING_SYNC, request_length, request, response_length, response);
+    if (!request || !response || request_length < 32u || request_length > RPC_M2S_BUFFER_SIZE || response_length < 32u || response_length > RPC_S2M_BUFFER_SIZE) {
+        return false;
+    }
+    // The durable-I/O grant repeats no step after one that used the link.
+    noah_qmk_durable_io_note_split_rpc();
+    return transaction_rpc_exec(PUT_PROFILE_WORKING_SYNC, request_length, request, response_length, response);
 }
 
 #    ifdef NOAH_PROFILE_SPLIT_TRANSPORT_TEST

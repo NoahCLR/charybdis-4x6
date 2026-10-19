@@ -8,12 +8,19 @@
 #include <stdint.h>
 
 #include "../protocol/profile_candidate_v1.h"
+#include "profile_storage_layout.h"
 
 enum {
     // The whole-profile validator guarantees one reader operation and at most
-    // this many newly observed bytes per scan call. Checksum reads also honor
-    // a smaller nonzero budget supplied by the owner.
+    // this many newly observed bytes per call. Checksum reads also honor a
+    // smaller nonzero budget supplied by the owner.
     NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET = NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX,
+    // A storage step works through up to a flash page of bytes, in reads and
+    // writes of at most the budget above: a REUSE step copies this much of
+    // its range, so it programs at most one page (D-F29, "Pacing").
+    NOAH_PROFILE_CANDIDATE_STEP_BYTES = NOAH_PROFILE_STORAGE_PAGE_SIZE,
+    // ...and a validation step takes this many validator calls.
+    NOAH_PROFILE_CANDIDATE_VALIDATION_CALLS = NOAH_PROFILE_CANDIDATE_STEP_BYTES / NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET,
 };
 
 typedef enum {
@@ -74,7 +81,6 @@ typedef struct {
     bool                                   has_candidate;
     bool                                   poisoned;
     bool                                   split_commit_authorization_required;
-    bool                                   reuse_read;
     uint16_t                               last_aborted_transaction_id;
     uint16_t                               last_committed_transaction_id;
     uint8_t                                reuse_bytes[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];

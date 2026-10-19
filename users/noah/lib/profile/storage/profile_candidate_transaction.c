@@ -501,41 +501,39 @@ static void process_commit(noah_profile_candidate_transaction_t *transaction, co
     (void)begin_commit(transaction);
 }
 
+// One step copies up to NOAH_PROFILE_CANDIDATE_STEP_BYTES of the range, each
+// piece read and then written through the transaction's chunk buffer.
 static bool process_reuse(noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_command_t *command) {
-    uint16_t copied = command->payload.reuse.copied;
-    uint16_t remaining = (uint16_t)(command->payload.reuse.length - copied);
-    uint8_t length = remaining > NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX ? NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX : (uint8_t)remaining;
-    uint32_t offset = command->payload.reuse.offset + copied;
-    noah_profile_candidate_backend_result_t result;
+    uint32_t offset = command->payload.reuse.offset + command->payload.reuse.copied;
+    uint16_t stepped = 0u;
 
     if (!transaction->has_candidate || transaction->poisoned || transaction->status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING || command->transaction_id != transaction->status.transaction_id || offset != transaction->status.next_offset || command->payload.reuse.offset > transaction->metadata.payload_length || command->payload.reuse.length > transaction->metadata.payload_length - command->payload.reuse.offset || !transaction->backend.read_source || !transaction->backend.write) {
         set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_INVALID_STATE, offset);
-        transaction->reuse_read = false;
         return false;
     }
-    if (!transaction->reuse_read) {
-        result = transaction->backend.read_source(transaction->backend.context, &command->payload.reuse.source, command->payload.reuse.source_offset + copied, transaction->reuse_bytes, length);
-        if (backend_complete(result)) {
-            transaction->reuse_read = true;
-            return true;
-        }
-    } else {
-        result = transaction->backend.write(transaction->backend.context, offset, transaction->reuse_bytes, length);
-        transaction->reuse_read = false;
-        if (backend_complete(result)) {
-            if (transaction->backend.note_reuse) {
-                transaction->backend.note_reuse(transaction->backend.context, &command->payload.reuse.source, offset, command->payload.reuse.source_offset + copied, length);
-            }
-            command->payload.reuse.copied += length;
-            transaction->status.next_offset += length;
-            clear_error(transaction);
-            if (command->payload.reuse.copied < command->payload.reuse.length) return true;
-            transaction->status.state = transaction->status.next_offset == transaction->metadata.payload_length ? NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE : NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING;
+    while (command->payload.reuse.copied < command->payload.reuse.length && stepped < NOAH_PROFILE_CANDIDATE_STEP_BYTES) {
+        uint16_t copied    = command->payload.reuse.copied;
+        uint16_t remaining = (uint16_t)(command->payload.reuse.length - copied);
+        uint8_t  length;
+
+        if (remaining > NOAH_PROFILE_CANDIDATE_STEP_BYTES - stepped) remaining = (uint16_t)(NOAH_PROFILE_CANDIDATE_STEP_BYTES - stepped);
+        length = remaining > NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX ? NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX : (uint8_t)remaining;
+
+        offset = command->payload.reuse.offset + copied;
+        if (!backend_complete(transaction->backend.read_source(transaction->backend.context, &command->payload.reuse.source, command->payload.reuse.source_offset + copied, transaction->reuse_bytes, length)) || !backend_complete(transaction->backend.write(transaction->backend.context, offset, transaction->reuse_bytes, length))) {
+            poison(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE, offset);
             return false;
         }
+        if (transaction->backend.note_reuse) {
+            transaction->backend.note_reuse(transaction->backend.context, &command->payload.reuse.source, offset, command->payload.reuse.source_offset + copied, length);
+        }
+        command->payload.reuse.copied += length;
+        transaction->status.next_offset += length;
+        stepped = (uint16_t)(stepped + length);
     }
-    poison(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE, offset);
-    transaction->reuse_read = false;
+    clear_error(transaction);
+    if (command->payload.reuse.copied < command->payload.reuse.length) return true;
+    transaction->status.state = transaction->status.next_offset == transaction->metadata.payload_length ? NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE : NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING;
     return false;
 }
 
@@ -667,7 +665,6 @@ static noah_profile_candidate_expire_result_t cancel_precommit(noah_profile_cand
         }
         transaction->status.last_operation = transaction->mailbox.command.operation;
         transaction->mailbox.pending       = false;
-        transaction->reuse_read            = false;
         memset(&transaction->mailbox.command, 0, sizeof(transaction->mailbox.command));
     }
     if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED || reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED || reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED) {

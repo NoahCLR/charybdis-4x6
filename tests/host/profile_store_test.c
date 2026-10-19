@@ -30,6 +30,8 @@ typedef struct {
     uint32_t last_write_address;
     uint32_t last_write_length;
     uint32_t last_read_length;
+    uint32_t largest_read_length;
+    uint32_t read_bytes;
 } fake_eeprom_t;
 
 static fake_eeprom_t eeprom;
@@ -55,6 +57,8 @@ static bool fake_read(void *context, noah_profile_storage_address_t address, uin
 
     memory->read_calls++;
     memory->last_read_length = length;
+    memory->read_bytes += length;
+    if (length > memory->largest_read_length) memory->largest_read_length = length;
     if (memory->fail_reads || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) {
         return false;
     }
@@ -236,6 +240,39 @@ static void test_checksums(void) {
     CHECK(crc16 == UINT16_C(0x29B1));
 }
 
+// The CRC-32 takes half bytes from a table; it must give the bit-at-a-time
+// result for any bytes, however they are split across updates.
+static uint32_t bitwise_crc32(uint32_t crc, const uint8_t *bytes, size_t length) {
+    for (size_t index = 0u; index < length; index++) {
+        crc ^= bytes[index];
+        for (uint8_t bit = 0u; bit < 8u; bit++) {
+            crc = (crc >> 1u) ^ (UINT32_C(0xEDB88320) & (uint32_t)-(int32_t)(crc & 1u));
+        }
+    }
+    return crc;
+}
+
+static void test_crc32_matches_the_bitwise_crc(void) {
+    uint8_t  bytes[1031];
+    uint32_t seed = UINT32_C(0x12345678);
+
+    for (size_t index = 0u; index < sizeof(bytes); index++) {
+        seed         = seed * UINT32_C(1103515245) + 12345u;
+        bytes[index] = (uint8_t)(seed >> 16u);
+    }
+    for (size_t split = 0u; split <= sizeof(bytes); split += 97u) {
+        uint32_t crc = noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, bytes, split);
+
+        crc = noah_profile_crc32_update(crc, &bytes[split], sizeof(bytes) - split);
+        CHECK(crc == bitwise_crc32(NOAH_PROFILE_CRC32_INITIAL, bytes, sizeof(bytes)));
+    }
+    for (unsigned value = 0u; value < 256u; value++) {
+        uint8_t byte = (uint8_t)value;
+
+        CHECK(noah_profile_crc32_update(0u, &byte, 1u) == bitwise_crc32(0u, &byte, 1u));
+    }
+}
+
 static void test_commit_and_boot_selection(void) {
     noah_profile_store_t           store;
     noah_profile_store_t           rebooted;
@@ -378,14 +415,21 @@ static void test_commit_state_machine_is_scan_bounded(void) {
     CHECK(eeprom.read_calls == prior_reads && eeprom.write_calls == prior_writes);
 
     do {
-        prior_reads  = eeprom.read_calls;
-        prior_writes = eeprom.write_calls;
-        result       = noah_profile_store_prepare_commit_step(&store, 1u, &record);
-        CHECK(eeprom.read_calls + eeprom.write_calls == prior_reads + prior_writes + 1u);
-        if (eeprom.read_calls != prior_reads) {
-            CHECK(eeprom.last_read_length <= 1u);
+        noah_profile_store_commit_phase_t phase      = store.commit_phase;
+        uint32_t                          prior_read = eeprom.read_bytes;
+
+        prior_reads                = eeprom.read_calls;
+        prior_writes               = eeprom.write_calls;
+        eeprom.largest_read_length = 0u;
+        result                     = noah_profile_store_prepare_commit_step(&store, 1u, &record);
+        if (eeprom.write_calls != prior_writes) {
+            CHECK(eeprom.write_calls == prior_writes + 1u && eeprom.read_calls == prior_reads && eeprom.last_write_length <= 1u);
+        } else if (phase == NOAH_PROFILE_STORE_COMMIT_PAYLOAD_READBACK) {
+            // The payload readback only reads: up to a flash page a step, in
+            // reads of the budget (D-F29, "Pacing").
+            CHECK(eeprom.read_calls > prior_reads && eeprom.largest_read_length <= 1u && eeprom.read_bytes - prior_read <= NOAH_PROFILE_STORAGE_PAGE_SIZE);
         } else {
-            CHECK(eeprom.last_write_length <= 1u);
+            CHECK(eeprom.read_calls == prior_reads + 1u && eeprom.last_read_length <= 1u);
         }
         CHECK(++steps < 160u);
     } while (result == NOAH_PROFILE_STORE_IN_PROGRESS);
@@ -393,6 +437,48 @@ static void test_commit_state_machine_is_scan_bounded(void) {
     CHECK(result == NOAH_PROFILE_STORE_OK);
     CHECK(record.slot == NOAH_PROFILE_SLOT_A && record.generation == 1u);
     CHECK(!store.prepare_active && store.commit_phase == NOAH_PROFILE_STORE_COMMIT_IDLE);
+}
+
+// A long payload's readback takes a flash page a step, in reads of the
+// budget, and covers every byte once.
+static void test_payload_readback_reads_a_page_a_step(void) {
+    enum { BODY = 600u };
+    static uint8_t                 payload[14u + BODY];
+    noah_profile_store_t           store;
+    noah_profile_store_candidate_t candidate;
+    noah_profile_store_record_t    record;
+    noah_profile_store_result_t    result;
+    uint32_t                       readback_steps = 0u;
+    uint32_t                       readback_bytes = 0u;
+
+    memcpy(payload, rgb_profile, 14u);
+    payload[10] = (uint8_t)BODY;
+    payload[11] = (uint8_t)(BODY >> 8u);
+    for (uint32_t index = 0u; index < BODY; index++) payload[14u + index] = (uint8_t)(index * 7u + 1u);
+    reset_eeprom(&eeprom);
+    initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    candidate = candidate_for(payload, sizeof(payload), 1u, 0u);
+    CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
+    for (uint32_t offset = 0u; offset < sizeof(payload); offset += NOAH_PROFILE_STORE_IO_CHUNK_MAX) {
+        uint32_t length = sizeof(payload) - offset < NOAH_PROFILE_STORE_IO_CHUNK_MAX ? sizeof(payload) - offset : NOAH_PROFILE_STORE_IO_CHUNK_MAX;
+        CHECK(noah_profile_store_prepare_write(&store, offset, &payload[offset], length) == NOAH_PROFILE_STORE_OK);
+    }
+    CHECK(noah_profile_store_prepare_commit_begin(&store) == NOAH_PROFILE_STORE_IN_PROGRESS);
+    do {
+        bool     readback = store.commit_phase == NOAH_PROFILE_STORE_COMMIT_PAYLOAD_READBACK;
+        uint32_t before   = eeprom.read_bytes;
+
+        eeprom.largest_read_length = 0u;
+        result                     = noah_profile_store_prepare_commit_step(&store, 20u, &record);
+        if (readback) {
+            CHECK(eeprom.largest_read_length <= 20u && eeprom.read_bytes - before <= NOAH_PROFILE_STORAGE_PAGE_SIZE);
+            readback_steps++;
+            readback_bytes += eeprom.read_bytes - before;
+        }
+    } while (result == NOAH_PROFILE_STORE_IN_PROGRESS);
+    CHECK(result == NOAH_PROFILE_STORE_OK && record.payload_length == sizeof(payload));
+    CHECK(readback_bytes == sizeof(payload));
+    CHECK(readback_steps == (sizeof(payload) + NOAH_PROFILE_STORAGE_PAGE_SIZE - 1u) / NOAH_PROFILE_STORAGE_PAGE_SIZE);
 }
 
 static void test_durable_prepare_is_not_authority_until_decided(void) {
@@ -1268,10 +1354,12 @@ int main(void) {
     test_pd_header_rejects_bad_contracts_before_writing();
     test_pd_header_power_loss_keeps_complete_generation();
     test_checksums();
+    test_crc32_matches_the_bitwise_crc();
     test_commit_and_boot_selection();
     test_header_reserved_bytes_are_zero();
     test_chunk_and_candidate_guards();
     test_commit_state_machine_is_scan_bounded();
+    test_payload_readback_reads_a_page_a_step();
     test_durable_prepare_is_not_authority_until_decided();
     test_durable_prepare_can_be_aborted_before_decision();
     test_destructive_reuse_guard_brackets_every_prepare();

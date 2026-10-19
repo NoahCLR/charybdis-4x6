@@ -491,3 +491,71 @@ static void test_a_failed_automatic_save_is_reported_and_not_repeated(void) {
     }
     puts("a failed automatic save is reported, not repeated for its revision, and an explicit Save or a new edit retries it");
 }
+
+// An edit and its undo, or a value set back, leave a working copy byte for
+// byte the saved profile ("Unsaved edits match what is saved", keyboard
+// check, 2026-10-19). Saving it writes nothing: the keyboard runs its saved
+// profile again with the same revision on both halves, whether the host
+// saves (Live + review) or the keyboard does by itself (Live).
+static void test_saving_the_saved_bytes_writes_nothing(void) {
+    static noah_profile_owner_t left, right;
+    static memory_t lm, rm;
+    uint8_t settings[NOAH_SETTINGS_MIN_SIZE];
+    noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .insert = sizeof(settings), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    noah_profile_working_splice_t dpi = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .offset = NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_DEFAULT_DPI * 4u, .remove = 4u, .insert = 4u};
+    const uint8_t modes[] = {NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW, NOAH_PROFILE_EDIT_MODE_LIVE};
+    uint8_t value[4];
+
+    for (uint8_t m = 0u; m < sizeof(modes); m++) {
+        split_link_t ll = {.peer = &right}, rl = {.peer = &left};
+        working_link_t lw = {.peer = &right}, rw = {.peer = &left};
+        uint32_t now = 1000u;
+        erased_memory(&lm); erased_memory(&rm); auto_settings(settings);
+        boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 77u, &now);
+        scan_until_converged(&left, &right, &now);
+        auto_quiet = false;
+        left.config.keyboard_quiet = auto_keyboard_quiet;
+        left.working_sync.mode.mode = right.working_sync.mode.mode = modes[m];
+        assert(live_edit(&left, &right, 1u, &create, settings, sizeof(settings), &now) == NOAH_PROFILE_WORKING_OK);
+        scan_until_converged(&left, &right, &now);
+        assert(noah_profile_owner_save(&left, 20u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
+        for (uint32_t guard = 0u; guard < 20000u && left.save.phase; guard++) scan_pair(&left, &right, &now);
+        assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && left.committed_descriptor.generation == 1u);
+        scan_until_converged(&left, &right, &now);
+        // DPI to 800, then back to the saved 400.
+        write_u32(value, 800u);
+        assert(live_edit(&left, &right, 2u, &dpi, value, sizeof(value), &now) == NOAH_PROFILE_WORKING_OK);
+        scan_until_converged(&left, &right, &now);
+        write_u32(value, 400u);
+        assert(live_edit(&left, &right, 3u, &dpi, value, sizeof(value), &now) == NOAH_PROFILE_WORKING_OK);
+        scan_until_converged(&left, &right, &now);
+        assert(left.working.active && right.working.active && active_scalar(&left, NOAH_SETTING_DEFAULT_DPI) == 400u);
+        uint32_t revision = left.working.revision, writes = lm.writes + rm.writes, saves = left.save.keyboard_saves;
+        if (modes[m] == NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW) {
+            assert(noah_profile_owner_save(&left, 21u, left.working.session, revision) == NOAH_PROFILE_WORKING_QUEUED);
+            for (uint32_t guard = 0u; guard < 20000u && left.save.phase; guard++) scan_pair(&left, &right, &now);
+            assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && left.save.last_transaction_id == 21u);
+        } else {
+            auto_quiet = true;
+            auto_scans(&left, &right, &now, 10000u);
+            assert(left.save.keyboard_saves == saves + 1u && left.save.last_automatic && left.save.last_result == NOAH_PROFILE_WORKING_OK);
+            assert(left.save.keyboard_revision == revision && left.save.keyboard_generation == 1u);
+        }
+        scan_until_converged(&left, &right, &now);
+        assert(lm.writes + rm.writes == writes);
+        assert(left.committed_descriptor.generation == 1u && right.committed_descriptor.generation == 1u);
+        assert(!left.working.active && !right.working.active);
+        assert(left.working.revision == revision && right.working.revision == revision);
+        assert(active_scalar(&left, NOAH_SETTING_DEFAULT_DPI) == 400u && active_scalar(&right, NOAH_SETTING_DEFAULT_DPI) == 400u);
+        auto_scans(&left, &right, &now, 10000u);
+        assert(lm.writes + rm.writes == writes && left.save.keyboard_saves == saves + (modes[m] == NOAH_PROFILE_EDIT_MODE_LIVE ? 1u : 0u));
+        // The next edit starts from the saved profile as usual.
+        auto_quiet = false;
+        write_u32(value, 600u);
+        assert(live_edit(&left, &right, 4u, &dpi, value, sizeof(value), &now) == NOAH_PROFILE_WORKING_OK);
+        scan_until_converged(&left, &right, &now);
+        assert(left.working.active && left.working.revision == revision + 1u && active_scalar(&right, NOAH_SETTING_DEFAULT_DPI) == 600u);
+    }
+    auto_quiet = true;
+    puts("saving a working copy identical to the saved profile writes nothing, in Live + review and in Live");
+}

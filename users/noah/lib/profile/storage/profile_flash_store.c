@@ -25,6 +25,9 @@ static uint32_t now_us(const noah_profile_flash_store_t *flash) {
 
 static void account(noah_profile_flash_store_t *flash, uint32_t elapsed) {
     flash->grant_us += elapsed;
+    if (flash->grant_operations < UINT16_MAX) {
+        flash->grant_operations++;
+    }
     if (flash->save_active) {
         flash->save_flash_us += elapsed;
     }
@@ -329,7 +332,8 @@ void noah_profile_flash_store_grant_begin(noah_profile_flash_store_t *flash, boo
     if (flash->grant_us > flash->diagnostics.longest_grant_us) {
         flash->diagnostics.longest_grant_us = flash->grant_us;
     }
-    flash->grant_us = 0u;
+    flash->grant_us         = 0u;
+    flash->grant_operations = 0u;
     // Erase a sector ahead, so typing can go on while the writer fills it.
     if (quiet && erase_due(flash, SECTOR_SIZE)) {
         (void)erase_next(flash);
@@ -339,6 +343,10 @@ void noah_profile_flash_store_grant_begin(noah_profile_flash_store_t *flash, boo
 bool noah_profile_flash_store_may_write(const noah_profile_flash_store_t *flash) {
     // After a failed erase the writer runs, so the store learns of it.
     return flash && (flash->failed || (!erase_due(flash, PAGE_SIZE) && flash->grant_us < NOAH_PROFILE_FLASH_GRANT_BUDGET_US));
+}
+
+bool noah_profile_flash_store_grant_flashed(const noah_profile_flash_store_t *flash) {
+    return flash && flash->grant_operations != 0u;
 }
 
 noah_profile_flash_diagnostics_t noah_profile_flash_store_diagnostics(const noah_profile_flash_store_t *flash) {

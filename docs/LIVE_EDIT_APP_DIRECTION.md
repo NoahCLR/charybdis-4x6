@@ -1712,9 +1712,8 @@ change. A sector erase pauses the keyboard for tens of milliseconds (W25Q16JV:
 grant, at most one per grant, ahead of a save's writes, and only when no key
 is held and the matrix has been unchanged for 50 ms. The profile step runs in
 a grant only with at least a page of erased flash ahead of its writes and the
-grant's flash time under a 2 ms budget, which an erase always exceeds; its
-grant writes at most one split chunk (106 bytes), so programs at most one
-page. A save therefore waits while the keyboard is busy, and one the keyboard
+grant's flash time under a 2 ms budget, which an erase always exceeds; a
+grant programs at most one page. A save therefore waits while the keyboard is busy, and one the keyboard
 never lets erase ends at Ark's or the split peer's time limit as a failed
 save; Live mode's quiet period avoids that. Erase suspend is not used. Each
 half measures its longest erase, longest program, most flash time in one
@@ -1723,6 +1722,38 @@ this half, page 1 the other, pulled once a second over split RPC
 `PUT_PROFILE_FLASH_DIAGNOSTICS`). These figures replace a separate measurement
 probe: the first keyboard session after a save reads the real pauses, and the
 slot size or pacing changes only if they say so.
+
+**Pacing (2026-10-19, after the first keyboard session).** The figures said
+so: flash was under 2 % of a save (a 6,423-byte save took 5.8 s on the USB
+half with 0.1 s of flash; a 37,139-byte one 28–35 s with 0.54 s), because the
+store copied and checked its bytes in 20-byte steps, one step per scan. Two
+rules follow.
+
+A grant repeats the store's steps while the half has storage work in progress
+(boot validation and discovery, its candidate, the copy it receives, the
+working copy loading or checking an edit): the subsystem whose step just worked
+goes again, until a step finds nothing to do, erases or programs (so a grant
+still erases at most one sector or programs at most one page), or uses the
+split link (the other half answers at its own pace), for at most 1 ms and 32
+steps (`qmk_durable_io.c`). An idle keyboard still gets one step per scan, and
+a scan grows by at most that millisecond while a save runs.
+
+A step works through up to a flash page of bytes. A timed build (per-step
+timers and the RP2040's XIP cache counters, same day) showed each step's fixed
+cost was what a save waited on, not its bytes: about 180 µs a step, more after
+a page program flushed the code cache, for 20 bytes. A REUSE step, Profile
+Wire's or the split receiver's, copies up to 256 bytes of its range in reads
+and writes of at most 20, so it still programs at most one page; a validation
+step takes up to twelve validator calls of at most 20 bytes each; the commit's
+payload readback reads up to 256 bytes a step. CRC-32 takes four bits at a time
+from a 16-entry table rather than one bit per loop, the same result for any
+bytes. In the owner's two-half host test a 2 KB save took 1,006 grants with
+one 20-byte step per scan; it takes 131 with page-sized steps, and 29 when they
+also repeat. On the keyboard a Save of the 6,432-byte profile now takes 1.0 s
+(0.9 s on the USB half, 0.5 s on the other) and a 37,232-byte one 4.6 s (4.5 s
+and 2.2 s), with the same flash time as before. Each half's copy of the large
+one takes 1.3–1.6 s, close to what the pauses allow: ten sector erases, each
+waiting for a quiet keyboard, and 145 page programs at one per scan.
 
 Each half keeps its own slots and the copy between halves is unchanged. Old
 EEPROM slots are not migrated: they held format 5, which is refused anyway. A
@@ -1904,7 +1935,13 @@ and the other half fills its copy from its own working copy, sending no
 profile bytes when the halves agree. The candidate is held to a saved
 record's rules, since its unedited domains came from one. When it lands the
 saved profile is the working copy's bytes, so the active profile becomes the
-new slot with the same revision. An Apply still works and replaces the
+new slot with the same revision. A working copy byte for byte the saved
+profile (edits undone, a value set back; "Unsaved edits match what is saved",
+keyboard check 2026-10-19) is not written again: Save compares it with the
+saved profile once its checksum matches, and the keyboard returns to the saved
+profile with nothing unsaved and the same revision, as Revert would but
+without a new revision, since nothing it runs changes. Live's own save does
+the same. An Apply still works and replaces the
 working copy; Apply frames are refused while an edit is mid-way or a save
 runs, and edits while a candidate is in progress.
 

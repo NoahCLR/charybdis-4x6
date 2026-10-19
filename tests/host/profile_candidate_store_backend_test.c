@@ -15,6 +15,7 @@ static uint8_t       eeprom_bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
 static uint32_t      eeprom_read_calls;
 static uint32_t      eeprom_write_calls;
 static uint32_t      eeprom_last_read_length;
+static uint32_t      eeprom_largest_read_length;
 static uint32_t      eeprom_last_write_length;
 static uint32_t      safe_boundary_reasons;
 static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
@@ -37,6 +38,7 @@ static bool memory_read(void *context, noah_profile_storage_address_t address, u
     }
     eeprom_read_calls++;
     eeprom_last_read_length = length;
+    if (length > eeprom_largest_read_length) eeprom_largest_read_length = length;
     memcpy(target, &bytes[address], length);
     return true;
 }
@@ -523,9 +525,12 @@ static void test_reboot_adopts_committed_profile_through_bounded_validator(void)
     while (result == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS) {
         uint32_t reads_before = eeprom_read_calls;
 
+        eeprom_largest_read_length = 0u;
         result = noah_profile_candidate_store_backend_adopt_committed_step(&rebooted_backend, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, &error);
-        assert(eeprom_read_calls == reads_before || eeprom_read_calls == reads_before + 1u);
-        if (eeprom_read_calls != reads_before) assert(eeprom_last_read_length <= NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
+        // A validation step takes up to a flash page's worth of validator
+        // calls, each one read of at most the budget.
+        assert(eeprom_read_calls - reads_before <= NOAH_PROFILE_CANDIDATE_VALIDATION_CALLS);
+        assert(eeprom_largest_read_length <= NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
         assert(++steps < 64u);
     }
     assert(result == NOAH_PROFILE_CANDIDATE_BACKEND_VALID);

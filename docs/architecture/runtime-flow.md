@@ -535,8 +535,8 @@ The RPC callback only validates/copies one exact request (32 bytes, or up to
 128 for a payload chunk) and returns a cached response (32 bytes, or up to 128
 for a pulled chunk). EEPROM access, whole-profile validation, and commit remain
 in matrix scan. Each half performs at most one RPC, one received chunk or reuse
-step of at most 106 bytes, or one
-validator/commit step per scan. A newer slave is pulled explicitly, so current
+step of at most 256 bytes, or one
+validation/commit step per scan step (D-F29, "Pacing"). A newer slave is pulled explicitly, so current
 USB role never decides durable authority. Disconnect, malformed response, role
 change, or passive-peer timeout invalidates peer evidence; conflict,
 corruption, and incompatibility stop without overwriting either record.

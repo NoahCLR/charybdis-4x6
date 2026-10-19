@@ -735,14 +735,14 @@ generation. Destination ranges must start at the exact next staged offset.
 Ranges cannot exceed the source or declared target. Each read checks the active
 source's kind, origin, generation and both checksums, plus the build's compiled
 default and action ABI identities. The source stays active; only the inactive
-candidate is written. Read and write alternate in scan context, each accessing
-at most 20 bytes. Progress advances `next_offset` after each write, and the
-mailbox remains pending until the range finishes. REUSE increments the operation
+candidate is written. A scan step copies up to one flash page (256 bytes) of the
+range, each piece read and then written in at most 20 bytes, so a step programs
+at most one page (D-F29, "Pacing"). Progress advances `next_offset` after each
+write, and the mailbox remains pending until the range finishes. REUSE increments the operation
 sequence once, at completion; its operation ID is `6`. Source/read/write failure
 poisons the candidate. There is no implicit retry of a partially copied range.
 The range ceiling bounds one occupied mailbox and the wait before an abort can
-be admitted. Owner supersession can discard it earlier, including its scratch
-read. The transaction remains within the existing 256-byte state ceiling and
+be admitted. Owner supersession can discard it earlier, part copied. The transaction remains within the existing 256-byte state ceiling and
 holds only a 20-byte copy buffer, never a profile-sized RAM buffer.
 
 STREAM_CHUNK has CHUNK's layout and status operation ID (`2`), but admission
@@ -778,7 +778,9 @@ Commit is admitted only for the matching validated transaction. The scan owner
 writes and reads back the non-marker header, streams one payload readback,
 checks canonical top-level shape, writes the two-byte commit marker last, reads
 that marker back, and only then requests provider activation. Each scan step
-performs exactly one EEPROM operation of at most 20 bytes. Behavior activation
+performs one storage operation of at most 20 bytes, except the payload
+readback, which reads up to a flash page (256 bytes) a step in reads of at most
+20 (D-F29, "Pacing"). Behavior activation
 may remain in the activating state until the safe-boundary predicate clears;
 the prior generation remains active meanwhile. A duplicate commit for the same
 transaction is a no-op while commit/activation is progressing and after final
@@ -1349,7 +1351,13 @@ nothing is uploaded and the other half copies its own working copy too
 both halves, marker-last decision and convergence as any Apply, and the same
 power-loss guarantees. Its transaction is the candidate's: candidate status
 (GET `0x18`) follows it exactly as it follows an Apply. With no unsaved edits
-Save answers OK at once and writes nothing. When it lands, the saved profile
+Save answers OK at once and writes nothing. A working copy byte for byte the
+saved profile it began from (edits undone, a value set back) is not written
+either: when its checksum, length and domains are the saved profile's, Save
+compares the bytes (save phase `7`), and if they are the same the keyboard
+runs its saved profile again at the next safe boundary (phase `8`), with
+nothing unsaved and the same revision, and the other half follows as after a
+Revert. The keyboard's own save in Live does the same. When it lands, the saved profile
 holds the working copy's bytes: no unsaved edits, the same revision. A save
 the keyboard cannot finish is reported as an Apply's would be, and the
 working copy is left as it was. A save waits for a quiet keyboard before each
@@ -1403,7 +1411,7 @@ not ready status `3`.
 | 4 | 4 | its session |
 | 8 | 4 | its revision |
 | 12 | 1 | its flags: bit 0 unsaved edits, 1 its saved profile is the compiled defaults |
-| 13 | 1 | save phase (`0` idle) |
+| 13 | 1 | save phase (`0` idle; `7` and `8` a save that found nothing to write) |
 | 14 | 1 | last save's result |
 | 15 | 1 | last save's candidate error id (`0` none) |
 | 16 | 2 | save transaction in progress |

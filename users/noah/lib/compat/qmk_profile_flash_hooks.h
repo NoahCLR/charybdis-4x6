@@ -22,6 +22,14 @@ void noah_qmk_profile_flash_grant_begin(void);
 // waits for erased flash or the grant has used its flash time (D-F29).
 bool noah_qmk_profile_flash_may_write(void);
 
+// Whether this grant has erased or programmed anything yet: the scheduler
+// repeats the store's local steps only until it has (D-F29).
+bool noah_qmk_profile_flash_grant_flashed(void);
+
+// The flash driver's free-running microsecond clock (the scheduler's time
+// budget for repeated steps).
+uint32_t noah_qmk_profile_flash_now_us(void);
+
 // Handles Profile Wire custom get 0x0D (flash pauses); false for any other
 // request.
 bool noah_qmk_profile_flash_wire_get(uint8_t *data, uint8_t length);

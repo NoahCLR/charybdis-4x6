@@ -98,6 +98,11 @@ typedef enum {
     NOAH_PROFILE_OWNER_SAVE_VALIDATE,
     NOAH_PROFILE_OWNER_SAVE_COMMIT,
     NOAH_PROFILE_OWNER_SAVE_WAIT,
+    // The working copy's checksums are the saved profile's: its bytes are
+    // compared with it, and if they are the same nothing is written.
+    NOAH_PROFILE_OWNER_SAVE_SAME,
+    // The same bytes: the working copy gives way to the saved profile.
+    NOAH_PROFILE_OWNER_SAVE_SETTLE,
 } noah_profile_owner_save_phase_t;
 
 // Save (D-F32): the working copy written as a new generation through the
@@ -180,6 +185,9 @@ typedef struct {
     uint32_t                             host_last_activity_at;
     uint32_t                             host_barrier_progress_offset;
     uint8_t                              scheduler_cursor;
+    // The subsystem whose step last worked: a repeated step in the same
+    // durable-I/O grant visits it alone (D-F29, "Pacing").
+    uint8_t                              scheduler_last;
     uint8_t                              host_barrier_progress_phase;
     bool                                 boot_activation_started : 1;
     bool                                 peer_activation_started : 1;
@@ -196,6 +204,7 @@ typedef struct {
     bool                                 host_cancel_pending : 1;
     bool                                 working_ready : 1;
     bool                                 master : 1;
+    bool                                 scan_again : 1;
 } noah_profile_owner_t;
 
 // Protocol-neutral, caller-owned observation of the complete live-profile
@@ -238,6 +247,17 @@ bool noah_profile_owner_init(noah_profile_owner_t *owner, const noah_profile_own
 // one split exchange. `master` is current transport role; `now_ms` is the
 // caller's wrapping millisecond clock.
 bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t now_ms);
+// Whether this half has storage work in progress that its steps move on
+// locally: boot validation and discovery, this half's candidate (a save or an
+// Apply), the copy it receives from the other half, or the working copy
+// loading or checking an edit. The durable-I/O scheduler repeats steps within
+// one grant only then (D-F29, "Pacing").
+bool noah_profile_owner_storage_busy(const noah_profile_owner_t *owner);
+// The next scan repeats a step within the same grant: it visits the subsystem
+// whose step last worked first, so the code it runs stays the same (on the
+// keyboard a step through every subsystem cost about 0.2 ms, mostly fetching
+// code from flash), and the ordinary round only if that one has nothing.
+void noah_profile_owner_scan_again(noah_profile_owner_t *owner, bool again);
 
 // Callback-side candidate admission remains a bounded decode/mailbox copy.
 // Advertising or routing this surface is a separate capability decision.

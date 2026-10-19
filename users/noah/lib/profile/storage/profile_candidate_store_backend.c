@@ -281,15 +281,21 @@ static noah_profile_candidate_backend_result_t validation_begin(void *context, c
     return NOAH_PROFILE_CANDIDATE_BACKEND_REJECTED;
 }
 
+// Validation only reads, so a step takes a flash page's worth of validator
+// calls rather than one: each call's fixed cost, not its bytes, was what a
+// save waited on (D-F29, "Pacing").
 static noah_profile_candidate_backend_result_t validation_step(void *context, uint8_t byte_budget, noah_profile_candidate_v1_error_t *error) {
     noah_profile_candidate_store_backend_t *backend         = context;
     noah_profile_validator_v1_error_t       validator_error = noah_profile_validator_v1_no_error();
     noah_profile_validator_v1_result_t      result;
+    uint8_t                                 calls = 0u;
 
     if (!backend) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
     }
-    result = noah_profile_validator_v1_step(&backend->validator, byte_budget, &validator_error);
+    do {
+        result = noah_profile_validator_v1_step(&backend->validator, byte_budget, &validator_error);
+    } while (result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS && ++calls < NOAH_PROFILE_CANDIDATE_VALIDATION_CALLS);
     if (result == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) {
         return NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS;
     }

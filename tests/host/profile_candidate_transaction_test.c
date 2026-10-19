@@ -45,7 +45,10 @@ typedef struct {
     noah_profile_candidate_v1_metadata_t    metadata;
 } fake_backend_t;
 
-static const uint8_t reuse_source[64] = "A source profile that remains immutable until activation.";
+// Long enough for a range that takes several REUSE steps; main fills the
+// bytes after the text.
+static uint8_t reuse_source[640] = "A source profile that remains immutable until activation.";
+static unsigned largest_write;
 static noah_profile_candidate_backend_result_t fake_read_source(void *context, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint8_t *bytes, uint8_t length) {
     fake_backend_t *fake = context;
     fake->source_read_calls++;
@@ -174,6 +177,7 @@ static noah_profile_candidate_backend_result_t fake_begin(void *context, const n
 static noah_profile_candidate_backend_result_t fake_write(void *context, uint32_t offset, const uint8_t *bytes, uint8_t length) {
     fake_backend_t *fake = context;
     fake->write_calls++;
+    if (length > largest_write) largest_write = length;
     if (fake->write_result == NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
         assert((uint32_t)offset + length <= fake->declared_length);
         memcpy(&fake->staged[offset], bytes, length);
@@ -1534,7 +1538,7 @@ static void reuse_frame(uint8_t frame[32], uint16_t transaction_id, uint32_t off
 }
 
 static void test_reuse_is_bounded_and_validated(void) {
-    uint8_t frame[32], target[48];
+    uint8_t frame[32], target[600];
     fake_backend_t fake;
     memset(&fake, 0, sizeof(fake));
     memcpy(target, reuse_source + 3, sizeof(target));
@@ -1547,14 +1551,21 @@ static void test_reuse_is_bounded_and_validated(void) {
     reuse_frame(frame, 77, 0, 3, sizeof(target));
     queue(&transaction, &fake, frame);
     assert(fake.source_read_calls == 0u);
+    // A step copies up to a flash page of the range, each piece read and then
+    // written in at most 20 bytes, so a step programs at most one page.
     unsigned steps = 0;
+    largest_write = 0u;
     while (transaction.mailbox.pending) {
-        unsigned before = fake.write_calls + fake.source_read_calls;
+        uint32_t before = status_of(&transaction).next_offset;
+        unsigned reads  = fake.source_read_calls;
+        unsigned writes = fake.write_calls;
         assert(noah_profile_candidate_transaction_scan(&transaction));
-        assert(fake.write_calls + fake.source_read_calls == before + 1u);
-        assert(++steps <= 6u);
+        assert(status_of(&transaction).next_offset - before <= NOAH_PROFILE_CANDIDATE_STEP_BYTES);
+        assert(fake.source_read_calls - reads == fake.write_calls - writes);
+        assert(++steps <= 3u);
     }
-    assert(steps == 6u);
+    assert(steps == (sizeof(target) + NOAH_PROFILE_CANDIDATE_STEP_BYTES - 1u) / NOAH_PROFILE_CANDIDATE_STEP_BYTES);
+    assert(largest_write == 20u);
     assert(memcmp(fake.staged, target, sizeof(target)) == 0);
     assert(status_of(&transaction).next_offset == sizeof(target));
     assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE);
@@ -1567,8 +1578,8 @@ static void test_reuse_is_bounded_and_validated(void) {
     assert(fake.commit_begin_calls == 0u);
 }
 
-static void test_supersession_discards_pending_reuse_read(void) {
-    uint8_t frame[32], target[48];
+static void test_supersession_discards_a_partly_copied_reuse(void) {
+    uint8_t frame[32], target[600];
     fake_backend_t fake;
     fake_init(&fake);
     memcpy(target, reuse_source, sizeof(target));
@@ -1580,20 +1591,18 @@ static void test_supersession_discards_pending_reuse_read(void) {
     begin_transaction(&transaction, &fake, 79, &metadata);
     reuse_frame(frame, 79, 0, 0, sizeof(target));
     queue_and_scan(&transaction, &fake, frame);
-    assert(transaction.reuse_read && transaction.mailbox.pending);
-    assert(fake.source_read_calls == 1u && fake.write_calls == 0u);
+    assert(transaction.mailbox.pending && status_of(&transaction).next_offset == NOAH_PROFILE_CANDIDATE_STEP_BYTES);
+    unsigned reads = fake.source_read_calls, writes = fake.write_calls;
     assert(noah_profile_candidate_transaction_supersede_precommit(&transaction) == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE);
-    assert(!transaction.reuse_read && !transaction.mailbox.pending);
+    assert(!transaction.mailbox.pending);
     assert(!noah_profile_candidate_transaction_scan(&transaction));
-    assert(fake.write_calls == 0u && fake.commit_begin_calls == 0u);
+    assert(fake.source_read_calls == reads && fake.write_calls == writes && fake.commit_begin_calls == 0u);
     assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
-    // A later candidate reads its own source rather than writing old scratch.
+    // A later candidate copies from its own source and offset.
     begin_transaction(&transaction, &fake, 80, &metadata);
     reuse_frame(frame, 80, 0, 1, sizeof(target));
     queue_and_scan(&transaction, &fake, frame);
-    assert(fake.source_read_calls == 2u && fake.write_calls == 0u);
-    assert(noah_profile_candidate_transaction_scan(&transaction));
-    assert(memcmp(fake.staged, reuse_source + 1, 20) == 0);
+    assert(memcmp(fake.staged, reuse_source + 1, NOAH_PROFILE_CANDIDATE_STEP_BYTES) == 0);
 }
 
 static void test_streaming_admission_and_reuse_failure(void) {
@@ -1720,12 +1729,13 @@ static void test_upload_over_64_kib(void) {
 int main(int argc, char **argv) {
     assert(argc == 2);
     fixture_path = argv[1];
+    for (size_t index = 64u; index < sizeof(reuse_source); index++) reuse_source[index] = (uint8_t)(index * 13u + 5u);
     test_upload_over_64_kib();
     // The firmware's 32-bit size: the backend's pointers count four bytes.
     assert(sizeof(noah_profile_candidate_transaction_t) - sizeof(noah_profile_candidate_backend_t) + sizeof(noah_profile_candidate_backend_t) / sizeof(void *) * 4u <= 256u);
     test_differential_transfer_frames();
     test_reuse_is_bounded_and_validated();
-    test_supersession_discards_pending_reuse_read();
+    test_supersession_discards_a_partly_copied_reuse();
     test_streaming_admission_and_reuse_failure();
     test_exact_frame_codecs();
     test_malformed_frame_matrix();

@@ -40,7 +40,16 @@ void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback) 
     registration_count++;
 }
 
+// Every RPC the exchange sends is told to the durable-I/O grant, which then
+// repeats no further step (D-F29, "Pacing"); one refused before sending is not.
+static unsigned rpcs_noted;
+
+void noah_qmk_durable_io_note_split_rpc(void) {
+    rpcs_noted++;
+}
+
 bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const void *request_data, uint8_t response_size, void *response_data) {
+    CHECK(rpcs_noted == rpc_exec_count + 1u);
     rpc_exec_count++;
     rpc_exec_id       = transaction_id;
     rpc_request_size  = request_size;
@@ -202,6 +211,7 @@ static void reset_transport_stubs(void) {
     registered_id       = -1;
     registration_count  = 0u;
     rpc_exec_count      = 0u;
+    rpcs_noted          = 0u;
     rpc_exec_id         = -1;
     rpc_request_size    = 0u;
     rpc_response_size   = 0u;
@@ -394,9 +404,12 @@ static void test_exchange_sends_the_request_and_reply_lengths(void) {
     CHECK(!noah_qmk_profile_split_transport_exchange(NULL, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response, NOAH_PROFILE_SPLIT_V1_FRAME_MAX + 1u));
     CHECK(rpc_exec_count == 3u);
 
+    CHECK(rpcs_noted == 3u);
+
     rpc_exec_result = false;
     CHECK(!noah_qmk_profile_split_transport_exchange(NULL, request, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE));
     CHECK(rpc_exec_count == 4u);
+    CHECK(rpcs_noted == 4u);
 }
 
 int main(void) {
