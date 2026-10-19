@@ -54,13 +54,13 @@
         },
         {
           "caller": "io_read",
-          "callee": "noah_qmk_profile_eeprom_read",
-          "reason": "the read-only profile store invokes the QMK EEPROM adapter through its injected storage IO callback"
+          "callee": "flash_read",
+          "reason": "the profile store reads the slot flash region in place through its injected flash backend (D-F29)"
         },
         {
           "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_profile_store_runtime_matrix_scan_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches profile discovery through its rotating step table"
+          "callee": "noah_qmk_durable_io_profile_step",
+          "reason": "the shared master/slave durable-I/O scheduler dispatches profile discovery through its rotating step table; the step waits while the slot flash says so (D-F29), and the pinned compiler inlines the store runtime step into it"
         },
         {
           "caller": "noah_qmk_durable_io_matrix_scan",
@@ -79,8 +79,13 @@
         },
         {
           "caller": "staged_reader_read",
-          "callee": "noah_qmk_profile_eeprom_read",
-          "reason": "The committed-slot reader invokes the installed EEPROM cache adapter; physical flash is not read on this path."
+          "callee": "flash_read",
+          "reason": "the staged profile reader reads the slot flash region in place through the installed flash backend (D-F29)"
+        },
+        {
+          "caller": "read_flash",
+          "callee": "rp2040_read",
+          "reason": "the flash backend reads through its driver's XIP read (D-F29)"
         }
       ],
       "cycle_bounds": [
@@ -238,7 +243,7 @@
         },
         {
           "name": "matrix scan live-profile boot discovery",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_profile_store_runtime_matrix_scan_step", "noah_profile_store_boot_select_step", "io_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_profile_store_boot_select_step", "io_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "matrix scan VIA metadata and snapshot RPC",
@@ -286,19 +291,19 @@
         },
         {
           "name": "physical press participation indexed behavior lookup",
-          "functions": ["main", "action_exec", "noah_participation_behavior", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "action_exec", "noah_participation_behavior", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "native tapping indexed behavior lookup",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "is_tap_record", "key_behavior_view_build", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "is_tap_record", "key_behavior_view_build", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "completed chord output behavior permission",
-          "functions": ["main", "action_exec", "noah_participation_combo_output", "noah_participation_behavior_generated", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "action_exec", "noah_participation_combo_output", "noah_participation_behavior_generated", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "generated output captured behavior permission",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "is_tap_record", "noah_qmk_combo_origin_capture_record", "noah_participation_combo_output", "noah_participation_behavior_generated", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "noah_qmk_profile_eeprom_read", "wear_leveling_read"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "is_tap_record", "noah_qmk_combo_origin_capture_record", "noah_participation_combo_output", "noah_participation_behavior_generated", "behavior_definition", "noah_effective_key_behavior_lookup", "noah_effective_key_behavior_runtime_lookup", "noah_key_behavior_domain_v1_step_in_row", "decode_row_fixed", "read_bytes", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "generated output origin reconstruction",

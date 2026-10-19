@@ -11,7 +11,7 @@ enum {
     ACTION_ABI_DIGEST = 0x11223344u,
 };
 
-static uint8_t       eeprom_bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+static uint8_t       eeprom_bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
 static uint32_t      eeprom_read_calls;
 static uint32_t      eeprom_write_calls;
 static uint32_t      eeprom_last_read_length;
@@ -32,7 +32,7 @@ static uint32_t always_safe(void *context) {
 static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     uint8_t *bytes = context;
 
-    if (!target || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
+    if (!target || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_REGION_SIZE) {
         return false;
     }
     eeprom_read_calls++;
@@ -44,7 +44,7 @@ static bool memory_read(void *context, noah_profile_storage_address_t address, u
 static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length) {
     uint8_t *bytes = context;
 
-    if (!source || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
+    if (!source || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_REGION_SIZE) {
         return false;
     }
     eeprom_write_calls++;
@@ -795,7 +795,6 @@ static void test_reuse_source_checks_active_identity_and_lease(void) {
     assert(interface.abort(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
 }
 
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
 // A schema 4 blob of one RGB domain filling `length` bytes: its envelope and
 // checksums are sound, and the validator refuses the domain at its end, since
 // RGB keeps 16-bit internal offsets (D-F28).
@@ -864,12 +863,9 @@ static void test_candidate_validation_over_64_kib(void) {
         assert(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
     }
 }
-#endif
 
 int main(void) {
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
     test_candidate_validation_over_64_kib();
-#endif
     test_reuse_source_checks_active_identity_and_lease();
     test_stage_validate_and_commit();
     test_validated_host_candidate_is_a_provisional_split_source();

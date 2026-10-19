@@ -72,7 +72,7 @@ static const noah_profile_logical_via_ops_t via = {
     .boot_release = via_release,
 };
 
-static uint8_t  eeprom[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+static uint8_t  eeprom[NOAH_PROFILE_STORAGE_REGION_SIZE];
 static uint32_t writes;
 // Power is lost before write number cut_at (counted from zero): it and every
 // later write never reach storage. UINT32_MAX never cuts.

@@ -112,6 +112,10 @@ void noah_via_macro_defaults_keyboard_post_init(void) {
     test_log_stage("via_macro_defaults_keyboard_post_init");
 }
 
+void noah_qmk_profile_flash_pre_init(void) {
+    test_log_stage("qmk_profile_flash_pre_init");
+}
+
 void noah_profile_store_runtime_init(void) {
     test_log_stage("profile_store_runtime_init");
 }
@@ -152,6 +156,10 @@ void noah_qmk_usb_product_name_pre_init(void) {
 
 void noah_qmk_usb_product_name_task(void) {
     test_log_stage("qmk_usb_product_name_task");
+}
+
+void noah_qmk_profile_flash_housekeeping(void) {
+    test_log_stage("qmk_profile_flash_housekeeping");
 }
 
 void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
@@ -209,9 +217,11 @@ static void test_keyboard_post_init_order(void) {
     test_expect_sequence(expected, ARRAY_SIZE(expected));
 }
 
-// Before USB starts, only the USB product name (D-F25) is set up.
+// Before USB starts: an EEPROM reset forgets the saved profiles (D-F29),
+// then the USB product name (D-F25) is read from what remains.
 static void test_keyboard_pre_init_order(void) {
     static const char *const expected[] = {
+        "qmk_profile_flash_pre_init",
         "qmk_usb_product_name_pre_init",
     };
 
@@ -225,6 +235,7 @@ static void test_housekeeping_order(void) {
         "held_repeat_tick",
         "runtime_diag_heartbeat",
         "qmk_usb_product_name_task",
+        "qmk_profile_flash_housekeeping",
     };
 
     test_log_reset();

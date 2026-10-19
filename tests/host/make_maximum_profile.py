@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "tests/fixtures/maximum_profile_v4.fixture"
 LAYERS = 16
 DEPTH = 5
-PAYLOAD_MAX = 53216
+PAYLOAD_MAX = 130048  # one 128 KiB slot less the kilobyte its header and marker take on flash (D-F29)
 ALLOWANCE = 12288  # reserved for future payload (per-key RGB and other additions)
 
 KIND_KEY, KIND_LAYER_MO, KIND_LAYER_LOCK, KIND_PD, KIND_PD_LOCK, KIND_MACRO, KIND_CUSTOM = 1, 2, 3, 4, 5, 6, 7

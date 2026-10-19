@@ -1,7 +1,7 @@
 # Profile Wire V1
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14, D-F28):
-> Profile Wire 2.0, profile schema 4.0, a 53,216-byte custom payload, and
+> Profile Wire 2.0, profile schema 4.0, a 130,048-byte custom payload, and
 > logical store format 6. Every profile length and offset is 32 bits wide, in
 > storage and on the wire. Every save binds a nonzero VIA generation and
 > digest. Split framing is version 3. Older profile/store formats and the
@@ -30,10 +30,9 @@ The blob is independent of Raw HID framing and EEPROM slot metadata.
 | 7 | 1 | flags; bit 0 means canonical encoding, all others reserved |
 
 The transport candidate length or storage header supplies total blob length,
-a 32-bit field everywhere it travels. Schema 4.0 is capped at 53,216 bytes, one
-52 KiB slot less its 32-byte header (D-F14), until the slots move to their own
-flash region; nothing in the format itself stops at 64 KiB. Schemas 1 to 3 are
-refused.
+a 32-bit field everywhere it travels. Schema 4.0 is capped at 130,048 bytes,
+one 128 KiB flash slot less its 32-byte header (D-F29); nothing in the format
+itself stops at 64 KiB. Schemas 1 to 3 are refused.
 
 ### Domain Envelope — 6 Bytes Plus Payload
 
@@ -634,8 +633,8 @@ storage, backup, Apply and recovery formats do not change.
 
 GET `0x04` reads the committed payload and `0x05` the compiled defaults the
 firmware was built with, through the envelope above with a wide page (request
-byte 4 its low byte, byte 5 its high byte): a 53,216-byte payload needs 2,130
-pages, and 16 bits of page reach 1.6 MB. Page 0 is metadata; page
+byte 4 its low byte, byte 5 its high byte): a 130,048-byte payload needs
+5,243 pages, and 16 bits of page reach 1.6 MB. Page 0 is metadata; page
 `n` from 1 carries payload bytes `(n - 1) × 25` onward, at most 25, with the
 payload length byte giving the count. A page past the end answers status `2`;
 status `3` means nothing is committed, or the compiled defaults cannot be
@@ -714,7 +713,7 @@ Begin candidate uses this complete layout:
 | 5 | 1 | schema major, `4` |
 | 6 | 1 | schema minor, `0` |
 | 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings, 4 pointing |
-| 8 | 4 | canonical blob length, `8..53216`, uint32 |
+| 8 | 4 | canonical blob length, `8..130048`, uint32 |
 | 12 | 4 | CRC32 of the exact canonical blob |
 | 16 | 4 | FNV-1a digest of the exact canonical blob |
 | 20 | 4 | action-ABI digest used to encode actions |
@@ -1068,6 +1067,7 @@ unhandled reply.
 | custom get | `0x09` | retired; unsupported | — |
 | custom get/set | `0x0A` | bounded split transaction capture, diagnostic builds only | [Split activity sync](split-activity-sync.md) |
 | custom get | `0x0B` | detected host OS | Host OS Readback, below |
+| custom get | `0x0D` | flash pauses of each half | Flash Pauses, below |
 | custom set | `0x10` | candidate begin | this document |
 | custom set | `0x11` | candidate chunk | this document |
 | custom set | `0x12` | candidate validate/prepare | this document |
@@ -1245,6 +1245,36 @@ compiled-default digest; earlier records therefore fall back to factory
 configuration and require a client restore. Full export continues to read
 current combo enable state and QMK-owned settings through device readback;
 immutable factory values never substitute for those live values.
+
+## Flash pauses — GET value `0x0D`
+
+Each half measures how long its profile slot flash work pauses the keyboard
+(D-F29), so a keyboard session can read the real figures. Custom get on
+channel 0, value `0x0D`, with the usual request id (nonzero), byte page and
+reserved zero bytes 5–31; a malformed request answers status `1`, a page past
+1 status `2`. Page 0 is the half answering USB; page 1 the other half, as the
+USB half last pulled it over the split link (once a second), or status `3`
+until a pull has succeeded. Each page's 25-byte payload, little-endian:
+
+| Offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | flags: bit 0 figures present |
+| 1 | 1 | physical half: `0` left, `1` right, `0xFF` not provisioned |
+| 2 | 4 | longest 4 KiB sector erase, µs |
+| 6 | 4 | longest 256-byte page program, µs |
+| 10 | 4 | most flash time in one scan's storage step, µs |
+| 14 | 4 | last save on this half, reset to final sync, µs |
+| 18 | 4 | flash time inside that save, µs |
+| 22 | 2 | saves since boot |
+| 24 | 1 | reserved, `0` |
+
+Every figure counts from boot and is lost on a power cycle; interrupts are
+off during each erase and program, so a pause is the time the keyboard did
+nothing else. A save's duration includes the host's transfer and any wait
+for a quiet keyboard before an erase, so the flash time beside it says how
+much of it was flash. Figures are diagnostics, not
+part of the profile, backup or fingerprint; no client behaviour depends on
+them.
 
 ## Host OS readback
 

@@ -39,7 +39,7 @@ compile_layout() {
         "$@"
 }
 
-compile_layout 143360u 41u \
+compile_layout 36864u 41u \
     "$ROOT/tests/host/profile_storage_layout_test.c" \
     "$ROOT/users/noah/lib/profile/storage/profile_storage_layout.c" \
     -o "$BIN"
@@ -59,7 +59,12 @@ expect_contract_compile_failure() {
     fi
 }
 
-expect_contract_compile_failure "logical EEPROM size drift" 8192u 41u
-expect_contract_compile_failure "VIA config boundary drift" 143360u 40u
+expect_contract_compile_failure "logical EEPROM size drift" 143360u 41u
+expect_contract_compile_failure "VIA config boundary drift" 36864u 40u
+
+# The link-time guard names the region's start: XIP base plus the 1 MiB
+# offset the layout test checks.
+grep -q '^ASSERT(__flash_binary_end <= 0x10100000, ' "$ROOT/users/noah/lib/compat/qmk_profile_flash.ld"
+grep -q 'qmk_profile_flash.ld' "$ROOT/users/noah/rules.mk"
 
 echo "profile storage layout compile guards passed"

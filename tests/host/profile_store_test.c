@@ -21,7 +21,7 @@ enum {
 };
 
 typedef struct {
-    uint8_t  bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+    uint8_t  bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
     uint32_t read_calls;
     uint32_t write_calls;
     uint32_t fail_write_call;
@@ -34,7 +34,7 @@ typedef struct {
 
 static fake_eeprom_t eeprom;
 static fake_eeprom_t alternate_eeprom;
-static uint8_t       eeprom_snapshot[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+static uint8_t       eeprom_snapshot[NOAH_PROFILE_STORAGE_REGION_SIZE];
 
 typedef struct {
     fake_eeprom_t      *memory;
@@ -260,7 +260,7 @@ static void test_commit_and_boot_selection(void) {
     CHECK(load_u32(&header[21]) == first_candidate.via_generation);
     CHECK(load_u32(&header[25]) == first_candidate.via_digest);
     CHECK(load_u16(&header[29]) == header_crc16(header));
-    CHECK(header[31] == 0xC3u);
+    CHECK(header[31] == 0x18u);
 
     initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_OK);
     CHECK(rebooted.committed.slot == NOAH_PROFILE_SLOT_A && rebooted.committed.payload_length == sizeof(empty_profile));
@@ -300,7 +300,7 @@ static void test_logical_header_binds_via_identity(void) {
     CHECK(load_u32(&header[21]) == candidate.via_generation);
     CHECK(load_u32(&header[25]) == candidate.via_digest);
     CHECK(load_u16(&header[29]) == header_crc16(header));
-    CHECK(header[31] == 0xC3u);
+    CHECK(header[31] == 0x18u);
 
     initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_OK);
     CHECK(rebooted.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
@@ -426,7 +426,7 @@ static void test_durable_prepare_is_not_authority_until_decided(void) {
     CHECK(result == NOAH_PROFILE_STORE_OK);
     CHECK(!store.prepare_active && !store.prepared_durable);
     CHECK(record.generation == 1u && record.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
-    CHECK(eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + 31u] == 0xC3u);
+    CHECK(eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + 31u] == 0x18u);
     initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_OK);
     CHECK(rebooted.committed.generation == 1u);
 }
@@ -930,7 +930,7 @@ static void test_pd_header_all_identity_bits_and_boot_paths(void) {
                 const uint8_t *header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
                 CHECK(header[0] == (uint8_t)(mask | (origin << 5u) | (flags << 6u)));
                 CHECK(load_u16(&header[29]) == header_crc16(header));
-                CHECK(header[31] == 0xC3u);
+                CHECK(header[31] == 0x18u);
                 CHECK(noah_profile_store_validate_slot(&store, NOAH_PROFILE_SLOT_A, true, &record) == NOAH_PROFILE_STORE_OK);
                 CHECK(record.domain_mask == mask && record.origin_half == origin && record.flags == flags);
                 CHECK(record.payload_digest == candidate.payload_digest && record.schema_major == NOAH_PROFILE_SCHEMA_MAJOR);
@@ -1171,13 +1171,12 @@ static void test_read_span_reads_within_the_io_bound(void) {
     CHECK(noah_profile_store_read_span(&store, start, span, sizeof(span)));
     CHECK(eeprom.read_calls == 4u && eeprom.last_read_length == 5u);
     CHECK(memcmp(span, &eeprom.bytes[start], sizeof(span)) == 0);
-    CHECK(!noah_profile_store_read_span(&store, NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - 4u, span, 5u));
+    CHECK(!noah_profile_store_read_span(&store, NOAH_PROFILE_STORAGE_REGION_SIZE - 4u, span, 5u));
     eeprom.fail_reads = true;
     CHECK(!noah_profile_store_read_span(&store, start, span, sizeof(span)));
     eeprom.fail_reads = false;
 }
 
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
 // Format 6's 32-bit payload length (D-F28), past 65,535 bytes in a 128 KiB
 // test slot: a 70,000-byte blob is written, committed, selected at boot by
 // the bounded scan and read back across the 64 KiB line.
@@ -1221,12 +1220,9 @@ static void test_payload_over_64_kib_round_trips(void) {
     CHECK(noah_profile_store_prepare_write(&rebooted, 65536u, payload, 4u) == NOAH_PROFILE_STORE_CHUNK_OUT_OF_ORDER);
     CHECK(noah_profile_store_prepare_abort(&rebooted) == NOAH_PROFILE_STORE_OK);
 }
-#endif
 
 int main(void) {
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
     test_payload_over_64_kib_round_trips();
-#endif
     test_read_span_reads_within_the_io_bound();
     test_retired_store_headers_never_become_authority();
     test_pd_store_accepts_every_settings_version_the_validator_does();

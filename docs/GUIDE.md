@@ -507,7 +507,7 @@ come from the same compiler and are byte-identical for the same commit. Docker
 must be running. A note beside each pair (`N_charybdis.build.txt`) records the
 firmware and BK commits, the compiler and both files' SHA-256.
 
-All current builds use the 32-slot engine and the EEPROM geometry of D-F14. Use
+All current builds use the 32-slot engine and the flash slot region of D-F29. Use
 `sh tools/build-firmware-pair.sh` for the flashable side-specific pair. The
 right build uses `NOAH_PHYSICAL_HALF=right` and `FORCE_MASTER=yes`; the left uses
 `NOAH_PHYSICAL_HALF=left` and `FORCE_SLAVE=yes`. A plain `qmk compile` produces

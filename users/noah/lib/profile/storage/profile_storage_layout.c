@@ -4,10 +4,6 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
-#    error "NOAH_PROFILE_TEST_WIDE_SLOTS is a host-test geometry; no firmware stores 128 KiB slots in EEPROM"
-#endif
-
 #ifdef VIA_ENABLE
 
 #    include "profile_storage_layout.h"
@@ -27,7 +23,9 @@
 #    define NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_START ((uint32_t)VIA_EEPROM_CONFIG_END + NOAH_PROFILE_STORAGE_COMPILED_KEYMAP_SIZE + NOAH_PROFILE_STORAGE_ENCODER_SIZE)
 #    define NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_SIZE ((uint32_t)DYNAMIC_KEYMAP_EEPROM_MAX_ADDR - NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_START + 1u)
 
-_Static_assert(TOTAL_EEPROM_BYTE_COUNT == NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE, "target logical EEPROM no longer matches the accepted 140 KiB profile partition");
+// The profile slots left QMK's logical EEPROM for their own flash region
+// (D-F29); what remains is the VIA region.
+_Static_assert(TOTAL_EEPROM_BYTE_COUNT == NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE, "target logical EEPROM no longer matches the accepted 36 KiB VIA region");
 _Static_assert(VIA_EEPROM_CONFIG_END == NOAH_PROFILE_STORAGE_DYNAMIC_KEYMAP_START_ADDR, "VIA config end moved the accepted dynamic-keymap start");
 _Static_assert(NOAH_PROFILE_STORAGE_COMPILED_KEYMAP_SIZE == NOAH_PROFILE_STORAGE_DYNAMIC_KEYMAP_SIZE, "compiled dynamic keymap no longer occupies the accepted 1,920-byte region");
 _Static_assert(NOAH_PROFILE_STORAGE_COMPILED_VIA_MACRO_START == NOAH_PROFILE_STORAGE_VIA_MACRO_START_ADDR, "compiled VIA macro start no longer matches the accepted address map");

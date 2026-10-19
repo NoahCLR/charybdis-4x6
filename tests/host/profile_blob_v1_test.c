@@ -452,7 +452,6 @@ static void test_find_domain_walks_the_envelope(void) {
     assert(!noah_profile_blob_v1_find_domain(&short_reader, 0, written, NOAH_PROFILE_DOMAIN_V1_RGB, &range));
 }
 
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
 // Schema 4's 32-bit lengths (D-F28), past 65,535 bytes: a domain that long
 // round-trips, and a second domain after it is found at its full offset.
 static void test_payload_over_64_kib(void) {
@@ -483,13 +482,10 @@ static void test_payload_over_64_kib(void) {
     blob[12] = 0u;
     assert(noah_profile_blob_v1_decode(blob, written, &decoded, &error) != NOAH_PROFILE_CODEC_V1_OK);
 }
-#endif
 
 int main(int argc, char **argv) {
     assert(argc == 2);
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
     test_payload_over_64_kib();
-#endif
     test_shared_blob_vectors(argv[1]);
     test_domain_envelopes();
     test_current_domain_registry();

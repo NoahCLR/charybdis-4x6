@@ -694,7 +694,7 @@ These values come from the keymap config and the shared userspace config. When t
 | `SPLIT_RUNTIME_SYNC_RETRY_MAX_MS` | `1000u` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_LAYER_STATE_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `SPLIT_ACTIVITY_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
-| `SPLIT_TRANSACTION_IDS_USER` | `PUT_SPLIT_RUNTIME_BASE_SYNC,PUT_SPLIT_COMBO_FEEDBACK_SYNC,PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC,PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC,PUT_VIA_KEYMAP_SYNC,PUT_VIA_KEYMAP_MIRROR,PUT_PROFILE_SPLIT_SYNC` | [users/noah/config.h](../users/noah/config.h) |
+| `SPLIT_TRANSACTION_IDS_USER` | `PUT_SPLIT_RUNTIME_BASE_SYNC,PUT_SPLIT_COMBO_FEEDBACK_SYNC,PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC,PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC,PUT_VIA_KEYMAP_SYNC,PUT_VIA_KEYMAP_MIRROR,PUT_PROFILE_SPLIT_SYNC,PUT_PROFILE_FLASH_DIAGNOSTICS` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_PD_MODE_ACTIVE_HALF_ENABLE` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `MATRIX_IO_DELAY` | `10` | [users/noah/config.h](../users/noah/config.h) |
 | `RGB_MATRIX_LED_COUNT` | `58` | [users/noah/config.h](../users/noah/config.h) |
@@ -728,12 +728,8 @@ These values come from the keymap config and the shared userspace config. When t
 | `VIA_FIRMWARE_VERSION` | `0x00010000u` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_LAYER_COUNT` | `LAYER_COUNT` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_MACRO_COUNT` | `128` | [users/noah/config.h](../users/noah/config.h) |
-| `WEAR_LEVELING_BACKING_SIZE` | `286720` | [users/noah/config.h](../users/noah/config.h) |
+| `WEAR_LEVELING_BACKING_SIZE` | `73728` | [users/noah/config.h](../users/noah/config.h) |
 | `DYNAMIC_KEYMAP_EEPROM_MAX_ADDR` | `0x8FFFu` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR` | `0x9000u` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR` | `0x15FFFu` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR` | `0x16000u` | [users/noah/config.h](../users/noah/config.h) |
-| `NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR` | `0x22FFFu` | [users/noah/config.h](../users/noah/config.h) |
 | `KEYRECORD_USER_DATA` | `defined` | [users/noah/config.h](../users/noah/config.h) |
 | `NOAH_LAYER_BANK_COUNT` | `16` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `TAPPING_TERM` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |

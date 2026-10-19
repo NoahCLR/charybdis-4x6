@@ -7,7 +7,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "../../compat/qmk_profile_eeprom.h"
+#include "../../compat/qmk_profile_flash.h"
 #include "../schema/profile_compiled_defaults_v1.h"
 
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
@@ -82,7 +82,7 @@ void noah_profile_store_runtime_init(void) {
     discovery_result             = NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
 #    if defined(VIA_ENABLE) && defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_USER)
     if (!noah_qmk_physical_half_origin(&origin) || !noah_profile_owner_init(&runtime_owner, &(noah_profile_owner_config_t){
-                                                                                                .store_io                = noah_qmk_profile_eeprom_io(),
+                                                                                                .store_io                = noah_qmk_profile_flash_io(),
                                                                                                 .split_exchange          = noah_qmk_profile_split_transport_exchange,
                                                                                                 .split_transport_context = NULL,
                                                                                                 .origin_half             = origin,
@@ -108,7 +108,7 @@ void noah_profile_store_runtime_init(void) {
         runtime_state    = NOAH_PROFILE_STORE_RUNTIME_STORAGE_ERROR;
         return;
     }
-    noah_profile_store_init(&runtime_store, noah_qmk_profile_eeprom_read_only_io(),
+    noah_profile_store_init(&runtime_store, noah_qmk_profile_flash_read_only_io(),
                             (noah_profile_store_compatibility_t){
                                 .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
                                 .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
@@ -374,7 +374,7 @@ typedef struct {
 static bool boot_payload_read(void *context, size_t offset, uint8_t *target, size_t length) {
     const boot_payload_t *payload = context;
 
-    return length == 0u || (length <= NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE && noah_profile_store_read_span(payload->store, (noah_profile_storage_address_t)(payload->start + offset), target, (uint32_t)length));
+    return length == 0u || (length <= NOAH_PROFILE_STORAGE_REGION_SIZE && noah_profile_store_read_span(payload->store, (noah_profile_storage_address_t)(payload->start + offset), target, (uint32_t)length));
 }
 
 bool noah_profile_store_runtime_read_keyboard_name(noah_profile_store_t *store, noah_profile_keyboard_name_t *name) {
@@ -415,7 +415,7 @@ bool noah_profile_store_runtime_boot_keyboard_name(noah_profile_keyboard_name_t 
     if (!name || !store || !ensure_compiled_open()) {
         return false;
     }
-    noah_profile_store_init(store, noah_qmk_profile_eeprom_read_only_io(),
+    noah_profile_store_init(store, noah_qmk_profile_flash_read_only_io(),
                             (noah_profile_store_compatibility_t){
                                 .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
                                 .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,

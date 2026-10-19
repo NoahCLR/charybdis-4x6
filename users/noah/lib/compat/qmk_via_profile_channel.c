@@ -22,6 +22,7 @@
 
 #    include "via.h"
 #    include "qmk_combo_readback.h"
+#    include "qmk_profile_flash_hooks.h"
 #    include "qmk_portable_profile.h"
 #    include "qmk_via_logical_profile.h"
 
@@ -305,6 +306,7 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
 NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
     if (noah_split_diagnostics_command(data, length)) return;
     if (noah_qmk_combo_readback_get(data, length)) return;
+    if (noah_qmk_profile_flash_wire_get(data, length)) return;
 #    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
     if (noah_qmk_via_logical_profile_handle(data, length)) return;
 #    endif

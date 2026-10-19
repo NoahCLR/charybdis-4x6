@@ -21,6 +21,7 @@
 #include "lib/compat/qmk_record_admission.h"
 #include "lib/compat/qmk_durable_io.h"
 #include "lib/compat/qmk_loop_stages.h"
+#include "lib/compat/qmk_profile_flash_hooks.h"
 #include "lib/compat/qmk_via_split_mirror.h"
 #include "lib/compat/qmk_via_split_sync.h"
 #include "lib/compat/qmk_via_sync_state.h"
@@ -88,6 +89,7 @@ void noah_housekeeping_task_user(void) {
     held_repeat_tick();
     noah_runtime_diag_heartbeat();
     noah_qmk_usb_product_name_task();
+    noah_qmk_profile_flash_housekeeping();
 }
 
 void noah_suspend_power_down_user(void) {
@@ -99,7 +101,10 @@ void noah_suspend_power_down_user(void) {
 }
 
 // Before USB starts: the logical EEPROM is readable, nothing else is up yet.
+// An EEPROM reset forgets the saved profiles before the name is read from
+// them.
 void noah_keyboard_pre_init_user(void) {
+    noah_qmk_profile_flash_pre_init();
     noah_qmk_usb_product_name_pre_init();
 }
 

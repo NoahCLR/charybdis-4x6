@@ -7,11 +7,19 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "qmk_profile_flash_hooks.h"
 #include "qmk_via_split_mirror.h"
 #include "qmk_via_split_sync.h"
 #include "../profile/storage/profile_store_runtime_hooks.h"
 
 typedef bool (*noah_qmk_durable_io_step_fn)(void);
+
+// The profile store's step waits while its flash says so: a save needs a
+// sector erased and the keyboard is busy, or the grant's flash time is spent
+// (D-F29).
+static bool noah_qmk_durable_io_profile_step(void) {
+    return noah_qmk_profile_flash_may_write() && noah_profile_store_runtime_matrix_scan_step();
+}
 
 enum {
     NOAH_QMK_DURABLE_IO_PROFILE_DISCOVERY = 0u,
@@ -33,12 +41,16 @@ void noah_qmk_durable_io_init(void) {
 
 void noah_qmk_durable_io_matrix_scan(void) {
     static const noah_qmk_durable_io_step_fn steps[NOAH_QMK_DURABLE_IO_STEP_COUNT] = {
-        noah_profile_store_runtime_matrix_scan_step,
+        noah_qmk_durable_io_profile_step,
         noah_qmk_via_split_mirror_matrix_scan_step,
         noah_qmk_via_split_sync_matrix_scan_step,
     };
 
     uint8_t index = noah_qmk_durable_io_next_step;
+
+    // Flash pauses are measured, and erases ahead of a save run, per grant
+    // (D-F29).
+    noah_qmk_profile_flash_grant_begin();
 
     for (uint8_t visited = 0u; visited < NOAH_QMK_DURABLE_IO_STEP_COUNT; visited++) {
         if (steps[index]()) {

@@ -38,6 +38,7 @@ NOAH_COMMON_SOURCES := \
     lib/profile/storage/profile_storage_layout.c \
     lib/profile/storage/profile_checksum.c \
     lib/profile/storage/profile_store.c \
+    lib/profile/storage/profile_flash_store.c \
     lib/profile/storage/profile_store_runtime.c \
     lib/profile/storage/profile_candidate_transaction.c \
     lib/profile/storage/profile_candidate_store_backend.c \
@@ -48,7 +49,7 @@ NOAH_COMMON_SOURCES := \
     lib/compat/qmk_split_diagnostics.c \
     lib/compat/qmk_split_transport_crc.c \
     lib/compat/qmk_loop_stages.c \
-    lib/compat/qmk_profile_eeprom.c \
+    lib/compat/qmk_profile_flash.c \
     lib/compat/qmk_physical_half.c \
     lib/compat/qmk_profile_split_transport.c \
     lib/compat/qmk_via_profile_channel.c \

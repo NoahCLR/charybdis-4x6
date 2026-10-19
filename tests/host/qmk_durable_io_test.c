@@ -18,6 +18,8 @@ static bool    ready[STEP_COUNT];
 static uint8_t log_entries[LOG_CAPACITY];
 static uint8_t log_count;
 static uint8_t consumed_count;
+static uint8_t grants;
+static bool    flash_may_write = true;
 
 static void check(bool condition, const char *message) {
     if (!condition) {
@@ -35,6 +37,16 @@ static bool record_step(uint8_t step) {
     ready[step] = false;
     consumed_count++;
     return true;
+}
+
+// Each scan opens one flash grant before any owner step (D-F29).
+void noah_qmk_profile_flash_grant_begin(void) {
+    check(log_count == 0u, "the flash grant opens before the scan's owner steps");
+    grants++;
+}
+
+bool noah_qmk_profile_flash_may_write(void) {
+    return flash_may_write;
 }
 
 bool noah_profile_store_runtime_matrix_scan_step(void) {
@@ -102,7 +114,38 @@ static void test_scheduler_skips_idle_owner_without_double_consumption(void) {
     check(consumed_count == 1u, "one scan must consume at most one owner step");
 }
 
+static void test_every_scan_opens_one_flash_grant(void) {
+    memset(ready, 0, sizeof(ready));
+    grants = 0u;
+    for (uint8_t scan = 0u; scan < 3u; scan++) {
+        reset_log();
+        ready[scan] = true;
+        noah_qmk_durable_io_matrix_scan();
+        check(grants == scan + 1u, "one flash grant per scan");
+    }
+}
+
+// While a save waits for erased flash or the grant's flash time is spent, the
+// profile step is not run and the grant goes to the next owner (D-F29).
+static void test_profile_step_waits_for_its_flash(void) {
+    memset(ready, 0, sizeof(ready));
+    ready[STEP_PROFILE] = true;
+    ready[STEP_MIRROR]  = true;
+    noah_qmk_durable_io_init();
+    flash_may_write = false;
+    reset_log();
+    noah_qmk_durable_io_matrix_scan();
+    check(log_count == 1u && log_entries[0] == STEP_MIRROR && consumed_count == 1u, "a waiting profile step must not run");
+    check(ready[STEP_PROFILE], "the waiting profile step keeps its work");
+    flash_may_write = true;
+    reset_log();
+    noah_qmk_durable_io_matrix_scan();
+    check(log_count == 2u && log_entries[1] == STEP_PROFILE && consumed_count == 1u, "the profile step runs once its flash allows");
+}
+
 int main(void) {
+    test_every_scan_opens_one_flash_grant();
+    test_profile_step_waits_for_its_flash();
     test_idle_scan_visits_each_owner_once();
     test_ready_owners_rotate_and_only_one_consumes();
     test_scheduler_skips_idle_owner_without_double_consumption();

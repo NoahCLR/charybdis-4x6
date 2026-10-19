@@ -38,8 +38,10 @@ contain every enabled domain and use domain-seeking reads (D-F12).
 
 The firmware is on a new base (D-F28): Profile Wire 2.0, profile schema 4.0
 and store format 6, in which every length and offset of a profile is 32 bits,
-in storage and on the wire, so profiles can outgrow 64 KiB once the slots
-move to flash. Everything the base does is implied by those versions; the
+in storage and on the wire. The two profile slots are a flash region of their
+own, 128 KiB each, read in place (D-F29), so a profile can reach 130,048 bytes
+and QMK's EEPROM cache shrinks to the 36 KiB VIA region, returning 106,496
+bytes of RAM per half. Everything the base does is implied by those versions; the
 capability feature word holds only split, saves and pointing. A keyboard
 holding a format-5 profile starts from its compiled defaults and says so in
 its status. No Ark speaks the new base yet, so this firmware is for its own
@@ -117,8 +119,19 @@ input cadence remain unmeasured for this path.
 - **No Ark drives the new base yet (D-F28).** Ark speaks Profile Wire 1,
   schema 3.0 and store format 5; this firmware refuses all three. Until Ark
   moves to the new base, keep the keyboard on released firmware and flash
-  this one only for its own task checks. The slots are still 53,216 bytes in
-  EEPROM.
+  this one only for its own task checks.
+
+- **The flash slots have not run on hardware (D-F29).** Boot and typing on
+  both halves, and RAM per half, can be checked at once. A save needs an Ark
+  on the new base: then read each half's flash pauses (Profile Wire custom get
+  `0x0D`, page 0 the USB half, page 1 the other) after a save of a large
+  profile, watch typing, pointing and the split link during it (interrupts are
+  off for each sector erase, typically tens of milliseconds; erases wait for a
+  quiet keyboard, so check that a save finishes promptly once typing stops),
+  and cut power during a save on each half to confirm the previous profile
+  comes back. Hold the EEPROM-reset key (or bootmagic) and confirm the
+  keyboard comes back on its compiled defaults. The build assumes 2 MiB of
+  flash; the controller's real size is unmeasured.
 
 - **Roll order needs hardware acceptance (D-F27).** Type `, `, `. `, `1e` and
   Enter into a letter fast; hold a symbol key into a letter; roll Shift into a
@@ -221,10 +234,11 @@ input cadence remain unmeasured for this path.
 - **The bigger profiles have not run on hardware** (D-F14). Flashing them
   resets each half's storage (the flash base moves), and the stored profile
   is refused by action ABI digest. Before relying on them, measure on both
-  halves: allocator and stack high-water with the 140 KiB EEPROM mirror; how
+  halves: allocator and stack high-water (the EEPROM mirror is 36 KiB since
+  D-F29); how
   long the maximum profile's validation (7,458 owner scans), boot (9,981)
   and the peer's prepare take in real time against the 60-second no-progress
-  window; how long a 140 KiB wear-leveling consolidation pauses; and how long
+  window; how long a 36 KiB wear-leveling consolidation pauses; and how long
   macro 127 takes to start on a full 34,903-byte macro bank. Also check
   typing, pointing and lighting with a maximum profile, a sixteen-key chord
   across both halves, and every participation control.
@@ -1154,6 +1168,8 @@ whole profile validates in 7,432 owner scans
 37,956 bytes, leaving 15,260, and validates in 7,458 owner scans.
 *Revised by D-F28:* schema 4's six-byte domain envelopes make it 37,966 bytes,
 leaving 15,250, validated in 7,459 owner scans.
+*Revised by D-F29:* the slots are 128 KiB in their own flash region, so it
+leaves 93,074 bytes, and logical EEPROM is the 36 KiB VIA region alone.
 
 The authored layout keeps its eight layers; layers 8–15 are transparent,
 unnamed and inactive. One supported tap depth (five) bounds behaviour steps,
@@ -1271,7 +1287,7 @@ The receiver writes at most 110 bytes in a scan, in store writes of at most
 20, whether they arrived in a chunk or it copies them; its validator steps
 read 20 bytes like the owner's, where they read 14 before. The sender reads
 each chunk from its staged candidate or committed record in store reads of at
-most 32 bytes (`NOAH_PROFILE_STORE_IO_CHUNK_MAX`), the bound the QMK EEPROM
+most 32 bytes (`NOAH_PROFILE_STORE_IO_CHUNK_MAX`), the bound the flash
 adapter enforces; a chunk read whole fails on the keyboard as a storage error. While the receiver
 still holds the sender's request, the sender polls at the 5 ms admission pace
 up to eight times in a row without progress before its ordinary backoff, so
@@ -1599,7 +1615,8 @@ capability page's payload capacities. Domain versions keep their numbers: a
 domain's bytes are the same in schema 3.0 and 4.0. RGB and key behaviours keep
 their 16-bit internal offsets, so each of those domains stays within 65,535
 bytes. The slots stay 53,216-byte payloads in EEPROM; nothing else stops a
-profile at 64 KiB once they move to their own flash region. Host tests carry a
+profile at 64 KiB once they move to their own flash region. *Revised by
+D-F29:* they have, with a 130,048-byte payload. Host tests carry a
 70,000-byte payload through the codec, the candidate upload, the split frames
 and the store in a 128 KiB test geometry the firmware refuses.
 
@@ -1647,3 +1664,75 @@ client already requires.
 Client follow-up: Ark moves to the new base (Profile Wire 2.0, schema 4.0, the
 new frames, capability layout 3 and feature word, status page 3 and state flag
 9) and refuses the old one.
+
+## D-F29 — Profile slots in their own flash region
+
+The two profile slots leave QMK's emulated EEPROM for a fixed region of flash
+and are read in place; replaces D-F14's EEPROM geometry. The region is
+256 KiB at flash offset 1 MiB (XIP `0x10100000`): slot A at region offset
+`0x00000`, slot B at `0x20000`, each 128 KiB: a 1 KiB record (the 32-byte
+header and the marker's cells) and a 130,048-byte payload (plan answer 6, the
+working size until a keyboard measures otherwise). It sits between the image (273,872 bytes) and the
+wear-leveling backing at the top of the 2 MiB the build assumes; the link
+fails if the image reaches it and the adapter does not compile if it reaches
+the backing. Logical EEPROM becomes the 36 KiB VIA region: backing 73,728
+bytes, and QMK's RAM mirror 106,496 bytes smaller per half
+([memory budgets](architecture/memory-budgets.md#profile-slots-in-their-own-flash-region--d-f29-2026-10-19)).
+
+No RAM buffer holds a slot: reads go through XIP, writes through one 256-byte
+page buffer. No page is programmed twice between erases, which is all the
+flash part promises: on flash the record is laid out by page (the header in
+page 0; the marker as three cells in pages 1 to 3, read as their bitwise AND,
+one cell programmed per step; the payload from page 4), and the store's
+addresses are mapped onto it. The markers are bit subsets of each other
+(erased `0xFF`, prepared `0x3C`, committed `0x18`, invalid `0x00`), so the
+AND of the cells is always the last step written; format 6 had committed with
+`0xC3` only while the slots were in EEPROM, unreleased, and the layout change
+needs no format bump. A save's reset names its target without touching flash;
+no write reaches the slot before its header sector is erased, so the slot
+stops being a boot candidate before anything is written to it. Pages are
+programmed when full, when a write moves on, or at a sync; the store syncs
+before its readback, after the prepared marker and after the commit marker,
+still written last. Today's guarantee holds: power lost anywhere in a save
+leaves the previous profile active, which host tests prove by cutting power at
+every erase and page program of a save, both before and halfway through the
+operation.
+
+Pauses: erase and program run with interrupts off while XIP is off, through
+pico-sdk's RAM-resident routines, as QMK's wear-leveling driver does; no BK
+change. A sector erase pauses the keyboard for tens of milliseconds (W25Q16JV:
+45 ms typical, 400 ms at worst), so it runs only at the start of a durable-I/O
+grant, at most one per grant, ahead of a save's writes, and only when no key
+is held and the matrix has been unchanged for 50 ms. The profile step runs in
+a grant only with at least a page of erased flash ahead of its writes and the
+grant's flash time under a 2 ms budget, which an erase always exceeds; its
+grant writes at most one split chunk (106 bytes), so programs at most one
+page. A save therefore waits while the keyboard is busy, and one the keyboard
+never lets erase ends at Ark's or the split peer's time limit as a failed
+save; Live mode's quiet period avoids that. Erase suspend is not used. Each
+half measures its longest erase, longest program, most flash time in one
+grant and its last save, readable over Profile Wire custom get `0x0D` (page 0
+this half, page 1 the other, pulled once a second over split RPC
+`PUT_PROFILE_FLASH_DIAGNOSTICS`). These figures replace a separate measurement
+probe: the first keyboard session after a save reads the real pauses, and the
+slot size or pacing changes only if they say so.
+
+Each half keeps its own slots and the copy between halves is unchanged. Old
+EEPROM slots are not migrated: they held format 5, which is refused anyway. A
+firmware update leaves the slots alone. An EEPROM reset still returns the
+keyboard to its compiled defaults, as formatting logical EEPROM did while the
+slots lived there: QMK makes its EEPROM magic valid early in formatting,
+before any userspace hook runs, so `keyboard_pre_init` erases both header
+sectors whenever the magic is not valid, before QMK's keyboard init and before
+the boot name is read. A boot interrupted before, during or between those
+erases, or before QMK's magic write, forgets the slots again on the next.
+
+Chosen over keeping the slots in a larger emulated EEPROM, which mirrors every
+byte in RAM, and over erasing a whole slot up front, which would pause one
+scan for every sector at once. Programming the header page once per marker
+step was dropped because the part does not promise repeated programs of a
+page; the first kilobyte of each slot is the price.
+
+Client follow-up: the capability page now reports a 130,048-byte slot payload
+and profile payload; Ark takes its limits from it. Ark may show the
+flash pauses (`0x0D`) in a diagnostics view; nothing depends on them.

@@ -66,8 +66,9 @@
 // - combo feedback locality
 // - truthful key-feedback semantics and tap branch state
 // - durable committed VIA-storage reconciliation
+// - the profile store's flash timing on the other half (diagnostics only)
 // so both halves render layer-owned RGB from the same runtime and keymap data.
-#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_VIA_KEYMAP_SYNC, PUT_VIA_KEYMAP_MIRROR, PUT_PROFILE_SPLIT_SYNC
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_VIA_KEYMAP_SYNC, PUT_VIA_KEYMAP_MIRROR, PUT_PROFILE_SPLIT_SYNC, PUT_PROFILE_FLASH_DIAGNOSTICS
 
 // Dynamic key-local placement for PD-mode RGB overlays.
 // Required only when a pd_mode_colors[] row uses RGB_KEY_HALF or
@@ -206,29 +207,14 @@
 #    define VIA_FIRMWARE_VERSION 0x00010000u
 #    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
 #    define DYNAMIC_KEYMAP_MACRO_COUNT 128
-// RP2040 wear-leveling exposes half of this backing region as logical EEPROM.
-// Firmware uses 140 KiB of logical EEPROM (D-F14). VIA owns the lower 36 KiB,
-// most of it the shared macro bank; the upper 104 KiB holds two last-known-good
-// live-profile slots of 52 KiB.
-// QMK mirrors logical EEPROM in RAM, so this sizes a 140 KiB cache per half.
-// The storage layout contract validates these exact inclusive address ranges
-// without reading or writing them.
+// RP2040 wear-leveling exposes half of this backing region as logical EEPROM:
+// 36 KiB, the VIA region alone (D-F29). The profile slots live in a flash
+// region of their own (profile_storage_layout.h) and are read in place, so
+// QMK's RAM mirror of logical EEPROM is 36 KiB per half.
 #    if defined(MCU_RP)
-#        define WEAR_LEVELING_BACKING_SIZE 286720
+#        define WEAR_LEVELING_BACKING_SIZE 73728
 #    endif
 #    define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR 0x8FFFu
-#    define NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR 0x9000u
-#    ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
-// Host tests only: two 128 KiB slots, so profiles past 65,535 bytes can be
-// tested (D-F28). The firmware build refuses this geometry.
-#        define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x28FFFu
-#        define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x29000u
-#        define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x48FFFu
-#    else
-#        define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x15FFFu
-#        define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x16000u
-#        define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x22FFFu
-#    endif
 #endif
 
 // Preserve participation through native tapping/combo and userspace queues.

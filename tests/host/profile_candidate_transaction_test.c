@@ -1662,7 +1662,6 @@ static void test_differential_transfer_frames(void) {
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
 }
 
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
 // Candidate upload past 65,535 bytes (D-F28): chunks and streaming chunks to
 // 66,000, a REUSE range landing there, then chunks to the end. Offsets,
 // lengths and status are whole at every step.
@@ -1721,14 +1720,11 @@ static void test_upload_over_64_kib(void) {
     while (status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING) assert(noah_profile_candidate_transaction_scan(&transaction));
     assert(status_of(&transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
 }
-#endif
 
 int main(int argc, char **argv) {
     assert(argc == 2);
     fixture_path = argv[1];
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
     test_upload_over_64_kib();
-#endif
     // The firmware's 32-bit size: the backend's pointers count four bytes.
     assert(sizeof(noah_profile_candidate_transaction_t) - sizeof(noah_profile_candidate_backend_t) + sizeof(noah_profile_candidate_backend_t) / sizeof(void *) * 4u <= 256u);
     test_differential_transfer_frames();
