@@ -8,7 +8,7 @@
 | Source files | canonical digest plus file revision | compiled-default representation |
 | Compiled defaults | canonical digest and action-ABI digest | recovery fallback |
 | Device commit | `{counter, origin_half}` plus canonical digest | durable authority and reboot source |
-| Working copy | base identity plus working revision and digest | volatile active profile after a live edit |
+| Working copy | session and revision over a saved base | volatile active profile after a live edit |
 | RGB preview | transaction id, base generation, digest | volatile overlay only |
 | Peer half | committed version tuple and digest | must converge before successful Apply |
 

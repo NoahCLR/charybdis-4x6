@@ -48,14 +48,16 @@ A token becomes stale as soon as a later profile generation is published.
 Every renderer family then refuses a stale token instead of reading part of
 each generation. They compose into caller-owned render frames before touching
 the LEDs, so an invalid or stale access can clear or discard the incomplete
-result. The mapped-key LED map is generation-independent; colors, modes,
+result. Physical LED-to-matrix geometry is fixed; mapped-layer coverage is
+rebuilt when the effective RGB publication epoch changes. Colors, modes,
 locality, groups, and feedback policy are resolved as render-local state, so
 they cannot remain cached after a profile switch.
 
 The flashable side-specific pair installs the effective-profile owner and all
-renderer invalidators, with live mutation enabled by default. Its logical
-transaction prepares both halves before the decision and requires exact
-profile convergence before activation. Generic builds without a physical-half
+renderer invalidators, with live mutation enabled by default. Durable Apply
+prepares both halves before the decision and requires exact profile convergence
+before activation. Live edits publish a volatile working copy locally at the
+safe boundary and then synchronize it to the peer. Generic builds without a physical-half
 identity use compiled defaults. Hardware acceptance remains separate from the
 implemented render and publication contracts.
 

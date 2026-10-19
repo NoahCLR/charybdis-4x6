@@ -46,10 +46,10 @@ that firmware did not compile.
 | Tap-branch feedback colors | ordered HSV list | publish a generation-consistent RGB view |
 | Tap-committed/hold/long-hold colors | HSV values | publish a generation-consistent RGB view |
 | Tap-commit policy | enum | strict activation boundary because key planning reads it |
-| Key-feedback locality | enum | RGB frame boundary |
+| Key-feedback locality | enum | publish a generation-consistent RGB view |
 | Key-feedback LED groups | semantic, inherit/literal HSV, group id | publish a generation-consistent RGB view |
 | Reusable LED groups | stable profile-local id and 58-bit bitmap | publish a generation-consistent RGB view |
-| Stage enable states | one bit per compiled RGB stage | RGB frame boundary unless field affects key planning |
+| Stage enable states | one bit per compiled RGB stage | publish a generation-consistent RGB view; strict activation boundary for key planning |
 
 These classifications describe which fields can change, not a separate
 RGB-preview endpoint. Current Apply and live edits publish through the strict
