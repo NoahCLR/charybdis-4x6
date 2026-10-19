@@ -52,6 +52,9 @@ typedef enum {
     // The final marker write may have become durable but could not be
     // confirmed. The caller must reconcile persistent status before retrying.
     NOAH_PROFILE_STORE_DURABILITY_UNKNOWN,
+    // The slot holds a record in an earlier store format (format 5, `NT`).
+    // It is never read or converted (D-F28).
+    NOAH_PROFILE_STORE_EARLIER_FORMAT,
 } noah_profile_store_result_t;
 
 typedef enum {
@@ -80,8 +83,8 @@ typedef enum {
     NOAH_PROFILE_STORE_BOOT_DONE,
 } noah_profile_store_boot_phase_t;
 
-typedef bool (*noah_profile_store_read_fn)(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length);
-typedef bool (*noah_profile_store_write_fn)(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length);
+typedef bool (*noah_profile_store_read_fn)(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length);
+typedef bool (*noah_profile_store_write_fn)(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length);
 
 typedef struct {
     noah_profile_store_read_fn  read;
@@ -121,7 +124,7 @@ typedef struct {
     uint8_t  domain_mask;
     uint8_t  flags;
     uint8_t  origin_half;
-    uint16_t payload_length;
+    uint32_t payload_length;
     uint32_t generation;
     uint32_t payload_crc32;
     uint32_t payload_digest;
@@ -132,7 +135,7 @@ typedef struct {
 } noah_profile_store_record_t;
 
 typedef struct {
-    // Format 3 is required, with a nonzero VIA generation and digest.
+    // Format 6 is required, with a nonzero VIA generation and digest.
     uint8_t format_version;
     uint8_t schema_major;
     uint8_t schema_minor;
@@ -140,7 +143,7 @@ typedef struct {
     uint8_t  domain_mask;
     uint8_t  flags;
     uint8_t  origin_half;
-    uint16_t payload_length;
+    uint32_t payload_length;
     uint32_t generation;
     uint32_t payload_crc32;
     uint32_t payload_digest;
@@ -163,11 +166,11 @@ typedef struct {
         };
     };
     noah_profile_slot_t               candidate_slot;
-    uint16_t                          candidate_written;
+    uint32_t                          candidate_written;
     uint32_t                          candidate_crc32_state;
     uint32_t                          candidate_digest_state;
     noah_profile_store_commit_phase_t commit_phase;
-    uint16_t                          commit_offset;
+    uint32_t                          commit_offset;
     uint32_t                          commit_crc32_state;
     uint32_t                          commit_digest_state;
     noah_profile_envelope_t           commit_envelope;
@@ -179,13 +182,16 @@ typedef struct {
     bool                              prepared_durable;
     bool                              auto_commit_prepared;
     bool                              reuse_active;
+    // A slot holds an earlier store format and nothing was adopted: the
+    // keyboard runs its compiled defaults, and status says so.
+    bool                              earlier_format;
     uint8_t                           scratch[NOAH_PROFILE_STORE_IO_CHUNK_MAX];
     noah_profile_store_result_t       boot_slot_a_result;
     noah_profile_store_result_t       boot_slot_b_result;
     noah_profile_store_result_t       boot_result;
     noah_profile_store_boot_phase_t   boot_phase;
     noah_profile_storage_address_t    boot_payload_start;
-    uint16_t                          boot_offset;
+    uint32_t                          boot_offset;
     uint32_t                          boot_crc32_state;
     uint32_t                          boot_digest_state;
     noah_profile_envelope_t           boot_envelope;
@@ -193,7 +199,7 @@ typedef struct {
 
 // Reads any span of logical EEPROM, in reads of at most
 // NOAH_PROFILE_STORE_IO_CHUNK_MAX bytes.
-bool                        noah_profile_store_read_span(const noah_profile_store_t *store, noah_profile_storage_address_t address, uint8_t *target, uint16_t length);
+bool                        noah_profile_store_read_span(const noah_profile_store_t *store, noah_profile_storage_address_t address, uint8_t *target, uint32_t length);
 void                        noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility);
 bool                        noah_profile_store_set_reuse_guard(noah_profile_store_t *store, const noah_profile_store_reuse_guard_t *guard);
 noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t *store, noah_profile_store_record_t *selected);
@@ -205,7 +211,7 @@ noah_profile_store_result_t noah_profile_store_boot_select_begin(noah_profile_st
 noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *selected);
 noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_t *store, noah_profile_slot_t slot, bool require_commit, noah_profile_store_record_t *record);
 noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate);
-noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_t *store, uint16_t offset, const uint8_t *bytes, uint16_t length);
+noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_t *store, uint32_t offset, const uint8_t *bytes, uint32_t length);
 // Validates the staged payload and persists transaction intent without making
 // it active authority. A prepared slot is ignored by ordinary boot selection
 // and may still be aborted safely.

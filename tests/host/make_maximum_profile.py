@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Write the maximum profile fixture (D-F14), or check it is current.
 
-Every table at its simultaneous maximum in one schema 3.0 blob: RGB v4 with
+Every table at its simultaneous maximum in one schema 4.0 blob: RGB v4 with
 sixteen groups, sixteen layer colours and 32 group rows; 128 behaviour rows of
 five full steps (640 steps); 128 combos of sixteen inputs; settings v8 with
 a shortcut on every custom key and every one of its 273 names at 32 bytes of
@@ -21,7 +21,7 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURE = ROOT / "tests/fixtures/maximum_profile_v3.fixture"
+FIXTURE = ROOT / "tests/fixtures/maximum_profile_v4.fixture"
 LAYERS = 16
 DEPTH = 5
 PAYLOAD_MAX = 53216
@@ -182,9 +182,9 @@ def pointing() -> bytes:
 
 def blob() -> tuple[bytes, list[tuple[int, int, bytes]]]:
     domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 8, settings()), (0x50, 3, pointing())]
-    out = bytearray(b"NLP1" + bytes([3, 0, len(domains), 1]))
+    out = bytearray(b"NLP1" + bytes([4, 0, len(domains), 1]))
     for domain_id, version, payload in domains:
-        out += bytes([domain_id, version]) + struct.pack("<H", len(payload)) + payload
+        out += bytes([domain_id, version]) + struct.pack("<I", len(payload)) + payload
     assert len(out) + ALLOWANCE <= PAYLOAD_MAX
     return bytes(out), domains
 

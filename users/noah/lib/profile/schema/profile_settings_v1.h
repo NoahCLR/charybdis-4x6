@@ -99,8 +99,8 @@ typedef struct {
 } noah_profile_settings_v1_validation_t;
 // One byte per call, permitting the whole-profile owner to retain its 20-byte
 // per-step I/O ceiling. False rejects the candidate before publication.
-bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *state, uint8_t byte, uint16_t length, uint8_t layers, uint8_t positions);
-bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *state, uint16_t length);
+bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *state, uint8_t byte, uint32_t length, uint8_t layers, uint8_t positions);
+bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *state, uint32_t length);
 bool noah_profile_setting_v1_valid(uint8_t id, uint32_t value, uint8_t layers);
 
 // The keyboard's own name, the domain's last name record (D-F25). Empty means

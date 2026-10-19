@@ -82,9 +82,11 @@ the interruption and keyboard acceptance procedures.
 
 ## Current-format cut (D-F10)
 
-Firmware accepts schema 3.0, RGB v4, key behaviors v2, combo v3, settings v8,
-sparse PD v3 and `NT` store format 5 only (D-F14). BEGIN requires a nonzero VIA
-binding.
+Firmware accepts Profile Wire 2.0, schema 4.0, RGB v4, key behaviors v2,
+combo v3, settings v8, sparse PD v3 and store format 6 only (D-F14, D-F28).
+BEGIN requires a nonzero VIA binding. Every profile length and offset is 32 bits
+on the wire, the capability page is layout 3 and the feature word holds only
+split, saves and pointing (D-F28); the Ark follow-up moves to all of it.
 The legacy GET 9 page and its feature bit are removed. Ark must require binding
 in `candidateMetadataForBlob`, update codec/rejection expectations and its
 integration probe recipes, refresh imported fixtures/specs and repin after the

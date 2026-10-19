@@ -24,8 +24,13 @@ enum {
     // Page 0 of a payload read is metadata; pages 1..N carry raw payload
     // bytes, a full report payload each.
     NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE = 0u,
-    // Capability layout 2 (D-F14) adds page 2 for fields wider than a byte.
-    NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT     = 2u,
+    // Profile Wire 2.0 opens the new base (D-F28): 32-bit profile lengths
+    // and offsets everywhere, a feature word of build differences only.
+    NOAH_PROFILE_WIRE_V1_PROTOCOL_MAJOR = 2u,
+    NOAH_PROFILE_WIRE_V1_PROTOCOL_MINOR = 0u,
+    // Capability layout 3 (D-F28): page 1 the byte-wide ceilings, page 2 the
+    // wider ones, payload capacities 32 bits.
+    NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT     = 3u,
     NOAH_PROFILE_WIRE_V1_CAPABILITY_PAGES      = 3u,
     NOAH_PROFILE_WIRE_V1_STATUS_PAGES          = 2u,
 };
@@ -37,62 +42,23 @@ typedef enum {
     NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE  = 3u,
 } noah_profile_wire_v1_status_code_t;
 
+// The feature word holds only what a build genuinely varies by (D-F28).
+// Everything this base does is implied by its protocol and schema versions;
+// what each bit of the earlier word meant is recorded in profile-wire-v1.md.
+// No firmware behaviour depends on a bit: the word only describes the build.
 enum {
-    // The firmware understands the read surface and frozen storage/schema
-    // bounds. Candidate writes, activation, preview, and peer reconciliation
-    // get their own bits only when those implementations actually land.
-    NOAH_PROFILE_FEATURE_READ_SURFACE          = 1u << 0,
-    NOAH_PROFILE_FEATURE_STORAGE_LAYOUT        = 1u << 1,
-    NOAH_PROFILE_FEATURE_RGB_SCHEMA            = 1u << 2,
-    NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA   = 1u << 3,
-    NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD        = 1u << 4,
-    NOAH_PROFILE_FEATURE_CANDIDATE_WRITE       = 1u << 5,
-    NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT     = 1u << 6,
-    NOAH_PROFILE_FEATURE_RGB_PREVIEW           = 1u << 7,
-    NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION    = 1u << 8,
-    NOAH_PROFILE_FEATURE_PEER_RECONCILIATION   = 1u << 9,
-    NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST     = 1u << 10,
-    NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH = 1u << 11,
-    NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY  = 1u << 12,
-    // Bit 13 is retired; the legacy PD readback page is unsupported.
-    // TG(), TO(), TT() and OSL() act through userspace layer ownership, so a
-    // host may offer them in behaviours and combos where they can run.
-    NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES = 1u << 14,
-    // Behaviours send QMK and keyboard functions (DPI_MOD, RGB Matrix, Magic,
-    // QK_BOOT…) through QMK's key processing, so a host may offer them in a
-    // behaviour's target, tap and hold.
-    NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS = 1u << 15,
-    // Userspace keycodes sit in fixed blocks (pointing holds 0x7e80, locks
-    // 0x7ea0, layer locks 0x7ec0, custom keys 0x7f00 since D-F14); action
-    // kind 7 is a custom key and the settings domain names the custom keys.
-    NOAH_PROFILE_FEATURE_CUSTOM_KEYS = 1u << 16,
-    // Physical key timestamps survive QMK buffering; authored LT rows own tapping.
-    NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING = 1u << 17,
-    NOAH_PROFILE_FEATURE_OWNED_TAPPING           = 1u << 18,
-    // Payload, compiled and settings readbacks (GET 0x04, 0x05, 0x07) take a
-    // 16-bit page: request byte 4 is its low byte and byte 5 its high byte.
-    NOAH_PROFILE_FEATURE_WIDE_PAGES = 1u << 19,
-    // Bit 20 is reserved and never advertised: participation controls come
-    // with the current settings and combo domain versions (participation-policy.md).
-    NOAH_PROFILE_FEATURE_UNICODE_MACROS = 1u << 21,
-    NOAH_PROFILE_FEATURE_HOST_LAYOUTS = 1u << 22,
-    NOAH_PROFILE_FEATURE_MACRO_PROTECTION = 1u << 23,
-    NOAH_PROFILE_FEATURE_CANDIDATE_REUSE = 1u << 24,
-    NOAH_PROFILE_FEATURE_CANDIDATE_STREAM = 1u << 25,
-    NOAH_PROFILE_FEATURE_MACRO_OUTPUT_ISOLATION = 1u << 26,
-    // Stored macros have no separate program ceiling; the shared bank bounds them.
-    NOAH_PROFILE_FEATURE_STREAMING_MACROS = 1u << 27,
-    // Pointing-mode taps may click plain mouse buttons 1-8.
-    NOAH_PROFILE_FEATURE_POINTING_CLICKS = 1u << 28,
-    // Pointing-mode taps may start VIA macros 0-127, with inherited modifiers.
-    NOAH_PROFILE_FEATURE_POINTING_MACROS = 1u << 29,
-    // Global and per-combo permission to use the output's shared behaviour.
-    NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS = 1u << 30,
+    // One half of a split keyboard: a save copies the profile to the other
+    // half, and status reports the peer.
+    NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD = 1u << 0,
+    // The build saves profiles: candidate writes (with reuse and streaming
+    // chunks), durable commit and activation. Set once the live-profile
+    // owner reports; the candidate chunk size is zero exactly without it.
+    NOAH_PROFILE_FEATURE_SAVES = 1u << 1,
+    // The build has a pointing device, so pointing keys and the pointing
+    // domain mean something on it.
+    NOAH_PROFILE_FEATURE_POINTING = 1u << 2,
+    NOAH_PROFILE_FEATURES_KNOWN = NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD | NOAH_PROFILE_FEATURE_SAVES | NOAH_PROFILE_FEATURE_POINTING,
 };
-// Every LT, MT and OSM key is decided by the key runtime, row or not, and
-// dual-role keys hold at the dual-role setting (D-F27). Bit 31 is the last
-// bit of the word; it is a macro because an enumerator must fit in an int.
-#define NOAH_PROFILE_FEATURE_UNIFIED_TAPPING (1u << 31)
 
 // A wide-page request: [command, channel, value, request id, page low, page
 // high], then 26 reserved zero bytes. The response echoes bytes 0..4 only,
@@ -115,6 +81,10 @@ enum {
     // NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS. No new save starts until
     // the peer confirms, and a peer that never does needs a restart.
     NOAH_PROFILE_STATE_PEER_CLEANUP_PENDING = 1u << 8,
+    // A slot holds a profile in an earlier store format. It is not read or
+    // converted (D-F28), so the keyboard runs its compiled defaults until a
+    // save; the flag clears once a profile is committed.
+    NOAH_PROFILE_STATE_STORED_EARLIER_FORMAT = 1u << 9,
 };
 
 typedef enum {
@@ -147,10 +117,10 @@ typedef struct {
     uint8_t  led_bitmap_size;
     uint8_t  custom_key_slots;
     uint8_t  via_macro_slots;
-    uint16_t max_profile_payload;
-    uint16_t profile_slot_payload;
+    uint32_t max_profile_payload;
+    uint32_t profile_slot_payload;
     uint32_t profile_slot_size;
-    uint16_t via_macro_bytes;
+    uint32_t via_macro_bytes;
     uint8_t  supported_domain_mask;
     uint8_t  max_name_bytes;
     uint8_t  layer_mask_bits;

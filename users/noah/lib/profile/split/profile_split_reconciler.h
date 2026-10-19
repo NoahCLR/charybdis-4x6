@@ -52,7 +52,9 @@ enum {
     // releasing never changes durable authority.
     NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS = 15000u,
     // Firmware-state regression policy, not an RP2040 SRAM-capacity claim.
-    NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT = 896u,
+    // It rose from 896 when the cached reply grew from 32 to 128 bytes, the
+    // size of a pulled chunk's frame (D-F28).
+    NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT = 1024u,
 };
 
 typedef enum {
@@ -79,24 +81,26 @@ typedef enum {
 } noah_profile_split_reconciler_state_t;
 
 typedef bool (*noah_profile_split_local_descriptor_fn)(void *context, noah_profile_split_descriptor_t *descriptor);
-typedef bool (*noah_profile_split_local_read_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length);
+typedef bool (*noah_profile_split_local_read_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, uint8_t *bytes, uint8_t length);
 typedef bool (*noah_profile_split_local_binding_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t *via_generation, uint32_t *via_digest);
 // Sends one request of request_length bytes (32 up to the largest frame) and
-// receives the peer's 32-byte reply.
-typedef bool (*noah_profile_split_exchange_fn)(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);
+// receives the peer's reply into response_length bytes, the request's
+// noah_profile_split_v1_reply_capacity (32, or up to the largest frame for a
+// PAYLOAD_REQUEST).
+typedef bool (*noah_profile_split_exchange_fn)(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length);
 
 // A range of a prepared copy the peer can fill from its own active profile:
 // destination `offset` in the copy, `source_offset` in the named source.
 typedef struct {
     noah_profile_split_v1_source_t source;
-    uint16_t                       offset;
-    uint16_t                       source_offset;
-    uint16_t                       length;
+    uint32_t                       offset;
+    uint32_t                       source_offset;
+    uint32_t                       length;
 } noah_profile_split_reuse_range_t;
 
 // Returns the first reuse range of the copy that ends after `offset`, or
 // false when none does. Called with the prepared source's context.
-typedef bool (*noah_profile_split_reuse_plan_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, noah_profile_split_reuse_range_t *range);
+typedef bool (*noah_profile_split_reuse_plan_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, noah_profile_split_reuse_range_t *range);
 
 typedef struct {
     void                                  *local_context;
@@ -115,10 +119,10 @@ typedef struct {
 typedef struct {
     noah_profile_split_reconciler_state_t state;
     noah_profile_split_v1_status_t        last_status;
-    uint16_t                              transfer_offset;
-    uint16_t                              transfer_length;
+    uint32_t                              transfer_offset;
+    uint32_t                              transfer_length;
     // Bytes of the current copy the peer filled from its own profile.
-    uint16_t                              reused_bytes;
+    uint32_t                              reused_bytes;
     uint32_t                              transport_failure_count;
     uint32_t                              retry_count;
     // The last ACK/BUSY the peer sent: why, and what its store held. With the
@@ -197,8 +201,8 @@ typedef struct {
     uint32_t                               incoming_via_digest;
     uint32_t                               incoming_profile_generation;
     uint32_t                               incoming_profile_digest;
-    uint16_t                               transfer_offset;
-    uint16_t                               reused_bytes;
+    uint32_t                               transfer_offset;
+    uint32_t                               reused_bytes;
     // Prepared-push diagnostics, reset on a new push and retained afterward.
     // Scans count reconciler invocations, not every QMK matrix scan.
     uint32_t                               prepared_scans;
@@ -209,18 +213,20 @@ typedef struct {
     uint8_t                                outbound_chunk[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX];
     // The next frame is PAYLOAD_REUSE for this range rather than a chunk.
     noah_profile_split_reuse_range_t outbound_reuse;
-    uint16_t                         outbound_reuse_progress; // the peer's offset in it so far
+    uint32_t                         outbound_reuse_progress; // the peer's offset in it so far
     // A receiver's PAYLOAD_REUSE range it copies over several scans: where
     // the request started in the copy and in the source, and where it ends.
     noah_profile_split_v1_source_t         incoming_reuse_source;
-    uint16_t                               incoming_reuse_offset;
-    uint16_t                               incoming_reuse_source_offset;
-    uint16_t                               incoming_reuse_end;
+    uint32_t                               incoming_reuse_offset;
+    uint32_t                               incoming_reuse_source_offset;
+    uint32_t                               incoming_reuse_end;
     uint8_t                                mailbox_length;
     uint8_t                                cached_request_length;
+    uint8_t                                cached_response_length;
     uint8_t                                mailbox_wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
     uint8_t                                cached_request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
-    uint8_t                                cached_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    // A pulled chunk's reply is as large as a pushed chunk's request.
+    uint8_t                                cached_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
     uint8_t                                metadata_response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
     noah_runtime_publication_generation_t  mailbox_sequence;
     noah_runtime_publication_generation_t  response_sequence;
@@ -257,7 +263,9 @@ void noah_profile_split_reconciler_init(noah_profile_split_reconciler_t *reconci
 
 // QMK RPC/callback side. It performs strict frame decode, at most one bounded
 // mailbox copy, and a cached response copy. EEPROM, validation, and provider
-// operations are deliberately absent from this path.
+// operations are deliberately absent from this path. `response_length` is the
+// reply buffer the requester asked for (FRAME_SIZE up to FRAME_MAX); the reply
+// frame starts it and the rest is zero.
 bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reconciler, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length);
 
 // Matrix-scan side. Each call performs at most one RPC, one payload read/write,

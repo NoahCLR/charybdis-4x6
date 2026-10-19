@@ -50,8 +50,10 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_peer_store_backend.c" \
         -o "$BUILD_DIR/profile_split_reconciler_test_$name"
-    "$BUILD_DIR/profile_split_reconciler_test_$name" "$ROOT/tests/fixtures/maximum_profile_v3.fixture"
+    "$BUILD_DIR/profile_split_reconciler_test_$name" "$ROOT/tests/fixtures/maximum_profile_v4.fixture"
 }
 
 build_and_run normal
 build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
+# 128 KiB test slots: pushes, pulls and reuse past 65,535 bytes (D-F28).
+build_and_run wide -DNOAH_PROFILE_TEST_WIDE_SLOTS -fsanitize=address,undefined -fno-omit-frame-pointer

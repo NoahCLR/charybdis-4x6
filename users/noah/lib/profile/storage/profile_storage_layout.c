@@ -4,6 +4,10 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
+#    error "NOAH_PROFILE_TEST_WIDE_SLOTS is a host-test geometry; no firmware stores 128 KiB slots in EEPROM"
+#endif
+
 #ifdef VIA_ENABLE
 
 #    include "profile_storage_layout.h"

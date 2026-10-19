@@ -40,7 +40,7 @@ typedef struct {
     uint32_t crc32;
     uint32_t digest;
     uint32_t action_abi_digest;
-    uint16_t byte_length;
+    uint32_t byte_length;
     uint8_t  domain_mask;
 } noah_profile_compiled_v1_metadata_t;
 
@@ -50,7 +50,7 @@ typedef struct {
 typedef struct {
     noah_profile_compiled_v1_metadata_t metadata;
     // Payload ranges indexed by the current domain registry, absent = zero.
-    struct { uint16_t offset, length; } domains[NOAH_PROFILE_DOMAIN_REGISTRY_COUNT];
+    struct { uint32_t offset, length; } domains[NOAH_PROFILE_DOMAIN_REGISTRY_COUNT];
 } noah_profile_compiled_v1_t;
 
 typedef bool (*noah_profile_compiled_v1_write_fn)(void *context, const uint8_t *bytes, size_t length);

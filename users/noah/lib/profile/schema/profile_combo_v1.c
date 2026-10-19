@@ -9,14 +9,14 @@ static uint32_t u32(const uint8_t *p) {
     return (uint32_t)u16(p) | ((uint32_t)u16(&p[2]) << 16u);
 }
 
-noah_profile_codec_v1_result_t noah_profile_combo_v1_decode_header(const uint8_t *bytes, uint16_t payload_length, noah_profile_combo_v1_header_t *header) {
+noah_profile_codec_v1_result_t noah_profile_combo_v1_decode_header(const uint8_t *bytes, uint32_t payload_length, noah_profile_combo_v1_header_t *header) {
     if (!bytes || !header) return NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT;
     memset(header, 0, sizeof(*header));
     if (payload_length < NOAH_PROFILE_COMBO_V2_HEADER_SIZE) return NOAH_PROFILE_CODEC_V1_TRUNCATED;
     if (bytes[1] || bytes[2] || bytes[3]) return NOAH_PROFILE_CODEC_V1_RESERVED_FIELDS;
     if (bytes[0] > NOAH_PROFILE_COMBO_V1_MAX_ROWS) return NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED;
     // Every row has at least its fixed part and two inputs.
-    if ((uint32_t)payload_length < NOAH_PROFILE_COMBO_V2_HEADER_SIZE + (uint32_t)bytes[0] * (NOAH_PROFILE_COMBO_V3_ROW_FIXED_SIZE + 4u * NOAH_PROFILE_COMBO_V1_MIN_INPUTS)) return NOAH_PROFILE_CODEC_V1_TRUNCATED;
+    if (payload_length < NOAH_PROFILE_COMBO_V2_HEADER_SIZE + (uint32_t)bytes[0] * (NOAH_PROFILE_COMBO_V3_ROW_FIXED_SIZE + 4u * NOAH_PROFILE_COMBO_V1_MIN_INPUTS)) return NOAH_PROFILE_CODEC_V1_TRUNCATED;
     header->row_count       = bytes[0];
     header->default_term_ms = u16(&bytes[4]);
     header->hold_term_ms    = u16(&bytes[6]);
@@ -58,11 +58,11 @@ bool noah_profile_combo_v1_read_header(const noah_profile_reader_t *reader, size
     return noah_profile_combo_v1_decode_header(bytes, payload.length, header) == NOAH_PROFILE_CODEC_V1_OK;
 }
 
-static bool read_at(const noah_profile_reader_t *reader, size_t base, uint16_t length, uint16_t offset, uint8_t *target, uint8_t count) {
+static bool read_at(const noah_profile_reader_t *reader, size_t base, uint32_t length, uint32_t offset, uint8_t *target, uint8_t count) {
     return offset <= length && count <= length - offset && noah_profile_reader_read(reader, base + offset, target, count);
 }
 
-noah_profile_combo_v1_iteration_t noah_profile_combo_v1_iteration_step(noah_profile_combo_v1_validation_t *state, const noah_profile_reader_t *reader, size_t base, uint16_t length, const noah_profile_action_v1_limits_t *limits, noah_profile_combo_v1_header_t *header, noah_profile_combo_v1_row_t *row, noah_profile_codec_v1_result_t *detail) {
+noah_profile_combo_v1_iteration_t noah_profile_combo_v1_iteration_step(noah_profile_combo_v1_validation_t *state, const noah_profile_reader_t *reader, size_t base, uint32_t length, const noah_profile_action_v1_limits_t *limits, noah_profile_combo_v1_header_t *header, noah_profile_combo_v1_row_t *row, noah_profile_codec_v1_result_t *detail) {
     noah_profile_codec_v1_result_t result = NOAH_PROFILE_CODEC_V1_READ_ERROR;
     if (!state || !reader || !limits || !header || !row || base > SIZE_MAX - length) {
         result = NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT;
@@ -90,7 +90,7 @@ noah_profile_combo_v1_iteration_t noah_profile_combo_v1_iteration_step(noah_prof
             if (!input_count_valid(state->bytes[0])) {
                 result = NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED;
             } else {
-                state->offset      = (uint16_t)(state->offset + NOAH_PROFILE_COMBO_V3_ROW_FIXED_SIZE);
+                state->offset      = state->offset + NOAH_PROFILE_COMBO_V3_ROW_FIXED_SIZE;
                 state->inputs_read = 0u;
                 state->phase       = 2u;
                 return NOAH_PROFILE_COMBO_V1_ITERATING;
@@ -102,7 +102,7 @@ noah_profile_combo_v1_iteration_t noah_profile_combo_v1_iteration_step(noah_prof
         if (length - state->offset < 4u * count) {
             result = NOAH_PROFILE_CODEC_V1_TRUNCATED;
         } else if (read_at(reader, base, length, state->offset, &state->bytes[NOAH_PROFILE_COMBO_V3_ROW_FIXED_SIZE + 4u * state->inputs_read], (uint8_t)(4u * count))) {
-            state->offset      = (uint16_t)(state->offset + 4u * count);
+            state->offset      = state->offset + 4u * count;
             state->inputs_read = (uint8_t)(state->inputs_read + count);
             if (state->inputs_read < state->bytes[0]) return NOAH_PROFILE_COMBO_V1_ITERATING;
             result = noah_profile_combo_v1_decode_row(state->bytes, limits, row);

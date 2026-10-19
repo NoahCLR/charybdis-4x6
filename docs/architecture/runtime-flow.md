@@ -397,7 +397,7 @@ Authored C defaults still compile into one window; their source grammar and
 valid slot rejected because the host is unknown, Unicode is off or the layout
 cannot type it remains retryable without a macro mutation.
 
-Profile Wire feature bit 21 advertises UTF-8 text and Host settings in scalar
+UTF-8 text and Host settings live in settings scalar
 27: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables
 Unicode playback. All other bits must be zero. The settings-v6 shape and zero
 defaults are unchanged: Auto with Unicode off. Clients require bit 21 before
@@ -547,9 +547,10 @@ flowchart LR
 ```
 
 The RPC callback only validates/copies one exact request (32 bytes, or up to
-128 for a payload chunk) and returns a cached 32-byte response. EEPROM access,
-whole-profile validation, and commit remain in matrix scan. Each half performs
-at most one RPC, one received chunk or reuse step of at most 110 bytes, or one
+128 for a payload chunk) and returns a cached response (32 bytes, or up to 128
+for a pulled chunk). EEPROM access, whole-profile validation, and commit remain
+in matrix scan. Each half performs at most one RPC, one received chunk or reuse
+step of at most 106 bytes, or one
 validator/commit step per scan. A newer slave is pulled explicitly, so current
 USB role never decides durable authority. Disconnect, malformed response, role
 change, or passive-peer timeout invalidates peer evidence; conflict,

@@ -19,8 +19,8 @@ static uint32_t qmk_read_calls;
 static uint32_t qmk_write_calls;
 static uint32_t current_compiled_digest = TEST_COMPILED_DIGEST;
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
-static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 3u, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 1u, 0u, 0xA5u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
+static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 1u, 0u, 0u, 0u, 0xA5u};
 
 noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_compiled_v1_t *profile, noah_profile_compiled_v1_error_t *error) {
     (void)error;
@@ -59,7 +59,7 @@ void eeprom_write_block(const void *source, void *target, size_t length) {
     memcpy(&eeprom_bytes[address], source, length);
 }
 
-static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
+static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     uint8_t *bytes = context;
 
     if (!target || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
@@ -69,7 +69,7 @@ static bool memory_read(void *context, noah_profile_storage_address_t address, u
     return true;
 }
 
-static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
+static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length) {
     uint8_t *bytes = context;
 
     if (!source || (uint32_t)address + length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE) {
@@ -133,14 +133,14 @@ static void reset_eeprom(uint8_t *bytes) {
 static uint16_t settings_profile(uint8_t *blob, const char *name) {
     uint8_t  name_length = (uint8_t)strlen(name);
     uint16_t length      = (uint16_t)(NOAH_SETTINGS_MIN_SIZE + name_length);
-    uint8_t *payload     = blob + 12;
+    uint8_t *payload     = blob + 14;
 
-    memcpy(blob, (const uint8_t[]){'N', 'L', 'P', '1', 3u, 0u, 1u, 1u, NOAH_PROFILE_DOMAIN_V1_SETTINGS, NOAH_SETTINGS_VERSION, (uint8_t)length, (uint8_t)(length >> 8)}, 12);
+    memcpy(blob, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, NOAH_PROFILE_DOMAIN_V1_SETTINGS, NOAH_SETTINGS_VERSION, (uint8_t)length, (uint8_t)(length >> 8), 0u, 0u}, 14);
     memset(payload, 0, length);
     memcpy(payload, (const uint8_t[]){NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES}, 5);
     payload[length - 1u - name_length] = name_length;
     memcpy(payload + length - name_length, name, name_length);
-    return (uint16_t)(12u + length);
+    return (uint16_t)(14u + length);
 }
 
 static void commit_settings(uint8_t *bytes, const char *name, uint32_t generation) {

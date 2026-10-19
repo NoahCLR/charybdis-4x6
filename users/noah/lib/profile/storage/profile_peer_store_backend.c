@@ -232,7 +232,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(n
     return NOAH_PROFILE_PEER_STORE_OK;
 }
 
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const uint8_t *bytes, uint8_t length) {
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint32_t offset, const uint8_t *bytes, uint8_t length) {
     uint8_t staged[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];
 
     if (!peer || peer->state != NOAH_PROFILE_PEER_STORE_RECEIVING) {
@@ -241,17 +241,17 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_prof
     if (!correlation_matches(peer, generation, payload_digest)) {
         return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_CONFLICT);
     }
-    if (!bytes || length == 0u || length > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX || (uint32_t)offset + length > peer->descriptor.payload_length) {
+    if (!bytes || length == 0u || length > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX || offset > peer->descriptor.payload_length || length > peer->descriptor.payload_length - offset) {
         return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_RANGE_ERROR);
     }
     if (offset < peer->next_offset) {
-        if ((uint32_t)offset + length > peer->next_offset) {
+        if (length > peer->next_offset - offset) {
             return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_RANGE_ERROR);
         }
         for (uint8_t done = 0u; done < length;) {
             uint8_t piece = (uint8_t)(length - done) < NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX ? (uint8_t)(length - done) : NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX;
 
-            if (peer->interface.read(peer->interface.context, (uint16_t)(offset + done), staged, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+            if (peer->interface.read(peer->interface.context, offset + done, staged, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
                 return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
             }
             if (memcmp(staged, &bytes[done], piece) != 0) {
@@ -270,13 +270,13 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_prof
         if (peer->interface.write(peer->interface.context, peer->next_offset, &bytes[done], piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
             return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
         }
-        peer->next_offset = (uint16_t)(peer->next_offset + piece);
+        peer->next_offset = peer->next_offset + piece;
         done              = (uint8_t)(done + piece);
     }
     return NOAH_PROFILE_PEER_STORE_OK;
 }
 
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_reuse(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const noah_profile_split_v1_source_t *source, uint16_t source_offset, uint16_t end, uint16_t byte_budget) {
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_reuse(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint32_t offset, const noah_profile_split_v1_source_t *source, uint32_t source_offset, uint32_t end, uint16_t byte_budget) {
     noah_profile_candidate_v1_source_t candidate_source;
     uint8_t                            bytes[NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX];
     uint16_t                           copied = 0u;
@@ -298,17 +298,17 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_reuse(noah_prof
         .origin     = source->origin,
     };
     while (peer->next_offset < end && copied < byte_budget) {
-        uint16_t left  = (uint16_t)(end - peer->next_offset) < (uint16_t)(byte_budget - copied) ? (uint16_t)(end - peer->next_offset) : (uint16_t)(byte_budget - copied);
+        uint32_t left  = end - peer->next_offset < (uint32_t)(byte_budget - copied) ? end - peer->next_offset : (uint32_t)(byte_budget - copied);
         uint8_t  piece = left < NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX ? (uint8_t)left : NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX;
-        uint32_t from  = (uint32_t)source_offset + (uint16_t)(peer->next_offset - offset);
+        uint32_t from  = source_offset + (peer->next_offset - offset);
 
-        if (from + piece > UINT16_MAX || noah_profile_candidate_store_backend_read_active(peer->backend, NOAH_PROFILE_STORAGE_ADMISSION_PEER, &candidate_source, (uint16_t)from, bytes, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+        if (from < source_offset || noah_profile_candidate_store_backend_read_active(peer->backend, NOAH_PROFILE_STORAGE_ADMISSION_PEER, &candidate_source, from, bytes, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
             return NOAH_PROFILE_PEER_STORE_SOURCE_UNAVAILABLE;
         }
         if (peer->interface.write(peer->interface.context, peer->next_offset, bytes, piece) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
             return abort_rejected(peer, NOAH_PROFILE_PEER_STORE_STORAGE_ERROR);
         }
-        peer->next_offset = (uint16_t)(peer->next_offset + piece);
+        peer->next_offset = peer->next_offset + piece;
         copied            = (uint16_t)(copied + piece);
     }
     return NOAH_PROFILE_PEER_STORE_OK;
@@ -467,7 +467,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_result(const no
     return peer ? peer->result : NOAH_PROFILE_PEER_STORE_INVALID_METADATA;
 }
 
-uint16_t noah_profile_peer_store_backend_next_offset(const noah_profile_peer_store_backend_t *peer) {
+uint32_t noah_profile_peer_store_backend_next_offset(const noah_profile_peer_store_backend_t *peer) {
     return peer ? peer->next_offset : 0u;
 }
 

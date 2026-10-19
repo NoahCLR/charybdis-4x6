@@ -60,8 +60,8 @@ static bool reject_write(void *context, const uint8_t *bytes, size_t length) {
     return false;
 }
 
-static uint16_t read_u16(const uint8_t *bytes) {
-    return (uint16_t)bytes[0] | ((uint16_t)bytes[1] << 8u);
+static uint32_t read_u32(const uint8_t *bytes) {
+    return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8u) | ((uint32_t)bytes[2] << 16u) | ((uint32_t)bytes[3] << 24u);
 }
 
 static bool fixture_value(const char *key, char *value, size_t capacity) {
@@ -236,7 +236,7 @@ static void test_real_authored_profile(void) {
     assert(profile.metadata.crc32 != 0u);
     assert(profile.metadata.digest != 0u);
     assert(profile.metadata.action_abi_digest != 0u);
-    assert(sizeof(profile) <= 40u);
+    assert(sizeof(profile) <= 60u); // metadata and five 32-bit ranges (D-F28)
     assert(!noah_profile_compiled_v1_compatibility(NULL, &runtime_compatibility));
     assert(!noah_profile_compiled_v1_compatibility(&profile, NULL));
     assert(noah_profile_compiled_v1_compatibility(&profile, &runtime_compatibility));
@@ -274,7 +274,8 @@ static void test_real_authored_profile(void) {
     assert(decoded.crc32 == profile.metadata.crc32);
     assert(decoded.digest == profile.metadata.digest);
     assert(decoded.domains[1].payload[0] == key_behavior_count);
-    assert(read_u16(&output[10]) == decoded.domains[0].payload_length);
+    // Schema 4: the first domain's 32-bit length follows its id and version.
+    assert(read_u32(&output[10]) == decoded.domains[0].payload_length);
     assert_golden(&profile);
 
     reader        = noah_profile_compiled_v1_reader(&profile);

@@ -248,9 +248,9 @@ The allowlist is tied to the audited QMK 0.0.8 native ABI:
 - Modified keyboard taps: high byte `0x01..0x1f` with at least one of its low
   four modifier bits set, low byte `0x04..0xa4`.
 - Mouse-button clicks: plain `0x00d1..0x00d8`, buttons 1–8 (D-F22, added
-  2026-10-12). Capability feature bit 28 says the keyboard accepts them; a
-  client writes them only to a keyboard that sets it. Older firmware rejects
-  them as `INVALID_ACTION`, so the domain version is unchanged.
+  2026-10-12). Every Profile Wire 2 firmware accepts them (feature bit 28
+  advertised them before D-F28). Older firmware rejects them as
+  `INVALID_ACTION`, so the domain version is unchanged.
 
 - VIA macro triggers: plain `0x7700..0x777f`, slots 0–127 (D-F23). Feature
   bit 29 advertises them. Their modifier policy must be inherit and their mask
@@ -365,15 +365,16 @@ belongs to [memory budgets](memory-budgets.md).
 
 ## Integration and identity gates
 
-Schema 3.0 includes domain `0x50`, advertised by domain-mask bit 4. Format 5
-(`NT`) stores five domain bits, origin in bit 5, flags in bit 6 and reserved
-bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ`, `NR` and `NS`
-headers are rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
+Schema 4.0 includes domain `0x50`, advertised by domain-mask bit 4. Store
+format 6 (D-F28) stores five domain bits, origin in bit 5, flags in bit 6 and
+reserved bit 7 in its header's first byte. It binds schema 4.0 and nonzero VIA
+identity. `NP`, `NQ`, `NR`, `NS` and `NT` headers are rejected. Header CRC,
+marker-last publication and bounded I/O remain unchanged.
 
 Synchronous validation, bounded boot scanning and commit shape validation
 share the current version rules in `profile_versions.h`: RGB v4, key behaviors
 v2, combos v3, settings v8 and sparse PD v3. Blob magic remains `NLP1`; schema
-bytes must be 3.0. Domain bodies also require semantic validation. Store tests
+bytes must be 4.0. Domain bodies also require semantic validation. Store tests
 cover all mask/origin/flag combinations, both boot paths, old-header rejection,
 reserved bits with repaired CRCs, incompatible versions, one-byte commit steps,
 durable prepare/abort and interrupted writes. These do not prove physical flash
@@ -383,7 +384,7 @@ The current action-ABI digest is the one capability page 0 reports; it covers
 the layer count, so the sixteen-layer bank changed it (D-F14). Older action
 vocabularies are refused.
 Candidate metadata, owner, peer storage and background stale-peer repair all
-use format 5 and require a
+use format 6 and require a
 correlated VIA bind before PREPARE_BEGIN. Retry preserves the bind for that exact
 generation/digest. Incompatible peers cannot Apply.
 

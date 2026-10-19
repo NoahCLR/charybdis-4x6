@@ -1,9 +1,10 @@
 # Portable keyboard profile v1
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
-> a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
-> binds a nonzero VIA generation and digest. HID and split framing remain v1.
+> schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
+> a 53,216-byte custom payload; and logical store format 6 (D-F28). Every save
+> binds a nonzero VIA generation and digest. Profile Wire is 2.0 and split
+> framing version 3, with 32-bit profile lengths and offsets throughout.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > A backup in an earlier format is refused, not translated.
 
@@ -42,7 +43,7 @@ user-selectable VIA layout options; EEPROM padding and validity metadata are
 not profile content. Executable hooks, hardware geometry, engine inclusion and
 safety ceilings remain firmware capabilities.
 
-VIA streams support capability-gated canonical UTF-8 text (feature bit 21), tap/down/up instructions and decimal delay
+VIA streams support canonical UTF-8 text, tap/down/up instructions and decimal delay
 instructions. Held keys must balance. The bank is reconstructed with zero
 padding and a final zero validity byte. Both macro banks are independent:
 64 VIA slots and 16 user macro slots retain their existing key identities.
@@ -98,13 +99,11 @@ a new name reaches the host.
 
 Settings header byte 5 bit 0 bypasses shared behaviours for every combo output
 while physical-key behaviours remain eligible. Other header flag bits are
-zero. Require capability feature bit 30 before setting it. Zero means **Combo
+zero. Zero means **Combo
 outputs use behaviours** is on, preserving existing profiles and compiled
 defaults. The corresponding per-combo switch is combo v3 row flag bit 4;
 [participation policy](participation-policy.md#combo-output-behaviour-permission)
-defines their vetoes, origin context and release pairing. An export preserves them; importing to a
-keyboard without feature bit 30 must refuse nonzero flags instead of dropping
-them. Neither extension changes domain versions, offsets or the action ABI.
+defines their vetoes, origin context and release pairing. An export preserves them. Neither extension changes domain versions, offsets or the action ABI.
 
 Every name in this domain follows one rule: at most 32 encoded bytes of
 well-formed UTF-8 (no overlong forms, no surrogates, nothing past U+10FFFF), no
@@ -136,7 +135,7 @@ a set exclusion bit keeps it out of combos. The
 | 23 | Persistent default-layer bitmask |
 | 24 | QMK keymap options |
 | 25–26 | Auto-mouse activation delay (ms) and movement threshold |
-| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback; bits 16..23 name the [host layout](host-layouts-v1.md) (0 US) and bit 24 marks a macOS ISO keyboard; other bits zero. Nonzero requires feature bit 21, and bits 16..24 feature bit 22. Previously reserved zero after version 5 combo references moved to layer records |
+| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback; bits 16..23 name the [host layout](host-layouts-v1.md) (0 US) and bit 24 marks a macOS ISO keyboard; other bits zero. Previously reserved zero after version 5 combo references moved to layer records |
 | 28 | Behaviour master enable |
 | 29 | Layer behaviours mask, one bit per layer |
 | 30 | Layer combos mask, one bit per layer |
@@ -174,7 +173,7 @@ GET value `0x07` reads the effective settings domain with its scalars overlaid
 by their live QMK owners. With no profile settings live it returns the current
 version named by the keymap: `layer_names[]`, the name in each `VIA_MACROS`
 row and in each `CUSTOM_KEYS` row. The request takes a 16-bit page, its low
-byte at request byte 4 and its high byte at byte 5 (feature bit 19). Page 0's
+byte at request byte 4 and its high byte at byte 5. Page 0's
 12-byte payload is version `1`, chunk size `25`, uint16 length, CRC32, and
 FNV-1a digest of the bytes as they are at that moment. Pages 1 onward return
 successive 25-byte chunks with an exact short final chunk, streamed from the

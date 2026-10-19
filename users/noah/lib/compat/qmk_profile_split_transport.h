@@ -18,7 +18,7 @@ void noah_qmk_profile_split_transport_reset_for_test(void);
 #    endif
 
 // noah_profile_split_exchange_fn adapter used by the master scan owner.
-bool noah_qmk_profile_split_transport_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]);
+bool noah_qmk_profile_split_transport_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length);
 
 #else
 
@@ -27,11 +27,12 @@ static inline bool noah_qmk_profile_split_transport_init(noah_profile_split_reco
     return false;
 }
 
-static inline bool noah_qmk_profile_split_transport_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
+static inline bool noah_qmk_profile_split_transport_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
     (void)context;
     (void)request;
     (void)request_length;
     (void)response;
+    (void)response_length;
     return false;
 }
 

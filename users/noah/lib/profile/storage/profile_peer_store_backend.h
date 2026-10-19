@@ -55,7 +55,7 @@ typedef struct {
     noah_profile_candidate_v1_error_t       validation_error;
     noah_profile_peer_store_state_t         state;
     noah_profile_peer_store_result_t        result;
-    uint16_t                                next_offset;
+    uint32_t                                next_offset;
     bool                                    auto_commit;
 } noah_profile_peer_store_backend_t;
 
@@ -71,7 +71,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(n
 // the candidate store takes. A fully repeated chunk is idempotent when its
 // staged bytes match; gaps, partial overlaps, and conflicting repeats poison
 // and abort the prepare.
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const uint8_t *bytes, uint8_t length);
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint32_t offset, const uint8_t *bytes, uint8_t length);
 
 // Fills the copy from this half's active profile for a PAYLOAD_REUSE range
 // that starts at `offset` in the copy and at `source_offset` in `source`, and
@@ -79,7 +79,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_write(noah_prof
 // before it, never after), copying at most `byte_budget` bytes in pieces the
 // candidate store takes, and checks the source's identity on every read. OK
 // means progress; the range is done when the next offset reaches `end`.
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_reuse(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint16_t offset, const noah_profile_split_v1_source_t *source, uint16_t source_offset, uint16_t end, uint16_t byte_budget);
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_reuse(noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint32_t offset, const noah_profile_split_v1_source_t *source, uint32_t source_offset, uint32_t end, uint16_t byte_budget);
 
 // Starts whole-profile validation after every declared byte arrived. step()
 // performs at most one bounded validator/store operation per call.
@@ -94,5 +94,5 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_abort(noah_prof
 
 noah_profile_peer_store_state_t          noah_profile_peer_store_backend_state(const noah_profile_peer_store_backend_t *peer);
 noah_profile_peer_store_result_t         noah_profile_peer_store_backend_result(const noah_profile_peer_store_backend_t *peer);
-uint16_t                                 noah_profile_peer_store_backend_next_offset(const noah_profile_peer_store_backend_t *peer);
+uint32_t                                 noah_profile_peer_store_backend_next_offset(const noah_profile_peer_store_backend_t *peer);
 const noah_profile_candidate_v1_error_t *noah_profile_peer_store_backend_validation_error(const noah_profile_peer_store_backend_t *peer);

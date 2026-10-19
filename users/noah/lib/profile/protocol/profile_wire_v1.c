@@ -62,35 +62,35 @@ static void encode_capabilities_page_zero(uint8_t *payload, const noah_profile_w
     write_u32(&payload[21], capabilities->compiled_default_digest);
 }
 
+// Layout 3 (D-F28): page 1 holds every byte-wide ceiling, page 2 the wider
+// ones.
 static void encode_capabilities_page_one(uint8_t *payload, const noah_profile_wire_v1_capabilities_t *capabilities) {
     payload[0]  = capabilities->compiled_layer_count;
     payload[1]  = capabilities->max_logical_layers;
     payload[2]  = capabilities->max_behavior_rows;
     payload[3]  = capabilities->max_tap_steps_per_behavior;
-    // Byte 4 (populated steps) and bytes 17..18 (slot size) moved to page 2.
-    payload[5]  = capabilities->max_combos;
-    payload[6]  = capabilities->max_keys_per_combo;
-    payload[7]  = capabilities->max_reusable_rgb_groups;
-    payload[8]  = capabilities->max_rgb_stage_group_rows;
-    payload[9]  = capabilities->physical_led_count;
-    payload[10] = capabilities->led_bitmap_size;
-    payload[11] = capabilities->custom_key_slots;
-    payload[12] = capabilities->via_macro_slots;
-    write_u16(&payload[13], capabilities->max_profile_payload);
-    write_u16(&payload[15], capabilities->profile_slot_payload);
-    write_u16(&payload[19], capabilities->via_macro_bytes);
-    payload[21] = capabilities->supported_domain_mask;
-    // Bytes 22..24 remain canonical zero padding.
+    payload[4]  = capabilities->max_combos;
+    payload[5]  = capabilities->max_keys_per_combo;
+    payload[6]  = capabilities->max_reusable_rgb_groups;
+    payload[7]  = capabilities->max_rgb_stage_group_rows;
+    payload[8]  = capabilities->physical_led_count;
+    payload[9]  = capabilities->led_bitmap_size;
+    payload[10] = capabilities->custom_key_slots;
+    payload[11] = capabilities->via_macro_slots;
+    payload[12] = capabilities->supported_domain_mask;
+    payload[13] = capabilities->max_name_bytes;
+    payload[14] = capabilities->layer_mask_bits;
+    payload[15] = capabilities->placement_positions;
+    // Bytes 16..24 remain canonical zero padding.
 }
 
 static void encode_capabilities_page_two(uint8_t *payload, const noah_profile_wire_v1_capabilities_t *capabilities) {
     write_u16(&payload[0], capabilities->max_populated_behavior_steps);
-    payload[2] = capabilities->max_tap_steps_per_behavior;
-    write_u32(&payload[3], capabilities->profile_slot_size);
-    payload[7] = capabilities->max_name_bytes;
-    payload[8] = capabilities->layer_mask_bits;
-    payload[9] = capabilities->placement_positions;
-    // Bytes 10..24 remain canonical zero padding.
+    write_u32(&payload[2], capabilities->profile_slot_size);
+    write_u32(&payload[6], capabilities->max_profile_payload);
+    write_u32(&payload[10], capabilities->profile_slot_payload);
+    write_u32(&payload[14], capabilities->via_macro_bytes);
+    // Bytes 18..24 remain canonical zero padding.
 }
 
 static void encode_status_page_zero(uint8_t *payload, const noah_profile_wire_v1_device_status_t *status) {

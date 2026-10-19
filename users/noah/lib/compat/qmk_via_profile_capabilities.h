@@ -22,24 +22,31 @@
 #    define NOAH_PROFILE_LED_COUNT 0u
 #endif
 
+#ifdef POINTING_DEVICE_ENABLE
+#    define NOAH_PROFILE_POINTING_CAPABILITY NOAH_PROFILE_FEATURE_POINTING
+#else
+#    define NOAH_PROFILE_POINTING_CAPABILITY 0u
+#endif
+
 #ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-#    define NOAH_PROFILE_MUTATION_CAPABILITIES (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION | NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY | NOAH_PROFILE_FEATURE_CANDIDATE_REUSE | NOAH_PROFILE_FEATURE_CANDIDATE_STREAM)
+#    define NOAH_PROFILE_MUTATION_CAPABILITIES NOAH_PROFILE_FEATURE_SAVES
 #    define NOAH_PROFILE_MUTATION_CHUNK_MAX NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX
 #else
 #    define NOAH_PROFILE_MUTATION_CAPABILITIES 0u
 #    define NOAH_PROFILE_MUTATION_CHUNK_MAX 0u
 #endif
 
-// Before the live-profile owner reports: read-only, digests unknown.
-#define NOAH_PROFILE_CHANNEL_READ_ONLY_FEATURES (NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS | NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING | NOAH_PROFILE_FEATURE_OWNED_TAPPING | NOAH_PROFILE_FEATURE_WIDE_PAGES | NOAH_PROFILE_FEATURE_UNICODE_MACROS | NOAH_PROFILE_FEATURE_HOST_LAYOUTS | NOAH_PROFILE_FEATURE_MACRO_PROTECTION | NOAH_PROFILE_FEATURE_MACRO_OUTPUT_ISOLATION | NOAH_PROFILE_FEATURE_STREAMING_MACROS | NOAH_PROFILE_FEATURE_POINTING_CLICKS | NOAH_PROFILE_FEATURE_POINTING_MACROS | NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS | NOAH_PROFILE_FEATURE_UNIFIED_TAPPING)
+// The feature word holds only what this build varies by (D-F28). Before the
+// live-profile owner reports, nothing can be saved yet.
+#define NOAH_PROFILE_CHANNEL_READ_ONLY_FEATURES (NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_POINTING_CAPABILITY)
 
 // Once the owner reports its compiled defaults.
-#define NOAH_PROFILE_CHANNEL_OWNER_FEATURES (NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_SPLIT_CAPABILITY | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_MUTATION_CAPABILITIES | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS | NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING | NOAH_PROFILE_FEATURE_OWNED_TAPPING | NOAH_PROFILE_FEATURE_WIDE_PAGES | NOAH_PROFILE_FEATURE_UNICODE_MACROS | NOAH_PROFILE_FEATURE_HOST_LAYOUTS | NOAH_PROFILE_FEATURE_MACRO_PROTECTION | NOAH_PROFILE_FEATURE_MACRO_OUTPUT_ISOLATION | NOAH_PROFILE_FEATURE_STREAMING_MACROS | NOAH_PROFILE_FEATURE_POINTING_CLICKS | NOAH_PROFILE_FEATURE_POINTING_MACROS | NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS | NOAH_PROFILE_FEATURE_UNIFIED_TAPPING)
+#define NOAH_PROFILE_CHANNEL_OWNER_FEATURES (NOAH_PROFILE_CHANNEL_READ_ONLY_FEATURES | NOAH_PROFILE_MUTATION_CAPABILITIES)
 
 #define NOAH_PROFILE_CHANNEL_BASE_CAPABILITIES                                                                                                                                                                                                                                                                           \
     {                                                                                                                                                                                                                                                                                                                    \
-        .protocol_major               = 1u,                                                                                                                                                                                                                                                                              \
-        .protocol_minor               = 0u,                                                                                                                                                                                                                                                                              \
+        .protocol_major               = NOAH_PROFILE_WIRE_V1_PROTOCOL_MAJOR,                                                                                                                                                                                                                                                              \
+        .protocol_minor               = NOAH_PROFILE_WIRE_V1_PROTOCOL_MINOR,                                                                                                                                                                                                                                                              \
         .schema_major                 = NOAH_PROFILE_SCHEMA_MAJOR,                                                                                                                                                                                                                                                       \
         .schema_minor                 = 0u, /* Stage 01 is intentionally read-only. Candidate capacity and domain */ /* support remain zero until the corresponding decoders and activation */ /* paths exist; the frozen schema ceilings below are declaration */ /* metadata, not a claim that writes are accepted. */ \
         .candidate_chunk_max          = 0u,                                                                                                                                                                                                                                                                              \

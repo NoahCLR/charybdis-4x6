@@ -77,7 +77,7 @@ static bool name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
     return true;
 }
 
-bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, uint8_t b, uint16_t length, uint8_t layers, uint8_t positions) {
+bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, uint8_t b, uint32_t length, uint8_t layers, uint8_t positions) {
     if (!s || layers != NOAH_SETTINGS_LAYERS || positions > NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS || length < NOAH_SETTINGS_MIN_SIZE || length > NOAH_SETTINGS_MAX_SIZE || s->offset >= length) return false;
     uint16_t offset = s->offset++;
     if (offset < NOAH_SETTINGS_HEADER_SIZE) {
@@ -102,7 +102,7 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
     return name_byte(s, b);
 }
 
-bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *s, uint16_t length) {
+bool noah_profile_settings_v1_complete(const noah_profile_settings_v1_validation_t *s, uint32_t length) {
     return s && s->offset == length && s->name == NOAH_SETTINGS_NAME_COUNT && !s->in_name;
 }
 

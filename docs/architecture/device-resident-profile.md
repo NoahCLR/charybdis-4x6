@@ -161,9 +161,21 @@ and recover the same editable values without consulting the C files.
 
 ## Current-format admission
 
-Firmware accepts only its current schema 3.0 domain versions and `NT` format-5
-storage (D-F10, D-F14). Every save binds VIA generation/digest, including custom-only
-edits. Legacy storage is refused at boot, and a backup in an earlier format is
-refused, not translated. See [Profile Wire](profile-wire-v1.md) and
+Firmware accepts only Profile Wire 2.0, schema 4.0 with its current domain
+versions, and store format 6 (D-F10, D-F14, D-F28). Every save binds VIA
+generation/digest, including custom-only edits. Legacy storage is refused at
+boot: the keyboard runs its compiled defaults and its status says a slot holds
+an earlier format. A backup in an earlier format is refused, not translated.
+See [Profile Wire](profile-wire-v1.md) and
 [logical transactions](logical-profile-transaction-v1.md) for admission and
 recovery rules.
+
+The profile is not bounded at 64 KiB anywhere it travels. Every length and
+offset of a profile, and of each domain inside it, is 32 bits in the blob's
+domain envelopes, the slot header, the store's I/O, the candidate wire and its
+status, the split copy between halves, and the capability page (D-F28). What
+does stay 16 bits is inside a domain whose own format bounds it: RGB and key
+behaviours keep their 16-bit internal offsets, so each of those domains is at
+most 65,535 bytes whatever the profile's size. Until the slots move to their
+own flash region the payload is capped at 53,216 bytes, one 52 KiB EEPROM slot
+less its header.

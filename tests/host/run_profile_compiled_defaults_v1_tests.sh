@@ -25,7 +25,7 @@ noah_host_export_qmk_cpath "$ROOT"
 # is refused as it is; the firmware never translates one.
 cp "$ROOT/tests/fixtures/client-regression/portable.bin.pd5" "$BUILD_DIR/old.bin"
 for fixture in populated maximum; do
-    python3 - "$ROOT/tests/fixtures/${fixture}_profile_v3.fixture" "$BUILD_DIR/$fixture.bin" <<'PYTHON'
+    python3 - "$ROOT/tests/fixtures/${fixture}_profile_v4.fixture" "$BUILD_DIR/$fixture.bin" <<'PYTHON'
 import pathlib, sys
 fields = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if "=" in line)
 pathlib.Path(sys.argv[2]).write_bytes(bytes.fromhex(fields["profile.hex"]))
@@ -125,9 +125,9 @@ fields = dict(line.split("=", 1) for line in Path(sys.argv[1]).read_text().split
 blob = bytes.fromhex(fields["profile.full.hex"])
 offset, domains = 8, {}
 for _ in range(blob[6]):
-    length = struct.unpack_from("<H", blob, offset + 2)[0]
-    domains[blob[offset]] = (blob[offset + 1], blob[offset + 4 : offset + 4 + length])
-    offset += 4 + length
+    length = struct.unpack_from("<I", blob, offset + 2)[0]
+    domains[blob[offset]] = (blob[offset + 1], blob[offset + 6 : offset + 6 + length])
+    offset += 6 + length
 presets = next(case for case in json.loads(Path(sys.argv[2]).read_text())["valid"] if case["name"] == "presets")
 assert domains[0x50] == (3, bytes.fromhex(presets["hex"])), "compiled PD domain differs from the presets vector"
 assert domains[0x10][0] == 4 and domains[0x10][1][0] == 4 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32

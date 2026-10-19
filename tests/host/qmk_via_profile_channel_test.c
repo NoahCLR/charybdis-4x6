@@ -163,7 +163,7 @@ const noah_profile_store_record_t *noah_profile_store_runtime_committed(void) {
 
 // Stands in for EEPROM. Each byte is derived from its offset so a chunk served
 // from the wrong address is visible in the assertion rather than plausible.
-static uint8_t store_payload_byte(uint16_t offset) {
+static uint8_t store_payload_byte(uint32_t offset) {
     return (uint8_t)(offset * 7u + 3u);
 }
 
@@ -173,7 +173,7 @@ static bool store_has_compiled = true;
 // The compiled defaults are a virtual view over authored const data, so the
 // stub derives them the same way: byte value from offset, distinct from the
 // committed pattern so a source mix-up is visible.
-static uint8_t store_compiled_byte(uint16_t offset) {
+static uint8_t store_compiled_byte(uint32_t offset) {
     return (uint8_t)(offset * 11u + 5u);
 }
 
@@ -189,25 +189,25 @@ bool noah_profile_store_runtime_compiled_metadata(noah_profile_compiled_v1_metad
     return true;
 }
 
-bool noah_profile_store_runtime_read_compiled(uint16_t offset, uint8_t *target, uint16_t length) {
-    if (!store_has_compiled || !target || length == 0u || (uint32_t)offset + (uint32_t)length > 40u) {
+bool noah_profile_store_runtime_read_compiled(uint32_t offset, uint8_t *target, uint32_t length) {
+    if (!store_has_compiled || !target || length == 0u || offset + length > 40u) {
         return false;
     }
-    for (uint16_t index = 0u; index < length; index++) {
-        target[index] = store_compiled_byte((uint16_t)(offset + index));
+    for (uint32_t index = 0u; index < length; index++) {
+        target[index] = store_compiled_byte(offset + index);
     }
     return true;
 }
 
-bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target, uint16_t length) {
+bool noah_profile_store_runtime_read_committed(uint32_t offset, uint8_t *target, uint32_t length) {
     if (store_read_committed_fails || !store_runtime_has_committed || !target || length == 0u) {
         return false;
     }
-    if ((uint32_t)offset + (uint32_t)length > (uint32_t)store_runtime_record.payload_length) {
+    if (offset > store_runtime_record.payload_length || length > store_runtime_record.payload_length - offset) {
         return false;
     }
-    for (uint16_t index = 0u; index < length; index++) {
-        target[index] = store_payload_byte((uint16_t)(offset + index));
+    for (uint32_t index = 0u; index < length; index++) {
+        target[index] = store_payload_byte(offset + index);
     }
     return true;
 }
@@ -230,17 +230,16 @@ static void make_request(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint8_
 }
 
 static uint32_t expected_feature_flags(void) {
-    // TG()/TO() ownership, behaviour QMK functions and the custom-key keycode
-    // blocks are runtime facts, advertised in every build.
-    uint32_t flags = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_OWNED_LAYER_TOGGLES | NOAH_PROFILE_FEATURE_BEHAVIOR_QMK_FUNCTIONS | NOAH_PROFILE_FEATURE_CUSTOM_KEYS | NOAH_PROFILE_FEATURE_PHYSICAL_GESTURE_TIMING | NOAH_PROFILE_FEATURE_OWNED_TAPPING | NOAH_PROFILE_FEATURE_WIDE_PAGES | NOAH_PROFILE_FEATURE_UNICODE_MACROS | NOAH_PROFILE_FEATURE_HOST_LAYOUTS | NOAH_PROFILE_FEATURE_MACRO_PROTECTION | NOAH_PROFILE_FEATURE_MACRO_OUTPUT_ISOLATION | NOAH_PROFILE_FEATURE_STREAMING_MACROS | NOAH_PROFILE_FEATURE_POINTING_CLICKS | NOAH_PROFILE_FEATURE_POINTING_MACROS | NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS | NOAH_PROFILE_FEATURE_UNIFIED_TAPPING;
+    // The new base's word holds only what a build varies by (D-F28).
+    uint32_t flags = 0u;
 #ifdef SPLIT_KEYBOARD
     flags |= NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD;
 #endif
-#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
-    flags |= NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH;
+#ifdef POINTING_DEVICE_ENABLE
+    flags |= NOAH_PROFILE_FEATURE_POINTING;
 #endif
 #ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-    flags |= NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION | NOAH_PROFILE_FEATURE_ATOMIC_LOGICAL_APPLY | NOAH_PROFILE_FEATURE_CANDIDATE_REUSE | NOAH_PROFILE_FEATURE_CANDIDATE_STREAM;
+    flags |= NOAH_PROFILE_FEATURE_SAVES;
 #endif
     return flags;
 }
@@ -265,43 +264,42 @@ static void test_capability_hook(void) {
     assert(frame[WIRE_PAYLOAD + 6u] == NOAH_PROFILE_WIRE_V1_REPORT_SIZE);
     assert(frame[WIRE_PAYLOAD + 7u] == expected_candidate_chunk);
     assert(read_u32(&frame[WIRE_PAYLOAD + 9u]) == expected_feature_flags());
-#ifndef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-    assert((read_u32(&frame[WIRE_PAYLOAD + 9u]) & (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION)) == 0u);
-#else
-    assert((read_u32(&frame[WIRE_PAYLOAD + 9u]) & (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION)) == (NOAH_PROFILE_FEATURE_CANDIDATE_WRITE | NOAH_PROFILE_FEATURE_PERSISTENT_COMMIT | NOAH_PROFILE_FEATURE_RUNTIME_ACTIVATION | NOAH_PROFILE_FEATURE_PEER_RECONCILIATION));
-#endif
+    // The saves bit and the chunk size agree: zero exactly without it.
+    assert(((read_u32(&frame[WIRE_PAYLOAD + 9u]) & NOAH_PROFILE_FEATURE_SAVES) != 0u) == (expected_candidate_chunk != 0u));
+    assert((read_u32(&frame[WIRE_PAYLOAD + 9u]) & ~(uint32_t)NOAH_PROFILE_FEATURES_KNOWN) == 0u);
+    assert(frame[WIRE_PAYLOAD + 2u] == NOAH_PROFILE_WIRE_V1_PROTOCOL_MAJOR && frame[WIRE_PAYLOAD + 4u] == NOAH_PROFILE_SCHEMA_MAJOR);
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
-    assert((read_u32(&frame[WIRE_PAYLOAD + 9u]) & (NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA)) == (NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA));
     assert(read_u32(&frame[WIRE_PAYLOAD + 13u]) == live_owner_status.action_abi_digest);
     assert(read_u32(&frame[WIRE_PAYLOAD + 21u]) == live_owner_status.compiled_default_digest);
-#else
-    assert((read_u32(&frame[WIRE_PAYLOAD + 9u]) & (NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA)) == 0u);
 #endif
     assert(read_u32(&frame[WIRE_PAYLOAD + 17u]) == VIA_FIRMWARE_VERSION);
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x32u, 1u);
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    // Layout 3 (D-F28): the byte-wide ceilings on page 1.
     assert(frame[WIRE_PAYLOAD] == DYNAMIC_KEYMAP_LAYER_COUNT);
 #ifdef RGB_MATRIX_ENABLE
-    assert(frame[WIRE_PAYLOAD + 9u] == RGB_MATRIX_LED_COUNT);
+    assert(frame[WIRE_PAYLOAD + 8u] == RGB_MATRIX_LED_COUNT);
 #else
-    assert(frame[WIRE_PAYLOAD + 9u] == 0u);
+    assert(frame[WIRE_PAYLOAD + 8u] == 0u);
 #endif
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
-    assert(frame[WIRE_PAYLOAD + 21u] == NOAH_PROFILE_CANDIDATE_V1_KNOWN_DOMAINS);
+    assert(frame[WIRE_PAYLOAD + 12u] == NOAH_PROFILE_CANDIDATE_V1_KNOWN_DOMAINS);
 #else
-    assert(frame[WIRE_PAYLOAD + 21u] == 0u);
+    assert(frame[WIRE_PAYLOAD + 12u] == 0u);
 #endif
-    assert(read_u16(&frame[WIRE_PAYLOAD + 13u]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
-    assert(read_u16(&frame[WIRE_PAYLOAD + 19u]) == 34903u);
+    assert(frame[WIRE_PAYLOAD + 13u] == NOAH_PROFILE_WIRE_V1_MAX_NAME_BYTES && frame[WIRE_PAYLOAD + 14u] == 32u && frame[WIRE_PAYLOAD + 15u] == MATRIX_ROWS * MATRIX_COLS);
 
+    // ...and the wider ones, 32-bit capacities, on page 2.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x33u, 2u);
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(read_u16(&frame[WIRE_PAYLOAD]) == NOAH_PROFILE_WIRE_V1_MAX_POPULATED_BEHAVIOR_STEPS);
-    assert(read_u32(&frame[WIRE_PAYLOAD + 3u]) == NOAH_PROFILE_STORAGE_SLOT_A_SIZE);
-    assert(frame[WIRE_PAYLOAD + 7u] == NOAH_PROFILE_WIRE_V1_MAX_NAME_BYTES && frame[WIRE_PAYLOAD + 8u] == 32u && frame[WIRE_PAYLOAD + 9u] == MATRIX_ROWS * MATRIX_COLS);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 2u]) == NOAH_PROFILE_STORAGE_SLOT_A_SIZE);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 6u]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 10u]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 14u]) == 34903u);
 }
 
 #ifndef NOAH_LIVE_PROFILE_OWNER_ENABLE
@@ -358,6 +356,7 @@ static void test_status_surfaces_coherent_owner_snapshot(void) {
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == expected_flags);
+
     assert(read_u32(&frame[WIRE_PAYLOAD + 4u]) == live_owner_status.compiled_default_digest);
     assert(read_u32(&frame[WIRE_PAYLOAD + 8u]) == live_owner_status.compiled_default_digest);
     assert(read_u32(&frame[WIRE_PAYLOAD + 12u]) == live_owner_status.active.payload_digest);
@@ -428,7 +427,7 @@ static void test_hook_rejects_unsupported_or_malformed_commands(void) {
     assert(frame[0] == id_custom_get_value);
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[WIRE_PAYLOAD + 1u] == NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING);
-    assert(read_u16(&frame[WIRE_PAYLOAD + 4u]) == 40u && read_u16(&frame[WIRE_PAYLOAD + 6u]) == 120u);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 4u]) == 40u && read_u32(&frame[WIRE_PAYLOAD + 8u]) == 120u);
 #else
     assert(frame[0] == id_unhandled);
 #endif
@@ -437,12 +436,22 @@ static void test_hook_rejects_unsupported_or_malformed_commands(void) {
     via_custom_value_command_kb(frame, sizeof(frame));
 #ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
     assert(frame[0] == id_custom_get_value && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
-    assert(frame[WIRE_PAYLOAD] == 1u);
-    assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == live_peer_status.reused_bytes);
-    assert(read_u16(&frame[WIRE_PAYLOAD + 16u]) == 40u && read_u16(&frame[WIRE_PAYLOAD + 18u]) == 120u);
-    for (uint8_t index = WIRE_PAYLOAD + 20u; index < sizeof(frame); index++) assert(frame[index] == 0u);
+    assert(frame[WIRE_PAYLOAD] == 2u);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 2u]) == live_peer_status.reused_bytes);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 18u]) == 40u);
+    for (uint8_t index = WIRE_PAYLOAD + 22u; index < sizeof(frame); index++) assert(frame[index] == 0u);
 #else
     assert(frame[0] == id_unhandled);
+#endif
+
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    // A slot in an earlier store format is not read (D-F28): nothing is
+    // committed, and status says why.
+    live_owner_status.has_committed         = false;
+    live_owner_status.stored_earlier_format = true;
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x47u, 0u);
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == (NOAH_PROFILE_STATE_CANDIDATE_PENDING | NOAH_PROFILE_STATE_PEER_KNOWN | NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY | NOAH_PROFILE_STATE_STORED_EARLIER_FORMAT));
 #endif
 
     via_custom_value_command_kb(NULL, 0u);
@@ -490,13 +499,14 @@ static void test_payload_read_reports_metadata_then_chunks(void) {
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[6] == NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
-    assert(frame[7] == 1u);
-    assert(read_u16(&frame[9]) == 60u);
-    assert(read_u32(&frame[11]) == 9u);
-    assert(read_u32(&frame[15]) == UINT32_C(0xAABBCCDD));
-    assert(read_u32(&frame[19]) == UINT32_C(0x11223344));
-    assert(frame[23] == 1u && frame[24] == 2u);
-    assert(frame[25] == 0x03u && frame[26] == 1u);
+    // Metadata layout 2 (D-F28): a 32-bit payload length.
+    assert(frame[7] == 2u);
+    assert(read_u32(&frame[9]) == 60u);
+    assert(read_u32(&frame[13]) == 9u);
+    assert(read_u32(&frame[17]) == UINT32_C(0xAABBCCDD));
+    assert(read_u32(&frame[21]) == UINT32_C(0x11223344));
+    assert(frame[25] == 1u && frame[26] == 2u);
+    assert(frame[27] == 0x03u && frame[28] == 1u);
 
     // Page 1 starts at offset 0 and carries a full report of payload.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 2u, 1u);
@@ -540,7 +550,7 @@ static void test_payload_read_takes_wide_pages(void) {
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 0u);
     via_custom_value_command_kb(frame, sizeof(frame));
-    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && read_u16(&frame[9]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && read_u32(&frame[9]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 2u, 0x2Cu);
     frame[5] = 0x01u; // page 300
@@ -625,12 +635,12 @@ static void test_compiled_read_serves_what_the_firmware_runs(void) {
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMPILED, 1u, 0u);
     via_custom_value_command_kb(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
-    assert(read_u16(&frame[9]) == 40u);
+    assert(read_u32(&frame[9]) == 40u);
     // Compiled defaults are not a committed generation.
-    assert(read_u32(&frame[11]) == 0u);
-    assert(read_u32(&frame[15]) == UINT32_C(0x01020304));
-    assert(read_u32(&frame[19]) == UINT32_C(0x05060708));
-    assert(frame[25] == 0x30u);
+    assert(read_u32(&frame[13]) == 0u);
+    assert(read_u32(&frame[17]) == UINT32_C(0x01020304));
+    assert(read_u32(&frame[21]) == UINT32_C(0x05060708));
+    assert(frame[27] == 0x30u);
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMPILED, 2u, 1u);
     via_custom_value_command_kb(frame, sizeof(frame));

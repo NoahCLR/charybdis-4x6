@@ -52,7 +52,7 @@ typedef struct {
 // A domain's payload inside one blob: offset from the blob start, zero length
 // when the blob omits the domain. Recorded once by the envelope walk.
 typedef struct {
-    uint16_t offset, length;
+    uint32_t offset, length;
 } noah_profile_domain_range_t;
 
 // The registry describes the wire vocabulary even in feature-gate builds.

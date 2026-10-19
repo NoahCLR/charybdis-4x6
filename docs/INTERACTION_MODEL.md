@@ -281,17 +281,17 @@ protection; there is no single constituent press that defines their hold.
 A runtime-owned key is classified once, by userspace. This includes every
 `LT()`, `MT()` and `OSM()` key, row or not, and `TT()`/`OSL()` which already
 have intrinsic userspace layer ownership; QMK's tapping engine classifies
-none of them, physical or combo output (feature bit 31). A row that does not author
+none of them, physical or combo output. A row that does not author
 a first hold, or no row, keeps the key's own, which
 starts only once the key is held past the tap-hold term: `LT()` holds its layer
 as `MO()`, `MT()` and `OSM()` hold their modifiers. A tap never turns that layer
 or those modifiers on, and a hold sends no tap or one-shot on release. The first
 tap stays the key's own tap, so adding a repeated-tap branch cannot remove the
 hold. A transparent hold over a lower `LT()` inherits the same threshold hold.
-The broader bypass is advertised by feature bit 18; bit 17 alone only promises
-the authored LT bypass, and bit 31 extends both to keys without a row. Pointer-mode interception remains earlier than authored
+Pointer-mode interception remains earlier than authored
 mouse behaviour: Arrow's button remapping can intentionally consume Button 3.
-These rules are advertised by Profile Wire feature bit 17. Older builds can
+Every Profile Wire 2 build follows these rules (they were feature bits 17, 18
+and 31 before D-F28). Older builds can
 lose a physically on-time repeat during buffering; increasing timing values
 can mask that defect while also delaying normal actions.
 

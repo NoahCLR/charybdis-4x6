@@ -190,7 +190,8 @@ snapshots. If origin reconstruction is unresolved, dispatch conservatively
 bypasses behaviour whenever any combo definition sharing that output bypasses
 it; it never borrows another definition's permission.
 
-Capability feature bit 30 advertises this extension. The stored switches are
+Every Profile Wire 2 firmware accepts this extension (feature bit 30 advertised
+it before D-F28). The stored switches are
 inverted: settings header byte 5 bit 0 bypasses all combo output behaviours;
 combo v3 row flag bit 4 bypasses that row's output behaviour. Zero preserves
 existing profiles and compiled defaults, without a

@@ -228,7 +228,7 @@ const noah_profile_store_record_t *noah_profile_store_runtime_committed(void) {
 #endif
 }
 
-bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target, uint16_t length) {
+bool noah_profile_store_runtime_read_committed(uint32_t offset, uint8_t *target, uint32_t length) {
 #if defined(VIA_ENABLE)
     const noah_profile_store_record_t *record = noah_profile_store_runtime_committed();
     const noah_profile_store_t        *store;
@@ -245,7 +245,7 @@ bool noah_profile_store_runtime_read_committed(uint16_t offset, uint8_t *target,
     }
     // Bounds first: offset and length arrive from the host, so a request that
     // runs past the committed payload is refused rather than clamped.
-    if ((uint32_t)offset + (uint32_t)length > (uint32_t)record->payload_length) {
+    if (offset > record->payload_length || length > record->payload_length - offset) {
         return false;
     }
     if (record->slot == NOAH_PROFILE_SLOT_A) {
@@ -292,12 +292,12 @@ bool noah_profile_store_runtime_compiled_metadata(noah_profile_compiled_v1_metad
     return true;
 }
 
-bool noah_profile_store_runtime_read_compiled(uint16_t offset, uint8_t *target, uint16_t length) {
+bool noah_profile_store_runtime_read_compiled(uint32_t offset, uint8_t *target, uint32_t length) {
     if (!target || length == 0u || !ensure_compiled_open() || !compiled_reader.read) {
         return false;
     }
     // Bounds first: offset and length arrive from the host.
-    if ((uint32_t)offset + (uint32_t)length > (uint32_t)compiled_profile.metadata.byte_length) {
+    if (offset > compiled_profile.metadata.byte_length || length > compiled_profile.metadata.byte_length - offset) {
         return false;
     }
     return compiled_reader.read(compiled_reader.context, offset, target, length);
@@ -374,7 +374,7 @@ typedef struct {
 static bool boot_payload_read(void *context, size_t offset, uint8_t *target, size_t length) {
     const boot_payload_t *payload = context;
 
-    return length == 0u || (length <= UINT16_MAX && noah_profile_store_read_span(payload->store, (noah_profile_storage_address_t)(payload->start + offset), target, (uint16_t)length));
+    return length == 0u || (length <= NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE && noah_profile_store_read_span(payload->store, (noah_profile_storage_address_t)(payload->start + offset), target, (uint32_t)length));
 }
 
 bool noah_profile_store_runtime_read_keyboard_name(noah_profile_store_t *store, noah_profile_keyboard_name_t *name) {

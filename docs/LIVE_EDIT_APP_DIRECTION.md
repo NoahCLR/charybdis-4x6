@@ -36,6 +36,15 @@ direction. Firmware accepts only current formats and every save binds VIA
 (D-F10); a backup in an earlier format is refused, not translated. Compiled defaults
 contain every enabled domain and use domain-seeking reads (D-F12).
 
+The firmware is on a new base (D-F28): Profile Wire 2.0, profile schema 4.0
+and store format 6, in which every length and offset of a profile is 32 bits,
+in storage and on the wire, so profiles can outgrow 64 KiB once the slots
+move to flash. Everything the base does is implied by those versions; the
+capability feature word holds only split, saves and pointing. A keyboard
+holding a format-5 profile starts from its compiled defaults and says so in
+its status. No Ark speaks the new base yet, so this firmware is for its own
+task checks only until Ark follows.
+
 Macro text is typed through a selected host layout (D-F16), with Unicode
 entry for macOS, Windows and Linux as the fallback, protected automatically
 from new physical presses with a per-macro override (D-F17); the encoding, ownership
@@ -69,7 +78,7 @@ types Cmd+F and before `,` types Cmd+,. Hardware acceptance is pending.
 
 Every `LT`, `MT` and `OSM` key is decided by the key runtime, with or without a
 behaviour row, and a key without a row behaves exactly as with an empty one
-(D-F27, Profile Wire bit 31). QMK's tapping engine classifies no record of a
+(D-F27). QMK's tapping engine classifies no record of a
 key the firmware supports.
 Dual-role keys hold at the dual-role setting, other rows at the tap/hold
 setting. A row without steps is no row: a plain key with one stays QMK's, and
@@ -92,8 +101,8 @@ Differential host uploads can reuse identified active bytes and stream bounded
 batches (D-F18), while full validation and both-half publication remain in place.
 Transfer timing and interruption acceptance for this path have not run on hardware.
 The copy to the other half reuses the same ranges from that half's own active
-profile and sends the rest in chunks of up to 110 bytes (D-F19); it has not run
-on hardware either.
+profile and sends the rest in chunks of up to 106 bytes (D-F19, D-F28); it has
+not run on hardware either.
 
 VIA full-bank checksums use bounded 224-byte RAM-mirror batches on both halves
 (D-F20), reducing each pass from 2,634 to 167 granted checksum steps. Timing and
@@ -104,6 +113,12 @@ preserving exact full-bank bytes and identity (D-F21). Hardware read timing and
 input cadence remain unmeasured for this path.
 
 ## Open Issues
+
+- **No Ark drives the new base yet (D-F28).** Ark speaks Profile Wire 1,
+  schema 3.0 and store format 5; this firmware refuses all three. Until Ark
+  moves to the new base, keep the keyboard on released firmware and flash
+  this one only for its own task checks. The slots are still 53,216 bytes in
+  EEPROM.
 
 - **Roll order needs hardware acceptance (D-F27).** Type `, `, `. `, `1e` and
   Enter into a letter fast; hold a symbol key into a letter; roll Shift into a
@@ -1129,14 +1144,16 @@ The context keeps repeated buffered presses independent; the gate makes an
 excluded duplicate inert to an eligible chord's member state.
 Defaults allow everything, so a profile that never uses them is unchanged.
 
-`tests/fixtures/maximum_profile_v3.fixture` holds every table at its maximum
+`tests/fixtures/maximum_profile_v4.fixture` holds every table at its maximum
 at once: 37,700 bytes, leaving 15,516 bytes of the slot. It validates, commits,
 boots and publishes whole on one half and prepares and commits on the peer;
 settings validation reads 20 bytes per step, like the other domains, so the
 whole profile validates in 7,432 owner scans
-([storage baseline](architecture/storage-and-resource-baseline.md#schema-3-ceilings-and-the-maximum-profile)).
+([storage baseline](architecture/storage-and-resource-baseline.md#schema-4-ceilings-and-the-maximum-profile)).
 *Revised by D-F26:* custom-key shortcuts add 256 bytes, so the maximum is
 37,956 bytes, leaving 15,260, and validates in 7,458 owner scans.
+*Revised by D-F28:* schema 4's six-byte domain envelopes make it 37,966 bytes,
+leaving 15,250, validated in 7,459 owner scans.
 
 The authored layout keeps its eight layers; layers 8–15 are transparent,
 unnamed and inactive. One supported tap depth (five) bounds behaviour steps,
@@ -1245,7 +1262,7 @@ version 2:
 - **Bigger chunks.** QMK's master-to-slave RPC buffer is 128 bytes, so a chunk
   carries up to 110 bytes. QMK sends each RPC's own lengths, so only this
   copy's chunk frames grow; every other split RPC, all replies and pulled
-  chunks keep their 32-byte frames. It costs 96 bytes more of the shared RPC
+  chunks keep their 32-byte frames (until D-F28 grows pulled replies too). It costs 96 bytes more of the shared RPC
   buffer and of the transport CRC's staging buffer on each half. A full
   request alone takes about 5.6 ms on the 230,400-baud link, before its reply
   and handshake; hardware acceptance must judge the whole exchange.
@@ -1568,3 +1585,65 @@ once and never repeated, and an empty `TT()` row took away its lock. Chosen
 (Noah, 2026-10-18): a key with nothing on it behaves like a normal key, so a
 client can drop an empty row without changing the key, and adding one cannot
 slow a key down. Bit 31 advertises this too.
+
+## D-F28 — A new base: 32-bit profile lengths, and a feature word of build differences
+
+Opens a new major of all three formats a profile travels in: Profile Wire 2.0,
+profile schema 4.0 and logical store format 6, with split framing version 3.
+In each, every length and offset of a profile is 32 bits: the blob's domain
+envelopes (now six bytes: id, version, length), the slot header's payload
+length, the store's read and write callbacks, the candidate wire's BEGIN
+length, CHUNK offset and REUSE ranges, candidate status, the split protocol's
+descriptor, chunk, request and reuse frames, payload readback metadata and the
+capability page's payload capacities. Domain versions keep their numbers: a
+domain's bytes are the same in schema 3.0 and 4.0. RGB and key behaviours keep
+their 16-bit internal offsets, so each of those domains stays within 65,535
+bytes. The slots stay 53,216-byte payloads in EEPROM; nothing else stops a
+profile at 64 KiB once they move to their own flash region. Host tests carry a
+70,000-byte payload through the codec, the candidate upload, the split frames
+and the store in a 128 KiB test geometry the firmware refuses.
+
+Where a 32-byte frame had no room, the layout changed rather than a field
+narrowing: the store header drops its `NT` magic and keys the format into its
+CRC16 and marker values; Profile Wire BEGIN drops its always-zero flags and
+its store-format byte, which the protocol version now implies; candidate status
+moves the error location to a new page 3; peer status page 1 packs the
+transfer owner and storage admission into one byte and page 2 leaves the
+transfer length to page 1; the split descriptor packs origin half and the
+override flag into its flags byte. The capability page is layout 3: byte-wide
+ceilings on page 1, wider ones on page 2. Split chunks shrink from 110 to 106
+bytes, and a pulled chunk now travels in a reply as large as a pushed one:
+QMK's slave-to-master RPC buffer rises to 128 bytes like the master-to-slave
+one, and a payload request asks for exactly its chunk's frame. A pulled chunk
+had carried 14 bytes, and the new offsets would have left 10, so pulling a
+maximum profile would have taken about 7,600 requests; it takes 718. Every
+other request still asks for a 32-byte reply.
+
+The feature word holds only what a build genuinely varies by, never a step in
+the firmware's history (Noah, 2026-10-19): bit 0 split keyboard, bit 1 saves
+(candidate writes, reuse, streaming, commit and activation, once the owner
+reports), bit 2 pointing device. Every Profile Wire 1 bit is retired, and what
+each meant is recorded once, in
+[Profile Wire](architecture/profile-wire-v1.md#the-profile-wire-1-feature-word-retired).
+No firmware behaviour depends on a bit. A later capability raises the minor
+version instead, and Ark requires the current one (Ark's D-L64).
+
+A slot written in format 5 is never read or converted: the keyboard starts
+from its compiled defaults, and Profile Wire state flag 9 says a slot holds an
+earlier format until a profile is saved. A backup from the old base is refused
+like any other earlier format; Noah's own profile crosses as authored defaults
+before the first release of the new base.
+
+Costs: 292 bytes of static state per half (the owner 260: its reconciler,
+candidate backend with sixteen reuse ranges, validator, store and status;
+the compiled handle 24), so the owner's engineering policy rises from 11,264
+to 11,520 bytes and the validator's from 384 to 400; and the shorter split
+chunks. The pulled-reply buffers add 184 bytes per half (QMK's slave-to-master
+RPC buffer and the reconciler's cached reply), leaving 1,068 below the
+209,920-byte tripwire; the reconciler's policy rises from 896 to 1,024 bytes. Chosen over a 24-bit length, which would have kept frames unchanged but
+set a new ceiling; and over keeping the old feature bits, which every current
+client already requires.
+
+Client follow-up: Ark moves to the new base (Profile Wire 2.0, schema 4.0, the
+new frames, capability layout 3 and feature word, status page 3 and state flag
+9) and refuses the old one.

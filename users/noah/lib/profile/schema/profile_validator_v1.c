@@ -161,7 +161,7 @@ static noah_profile_validator_v1_result_t checksum_step(noah_profile_validator_v
     }
     validator->crc32_state  = noah_profile_crc32_update(validator->crc32_state, bytes, chunk);
     validator->digest_state = noah_profile_fnv1a_update(validator->digest_state, bytes, chunk);
-    validator->checksum_offset = (uint16_t)(validator->checksum_offset + chunk);
+    validator->checksum_offset = validator->checksum_offset + (uint32_t)chunk;
     if (validator->checksum_offset != validator->declaration.byte_length) {
         return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     }
@@ -332,7 +332,7 @@ static noah_profile_validator_v1_result_t validate_combos(noah_profile_validator
     noah_profile_action_v1_limits_t limits = noah_profile_action_v1_default_limits();
     uint8_t row_index = state->row_index;
     uint8_t phase = state->phase;
-    uint16_t read_offset = state->offset;
+    uint32_t read_offset = state->offset;
     noah_profile_combo_v1_iteration_t result = noah_profile_combo_v1_iteration_step(state, &validator->reader, validator->base_offset + offset, validator->payload.length, &limits, &header, &row, &detail);
     if (result == NOAH_PROFILE_COMBO_V1_HEADER || result == NOAH_PROFILE_COMBO_V1_ITERATING) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
     if (result == NOAH_PROFILE_COMBO_V1_COMPLETE) return NOAH_PROFILE_VALIDATOR_V1_VALID;
@@ -365,12 +365,12 @@ static noah_profile_validator_v1_result_t validate_settings(noah_profile_validat
     noah_profile_settings_v1_validation_t *state = &v->domain_validation.settings;
     uint8_t                                bytes[NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX];
     size_t                                 offset = v->payload.offset + state->offset;
-    uint16_t                               count  = v->payload.length - state->offset;
+    uint32_t                               count  = v->payload.length - state->offset;
     // One read of up to a step's bytes, consumed one at a time: a maximum
     // settings domain takes about 484 steps rather than 9,669.
     if (count > sizeof(bytes)) count = sizeof(bytes);
     if (read_blob(v, offset, bytes, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
-    for (uint16_t i = 0; i < count; i++)
+    for (uint32_t i = 0; i < count; i++)
         if (!noah_profile_settings_v1_consume(state, bytes[i], v->payload.length, v->compatibility.logical_layer_count, v->compatibility.placement_positions)) return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset + i, error);
     offset += count - 1u;
     if (state->offset < v->payload.length) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;

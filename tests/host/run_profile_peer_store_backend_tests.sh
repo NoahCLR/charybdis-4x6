@@ -51,3 +51,5 @@ build_and_run() {
 
 build_and_run normal
 build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
+# 128 KiB test slots: the split copy past 65,535 bytes (D-F28).
+build_and_run wide -DNOAH_PROFILE_TEST_WIDE_SLOTS -fsanitize=address,undefined -fno-omit-frame-pointer
