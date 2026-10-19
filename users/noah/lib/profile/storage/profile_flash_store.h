@@ -93,6 +93,8 @@ typedef struct {
     uint32_t                         save_started_us;
     uint32_t                         save_flash_us;
     uint32_t                         grant_us;
+    // Erases and programs in this grant.
+    uint16_t                         grant_operations;
     noah_profile_flash_diagnostics_t diagnostics;
 } noah_profile_flash_store_t;
 
@@ -108,4 +110,8 @@ noah_profile_store_io_t noah_profile_flash_store_read_only_io(noah_profile_flash
 void noah_profile_flash_store_grant_begin(noah_profile_flash_store_t *flash, bool quiet);
 // Whether the store's writer may run in this grant (the pause policy above).
 bool                             noah_profile_flash_store_may_write(const noah_profile_flash_store_t *flash);
+// Whether this grant has erased or programmed anything: a grant may give the
+// store more local steps only until it has, so a grant still erases at most
+// one sector or programs at most one page (D-F29).
+bool                             noah_profile_flash_store_grant_flashed(const noah_profile_flash_store_t *flash);
 noah_profile_flash_diagnostics_t noah_profile_flash_store_diagnostics(const noah_profile_flash_store_t *flash);

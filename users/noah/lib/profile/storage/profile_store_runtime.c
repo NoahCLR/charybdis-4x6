@@ -154,6 +154,25 @@ static __attribute__((noinline)) bool register_transports(void) {
 }
 #endif
 
+bool noah_profile_store_runtime_storage_busy(void) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_storage_busy(&runtime_owner);
+#else
+    // Boot discovery without an owner reads a slot once per grant.
+    return false;
+#endif
+}
+
+void noah_profile_store_runtime_scan_again(bool again) {
+#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+    if (runtime_owner_initialized && !runtime_integration_error) {
+        noah_profile_owner_scan_again(&runtime_owner, again);
+    }
+#else
+    (void)again;
+#endif
+}
+
 bool noah_profile_store_runtime_matrix_scan_step(void) {
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
     bool worked;

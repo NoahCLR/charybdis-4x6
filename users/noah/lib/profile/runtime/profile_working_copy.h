@@ -157,6 +157,9 @@ typedef struct {
     uint32_t                          session;
     uint32_t                          revision;
     bool                              active;
+    // Reverting because Save found the copy identical to `saved`: the same
+    // revision, and the edit status keeps reporting the last edit.
+    bool                              settling;
     // The provider's publication count after this copy's own last
     // publication: any other publication replaced the profile under it.
     uint32_t                          publication_count;
@@ -233,6 +236,11 @@ noah_profile_working_result_t noah_profile_working_copy_abort(noah_profile_worki
 // Discards the working copy at the next safe boundary (QUEUED), or does
 // nothing when the saved profile is already active (OK).
 noah_profile_working_result_t noah_profile_working_copy_revert(noah_profile_working_copy_t *copy, uint16_t transaction_id, uint32_t session, uint32_t revision);
+// For a Save that found the working copy byte for byte the saved profile it
+// began from: the keyboard runs that saved profile again at the next safe
+// boundary (QUEUED), with nothing unsaved and the same revision, since
+// nothing it runs changes. OK with no working copy; busy during an edit.
+noah_profile_working_result_t noah_profile_working_copy_settle_saved(noah_profile_working_copy_t *copy);
 
 // One scan grant: a load chunk, a run of validator steps, or one attempt to
 // publish. True when it did work.

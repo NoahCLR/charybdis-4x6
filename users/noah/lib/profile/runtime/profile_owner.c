@@ -994,11 +994,21 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
         return true;
     }
 
-    for (uint8_t visited = 0u; visited < OWNER_SCHEDULE_COUNT; visited++) {
-        uint8_t current = owner->scheduler_cursor;
-        bool    worked  = false;
+    // A repeated step tries the subsystem whose step last worked first, then,
+    // if it has nothing, the ordinary round.
+    uint8_t visits = (uint8_t)OWNER_SCHEDULE_COUNT + (owner->scan_again ? 1u : 0u);
 
-        owner->scheduler_cursor = (uint8_t)((owner->scheduler_cursor + 1u) % OWNER_SCHEDULE_COUNT);
+    for (uint8_t visited = 0u; visited < visits; visited++) {
+        uint8_t current;
+        bool    worked = false;
+
+        if (owner->scan_again) {
+            owner->scan_again = false;
+            current           = owner->scheduler_last;
+        } else {
+            current                 = owner->scheduler_cursor;
+            owner->scheduler_cursor = (uint8_t)((owner->scheduler_cursor + 1u) % OWNER_SCHEDULE_COUNT);
+        }
         if (current == OWNER_SCHEDULE_HOST) {
             if (activating_boot) {
                 worked = scan_activation(owner);
@@ -1062,10 +1072,55 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
             worked = !activating_boot && scan_working(owner, master, now_ms);
         }
         if (worked) {
+            owner->scheduler_last = current;
             return true;
         }
     }
     return false;
+}
+
+void noah_profile_owner_scan_again(noah_profile_owner_t *owner, bool again) {
+    if (owner) {
+        owner->scan_again = again;
+    }
+}
+
+bool noah_profile_owner_storage_busy(const noah_profile_owner_t *owner) {
+    noah_profile_peer_store_state_t peer;
+
+    if (!owner) {
+        return false;
+    }
+    switch (owner->state) {
+        case NOAH_PROFILE_OWNER_VALIDATING_COMPILED:
+        case NOAH_PROFILE_OWNER_DISCOVERING:
+        case NOAH_PROFILE_OWNER_ADOPTING_COMMITTED:
+        case NOAH_PROFILE_OWNER_RECONCILING_COMMITTED:
+        case NOAH_PROFILE_OWNER_ACTIVATING_COMMITTED:
+            return true;
+        case NOAH_PROFILE_OWNER_READY_COMPILED:
+        case NOAH_PROFILE_OWNER_READY_VALIDATED:
+            break;
+        default:
+            return false;
+    }
+    switch (owner->host_transaction.status.state) {
+        case NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING:
+        case NOAH_PROFILE_CANDIDATE_V1_STATE_COMPLETE:
+        case NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING:
+        case NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING:
+        case NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING:
+        case NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER:
+        case NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER:
+            return true;
+        default:
+            break;
+    }
+    peer = noah_profile_peer_store_backend_state(&owner->peer_store);
+    if (peer == NOAH_PROFILE_PEER_STORE_RECEIVING || peer == NOAH_PROFILE_PEER_STORE_VALIDATING || peer == NOAH_PROFILE_PEER_STORE_PREPARING || peer == NOAH_PROFILE_PEER_STORE_COMMITTING) {
+        return true;
+    }
+    return owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || owner->working.phase == NOAH_PROFILE_WORKING_PHASE_LOADING || owner->working.phase == NOAH_PROFILE_WORKING_PHASE_VALIDATING;
 }
 
 bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t now_ms) {
@@ -1442,7 +1497,7 @@ static __attribute__((noinline)) bool save_step(noah_profile_owner_t *owner) {
     if (save->phase != NOAH_PROFILE_OWNER_SAVE_CHECKSUM && transaction->mailbox.pending) {
         return false;
     }
-    if (save->phase >= NOAH_PROFILE_OWNER_SAVE_REUSE && (transaction->status.transaction_id != save->transaction_id || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED)) {
+    if (save->phase >= NOAH_PROFILE_OWNER_SAVE_REUSE && save->phase <= NOAH_PROFILE_OWNER_SAVE_WAIT && (transaction->status.transaction_id != save->transaction_id || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED)) {
         return fail_save(owner);
     }
     switch (save->phase) {
@@ -1460,12 +1515,53 @@ static __attribute__((noinline)) bool save_step(noah_profile_owner_t *owner) {
             save->digest = noah_profile_fnv1a_update(save->digest, owner->working.bytes + save->offset, count);
             save->offset += count;
             if (save->offset == save->length) {
+                const noah_profile_validator_v1_profile_t *saved = &owner->working.saved.profile;
+
                 save->crc32  = noah_profile_crc32_finish(save->crc32);
                 save->offset = 0u;
-                save->phase  = NOAH_PROFILE_OWNER_SAVE_BEGIN;
+                // Edits undone, or a value set back: possibly the saved
+                // profile's own bytes, which a save would write again.
+                save->phase = save->length == saved->byte_length && save->crc32 == saved->crc32 && save->digest == saved->digest && save->domain_mask == saved->domain_mask ? NOAH_PROFILE_OWNER_SAVE_SAME : NOAH_PROFILE_OWNER_SAVE_BEGIN;
             }
             return true;
         }
+        case NOAH_PROFILE_OWNER_SAVE_SAME: {
+            uint8_t  saved[NOAH_PROFILE_WORKING_LOAD_PIECE];
+            uint32_t end = save->length - save->offset > OWNER_SAVE_CHECKSUM_BYTES ? save->offset + OWNER_SAVE_CHECKSUM_BYTES : save->length;
+
+            if (!owner->working.active) {
+                finish_save(owner, NOAH_PROFILE_WORKING_ABORTED, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+                return true;
+            }
+            // Byte for byte, in pieces the saved profile's reader takes.
+            while (save->offset < end) {
+                uint32_t piece = end - save->offset < sizeof(saved) ? end - save->offset : sizeof(saved);
+
+                if (!noah_effective_profile_snapshot_read(&owner->working.saved, save->offset, saved, piece) || memcmp(saved, owner->working.bytes + save->offset, piece) != 0) {
+                    save->offset = 0u;
+                    save->phase  = NOAH_PROFILE_OWNER_SAVE_BEGIN;
+                    return true;
+                }
+                save->offset += piece;
+            }
+            if (save->offset < save->length) {
+                return true;
+            }
+            if (noah_profile_working_copy_settle_saved(&owner->working) != NOAH_PROFILE_WORKING_QUEUED) {
+                finish_save(owner, NOAH_PROFILE_WORKING_PUBLICATION_FAILED, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+                return true;
+            }
+            save->phase = NOAH_PROFILE_OWNER_SAVE_SETTLE;
+            return true;
+        }
+        case NOAH_PROFILE_OWNER_SAVE_SETTLE:
+            if (noah_profile_working_copy_busy(&owner->working)) {
+                return false;
+            }
+            // Saved: the keyboard runs its saved profile, no generation was
+            // written, and the revision did not move.
+            finish_save(owner, owner->working.active ? NOAH_PROFILE_WORKING_PUBLICATION_FAILED : NOAH_PROFILE_WORKING_OK, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+            return true;
         case NOAH_PROFILE_OWNER_SAVE_BEGIN:
             command.operation     = NOAH_PROFILE_CANDIDATE_V1_OPERATION_BEGIN;
             command.payload.begin = (noah_profile_candidate_v1_metadata_t){

@@ -122,6 +122,16 @@ bool noah_qmk_profile_flash_may_write(void) {
     return noah_profile_flash_store_may_write(flash_store());
 }
 
+bool noah_qmk_profile_flash_grant_flashed(void) {
+    return noah_profile_flash_store_grant_flashed(flash_store());
+}
+
+uint32_t noah_qmk_profile_flash_now_us(void) {
+    noah_profile_flash_store_t *flash = flash_store();
+
+    return flash->driver.now_us ? flash->driver.now_us(flash->driver.context) : 0u;
+}
+
 noah_profile_flash_diagnostics_t noah_qmk_profile_flash_diagnostics(void) {
     return noah_profile_flash_store_diagnostics(flash_store());
 }

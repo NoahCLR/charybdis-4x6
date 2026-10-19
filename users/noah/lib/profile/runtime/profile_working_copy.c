@@ -40,6 +40,7 @@ static void clear_edit(noah_profile_working_copy_t *copy) {
 }
 
 static noah_profile_working_result_t finish(noah_profile_working_copy_t *copy, noah_profile_working_result_t result) {
+    copy->settling            = false;
     copy->last_transaction_id = copy->transaction_id;
     copy->last_result         = (uint8_t)result;
     copy->last_phase          = copy->phase;
@@ -769,15 +770,41 @@ static bool scan_revert(noah_profile_working_copy_t *copy) {
         return false;
     }
     if (result != NOAH_EFFECTIVE_PROFILE_PUBLISHED) {
+        if (copy->settling) {
+            // The copy stays; the Save that asked fails.
+            copy->settling = false;
+            copy->phase    = NOAH_PROFILE_WORKING_PHASE_IDLE;
+            return true;
+        }
         (void)finish(copy, NOAH_PROFILE_WORKING_PUBLICATION_FAILED);
         return true;
     }
     copy->active = false;
     copy->published.valid = false;
     note_publications(copy);
+    if (copy->settling) {
+        copy->settling = false;
+        copy->phase    = NOAH_PROFILE_WORKING_PHASE_IDLE;
+        return true;
+    }
     copy->revision++;
     (void)finish(copy, NOAH_PROFILE_WORKING_OK);
     return true;
+}
+
+noah_profile_working_result_t noah_profile_working_copy_settle_saved(noah_profile_working_copy_t *copy) {
+    if (!copy) {
+        return NOAH_PROFILE_WORKING_INVALID_ARGUMENT;
+    }
+    if (copy->phase != NOAH_PROFILE_WORKING_PHASE_IDLE) {
+        return NOAH_PROFILE_WORKING_BUSY;
+    }
+    if (!copy->active) {
+        return NOAH_PROFILE_WORKING_OK;
+    }
+    copy->settling = true;
+    copy->phase    = NOAH_PROFILE_WORKING_PHASE_REVERTING;
+    return NOAH_PROFILE_WORKING_QUEUED;
 }
 
 bool noah_profile_working_copy_scan(noah_profile_working_copy_t *copy) {

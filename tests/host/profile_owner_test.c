@@ -71,6 +71,7 @@ typedef struct {
     noah_profile_owner_t *peer;
     uint32_t chunk_frames;
     uint32_t reuse_frames;
+    uint32_t metadata_frames;
     uint32_t exchanges;
     uint32_t source_unavailable;
     uint8_t largest_chunk;
@@ -244,6 +245,7 @@ static bool split_exchange(void *context, const uint8_t *request, uint8_t reques
         if (request[20] > link->largest_chunk) link->largest_chunk = request[20];
     }
     if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) link->reuse_frames++;
+    if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_METADATA) link->metadata_frames++;
     link->exchanges++;
     bool result = noah_profile_split_reconciler_receive(peer_reconciler, request, request_length, response, response_length);
     if (result && response[2] == NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE) link->source_unavailable++;
@@ -533,7 +535,7 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
     for (uint32_t guard = 0u; guard < 4096u && left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++) scan_pair(&left, &right, &now);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
 
-    left_link.chunk_frames = left_link.reuse_frames = left_link.exchanges = left_link.source_unavailable = 0u;
+    left_link.chunk_frames = left_link.reuse_frames = left_link.metadata_frames = left_link.exchanges = left_link.source_unavailable = 0u;
     uint32_t peer_ready_at = 0u, master_ready_at = 0u, master_scans = 0u;
     paced_copy = true;
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 312u);
@@ -554,7 +556,9 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
     assert(noah_profile_owner_peer_transfer(&left, &diagnostic));
     assert(diagnostic.reused_bytes == candidate_length && !diagnostic.reuse_unavailable);
     assert(diagnostic.reuse_exchanges == left_link.reuse_frames && diagnostic.source_unavailable_replies == 0u);
-    assert(diagnostic.prepared_exchanges == left_link.exchanges);
+    // Every exchange but the periodic metadata one, which may fall due
+    // while the copy runs, is the prepared push's.
+    assert(diagnostic.prepared_exchanges == left_link.exchanges - left_link.metadata_frames);
     assert(diagnostic.prepared_scans > 0u && diagnostic.prepared_scans <= master_scans);
     for (uint32_t guard = 0u; guard < 8192u && (left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || left.state != NOAH_PROFILE_OWNER_READY_VALIDATED || right.state != NOAH_PROFILE_OWNER_READY_VALIDATED || right.committed_descriptor.generation != 2u); guard++) scan_pair(&left, &right, &now);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
@@ -2057,6 +2061,80 @@ static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
     puts("a live edit reaches both halves without flash; Save writes both by reuse; a replug boots the saved profile; Revert follows on both");
 }
 
+
+// One durable-I/O grant as the scheduler gives it (qmk_durable_io.c, D-F29
+// "Pacing"): a step, then more of the subsystem whose step worked (the owner
+// visits it alone) while the half has storage work in progress,
+// until a step finds nothing to do, uses the split link or writes a page's
+// worth (the flash store programs at most one page per grant), or 32 steps.
+static unsigned grant(noah_profile_owner_t *owner, bool master, uint32_t now, const memory_t *memory, const split_link_t *link, const working_link_t *working_link, bool repeat) {
+    unsigned steps = 0u;
+    uint32_t writes = memory->writes;
+
+    do {
+        uint32_t exchanges = link->exchanges + working_link->exchanges;
+
+        noah_profile_owner_scan_again(owner, steps != 0u);
+        steps++;
+        if (!noah_profile_owner_scan(owner, master, now) || !repeat || link->exchanges + working_link->exchanges != exchanges) break;
+    } while (steps < 32u && noah_profile_owner_storage_busy(owner) && memory->writes - writes < NOAH_PROFILE_STORAGE_PAGE_SIZE / NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX);
+    return steps;
+}
+
+// A save took seconds of scans on the keyboard though its flash took 0.1 s
+// (keyboard check, 2026-10-19): one small step per scan. With local steps
+// repeated within a grant it lands in far fewer grants, and the same as
+// before on both halves; neither half reports work in progress before or
+// after it.
+static unsigned save_in_grants(bool repeat) {
+    static noah_profile_owner_t left;
+    static noah_profile_owner_t right;
+    static memory_t             left_memory;
+    static memory_t             right_memory;
+    static uint8_t              keymap[KEYMAP_LENGTH];
+    split_link_t                left_link          = {.peer = &right};
+    split_link_t                right_link         = {.peer = &left};
+    working_link_t              left_working_link  = {.peer = &right};
+    working_link_t              right_working_link = {.peer = &left};
+    noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    uint32_t                      now    = 1000u;
+    unsigned                      grants = 0u;
+    bool                          right_busy = false;
+
+    erased_memory(&left_memory);
+    erased_memory(&right_memory);
+    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0x5AFE5AFEu, &now);
+    scan_until_converged(&left, &right, &now);
+    for (uint32_t i = 0u; i < KEYMAP_LENGTH; i += 2u) keymap[i] = (uint8_t)(4u + i % 20u);
+    assert(live_edit(&left, &right, 1u, &create, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
+    scan_until_converged(&left, &right, &now);
+    assert(!noah_profile_owner_storage_busy(&left) && !noah_profile_owner_storage_busy(&right));
+    assert(noah_profile_owner_save(&left, 40u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
+    assert(noah_profile_owner_storage_busy(&left));
+    for (; grants < 100000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; grants++) {
+        (void)grant(&right, false, now, &right_memory, &right_link, &right_working_link, repeat);
+        right_busy = right_busy || noah_profile_owner_storage_busy(&right);
+        (void)grant(&left, true, now, &left_memory, &left_link, &left_working_link, repeat);
+        now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+    }
+    assert(left.save.phase == NOAH_PROFILE_OWNER_SAVE_IDLE && left.save.last_result == NOAH_PROFILE_WORKING_OK && left.save.last_transaction_id == 40u);
+    assert(right_busy);
+    scan_until_converged(&left, &right, &now);
+    assert(left.committed_descriptor.generation == 1u && right.committed_descriptor.generation == 1u);
+    assert(left.committed_descriptor.payload_digest == right.committed_descriptor.payload_digest);
+    assert(!left.working.active && !right.working.active);
+    assert(!noah_profile_owner_storage_busy(&left) && !noah_profile_owner_storage_busy(&right));
+    return grants;
+}
+
+static void test_repeated_local_steps_save_in_far_fewer_grants(void) {
+    unsigned one_step = save_in_grants(false);
+    unsigned repeated = save_in_grants(true);
+
+    printf("a save of a %u-byte profile: %u grants with one step each, %u with repeated local steps\n", (unsigned)(sizeof(compiled_blob) + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE + KEYMAP_LENGTH), one_step, repeated);
+    assert(repeated * 4u <= one_step);
+}
+
 static void test_apply_while_editing_waits_and_a_save_refuses_apart_halves(void) {
     static noah_profile_owner_t left;
     static noah_profile_owner_t right;
@@ -2136,12 +2214,14 @@ static void test_an_abandoned_edit_is_aborted_and_revert_ends_one(void) {
 
 int main(void) {
     test_auto_save_modes_and_adjustments();
+    test_saving_the_saved_bytes_writes_nothing();
     test_auto_save_hour_bound();
     test_auto_save_power_cuts();
     test_apply_waits_behind_a_queued_adjustment();
     test_adjustments_without_a_settings_domain();
     test_a_failed_automatic_save_is_reported_and_not_repeated();
     test_live_edit_reaches_both_halves_and_save_writes_both();
+    test_repeated_local_steps_save_in_far_fewer_grants();
     test_apply_while_editing_waits_and_a_save_refuses_apart_halves();
     test_an_abandoned_edit_is_aborted_and_revert_ends_one();
     test_partial_runtime_install_rolls_back();

@@ -750,13 +750,18 @@ noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_
             return NOAH_PROFILE_STORE_IN_PROGRESS;
 
         case NOAH_PROFILE_STORE_COMMIT_PAYLOAD_READBACK:
-            length = bounded_step_length((uint32_t)(store->candidate.payload_length - store->commit_offset), byte_budget);
-            if (!io_read(store, (start + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + store->commit_offset), store->scratch, length)) {
-                return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
+            // Up to a flash page per step, in reads of the budget: the
+            // readback only reads (D-F29, "Pacing").
+            for (uint32_t read = 0u; read < NOAH_PROFILE_STORAGE_PAGE_SIZE && store->commit_offset != store->candidate.payload_length; read += length) {
+                length = store->candidate.payload_length - store->commit_offset;
+                length = bounded_step_length(length < NOAH_PROFILE_STORAGE_PAGE_SIZE - read ? length : NOAH_PROFILE_STORAGE_PAGE_SIZE - read, byte_budget);
+                if (!io_read(store, (start + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + store->commit_offset), store->scratch, length)) {
+                    return finish_prepare(store, NOAH_PROFILE_STORE_IO_ERROR);
+                }
+                store->commit_crc32_state  = noah_profile_crc32_update(store->commit_crc32_state, store->scratch, length);
+                store->commit_digest_state = noah_profile_fnv1a_update(store->commit_digest_state, store->scratch, length);
+                store->commit_offset       = store->commit_offset + length;
             }
-            store->commit_crc32_state  = noah_profile_crc32_update(store->commit_crc32_state, store->scratch, length);
-            store->commit_digest_state = noah_profile_fnv1a_update(store->commit_digest_state, store->scratch, length);
-            store->commit_offset       = store->commit_offset + length;
             if (store->commit_offset == store->candidate.payload_length) {
                 if (noah_profile_crc32_finish(store->commit_crc32_state) != store->candidate.payload_crc32 || store->commit_digest_state != store->candidate.payload_digest) {
                     return finish_prepare(store, NOAH_PROFILE_STORE_CHECKSUM_MISMATCH);

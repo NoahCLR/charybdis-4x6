@@ -10,6 +10,7 @@
 #include "profile_split_authority.h"
 #include "profile_split_protocol_v1.h"
 #include "../storage/profile_peer_store_backend.h"
+#include "../storage/profile_storage_layout.h"
 
 enum {
     NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS = 50u,
@@ -29,9 +30,10 @@ enum {
     // correlated STORE_WORKING reply is expected work, not a lost mailbox.
     // Collect completion promptly without spending an RPC every 5 ms.
     NOAH_PROFILE_SPLIT_STORE_POLL_MS = 25u,
-    // The receiver writes at most one full chunk's worth of bytes in a scan,
-    // whether they arrived in a chunk or are copied for PAYLOAD_REUSE.
-    NOAH_PROFILE_SPLIT_PEER_SCAN_BYTES = NOAH_PROFILE_SPLIT_V1_CHUNK_MAX,
+    // The receiver copies at most a flash page of a PAYLOAD_REUSE range in a
+    // scan, in writes of at most a candidate chunk, so a scan programs at
+    // most one page (D-F29, "Pacing"). A chunk that arrives is written whole.
+    NOAH_PROFILE_SPLIT_PEER_SCAN_BYTES = NOAH_PROFILE_STORAGE_PAGE_SIZE,
     NOAH_PROFILE_SPLIT_POLL_MS         = 1000u,
     // A passive half cannot actively probe the link. Missing three normal
     // master polls invalidates its peer observation and therefore activation.

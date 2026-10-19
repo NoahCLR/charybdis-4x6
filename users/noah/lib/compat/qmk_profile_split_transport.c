@@ -3,6 +3,7 @@
 // ──────────────────────────────────────────────────────────────────────────
 
 #include "qmk_profile_split_transport.h"
+#include "qmk_durable_io.h"
 
 #if defined(SPLIT_TRANSACTION_IDS_USER)
 
@@ -47,7 +48,12 @@ void noah_qmk_profile_split_transport_reset_for_test(void) {
 // and reading their small frames, and only a pulled chunk reads up to 128.
 bool noah_qmk_profile_split_transport_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
     (void)context;
-    return request && response && request_length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && request_length <= NOAH_PROFILE_SPLIT_V1_FRAME_MAX && response_length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && response_length <= NOAH_PROFILE_SPLIT_V1_FRAME_MAX && transaction_rpc_exec(PUT_PROFILE_SPLIT_SYNC, request_length, request, response_length, response);
+    if (!request || !response || request_length < NOAH_PROFILE_SPLIT_V1_FRAME_SIZE || request_length > NOAH_PROFILE_SPLIT_V1_FRAME_MAX || response_length < NOAH_PROFILE_SPLIT_V1_FRAME_SIZE || response_length > NOAH_PROFILE_SPLIT_V1_FRAME_MAX) {
+        return false;
+    }
+    // The durable-I/O grant repeats no step after one that used the link.
+    noah_qmk_durable_io_note_split_rpc();
+    return transaction_rpc_exec(PUT_PROFILE_SPLIT_SYNC, request_length, request, response_length, response);
 }
 
 #endif

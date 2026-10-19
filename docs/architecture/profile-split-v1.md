@@ -190,7 +190,8 @@ The source identity is Profile Wire's candidate REUSE source (compiled sources
 have generation zero). The receiver holds a reuse like a chunk: only for the
 copy it is receiving, at or before its next offset (a later start is a gap and
 rejects the copy). It copies from its next offset to the range's end, at most
-106 bytes a scan in reads and writes of at most 20, checking the source's
+a flash page (256 bytes) a scan in reads and writes of at most 20, so a scan
+programs at most one page (D-F29, "Pacing"), checking the source's
 whole identity and its compiled-default and action-ABI digests on every read,
 as Profile Wire's REUSE does. Meanwhile it answers BUSY with reason `8`
 (copying) and its progress as the offset, and the ACK with the range's end
@@ -328,8 +329,10 @@ before any deadline return; unchanged values need neither revalidation nor a
 replacement copy. This does not cache payload bytes or defer local changes.
 
 Matrix scan performs at most one transport exchange, one received chunk or
-one scan's share of a reuse range (at most 106 bytes, stored in writes of at
-most 20), or one validator/marker-last commit step of at most 20 bytes. It supports newer-local
+one scan's share of a reuse range (at most 256 bytes, stored in writes of at
+most 20), one validation step (up to twelve validator calls of at most 20
+bytes), or one marker-last commit step (one operation of at most 20 bytes; the
+payload readback up to 256 bytes in reads of at most 20). It supports newer-local
 push, newer-peer pull, staged-source prepare/pause/commit/abort,
 byte-identical retries, 50–1,000 ms backoff, disconnect/reconnect, prepared-
 sender preservation across role changes, passive-peer expiry, and terminal
