@@ -44,9 +44,6 @@ typedef struct {
 
 void    keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record);
 void    keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyrecord_t *record);
-// Called once QMK's default action has run for the record, from the same
-// finalize step that settles report ownership.
-void    keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record);
 bool    keyboard_mod_ownership_should_suppress_default(uint16_t keycode, keyrecord_t *record);
 bool    keyboard_mod_ownership_can_register_mods(uint8_t mods);
 bool    keyboard_mod_ownership_can_unregister_mods(uint8_t mods);

@@ -26,7 +26,8 @@ void noah_qmk_portable_storage_init(void) {
 }
 // The dual-role setting is QMK's tapping term, and quick tap follows it. The
 // key runtime decides every dual-role key (D-F27) and reads the setting
-// itself, so QMK's tapping engine asks these for no key any more.
+// itself; QMK asks these only for TT() and OSL() to layers 16-31
+// (qmk_live_tapping_config.h).
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;

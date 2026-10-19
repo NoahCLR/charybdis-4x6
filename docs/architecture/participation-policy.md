@@ -251,10 +251,9 @@ storage, and costs one masked bit test per scope on an ordinary press.
 - **Tap-hold.** QMK decides whether a record is a tap-hold through BK's
   `is_tap_record_user()`, a per-record weak hook given QMK's own answer and
   `is_tap_keycode_user()`'s. The userspace override keeps the keycode hook's
-  answer for a press that uses its row, and for one that bypasses it answers
-  as the key does without a row. Every `LT()`, `MT()` and `OSM()` key is the
-  runtime's either way (D-F27), so neither answer lets QMK's tapping engine
-  classify it.
+  answer for every record. Every `LT()`, `MT()` and `OSM()` key is the
+  runtime's with its row or without it (D-F27), so a press that bypasses its
+  row answers the same, and QMK's tapping engine classifies none of them.
 - **Combos.** `combo_key_record_allowed()` in
   `users/noah/lib/compat/qmk_combo_origin.c` vetoes a member press unless its
   stored combo decision and the combo row both allow it on its source layer.

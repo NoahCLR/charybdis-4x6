@@ -69,12 +69,12 @@ modifiers before a physical press, and that cleared state must reach the host
 without another basic usage edge. Report emission retains QMK's one-shot
 modifier consumption.
 Pre-process still tracks which physical modifier keys are down, which is the
-separate question masking policy asks. A QMK mod-tap is a physically held
-modifier too, once QMK has resolved it as a hold: pre-process runs before QMK's
-tapping engine and cannot see that, so the finalize step counts it, from the
-record with tap count 0 that QMK's default action took. Its modifiers are also
-managed owners, because QMK registers them through `register_mods()`, so
-teardown is unchanged. A tapped mod-tap never held a modifier.
+separate question masking policy asks. A mod-tap is not one: every `MT()` is
+the runtime's (D-F27), and its hold is a managed owner of its modifiers, as
+any behaviour's hold is, so a pointing mode that holds the same modifier
+masks it (see Open Issues in
+[LIVE_EDIT_APP_DIRECTION](../LIVE_EDIT_APP_DIRECTION.md#open-issues)). A
+tapped mod-tap never holds a modifier.
 
 Physical modifier-only combinations (`KC_MEH`, `KC_HYPR`, or a modifier
 wrapped in `QK_MODS`, such as `S(KC_LEFT_CTRL)`) count every real modifier they

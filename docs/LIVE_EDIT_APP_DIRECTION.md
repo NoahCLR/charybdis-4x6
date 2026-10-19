@@ -69,7 +69,8 @@ any other key as a tap first, so Cmd released before F types Cmd+F and before
 
 Every `LT`, `MT` and `OSM` key is decided by the key runtime, with or without a
 behaviour row, and a key without a row behaves exactly as with an empty one
-(D-F27, Profile Wire bit 31). QMK's tapping engine classifies no record.
+(D-F27, Profile Wire bit 31). QMK's tapping engine classifies no record of a
+key the firmware supports.
 Dual-role keys hold at the dual-role setting, other rows at the tap/hold
 setting. A row without steps is no row: a plain key with one stays QMK's, and
 `TT()` keeps its own taps. Hardware acceptance is pending.
@@ -112,6 +113,15 @@ input cadence remain unmeasured for this path.
   Type normally on F, J and Z and use their layers; tap, then hold J and Z;
   roll Cmd+Z and Shift+J off the modifier; fire combo C0 (D + F). Hold Delete
   (its live row is empty): it repeats, and combo C11 still fires.
+
+- **A held mod-tap is hidden under a pointing mode that holds its modifier
+  (D-F27).** A pointing mode that holds a modifier (a scroll mode's, such as
+  Pinch's Cmd) hides it from keys pressed meanwhile unless a physical key also
+  holds it. Every `MT()` is the runtime's, and its hold is a managed owner, not
+  a physical one, so holding `MT(Cmd, A)` in such a mode and pressing C types
+  `c`, not Cmd+C. An `MT()` with a behaviour row already did this; one without
+  a row did not before D-F27, when QMK decided it and its hold counted as
+  physical. The compiled layout has no `MT()` key.
 
 - **Custom key shortcuts need hardware acceptance (D-F26).** On both halves:
   hold a mixed-side shortcut, tap it, hold a modifier-only one, put a
@@ -565,8 +575,8 @@ default and applies until settings are live. Quick tap follows the tapping term
 as it does in QMK by default. The one term is global: the app offers no
 per-key tapping term, and a behaviour row's own tap / hold timing still governs
 that row in the runtime. Since D-F27 ("Every dual-role key") the runtime decides
-every dual-role key and reads the setting itself; the QMK hooks no longer
-decide any key.
+every dual-role key and reads the setting itself; the QMK hooks serve only
+`TT()` and `OSL()` to layers 16–31, the one tap key QMK still decides (D-F27).
 
 ### D-L39 — Only the keyboard ends a staging, together with its candidate
 
@@ -709,7 +719,8 @@ Userspace queries existing QMK queues to preserve eligible continuations and
 suppress scan-time holds after physical release. Authored `LT()` rows bypass
 native tapping so one engine decides their behaviour; plain native dual-role
 keys retained QMK semantics until D-F27 moved every `LT`/`MT`/`OSM` key to the
-runtime (bit 31). Since then QMK's tapping queue holds no record, and an
+runtime (bit 31). Since then QMK's tapping queue holds a record only behind a
+key the firmware does not support (D-F27), and an
 eligible press waiting in record admission continues its series as one in the
 combo buffer does. No authored layout, combo or default timing changes.
 
@@ -1460,9 +1471,9 @@ that key is undecided waits for its decision when it is a modifier or layer
 key, as QMK keeps such a release in its tapping buffer. A key the runtime
 handles counts by what it holds at that moment (a layer, or real modifiers
 from a hold or a registered fallback); any other key by QMK's rule for its
-keycode (a modifier, a mods-only key, `MO`, `LT`, `LM`, or an `MT` or `OSM`
-released as a hold; since every `LT`, `MT` and `OSM` is handled, in practice a
-plain modifier or a mods-only key). The undecided key's tap or hold then goes out under that
+keycode (a modifier, a mods-only key, `MO` or `LM`; `LT`, `MT` and `OSM` are
+always handled, so in practice a plain modifier or a mods-only key). The
+undecided key's tap or hold then goes out under that
 modifier or layer, and the release follows, so Cmd let go before F still types
 Cmd+F. Every other release goes at once, as in QMK. A waiting release replays
 in order and waits behind each replayed key that is undecided in turn. It
@@ -1490,7 +1501,11 @@ runtime, with or without a row, and a key without a row behaves exactly as with
 an empty row: its tap is its own, `LT` holds its layer as `MO`, `MT` and `OSM`
 hold their modifiers, it makes later keys wait (class 1), and its interrupted
 tap is still typed (D-F02). QMK's tapping engine classifies no record, physical
-or combo output, with behaviours on or off. Behaviours switched off (the
+or combo output, with behaviours on or off, and the firmware has no path that
+reads a tap decision of QMK's. The one tap key QMK still decides is `TT()` or
+`OSL()` to a layer from 16 to 31, which the firmware refuses wherever it
+validates a keymap but an external VIA client can still write
+([implementation](KEY_RUNTIME.md#physical-event-timing-at-the-qmk-boundary)). Behaviours switched off (the
 master, a layer's switch, a row's enable or allowed layers) or a placement
 bypass ignore the row only: the key keeps this default, and so does a combo
 output that is an `MT` or `OSM`. Tap, then press and hold again at once, is a

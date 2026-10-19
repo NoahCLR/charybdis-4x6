@@ -21,7 +21,6 @@
 #include "../../compat/qmk_combo_origin.h"
 #include "../../macro/macro_input_guard.h"
 #include "../../macro/macro_payload.h"
-#include "../../compat/qmk_oneshot_contract.h"
 #include "../../compat/qmk_native_report_contract.h"
 #include "../../compat/qmk_source_layer_contract.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
@@ -237,30 +236,6 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_non_handled
     return KEY_RUNTIME_PROCESS_NEXT;
 }
 
-// An LT() that QMK's tapping engine decided arrives with tap.count 0 for a
-// hold. Only that hold, which QMK would turn into layer_on() and layer_off(),
-// goes through layer ownership; a tap still reaches QMK and sends the tap
-// keycode. Every LT() is the runtime's now (D-F27), so no physical key comes
-// this way; the stage is removed with the rest of QMK's tapping paths.
-static bool key_runtime_process_is_plain_layer_tap_hold(uint16_t keycode, const keyrecord_t *record) {
-    return IS_QK_LAYER_TAP(keycode) && QK_LAYER_TAP_GET_LAYER(keycode) < LAYER_COUNT && record->tap.count == 0u && record->event.type == KEY_EVENT;
-}
-
-static key_runtime_process_stage_outcome_t key_runtime_process_stage_layer_tap_hold(key_runtime_process_ctx_t *ctx) {
-    if (!key_runtime_process_is_plain_layer_tap_hold(ctx->keycode, ctx->record)) {
-        return KEY_RUNTIME_PROCESS_NEXT;
-    }
-
-    if (ctx->record->event.pressed) {
-        layer_ownership_momentary_press(ctx->record->event.key, (uint8_t)QK_LAYER_TAP_GET_LAYER(ctx->keycode));
-    } else {
-        (void)layer_ownership_momentary_release(ctx->record->event.key);
-    }
-
-    key_runtime_trace_message("process:layer_tap_hold", "plain layer-tap hold owned");
-    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
-}
-
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_direct_action(key_runtime_process_ctx_t *ctx) {
     if (!key_runtime_process_direct_action_key(ctx->keycode, ctx->record)) {
         return KEY_RUNTIME_PROCESS_NEXT;
@@ -338,7 +313,6 @@ static void key_runtime_process_settle_report_ownership(uint16_t keycode, keyrec
 
     owned_keycode_track_physical_event(keycode, record);
     keyboard_mod_ownership_track_report_keycode_event(keycode, record);
-    keyboard_mod_ownership_track_mod_tap_hold_event(keycode, record);
 }
 
 // Physical keys whose press the profile output fence dropped. Their release
@@ -382,11 +356,13 @@ static bool key_runtime_process_record_uses_row(uint16_t keycode, const keyrecor
     return true;
 }
 
-// QMK's tapping engine gives this the last word on every record (BK's
-// is_tap_record_user), after is_tap_keycode_user below has answered for the
-// keycode. A press that bypassed its row answers as the key does without one:
-// every LT(), MT() and OSM() key is the runtime's either way (D-F27), as are
-// TT() and OSL(), so QMK classifies none of them.
+// QMK's tapping engine asks this about every record (BK's is_tap_record_user)
+// as it leaves the queue, after is_tap_keycode_user below has answered for the
+// keycode. That answer stands: every LT(), MT() and OSM() key is the runtime's,
+// row or not and behaviours on or off (D-F27), as are TT() and OSL(), so QMK
+// classifies none of them. A placement bypass changes nothing here, because a
+// key the runtime handles without its row is handled with it too. The hook
+// stays for the press it settles and the combo output it captures.
 bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) {
     uint16_t keycode = get_record_keycode(record, false);
     if (record->event.type == KEY_EVENT && !noah_synthetic_record_active()) {
@@ -400,10 +376,8 @@ bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) 
         noah_qmk_combo_origin_capture_record(keycode, record);
     }
 
-    if (key_runtime_process_record_uses_row(keycode, record)) {
-        return default_tap;
-    }
-    return native_tap && !key_behavior_lookup_without_row(keycode).handled;
+    (void)native_tap;
+    return default_tap;
 }
 
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -443,7 +417,7 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {
-        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "pd_mode_release", .handler = key_runtime_process_stage_pd_mode_release}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "layer_tap_hold", .handler = key_runtime_process_stage_layer_tap_hold}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "native_overlap", .handler = key_runtime_process_stage_native_overlap}, {.name = "idle_custom_key", .handler = key_runtime_process_stage_idle_custom_key},
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "pd_mode_release", .handler = key_runtime_process_stage_pd_mode_release}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "native_overlap", .handler = key_runtime_process_stage_native_overlap}, {.name = "idle_custom_key", .handler = key_runtime_process_stage_idle_custom_key},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,
@@ -506,19 +480,11 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
 // QMK's rule for what uses up a one-shot layer (process_record in action.c):
 // any press except a modifier, a one-shot modifier, a mod-tap still held, or
 // OSL() itself. It is released once that press has been processed, so the
-// press still resolved on the one-shot layer.
-static bool key_runtime_process_press_uses_oneshot_layer(uint16_t keycode, const keyrecord_t *record) {
-    if (IS_MODIFIER_KEYCODE(keycode) || IS_QK_ONE_SHOT_MOD(keycode) || IS_QK_ONE_SHOT_LAYER(keycode)) {
-        return false;
-    }
-
-    if (IS_QK_MOD_TAP(keycode)) {
-        // Runtime-owned MT taps are settled by their planner, including a
-        // delayed multi-tap. Every MT is runtime-owned (D-F27); this answers for
-        // one that QMK decided, which no physical key is any more.
-        return !(key_runtime_process_record_uses_row(keycode, record) ? key_behavior_lookup(keycode) : key_behavior_lookup_without_row(keycode)).handled && record->tap.count != 0u && noah_qmk_contract_tap_uses_oneshot_layer(keycode);
-    }
-    return true;
+// press still resolved on the one-shot layer. Every MT() is the runtime's
+// (D-F27): its release planner consumes the layer for a qualifying tap,
+// including a delayed multi-tap, so its press never does.
+static bool key_runtime_process_press_uses_oneshot_layer(uint16_t keycode) {
+    return !(IS_MODIFIER_KEYCODE(keycode) || IS_QK_ONE_SHOT_MOD(keycode) || IS_QK_ONE_SHOT_LAYER(keycode) || IS_QK_MOD_TAP(keycode));
 }
 
 static void key_runtime_process_settle_oneshot_layer(uint16_t keycode, const keyrecord_t *record) {
@@ -526,7 +492,7 @@ static void key_runtime_process_settle_oneshot_layer(uint16_t keycode, const key
         return;
     }
 
-    if (layer_ownership_oneshot_layer() != UINT8_MAX && key_runtime_process_press_uses_oneshot_layer(keycode, record)) {
+    if (layer_ownership_oneshot_layer() != UINT8_MAX && key_runtime_process_press_uses_oneshot_layer(keycode)) {
         (void)layer_ownership_oneshot_consume();
     }
 }
@@ -549,8 +515,11 @@ void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {
     noah_process_record_user_finalize(keycode, record, true);
 }
 
-// The keycode-only form, for QMK builds without the record hook: it cannot see
-// a press's placement, so it answers as if every press used its row.
+// QMK's answer for the keycode, which is_tap_record_user above keeps. No key
+// the runtime handles is QMK's tap key. The only tap actions it does not handle
+// are TT() and OSL() to layers 16-31: the firmware refuses them wherever it
+// validates a keymap, but an external VIA client can still write one, and QMK
+// still decides it (KEY_RUNTIME.md, "Physical-event timing").
 bool is_tap_keycode_user(uint16_t keycode, bool default_tap) {
     return default_tap && !key_behavior_lookup(keycode).handled;
 }

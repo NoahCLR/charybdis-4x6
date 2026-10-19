@@ -817,11 +817,6 @@ void keyboard_mod_ownership_track_report_keycode_event(uint16_t keycode, keyreco
     (void)record;
 }
 
-void keyboard_mod_ownership_track_mod_tap_hold_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-}
-
 void keyboard_mod_ownership_track_physical_keycode_event(uint16_t keycode, keyrecord_t *record) {
     uint8_t mask = 0;
 
@@ -4268,9 +4263,11 @@ static void test_qmk_dual_role_key_without_row_matches_empty_row(void) {
         }
     }
 }
-// QMK's tapping engine classifies no record, physical or combo output, with
-// behaviours on or off: authored rows, intrinsic TT/OSL and keys without a row.
-static void test_qmk_tapping_engine_classifies_nothing(void) {
+// QMK's tapping engine classifies no record of a key the firmware supports,
+// physical or combo output, with behaviours on or off: authored rows,
+// intrinsic TT/OSL and keys without a row. Only TT()/OSL() to layers 16-31,
+// which the firmware does not support, are still QMK's.
+static void test_qmk_tapping_engine_classifies_no_supported_key(void) {
     const uint16_t physical[] = {LT(TEST_LAYER_SYM, KC_J), MT(MOD_LCTL, KC_B), OSM(MOD_RSFT), MT(MOD_LCTL, KC_A), OSM(MOD_LSFT), LT(TEST_LAYER_NAV, KC_B), TT(2), OSL(2), TT(3), OSL(3)};
     const gesture_step_t tap[] = {{0,3,0,true}, {40,3,0,false}}, hold[] = {{0,3,0,true}, {30,3,1,true}, {50,3,1,false}, {300,3,0,false}};
     for (unsigned i = 0; i < ARRAY_SIZE(physical); i++)
@@ -4302,6 +4299,17 @@ static void test_qmk_tapping_engine_classifies_nothing(void) {
         gesture_check_quiescent();
     }
     gesture_engine_combo_output_set(0, original);
+    // The one exception: TT() and OSL() to layers 16-31. The firmware refuses
+    // them wherever it validates a keymap, but an external VIA client can still
+    // write one; the runtime does not handle it, so QMK's tapping decides it.
+    const uint16_t unsupported[] = {TT(16), TT(31), OSL(16), OSL(31)};
+    for (unsigned i = 0; i < ARRAY_SIZE(unsupported); i++) {
+        test_reset_state(); fake_time = 26000; gesture_test_code = unsupported[i]; gesture_out_count = 0;
+        CHECK(!noah_action_supported_at(unsupported[i], NOAH_ACTION_PLACEMENT_KEY) && !key_behavior_lookup(unsupported[i]).handled);
+        gesture_play(tap, ARRAY_SIZE(tap), 800);
+        CHECK(gesture_tap_classified == 1);
+        gesture_check_quiescent();
+    }
 }
 // A dual-role key (LT, MT, OSM, TT, OSL) holds at the dual-role setting, row
 // or not, unless its row sets its own time; any other row at the tap/hold
@@ -4482,7 +4490,7 @@ int main(int argc, char **argv) {
         else if (strcmp(regression, "layer-hold") == 0) test_qmk_layer_hold_key_makes_keys_wait();
         else if (strcmp(regression, "lock-tap") == 0) test_qmk_key_after_lock_tap_lands_on_locked_layer();
         else if (strcmp(regression, "hold-time") == 0) test_qmk_dual_role_hold_time_defaults();
-        else if (strcmp(regression, "classifies") == 0) test_qmk_tapping_engine_classifies_nothing();
+        else if (strcmp(regression, "classifies") == 0) test_qmk_tapping_engine_classifies_no_supported_key();
         else if (strcmp(regression, "rowless") == 0) test_qmk_dual_role_key_without_row_matches_empty_row();
         else if (strcmp(regression, "plain-empty") == 0) test_qmk_plain_key_empty_row_is_no_row();
         else CHECK(false);
@@ -4541,7 +4549,7 @@ int main(int argc, char **argv) {
     test_qmk_key_after_lock_tap_lands_on_locked_layer();
     test_qmk_combo_output_gui_behaviour();
     test_qmk_dual_role_hold_time_defaults();
-    test_qmk_tapping_engine_classifies_nothing();
+    test_qmk_tapping_engine_classifies_no_supported_key();
     test_qmk_dual_role_key_without_row_matches_empty_row();
     test_qmk_plain_key_empty_row_is_no_row();
     puts("QMK gesture pipeline tests passed");
