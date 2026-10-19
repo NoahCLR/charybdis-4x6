@@ -25,8 +25,9 @@ enum {
     // Regression policy for the payload-independent 32-bit scan state. This
     // is not a hardware SRAM-capacity claim; target resource gates account
     // for the linked instance separately. D-F14's 128-byte pointing records
-    // make the PD iterator the largest domain state: 372 bytes on Cortex-M0+.
-    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 384u,
+    // make the PD iterator the largest domain state; D-F28's 32-bit blob
+    // lengths and offsets add 20 bytes: 392 bytes on Cortex-M0+.
+    NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET = 400u,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8      = 0xffu,
     NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16     = 0xffffu,
 };
@@ -87,7 +88,7 @@ typedef struct {
     uint8_t  schema_minor;
     uint8_t  domain_mask;
     uint8_t  flags;
-    uint16_t byte_length;
+    uint32_t byte_length;
     uint32_t crc32;
     uint32_t digest;
     uint32_t action_abi_digest;
@@ -115,7 +116,7 @@ typedef struct {
 typedef struct {
     uint8_t  required_domain_mask;
     uint8_t  allowed_domain_mask;
-    uint16_t max_blob_size;
+    uint32_t max_blob_size;
     uint32_t action_abi_digest;
 
     // Exact compiled identities used by behavior cross-reference validation.
@@ -137,7 +138,7 @@ typedef struct {
 typedef struct {
     uint8_t                         domain_mask;
     uint8_t                         domain_count;
-    uint16_t                        byte_length;
+    uint32_t                        byte_length;
     uint32_t                        crc32;
     uint32_t                        digest;
     uint32_t                        action_abi_digest;
@@ -174,7 +175,7 @@ typedef struct {
     uint32_t                                      digest_state;
     noah_profile_envelope_t                       envelope;
     noah_profile_domain_range_t                   payload;         // the domain being decoded
-    uint16_t                                      checksum_offset; // a blob is at most 53,216 bytes
+    uint32_t                                      checksum_offset;
     uint8_t                                       domain;          // its registry index
     bool                                          has_reference_error;
     noah_profile_validator_v1_domain_validation_t domain_validation;

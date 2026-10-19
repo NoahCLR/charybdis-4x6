@@ -147,8 +147,9 @@ static void test_domain_envelopes(void) {
     size_t                        next_offset;
 
     expect_result(noah_profile_domain_v1_encode(&input, encoded, sizeof(encoded), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
-    assert(written == 6u);
-    assert(memcmp(encoded, (const uint8_t[]){0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 0x02u, 0x00u, 0xAAu, 0xBBu}, 6u) == 0);
+    // Schema 4 (D-F28): id, version, then a 32-bit little-endian length.
+    assert(written == 8u);
+    assert(memcmp(encoded, (const uint8_t[]){0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 0x02u, 0x00u, 0x00u, 0x00u, 0xAAu, 0xBBu}, 8u) == 0);
     expect_result(noah_profile_domain_v1_decode(encoded, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(decoded.id == input.id && decoded.version == input.version);
     assert(decoded.payload_length == input.payload_length && memcmp(decoded.payload, input.payload, input.payload_length) == 0);
@@ -169,14 +170,21 @@ static void test_domain_envelopes(void) {
     encoded[1] = NOAH_PROFILE_DOMAIN_VERSION_RGB - 1u;
     expect_result(noah_profile_domain_v1_decode(encoded, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
     encoded[1] = NOAH_PROFILE_DOMAIN_VERSION_RGB;
-    encoded[2] = 0xFFu;
-    encoded[3] = 0xFFu;
+    // Every length byte counts: a length past 65,535 is read whole, not as
+    // its low 16 bits.
+    for (uint8_t byte = 3u; byte < 6u; byte++) {
+        encoded[3] = encoded[4] = encoded[5] = 0u;
+        encoded[byte] = 0x01u;
+        expect_result(noah_profile_domain_v1_decode(encoded, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_TRUNCATED);
+    }
+    encoded[2] = 0x02u;
+    encoded[2] = encoded[3] = encoded[4] = encoded[5] = 0xFFu;
     expect_result(noah_profile_domain_v1_decode(encoded, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_TRUNCATED);
 
-    input.payload_length = UINT16_MAX + (size_t)1u;
+    input.payload_length = NOAH_PROFILE_BLOB_V1_MAX_SIZE + (size_t)1u;
     expect_result(noah_profile_domain_v1_encode(&input, encoded, sizeof(encoded), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
     input.payload_length = sizeof(payload);
-    expect_result(noah_profile_domain_v1_encode(&input, encoded, 5u, &written, &error), NOAH_PROFILE_CODEC_V1_OUTPUT_TOO_SMALL);
+    expect_result(noah_profile_domain_v1_encode(&input, encoded, 7u, &written, &error), NOAH_PROFILE_CODEC_V1_OUTPUT_TOO_SMALL);
     input.payload = NULL;
     expect_result(noah_profile_domain_v1_encode(&input, encoded, sizeof(encoded), &written, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     expect_result(noah_profile_domain_v1_read(encoded, sizeof(encoded), sizeof(encoded) + 1u, &decoded, &next_offset, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
@@ -220,18 +228,23 @@ static void test_blob_rejections(const char *fixture_path) {
     mutated[9] = 2u;
     expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
 
+    // The second domain starts after the first's six-byte header and four
+    // payload bytes.
     memcpy(mutated, valid, valid_length);
-    mutated[16] = NOAH_PROFILE_DOMAIN_V1_RGB;
-    mutated[17] = NOAH_PROFILE_RGB_VERSION;
+    mutated[18] = NOAH_PROFILE_DOMAIN_V1_RGB;
+    mutated[19] = NOAH_PROFILE_RGB_VERSION;
     expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_DUPLICATE_DOMAIN);
     memcpy(mutated, valid, valid_length);
-    memcpy(&mutated[8], &valid[16], valid_length - 16u);
-    memcpy(&mutated[8u + valid_length - 16u], &valid[8], 8u);
+    memcpy(&mutated[8], &valid[18], valid_length - 18u);
+    memcpy(&mutated[8u + valid_length - 18u], &valid[8], 10u);
     expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_DOMAIN_ORDER);
 
     memcpy(mutated, valid, valid_length);
     mutated[10] = 0xFFu;
     mutated[11] = 0xFFu;
+    expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_TRUNCATED);
+    memcpy(mutated, valid, valid_length);
+    mutated[12] = 0x01u; // a length of 65,540: only the high bytes differ
     expect_result(noah_profile_blob_v1_decode(mutated, valid_length, &blob, &error), NOAH_PROFILE_CODEC_V1_TRUNCATED);
     for (size_t extra = 1u; extra <= 16u; extra++) {
         memcpy(mutated, valid, valid_length);
@@ -253,7 +266,7 @@ static void test_blob_encoder_bounds(void) {
         {.id = NOAH_PROFILE_DOMAIN_V1_RGB, .version = NOAH_PROFILE_DOMAIN_VERSION_RGB, .payload = NULL, .payload_length = 0u},
     };
 
-    expect_result(noah_profile_blob_v1_encode(domains, 2u, output, 15u, &written, &error), NOAH_PROFILE_CODEC_V1_OUTPUT_TOO_SMALL);
+    expect_result(noah_profile_blob_v1_encode(domains, 2u, output, 19u, &written, &error), NOAH_PROFILE_CODEC_V1_OUTPUT_TOO_SMALL);
     expect_result(noah_profile_blob_v1_encode(domains, 3u, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_DUPLICATE_DOMAIN);
     domains[1].id = 0x60u;
     expect_result(noah_profile_blob_v1_encode(domains, 2u, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN);
@@ -401,7 +414,7 @@ static void test_current_domain_registry(void) {
         mask |= shape->mask;
         assert(noah_profile_domain_count(mask) == i + 1u);
         for (unsigned version = 0; version <= UINT8_MAX; version++) {
-            uint8_t encoded[4]; size_t written;
+            uint8_t encoded[NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE]; size_t written;
             noah_profile_domain_v1_t domain = {.id = expected[i].id, .version = (uint8_t)version};
             expect_result(noah_profile_domain_v1_encode(&domain, encoded, sizeof(encoded), &written, NULL), version == expected[i].version ? NOAH_PROFILE_CODEC_V1_OK : NOAH_PROFILE_CODEC_V1_UNKNOWN_DOMAIN_VERSION);
         }
@@ -439,8 +452,44 @@ static void test_find_domain_walks_the_envelope(void) {
     assert(!noah_profile_blob_v1_find_domain(&short_reader, 0, written, NOAH_PROFILE_DOMAIN_V1_RGB, &range));
 }
 
+#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
+// Schema 4's 32-bit lengths (D-F28), past 65,535 bytes: a domain that long
+// round-trips, and a second domain after it is found at its full offset.
+static void test_payload_over_64_kib(void) {
+    enum { WIDE = 70000u };
+    static uint8_t                 rgb[WIDE], blob[NOAH_PROFILE_BLOB_V1_MAX_SIZE];
+    static const uint8_t           combos[3] = {7, 8, 9};
+    const noah_profile_domain_v1_t domains[] = {
+        {NOAH_PROFILE_DOMAIN_V1_RGB, NOAH_PROFILE_DOMAIN_VERSION_RGB, rgb, sizeof(rgb)},
+        {NOAH_PROFILE_DOMAIN_V1_COMBOS, NOAH_PROFILE_DOMAIN_VERSION_COMBOS, combos, sizeof(combos)},
+    };
+    noah_profile_blob_v1_t        decoded;
+    noah_profile_domain_range_t   range;
+    noah_profile_codec_v1_error_t error;
+    size_t                        written;
+
+    for (size_t index = 0; index < sizeof(rgb); index++) rgb[index] = (uint8_t)(index * 31u);
+    expect_result(noah_profile_blob_v1_encode(domains, 2u, blob, sizeof(blob), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
+    assert(written == 8u + 6u + WIDE + 6u + 3u);
+    assert(blob[10] == (uint8_t)WIDE && blob[11] == (uint8_t)(WIDE >> 8u) && blob[12] == (uint8_t)(WIDE >> 16u) && blob[13] == 0u);
+    expect_result(noah_profile_blob_v1_decode(blob, written, &decoded, &error), NOAH_PROFILE_CODEC_V1_OK);
+    assert(decoded.domains[0].payload_length == WIDE && !memcmp(decoded.domains[0].payload, rgb, WIDE));
+    assert(decoded.domains[1].payload_length == 3u && decoded.domains[1].payload == &blob[8u + 6u + WIDE + 6u]);
+    noah_profile_reader_t reader = noah_profile_reader_from_memory(blob, written);
+    assert(noah_profile_blob_v1_find_domain(&reader, 0, written, NOAH_PROFILE_DOMAIN_V1_COMBOS, &range));
+    assert(range.offset == 8u + 6u + WIDE + 6u && range.offset > UINT16_MAX && range.length == 3u);
+    // The same blob with its first length cut to its low 16 bits is refused,
+    // not read as a shorter domain.
+    blob[12] = 0u;
+    assert(noah_profile_blob_v1_decode(blob, written, &decoded, &error) != NOAH_PROFILE_CODEC_V1_OK);
+}
+#endif
+
 int main(int argc, char **argv) {
     assert(argc == 2);
+#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
+    test_payload_over_64_kib();
+#endif
     test_shared_blob_vectors(argv[1]);
     test_domain_envelopes();
     test_current_domain_registry();

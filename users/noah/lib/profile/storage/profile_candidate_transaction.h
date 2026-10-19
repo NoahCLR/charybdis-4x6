@@ -29,14 +29,14 @@ typedef enum {
 typedef struct {
     void *context;
     noah_profile_candidate_backend_result_t (*begin)(void *context, const noah_profile_candidate_v1_metadata_t *metadata);
-    noah_profile_candidate_backend_result_t (*write)(void *context, uint16_t offset, const uint8_t *bytes, uint8_t length);
-    noah_profile_candidate_backend_result_t (*read)(void *context, uint16_t offset, uint8_t *bytes, uint8_t length);
+    noah_profile_candidate_backend_result_t (*write)(void *context, uint32_t offset, const uint8_t *bytes, uint8_t length);
+    noah_profile_candidate_backend_result_t (*read)(void *context, uint32_t offset, uint8_t *bytes, uint8_t length);
     // Reads the immutable active source only when its entire supplied identity
     // still matches. Called from scan context, with at most 20 bytes.
-    noah_profile_candidate_backend_result_t (*read_source)(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint8_t *bytes, uint8_t length);
+    noah_profile_candidate_backend_result_t (*read_source)(void *context, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint8_t *bytes, uint8_t length);
     // Optional. Told each REUSE step that was copied: `length` bytes at
     // candidate `offset` came from `source` at `source_offset`.
-    void (*note_reuse)(void *context, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint16_t source_offset, uint8_t length);
+    void (*note_reuse)(void *context, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint32_t source_offset, uint8_t length);
     noah_profile_candidate_backend_result_t (*validation_begin)(void *context, const noah_profile_candidate_v1_metadata_t *metadata, noah_profile_candidate_v1_error_t *error);
     // Each step must return IN_PROGRESS, VALID, REJECTED, or IO_ERROR and obey
     // the per-step reader-work contract above. OK is deliberately not a
@@ -56,7 +56,7 @@ typedef struct {
     uint8_t  schema_major;
     uint8_t  schema_minor;
     uint8_t  supported_domain_mask;
-    uint16_t max_payload_length;
+    uint32_t max_payload_length;
     uint32_t action_abi_digest;
 } noah_profile_candidate_compatibility_t;
 

@@ -1,10 +1,11 @@
 # Profile Split Protocol V1
 
-> Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
-> a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
-> binds a nonzero VIA generation and digest. HID framing remains v1; split
-> framing is version 2 (sized payload chunks and reuse ranges, D-F19).
+> Current firmware accepts only the formats it writes (D-F10, D-F14, D-F28):
+> profile schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8 and
+> sparse PD v3; a 53,216-byte custom payload; and logical store format 6. Every
+> save binds a nonzero VIA generation and digest. Profile Wire is 2.0; split
+> framing is version 3 (32-bit offsets and lengths, D-F28, after version 2's
+> sized payload chunks and reuse ranges, D-F19).
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > A backup in an earlier format is refused, not translated.
 
@@ -14,19 +15,28 @@ remain open
 
 This is a dedicated sibling protocol for the durable live profile. It does not
 extend the VIA region reconciler. Byte 0 of every frame is the framing version,
-`2`; a frame of any other version is refused. Every reply, and every request
-except a payload chunk or a payload reuse, is exactly 32 bytes. A payload chunk
-is its 17-byte header, the chunk and the CRC: 18 + n bytes for an n-byte chunk,
-at least 32 (a shorter chunk is zero-padded to 32). A payload reuse is 36 bytes.
-The last byte of every frame is CRC8 polynomial `0x07` over the bytes before
-it, multi-byte values are little-endian, and every reserved or unused byte is
-zero. A request carries a chunk of at most 110 bytes, the largest request
-being 128 bytes; a chunk that answers a payload request travels in a 32-byte
-reply and so carries at most 14.
+`3`; a frame of any other version is refused. Every frame except a payload
+chunk or a payload reuse is exactly 32 bytes. A payload chunk is its 21-byte
+header, the chunk and the CRC: 22 + n bytes for an n-byte chunk, at least 32
+(a shorter chunk is zero-padded to 32). A payload reuse is 44 bytes. The last
+byte of every frame is CRC8 polynomial `0x07` over the bytes before it,
+multi-byte values are little-endian, and every reserved or unused byte is
+zero. Every offset and length in a frame is 32 bits (D-F28). A chunk carries
+at most 106 bytes, the largest frame being 128 bytes, whether it is pushed as
+a request or pulled as the reply to a payload request.
 
-Version 1 had only 32-byte frames and 14-byte chunks. Both halves run one
-build, so a half on version 1 simply fails to decode its sibling's frames and
-reports it unreadable; nothing durable is at risk.
+Every request asks for a 32-byte reply except a payload request, which asks
+for exactly the frame of the chunk it pulls: what remains of the payload from
+its offset, up to 106 bytes, so 22 + n bytes and at least 32. Its reply starts
+the buffer, and a busy or error answer is a 32-byte frame there with the rest
+zero; a reply with anything nonzero past its frame is refused as torn.
+
+Version 1 had only 32-byte frames and 14-byte chunks; version 2 had 16-bit
+offsets and lengths, 110-byte request chunks and 14-byte reply chunks.
+Version 3 first kept 32-byte replies, whose pulled chunks carried 10 bytes:
+pulling a maximum profile took about 7,600 requests instead of 718. Both
+halves run one build, so a half on an earlier version simply fails to decode
+its sibling's frames and reports it unreadable; nothing durable is at risk.
 
 ## Frame Kinds And Status
 
@@ -52,10 +62,10 @@ answer to a payload reuse, below). Descriptor operations other than
 metadata require OK. Acknowledgement accepts only OK or busy; error frames
 accept neither.
 
-A busy acknowledgement says why in the unused chunk bytes: byte 17 is the busy
-reason, 18 the receiver's store state, 19 its transfer owner and 20 who holds
+A busy acknowledgement says why in the unused chunk bytes: byte 21 is the busy
+reason, 22 the receiver's store state, 23 its transfer owner and 24 who holds
 its storage admission, with the chunk length still zero. A reply the split
-callback writes itself (admission, mailbox full) takes 18–20 from the
+callback writes itself (admission, mailbox full) takes 22–24 from the
 receiver's last scan (the values are listed with candidate status page 1 in
 [Profile Wire](profile-wire-v1.md)). Every other frame keeps those bytes zero.
 Its offset is the receiver's progress only when the store holds the requested
@@ -68,22 +78,25 @@ Metadata, prepare begin, prepare commit, and abort use this layout:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | protocol version, `1` |
+| 0 | 1 | framing version, `3` |
 | 1 | 1 | frame kind |
 | 2 | 1 | status |
-| 3 | 1 | bit 0 has committed profile; bit 1 metadata readable; bit 2 logical record (required for a committed profile) |
-| 4 | 1 | schema major, exactly Profile Wire v1 major |
-| 5 | 1 | schema minor, exactly Profile Wire v1 minor |
-| 6 | 1 | persistent profile flags |
-| 7 | 1 | stable physical origin half, `0` or `1` |
-| 8 | 2 | canonical payload length |
-| 10 | 4 | durable generation counter |
-| 14 | 4 | payload CRC32 |
-| 18 | 4 | canonical payload FNV-1a digest |
-| 22 | 4 | compiled-default digest |
-| 26 | 4 | action-ABI digest |
-| 30 | 1 | Profile Wire domain mask derived from the canonical payload |
+| 3 | 1 | bit 0 has committed profile; bit 1 metadata readable; bit 2 logical record (required for a committed profile); bit 3 stable physical origin half; bit 4 the persistent override flag; bits 5–7 zero |
+| 4 | 1 | schema major, exactly the current schema major |
+| 5 | 1 | schema minor, exactly the current schema minor |
+| 6 | 1 | Profile Wire domain mask derived from the canonical payload |
+| 7 | 4 | canonical payload length, uint32 |
+| 11 | 4 | durable generation counter |
+| 15 | 4 | payload CRC32 |
+| 19 | 4 | canonical payload FNV-1a digest |
+| 23 | 4 | compiled-default digest |
+| 27 | 4 | action-ABI digest |
 | 31 | 1 | frame CRC8 |
+
+Version 2 kept the persistent flags and origin half in bytes 6 and 7 and the
+domain mask in byte 30 beside a 16-bit length; version 3 packs both into the
+flags byte (the store allows one persistent flag, override) to make room for a
+32-bit length.
 
 A readable compiled-default descriptor has no committed profile. Its
 generation, payload length, payload identities, persistent flags, and origin
@@ -98,17 +111,17 @@ whole-profile validation before commit.
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | protocol version, `1` |
+| 0 | 1 | framing version, `3` |
 | 1 | 1 | frame kind |
 | 2 | 1 | status |
 | 3 | 1 | reserved zero |
 | 4 | 4 | correlated durable generation |
 | 8 | 4 | correlated payload digest |
-| 12 | 2 | payload offset or acknowledged next offset |
-| 14 | 2 | total payload length |
-| 16 | 1 | chunk length: `1..110` in a payload chunk, `0` otherwise |
-| 17 | n | payload bytes, then zero padding to byte 30 when n < 14 |
-| last | 1 | frame CRC8: byte 31, or byte 17 + n of a longer chunk |
+| 12 | 4 | payload offset or acknowledged next offset, uint32 |
+| 16 | 4 | total payload length, uint32 |
+| 20 | 1 | chunk length: `1..106` in a payload chunk, `0` otherwise |
+| 21 | n | payload bytes, then zero padding to byte 30 when n < 10 |
+| last | 1 | frame CRC8: byte 31, or byte 21 + n of a longer chunk |
 
 Payload chunks require OK, a nonzero generation, a valid complete profile
 length, a nonempty chunk, and an in-range `offset + length`. Acknowledgement
@@ -129,40 +142,40 @@ it cannot cancel a different live transfer or an uncertain durable phase.
 
 A payload request has the same correlation, offset, and total length fields but
 no chunk. Its response is a payload chunk beginning at the exact requested
-offset. QMK custom RPC is initiated only by the current transport master, so
+offset, as long as the requester's reply buffer: up to 106 bytes. QMK custom RPC is initiated only by the current transport master, so
 this explicit pull prevents USB role from becoming durable profile authority.
 
 ## Payload Reuse
 
 A payload reuse asks the receiver to fill `length` bytes of the copy at
 `offset` from its own active profile, at `source offset`, rather than receive
-them. It is 36 bytes:
+them. It is 44 bytes:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | framing version, `2` |
+| 0 | 1 | framing version, `3` |
 | 1 | 1 | kind, `12` |
 | 2 | 1 | status, OK |
 | 3 | 1 | reserved zero |
 | 4 | 4 | correlated durable generation |
 | 8 | 4 | correlated payload digest |
-| 12 | 2 | destination offset in the copy |
-| 14 | 2 | total payload length |
-| 16 | 2 | length, at least 1 and within the copy |
-| 18 | 2 | source offset |
-| 20 | 4 | source generation |
-| 24 | 4 | source FNV-1a digest |
-| 28 | 4 | source CRC32 |
-| 32 | 1 | source active kind: compiled `0`, committed `1` |
-| 33 | 1 | source origin: compiled `255`, committed `0..1` |
-| 34 | 1 | reserved zero |
-| 35 | 1 | frame CRC8 |
+| 12 | 4 | destination offset in the copy, uint32 |
+| 16 | 4 | total payload length, uint32 |
+| 20 | 4 | length, at least 1 and within the copy, uint32 |
+| 24 | 4 | source offset, uint32 |
+| 28 | 4 | source generation |
+| 32 | 4 | source FNV-1a digest |
+| 36 | 4 | source CRC32 |
+| 40 | 1 | source active kind: compiled `0`, committed `1` |
+| 41 | 1 | source origin: compiled `255`, committed `0..1` |
+| 42 | 1 | reserved zero |
+| 43 | 1 | frame CRC8 |
 
 The source identity is Profile Wire's candidate REUSE source (compiled sources
 have generation zero). The receiver holds a reuse like a chunk: only for the
 copy it is receiving, at or before its next offset (a later start is a gap and
 rejects the copy). It copies from its next offset to the range's end, at most
-110 bytes a scan in reads and writes of at most 20, checking the source's
+106 bytes a scan in reads and writes of at most 20, checking the source's
 whole identity and its compiled-default and action-ABI digests on every read,
 as Profile Wire's REUSE does. Meanwhile it answers BUSY with reason `8`
 (copying) and its progress as the offset, and the ACK with the range's end
@@ -294,17 +307,18 @@ before any deadline return; unchanged values need neither revalidation nor a
 replacement copy. This does not cache payload bytes or defer local changes.
 
 Matrix scan performs at most one transport exchange, one received chunk or
-one scan's share of a reuse range (at most 110 bytes, stored in writes of at
+one scan's share of a reuse range (at most 106 bytes, stored in writes of at
 most 20), or one validator/marker-last commit step of at most 20 bytes. It supports newer-local
 push, newer-peer pull, staged-source prepare/pause/commit/abort,
 byte-identical retries, 50–1,000 ms backoff, disconnect/reconnect, prepared-
 sender preservation across role changes, passive-peer expiry, and terminal
 conflict/corruption/incompatibility states. Every peer loss republishes
 fail-closed authority. The QMK adapter appends `PUT_PROFILE_SPLIT_SYNC`, sends each request at
-its own length with a 32-byte reply, and can be registered only after a real
-owner initializes the reconciler. `users/noah/config.h` raises QMK's
-master-to-slave RPC buffer to 128 bytes for the largest request. QMK carries
-each RPC's own lengths, so every other split RPC still sends its own small
+its own length and reads the reply length the request asks for, and can be
+registered only after a real owner initializes the reconciler.
+`users/noah/config.h` raises both of QMK's RPC buffers to 128 bytes, for the
+largest pushed request and the largest pulled reply. QMK carries each RPC's
+own lengths, so every other split RPC still sends and reads its own small
 frames; the VIA mirror keeps its own 32-byte bound.
 
 An abandoned inbound provisional prepare has its own passive lease expiry. The
@@ -372,7 +386,7 @@ pair advertises them together for the two-half acceptance matrix.
 ## Mandatory logical binding
 
 A transfer sends LOGICAL_BIND (kind 9) before PREPARE_BEGIN, with the exact
-custom generation/digest and nonzero VIA generation/digest in format 5.
+custom generation/digest and nonzero VIA generation/digest in format 6.
 PREPARE_BEGIN without that correlated bind is invalid metadata. The receiver
 retains the bind across repeated BEGINs after BUSY or a lost ACK, replacing it
 when a new bind arrives. Convergence-only mode admits this metadata for crossed

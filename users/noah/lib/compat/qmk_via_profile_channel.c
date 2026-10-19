@@ -122,6 +122,9 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
     if (owner->peer_cleanup_pending) {
         status->state_flags |= NOAH_PROFILE_STATE_PEER_CLEANUP_PENDING;
     }
+    if (owner->stored_earlier_format) {
+        status->state_flags |= NOAH_PROFILE_STATE_STORED_EARLIER_FORMAT;
+    }
     if (owner->owner_state == NOAH_PROFILE_OWNER_GENERATION_CONFLICT || owner->owner_state == NOAH_PROFILE_OWNER_CONCURRENT_COMMIT || noah_profile_authority_is_conflict(owner->authority_state)) {
         status->conflict_count = 1u;
     }
@@ -186,11 +189,6 @@ static bool noah_profile_channel_handle_cadence_get(uint8_t *data, uint8_t lengt
 }
 #    endif
 
-static void noah_profile_channel_write_u16(uint8_t *target, uint16_t value) {
-    target[0] = (uint8_t)(value & 0xffu);
-    target[1] = (uint8_t)((value >> 8) & 0xffu);
-}
-
 static void noah_profile_channel_write_u32(uint8_t *target, uint32_t value) {
     target[0] = (uint8_t)(value & 0xffu);
     target[1] = (uint8_t)((value >> 8) & 0xffu);
@@ -211,7 +209,7 @@ static void noah_profile_channel_write_u32(uint8_t *target, uint32_t value) {
 static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t length) {
     const noah_profile_store_record_t  *record = NULL;
     noah_profile_compiled_v1_metadata_t compiled_metadata;
-    uint16_t                            payload_length;
+    uint32_t                            payload_length;
     uint32_t                            offset;
     uint32_t                            remaining;
     uint16_t                            page;
@@ -260,27 +258,27 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
     if (page == NOAH_PROFILE_WIRE_V1_PAYLOAD_METADATA_PAGE) {
         data[5] = NOAH_PROFILE_WIRE_V1_STATUS_OK;
         data[6] = NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
-        data[7] = 1u; // layout version
+        data[7] = 2u; // layout version: a 32-bit payload length (D-F28)
         data[8] = NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
-        noah_profile_channel_write_u16(&data[9], payload_length);
+        noah_profile_channel_write_u32(&data[9], payload_length);
         if (compiled) {
             // Compiled defaults have no generation: they are what the firmware
             // was built with, not something committed.
-            noah_profile_channel_write_u32(&data[11], 0u);
-            noah_profile_channel_write_u32(&data[15], compiled_metadata.digest);
-            noah_profile_channel_write_u32(&data[19], compiled_metadata.crc32);
-            data[23] = NOAH_PROFILE_STORE_SCHEMA_MAJOR;
-            data[24] = NOAH_PROFILE_STORE_SCHEMA_MINOR;
-            data[25] = compiled_metadata.domain_mask;
+            noah_profile_channel_write_u32(&data[13], 0u);
+            noah_profile_channel_write_u32(&data[17], compiled_metadata.digest);
+            noah_profile_channel_write_u32(&data[21], compiled_metadata.crc32);
+            data[25] = NOAH_PROFILE_STORE_SCHEMA_MAJOR;
+            data[26] = NOAH_PROFILE_STORE_SCHEMA_MINOR;
+            data[27] = compiled_metadata.domain_mask;
         } else {
-            noah_profile_channel_write_u32(&data[11], record->generation);
-            noah_profile_channel_write_u32(&data[15], record->payload_digest);
-            noah_profile_channel_write_u32(&data[19], record->payload_crc32);
-            data[23] = record->schema_major;
-            data[24] = record->schema_minor;
-            data[25] = record->domain_mask;
-            data[26] = record->origin_half;
-            data[27] = record->flags;
+            noah_profile_channel_write_u32(&data[13], record->generation);
+            noah_profile_channel_write_u32(&data[17], record->payload_digest);
+            noah_profile_channel_write_u32(&data[21], record->payload_crc32);
+            data[25] = record->schema_major;
+            data[26] = record->schema_minor;
+            data[27] = record->domain_mask;
+            data[28] = record->origin_half;
+            data[29] = record->flags;
         }
         return true;
     }
@@ -294,7 +292,7 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
     remaining = payload_length - offset;
     chunk     = remaining < NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE ? (uint8_t)remaining : NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
 
-    if (!(compiled ? noah_profile_store_runtime_read_compiled((uint16_t)offset, &data[7], chunk) : noah_profile_store_runtime_read_committed((uint16_t)offset, &data[7], chunk))) {
+    if (!(compiled ? noah_profile_store_runtime_read_compiled(offset, &data[7], chunk) : noah_profile_store_runtime_read_committed(offset, &data[7], chunk))) {
         memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
         data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
         return true;
@@ -360,8 +358,6 @@ NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *da
 _Static_assert(DYNAMIC_KEYMAP_LAYER_COUNT <= UINT8_MAX, "compiled layer count must fit the capability frame");
 _Static_assert(DYNAMIC_KEYMAP_LAYER_COUNT <= NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS, "compiled layer count must fit the declared Profile Wire ceiling");
 _Static_assert(DYNAMIC_KEYMAP_MACRO_COUNT <= UINT8_MAX, "VIA macro count must fit the capability frame");
-_Static_assert(NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX <= UINT16_MAX, "profile payload capacity must fit the capability frame");
-_Static_assert(NOAH_PROFILE_STORAGE_VIA_MACRO_SIZE <= UINT16_MAX, "VIA macro capacity must fit the capability frame");
 _Static_assert(VIA_FIRMWARE_VERSION != 0u, "Profile Wire firmware must advertise a meaningful VIA firmware version");
 _Static_assert((uint8_t)NOAH_PROFILE_WIRE_V1_COMMAND_GET == (uint8_t)id_custom_get_value, "Profile Wire custom-get routing drifted from QMK VIA");
 _Static_assert((uint8_t)NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL == (uint8_t)id_custom_channel, "Profile Wire custom channel drifted from QMK VIA");
@@ -377,6 +373,7 @@ _Static_assert(NOAH_PROFILE_LED_COUNT == NOAH_PROFILE_WIRE_V1_MAX_PHYSICAL_LEDS,
 #    undef NOAH_PROFILE_MUTATION_CHUNK_MAX
 #    undef NOAH_PROFILE_MUTATION_CAPABILITIES
 #    undef NOAH_PROFILE_SPLIT_CAPABILITY
+#    undef NOAH_PROFILE_POINTING_CAPABILITY
 
 #endif
 

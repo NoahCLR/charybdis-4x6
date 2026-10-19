@@ -16,7 +16,7 @@ there; its cross-language runner bodies were moved unchanged into Ark's
 - `portable.bin.pd5`: a populated profile from eight-slot firmware (schema 2,
   RGB v2, PD v1). The firmware refuses it as it is; it is the one vector for
   refusing an earlier format. Its current-format counterpart, with the same
-  worst-case macro and custom-key names, is `tests/fixtures/populated_profile_v3.fixture`.
+  worst-case macro and custom-key names, is `tests/fixtures/populated_profile_v4.fixture`.
 
 The firmware suite decompresses/loads these local inputs using Python or shell,
 then exercises the existing C tests in their normal and sanitizer variants.

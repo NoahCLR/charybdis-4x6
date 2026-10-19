@@ -25,9 +25,9 @@ enum {
 };
 
 typedef struct {
-    uint16_t offset;
-    uint16_t source_offset;
-    uint16_t length;
+    uint32_t offset;
+    uint32_t source_offset;
+    uint32_t length;
 } noah_profile_candidate_store_reuse_range_t;
 
 typedef struct {
@@ -96,15 +96,15 @@ bool                                   noah_profile_candidate_store_backend_rele
 // never imply durability: the returned identity is the provisional store
 // candidate, and both calls fail once local marker-last commit begins.
 bool noah_profile_candidate_store_backend_staged_candidate(const noah_profile_candidate_store_backend_t *backend, noah_profile_store_candidate_t *candidate);
-bool noah_profile_candidate_store_backend_staged_read(void *context, const noah_profile_store_candidate_t *candidate, uint16_t offset, uint8_t *bytes, uint8_t length);
+bool noah_profile_candidate_store_backend_staged_read(void *context, const noah_profile_store_candidate_t *candidate, uint32_t offset, uint8_t *bytes, uint8_t length);
 // The first REUSE range of that staged candidate ending after `offset`, so
 // the peer copy can ask the sibling to fill it from its own active profile.
-bool noah_profile_candidate_store_backend_staged_reuse(const noah_profile_candidate_store_backend_t *backend, const noah_profile_store_candidate_t *candidate, uint16_t offset, noah_profile_candidate_v1_source_t *source, noah_profile_candidate_store_reuse_range_t *range);
+bool noah_profile_candidate_store_backend_staged_reuse(const noah_profile_candidate_store_backend_t *backend, const noah_profile_store_candidate_t *candidate, uint32_t offset, noah_profile_candidate_v1_source_t *source, noah_profile_candidate_store_reuse_range_t *range);
 
 // Reads this half's active profile for the staging owner `owner`, only while
 // its whole identity still matches `source`, with at most 20 bytes. The host
 // uses it for candidate REUSE, the peer receiver for a split reuse range.
-noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_read_active(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t owner, const noah_profile_candidate_v1_source_t *source, uint16_t offset, uint8_t *bytes, uint8_t length);
+noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_read_active(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t owner, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint8_t *bytes, uint8_t length);
 
 // Split logical transactions persist intent and the decision in separate
 // phases. These calls retain the validated profile and admission lease across

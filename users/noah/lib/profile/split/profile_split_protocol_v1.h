@@ -9,20 +9,21 @@
 #include "profile_split_authority.h"
 
 enum {
-    // Framing version 2 added sized payload chunks and PAYLOAD_REUSE. Both
-    // halves run one build, so an older peer simply fails to decode.
-    NOAH_PROFILE_SPLIT_PROTOCOL_VERSION = 2u,
-    // Every reply, and every request except the two below, is this size.
+    // Framing version 2 added sized payload chunks and PAYLOAD_REUSE; version
+    // 3 widened every offset and length to 32 bits (D-F28). Both halves run
+    // one build, so an older peer simply fails to decode.
+    NOAH_PROFILE_SPLIT_PROTOCOL_VERSION = 3u,
+    // Every frame except a payload chunk and a reuse request is this size,
+    // and so is the reply buffer of every request but PAYLOAD_REQUEST.
     NOAH_PROFILE_SPLIT_V1_FRAME_SIZE = 32u,
-    // The largest request: a full payload chunk. It sizes QMK's master-to-
-    // slave RPC buffer; replies keep the 32-byte slave-to-master buffer.
+    // The largest frame either way: a full payload chunk, pushed as a request
+    // or pulled as the reply to a PAYLOAD_REQUEST. It sizes both of QMK's RPC
+    // buffers.
     NOAH_PROFILE_SPLIT_V1_FRAME_MAX = 128u,
-    // A payload chunk frame is its 17-byte header, the chunk and the CRC.
-    NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD = 18u,
-    NOAH_PROFILE_SPLIT_V1_CHUNK_MAX      = NOAH_PROFILE_SPLIT_V1_FRAME_MAX - NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD,
-    // A chunk that answers a PAYLOAD_REQUEST travels in a 32-byte reply.
-    NOAH_PROFILE_SPLIT_V1_REPLY_CHUNK_MAX  = NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD,
-    NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE = 36u,
+    // A payload chunk frame is its 21-byte header, the chunk and the CRC.
+    NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD   = 22u,
+    NOAH_PROFILE_SPLIT_V1_CHUNK_MAX        = NOAH_PROFILE_SPLIT_V1_FRAME_MAX - NOAH_PROFILE_SPLIT_V1_CHUNK_OVERHEAD,
+    NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE = 44u,
 };
 
 typedef enum {
@@ -100,14 +101,14 @@ typedef struct {
     noah_profile_split_descriptor_t descriptor;
     uint32_t                        generation;
     uint32_t                        payload_digest;
-    uint16_t                        offset;
-    uint16_t                        payload_length;
+    uint32_t                        offset;
+    uint32_t                        payload_length;
     uint8_t                         chunk_length;
     uint8_t                         chunk[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX];
     // PAYLOAD_REUSE only: fill `reuse_length` bytes at `offset` from the
     // source's bytes at `reuse_source_offset`.
-    uint16_t                        reuse_length;
-    uint16_t                        reuse_source_offset;
+    uint32_t                        reuse_length;
+    uint32_t                        reuse_source_offset;
     noah_profile_split_v1_source_t  reuse_source;
     uint8_t                         store_format_version;
     uint32_t                        via_generation;
@@ -120,10 +121,22 @@ typedef struct {
 } noah_profile_split_v1_frame_t;
 
 // The frame's length on the wire: 32 bytes, a payload chunk's header plus
-// its chunk, or a reuse frame's 36. Zero for an invalid frame.
+// its chunk, or a reuse frame's 44. Zero for an invalid frame.
 uint8_t noah_profile_split_v1_frame_length(const noah_profile_split_v1_frame_t *frame);
 // Returns the encoded length, or zero when the frame is invalid or does not
 // fit `capacity`.
 uint8_t noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *frame, uint8_t *out, uint8_t capacity);
 // Accepts exactly one frame of its kind's length.
 bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noah_profile_split_v1_frame_t *frame);
+// The reply buffer a request asks QMK for. A PAYLOAD_REQUEST is answered with
+// the chunk at its offset, up to NOAH_PROFILE_SPLIT_V1_CHUNK_MAX bytes, so its
+// buffer is that chunk's frame; every other request's is FRAME_SIZE. Zero for
+// an invalid request.
+uint8_t noah_profile_split_v1_reply_capacity(const noah_profile_split_v1_frame_t *request);
+// The chunk a PAYLOAD_REQUEST for `offset` of `payload_length` bytes is
+// answered with: what remains, up to NOAH_PROFILE_SPLIT_V1_CHUNK_MAX.
+uint8_t noah_profile_split_v1_pulled_chunk_length(uint32_t offset, uint32_t payload_length);
+// Decodes a reply: one frame at the start of the `capacity`-byte buffer, the
+// rest zero. A BUSY or ERROR answering a PAYLOAD_REQUEST is a 32-byte frame
+// in that request's larger buffer.
+bool noah_profile_split_v1_reply_decode(const uint8_t *wire, uint8_t capacity, noah_profile_split_v1_frame_t *frame);

@@ -7,8 +7,8 @@ text on that layout, and clients use the same data to label keys and to judge
 which characters a macro can type.
 
 This document defines the catalogue, the fixture that carries it, the stroke
-encoding and how the data is derived. Settings scalar 27 selects a layout
-(feature bit 22); [runtime flow](runtime-flow.md) defines typing through it.
+encoding and how the data is derived. Settings scalar 27 selects a layout;
+[runtime flow](runtime-flow.md) defines typing through it.
 
 ## Catalogue
 

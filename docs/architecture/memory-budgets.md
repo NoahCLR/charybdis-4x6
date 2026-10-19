@@ -418,9 +418,10 @@ boot and 213,880 B of flash image sections.
 
 ## Complete compiled defaults representation
 
-D-F12 retains a 40-byte compiled-profile handle: metadata and five domain
-offset/length pairs. Factory RGB adds one 551-byte encoded cache, a 40-byte
-reader view and readiness state in SRAM0–3. It shares the stored RGB decoder;
+D-F12 retains a compiled-profile handle of metadata and five domain
+offset/length pairs: 40 bytes, 60 since D-F28 made the pairs 32-bit. Factory
+RGB adds one 551-byte encoded cache, a 40-byte reader view and readiness state
+in SRAM0–3. It shares the stored RGB decoder;
 ordinary frames do no serialization. Compiled combos and settings warm the
 existing effective caches instead of allocating another profile buffer.
 
@@ -610,3 +611,39 @@ Later changes no longer pass the reviewed-path gate: the manifests carry
 adjacencies the linker no longer makes and miss indirect call sites from
 `process_record_user` (an [open issue](../LIVE_EDIT_APP_DIRECTION.md#open-issues)).
 Until they are reviewed, the figures above are the last ones the gate accepted.
+
+## The new base: 32-bit profile lengths — D-F28, 2026-10-19
+
+Every profile length and offset the firmware holds is now 32 bits, so the
+structures that hold them grow. Pair build of the pinned image
+(`tools/build-firmware-pair.sh`, GCC 15.2.0, BK `d280a4471e`), left half
+(`FORCE_SLAVE`, the half built last), against the same build of
+`chore/trial-review-fixes` at `fe4958a8` (`dev` with trial merges of #104 and
+#105):
+
+| | This change | `fe4958a8` |
+| --- | ---: | ---: |
+| SRAM0–3 `.data + .bss` | 208,668 bytes | 208,376 |
+| Below the 209,920-byte tripwire | 1,252 bytes | 1,544 |
+| Live-profile owner (`runtime_owner`) | 11,328 bytes | 11,068 |
+| Compiled-profile handle | 60 bytes | 36 |
+
+On Cortex-M0+ the owner's parts grow as follows: the candidate store backend
+by 128 bytes (its sixteen remembered reuse ranges by 96, its validator by 20),
+the split reconciler by 36 to its 896-byte allowance exactly, the store by
+24, the effective-profile provider by 16, the peer store by 12 and the host
+transaction by 8. The owner's engineering policy rises from 11,264 to 11,520
+bytes and the validator's from 384 to 400; neither is a physical SRAM limit.
+These are link-time values, not runtime high-water; the reviewed-path stack
+gate was not run for this change (it already fails on `dev`, an
+[open issue](../LIVE_EDIT_APP_DIRECTION.md#open-issues)).
+
+Pulled chunks then moved into replies as large as pushed ones (D-F28), which
+costs 184 bytes more per half in the same build: QMK's slave-to-master RPC
+buffer rises from 32 to 128 bytes in the split shared memory (96), and the
+reconciler's cached reply from 32 to 128 (96, so the owner links at 11,424
+bytes, inside its 11,520 policy). The transport CRC's staging buffer already
+held the 128-byte request and does not grow; LTO packing recovers 8 bytes.
+SRAM0–3 `.data + .bss` is 208,852 bytes on the left half, 1,068 below the
+unchanged 209,920-byte tripwire. The reconciler's own 32-bit policy rises from
+896 to 1,024 bytes; it links at 992.

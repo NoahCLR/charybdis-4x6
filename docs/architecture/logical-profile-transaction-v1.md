@@ -1,9 +1,10 @@
 # Logical Profile Transaction V1
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
-> a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
-> binds a nonzero VIA generation and digest. HID and split framing remain v1.
+> schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
+> a 53,216-byte custom payload; and logical store format 6 (D-F28). Every save
+> binds a nonzero VIA generation and digest. Profile Wire is 2.0 and split
+> framing version 3, with 32-bit profile lengths and offsets throughout.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > A backup in an earlier format is refused, not translated.
 
@@ -27,16 +28,20 @@ VIA digest; action ABI digest; and storage schema.
 The custom slot header advances to a format that carries the bound VIA identity
 and two marker states: `prepared` and `committed`. The prepared marker is durable
 transaction intent but is never active authority. The committed marker is the
-logical decision record. Format-1 `NP`, format-2 `NQ`, format-3 `NR` and format-4 `NS`
-records are rejected at boot and admission; firmware does not migrate old
-storage.
+logical decision record. Format-1 `NP`, format-2 `NQ`, format-3 `NR`, format-4 `NS`
+and format-5 `NT` records are rejected at boot and admission; firmware does not
+migrate old storage, and status reports a format-5 slot (Profile Wire state
+flag 9).
 
-Format 5 keeps a 32-byte header with a 53,216-byte payload capacity (D-F14).
-Its `NT` magic binds schema 3.0. Byte 2 packs five domain bits (0–4), origin (5),
-profile flags (6), and a reserved zero bit (7). The header retains payload
-CRC32, compiled-default digest and action-ABI digest, and stores the bound VIA
+Format 6 (D-F28) keeps a 32-byte header with a 53,216-byte payload capacity
+(D-F14) and binds schema 4.0. It has no magic: byte 0 packs five domain bits
+(0–4), origin (5), profile flags (6) and a reserved zero bit (7), and bytes 1–4
+hold the 32-bit payload length. The header retains payload CRC32,
+compiled-default digest and action-ABI digest, and stores the bound VIA
 generation and digest. Validation derives the canonical payload digest again.
-CRC16 protects bytes 0–28; byte 31 is the one-byte prepared/committed marker. This preserves
+CRC16 covers the format version and then bytes 0–28; byte 31 is the one-byte
+prepared (`0x3C`) or committed (`0xC3`) marker, values format 5 never wrote. The
+full layout is in the [storage baseline](storage-and-resource-baseline.md#schema-4-geometry-d-f14-d-f28). This preserves
 firmware-update compatibility checks instead of treating the current firmware's
 identities as if they had been stored with the profile.
 
@@ -261,7 +266,7 @@ stale Apply.
 The host reads a complete snapshot once for review and recovery. After acquiring
 the candidate lease, it checks custom identity, VIA identity, and settings digest
 without rereading the 34,903-byte macro bank. It transfers only changed 28-byte
-VIA blocks. With Profile Wire bits 24 and 25, custom uploads also reuse exact
+VIA blocks. Custom uploads also reuse exact
 active-source ranges and verify bounded batches of streamed chunks; the copy to
 the other half reuses the same ranges from its own active profile and sends
 the rest in chunks of up to 110 bytes. Both halves still prepare the complete

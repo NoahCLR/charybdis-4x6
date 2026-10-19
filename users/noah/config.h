@@ -28,15 +28,18 @@
 #    undef SERIAL_USART_TIMEOUT
 #    define SERIAL_USART_TIMEOUT 5
 
-// Profile Apply copies the profile to the other half in split RPC frames.
-// QMK sends each RPC's own length, so this raises the ceiling for the profile
-// copy's payload chunks only (up to 110 profile bytes a frame instead of 14);
-// every other split RPC keeps its 32-byte frames. The cost is 96 bytes more
-// of the shared RPC buffer and the transport CRC's staging buffer on each
-// half. A full request alone takes about 5.6 ms on the 230,400-baud link,
-// before its reply and handshake.
-// Replies stay at QMK's 32-byte default.
+// Profile Apply copies the profile to the other half in split RPC frames, and
+// the USB half pulls the other half's newer profile in them. QMK sends each
+// RPC's own request and reply lengths, so these raise the ceiling for the
+// profile copy's payload chunks only (up to 106 profile bytes a frame, pushed
+// or pulled, instead of 10); every other split RPC keeps its 32-byte frames.
+// Each costs 96 bytes of its shared RPC buffer on each half; the transport
+// CRC's staging buffer, sized by the larger of the two, adds 96 once. A full
+// frame alone takes about 5.6 ms on the 230,400-baud link, before the rest of
+// its RPC; QMK's serial timeout applies to each wait for the FIFO, not the
+// whole frame.
 #    define RPC_M2S_BUFFER_SIZE 128
+#    define RPC_S2M_BUFFER_SIZE 128
 
 // A failed userspace runtime RPC stops the current send pass. Retry probes use
 // a short exponential backoff so an unplugged half cannot spend every scan in
@@ -215,9 +218,17 @@
 #    endif
 #    define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR 0x8FFFu
 #    define NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR 0x9000u
-#    define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x15FFFu
-#    define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x16000u
-#    define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x22FFFu
+#    ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
+// Host tests only: two 128 KiB slots, so profiles past 65,535 bytes can be
+// tested (D-F28). The firmware build refuses this geometry.
+#        define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x28FFFu
+#        define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x29000u
+#        define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x48FFFu
+#    else
+#        define NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR 0x15FFFu
+#        define NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR 0x16000u
+#        define NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR 0x22FFFu
+#    endif
 #endif
 
 // Preserve participation through native tapping/combo and userspace queues.

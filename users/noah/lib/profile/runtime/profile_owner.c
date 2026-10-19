@@ -78,9 +78,9 @@ static noah_profile_split_descriptor_t descriptor_from_candidate(const noah_prof
     };
 }
 
-static bool local_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length);
+static bool local_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, uint8_t *bytes, uint8_t length);
 
-static bool host_staged_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length) {
+static bool host_staged_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, uint8_t *bytes, uint8_t length) {
     noah_profile_owner_t          *owner = context;
     noah_profile_store_candidate_t candidate;
 
@@ -118,7 +118,7 @@ static bool host_staged_read(void *context, const noah_profile_split_descriptor_
 // own active profile. Only while the candidate is still staged: after this
 // half's commit marker a copy is sent again from the committed record, as
 // bytes.
-static bool host_reuse_plan(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, noah_profile_split_reuse_range_t *range) {
+static bool host_reuse_plan(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, noah_profile_split_reuse_range_t *range) {
     noah_profile_owner_t                      *owner = context;
     noah_profile_store_candidate_t             candidate;
     noah_profile_split_descriptor_t            staged;
@@ -303,7 +303,7 @@ static bool resolve_boot_via_authority(noah_profile_owner_t *owner) {
     return true;
 }
 
-static bool local_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint16_t offset, uint8_t *bytes, uint8_t length) {
+static bool local_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, uint8_t *bytes, uint8_t length) {
     noah_profile_owner_t              *owner = context;
     const noah_profile_store_record_t *record;
     noah_profile_storage_address_t  payload_start;
@@ -312,7 +312,7 @@ static bool local_read(void *context, const noah_profile_split_descriptor_t *des
         return false;
     }
     record = owner->store.committed.slot == NOAH_PROFILE_SLOT_NONE ? NULL : &owner->store.committed;
-    if (!record_matches_descriptor(record, descriptor) || !record_payload_start(record->slot, &payload_start) || (uint32_t)offset + length > record->payload_length) {
+    if (!record_matches_descriptor(record, descriptor) || !record_payload_start(record->slot, &payload_start) || offset > record->payload_length || length > record->payload_length - offset) {
         return false;
     }
     return noah_profile_store_read_span(&owner->store, (payload_start + offset), bytes, length);
@@ -1204,6 +1204,7 @@ bool noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_o
         status->committed     = owner->committed_descriptor;
         status->has_committed = true;
     }
+    status->stored_earlier_format = !committed && owner->store.earlier_format;
     if (owner->split_initialized && noah_profile_split_authority_status(&owner->reconciler.authority, &authority)) {
         status->authority_state  = authority.state;
         status->peer             = authority.peer;

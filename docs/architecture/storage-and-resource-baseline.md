@@ -83,7 +83,7 @@ prefer bounded indexes and derived caches where that keeps ownership simple.
 
 `WEAR_LEVELING_BACKING_SIZE` is 286,720 bytes. RP2040 wear leveling exposes
 half of that as 140 KiB of logical EEPROM; the current map is
-[Schema-3 geometry (D-F14)](#schema-3-geometry-d-f14). The two maps below are
+[Schema-4 geometry (D-F14, D-F28)](#schema-4-geometry-d-f14-d-f28). The two maps below are
 historical, from the 32,768-byte backing and its 16,384 logical bytes.
 
 ### Historical Map Before The Profile Partition
@@ -250,14 +250,44 @@ main-process path and 328/768 bytes for the largest named split-slave path. The
 memory figures are linked values per half; the stack figures cover the manifest
 paths only and are not runtime high-water evidence.
 
-### Schema-3 geometry (D-F14)
+### Schema-4 geometry (D-F14, D-F28)
 
-Format-5 `NT` keeps the `NR` header layout: identity byte 2 holds domain bits
-0–4, origin bit 5 and override bit 6; payload length stays a 16-bit field
-because a slot payload is at most 53,216 bytes. Storage addresses are 32 bits
-(`noah_profile_storage_address_t`), since slot B ends at `0x22FFF`. Format 5
-binds schema 3.0 and accepts only RGB v4, key-behavior v2, combo v3, settings
-v8 (v6 when it landed; D-F25 and D-F26 each added one) and sparse PD v3.
+Store format 6 (D-F28) gives the payload length 32 bits. Its 32-byte slot
+header has no room left for a magic, so the format is keyed into the header
+instead:
+
+| Byte | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | identity: domain bits 0–4, origin bit 5, override bit 6, bit 7 zero |
+| 1 | 4 | payload length, uint32 |
+| 5 | 4 | generation |
+| 9 | 4 | payload CRC32 |
+| 13 | 4 | compiled-default digest |
+| 17 | 4 | action-ABI digest |
+| 21 | 4 | bound VIA generation |
+| 25 | 4 | bound VIA digest |
+| 29 | 2 | CRC16-CCITT over the format version (one byte, `6`) then bytes 0–28 |
+| 31 | 1 | marker: committed `0xC3`, prepared `0x3C`, invalid `0x00` |
+
+Format 5 (`NT`) had a two-byte magic, identity at byte 2, a 16-bit length at
+byte 3, an unkeyed CRC and markers `0xA5`/`0x5A`. A slot with the `NT` magic
+and either format-5 marker is an earlier format: it is refused before its
+payload is read, never converted (Ark's D-L64), and status reports it (Profile Wire
+state flag 9) while nothing current is committed. Any other header from an
+earlier or later format fails the keyed CRC or carries a marker this format
+never writes. Storage addresses are 32 bits (`noah_profile_storage_address_t`),
+since slot B ends at `0x22FFF`, and so are the store's read and write
+callbacks. Format 6 binds schema 4.0 and accepts only RGB v4, key-behavior v2,
+combo v3, settings v8 (v6 when it landed; D-F25 and D-F26 each added one) and
+sparse PD v3: the domain versions are schema 3.0's (D-F28).
+
+The slots stay 53,216-byte payloads in EEPROM until they move to their own
+flash region; nothing in the format, the wire or the split copy stops at
+64 KiB any more. Host tests build a 128 KiB slot geometry
+(`NOAH_PROFILE_TEST_WIDE_SLOTS`, refused by the firmware build) and carry a
+70,000-byte payload through the blob codec, the candidate upload, the split
+frames, the receiving half's staging of a split copy (chunks and a reuse range
+past 64 KiB) and a store write, commit, boot and read.
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
@@ -272,14 +302,13 @@ moves the flash base, so the previous 18 KiB contents are never read.
 
 The macro expansion keeps that flash base and the 140 KiB RAM mirror unchanged.
 VIA sync metadata schema 5 refuses schema 4, so the existing recovery path
-resets VIA and seeds authored defaults before declaring authority. Logical
-store format 5 uses `NT` magic; old `NS` headers are refused even if old payload
-bytes happen to land on a new slot boundary. There is no in-place migration.
+resets VIA and seeds authored defaults before declaring authority. There is no
+in-place migration of the profile store either.
 The 41-byte configuration and 1,920-byte keymap leave 34,903 macro-bank bytes.
 All 128 slot terminators count toward that bank; a single macro can use the
-remaining space without a separate compiled-program limit (feature bit 27).
+remaining space without a separate compiled-program limit.
 
-### Schema-3 ceilings and the maximum profile
+### Schema-4 ceilings and the maximum profile
 
 | Surface | Ceiling |
 | --- | ---: |
@@ -294,30 +323,33 @@ remaining space without a separate compiled-program limit (feature bit 27).
 | Canonical profile payload | 53,216 bytes |
 
 Unlike the V1 ceilings above, every one of these is reachable at once.
-`tests/fixtures/maximum_profile_v3.fixture`, written by
+`tests/fixtures/maximum_profile_v4.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table at
-its maximum and every name at 32 bytes: 37,956 bytes (RGB 591, behaviours
+its maximum and every name at 32 bytes: 37,966 bytes (RGB 591, behaviours
 13,828, combos 9,736, settings 9,669 with every custom-key shortcut (D-F26),
-pointing 4,104, plus 28 bytes of header and envelopes). That leaves 15,260
-bytes of the slot, more than the
+pointing 4,104, plus 38 bytes of header and six-byte envelopes). That leaves
+15,250 bytes of the slot, more than the
 12 KiB reserved for future payload. The fixture is the maximum for the
 encodings, not a limit the firmware checks: a larger profile is refused only
 by a table's own ceiling or the slot.
 
 The owner validates one step a matrix scan, each step one read of at most 20
-bytes. The maximum profile validates in 7,458 scans, a boot that adopts it
-publishes after 9,981, and a peer's prepared copy spends 9,374 scans
+bytes. The maximum profile validates in 7,459 scans, a boot that adopts it
+publishes after 9,983, and a peer's prepared copy spends 9,374 scans
 validating and preparing without transfer progress (its steps read 20 bytes
 like the owner's; they read the 14-byte split chunk size before framing
 version 2), which the split harness's conservative
 5 ms scan keeps inside the owner's 60-second no-progress window. Real
 durations depend on the scan rate and are hardware acceptance evidence.
 
-Split framing version 2 retains bounded mailbox, duplicate-request and outbound
+Split framing version 3 retains bounded mailbox, duplicate-request and outbound
 chunk buffers of at most 128 bytes, plus reuse source/progress state; it never
 keeps a full profile in the reconciler. Its 32-bit state regression allowance
-is 896 bytes (previously 768). The owner's 11,264-byte state allowance and the
-209,920-byte schema-3 static-data tripwire remain unchanged. These allowances
+is 896 bytes (previously 768), which its 32-bit offsets fill exactly. D-F28's
+wider offsets add 292 bytes of static state per half (the owner 260, the
+compiled-profile handle 24, padding 8), so the owner's engineering allowance
+rises from 11,264 to 11,520 bytes; the 209,920-byte static-data tripwire is
+unchanged ([memory budgets](memory-budgets.md#the-new-base-32-bit-profile-lengths--d-f28-2026-10-19)). These allowances
 are engineering policies; acceptance still requires fresh linked memory and
 reviewed-path stack checks for each half, and hardware high-water evidence.
 `run_profile_domain_owner_round_trip_tests.sh` saves, boots, publishes,

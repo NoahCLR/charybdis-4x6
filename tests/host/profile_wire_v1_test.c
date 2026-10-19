@@ -10,10 +10,10 @@
 static const noah_profile_wire_v1_read_service_t service = {
     .capabilities =
         {
-            .protocol_major               = 1u,
-            .schema_major                 = 3u,
+            .protocol_major               = NOAH_PROFILE_WIRE_V1_PROTOCOL_MAJOR,
+            .schema_major                 = 4u,
             .candidate_chunk_max          = 0u,
-            .feature_flags                = NOAH_PROFILE_FEATURE_READ_SURFACE | NOAH_PROFILE_FEATURE_STORAGE_LAYOUT | NOAH_PROFILE_FEATURE_RGB_SCHEMA | NOAH_PROFILE_FEATURE_KEY_BEHAVIOR_SCHEMA | NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD | NOAH_PROFILE_FEATURE_ACTION_ABI_DIGEST | NOAH_PROFILE_FEATURE_COMPILED_PROFILE_HASH | NOAH_PROFILE_FEATURE_WIDE_PAGES | NOAH_PROFILE_FEATURE_STREAMING_MACROS | NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS,
+            .feature_flags                = NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD | NOAH_PROFILE_FEATURE_POINTING,
             .action_abi_digest            = UINT32_C(0x12345678),
             .firmware_version             = UINT32_C(0x00010000),
             .compiled_default_digest      = UINT32_C(0x89ABCDEF),
@@ -30,10 +30,11 @@ static const noah_profile_wire_v1_read_service_t service = {
             .led_bitmap_size              = 8u,
             .custom_key_slots             = 128u,
             .via_macro_slots              = 128u,
-            .max_profile_payload          = 53216u,
-            .profile_slot_payload         = 53216u,
-            .profile_slot_size            = 53248u,
-            .via_macro_bytes              = 34903u,
+            // Past 65,535: the capacities are 32 bits wide (D-F28).
+            .max_profile_payload          = 131040u,
+            .profile_slot_payload         = 131040u,
+            .profile_slot_size            = 131072u,
+            .via_macro_bytes              = 70000u,
             .supported_domain_mask        = 3u,
             .max_name_bytes               = 32u,
             .layer_mask_bits              = 32u,
@@ -131,22 +132,21 @@ static void test_capability_pages(void) {
     assert(noah_profile_wire_v1_handle_get(&service, frame, sizeof(frame)));
     assert_golden("capabilities-page-0-response", frame);
     assert_success(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x41u, 0u);
-    assert(frame[7] == NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT && frame[8] == 3u);
-    assert(frame[9] == 1u && frame[11] == 3u);
+    assert(frame[7] == NOAH_PROFILE_WIRE_V1_CAPABILITY_LAYOUT && frame[7] == 3u && frame[8] == 3u);
+    assert(frame[9] == 2u && frame[10] == 0u && frame[11] == 4u);
     assert(frame[13] == 32u && frame[14] == 0u && frame[15] == 2u);
-    assert(frame[16] == 0x1Fu && frame[17] == 0x0Cu && frame[18] == 0x08u && frame[19] == 0x48u);
+    // The feature word: split and pointing, nothing else (D-F28).
+    assert(frame[16] == 0x05u && frame[17] == 0u && frame[18] == 0u && frame[19] == 0u);
 
     request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x42u, 1u);
     assert_golden("capabilities-page-1-request", frame);
     assert(noah_profile_wire_v1_handle_get(&service, frame, sizeof(frame)));
     assert_golden("capabilities-page-1-response", frame);
     assert_success(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x42u, 1u);
-    assert(frame[7] == 16u && frame[8] == 16u && frame[9] == 128u && frame[10] == 5u);
-    // Byte 4 (populated steps) and bytes 17..18 (slot size) moved to page 2.
-    assert(frame[11] == 0u && frame[24] == 0u && frame[25] == 0u);
-    assert(frame[20] == 0xE0u && frame[21] == 0xCFu && frame[22] == 0xE0u && frame[23] == 0xCFu);
-    assert(frame[26] == 0x57u && frame[27] == 0x88u);
-    assert(frame[28] == 3u && frame[29] == 0u && frame[30] == 0u && frame[31] == 0u);
+    // Layout 3: every byte-wide ceiling, in order, then zero.
+    assert(frame[7] == 16u && frame[8] == 16u && frame[9] == 128u && frame[10] == 5u && frame[11] == 128u);
+    assert(frame[18] == 128u && frame[19] == 3u && frame[20] == 32u && frame[21] == 32u && frame[22] == 60u);
+    for (uint8_t index = 23u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
 
     // Page 2 holds the fields wider than a byte.
     request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x45u, 2u);
@@ -154,9 +154,12 @@ static void test_capability_pages(void) {
     assert(noah_profile_wire_v1_handle_get(&service, frame, sizeof(frame)));
     assert_golden("capabilities-page-2-response", frame);
     assert_success(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x45u, 2u);
-    assert(frame[7] == 0x80u && frame[8] == 0x02u && frame[9] == 5u);
-    assert(frame[10] == 0u && frame[11] == 0xD0u && frame[12] == 0u && frame[13] == 0u);
-    assert(frame[14] == 32u && frame[15] == 32u && frame[16] == 60u);
+    assert(frame[7] == 0x80u && frame[8] == 0x02u);
+    assert(frame[9] == 0x00u && frame[10] == 0x00u && frame[11] == 0x02u && frame[12] == 0x00u);
+    assert(frame[13] == 0xE0u && frame[14] == 0xFFu && frame[15] == 0x01u && frame[16] == 0x00u);
+    assert(frame[17] == 0xE0u && frame[18] == 0xFFu && frame[19] == 0x01u && frame[20] == 0x00u);
+    assert(frame[21] == 0x70u && frame[22] == 0x11u && frame[23] == 0x01u && frame[24] == 0x00u);
+    for (uint8_t index = 25u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) assert(frame[index] == 0u);
 
     request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x46u, 3u);
     assert(noah_profile_wire_v1_handle_get(&service, frame, sizeof(frame)));
@@ -215,15 +218,13 @@ static void test_malformed_requests(void) {
 }
 
 int main(int argc, char **argv) {
-    assert(NOAH_PROFILE_FEATURE_MACRO_PROTECTION == (1u << 23));
-    assert(NOAH_PROFILE_FEATURE_MACRO_OUTPUT_ISOLATION == (1u << 26));
-    assert(NOAH_PROFILE_FEATURE_STREAMING_MACROS == (1u << 27));
-    assert(NOAH_PROFILE_FEATURE_POINTING_CLICKS == (1u << 28));
-    assert(NOAH_PROFILE_FEATURE_POINTING_MACROS == (1u << 29));
-    assert(NOAH_PROFILE_FEATURE_COMBO_OUTPUT_BEHAVIORS == (1u << 30));
-    assert(NOAH_PROFILE_FEATURE_UNIFIED_TAPPING == (1u << 31));
-    assert(NOAH_PROFILE_FEATURE_CANDIDATE_REUSE == (1u << 24));
-    assert(NOAH_PROFILE_FEATURE_CANDIDATE_STREAM == (1u << 25));
+    // The new base's word (D-F28): only what a build varies by.
+    assert(NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD == (1u << 0));
+    assert(NOAH_PROFILE_FEATURE_SAVES == (1u << 1));
+    assert(NOAH_PROFILE_FEATURE_POINTING == (1u << 2));
+    assert(NOAH_PROFILE_FEATURES_KNOWN == 0x07u);
+    assert(NOAH_PROFILE_WIRE_V1_PROTOCOL_MAJOR == 2u && NOAH_PROFILE_WIRE_V1_PROTOCOL_MINOR == 0u);
+    assert(NOAH_PROFILE_STATE_STORED_EARLIER_FORMAT == (1u << 9));
     assert(argc == 2);
     fixture_path = argv[1];
     test_capability_pages();

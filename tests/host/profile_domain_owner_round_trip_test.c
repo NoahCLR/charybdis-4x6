@@ -80,13 +80,13 @@ static uint32_t cut_at = UINT32_MAX;
 static bool     power_lost(void) {
     return writes > cut_at;
 }
-static bool    memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
+static bool    memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     (void)context;
     assert(length <= 32 && (size_t)address + length <= sizeof(eeprom));
     memcpy(target, eeprom + address, length);
     return true;
 }
-static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
+static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length) {
     (void)context;
     assert(length <= 20 && (size_t)address + length <= sizeof(eeprom));
     if (writes++ >= cut_at) return true;
@@ -158,11 +158,10 @@ static uint8_t submit_transfer(size_t length, bool reuse) {
     frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN);
     frame[5] = NOAH_PROFILE_SCHEMA_MAJOR;
     frame[7] = NOAH_PROFILE_DOMAIN_MASK_ALL;
-    u16(frame + 9, (uint16_t)length);
-    u32(frame + 11, crc(candidate, length));
-    u32(frame + 15, digest(candidate, length));
-    u32(frame + 19, owner.compiled.metadata.action_abi_digest);
-    frame[23] = NOAH_PROFILE_LOGICAL_STORE_VERSION;
+    u32(frame + 8, (uint32_t)length);
+    u32(frame + 12, crc(candidate, length));
+    u32(frame + 16, digest(candidate, length));
+    u32(frame + 20, owner.compiled.metadata.action_abi_digest);
     u32(frame + 24, 6);
     u32(frame + 28, 0xabcdef01u);
     send(frame);
@@ -183,14 +182,14 @@ static uint8_t submit_transfer(size_t length, bool reuse) {
             }
             if (equal >= 80) {
                 frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE);
-                u16(frame + 5, (uint16_t)offset);
-                u16(frame + 7, (uint16_t)offset);
-                u16(frame + 9, (uint16_t)equal);
-                u32(frame + 11, source.identity.generation);
-                u32(frame + 15, source.identity.payload_digest);
-                u32(frame + 19, source.identity.payload_crc32);
-                frame[23] = source.identity.kind - 1u;
-                frame[24] = source.identity.origin;
+                u32(frame + 5, (uint32_t)offset);
+                u32(frame + 9, (uint32_t)offset);
+                u32(frame + 13, (uint32_t)equal);
+                u32(frame + 17, source.identity.generation);
+                u32(frame + 21, source.identity.payload_digest);
+                u32(frame + 25, source.identity.payload_crc32);
+                frame[29] = source.identity.kind - 1u;
+                frame[30] = source.identity.origin;
                 send(frame);
                 assert(!owner.host_transaction.poisoned);
                 offset += equal;
@@ -200,9 +199,9 @@ static uint8_t submit_transfer(size_t length, bool reuse) {
         }
         frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK);
         uint8_t count = length - offset < 20 ? (uint8_t)(length - offset) : 20;
-        u16(frame + 5, (uint16_t)offset);
-        frame[7] = count;
-        memcpy(frame + 8, candidate + offset, count);
+        u32(frame + 5, (uint32_t)offset);
+        frame[9] = count;
+        memcpy(frame + 10, candidate + offset, count);
         send(frame);
         offset += count;
     }
@@ -325,7 +324,7 @@ static void reboot(void) {
 
 // ─── The maximum profile (D-F14) ────────────────────────────────────────────
 //
-// tests/fixtures/maximum_profile_v3.fixture holds every table at its
+// tests/fixtures/maximum_profile_v4.fixture holds every table at its
 // simultaneous maximum (tests/host/make_maximum_profile.py). It must validate,
 // commit, boot and publish whole; mutated or truncated copies must be refused
 // without touching the active generation; and a save cut by lost power must
@@ -385,8 +384,9 @@ static void put_u16(uint8_t *p, uint16_t value) {
     p[1] = (uint8_t)(value >> 8);
 }
 static size_t domain_offset(uint8_t id) {
-    for (size_t at = 8; at < maximum_length; at += 4u + (size_t)(maximum[at + 2] | maximum[at + 3] << 8))
-        if (maximum[at] == id) return at + 4u;
+    // Schema 4 envelopes: id, version, then a 32-bit length (D-F28).
+    for (size_t at = 8; at < maximum_length; at += 6u + (size_t)((uint32_t)maximum[at + 2] | (uint32_t)maximum[at + 3] << 8 | (uint32_t)maximum[at + 4] << 16 | (uint32_t)maximum[at + 5] << 24))
+        if (maximum[at] == id) return at + 6u;
     assert(!"domain missing");
     return 0;
 }

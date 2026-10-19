@@ -1,12 +1,15 @@
 # Profile Wire V1
 
-> Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 3.0; a 53,216-byte custom payload; and logical store format 5
-> (`NT`). Every save binds a nonzero VIA generation and digest. HID and split
-> framing remain v1. Older profile/store formats and the legacy GET 9 source
-> page are rejected. A backup in an earlier format is refused, not translated.
+> Current firmware accepts only the formats it writes (D-F10, D-F14, D-F28):
+> Profile Wire 2.0, profile schema 4.0, a 53,216-byte custom payload, and
+> logical store format 6. Every profile length and offset is 32 bits wide, in
+> storage and on the wire. Every save binds a nonzero VIA generation and
+> digest. Split framing is version 3. Older profile/store formats and the
+> legacy GET 9 source page are rejected. A backup in an earlier format is
+> refused, not translated.
 
-Status: accepted Stage 00 wire contract
+Status: accepted wire contract; Profile Wire 2.0 opens the new base (D-F28).
+The file keeps its `v1` name, as do the C modules that implement it.
 
 All multi-byte integers use little-endian byte order. All reserved bytes and
 reserved flag bits must be zero. Encoders emit one canonical representation;
@@ -21,23 +24,29 @@ The blob is independent of Raw HID framing and EEPROM slot metadata.
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 4 | ASCII magic `NLP1` |
-| 4 | 1 | schema major, `3` |
+| 4 | 1 | schema major, `4` |
 | 5 | 1 | schema minor, initially `0` |
 | 6 | 1 | domain count |
 | 7 | 1 | flags; bit 0 means canonical encoding, all others reserved |
 
-The transport candidate length or storage header supplies total blob length.
-Schema 3.0 is capped at 53,216 bytes, one 52 KiB slot less its 32-byte header
-(D-F14); schemas 1 and 2 are refused.
+The transport candidate length or storage header supplies total blob length,
+a 32-bit field everywhere it travels. Schema 4.0 is capped at 53,216 bytes, one
+52 KiB slot less its 32-byte header (D-F14), until the slots move to their own
+flash region; nothing in the format itself stops at 64 KiB. Schemas 1 to 3 are
+refused.
 
-### Domain Envelope — 4 Bytes Plus Payload
+### Domain Envelope — 6 Bytes Plus Payload
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 1 | domain id |
 | 1 | 1 | domain version |
-| 2 | 2 | payload length |
-| 4 | N | domain payload |
+| 2 | 4 | payload length, uint32 |
+| 6 | N | domain payload |
+
+Schema 4.0 differs from 3.0 only here: the payload length was 16 bits, and
+the envelope 4 bytes. Domain versions keep their numbers (D-F28); a domain's
+payload bytes are the same in both.
 
 Domains appear once, in ascending id order, with no padding or trailing bytes.
 Unknown required domains reject the candidate. Unknown optional domains are
@@ -324,7 +333,7 @@ Firmware built without combos reports a
 valid disabled empty table. No SET or SAVE operation exists for this value.
 
 The request takes a 16-bit page, its low byte at request byte 4 and its high
-byte at byte 5 (feature bit 19). Every successful page has exactly 25 payload
+byte at byte 5. Every successful page has exactly 25 payload
 bytes. Metadata is page 0:
 
 | Offset | Size | Field |
@@ -353,7 +362,7 @@ Row `n` occupies pages `2 + 2n` (page A) and `3 + 2n` (page B):
 | A | 1 | 1 | input count, `2..16` |
 | A | 2 | 2 | native output keycode; zero means a firmware callback |
 | A | 4 | 2 | combo window in milliseconds, including per-combo hook result |
-| A | 6 | 1 | flags: bit 0 must hold, 1 must tap, 2 press in order, 3 follows the default window, 4 disabled, 5 bypass output behaviour (feature bit 30) |
+| A | 6 | 1 | flags: bit 0 must hold, 1 must tap, 2 press in order, 3 follows the default window, 4 disabled, 5 bypass output behaviour |
 | A | 7 | 4 | allowed-layer mask, uint32, one bit per layer; bits at or above the layer count zero |
 | A | 11 | 14 | native inputs 0..6 in declared order, uint16 each; unused entries zero |
 | B | 0 | 18 | native inputs 7..15, uint16 each; unused entries zero |
@@ -421,15 +430,25 @@ A successful v1 capability or status page has exactly 25 payload bytes. The
 desktop correlates all five echoed bytes; a broad command-only match is not
 valid for this channel.
 
-Capabilities use three pages (response layout `2`, D-F14). Page 0 contains
-the response-layout version, page count, protocol/schema versions, report and
-chunk sizes, status-page count, feature flags, action-ABI digest, firmware
-version, and compiled-default digest. Page 1 contains compiled and maximum
-layer/behavior/combo/RGB/macro capacities, the custom-key slot count (payload
-byte 11), the selected schema's payload capacities and the advertised VIA
-macro bound. Feature bits distinguish schema/storage knowledge from candidate
-write, commit, preview, activation, and peer support, so read-only firmware
-does not advertise write operations prematurely.
+Capabilities use three pages (response layout `3`, D-F28).
+
+| Page 0 byte | Field |
+| ---: | --- |
+| 0 | response layout, `3` |
+| 1 | capability page count, `3` |
+| 2 | Profile Wire major, `2` |
+| 3 | Profile Wire minor, `0` |
+| 4 | schema major, `4` |
+| 5 | schema minor, `0` |
+| 6 | report size, `32` |
+| 7 | candidate chunk capacity, `0` or `1..20` |
+| 8 | status page count, `2` |
+| 9–12 | feature word, below |
+| 13–16 | action-ABI digest; zero until the live-profile owner reports |
+| 17–20 | firmware version |
+| 21–24 | compiled-default digest; zero until the owner reports |
+
+Page 1 holds every ceiling that fits a byte:
 
 | Page 1 byte | Field |
 | ---: | --- |
@@ -437,35 +456,62 @@ does not advertise write operations prematurely.
 | 1 | maximum logical layers |
 | 2 | maximum behaviour rows |
 | 3 | supported tap depth (maximum tap steps per behaviour) |
-| 4 | zero; the populated-step ceiling is on page 2 |
-| 5 | maximum combos |
-| 6 | maximum inputs per combo |
-| 7 | maximum reusable RGB groups |
-| 8 | maximum RGB stage-group rows |
-| 9 | physical LED count |
-| 10 | LED bitmap bytes |
-| 11 | custom-key slots |
-| 12 | VIA macro slots |
-| 13–14 | maximum profile payload |
-| 15–16 | slot payload capacity |
-| 17–18 | zero; the slot size is on page 2 |
-| 19–20 | VIA macro bank bytes |
-| 21 | supported domain mask |
-| 22–24 | zero |
+| 4 | maximum combos |
+| 5 | maximum inputs per combo |
+| 6 | maximum reusable RGB groups |
+| 7 | maximum RGB stage-group rows |
+| 8 | physical LED count |
+| 9 | LED bitmap bytes |
+| 10 | custom-key slots |
+| 11 | VIA macro slots |
+| 12 | supported domain mask; zero until the owner reports |
+| 13 | maximum encoded bytes per name |
+| 14 | layer-mask width in bits, `32` |
+| 15 | placement positions per layer (matrix rows × columns) |
+| 16–24 | zero |
 
-Page 2 carries the fields wider than a byte:
+Page 2 holds the wider ones; every byte count is 32 bits:
 
 | Page 2 byte | Field |
 | ---: | --- |
 | 0–1 | maximum populated behaviour steps |
-| 2 | supported tap depth (equal to page 1 byte 3) |
-| 3–6 | profile slot size in bytes |
-| 7 | maximum encoded bytes per name |
-| 8 | layer-mask width in bits, `32` |
-| 9 | placement positions per layer (matrix rows × columns) |
-| 10–24 | zero |
+| 2–5 | profile slot size in bytes |
+| 6–9 | maximum profile payload |
+| 10–13 | slot payload capacity |
+| 14–17 | VIA macro bank bytes |
+| 18–24 | zero |
 
-Capability feature bits are:
+### The feature word
+
+Everything the base does is implied by its Profile Wire and schema versions,
+which a client requires exactly (Ark's D-L64). The feature word holds only what a
+build genuinely varies by, never a step in the firmware's history (D-F28); a
+later capability raises the minor version instead. No firmware behaviour
+depends on a bit: the word only describes the build.
+
+| Bit | Meaning |
+| ---: | --- |
+| 0 | split keyboard: this build is one half of a split pair; a save copies the profile to the other half, and status reports the peer |
+| 1 | saves: candidate writes (with reuse and streaming chunks), durable commit and activation. Set once the live-profile owner reports, in a build that saves |
+| 2 | pointing device: the build has one, so pointing keys and the pointing domain mean something on it |
+| 3–31 | reserved, zero |
+
+Supported-domain-mask bits 0–4 are RGB, key behaviors, combos, portable
+settings and pointing. Candidate chunk capacity is zero exactly when bit 1 is
+clear and otherwise `1..20`. Before the owner reports, the word holds bits 0
+and 2 only, and the digests and domain mask are zero. The live client rejects
+inconsistent combinations before it offers a live operation.
+
+#### The Profile Wire 1 feature word (retired)
+
+Profile Wire 2 retired every bit of the earlier word; this is their one
+record. What each promised is now part of the base, except that bit 4 is
+today's bit 0; bits 5, 6, 8, 9, 12, 24 and 25 are today's bit 1 (peer
+reconciliation is bits 0 and 1 together); bits 2 and 3 are supported-domain-mask
+bits 0 and 1; bits 10 and 11 are the nonzero digests on page 0 (status reports
+"digests unavailable" until then); and bits 7 (RGB preview, never built), 13
+and 20 have no successor. "Require this bit" in the old text means nothing
+now: every Profile Wire 2 firmware does what the bit promised.
 
 | Bit | Meaning |
 | ---: | --- |
@@ -502,18 +548,6 @@ Capability feature bits are:
 | 30 | combo output behaviour permissions: settings header byte 5 bit 0 bypasses all combo output behaviours; combo v3 row flag bit 4 bypasses one output. Both zero means allowed. Native combo readback v3 row flag bit 5 reports the per-combo bypass. Require this bit before writing either extension. See [participation policy](participation-policy.md#combo-output-behaviour-permission) |
 | 31 | unified tapping: every `LT()`, `MT()` and `OSM()` key is decided by the key runtime with or without a behaviour row, and a key without a row behaves exactly as with an empty one; behaviours switched off or bypassed ignore the row only. QMK's tapping engine classifies no record of a key the firmware supports, physical or combo output. A dual-role key (`LT`, `MT`, `OSM`, `TT`, `OSL`) holds at the dual-role setting (settings id 0) unless its row sets its own time; every other row holds at the tap/hold setting. Tapped and then held again at once, such a key starts a new hold rather than repeating its tap. A row without steps is no row for a key's taps and for whether the runtime handles it: a plain key with one stays native, `TT()` keeps its own taps, and its hold times apply only to a key the runtime handles anyway (both joined the bit on the same unreleased branch). Extends bits 17 and 18 (D-F27) without changing profile bytes |
 
-Bit 31 is the last bit of the 32-bit feature word: the word is full, so a
-further capability needs a new field or a protocol change, not a bit.
-
-Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
-settings respectively. RGB and behavior domain bits must agree exactly with
-their schema feature bits. Candidate chunk capacity is
-zero exactly when candidate writes are absent and otherwise is `1..20`.
-Commit, runtime activation, candidate reuse and streaming chunks require candidate writes. RGB preview also
-requires the RGB domain. Peer reconciliation requires both split-keyboard and
-persistent-commit support. The live client rejects inconsistent combinations
-before it offers a live operation.
-
 Status also uses two pages. Page 0 reports state flags and source, compiled,
 active, pending, and committed digests. Page 1 reports active, committed, and
 peer generation identities plus transaction, conflict, validation, and error
@@ -521,7 +555,7 @@ state. Until the store and generated compiled digest land, firmware truthfully
 reports `compiled-only` with `digests unavailable`; zero is not presented as a
 real digest.
 
-State flags (page 0, bytes 2–3). Bits 9–15 are reserved and must be zero.
+State flags (page 0, bytes 2–3). Bits 10–15 are reserved and must be zero.
 
 | Bit | Flag |
 | ---: | --- |
@@ -534,6 +568,7 @@ State flags (page 0, bytes 2–3). Bits 9–15 are reserved and must be zero.
 | 6 | waiting for a safe activation boundary |
 | 7 | digests unavailable |
 | 8 | peer cleanup pending |
+| 9 | a slot holds a profile in an earlier store format |
 
 Peer cleanup pending (added 2026-09-23) means a cancelled save's split ABORT
 was never acknowledged, so the USB half released its own side after
@@ -543,6 +578,12 @@ marker exists on either half, and durable authority is unchanged. Until the
 peer acknowledges the retried ABORT, the keyboard starts no new save or split
 transfer; a peer that never does needs a restart. A decoder that predates the
 bit rejects the status while it is set, as it rejects any unknown flag.
+
+Bit 9 (D-F28) means a slot holds a profile written in an earlier store format
+(format 5, `NT`) and nothing current is committed. The firmware never reads or
+converts such a slot (Ark's D-L64): the keyboard runs its compiled defaults, and
+bit 0 is set with it. The bit clears once a profile is saved, which writes the
+other slot; the earlier one stays untouched until a later save reuses it.
 
 ### Sparse VIA Macro Read Map — GET Value `0x0c`
 
@@ -592,8 +633,9 @@ storage, backup, Apply and recovery formats do not change.
 ### Payload Readback — GET Values `0x04` And `0x05`
 
 GET `0x04` reads the committed payload and `0x05` the compiled defaults the
-firmware was built with, through the envelope above with a wide page (feature
-bit 19): a 53,216-byte payload needs 2,130 pages. Page 0 is metadata; page
+firmware was built with, through the envelope above with a wide page (request
+byte 4 its low byte, byte 5 its high byte): a 53,216-byte payload needs 2,130
+pages, and 16 bits of page reach 1.6 MB. Page 0 is metadata; page
 `n` from 1 carries payload bytes `(n - 1) × 25` onward, at most 25, with the
 payload length byte giving the count. A page past the end answers status `2`;
 status `3` means nothing is committed, or the compiled defaults cannot be
@@ -601,18 +643,21 @@ opened. Page 0's 25-byte payload, little-endian:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | layout version `1` |
+| 0 | 1 | layout version `2` |
 | 1 | 1 | page payload size `25` |
-| 2 | 2 | payload length |
-| 4 | 4 | generation; `0` for the compiled defaults |
-| 8 | 4 | FNV-1a payload digest |
-| 12 | 4 | CRC32 of the payload |
-| 16 | 1 | schema major |
-| 17 | 1 | schema minor |
-| 18 | 1 | domain mask |
-| 19 | 1 | origin half; committed record only |
-| 20 | 1 | record flags; committed record only |
-| 21 | 4 | reserved, zero |
+| 2 | 4 | payload length, uint32 |
+| 6 | 4 | generation; `0` for the compiled defaults |
+| 10 | 4 | FNV-1a payload digest |
+| 14 | 4 | CRC32 of the payload |
+| 18 | 1 | schema major |
+| 19 | 1 | schema minor |
+| 20 | 1 | domain mask |
+| 21 | 1 | origin half; committed record only |
+| 22 | 1 | record flags; committed record only |
+| 23 | 2 | reserved, zero |
+
+Layout 1 (Profile Wire 1) had a 16-bit length at offset 2 and every later
+field two bytes earlier.
 
 ### Native VIA Buffer Admission
 
@@ -642,8 +687,8 @@ uses VIA custom save command `0x09`. Both use custom channel `0x00` and an exact
 | `0x12` | validate candidate |
 | `0x13` | durably commit and request safe activation |
 | `0x14` | abort candidate |
-| `0x1B` | reuse active candidate bytes, feature bit 24 |
-| `0x1C` | write streaming candidate chunk, feature bit 25 |
+| `0x1B` | reuse active candidate bytes |
+| `0x1C` | write streaming candidate chunk |
 
 Custom set values `0x15`, `0x16`, `0x17` and `0x1A` belong to the logical VIA
 staging channel, specified in
@@ -666,17 +711,20 @@ Begin candidate uses this complete layout:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 5 | 1 | schema major |
-| 6 | 1 | schema minor |
-| 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings, and schema-2 bit 4 PD |
-| 8 | 1 | flags, initially zero |
-| 9 | 2 | canonical blob length, `8..53216`, schema 3.0 only |
-| 11 | 4 | CRC32 of the exact canonical blob |
-| 15 | 4 | FNV-1a digest of the exact canonical blob |
-| 19 | 4 | action-ABI digest used to encode actions |
-| 23 | 1 | store format, exactly `5` |
+| 5 | 1 | schema major, `4` |
+| 6 | 1 | schema minor, `0` |
+| 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings, 4 pointing |
+| 8 | 4 | canonical blob length, `8..53216`, uint32 |
+| 12 | 4 | CRC32 of the exact canonical blob |
+| 16 | 4 | FNV-1a digest of the exact canonical blob |
+| 20 | 4 | action-ABI digest used to encode actions |
 | 24 | 4 | nonzero bound VIA generation |
 | 28 | 4 | nonzero bound VIA digest |
+
+Profile Wire 1's BEGIN also carried a flags byte (always zero) and the store
+format (`5`); a 32-bit length leaves no room for either, and the protocol
+version now implies the store format (6). A length whose low 16 bits are in
+range but whose high bytes are not is refused like any other.
 
 The requested-domain mask may be zero for the canonical empty profile and may
 contain only the domains advertised by that firmware. Compatibility with the build's advertised
@@ -684,7 +732,7 @@ schema, domain mask, action ABI, and capacity is checked by the scan owner
 before storage work begins.
 
 A repeated BEGIN for the same transaction is idempotent only when every field
-matches the original, including store format and bound VIA generation/digest.
+matches the original, including the bound VIA generation/digest.
 A changed field rejects and poisons the candidate with `CONFLICTING_RETRY`;
 it cannot replace the original binding or restart storage work. Repeating the
 original BEGIN afterward does not revive the poisoned candidate.
@@ -693,10 +741,10 @@ Candidate chunk uses this complete layout:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 5 | 2 | zero-based byte offset in the candidate blob |
-| 7 | 1 | chunk length, `1..20` |
-| 8 | 20 | chunk bytes, followed by zero padding |
-| 28 | 4 | reserved, all zero |
+| 5 | 4 | zero-based byte offset in the candidate blob, uint32 |
+| 9 | 1 | chunk length, `1..20` |
+| 10 | 20 | chunk bytes, followed by zero padding |
+| 30 | 2 | reserved, all zero |
 
 Chunks are sequential. A retry of an already staged `{transaction, offset,
 length, bytes}` tuple is accepted after the scan owner reads and compares the
@@ -706,24 +754,23 @@ and nonzero padding are rejected.
 
 #### Differential candidate transfer
 
-Feature bit 24 advertises REUSE (`SET 0x1B`); bit 25 advertises STREAM_CHUNK
-(`SET 0x1C`). Both require candidate writes. The capability layout, schema,
-stored record format and existing operations retain their meanings. A client
-without these features uses ordinary complete uploads.
+REUSE (`SET 0x1B`) and STREAM_CHUNK (`SET 0x1C`) come with candidate writes
+(feature bit 1, saves). A client may still upload every byte with ordinary
+chunks.
 
 REUSE uses the same transaction header as CHUNK:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 5 | 2 | destination offset in the new candidate |
-| 7 | 2 | source offset in the active canonical blob |
-| 9 | 2 | copy length, `1..1024` |
-| 11 | 4 | source generation |
-| 15 | 4 | source FNV-1a digest |
-| 19 | 4 | source CRC32 |
-| 23 | 1 | source active kind: compiled `0`, committed `1` |
-| 24 | 1 | source origin: compiled `255`, committed `0..1` |
-| 25 | 7 | reserved, all zero |
+| 5 | 4 | destination offset in the new candidate, uint32 |
+| 9 | 4 | source offset in the active canonical blob, uint32 |
+| 13 | 4 | copy length, `1..1024`, uint32 |
+| 17 | 4 | source generation |
+| 21 | 4 | source FNV-1a digest |
+| 25 | 4 | source CRC32 |
+| 29 | 1 | source active kind: compiled `0`, committed `1` |
+| 30 | 1 | source origin: compiled `255`, committed `0..1` |
+| 31 | 1 | reserved, zero |
 
 Compiled sources require generation zero; committed sources require a nonzero
 generation. Destination ranges must start at the exact next staged offset.
@@ -827,28 +874,51 @@ commit, or activation success.
 
 ### Candidate Operation Status
 
-Candidate operation status uses custom get value `0x18`, request page zero,
-and the normal read request/response envelope. It exists only in builds that
-route and advertise candidate writes. Its successful 25-byte payload is:
+Candidate operation status uses custom get value `0x18` and the normal read
+request/response envelope. It exists only in builds that route and advertise
+candidate writes. Page 0 is the candidate's progress; its successful 25-byte
+payload is:
 
 | Payload offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | layout version, `1` |
+| 0 | 1 | layout version, `2` |
 | 1 | 1 | candidate state |
 | 2 | 1 | last operation |
 | 3 | 1 | flags: bit 0 mailbox pending, bit 1 candidate poisoned |
 | 4 | 2 | candidate or last affected transaction id |
-| 6 | 2 | next sequential byte offset |
-| 8 | 2 | declared candidate length |
-| 10 | 4 | declared FNV-1a digest |
-| 14 | 1 | stable candidate error id |
-| 15 | 1 | error domain id, or `0xFF` |
-| 16 | 1 | error table id, or `0xFF` |
-| 17 | 2 | error row index, or `0xFFFF` |
-| 19 | 1 | error tap/step index, or `0xFF` |
-| 20 | 1 | error field id, or `0xFF` |
-| 21 | 2 | candidate byte offset, or `0xFFFF` |
-| 23 | 2 | operation sequence, incremented after each processed mailbox item |
+| 6 | 4 | next sequential byte offset, uint32 |
+| 10 | 4 | declared candidate length, uint32 |
+| 14 | 4 | declared FNV-1a digest |
+| 18 | 1 | stable candidate error id |
+| 19 | 2 | operation sequence, incremented after each processed mailbox item |
+| 21 | 2 | error sequence, incremented whenever the error id or its location changes |
+| 23 | 2 | reserved, zero |
+
+Page 3 (D-F28) is where the error is. Layout 1 of page 0 carried it, with a
+16-bit byte offset; the 32-bit offsets leave it no room. Its payload is:
+
+| Payload offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | layout version, `1` |
+| 1 | 1 | stable candidate error id, as on page 0 |
+| 2 | 1 | error domain id, or `0xFF` |
+| 3 | 1 | error table id, or `0xFF` |
+| 4 | 2 | error row index, or `0xFFFF` |
+| 6 | 1 | error tap/step index, or `0xFF` |
+| 7 | 1 | error field id, or `0xFF` |
+| 8 | 4 | candidate byte offset, uint32, or `0xFFFFFFFF` |
+| 12 | 2 | transaction id, as on page 0 |
+| 14 | 2 | operation sequence, as on page 0 |
+| 16 | 2 | error sequence, as on page 0 |
+| 18 | 7 | reserved, zero |
+
+A host reads page 3 after a page 0 that reports an error and keeps it only
+when its transaction id, operation sequence and error sequence all match that
+page 0; otherwise it reads page 0 again. The operation sequence alone is not
+enough: validation, commit and peer events replace the error between mailbox
+items (a CHUNK refused while validating, then the validator's own rejection,
+share one operation sequence), and only the error sequence moves with each
+replacement. Setting the same error again does not advance it.
 
 Page 1 (added 2026-09-23) reports the save's copy to the other half, which
 page 0 cannot show: during `PREPARING_PEER` page 0 stays identical until the
@@ -857,35 +927,35 @@ peer is ready. Builds with the live-profile owner answer it; others answer
 
 | Payload offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | layout version, `1` |
+| 0 | 1 | layout version, `2` |
 | 1 | 1 | peer phase |
 | 2 | 1 | the peer's last split status |
 | 3 | 1 | flags: bit 0 peer cleanup pending, bit 1 this half is transport master, bit 2 waiting for a safe boundary |
-| 4 | 2 | bytes of the profile transferred to the peer, including those it copied from its own profile |
-| 6 | 2 | bytes to transfer |
-| 8 | 4 | split retries since boot |
-| 12 | 4 | split transport failures since boot |
-| 16 | 2 | the peer's BUSY replies in a row (saturating) |
-| 18 | 1 | why the peer last held off: its last BUSY reason other than routine admission |
-| 19 | 1 | the peer's store state in its last BUSY |
-| 20 | 1 | the peer's transfer owner in its last BUSY |
-| 21 | 1 | who held the peer's storage admission in its last BUSY: `0` none, `1` host, `2` peer |
-| 22 | 3 | reserved, zero |
+| 4 | 4 | bytes of the profile transferred to the peer, including those it copied from its own profile, uint32 |
+| 8 | 4 | bytes to transfer, uint32 |
+| 12 | 4 | split retries since boot |
+| 16 | 4 | split transport failures since boot |
+| 20 | 2 | the peer's BUSY replies in a row (saturating) |
+| 22 | 1 | why the peer last held off: its last BUSY reason other than routine admission |
+| 23 | 1 | the peer's store state in its last BUSY |
+| 24 | 1 | low nibble: the peer's transfer owner in its last BUSY; high nibble: who held the peer's storage admission then, `0` none, `1` host, `2` peer |
 
 Page 2 is a read-only peer-copy diagnostic. Its 25-byte payload is:
 
 | Payload offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | layout version, `1` |
+| 0 | 1 | layout version, `2` |
 | 1 | 1 | flags: bit 0 reuse became unavailable; other bits zero |
-| 2 | 2 | bytes acknowledged as copied from the peer's own source |
-| 4 | 2 | PAYLOAD_REUSE RPC attempts, including repeated progress polls and transport failures |
-| 6 | 2 | correlated SOURCE_UNAVAILABLE replies accepted by the sender |
-| 8 | 4 | sender reconciler scan invocations during the prepared push |
-| 12 | 4 | all RPC attempts during the prepared push, including failed attempts |
-| 16 | 2 | current reconciler transfer offset, as on page 1 |
-| 18 | 2 | current reconciler transfer length, as on page 1 |
-| 20 | 5 | reserved, zero |
+| 2 | 4 | bytes acknowledged as copied from the peer's own source, uint32 |
+| 6 | 2 | PAYLOAD_REUSE RPC attempts, including repeated progress polls and transport failures |
+| 8 | 2 | correlated SOURCE_UNAVAILABLE replies accepted by the sender |
+| 10 | 4 | sender reconciler scan invocations during the prepared push |
+| 14 | 4 | all RPC attempts during the prepared push, including failed attempts |
+| 18 | 4 | current reconciler transfer offset, as on page 1, uint32 |
+| 22 | 3 | reserved, zero |
+
+Layout 1 of pages 1 and 2 had 16-bit offsets and lengths; page 2 also
+repeated page 1's transfer length, which layout 2 leaves to page 1.
 
 Counters saturate at their field widths, reset when a new prepared push is
 accepted, and remain available after it ends. They include validation,
@@ -1009,8 +1079,8 @@ unhandled reply.
 | custom get | `0x18` | candidate operation status | this document |
 | custom get | `0x19` | logical VIA staging status | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
 | custom set | `0x1A` | logical VIA staging abort: always refused, unsupported | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
-| custom set | `0x1B` | candidate reuse, feature bit 24 | Differential candidate transfer, above |
-| custom set | `0x1C` | candidate streaming chunk, feature bit 25 | Differential candidate transfer, above |
+| custom set | `0x1B` | candidate reuse | Differential candidate transfer, above |
+| custom set | `0x1C` | candidate streaming chunk | Differential candidate transfer, above |
 
 Every mutating operation includes a nonzero transaction id. Candidate begin
 declares schema, length, CRC, digest, and requested domain mask. Chunks include
@@ -1101,7 +1171,7 @@ Each row is `12 + 4 × inputs` bytes (20 to 76), in priority/index order:
 | Offset | Bytes | Field |
 | ---: | ---: | --- |
 | 0 | 1 | input count, 2..16 |
-| 1 | 1 | flags: bit 0 must hold, bit 1 tap only, bit 2 ordered, bit 3 disabled, bit 4 bypass output behaviour (feature bit 30); others zero |
+| 1 | 1 | flags: bit 0 must hold, bit 1 tap only, bit 2 ordered, bit 3 disabled, bit 4 bypass output behaviour; others zero |
 | 2 | 2 | combo window in ms, little endian; `0` follows the default window |
 | 4 | 4 | allowed layers, `u32`, one bit per layer; bits at or above the bank (16) zero, an empty mask allowed |
 | 8 | 4 | output semantic action |
@@ -1122,8 +1192,7 @@ The output bypass flag does not disable the chord or change its inputs,
 output, timing or chord-layer mask. It is independent of the global output
 behaviour switch in settings header byte 5. Both flags are zero by default;
 existing v3 combo data keeps its behaviour and needs no format migration.
-Older firmware rejects the new flag, so clients require feature bit 30 before
-writing it. The completed chord snapshots output permission and origin for
+The completed chord snapshots output permission and origin for
 queued delivery and release; see the [participation policy](participation-policy.md#combo-output-behaviour-permission).
 Incremental validation reads the header in one step, a row's fixed part in
 one, then its inputs four at a time (16 bytes), preserving the one-read /
@@ -1149,8 +1218,9 @@ Domain `0x40` v8 and GET values `0x07`/`0x08` are specified in
 [portable-profile-v1.md](portable-profile-v1.md). The canonical envelope now
 permits five known domains; an unknown domain still rejects the candidate.
 The settings validator uses the existing bounded reader and safe publication
-boundary. Validator/provider state policies are 384/784 bytes respectively
-(384 since D-F14: the 128-byte pointing records make the PD iterator the largest domain state).
+boundary. Validator/provider state policies are 400/784 bytes respectively
+(384 since D-F14: the 128-byte pointing records make the PD iterator the largest domain state;
+400 since D-F28, whose 32-bit blob lengths and offsets add 20 bytes, 392 on Cortex-M0+).
 The standard compiled payload contains all five enabled domains in registry
 order: RGB, key behaviours, combos, settings and pointing. Its immutable
 factory settings and authored names share the settings domain's encoder.
@@ -1158,7 +1228,8 @@ Compiled combo rows preserve authored order, default-window inheritance and
 native actions through semantic encoding. No domain version changes.
 
 Opening compiled defaults records five bounded offset/length pairs alongside
-its metadata (a 40-byte handle policy). A domain's length is the byte count
+its metadata (a 60-byte handle policy since D-F28: metadata plus five 32-bit
+ranges). A domain's length is the byte count
 its module's encoder emits; an encoder that emits nothing leaves the domain out
 of that build's compiled profile. An arbitrary read emits the blob header,
 intersecting domain headers and only intersecting domain payloads; it never
@@ -1183,7 +1254,7 @@ Success carries two bytes: version 1 and the detected OS (0 unknown, 1 macOS,
 2 Windows, 3 Linux). Unknown includes unsupported iOS and unavailable detection.
 This reports QMK’s current USB guess, not the selected override or confirmation
 of host input configuration. Settings scalar 27 stores the override, Unicode
-switch and (feature bit 22) host layout separately; clients derive the effective OS with manual selection first.
+switch and host layout separately; clients derive the effective OS with manual selection first.
 The result is volatile and is refreshed by Read keyboard; it is not a profile
 value, backup field or part of the profile fingerprint. Detection may be wrong
 or change after USB setup, particularly with switches/KVMs. Do not infer an OS

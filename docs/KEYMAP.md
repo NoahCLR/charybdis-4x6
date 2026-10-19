@@ -492,7 +492,7 @@ same key, duplicate key-downs are invalid, and no key may remain held at the
 end. Invalid balance is rejected before playback, so a macro cannot release
 another producer's key or leave its own key registered.
 
-VIA text supports canonical UTF-8 with Profile Wire feature bit 21. Select the
+VIA text supports canonical UTF-8. Select the
 host setup in the saved profile before playing non-ASCII text; ASCII-only mode
 remains the default. See [runtime flow](architecture/runtime-flow.md) for the
 encoding, program limit, ownership and host-entry requirements. Malformed

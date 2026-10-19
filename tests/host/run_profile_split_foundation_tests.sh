@@ -26,6 +26,8 @@ build_and_run() {
 
 build_and_run normal
 build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
+# 128 KiB test slots: split frames past 65,535 bytes (D-F28).
+build_and_run wide -DNOAH_PROFILE_TEST_WIDE_SLOTS -fsanitize=address,undefined -fno-omit-frame-pointer
 
 ARM_CC="${ARM_CC:-arm-none-eabi-gcc}"
 "$ARM_CC" -std=c11 -Wall -Wextra -Werror -pedantic \

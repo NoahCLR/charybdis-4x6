@@ -29,12 +29,17 @@
 #define NOAH_PROFILE_WIRE_V1_LAYER_MASK_BITS 32u
 
 // Logical EEPROM addresses reach 0x22FFF, so storage addresses are 32 bits
-// wide; payload offsets and lengths inside one slot still fit 16 bits.
+// wide, as are payload offsets and lengths inside a slot (D-F28).
 typedef uint32_t noah_profile_storage_address_t;
 
-#define NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE 0x23000u
+#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
+#    define NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE 0x49000u
+#    define NOAH_PROFILE_STORAGE_EXPECTED_SLOT_SIZE 0x20000u
+#else
+#    define NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE 0x23000u
+#    define NOAH_PROFILE_STORAGE_EXPECTED_SLOT_SIZE 0xD000u
+#endif
 #define NOAH_PROFILE_STORAGE_VIA_REGION_SIZE 0x9000u
-#define NOAH_PROFILE_STORAGE_EXPECTED_SLOT_SIZE 0xD000u
 #define NOAH_PROFILE_STORAGE_DYNAMIC_KEYMAP_START_ADDR 0x0029u
 #define NOAH_PROFILE_STORAGE_DYNAMIC_KEYMAP_SIZE 1920u
 #define NOAH_PROFILE_STORAGE_VIA_MACRO_START_ADDR 0x07A9u
@@ -74,7 +79,7 @@ _Static_assert(NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR + 1u == NOAH_PROFILE_STORAGE
 _Static_assert(NOAH_PROFILE_STORAGE_SLOT_A_SIZE == NOAH_PROFILE_STORAGE_EXPECTED_SLOT_SIZE && NOAH_PROFILE_STORAGE_SLOT_B_SIZE == NOAH_PROFILE_STORAGE_EXPECTED_SLOT_SIZE, "each live-profile slot must match the selected schema geometry");
 _Static_assert(NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX == NOAH_PROFILE_STORAGE_EXPECTED_SLOT_SIZE - 32u, "32-byte slot header must leave the selected payload capacity");
 _Static_assert(NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE <= NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE, "commit marker must fit inside the canonical slot header");
-_Static_assert(NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX <= UINT16_MAX, "profile payload length must fit the wire/storage uint16 field");
+_Static_assert(NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX == NOAH_PROFILE_PAYLOAD_MAX, "the schema's payload ceiling is one slot's payload");
 _Static_assert(NOAH_PROFILE_STORAGE_SLOT_B_END_ADDR <= UINT32_MAX, "storage addresses fit noah_profile_storage_address_t");
 _Static_assert(NOAH_PROFILE_WIRE_V1_LED_BITMAP_SIZE == 8u, "58 physical LEDs must use an eight-byte canonical bitmap");
 #endif

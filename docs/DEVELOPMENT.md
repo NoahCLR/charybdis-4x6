@@ -188,19 +188,22 @@ compare; recorded sets live under [`measurements/`](../measurements/README.md).
 Handled keys preserve physical gesture timing across combo/tapping buffering;
 authored layer-tap behaviours use one tap/hold decision. See the
 [timing contract](INTERACTION_MODEL.md#physical-gestures-and-buffered-delivery).
-This requires the paired QMK fork changes and an Ark client recognizing Profile
-Wire feature bit 17. The current layout and timing defaults are unchanged.
+This requires the paired QMK fork changes. The current layout and timing
+defaults are unchanged.
 
 Runtime-owned tapping now also covers authored MT/OSM rows and intrinsic TT/OSL
-keys (Profile Wire bit 18). Keys pressed while such a key is undecided wait for
+keys. Keys pressed while such a key is undecided wait for
 its tap or hold, as QMK's tapping does, so rolls keep their order. The
 [release timing contract](INTERACTION_MODEL.md#release-intervals-and-timing-advice)
 also defines the impossible release interval Ark reports.
 
 Every LT/MT/OSM key, with or without a row, is now the runtime's too, and QMK's
-tapping engine classifies no record (D-F27, Profile Wire bit 31). Ark refuses
-unknown feature bits, so it must recognise bit 31 before it connects to such a
-build.
+tapping engine classifies no record (D-F27).
+
+The new base (D-F28) moves Profile Wire to 2.0, the profile schema to 4.0 and
+the store to format 6, with 32-bit profile lengths and offsets everywhere, and
+retires the feature bits these timing changes were once advertised by. Only an
+Ark on the new base can drive such a build.
 
 ## Open release gates
 

@@ -35,7 +35,7 @@ typedef struct {
     uint32_t payload_digest;
     uint32_t compiled_default_digest;
     uint32_t action_abi_digest;
-    uint16_t payload_length;
+    uint32_t payload_length;
     uint8_t  schema_major;
     uint8_t  schema_minor;
     uint8_t  domain_mask;

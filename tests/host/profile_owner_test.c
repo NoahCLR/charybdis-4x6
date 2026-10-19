@@ -8,7 +8,7 @@
 #include "users/noah/lib/profile/runtime/profile_owner.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 
-static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 3u, 0u, 0u, 1u};
+static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
 
 typedef struct {
     uint8_t  bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
@@ -206,7 +206,7 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
 
 // Reads and writes are bounded as the QMK EEPROM adapter bounds them
 // (qmk_profile_eeprom.c).
-static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint16_t length) {
+static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     memory_t *memory = context;
     memory->reads++;
     if (length > memory->largest_read) memory->largest_read = length;
@@ -215,7 +215,7 @@ static bool memory_read(void *context, noah_profile_storage_address_t address, u
     return true;
 }
 
-static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint16_t length) {
+static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length) {
     memory_t *memory = context;
     memory->writes++;
     if (length > memory->largest_write) memory->largest_write = length;
@@ -228,14 +228,14 @@ static bool memory_write(void *context, noah_profile_storage_address_t address, 
     return true;
 }
 
-static bool split_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t response[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE]) {
+static bool split_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
     split_link_t                    *link = context;
     noah_profile_split_reconciler_t *peer_reconciler;
 
     if (!link || !link->peer || !(peer_reconciler = noah_profile_owner_split_reconciler(link->peer))) {
         return false;
     }
-    return noah_profile_split_reconciler_receive(peer_reconciler, request, request_length, response, NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    return noah_profile_split_reconciler_receive(peer_reconciler, request, request_length, response, response_length);
 }
 
 static void write_u16(uint8_t *target, uint16_t value) {
@@ -274,18 +274,16 @@ static void begin_frame(uint8_t frame[32], uint16_t transaction_id) {
     frame[5] = declaration.schema_major;
     frame[6] = declaration.schema_minor;
     frame[7] = declaration.requested_domains;
-    write_u16(&frame[9], declaration.payload_length);
-    write_u32(&frame[11], declaration.crc32);
-    write_u32(&frame[15], declaration.digest);
-    write_u32(&frame[19], declaration.action_abi_digest);
-    frame[23] = NOAH_PROFILE_LOGICAL_STORE_VERSION;
+    write_u32(&frame[8], declaration.payload_length);
+    write_u32(&frame[12], declaration.crc32);
+    write_u32(&frame[16], declaration.digest);
+    write_u32(&frame[20], declaration.action_abi_digest);
     write_u32(&frame[24], 6u);
     write_u32(&frame[28], UINT32_C(0xabcdef01));
 }
 
 static void logical_begin_frame(uint8_t frame[32], uint16_t transaction_id, uint32_t via_generation, uint32_t via_digest) {
     begin_frame(frame, transaction_id);
-    frame[23] = NOAH_PROFILE_STORE_FORMAT_VERSION;
     write_u32(&frame[24], via_generation);
     write_u32(&frame[28], via_digest);
 }
@@ -296,9 +294,9 @@ static void chunk_frame(uint8_t frame[32], uint16_t transaction_id) {
     frame[1] = NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL;
     frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK;
     write_u16(&frame[3], transaction_id);
-    write_u16(&frame[5], 0u);
-    frame[7] = sizeof(compiled_blob);
-    memcpy(&frame[8], compiled_blob, sizeof(compiled_blob));
+    write_u32(&frame[5], 0u);
+    frame[9] = sizeof(compiled_blob);
+    memcpy(&frame[10], compiled_blob, sizeof(compiled_blob));
 }
 
 static void simple_frame(uint8_t frame[32], uint8_t value, uint16_t transaction_id) {
@@ -1680,7 +1678,7 @@ static void test_every_precommit_cancel_ends_the_via_staging(void) {
     // An unbound candidate is rejected without a lease or staging to end.
     logical_via_abort_count = 0u;
     begin_frame(frame, 203u);
-    memset(frame + 23, 0, 9);
+    memset(frame + 24, 0, 8);
     send_and_scan_pair(&left, &right, frame, &now);
     now = left.host_last_activity_at + NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS;
     for (uint32_t guard = 0u; guard < 8u; guard++)
@@ -1727,7 +1725,7 @@ static void test_logical_via_admission_follows_the_candidate(void) {
 
     // A retired unbound BEGIN cannot acquire a candidate.
     begin_frame(frame, 204u);
-    memset(frame + 23, 0, 9);
+    memset(frame + 24, 0, 8);
     send_and_scan_pair(&left, &right, frame, &now);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(!noah_profile_owner_logical_via_admit(&left, 204u, 0u, 0u));

@@ -23,7 +23,7 @@ noah_host_export_qmk_cpath "$ROOT"
 } >"$CONFIG"
 # Combos and settings come from the populated fixture; RGB, key behaviors and
 # pointing content come from the real authored writer.
-python3 - "$ROOT/tests/fixtures/populated_profile_v3.fixture" "$BUILD_DIR/populated.bin" <<'PYTHON'
+python3 - "$ROOT/tests/fixtures/populated_profile_v4.fixture" "$BUILD_DIR/populated.bin" <<'PYTHON'
 import pathlib, sys
 fields = dict(line.split("=", 1) for line in pathlib.Path(sys.argv[1]).read_text().splitlines() if "=" in line)
 pathlib.Path(sys.argv[2]).write_bytes(bytes.fromhex(fields["profile.hex"]))
@@ -90,7 +90,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_peer_store_backend.c" \
         -o "$bin"
-    "$bin" "$BUILD_DIR/populated.bin" "$ROOT/tests/fixtures/maximum_profile_v3.fixture"
+    "$bin" "$BUILD_DIR/populated.bin" "$ROOT/tests/fixtures/maximum_profile_v4.fixture"
 }
 build_and_run normal -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
 build_and_run sanitized -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer

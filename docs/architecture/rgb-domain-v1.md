@@ -15,7 +15,7 @@ The payload starts with this fixed 16-byte header:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | payload format version, equal to the domain version: `4` in schema 3.0 |
+| 0 | 1 | payload format version, equal to the domain version: `4` in schemas 3.0 and 4.0 |
 | 1 | 1 | reserved, zero |
 | 2 | 2 | stage-enable mask |
 | 4 | 1 | reusable group count, `0..16` |
@@ -96,7 +96,7 @@ upgrade added rows for slots 6 and 7.
 
 Version 4 (D-F14) is version 3 with up to sixteen layer colours: the version
 byte (payload byte 0 and envelope) is 4, and layer-group selectors are a layer
-below 16 or `0xff`. Every other byte is version 3's. Schema-3 firmware accepts
+below 16 or `0xff`. Every other byte is version 3's. Schema-3 and schema-4 firmware accept
 only version 4: an importer turns a version-3 domain into version 4 by setting
 the version to 4, adding after the last layer-colour row the rows
 `n 00 00 00 01` (black, keys mapped on this layer only) for each missing layer

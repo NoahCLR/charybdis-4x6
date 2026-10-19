@@ -23,8 +23,9 @@ enum {
     // Engineering-state regression policy for one 32-bit keyboard half. This
     // is not an RP2040 physical-SRAM limit; linked target gates remain the
     // authority for the concrete firmware artifact. D-F14's native combo
-    // table (128 rows of sixteen inputs) links the owner at 10,552 bytes.
-    NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT = 11264u,
+    // table (128 rows of sixteen inputs) links the owner at 10,552 bytes;
+    // with D-F28's 32-bit profile offsets it links at 11,328.
+    NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT = 11520u,
     // Ordinary host staging expires after 15 seconds without host-owned work.
     // Split preparation has a separate no-progress window: it bounds the
     // longest stretch without transfer progress, not the whole copy, which for
@@ -110,7 +111,7 @@ typedef struct {
     noah_profile_store_result_t          discovery_result;
     noah_profile_owner_state_t           state;
     uint32_t                             host_last_activity_at;
-    uint16_t                             host_barrier_progress_offset;
+    uint32_t                             host_barrier_progress_offset;
     uint8_t                              scheduler_cursor;
     bool                                 boot_activation_started : 1;
     bool                                 peer_activation_started : 1;
@@ -155,6 +156,9 @@ typedef struct {
     bool                                 peer_converged;
     bool                                 transfer_pending;
     bool                                 peer_cleanup_pending;
+    // Nothing is committed because a slot holds an earlier store format,
+    // which is never read (D-F28): the keyboard runs its compiled defaults.
+    bool                                 stored_earlier_format;
 } noah_profile_owner_status_t;
 
 // The save's copy to the other half, for candidate status page 1.
