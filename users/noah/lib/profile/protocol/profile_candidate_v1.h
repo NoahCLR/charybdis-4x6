@@ -126,11 +126,9 @@ typedef struct {
     uint32_t digest;
     uint32_t action_abi_digest;
     // Not on the wire since D-F28: the base's version implies store format
-    // 6, which the decoder fills in. Every BEGIN binds the candidate to a
-    // nonzero VIA generation and digest in the report tail.
+    // 6, which the decoder fills in. The report tail that bound a candidate
+    // to the VIA store must be zero since D-F31.
     uint8_t  store_format_version;
-    uint32_t via_generation;
-    uint32_t via_digest;
 } noah_profile_candidate_v1_metadata_t;
 
 typedef struct {
@@ -206,7 +204,7 @@ bool noah_profile_candidate_v1_handle_status_get(const noah_profile_candidate_v1
 // from the split reconciler's internal states by the owner.
 typedef enum {
     NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_IDLE = 0u,
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BINDING,    // binding the staged VIA copy
+    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BINDING,    // retired with VIA (D-F31), never reported
     NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BEGINNING,  // PREPARE_BEGIN not yet admitted
     NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING,    // payload bytes in flight
     NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_PREPARING,  // peer validating and writing its prepared copy

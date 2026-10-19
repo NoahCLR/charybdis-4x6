@@ -10,14 +10,12 @@
 #include <stddef.h>
 #include <string.h>
 
-#ifdef VIA_ENABLE
-
 static bool metadata_equal(const noah_profile_candidate_v1_metadata_t *left, const noah_profile_candidate_v1_metadata_t *right) {
-    return left && right && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->requested_domains == right->requested_domains && left->flags == right->flags && left->payload_length == right->payload_length && left->crc32 == right->crc32 && left->digest == right->digest && left->action_abi_digest == right->action_abi_digest && left->store_format_version == right->store_format_version && left->via_generation == right->via_generation && left->via_digest == right->via_digest;
+    return left && right && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->requested_domains == right->requested_domains && left->flags == right->flags && left->payload_length == right->payload_length && left->crc32 == right->crc32 && left->digest == right->digest && left->action_abi_digest == right->action_abi_digest && left->store_format_version == right->store_format_version;
 }
 
 static bool committed_record_equal(const noah_profile_store_record_t *left, const noah_profile_store_record_t *right) {
-    return left && right && left->slot == right->slot && left->format_version == right->format_version && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->via_generation == right->via_generation && left->via_digest == right->via_digest;
+    return left && right && left->slot == right->slot && left->format_version == right->format_version && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest;
 }
 
 static bool validated_profile_matches_record(const noah_profile_validator_v1_profile_t *profile, const noah_profile_store_record_t *record) {
@@ -25,11 +23,11 @@ static bool validated_profile_matches_record(const noah_profile_validator_v1_pro
 }
 
 static bool metadata_matches_candidate(const noah_profile_candidate_v1_metadata_t *metadata, const noah_profile_store_candidate_t *candidate) {
-    return metadata && candidate && metadata->schema_major == candidate->schema_major && metadata->schema_minor == candidate->schema_minor && metadata->requested_domains == candidate->domain_mask && metadata->flags == 0u && metadata->payload_length == candidate->payload_length && metadata->crc32 == candidate->payload_crc32 && metadata->digest == candidate->payload_digest && metadata->action_abi_digest == candidate->action_abi_digest && (metadata->store_format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && metadata->store_format_version == candidate->format_version) && metadata->via_generation == candidate->via_generation && metadata->via_digest == candidate->via_digest;
+    return metadata && candidate && metadata->schema_major == candidate->schema_major && metadata->schema_minor == candidate->schema_minor && metadata->requested_domains == candidate->domain_mask && metadata->flags == 0u && metadata->payload_length == candidate->payload_length && metadata->crc32 == candidate->payload_crc32 && metadata->digest == candidate->payload_digest && metadata->action_abi_digest == candidate->action_abi_digest && metadata->store_format_version == NOAH_PROFILE_STORE_FORMAT_VERSION && metadata->store_format_version == candidate->format_version;
 }
 
 static bool store_candidate_equal(const noah_profile_store_candidate_t *left, const noah_profile_store_candidate_t *right) {
-    return left && right && left->format_version == right->format_version && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->via_generation == right->via_generation && left->via_digest == right->via_digest;
+    return left && right && left->format_version == right->format_version && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->flags == right->flags && left->payload_length == right->payload_length && left->generation == right->generation && left->origin_half == right->origin_half && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest;
 }
 
 static bool candidate_payload_start(const noah_profile_candidate_store_backend_t *backend, noah_profile_storage_address_t *address) {
@@ -177,8 +175,6 @@ static noah_profile_candidate_backend_result_t begin_candidate(void *context, co
         .payload_digest          = metadata->digest,
         .compiled_default_digest = backend->compiled_default_digest,
         .action_abi_digest       = metadata->action_abi_digest,
-        .via_generation          = metadata->via_generation,
-        .via_digest              = metadata->via_digest,
     };
     return map_store_result(begin_exact_with_owner(backend, metadata, &candidate, NOAH_PROFILE_STORAGE_ADMISSION_HOST));
 }
@@ -714,5 +710,3 @@ bool noah_profile_candidate_store_backend_committed(const noah_profile_candidate
 }
 
 _Static_assert((unsigned)NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX <= (unsigned)NOAH_PROFILE_STORE_IO_CHUNK_MAX, "candidate wire chunks must fit the store write bound");
-
-#endif

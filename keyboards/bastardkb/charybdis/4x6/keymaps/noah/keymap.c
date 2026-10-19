@@ -166,16 +166,17 @@
     KEY(CUSTOM_KEY_126, "")          \
     KEY(CUSTOM_KEY_127, "")
 
-// ─── VIA Macros ─────────────────────────────────────────────────────────────
-// VIA_MACRO_0–127 are the authored aliases for VIA's dynamic macro slots.
+// ─── Macros ─────────────────────────────────────────────────────────────────
+// VIA_MACRO_0–127 are the authored aliases for the 128 macro slots (the name
+// is historical; VIA is not supported, D-F31).
 // All 128 slots are listed here so the slot limit stays visible in keymap.c.
 // Each row is:
 //   MACRO(VIA_MACRO_n, "name", "payload")
 // The name is what Charybdis Ark shows for the macro: at most 32 bytes of
-// UTF-8. Use empty strings for an unused slot. The firmware seeds
-// VIA's dynamic macro EEPROM defaults from the payloads on init/reset.
-// Workflow: author defaults here -> compile/flash -> reset EEPROM to re-seed
-// them. A profile saved from Charybdis Ark keeps its own names and payloads.
+// UTF-8. Use empty strings for an unused slot. The payloads are the macro
+// domain of the compiled default profile, which a keyboard with no saved
+// profile plays. A profile saved from Charybdis Ark keeps its own names and
+// payloads.
 // Payload syntax:
 //   - text {hello} sends "hello" one key at a time
 //   - {KC_A} tap one key, {KC_LGUI,KC_SPC} tap a chord
@@ -334,8 +335,8 @@
 // physical combo footprint. Cross-half combos therefore broaden locality to
 // both halves instead of guessing one side.
 //
-// Combo origin tracking follows the live resolved keycodes QMK sees, so VIA /
-// dynamic keymap changes stay authoritative. Keep each combo row's member
+// Combo origin tracking follows the live resolved keycodes QMK sees, so the
+// active profile's keymap stays authoritative. Keep each combo row's member
 // keycodes unique so that footprint tracking can disambiguate the chord.
 // Overlap-suppressed candidates are retired from feedback at the next compat
 // reconciliation boundary; delayed legitimate outputs retain their exact

@@ -97,7 +97,6 @@ sat unprocessed in the candidate mailbox until a power cycle.
 | Roll back preview | unchanged | committed profile | committed profile | preview cleared |
 | Apply draft to keyboard | unchanged | compare base generation, validate, then commit | prepare then converge | device persisted and exact payload read back |
 | Reset device | unchanged | commit override-disabled generation | converge reset generation | compiled defaults active; source unchanged |
-| Reconcile external VIA change | unchanged | detect changed VIA digest and refuse stale logical generation | prove peer VIA state or expose drift | adopted new logical generation or explicit conflict; never silent divergence |
 
 ## Source and device separation
 
@@ -151,8 +150,7 @@ The landed predicate freezes the following firmware reason bits:
 The predicate snapshot uses bounded generation publication so an extension-host
 status read cannot observe counts from two evaluations. A missing peer observer
 is intentionally unsafe. One exception is bounded: while a host Apply is
-`ACTIVATING` the record this owner already saw the peer durably commit (and,
-for a logical record, whose VIA ACCEPT the peer acknowledged), the peer reason
+`ACTIVATING` the record this owner already saw the peer durably commit, the peer reason
 is satisfied by that confirmation instead of a second live observation. The predicate is installed by the gated D-021 owner
 together with the behavior and RGB invalidators and exact split peer observer.
 Ordinary firmware still allocates only the read-only shell. The D-022

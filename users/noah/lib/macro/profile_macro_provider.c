@@ -8,8 +8,8 @@
 #include "../profile/runtime/effective_keymap_macros_runtime.h"
 #include "macro_slot_provider.h"
 
-#ifndef DYNAMIC_KEYMAP_MACRO_DELAY
-#    define DYNAMIC_KEYMAP_MACRO_DELAY TAP_CODE_DELAY
+#ifndef NOAH_MACRO_SLOT_DELAY
+#    define NOAH_MACRO_SLOT_DELAY TAP_CODE_DELAY
 #endif
 
 static macro_slot_metadata_t profile_macro_slots[VIA_MACRO_SLOT_COUNT];
@@ -100,7 +100,7 @@ bool noah_profile_macro_start(uint16_t action) {
         macro_slot_provider_invalidate_all(&profile_macro_provider, profile_macro_slots);
         publication = current;
     }
-    return macro_slot_provider_start(&profile_macro_provider, profile_macro_slots, (uint8_t)(action - QK_MACRO), MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, DYNAMIC_KEYMAP_MACRO_DELAY, MACRO_PAYLOAD_SOURCE_VIA) == MACRO_PAYLOAD_START_STARTED;
+    return macro_slot_provider_start(&profile_macro_provider, profile_macro_slots, (uint8_t)(action - QK_MACRO), MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, NOAH_MACRO_SLOT_DELAY, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED;
 }
 
 bool noah_profile_macro_try_play(uint16_t action) {

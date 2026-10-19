@@ -64,14 +64,9 @@ typedef uint32_t noah_profile_storage_address_t;
 #define NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_FLASH_OFFSET 0x400u
 #define NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX (NOAH_PROFILE_STORAGE_SLOT_SIZE - NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_FLASH_OFFSET)
 
-// QMK's logical EEPROM is the VIA region alone: 41 bytes of QMK and VIA
-// configuration, the dynamic keymap and the VIA macro bank.
-#define NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE 0x9000u
-#define NOAH_PROFILE_STORAGE_VIA_REGION_SIZE 0x9000u
-#define NOAH_PROFILE_STORAGE_DYNAMIC_KEYMAP_START_ADDR 0x0029u
-#define NOAH_PROFILE_STORAGE_DYNAMIC_KEYMAP_SIZE 1920u
-#define NOAH_PROFILE_STORAGE_VIA_MACRO_START_ADDR 0x07A9u
-#define NOAH_PROFILE_STORAGE_VIA_MACRO_SIZE 34903u
+// QMK's logical EEPROM holds only its eeconfig, with room for a user
+// datablock (D-F31): half of QMK's 8 KiB RP2040 wear-leveling default.
+#define NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE 0x1000u
 
 _Static_assert(NOAH_PROFILE_STORAGE_SLOT_A_SIZE == NOAH_PROFILE_STORAGE_SLOT_SIZE && NOAH_PROFILE_STORAGE_SLOT_B_SIZE == NOAH_PROFILE_STORAGE_SLOT_SIZE, "both slots have the one slot size");
 _Static_assert(NOAH_PROFILE_STORAGE_SLOT_A_END_ADDR + 1u == NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR, "slot B follows slot A with no gap");
@@ -85,11 +80,3 @@ _Static_assert(NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_FLASH_OFFSET <= NOAH_PROFILE_ST
 _Static_assert(NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE <= NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE, "commit marker must fit inside the canonical slot header");
 _Static_assert(NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX == NOAH_PROFILE_PAYLOAD_MAX, "the schema's payload ceiling is one slot's payload");
 _Static_assert(NOAH_PROFILE_WIRE_V1_LED_BITMAP_SIZE == 8u, "58 physical LEDs must use an eight-byte canonical bitmap");
-
-#ifdef VIA_ENABLE
-#    ifndef DYNAMIC_KEYMAP_EEPROM_MAX_ADDR
-#        error "DYNAMIC_KEYMAP_EEPROM_MAX_ADDR must end VIA storage at the logical EEPROM boundary"
-#    endif
-_Static_assert(DYNAMIC_KEYMAP_EEPROM_MAX_ADDR + 1u == NOAH_PROFILE_STORAGE_VIA_REGION_SIZE, "VIA storage must end at the accepted 36 KiB boundary");
-_Static_assert(NOAH_PROFILE_STORAGE_VIA_REGION_SIZE == NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE, "logical EEPROM is the VIA region alone");
-#endif

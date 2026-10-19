@@ -10,8 +10,7 @@
 // - when the live name later differs from the one USB enumerated with (an
 //   Apply renamed the keyboard, or boot activated a different profile), the
 //   half on USB restarts USB once it is safe: the profile owner is settled on
-//   both halves with nothing held or running, VIA has no save in flight, and
-//   no Raw HID frame has arrived for NOAH_QMK_USB_PRODUCT_NAME_QUIET_MS, so a
+//   both halves with nothing held or running, and no Raw HID frame has arrived for NOAH_QMK_USB_PRODUCT_NAME_QUIET_MS, so a
 //   client finishes reading first.
 //
 // The half without USB never restarts it: its USB stays off as QMK left it.

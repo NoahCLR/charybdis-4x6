@@ -1,15 +1,20 @@
-#include "qmk_split_diagnostics.h"
-#include "../profile/runtime/effective_pd_runtime.h"
 // ───────────────────────────────────────────────────────────────────────────────
-// QMK VIA Live Profile Custom Channel
+// QMK Raw HID Profile Wire Channel
 // ───────────────────────────────────────────────────────────────────────────────
+//
+// The firmware answers Raw HID itself (D-F31): every report reaches
+// raw_hid_receive below, goes to the Profile Wire handlers, and is sent back.
+// A report none of them takes is answered with the unhandled command byte.
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include <string.h>
 
-#if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE) && (!defined(NOAH_LIVE_PROFILE_OWNER_ENABLE) || !defined(VIA_ENABLE))
-#    error "live-profile mutation requires the complete VIA owner"
+#include "qmk_split_diagnostics.h"
+#include "../profile/runtime/effective_pd_runtime.h"
+
+#if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE) && !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+#    error "live-profile mutation requires the live-profile owner"
 #endif
 
 #ifdef NOAH_STACK_BUDGET_ENABLE
@@ -18,20 +23,21 @@
 #    define NOAH_PROFILE_CHANNEL_STACK_BOUNDARY
 #endif
 
-#ifdef VIA_ENABLE
+#ifdef RAW_ENABLE
 
-#    include "via.h"
+#    include "raw_hid.h"
+#    include "usb_descriptor.h"
 #    include "qmk_combo_readback.h"
 #    include "qmk_profile_flash_hooks.h"
 #    include "qmk_portable_profile.h"
-#    include "qmk_via_logical_profile.h"
+#    include "qmk_usb_product_name.h"
 
 #    include "../profile/protocol/profile_wire_v1.h"
 #    include "../profile/storage/profile_storage_layout.h"
 #    include "../profile/storage/profile_store_runtime.h"
 #    include "../state/diagnostics/runtime_diag.h"
 
-#    include "qmk_via_profile_capabilities.h"
+#    include "qmk_profile_capabilities.h"
 
 static noah_profile_wire_v1_read_service_t noah_profile_wire_v1_read_service = {
     .capabilities = NOAH_PROFILE_CHANNEL_BASE_CAPABILITIES,
@@ -303,13 +309,10 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
     return true;
 }
 
-NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *data, uint8_t length) {
+NOAH_PROFILE_CHANNEL_STACK_BOUNDARY static void noah_profile_channel_dispatch(uint8_t *data, uint8_t length) {
     if (noah_split_diagnostics_command(data, length)) return;
     if (noah_qmk_combo_readback_get(data, length)) return;
     if (noah_qmk_profile_flash_wire_get(data, length)) return;
-#    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-    if (noah_qmk_via_logical_profile_handle(data, length)) return;
-#    endif
 #    ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
     if (noah_profile_channel_handle_cadence_get(data, length)) {
         return;
@@ -352,20 +355,25 @@ NOAH_PROFILE_CHANNEL_STACK_BOUNDARY void via_custom_value_command_kb(uint8_t *da
     if (noah_profile_wire_v1_handle_get(&noah_profile_wire_v1_read_service, data, length)) {
         return;
     }
-    if (data && length > 0u) {
-        data[0] = id_unhandled;
-    }
+    data[0] = NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED;
 }
 
-_Static_assert(DYNAMIC_KEYMAP_LAYER_COUNT <= UINT8_MAX, "compiled layer count must fit the capability frame");
-_Static_assert(DYNAMIC_KEYMAP_LAYER_COUNT <= NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS, "compiled layer count must fit the declared Profile Wire ceiling");
-_Static_assert(DYNAMIC_KEYMAP_MACRO_COUNT <= UINT8_MAX, "VIA macro count must fit the capability frame");
-_Static_assert(VIA_FIRMWARE_VERSION != 0u, "Profile Wire firmware must advertise a meaningful VIA firmware version");
-_Static_assert((uint8_t)NOAH_PROFILE_WIRE_V1_COMMAND_GET == (uint8_t)id_custom_get_value, "Profile Wire custom-get routing drifted from QMK VIA");
-_Static_assert((uint8_t)NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL == (uint8_t)id_custom_channel, "Profile Wire custom channel drifted from QMK VIA");
-_Static_assert((uint8_t)NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET == (uint8_t)id_custom_set_value, "Profile candidate custom-set routing drifted from QMK VIA");
-_Static_assert((uint8_t)NOAH_PROFILE_CANDIDATE_V1_COMMAND_SAVE == (uint8_t)id_custom_save, "Profile candidate custom-save routing drifted from QMK VIA");
+void raw_hid_receive(uint8_t *data, uint8_t length) {
+    if (!data || length == 0u) {
+        return;
+    }
+    // A USB rename waits for the host to go quiet.
+    noah_qmk_usb_product_name_note_host_frame();
+    noah_profile_channel_dispatch(data, length);
+    raw_hid_send(data, length);
+}
+
+_Static_assert(LAYER_COUNT <= UINT8_MAX, "compiled layer count must fit the capability frame");
+_Static_assert(LAYER_COUNT <= NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS, "compiled layer count must fit the declared Profile Wire ceiling");
+_Static_assert(NOAH_PROFILE_MACROS_V1_SLOTS <= UINT8_MAX, "macro count must fit the capability frame");
+_Static_assert(NOAH_FIRMWARE_VERSION != 0u, "Profile Wire firmware must advertise a meaningful firmware version");
 _Static_assert(NOAH_PROFILE_WIRE_V1_REPORT_SIZE == 32u, "Profile Wire requires the reviewed 32-byte QMK Raw HID report");
+_Static_assert(RAW_EPSIZE == NOAH_PROFILE_WIRE_V1_REPORT_SIZE, "QMK's Raw HID report is not the Profile Wire report size");
 
 #    ifdef RGB_MATRIX_ENABLE
 _Static_assert(NOAH_PROFILE_LED_COUNT == NOAH_PROFILE_WIRE_V1_MAX_PHYSICAL_LEDS, "compiled RGB geometry drifted from the declared Profile Wire ceiling");

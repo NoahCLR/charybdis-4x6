@@ -128,7 +128,7 @@ by a release, to exactly the pinned commit.
 Re-pin with `sh tools/pin-qmk.sh [REV]` (default: the published BK dev head).
 It lists the BK commits since the old pin and what changed by area: hooks and
 core, keycode numbering, VIA, RGB matrix, the Charybdis board and submodules.
-Keycode, VIA or RGB changes need an Ark follow-up.
+Keycode or RGB changes need an Ark follow-up; this firmware does not build BK's VIA code (D-F31).
 
 ## The firmware contract
 
@@ -137,7 +137,7 @@ client: the exact Profile Wire capability pages the keyboard answers once its
 live-profile owner is up (versions, feature flags, capacities, the action-ABI
 digest and the compiled-default digest), the BK pin, and the SHA-256 of every
 fixture under `tests/fixtures`. It builds them from the code the keyboard
-runs: the VIA channel and the probe share `lib/compat/qmk_via_profile_capabilities.h`,
+runs: the Raw HID channel and the probe share `lib/compat/qmk_profile_capabilities.h`,
 the digests come from the compiled-defaults code the owner uses, and the bytes
 from the Profile Wire encoder. The host suite runs it; a release's `Pair build`
 produces it as `firmware-contract.json`, which the release publishes. Firmware only states the contract; the

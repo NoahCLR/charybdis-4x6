@@ -27,7 +27,6 @@ enum {
 };
 
 layer_state_t layer_state;
-extern bool key_runtime_integration_output_ready;
 
 static uint16_t fake_time;
 static uint16_t last_tap;
@@ -339,7 +338,7 @@ void noah_dispatch_synthetic_qmk_record(uint16_t keycode, bool pressed, uint8_t 
     (void)tap_count;
 }
 
-bool noah_qmk_contract_try_play_via_macro(uint16_t keycode) {
+bool noah_profile_macro_try_play(uint16_t keycode) {
     (void)keycode;
     return false;
 }
@@ -670,36 +669,6 @@ static void test_behavior_tap_arms_osl_and_hold_holds_tt(void) {
     CHECK(layer_ownership_oneshot_layer() == UINT8_MAX);
 }
 
-static void test_profile_output_fence_drops_whole_key_presses(void) {
-    keyrecord_t press   = {.event = {.key = {.row = 0u, .col = 0u}, .pressed = true, .type = KEY_EVENT}};
-    keyrecord_t release = press;
-    keyrecord_t other   = {.event = {.key = {.row = 1u, .col = 2u}, .pressed = true, .type = KEY_EVENT}};
-
-    release.event.pressed = false;
-    test_reset_state();
-
-    // A press made during the fence loses its release too, even when the
-    // fence lifts while the key is still held.
-    key_runtime_integration_output_ready = false;
-    CHECK(!noah_pre_process_record_user(KC_A, &press));
-    key_runtime_integration_output_ready = true;
-    CHECK(!noah_pre_process_record_user(KC_A, &release));
-
-    // A press made before the fence keeps its release after the fence lifts.
-    CHECK(noah_pre_process_record_user(KC_B, &other));
-    key_runtime_integration_output_ready = false;
-    other.event.pressed = true;
-    CHECK(!noah_pre_process_record_user(KC_A, &press));
-    CHECK(!noah_pre_process_record_user(KC_A, &release));
-    key_runtime_integration_output_ready = true;
-    other.event.pressed = false;
-    CHECK(noah_pre_process_record_user(KC_B, &other));
-
-    // Once paired, the key is ordinary again.
-    CHECK(noah_pre_process_record_user(KC_A, &press));
-    CHECK(noah_pre_process_record_user(KC_A, &release));
-}
-
 // A runtime-owned MT has no native tap.count. Its owning release decision
 // must consume the real one-shot, while still sending the authored tap.
 static void test_owned_mod_tap_consumes_oneshot(void) {
@@ -732,7 +701,6 @@ static void test_owned_mod_tap_consumes_oneshot(void) {
 
 int main(void) {
     test_owned_mod_tap_consumes_oneshot();
-    test_profile_output_fence_drops_whole_key_presses();
     test_double_tap_hold_toggles_num_layer_lock_off_on_second_cycle();
     test_thumb_cycle_release_still_clears_slot_when_layer_change_resolves_to_other_keycode();
     test_double_tap_hold_with_prethreshold_scan_toggles_num_layer_only_once();

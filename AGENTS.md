@@ -56,8 +56,8 @@ Charybdis Ark repository; no firmware task needs them.
 Ark reads everything it edits from the keyboard, keeps every change in
 one reviewed draft with undo and redo, and applies it to both halves through a
 recovery-first logical transaction; complete profiles back up and restore. The
-firmware's remaining work — physical interruption acceptance, external VIA
-adoption and broad hardware acceptance — is under "Current Firmware Status" in
+firmware's remaining work — physical interruption acceptance and broad
+hardware acceptance — is under "Current Firmware Status" in
 [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md).
 
 ## Start Here
@@ -87,7 +87,7 @@ adoption and broad hardware acceptance — is under "Current Firmware Status" in
 - Runtime modules under `users/noah/` must not include `noah_keymap.h`.
 - Keymap-owned translation units under `keyboards/.../keymaps/noah/` must not include `noah_runtime.h`.
 - If a keymap overrides a weak QMK hook, chain back into the matching `noah_*` helper unless the task explicitly replaces the shared behavior and documents that choice.
-- Keep fork-specific QMK or VIA contracts centralized in `users/noah/lib/compat/` instead of scattering new compatibility assumptions through unrelated modules.
+- Keep fork-specific QMK contracts centralized in `users/noah/lib/compat/` instead of scattering new compatibility assumptions through unrelated modules. VIA is not supported (D-F31).
 - Do not introduce raw QMK layer-action outputs in authored data when they bypass userspace layer ownership.
 
 Required verification workflow:
@@ -100,7 +100,7 @@ Required verification workflow:
    - authored profile validation: `sh tests/host/run_key_behavior_lookup_tests.sh`, `sh tests/host/run_key_behavior_validation_tests.sh`, `sh tests/host/run_keymap_validation_tests.sh`, `sh tests/host/run_real_profile_validation_tests.sh`
    - RGB: `sh tests/host/run_rgb_validation_tests.sh`, `sh tests/host/run_rgb_layer_render_tests.sh`
    - hooks / ownership: `sh tests/host/run_hook_chaining_tests.sh`, `sh tests/host/run_keyboard_mod_ownership_tests.sh`, `sh tests/host/run_owned_keycode_tests.sh`, `sh tests/host/run_held_action_tests.sh`, `sh tests/host/run_layer_ownership_tests.sh`
-   - macro / VIA / QMK-contract work: `sh tests/host/run_qmk_contract_checks.sh`, `sh tests/host/run_action_lifecycle_tests.sh`, `sh tests/host/run_qmk_portable_profile_tests.sh`, `sh tests/host/run_macro_payload_tests.sh`, `sh tests/host/run_via_macro_defaults_tests.sh`, `sh tests/host/run_via_macro_action_lifecycle_tests.sh`
+   - macro / Raw HID / QMK-contract work: `sh tests/host/run_qmk_contract_checks.sh`, `sh tests/host/run_action_lifecycle_tests.sh`, `sh tests/host/run_qmk_portable_profile_tests.sh`, `sh tests/host/run_macro_payload_tests.sh`, `sh tests/host/run_profile_keymap_macros_runtime_tests.sh`, `sh tests/host/run_profile_wire_v1_tests.sh`
    - shared runtime / tracing: `sh tests/host/run_runtime_init_order_tests.sh`, `sh tests/host/run_runtime_debug_tests.sh`, `sh tests/host/run_runtime_trace_tests.sh`
    - Charybdis Ark lives in its independent repository and owns its checks; firmware checks must not invoke an app checkout.
 4. If authored keymap, combo, macro, or RGB data changed, also run:

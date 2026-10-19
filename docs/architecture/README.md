@@ -84,16 +84,16 @@ The main rule is:
 | Runtime fact | Owner | Readers or projections |
 | --- | --- | --- |
 | Compiled profile defaults | keymap-owned files under `keyboards/.../keymaps/noah/` | firmware compilation, compiled-defaults readback, validation, profile introspection |
-| Active committed live profile | one logical generation across VIA dynamic storage and the custom profile store | effective runtime views, dynamic keymap, Charybdis Ark readback |
+| Active committed live profile | one generation of the profile store, keymap and macros included (D-F31) | effective runtime views, key lookup, macro playback, Charybdis Ark readback |
 | Action classification and dispatch semantics | `users/noah/lib/action/` | key behavior materialization, key runtime, macro dispatch, direct action taps |
-| QMK and fork compatibility assumptions | `users/noah/lib/compat/` | runtime entry flow, combo origin normalization, VIA split sync, QMK contract checks |
+| QMK and fork compatibility assumptions | `users/noah/lib/compat/` | runtime entry flow, combo origin normalization, the Raw HID channel, QMK contract checks |
 | Authored key-behavior lookup and materialization | `users/noah/lib/key/behavior/` | key-runtime press planning and validation |
 | Active key-runtime state | `users/noah/lib/key/runtime/reducer/` | key-runtime planning, debug, feedback, projection |
 | Release, scan, tap-series, and effect planning | `users/noah/lib/key/runtime/planning/` | top-level key-runtime wrappers and transition plans |
 | QMK-facing effect application | `users/noah/lib/key/runtime/projection/` | action dispatch, held/repeat registries, layer ownership, PD mode state, feedback |
 | Pending release dispatch queue | `users/noah/lib/key/runtime/queue/` | release/scan adapters and runtime debug |
 | Held action and repeat applied registries | `users/noah/lib/key/ownership/` | key-runtime projection and housekeeping |
-| Macro payload parsing, VIA macro defaults | `users/noah/lib/macro/` | action lifecycle, process flow, VIA default seeding |
+| Macro payload parsing and the profile macro provider | `users/noah/lib/macro/` | action lifecycle, process flow, macro playback |
 | PD mode definitions, state, policy, and handlers | `users/noah/lib/pointing/` | key runtime, pointing hook, RGB, split sync |
 | RGB rendering and validation | `users/noah/lib/rgb/` | RGB hook, authored RGB config, split/runtime feedback snapshots |
 | Shared storage, diagnostics, modifier policy, layer/mod ownership | `users/noah/lib/state/` | all runtime owners through narrow surfaces |
@@ -132,7 +132,7 @@ flowchart TD
 | Configure a PD slot | Charybdis Ark or factory `pd_config.c` | [Adding a Pointing Mode](../ADDING_PD_MODE.md) |
 | Change RGB rendering | `rgb_config.c` for authored colors, `users/noah/lib/rgb/` for render logic | [RGB Configuration](../RGB_CONFIG.md) |
 | Change split mirroring | `users/noah/lib/split/runtime_sync.*` | [runtime-flow.md](./runtime-flow.md) |
-| Change VIA macro behavior | `keymap.c` `VIA_MACROS(MACRO)` defaults or `users/noah/lib/macro/` | [change-guide.md](./change-guide.md) |
+| Change macro behavior | `keymap.c` `VIA_MACROS(MACRO)` defaults or `users/noah/lib/macro/` | [change-guide.md](./change-guide.md) |
 | Change hook wiring | `users/noah/hooks.c`, `users/noah/runtime_init.c` | [Hook Overrides](../HOOK_OVERRIDES.md) |
 | Change target memory, EEPROM size, or stack policy | resource owner plus the matching budget tool | [memory-budgets.md](./memory-budgets.md), [change-guide.md](./change-guide.md) |
 

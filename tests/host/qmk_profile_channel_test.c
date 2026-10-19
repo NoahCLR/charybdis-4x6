@@ -3,15 +3,43 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "via.h"
-
 #include "users/noah/lib/profile/protocol/profile_wire_v1.h"
 #include "users/noah/lib/profile/storage/profile_storage_layout.h"
 #include "users/noah/lib/profile/storage/profile_store_runtime.h"
 #include "users/noah/lib/state/diagnostics/runtime_diag.h"
-#include "users/noah/lib/compat/qmk_via_split_sync.h"
+#include "users/noah/lib/profile/protocol/profile_candidate_v1.h"
 
-void via_custom_value_command_kb(uint8_t *data, uint8_t length);
+// The firmware answers every Raw HID report itself (D-F31): each one goes to
+// raw_hid_receive and is sent back exactly once, as the reply.
+void raw_hid_receive(uint8_t *data, uint8_t length);
+
+static uint32_t       host_frames;
+static uint32_t       sent_reports;
+static const uint8_t *sent_data;
+static uint8_t        sent_length;
+
+void noah_qmk_usb_product_name_note_host_frame(void) {
+    host_frames++;
+}
+
+void raw_hid_send(uint8_t *data, uint8_t length) {
+    sent_reports++;
+    sent_data   = data;
+    sent_length = length;
+}
+
+static void channel(uint8_t *data, uint8_t length) {
+    uint32_t frames = host_frames;
+    uint32_t sent   = sent_reports;
+
+    raw_hid_receive(data, length);
+    if (!data || length == 0u) {
+        assert(host_frames == frames && sent_reports == sent);
+        return;
+    }
+    assert(host_frames == frames + 1u);
+    assert(sent_reports == sent + 1u && sent_data == data && sent_length == length);
+}
 
 enum {
     WIRE_PAYLOAD = 7u,
@@ -23,7 +51,7 @@ static uint32_t                           flash_wire_requests;
 // The flash adapter answers GET 0x0D itself (profile_store_runtime_test.c
 // covers it); the channel only has to route it there first.
 bool noah_qmk_profile_flash_wire_get(uint8_t *data, uint8_t length) {
-    if (!data || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || data[0] != id_custom_get_value || data[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || data[2] != 0x0Du) {
+    if (!data || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || data[0] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || data[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || data[2] != 0x0Du) {
         return false;
     }
     flash_wire_requests++;
@@ -32,44 +60,6 @@ bool noah_qmk_profile_flash_wire_get(uint8_t *data, uint8_t length) {
 }
 static noah_profile_store_record_t        store_runtime_record;
 static bool                               store_runtime_has_committed;
-
-#if defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)
-uint16_t noah_qmk_via_storage_region_size(noah_qmk_via_sync_region_t region) {
-    switch (region) {
-        case NOAH_QMK_VIA_SYNC_REGION_VIA_CONFIG:
-            return 2u;
-        case NOAH_QMK_VIA_SYNC_REGION_KEYMAP:
-            return 960u;
-        case NOAH_QMK_VIA_SYNC_REGION_MACRO:
-            return 7191u;
-        default:
-            return 0u;
-    }
-}
-
-bool noah_qmk_via_logical_submit(uint16_t transaction_id, const noah_qmk_via_sync_frame_t *request) {
-    (void)transaction_id;
-    (void)request;
-    return true;
-}
-
-bool noah_qmk_via_logical_status(noah_qmk_via_logical_status_t *status) {
-    if (!status) return false;
-    *status = (noah_qmk_via_logical_status_t){0};
-    return true;
-}
-
-// Staging admission belongs to the owner; qmk_via_logical_profile_test.c
-// covers it. This channel test only routes frames.
-bool noah_profile_store_runtime_logical_via_admit(uint16_t transaction_id, uint32_t generation, uint32_t digest) {
-    (void)transaction_id;
-    (void)generation;
-    (void)digest;
-    return true;
-}
-
-void noah_profile_store_runtime_logical_via_progress(void) {}
-#endif
 
 #ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
 bool noah_runtime_cadence_wire_page(uint8_t page, uint8_t payload[NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE]) {
@@ -139,7 +129,6 @@ static void initialize_live_owner_status(void) {
     live_owner_status.has_pending               = true;
     live_owner_status.safe_boundary_reason_mask = 1u;
     live_owner_status.committed                 = (noah_profile_split_descriptor_t){
-        .logical        = true,
         .generation     = 7u,
         .payload_digest = UINT32_C(0x31323334),
         .origin_half    = 1u,
@@ -154,7 +143,6 @@ static void initialize_live_owner_status(void) {
     live_owner_status.candidate_pending             = true;
     live_owner_status.last_committed_transaction_id = UINT16_C(0x5152);
     live_owner_status.peer                          = (noah_profile_split_descriptor_t){
-        .logical     = true,
         .generation  = 9u,
         .origin_half = 0u,
         .readable    = true,
@@ -234,8 +222,8 @@ static uint32_t read_u32(const uint8_t *source) {
 
 static void make_request(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint8_t value, uint8_t request_id, uint8_t page) {
     memset(frame, 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE);
-    frame[0] = id_custom_get_value;
-    frame[1] = id_custom_channel;
+    frame[0] = NOAH_PROFILE_WIRE_V1_COMMAND_GET;
+    frame[1] = NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL;
     frame[2] = value;
     frame[3] = request_id;
     frame[4] = page;
@@ -265,9 +253,9 @@ static void test_capability_hook(void) {
 #endif
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x31u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
-    assert(frame[0] == id_custom_get_value);
-    assert(frame[1] == id_custom_channel);
+    channel(frame, sizeof(frame));
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET);
+    assert(frame[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL);
     assert(frame[2] == NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY);
     assert(frame[3] == 0x31u);
     assert(frame[4] == 0u);
@@ -284,13 +272,13 @@ static void test_capability_hook(void) {
     assert(read_u32(&frame[WIRE_PAYLOAD + 13u]) == live_owner_status.action_abi_digest);
     assert(read_u32(&frame[WIRE_PAYLOAD + 21u]) == live_owner_status.compiled_default_digest);
 #endif
-    assert(read_u32(&frame[WIRE_PAYLOAD + 17u]) == VIA_FIRMWARE_VERSION);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 17u]) == NOAH_FIRMWARE_VERSION);
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x32u, 1u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     // Layout 3 (D-F28): the byte-wide ceilings on page 1.
-    assert(frame[WIRE_PAYLOAD] == DYNAMIC_KEYMAP_LAYER_COUNT);
+    assert(frame[WIRE_PAYLOAD] == LAYER_COUNT);
 #ifdef RGB_MATRIX_ENABLE
     assert(frame[WIRE_PAYLOAD + 8u] == RGB_MATRIX_LED_COUNT);
 #else
@@ -305,7 +293,7 @@ static void test_capability_hook(void) {
 
     // ...and the wider ones, 32-bit capacities, on page 2.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0x33u, 2u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(read_u16(&frame[WIRE_PAYLOAD]) == NOAH_PROFILE_WIRE_V1_MAX_POPULATED_BEHAVIOR_STEPS);
     assert(read_u32(&frame[WIRE_PAYLOAD + 2u]) == NOAH_PROFILE_STORAGE_SLOT_A_SIZE);
@@ -321,7 +309,7 @@ static void test_status_surfaces_read_only_store_discovery(void) {
     store_runtime_state         = NOAH_PROFILE_STORE_RUNTIME_DISCOVERY_PENDING;
     store_runtime_has_committed = false;
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x41u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == (NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT | NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE));
     assert(read_u32(&frame[WIRE_PAYLOAD + 20u]) == 0u);
@@ -335,27 +323,27 @@ static void test_status_surfaces_read_only_store_discovery(void) {
         .origin_half    = 1u,
     };
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x42u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == (NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT | NOAH_PROFILE_STATE_COMMITTED_VALID | NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE));
     assert(read_u32(&frame[WIRE_PAYLOAD + 20u]) == UINT32_C(0x78563412));
     assert(frame[WIRE_PAYLOAD + 24u] == NOAH_PROFILE_ACTIVE_COMPILED_ONLY);
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x43u, 1u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(read_u32(&frame[WIRE_PAYLOAD + 5u]) == UINT32_C(0x01020304));
     assert(frame[WIRE_PAYLOAD + 9u] == 1u);
 
     store_runtime_state         = NOAH_PROFILE_STORE_RUNTIME_GENERATION_CONFLICT;
     store_runtime_has_committed = false;
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x44u, 1u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     // Page one remains paired with the last page-zero observation.
     assert(read_u16(&frame[WIRE_PAYLOAD + 19u]) == 0u);
     assert(read_u32(&frame[WIRE_PAYLOAD + 5u]) == UINT32_C(0x01020304));
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x45u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x46u, 1u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(read_u16(&frame[WIRE_PAYLOAD + 19u]) == 1u);
     assert(read_u32(&frame[WIRE_PAYLOAD + 5u]) == 0u);
 }
@@ -365,7 +353,7 @@ static void test_status_surfaces_coherent_owner_snapshot(void) {
     uint16_t expected_flags = NOAH_PROFILE_STATE_COMMITTED_VALID | NOAH_PROFILE_STATE_CANDIDATE_PENDING | NOAH_PROFILE_STATE_PEER_KNOWN | NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY;
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x41u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == expected_flags);
 
@@ -379,7 +367,7 @@ static void test_status_surfaces_coherent_owner_snapshot(void) {
     live_owner_status.active.generation        = 99u;
     live_owner_status.candidate.transaction_id = UINT16_C(0x6162);
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x42u, 1u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(read_u32(&frame[WIRE_PAYLOAD]) == 7u);
     assert(frame[WIRE_PAYLOAD + 4u] == 1u);
     assert(read_u32(&frame[WIRE_PAYLOAD + 5u]) == 7u);
@@ -397,63 +385,63 @@ static void test_hook_rejects_unsupported_or_malformed_commands(void) {
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 0u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
-    assert(frame[0] == id_custom_get_value);
+    channel(frame, sizeof(frame));
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET);
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
 
     make_request(frame, 0x7Fu, 1u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
-    assert(frame[0] == id_unhandled);
+    channel(frame, sizeof(frame));
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED);
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY, 1u, 0u);
-    via_custom_value_command_kb(frame, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 1u);
-    assert(frame[0] == id_unhandled);
+    channel(frame, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 1u);
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED);
 
     memset(frame, 0, sizeof(frame));
-    frame[0] = id_custom_set_value;
-    frame[1] = id_custom_channel;
+    frame[0] = NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET;
+    frame[1] = NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL;
     frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN;
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
 #ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-    assert(frame[0] == id_custom_set_value);
+    assert(frame[0] == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET);
     assert(frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_QUEUED);
     assert(mutation_receive_count == 1u);
 #else
-    assert(frame[0] == id_unhandled);
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED);
 #endif
 
     make_request(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS, 2u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
 #ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-    assert(frame[0] == id_custom_get_value);
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET);
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[WIRE_PAYLOAD + 1u] == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
     assert(read_u16(&frame[WIRE_PAYLOAD + 4u]) == live_owner_status.candidate.transaction_id);
 #else
-    assert(frame[0] == id_unhandled);
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED);
 #endif
 
     make_request(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS, 3u, 1u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
 #ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-    assert(frame[0] == id_custom_get_value);
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET);
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[WIRE_PAYLOAD + 1u] == NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING);
     assert(read_u32(&frame[WIRE_PAYLOAD + 4u]) == 40u && read_u32(&frame[WIRE_PAYLOAD + 8u]) == 120u);
 #else
-    assert(frame[0] == id_unhandled);
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED);
 #endif
 
     make_request(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS, 4u, 2u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
 #ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
-    assert(frame[0] == id_custom_get_value && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[WIRE_PAYLOAD] == 2u);
     assert(read_u32(&frame[WIRE_PAYLOAD + 2u]) == live_peer_status.reused_bytes);
     assert(read_u32(&frame[WIRE_PAYLOAD + 18u]) == 40u);
     for (uint8_t index = WIRE_PAYLOAD + 22u; index < sizeof(frame); index++) assert(frame[index] == 0u);
 #else
-    assert(frame[0] == id_unhandled);
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED);
 #endif
 
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
@@ -462,11 +450,22 @@ static void test_hook_rejects_unsupported_or_malformed_commands(void) {
     live_owner_status.has_committed         = false;
     live_owner_status.stored_earlier_format = true;
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x47u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == (NOAH_PROFILE_STATE_CANDIDATE_PENDING | NOAH_PROFILE_STATE_PEER_KNOWN | NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY | NOAH_PROFILE_STATE_STORED_EARLIER_FORMAT));
 #endif
 
-    via_custom_value_command_kb(NULL, 0u);
+    channel(NULL, 0u);
+
+    // What VIA used to answer is now unhandled: protocol and firmware
+    // version reads, keymap and macro commands, an EEPROM reset.
+    static const uint8_t retired_commands[] = {0x01u, 0x02u, 0x04u, 0x05u, 0x0Au, 0x0Cu, 0x0Eu, 0x0Fu, 0x11u, 0x12u, 0x13u};
+    for (uint8_t index = 0u; index < sizeof(retired_commands); index++) {
+        memset(frame, 0, sizeof(frame));
+        frame[0] = retired_commands[index];
+        frame[1] = 0x01u;
+        channel(frame, sizeof(frame));
+        assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED);
+    }
 }
 
 #ifdef NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
@@ -474,18 +473,18 @@ static void test_cadence_read_route_is_bounded_and_canonical(void) {
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
 
     make_request(frame, NOAH_RUNTIME_CADENCE_WIRE_VALUE, 0x71u, 3u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[6] == NOAH_RUNTIME_CADENCE_WIRE_PAYLOAD_SIZE);
     assert(frame[WIRE_PAYLOAD] == 1u && frame[WIRE_PAYLOAD + 1u] == 3u);
 
     make_request(frame, NOAH_RUNTIME_CADENCE_WIRE_VALUE, 0x72u, NOAH_RUNTIME_CADENCE_WIRE_PAGES);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
     assert(frame[6] == 0u);
 
     make_request(frame, NOAH_RUNTIME_CADENCE_WIRE_VALUE, 0u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
 }
 #endif
@@ -508,7 +507,7 @@ static void test_payload_read_reports_metadata_then_chunks(void) {
     store_runtime_record.origin_half    = 1u;
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[6] == NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
     // Metadata layout 2 (D-F28): a 32-bit payload length.
@@ -522,7 +521,7 @@ static void test_payload_read_reports_metadata_then_chunks(void) {
 
     // Page 1 starts at offset 0 and carries a full report of payload.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 2u, 1u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[6] == NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
     for (uint8_t index = 0u; index < NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE; index++) {
@@ -531,7 +530,7 @@ static void test_payload_read_reports_metadata_then_chunks(void) {
 
     // The final chunk is short, and reports its real length.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 3u, 3u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[6] == 10u);
     assert(frame[7] == store_payload_byte(50u));
@@ -545,7 +544,7 @@ static void test_payload_read_refuses_pages_past_the_payload(void) {
     store_runtime_record.payload_length = 30u;
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 3u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
     assert(frame[6] == 0u);
 }
@@ -561,37 +560,37 @@ static void test_payload_read_takes_wide_pages(void) {
     store_runtime_record.payload_length = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX;
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && read_u32(&frame[9]) == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX);
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 2u, 0x2Cu);
     frame[5] = 0x01u; // page 300
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[3] == 2u && frame[4] == 0x2Cu);
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
     assert(frame[7] == store_payload_byte(299u * NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE));
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 3u, (uint8_t)last_page);
     frame[5] = (uint8_t)(last_page >> 8u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[6] == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX - (last_page - 1u) * NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 4u, (uint8_t)(last_page + 1u));
     frame[5] = (uint8_t)((last_page + 1u) >> 8u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
 
     // The highest page never wraps onto an early offset.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 5u, 0xFFu);
     frame[5] = 0xFFu;
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
 
     // Byte 6 onward stays reserved.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 6u, 1u);
     frame[6] = 1u;
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
 }
 
@@ -601,7 +600,7 @@ static void test_payload_read_reports_unavailable_without_a_commit(void) {
     store_runtime_has_committed = false;
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE);
 }
 
@@ -614,13 +613,13 @@ static void test_payload_read_rejects_malformed_requests(void) {
 
     // A zero request id is not correlatable.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 0u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
 
     // Reserved bytes must be zero, so a host cannot smuggle state in them.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 1u);
     frame[20] = 0x5Au;
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
 }
 
@@ -633,7 +632,7 @@ static void test_payload_read_surfaces_storage_failure(void) {
     store_read_committed_fails          = true;
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD, 1u, 1u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE);
     store_read_committed_fails = false;
 }
@@ -645,7 +644,7 @@ static void test_compiled_read_serves_what_the_firmware_runs(void) {
     store_runtime_has_committed = false; // nothing committed: compiled must still answer
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMPILED, 1u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(read_u32(&frame[9]) == 40u);
     // Compiled defaults are not a committed generation.
@@ -655,7 +654,7 @@ static void test_compiled_read_serves_what_the_firmware_runs(void) {
     assert(frame[27] == 0x30u);
 
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMPILED, 2u, 1u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
     assert(frame[6] == NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE);
     assert(frame[7] == store_compiled_byte(0u));
@@ -669,7 +668,7 @@ static void test_compiled_read_reports_unavailable_when_absent(void) {
 
     store_has_compiled = false;
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMPILED, 1u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE);
     store_has_compiled = true;
 }
@@ -677,21 +676,21 @@ static void test_compiled_read_reports_unavailable_when_absent(void) {
 static void test_combo_read_route_without_combo_feature(void) {
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 17u, 0u);
-    via_custom_value_command_kb(frame, sizeof(frame));
-    assert(frame[0] == id_custom_get_value && frame[3] == 17u);
+    channel(frame, sizeof(frame));
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && frame[3] == 17u);
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
     assert(frame[7] == 3u && frame[8] == 0u && frame[9] == 16u && frame[10] == LAYER_COUNT && frame[11] == 0u);
     // An empty table still reports each layer as its own reference layer.
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 18u, 1u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u && frame[7] == 0u && frame[7u + LAYER_COUNT - 1u] == LAYER_COUNT - 1u);
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 18u, 2u);
-    via_custom_value_command_kb(frame, sizeof(frame));
+    channel(frame, sizeof(frame));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE && frame[6] == 0u);
     make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_COMBOS, 19u, 0u);
-    frame[0] = id_custom_set_value;
-    via_custom_value_command_kb(frame, sizeof(frame));
-    assert(frame[0] == id_unhandled);
+    frame[0] = NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET;
+    channel(frame, sizeof(frame));
+    assert(frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED);
 }
 
 static void test_flash_pause_read_routes_to_the_flash_adapter(void) {
@@ -699,8 +698,8 @@ static void test_flash_pause_read_routes_to_the_flash_adapter(void) {
 
     make_request(frame, 0x0Du, 21u, 0u);
     flash_wire_requests = 0u;
-    via_custom_value_command_kb(frame, sizeof(frame));
-    assert(flash_wire_requests == 1u && frame[0] == id_custom_get_value && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    channel(frame, sizeof(frame));
+    assert(flash_wire_requests == 1u && frame[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
 }
 
 int main(void) {
@@ -727,6 +726,6 @@ int main(void) {
     test_compiled_read_serves_what_the_firmware_runs();
     test_compiled_read_reports_unavailable_when_absent();
     test_combo_read_route_without_combo_feature();
-    puts("qmk VIA Profile Wire channel tests passed");
+    puts("qmk Raw HID Profile Wire channel tests passed");
     return 0;
 }

@@ -5,16 +5,14 @@
 #include <string.h>
 
 #include "users/noah/lib/compat/qmk_usb_product_name.h"
-#include "users/noah/lib/compat/qmk_via_split_sync.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
 #include "users/noah/lib/profile/storage/profile_store_runtime.h"
 
 // The world the module reads, set by each test.
-static bool                                     master, usb_active, settled, via_ready = true, boot_found;
-static noah_profile_keyboard_name_t             boot_name, live_name;
-static uint32_t                                 publication, now;
-static unsigned                                 restarts, boot_reads;
-static noah_qmk_via_split_sync_debug_snapshot_t via;
+static bool                         master, usb_active, settled, boot_found;
+static noah_profile_keyboard_name_t boot_name, live_name;
+static uint32_t                     publication, now;
+static unsigned                     restarts, boot_reads;
 
 bool is_keyboard_master(void) {
     return master;
@@ -45,12 +43,6 @@ void noah_effective_settings_keyboard_name(noah_profile_keyboard_name_t *name) {
 uint32_t noah_effective_settings_publication(void) {
     return publication;
 }
-noah_qmk_via_split_sync_debug_snapshot_t noah_qmk_via_split_sync_debug_snapshot(void) {
-    return via;
-}
-bool noah_qmk_via_logical_boot_output_ready(void) {
-    return via_ready;
-}
 
 static noah_profile_keyboard_name_t name_of(const char *text) {
     noah_profile_keyboard_name_t name = {.length = (uint8_t)strlen(text)};
@@ -77,8 +69,7 @@ static void serves(const char *text) {
 static void boot(const char *committed, bool is_master) {
     boot_found = committed != NULL;
     boot_name  = boot_found ? name_of(committed) : (noah_profile_keyboard_name_t){0};
-    master = is_master, usb_active = true, settled = true, via_ready = true;
-    memset(&via, 0, sizeof(via));
+    master = is_master, usb_active = true, settled = true;
     restarts = 0;
     noah_qmk_usb_product_name_pre_init();
     publish(committed ? committed : "");
@@ -132,22 +123,6 @@ static void test_rename_restarts_once_when_safe(void) {
     noah_qmk_usb_product_name_task();
     assert(restarts == 0u);
     usb_active = true;
-    via_ready  = false;
-    noah_qmk_usb_product_name_task();
-    assert(restarts == 0u);
-    via_ready               = true;
-    via.replication_pending = true;
-    noah_qmk_usb_product_name_task();
-    assert(restarts == 0u);
-    via.replication_pending = false;
-    via.local_dirty         = true;
-    noah_qmk_usb_product_name_task();
-    assert(restarts == 0u);
-    via.local_dirty     = false;
-    via.receiver_active = true;
-    noah_qmk_usb_product_name_task();
-    assert(restarts == 0u);
-    via.receiver_active = false;
     // A client still talking keeps it waiting for a quiet second.
     now = 5000u;
     noah_qmk_usb_product_name_note_host_frame();

@@ -13,9 +13,10 @@ any C and you don't reflash.
   Your changes go into a draft that you review before anything is saved, and
   Apply writes both halves and reads them back. You can export a whole profile
   to one file and import it again. Small edits can reuse unchanged profile data
-  on both halves, and full-bank checksums run in batches to shorten Apply's wait
-  while the keyboard still validates and saves the complete result. Reads can
-  skip confirmed empty macro storage with a supporting Ark version.
+  on both halves while the keyboard still validates and saves the complete
+  result. Keys and macros are part of that profile too. The VIA app is not
+  supported: I dropped it so the whole configuration lives in one store that
+  Ark edits.
 - **Text macros in your layout.** Macros type through your computer's keyboard
   layout (US, Dutch, German, French, UK and more on macOS, Windows and Linux),
   accents included, with Unicode entry for emoji. Protected playback suspends

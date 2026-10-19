@@ -42,7 +42,6 @@ build_and_run() {
         -DPOINTING_DEVICE_ENABLE \
         -DRGB_MATRIX_ENABLE \
         -DRGB_MATRIX_WS2812 \
-        -DVIA_ENABLE \
         -DMCU_RP \
         -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
         -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
@@ -104,7 +103,6 @@ build_and_run empty -DNOAH_PD_PROFILE_ENABLE -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -
 # the canonical key-behavior domain alone and must remain warning-clean.
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_PD_PROFILE_ENABLE \
-    -DVIA_ENABLE \
     -DMCU_RP \
     -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
     -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \

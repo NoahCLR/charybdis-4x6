@@ -57,10 +57,9 @@ bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const voi
     return rpc_exec_result;
 }
 
-noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin_logical(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor, uint32_t via_generation, uint32_t via_digest) {
+noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor) {
     (void)peer;
     (void)descriptor;
-    CHECK(via_generation == 6u && via_digest == UINT32_C(0xabcdef01));
     peer_begin_count++;
     return NOAH_PROFILE_PEER_STORE_BUSY;
 }
@@ -156,7 +155,6 @@ static noah_profile_split_descriptor_t committed_descriptor(void) {
         .origin_half             = 1u,
         .readable                = true,
         .has_profile             = true,
-        .logical                 = true,
     };
 }
 
@@ -257,19 +255,6 @@ static void test_callback_forwards_and_reuses_cached_busy_response(void) {
     reset_transport_stubs();
     init_reconciler(&reconciler, &peer_store);
     CHECK(noah_qmk_profile_split_transport_init(&reconciler));
-    noah_profile_split_v1_frame_t bind = {
-        .kind                 = NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND,
-        .status               = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
-        .generation           = request.descriptor.generation,
-        .payload_digest       = request.descriptor.payload_digest,
-        .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation       = 6u,
-        .via_digest           = UINT32_C(0xabcdef01),
-    };
-    CHECK(noah_profile_split_v1_frame_encode(&bind, request_wire, sizeof(request_wire)));
-    registered_callback(sizeof(request_wire), request_wire, sizeof(response_wire), response_wire);
-    CHECK(noah_profile_split_reconciler_scan(&reconciler, false, 0u));
-    CHECK(peer_begin_count == 0u);
     CHECK(noah_profile_split_v1_frame_encode(&request, request_wire, sizeof(request_wire)));
 
     memset(response_wire, 0xA5, sizeof(response_wire));

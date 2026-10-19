@@ -135,6 +135,13 @@ static uint16_t header_crc16(const uint8_t *header) {
     return noah_profile_crc16_ccitt_update(noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, &format, 1u), header, 33u);
 }
 
+static void store_u32(uint8_t *bytes, uint32_t value) {
+    bytes[0] = (uint8_t)value;
+    bytes[1] = (uint8_t)(value >> 8u);
+    bytes[2] = (uint8_t)(value >> 16u);
+    bytes[3] = (uint8_t)(value >> 24u);
+}
+
 static void store_u16(uint8_t *bytes, uint16_t value) {
     bytes[0] = (uint8_t)value;
     bytes[1] = (uint8_t)(value >> 8u);
@@ -158,8 +165,6 @@ static noah_profile_store_candidate_t candidate_for(const uint8_t *payload, uint
 
     return (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_STORE_FORMAT_VERSION,
-        .via_generation          = 17u,
-        .via_digest              = UINT32_C(0x89ABCDEF),
         .schema_major            = NOAH_PROFILE_SCHEMA_MAJOR,
         .schema_minor            = 0u,
         .domain_mask             = domain_mask,
@@ -259,8 +264,7 @@ static void test_commit_and_boot_selection(void) {
     CHECK(load_u32(&header[10]) == first_candidate.payload_crc32);
     CHECK(load_u32(&header[14]) == COMPILED_DIGEST);
     CHECK(load_u32(&header[18]) == ACTION_ABI_DIGEST);
-    CHECK(load_u32(&header[22]) == first_candidate.via_generation);
-    CHECK(load_u32(&header[26]) == first_candidate.via_digest);
+    for (uint8_t reserved = 22u; reserved < 33u; reserved++) CHECK(header[reserved] == 0u);
     CHECK(load_u16(&header[33]) == header_crc16(header));
     CHECK(header[35] == 0x18u);
 
@@ -275,40 +279,37 @@ static void test_commit_and_boot_selection(void) {
     CHECK(noah_profile_store_next_generation(&store, &next) && next == 8u);
 }
 
-static void test_logical_header_binds_via_identity(void) {
+// Bytes 22..32 are reserved and zero; 22..29 held the VIA binding until
+// D-F31. A record round-trips without them, and compatibility still decides
+// whether a committed slot is selected.
+static void test_header_reserved_bytes_are_zero(void) {
     noah_profile_store_t           store;
     noah_profile_store_t           rebooted;
     noah_profile_store_record_t    record;
     noah_profile_store_candidate_t candidate;
-    const uint8_t                 *header;
+    uint8_t                       *header;
 
     reset_eeprom(&eeprom);
     initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
     candidate                = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
     candidate.format_version = NOAH_PROFILE_STORE_FORMAT_VERSION;
-    candidate.via_generation = 17u;
-    candidate.via_digest     = UINT32_C(0x89ABCDEF);
     CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
     CHECK(noah_profile_store_prepare_write(&store, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_STORE_OK);
     CHECK(noah_profile_store_prepare_commit(&store, &record) == NOAH_PROFILE_STORE_OK);
     CHECK(record.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
-    CHECK(record.via_generation == candidate.via_generation && record.via_digest == candidate.via_digest);
     header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
     CHECK(load_u32(&header[1]) == candidate.payload_length);
     CHECK(load_u32(&header[6]) == candidate.generation);
     CHECK(load_u32(&header[10]) == candidate.payload_crc32);
     CHECK(load_u32(&header[14]) == candidate.compiled_default_digest);
     CHECK(load_u32(&header[18]) == candidate.action_abi_digest);
-    CHECK(load_u32(&header[22]) == candidate.via_generation);
-    CHECK(load_u32(&header[26]) == candidate.via_digest);
+    for (uint8_t reserved = 22u; reserved < 33u; reserved++) CHECK(header[reserved] == 0u);
     CHECK(load_u16(&header[33]) == header_crc16(header));
     CHECK(header[35] == 0x18u);
 
     initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_OK);
     CHECK(rebooted.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
     CHECK(rebooted.committed.payload_digest == candidate.payload_digest);
-    CHECK(rebooted.committed.via_generation == candidate.via_generation);
-    CHECK(rebooted.committed.via_digest == candidate.via_digest);
     {
         noah_profile_store_compatibility_t incompatible = compatibility();
         noah_profile_store_record_t        selected;
@@ -320,11 +321,12 @@ static void test_logical_header_binds_via_identity(void) {
         noah_profile_store_init(&rebooted, io_for(&eeprom), incompatible);
         CHECK(noah_profile_store_boot_select(&rebooted, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
     }
-    initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_OK);
-
-    candidate.generation     = 2u;
-    candidate.via_generation = 0u;
-    CHECK(noah_profile_store_prepare_begin(&rebooted, &candidate) == NOAH_PROFILE_STORE_INVALID_ARGUMENT);
+    // A header still carrying a VIA binding is not this format's: refused,
+    // even with its checksum repaired.
+    store_u32(&header[22], 17u);
+    store_u32(&header[26], UINT32_C(0x89ABCDEF));
+    store_u16(&header[33], header_crc16(header));
+    initialize_store(&rebooted, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
 }
 
 static void test_chunk_and_candidate_guards(void) {
@@ -404,8 +406,6 @@ static void test_durable_prepare_is_not_authority_until_decided(void) {
     {
         noah_profile_store_candidate_t candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
         candidate.format_version                 = NOAH_PROFILE_STORE_FORMAT_VERSION;
-        candidate.via_generation                 = 3u;
-        candidate.via_digest                     = UINT32_C(0x76543210);
         CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
         CHECK(noah_profile_store_prepare_write(&store, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_STORE_OK);
     }
@@ -824,8 +824,6 @@ static noah_profile_store_candidate_t pd_candidate(const uint8_t *payload, uint1
     value.format_version                 = NOAH_PROFILE_STORE_FORMAT_VERSION;
     value.domain_mask = mask;
     value.flags = flags;
-    value.via_generation = generation + 20u;
-    value.via_digest = UINT32_C(0xABCD0000) + generation;
     return value;
 }
 
@@ -936,7 +934,6 @@ static void test_pd_header_all_identity_bits_and_boot_paths(void) {
                 CHECK(noah_profile_store_validate_slot(&store, NOAH_PROFILE_SLOT_A, true, &record) == NOAH_PROFILE_STORE_OK);
                 CHECK(record.domain_mask == mask && record.origin_half == origin && record.flags == flags);
                 CHECK(record.payload_digest == candidate.payload_digest && record.schema_major == NOAH_PROFILE_SCHEMA_MAJOR);
-                CHECK(record.via_generation == candidate.via_generation && record.via_digest == candidate.via_digest);
                 noah_profile_store_init(&rebooted, io_for(&eeprom), pd_compatibility());
                 CHECK(noah_profile_store_boot_select_begin(&rebooted) == NOAH_PROFILE_STORE_IN_PROGRESS);
                 noah_profile_store_result_t result;
@@ -989,11 +986,10 @@ static void test_pd_header_rejects_bad_contracts_before_writing(void) {
     reset_eeprom(&eeprom);
     initialize_pd_store(&store);
     for (uint8_t invalid = 0u; invalid < 10u; invalid++) {
+        if (invalid == 1u || invalid == 2u) continue; // were the retired VIA binding (D-F31)
         candidate = valid;
         switch (invalid) {
             case 0: candidate.domain_mask = 0x80u; break;
-            case 1: candidate.via_generation = 0u; break;
-            case 2: candidate.via_digest = 0u; break;
             case 3: candidate.origin_half = 2u; break;
             case 4: candidate.flags = 2u; break;
             case 5:
@@ -1015,10 +1011,10 @@ static void test_pd_header_rejects_bad_contracts_before_writing(void) {
     uint8_t *header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
     noah_profile_store_record_t record;
     // Reserved header bytes and flag bits remain invalid with repaired CRCs.
-    for (uint8_t reserved = 30; reserved <= 32; reserved++) {
+    for (uint8_t reserved = 22; reserved <= 32; reserved++) {
         header[reserved] = 1;
         store_u16(&header[33], header_crc16(header));
-        CHECK(noah_profile_store_validate_slot(&store, NOAH_PROFILE_SLOT_A, true, &record) == NOAH_PROFILE_STORE_INVALID_HEADER);
+        CHECK(noah_profile_store_validate_slot(&store, NOAH_PROFILE_SLOT_A, true, &record) == (reserved < 30u ? NOAH_PROFILE_STORE_EARLIER_FORMAT : NOAH_PROFILE_STORE_INVALID_HEADER));
         header[reserved] = 0;
     }
     header[5] ^= 4;
@@ -1051,8 +1047,6 @@ static void test_pd_header_rejects_bad_contracts_before_writing(void) {
     candidate = candidate_for(empty_profile, sizeof(empty_profile), 1u, 0u);
     candidate.format_version = NOAH_PROFILE_STORE_FORMAT_VERSION;
     candidate.domain_mask    = 128u;
-    candidate.via_generation = 1u;
-    candidate.via_digest = 1u;
     CHECK(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_INVALID_ARGUMENT);
     CHECK(eeprom.write_calls == 0u);
 }
@@ -1087,8 +1081,6 @@ static void test_pd_header_power_loss_keeps_complete_generation(void) {
             CHECK(record.domain_mask == 31u && record.payload_digest == first.payload_digest);
             CHECK(record.origin_half == (record.generation == 1u ? 0u : 1u));
             CHECK(record.flags == (record.generation == 1u ? 1u : 0u));
-            CHECK(record.via_generation == record.generation + 20u);
-            CHECK(record.via_digest == UINT32_C(0xABCD0000) + record.generation);
         }
     }
     // A durable prepared NR record is inspectable but never selected at boot.
@@ -1129,7 +1121,7 @@ static void write_format5_header(uint8_t *header, uint8_t marker) {
 // same fields one byte earlier and the keyed CRC16 at 29. Through today's
 // addresses its page-0 bytes 31 to 34 read erased while the marker cells still
 // read committed. Bytes 30 to 32 must be zero, so it is refused even when the
-// CRC happens to match (forced_crc), and never reported as an earlier format.
+// CRC happens to match (forced_crc), and reported as a retired test format.
 static void write_32_byte_format6_header(uint8_t *header, bool forced_crc) {
     static const uint8_t format = NOAH_PROFILE_STORE_FORMAT_VERSION;
     uint8_t              old[30];
@@ -1146,19 +1138,25 @@ static void write_32_byte_format6_header(uint8_t *header, bool forced_crc) {
 }
 
 static void test_retired_store_headers_never_become_authority(void) {
-    for (uint8_t variant = 0u; variant < 5u; variant++) {
+    for (uint8_t variant = 0u; variant < 6u; variant++) {
         noah_profile_store_t        store, rebooted;
         noah_profile_store_record_t selected;
         uint8_t                     before[NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE];
         uint8_t                    *header = &eeprom.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR];
-        bool                        earlier = variant < 2u;
-        noah_profile_store_result_t refused = earlier ? NOAH_PROFILE_STORE_EARLIER_FORMAT : variant == 4u ? NOAH_PROFILE_STORE_INVALID_HEADER : NOAH_PROFILE_STORE_CHECKSUM_MISMATCH;
+        bool                        earlier = variant != 2u;
+        noah_profile_store_result_t refused = earlier ? NOAH_PROFILE_STORE_EARLIER_FORMAT : NOAH_PROFILE_STORE_CHECKSUM_MISMATCH;
 
         reset_eeprom(&eeprom);
         initialize_store(&store, &eeprom, NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
         CHECK(commit_payload(&store, empty_profile, sizeof(empty_profile), 1u, 0u, &selected) == NOAH_PROFILE_STORE_OK);
-        if (earlier) {
+        if (variant < 2u) {
             write_format5_header(header, variant == 0u ? 0xA5u : 0x5Au);
+        } else if (variant == 5u) {
+            // The immediately preceding test build bound a VIA generation
+            // and digest at 22..29, with the same format and valid CRC.
+            store_u32(&header[22], 6u);
+            store_u32(&header[26], UINT32_C(0xabcdef01));
+            store_u16(&header[33], header_crc16(header));
         } else if (variant >= 3u) {
             write_32_byte_format6_header(header, variant == 4u);
         } else {
@@ -1271,7 +1269,7 @@ int main(void) {
     test_pd_header_power_loss_keeps_complete_generation();
     test_checksums();
     test_commit_and_boot_selection();
-    test_logical_header_binds_via_identity();
+    test_header_reserved_bytes_are_zero();
     test_chunk_and_candidate_guards();
     test_commit_state_machine_is_scan_bounded();
     test_durable_prepare_is_not_authority_until_decided();

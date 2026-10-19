@@ -21,18 +21,11 @@
 // in the keymap's config.h as an enum. LAYER_COUNT is the sentinel last value
 // and is derived automatically — no manual count to keep in sync.
 
-#ifdef VIA_ENABLE
-_Static_assert(LAYER_COUNT == DYNAMIC_KEYMAP_LAYER_COUNT, "LAYER_COUNT and DYNAMIC_KEYMAP_LAYER_COUNT are out of sync — update the keymap config.h");
-#endif
-
 #define VIA_MACRO_SLOT_COUNT 128
 // The names Charybdis Ark shows until a layer, macro or custom key is renamed
 // there: each holds at most 32 bytes of UTF-8, followed by its terminator.
 #define NOAH_LAYER_NAME_SIZE 33
 #define NOAH_MACRO_NAME_SIZE 33
-#ifdef VIA_ENABLE
-_Static_assert(VIA_MACRO_SLOT_COUNT == DYNAMIC_KEYMAP_MACRO_COUNT, "VIA_MACRO_SLOT_COUNT and DYNAMIC_KEYMAP_MACRO_COUNT are out of sync");
-#endif
 
 // VIA_MACRO_0–63 are authored aliases for VIA's dynamic macro slots.
 // The QMK-specific base keycodes stay here so keymap.c can stay declarative.

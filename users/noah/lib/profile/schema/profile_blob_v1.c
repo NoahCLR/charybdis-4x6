@@ -430,6 +430,4 @@ noah_profile_codec_v1_result_t noah_profile_action_v1_decode(const uint8_t *byte
 _Static_assert(NOAH_PROFILE_BLOB_V1_HEADER_SIZE + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE <= NOAH_PROFILE_BLOB_V1_MAX_SIZE, "Profile blob envelope must fit the payload ceiling");
 _Static_assert(NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS == NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS, "action and storage layer ceilings drifted");
 _Static_assert(NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS == NOAH_PROFILE_WIRE_V1_MAX_CUSTOM_KEYS, "action and storage macro ceilings drifted");
-#ifdef VIA_ENABLE
 _Static_assert(NOAH_PROFILE_BLOB_V1_MAX_SIZE == NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX, "canonical blob must fit exactly within a profile slot payload");
-#endif

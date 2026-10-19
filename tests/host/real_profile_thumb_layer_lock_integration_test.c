@@ -617,7 +617,7 @@ void wait_ms(uint16_t ms) {
     (void)ms;
 }
 
-bool noah_qmk_contract_try_play_via_macro(uint16_t action) {
+bool noah_profile_macro_try_play(uint16_t action) {
     (void)action;
     return false;
 }

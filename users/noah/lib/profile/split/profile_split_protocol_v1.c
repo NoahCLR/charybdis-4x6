@@ -45,17 +45,15 @@ enum {
     WIRE_REUSE_KIND_COMPILED   = 0u,
     WIRE_REUSE_KIND_COMMITTED  = 1u,
     WIRE_REUSE_ORIGIN_COMPILED = 255u,
-    WIRE_BIND_FORMAT           = 12u,
-    WIRE_BIND_VIA_GEN          = 13u,
-    WIRE_BIND_VIA_DIGEST       = 17u,
     WIRE_FLAG_HAS_PROFILE      = 1u << 0,
     WIRE_FLAG_READABLE         = 1u << 1,
-    WIRE_FLAG_LOGICAL          = 1u << 2,
+    // Bit 2 marked a record bound to the VIA store; retired with VIA (D-F31)
+    // and refused when set.
     // A descriptor's origin half and its one profile flag (override) share
     // the flags byte since version 3, leaving room for a 32-bit length.
     WIRE_FLAG_ORIGIN_HALF      = 1u << 3,
     WIRE_FLAG_PROFILE_OVERRIDE = 1u << 4,
-    WIRE_DESCRIPTOR_FLAGS      = WIRE_FLAG_HAS_PROFILE | WIRE_FLAG_READABLE | WIRE_FLAG_LOGICAL | WIRE_FLAG_ORIGIN_HALF | WIRE_FLAG_PROFILE_OVERRIDE,
+    WIRE_DESCRIPTOR_FLAGS      = WIRE_FLAG_HAS_PROFILE | WIRE_FLAG_READABLE | WIRE_FLAG_ORIGIN_HALF | WIRE_FLAG_PROFILE_OVERRIDE,
 };
 
 static uint8_t crc8(const uint8_t *bytes, size_t length) {
@@ -95,7 +93,7 @@ static bool descriptor_kind(noah_profile_split_v1_kind_t kind) {
 }
 
 static bool descriptor_zero(const noah_profile_split_descriptor_t *descriptor) {
-    return descriptor && descriptor->generation == 0u && descriptor->payload_crc32 == 0u && descriptor->payload_digest == 0u && descriptor->compiled_default_digest == 0u && descriptor->action_abi_digest == 0u && descriptor->payload_length == 0u && descriptor->schema_major == 0u && descriptor->schema_minor == 0u && descriptor->domain_mask == 0u && descriptor->profile_flags == 0u && descriptor->origin_half == 0u && !descriptor->readable && !descriptor->has_profile && !descriptor->logical;
+    return descriptor && descriptor->generation == 0u && descriptor->payload_crc32 == 0u && descriptor->payload_digest == 0u && descriptor->compiled_default_digest == 0u && descriptor->action_abi_digest == 0u && descriptor->payload_length == 0u && descriptor->schema_major == 0u && descriptor->schema_minor == 0u && descriptor->domain_mask == 0u && descriptor->profile_flags == 0u && descriptor->origin_half == 0u && !descriptor->readable && !descriptor->has_profile;
 }
 
 static bool reuse_zero(const noah_profile_split_v1_frame_t *frame) {
@@ -151,14 +149,6 @@ static bool transfer_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     return frame->kind == NOAH_PROFILE_SPLIT_V1_ERROR && frame->status != NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->status != NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
 }
 
-static bool logical_bind_shape_valid(const noah_profile_split_v1_frame_t *frame) {
-    return frame && descriptor_zero(&frame->descriptor) && frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->generation != 0u && frame->payload_digest != 0u && frame->offset == 0u && frame->payload_length == 0u && frame->chunk_length == 0u && bytes_zero(frame->chunk, sizeof(frame->chunk)) && frame->store_format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && frame->via_generation != 0u && frame->via_digest != 0u;
-}
-
-static bool logical_bind_request_shape_valid(const noah_profile_split_v1_frame_t *frame) {
-    return frame && descriptor_zero(&frame->descriptor) && frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->generation != 0u && frame->payload_digest != 0u && frame->offset == 0u && frame->payload_length == 0u && frame->chunk_length == 0u && bytes_zero(frame->chunk, sizeof(frame->chunk)) && frame->store_format_version == 0u && frame->via_generation == 0u && frame->via_digest == 0u;
-}
-
 static bool frame_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     if (!frame || frame->kind < NOAH_PROFILE_SPLIT_V1_METADATA || frame->kind > NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE || frame->status > NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE) {
         return false;
@@ -166,11 +156,8 @@ static bool frame_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     if (frame->kind != NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE && !reuse_zero(frame)) {
         return false;
     }
-    if (frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND) {
-        return logical_bind_shape_valid(frame);
-    }
-    if (frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST) {
-        return logical_bind_request_shape_valid(frame);
+    if (frame->kind == 9u || frame->kind == 11u) {
+        return false; // retired VIA binding kinds (D-F31)
     }
     if (frame->kind != NOAH_PROFILE_SPLIT_V1_ACK && (frame->busy_reason || frame->busy_store_state || frame->busy_owner || frame->busy_admission)) {
         return false;
@@ -208,7 +195,7 @@ uint8_t noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *
     out[WIRE_KIND]    = (uint8_t)frame->kind;
     out[WIRE_STATUS]  = (uint8_t)frame->status;
     if (descriptor_kind(frame->kind)) {
-        out[WIRE_FLAGS]        = (frame->descriptor.has_profile ? WIRE_FLAG_HAS_PROFILE : 0u) | (frame->descriptor.readable ? WIRE_FLAG_READABLE : 0u) | (frame->descriptor.logical ? WIRE_FLAG_LOGICAL : 0u) | (frame->descriptor.origin_half ? WIRE_FLAG_ORIGIN_HALF : 0u) | (frame->descriptor.profile_flags ? WIRE_FLAG_PROFILE_OVERRIDE : 0u);
+        out[WIRE_FLAGS]        = (frame->descriptor.has_profile ? WIRE_FLAG_HAS_PROFILE : 0u) | (frame->descriptor.readable ? WIRE_FLAG_READABLE : 0u) | (frame->descriptor.origin_half ? WIRE_FLAG_ORIGIN_HALF : 0u) | (frame->descriptor.profile_flags ? WIRE_FLAG_PROFILE_OVERRIDE : 0u);
         out[WIRE_SCHEMA_MAJOR] = frame->descriptor.schema_major;
         out[WIRE_SCHEMA_MINOR] = frame->descriptor.schema_minor;
         write_u32(&out[WIRE_PAYLOAD_LENGTH], frame->descriptor.payload_length);
@@ -218,12 +205,6 @@ uint8_t noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *
         write_u32(&out[WIRE_COMPILED_DIGEST], frame->descriptor.compiled_default_digest);
         write_u32(&out[WIRE_ACTION_ABI], frame->descriptor.action_abi_digest);
         out[WIRE_DOMAIN_MASK] = frame->descriptor.domain_mask;
-    } else if (frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND || frame->kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST) {
-        write_u32(&out[WIRE_TRANSFER_GEN], frame->generation);
-        write_u32(&out[WIRE_TRANSFER_DIGEST], frame->payload_digest);
-        out[WIRE_BIND_FORMAT] = frame->store_format_version;
-        write_u32(&out[WIRE_BIND_VIA_GEN], frame->via_generation);
-        write_u32(&out[WIRE_BIND_VIA_DIGEST], frame->via_digest);
     } else if (frame->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) {
         write_u32(&out[WIRE_TRANSFER_GEN], frame->generation);
         write_u32(&out[WIRE_TRANSFER_DIGEST], frame->payload_digest);
@@ -285,17 +266,7 @@ bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noa
             .origin_half             = (wire[WIRE_FLAGS] & WIRE_FLAG_ORIGIN_HALF) != 0u ? 1u : 0u,
             .readable                = (wire[WIRE_FLAGS] & WIRE_FLAG_READABLE) != 0u,
             .has_profile             = (wire[WIRE_FLAGS] & WIRE_FLAG_HAS_PROFILE) != 0u,
-            .logical                 = (wire[WIRE_FLAGS] & WIRE_FLAG_LOGICAL) != 0u,
         };
-    } else if (decoded.kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND || decoded.kind == NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST) {
-        if (wire[WIRE_FLAGS] != 0u || !bytes_zero(&wire[21], 10u)) {
-            return false;
-        }
-        decoded.generation           = read_u32(&wire[WIRE_TRANSFER_GEN]);
-        decoded.payload_digest       = read_u32(&wire[WIRE_TRANSFER_DIGEST]);
-        decoded.store_format_version = wire[WIRE_BIND_FORMAT];
-        decoded.via_generation       = read_u32(&wire[WIRE_BIND_VIA_GEN]);
-        decoded.via_digest           = read_u32(&wire[WIRE_BIND_VIA_DIGEST]);
     } else if (decoded.kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) {
         if (wire[WIRE_FLAGS] != 0u || wire[WIRE_REUSE_RESERVED] != 0u) {
             return false;

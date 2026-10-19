@@ -55,7 +55,7 @@ buttons are under **Advanced**. Keep changes in the shared draft, bind its
 hold/toggle action, set RGB, then review and Apply. See
 [Pointer modes](POINTER_MODES.md).
 
-A direction, diagonal or button tap override can start a VIA macro. Triggers
+A direction, diagonal or button tap override can start a macro. Triggers
 while another macro is playing are dropped, never queued. **Every step** is
 allowed; **Once per movement** usually fits a longer macro better. An empty
 macro sends nothing and leaves the movement unspent. Macro outputs inherit
@@ -151,7 +151,7 @@ Use it for:
 
 - the physical layer layout
 - combos
-- VIA macro defaults
+- macro defaults (`VIA_MACRO_n`, a historical name)
 - custom keys, their names and shortcuts
 - `key_behaviors[]`
 - pointing-mode key placement and richer mode gestures
@@ -285,7 +285,7 @@ so Cmd released just before `,` types Cmd+,. The
 [interaction model](INTERACTION_MODEL.md#keys-pressed-while-a-taphold-key-is-undecided)
 has the details.
 
-`action` can be a normal keycode, a modified keycode such as `S(KC_1)`, a VIA
+`action` can be a normal keycode, a modified keycode such as `S(KC_1)`, a
 macro, a supported QMK behavior keycode such as `OSM()` or
 `MT()`, a generated pointing-mode lock such as `PD_SLOT_0_LOCK`, or a layer
 lock through `LOCK_LAYER(layer)`. QMK's `TG(layer)` is the same lock as
@@ -448,26 +448,20 @@ layer set and activity timer; this userspace adds custom split RPCs in
 - `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` and
   `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC`: key-feedback flash visibility, semantic
   state, broad owner groups, and tap-branch colors
-- `PUT_VIA_KEYMAP_SYNC`: durable reconciliation of committed VIA keymap,
-  encoder, macro, validity, and layout-option storage
+- `PUT_PROFILE_SPLIT_SYNC`: the saved profile, copied and committed on both
+  halves together
 
 You can forget those packet names immediately. The point is that both halves
 know the same layers, keys, combos, pointing modes, and feedback state, so the
 board behaves and lights up like one device instead of two disconnected halves.
 
-VIA edits use a stricter path than transient lighting and pointing state. The
-receiving half never trusts or replays an inbound VIA command. Instead, the
-firmware marks local storage dirty before QMK changes it, reads back the
-committed storage afterward, and reconciles a versioned snapshot with the
-other half. Transfers are CRC-checked, range-checked, retried with bounded
-backoff, and considered complete only after the receiver verifies the complete
-digest and acknowledges it. Full-bank checksum work runs in small RAM-read
-batches on both halves, so even a tiny edit keeps the same complete verification
-with fewer scans spent waiting for it. Boot, reconnect, and USB-role changes always
-exchange metadata again. A newer clean generation wins; if equal generations
-have different contents, the current USB master wins deterministically and
-publishes a new generation. RGB and VIA-macro caches refresh only after local
-storage has committed.
+Saved edits use a stricter path than transient lighting and pointing state.
+A save reaches both halves as one profile generation: each half validates its
+copy and keeps it as a prepared record, the half on USB commits first, and the
+new profile becomes active only once the other half holds it too. Transfers
+are CRC-checked, range-checked and retried with bounded backoff. Boot,
+reconnect and USB-role changes always exchange the saved profile's identity
+again, and the newer one wins.
 
 ## Building from source
 
@@ -514,6 +508,10 @@ right build uses `NOAH_PHYSICAL_HALF=right` and `FORCE_MASTER=yes`; the left use
 a 32-slot factory-only image without the live profile owner.
 
 ## Old firmware and profile limits
+
+The VIA app is not supported (decided 2026-10-19). The firmware answers only
+Charybdis Ark's Profile Wire, keys and macros live in the saved profile, and a
+VIA client finds nothing it can read or write. Use Ark for everything.
 
 Old five-layer firmware is no longer built here. Its storage geometry is
 incompatible with current firmware, so retain the old pair and its backups if

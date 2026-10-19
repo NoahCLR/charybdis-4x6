@@ -327,8 +327,6 @@ static void commit(uint32_t generation) {
         .payload_digest          = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, payload, sizeof(payload)),
         .compiled_default_digest = TEST_COMPILED_DIGEST,
         .action_abi_digest       = TEST_ACTION_DIGEST,
-        .via_generation          = 1u,
-        .via_digest              = 1u,
     };
 
     noah_profile_flash_store_init(&flash, noah_qmk_profile_flash_driver());

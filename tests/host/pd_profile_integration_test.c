@@ -8,8 +8,6 @@
 
 static void test_candidate_capacity(void) {
     uint8_t frame[32] = {NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET, NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, 1, 0, NOAH_PROFILE_SCHEMA_MAJOR, 0, 31};
-    frame[24]         = 6;
-    frame[28]         = 42;
     noah_profile_candidate_v1_command_t command;
     noah_profile_candidate_v1_frame_error_t error;
     // Schema 4 advertises a 131,040-byte slot payload (D-F29): admission must accept the whole range,

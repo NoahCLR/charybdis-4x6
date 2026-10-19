@@ -4,7 +4,7 @@
 #include "../profile/schema/profile_keymap_v1.h"
 
 // BK deliberately makes this hook weak. All QMK and combo-origin reads use
-// it; the RGB coverage map uses it too. Never read VIA's unused keymap copy.
+// it; the RGB coverage map uses it too.
 uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
     if (layer >= LAYER_COUNT || key.row >= MATRIX_ROWS || key.col >= MATRIX_COLS) return KC_NO;
     if (!noah_effective_keymap_is_live()) return pgm_read_word(&keymaps[layer][key.row][key.col]);

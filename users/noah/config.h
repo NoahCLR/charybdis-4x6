@@ -65,10 +65,10 @@
 // - base runtime-visible state (automouse / pd / preview)
 // - combo feedback locality
 // - truthful key-feedback semantics and tap branch state
-// - durable committed VIA-storage reconciliation
+// - the profile copy and commit between halves
 // - the profile store's flash timing on the other half (diagnostics only)
 // so both halves render layer-owned RGB from the same runtime and keymap data.
-#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_VIA_KEYMAP_SYNC, PUT_VIA_KEYMAP_MIRROR, PUT_PROFILE_SPLIT_SYNC, PUT_PROFILE_FLASH_DIAGNOSTICS
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_PROFILE_SPLIT_SYNC, PUT_PROFILE_FLASH_DIAGNOSTICS
 
 // Dynamic key-local placement for PD-mode RGB overlays.
 // Required only when a pd_mode_colors[] row uses RGB_KEY_HALF or
@@ -198,24 +198,14 @@
 
 #endif // POINTING_DEVICE_ENABLE
 
-// ─── VIA ────────────────────────────────────────────────────────────────────
+// ─── Firmware identity and EEPROM ─────────────────────────────────────────
 
-#ifdef VIA_ENABLE
-// Profile Wire v1-capable firmware. Standard VIA reports this numeric value in
-// big-endian byte order while the custom Profile Wire capability page encodes
-// the same uint32 value little-endian; clients compare the decoded values.
-#    define VIA_FIRMWARE_VERSION 0x00010000u
-#    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
-#    define DYNAMIC_KEYMAP_MACRO_COUNT 128
-// RP2040 wear-leveling exposes half of this backing region as logical EEPROM:
-// 36 KiB, the VIA region alone (D-F29). The profile slots live in a flash
-// region of their own (profile_storage_layout.h) and are read in place, so
-// QMK's RAM mirror of logical EEPROM is 36 KiB per half.
-#    if defined(MCU_RP)
-#        define WEAR_LEVELING_BACKING_SIZE 73728
-#    endif
-#    define DYNAMIC_KEYMAP_EEPROM_MAX_ADDR 0x8FFFu
-#endif
+// The firmware version the Profile Wire capability page reports (D-F31).
+#define NOAH_FIRMWARE_VERSION 0x00010000u
+// VIA is not supported (D-F31). QMK's logical EEPROM holds only its eeconfig,
+// with room for a user datablock: the wear-leveling backing is QMK's RP2040
+// default of 8 KiB, so the RAM mirror of logical EEPROM is 4 KiB per half. The
+// profile slots live in a flash region of their own (profile_storage_layout.h).
 
 // Preserve participation through native tapping/combo and userspace queues.
 #define KEYRECORD_USER_DATA

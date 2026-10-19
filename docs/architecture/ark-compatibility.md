@@ -26,7 +26,8 @@ These firmware paths are Ark's inputs, and changing them does not fail any
 firmware gate:
 
 - Ark's `tests/integration/` runners compile the probes
-  `tests/host/{profile_compiled_defaults_v1,profile_pd_v1,qmk_portable_editor,qmk_portable_profile,qmk_via_storage_regions}_test.c`
+  `tests/host/{profile_compiled_defaults_v1,profile_pd_v1,qmk_portable_editor,qmk_portable_profile}_test.c`
+  (`qmk_via_storage_regions_test.c` left with VIA, D-F31)
   and Ark's own probes with sources under `users/noah/lib/`, headers under
   `tests/host/include/`, the keymap and `tests/host/noah_host_qmk_env.sh`. They
   read `tests/fixtures/compiled_profile_pd_v2.fixture` and the old-format
@@ -84,12 +85,13 @@ the interruption and keyboard acceptance procedures.
 
 Firmware accepts Profile Wire 2.0, schema 4.0, RGB v4, key behaviors v2,
 combo v3, settings v8, sparse PD v3 and store format 6 only (D-F14, D-F28).
-BEGIN requires a nonzero VIA binding. Every profile length and offset is 32 bits
+BEGIN's bytes 24–31, the VIA binding until D-F31, must be zero. Every profile length and offset is 32 bits
 on the wire, the capability page is layout 3 and the feature word holds only
 split, saves and pointing (D-F28); the Ark follow-up moves to all of it.
-The legacy GET 9 page and its feature bit are removed. Ark must require binding
-in `candidateMetadataForBlob`, update codec/rejection expectations and its
-integration probe recipes, refresh imported fixtures/specs and repin after the
+The legacy GET 9 page and its feature bit are removed. Since D-F31 there is no
+VIA: Ark must send a zero BEGIN tail from `candidateMetadataForBlob` and drop
+logical VIA staging and the VIA reads, update codec/rejection expectations and
+its integration probe recipes, refresh imported fixtures/specs and repin after the
 firmware lands. Neither side translates a backup in an earlier format; it is
 refused. In `client-regression/`, `portable.bin.pd5` is the one frozen
 old-format profile, kept as rejection evidence, and the frozen PD corpus checks

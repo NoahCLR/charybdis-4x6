@@ -9,15 +9,15 @@
 
 #include "profile_checksum.h"
 
-#ifdef VIA_ENABLE
-
 // Store format 6 (D-F28). The 36-byte header has no room for a magic, so the
 // format is keyed into the header CRC16 (its first input byte is the format
 // version) and into the marker values. A format-5 header (`NT`, markers
 // 0xA5/0x5A) is recognised and refused. The first byte is the whole domain
 // mask, one bit per registry row (seven with the keymap and macros); the
 // payload length is 32 bits; a separate flags byte holds the
-// origin half (bit 0) and the override flag (bit 1).
+// origin half (bit 0) and the override flag (bit 1). Bytes 22..32 are
+// reserved and zero: 22..29 held the VIA store's generation and digest a
+// record was bound to, retired with VIA (D-F31).
 //
 // Slots are NOR flash (D-F29): an erased byte reads 0xFF and programming only
 // clears bits. The marker therefore only ever loses bits on its way from
@@ -34,8 +34,7 @@ enum {
     LOGICAL_HEADER_PAYLOAD_CRC32      = 10u,
     LOGICAL_HEADER_COMPILED_DIGEST    = 14u,
     LOGICAL_HEADER_ACTION_ABI_DIGEST  = 18u,
-    LOGICAL_HEADER_VIA_GENERATION     = 22u,
-    LOGICAL_HEADER_VIA_DIGEST         = 26u,
+    LOGICAL_HEADER_RESERVED           = 22u,
     LOGICAL_HEADER_CRC16              = 33u,
     LOGICAL_HEADER_MARKER             = 35u,
     LOGICAL_HEADER_CHECKSUMMED_LENGTH = 33u,
@@ -132,7 +131,7 @@ static bool generation_is_newer(uint32_t candidate, uint32_t current) {
 }
 
 static bool record_identity_equal(const noah_profile_store_record_t *lhs, const noah_profile_store_record_t *rhs) {
-    return lhs->format_version == rhs->format_version && lhs->schema_major == rhs->schema_major && lhs->schema_minor == rhs->schema_minor && lhs->domain_mask == rhs->domain_mask && lhs->flags == rhs->flags && lhs->payload_length == rhs->payload_length && lhs->generation == rhs->generation && lhs->origin_half == rhs->origin_half && lhs->payload_crc32 == rhs->payload_crc32 && lhs->payload_digest == rhs->payload_digest && lhs->compiled_default_digest == rhs->compiled_default_digest && lhs->action_abi_digest == rhs->action_abi_digest && lhs->via_generation == rhs->via_generation && lhs->via_digest == rhs->via_digest;
+    return lhs->format_version == rhs->format_version && lhs->schema_major == rhs->schema_major && lhs->schema_minor == rhs->schema_minor && lhs->domain_mask == rhs->domain_mask && lhs->flags == rhs->flags && lhs->payload_length == rhs->payload_length && lhs->generation == rhs->generation && lhs->origin_half == rhs->origin_half && lhs->payload_crc32 == rhs->payload_crc32 && lhs->payload_digest == rhs->payload_digest && lhs->compiled_default_digest == rhs->compiled_default_digest && lhs->action_abi_digest == rhs->action_abi_digest;
 }
 
 static uint16_t header_crc16(const uint8_t *header) {
@@ -152,8 +151,6 @@ static void encode_header(uint8_t *header, const noah_profile_store_candidate_t 
     write_u32(&header[LOGICAL_HEADER_PAYLOAD_CRC32], candidate->payload_crc32);
     write_u32(&header[LOGICAL_HEADER_COMPILED_DIGEST], candidate->compiled_default_digest);
     write_u32(&header[LOGICAL_HEADER_ACTION_ABI_DIGEST], candidate->action_abi_digest);
-    write_u32(&header[LOGICAL_HEADER_VIA_GENERATION], candidate->via_generation);
-    write_u32(&header[LOGICAL_HEADER_VIA_DIGEST], candidate->via_digest);
     write_u16(&header[LOGICAL_HEADER_CRC16], header_crc16(header));
 }
 
@@ -164,8 +161,22 @@ static noah_profile_store_result_t decode_header(noah_profile_store_t *store, no
     if (require_commit && header[LOGICAL_HEADER_MARKER] != logical_commit_marker) {
         return NOAH_PROFILE_STORE_INVALID_HEADER;
     }
+    // Earlier format-6 test builds used a 32-byte header. Its old marker
+    // cell and the following erased bytes remain visible through this layout.
+    if ((header[LOGICAL_HEADER_MARKER] == logical_commit_marker || header[LOGICAL_HEADER_MARKER] == logical_prepared_marker) &&
+        header[31] == 0xffu && header[32] == 0xffu &&
+        read_u16(&header[29]) == noah_profile_crc16_ccitt_update(noah_profile_crc16_ccitt_update(NOAH_PROFILE_CRC16_INITIAL, &header_format, 1u), header, 29u)) {
+        return NOAH_PROFILE_STORE_EARLIER_FORMAT;
+    }
     if (read_u16(&header[LOGICAL_HEADER_CRC16]) != header_crc16(header)) return NOAH_PROFILE_STORE_CHECKSUM_MISMATCH;
-    if (header[30] || header[31] || header[32]) return NOAH_PROFILE_STORE_INVALID_HEADER;
+    // Valid test-build records carrying the retired VIA binding are refused
+    // with the same diagnostic as an earlier format, rather than as empty.
+    for (uint8_t index = LOGICAL_HEADER_RESERVED; index < 30u; index++) {
+        if (header[index] != 0u) return NOAH_PROFILE_STORE_EARLIER_FORMAT;
+    }
+    for (uint8_t index = 30u; index < LOGICAL_HEADER_CRC16; index++) {
+        if (header[index] != 0u) return NOAH_PROFILE_STORE_INVALID_HEADER;
+    }
     uint8_t flags = header[LOGICAL_HEADER_FLAGS];
     if ((header[LOGICAL_HEADER_DOMAIN_MASK] & (uint8_t)~NOAH_PROFILE_DOMAIN_MASK_ALL) != 0u || (flags & (uint8_t)~LOGICAL_HEADER_KNOWN_FLAGS) != 0u) return NOAH_PROFILE_STORE_INVALID_HEADER;
     memset(record, 0, sizeof(*record));
@@ -181,13 +192,11 @@ static noah_profile_store_result_t decode_header(noah_profile_store_t *store, no
     record->payload_crc32           = read_u32(&header[LOGICAL_HEADER_PAYLOAD_CRC32]);
     record->compiled_default_digest = read_u32(&header[LOGICAL_HEADER_COMPILED_DIGEST]);
     record->action_abi_digest       = read_u32(&header[LOGICAL_HEADER_ACTION_ABI_DIGEST]);
-    record->via_generation          = read_u32(&header[LOGICAL_HEADER_VIA_GENERATION]);
-    record->via_digest              = read_u32(&header[LOGICAL_HEADER_VIA_DIGEST]);
     if (record->schema_major != store->compatibility.schema_major || record->schema_minor != store->compatibility.schema_minor) {
         return NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA;
     }
 
-    if (record->payload_length < PROFILE_BLOB_HEADER_SIZE || record->payload_length > NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX || record->generation == 0u || record->origin_half > 1u || (record->flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) != 0u || (record->via_generation == 0u || record->via_digest == 0u)) {
+    if (record->payload_length < PROFILE_BLOB_HEADER_SIZE || record->payload_length > NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX || record->generation == 0u || record->origin_half > 1u || (record->flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) != 0u) {
         return NOAH_PROFILE_STORE_INVALID_HEADER;
     }
     if (record->action_abi_digest != store->compatibility.action_abi_digest) {
@@ -535,7 +544,7 @@ noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_sto
 }
 
 static noah_profile_store_result_t validate_candidate(const noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate) {
-    if (!candidate || candidate->payload_length < PROFILE_BLOB_HEADER_SIZE || candidate->payload_length > NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX || candidate->generation == 0u || candidate->origin_half > 1u || candidate->schema_major > 15u || candidate->schema_minor > 15u || (candidate->flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) != 0u || candidate->format_version != NOAH_PROFILE_STORE_FORMAT_VERSION || (candidate->via_generation == 0u || candidate->via_digest == 0u)) {
+    if (!candidate || candidate->payload_length < PROFILE_BLOB_HEADER_SIZE || candidate->payload_length > NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX || candidate->generation == 0u || candidate->origin_half > 1u || candidate->schema_major > 15u || candidate->schema_minor > 15u || (candidate->flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) != 0u || candidate->format_version != NOAH_PROFILE_STORE_FORMAT_VERSION) {
         return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
     }
     if (candidate->schema_major != store->compatibility.schema_major || candidate->schema_minor != store->compatibility.schema_minor || (candidate->schema_major != NOAH_PROFILE_SCHEMA_MAJOR || candidate->schema_minor != 0u)) {
@@ -679,8 +688,6 @@ static void record_from_candidate(const noah_profile_store_t *store, noah_profil
         .payload_digest          = store->candidate.payload_digest,
         .compiled_default_digest = store->candidate.compiled_default_digest,
         .action_abi_digest       = store->candidate.action_abi_digest,
-        .via_generation          = store->candidate.via_generation,
-        .via_digest              = store->candidate.via_digest,
     };
 }
 
@@ -931,11 +938,9 @@ bool noah_profile_store_next_generation(const noah_profile_store_t *store, uint3
 }
 
 _Static_assert(NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE == 36u, "persistent profile header layout requires exactly 36 bytes");
-_Static_assert(LOGICAL_HEADER_MARKER + 1u == NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE, "logical commit marker must be the final header field");
+_Static_assert(LOGICAL_HEADER_MARKER + 1u == NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE, "commit marker must be the final header field");
 _Static_assert(NOAH_PROFILE_DOMAIN_MASK_ALL <= UINT8_MAX && NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX <= UINT32_MAX, "the header's domain mask byte and 32-bit length hold every profile a slot can");
 _Static_assert(NOAH_PROFILE_STORE_IO_CHUNK_MAX <= NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX, "bounded write chunk must fit a slot payload");
 #    if UINTPTR_MAX == UINT32_MAX
 _Static_assert(sizeof(noah_profile_store_t) <= NOAH_PROFILE_STORE_STATE_BUDGET_32BIT, "persistent profile store exceeded its reviewed 32-bit state budget");
 #    endif
-
-#endif

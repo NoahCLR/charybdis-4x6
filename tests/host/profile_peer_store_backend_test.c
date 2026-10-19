@@ -66,7 +66,6 @@ static uint32_t payload_digest(const uint8_t *payload, uint32_t length) {
 
 static noah_profile_split_descriptor_t descriptor_for(const fixture_t *fixture, uint32_t generation, uint8_t origin, uint8_t profile_flags, uint8_t domain_mask) {
     return (noah_profile_split_descriptor_t){
-        .logical                 = true,
         .generation              = generation,
         .payload_crc32           = payload_crc(empty_profile, sizeof(empty_profile)),
         .payload_digest          = payload_digest(empty_profile, sizeof(empty_profile)),
@@ -139,7 +138,7 @@ static noah_profile_peer_store_result_t finish_commit(fixture_t *fixture, const 
 static void transfer_payload(fixture_t *fixture, const noah_profile_split_descriptor_t *descriptor) {
     uint16_t offset = 0u;
 
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture->peer, descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_begin(&fixture->peer, descriptor) == NOAH_PROFILE_PEER_STORE_OK);
     while (offset < descriptor->payload_length) {
         uint8_t length = (uint8_t)(descriptor->payload_length - offset);
         if (length > NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) {
@@ -161,16 +160,10 @@ static void test_exact_identity_commit_reboot_and_idempotence(void) {
     fixture_init(&fixture);
     descriptor = descriptor_for(&fixture, 5u, 0u, NOAH_PROFILE_STORE_FLAG_OVERRIDE, 0u);
     uint32_t writes_before = fixture.memory.writes;
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 0u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_INVALID_METADATA);
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, 0u) == NOAH_PROFILE_PEER_STORE_INVALID_METADATA);
-    noah_profile_split_descriptor_t unbound = descriptor;
-    unbound.logical                         = false;
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &unbound, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_INVALID_METADATA);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, NULL) == NOAH_PROFILE_PEER_STORE_INVALID_METADATA);
     assert(fixture.memory.writes == writes_before);
     transfer_payload(&fixture, &descriptor);
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 7u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_CONFLICT);
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef02)) == NOAH_PROFILE_PEER_STORE_CONFLICT);
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_IN_PROGRESS);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_IN_PROGRESS);
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_PEER_STORE_OK);
     assert(finish_commit(&fixture, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
     assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_COMMITTED);
@@ -180,15 +173,13 @@ static void test_exact_identity_commit_reboot_and_idempotence(void) {
     assert(fixture.store.committed.domain_mask == 0u);
     assert(fixture.store.committed.compiled_default_digest == fixture.compiled_digest);
     writes_after_commit = fixture.memory.writes;
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED);
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 7u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_CONFLICT);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED);
     assert(fixture.memory.writes == writes_after_commit);
 
     noah_profile_peer_store_backend_t restarted_peer;
     noah_profile_peer_store_backend_init(&restarted_peer, &fixture.candidate_backend);
-    assert(noah_profile_peer_store_backend_begin_logical(&restarted_peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED);
-    assert(noah_profile_peer_store_backend_begin_logical(&restarted_peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED);
-    assert(noah_profile_peer_store_backend_begin_logical(&restarted_peer, &descriptor, 7u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_CONFLICT);
+    assert(noah_profile_peer_store_backend_begin(&restarted_peer, &descriptor) == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED);
+    assert(noah_profile_peer_store_backend_begin(&restarted_peer, &descriptor) == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED);
     assert(fixture.memory.writes == writes_after_commit);
 
     noah_profile_store_init(&rebooted, fixture.store.io, fixture.store.compatibility);
@@ -228,21 +219,21 @@ static void test_ordering_and_compatibility_reject_before_write(void) {
 
     writes    = fixture.memory.writes;
     candidate = descriptor_for(&fixture, 2u, 1u, NOAH_PROFILE_STORE_FLAG_OVERRIDE, 0u);
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &candidate, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_STALE);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &candidate) == NOAH_PROFILE_PEER_STORE_STALE);
     assert(fixture.memory.writes == writes);
 
     candidate = descriptor_for(&fixture, 3u, 1u, NOAH_PROFILE_STORE_FLAG_OVERRIDE, 0u);
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &candidate, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_CONFLICT);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &candidate) == NOAH_PROFILE_PEER_STORE_CONFLICT);
     assert(fixture.memory.writes == writes);
 
     candidate = committed;
     candidate.payload_digest ^= 1u;
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &candidate, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_CORRUPT);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &candidate) == NOAH_PROFILE_PEER_STORE_CORRUPT);
     assert(fixture.memory.writes == writes);
 
     candidate = descriptor_for(&fixture, 4u, 1u, NOAH_PROFILE_STORE_FLAG_OVERRIDE, 0u);
     candidate.compiled_default_digest ^= 1u;
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &candidate, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_INCOMPATIBLE);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &candidate) == NOAH_PROFILE_PEER_STORE_INCOMPATIBLE);
     assert(fixture.memory.writes == writes);
 }
 
@@ -254,7 +245,7 @@ static void test_chunk_replay_gap_overlap_and_conflict(void) {
 
     fixture_init(&fixture);
     descriptor = descriptor_for(&fixture, 1u, 0u, NOAH_PROFILE_STORE_FLAG_OVERRIDE, 0u);
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 0u, empty_profile, 4u) == NOAH_PROFILE_PEER_STORE_OK);
     writes = fixture.memory.writes;
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 0u, empty_profile, 4u) == NOAH_PROFILE_PEER_STORE_OK);
@@ -262,10 +253,10 @@ static void test_chunk_replay_gap_overlap_and_conflict(void) {
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 2u, &empty_profile[2], 4u) == NOAH_PROFILE_PEER_STORE_RANGE_ERROR);
     assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_REJECTED);
 
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 2u, &empty_profile[2], 2u) == NOAH_PROFILE_PEER_STORE_RANGE_ERROR);
 
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 0u, empty_profile, 4u) == NOAH_PROFILE_PEER_STORE_OK);
     memcpy(conflicting, empty_profile, sizeof(conflicting));
     conflicting[0] ^= 1u;
@@ -308,7 +299,7 @@ static void test_durability_unknown_requires_boot_reconciliation(void) {
     assert(noah_profile_peer_store_backend_abort(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_DURABILITY_UNKNOWN);
 
     noah_profile_peer_store_backend_init(&restarted_peer, &fixture.candidate_backend);
-    assert(noah_profile_peer_store_backend_begin_logical(&restarted_peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_DURABILITY_UNKNOWN);
+    assert(noah_profile_peer_store_backend_begin(&restarted_peer, &descriptor) == NOAH_PROFILE_PEER_STORE_DURABILITY_UNKNOWN);
     fixture.memory.fail_reads = false;
     assert(noah_profile_store_boot_select(&fixture.store, &selected) == NOAH_PROFILE_STORE_OK);
     assert(selected.generation == descriptor.generation && selected.origin_half == descriptor.origin_half);
@@ -316,7 +307,7 @@ static void test_durability_unknown_requires_boot_reconciliation(void) {
     assert(selected.compiled_default_digest == descriptor.compiled_default_digest && selected.action_abi_digest == descriptor.action_abi_digest);
     assert(!fixture.store.reconciliation_required);
     noah_profile_peer_store_backend_init(&restarted_peer, &fixture.candidate_backend);
-    assert(noah_profile_peer_store_backend_begin_logical(&restarted_peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_BUSY);
+    assert(noah_profile_peer_store_backend_begin(&restarted_peer, &descriptor) == NOAH_PROFILE_PEER_STORE_BUSY);
 }
 
 static bool staged_equals(fixture_t *fixture, const uint8_t *expected, uint32_t length) {
@@ -358,7 +349,7 @@ static void test_reuse_fills_ranges_from_the_active_profile(void) {
     descriptor.payload_length = sizeof(target);
     descriptor.payload_crc32  = payload_crc(target, sizeof(target));
     descriptor.payload_digest = payload_digest(target, sizeof(target));
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
 
     // One full chunk and its exact repeat.
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 0u, target, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) == NOAH_PROFILE_PEER_STORE_OK);
@@ -411,7 +402,7 @@ static void test_reuse_fills_ranges_from_the_active_profile(void) {
     // A range that starts past the next offset is a gap: the copy is
     // rejected and its storage released.
     descriptor.generation = 5u;
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
     assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 1u, &source, 0u, 20u, 50u) == NOAH_PROFILE_PEER_STORE_RANGE_ERROR);
     assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_REJECTED);
     assert(noah_profile_candidate_store_backend_admission_owner(&fixture.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
@@ -438,7 +429,7 @@ static void test_copy_over_64_kib(void) {
     descriptor.payload_length = WIDE;
     descriptor.payload_crc32  = payload_crc(target, WIDE);
     descriptor.payload_digest = payload_digest(target, WIDE);
-    assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
+    assert(noah_profile_peer_store_backend_begin(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
 
     for (offset = 0u; offset < REUSED_AT;) {
         uint8_t length = REUSED_AT - offset < NOAH_PROFILE_SPLIT_V1_CHUNK_MAX ? (uint8_t)(REUSED_AT - offset) : NOAH_PROFILE_SPLIT_V1_CHUNK_MAX;
@@ -499,7 +490,7 @@ static void test_validation_over_64_kib(void) {
         descriptor.payload_length = WIDE;
         descriptor.payload_crc32  = payload_crc(blob, WIDE);
         descriptor.payload_digest = payload_digest(blob, WIDE);
-        assert(noah_profile_peer_store_backend_begin_logical(&fixture.peer, &descriptor, 6u, UINT32_C(0xabcdef01)) == NOAH_PROFILE_PEER_STORE_OK);
+        assert(noah_profile_peer_store_backend_begin(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
         for (uint32_t offset = 0u; offset < WIDE;) {
             uint8_t length = WIDE - offset < NOAH_PROFILE_SPLIT_V1_CHUNK_MAX ? (uint8_t)(WIDE - offset) : NOAH_PROFILE_SPLIT_V1_CHUNK_MAX;
 

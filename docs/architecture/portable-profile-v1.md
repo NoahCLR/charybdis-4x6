@@ -2,9 +2,9 @@
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
 > schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8, sparse PD v3, keymap v1 and macros v1;
-> a slot-sized payload (see the storage contract); and logical store format 6 (D-F28). Every save
-> binds a nonzero VIA generation and digest. Profile Wire is 2.0 and split
-> framing version 3, with 32-bit profile lengths and offsets throughout.
+> a slot-sized payload (see the storage contract); and logical store format 6 (D-F28). The profile
+> is the only store (D-F31). Profile Wire is 2.0 and split
+> framing version 4, with 32-bit profile lengths and offsets throughout.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > A backup in an earlier format is refused, not translated.
 
@@ -45,16 +45,14 @@ whole-stream preflight, balanced ownership and bounded IR windows. Invalid
 playback never emits a partial stream.
 
 The active saved bank is read through the profile reader. Compiled fallback
-uses the same authored payloads `via_macro_defaults.c` seeds, with the same
-compiler. A publication invalidates the slot metadata and lookup cache;
+compiles the authored payloads in `keymap.c` with the same compiler. A publication invalidates the slot metadata and lookup cache;
 the profile's safe boundary excludes a running macro, so a refill cannot span
 generations. Neither a key lookup nor a refill materializes the whole bank.
 
-This is an additive transition: VIA still compiles and coordinates its old
-copy, but its keymap and macro writes no longer control typing. Removing VIA
-and moving the client to these domains are separate follow-ups. The portable
-JSON envelope below describes the client before that follow-up; clients of the
-new base must carry the two domains in the canonical NLP1 profile.
+VIA is not supported (D-F31): the firmware keeps no other copy of the keymap
+or macros. The portable JSON envelope below describes the client before it
+moved to the new base; clients of the new base carry the two domains in the
+canonical NLP1 profile.
 
 ## Portable document
 
@@ -69,7 +67,7 @@ versions fail validation. Files are limited to 100,000 bytes.
 | `actionAbiDigest` | Nonzero uint32 engine vocabulary identity |
 | `layers` | Sixteen arrays of 60 uint16 native keycodes, in matrix row/column order, including unused physical matrix positions |
 | `profile` | Canonical base64 NLP1 payload, at most 4,064 bytes; domains `0x10`, `0x20`, `0x30`, `0x40`, in that order |
-| `macros` | Exactly 128 canonical base64 VIA macro streams, excluding their zero terminators |
+| `macros` | Exactly 128 canonical base64 macro streams, excluding their zero terminators |
 
 A document is restorable only onto firmware with the same action-ABI digest,
 profile schema and domain versions (the summary above). A document exported
@@ -81,11 +79,11 @@ keyboard's compiled readback. Combo rows come from effective native readback;
 the exported override is explicit even when empty. Custom trigger/release/
 repress hooks, strict/disabled timing and fixed combo-reference builds are not
 portable in v1 and prevent export. This standard board has no encoder or
-user-selectable VIA layout options; EEPROM padding and validity metadata are
+user-selectable layout options; EEPROM padding and validity metadata are
 not profile content. Executable hooks, hardware geometry, engine inclusion and
 safety ceilings remain firmware capabilities.
 
-VIA streams support canonical UTF-8 text, tap/down/up instructions and decimal delay
+Macro streams support canonical UTF-8 text, tap/down/up instructions and decimal delay
 instructions. Held keys must balance. The bank is reconstructed with zero
 padding and a final zero validity byte. Both macro banks are independent:
 64 VIA slots and 16 user macro slots retain their existing key identities.
@@ -99,9 +97,9 @@ carry them and export stays canonical. Differential transfer therefore never
 compares against a bank rebuilt from a document. A capture keeps the exact
 layout and macro bytes it read, beside the storage identity it verified, and an
 Apply compares staging and local roll-forward against those. Optional
-[macro read maps](profile-wire-v1.md#sparse-via-macro-read-map--get-value-0x0c)
-let a capture reconstruct firmware-confirmed zero blocks while reading every
-nonzero block and verifying the same full-store identity. Its result keeps
+macro read maps (GET `0x0c`, retired with VIA in D-F31) let a capture
+reconstruct firmware-confirmed zero blocks while reading every nonzero block
+and verifying the same full-store identity. Its result keeps
 the target bank, which it has just proved both halves hold. A reviewed snapshot
 without those bytes is not reused: Apply reads the keyboard again. The
 interrupted-capture path already carries the raw bank it read.
@@ -121,7 +119,7 @@ All multibyte fields are little-endian:
 | 8 | 124 | 31 uint32 scalar values |
 | 132 | 272 | 16 layer records of 17 bytes, layer 0 first: byte 0 the layer's combo reference layer (below 16); bytes 1–8 its behaviour-bypass placement bitmap; bytes 9–16 its combo-exclusion placement bitmap |
 | 404 | 256 | 128 custom-key shortcuts of 2 bytes, custom key 0 first (D-F26): byte 0 the modifier mask in HID report order (bit 0 Left Ctrl, 1 Left Shift, 2 Left Alt, 3 Left GUI, 4 Right Ctrl, 5 Right Shift, 6 Right Alt, 7 Right GUI; any combination); byte 1 the key, `0x00` for none, a basic key `0x04..0xa4` or a mouse button `0xd1..0xd8`. Both zero means no shortcut |
-| 660 | variable | 273 counted names: 16 layer names, then 128 VIA macro names, then 128 custom-key names, then the keyboard name; each a uint8 length `0..32`, then that many bytes of UTF-8 |
+| 660 | variable | 273 counted names: 16 layer names, then 128 macro names, then 128 custom-key names, then the keyboard name; each a uint8 length `0..32`, then that many bytes of UTF-8 |
 
 The minimum is 933 bytes (every name empty) and the maximum 9,669 bytes (every
 name 32 bytes). The complete profile shares the slot payload ceiling and
@@ -222,16 +220,12 @@ successive 25-byte chunks with an exact short final chunk, streamed from the
 live domain rather than a snapshot; the largest domain needs 376 chunk pages.
 The host reads page 0 again after the chunks and requires identity and both
 checksums to match, so a change during the read fails it. The complete export also
-rechecks settings after reading the VIA banks, so changing RGB or DPI during a
-backup invalidates the read.
+rechecks settings after reading the rest of the profile, so changing RGB or
+DPI during a backup invalidates the read.
 
-GET value `0x08`, page 0 returns 25 bytes: version `1`; flags; local generation
-and digest; peer generation and digest; last acknowledged generation; last
-error; uint16 conflict count. Flags are local dirty (bit 0), recovery required
-(1), digest valid (2), replication pending (3), and receiver active (4).
-Readiness requires only the digest-valid flag, no reported error/conflict, and
-matching local/peer generation and digest. These are VIA storage identities;
-the custom-profile owner retains its separate status and generation.
+GET value `0x08`, page 0 reported the VIA store's sync state until D-F31; it
+is now an unknown page (status `2`). The profile owner's status is the only
+storage status.
 
 GET value `0x08`, page 1 is optional editor metadata: exactly two bytes,
 version `1` and the device's actual RGB maximum brightness (uint8, including
@@ -304,27 +298,22 @@ importing; stale layout drafts must not be applied to a new layer order.
 
 Restore validates the file, captures a coherent current state, shows a review,
 and saves a local recovery file before staging. After acquiring the profile
-lease it compares the custom status, VIA generation/digest and settings digest
-without transferring the complete matrix and macro bank again. The app sends
-only changed VIA blocks to the non-USB half while that copy is inactive, then
-firmware validates and durably prepares the custom record on both halves with
-the exact target VIA generation and digest. The USB-side custom marker is the
-logical decision. Firmware commits the peer custom record, accepts its staged
-VIA copy, copies the target VIA state back to the USB half, and activates only
-after both identities converge.
+lease it compares the profile status and settings digest, then uploads the
+candidate, reusing ranges of the active profile. Firmware validates and
+durably prepares the record on both halves; the USB-side marker is the
+decision. Firmware commits the other half's record and activates once that
+half is seen holding it (D-F31).
 
 A timeout after the decision is reported as incomplete and retains the recovery
-path. On reboot, a committed logical record fences normal VIA reconciliation
-and effective-profile activation until its bound VIA generation is recovered.
-Before the decision, an interrupted prepared record remains inactive and the
-old USB-side VIA copy restores the peer. The detailed ordering is specified in
+path. Before the decision, an interrupted prepared record remains inactive and
+the previous profile stays authority on both halves. The detailed ordering is specified in
 [`logical-profile-transaction-v1.md`](logical-profile-transaction-v1.md).
 Physical power-loss acceptance at each durable boundary remains required.
 
 ## Upgrade and acceptance
 
-Current firmware has sixteen-layer VIA geometry (a 1,920-byte keymap) and
-synchronization metadata schema 5 with a 34,903-byte macro bank; an older bank is reset, not misread. Older geometry, action vocabulary and
+Current firmware has a sixteen-layer keymap domain (1,920 bytes) and a
+34,903-byte macro domain (D-F30). Older geometry, action vocabulary and
 storage are refused: firmware does not interpret old storage in place, and a
 backup from earlier firmware cannot be restored.
 
@@ -381,6 +370,6 @@ unavailable.
 
 Apply invokes one existing complete-profile restore, with recovery storage before
 writes and target fingerprint verification before resetting history. Current
-firmware publishes the custom and VIA stores as one logical generation. Export
+firmware publishes the profile as one generation (D-F31). Export
 still captures saved state. Drafts are window-local; unkept forms and kept
 changes are not crash-persistent backups.

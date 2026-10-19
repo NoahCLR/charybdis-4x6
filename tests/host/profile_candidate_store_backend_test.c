@@ -58,8 +58,6 @@ static noah_profile_candidate_v1_metadata_t metadata_for(const uint8_t *payload,
 
     return (noah_profile_candidate_v1_metadata_t){
         .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation       = 6u,
-        .via_digest           = UINT32_C(0xabcdef01),
         .schema_major         = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
         .schema_minor         = NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR,
         .requested_domains    = 0u,
@@ -98,8 +96,6 @@ static void transaction_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], u
         store_u32(&frame[12], metadata->crc32);
         store_u32(&frame[16], metadata->digest);
         store_u32(&frame[20], metadata->action_abi_digest);
-        store_u32(&frame[24], metadata->via_generation);
-        store_u32(&frame[28], metadata->via_digest);
     } else if (value == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK) {
         store_u32(&frame[5], 0u);
         frame[9] = (uint8_t)metadata->payload_length;
@@ -588,8 +584,6 @@ static void test_only_staged_candidates_are_held_to_the_candidate_runtime(void) 
     // the compatibility's own runtime.
     noah_profile_store_candidate_t peer = {
         .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation          = 6u,
-        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -645,8 +639,6 @@ static void test_override_disabled_commit_activates_compiled_fallback(void) {
 
     reset = (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation          = 6u,
-        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -687,8 +679,6 @@ static void test_host_and_peer_share_one_explicit_admission_lease(void) {
     interface = noah_profile_candidate_store_backend_interface(&backend);
     exact     = (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation          = 6u,
-        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,
@@ -734,8 +724,6 @@ static void test_owner_activation_api_checks_lease_and_exposes_exact_commit(void
     interface = noah_profile_candidate_store_backend_interface(&backend);
     exact     = (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation          = 6u,
-        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = metadata.schema_major,
         .schema_minor            = metadata.schema_minor,
         .domain_mask             = metadata.requested_domains,

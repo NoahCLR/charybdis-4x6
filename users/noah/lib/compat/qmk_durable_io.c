@@ -8,57 +8,22 @@
 #include <stdint.h>
 
 #include "qmk_profile_flash_hooks.h"
-#include "qmk_via_split_mirror.h"
-#include "qmk_via_split_sync.h"
 #include "../profile/storage/profile_store_runtime_hooks.h"
-
-typedef bool (*noah_qmk_durable_io_step_fn)(void);
 
 // The profile store's step waits while its flash says so: a save needs a
 // sector erased and the keyboard is busy, or the grant's flash time is spent
-// (D-F29).
-static bool noah_qmk_durable_io_profile_step(void) {
+// (D-F29). It and the scan stay out of line in every build, so the flashed
+// firmware has the call shape the reviewed stack paths name
+// (tools/firmware_stack_budget*.json).
+static __attribute__((noinline)) bool noah_qmk_durable_io_profile_step(void) {
     return noah_qmk_profile_flash_may_write() && noah_profile_store_runtime_matrix_scan_step();
 }
 
-enum {
-    NOAH_QMK_DURABLE_IO_PROFILE_DISCOVERY = 0u,
-    NOAH_QMK_DURABLE_IO_VIA_MIRROR,
-    NOAH_QMK_DURABLE_IO_VIA_SYNC,
-    NOAH_QMK_DURABLE_IO_STEP_COUNT,
-};
+void noah_qmk_durable_io_init(void) {}
 
-static uint8_t noah_qmk_durable_io_next_step;
-
-static uint8_t noah_qmk_durable_io_step_after(uint8_t step) {
-    step++;
-    return step == NOAH_QMK_DURABLE_IO_STEP_COUNT ? NOAH_QMK_DURABLE_IO_PROFILE_DISCOVERY : step;
-}
-
-void noah_qmk_durable_io_init(void) {
-    noah_qmk_durable_io_next_step = NOAH_QMK_DURABLE_IO_PROFILE_DISCOVERY;
-}
-
-void noah_qmk_durable_io_matrix_scan(void) {
-    static const noah_qmk_durable_io_step_fn steps[NOAH_QMK_DURABLE_IO_STEP_COUNT] = {
-        noah_qmk_durable_io_profile_step,
-        noah_qmk_via_split_mirror_matrix_scan_step,
-        noah_qmk_via_split_sync_matrix_scan_step,
-    };
-
-    uint8_t index = noah_qmk_durable_io_next_step;
-
-    // Flash pauses are measured, and erases ahead of a save run, per grant
-    // (D-F29).
+__attribute__((noinline)) void noah_qmk_durable_io_matrix_scan(void) {
+    // The profile store is the only durable owner left (D-F31). Flash pauses
+    // are measured, and erases ahead of a save run, per grant (D-F29).
     noah_qmk_profile_flash_grant_begin();
-
-    for (uint8_t visited = 0u; visited < NOAH_QMK_DURABLE_IO_STEP_COUNT; visited++) {
-        if (steps[index]()) {
-            noah_qmk_durable_io_next_step = noah_qmk_durable_io_step_after(index);
-            return;
-        }
-        index = noah_qmk_durable_io_step_after(index);
-    }
+    (void)noah_qmk_durable_io_profile_step();
 }
-
-_Static_assert(NOAH_QMK_DURABLE_IO_STEP_COUNT == 3u, "durable-I/O scheduler inventory changed without updating its round-robin contract");

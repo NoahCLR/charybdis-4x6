@@ -7,7 +7,7 @@
 
 #include "../profile/split/profile_split_reconciler.h"
 
-#if defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)
+#if defined(SPLIT_TRANSACTION_IDS_USER)
 
 // Installs the single production reconciler after its store/provider owner is
 // initialized. Merely compiling this adapter does not enable live mutation.

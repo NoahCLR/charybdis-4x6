@@ -6,11 +6,8 @@
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
 #    include <string.h>
 #    include "eeconfig.h"
-#    include "via.h"
-#    include "qmk_via_sync_metadata.h"
 #    include "pointing_device_auto_mouse.h"
 #    include "noah_keymap_ids.h"
-#    include "qmk_via_split_sync.h"
 #    include "../profile/runtime/effective_settings_runtime.h"
 #    include "../profile/schema/profile_settings_defaults.h"
 #    include "../profile/storage/profile_checksum.h"
@@ -19,10 +16,6 @@
 // Cold readback workspace, never used by key events or RGB rendering.
 void noah_qmk_portable_storage_init(void) {
     noah_effective_settings_set_apply(noah_qmk_portable_apply);
-    uint32_t word = eeconfig_read_user();
-    // An older bank's layout uses another keycode numbering or geometry. Never
-    // interpret it, even when both builds happen on the same date.
-    if ((word >> 28) != NOAH_QMK_VIA_SYNC_METADATA_SCHEMA) via_eeprom_set_valid(false);
 }
 // The dual-role setting is QMK's tapping term, and quick tap follows it. The
 // key runtime decides every dual-role key (D-F27) and reads the setting
@@ -126,7 +119,7 @@ void noah_qmk_portable_apply(void) {
     eeconfig_update_keymap(&keymap_config);
 }
 bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
-    if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8 && frame[2] != 0x0b && frame[2] != 0x0c)) return false;
+    if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8 && frame[2] != 0x0b)) return false;
     // Settings readback (GET 7) takes a wide page: byte 5 is its high byte.
     uint16_t page      = frame[2] == 7 ? (uint16_t)(frame[4] | frame[5] << 8) : frame[4];
     bool     malformed = !frame[3];
@@ -138,10 +131,6 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
         return true;
     }
     uint8_t *p = frame + 7;
-    if (frame[2] == 0x0c) {
-        frame[5] = noah_qmk_via_macro_read_map_page(frame[4], p, frame + 6);
-        return true;
-    }
     if (frame[2] == 0x0b) {
         if (frame[4]) { frame[5] = 2; return true; }
         p[0] = 1;
@@ -150,22 +139,9 @@ bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
         return true;
     }
     if (frame[2] == 8) {
-        if (frame[4]) {
-            frame[6] = noah_qmk_portable_editor_page(frame[4], p);
-            if (!frame[6]) frame[5] = 2;
-            return true;
-        }
-        noah_qmk_via_split_sync_debug_snapshot_t s = noah_qmk_via_split_sync_debug_snapshot();
-        p[0]                                       = 1;
-        p[1]                                       = s.local_dirty | s.recovery_required << 1 | s.digest_valid << 2 | s.replication_pending << 3 | s.receiver_active << 4;
-        u32(p + 2, s.local_generation);
-        u32(p + 6, s.local_digest);
-        u32(p + 10, s.peer_generation);
-        u32(p + 14, s.peer_digest);
-        u32(p + 18, s.last_peer_ack_generation);
-        p[22] = s.last_error;
-        u16(p + 23, s.conflict_count);
-        frame[6] = 25;
+        // Page 0 was the VIA store's sync state, gone with VIA (D-F31).
+        frame[6] = frame[4] ? noah_qmk_portable_editor_page(frame[4], p) : 0u;
+        if (!frame[6]) frame[5] = 2;
     } else if (!page) {
         uint16_t length = 0;
         uint32_t crc = NOAH_PROFILE_CRC32_INITIAL, fnv = NOAH_PROFILE_FNV1A_INITIAL;

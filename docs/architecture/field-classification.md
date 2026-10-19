@@ -77,7 +77,7 @@ runtime cache and QMK setters. It also includes debounce, activation delay,
 movement threshold, combo enable/reference policy, behaviour and combo
 participation (master, per-layer masks and placement bitmaps), RGB
 speed/flags, persistent default-layer state and QMK keymap options. Combo
-timing is materialized in the combo domain. The 128 VIA macros with their names
+timing is materialized in the combo domain. The 128 macros with their names
 and sixteen user-facing layer names are portable.
 
 ### Compiled Capability Or Feature Inclusion
@@ -87,7 +87,7 @@ and sixteen user-facing layer names are portable.
 - `RGB_COMBO_FEEDBACK_ENABLE`
 - `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`
 - `RGB_AUTOMOUSE_GRADIENT_ENABLE`
-- VIA, combo, RGB Matrix, pointing-device, and split feature gates
+- Raw HID, combo, RGB Matrix, pointing-device, and split feature gates (VIA is not supported, D-F31)
 
 Milestone A adds runtime enable bits for compiled RGB feedback stages. Turning
 on a feature omitted from the firmware still requires flashing.
@@ -144,7 +144,7 @@ per-slot records are the single owner of mode DPI.
 
 - Standard QMK keycodes may use a 16-bit operand only when the stored
   action-ABI digest matches the connected firmware.
-- Layer, PD-mode, VIA-macro, hardcoded-macro, and userspace-owned actions use
+- Layer, PD-mode, macro-slot, hardcoded-macro, and userspace-owned actions use
   semantic action kinds plus bounded operands. They are not persisted as raw
   custom-keycode enum values.
 - PD identities come from the manifest's stable semantic id, not its current

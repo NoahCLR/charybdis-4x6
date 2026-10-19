@@ -22,7 +22,6 @@ build_test() {
 
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
         "$@" \
-        -DVIA_ENABLE \
         -DSPLIT_KEYBOARD \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DNOAH_PROFILE_SPLIT_TRANSPORT_TEST \

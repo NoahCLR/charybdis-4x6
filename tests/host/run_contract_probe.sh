@@ -6,7 +6,7 @@
 # tests/fixtures. Firmware only states what it is; the agreement check that
 # judges it lives with the client. Built with the production feature set
 # (users/noah/rules.mk defaults: live-profile owner and mutation, PD profile,
-# split, VIA, combos, RGB matrix, pointing device).
+# split, Raw HID, combos, RGB matrix, pointing device).
 #
 #   sh tests/host/run_contract_probe.sh [--output FILE]
 
@@ -39,10 +39,9 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DPOINTING_DEVICE_ENABLE \
     -DRGB_MATRIX_ENABLE \
     -DRGB_MATRIX_WS2812 \
-    -DVIA_ENABLE \
     -DSPLIT_KEYBOARD \
     -DMCU_RP \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x1000u \
     -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DNOAH_LIVE_PROFILE_OWNER_ENABLE \
     -DNOAH_LIVE_PROFILE_MUTATION_ENABLE \

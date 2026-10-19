@@ -3,8 +3,8 @@
 > Current firmware accepts only the formats it writes (D-F10, D-F14, D-F28):
 > Profile Wire 2.0, profile schema 4.0, a slot-sized profile payload, and
 > logical store format 6. Every profile length and offset is 32 bits wide, in
-> storage and on the wire. Every save binds a nonzero VIA generation and
-> digest. Split framing is version 3. Older profile/store formats and the
+> storage and on the wire. The profile is the only store: VIA is not
+> supported (D-F31). Split framing is version 4. Older profile/store formats and the
 > legacy GET 9 source page are rejected. A backup in an earlier format is
 > refused, not translated.
 
@@ -59,7 +59,7 @@ Accepted domains (`users/noah/lib/profile/schema/profile_domain_registry.h`):
 | `0x10` | RGB | 4 |
 | `0x20` | Key behaviors | 2 |
 | `0x30` | Combo overrides | 3 |
-| `0x40` | Settings, layer records, custom-key shortcuts, layer names, VIA macro names, custom-key names and the keyboard name | 8 |
+| `0x40` | Settings, layer records, custom-key shortcuts, layer names, macro names, custom-key names and the keyboard name | 8 |
 | `0x50` | Sparse pointing-mode slots | 3 |
 
 ### Firmware domain ownership
@@ -105,8 +105,8 @@ geometry and feature admission. The subsequent complete compiled profile
 (D-F12, below) deliberately changes compiled-default identity. The owner
 round-trip harness saves and reboots both the complete authored seven-domain
 profile and a profile with populated imported combo/settings overrides,
-checking every published domain and runtime view. Hardware eligibility and the independent VIA adapter
-are injected; this host harness does not establish physical acceptance. The
+checking every published domain and runtime view. Hardware eligibility is
+injected; this host harness does not establish physical acceptance. The
 reviewed stack manifest follows the shared iterators through PD publication,
 combo cache EEPROM reads and host PD record validation; compiler-inlined
 settings readback/publication paths are represented by their linked callers.
@@ -131,7 +131,7 @@ Initial action kinds:
 | 3 | logical layer id, lock |
 | 4 | stable PD-mode id, momentary: `0..31` on 32-slot firmware (native `PD_SLOT_n` = `0x7e80 + n`) |
 | 5 | stable PD-mode id, lock: `0..31` on 32-slot firmware (native `PD_SLOT_n_LOCK` = `0x7ea0 + n`) |
-| 6 | VIA macro slot |
+| 6 | macro slot |
 | 7 | custom key `0..127` (`CUSTOM_KEY_n`, native `0x7f00 + n` since D-F14; before it `0..63` at `0x7e40 + n`, now inert); under earlier action vocabularies this kind named the retired user macros, and a digest mismatch keeps the two apart. Valid as a key, a combo output and, since D-F26, a behaviour step's tap, press-and-hold or other hold, where it sends the custom key's shortcut only |
 
 Userspace-owned actions are never encoded as raw custom-keycode enum values.
@@ -317,10 +317,20 @@ contract is mirrored in
 Digest collisions are acceptable for drift display but never replace CRC,
 length, schema, capacity, and semantic validation before activation.
 
-## VIA Raw HID Profile Channel
+## Raw HID Profile Channel
 
-The project uses VIA's existing custom channel (`channel_id = 0`) and 32-byte
-reports. The extension host always sends and receives exactly 32 bytes.
+The firmware answers Raw HID itself (D-F31): QMK's Raw HID interface, usage
+page `0xFF60`, with 32-byte reports in both directions. Every report reaches
+`raw_hid_receive` (`users/noah/lib/compat/qmk_profile_channel.c`), goes to the
+Profile Wire handlers, and is sent back exactly once as the reply. Byte 0 is
+the command (`0x08` get, `0x07` set, `0x09` save), byte 1 the channel, `0x00`
+for every Profile Wire value. A report no handler takes is answered with
+command byte `0xFF` and the rest of the request unchanged; that is the value
+VIA used for unhandled, so the protocol-version, keymap, macro and EEPROM
+commands a VIA client sends all get it. The host always sends and receives
+exactly 32 bytes. The keyboard identifies itself through the capability page
+alone (its firmware version at page 0 bytes 17–20); there is no separate
+protocol-version read.
 
 ### Native Combo Readback — GET Value `0x06`
 
@@ -408,7 +418,7 @@ Capability and status reads use this exact request header:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | VIA command `0x08`, custom get |
+| 0 | 1 | command `0x08`, get |
 | 1 | 1 | custom channel `0x00` |
 | 2 | 1 | value id |
 | 3 | 1 | nonzero request id |
@@ -462,7 +472,7 @@ Page 1 holds every ceiling that fits a byte:
 | 8 | physical LED count |
 | 9 | LED bitmap bytes |
 | 10 | custom-key slots |
-| 11 | VIA macro slots |
+| 11 | macro slots (the macro domain's, 128; named VIA macro slots before D-F31) |
 | 12 | supported domain mask; zero until the owner reports |
 | 13 | maximum encoded bytes per name |
 | 14 | layer-mask width in bits, `32` |
@@ -477,7 +487,7 @@ Page 2 holds the wider ones; every byte count is 32 bits:
 | 2–5 | profile slot size in bytes |
 | 6–9 | maximum profile payload |
 | 10–13 | slot payload capacity |
-| 14–17 | VIA macro bank bytes |
+| 14–17 | macro domain capacity in bytes (34,903; the VIA bank's before D-F31) |
 | 18–24 | zero |
 
 ### The feature word
@@ -541,9 +551,9 @@ now: every Profile Wire 2 firmware does what the bit promised.
 | 24 | candidate reuse: copy bounded ranges from an identified active profile into the inactive candidate (`SET 0x1B`, below) |
 | 25 | candidate streaming chunks: admit sequential chunks and prove bounded batches through status (`SET 0x1C`, below) |
 | 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](runtime-flow.md) |
-| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised VIA macro bank (34,903 bytes in this layout). See [runtime flow](runtime-flow.md) |
+| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised macro capacity (34,903 bytes in this layout). See [runtime flow](runtime-flow.md) |
 | 28 | pointing-mode clicks: a direction or button-override tap in the PD domain may be a plain mouse button 1–8 (`0x00d1..0x00d8`). Require this bit before writing one; older firmware rejects it as `INVALID_ACTION`. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
-| 29 | pointing-mode VIA macros: direction, diagonal and button tap overrides may start slots 0–127 (`0x7700..0x777f`), inherit policy and zero mask only. Require this bit before writing one. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
+| 29 | pointing-mode macros: direction, diagonal and button tap overrides may start slots 0–127 (`0x7700..0x777f`), inherit policy and zero mask only. Require this bit before writing one. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 30 | combo output behaviour permissions: settings header byte 5 bit 0 bypasses all combo output behaviours; combo v3 row flag bit 4 bypasses one output. Both zero means allowed. Native combo readback v3 row flag bit 5 reports the per-combo bypass. Require this bit before writing either extension. See [participation policy](participation-policy.md#combo-output-behaviour-permission) |
 | 31 | unified tapping: every `LT()`, `MT()` and `OSM()` key is decided by the key runtime with or without a behaviour row, and a key without a row behaves exactly as with an empty one; behaviours switched off or bypassed ignore the row only. QMK's tapping engine classifies no record of a key the firmware supports, physical or combo output. A dual-role key (`LT`, `MT`, `OSM`, `TT`, `OSL`) holds at the dual-role setting (settings id 0) unless its row sets its own time; every other row holds at the tap/hold setting. Tapped and then held again at once, such a key starts a new hold rather than repeating its tap. A row without steps is no row for a key's taps and for whether the runtime handles it: a plain key with one stays native, `TT()` keeps its own taps, and its hold times apply only to a key the runtime handles anyway (both joined the bit on the same unreleased branch). Extends bits 17 and 18 (D-F27) without changing profile bytes |
 
@@ -567,7 +577,7 @@ State flags (page 0, bytes 2–3). Bits 10–15 are reserved and must be zero.
 | 6 | waiting for a safe activation boundary |
 | 7 | digests unavailable |
 | 8 | peer cleanup pending |
-| 9 | a slot holds a profile in an earlier store format |
+| 9 | a slot was refused as an earlier store format or test layout |
 
 Peer cleanup pending (added 2026-09-23) means a cancelled save's split ABORT
 was never acknowledged, so the USB half released its own side after
@@ -579,55 +589,14 @@ transfer; a peer that never does needs a restart. A decoder that predates the
 bit rejects the status while it is set, as it rejects any unknown flag.
 
 Bit 9 (D-F28) means a slot holds a profile written in an earlier store format
-(format 5, `NT`) and nothing current is committed. The firmware never reads or
+(format 5, `NT`) or a retired format-6 test layout (the compact 32-byte
+header or the VIA-bound header), and nothing current is committed. The firmware never reads or
 converts such a slot (Ark's D-L64): the keyboard runs its compiled defaults, and
 bit 0 is set with it. The bit clears once a profile is saved, which writes the
 other slot; the earlier one stays untouched until a later save reuses it.
 
-### Sparse VIA Macro Read Map — GET Value `0x0c`
-
-Channel 0, value `0x0c`, uses the ordinary byte page and nonzero request ID;
-request bytes 5–31 are reserved zero. It has no capability bit; current
-firmware always serves it. A bank without a completed clean local checksum returns UNAVAILABLE. The map also returns UNAVAILABLE unless the checksum worker
-hashed the standard board's exact two-byte VIA config `[1,0]` (valid EEPROM,
-zero layout options). QMK permits another client to set nonzero layout options;
-that clean state remains readable through the full VIA path. Compatibility is
-recorded in the same completed cursor as the hash and bitmap, rather than
-sampling current config during GET. A client may use the full VIA read when page 0 is unavailable. Once a map is accepted, an unavailable or malformed later page
-fails that read rather than substituting data from another generation.
-
-Page 0 has exactly 13 bytes, with multibyte integers little-endian:
-
-| Offset | Bytes | Meaning |
-| --- | --- | --- |
-| 0 | 1 | Map layout version, `1` |
-| 1 | 2 | Block size, `256` bytes |
-| 3 | 2 | Full VIA macro capacity, including the write-validity byte |
-| 5 | 4 | Nonzero local storage generation |
-| 9 | 4 | Canonical full VIA-store FNV-1a digest |
-
-Pages 1 onward carry up to 25 bitmap bytes each, exactly
-`ceil(ceil(capacity / 256) / 8)` bytes altogether. Bit `block % 8` of byte
-`floor(block / 8)` marks a block containing at least one nonzero byte; every
-unmarked block is exactly zero. Unused high bits and response padding are zero.
-There are 18 bitmap bytes at capacity 34,903, and at most 32 at capacity 65,535.
-Past-end pages return UNKNOWN_PAGE with no payload.
-
-The checksum worker gathers these bits from the same bytes it hashes, within
-its existing 224-byte scan budget and 14-byte read workspace. The map is published
-with that checksum and invalidated with it on every mutation or remote apply;
-GET copies only metadata or bitmap bytes and never walks the bank. Both locally
-computed and receiver-verified identities carry their own matching bitmap.
-
-A client reads page 0, the bitmap, the marked ranges through ordinary VIA
-MACRO_READ, and page 0 again. It requires identical metadata, checks geometry
-against VIA and Profile Wire, reconstructs omitted bytes as zero, and verifies
-the full canonical VIA digest using its freshly read layout and the standard
-board's fixed VIA config. Complete capture also matches the map identity to its
-initial storage status and retains its final profile/storage/settings coherence
-checks. Stale bytes after the final macro and a nonzero write-validity marker
-are included like any other stored bytes. This is a lossless transport change;
-storage, backup, Apply and recovery formats do not change.
+GET `0x0c`, the sparse VIA macro read map (D-F21), is retired with VIA
+(D-F31) and answered unhandled.
 
 ### Payload Readback — GET Values `0x04` And `0x05`
 
@@ -658,25 +627,10 @@ opened. Page 0's 25-byte payload, little-endian:
 Layout 1 (Profile Wire 1) had a 16-bit length at offset 2 and every later
 field two bytes earlier.
 
-### Native VIA Buffer Admission
-
-Native keymap and macro buffer GET/SET commands use a four-byte header followed
-by at most 28 data bytes in a 32-byte Raw HID report. Before mutation
-classification or native QMK dispatch, firmware checks that the header is
-present and the requested byte count fits the received report. A malformed
-request receives VIA's `id_unhandled` reply (`0xff`) and is fully consumed:
-it performs no native read/write, split mirror or mutation bookkeeping.
-Classification alone cannot reject a request because an unclassified command
-still reaches native QMK.
-
-Valid buffer requests retain native VIA's region-bound behavior, including
-zero-length requests and writes that straddle the storage region's end. The
-guard bounds the report payload; storage range policy remains with QMK.
-
 ### Candidate Mutation Envelope
 
-Candidate staging mutations use VIA custom set command `0x07`; durable commit
-uses VIA custom save command `0x09`. Both use custom channel `0x00` and an exact
+Candidate staging mutations use custom set command `0x07`; durable commit
+uses custom save command `0x09`. Both use custom channel `0x00` and an exact
 32-byte report:
 
 | Value id | Operation |
@@ -689,9 +643,8 @@ uses VIA custom save command `0x09`. Both use custom channel `0x00` and an exact
 | `0x1B` | reuse active candidate bytes |
 | `0x1C` | write streaming candidate chunk |
 
-Custom set values `0x15`, `0x16`, `0x17` and `0x1A` belong to the logical VIA
-staging channel, specified in
-[Logical Profile Transaction V1](logical-profile-transaction-v1.md#cancellation-and-lease-ownership);
+Custom set values `0x15`, `0x16`, `0x17` and `0x1A`, and get `0x19`, were the
+logical VIA staging channel, retired with VIA (D-F31) and answered unhandled;
 the complete map is under Value Ids below. A firmware build must not route
 candidate mutation frames or advertise candidate-write capability merely
 because the standalone codec and coordinator are compiled.
@@ -701,7 +654,7 @@ for commit, which uses `0x09`):
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | VIA command: custom set `0x07` or commit custom save `0x09` |
+| 0 | 1 | command: set `0x07`, or save `0x09` for commit |
 | 1 | 1 | custom channel `0x00` |
 | 2 | 1 | operation value id |
 | 3 | 2 | nonzero transaction id |
@@ -717,8 +670,7 @@ Begin candidate uses this complete layout:
 | 12 | 4 | CRC32 of the exact canonical blob |
 | 16 | 4 | FNV-1a digest of the exact canonical blob |
 | 20 | 4 | action-ABI digest used to encode actions |
-| 24 | 4 | nonzero bound VIA generation |
-| 28 | 4 | nonzero bound VIA digest |
+| 24 | 8 | reserved, zero (the bound VIA generation and digest until D-F31) |
 
 Profile Wire 1's BEGIN also carried a flags byte (always zero) and the store
 format (`5`); a 32-bit length leaves no room for either, and the protocol
@@ -731,9 +683,9 @@ schema, domain mask, action ABI, and capacity is checked by the scan owner
 before storage work begins.
 
 A repeated BEGIN for the same transaction is idempotent only when every field
-matches the original, including the bound VIA generation/digest.
+matches the original.
 A changed field rejects and poisons the candidate with `CONFLICTING_RETRY`;
-it cannot replace the original binding or restart storage work. Repeating the
+it cannot replace the original identity or restart storage work. Repeating the
 original BEGIN afterward does not revive the poisoned candidate.
 
 Candidate chunk uses this complete layout:
@@ -831,11 +783,8 @@ generation and digest before retrying.
 Abort is idempotent before durable commit; retrying a successful or no-op abort
 never repeats storage work.
 The device owner expires ordinary host staging after 15 seconds without
-processed precommit work; for a candidate bound to a VIA identity, each
-logical VIA staging frame the owner admits counts as that work. Every
-precommit cancel of such a candidate also ends its VIA staging, and the host
-cannot end that staging itself; see
-[Logical Profile Transaction V1](logical-profile-transaction-v1.md#cancellation-and-lease-ownership).
+processed precommit work; see
+[Profile Transaction V1](logical-profile-transaction-v1.md#cancellation-and-lease-ownership).
 Once a peer-required candidate enters its distributed
 prepare, it uses a separate 60-second no-progress window; only acknowledged
 split payload progress refreshes that window, not BUSY replies or retries. A
@@ -969,8 +918,8 @@ transfer change; the two reports are individually coherent, not one atomic
 capture. A later background repair can change the current offset and length
 without resetting the last prepared push's counters.
 
-Flag bit 2 (added 2026-09-25) means the commit decision, or the VIA ACCEPT
-that follows it, is waiting for this half to go idle: no held key, pending
+Flag bit 2 (added 2026-09-25) means the commit decision is waiting for this
+half to go idle: no held key, pending
 tap, locked layer or pointer mode, one-shot, macro or combo. Input still works
 in this state, so the user can release or unlock what holds it. If it does not
 clear before the 60 s pre-decision no-progress timeout, the save is cancelled
@@ -991,7 +940,8 @@ the peer as it is now; byte 18 keeps the last reason that was not admission.
 All of them reset when a copy starts. The host reports these when a copy
 stalls; no decision depends on them.
 
-Peer phases are `0` idle, `1` binding the staged VIA copy, `2` beginning, `3`
+Peer phases are `0` idle, `1` retired (binding the staged VIA copy until
+D-F31; never reported), `2` beginning, `3`
 sending, `4` the peer validating and writing its prepared copy, `5` the peer
 prepared, `6` the peer committing, `7` aborting the peer's copy, `8` the split
 reconciler stopped (the last status says why), and `9` waiting for the link
@@ -1052,9 +1002,9 @@ by the standalone firmware C codec/coordinator suite.
 
 Every value this firmware routes on custom channel `0x00`. A value missing
 from a build (a diagnostic, bridge or read-only image) falls through to QMK's
-unhandled reply.
+unhandled reply (command byte `0xFF`).
 
-| VIA command | Value id | Operation | Specified in |
+| Command | Value id | Operation | Specified in |
 | --- | ---: | --- | --- |
 | custom get | `0x01` | capabilities page | this document |
 | custom get | `0x02` | profile status page | this document |
@@ -1063,22 +1013,21 @@ unhandled reply.
 | custom get | `0x05` | compiled payload read | Payload Readback, above |
 | custom get | `0x06` | native combo readback | this document |
 | custom get | `0x07` | effective settings readback | [Portable Profile V1](portable-profile-v1.md) |
-| custom get | `0x08` | VIA storage status and editor pages | [Portable Profile V1](portable-profile-v1.md) |
+| custom get | `0x08` | editor pages; page 0, the VIA store's status until D-F31, is an unknown page | [Portable Profile V1](portable-profile-v1.md) |
 | custom get | `0x09` | retired; unsupported | — |
 | custom get/set | `0x0A` | bounded split transaction capture, diagnostic builds only | [Split activity sync](split-activity-sync.md) |
 | custom get | `0x0B` | detected host OS | Host OS Readback, below |
+| custom get | `0x0C` | retired with VIA (sparse macro read map); unhandled | D-F21, D-F31 |
 | custom get | `0x0D` | flash pauses of each half | Flash Pauses, below |
 | custom set | `0x10` | candidate begin | this document |
 | custom set | `0x11` | candidate chunk | this document |
 | custom set | `0x12` | candidate validate/prepare | this document |
 | custom save | `0x13` | candidate commit | this document |
 | custom set | `0x14` | candidate abort | this document |
-| custom set | `0x15` | logical VIA staging begin | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
-| custom set | `0x16` | logical VIA staging chunk | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
-| custom set | `0x17` | logical VIA staging verify | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
+| custom set | `0x15`–`0x17` | retired with VIA (logical staging); unhandled | D-F31 |
 | custom get | `0x18` | candidate operation status | this document |
-| custom get | `0x19` | logical VIA staging status | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
-| custom set | `0x1A` | logical VIA staging abort: always refused, unsupported | [Logical Profile Transaction V1](logical-profile-transaction-v1.md) |
+| custom get | `0x19` | retired with VIA (logical staging status); unhandled | D-F31 |
+| custom set | `0x1A` | retired with VIA (logical staging abort); unhandled | D-F31 |
 | custom set | `0x1B` | candidate reuse | Differential candidate transfer, above |
 | custom set | `0x1C` | candidate streaming chunk | Differential candidate transfer, above |
 

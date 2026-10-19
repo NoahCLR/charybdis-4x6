@@ -72,7 +72,7 @@ still arms it, a second tap within `TAPPING_TERM` cancels it, a slower second
 tap keeps it on, and a hold that another key used is only a hold. `TO()`
 releases it with the locks. `ONESHOT_TIMEOUT` and `ONESHOT_TAP_TOGGLE` apply to
 QMK's `OSM()` only, and a build that sets them says so; with one-shot keys
-turned off (Magic / VIA), `OSL()` is only a hold, as QMK's is.
+turned off (Magic keys or the keymap options setting), `OSL()` is only a hold, as QMK's is.
 
 `TT(layer)`'s last tap locks the layer on its release. A tap that keeps the
 key's own layer on (that lock, or `OSL()` arming) skips the multi-tap

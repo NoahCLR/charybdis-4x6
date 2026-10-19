@@ -124,8 +124,6 @@ static noah_profile_store_candidate_t candidate_for(const uint8_t *payload, uint
 
     return (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation          = 6u,
-        .via_digest              = UINT32_C(0xabcdef01),
         .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
         .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
         .domain_mask             = payload[6] == 0u ? 0u : 1u,

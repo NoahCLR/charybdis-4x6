@@ -43,11 +43,6 @@
           "reason": "Provider publication invokes the portable settings invalidator; its injected native apply callback is accounted separately."
         },
         {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_qmk_durable_io_profile_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches the engineering live-profile owner through its rotating step table; the step waits while the slot flash says so (D-F29), and the pinned compiler inlines the store runtime step into it"
-        },
-        {
           "caller": "noah_profile_candidate_transaction_scan",
           "callee": "read_source",
           "reason": "The scan-owned reuse operation invokes the candidate backend active-source reader; source identity and the copied snapshot stay on this call path."
@@ -101,11 +96,6 @@
           "caller": "noah_profile_candidate_store_backend_activation_step",
           "callee": "noah_effective_pd_invalidate",
           "reason": "Provider publication invokes the validated immutable PD cache invalidator."
-        },
-        {
-          "caller": "noah_qmk_durable_io_profile_step",
-          "callee": "noah_effective_pd_invalidate",
-          "reason": "Boot publication of the compiled generation, inlined into the scan step, invokes the PD cache invalidator through the provider listener table."
         },
         {
           "caller": "noah_profile_reader_read",
@@ -216,7 +206,7 @@
         },
         {
           "name": "portable profile globals and macro-name readback",
-          "functions": ["main", "via_custom_value_command_kb", "readback_fill", "noah_setting"]
+          "functions": ["main", "noah_profile_channel_dispatch", "readback_fill", "noah_setting"]
         },
         {
           "name": "portable profile settings publication",
@@ -295,12 +285,12 @@
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_split_reconciler_scan_mode", "metadata_exchange", "rpc_exchange", "noah_qmk_profile_split_transport_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
         },
         {
-          "name": "engineering owner coherent VIA status read",
-          "functions": ["main", "via_custom_value_command_kb", "noah_profile_store_runtime_owner_status", "noah_profile_owner_status", "noah_profile_split_authority_status"]
+          "name": "engineering owner coherent Profile Wire status read",
+          "functions": ["main", "noah_profile_channel_dispatch", "noah_profile_store_runtime_owner_status", "noah_profile_owner_status", "noah_profile_split_authority_status"]
         },
         {
           "name": "engineering mutation Raw HID dispatch",
-          "functions": ["main", "via_custom_value_command_kb"]
+          "functions": ["main", "noah_profile_channel_dispatch"]
         },
         {
           "name": "Combo published cache slot flash read",
@@ -312,7 +302,7 @@
         },
         {
           "name": "PD compiled cache initialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_effective_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_pd_v1_validate_record", "tap_valid"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_pd_v1_validate_record", "tap_valid"]
         },
         {
           "name": "PD published cache slot flash read",

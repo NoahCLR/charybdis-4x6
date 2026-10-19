@@ -27,7 +27,6 @@
 #include "../../state/ownership/layer_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
 #include "../../state/diagnostics/runtime_diag.h"
-#include "../../profile/storage/profile_store_runtime_hooks.h"
 #include "slot/origin_registry.h"
 
 #ifdef NOAH_HOST_TEST_ENV
@@ -315,29 +314,6 @@ static void key_runtime_process_settle_report_ownership(uint16_t keycode, keyrec
     keyboard_mod_ownership_track_report_keycode_event(keycode, record);
 }
 
-// Physical keys whose press the profile output fence dropped. Their release
-// is dropped too, even after the fence lifts, so no half event reaches QMK.
-static uint8_t key_runtime_fenced_presses[KEY_ORIGIN_BITMAP_SIZE];
-
-static bool key_runtime_process_output_fenced(const keyrecord_t *record) {
-    bool key_event = record->event.type == KEY_EVENT && key_origin_keypos_valid(record->event.key);
-
-    if (key_event && !record->event.pressed && key_origin_bitmap_has_keypos(key_runtime_fenced_presses, record->event.key)) {
-        key_origin_bitmap_remove_keypos(key_runtime_fenced_presses, record->event.key);
-        return true;
-    }
-    // QMK resolves a VIA key before reaching this hook. Once a logical
-    // decision is authorized, local VIA bytes may be only partly rolled
-    // forward; do not dispatch that mixed keymap to the host.
-    if (noah_profile_store_runtime_output_ready()) {
-        return false;
-    }
-    if (key_event && record->event.pressed) {
-        key_origin_bitmap_add_keypos(key_runtime_fenced_presses, record->event.key);
-    }
-    return true;
-}
-
 // Whether a record uses its keycode's behaviour row (participation-policy.md).
 // A physical key answers with the decision its press stored; a combo's output
 // with its completed chord's output permission and origin layer; anything
@@ -382,9 +358,6 @@ bool is_tap_record_user(keyrecord_t *record, bool native_tap, bool default_tap) 
 
 bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (!noah_record_admission_macro_admit(record, macro_payload_engine_protected(), noah_synthetic_record_active())) return false;
-    if (key_runtime_process_output_fenced(record)) {
-        return false;
-    }
     if (noah_synthetic_record_active()) {
         return true;
     }
@@ -518,8 +491,8 @@ void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {
 // QMK's answer for the keycode, which is_tap_record_user above keeps. No key
 // the runtime handles is QMK's tap key. The only tap actions it does not handle
 // are TT() and OSL() to layers 16-31: the firmware refuses them wherever it
-// validates a keymap, but an external VIA client can still write one, and QMK
-// still decides it (KEY_RUNTIME.md, "Physical-event timing").
+// validates a keymap, and since VIA left (D-F31) nothing else writes one; QMK
+// would still decide it (KEY_RUNTIME.md, "Physical-event timing").
 bool is_tap_keycode_user(uint16_t keycode, bool default_tap) {
     return default_tap && !key_behavior_lookup(keycode).handled;
 }

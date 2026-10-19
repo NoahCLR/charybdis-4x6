@@ -19,7 +19,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DEECONFIG_USER_DATA_SIZE=0 \
     -DSPLIT_TRANSACTION_IDS_USER \
-    -DVIA_ENABLE \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \

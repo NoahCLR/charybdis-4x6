@@ -14,8 +14,13 @@ endif
 include $(USER_PATH)/source_manifest.mk
 include $(USER_PATH)/lib/compat/qmk_split_transport.mk
 
-# VIA support: enables runtime key remapping via the VIA desktop app.
-VIA_ENABLE = yes
+# VIA is not supported (D-F31). The firmware answers Raw HID itself: hosts
+# speak Profile Wire on QMK's Raw HID interface (usage page 0xFF60).
+RAW_ENABLE = yes
+# VIA used to switch these on; the firmware still uses them. Bootmagic comes
+# from the keyboard's own definition.
+SEND_STRING_ENABLE = yes
+TRI_LAYER_ENABLE = yes
 OS_DETECTION_ENABLE = yes
 
 # Key combos: press multiple keys simultaneously to trigger an action.
@@ -91,9 +96,6 @@ ifneq ($(strip $(NOAH_LIVE_PROFILE_OWNER)),no)
         $(error NOAH_LIVE_PROFILE_OWNER must be `yes` or `no`)
     endif
     ifneq ($(strip $(NOAH_PHYSICAL_HALF)),)
-        ifneq ($(strip $(VIA_ENABLE)),yes)
-            $(error NOAH_LIVE_PROFILE_OWNER=yes requires VIA_ENABLE=yes)
-        endif
         OPT_DEFS += -DNOAH_LIVE_PROFILE_OWNER_ENABLE
         SRC += $(NOAH_LIVE_PROFILE_OWNER_SOURCES)
     else
@@ -127,13 +129,10 @@ endif
 
 # Temporary, read-only on-device cadence recorder used to compare ordinary and
 # live-profile firmware from the same source revision. The recorder is absent
-# from normal artifacts and requires VIA for bounded post-capture readback.
+# from normal artifacts and is read back over Profile Wire.
 ifneq ($(strip $(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS)),)
     ifneq ($(strip $(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS)),yes)
         $(error NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS must be `yes` when specified)
-    endif
-    ifneq ($(strip $(VIA_ENABLE)),yes)
-        $(error NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes requires VIA_ENABLE=yes)
     endif
     OPT_DEFS += -DNOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE
 endif

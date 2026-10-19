@@ -252,7 +252,7 @@ The allowlist is tied to the audited QMK 0.0.8 native ABI:
   advertised them before D-F28). Older firmware rejects them as
   `INVALID_ACTION`, so the domain version is unchanged.
 
-- VIA macro triggers: plain `0x7700..0x777f`, slots 0–127 (D-F23). Feature
+- Macro triggers: plain `0x7700..0x777f`, slots 0–127 (D-F23). Feature
   bit 29 advertises them. Their modifier policy must be inherit and their mask
   zero; older firmware rejects them as `INVALID_ACTION` without a version change.
 
@@ -284,7 +284,7 @@ apart from the keyboard's. QMK sends a button's report at once from the report
 the pointing task is building, which still holds that poll's motion; a click
 from motion clears that motion first, so it cannot move the held-still cursor.
 
-A macro starts through the existing VIA provider and runs across scans. A start
+A macro starts through the profile macro provider and runs across scans. A start
 counts as one output and spends a once-per-movement movement only if playback
 actually starts. Empty, invalid/unplayable or busy slots send nothing and leave
 it unspent. Every attempted direction still consumes the existing per-report
@@ -349,15 +349,15 @@ and prove that current readers reject legacy envelopes.
 
 ## Storage geometry
 
-Current firmware uses one geometry (D-F29):
+Current firmware uses one geometry (D-F29, D-F31):
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
-| logical EEPROM `0x00000..0x08fff` | 36,864 | QMK/VIA allocation |
+| logical EEPROM `0x00000..0x00fff` | 4,096 | QMK eeconfig and its datablocks |
 | slot region `0x00000..0x1ffff` (flash `0x100000`) | 131,072 | Profile slot A, 32-byte header + 130,048-byte payload |
 | slot region `0x20000..0x3ffff` (flash `0x120000`) | 131,072 | Profile slot B, same layout |
 
-Logical EEPROM is 36,864 bytes; RP2040 wear-level backing is 73,728 bytes. The
+Logical EEPROM is 4,096 bytes; RP2040 wear-level backing is QMK's default 8,192 bytes. The
 slots are a flash region of their own, read in place
 ([storage baseline](storage-and-resource-baseline.md#profile-slot-flash-region-d-f29)). Older layouts are not interpreted in place, and a backup from earlier
 firmware cannot be restored here; keep it with its matching firmware pair.
@@ -368,8 +368,8 @@ belongs to [memory budgets](memory-budgets.md).
 
 Schema 4.0 includes domain `0x50`, advertised by domain-mask bit 4. Store
 format 6 (D-F28, D-F30) stores seven domain bits in its header's first byte;
-origin and override flags have their own byte 5. The header is 36 bytes. It binds schema 4.0 and nonzero VIA
-identity. `NP`, `NQ`, `NR`, `NS` and `NT` headers are rejected. Header CRC,
+origin and override flags have their own byte 5. The header is 36 bytes. It binds schema 4.0; bytes 22–32 are reserved zero
+(the VIA identity until D-F31). `NP`, `NQ`, `NR`, `NS` and `NT` headers are rejected. Header CRC,
 marker-last publication and bounded I/O remain unchanged.
 
 Synchronous validation, bounded boot scanning and commit shape validation
@@ -385,9 +385,8 @@ The current action-ABI digest is the one capability page 0 reports; it covers
 the layer count, so the sixteen-layer bank changed it (D-F14). Older action
 vocabularies are refused.
 Candidate metadata, owner, peer storage and background stale-peer repair all
-use format 6 and require a
-correlated VIA bind before PREPARE_BEGIN. Retry preserves the bind for that exact
-generation/digest. Incompatible peers cannot Apply.
+use format 6 with no binding: PREPARE_BEGIN opens a copy (D-F31).
+Incompatible peers cannot Apply.
 
 GET subcommand 9 and feature bit 13 are retired. Firmware neither advertises nor
 serves legacy source definitions, and has no version-1 PD envelope validator.
@@ -464,7 +463,7 @@ profile digest and both-half state for each case:
 4. Held or locked modes make Apply wait with a useful reason; no modifier or
    mouse button stays stuck.
 5. Power or link interruption on either side of the logical decision recovers
-   the old or new complete generation, with no mode, RGB or VIA mixture.
+   the old or new complete generation, with no mode or RGB mixture.
 6. Mixed-version halves, stale drafts and old clients refuse mutation without
    losing the prior configuration.
 7. Pointing cadence, save time and per-half memory and stack evidence.
@@ -473,7 +472,7 @@ profile digest and both-half state for each case:
    held while a mode clicks it; the cursor staying still. Record the events the
    host actually receives; do not infer Back or Forward from a button number.
 
-9. VIA macro outputs (D-F23): delayed and mouse-click macros from straight and
+9. Macro outputs (D-F23): delayed and mouse-click macros from straight and
    diagonal motion, Once per movement and Every step, and physical button tap
    overrides. Confirm triggers while busy are dropped, empty macros leave a
    movement unspent, held modifiers follow inherited playback and mouse clicks
