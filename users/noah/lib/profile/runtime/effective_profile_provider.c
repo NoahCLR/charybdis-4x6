@@ -352,7 +352,7 @@ noah_effective_profile_result_t noah_effective_profile_provider_poll(noah_effect
     if (!provider->has_pending) {
         return NOAH_EFFECTIVE_PROFILE_NO_PENDING;
     }
-    if (!provider->safe_boundary && ((provider->pending.profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) || ((provider->pending.profile.domain_mask | provider->active_banks[provider->active_index].profile.domain_mask) & (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD)))) {
+    if (!provider->safe_boundary && ((provider->pending.profile.domain_mask & NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS) || ((provider->pending.profile.domain_mask | provider->active_banks[provider->active_index].profile.domain_mask) & (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEYMAP | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MACROS)))) {
         return NOAH_EFFECTIVE_PROFILE_SAFE_BOUNDARY_REQUIRED;
     }
     update_begin(provider);

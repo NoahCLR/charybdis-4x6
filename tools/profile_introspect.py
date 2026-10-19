@@ -10,6 +10,7 @@ import html
 import os
 import re
 import shlex
+import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -3915,6 +3916,19 @@ def check_outputs(assets: dict[Path, str]) -> int:
     return 0
 
 
+def authored_macro_bank(write: bool) -> int:
+    """Regenerate or check the profile's authored_macro_bank.h.
+
+    The bank encoding comes from the firmware's own macro compiler and encoder,
+    so the real-profile validation harness builds it rather than a Python copy.
+    """
+    env = dict(os.environ)
+    if write:
+        env["NOAH_WRITE_AUTHORED_MACRO_BANK"] = "1"
+    harness = REPO_ROOT / "tests/host/run_real_profile_validation_tests.sh"
+    return subprocess.run(["sh", str(harness), str(KEYMAP_FILE.parent)], env=env, stdout=subprocess.DEVNULL).returncode
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     profile_group = parser.add_mutually_exclusive_group()
@@ -3938,11 +3952,16 @@ def main() -> int:
 
     if args.write:
         write_outputs(assets)
+        if authored_macro_bank(write=True) != 0:
+            return 1
 
     if args.check:
         check_status = check_outputs(assets)
         if check_status != 0:
             return check_status
+        if authored_macro_bank(write=False) != 0:
+            sys.stderr.write(f"stale or invalid {KEYMAP_FILE.parent / 'authored_macro_bank.h'}: run tools/profile_introspect.py --write\n")
+            return 1
 
     if args.print_markdown:
         sys.stdout.write(markdown)

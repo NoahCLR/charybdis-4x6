@@ -1,7 +1,7 @@
 # Profile Wire V1
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14, D-F28):
-> Profile Wire 2.0, profile schema 4.0, a 130,048-byte custom payload, and
+> Profile Wire 2.0, profile schema 4.0, a slot-sized profile payload, and
 > logical store format 6. Every profile length and offset is 32 bits wide, in
 > storage and on the wire. Every save binds a nonzero VIA generation and
 > digest. Split framing is version 3. Older profile/store formats and the
@@ -31,7 +31,7 @@ The blob is independent of Raw HID framing and EEPROM slot metadata.
 
 The transport candidate length or storage header supplies total blob length,
 a 32-bit field everywhere it travels. Schema 4.0 is capped at 130,048 bytes,
-one 128 KiB flash slot less its 32-byte header (D-F29); nothing in the format
+one 128 KiB flash slot less its 1 KiB physical record (D-F29); nothing in the format
 itself stops at 64 KiB. Schemas 1 to 3 are refused.
 
 ### Domain Envelope — 6 Bytes Plus Payload
@@ -103,7 +103,7 @@ range length.
 The registry/traversal change (D-F11) preserves wire bytes, digests, slot
 geometry and feature admission. The subsequent complete compiled profile
 (D-F12, below) deliberately changes compiled-default identity. The owner
-round-trip harness saves and reboots both the complete authored five-domain
+round-trip harness saves and reboots both the complete authored seven-domain
 profile and a profile with populated imported combo/settings overrides,
 checking every published domain and runtime view. Hardware eligibility and the independent VIA adapter
 are injected; this host harness does not establish physical acceptance. The
@@ -634,7 +634,7 @@ storage, backup, Apply and recovery formats do not change.
 GET `0x04` reads the committed payload and `0x05` the compiled defaults the
 firmware was built with, through the envelope above with a wide page (request
 byte 4 its low byte, byte 5 its high byte): a 130,048-byte payload needs
-5,243 pages, and 16 bits of page reach 1.6 MB. Page 0 is metadata; page
+5,203 pages, and 16 bits of page reach 1.6 MB. Page 0 is metadata; page
 `n` from 1 carries payload bytes `(n - 1) × 25` onward, at most 25, with the
 payload length byte giving the count. A page past the end answers status `2`;
 status `3` means nothing is committed, or the compiled defaults cannot be
@@ -1216,20 +1216,19 @@ unavailable and exposes zero definitions rather than a partially decoded table.
 
 Domain `0x40` v8 and GET values `0x07`/`0x08` are specified in
 [portable-profile-v1.md](portable-profile-v1.md). The canonical envelope now
-permits five known domains; an unknown domain still rejects the candidate.
+permits seven known domains; an unknown domain still rejects the candidate.
 The settings validator uses the existing bounded reader and safe publication
 boundary. Validator/provider state policies are 400/784 bytes respectively
 (384 since D-F14: the 128-byte pointing records make the PD iterator the largest domain state;
 400 since D-F28, whose 32-bit blob lengths and offsets add 20 bytes, 392 on Cortex-M0+).
-The standard compiled payload contains all five enabled domains in registry
-order: RGB, key behaviours, combos, settings and pointing. Its immutable
+The standard compiled payload contains all seven enabled domains in registry
+order: RGB, key behaviours, combos, settings, pointing, keymap and macros. Its immutable
 factory settings and authored names share the settings domain's encoder.
 Compiled combo rows preserve authored order, default-window inheritance and
 native actions through semantic encoding. No domain version changes.
 
-Opening compiled defaults records five bounded offset/length pairs alongside
-its metadata (a 60-byte handle policy since D-F28: metadata plus five 32-bit
-ranges). A domain's length is the byte count
+Opening compiled defaults records seven bounded 32-bit offset/length pairs
+alongside its metadata (a 76-byte handle). A domain's length is the byte count
 its module's encoder emits; an encoder that emits nothing leaves the domain out
 of that build's compiled profile. An arbitrary read emits the blob header,
 intersecting domain headers and only intersecting domain payloads; it never

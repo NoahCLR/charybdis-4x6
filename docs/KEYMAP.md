@@ -2,6 +2,17 @@
 
 This is the prose profile doc for the current `noah` Charybdis 4x6 keymap.
 
+The active profile owns the matrix (`0x60` v1) and macro bank (`0x70` v1).
+The authored `keymaps[][][]` and `VIA_MACROS` below are compiled defaults.
+With no saved domain, those defaults type as before. Key lookup, combo origin,
+transparent fallthrough and RGB coverage all use the active matrix; macro
+playback uses its bank. VIA is still compiled during the transition, but it
+refuses keymap and macro writes (`id_unhandled`): its separate copies no longer
+change typing. A client for the new base is required to edit these domains.
+After changing `VIA_MACROS`, run `tools/profile_introspect.py --write`: it also
+regenerates `authored_macro_bank.h`, the same macros already in the bank
+encoding, which the compiled defaults copy.
+
 If you want the fastest visual snapshot, start with
 [KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md). The top-level [README](../README.md),
 the [firmware guide](./GUIDE.md) and [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) explain what the shared
@@ -421,14 +432,13 @@ key." It is more opinionated than that.
 
 ## Macro And Shortcut Surfaces
 
-The profile's macros are VIA macro slots:
+The profile's macros retain their 128 macro-slot key identities:
 
-- VIA exposes `VIA_MACRO_0` through `VIA_MACRO_63`, each of which can carry a
-  name
+- The profile exposes `VIA_MACRO_0` through `VIA_MACRO_127`, each with a name
 - `VIA_MACRO_0` through `VIA_MACRO_10` currently have source defaults in
   `VIA_MACROS(MACRO)`
 
-VIA macros play through one scan-driven engine. Starting a
+Profile macros play through one scan-driven engine. Starting a
 macro does not wait inside the triggering key event: delays, text, chords, and
 key holds advance through later matrix scans, so pointing, RGB, VIA, split, and
 normal key processing continue between macro operations. Playback has a
@@ -481,9 +491,9 @@ while others are just my current app-launcher or utility bindings:
 | `VIA_MACRO_9` | `{KC_LSFT,KC_LGUI,KC_P}` | current shortcut for the VS Code command palette |
 | `VIA_MACRO_10` | `{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}` | select all, short wait, then copy |
 
-`VIA_MACRO_11` through `VIA_MACRO_63` are empty by default. The RP2040
-wear-leveling region is enlarged for this profile, leaving roughly 15 KB of
-shared VIA macro buffer space after dynamic layer storage.
+`VIA_MACRO_11` through `VIA_MACRO_127` are empty by default. The profile macro
+domain holds up to 34,903 bytes, including every slot's terminator. Its saved
+bank lives in the profile slots, outside the QMK wear-leveling region.
 
 Prefer chord payloads such as `{KC_LGUI,KC_C}` for self-contained shortcuts.
 Explicit key-down/key-up payloads such as `{+KC_LSFT}` and `{-KC_LSFT}` must

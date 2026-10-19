@@ -72,6 +72,24 @@ bool noah_qmk_via_should_seed_defaults_post_init(void) {
     return !via_eeprom_is_valid();
 }
 
+bool noah_qmk_via_refuse_profile_owned_write(uint8_t *data, uint8_t length) {
+    if (!data || length == 0u) return false;
+    switch (data[0]) {
+        case id_dynamic_keymap_set_keycode:
+        case id_dynamic_keymap_set_buffer:
+        case id_dynamic_keymap_reset:
+        case id_dynamic_keymap_macro_set_buffer:
+        case id_dynamic_keymap_macro_reset:
+            // Typing reads the profile's keymap and macro domains, so VIA's
+            // copies no longer change anything. Refuse rather than look saved.
+            data[0] = id_unhandled;
+            raw_hid_send(data, length);
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool noah_qmk_via_handle_malformed_buffer_command(uint8_t *data, uint8_t length) {
     if (!data || length == 0u) return false;
     switch (data[0]) {

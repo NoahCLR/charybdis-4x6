@@ -12,6 +12,8 @@
 #include "profile_combo_v1.h"
 #include "profile_settings_v1.h"
 #include "profile_pd_v1.h"
+#include "profile_keymap_v1.h"
+#include "profile_macros_v1.h"
 
 enum {
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB           = NOAH_PROFILE_DOMAIN_MASK_RGB,
@@ -19,6 +21,8 @@ enum {
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS      = NOAH_PROFILE_DOMAIN_MASK_SETTINGS,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS        = NOAH_PROFILE_DOMAIN_MASK_COMBOS,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD = NOAH_PROFILE_ENABLED_PD_MASK,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEYMAP        = NOAH_PROFILE_DOMAIN_MASK_KEYMAP,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MACROS        = NOAH_PROFILE_DOMAIN_MASK_MACROS,
     NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS = NOAH_PROFILE_ENABLED_DOMAIN_MASK,
     NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX        = 20u,
     NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX   = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
@@ -100,6 +104,8 @@ typedef enum {
     NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD,
     NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_HOLD_OTHER,
     NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT,
+    // A keymap keycode, passed as a QMK_KEYCODE action.
+    NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_KEYMAP,
 } noah_profile_validator_v1_placement_t;
 
 // Checks the schema cannot make on its own, supplied by the firmware runtime.
@@ -158,6 +164,8 @@ typedef union {
     noah_profile_combo_v1_validation_t       combos;
     noah_profile_rgb_v1_validation_t         rgb;
     noah_key_behavior_domain_v1_validation_t key_behaviors;
+    noah_profile_keymap_v1_validation_t      keymap;
+    noah_profile_macros_v1_validation_t      macros;
 } noah_profile_validator_v1_domain_validation_t;
 
 // Caller-owned, payload-independent state. Treat fields after phase as

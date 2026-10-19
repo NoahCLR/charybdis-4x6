@@ -6,6 +6,7 @@
 #include "profile_owner.h"
 #include "profile_action_placement_v1.h"
 #include "effective_settings_runtime.h"
+#include "effective_keymap_macros_runtime.h"
 
 #include <limits.h>
 #include <stddef.h>
@@ -177,6 +178,7 @@ static void reset_host_barrier(noah_profile_owner_t *owner) {
     owner->host_cancel_reason                  = NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE;
     owner->host_cancel_pending                 = false;
     owner->host_barrier_progress_offset        = 0u;
+    owner->host_barrier_progress_phase         = 0u;
     owner->host_via_accept_requested           = false;
     owner->host_via_abort_requested            = false;
     owner->host_via_progress                   = false;
@@ -349,8 +351,25 @@ static void fail_integration(noah_profile_owner_t *owner) {
     owner->state = NOAH_PROFILE_OWNER_INTEGRATION_ERROR;
 }
 
-static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
-    noah_effective_profile_invalidator_t     invalidators[5];
+// One invalidator per runtime that follows the active profile.
+enum {
+    OWNER_INVALIDATOR_COUNT = 3u
+#ifdef COMBO_ENABLE
+                              + 1u
+#endif
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+                              + 1u
+#endif
+#ifdef NOAH_PD_PROFILE_ENABLE
+                              + 1u
+#endif
+};
+_Static_assert((unsigned)OWNER_INVALIDATOR_COUNT <= (unsigned)NOAH_EFFECTIVE_PROFILE_MAX_INVALIDATORS, "the provider holds every runtime's invalidator");
+
+// Boot only: kept out of line so its locals do not widen the durable I/O
+// step's frame on every scan.
+static __attribute__((noinline)) bool initialize_runtime_graph(noah_profile_owner_t *owner) {
+    noah_effective_profile_invalidator_t     invalidators[OWNER_INVALIDATOR_COUNT];
     uint8_t invalidator_count = 0;
     noah_profile_candidate_backend_t         host_backend;
     noah_profile_candidate_compatibility_t   host_compatibility;
@@ -371,6 +390,7 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
 #ifdef COMBO_ENABLE
     noah_effective_combo_runtime_init(&owner->combos);
 #endif
+    invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){.callback = noah_effective_keymap_macros_invalidate, .context = NULL};
     invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){
         .callback = noah_effective_key_behavior_runtime_invalidate,
         .context  = &owner->key_behaviors,
@@ -395,6 +415,7 @@ static bool initialize_runtime_graph(noah_profile_owner_t *owner) {
                                              ) != NOAH_EFFECTIVE_PROFILE_OK) {
         return false;
     }
+    noah_effective_keymap_macros_invalidate(NULL, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     noah_effective_key_behavior_runtime_invalidate(&owner->key_behaviors, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     noah_effective_rgb_runtime_invalidate(&owner->rgb, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     if (!owner->rgb.banks[owner->rgb.active_index].valid) return false;
@@ -864,12 +885,14 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
 }
 
 static void note_host_barrier_progress(noah_profile_owner_t *owner, uint32_t now_ms) {
-    noah_profile_split_reconciler_status_t status;
+    uint32_t offset;
+    uint8_t  phase;
 
-    if (!owner || !owner->host_barrier_started || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER || !noah_profile_split_reconciler_status(&owner->reconciler, &status) || status.transfer_offset == owner->host_barrier_progress_offset) {
+    if (!owner || !owner->host_barrier_started || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER || !noah_profile_split_reconciler_progress(&owner->reconciler, &offset, &phase) || (offset == owner->host_barrier_progress_offset && phase <= owner->host_barrier_progress_phase)) {
         return;
     }
-    owner->host_barrier_progress_offset = status.transfer_offset;
+    owner->host_barrier_progress_offset = offset;
+    owner->host_barrier_progress_phase  = phase;
     owner->host_last_activity_at        = now_ms;
     owner->host_activity_known          = true;
 }

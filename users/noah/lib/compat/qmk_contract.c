@@ -3,6 +3,9 @@
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "qmk_via_playback_contract.h"
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+#    include "../macro/profile_macro_provider.h"
+#endif
 
 #ifdef VIA_ENABLE
 #    include "dynamic_keymap.h"
@@ -22,7 +25,9 @@ void noah_qmk_via_macro_get_buffer(uint16_t offset, uint16_t size, uint8_t *data
 #endif
 
 bool noah_qmk_contract_start_via_macro(uint16_t action) {
-#ifdef VIA_ENABLE
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    return noah_profile_macro_start(action);
+#elif defined(VIA_ENABLE)
     return via_macro_provider_start(action);
 #else
     (void)action;
@@ -31,7 +36,9 @@ bool noah_qmk_contract_start_via_macro(uint16_t action) {
 }
 
 bool noah_qmk_contract_try_play_via_macro(uint16_t action) {
-#ifdef VIA_ENABLE
+#ifdef NOAH_PORTABLE_PROFILE_ENABLE
+    return noah_profile_macro_try_play(action);
+#elif defined(VIA_ENABLE)
     return via_macro_provider_try_play(action);
 #else
     (void)action;

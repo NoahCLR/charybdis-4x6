@@ -367,8 +367,8 @@ belongs to [memory budgets](memory-budgets.md).
 ## Integration and identity gates
 
 Schema 4.0 includes domain `0x50`, advertised by domain-mask bit 4. Store
-format 6 (D-F28) stores five domain bits, origin in bit 5, flags in bit 6 and
-reserved bit 7 in its header's first byte. It binds schema 4.0 and nonzero VIA
+format 6 (D-F28, D-F30) stores seven domain bits in its header's first byte;
+origin and override flags have their own byte 5. The header is 36 bytes. It binds schema 4.0 and nonzero VIA
 identity. `NP`, `NQ`, `NR`, `NS` and `NT` headers are rejected. Header CRC,
 marker-last publication and bounded I/O remain unchanged.
 

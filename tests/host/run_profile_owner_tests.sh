@@ -29,6 +29,7 @@ build_and_run() {
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
         "$ROOT/tests/host/profile_owner_test.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_owner.c" \
+        "$ROOT/users/noah/lib/profile/runtime/effective_keymap_macros_runtime.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
@@ -38,6 +39,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_authority.c" \

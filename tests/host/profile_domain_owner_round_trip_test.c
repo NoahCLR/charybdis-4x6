@@ -7,6 +7,7 @@
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 #include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "users/noah/lib/profile/runtime/effective_keymap_macros_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap.h"
@@ -263,6 +264,22 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
                 break;
             }
         assert(memcmp(bytes, domain->payload, domain->payload_length) == 0);
+        if (domain->id == NOAH_PROFILE_DOMAIN_V1_KEYMAP) {
+            assert(noah_effective_keymap_is_live() && domain->payload_length == 1920);
+            for (uint8_t layer = 0; layer < LAYER_COUNT; layer++)
+                for (uint8_t row = 0; row < MATRIX_ROWS; row++)
+                    for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+                        size_t at = ((size_t)layer * MATRIX_ROWS * MATRIX_COLS + row * MATRIX_COLS + col) * 2;
+                        uint16_t code = domain->payload[at] | (uint16_t)domain->payload[at + 1] << 8;
+                        assert(keymap_key_to_keycode(layer, (keypos_t){.row = row, .col = col}) == code);
+                    }
+        }
+        if (domain->id == NOAH_PROFILE_DOMAIN_V1_MACROS) {
+            uint8_t byte;
+            assert(noah_effective_macro_bank_is_live() && noah_effective_macro_bank_length() == domain->payload_length);
+            assert(noah_effective_macro_bank_read(0, &byte, 1u) && byte == domain->payload[0]);
+            assert(noah_effective_macro_bank_read(domain->payload_length - 1, &byte, 1u) && byte == 0);
+        }
         if (domain->id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) {
             assert(noah_effective_settings_length() == domain->payload_length);
             for (size_t j = 0; j < domain->payload_length; j++)
@@ -408,7 +425,11 @@ static void test_maximum_profile(void) {
     // One validator step a scan, each one read of at most 20 bytes. The peer's
     // copy of this validation is the longest stretch a split prepare spends
     // without transfer progress, inside the owner's no-progress window.
-    assert(validation_scans < 8000u);
+    // Keep the prior table-work bound and add only the two bounded passes
+    // over the new domains (checksum and semantic decoding), plus envelopes.
+    const uint32_t extra_steps = (1920u + 34903u + 12u + 19u) / 20u + (1920u + 19u) / 20u + (34903u + 19u) / 20u + 2u;
+    assert(validation_scans < 8000u + extra_steps);
+    assert(validation_scans * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS < NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS);
     assert_published(maximum, &expected, 1);
     assert_maximum_edges();
     reboot();

@@ -69,8 +69,8 @@ typedef enum {
 } noah_profile_split_v1_status_t;
 
 // Why a receiver answered ACK/BUSY, carried in that reply's unused chunk
-// bytes so the sender can report it. Diagnostic only: no decision depends on
-// it, and 0 means the receiver did not say.
+// bytes. Correlated STORE_WORKING phase advances also refresh the owner
+// no-progress deadline; repeated phases do not. Zero means unspecified.
 typedef enum {
     NOAH_PROFILE_SPLIT_V1_BUSY_UNSPECIFIED      = 0u,
     NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED         = 1u, // queued; the answer comes on a retry

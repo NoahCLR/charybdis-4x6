@@ -60,3 +60,6 @@ noah_effective_rgb_result_t noah_effective_rgb_runtime_frame_status(const noah_e
 // the same immutable compiled-domain cache.
 noah_effective_rgb_result_t noah_effective_rgb_capture_frame(noah_effective_rgb_frame_t *frame);
 noah_effective_rgb_result_t noah_effective_rgb_frame_status(const noah_effective_rgb_frame_t *frame);
+
+// Scan-owner invalidation stamp for derived matrix coverage maps.
+uint32_t noah_effective_rgb_publication_epoch(void);

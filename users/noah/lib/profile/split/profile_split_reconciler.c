@@ -770,6 +770,10 @@ static void update_remote_commit_response(noah_profile_split_reconciler_t *recon
     }
     memcpy(request_wire, reconciler->cached_request_wire, sizeof(request_wire));
     if (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
+        // The cached BUSY must expose a completed phase, not remain frozen at
+        // VALIDATING throughout the durable preparation that follows it.
+        busy_reply(&response, reconciler, store_busy_reason(reconciler, request.descriptor.generation, request.descriptor.payload_digest, request.descriptor.payload_length), request.descriptor.generation, request.descriptor.payload_digest, request.descriptor.payload_length);
+        cache_response(reconciler, request_wire, request_length, &response);
         return;
     }
     if (result == NOAH_PROFILE_PEER_STORE_OK || result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED) {
@@ -811,7 +815,7 @@ static bool advance_store_transfer(noah_profile_split_reconciler_t *reconciler) 
         return false;
     }
     result = noah_profile_peer_store_backend_step(reconciler->config.peer_store, NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX);
-    if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH) {
+    if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH && (result != NOAH_PROFILE_PEER_STORE_IN_PROGRESS || state != noah_profile_peer_store_backend_state(reconciler->config.peer_store))) {
         update_remote_commit_response(reconciler, result);
     }
     if (result != NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
@@ -871,6 +875,10 @@ static void retry_admitted_mailbox(noah_profile_split_reconciler_t *reconciler, 
     if ((reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_DURABLE || reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT) && response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING && response->generation == reconciler->transfer_descriptor.generation && response->payload_digest == reconciler->transfer_descriptor.payload_digest && response->payload_length == reconciler->transfer_descriptor.payload_length && response->offset == reconciler->transfer_descriptor.payload_length && response->busy_owner == NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH && response->busy_admission == NOAH_PROFILE_STORAGE_ADMISSION_PEER && (response->busy_store_state == NOAH_PROFILE_PEER_STORE_VALIDATING || response->busy_store_state == NOAH_PROFILE_PEER_STORE_PREPARING || response->busy_store_state == NOAH_PROFILE_PEER_STORE_COMMITTING)) {
         reconciler->attempt_immediate = false;
         reconciler->next_attempt_at   = now + NOAH_PROFILE_SPLIT_STORE_POLL_MS;
+        // A correlated transition proves a bounded stage completed. Repeated
+        // BUSY replies, mismatched copies and backwards phases prove nothing.
+        if (response->busy_store_state > reconciler->prepare_progress_phase)
+            reconciler->prepare_progress_phase = response->busy_store_state;
         reconciler->retry_ms          = NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS * 2u;
         reconciler->admission_retries = 0u;
         if (reconciler->retry_count != UINT32_MAX) reconciler->retry_count++;
@@ -1175,6 +1183,7 @@ static void push_begin(noah_profile_split_reconciler_t *reconciler, uint32_t now
         handle_protocol_error(reconciler, &response, now);
         return;
     }
+    reconciler->prepare_progress_phase = 0u;
     reconciler->transfer_offset = response.offset;
     reconciler->state           = response.offset == reconciler->transfer_descriptor.payload_length ? (reconciler->prepared_push_active ? prepared_payload_complete_state(reconciler) : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT) : NOAH_PROFILE_SPLIT_RECONCILER_PUSH_READ;
     note_progress(reconciler, now);
@@ -1808,6 +1817,7 @@ bool noah_profile_split_reconciler_prepared_push_begin_logical(noah_profile_spli
     reconciler->admission_retries        = 0u;
     reconciler->reused_bytes             = 0u;
     reconciler->prepared_scans           = 0u;
+    reconciler->prepare_progress_phase   = 0u;
     reconciler->prepared_exchanges       = 0u;
     reconciler->reuse_exchanges          = 0u;
     reconciler->source_unavailable_replies = 0u;
@@ -1904,6 +1914,7 @@ bool noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t 
         .last_status             = reconciler->last_status,
         .transfer_offset         = reconciler->transfer_offset,
         .transfer_length         = reconciler->transfer_descriptor.payload_length,
+        .prepare_progress_phase  = reconciler->prepare_progress_phase,
         .reused_bytes            = reconciler->reused_bytes,
         .transport_failure_count = reconciler->transport_failure_count,
         .retry_count             = reconciler->retry_count,
@@ -1919,6 +1930,15 @@ bool noah_profile_split_reconciler_status(const noah_profile_split_reconciler_t 
         .peer_cleanup_pending    = reconciler->orphan_pending,
         .prepared_push_active    = reconciler->prepared_push_active,
     };
+    return true;
+}
+
+bool noah_profile_split_reconciler_progress(const noah_profile_split_reconciler_t *reconciler, uint32_t *transfer_offset, uint8_t *prepare_progress_phase) {
+    if (!(reconciler && reconciler->initialized && transfer_offset && prepare_progress_phase)) {
+        return false;
+    }
+    *transfer_offset        = reconciler->transfer_offset;
+    *prepare_progress_phase = reconciler->prepare_progress_phase;
     return true;
 }
 

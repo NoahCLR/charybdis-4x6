@@ -44,7 +44,7 @@ build_and_run() {
         -DVIA_ENABLE \
         -DMCU_RP \
         -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
-        -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
@@ -61,6 +61,11 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_action_placement_v1.c" \
@@ -71,10 +76,14 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_owner.c" \
+        "$ROOT/users/noah/lib/profile/runtime/effective_keymap_macros_runtime.c" \
+        "$ROOT/users/noah/lib/compat/qmk_profile_keymap.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_key_behavior_runtime.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \

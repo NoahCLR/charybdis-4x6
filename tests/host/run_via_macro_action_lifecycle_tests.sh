@@ -15,8 +15,12 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+build_and_run() {
+name="$1"
+shift
+BIN="$BUILD_DIR/$name"
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
-    -DVIA_ENABLE -DNOAH_PD_PROFILE_ENABLE -DPOINTING_DEVICE_ENABLE \
+    -DVIA_ENABLE -DNOAH_PD_PROFILE_ENABLE -DPOINTING_DEVICE_ENABLE "$@" \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \
@@ -35,10 +39,17 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/macro/host_layout.c" \
     "$ROOT/users/noah/lib/macro/host_layout_tables.c" \
     "$ROOT/users/noah/lib/macro/via_macro_provider.c" \
+    ${PROFILE_PROVIDER_SOURCE:+"$PROFILE_PROVIDER_SOURCE"} \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \
     "$ROOT/users/noah/lib/pointing/modes/pd_mode_configured.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
     -o "$BIN"
-
 "$BIN"
+}
+
+PROFILE_PROVIDER_SOURCE=""
+build_and_run via
+PROFILE_PROVIDER_SOURCE="$ROOT/users/noah/lib/macro/profile_macro_provider.c"
+build_and_run profile -DNOAH_PROFILE_PROVIDER_TEST -DNOAH_PORTABLE_PROFILE_ENABLE
+build_and_run profile_sanitized -DNOAH_PROFILE_PROVIDER_TEST -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer

@@ -279,9 +279,9 @@ static void test_reset_takes_the_slot_and_erases_ahead_of_writes(void) {
     CHECK(!io.write(io.context, 64u, pattern, sizeof(pattern)));
     CHECK(!io.reset(io.context, 0x1000u, 64u));
     CHECK(!io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX + 1u));
-    CHECK(!io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR, 31u));
+    CHECK(!io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - 1u));
     // A reset touches no flash; the slot already reads as erased.
-    CHECK(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR, 32u + 2u * SECTOR));
+    CHECK(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + 2u * SECTOR));
     CHECK(flash_chip.operations == 0u);
     CHECK(io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR, bytes, 32u) && bytes[0] == 0xFFu && bytes[31] == 0xFFu);
     CHECK(flash_chip.bytes[NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR] == 0x5Au);
@@ -310,9 +310,9 @@ static void test_reset_takes_the_slot_and_erases_ahead_of_writes(void) {
 
     // A payload write stays in the page buffer, readable, until its page
     // fills or a sync; it lands a kilobyte further on flash.
-    CHECK(io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + 40u, pattern, sizeof(pattern)));
+    CHECK(io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + 8u, pattern, sizeof(pattern)));
     CHECK(flash_chip.operations == 1u);
-    CHECK(io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + 38u, bytes, 8u));
+    CHECK(io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + 6u, bytes, 8u));
     CHECK(bytes[0] == 0xFFu && bytes[1] == 0xFFu && memcmp(&bytes[2], pattern, sizeof(pattern)) == 0 && bytes[6] == 0xFFu);
     CHECK(io.sync(io.context));
     CHECK(flash_chip.operations == 2u);
@@ -328,8 +328,8 @@ static void test_reset_takes_the_slot_and_erases_ahead_of_writes(void) {
     // Reads and writes stay within one store chunk and the bytes a slot can
     // hold.
     CHECK(!io.read(io.context, 0u, bytes, NOAH_PROFILE_STORE_IO_CHUNK_MAX + 1u));
-    CHECK(io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + 32u + NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX - 1u, bytes, 1u));
-    CHECK(!io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + 32u + NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX - 1u, bytes, 2u));
+    CHECK(io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX - 1u, bytes, 1u));
+    CHECK(!io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX - 1u, bytes, 2u));
     CHECK(!io.read(io.context, REGION - 1u, bytes, 1u));
     CHECK(flash_chip.nor_violations == 0u && flash_chip.double_programs == 0u);
 
@@ -348,8 +348,8 @@ static void test_writes_never_land_on_unerased_flash(void) {
     reset_chip(&flash_chip, 0x00u);
     CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
     io = noah_profile_flash_store_io(&half.flash);
-    CHECK(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, 32u + 3u * SECTOR));
-    CHECK(io.write(io.context, 32u + 2u * SECTOR, pattern, sizeof(pattern)) && io.sync(io.context));
+    CHECK(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + 3u * SECTOR));
+    CHECK(io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + 2u * SECTOR, pattern, sizeof(pattern)) && io.sync(io.context));
     CHECK(flash_chip.operations == 4u);
     CHECK(memcmp(&flash_chip.bytes[PAYLOAD + 2u * SECTOR], pattern, sizeof(pattern)) == 0);
     CHECK(flash_chip.nor_violations == 0u && flash_chip.double_programs == 0u);
@@ -371,15 +371,15 @@ static void test_marker_steps_each_program_their_own_cell(void) {
     io = noah_profile_flash_store_io(&half.flash);
     CHECK(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, 64u));
     grant(&half, &flash_chip);
-    CHECK(io.write(io.context, 0u, header, 20u) && io.write(io.context, 20u, &header[20], 11u) && io.sync(io.context));
-    CHECK(flash_chip.bytes[0] == 7u && flash_chip.bytes[30] == 0u && flash_chip.bytes[31] == 0xFFu);
+    CHECK(io.write(io.context, 0u, header, 20u) && io.write(io.context, 20u, &header[20], sizeof(header) - 20u) && io.sync(io.context));
+    CHECK(flash_chip.bytes[0] == 7u && flash_chip.bytes[NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - 2u] == 0u && flash_chip.bytes[NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - 1u] == 0xFFu);
     for (size_t step = 0u; step < sizeof(steps); step++) {
-        CHECK(io.write(io.context, 31u, &steps[step], 1u) && io.sync(io.context));
-        CHECK(io.read(io.context, 31u, &byte, 1u) && byte == steps[step]);
+        CHECK(io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - 1u, &steps[step], 1u) && io.sync(io.context));
+        CHECK(io.read(io.context, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - 1u, &byte, 1u) && byte == steps[step]);
         CHECK(flash_chip.bytes[CELLS + step * PAGE] == steps[step]);
     }
     // There is no fourth step.
-    CHECK(!io.write(io.context, 31u, &steps[2], 1u));
+    CHECK(!io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - 1u, &steps[2], 1u));
     // The header page was programmed once, as was each cell's page.
     CHECK(flash_chip.nor_violations == 0u && flash_chip.double_programs == 0u);
 }

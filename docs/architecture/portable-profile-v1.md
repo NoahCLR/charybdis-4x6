@@ -1,8 +1,8 @@
 # Portable keyboard profile v1
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
-> a 130,048-byte custom payload; and logical store format 6 (D-F28). Every save
+> schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8, sparse PD v3, keymap v1 and macros v1;
+> a slot-sized payload (see the storage contract); and logical store format 6 (D-F28). Every save
 > binds a nonzero VIA generation and digest. Profile Wire is 2.0 and split
 > framing version 3, with 32-bit profile lengths and offsets throughout.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
@@ -13,6 +13,48 @@ and committed data have the same representation. An absent live domain is
 materialized from device readback before export; it never means “use the
 destination firmware's defaults”. Transient presses, running macros, pointer
 motion and temporary layer activation are not configuration.
+
+## Keymap domain `0x60`, version 1
+
+The payload is exactly 1,920 bytes: sixteen layers of sixty matrix positions,
+row first, then column, each a little-endian uint16 native QMK keycode. The
+four unwired matrix positions are included. There is no inner header.
+A candidate uses the firmware's ordinary key placement rules: empty and
+transparent positions are valid; unowned layer actions, unassigned userspace
+codes and layer targets outside 0–15 (including `TT(16)` and `OSL(16)`) fail.
+Validation reads at most twenty bytes per step and reports the rejected layer
+and matrix position. Existing domain versions are unchanged.
+
+`keymap_key_to_keycode` is the runtime authority for QMK, combo-origin
+reconstruction, handled-key transparency and RGB layer coverage. A saved
+domain borrows the active generation's reader and reads two bytes per lookup;
+compiled or omitted domains read the authored const matrix directly. Hot
+lookups never serialize the compiled profile. A publication invalidates the
+RGB coverage map before its next render.
+
+## Macro domain `0x70`, version 1
+
+The payload retains the existing bank encoding: 128 consecutive zero-terminated
+macro streams, at most 34,903 bytes in total, with optional unused capacity after
+the last macro and a final zero validity byte. Unused capacity may retain stale
+bytes after shortening macros, just as in the existing bank. Empty slots contain only their terminator. Text, UTF-8,
+tap/down/up, decimal delays and protection prefixes retain the encoding read
+by `macro_payload_decode_qmk.c`. The incremental validator checks framing,
+canonical UTF-8 and the protection prefix; playback retains its existing
+whole-stream preflight, balanced ownership and bounded IR windows. Invalid
+playback never emits a partial stream.
+
+The active saved bank is read through the profile reader. Compiled fallback
+uses the same authored payloads `via_macro_defaults.c` seeds, with the same
+compiler. A publication invalidates the slot metadata and lookup cache;
+the profile's safe boundary excludes a running macro, so a refill cannot span
+generations. Neither a key lookup nor a refill materializes the whole bank.
+
+This is an additive transition: VIA still compiles and coordinates its old
+copy, but its keymap and macro writes no longer control typing. Removing VIA
+and moving the client to these domains are separate follow-ups. The portable
+JSON envelope below describes the client before that follow-up; clients of the
+new base must carry the two domains in the canonical NLP1 profile.
 
 ## Portable document
 
@@ -82,9 +124,9 @@ All multibyte fields are little-endian:
 | 660 | variable | 273 counted names: 16 layer names, then 128 VIA macro names, then 128 custom-key names, then the keyboard name; each a uint8 length `0..32`, then that many bytes of UTF-8 |
 
 The minimum is 933 bytes (every name empty) and the maximum 9,669 bytes (every
-name 32 bytes). The complete profile shares the 130,048-byte ceiling and
+name 32 bytes). The complete profile shares the slot payload ceiling and
 rejects excess without trimming. Names are profile data for the client. Macro
-content belongs to the bound VIA bank; a custom key's shortcut is its own
+content belongs to profile domain `0x70`; a custom key's shortcut is its own
 action and its behaviour row works on top of it (D-F26). Firmware does not
 check that a step naming a custom key has a shortcut; one without sends
 nothing.

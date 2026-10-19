@@ -2,7 +2,7 @@
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14, D-F28):
 > profile schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8 and
-> sparse PD v3; a 130,048-byte custom payload; and logical store format 6. Every
+> sparse PD v3, keymap v1 and macros v1; a slot-sized profile payload; and logical store format 6. Every
 > save binds a nonzero VIA generation and digest. Profile Wire is 2.0; split
 > framing is version 3 (32-bit offsets and lengths, D-F28, after version 2's
 > sized payload chunks and reuse ranges, D-F19).
@@ -220,9 +220,15 @@ ownership and peer storage admission, is ordinary asynchronous work. During
 `PUSH_DURABLE` and `PUSH_COMMIT`, validating, preparing and committing stores
 are polled every 25 ms. They do not enter exponential failure backoff just
 because semantic validation takes more than one poll. The validator and
-marker-last write budgets are unchanged, and the owner's existing no-progress
-timeout still applies before the decision. Other BUSY replies and transport
-failures retain the existing backoff.
+marker-last write budgets are unchanged. The cached reply is refreshed when
+validation advances to preparation. The sender counts only a strictly newer
+correlated store phase as progress for this copy. That advances the owner's
+60-second no-progress deadline once per phase, allowing a large profile to
+finish validation and readback without changing either per-scan budget.
+Repeated or backwards BUSY phases, mismatched generation/digest/length,
+partial offsets, another transfer owner or non-peer admission do not advance
+it. A stalled phase still times out after sixty seconds. Other BUSY replies
+and transport failures retain the existing backoff.
 
 Profile Wire candidate status page 2 reports acknowledged reused bytes, reuse
 RPC attempts, source-unavailable replies, prepared-push reconciler invocations

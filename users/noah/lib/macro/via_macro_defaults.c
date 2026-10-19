@@ -223,7 +223,7 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
     // Every Raw HID frame reaches VIA here first; a USB rename waits for quiet.
     noah_qmk_usb_product_name_note_host_frame();
 
-    if (noah_qmk_via_handle_malformed_buffer_command(data, length)) {
+    if (noah_qmk_via_refuse_profile_owned_write(data, length) || noah_qmk_via_handle_malformed_buffer_command(data, length)) {
         return true;
     }
 

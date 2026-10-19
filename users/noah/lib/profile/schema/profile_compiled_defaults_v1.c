@@ -297,4 +297,4 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
 }
 
 // Metadata and one 32-bit offset/length pair per domain (D-F28), nothing more.
-_Static_assert(sizeof(noah_profile_compiled_v1_t) == sizeof(noah_profile_compiled_v1_metadata_t) + NOAH_PROFILE_DOMAIN_REGISTRY_COUNT * 2u * sizeof(uint32_t) && sizeof(noah_profile_compiled_v1_t) <= 60u, "compiled-profile handle retains metadata and five ranges only");
+_Static_assert(sizeof(noah_profile_compiled_v1_t) == sizeof(noah_profile_compiled_v1_metadata_t) + NOAH_PROFILE_DOMAIN_REGISTRY_COUNT * 2u * sizeof(uint32_t) && sizeof(noah_profile_compiled_v1_t) <= 76u, "compiled-profile handle retains metadata and seven ranges only");

@@ -237,3 +237,7 @@ int main(void) {
     puts("keymap_validation host tests passed");
     return 0;
 }
+
+uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
+    return keycode_at_keymap_location(layer, key.row, key.col);
+}

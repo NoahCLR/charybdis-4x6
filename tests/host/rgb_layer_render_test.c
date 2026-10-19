@@ -528,7 +528,8 @@ rgb_t hsv_to_rgb(hsv_t hsv) {
     return rgb_from_hsv(hsv);
 }
 
-uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
+uint16_t keymap_key_to_keycode(uint8_t layer_num, keypos_t key) {
+    uint8_t row = key.row, column = key.col;
     return test_keymap[layer_num][row][column];
 }
 

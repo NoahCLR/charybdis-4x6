@@ -132,8 +132,8 @@ typedef struct {
     uint8_t             format_version;
     uint8_t             schema_major;
     uint8_t             schema_minor;
-    // Derived from the checksummed canonical payload during slot validation;
-    // it is not an independent field in the fixed 32-byte header.
+    // The header's first byte, its own field in the fixed 36-byte header.
+    // Slot validation refuses a payload whose domains differ from it.
     uint8_t  domain_mask;
     uint8_t  flags;
     uint8_t  origin_half;
@@ -198,7 +198,7 @@ typedef struct {
     // A slot holds an earlier store format and nothing was adopted: the
     // keyboard runs its compiled defaults, and status says so.
     bool                              earlier_format;
-    uint8_t                           scratch[NOAH_PROFILE_STORE_IO_CHUNK_MAX];
+    uint8_t                           scratch[NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE];
     noah_profile_store_result_t       boot_slot_a_result;
     noah_profile_store_result_t       boot_slot_b_result;
     noah_profile_store_result_t       boot_result;

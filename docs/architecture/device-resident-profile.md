@@ -49,28 +49,48 @@ commit uses compare-and-swap semantics: if the device generation changed after
 the draft was opened, the app refuses the write and asks the user to refresh or
 resolve the conflict.
 
-## One Logical Profile, Initially More Than One Storage Adapter
+## Profile domains own layout and macros
 
-The user should see one profile even while firmware continues to use established
-QMK storage owners internally:
+The canonical schema-4 profile includes keymap domain `0x60` v1 (16 × 60
+little-endian keycodes) and macro domain `0x70` v1 (128 streams in the existing
+bank encoding, up to 34,903 bytes). Authored C remains the compiled default for
+both; the authored macros are also generated already in the bank encoding
+(`authored_macro_bank.h`, rebuilt with the firmware's encoder by
+`tools/profile_introspect.py --write` and checked by real-profile validation),
+so writing the compiled defaults copies bytes and compiles no macro. Domain
+omission falls back to those authored defaults, just as for the other optional
+domains, and so does a domain bit whose range cannot be found. Complete exports
+must materialize all domains.
 
-- standard VIA dynamic storage for layout keys and VIA macros;
-- the versioned custom profile store for RGB, custom behaviors, and future
-  profile-policy domains.
+The active effective-profile generation supplies both key lookup and macro
+playback. The keymap override is shared by QMK, combo origin, handled-key
+transparency and RGB layer maps. Readers borrow immutable storage instead of
+copying the matrix or bank into a new RAM cache. Macro publication uses the
+existing no-running-macro safe boundary, and cache metadata is invalidated
+before the next playback.
 
-This is an intentional boundary, not the user model. The app reads both stores
-into one generation-aware document and coordinates writes and verification
-across them. Replacing VIA storage with a duplicate custom keymap
-format is not required for the device-first milestone and would reduce VIA
-interoperability.
+During this additive transition VIA remains compiled, and its binding and
+staging still participate in Apply and recovery. Its separate layout and macro
+copy is no longer read for typing or playback, so VIA keymap and macro writes
+and resets are refused with `id_unhandled` rather than appearing to save. VIA removal and the client's
+new-base profile codec must follow before this becomes a supported editing
+path; the transition deliberately does not promise VIA interoperability.
 
-The final product requires one authoritative manifest and coordinator binding
-the participating store digests to one logical generation. External VIA writes
-must be adopted as a new generation or exposed as conflicts. If atomic
-cross-store commits cannot be made trustworthy, the limitation must be visible
-and recoverable; the product must not claim a complete commit. Connected-half
-VIA readback is not equivalent to proof that both halves hold the same complete
-logical profile.
+The format-6 slot header is 36 bytes: domain mask at byte 0, uint32 payload
+length at 1, origin/override flags at 5, generation at 6, payload CRC32 at 10,
+compiled digest at 14, action ABI at 18, VIA generation/digest at 22/26, three
+zero reserved bytes at 30–32, CRC16 at 33 and the final marker at 35. The CRC
+covers bytes 0–32 prefixed by the store format. This preserves full 32-bit
+lengths while admitting all seven domain-mask bits. Boot discovery reads at
+most one bounded storage chunk per step; publication still writes the marker
+last. These offsets describe the logical store view: on flash the marker is
+read from the three separate cells and the payload starts at the 1 KiB
+physical record boundary (D-F29). Retired format-5 markers remain recognized
+at their old byte 31. Format 6 was never released with its earlier 32-byte
+header (identity byte, CRC16 at 29, marker at 31), so the number did not
+change. Such a slot reads here with bytes 31–34 erased: its reserved bytes are
+nonzero and its CRC fails, so it is refused like any invalid slot (not reported
+as an earlier format) and the keyboard runs its compiled defaults.
 
 ## Current Implementation Gap
 
@@ -202,3 +222,5 @@ the keyboard is busy. Each half reports its longest pauses over Profile Wire
 (custom get `0x0D`). An EEPROM reset forgets the saved profiles before QMK
 re-validates its EEPROM, so an interrupted boot forgets them again. See the
 [storage baseline](storage-and-resource-baseline.md#profile-slot-flash-region-d-f29).
+
+The maximum fixture includes every domain and retains a 12,288-byte reserve.

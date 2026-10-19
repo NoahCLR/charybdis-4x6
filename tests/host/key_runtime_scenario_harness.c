@@ -809,3 +809,7 @@ __attribute__((weak)) uint16_t get_record_keycode(keyrecord_t *record, bool upda
 key_behavior_view_t key_behavior_lookup_without_row(uint16_t keycode) {
     return key_behavior_lookup(keycode);
 }
+
+uint16_t keymap_key_to_keycode(uint8_t layer, keypos_t key) {
+    return keycode_at_keymap_location(layer, key.row, key.col);
+}

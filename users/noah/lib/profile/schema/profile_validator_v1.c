@@ -390,6 +390,50 @@ static noah_profile_validator_v1_result_t validate_pd(noah_profile_validator_v1_
 #endif
 }
 
+static noah_profile_validator_v1_result_t reject_record(noah_profile_validator_v1_t *v, size_t offset, uint8_t domain_id, uint8_t table_id, uint16_t row_index, noah_profile_validator_v1_error_t *error) {
+    return reject(v, NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, offset, (uint8_t)(v->envelope.index - 1u), domain_id, table_id, row_index, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_DETAIL_NONE, 0u, error);
+}
+
+// Ten keycodes a step. A rejected keycode names its layer (table) and matrix
+// position (row).
+static noah_profile_validator_v1_result_t validate_keymap(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
+    noah_profile_keymap_v1_validation_t *state     = &v->domain_validation.keymap;
+    uint8_t                              positions = v->compatibility.placement_positions;
+    uint8_t                              bytes[NOAH_PROFILE_KEYMAP_V1_STEP_BYTES];
+    uint32_t                             count = v->payload.length - state->offset;
+
+    if (state->offset == 0u && !noah_profile_keymap_v1_length_valid(v->payload.length, v->compatibility.logical_layer_count, positions)) return reject_record(v, v->payload.offset, NOAH_PROFILE_DOMAIN_V1_KEYMAP, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, error);
+    if (count > sizeof(bytes)) count = sizeof(bytes);
+    if (read_blob(v, v->payload.offset + state->offset, bytes, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
+    for (uint32_t i = 0; i < count; i += NOAH_PROFILE_KEYMAP_V1_KEYCODE_SIZE) {
+        noah_profile_action_v1_t keycode = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = (uint16_t)(bytes[i] | bytes[i + 1u] << 8u)};
+        uint32_t                 index   = (state->offset + i) / NOAH_PROFILE_KEYMAP_V1_KEYCODE_SIZE;
+        if (!placement_is_supported(v, &keycode, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_KEYMAP)) return reject_record(v, v->payload.offset + state->offset + i, NOAH_PROFILE_DOMAIN_V1_KEYMAP, (uint8_t)(index / positions), (uint16_t)(index % positions), error);
+    }
+    state->offset += count;
+    return state->offset < v->payload.length ? NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS : NOAH_PROFILE_VALIDATOR_V1_VALID;
+}
+
+// Up to twenty bytes a step, consumed one at a time. A rejection names the
+// macro (row) it falls in.
+static noah_profile_validator_v1_result_t validate_macros(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
+    noah_profile_macros_v1_validation_t *state  = &v->domain_validation.macros;
+    uint8_t                              slots  = v->compatibility.via_macro_slot_count;
+    uint32_t                             offset = state->offset;
+    uint8_t                              bytes[NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX];
+    uint32_t                             count  = v->payload.length - offset;
+
+    if (offset == 0u && !noah_profile_macros_v1_length_valid(v->payload.length, slots)) return reject_record(v, v->payload.offset, NOAH_PROFILE_DOMAIN_V1_MACROS, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U8, NOAH_PROFILE_VALIDATOR_V1_LOCATION_NONE_U16, error);
+    if (count > sizeof(bytes)) count = sizeof(bytes);
+    if (read_blob(v, v->payload.offset + offset, bytes, count, error) != NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS) return v->terminal_result;
+    for (uint32_t i = 0; i < count; i++)
+        if (!noah_profile_macros_v1_consume(state, bytes[i], slots)) return reject_record(v, v->payload.offset + offset + i, NOAH_PROFILE_DOMAIN_V1_MACROS, 0u, state->macros, error);
+    state->offset = offset + count;
+    if (state->offset < v->payload.length) return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
+    if (!noah_profile_macros_v1_complete(state, slots)) return reject_record(v, v->payload.offset + v->payload.length - 1u, NOAH_PROFILE_DOMAIN_V1_MACROS, 0u, state->macros, error);
+    return NOAH_PROFILE_VALIDATOR_V1_VALID;
+}
+
 // Each registry row's validator, called directly so the linked stack contexts
 // keep a direct edge to every domain.
 static noah_profile_validator_v1_result_t validate_domain(noah_profile_validator_v1_t *validator, noah_profile_validator_v1_error_t *error) {
