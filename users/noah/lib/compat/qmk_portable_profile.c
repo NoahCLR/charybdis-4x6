@@ -39,7 +39,7 @@ static void u32(uint8_t *p, uint32_t v) {
 }
 // What QMK runs now for a setting it holds. Settings readback reports the
 // stored profile (D-F32); this is the runtime readback beside it, since
-// adjustment keys (DPI, RGB) still move QMK's values until they become edits.
+// adjustment keys (DPI, RGB) give immediate feedback before their edit publishes.
 uint32_t noah_qmk_portable_live_setting(uint8_t id) {
     switch (id) {
         case NOAH_SETTING_AUTO_MOUSE_ENABLED:
@@ -88,25 +88,35 @@ static uint8_t readback_fill(uint8_t kind, uint16_t offset, uint8_t *target) {
         target[i] = settings_byte(offset + i);
     return count;
 }
+static uint32_t projected_setting(uint8_t id, uint32_t fallback) {
+    uint32_t value = noah_setting(id, fallback);
+#    ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    // A Save or earlier edit can project while a newer key adjustment waits.
+    // Keep the newest local feedback, never write it into the frozen profile.
+    (void)noah_profile_store_runtime_pending_adjustment(id, &value);
+#    endif
+    return value;
+}
+
 // Pushes the active settings into QMK, at boot (compiled defaults included),
 // on activation and on a live settings edit (D-F32). The profile is the only
 // durable owner of these values, so QMK's EEPROM copies are never written
 // here and never win at boot. Combos on/off is not pushed: QMK's combo flag
 // is the runtime override beside the stored master (participation.c).
 void noah_qmk_portable_apply(void) {
-    set_auto_mouse_enable(noah_setting(NOAH_SETTING_AUTO_MOUSE_ENABLED, get_auto_mouse_enable()));
-    set_auto_mouse_layer(noah_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, get_auto_mouse_layer()));
-    set_auto_mouse_timeout(noah_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, get_auto_mouse_timeout()));
-    set_auto_mouse_debounce(noah_setting(NOAH_SETTING_AUTO_MOUSE_DEBOUNCE, get_auto_mouse_debounce()));
-    uint16_t dpi = noah_setting(NOAH_SETTING_DEFAULT_DPI, charybdis_get_pointer_default_dpi());
+    set_auto_mouse_enable(projected_setting(NOAH_SETTING_AUTO_MOUSE_ENABLED, get_auto_mouse_enable()));
+    set_auto_mouse_layer(projected_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, get_auto_mouse_layer()));
+    set_auto_mouse_timeout(projected_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT, get_auto_mouse_timeout()));
+    set_auto_mouse_debounce(projected_setting(NOAH_SETTING_AUTO_MOUSE_DEBOUNCE, get_auto_mouse_debounce()));
+    uint16_t dpi = projected_setting(NOAH_SETTING_DEFAULT_DPI, charybdis_get_pointer_default_dpi());
     for (uint8_t i = 0; i < 16 && charybdis_get_pointer_default_dpi() != dpi; i++)
         charybdis_cycle_pointer_default_dpi_noeeprom(true);
-    dpi = noah_setting(NOAH_SETTING_SNIPING_DPI, charybdis_get_pointer_sniping_dpi());
+    dpi = projected_setting(NOAH_SETTING_SNIPING_DPI, charybdis_get_pointer_sniping_dpi());
     for (uint8_t i = 0; i < 4 && charybdis_get_pointer_sniping_dpi() != dpi; i++)
         charybdis_cycle_pointer_sniping_dpi_noeeprom(true);
-    noah_qmk_portable_apply_lighting(noah_setting(NOAH_SETTING_RGB_MODE, noah_qmk_portable_live_setting(NOAH_SETTING_RGB_MODE)), noah_setting(NOAH_SETTING_RGB_COLOR, noah_qmk_portable_live_setting(NOAH_SETTING_RGB_COLOR)));
-    default_layer_set(noah_setting(NOAH_SETTING_DEFAULT_LAYERS, default_layer_state));
-    keymap_config.raw = noah_setting(NOAH_SETTING_KEYMAP_OPTIONS, keymap_config.raw);
+    noah_qmk_portable_apply_lighting(projected_setting(NOAH_SETTING_RGB_MODE, noah_qmk_portable_live_setting(NOAH_SETTING_RGB_MODE)), projected_setting(NOAH_SETTING_RGB_COLOR, noah_qmk_portable_live_setting(NOAH_SETTING_RGB_COLOR)));
+    default_layer_set(projected_setting(NOAH_SETTING_DEFAULT_LAYERS, default_layer_state));
+    keymap_config.raw = projected_setting(NOAH_SETTING_KEYMAP_OPTIONS, keymap_config.raw);
 }
 bool noah_qmk_portable_profile_get(uint8_t *frame, uint8_t length) {
     if (!frame || length != 32 || frame[0] != 8 || frame[1] || (frame[2] != 7 && frame[2] != 8 && frame[2] != 0x0b)) return false;

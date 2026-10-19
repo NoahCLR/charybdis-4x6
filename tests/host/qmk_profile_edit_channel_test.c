@@ -188,11 +188,24 @@ static void test_gets(void) {
     assert(frame[7] == NOAH_PROFILE_EDIT_WIRE_STATUS_LAYOUT && frame[8] == fake.local.phase && u32(&frame[11]) == fake.local.session && u32(&frame[15]) == fake.local.revision && u32(&frame[19]) == fake.saved_generation);
     assert(frame[29] == NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW);
     assert((frame[9] & NOAH_PROFILE_EDIT_WIRE_UNSAVED) && (frame[9] & NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED));
+    // A keyboard adjustment waiting to publish is flag 13 (a new Apply is BUSY meanwhile).
+    assert(!(frame[10] & (NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING >> 8u)));
+    fake.adjustment_pending = true;
+    get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && (frame[10] & (NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING >> 8u)) && NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING == 0x2000u);
+    fake.adjustment_pending = false;
     get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 1u);
     assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && u32(&frame[11]) == fake.peer.session && u32(&frame[15]) == fake.peer.revision);
     get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 2u);
     assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[7] == fake.local.error.code && frame[8] == fake.local.error.domain_id && u32(&frame[25]) == fake.local.length);
+    fake.save.automatic = true;
+    fake.save.last_automatic = true;
+    fake.save.keyboard_saves = 17u;
+    fake.save.keyboard_revision = 41u;
+    fake.save.keyboard_generation = 9u;
     get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 3u);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[7] == 1u && frame[8] == 3u && u32(&frame[9]) == 17u && u32(&frame[13]) == 41u && u32(&frame[17]) == 9u && frame[21] == (3000u & 255u) && frame[22] == (3000u >> 8u));
+    get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 4u);
     assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
     get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
     frame[3] = 0u;

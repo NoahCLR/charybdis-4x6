@@ -13,7 +13,7 @@
 
 enum {
     NOAH_PROFILE_EDIT_WIRE_STATUS_LAYOUT  = 1u,
-    NOAH_PROFILE_EDIT_WIRE_STATUS_PAGES   = 3u,
+    NOAH_PROFILE_EDIT_WIRE_STATUS_PAGES   = 4u,
     NOAH_PROFILE_EDIT_WIRE_WORKING_LAYOUT = 1u,
     // Inserted bytes per EDIT_DATA report.
     NOAH_PROFILE_EDIT_WIRE_DATA_MAX = 22u,
@@ -37,7 +37,10 @@ enum {
     NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED     = 1u << 11,
     // Writing the edit mode failed on this half; it is tried again.
     NOAH_PROFILE_EDIT_WIRE_MODE_NOT_STORED  = 1u << 12,
-    NOAH_PROFILE_EDIT_WIRE_STATUS_FLAGS     = 0x1FFFu,
+    // A DPI or lighting key's change awaits publication as an edit; a new
+    // Apply, edit, Save, Revert and mode change are BUSY until it is.
+    NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING = 1u << 13,
+    NOAH_PROFILE_EDIT_WIRE_STATUS_FLAGS     = 0x3FFFu,
 };
 
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)

@@ -16,6 +16,9 @@
 #    include "../../compat/qmk_profile_split_transport.h"
 #    include "../../compat/qmk_profile_working.h"
 #    include "../runtime/profile_owner.h"
+#    ifdef NOAH_PORTABLE_PROFILE_ENABLE
+#        include "../schema/profile_settings_defaults.h"
+#    endif
 #endif
 
 static noah_profile_store_runtime_state_t runtime_state;
@@ -30,6 +33,11 @@ static volatile bool               runtime_storage_paused;
 __attribute__((noinline)) void noah_profile_store_runtime_note_storage_paused(bool paused) {
     runtime_storage_paused = paused;
     noah_profile_paused_clock_note(&runtime_clock, paused, timer_read32());
+}
+
+static bool keyboard_quiet(void *context) {
+    (void)context;
+    return noah_qmk_profile_flash_keyboard_quiet();
 }
 
 static bool storage_paused(void *context) {
@@ -80,6 +88,11 @@ void noah_profile_store_runtime_init(void) {
                                                                                                 .working_exchange        = noah_qmk_profile_working_transport_exchange,
                                                                                                 .edit_mode_storage       = noah_qmk_edit_mode_storage(),
                                                                                                 .storage_paused          = storage_paused,
+                                                                                                .keyboard_quiet          = keyboard_quiet,
+#        ifdef NOAH_PORTABLE_PROFILE_ENABLE
+                                                                                                .settings_defaults_length = noah_profile_settings_defaults_length,
+                                                                                                .settings_defaults_byte   = noah_profile_settings_defaults_byte,
+#        endif
                                                                                             })) {
         runtime_integration_error = true;
         runtime_state             = NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR;
@@ -403,6 +416,14 @@ bool noah_profile_store_runtime_boot_keyboard_name(noah_profile_keyboard_name_t 
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
 static noah_profile_owner_t *editor(void) {
     return runtime_owner_initialized && !runtime_integration_error ? &runtime_owner : NULL;
+}
+
+bool noah_profile_store_runtime_pending_adjustment(uint8_t setting, uint32_t *value) {
+    return editor() && noah_profile_owner_pending_adjustment(editor(), setting, value);
+}
+
+bool noah_profile_store_runtime_adjust(uint8_t setting, uint32_t value) {
+    return editor() && noah_profile_owner_adjust(editor(), setting, value);
 }
 
 noah_profile_working_result_t noah_profile_store_runtime_edit_begin(uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags) {

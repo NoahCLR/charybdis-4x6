@@ -390,11 +390,13 @@ policy decides when one may run.
   one split chunk (106 bytes) in store writes of at most 20, so its pages fill
   at most once; each commit step writes one record and syncs it.
 
-A save the keyboard never lets erase waits: Ark's own and the split peer's
-time limits (15 s for the host transaction, 3 s without progress for the
-peer) then end it as a failed save, and the previous profile stays active.
-Live mode saves only after a quiet period, so it does not meet this. Erase
-suspend is not used. The pointing sensor keeps counting motion during a
+A save waits while the keyboard cannot safely erase. D-F32 excludes that
+wait from the owner's host and split no-progress clocks: the waiting half
+reports STORAGE_PAUSED (busy reason 9), which counts as peer progress.
+A held key therefore delays a save without making the storage wait itself
+expire it. Live starts only after 3 seconds without an edit or held key;
+typing after that can pause later erases in the same way. Erase suspend is
+not used. The pointing sensor keeps counting motion during a
 pause, so pointing stutters rather than loses movement. A save of the maximum
 profile erases 19 sectors and programs about 297 pages, with the header and
 marker cells each programmed on their own page.

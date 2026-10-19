@@ -37,6 +37,7 @@ enum {
     // longest stretch without transfer or correlated peer-phase progress, not
     // the whole copy. Repeated BUSY replies never extend the deadline.
     NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS             = 15000u,
+    NOAH_PROFILE_OWNER_AUTO_SAVE_QUIET_MS           = 3000u,
     NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS = 60000u,
 };
 
@@ -78,6 +79,15 @@ typedef struct {
     // waiting for a quiet keyboard). Optional; told to the other half.
     bool (*storage_paused)(void *context);
     void *storage_paused_context;
+    // No held key and a quiet matrix. Missing means automatic saves disabled.
+    bool (*keyboard_quiet)(void *context);
+    void *keyboard_quiet_context;
+    // The authored settings a profile without a settings domain inherits. An
+    // adjustment key's change needs a settings domain to live in, so the
+    // owner copies these into the working copy first. Missing: such a profile
+    // cannot take adjustments (they stay local feedback and are not stored).
+    uint16_t (*settings_defaults_length)(void);
+    uint8_t (*settings_defaults_byte)(uint16_t offset);
 } noah_profile_owner_config_t;
 
 typedef enum {
@@ -103,8 +113,26 @@ typedef struct {
     uint8_t  phase;
     uint8_t  domain_mask;
     uint8_t  last_result; // noah_profile_working_result_t
+    bool     automatic;
+    bool     last_automatic;
+    uint32_t keyboard_saves;
+    uint32_t keyboard_revision;
+    uint32_t keyboard_generation;
     uint8_t  last_error;  // noah_profile_candidate_v1_error_id_t of a failed save
 } noah_profile_owner_save_t;
+
+// Four adjustment scalars, coalesced while another edit or Save holds RAM.
+// They never mutate the bytes a save is reading.
+typedef struct {
+    uint32_t values[4];
+    uint32_t quiet_since;
+    uint32_t observed_revision;
+    uint16_t sequence;
+    uint16_t edit_transaction;
+    uint8_t pending;
+    bool apply_adjustments_only;
+    bool attempted;
+} noah_profile_owner_auto_save_t;
 
 // The compiled validator is needed only before the candidate backend exists,
 // so both lifetimes deliberately share one stable union. The backend address
@@ -138,6 +166,7 @@ typedef struct {
     noah_profile_working_copy_t          working;
     noah_profile_working_sync_t          working_sync;
     noah_profile_owner_save_t            save;
+    noah_profile_owner_auto_save_t       auto_save;
     uint32_t                             now_ms;
     // The host's last frame of the edit it is sending: an edit not finished
     // within the host timeout is aborted, as an abandoned Apply is.
@@ -245,6 +274,11 @@ noah_profile_working_result_t noah_profile_owner_revert(noah_profile_owner_t *ow
 noah_profile_working_result_t noah_profile_owner_save(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision);
 noah_profile_working_result_t noah_profile_owner_set_edit_mode(noah_profile_owner_t *owner, uint8_t mode);
 
+// A keyboard adjustment queues one of DEFAULT_DPI, SNIPING_DPI, RGB_MODE or
+// RGB_COLOR. Repeated keys coalesce; the next available edit publishes them.
+bool noah_profile_owner_adjust(noah_profile_owner_t *owner, uint8_t setting, uint32_t value);
+bool noah_profile_owner_pending_adjustment(const noah_profile_owner_t *owner, uint8_t setting, uint32_t *value);
+
 typedef struct {
     noah_profile_working_status_t   local;
     noah_profile_working_peer_t     peer;
@@ -259,6 +293,7 @@ typedef struct {
     bool                            peer_converged;
     bool                            mode_conflict;
     bool                            edits_blocked;  // a new edit would be refused BUSY now
+    bool                            adjustment_pending; // a keyboard adjustment awaits publication; a new Apply is BUSY
     bool                            storage_paused; // a save here waits for a quiet keyboard
     bool                            peer_storage_paused; // the other half's save waits for a quiet keyboard
     bool                            peer_refused;        // the other half refused this working copy, whole

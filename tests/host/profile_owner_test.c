@@ -8,6 +8,8 @@
 #include "users/noah/lib/profile/runtime/profile_owner.h"
 #include "users/noah/lib/profile/runtime/effective_keymap_macros_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
+#include "users/noah/lib/profile/schema/profile_settings_v1.h"
+#include "users/noah/lib/profile/storage/profile_flash_store.h"
 
 static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
 
@@ -2130,8 +2132,15 @@ static void test_an_abandoned_edit_is_aborted_and_revert_ends_one(void) {
     assert(noah_profile_owner_receive(&left, frame, sizeof(frame)) && frame[5] != NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
     puts("an abandoned edit ends at the host timeout, and Revert ends one at once");
 }
+#include "profile_owner_auto_save_test.inc"
 
 int main(void) {
+    test_auto_save_modes_and_adjustments();
+    test_auto_save_hour_bound();
+    test_auto_save_power_cuts();
+    test_apply_waits_behind_a_queued_adjustment();
+    test_adjustments_without_a_settings_domain();
+    test_a_failed_automatic_save_is_reported_and_not_repeated();
     test_live_edit_reaches_both_halves_and_save_writes_both();
     test_apply_while_editing_waits_and_a_save_refuses_apart_halves();
     test_an_abandoned_edit_is_aborted_and_revert_ends_one();

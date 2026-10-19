@@ -17,7 +17,9 @@ any C and you don't reflash.
   result. Keys and macros are part of that profile too. The VIA app is not
   supported: I dropped it so the whole configuration lives in one store that
   Ark edits. The firmware can also take each edit live, on both halves at once,
-  and keep it until you save, while a replug goes back to what you saved
+  and either wait for your Save (Live + review) or save itself after 3 quiet
+  seconds (Live), even if the app closes. DPI and RGB adjustment keys join
+  the same working copy. A replug goes back to what finished saving
   ([guide](docs/GUIDE.md#live-edits-save-and-what-a-replug-does)); Ark's side
   of that is still to come.
 - **Text macros in your layout.** Macros type through your computer's keyboard

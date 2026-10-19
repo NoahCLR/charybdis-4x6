@@ -468,38 +468,57 @@ again, and the newer one wins.
 ## Live edits, Save and what a replug does
 
 The keyboard keeps a working copy of its profile in RAM on each half. In a
-live mode, every change you make in Ark lands in that working copy and takes
-effect on both halves at once: the new key, colour or behaviour works as soon
-as the keyboard is between key presses (it waits while you hold a key or a
-layer, so nothing changes under your fingers). Nothing is written to flash.
+live mode, an edit takes effect on both halves at the next safe boundary:
+the keyboard waits while a key or layer is held, so nothing changes under
+your fingers. Each keyboard remembers its edit mode outside the profile,
+so a backup or review never changes that choice. The default is Live + review.
 
-- **Save** writes the working copy to flash as your saved profile, on both
-  halves, the same careful way an Apply always has: a power cut during a save
-  leaves either the old saved profile or the new one, never a mixture.
-- **Revert** throws the unsaved changes away and goes back to the saved
-  profile, without writing anything.
-- **A replug always starts from the saved profile.** Changes you made but did
-  not save are gone after unplugging or a power cut, whichever half you plug
-  in. That is what makes a bad edit harmless: unplug, and it is undone.
-- **Apply** (Ark's Apply mode) still saves a whole profile in one go, and it
-  replaces any unsaved changes.
+- **Apply:** Ark keeps edits in its draft until you review and Apply. Apply
+  saves the complete profile on both halves and replaces any working copy.
+- **Live:** the keyboard saves its working copy after **3 seconds without an
+  edit and without a held key**. It does this even after Ark closes or loses
+  its connection. Holding a key restarts the quiet interval; it waits a full
+  quiet interval after release. Each edited revision gets at most one
+  automatic save attempt. A failed save keeps the working copy unsaved and
+  reports the failure; Save can retry it.
+- **Live + review:** edits work immediately, and stay unsaved until you review
+  and **Save**. The keyboard never saves them on its own. **Revert** returns to
+  the saved profile without writing flash.
 
-Each keyboard remembers which of the three ways you chose to edit it (Apply,
-Live, Live + review; Live + review unless you change it), outside the profile:
-it is not part of a backup and is not reviewed. The firmware does not yet save
-on its own in Live; that comes later.
+A replug always starts from the saved profile. In Live, unplugging before the
+quiet interval and save finish loses the unsaved edits, usually the last few
+seconds. In Live + review it loses every edit since Save. Status distinguishes
+unsaved edits, a save in progress, a failed save and a completed keyboard save;
+wait for completion before unplugging if you need to keep an edit. Ark's Live
+controls and its "saved by the keyboard" indication follow this firmware work.
 
-A save waits for a quiet moment before each flash erase: no key held and no
-key pressed for 50 ms. Typing through a save only makes it take longer; it
-never makes it fail.
+**DPI and RGB adjustment keys are edits too.** They change the current value
+immediately and join the working copy on both halves at a safe boundary. In
+Apply and Live the keyboard saves them after the same quiet interval; in Live
++ review they appear in review and wait for Save. Repeated presses coalesce
+while another edit or save is in progress. An adjustment during a save becomes
+a subsequent edit, never a change to the profile already being written. In
+Apply, a working copy containing a posted client edit is never automatically
+saved just because an adjustment joined it. While an adjustment waits to be
+applied (a moment), a new Apply from the app is told the keyboard is busy and
+tries again; an Apply already under way finishes first, and an adjustment made
+during it follows it. A profile that has no settings of its own (it uses the
+built-in ones) gets them, unchanged apart from your adjustment, the first time
+you adjust.
 
-The profile now owns everything it stores, including lighting mode and
-colour, default layers, keymap options and DPI: at every start the keyboard
-uses the saved profile's values, not what QMK remembered. The DPI and RGB
-keys still change the current values, but until they become edits a replug
-returns to the saved ones. The combos and behaviours on/off switches in the
-profile are the stored choice; a key that toggles combos (or, later,
-behaviours) overrides it only until the next replug and is never saved.
+The profile owns lighting mode and colour, default layers, keymap options and
+DPI. QMK's EEPROM is never written by the adjustment keys and never wins over
+the profile at boot. Participation toggles (combos and behaviours on/off) are
+RAM overrides beside the stored choice: never saved, never reviewed, cleared
+by a replug. RGB's on/off key changes the stored lighting setting like other
+RGB adjustments.
+
+Every Save, automatic or explicit, uses the same marker-last storage path on
+both halves: a power cut leaves a complete old or new saved profile, never a
+mixture. Erases wait for no held key and no matrix change for 50 ms; a key
+pressed during a paced save can make it wait longer. A press and release
+entirely inside a flash pause can still be missed. Pause diagnostics on both
+halves are available for the first keyboard checks.
 
 ## Building from source
 

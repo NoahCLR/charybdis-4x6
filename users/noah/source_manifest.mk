@@ -64,6 +64,7 @@ NOAH_COMMON_SOURCES := \
     lib/compat/qmk_profile_channel.c \
     lib/compat/qmk_profile_edit_channel.c \
     lib/compat/qmk_profile_working.c \
+    lib/compat/qmk_profile_adjustments.c \
     lib/compat/qmk_combo_readback.c \
     lib/compat/qmk_effective_combos.c \
     lib/compat/qmk_mod_contract.c \

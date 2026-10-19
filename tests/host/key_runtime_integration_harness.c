@@ -10,6 +10,13 @@
 #include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/noah_runtime.h"
 
+// Adjustment routing has its own QMK contract suite. Other key-runtime
+// harnesses can replace this seam when they exercise profile adjustments.
+__attribute__((weak)) bool noah_qmk_profile_adjustment_process(uint16_t keycode, keyrecord_t *record) {
+    (void)keycode; (void)record;
+    return true;
+}
+
 __attribute__((weak)) layer_state_t layer_state;
 __attribute__((weak)) layer_state_t default_layer_state;
 
