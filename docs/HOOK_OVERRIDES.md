@@ -16,6 +16,15 @@ If you still want the shared `noah` userspace behavior, call the matching
 `noah_*` helper from
 [`users/noah/noah_runtime.h`](../users/noah/noah_runtime.h).
 
+Weak default *data* (a table the keymap may define, such as the RGB LED-group
+tables) lives in a file that only defines it, such as
+[`users/noah/lib/rgb/core/rgb_config_defaults.c`](../users/noah/lib/rgb/core/rgb_config_defaults.c);
+its readers see an `extern` declaration. GCC folds a weak `const` object's
+initializer into the code of the file that defines it, so a reader there never
+sees the keymap's table. The host compilers do not, so only
+`tests/host/weak_const_default_test.py` catches it: the flashed firmware once
+lost a saved LED group this way while every host test passed.
+
 One important process-chain detail:
 
 - if your override returns `false` after calling
@@ -92,7 +101,8 @@ This pattern applies to:
 - `pointing_device_init_user()` -> `noah_pointing_device_init_user()`
 
 `keyboard_pre_init_user()` runs before USB starts and serves the saved
-keyboard name as the USB product string (D-F25). An override that skips the
+keyboard name, or with nothing saved the compiled defaults' name, as the USB
+product string (D-F25). An override that skips the
 helper enumerates under the built-in name, then restarts USB once after boot
 to take up the saved one.
 

@@ -5,9 +5,11 @@ set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 
 python3 "$ROOT/pair_build_script_test.py"
+python3 "$ROOT/weak_const_default_test.py"
 sh "$ROOT/run_firmware_client_independence_tests.sh"
 sh "$ROOT/run_qmk_contract_checks.sh"
 sh "$ROOT/run_qmk_usb_product_name_tests.sh"
+sh "$ROOT/run_qmk_usb_product_name_owner_tests.sh"
 sh "$ROOT/run_qmk_report_filter_tests.sh"
 sh "$ROOT/run_split_transport_build_tests.sh"
 sh "$ROOT/run_split_activity_tests.sh"

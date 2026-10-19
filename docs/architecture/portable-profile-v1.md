@@ -189,9 +189,14 @@ nonzero with bits only in 0–15. The layer masks (29, 30) reject bits 16 and
 above; an empty mask is allowed.
 
 Compiled defaults set scalar 28 to 1 and scalars 29 and 30 to `0xffff`; every
-layer refers combos to itself, every bitmap is zero, layers 8–15 are
-unnamed and so is the keyboard. So a profile that never sets the participation controls behaves as
-version 5 did.
+layer refers combos to itself and every bitmap is zero. So a profile that never sets the participation controls behaves as
+version 5 did. The keymap's `config.h` authors the rest of what is not QMK's
+own: the RGB idle timeout (`NOAH_RGB_IDLE_TIMEOUT_MS`), the host settings
+(`NOAH_DEFAULT_HOST_OS`, `NOAH_DEFAULT_HOST_LAYOUT`,
+`NOAH_DEFAULT_UNICODE_PLAYBACK`, `NOAH_DEFAULT_MACOS_ISO`) and the keyboard
+name (`NOAH_KEYBOARD_NAME`); without them the timeout is 15 minutes, the host
+Auto with the US layout and the keyboard unnamed. The names come from
+`keymap.c`.
 
 At publication the settings invalidator copies the bounded domain into a cold
 runtime cache using reads of at most 20 bytes. Key, RGB, pointer and macro

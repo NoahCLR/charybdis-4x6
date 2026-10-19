@@ -278,6 +278,20 @@ static void check_authored_macro_bank(void) {
     CHECK(fclose(file) == 0);
 }
 
+// A layer or keyboard name: UTF-8 without control characters, ending before
+// its field of `size` bytes does.
+static void check_utf8_name(const unsigned char *name, size_t size) {
+    CHECK(memchr(name, '\0', size) != NULL);
+    for (size_t i = 0; name[i];) {
+        unsigned char lead = name[i];
+        size_t        extra = lead < 0x80 ? 0 : lead >= 0xc2 && lead <= 0xdf ? 1 : lead >= 0xe0 && lead <= 0xef ? 2 : lead >= 0xf0 && lead <= 0xf4 ? 3 : SIZE_MAX;
+        CHECK(extra != SIZE_MAX && lead >= 0x20 && lead != 0x7f);
+        for (size_t k = 1; k <= extra; k++)
+            CHECK((name[i + k] & 0xc0) == 0x80);
+        i += extra + 1;
+    }
+}
+
 // The names settings v4 can hold: a macro name is printable ASCII, a layer
 // name UTF-8 without control characters, each ending before its field does.
 static void check_authored_names(void) {
@@ -294,18 +308,13 @@ static void check_authored_names(void) {
         for (const char *c = name; *c; c++)
             CHECK(*c >= 0x20 && *c <= 0x7e);
     }
-    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
-        const unsigned char *name = (const unsigned char *)layer_names[layer];
-        CHECK(memchr(name, '\0', NOAH_LAYER_NAME_SIZE) != NULL);
-        for (size_t i = 0; name[i];) {
-            unsigned char lead = name[i];
-            size_t        extra = lead < 0x80 ? 0 : lead >= 0xc2 && lead <= 0xdf ? 1 : lead >= 0xe0 && lead <= 0xef ? 2 : lead >= 0xf0 && lead <= 0xf4 ? 3 : SIZE_MAX;
-            CHECK(extra != SIZE_MAX && lead >= 0x20 && lead != 0x7f);
-            for (size_t k = 1; k <= extra; k++)
-                CHECK((name[i + k] & 0xc0) == 0x80);
-            i += extra + 1;
-        }
-    }
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++)
+        check_utf8_name((const unsigned char *)layer_names[layer], NOAH_LAYER_NAME_SIZE);
+#ifdef NOAH_KEYBOARD_NAME
+    // The keyboard name follows the layer-name rule, in at most 32 bytes.
+    CHECK(sizeof(NOAH_KEYBOARD_NAME) <= NOAH_LAYER_NAME_SIZE);
+    check_utf8_name((const unsigned char *)NOAH_KEYBOARD_NAME, sizeof(NOAH_KEYBOARD_NAME));
+#endif
 }
 
 int main(void) {
