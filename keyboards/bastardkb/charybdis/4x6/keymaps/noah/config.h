@@ -77,8 +77,8 @@ enum charybdis_keymap_layers {
 // Dragscroll and pinch are excluded — the shared local dragscroll handler
 // owns their CPI through the pd-mode lifecycle.
 // 0 means "keep normal pointer DPI" for that mode.
-#    define PD_MODE_VOLUME_DPI 0
-#    define PD_MODE_BRIGHTNESS_DPI 0
+#    define PD_MODE_VOLUME_DPI 400
+#    define PD_MODE_BRIGHTNESS_DPI 400
 #    define PD_MODE_ZOOM_DPI 400
 #    define PD_MODE_ARROW_DPI 400
 
@@ -117,8 +117,13 @@ enum charybdis_keymap_layers {
 #    define RGB_MATRIX_DEFAULT_VAL RGB_MATRIX_MAXIMUM_BRIGHTNESS
 // Minimum ms between LED updates — higher reduces CPU load, lowers animation smoothness.
 #    define RGB_MATRIX_LED_FLUSH_LIMIT 32
-// Turn off LEDs after this many ms of inactivity (requires SPLIT_ACTIVITY_ENABLE).
-#    define RGB_MATRIX_TIMEOUT 900000
+// Effect speed, 0–255: how fast an animated base effect runs.
+#    undef RGB_MATRIX_DEFAULT_SPD
+#    define RGB_MATRIX_DEFAULT_SPD 32
+// Turn off LEDs after this many ms of inactivity (requires SPLIT_ACTIVITY_ENABLE);
+// zero keeps them on. The live profile stores its own once one is saved.
+#    define NOAH_RGB_IDLE_TIMEOUT_MS 600000
+#    define RGB_MATRIX_TIMEOUT NOAH_RGB_IDLE_TIMEOUT_MS
 
 // PD-mode RGB feedback overlay.
 // Comment out RGB_PD_MODE_FEEDBACK_ENABLE to disable the stage entirely.
@@ -150,6 +155,22 @@ enum charybdis_keymap_layers {
 #    endif
 
 #endif // RGB_MATRIX_ENABLE
+
+// ─── Host and name ──────────────────────────────────────────────────────────
+
+// The computer macros type into: 0 Auto, 1 macOS, 2 Windows, 3 Linux.
+#define NOAH_DEFAULT_HOST_OS 1
+// The host layout macro text is typed through (an ID from
+// docs/architecture/host-layouts-v1.md; 0 US, 2 macOS Dutch).
+#define NOAH_DEFAULT_HOST_LAYOUT 2
+// 1 types characters the layout lacks through the host's Unicode entry.
+#define NOAH_DEFAULT_UNICODE_PLAYBACK 0
+// 1 when macOS classified the keyboard as ISO.
+#define NOAH_DEFAULT_MACOS_ISO 0
+
+// The keyboard's own name, the USB product name computers and Charybdis Ark
+// list it under: at most 32 bytes of UTF-8. Empty keeps QMK's built-in name.
+#define NOAH_KEYBOARD_NAME "Charybdis - Home"
 
 #if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(__ASSEMBLER__)
 #    include <stdint.h>

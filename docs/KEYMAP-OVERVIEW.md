@@ -41,7 +41,7 @@ Timing legend for the layer-local behavior tables:
 - RGB matrix render mode: `ALL_KEYS`
 - Authored layer color: `HSV(0, 0, 0)`
 - Preview color: <img alt="LAYER_BASE preview color" src="media/profile-introspection/profile-color-swatch-ff0000.svg" width="96" height="28" />
-- Combo badges on this layer: `C1`, `C2`, `C3`, `C4`
+- Combo badges on this layer: `C1`, `C2`, `C3`, `C4`, `C5`
 
 ![LAYER_BASE](media/profile-introspection/profile-layer-LAYER_BASE.svg)
 
@@ -64,19 +64,19 @@ Timing legend for the layer-local behavior tables:
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `,` | `,` (`KC_COMM`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LABK)` | `-` | `tap_hold(150)` |
 | `.` | `.` (`KC_DOT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_RABK)` | `-` | `tap_hold(150)` |
-| `LT[NAV]/SLSH` | `LT[NAV]/SLSH` (`LT(LAYER_NAV,KC_SLSH)`) | `double` | `-` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NAV))` | `-` | `tap_hold=100, multi_tap(150)` |
 | `RALT` | `RALT` (`KC_RIGHT_ALT`) | `single` | `TAP_SENDS(PD_SLOT_4_LOCK)` | `-` | `-` | `multi_tap(150)` |
 | `RALT` | `RALT` (`KC_RIGHT_ALT`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_6)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `LGUI` | `LGUI` (`KC_LEFT_GUI`) | `triple` | `TAP_SENDS(OSM(MOD_LSFT))` | `-` | `-` | `multi_tap(150)` |
-| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `double` | `TAP_SENDS(LOCK_LAYER(LAYER_NUM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NUM))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `triple` | `TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_1))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_1))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `quadruple` | `TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_2))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_2))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_NAV))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))` | `-` | `tap_hold=150, multi_tap(150)` |
-| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `tap_hold=150, long_hold(400), multi_tap(150)` |
-| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
-| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `tap_hold=150, long_hold(400), multi_tap(150)` |
+| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_SYM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_SYM))` | `-` | `tap_hold(150), multi_tap(150)` |
+| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `double` | `TAP_SENDS(LOCK_LAYER(LAYER_NUM))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NUM))` | `-` | `tap_hold(150), multi_tap(150)` |
+| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `triple` | `TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_1))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_1))` | `-` | `tap_hold(150), multi_tap(150)` |
+| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `quadruple` | `TAP_SENDS(LOCK_LAYER(LAYER_EXTRA_2))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_EXTRA_2))` | `-` | `tap_hold(150), multi_tap(150)` |
+| `CUSTOM_KEY_1` | `CUSTOM_KEY_1` | `quintuple` | `TAP_SENDS(LOCK_LAYER(LAYER_POINTER))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_POINTER))` | `-` | `tap_hold(150), multi_tap(150)` |
+| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `single` | `TAP_SENDS(LOCK_LAYER(LAYER_NAV))` | `PRESS_AND_HOLD_UNTIL_RELEASE(MO(LAYER_NAV))` | `-` | `tap_hold(150), multi_tap(150)` |
+| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `double` | `TAP_SENDS(KC_MPLY)` | `TAP_ON_RELEASE_AFTER_HOLD(KC_ESCAPE)` | `TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_NUM))` | `tap_hold(150), long_hold(400), multi_tap(150)` |
+| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `triple` | `TAP_SENDS(KC_MNXT)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MNXT)` | `tap_hold(150), long_hold(400), multi_tap(150)` |
+| `CUSTOM_KEY_0` | `CUSTOM_KEY_0` | `quadruple` | `TAP_SENDS(KC_MPRV)` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(KC_MPRV)` | `tap_hold(150), long_hold(400), multi_tap(150)` |
 | `ENT` | `ENT` (`KC_ENT`) | `single` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))` | `-` | `tap_hold(150)` |
 
 #### PD Modes Reachable On This Layer
@@ -94,6 +94,7 @@ Timing legend for the layer-local behavior tables:
 | `C2` | `N` + `M` | `LGUI` (`KC_LGUI`) |
 | `C3` | `M` + `,` + `.` + `LT[NAV]/SLSH` | `G(N)` (`G(KC_N)`) |
 | `C4` | `M` + `,` + `.` | `G(T)` (`G(KC_T)`) |
+| `C5` | `LT[SYM]/Z` + `X` + `C` + `V` + `M` + `,` + `.` + `LT[NAV]/SLSH` | `ESC` (`KC_ESC`) |
 
 ### `LAYER_NUM`
 
@@ -163,8 +164,8 @@ No authored combos resolve entirely from keys on this layer.
 
 | Key On Layer | Behavior Keycode | Tap Count | Tap | Hold | Long Hold | Timing |
 | --- | --- | --- | --- | --- | --- | --- |
-| `G(C) x2` | `G(C)` (`G(KC_C)`) | `double` | `TAP_SENDS(VIA_MACRO_10)` | `-` | `-` | `multi_tap(150)` |
-| `G(V) x2` | `G(V)` (`G(KC_V)`) | `double` | `TAP_SENDS(VIA_MACRO_7)` | `-` | `-` | `multi_tap(150)` |
+| `G(C)` | `G(C)` (`G(KC_C)`) | `double` | `TAP_SENDS(VIA_MACRO_10)` | `-` | `-` | `multi_tap(150)` |
+| `G(V)` | `G(V)` (`G(KC_V)`) | `double` | `TAP_SENDS(VIA_MACRO_7)` | `-` | `-` | `multi_tap(150)` |
 | `LSFT` | `LSFT` (`KC_LEFT_SHIFT`) | `single` | `TAP_SENDS(KC_CAPS)` | `-` | `-` | `release before tap_hold(150); otherwise normal hold` |
 | `LEFT` | `LEFT` (`KC_LEFT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))` | `tap_hold(150), long_hold(400)` |
 | `RIGHT` | `RIGHT` (`KC_RIGHT`) | `single` | `-` | `TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT))` | `TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))` | `tap_hold(150), long_hold(400)` |
@@ -181,7 +182,7 @@ No authored combos resolve entirely from keys on this layer.
 
 | Combo | Inputs On This Layer | Output |
 | --- | --- | --- |
-| `C1` | `G(C) x2` + `G(V) x2` | `G(A)` (`G(KC_A)`) |
+| `C1` | `G(C)` + `G(V)` | `G(A)` (`G(KC_A)`) |
 | `C2` | `MS_BTN1` + `MS_BTN2` + `PD_SLOT_0` | `G(T)` (`G(KC_T)`) |
 | `C3` | `MS_BTN1` + `MS_BTN2` | `MS_BTN6` |
 
@@ -202,7 +203,7 @@ No authored combos resolve entirely from keys on this layer.
 | `PD_SLOT_5` | `PD_SLOT_5` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `PD_SLOT_5` | `PD_SLOT_5` | `double` | `TAP_SENDS(VIA_MACRO_6)` | `PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_3)` | `-` | `tap_hold(150), multi_tap(150)` |
 | `MS_BTN3` | `MS_BTN3` | `double` | `-` | `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)` | `-` | `tap_hold=100, multi_tap=100` |
-| `CUSTOM_KEY_3` | `CUSTOM_KEY_3` | `single` | `TAP_SENDS(KC_TRNS)` | `PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN6)` | `-` | `tap_hold=100` |
+| `CUSTOM_KEY_3` | `CUSTOM_KEY_3` | `single` | `TAP_SENDS(KC_TRNS)` | `PRESS_AND_HOLD_UNTIL_RELEASE(LCAG(KC_SPC))` | `-` | `tap_hold(150)` |
 | `PD_SLOT_1` | `PD_SLOT_1` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
 | `PD_SLOT_1` | `PD_SLOT_1` | `double` | `TAP_SENDS(KC_MUTE)` | `-` | `-` | `multi_tap(150)` |
 | `PD_SLOT_0` | `PD_SLOT_0` | `single` | `TAP_SENDS(KC_TRNS)` | `-` | `-` | `multi_tap(150)` |
@@ -217,6 +218,7 @@ No authored combos resolve entirely from keys on this layer.
 | `PD_SLOT_2` directly on layer | `PD_SLOT_2` | `PD_MODE_BRIGHTNESS` | `RGB_RIGHT_HALF` | `HSV(213, 255, 200)` | <img alt="PD_MODE_BRIGHTNESS color" src="media/profile-introspection/profile-color-swatch-ff00fc.svg" width="96" height="28" /> |
 | `PD_SLOT_5` via `double hold` -> `PD_SLOT_3` | `PD_SLOT_3` | `PD_MODE_ZOOM` | `RGB_RIGHT_HALF` | `HSV(70, 255, 200)` | <img alt="PD_MODE_ZOOM color" src="media/profile-introspection/profile-color-swatch-5aff00.svg" width="96" height="28" /> |
 | `PD_SLOT_5` directly on layer | `PD_SLOT_5` | `PD_MODE_PINCH` | `RGB_RIGHT_HALF` | `HSV(55, 255, 200)` | <img alt="PD_MODE_PINCH color" src="media/profile-introspection/profile-color-swatch-b4ff00.svg" width="96" height="28" /> |
+| `PD_SLOT_7` directly on layer | `PD_SLOT_7` | `PD_MODE_SLOT_7` | `RGB_RIGHT_HALF` | `HSV(200, 193, 108)` | <img alt="PD_MODE_SLOT_7 color" src="media/profile-introspection/profile-color-swatch-c63dff.svg" width="96" height="28" /> |
 
 #### Combos Available On This Layer
 
@@ -269,9 +271,9 @@ No authored combos resolve entirely from keys on this layer.
 
 ### `LAYER_EXTRA_3`
 
-- RGB matrix render mode: `KEYS_MAPPED_ON_THIS_LAYER_ONLY`
-- Authored layer color: `HSV(0, 0, 0)`
-- Preview color: no override
+- RGB matrix render mode: `ALL_KEYS`
+- Authored layer color: `HSV(209, 255, 200)`
+- Preview color: <img alt="LAYER_EXTRA_3 preview color" src="media/profile-introspection/profile-color-swatch-ea00ff.svg" width="96" height="28" />
 
 ![LAYER_EXTRA_3](media/profile-introspection/profile-layer-LAYER_EXTRA_3.svg)
 
@@ -592,7 +594,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | --- | --- | --- | --- |
 | `VIA_MACRO_0` | Spotlight | `{KC_LGUI,KC_SPC}` | `LAYER_NAV @ VIA0` |
 | `VIA_MACRO_1` | AI Chat | `{KC_LALT,KC_SPC}` | `LAYER_NAV @ VIA1` |
-| `VIA_MACRO_2` | Warp Terminal | `{KC_LALT,KC_LGUI,KC_SPC}` | `LAYER_NAV @ VIA2` |
+| `VIA_MACRO_2` | Warp Terminal | `{KC_LALT,KC_LGUI,KC_SPC}` | `LAYER_NAV @ VIA2`, `LAYER_EXTRA_1 @ VIA2` |
 | `VIA_MACRO_3` | OCR Copy | `{KC_LCTL,KC_LALT,KC_LGUI,KC_C}` | `LAYER_SYM @ VIA3` |
 | `VIA_MACRO_4` | Drag Screenshot | `{KC_LCTL,KC_LALT,KC_LGUI,KC_X}` | `LAYER_SYM @ VIA4` |
 | `VIA_MACRO_5` | Emoji | `{KC_LCTL,KC_LGUI,KC_SPC}` | `LAYER_SYM @ VIA5` |
@@ -601,6 +603,13 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `VIA_MACRO_8` | VS Code Preview MD | `{KC_LSFT,KC_LGUI,KC_V}` | `LAYER_SYM @ VIA8` |
 | `VIA_MACRO_9` | VS Code Run Task | `{KC_LSFT,KC_LGUI,KC_P}` | `LAYER_SYM @ VIA9` |
 | `VIA_MACRO_10` | Select All + Copy | `{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}` | `G(KC_C) double tap` |
+| `VIA_MACRO_11` | Select All | `{KC_LGUI,KC_A}` | `LAYER_NAV @ VIA11` |
+| `VIA_MACRO_12` | Copy | `{KC_LGUI,KC_C}` | `LAYER_NAV @ VIA12` |
+| `VIA_MACRO_13` | Paste | `{KC_LGUI,KC_V}` | `LAYER_NAV @ VIA13` |
+| `VIA_MACRO_14` | Cut | `{KC_LGUI,KC_X}` | `LAYER_NAV @ VIA14` |
+| `VIA_MACRO_15` | Undo | `{KC_LGUI,KC_Z}` | `LAYER_NAV @ VIA15` |
+| `VIA_MACRO_16` | Redo | `{KC_LSFT,KC_LGUI,KC_Z}` | `LAYER_NAV @ VIA16` |
+| `VIA_MACRO_19` | T3 Code | `{+KC_LGUI}{KC_TAB}{120}t3 code{-KC_LGUI}` | `LAYER_EXTRA_1 @ VIA19` |
 
 ## Reference
 
@@ -617,7 +626,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 ### Shared Keycode Surfaces
 
 - Layers: `LAYER_BASE`, `LAYER_NUM`, `LAYER_SYM`, `LAYER_NAV`, `LAYER_POINTER`, `LAYER_EXTRA_1`, `LAYER_EXTRA_2`, `LAYER_EXTRA_3`, `LAYER_EXTRA_4`, `LAYER_EXTRA_5`, `LAYER_EXTRA_6`, `LAYER_EXTRA_7`, `LAYER_EXTRA_8`, `LAYER_EXTRA_9`, `LAYER_EXTRA_10`, `LAYER_EXTRA_11`
-- Named custom keys: `CUSTOM_KEY_0` (Right Thumb), `CUSTOM_KEY_1` (Left Thumb), `CUSTOM_KEY_2` (Click Spam), `CUSTOM_KEY_3` (Drag Window)
+- Named custom keys: `CUSTOM_KEY_0` (Right Thumb), `CUSTOM_KEY_1` (Left Thumb), `CUSTOM_KEY_2` (Click Spam), `CUSTOM_KEY_3` (Vorssaint Radial), `CUSTOM_KEY_4` (VoiceInk; shortcut `KC_LCTL + KC_LALT + KC_SPC`)
 - PD color overlays: `PD_MODE_SLOT_6`, `PD_MODE_SLOT_7`, `PD_MODE_DRAGSCROLL`, `PD_MODE_VOLUME`, `PD_MODE_BRIGHTNESS`, `PD_MODE_ARROW`, `PD_MODE_PINCH`, `PD_MODE_ZOOM`, `PD_MODE_SLOT_8`, `PD_MODE_SLOT_9`, `PD_MODE_SLOT_10`, `PD_MODE_SLOT_11`, `PD_MODE_SLOT_12`, `PD_MODE_SLOT_13`, `PD_MODE_SLOT_14`, `PD_MODE_SLOT_15`, `PD_MODE_SLOT_16`, `PD_MODE_SLOT_17`, `PD_MODE_SLOT_18`, `PD_MODE_SLOT_19`, `PD_MODE_SLOT_20`, `PD_MODE_SLOT_21`, `PD_MODE_SLOT_22`, `PD_MODE_SLOT_23`, `PD_MODE_SLOT_24`, `PD_MODE_SLOT_25`, `PD_MODE_SLOT_26`, `PD_MODE_SLOT_27`, `PD_MODE_SLOT_28`, `PD_MODE_SLOT_29`, `PD_MODE_SLOT_30`, `PD_MODE_SLOT_31`
 - Auto-mouse fade destination mode: `FOLLOW_REAL_DESTINATION`
 - Key-behavior feedback locality: `RGB_KEY_HALF`
@@ -635,7 +644,7 @@ Authored key-feedback LED groups repaint after the feedback locality render insi
 | `LAYER_POINTER` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 150)` | <img alt="LAYER_POINTER preview color" src="media/profile-introspection/profile-color-swatch-ffffff.svg" width="96" height="28" /> |
 | `LAYER_EXTRA_1` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(96, 255, 200)` | <img alt="LAYER_EXTRA_1 preview color" src="media/profile-introspection/profile-color-swatch-00ff42.svg" width="96" height="28" /> |
 | `LAYER_EXTRA_2` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(140, 255, 200)` | <img alt="LAYER_EXTRA_2 preview color" src="media/profile-introspection/profile-color-swatch-00b4ff.svg" width="96" height="28" /> |
-| `LAYER_EXTRA_3` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
+| `LAYER_EXTRA_3` | `ALL_KEYS` | `HSV(209, 255, 200)` | <img alt="LAYER_EXTRA_3 preview color" src="media/profile-introspection/profile-color-swatch-ea00ff.svg" width="96" height="28" /> |
 | `LAYER_EXTRA_4` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
 | `LAYER_EXTRA_5` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
 | `LAYER_EXTRA_6` | `KEYS_MAPPED_ON_THIS_LAYER_ONLY` | `HSV(0, 0, 0)` | no override |
@@ -666,12 +675,12 @@ Reusable groups define physical LED sets once near the LED map in `rgb_config.c`
 | --- | --- |
 | `layer_count` | `16` |
 | `layout_key_count` | `56` |
-| `key_behavior_count` | `37` |
+| `key_behavior_count` | `39` |
 | `key_behavior_step_count` | `49` |
-| `combo_count` | `10` |
+| `combo_count` | `15` |
 | `via_macro_count` | `128` |
-| `via_macro_non_empty_count` | `11` |
-| `named_custom_key_count` | `4` |
+| `via_macro_non_empty_count` | `18` |
+| `named_custom_key_count` | `5` |
 | `pd_mode_count` | `32` |
 | `pd_mode_color_count` | `32` |
 | `reusable_led_group_count` | `4` |
@@ -737,8 +746,8 @@ These values come from the keymap config and the shared userspace config. When t
 | `CUSTOM_LONGER_HOLD_TERM` | `400` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `CUSTOM_MULTI_TAP_TERM` | `150` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `CHARYBDIS_DRAGSCROLL_DPI` | `100` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
-| `PD_MODE_VOLUME_DPI` | `0` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
-| `PD_MODE_BRIGHTNESS_DPI` | `0` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `PD_MODE_VOLUME_DPI` | `400` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `PD_MODE_BRIGHTNESS_DPI` | `400` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `PD_MODE_ZOOM_DPI` | `400` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `PD_MODE_ARROW_DPI` | `400` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `CHARYBDIS_MINIMUM_DEFAULT_DPI` | `400` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
@@ -756,6 +765,8 @@ These values come from the keymap config and the shared userspace config. When t
 | `RGB_MATRIX_MAXIMUM_BRIGHTNESS` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_MATRIX_DEFAULT_VAL` | `RGB_MATRIX_MAXIMUM_BRIGHTNESS` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_MATRIX_LED_FLUSH_LIMIT` | `32` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `RGB_MATRIX_DEFAULT_SPD` | `32` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `NOAH_RGB_IDLE_TIMEOUT_MS` | `600000` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_MATRIX_TIMEOUT` | `0` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_PD_MODE_FEEDBACK_ENABLE` | `defined` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_COMBO_FEEDBACK_ENABLE` | `defined` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
@@ -763,6 +774,11 @@ These values come from the keymap config and the shared userspace config. When t
 | `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` | `200` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `RGB_AUTOMOUSE_GRADIENT_ENABLE` | `defined` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `AUTOMOUSE_RGB_DEAD_TIME` | `(AUTO_MOUSE_TIME/3)` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `NOAH_DEFAULT_HOST_OS` | `1` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `NOAH_DEFAULT_HOST_LAYOUT` | `2` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `NOAH_DEFAULT_UNICODE_PLAYBACK` | `0` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `NOAH_DEFAULT_MACOS_ISO` | `0` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
+| `NOAH_KEYBOARD_NAME` | `"Charybdis - Home"` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `AUTO_MOUSE_DELAY` | `noah_setting(25,200)` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 | `AUTO_MOUSE_THRESHOLD` | `noah_setting(26,10)` | [keymap config.h](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h) |
 

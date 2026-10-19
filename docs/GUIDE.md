@@ -88,7 +88,8 @@ Name the keyboard in Ark's Settings and your computer lists it under that
 name: Chrome's HID chooser, the system's device list and Ark's keyboard menu.
 It is stored in the profile, so it travels with backups. Left empty, the
 keyboard keeps its built-in name, `keyboard_name` in the QMK fork's
-`keyboard.json`.
+`keyboard.json`. A keyboard with no saved profile uses the name its firmware
+was built with, `NOAH_KEYBOARD_NAME` in the keymap's `config.h`.
 
 Computers read a USB device's name only when it connects. After an Apply that
 renames the keyboard, the half the cable is plugged into disconnects from USB

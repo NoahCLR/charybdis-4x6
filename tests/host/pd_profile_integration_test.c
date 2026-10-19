@@ -136,9 +136,9 @@ int main(int argc, char **argv) {
 
     noah_effective_profile_snapshot_t snapshot = {0};
     noah_effective_profile_identity_t identity = {0};
-    // The presets: seven stored records, slots 7..31 omitted.
+    // The presets: eight stored records, slots 8..31 omitted.
     size_t presets_length = load_domain(argv[1]);
-    assert(presets_length == 8 + 7 * NOAH_PROFILE_PD_V1_RECORD_SIZE);
+    assert(presets_length == 8 + 8 * NOAH_PROFILE_PD_V1_RECORD_SIZE);
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_VALID);
     noah_profile_domain_range_t pd;
     assert(noah_profile_blob_v1_find_domain(&reader, 0, reader.length, NOAH_PROFILE_DOMAIN_V1_PD, &pd) && pd.offset == 14 && pd.length == presets_length && profile.domain_mask == 16);
@@ -147,7 +147,8 @@ int main(int argc, char **argv) {
     assert(noah_effective_pd_for_mask(1)[1] == 2);
     assert(noah_effective_pd_for_mask(16)[3] == 2);
     assert(noah_effective_pd_for_mask(64)[3] == 1);
-    assert(!noah_effective_pd_for_mask(128));
+    assert(noah_effective_pd_for_mask(128)[3] == 1);
+    assert(!noah_effective_pd_for_mask(256));
     assert(!noah_effective_pd_for_mask(3));
     assert_cache_matches_domain();
     // Every byte of the domain is rejected on read failure; no stale or
@@ -159,7 +160,7 @@ int main(int argc, char **argv) {
     failed_offset = SIZE_MAX;
     noah_effective_pd_invalidate(NULL, 2, identity, identity, &snapshot);
     assert(noah_effective_pd_ready());
-    for (uint8_t slot = 0; slot < 7; slot++) {
+    for (uint8_t slot = 0; slot < 8; slot++) {
         size_t offset = 20 + (size_t)slot * NOAH_PROFILE_PD_V1_RECORD_SIZE + 90;
         blob[offset] = 1;
         assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
@@ -188,9 +189,9 @@ int main(int argc, char **argv) {
     }
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_VALID);
     // A header naming more records than the payload holds.
-    blob[14 + 3] = 8;
+    blob[14 + 3] = 9;
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
-    blob[14 + 3] = 7;
+    blob[14 + 3] = 8;
     blob[14] = 1;
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
     blob[14] = 2;

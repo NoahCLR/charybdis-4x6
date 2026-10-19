@@ -369,8 +369,8 @@ static void test_real_authored_profile(void) {
         }
     }
     assert(stored == pd_payload[3]);
-    // Slots 0..6 carry the authored presets; slot 7 and slots 8..31 are empty.
-    assert(pd_payload[3] == 7 && noah_effective_pd_record(6)[1] == 1 && noah_effective_pd_record(7)[1] == 0);
+    // Slots 0..7 carry the authored presets; slots 8..31 are empty.
+    assert(pd_payload[3] == 8 && noah_effective_pd_record(7)[1] == 1 && noah_effective_pd_record(8)[1] == 0);
     fprintf(stderr, "compiled PD cache warmup: %zu behavior-row sorts\n", behavior_visits);
     assert(behavior_visits == 0);
     // Exercise every PD byte and record boundary against the full golden stream.

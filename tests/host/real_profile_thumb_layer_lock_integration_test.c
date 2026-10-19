@@ -3091,7 +3091,8 @@ static void test_preview_shows_only_where_every_outcome_lands(void) {
     CHECK(key_runtime_core_undecided_dual_role_key_pos(NULL));
     // No key-local hold colour replaces it: the layer's own light is the cue.
     CHECK(test_feedback_semantic_for_key(slash) == KEY_FEEDBACK_SEMANTIC_NONE);
-    key_runtime_integration_advance(&fake_time, 120); key_runtime_integration_scan();
+    // Past the row's 150 ms hold term.
+    key_runtime_integration_advance(&fake_time, 160); key_runtime_integration_scan();
     CHECK(test_layer_active(LAYER_NAV));
     CHECK(key_feedback_preview_layer() == UINT8_MAX);
     CHECK(test_feedback_semantic_for_key(slash) == KEY_FEEDBACK_SEMANTIC_NONE);

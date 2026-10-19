@@ -2213,8 +2213,9 @@ static void test_upper_slot_hold_lock_dpi_and_disabled_slot(uint8_t slot) {
 }
 
 static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
-    CHECK(PD_SLOT_7 == PD_SLOT_0 + 7 && PD_SLOT_31 == PD_SLOT_0 + 31 && PD_SLOT_31_LOCK == PD_SLOT_0_LOCK + 31);
-    test_upper_slot_hold_lock_dpi_and_disabled_slot(7);
+    CHECK(PD_SLOT_8 == PD_SLOT_0 + 8 && PD_SLOT_31 == PD_SLOT_0 + 31 && PD_SLOT_31_LOCK == PD_SLOT_0_LOCK + 31);
+    // Slot 8 is the first the authored defaults leave disabled.
+    test_upper_slot_hold_lock_dpi_and_disabled_slot(8);
     // Slot 31 proves the upper-bound identity path: the mask's top bit, the
     // last keycodes of both blocks and the last cache row.
     test_upper_slot_hold_lock_dpi_and_disabled_slot(31);

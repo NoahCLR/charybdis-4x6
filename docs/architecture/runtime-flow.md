@@ -599,7 +599,9 @@ Hosts read the string when they enumerate the keyboard, which QMK starts in
 reads the committed profile's name first: QMK has initialized EEPROM by then,
 and the read borrows the store the runtime has not started, so it costs no
 RAM. Boot selection checks the record's checksum and compatibility, not the
-peer. Both halves do this before either knows its role; on the half without
+peer. With no committed name to read the keyboard runs its compiled defaults,
+so it serves their name (`NOAH_KEYBOARD_NAME` in the keymap's `config.h`)
+and needs no restart to take it. Both halves do this before either knows its role; on the half without
 USB the name only sits in memory.
 
 The activated profile is authoritative. When its name differs from the one

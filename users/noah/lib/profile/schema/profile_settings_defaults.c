@@ -1,8 +1,36 @@
 #include "profile_settings_defaults.h"
 #include "profile_compiled_writer.h"
+#include <string.h>
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
 #    include "noah_keymap_ids.h"
 #    include "../../compat/qmk_factory_settings.h"
+#    include "../../compat/qmk_host_setting.h"
+// The keymap's config.h may author these; without it the keyboard starts with
+// lighting that sleeps after 15 minutes, automatic host settings and the
+// built-in name.
+#    ifndef NOAH_RGB_IDLE_TIMEOUT_MS
+#        define NOAH_RGB_IDLE_TIMEOUT_MS 900000
+#    endif
+#    ifndef NOAH_DEFAULT_HOST_OS
+#        define NOAH_DEFAULT_HOST_OS NOAH_HOST_AUTO
+#    endif
+#    ifndef NOAH_DEFAULT_UNICODE_PLAYBACK
+#        define NOAH_DEFAULT_UNICODE_PLAYBACK 0
+#    endif
+#    ifndef NOAH_DEFAULT_HOST_LAYOUT
+#        define NOAH_DEFAULT_HOST_LAYOUT 0
+#    endif
+#    ifndef NOAH_DEFAULT_MACOS_ISO
+#        define NOAH_DEFAULT_MACOS_ISO 0
+#    endif
+#    ifndef NOAH_KEYBOARD_NAME
+#        define NOAH_KEYBOARD_NAME ""
+#    endif
+#    define NOAH_DEFAULT_HOST_SETTINGS ((uint32_t)(NOAH_DEFAULT_HOST_OS) | ((NOAH_DEFAULT_UNICODE_PLAYBACK) ? (uint32_t)NOAH_HOST_UNICODE_ENABLED : 0u) | (uint32_t)(NOAH_DEFAULT_HOST_LAYOUT) << NOAH_HOST_LAYOUT_SHIFT | ((NOAH_DEFAULT_MACOS_ISO) ? NOAH_HOST_MACOS_ISO : 0u))
+_Static_assert((NOAH_DEFAULT_HOST_OS) <= NOAH_HOST_LINUX, "The default host is Auto, macOS, Windows or Linux");
+_Static_assert((NOAH_DEFAULT_HOST_LAYOUT) < NOAH_HOST_LAYOUT_LIMIT, "The default host layout is one the firmware has");
+_Static_assert((NOAH_RGB_IDLE_TIMEOUT_MS) <= 86400000, "The lighting timeout is at most one day");
+_Static_assert(sizeof(NOAH_KEYBOARD_NAME) - 1u <= NOAH_SETTINGS_NAME_MAX, "The keyboard name is at most 32 bytes");
 uint32_t noah_profile_settings_default(uint8_t id) {
     if (id >= NOAH_SETTING_DRAGSCROLL_DPI && id <= NOAH_SETTING_ARROW_DPI) return 0;
     switch (id) {
@@ -31,7 +59,7 @@ uint32_t noah_profile_settings_default(uint8_t id) {
         case NOAH_SETTING_AUTO_MOUSE_DEAD_TIME:
             return AUTOMOUSE_RGB_DEAD_TIME;
         case NOAH_SETTING_RGB_TIMEOUT:
-            return 900000;
+            return NOAH_RGB_IDLE_TIMEOUT_MS;
         case NOAH_SETTING_DEFAULT_DPI:
             return CHARYBDIS_MINIMUM_DEFAULT_DPI;
         case NOAH_SETTING_SNIPING_DPI:
@@ -50,6 +78,8 @@ uint32_t noah_profile_settings_default(uint8_t id) {
             return 200;
         case NOAH_SETTING_AUTO_MOUSE_THRESHOLD:
             return 10;
+        case NOAH_SETTING_UNICODE_HOST_MODE:
+            return NOAH_DEFAULT_HOST_SETTINGS;
         case NOAH_SETTING_BEHAVIORS_ENABLED:
             return 1u;
         case NOAH_SETTING_LAYER_BEHAVIORS:
@@ -75,9 +105,9 @@ static uint8_t name_length(const char *name) {
     return length;
 }
 // Name records in order: the layers', the macros', the custom keys', then the
-// keyboard's, which is empty: the built-in name until someone names it.
+// keyboard's (NOAH_KEYBOARD_NAME; empty is the built-in name).
 static const char *record_name(uint16_t record) {
-    if (record == NOAH_SETTINGS_KEYBOARD_NAME_RECORD) return "";
+    if (record == NOAH_SETTINGS_KEYBOARD_NAME_RECORD) return NOAH_KEYBOARD_NAME;
     if (record < NOAH_SETTINGS_LAYERS) return layer_names[record];
     record -= NOAH_SETTINGS_LAYERS;
     if (record < NOAH_SETTINGS_MACRO_NAMES) return via_macro_names[record];
@@ -124,6 +154,15 @@ uint8_t noah_profile_settings_defaults_byte(uint16_t offset) {
     }
     cursor_record = NOAH_SETTINGS_NAME_COUNT;
     return 0u;
+}
+
+// The compiled defaults' keyboard name, for USB before any settings are live.
+bool noah_profile_settings_defaults_keyboard_name(noah_profile_keyboard_name_t *name) {
+    if (!name) return false;
+    memset(name, 0, sizeof(*name));
+    name->length = name_length(NOAH_KEYBOARD_NAME);
+    memcpy(name->bytes, NOAH_KEYBOARD_NAME, name->length);
+    return true;
 }
 #endif
 

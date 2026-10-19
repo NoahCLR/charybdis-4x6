@@ -142,3 +142,7 @@ presets = next(case for case in json.loads(Path(sys.argv[2]).read_text())["valid
 assert domains[0x50] == (3, bytes.fromhex(presets["hex"])), "compiled PD domain differs from the presets vector"
 assert domains[0x10][0] == 4 and domains[0x10][1][0] == 4 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32
 PY
+
+# The compiled defaults are Noah's keyboard profile, domain by domain, apart
+# from the differences its fixture lists.
+python3 "$ROOT/tests/host/folded_keyboard_profile_test.py" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" "$ROOT/tests/fixtures/folded_keyboard_profile.json"
