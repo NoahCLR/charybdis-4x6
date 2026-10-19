@@ -6,12 +6,12 @@ The active profile owns the matrix (`0x60` v1) and macro bank (`0x70` v1).
 The authored `keymaps[][][]` and `VIA_MACROS` below are compiled defaults.
 With no saved domain, those defaults type as before. Key lookup, combo origin,
 transparent fallthrough and RGB coverage all use the active matrix; macro
-playback uses its bank. VIA is still compiled during the transition, but it
-refuses keymap and macro writes (`id_unhandled`): its separate copies no longer
-change typing. A client for the new base is required to edit these domains.
-After changing `VIA_MACROS`, run `tools/profile_introspect.py --write`: it also
-regenerates `authored_macro_bank.h`, the same macros already in the bank
-encoding, which the compiled defaults copy.
+playback uses its bank. VIA is not supported (D-F31): the profile is the only
+copy, and a client for the new base is required to edit these domains. The
+`VIA_MACRO_n` names are historical. After changing `VIA_MACROS`, run
+`tools/profile_introspect.py --write`: it also regenerates
+`authored_macro_bank.h`, the same macros already in the bank encoding, which
+the compiled defaults copy.
 
 If you want the fastest visual snapshot, start with
 [KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md). The top-level [README](../README.md),
@@ -46,7 +46,7 @@ trackball control get packed into the right side and the thumbs.
 | --- | --- | --- |
 | `LAYER_BASE` | default typing layer | QWERTY, home-row layer access, custom thumbs, number-row symbol holds, signature `Esc`, `Enter`, `Shift`, and `Right Alt` behaviors |
 | `LAYER_NUM` | right-hand numpad layer | numpad on the right half, `MO(LAYER_NAV)` retained on the left side for fast access back into navigation |
-| `LAYER_SYM` | symbols and DPI layer | DPI controls on the left, bracket and quote families on the right, and a lower-left shortcut cluster anchored by five VIA macros |
+| `LAYER_SYM` | symbols and DPI layer | DPI controls on the left, bracket and quote families on the right, and a lower-left shortcut cluster anchored by five macros |
 | `LAYER_NAV` | navigation, media, system control, mouse buttons | arrow cluster, media, volume, brightness, direct macOS shortcuts, mouse buttons, `PD_SLOT_0`, and current auto-sniping |
 | `LAYER_POINTER` | auto-mouse pointer surface | `PD_SLOT_2`, `PD_SLOT_5`, `PD_SLOT_1`, `PD_SLOT_0`, mouse buttons, and `LT(LAYER_NUM, KC_SPC)` on the thumb cluster |
 
@@ -364,7 +364,7 @@ This is the densest current layer. It combines:
 - direct macOS shortcuts
 - `MS_BTN1` and `MS_BTN2`
 - `PD_SLOT_0`
-- four VIA macros
+- four macros
 
 It is also the current auto-sniping layer, so entering nav changes both keys
 and trackball feel.
@@ -440,16 +440,16 @@ The profile's macros retain their 128 macro-slot key identities:
 
 Profile macros play through one scan-driven engine. Starting a
 macro does not wait inside the triggering key event: delays, text, chords, and
-key holds advance through later matrix scans, so pointing, RGB, VIA, split, and
+key holds advance through later matrix scans, so pointing, RGB, split, and
 normal key processing continue between macro operations. Playback has a
 deliberate one-active/no-queue policy. A second macro trigger is consumed while
 the first keeps running, and it must be triggered again later if desired.
 
 The engine validates the complete payload before output, owns exact leases for
 every synthetic key it retains, and releases those leases on completion,
-cancellation, or runtime failure. VIA edits invalidate the cache immediately,
-but the bytes of an already running slot remain pinned until it finishes; the
-edited payload is loaded on the next trigger. EEPROM reset requests cancellation
+cancellation, or runtime failure. A saved profile invalidates the cache at a
+no-macro boundary, so a running slot finishes on the bytes it started with;
+the new payload is loaded on the next trigger. EEPROM reset requests cancellation
 and cleanup before the active cache entry can be reused. Timing is scan-granular:
 each operation runs on the first scan at or after its configured interval.
 
@@ -474,7 +474,7 @@ Direct macOS-standard shortcuts bound in layers include:
 | `G(KC_Z)` | undo | `LAYER_NAV` |
 | `LSG(KC_Z)` | redo | `LAYER_NAV` |
 
-The VIA defaults are a smaller mixed set. Some are standard macOS shortcuts,
+The macro defaults are a smaller mixed set. Some are standard macOS shortcuts,
 while others are just my current app-launcher or utility bindings:
 
 | Slot | Payload | Meaning |
@@ -502,7 +502,7 @@ same key, duplicate key-downs are invalid, and no key may remain held at the
 end. Invalid balance is rejected before playback, so a macro cannot release
 another producer's key or leave its own key registered.
 
-VIA text supports canonical UTF-8. Select the
+Macro text supports canonical UTF-8. Select the
 host setup in the saved profile before playing non-ASCII text; ASCII-only mode
 remains the default. See [runtime flow](architecture/runtime-flow.md) for the
 encoding, program limit, ownership and host-entry requirements. Malformed
@@ -512,10 +512,10 @@ slots produce no partial typing and remain cached invalid until a mutation.
 So the current profile uses both:
 
 - direct modded keycodes for many standard macOS editing and app shortcuts
-- VIA macros for a smaller set of macOS launcher/system shortcuts and
+- macros for a smaller set of macOS launcher/system shortcuts and
   personal utility bindings
 
-Some other shortcuts in the current profile, especially several VIA slots, are
+Some other shortcuts in the current profile, especially several macro slots, are
 simply personal shortcuts rather than standard macOS conventions.
 
 ## Verification

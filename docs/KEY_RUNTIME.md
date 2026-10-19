@@ -560,7 +560,7 @@ decision of QMK's.
 
 The one tap key QMK still decides is `TT()` or `OSL()` to a layer from 16 to
 31. The firmware refuses those wherever it validates a keymap (the compiled
-layout and Profile Wire), but an external VIA client can still write one; the
+layout and Profile Wire), and since D-F31 nothing else writes one; the
 runtime does not handle it, so QMK's tapping engine classifies it, and the
 pipeline pins that. For it alone the firmware keeps QMK's per-key tapping and
 quick-tap terms on the dual-role setting (`get_tapping_term()`,

@@ -3,10 +3,10 @@
 // ──────────────────────────────────────────────────────────────────────────
 #pragma once
 
-// Initializes deterministic round-robin ownership across boot discovery, the
-// VIA write-through mirror, and durable VIA reconciliation.
+// Nothing to initialize since the VIA store left (D-F31); kept so the boot
+// order stays explicit.
 void noah_qmk_durable_io_init(void);
 
-// Runs at most one subsystem step. Split callbacks only populate mailboxes;
-// every EEPROM/storage effect owned by these subsystems is reached from here.
+// Grants the profile store one step. Split callbacks only populate mailboxes;
+// every flash effect of the profile store is reached from here.
 void noah_qmk_durable_io_matrix_scan(void);

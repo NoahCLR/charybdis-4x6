@@ -65,11 +65,11 @@ There is no logging, EEPROM write, or continuous USB readback during capture.
 All recorder state and transport probes are absent when the flag is unset.
 Compare instrumented and ordinary firmware to establish measurement overhead.
 
-VIA custom channel 0, value `0x0A`, diagnostic builds only:
+Profile Wire channel 0, value `0x0A`, diagnostic builds only:
 
-- 32-byte request: byte 0 = `7` to read or `8` to arm, VIA's `id_custom_set_value`
-  and `id_custom_get_value` used the other way round (QMK routes both to the
-  same handler); the cadence recorder reads with `8`. Byte 1 = 0; byte 2 = `0x0A`;
+- 32-byte request: byte 0 = `7` to read or `8` to arm, the set and get
+  commands used the other way round (the channel routes both to the same
+  handler); the cadence recorder reads with `8`. Byte 1 = 0; byte 2 = `0x0A`;
   byte 3 = nonzero correlation; byte 4 = page; bytes 5–31 zero.
 - Arm (`8`) page 0 clears/arms capture. It changes only volatile diagnostic state.
 - Read (`7`) page 0 returns metadata. Pages 1..N return transaction ID page-1; reads
@@ -85,7 +85,7 @@ VIA custom channel 0, value `0x0A`, diagnostic builds only:
 
 `node tools/capture-split-diagnostics.cjs` arms, waits without device requests,
 then reads frozen pages as JSON. It uses the firmware tools' own node-hid
-installation (`npm ci --prefix tools`) and is a separate engineering tool. Close competing app/VIA
+installation (`npm ci --prefix tools`) and is a separate engineering tool. Close competing app
 connections. Select `--path` if more than one matching keyboard is attached.
 Capture with the procedure in
 [`measurements/pointing-cadence/`](../../measurements/pointing-cadence/README.md),
@@ -109,7 +109,7 @@ stages, in wire order:
 | Stage | From → to |
 | --- | --- |
 | `matrixScan` | `keyboard_task` entry → `matrix_scan_user`: local matrix, debounce, QMK's split transactions |
-| `durableIo` | VIA macro defaults and the durable I/O scan (profile and VIA sync RPCs) |
+| `durableIo` | the durable I/O scan: the profile store and its split RPCs |
 | `keyRuntime` | combo origins, key runtime scan, macro engine |
 | `splitSync` | runtime split sync RPCs |
 | `qmkTasks` | `matrix_scan_user` return → pointing hook: key event dispatch, `quantum_task`, `rgb_matrix_task` (effect and LED flush), the keyboard's pointing code |
@@ -118,7 +118,7 @@ stages, in wire order:
 | `sensorRead` | the pointing driver's report read |
 | `pointingTask` | `pointing_device_task_user` |
 | `pointingReport` | pointing hook return → `keyboard_task` end: auto-mouse, USB mouse report, mousekey and LED tasks |
-| `outsideKeyboardTask` | between `keyboard_task` calls: USB events, raw HID and VIA, deferred executors, housekeeping |
+| `outsideKeyboardTask` | between `keyboard_task` calls: USB events, Raw HID, deferred executors, housekeeping |
 
 `matrixScan` includes the split recorder's transactions; subtract its share
 for the local scan. The shares sum to about 1 (`coverage`). On a loop where

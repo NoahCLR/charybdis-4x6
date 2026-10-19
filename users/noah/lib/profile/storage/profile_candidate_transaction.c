@@ -7,7 +7,7 @@
 #include <string.h>
 
 static bool metadata_equal(const noah_profile_candidate_v1_metadata_t *left, const noah_profile_candidate_v1_metadata_t *right) {
-    return left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->requested_domains == right->requested_domains && left->flags == right->flags && left->payload_length == right->payload_length && left->crc32 == right->crc32 && left->digest == right->digest && left->action_abi_digest == right->action_abi_digest && left->store_format_version == right->store_format_version && left->via_generation == right->via_generation && left->via_digest == right->via_digest;
+    return left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->requested_domains == right->requested_domains && left->flags == right->flags && left->payload_length == right->payload_length && left->crc32 == right->crc32 && left->digest == right->digest && left->action_abi_digest == right->action_abi_digest && left->store_format_version == right->store_format_version;
 }
 
 static bool error_equal(const noah_profile_candidate_v1_error_t *left, const noah_profile_candidate_v1_error_t *right) {

@@ -766,3 +766,45 @@ transfer offset and phase. No budgets or tests were weakened. The complete
 stack gate and scan-cadence acceptance remain unresolved. Both halves' typing,
 layers, combos and macros from flashed defaults, scan cadence and runtime
 high-water remain keyboard acceptance.
+
+## VIA removed: one store — D-F31, 2026-10-19
+
+VIA leaves the build, and QMK's logical EEPROM holds only its eeconfig: the
+wear-leveling backing returns to QMK's RP2040 default of 8,192 bytes, so its
+RAM mirror (`wear_leveling`) is 4,104 bytes instead of 36,872. The VIA split
+sync, mirror and staging state, its macro provider and its defaults seeder go
+with it.
+
+An instrumented right-half resource build (`NOAH_RESOURCE_CHECKS=yes`
+`tools/build-firmware-pair.sh`, pinned GCC 15.2.0 image, BK `d280a4471e`) on
+the keymap-and-macro domains' reviewed head `3d17afc0` plus this change links
+4,332 bytes of `.data` and 65,440 of `.bss` in SRAM0–3: 69,772 combined,
+33,372 fewer than D-F30's 103,144 (32,768 of them the mirror). The static-data
+tripwire drops by exactly the mirror's 32,768 bytes, from 103,424 to 70,656
+(`tests/host/run_firmware_memory_budget_checks.sh`), leaving 884 bytes. The
+SRAM0–3 fixed prefix is 69,784 bytes and the boot linker/core-memory span
+192,360; fixed linked occupancy across unique SRAM banks is 77,240 bytes.
+Named macro storage is 692 bytes, with the profile provider's slot metadata
+now the required symbol. These are linked figures, not runtime free memory
+or high-water.
+
+Stack (reviewed paths, same ELF): the ordinary manifest fails only on the six
+handled-key paths D-F30 recorded (1,952–2,304 bytes against 1,920), so the
+instrumented pair still stops before the left half. Its macro paths pass:
+saved macro storage read 1,896, slot search 1,776, compiled-default macro
+parse 1,720, physical key lookup 432. The owner manifest, run separately on
+the preserved right ELF, now passes every path, including the two chunk paths
+over budget since D-F29: peer large chunk write 1,896 and repeated chunk read
+1,888 (D-F30: 1,968 and 1,960). Reuse mailbox admission and its rejected reply
+are 1,776 (1,848), large chunk mailbox decode 1,752 (1,840), and compiled
+keymap and macro reuse 1,632 on the peer and 1,432 on the candidate (1,672 and
+1,464). The manifests drop every VIA path and name the Raw HID dispatcher
+where they named VIA's custom-value hook. With a single stored caller left,
+LTO inlined the macro window decoder, the macro compiler and the durable-I/O
+scan, so all three are now `noinline` in every build
+(`macro_payload_decode_qmk.c`, `macro_payload_parse.c`, `qmk_durable_io.c`),
+keeping the measured call shape in the flashed firmware; inlined, the compiler
+widened the provider's frame on the saved-macro storage read to 1,968 bytes.
+The decoder's byte reads are a direct call. The complete stack gate remains
+failing on the six inherited paths; no budget or test was weakened. Allocator
+and stack high-water on both physical halves remain keyboard acceptance.

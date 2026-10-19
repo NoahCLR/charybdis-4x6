@@ -32,14 +32,15 @@ fi
 # sixteen inputs, the behaviour row index, 272 names, 128-byte pointing
 # records) another 20 KiB over the 17,400 bytes they linked at. D-F29 moves
 # the profile slots out of logical EEPROM into their own flash region, so the
-# cache mirrors the 36 KiB VIA region alone: 106,496 bytes fewer. All are
-# policy, not capacity. See
+# cache mirrors the 36 KiB VIA region alone: 106,496 bytes fewer. D-F31 removes
+# VIA, so it mirrors only QMK's 4 KiB eeconfig region: 32,768 bytes fewer. All
+# are policy, not capacity. See
 # docs/architecture/memory-budgets.md for linked accounting and the
 # outstanding physical high-water release gate.
 STATIC_RAM_POLICY=57344
 CFLAGS_FILE="$QMK_ROOT/.build/obj_$TARGET/cflags.txt"
 if [ -f "$CFLAGS_FILE" ] && grep -Eq '(^|[[:space:]])-DNOAH_PD_PROFILE_ENABLE([[:space:]]|$)' "$CFLAGS_FILE"; then
-    STATIC_RAM_POLICY=$((60416 + 4096 + 124928 + 20480 - 106496))
+    STATIC_RAM_POLICY=$((60416 + 4096 + 124928 + 20480 - 106496 - 32768))
 fi
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \

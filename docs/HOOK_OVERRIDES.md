@@ -280,16 +280,16 @@ This pattern applies to:
 
 | QMK hook | Shared helper | What the helper currently owns |
 | --- | --- | --- |
-| `eeconfig_init_user()` | `noah_eeconfig_init_user()` | VIA macro seeding after EEPROM init |
+| `eeconfig_init_user()` | `noah_eeconfig_init_user()` | cancelling a running macro on EEPROM reset (the saved profiles are forgotten at boot, D-F29) |
 | `get_hold_on_other_key_press()` | none | weak default returns `false`; define the QMK hook directly for keymap-specific hold preference |
 | `pre_process_record_user()` | `noah_pre_process_record_user()` | physical-key tracking for keyboard modifier ownership before the main process path |
 | `process_record_user()` | `noah_process_record_user()` | key behavior engine, pointer-mode keys, non-handled release cleanup, direct actions, macros, and process-entry tracing |
 | `post_process_record_user()` | `noah_post_process_record_user()` | process-return finalization, including keyboard-event modifier-mask teardown and process trace result emission |
-| `matrix_scan_user()` | `noah_matrix_scan_user()` | VIA macro default reseeding, one rotating scan-owned durable-I/O grant across profile discovery/VIA mirroring/VIA reconciliation, key runtime scanning, and split shared-state sync ticks |
-| `matrix_slave_scan_user()` | `noah_matrix_slave_scan_user()` | the slave half's rotating durable-I/O grant, including live-profile initialization and profile/VIA split receiver mailboxes; QMK never routes the slave through `matrix_scan_user()` |
+| `matrix_scan_user()` | `noah_matrix_scan_user()` | one scan-owned durable-I/O grant for the profile store, key runtime scanning, and split shared-state sync ticks |
+| `matrix_slave_scan_user()` | `noah_matrix_slave_scan_user()` | the slave half's durable-I/O grant, including live-profile initialization and the profile split receiver mailbox; QMK never routes the slave through `matrix_scan_user()` |
 | `housekeeping_task_user()` | `noah_housekeeping_task_user()` | held-repeat ticking, watchdog refresh, and runtime boot-indicator expiry |
 | `suspend_power_down_user()` | `noah_suspend_power_down_user()` | watchdog refresh while the host has USB suspended; QMK's suspend loop never reaches `housekeeping_task()`, so an override that drops this chain lets the watchdog reset the master about 2 s after the host sleeps |
-| `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | VIA macro default seeding, profile-store discovery setup, durable-I/O scheduler setup, RGB runtime init, and split shared-state init |
+| `keyboard_post_init_user()` | `noah_keyboard_post_init_user()` | the settings apply hook, profile-store discovery setup, durable-I/O scheduler setup, RGB runtime init, and split shared-state init |
 | `layer_state_set_user()` | `noah_layer_state_set_user()` | pointer-layer policy, auto-sniping layer state, and queueing scan-time pd-mode DPI policy after layer-owned sniping changes |
 | `pointing_device_task_user()` | `noah_pointing_device_task_user()` | pointer-mode mouse-report transforms and pointing idle-noise suppression |
 | `pointing_device_init_user()` | `noah_pointing_device_init_user()` | auto-mouse init |
@@ -303,8 +303,7 @@ outright with no chaining helper and no compile gate to notice.
 
 | QMK hook | Defined in | What it owns |
 | --- | --- | --- |
-| `via_init_kb()` | `users/noah/lib/macro/via_macro_defaults.c` | arms VIA macro default seeding for the first post-init scan |
-| `via_command_kb()` | `users/noah/lib/macro/via_macro_defaults.c` | VIA mutation classification, macro reseeding, and split-mirror marking; replacing it silently drops all three, so storage changes without the digest or the peer learning about it |
+| `raw_hid_receive()` | `users/noah/lib/compat/qmk_profile_channel.c` | every Raw HID report: Profile Wire dispatch and its reply (D-F31); replacing it cuts Charybdis Ark off the keyboard |
 | `is_keyboard_master_impl()` | `users/noah/lib/compat/split_role.c` | forced split role under `FORCE_MASTER`/`FORCE_SLAVE`; empty otherwise |
 | `is_keyboard_left_impl()` | `users/noah/lib/compat/qmk_physical_half.c` | flash-provisioned handedness under `NOAH_PHYSICAL_HALF=left/right`; empty for generic firmware |
 

@@ -59,19 +59,10 @@ NOAH_COMMON_SOURCES := \
     lib/compat/qmk_profile_flash.c \
     lib/compat/qmk_physical_half.c \
     lib/compat/qmk_profile_split_transport.c \
-    lib/compat/qmk_via_profile_channel.c \
+    lib/compat/qmk_profile_channel.c \
     lib/compat/qmk_combo_readback.c \
     lib/compat/qmk_effective_combos.c \
-    lib/compat/qmk_contract.c \
     lib/compat/qmk_mod_contract.c \
-    lib/compat/qmk_via_contract.c \
-    lib/compat/qmk_via_storage_regions.c \
-    lib/compat/qmk_via_sync_metadata.c \
-    lib/compat/qmk_via_sync_protocol.c \
-    lib/compat/qmk_via_sync_state.c \
-    lib/compat/qmk_via_logical_profile.c \
-    lib/compat/qmk_via_split_mirror.c \
-    lib/compat/qmk_via_split_sync.c \
     lib/compat/qmk_usb_product_name.c \
     lib/action/action_kind.c \
     lib/action/action_kind_dispatch.c \
@@ -113,8 +104,6 @@ NOAH_COMMON_SOURCES := \
     lib/macro/host_layout.c \
     lib/macro/host_layout_tables.c \
     lib/macro/macro_payload_encode.c \
-    lib/macro/via_macro_provider.c \
-    lib/macro/via_macro_defaults.c \
     lib/key/runtime/feedback.c \
     lib/state/modifiers/keyboard_mod_state.c \
     lib/state/modifiers/keyboard_mod_policy.c \

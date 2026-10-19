@@ -45,7 +45,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | Source group | Responsibility | Runtime authority | Inputs | Outputs or side effects | Primary tests | Related docs |
 | --- | --- | --- | --- | --- | --- | --- |
 | `action/` | Classify and dispatch action keycodes; aggregate physical and managed literal report ownership | Action metadata, dispatch policy, and owner-scoped literal-key leases | Runtime effects, physical key observations, direct action keys, macro actions | Aggregate-boundary QMK report transitions, synthetic records, PD keycode press/release, macro playback | `run_action_dispatch_tests.sh`, `run_action_lifecycle_tests.sh`, `run_owned_keycode_tests.sh`, `run_delayed_action_tests.sh` | [change-guide](./change-guide.md), [KEY_RUNTIME](../KEY_RUNTIME.md) |
-| `compat/` | Centralize QMK/fork/VIA contracts | Compatibility-only | QMK combo records and state, VIA commands, QMK APIs | Bounded generation-aware combo origins, VIA split replication, live-profile RPC adapter, sampled auto-mouse elapsed access, contract wrappers | `run_qmk_contract_checks.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh`, `run_qmk_profile_split_transport_tests.sh`, `run_feature_gate_compile_tests.sh` | [runtime-flow](./runtime-flow.md) |
+| `compat/` | Centralize QMK/fork contracts | Compatibility-only | QMK combo records and state, Raw HID reports, QMK APIs | Bounded generation-aware combo origins, the Raw HID Profile Wire channel, live-profile RPC adapter, sampled auto-mouse elapsed access, contract wrappers | `run_qmk_contract_checks.sh`, `run_qmk_combo_origin_tests.sh`, `run_profile_wire_v1_tests.sh`, `run_qmk_profile_split_transport_tests.sh`, `run_feature_gate_compile_tests.sh` | [runtime-flow](./runtime-flow.md) |
 | `key/behavior/` | Resolve compiled or installed effective key behavior | Active behavior interpretation | compiled `key_behaviors[]` fallback, generation-owned live behavior view, resolved keycodes | `handled_key_resolution_t`, materialized runtime contracts, validation errors | `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh` | [INTERACTION_MODEL](../INTERACTION_MODEL.md), [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/ownership/` | Applied held-action and repeat registries | Projected applied state | Key-runtime effects, housekeeping tick | Registered held actions, repeating actions | `run_held_action_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh` | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/` top level | QMK-facing key-runtime orchestration | Integration only | QMK key events and scan events | Reducer observations, transition plans, projected effects | key-runtime release/scenario/integration/layer-lock/modifier-hold suites | [KEY_RUNTIME](../KEY_RUNTIME.md), [runtime-flow](./runtime-flow.md) |
@@ -55,12 +55,12 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `key/runtime/queue/` | Pending release dispatch queue | Authoritative queue inside key runtime | Deferred dispatch effects, release blockers | Ordered pending release snapshots and drains | release matrix, runtime debug, scenario tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/slot/` | Per-key-position helpers | Helper data, not independent authority | Key positions, combo origins, materialized behavior | Packed key positions, origin bitmaps, slot interaction contracts | combo origin, PD, RGB, split, key-runtime tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/trace/` and top-level `trace.*` | Runtime tracing | Diagnostic only | Runtime events, transition plans, projection snapshots | Trace entries and optional console output | `run_runtime_trace_tests.sh`, key-runtime trace variants | [KEY_RUNTIME](../KEY_RUNTIME.md) |
-| `macro/` | VIA macro defaults, payload parser, compact slot metadata, one pinned shared IR, scan-driven playback, and host layout tables ([host-layouts-v1](./host-layouts-v1.md)) | Macro payload validation and one-active execution lifecycle | `VIA_MACRO_n`, payload strings, VIA EEPROM, matrix scans | Lease-backed macro output, bounded cleanup, VIA default seeding | macro payload/engine/provider/defaults/VIA lifecycle tests | [KEYMAP](../KEYMAP.md), [runtime-flow](./runtime-flow.md), [VIA_TO_QMK](../tooling/VIA_TO_QMK.md) |
+| `macro/` | Profile macro provider, payload parser, compact slot metadata, one pinned shared IR, scan-driven playback, and host layout tables ([host-layouts-v1](./host-layouts-v1.md)) | Macro payload validation and one-active execution lifecycle | `VIA_MACRO_n` (a historical name), payload strings, the profile macro domain, matrix scans | Lease-backed macro output, bounded cleanup | macro payload/engine/provider and profile keymap/macro tests | [KEYMAP](../KEYMAP.md), [runtime-flow](./runtime-flow.md), [VIA_TO_QMK](../tooling/VIA_TO_QMK.md) |
 | `pointing/defs/` | PD mode manifest and generated keycodes | Authored PD identity | PD mode manifest macros | Mode ids, flags, keycodes, lock keycodes | PD mode and profile validation tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/modes/` | Configured directional engine and shared dragscroll algorithm | Validated effective slot records | Mouse reports and mode lifecycle transitions | Transformed reports and bounded synthetic actions | `run_pd_mode_handlers_tests.sh`, `run_pd_mode_tests.sh` | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/policy/` | Pointer layer and PD policy rules | Policy helper | Layer state, keycodes, PD traits | Pointer layer activation, mouse-record classification | `run_pointer_layer_policy_tests.sh`, PD/key-runtime integration tests | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/runtime/` | PD mode state, snapshots, lifecycle, key bridge | Authoritative PD state | PD key events, key-runtime effects, pointer reports, split snapshots | Local/display/remote PD state, active handler routing, DPI sync | PD runtime/mode/bridge integration tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [runtime-flow](./runtime-flow.md) |
-| `profile/runtime/` | Effective-profile publication, semantic-action translation, generation-owned behavior/RGB views, activation safety, and the gated single-owner composition | Pending/active profile generation plus activation wait evidence; complete owner only in a side-specific engineering artifact | Compiled/validated snapshots, candidate and peer leases, authoritative runtime activity, provisional/durable split convergence | Incremental boot/adoption, distributed prepare/commit fencing, coherent generation publication, behavior/RGB view swaps, bounded host/split scheduling, stale-token refusal | `run_profile_owner_tests.sh`, `run_profile_owner_via_integration_tests.sh`, effective-provider/RGB/activation tests, feature and engineering stack gates | active live-edit architecture review |
+| `profile/runtime/` | Effective-profile publication, semantic-action translation, generation-owned behavior/RGB views, activation safety, and the gated single-owner composition | Pending/active profile generation plus activation wait evidence; complete owner only in a side-specific engineering artifact | Compiled/validated snapshots, candidate and peer leases, authoritative runtime activity, provisional/durable split convergence | Incremental boot/adoption, distributed prepare/commit fencing, coherent generation publication, behavior/RGB view swaps, bounded host/split scheduling, stale-token refusal | `run_profile_owner_tests.sh`, `run_profile_domain_owner_round_trip_tests.sh`, effective-provider/RGB/activation tests, feature and engineering stack gates | active live-edit architecture review |
 | `profile/split/` | Canonical live-profile sibling frames, D-014 authority, and D-022 distributed commit reconciliation | Caller-owned reconciler; registered only by the gated engineering profile owner | Durable local/peer descriptors, provisional prepare intent, staged or durable bounded payload reader, exact peer store, one-frame QMK exchange | Strict push/pull/prepare frames (chunks up to 106 bytes pushed or pulled, 32-byte frames otherwise, reuse ranges filled from the receiver's active profile), prepared pause/abort/authorization, one callback mailbox, full or convergence-only arbitration, coherent authority snapshots, fail-closed activation peer count | `run_profile_split_foundation_tests.sh`, `run_profile_split_reconciler_tests.sh`, `run_qmk_profile_split_transport_tests.sh`, engineering stack gate | active live-edit architecture review and `profile-split-v1.md` |
 | `rgb/automouse/` | Auto-mouse RGB fade support | Projected UI | Effective fade destination, auto-mouse timing, and layer state | Generation-consistent fade frame and progress quantization | RGB layer render tests | [RGB_CONFIG](../RGB_CONFIG.md) |
 | `rgb/core/` | RGB orchestration, effective-config adapters, helpers, validation | Render pipeline owner | One captured effective RGB frame, compiled fallbacks, runtime snapshots | LED frame application, bounded reads for every RGB family and key-feedback tap policy, validation, map invalidation | `run_effective_rgb_runtime_tests.sh`, `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` | [RGB_CONFIG](../RGB_CONFIG.md) |
@@ -84,15 +84,13 @@ source trace because they rewrite or verify human-facing firmware docs.
 ### `compat/`
 
 - Record admission behind undecided tap/hold keys: `qmk_record_admission.c/h`
-- Combo and split adapters: `qmk_combo_origin.c/h`,
-  `qmk_via_split_sync.c/h`, `qmk_via_sync_metadata.c/h`,
-  `qmk_via_sync_protocol.c/h`, `qmk_via_sync_state.c/h`, and
+- Combo and split adapters: `qmk_combo_origin.c/h` and
   `qmk_profile_split_transport.c/h`
-- QMK contract wrappers: `qmk_contract.c`, `qmk_mod_contract.c/h`,
+- Raw HID Profile Wire channel: `qmk_profile_channel.c` (`raw_hid_receive`)
+  and `qmk_profile_capabilities.h`
+- QMK contract wrappers: `qmk_mod_contract.c/h`,
   `qmk_native_report_contract.h` (weak-modifier changes for shared native usages),
-  `qmk_auto_mouse_contract.h`, `qmk_pointing_contract.h`,
-  `qmk_via_contract.c`, `qmk_via_playback_contract.h`,
-  `qmk_via_storage_contract.h`, `qmk_via_storage_regions.c/h`
+  `qmk_auto_mouse_contract.h`, `qmk_pointing_contract.h`
 - Split helpers: `split_half.h`, `split_role.c`
 - Split frame CRC contract check: `qmk_split_transport_crc.c`
 - Diagnostic probes, empty unless their flag is set: `qmk_split_diagnostics.c/h`
@@ -108,19 +106,7 @@ Each is reconciled against the pinned QMK active/disabled layout at the scan
 boundary, and either promoted exactly once, suppressed, expired after the legal
 buffered-output window, or reset.
 
-Inbound VIA commands are classified and marked dirty before QMK applies them,
-but are never replayed on the slave. `qmk_via_split_sync.c` exchanges only
-committed canonical storage snapshots. Its fixed 32-byte frames carry a
-version, generation, region/range, digest, status, and CRC; the receiver
-validates all of them before storage effects. `qmk_via_storage_regions.c`
-centralizes bounded access to VIA validity/layout options, dynamic keymap,
-optional encoder, and macro storage. Clean generation publication happens only
-after complete digest verification, and the sender retains replication-pending
-state until the peer's generation/digest acknowledgement. The current USB
-master initiates metadata exchange after boot, reconnect, and role changes,
-with one storage chunk or RPC per scan and 50–1,000 ms retry backoff.
-
-The live-profile adapter is separate from VIA region reconciliation. Its
+The live-profile split adapter (`qmk_profile_split_transport.c`). Its
 callback only forwards exact frames (up to 128 bytes, at QMK's per-call RPC
 length) into the caller-owned profile reconciler and returns cached 32-byte
 replies; scan context owns every profile read,
@@ -128,8 +114,8 @@ write, validation, and marker-last commit step. The transaction id is appended
 after the existing userspace ids. Ordinary firmware leaves the adapter
 unregistered. A side-specific engineering artifact registers it through the
 single owner after compiled-profile validation and graph initialization. That
-artifact exposes coherent owner capabilities and status through the VIA
-channel. Adding the explicit mutation gate couples candidate status and host
+artifact exposes coherent owner capabilities and status through the Raw HID
+Profile Wire channel. Adding the explicit mutation gate couples candidate status and host
 mutation routing to the complete write/commit/activation/peer capability set;
 ordinary and owner-only firmware remain read-only.
 
@@ -175,8 +161,8 @@ semantics without taking another platform timer sample.
 
 ### `macro/`
 
-- Providers: `macro_slot_provider.c/h`,
-  `via_macro_provider.c/h`, `via_macro_defaults.c/h`
+- Providers: `macro_slot_provider.c/h`, `profile_macro_provider.c/h` (the
+  profile's macro domain)
 - Payload parser/encoder/runtime: `macro_payload.c/h`,
   `macro_payload_internal.h`, `macro_payload_decode_qmk.c`,
   `macro_payload_encode.c`, `macro_payload_keycodes.c`,
@@ -252,7 +238,7 @@ semantics without taking another platform timer sample.
 The authored profile boundary is intentionally outside `users/noah/lib/`:
 
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c` owns layers,
-  combos, VIA macro defaults, key behaviors, and custom-key names and
+  combos, macro defaults, key behaviors, and custom-key names and
   shortcuts (`CUSTOM_KEYS`).
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h` owns keymap-facing
   timing, layer ids, pointer tuning, and RGB feature flags.
@@ -273,7 +259,7 @@ Use the runner that matches the behavior touched while iterating, then use
 | Key behavior, authored profile validation, and generated overview | `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_all_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
 | Key runtime | `run_key_runtime_release_matrix_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh`, `run_pd_mode_key_runtime_integration_tests.sh`, `run_key_runtime_layer_lock_integration_tests.sh`, `run_key_runtime_scenario_tests.sh`, `run_key_runtime_integration_harness_tests.sh` |
 | Hooks, ownership, and boundaries | `run_hook_chaining_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh`, `run_feature_gate_compile_tests.sh` |
-| Macro, VIA, and QMK compatibility | `run_macro_payload_tests.sh`, `run_qmk_portable_profile_tests.sh`, `run_via_macro_defaults_tests.sh`, `run_via_macro_action_lifecycle_tests.sh`, `run_qmk_combo_origin_tests.sh`, `run_qmk_via_split_sync_tests.sh` |
+| Macro and QMK compatibility | `run_macro_payload_tests.sh`, `run_qmk_portable_profile_tests.sh`, `run_profile_keymap_macros_runtime_tests.sh`, `run_action_lifecycle_tests.sh`, `run_qmk_combo_origin_tests.sh`, `run_profile_wire_v1_tests.sh` (the Raw HID channel) |
 | Pointing and PD mode | `run_pd_mode_tests.sh`, `run_pd_mode_handlers_tests.sh`, `run_pd_runtime_tests.sh`, `run_pointer_layer_policy_tests.sh` |
 | RGB and split | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh`, `run_split_runtime_sync_tests.sh` |
 | Runtime diagnostics and tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |

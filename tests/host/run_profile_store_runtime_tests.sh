@@ -18,7 +18,6 @@ trap cleanup EXIT INT TERM
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DQMK_STUB_SUPPRESS_LAYER_COUNT \
-    -DVIA_ENABLE \
     -DNOAH_PORTABLE_PROFILE_ENABLE \
     -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
     -I"$ROOT" \

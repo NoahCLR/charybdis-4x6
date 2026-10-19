@@ -81,13 +81,16 @@ prefer bounded indexes and derived caches where that keeps ownership simple.
 
 ## Logical EEPROM Address Map
 
-`WEAR_LEVELING_BACKING_SIZE` is 73,728 bytes. RP2040 wear leveling exposes
-half of that as 36 KiB of logical EEPROM, the VIA region alone: QMK EECONFIG,
-VIA configuration, the dynamic keymap and the VIA macro bank, `0x0000–0x8FFF`.
-The profile slots have a flash region of their own
-([Profile slot flash region](#profile-slot-flash-region-d-f29)). The two maps
-below are historical, from the 32,768-byte backing and its 16,384 logical
-bytes.
+`WEAR_LEVELING_BACKING_SIZE` is QMK's RP2040 default, 8,192 bytes, and wear
+leveling exposes half of it as 4 KiB of logical EEPROM (D-F31). It holds only
+QMK's eeconfig and its datablocks, with room for the user datablock that will
+hold the edit mode; QMK's RAM mirror is the same 4 KiB. VIA is not supported,
+so there is no VIA configuration, dynamic keymap or macro bank: keys and
+macros are profile domains (D-F30), and the profile slots have a flash region
+of their own ([Profile slot flash region](#profile-slot-flash-region-d-f29)).
+From D-F29 to D-F31 the backing was 73,728 bytes, a 36 KiB VIA region at
+`0x0000–0x8FFF`. The two maps below are historical, from the 32,768-byte
+backing and its 16,384 logical bytes.
 
 ### Historical Map Before The Profile Partition
 
@@ -269,9 +272,7 @@ instead:
 | 10 | 4 | payload CRC32 |
 | 14 | 4 | compiled-default digest |
 | 18 | 4 | action-ABI digest |
-| 22 | 4 | bound VIA generation |
-| 26 | 4 | bound VIA digest |
-| 30 | 3 | reserved zero |
+| 22 | 11 | reserved zero; refused otherwise (22–29 held the bound VIA generation and digest until D-F31) |
 | 33 | 2 | CRC16-CCITT over the format version (one byte, `6`) then bytes 0–32 |
 | 35 | 1 | marker: erased `0xFF`, prepared `0x3C`, committed `0x18`, invalid `0x00` |
 
@@ -315,11 +316,9 @@ tests carry a 70,000-byte payload through the blob codec, the candidate upload,
 the split frames, the receiving half's staging of a split copy (chunks and a
 reuse range past 64 KiB) and a store write, commit, boot and read.
 
-The 41-byte configuration and 1,920-byte keymap leave 34,903 macro-bank bytes
-of the 36 KiB VIA region. All 128 slot terminators count toward that bank; a
-single macro can use the remaining space without a separate compiled-program
-limit. VIA sync metadata schema 5 refuses schema 4, so the existing recovery
-path resets VIA and seeds authored defaults before declaring authority.
+The macro domain holds 34,903 bytes, the size the VIA bank had in its 36 KiB
+region. All 128 slot terminators count toward it; a single macro can use the
+remaining space without a separate compiled-program limit.
 
 ### Profile slot flash region (D-F29)
 
@@ -332,7 +331,7 @@ into the region.
 | `0x000000–` image end | — | about 272 KB today | firmware image (`__flash_binary_end`) |
 | `0x100000–0x11FFFF` | `0x00000–0x1FFFF` | 131,072 | profile slot A: 1 KiB record (header and marker cells), 130,048-byte payload |
 | `0x120000–0x13FFFF` | `0x20000–0x3FFFF` | 131,072 | profile slot B |
-| `0x1EE000–0x1FFFFF` | — | 73,728 | wear-leveling backing (36 KiB logical EEPROM) |
+| `0x1FE000–0x1FFFFF` | — | 8,192 | wear-leveling backing (4 KiB logical EEPROM, D-F31) |
 
 The build assumes 2 MiB of flash (pico-sdk's default, as wear leveling does).
 The link fails if the image reaches `0x10100000`
@@ -420,7 +419,7 @@ program, never both, and no erase on a busy keyboard.
 | Key-behavior rows | 128 |
 | Tap steps per behavior / populated steps | 5 / 640 aggregate |
 | Combos / inputs per combo | 128 / 2–16 |
-| VIA macros / custom keys | 128 / 128 |
+| Macros / custom keys | 128 / 128 |
 | Names | 32 bytes of UTF-8 each |
 | Reusable RGB groups / stage-group rows | 16 / 32 aggregate |
 | Pointing slots | 32 |
@@ -446,7 +445,7 @@ owner/save/reboot and split suites exercise this complete fixture; actual
 validation, prepare and boot duration depend on keyboard scan cadence and
 remain hardware acceptance evidence.
 
-Split framing version 3 retains bounded mailbox, duplicate-request and outbound
+Split framing version 4 retains bounded mailbox, duplicate-request and outbound
 chunk buffers of at most 128 bytes, plus reuse source/progress state; it never
 keeps a full profile in the reconciler. Its 32-bit state regression allowance
 is 896 bytes (previously 768), which its 32-bit offsets fill exactly. D-F28's

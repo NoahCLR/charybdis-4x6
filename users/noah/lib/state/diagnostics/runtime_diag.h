@@ -21,7 +21,7 @@ typedef enum {
     // keyboard_task entry to matrix_scan_user: local matrix, debounce and
     // QMK's split transport.
     NOAH_RUNTIME_DIAG_STAGE_MATRIX_SCAN,
-    // VIA macro defaults and the durable I/O scan (profile and VIA sync RPCs).
+    // The durable I/O scan: the profile store and its split RPCs.
     NOAH_RUNTIME_DIAG_STAGE_DURABLE_IO,
     // Combo origins, the key runtime scan and the macro engine.
     NOAH_RUNTIME_DIAG_STAGE_KEY_RUNTIME,
@@ -41,14 +41,14 @@ typedef enum {
     // The pointing hook's return to keyboard_task's end: auto-mouse, the USB
     // mouse report, mousekey and LED tasks.
     NOAH_RUNTIME_DIAG_STAGE_POINTING_REPORT,
-    // Between keyboard_task calls: USB events, raw HID and VIA, deferred
+    // Between keyboard_task calls: USB events, Raw HID, deferred
     // executors, housekeeping.
     NOAH_RUNTIME_DIAG_STAGE_OUTSIDE_KEYBOARD_TASK,
     NOAH_RUNTIME_DIAG_STAGE_COUNT,
 } noah_runtime_diag_stage_t;
 
-// Cadence recorder wire format 2, VIA custom get value 0x03 (Profile Wire
-// channel), diagnostic builds only. Payloads are 25 bytes, little endian.
+// Cadence recorder wire format 2, Profile Wire GET value 0x03, diagnostic
+// builds only. Payloads are 25 bytes, little endian.
 //
 // Page 0, metadata: format, page count, completed windows, LE32 sequence
 // (windows stored since boot), LE32 window length in us, five LE16 gap

@@ -10,7 +10,7 @@
 // the scalar policy, one fixed record per layer (its combo reference layer and
 // its two placement bitmaps), one two-byte shortcut per custom key, then every
 // name counted: a length byte and at most 32 bytes of UTF-8, the layers'
-// first, then the VIA macros', then the custom keys', then the keyboard's own
+// first, then the macros', then the custom keys', then the keyboard's own
 // name. The fixed part comes first so its fields sit at known offsets.
 enum {
     NOAH_SETTINGS_VERSION              = NOAH_PROFILE_SETTINGS_VERSION,

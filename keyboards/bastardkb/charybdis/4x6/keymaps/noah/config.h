@@ -34,7 +34,7 @@ enum charybdis_keymap_layers {
     LAYER_EXTRA_10,
     LAYER_EXTRA_11,
     // ─── Add new layers above this line. ───────────────────────────────────
-    LAYER_COUNT = NOAH_LAYER_BANK_COUNT, // sentinel — used for VIA Dynamic layer count
+    LAYER_COUNT = NOAH_LAYER_BANK_COUNT, // sentinel — the size of the layer bank
 };
 #endif
 

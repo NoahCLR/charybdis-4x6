@@ -43,7 +43,6 @@ typedef struct {
     uint8_t  origin_half;
     bool     readable : 1;
     bool     has_profile : 1;
-    bool     logical : 1;
 } noah_profile_split_descriptor_t;
 
 typedef struct {

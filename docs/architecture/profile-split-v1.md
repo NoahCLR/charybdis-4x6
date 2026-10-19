@@ -2,9 +2,10 @@
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14, D-F28):
 > profile schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8 and
-> sparse PD v3, keymap v1 and macros v1; a slot-sized profile payload; and logical store format 6. Every
-> save binds a nonzero VIA generation and digest. Profile Wire is 2.0; split
-> framing is version 3 (32-bit offsets and lengths, D-F28, after version 2's
+> sparse PD v3, keymap v1 and macros v1; a slot-sized profile payload; and logical store format 6. The
+> profile is the only store (D-F31). Profile Wire is 2.0; split
+> framing is version 4 (VIA removed, D-F31; 32-bit offsets and lengths since
+> version 3, D-F28, after version 2's
 > sized payload chunks and reuse ranges, D-F19).
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > A backup in an earlier format is refused, not translated.
@@ -13,9 +14,9 @@ Status: accepted internal split foundation and distributed commit barrier with
 gated owner registration; normal mutation exposure and hardware acceptance
 remain open
 
-This is a dedicated sibling protocol for the durable live profile. It does not
-extend the VIA region reconciler. Byte 0 of every frame is the framing version,
-`3`; a frame of any other version is refused. Every frame except a payload
+This is the split protocol for the durable live profile, the only store
+since D-F31. Byte 0 of every frame is the framing version,
+`4`; a frame of any other version is refused. Every frame except a payload
 chunk or a payload reuse is exactly 32 bytes. A payload chunk is its 21-byte
 header, the chunk and the CRC: 22 + n bytes for an n-byte chunk, at least 32
 (a shorter chunk is zero-padded to 32). A payload reuse is 44 bytes. The last
@@ -50,9 +51,9 @@ its sibling's frames and reports it unreadable; nothing durable is at risk.
 | acknowledgement | `6` | report accepted progress or busy state |
 | error | `7` | report a stable terminal or retryable error |
 | payload request | `8` | let the current QMK master pull bytes from a newer sibling |
-| logical bind | `9` | carry the VIA identity bound to the copy (below) |
+| retired | `9` | was the VIA bind; refused since D-F31 |
 | prepare durable | `10` | validate the received copy and persist only its prepared marker |
-| logical bind request | `11` | ask a newer sibling for its binding before a pull |
+| retired | `11` | was the VIA bind request; refused since D-F31 |
 | payload reuse | `12` | fill a range of the copy from the receiver's own active profile |
 
 Status ids are OK `0`, invalid frame `1`, incompatible `2`, stale `3`,
@@ -78,10 +79,10 @@ Metadata, prepare begin, prepare commit, and abort use this layout:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | framing version, `3` |
+| 0 | 1 | framing version, `4` |
 | 1 | 1 | frame kind |
 | 2 | 1 | status |
-| 3 | 1 | bit 0 has committed profile; bit 1 metadata readable; bit 2 logical record (required for a committed profile); bit 3 stable physical origin half; bit 4 the persistent override flag; bits 5–7 zero |
+| 3 | 1 | bit 0 has committed profile; bit 1 metadata readable; bit 2 reserved zero (a VIA-bound record until D-F31); bit 3 stable physical origin half; bit 4 the persistent override flag; bits 5–7 zero |
 | 4 | 1 | schema major, exactly the current schema major |
 | 5 | 1 | schema minor, exactly the current schema minor |
 | 6 | 1 | Profile Wire domain mask derived from the canonical payload |
@@ -111,7 +112,7 @@ whole-profile validation before commit.
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | framing version, `3` |
+| 0 | 1 | framing version, `4` |
 | 1 | 1 | frame kind |
 | 2 | 1 | status |
 | 3 | 1 | reserved zero |
@@ -153,7 +154,7 @@ them. It is 44 bytes:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | framing version, `3` |
+| 0 | 1 | framing version, `4` |
 | 1 | 1 | kind, `12` |
 | 2 | 1 | status, OK |
 | 3 | 1 | reserved zero |
@@ -325,7 +326,7 @@ registered only after a real owner initializes the reconciler.
 `users/noah/config.h` raises both of QMK's RPC buffers to 128 bytes, for the
 largest pushed request and the largest pulled reply. QMK carries each RPC's
 own lengths, so every other split RPC still sends and reads its own small
-frames; the VIA mirror keeps its own 32-byte bound.
+frames.
 
 An abandoned inbound provisional prepare has its own passive lease expiry. The
 receiver aborts that incomplete inactive-slot candidate and releases `PEER`
@@ -352,15 +353,15 @@ since the receiver has then rejected the copy and released its storage.
 A receiver that cannot store a prepared copy, typically one failed flash write,
 answers a correlated storage error. Until the commit is authorized nothing is
 durable on either half, so the sender sends the copy again from
-`PREPARE_BEGIN` (or the logical bind), up to two times, before it stops with
+`PREPARE_BEGIN`, up to two times, before it stops with
 that status. The owner then ends the host's Apply at once with candidate error
 `24` rather than waiting out its no-progress timeout. If both halves change
 transport roles, an outbound prepared source retains its candidate correlation
 but restarts at `PREPARE_BEGIN` before resuming chunks or an authorized commit;
 it never assumes the new receiver retained volatile prepare state. The same
 rebuild applies when an authorized commit meets a receiver that no longer holds
-the lease, typically because it rebooted while the link was down: a logical
-copy restarts at the VIA bind rather than `PREPARE_BEGIN`, and after its own
+the lease, typically because it rebooted while the link was down: the copy
+restarts at `PREPARE_BEGIN`, and after its own
 commit marker the sender reads the copy from its committed record because the
 staged candidate no longer exists.
 
@@ -389,15 +390,13 @@ Until those pieces pass, mutation, activation, and peer-reconciliation
 capability bits remain disabled in ordinary firmware. The engineering mutation
 pair advertises them together for the two-half acceptance matrix.
 
-## Mandatory logical binding
+## No binding
 
-A transfer sends LOGICAL_BIND (kind 9) before PREPARE_BEGIN, with the exact
-custom generation/digest and nonzero VIA generation/digest in format 6.
-PREPARE_BEGIN without that correlated bind is invalid metadata. The receiver
-retains the bind across repeated BEGINs after BUSY or a lost ACK, replacing it
-when a new bind arrives. Convergence-only mode admits this metadata for crossed
-host arbitration while keeping payload mutation fenced.
-
-Background repair follows the same rule. A newer local committed record pushes
-its stored binding; pulling a newer peer first requests its binding with
-LOGICAL_BIND_REQUEST (kind 11). There is no unbound prepared-push path.
+Until D-F31 every copy carried the VIA generation and digest its record was
+bound to, sent before PREPARE_BEGIN as LOGICAL_BIND (kind 9) or fetched before
+a pull with LOGICAL_BIND_REQUEST (kind 11). The profile is now the only store:
+PREPARE_BEGIN is a copy's first exchange, both kinds are refused like any
+unknown kind, and descriptor flag bit 2, which marked a record bound to VIA,
+is refused when set. Framing version 4 also distinguishes builds whose QMK
+split call IDs moved down by two when the VIA calls were removed. Both halves
+must be flashed together; earlier framing is refused as incompatible.

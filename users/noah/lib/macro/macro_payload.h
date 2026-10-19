@@ -27,7 +27,7 @@ typedef enum {
 
 typedef struct {
     uint16_t length;
-    uint8_t  protection; // 0 automatic, 1 on, 2 off; VIA prefix 1,5,value.
+    uint8_t  protection; // 0 automatic, 1 on, 2 off; bank prefix 1,5,value.
     bool     more;       // Another window of the same macro follows this one.
     uint8_t  bytes[MACRO_PAYLOAD_IR_MAX_BYTES];
 } macro_payload_ir_t;
@@ -58,7 +58,7 @@ typedef bool (*macro_payload_load_window_fn)(void *context);
 
 typedef enum {
     MACRO_PAYLOAD_SOURCE_DIRECT = 0,
-    MACRO_PAYLOAD_SOURCE_VIA,
+    MACRO_PAYLOAD_SOURCE_SLOT,
 } macro_payload_source_t;
 
 typedef enum {

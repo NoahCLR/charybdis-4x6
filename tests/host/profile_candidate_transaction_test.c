@@ -113,8 +113,6 @@ static void write_u32(uint8_t *target, uint32_t value) {
 static noah_profile_candidate_v1_metadata_t metadata_for(const uint8_t *bytes, uint32_t length) {
     noah_profile_candidate_v1_metadata_t metadata = {
         .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
-        .via_generation       = 6u,
-        .via_digest           = UINT32_C(0xabcdef01),
         .schema_major         = NOAH_PROFILE_SCHEMA_MAJOR,
         .schema_minor         = 0u,
         .requested_domains    = 0u,
@@ -141,8 +139,6 @@ static void begin_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint16_
     write_u32(&frame[12], metadata->crc32);
     write_u32(&frame[16], metadata->digest);
     write_u32(&frame[20], metadata->action_abi_digest);
-    write_u32(&frame[24], metadata->via_generation);
-    write_u32(&frame[28], metadata->via_digest);
 }
 
 static void chunk_frame(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint8_t length) {
@@ -436,11 +432,11 @@ static void test_malformed_frame_matrix(void) {
     begin_frame(frame, 1u, &metadata);
     assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
     assert(command.payload.begin.store_format_version == NOAH_PROFILE_LOGICAL_STORE_VERSION && command.payload.begin.flags == 0u);
-    // Missing VIA identities are rejected before any candidate lease or
-    // persistent writes can begin.
-    for (uint8_t offset = 24u; offset <= 28u; offset += 4u) {
+    // Bytes 24..31 bound a candidate to the VIA store until D-F31; any
+    // nonzero byte there is refused before a candidate lease or a write.
+    for (uint8_t offset = 24u; offset < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; offset++) {
         begin_frame(frame, 1u, &metadata);
-        memset(frame + offset, 0, 4);
+        frame[offset] = 1u;
         assert(noah_profile_candidate_v1_decode(frame, 32u, &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED && error.frame_offset == offset);
     }
 
@@ -684,7 +680,7 @@ static void begin_transaction(noah_profile_candidate_transaction_t *transaction,
     assert(status_of(transaction).state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
 }
 
-static void test_begin_retry_requires_identical_via_binding(void) {
+static void test_begin_retry_requires_identical_metadata(void) {
     static const uint8_t profile[8] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
     for (uint8_t changed = 1u; changed <= 3u; changed++) {
         fake_backend_t fake;
@@ -703,8 +699,8 @@ static void test_begin_retry_requires_identical_via_binding(void) {
         assert(fake.begin_calls == 1u);
 
         noah_profile_candidate_v1_metadata_t retry = original;
-        if (changed & 1u) retry.via_generation++;
-        if (changed & 2u) retry.via_digest++;
+        if (changed & 1u) retry.crc32++;
+        if (changed & 2u) retry.action_abi_digest++;
         begin_frame(frame, 123u, &retry);
         queue_and_scan(&transaction, &fake, frame);
         noah_profile_candidate_v1_status_t status = status_of(&transaction);
@@ -712,8 +708,8 @@ static void test_begin_retry_requires_identical_via_binding(void) {
         assert(status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
         assert(status.flags == NOAH_PROFILE_CANDIDATE_V1_STATUS_POISONED);
         assert(fake.begin_calls == 1u && fake.commit_begin_calls == 0u);
-        assert(transaction.metadata.via_generation == original.via_generation);
-        assert(transaction.metadata.via_digest == original.via_digest);
+        assert(transaction.metadata.crc32 == original.crc32);
+        assert(transaction.metadata.action_abi_digest == original.action_abi_digest);
 
         // An original BEGIN cannot revive a poisoned candidate either.
         begin_frame(frame, 123u, &original);
@@ -1736,7 +1732,7 @@ int main(int argc, char **argv) {
     test_operation_status_codec();
     test_peer_status_page();
     test_mailbox_and_begin_retries();
-    test_begin_retry_requires_identical_via_binding();
+    test_begin_retry_requires_identical_metadata();
     test_sequential_chunks_and_duplicate_rules();
     test_bounded_validation_and_error_locations();
     test_error_pages_follow_asynchronous_errors();

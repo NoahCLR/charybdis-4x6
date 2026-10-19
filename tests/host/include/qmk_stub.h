@@ -55,12 +55,6 @@ static inline uint16_t pgm_read_word(const void *addr_) {
 #ifndef TAP_HOLD_CAPS_DELAY
 #    define TAP_HOLD_CAPS_DELAY 80u
 #endif
-#ifndef DYNAMIC_KEYMAP_LAYER_COUNT
-#    define DYNAMIC_KEYMAP_LAYER_COUNT LAYER_COUNT
-#endif
-#ifndef DYNAMIC_KEYMAP_MACRO_COUNT
-#    define DYNAMIC_KEYMAP_MACRO_COUNT 128u
-#endif
 
 #ifndef MOD_BIT
 #    define MOD_BIT(keycode_) (1u << ((keycode_) & 0x07u))

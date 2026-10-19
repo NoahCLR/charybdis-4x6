@@ -129,9 +129,8 @@ Mapped-only layers compose cleanly with overlap: lower active colored layers
 stay visible wherever the higher layer is transparent. `LAYER_BASE` is treated
 as the persistent underlay for the layer scene, so a non-black base color
 paints both when no higher layer is active and underneath higher mapped-only
-layers. The runtime resolves that against the effective keymap, so VIA dynamic
-keymap edits are reflected after the runtime refreshes its cached LED
-coverage.
+layers. The runtime resolves that against the effective keymap, so a saved keymap
+is reflected after the runtime refreshes its cached LED coverage.
 
 `HSV(0, 0, 0)` means "do not paint a solid layer color here." That is
 useful for:

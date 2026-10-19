@@ -4,7 +4,7 @@
 
 #include "qmk_profile_split_transport.h"
 
-#if defined(VIA_ENABLE) && defined(SPLIT_TRANSACTION_IDS_USER)
+#if defined(SPLIT_TRANSACTION_IDS_USER)
 
 #    include <string.h>
 

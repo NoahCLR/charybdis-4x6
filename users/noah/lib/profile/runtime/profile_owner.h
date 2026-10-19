@@ -52,29 +52,12 @@ typedef enum {
     NOAH_PROFILE_OWNER_CONCURRENT_COMMIT,
 } noah_profile_owner_state_t;
 
-typedef bool (*noah_profile_logical_via_ready_fn)(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest);
-typedef bool (*noah_profile_logical_via_command_fn)(void *context, uint16_t transaction_id, uint32_t generation, uint32_t digest);
-typedef bool (*noah_profile_logical_via_converged_fn)(void *context, uint32_t generation, uint32_t digest);
-typedef bool (*noah_profile_logical_via_boot_recover_fn)(void *context, uint32_t generation, uint32_t digest);
-typedef void (*noah_profile_logical_via_boot_release_fn)(void *context);
-
-typedef struct {
-    noah_profile_logical_via_ready_fn        ready;
-    noah_profile_logical_via_command_fn      accept;
-    noah_profile_logical_via_command_fn      abort;
-    noah_profile_logical_via_converged_fn    converged;
-    noah_profile_logical_via_boot_recover_fn boot_recover;
-    noah_profile_logical_via_boot_release_fn boot_release;
-    void                                    *context;
-} noah_profile_logical_via_ops_t;
-
 typedef struct {
     noah_profile_store_io_t               store_io;
     noah_profile_split_exchange_fn        split_exchange;
     void                                 *split_transport_context;
     uint8_t                               origin_half;
     bool                                  peer_required;
-    const noah_profile_logical_via_ops_t *logical_via;
 } noah_profile_owner_config_t;
 
 // The compiled validator is needed only before the candidate backend exists,
@@ -127,14 +110,10 @@ typedef struct {
     bool                                 host_barrier_waiting_boundary : 1;
     bool                                 host_barrier_peer_confirmed : 1;
     bool                                 host_cancel_pending : 1;
-    bool                                 host_via_accept_requested : 1;
-    bool                                 host_via_abort_requested : 1;
-    bool                                 host_via_progress : 1;
-    bool                                 boot_via_resolution_known : 1;
 } noah_profile_owner_t;
 
 // Protocol-neutral, caller-owned observation of the complete live-profile
-// graph. The VIA adapter maps this snapshot into its frozen two-page status;
+// graph. The Profile Wire channel maps this snapshot into its status pages;
 // no mutable owner pointer crosses the runtime boundary.
 typedef struct {
     noah_profile_owner_state_t           owner_state;
@@ -157,7 +136,7 @@ typedef struct {
     bool                                 peer_converged;
     bool                                 transfer_pending;
     bool                                 peer_cleanup_pending;
-    // Nothing is committed because a slot holds an earlier store format,
+    // Nothing is committed because a slot holds an earlier store format or retired test layout,
     // which is never read (D-F28): the keyboard runs its compiled defaults.
     bool                                 stored_earlier_format;
 } noah_profile_owner_status_t;
@@ -178,21 +157,7 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
 // Advertising or routing this surface is a separate capability decision.
 bool noah_profile_owner_receive(noah_profile_owner_t *owner, uint8_t *frame, size_t length);
 
-// Host logical VIA staging belongs to the host candidate. It is admitted only
-// for that candidate's transaction id and bound VIA identity, and only while
-// the candidate is still being received or validated: from COMMIT on the
-// staged bytes are fixed, and only this owner ends the staging (ACCEPT after
-// the decision, a coordinated cancel before it). An admitted frame the VIA
-// layer queued is reported as progress, which the next scan counts as host
-// activity, so a long staging keeps its candidate's lease while status polls
-// alone do not.
-bool noah_profile_owner_logical_via_admit(const noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t generation, uint32_t digest);
-void noah_profile_owner_logical_via_progress(noah_profile_owner_t *owner);
-
 noah_profile_owner_state_t         noah_profile_owner_state(const noah_profile_owner_t *owner);
-// Key output is fenced only from the logical VIA ACCEPT request until
-// activation (or a post-commit authority failure). Every other state types.
-bool                               noah_profile_owner_output_ready(const noah_profile_owner_t *owner);
 noah_profile_store_result_t        noah_profile_owner_discovery_result(const noah_profile_owner_t *owner);
 const noah_profile_store_record_t *noah_profile_owner_committed(const noah_profile_owner_t *owner);
 

@@ -276,7 +276,7 @@ While active:
 - motion is accumulated and emitted in discrete steps
 - large motion follows the shared bounded discrete-output policy
 
-A direction, diagonal or button tap override can start a VIA macro (D-F23),
+A direction, diagonal or button tap override can start a macro (D-F23),
 with inherited modifiers only. Busy triggers are dropped. Every step is allowed;
 Once per movement is useful for longer macros. Empty slots send nothing and do
 not spend a movement. Mouse clicks inside a macro bypass the mode's button

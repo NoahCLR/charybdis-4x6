@@ -1,13 +1,15 @@
 #pragma once
 
-// Profile Wire capabilities exactly as this keyboard reports them. The VIA
-// profile channel and the host contract probe (tests/host/contract_probe.c)
+// Profile Wire capabilities exactly as this keyboard reports them. The Raw
+// HID profile channel and the host contract probe (tests/host/contract_probe.c)
 // both build them from here, so the contract a client is checked against cannot
 // drift from the firmware. Include after the Profile Wire, storage-layout and
 // candidate headers and the keyboard's config.
 
-#ifndef VIA_FIRMWARE_VERSION
-#    define VIA_FIRMWARE_VERSION 0u
+#include "../profile/schema/profile_macros_v1.h"
+
+#ifndef NOAH_FIRMWARE_VERSION
+#    define NOAH_FIRMWARE_VERSION 0u
 #endif
 
 #ifdef SPLIT_KEYBOARD
@@ -52,9 +54,9 @@
         .candidate_chunk_max          = 0u,                                                                                                                                                                                                                                                                              \
         .feature_flags                = NOAH_PROFILE_CHANNEL_READ_ONLY_FEATURES,                                                                                                                                                                                                                                         \
         .action_abi_digest            = 0u,                                                                                                                                                                                                                                                                              \
-        .firmware_version             = VIA_FIRMWARE_VERSION,                                                                                                                                                                                                                                                            \
+        .firmware_version             = NOAH_FIRMWARE_VERSION,                                                                                                                                                                                                                                                             \
         .compiled_default_digest      = 0u,                                                                                                                                                                                                                                                                              \
-        .compiled_layer_count         = DYNAMIC_KEYMAP_LAYER_COUNT,                                                                                                                                                                                                                                                      \
+        .compiled_layer_count         = LAYER_COUNT,                                                                                                                                                                                                                                                                     \
         .max_logical_layers           = NOAH_PROFILE_WIRE_V1_MAX_LOGICAL_LAYERS,                                                                                                                                                                                                                                         \
         .max_behavior_rows            = NOAH_PROFILE_WIRE_V1_MAX_BEHAVIOR_ROWS,                                                                                                                                                                                                                                          \
         .max_tap_steps_per_behavior   = NOAH_PROFILE_WIRE_V1_MAX_TAP_STEPS_PER_BEHAVIOR,                                                                                                                                                                                                                                 \
@@ -66,11 +68,11 @@
         .physical_led_count           = NOAH_PROFILE_LED_COUNT,                                                                                                                                                                                                                                                          \
         .led_bitmap_size              = NOAH_PROFILE_WIRE_V1_LED_BITMAP_SIZE,                                                                                                                                                                                                                                            \
         .custom_key_slots             = NOAH_PROFILE_WIRE_V1_MAX_CUSTOM_KEYS,                                                                                                                                                                                                                                            \
-        .via_macro_slots              = DYNAMIC_KEYMAP_MACRO_COUNT,                                                                                                                                                                                                                                                      \
+        .macro_slots                  = NOAH_PROFILE_MACROS_V1_SLOTS,                                                                                                                                                                                                                                                     \
         .max_profile_payload          = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,                                                                                                                                                                                                                                           \
         .profile_slot_payload         = NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX,                                                                                                                                                                                                                                           \
         .profile_slot_size            = NOAH_PROFILE_STORAGE_SLOT_A_SIZE,                                                                                                                                                                                                                                                \
-        .via_macro_bytes              = NOAH_PROFILE_STORAGE_VIA_MACRO_SIZE,                                                                                                                                                                                                                                             \
+        .macro_bytes                  = NOAH_PROFILE_MACROS_V1_MAX_SIZE,                                                                                                                                                                                                                                                 \
         .supported_domain_mask        = 0u,                                                                                                                                                                                                                                                                              \
         .max_name_bytes               = NOAH_PROFILE_WIRE_V1_MAX_NAME_BYTES,                                                                                                                                                                                                                                             \
         .layer_mask_bits              = NOAH_PROFILE_WIRE_V1_LAYER_MASK_BITS,                                                                                                                                                                                                                                            \

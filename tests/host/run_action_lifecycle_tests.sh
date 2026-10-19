@@ -22,7 +22,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -I"$ROOT/users/noah" \
     -I"$ROOT/tests/host/include" \
     "$ROOT/tests/host/action_lifecycle_test.c" \
-    "$ROOT/users/noah/lib/compat/qmk_contract.c" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c" \
     "$ROOT/users/noah/lib/action/action_kind.c" \
     "$ROOT/users/noah/lib/action/action_kind_dispatch.c" \
     "$ROOT/users/noah/lib/action/action_lifecycle.c" \

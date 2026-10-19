@@ -18,9 +18,7 @@ build_and_run() {
     name="$1"
     shift
     cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" \
-        -DVIA_ENABLE \
         -DSPLIT_KEYBOARD \
-        -DDYNAMIC_KEYMAP_EEPROM_MAX_ADDR=0x8FFFu \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
         -I"$ROOT" \

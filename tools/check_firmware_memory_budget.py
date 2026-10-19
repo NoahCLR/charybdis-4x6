@@ -40,7 +40,7 @@ import sys
 
 
 REQUIRED_SYMBOLS = (
-    "via_macro_slots",
+    "profile_macro_slots",
     "macro_slot_active_ir",
 )
 BOOKKEEPING_SYMBOLS = (
@@ -49,8 +49,6 @@ BOOKKEEPING_SYMBOLS = (
     "macro_slot_active_cursor",
     "macro_slot_active_provider",
     "macro_slot_active_slot",
-    "via_macro_found",
-    "profile_macro_slots",
     "profile_macro_found",
 )
 LAYOUT_SYMBOLS = (

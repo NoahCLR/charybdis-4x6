@@ -39,9 +39,9 @@ LAYOUT_OUTPUT = "\n".join(
 
 MACRO_OUTPUT = "\n".join(
     (
-        "20000010 00000040 B via_macro_slots.lto_priv.7",
-        "20000050 00000202 b macro_slot_active_ir.lto_priv.8",
-        "20000254 00000004 b macro_slot_active_metadata.lto_priv.9",
+        "20000010 00000080 B profile_macro_slots.lto_priv.7",
+        "20000090 00000202 b macro_slot_active_ir.lto_priv.8",
+        "20000294 00000004 b macro_slot_active_metadata.lto_priv.9",
     )
 )
 
@@ -74,31 +74,27 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
         symbols = MEMORY_BUDGET.parse_nm_symbols(
             "\n".join(
                 (
-                    "20000010 00000040 B via_macro_slots.lto_priv.7",
                     "20000050 00000202 b macro_slot_active_ir.lto_priv.8",
                     "20000254 00000004 b macro_slot_active_metadata.lto_priv.9",
                     "20000258 00000014 b macro_slot_active_cursor.lto_priv.10",
                     "2000026c 00000010 b macro_slot_active_provider",
                     "2000027c 00000001 b macro_slot_active_slot",
-                    "2000027d 00000006 b via_macro_found",
                     "20000284 00000080 b profile_macro_slots.lto_priv.11",
                     "20000304 00000006 b profile_macro_found",
                     "00000100 00000020 T macro_slot_active_ir_helper",
                 )
             )
         )
-        self.assertEqual(symbols["via_macro_slots"], 64)
         self.assertEqual(symbols["macro_slot_active_ir"], 514)
         self.assertEqual(symbols["macro_slot_active_metadata"], 4)
         self.assertEqual(symbols["macro_slot_active_cursor"], 20)
         self.assertEqual(symbols["macro_slot_active_provider"], 16)
         self.assertEqual(symbols["macro_slot_active_slot"], 1)
-        self.assertEqual(symbols["via_macro_found"], 6)
         self.assertEqual(symbols["profile_macro_slots"], 128)
         self.assertEqual(symbols["profile_macro_found"], 6)
 
     def test_rejects_missing_required_symbol(self):
-        with self.assertRaisesRegex(ValueError, "via_macro_slots"):
+        with self.assertRaisesRegex(ValueError, "profile_macro_slots"):
             MEMORY_BUDGET.parse_nm_symbols(
                 "20000010 00000202 b macro_slot_active_ir\n"
             )
@@ -106,8 +102,8 @@ class FirmwareMemoryBudgetToolTest(unittest.TestCase):
     def test_rejects_duplicate_canonical_symbol(self):
         with self.assertRaisesRegex(ValueError, "duplicate"):
             MEMORY_BUDGET.parse_nm_symbols(
-                "20000020 00000040 b via_macro_slots\n"
-                "20000030 00000040 b via_macro_slots.lto_priv.1\n"
+                "20000020 00000080 b profile_macro_slots\n"
+                "20000030 00000080 b profile_macro_slots.lto_priv.1\n"
                 "20000060 00000202 b macro_slot_active_ir\n"
             )
 

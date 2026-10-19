@@ -76,7 +76,7 @@ static void encode_capabilities_page_one(uint8_t *payload, const noah_profile_wi
     payload[8]  = capabilities->physical_led_count;
     payload[9]  = capabilities->led_bitmap_size;
     payload[10] = capabilities->custom_key_slots;
-    payload[11] = capabilities->via_macro_slots;
+    payload[11] = capabilities->macro_slots;
     payload[12] = capabilities->supported_domain_mask;
     payload[13] = capabilities->max_name_bytes;
     payload[14] = capabilities->layer_mask_bits;
@@ -89,7 +89,7 @@ static void encode_capabilities_page_two(uint8_t *payload, const noah_profile_wi
     write_u32(&payload[2], capabilities->profile_slot_size);
     write_u32(&payload[6], capabilities->max_profile_payload);
     write_u32(&payload[10], capabilities->profile_slot_payload);
-    write_u32(&payload[14], capabilities->via_macro_bytes);
+    write_u32(&payload[14], capabilities->macro_bytes);
     // Bytes 18..24 remain canonical zero padding.
 }
 

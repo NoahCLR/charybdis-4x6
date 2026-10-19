@@ -3,8 +3,8 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // OSL() is owned by userspace (layer_ownership_oneshot_*); QMK's own one-shot
-// layer state is never set. QMK's keymap_config.oneshot_enable (Magic / VIA
-// "one-shot keys") still decides whether a tap arms it: with one-shots off,
+// layer state is never set. QMK's keymap_config.oneshot_enable (Magic keys,
+// or the keymap options setting) still decides whether a tap arms it: with one-shots off,
 // OSL(layer) is only a hold, as QMK's is. ONESHOT_TIMEOUT and
 // ONESHOT_TAP_TOGGLE apply to QMK's OSM() only.
 // ────────────────────────────────────────────────────────────────────────────

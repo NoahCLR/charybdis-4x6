@@ -112,7 +112,10 @@ typedef struct {
     macro_payload_hold_balance_t balance;
 } macro_payload_qmk_clean_point_t;
 
-bool macro_payload_decode_qmk_window(macro_payload_ir_t *ir, macro_payload_stream_cursor_t *cursor, uint16_t length, macro_payload_read_byte_fn read_byte, void *context) {
+// Kept out of line in every build: the profile provider is its only stored
+// caller since VIA left (D-F31), and the reviewed stack paths measure the
+// decoder in a frame of its own (tools/firmware_stack_budget.json).
+__attribute__((noinline)) bool macro_payload_decode_qmk_window(macro_payload_ir_t *ir, macro_payload_stream_cursor_t *cursor, uint16_t length, macro_payload_read_byte_fn read_byte, void *context) {
     macro_payload_text_chunk_t      text_chunk                                = {0};
     macro_payload_hold_balance_t    balance                                   = {0};
     macro_payload_qmk_clean_point_t clean                                     = {0};

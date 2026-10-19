@@ -10,9 +10,10 @@
 
 enum {
     // Framing version 2 added sized payload chunks and PAYLOAD_REUSE; version
-    // 3 widened every offset and length to 32 bits (D-F28). Both halves run
-    // one build, so an older peer simply fails to decode.
-    NOAH_PROFILE_SPLIT_PROTOCOL_VERSION = 3u,
+    // 3 widened every offset and length to 32 bits (D-F28); version 4
+    // removes VIA binding and changes the QMK split call IDs (D-F31).
+    // Both halves must run one build; older framing is refused.
+    NOAH_PROFILE_SPLIT_PROTOCOL_VERSION = 4u,
     // Every frame except a payload chunk and a reuse request is this size,
     // and so is the reply buffer of every request but PAYLOAD_REQUEST.
     NOAH_PROFILE_SPLIT_V1_FRAME_SIZE = 32u,
@@ -38,13 +39,11 @@ typedef enum {
     // pull a newer durable profile from the sibling without making USB role
     // part of authority. The response is a correlated PAYLOAD_CHUNK.
     NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST = 8u,
-    // Carries the VIA identity bound to a format-3 custom record. It is sent
-    // before PREPARE_BEGIN so the peer can write the exact same slot header.
-    NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND = 9u,
+    // Kinds 9 and 11 bound a copy to the VIA store's identity. They are
+    // retired with VIA (D-F31) and refused like any unknown kind.
     // Validates the received payload and persists only the prepared marker.
-    // PREPARE_COMMIT remains the later logical decision command.
-    NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE      = 10u,
-    NOAH_PROFILE_SPLIT_V1_LOGICAL_BIND_REQUEST = 11u,
+    // PREPARE_COMMIT remains the later decision command.
+    NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE = 10u,
     // Asks the receiver to fill a range of the copy from its own active
     // profile, which it checks against the named source identity. It answers
     // like a payload chunk; SOURCE_UNAVAILABLE means "send these bytes".
@@ -110,9 +109,6 @@ typedef struct {
     uint32_t                        reuse_length;
     uint32_t                        reuse_source_offset;
     noah_profile_split_v1_source_t  reuse_source;
-    uint8_t                         store_format_version;
-    uint32_t                        via_generation;
-    uint32_t                        via_digest;
     // ACK/BUSY only; zero in every other frame.
     uint8_t                         busy_reason;
     uint8_t                         busy_store_state;

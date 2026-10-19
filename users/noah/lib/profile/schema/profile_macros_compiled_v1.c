@@ -10,7 +10,8 @@
 _Static_assert(VIA_MACRO_SLOT_COUNT == NOAH_PROFILE_MACROS_V1_SLOTS, "the macro domain holds every macro slot");
 
 // The authored macros already in the bank encoding, each ending with its
-// terminator: what VIA's bank is seeded with. Real-profile validation rebuilds
+// terminator, the bank encoding VIA's dynamic macros used (D-F30, D-F31).
+// Real-profile validation rebuilds
 // authored_macro_bank with the firmware encoder, so writing a profile copies
 // bytes instead of compiling macros on the save path.
 noah_profile_compiled_v1_result_t noah_profile_macros_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {

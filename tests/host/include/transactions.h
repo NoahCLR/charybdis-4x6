@@ -17,10 +17,8 @@ enum {
     PUT_SPLIT_COMBO_FEEDBACK_SYNC        = 2,
     PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC = 3,
     PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC   = 4,
-    PUT_VIA_KEYMAP_SYNC                  = 5,
-    PUT_VIA_KEYMAP_MIRROR                = 6,
-    PUT_PROFILE_SPLIT_SYNC               = 7,
-    PUT_PROFILE_FLASH_DIAGNOSTICS        = 8,
+    PUT_PROFILE_SPLIT_SYNC               = 5,
+    PUT_PROFILE_FLASH_DIAGNOSTICS        = 6,
 };
 
 void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback);

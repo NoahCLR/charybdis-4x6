@@ -21,7 +21,6 @@ build_and_run() {
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DNOAH_PROFILE_SPLIT_TEST_HOOKS \
-        -DVIA_ENABLE \
         -DNOAH_PD_PROFILE_ENABLE \
         -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
         -I"$ROOT" \

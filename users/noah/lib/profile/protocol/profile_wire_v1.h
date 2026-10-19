@@ -10,6 +10,9 @@ enum {
     NOAH_PROFILE_WIRE_V1_REPORT_SIZE      = 32u,
     NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE     = 25u,
     NOAH_PROFILE_WIRE_V1_COMMAND_GET      = 0x08u,
+    // The firmware answers every Raw HID report itself (D-F31). A report no
+    // Profile Wire handler takes comes back with this command byte.
+    NOAH_PROFILE_WIRE_V1_COMMAND_UNHANDLED = 0xFFu,
     NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL   = 0x00u,
     NOAH_PROFILE_WIRE_V1_VALUE_CAPABILITY = 0x01u,
     NOAH_PROFILE_WIRE_V1_VALUE_STATUS     = 0x02u,
@@ -116,11 +119,11 @@ typedef struct {
     uint8_t  physical_led_count;
     uint8_t  led_bitmap_size;
     uint8_t  custom_key_slots;
-    uint8_t  via_macro_slots;
+    uint8_t  macro_slots;
     uint32_t max_profile_payload;
     uint32_t profile_slot_payload;
     uint32_t profile_slot_size;
-    uint32_t via_macro_bytes;
+    uint32_t macro_bytes;
     uint8_t  supported_domain_mask;
     uint8_t  max_name_bytes;
     uint8_t  layer_mask_bits;
@@ -154,7 +157,7 @@ typedef struct {
 } noah_profile_wire_v1_read_service_t;
 
 // Handles only Profile Wire v1 custom-get requests. The request header is:
-// [VIA command, channel, value, nonzero request id, page], followed by zeroed
+// [command, channel, value, nonzero request id, page], followed by zeroed
 // reserved bytes. A handled response preserves those five correlation bytes,
 // then returns [status, payload length, payload...].
 bool noah_profile_wire_v1_handle_get(const noah_profile_wire_v1_read_service_t *service, uint8_t *frame, uint8_t length);

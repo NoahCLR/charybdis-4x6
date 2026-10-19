@@ -186,7 +186,10 @@ bool macro_payload_parse_command(const char *start, const char *end, macro_paylo
     return true;
 }
 
-bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
+// Kept out of line in every build: the profile provider is its only caller
+// since VIA left (D-F31), and inlined there it would widen the provider's frame
+// on the saved-macro storage read too (tools/firmware_stack_budget.json).
+__attribute__((noinline)) bool macro_payload_compile(const char *payload, macro_payload_ir_t *ir) {
     const char                  *cursor     = payload;
     const char                  *text_start = payload;
     macro_payload_hold_balance_t balance    = {0};

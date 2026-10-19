@@ -58,21 +58,6 @@
           "reason": "the profile store reads the slot flash region in place through its injected flash backend (D-F29)"
         },
         {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_qmk_durable_io_profile_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches profile discovery through its rotating step table; the step waits while the slot flash says so (D-F29), and the pinned compiler inlines the store runtime step into it"
-        },
-        {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_qmk_via_split_mirror_matrix_scan_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches the VIA mirror mailbox through its rotating step table"
-        },
-        {
-          "caller": "noah_qmk_durable_io_matrix_scan",
-          "callee": "noah_qmk_via_split_sync_matrix_scan_step",
-          "reason": "the shared master/slave durable-I/O scheduler dispatches durable VIA reconciliation through its rotating step table"
-        },
-        {
           "caller": "noah_profile_reader_read",
           "callee": "staged_reader_read",
           "reason": "Published key-behavior views read the retained committed slot through their installed snapshot reader."
@@ -86,11 +71,6 @@
           "caller": "read_flash",
           "callee": "rp2040_read",
           "reason": "the flash backend reads through its driver's XIP read (D-F29)"
-        },
-        {
-          "caller": "macro_payload_decode_qmk_window",
-          "callee": "noah_effective_macro_read_byte",
-          "reason": "the profile provider supplies the runtime's bank byte reader to the existing stored-bank window decoder"
         },
         {
           "caller": "noah_effective_macro_read_byte",
@@ -253,40 +233,8 @@
           "functions": ["main", "matrix_scan", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
         },
         {
-          "name": "matrix scan VIA default macro seed",
-          "functions": ["main", "matrix_scan", "apply_via_default_macros", "seed_via_default_macros", "macro_payload_compile", "macro_payload_lookup_keycode", "strlen"]
-        },
-        {
-          "name": "matrix scan VIA canonical digest read",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_storage_digest_step", "noah_qmk_via_storage_region_read", "nvm_dynamic_keymap_macro_read_buffer", "eeprom_read_byte", "wear_leveling_read"]
-        },
-        {
           "name": "matrix scan live-profile boot discovery",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "noah_profile_store_boot_select_step", "io_read", "flash_read", "read_flash", "rp2040_read"]
-        },
-        {
-          "name": "matrix scan VIA metadata and snapshot RPC",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_rpc_exchange", "transaction_rpc_exec", "transport_execute_transaction"]
-        },
-        {
-          "name": "matrix scan VIA pulled macro fragment write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_storage_region_write", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan VIA verified generation commit",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "noah_qmk_via_sync_state_complete_mutation", "noah_qmk_via_sync_state_persist", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan VIA two-dirty default recovery",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_sync_matrix_scan_step", "eeconfig_init_via", "dynamic_keymap_reset", "nvm_dynamic_keymap_update_keycode", "eeprom_update_byte", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan queued VIA mirror keymap write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_mirror_matrix_scan_step", "nvm_dynamic_keymap_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
-        },
-        {
-          "name": "matrix scan queued VIA mirror macro write",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_via_split_mirror_matrix_scan_step", "nvm_dynamic_keymap_macro_update_buffer", "eeprom_update_byte", "wear_leveling_write"]
         },
         {
           "name": "pointing task dragscroll accumulation",
@@ -394,16 +342,6 @@
           "caller": "slave_rpc_exec_callback",
           "callee": "split_runtime_sync_slave_key_feedback_branch_rpc",
           "reason": "local split RPC registry branch-feedback callback"
-        },
-        {
-          "caller": "slave_rpc_exec_callback",
-          "callee": "noah_qmk_via_split_sync_rpc",
-          "reason": "local split RPC registry dispatches the durable VIA reconciliation callback"
-        },
-        {
-          "caller": "slave_rpc_exec_callback",
-          "callee": "noah_qmk_via_split_mirror_rpc",
-          "reason": "local split RPC registry dispatches the best-effort VIA mirror callback"
         }
       ],
       "cycle_bounds": [],
@@ -423,18 +361,6 @@
         {
           "name": "branch-feedback RPC",
           "functions": ["SlaveThread", "slave_rpc_exec_callback", "split_runtime_sync_slave_key_feedback_branch_rpc"]
-        },
-        {
-          "name": "VIA durable request mailbox admission",
-          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_rpc", "noah_qmk_via_sync_frame_decode", "noah_qmk_via_sync_crc8"]
-        },
-        {
-          "name": "VIA mirror mailbox admission",
-          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_mirror_rpc"]
-        },
-        {
-          "name": "VIA structured acknowledgement encode",
-          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_via_split_sync_rpc", "noah_qmk_via_respond_status", "noah_qmk_via_encode_response", "noah_qmk_via_sync_frame_encode", "noah_qmk_via_sync_crc8"]
         }
       ]
     }

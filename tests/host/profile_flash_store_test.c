@@ -176,8 +176,6 @@ static void build_profile(uint8_t *payload, uint32_t length, uint8_t seed) {
 static noah_profile_store_candidate_t candidate_for(const uint8_t *payload, uint32_t length, uint32_t generation) {
     return (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_STORE_FORMAT_VERSION,
-        .via_generation          = 17u,
-        .via_digest              = UINT32_C(0x89ABCDEF),
         .schema_major            = NOAH_PROFILE_SCHEMA_MAJOR,
         .schema_minor            = 0u,
         .domain_mask             = 1u,

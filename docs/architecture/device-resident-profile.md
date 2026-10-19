@@ -69,17 +69,14 @@ copying the matrix or bank into a new RAM cache. Macro publication uses the
 existing no-running-macro safe boundary, and cache metadata is invalidated
 before the next playback.
 
-During this additive transition VIA remains compiled, and its binding and
-staging still participate in Apply and recovery. Its separate layout and macro
-copy is no longer read for typing or playback, so VIA keymap and macro writes
-and resets are refused with `id_unhandled` rather than appearing to save. VIA removal and the client's
-new-base profile codec must follow before this becomes a supported editing
-path; the transition deliberately does not promise VIA interoperability.
+VIA is not supported (D-F31): the firmware builds without it, answers Raw HID
+itself, and keeps no second copy of the layout or macros. The profile is the
+only store.
 
 The format-6 slot header is 36 bytes: domain mask at byte 0, uint32 payload
 length at 1, origin/override flags at 5, generation at 6, payload CRC32 at 10,
-compiled digest at 14, action ABI at 18, VIA generation/digest at 22/26, three
-zero reserved bytes at 30–32, CRC16 at 33 and the final marker at 35. The CRC
+compiled digest at 14, action ABI at 18, eleven zero reserved bytes at 22–32
+(22–29 held the bound VIA generation and digest until D-F31), CRC16 at 33 and the final marker at 35. The CRC
 covers bytes 0–32 prefixed by the store format. This preserves full 32-bit
 lengths while admitting all seven domain-mask bits. Boot discovery reads at
 most one bounded storage chunk per step; publication still writes the marker
@@ -88,21 +85,22 @@ read from the three separate cells and the payload starts at the 1 KiB
 physical record boundary (D-F29). Retired format-5 markers remain recognized
 at their old byte 31. Format 6 was never released with its earlier 32-byte
 header (identity byte, CRC16 at 29, marker at 31), so the number did not
-change. Such a slot reads here with bytes 31–34 erased: its reserved bytes are
-nonzero and its CRC fails, so it is refused like any invalid slot (not reported
-as an earlier format) and the keyboard runs its compiled defaults.
+change. Such a slot reads here with bytes 31–34 erased; its original keyed
+CRC identifies the retired layout. A 36-byte slot written by a test build
+from before D-F31 carries a VIA generation or digest in bytes 22–29 and is
+also refused. The keyboard runs its compiled defaults, and Profile Wire state
+flag 9 identifies either refused test layout when nothing current is committed.
 
 ## Current Implementation Gap
 
 Ark now reads the complete supported configuration from the keyboard,
 edits all current domains, exports/imports a materialized snapshot of the whole layer bank,
-and applies one custom/VIA logical generation without consulting repository
-sources. Both custom halves are durably prepared before the decision marker;
-activation and reboot recovery require the bound VIA identity to converge.
+and applies one profile generation without consulting repository sources.
+Both halves are durably prepared before the decision marker; activation
+waits until the other half has been seen holding the commit.
 
 Remaining product work is physical interruption acceptance across each durable
-boundary, adoption or conflict reporting for writes made by external VIA
-clients, guided recovery, the known one-half reconnect transition, broad
+boundary, guided recovery, the known one-half reconnect transition, broad
 hardware acceptance, and standalone distribution. Until the interruption
 matrix is recorded, Apply continues to create a recovery file.
 
@@ -122,9 +120,9 @@ to compiled defaults is not built yet):
 - **Reset to compiled defaults** — activate the firmware's compiled profile by
   an explicit durable operation.
 
-Writes made through another VIA client are treated as external changes. The app
-must detect them and offer adoption or conflict resolution before applying a
-stale whole-profile draft.
+Only Profile Wire writes the profile; VIA clients are not answered (D-F31).
+The app still detects a profile changed by another session and offers
+adoption or conflict resolution before applying a stale whole-profile draft.
 
 Labels such as `Apply`, `Reload`, `Source`, and `Device` must always state which
 direction data moves. Digest equality alone is not a substitute for payload
@@ -143,19 +141,6 @@ Device ownership does not justify permanent scan-loop cost. In steady state:
 - pointing-device cadence is measured on hardware and protected by a regression
   threshold.
 
-VIA scan admission samples receiver verification, local digest, mailbox and boot
-recovery work flags together under one atomic section. They are hints: selected
-workers retain their own protected snapshots and epoch checks, in the existing
-priority order. Receiver verification and the mailbox each define their start
-condition once, shared by admission and worker, so a hint cannot drift narrower
-than its worker and silently stall it; digest and boot recovery are each a
-single flag their worker checks first. Work arriving after admission is
-observed on the next scan.
-Admission is checked every scan, independently of ordinary metadata polling;
-role changes, pending mutations and logical roll-forward still follow their
-existing checks and deadlines. The roll-forward clock is read only while an
-accepted transaction is waiting for host writes.
-
 Small materialized runtime caches are valid engineering choices. Each keyboard
 half has 270,336 bytes of physical SRAM; static regression policies and runtime
 high-water evidence must guide the tradeoff without presenting policy margin as
@@ -166,8 +151,8 @@ physical capacity.
 The delivery slices are in Ark's product goal and the product's status in
 Ark's direction; the firmware's status is in the
 [firmware direction](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
-The logical-generation manifest and cross-store commit and recovery ordering
-are implemented; external VIA edit adoption remains. The active phase is
+The one-store commit and recovery ordering are implemented (D-F31). The
+active phase is
 acceptance: reboot, reconnect, applicable USB/role configurations,
 interruption, two-half convergence, and polling/resource regressions before
 production promotion.
@@ -182,12 +167,12 @@ and recover the same editable values without consulting the C files.
 ## Current-format admission
 
 Firmware accepts only Profile Wire 2.0, schema 4.0 with its current domain
-versions, and store format 6 (D-F10, D-F14, D-F28). Every save binds VIA
-generation/digest, including custom-only edits. Legacy storage is refused at
+versions, and store format 6 (D-F10, D-F14, D-F28). Every save is one
+generation of the one store (D-F31). Legacy storage is refused at
 boot: the keyboard runs its compiled defaults and its status says a slot holds
 an earlier format. A backup in an earlier format is refused, not translated.
 See [Profile Wire](profile-wire-v1.md) and
-[logical transactions](logical-profile-transaction-v1.md) for admission and
+[the one-store transaction](logical-profile-transaction-v1.md) for admission and
 recovery rules.
 
 The profile is not bounded at 64 KiB anywhere it travels. Every length and
@@ -204,8 +189,8 @@ marker take on flash (D-F29).
 
 Each half keeps its own two slots, A and B, in a fixed region of its own flash
 outside QMK's emulated EEPROM (D-F29), and reads the committed one in place:
-no RAM copy of a slot exists. QMK's logical EEPROM holds only the VIA region
-(configuration, dynamic keymap and macro bank). The copy between halves is
+no RAM copy of a slot exists. QMK's logical EEPROM holds only its own
+eeconfig, with room for a user datablock (D-F31); its RAM mirror is 4 KiB. The copy between halves is
 unchanged: each half writes its own inactive slot.
 
 Every save keeps the same guarantee: power lost at any point leaves the

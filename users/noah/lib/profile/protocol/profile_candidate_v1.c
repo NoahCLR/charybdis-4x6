@@ -139,10 +139,11 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
         if (metadata->payload_length < NOAH_PROFILE_CANDIDATE_V1_MIN_BLOB_SIZE || metadata->payload_length > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 8u);
         }
-        metadata->via_generation = read_u32(&frame[24]);
-        metadata->via_digest     = read_u32(&frame[28]);
-        if (metadata->via_generation == 0u || metadata->via_digest == 0u) {
-            return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, metadata->via_generation == 0u ? 24u : 28u);
+        // Bytes 24..31 bound the candidate to the VIA store until D-F31.
+        for (uint8_t index = 24u; index < NOAH_PROFILE_WIRE_V1_REPORT_SIZE; index++) {
+            if (frame[index] != 0u) {
+                return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, index);
+            }
         }
         return NOAH_PROFILE_CANDIDATE_V1_DECODE_OK;
     }

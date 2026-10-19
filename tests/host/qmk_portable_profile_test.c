@@ -95,12 +95,6 @@ void eeconfig_update_keymap(const keymap_config_t *config) {
     (void)config;
     durable_writes++;
 }
-uint32_t eeconfig_read_user(void) {
-    return 0;
-}
-void via_eeprom_set_valid(bool valid) {
-    (void)valid;
-}
 uint8_t noah_qmk_portable_editor_page(uint8_t page, uint8_t *payload) {
     (void)page;
     (void)payload;
@@ -162,17 +156,24 @@ int main(int argc, char **argv) {
     uint8_t  bytes[NOAH_SETTINGS_MAX_SIZE], stored[NOAH_SETTINGS_MAX_SIZE] = {0};
     uint16_t length;
 
-    // Optional macro-map requests are handled even without a ready split bank.
+    // The VIA macro map (GET 0x0c) left with VIA (D-F31): not served, and
+    // the request is left as it was.
     memset(frame, 0, sizeof(frame));
     frame[0] = 8u;
     frame[2] = 0x0cu;
     frame[3] = 1u;
-    assert(noah_qmk_portable_profile_get(frame, sizeof(frame)) && frame[5] == 3u && frame[6] == 0u);
-    frame[3] = 0u;
-    assert(noah_qmk_portable_profile_get(frame, sizeof(frame)) && frame[5] == 1u);
+    {
+        uint8_t untouched[32];
+        memcpy(untouched, frame, sizeof(frame));
+        assert(!noah_qmk_portable_profile_get(frame, sizeof(frame)));
+        assert(!memcmp(untouched, frame, sizeof(frame)));
+    }
+    // Page 0 of GET 0x08 was the VIA store's sync state: an unknown page now.
+    memset(frame, 0, sizeof(frame));
+    frame[0] = 8u;
+    frame[2] = 8u;
     frame[3] = 1u;
-    frame[5] = 1u;
-    assert(noah_qmk_portable_profile_get(frame, sizeof(frame)) && frame[5] == 1u);
+    assert(noah_qmk_portable_profile_get(frame, sizeof(frame)) && frame[5] == 2u && frame[6] == 0u);
 
     // Retired source readback must not be served or mutate the request.
     memset(frame, 0, sizeof(frame));

@@ -52,7 +52,7 @@ typedef enum {
     // The final marker write may have become durable but could not be
     // confirmed. The caller must reconcile persistent status before retrying.
     NOAH_PROFILE_STORE_DURABILITY_UNKNOWN,
-    // The slot holds a record in an earlier store format (format 5, `NT`).
+    // The slot holds a record in an earlier store format or a retired format-6 test layout.
     // It is never read or converted (D-F28).
     NOAH_PROFILE_STORE_EARLIER_FORMAT,
 } noah_profile_store_result_t;
@@ -143,12 +143,10 @@ typedef struct {
     uint32_t payload_digest;
     uint32_t compiled_default_digest;
     uint32_t action_abi_digest;
-    uint32_t via_generation;
-    uint32_t via_digest;
 } noah_profile_store_record_t;
 
 typedef struct {
-    // Format 6 is required, with a nonzero VIA generation and digest.
+    // Format 6 is required.
     uint8_t format_version;
     uint8_t schema_major;
     uint8_t schema_minor;
@@ -162,8 +160,6 @@ typedef struct {
     uint32_t payload_digest;
     uint32_t compiled_default_digest;
     uint32_t action_abi_digest;
-    uint32_t via_generation;
-    uint32_t via_digest;
 } noah_profile_store_candidate_t;
 
 typedef struct {
