@@ -647,3 +647,64 @@ held the 128-byte request and does not grow; LTO packing recovers 8 bytes.
 SRAM0–3 `.data + .bss` is 208,852 bytes on the left half, 1,068 below the
 unchanged 209,920-byte tripwire. The reconciler's own 32-bit policy rises from
 896 to 1,024 bytes; it links at 992.
+
+## Profile slots in their own flash region — D-F29, 2026-10-19
+
+The two profile slots leave QMK's logical EEPROM for a flash region of their
+own and are read in place, so the wear-leveling cache mirrors only the 36 KiB
+VIA region: `WEAR_LEVELING_BACKING_SIZE` 73,728 bytes and `wear_leveling`
+36,872 bytes per half, 106,496 fewer. Pair build of the pinned image
+(`tools/build-firmware-pair.sh`, GCC 15.2.0, BK `d280a4471e`), against the
+same build of the new base (`refactor/new-base-with-32-bit-profile-lengths`
+at `86d7fd89`):
+
+| | Right (`FORCE_MASTER`) | Left (`FORCE_SLAVE`) | New base, left |
+| --- | ---: | ---: | ---: |
+| SRAM0–3 `.data` | 4,360 bytes | 4,360 | — |
+| SRAM0–3 `.bss` | 98,568 bytes | 98,568 | — |
+| SRAM0–3 `.data + .bss` | 102,928 bytes | 102,928 | 208,852 |
+| Static-data tripwire | 103,424 bytes | 103,424 | 209,920 |
+| Below it | 496 bytes | 496 | 1,068 |
+| Linker/core-memory span at boot | 159,208 bytes | 159,208 | — |
+| Image end (`__flash_binary_end`) | 273,872 bytes | 273,840 | — |
+
+The tripwire drops by exactly the 106,496 cache bytes, from 209,920 to
+103,424 (`tests/host/run_firmware_memory_budget_checks.sh`); it stays a
+regression policy, not a physical limit. The change itself costs 572 bytes:
+the flash backend (`noah_qmk_profile_flash`, 336 bytes, its 256-byte page
+buffer included), the other half's pulled pause figures, and the store's I/O
+table, which gains reset and sync (the owner links at 11,440 bytes, inside its
+11,520-byte policy). The boot span is the allocator's range, not runtime-free
+memory; allocator and stack high-water on both halves remain keyboard
+evidence.
+
+After review the backend keeps an erase frontier, a write frontier, a failure
+flag and a marker-step count: `noah_qmk_profile_flash` links at 352 bytes (16
+more). The instrumented resource build of the right half
+(`NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh`, same compiler and
+BK) links SRAM0–3 `.data` 4,356 and `.bss` 98,584 bytes, 102,940 together,
+484 below the 103,424-byte tripwire.
+
+Reviewed-path stack gates, on that right-half ELF, against the same build of
+the new base at `86d7fd89`. Both manifests now name the flash backend: reads
+(`flash_read`, `read_flash`, `rp2040_read`), writes and page programs
+(`flash_write`, `write_flash`, `flush`, `rp2040_program_page`), syncs
+(`io_sync`, `flash_sync`), the erase ahead of a save
+(`noah_qmk_durable_io_matrix_scan` → `erase_next` → `rp2040_erase_sector`) and
+the boot-time forget (`main` → `rp2040_erase_sector`); the profile step is
+reached through `noah_qmk_durable_io_profile_step`, its flash gate, into which
+the compiler inlines the store runtime step. Paths stop at the driver
+functions: the checker accepts no `bx ip` tail as evidence, so it cannot
+follow the linker veneer into pico-sdk's RAM-resident `flash_range_erase` and
+`flash_range_program`, whose frames add 40 bytes (plus the boot ROM's) with
+interrupts off.
+
+| Manifest | New base `86d7fd89` | This branch |
+| --- | --- | --- |
+| `firmware_stack_budget.json` | 6 key-runtime paths over the 1,920-byte budget (1,952–2,304) | the same 6, same figures; storage paths pass (boot discovery 672, behaviour lookups 1,072–1,336) |
+| `firmware_stack_budget_live_profile_owner.json` | 2 over: peer large chunk write 1,984, repeated chunk read 1,952 | the same 2, now 2,024 (+40) and 2,016 (+64): the flash backend's write and read frames replace the EEPROM adapter's |
+
+No path fails that passed before. The new flash paths pass: erase ahead in a
+quiet grant 312 bytes, a write that erases first 1,016, the commit sync
+1,080, the boot forget 168. The resource build stops at the right half's first
+failing manifest, so the left half was not analysed.

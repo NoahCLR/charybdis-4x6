@@ -2,7 +2,7 @@
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
 > schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8 and sparse PD v3;
-> a 53,216-byte custom payload; and logical store format 6 (D-F28). Every save
+> a 130,048-byte custom payload; and logical store format 6 (D-F28). Every save
 > binds a nonzero VIA generation and digest. Profile Wire is 2.0 and split
 > framing version 3, with 32-bit profile lengths and offsets throughout.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
@@ -82,7 +82,7 @@ All multibyte fields are little-endian:
 | 660 | variable | 273 counted names: 16 layer names, then 128 VIA macro names, then 128 custom-key names, then the keyboard name; each a uint8 length `0..32`, then that many bytes of UTF-8 |
 
 The minimum is 933 bytes (every name empty) and the maximum 9,669 bytes (every
-name 32 bytes). The complete profile shares the 53,216-byte ceiling and
+name 32 bytes). The complete profile shares the 130,048-byte ceiling and
 rejects excess without trimming. Names are profile data for the client. Macro
 content belongs to the bound VIA bank; a custom key's shortcut is its own
 action and its behaviour row works on top of it (D-F26). Firmware does not

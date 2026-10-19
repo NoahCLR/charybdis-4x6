@@ -545,7 +545,6 @@ static void test_protocol_reply_buffers(void) {
     assert(!noah_profile_split_v1_reply_decode(wire, NOAH_PROFILE_SPLIT_V1_FRAME_MAX, &decoded));
 }
 
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
 // The split copy past 65,535 bytes (D-F28): a descriptor, chunk, pull request
 // and reuse range of a 100,000-byte copy round-trip with every field whole.
 static void test_protocol_over_64_kib(void) {
@@ -583,12 +582,9 @@ static void test_protocol_over_64_kib(void) {
     reuse.reuse_source_offset = NOAH_PROFILE_BLOB_V1_MAX_SIZE - 19999u;
     assert(noah_profile_split_v1_frame_length(&reuse) == 0u);
 }
-#endif
 
 int main(void) {
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
     test_protocol_over_64_kib();
-#endif
     test_protocol_descriptor_flags();
     test_authority_decision_table();
     test_authority_publication_and_activation_observer();

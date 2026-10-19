@@ -349,16 +349,17 @@ and prove that current readers reject legacy envelopes.
 
 ## Storage geometry
 
-Current firmware uses one geometry:
+Current firmware uses one geometry (D-F29):
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
-| `0x00000..0x08fff` | 36,864 | QMK/VIA allocation |
-| `0x09000..0x15fff` | 53,248 | Profile slot A, 32-byte header + 53,216-byte payload |
-| `0x16000..0x22fff` | 53,248 | Profile slot B, same layout |
+| logical EEPROM `0x00000..0x08fff` | 36,864 | QMK/VIA allocation |
+| slot region `0x00000..0x1ffff` (flash `0x100000`) | 131,072 | Profile slot A, 32-byte header + 130,048-byte payload |
+| slot region `0x20000..0x3ffff` (flash `0x120000`) | 131,072 | Profile slot B, same layout |
 
-Logical EEPROM is 143,360 bytes; RP2040 wear-level backing is 286,720 bytes
-(D-F14). Older layouts are not interpreted in place, and a backup from earlier
+Logical EEPROM is 36,864 bytes; RP2040 wear-level backing is 73,728 bytes. The
+slots are a flash region of their own, read in place
+([storage baseline](storage-and-resource-baseline.md#profile-slot-flash-region-d-f29)). Older layouts are not interpreted in place, and a backup from earlier
 firmware cannot be restored here; keep it with its matching firmware pair.
 Physical geometry migration acceptance remains outstanding. Resource accounting
 belongs to [memory budgets](memory-budgets.md).

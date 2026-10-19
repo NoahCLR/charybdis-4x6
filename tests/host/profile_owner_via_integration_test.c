@@ -83,7 +83,7 @@ static uint16_t       candidate_length = sizeof(compiled_blob);
 static uint8_t        candidate_domains;
 
 typedef struct {
-    uint8_t bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+    uint8_t bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
 } memory_t;
 
 typedef struct {
@@ -444,8 +444,8 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
     return policy && policy->initialized && policy->peer_observer && policy->peer_observer(policy->peer_context, &unresolved) && unresolved == 0u ? 0u : NOAH_PROFILE_ACTIVATION_REASON_PEER;
 }
 
-// Reads and writes are bounded as the QMK EEPROM adapter bounds them
-// (qmk_profile_eeprom.c).
+// Reads and writes are bounded as the flash adapter bounds them
+// (qmk_profile_flash.c).
 static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     memory_t *memory = context;
     if (!target || length == 0u || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) return false;

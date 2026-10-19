@@ -79,13 +79,13 @@ static noah_profile_validator_v1_result_t reject_simple(noah_profile_validator_v
 }
 
 static bool behavior_limits_are_valid(const noah_key_behavior_limits_v1_t *limits) {
-    return limits->max_rows != 0u && limits->max_rows <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS && limits->max_populated_steps != 0u && limits->max_populated_steps <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS && limits->max_tap_steps_per_row != 0u && limits->max_tap_steps_per_row <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW && limits->max_repeat_hz != 0u && limits->max_repeat_hz <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ && limits->max_payload_size != 0u && limits->max_payload_size <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE;
+    return limits->max_rows != 0u && limits->max_rows <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS && limits->max_populated_steps != 0u && limits->max_populated_steps <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_POPULATED_STEPS && limits->max_tap_steps_per_row != 0u && limits->max_tap_steps_per_row <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_TAP_STEPS_PER_ROW && limits->max_repeat_hz != 0u && limits->max_repeat_hz <= NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ && limits->max_payload_size != 0u && noah_profile_size_within(limits->max_payload_size, NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE);
 }
 
 static bool rgb_limits_are_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
     const noah_profile_rgb_v1_limits_t *limits = &compatibility->rgb_limits;
 
-    return (limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) == 0u && limits->max_payload_size != 0u && limits->max_payload_size <= NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE && limits->max_logical_layers <= NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS && limits->logical_layer_count == compatibility->logical_layer_count && limits->logical_layer_count <= limits->max_logical_layers && limits->tap_branch_color_count != 0u && limits->tap_branch_color_count <= NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS && limits->supported_pd_mode_mask == compatibility->supported_pd_mode_mask && (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) == 0u;
+    return (limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) == 0u && limits->max_payload_size != 0u && noah_profile_size_within(limits->max_payload_size, NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE) && limits->max_logical_layers <= NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS && limits->logical_layer_count == compatibility->logical_layer_count && limits->logical_layer_count <= limits->max_logical_layers && limits->tap_branch_color_count != 0u && limits->tap_branch_color_count <= NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS && limits->supported_pd_mode_mask == compatibility->supported_pd_mode_mask && (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) == 0u;
 }
 
 static bool compatibility_is_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {

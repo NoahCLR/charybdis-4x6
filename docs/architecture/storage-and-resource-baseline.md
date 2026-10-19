@@ -74,17 +74,20 @@ the current `.data + .bss` regression policy. A zero-initialized buffer placed
 in `.bss` would also violate the BSS policy. Neither would exhaust the RP2040:
 one nominal buffer would leave about 209,376 bytes in the SRAM0–3
 linker/core-memory span, and two would leave about 205,280 bytes before runtime
-allocation. Candidate bytes remain in the inactive EEPROM slot because this
+allocation. Candidate bytes remain in the inactive slot because this
 supports power-loss-safe staging and avoids unnecessary duplication, not
 because the hardware has only 2–3 KiB RAM available. Firmware should still
 prefer bounded indexes and derived caches where that keeps ownership simple.
 
 ## Logical EEPROM Address Map
 
-`WEAR_LEVELING_BACKING_SIZE` is 286,720 bytes. RP2040 wear leveling exposes
-half of that as 140 KiB of logical EEPROM; the current map is
-[Schema-4 geometry (D-F14, D-F28)](#schema-4-geometry-d-f14-d-f28). The two maps below are
-historical, from the 32,768-byte backing and its 16,384 logical bytes.
+`WEAR_LEVELING_BACKING_SIZE` is 73,728 bytes. RP2040 wear leveling exposes
+half of that as 36 KiB of logical EEPROM, the VIA region alone: QMK EECONFIG,
+VIA configuration, the dynamic keymap and the VIA macro bank, `0x0000–0x8FFF`.
+The profile slots have a flash region of their own
+([Profile slot flash region](#profile-slot-flash-region-d-f29)). The two maps
+below are historical, from the 32,768-byte backing and its 16,384 logical
+bytes.
 
 ### Historical Map Before The Profile Partition
 
@@ -187,7 +190,8 @@ feature-specific policy in [memory budgets](memory-budgets.md).
 
 Inactive-slot commit ordering is:
 
-1. invalidate its commit marker;
+1. invalidate it: on flash, erase its header sector before anything is
+   written to the slot (D-F29); on byte-writable test media, clear its marker;
 2. write the payload in bounded scan-context chunks;
 3. write the non-commit header;
 4. read back and verify payload and header checksums;
@@ -267,7 +271,7 @@ instead:
 | 21 | 4 | bound VIA generation |
 | 25 | 4 | bound VIA digest |
 | 29 | 2 | CRC16-CCITT over the format version (one byte, `6`) then bytes 0–28 |
-| 31 | 1 | marker: committed `0xC3`, prepared `0x3C`, invalid `0x00` |
+| 31 | 1 | marker: erased `0xFF`, prepared `0x3C`, committed `0x18`, invalid `0x00` |
 
 Format 5 (`NT`) had a two-byte magic, identity at byte 2, a 16-bit length at
 byte 3, an unkeyed CRC and markers `0xA5`/`0x5A`. A slot with the `NT` magic
@@ -276,37 +280,134 @@ payload is read, never converted (Ark's D-L64), and status reports it (Profile W
 state flag 9) while nothing current is committed. Any other header from an
 earlier or later format fails the keyed CRC or carries a marker this format
 never writes. Storage addresses are 32 bits (`noah_profile_storage_address_t`),
-since slot B ends at `0x22FFF`, and so are the store's read and write
-callbacks. Format 6 binds schema 4.0 and accepts only RGB v4, key-behavior v2,
-combo v3, settings v8 (v6 when it landed; D-F25 and D-F26 each added one) and
-sparse PD v3: the domain versions are schema 3.0's (D-F28).
+offsets into the slot region, and so are the store's read and write
+callbacks. Each marker is a bit subset of the one before it, so on NOR flash
+each step only clears bits (D-F29); format 6 committed with `0xC3` while the
+slots were in EEPROM, before any release.
 
-The slots stay 53,216-byte payloads in EEPROM until they move to their own
-flash region; nothing in the format, the wire or the split copy stops at
-64 KiB any more. Host tests build a 128 KiB slot geometry
-(`NOAH_PROFILE_TEST_WIDE_SLOTS`, refused by the firmware build) and carry a
-70,000-byte payload through the blob codec, the candidate upload, the split
-frames, the receiving half's staging of a split copy (chunks and a reuse range
-past 64 KiB) and a store write, commit, boot and read.
+On flash the record is laid out by page, so that no 256-byte page is
+programmed twice between erases (D-F29). The store's addresses stay as the
+table above gives them; the flash backend places them:
 
-| Range | Bytes | Owner |
-| --- | ---: | --- |
-| `0x00000–0x08FFF` | 36,864 | QMK EECONFIG, VIA config, dynamic keymap, VIA macros |
-| `0x09000–0x15FFF` | 53,248 | Live-profile slot A |
-| `0x16000–0x22FFF` | 53,248 | Live-profile slot B |
+| Slot flash offset | Bytes | Holds | Programmed |
+| --- | ---: | --- | --- |
+| `0x000` | 256 | header bytes 0–30; byte 31 stays erased | once, at the header write |
+| `0x100`, `0x200`, `0x300` | 1 each, a page each | the marker's three cells | one per marker step, in order |
+| `0x400` | to the slot's end | payload | each page once, in order |
 
-Logical EEPROM is 140 KiB and wear-level backing 280 KiB at the top of flash.
-QMK mirrors the logical EEPROM in SRAM0–3; see
-[memory budgets](memory-budgets.md#bigger-profile-storage--d-f14). Geometry
-moves the flash base, so the previous 18 KiB contents are never read.
+The marker reads as the bitwise AND of its cells. Each step programs the next
+cell with the step's value: prepared `0x3C` into the first, committed `0x18`
+into the second; an abort's invalid `0x00` goes into the next unused one. As
+each value is a bit subset of the one before, the AND is always the last
+value written, so the marker sequence and its marker-last durability are as
+on byte media. A half-programmed cell can only clear more bits of the AND,
+which reads as no marker this format writes. The header and every cell lie in
+the slot's first sector, so erasing it clears the record at once. The first
+kilobyte is the record's, so a slot holds at most 130,048 payload bytes. Format 6 binds schema 4.0 and
+accepts only RGB v4, key-behavior v2, combo v3, settings v8 (v6 when it
+landed; D-F25 and D-F26 each added one) and sparse PD v3: the domain versions
+are schema 3.0's (D-F28).
 
-The macro expansion keeps that flash base and the 140 KiB RAM mirror unchanged.
-VIA sync metadata schema 5 refuses schema 4, so the existing recovery path
-resets VIA and seeds authored defaults before declaring authority. There is no
-in-place migration of the profile store either.
-The 41-byte configuration and 1,920-byte keymap leave 34,903 macro-bank bytes.
-All 128 slot terminators count toward that bank; a single macro can use the
-remaining space without a separate compiled-program limit.
+Nothing in the format, the wire or the split copy stops at 64 KiB: host
+tests carry a 70,000-byte payload through the blob codec, the candidate upload,
+the split frames, the receiving half's staging of a split copy (chunks and a
+reuse range past 64 KiB) and a store write, commit, boot and read.
+
+The 41-byte configuration and 1,920-byte keymap leave 34,903 macro-bank bytes
+of the 36 KiB VIA region. All 128 slot terminators count toward that bank; a
+single macro can use the remaining space without a separate compiled-program
+limit. VIA sync metadata schema 5 refuses schema 4, so the existing recovery
+path resets VIA and seeds authored defaults before declaring authority.
+
+### Profile slot flash region (D-F29)
+
+The two slots are a fixed 256 KiB region of flash, 1 MiB in, read in place
+through XIP: no RAM buffer holds a slot. Addresses in the store are offsets
+into the region.
+
+| Flash offset | Region offset | Bytes | Owner |
+| --- | --- | ---: | --- |
+| `0x000000–` image end | — | about 272 KB today | firmware image (`__flash_binary_end`) |
+| `0x100000–0x11FFFF` | `0x00000–0x1FFFF` | 131,072 | profile slot A: 1 KiB record (header and marker cells), 130,048-byte payload |
+| `0x120000–0x13FFFF` | `0x20000–0x3FFFF` | 131,072 | profile slot B |
+| `0x1EE000–0x1FFFFF` | — | 73,728 | wear-leveling backing (36 KiB logical EEPROM) |
+
+The build assumes 2 MiB of flash (pico-sdk's default, as wear leveling does).
+The link fails if the image reaches `0x10100000`
+(`users/noah/lib/compat/qmk_profile_flash.ld`), and the flash adapter does not
+compile if the region reaches the wear-leveling backing. A UF2 writes only the
+image, so the slots survive a firmware update. An EEPROM reset forgets them,
+as formatting logical EEPROM did while the slots lived there: QMK formats
+logical EEPROM at boot exactly when its magic is not valid, and makes the
+magic valid early in formatting, before any userspace hook runs; so
+`keyboard_pre_init` erases both header sectors whenever the magic is not
+valid, before QMK's keyboard init and before anything reads a slot. Until
+both erases are done the magic stays invalid, so a boot interrupted anywhere
+in between forgets the slots again (`tests/host/qmk_profile_flash_test.c`
+cuts power before, during and between the erases and before the magic
+write). Old EEPROM slots are not migrated: they held format 5, which this
+store refuses anyway.
+
+Flash is NOR: a sector (4 KiB) erases to `0xFF`, a page program (256 bytes)
+only clears bits, and no page is programmed again before its sector is
+erased (the host test fakes refuse it). The backend (`profile_flash_store.c`)
+keeps one 256-byte page buffer:
+
+- a save's reset touches no flash: it names the target range, which from then
+  on reads as erased, and every write to it waits until the header sector is
+  erased, so the slot stops being a boot candidate before anything is written
+  to it. Until that erase the slot holds what it held, an older profile than
+  the active one, which is what a power cut at that moment leaves too; a save
+  aborted before the erase leaves the slot untouched;
+- writes collect in the page buffer and reach flash as one page program when
+  the page fills, when a write moves to another page, or at a sync; reads
+  overlay the buffered page;
+- the store syncs before the header readback, after the prepared marker and
+  after the commit marker, which is still written last.
+
+Erase and program run with interrupts off while XIP is off, through pico-sdk's
+RAM-resident `flash_range_erase` and `flash_range_program`, as QMK's
+wear-leveling driver does: the keyboard pauses for the operation, so the pause
+policy decides when one may run.
+
+- **Erases run only on a quiet keyboard.** A sector erase (W25Q16JV: 45 ms
+  typical, 400 ms at worst) runs at the start of a durable-I/O grant, at most
+  one per grant, only when no key is held and the matrix has not changed for
+  50 ms (`NOAH_QMK_PROFILE_FLASH_QUIET_MS`), and only for a save: the next
+  sector of its range, while fewer than a sector of erased bytes lie ahead of
+  its writes. An erase so starts only in a pause in typing; a key pressed
+  during it is read when it ends, and only a press and release both inside
+  the erase would be missed.
+- **The writer waits for erased flash.** The profile step runs in a grant only
+  while at least a page of erased flash lies ahead of the save's writes and
+  the grant's flash time is under its 2 ms budget
+  (`NOAH_PROFILE_FLASH_GRANT_BUDGET_US`), which an erase always exceeds. So an
+  erase never shares a grant with the writer, and a save simply waits while
+  the keyboard is busy. Should a write still reach unerased flash, the backend
+  erases first rather than write it.
+- **A grant programs at most one page.** The writer's grant writes at most
+  one split chunk (106 bytes) in store writes of at most 20, so its pages fill
+  at most once; each commit step writes one record and syncs it.
+
+A save the keyboard never lets erase waits: Ark's own and the split peer's
+time limits (15 s for the host transaction, 3 s without progress for the
+peer) then end it as a failed save, and the previous profile stays active.
+Live mode saves only after a quiet period, so it does not meet this. Erase
+suspend is not used. The pointing sensor keeps counting motion during a
+pause, so pointing stutters rather than loses movement. A save of the maximum
+profile erases 10 sectors and programs about 152 pages.
+
+Each half measures its own pauses since boot: longest sector erase, longest
+page program, the most flash time in one grant, and the last save's duration
+and flash time. Profile Wire custom get `0x0D` reads them
+([Profile Wire](profile-wire-v1.md#flash-pauses--get-value-0x0d)).
+
+Power loss: host tests cut power at every erase and page program of a save,
+with the operation either not started or half done, and the previous profile
+stays active unless the commit marker was programmed; the interrupted slot is
+reused by the next save (`tests/host/profile_flash_store_test.c`). The same
+tests check every grant against the pause policy: one erase or one page
+program, never both, and no erase on a busy keyboard.
 
 ### Schema-4 ceilings and the maximum profile
 
@@ -320,7 +421,7 @@ remaining space without a separate compiled-program limit.
 | Names | 32 bytes of UTF-8 each |
 | Reusable RGB groups / stage-group rows | 16 / 32 aggregate |
 | Pointing slots | 32 |
-| Canonical profile payload | 53,216 bytes |
+| Canonical profile payload | 130,048 bytes |
 
 Unlike the V1 ceilings above, every one of these is reachable at once.
 `tests/fixtures/maximum_profile_v4.fixture`, written by
@@ -328,7 +429,7 @@ Unlike the V1 ceilings above, every one of these is reachable at once.
 its maximum and every name at 32 bytes: 37,966 bytes (RGB 591, behaviours
 13,828, combos 9,736, settings 9,669 with every custom-key shortcut (D-F26),
 pointing 4,104, plus 38 bytes of header and six-byte envelopes). That leaves
-15,250 bytes of the slot, more than the
+93,074 bytes of the 128 KiB slot (D-F29), more than the
 12 KiB reserved for future payload. The fixture is the maximum for the
 encodings, not a limit the firmware checks: a larger profile is refused only
 by a table's own ceiling or the slot.

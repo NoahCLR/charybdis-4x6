@@ -44,7 +44,7 @@ build_and_run() {
         -DRGB_MATRIX_WS2812 \
         -DVIA_ENABLE \
         -DMCU_RP \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
         -I"$ROOT" \
@@ -99,7 +99,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_PD_PROFILE_ENABLE \
     -DVIA_ENABLE \
     -DMCU_RP \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
     -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
     -I"$ROOT" \

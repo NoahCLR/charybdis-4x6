@@ -6,15 +6,9 @@
 // store format 6 and Profile Wire 2 open the new base (D-F28): every length
 // and offset inside a profile is 32 bits wide.
 #define NOAH_PROFILE_SCHEMA_MAJOR 4u
-// A 52 KiB profile slot less its 32-byte header (D-F14). Host tests may
-// build with NOAH_PROFILE_TEST_WIDE_SLOTS: 128 KiB slots, so 32-bit lengths
-// are exercised past 65,535 bytes before any keyboard can store that much.
-// The firmware refuses it (profile_storage_layout.c).
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
-#    define NOAH_PROFILE_PAYLOAD_MAX 131040u
-#else
-#    define NOAH_PROFILE_PAYLOAD_MAX 53216u
-#endif
+// A 128 KiB profile slot less the first kilobyte its header and commit
+// marker take on flash (D-F29).
+#define NOAH_PROFILE_PAYLOAD_MAX 130048u
 #define NOAH_PROFILE_DOMAIN_COUNT NOAH_PROFILE_DOMAIN_REGISTRY_COUNT
 #define NOAH_PROFILE_PD_COUNT 32u
 #define NOAH_PROFILE_PD_VERSION NOAH_PROFILE_DOMAIN_VERSION_PD

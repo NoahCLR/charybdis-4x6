@@ -2,7 +2,7 @@
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14, D-F28):
 > profile schema 4.0; RGB v4, key behaviors v2, combos v3, settings v8 and
-> sparse PD v3; a 53,216-byte custom payload; and logical store format 6. Every
+> sparse PD v3; a 130,048-byte custom payload; and logical store format 6. Every
 > save binds a nonzero VIA generation and digest. Profile Wire is 2.0; split
 > framing is version 3 (32-bit offsets and lengths, D-F28, after version 2's
 > sized payload chunks and reuse ranges, D-F19).

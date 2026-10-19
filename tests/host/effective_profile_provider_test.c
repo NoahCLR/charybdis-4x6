@@ -98,7 +98,7 @@ static void invalidate(void *context, uint32_t publication_count, noah_effective
     invalidation->saw_reentrant_guard     = noah_effective_profile_provider_request_compiled_fallback(invalidation->provider) == NOAH_EFFECTIVE_PROFILE_REENTRANT;
 }
 
-static noah_profile_validator_v1_profile_t validate_profile(const noah_profile_reader_t *reader, size_t base_offset, uint16_t byte_length, uint8_t domain_mask) {
+static noah_profile_validator_v1_profile_t validate_profile(const noah_profile_reader_t *reader, size_t base_offset, uint32_t byte_length, uint8_t domain_mask) {
     noah_profile_validator_v1_compatibility_t compatibility = noah_profile_validator_v1_default_compatibility(ACTION_ABI_DIGEST);
     noah_profile_validator_v1_declaration_t   declaration;
     noah_profile_validator_v1_error_t         error = noah_profile_validator_v1_no_error();

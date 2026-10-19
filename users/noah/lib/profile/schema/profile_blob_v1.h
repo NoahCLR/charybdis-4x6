@@ -3,6 +3,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include "profile_reader.h"
@@ -27,6 +28,13 @@ enum {
     NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS  = 128u,
     NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS      = 128u,
 };
+
+// A size against its ceiling, through 32 bits: a domain's 16-bit size limit
+// may sit at a ceiling of 0xFFFF once slots outgrow 64 KiB (D-F29), where a
+// direct comparison is always true.
+static inline bool noah_profile_size_within(uint32_t size, uint32_t ceiling) {
+    return size <= ceiling;
+}
 
 typedef enum {
     NOAH_PROFILE_ACTION_V1_NONE              = 0u,

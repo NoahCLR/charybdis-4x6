@@ -240,6 +240,8 @@ uint32_t                   timer_read32(void);
 uint32_t                   timer_elapsed32(uint32_t last);
 uint32_t                   last_input_activity_elapsed(void);
 uint32_t                   last_matrix_activity_elapsed(void);
+typedef uint8_t            matrix_row_t;
+matrix_row_t               matrix_get_row(uint8_t row);
 bool                       is_keyboard_master(void);
 bool                       is_keyboard_left(void);
 struct rgb_matrix_limits_t rgb_matrix_get_limits(uint8_t iter);

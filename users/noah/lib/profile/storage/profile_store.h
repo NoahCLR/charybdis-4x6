@@ -85,10 +85,23 @@ typedef enum {
 
 typedef bool (*noah_profile_store_read_fn)(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length);
 typedef bool (*noah_profile_store_write_fn)(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length);
+// Flash only (D-F29). Prepares [address, address + length) of one slot for
+// writing: before it returns, the slot's first sector (its header) is erased,
+// so the slot stops being a boot candidate at once; the rest may be erased
+// later, but before any write reaches it. Writes outside the range fail.
+typedef bool (*noah_profile_store_reset_fn)(void *context, noah_profile_storage_address_t address, uint32_t length);
+// Flash only: makes every write so far durable before it returns.
+typedef bool (*noah_profile_store_sync_fn)(void *context);
 
+// Storage the store reads and writes. Without reset the store invalidates a
+// slot by writing its marker byte, and without sync every write is durable
+// when it returns: byte-writable media, as the host test fakes are. The
+// firmware's flash backend provides both (profile_flash_store.h).
 typedef struct {
     noah_profile_store_read_fn  read;
     noah_profile_store_write_fn write;
+    noah_profile_store_reset_fn reset;
+    noah_profile_store_sync_fn  sync;
     void                       *context;
 } noah_profile_store_io_t;
 
@@ -197,7 +210,7 @@ typedef struct {
     noah_profile_envelope_t           boot_envelope;
 } noah_profile_store_t;
 
-// Reads any span of logical EEPROM, in reads of at most
+// Reads any span of the slot region, in reads of at most
 // NOAH_PROFILE_STORE_IO_CHUNK_MAX bytes.
 bool                        noah_profile_store_read_span(const noah_profile_store_t *store, noah_profile_storage_address_t address, uint8_t *target, uint32_t length);
 void                        noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility);
@@ -222,7 +235,7 @@ noah_profile_store_result_t noah_profile_store_prepare_durable_step(noah_profile
 noah_profile_store_result_t noah_profile_store_prepared_commit_begin(noah_profile_store_t *store);
 noah_profile_store_result_t noah_profile_store_prepared_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *committed);
 // Starts and advances a marker-last commit without unbounded scan work. Begin
-// performs no EEPROM I/O. This compatibility API runs both durable prepare and
+// performs no storage I/O. This compatibility API runs both durable prepare and
 // decision phases. Each step performs exactly one read or write of at most
 // byte_budget bytes; byte_budget must be 1..20. The final OK step returns the
 // committed record and releases the destructive-backing reservation.

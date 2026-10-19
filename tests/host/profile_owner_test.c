@@ -11,7 +11,7 @@
 static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
 
 typedef struct {
-    uint8_t  bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+    uint8_t  bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
     uint32_t reads;
     uint32_t writes;
     uint16_t largest_read;
@@ -204,8 +204,8 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
     return activation_block_reason | (policy && policy->initialized && policy->peer_observer && policy->peer_observer(policy->peer_context, &unresolved) && unresolved == 0u ? 0u : NOAH_PROFILE_ACTIVATION_REASON_PEER);
 }
 
-// Reads and writes are bounded as the QMK EEPROM adapter bounds them
-// (qmk_profile_eeprom.c).
+// Reads and writes are bounded as the flash adapter bounds them
+// (qmk_profile_flash.c).
 static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     memory_t *memory = context;
     memory->reads++;

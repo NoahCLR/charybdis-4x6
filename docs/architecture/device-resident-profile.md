@@ -176,6 +176,29 @@ domain envelopes, the slot header, the store's I/O, the candidate wire and its
 status, the split copy between halves, and the capability page (D-F28). What
 does stay 16 bits is inside a domain whose own format bounds it: RGB and key
 behaviours keep their 16-bit internal offsets, so each of those domains is at
-most 65,535 bytes whatever the profile's size. Until the slots move to their
-own flash region the payload is capped at 53,216 bytes, one 52 KiB EEPROM slot
-less its header.
+most 65,535 bytes whatever the profile's size. The payload is capped at
+130,048 bytes, one 128 KiB slot less the kilobyte its header and commit
+marker take on flash (D-F29).
+
+## Where the profile is stored
+
+Each half keeps its own two slots, A and B, in a fixed region of its own flash
+outside QMK's emulated EEPROM (D-F29), and reads the committed one in place:
+no RAM copy of a slot exists. QMK's logical EEPROM holds only the VIA region
+(configuration, dynamic keymap and macro bank). The copy between halves is
+unchanged: each half writes its own inactive slot.
+
+Every save keeps the same guarantee: power lost at any point leaves the
+previous profile active. A save writes only the inactive slot, takes it out
+of boot selection before writing anything to it (its header sector is
+erased), writes payload and header, reads both back, writes a prepared marker
+and, last, the commit marker. Boot selects the newest slot with a committed
+marker, a valid header CRC and a payload matching its CRC32; a slot
+interrupted anywhere before its commit marker is never selected. No flash
+page is programmed twice between erases. Erases wait for a quiet keyboard (no
+key held, no matrix change for 50 ms) and run one per scan, never in the scan
+the save's writer runs in, which programs at most one page; a save waits while
+the keyboard is busy. Each half reports its longest pauses over Profile Wire
+(custom get `0x0D`). An EEPROM reset forgets the saved profiles before QMK
+re-validates its EEPROM, so an interrupted boot forgets them again. See the
+[storage baseline](storage-and-resource-baseline.md#profile-slot-flash-region-d-f29).

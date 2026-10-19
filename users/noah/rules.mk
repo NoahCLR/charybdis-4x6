@@ -24,6 +24,10 @@ COMBO_ENABLE = yes
 # Link-time optimization: reduces binary size.
 LTO_ENABLE = yes
 
+# The profile slots have a flash region of their own (D-F29); the link fails
+# if the image grows into it.
+EXTRALDFLAGS += $(USER_PATH)/lib/compat/qmk_profile_flash.ld
+
 # The reviewed target paths need more than the ChibiOS platform default while
 # retaining a 25% (and at least 512-byte) process-stack reserve.
 USE_PROCESS_STACKSIZE = 0xA00

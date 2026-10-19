@@ -67,7 +67,7 @@ static bool slot_payload_start(noah_profile_slot_t slot, noah_profile_storage_ad
 static bool staged_reader_read(void *context, size_t offset, uint8_t *target, size_t length) {
     noah_profile_store_t *store = context;
 
-    if (!store || !store->io.read || !target || length == 0u || offset >= NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE || length > NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE - offset) {
+    if (!store || !store->io.read || !target || length == 0u || offset >= NOAH_PROFILE_STORAGE_REGION_SIZE || length > NOAH_PROFILE_STORAGE_REGION_SIZE - offset) {
         return false;
     }
     return store->io.read(store->io.context, (noah_profile_storage_address_t)offset, target, (uint32_t)length);
@@ -630,7 +630,7 @@ void noah_profile_candidate_store_backend_init(noah_profile_candidate_store_back
     backend->staged_reader           = (noah_profile_reader_t){
         .read    = staged_reader_read,
         .context = store,
-        .length  = NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE,
+        .length  = NOAH_PROFILE_STORAGE_REGION_SIZE,
     };
     if (compatibility) {
         backend->compatibility = *compatibility;

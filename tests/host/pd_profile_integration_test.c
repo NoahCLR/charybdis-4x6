@@ -12,7 +12,7 @@ static void test_candidate_capacity(void) {
     frame[28]         = 42;
     noah_profile_candidate_v1_command_t command;
     noah_profile_candidate_v1_frame_error_t error;
-    // Schema 4 advertises 53,216 bytes: admission must accept the whole range,
+    // Schema 4 advertises a 131,040-byte slot payload (D-F29): admission must accept the whole range,
     // including profiles above the old 5,088-byte ceiling (D-F14), and refuse
     // a 32-bit length past it, however its low 16 bits read (D-F28).
     const uint32_t lengths[] = {5088, 5089, NOAH_PROFILE_PAYLOAD_MAX, NOAH_PROFILE_PAYLOAD_MAX + 1u, 65504, 65535, 65536u + 5088u, UINT32_MAX};
@@ -27,7 +27,8 @@ static void test_candidate_capacity(void) {
     memset(frame + 5, 0, sizeof(frame) - 5);
     frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK;
     frame[5] = (uint8_t)(NOAH_PROFILE_PAYLOAD_MAX - 1u);
-    frame[6] = (NOAH_PROFILE_PAYLOAD_MAX - 1u) >> 8;
+    frame[6] = (uint8_t)((NOAH_PROFILE_PAYLOAD_MAX - 1u) >> 8);
+    frame[7] = (uint8_t)((NOAH_PROFILE_PAYLOAD_MAX - 1u) >> 16);
     frame[9] = 1;
     assert(noah_profile_candidate_v1_decode(frame, sizeof(frame), &command, &error) == NOAH_PROFILE_CANDIDATE_V1_DECODE_OK);
     frame[9] = 2;

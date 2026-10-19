@@ -12,7 +12,7 @@ enum {
 };
 
 typedef struct {
-    uint8_t  bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+    uint8_t  bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
     uint32_t reads;
     uint32_t writes;
     bool     fail_reads;
@@ -417,7 +417,6 @@ static void test_reuse_fills_ranges_from_the_active_profile(void) {
     assert(noah_profile_candidate_store_backend_admission_owner(&fixture.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
 
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
 // The receiving end of the split copy past 65,535 bytes (D-F28): chunks
 // across the 64 KiB line, a reuse range landing past it, and the rest, staged
 // whole with the store's running checksums over all 70,000 bytes.
@@ -523,13 +522,10 @@ static void test_validation_over_64_kib(void) {
         assert(fixture.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
     }
 }
-#endif
 
 int main(void) {
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
     test_copy_over_64_kib();
     test_validation_over_64_kib();
-#endif
     test_exact_identity_commit_reboot_and_idempotence();
     test_reset_record_preserves_zero_flags_without_activation();
     test_ordering_and_compatibility_reject_before_write();

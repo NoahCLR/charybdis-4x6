@@ -21,7 +21,7 @@ static const uint8_t max_profile[NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE];
 #define FAULT_SWEEP_LENGTH 5088u
 
 typedef struct {
-    uint8_t  bytes[NOAH_PROFILE_STORAGE_LOGICAL_EEPROM_SIZE];
+    uint8_t  bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
     uint32_t reads;
     uint32_t writes;
     uint32_t bytes_written;
@@ -1086,7 +1086,7 @@ static void test_maximum_candidate_resolves_within_owner_no_progress_window(void
     descriptor.payload_digest = payload_digest(max_profile, sizeof(max_profile));
 
     assert(noah_profile_split_reconciler_prepared_push_begin_logical(&right.reconciler, &descriptor, &source, staged_read, 6u, UINT32_C(0xabcdef01)));
-    // A full 53,216-byte payload is 3,802 split chunks, then the peer's
+    // A full 131,040-byte payload is thousands of split chunks, then the peer's
     // validation; the loop bound is generous, the timing assertion is not.
     for (uint32_t scan = 0u; scan < 16u * MAX_SCANS; scan++) {
         resolved_at = start_at + scan * NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS;
@@ -2354,7 +2354,6 @@ static void test_maximum_profile_pull_is_bounded(void) {
     assert(right.link.exchanges <= 2u * chunks + 64u);
 }
 
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
 enum { WIDE_LENGTH = 70000u };
 static uint8_t wide_profile[WIDE_LENGTH];
 
@@ -2506,12 +2505,10 @@ static void test_wide_reuse_through_the_reconciler(void) {
     assert(slot_holds(&left, copy, WIDE_LENGTH));
     assert_wide_copy_refused_after_checksums(&left);
 }
-#endif
 
 int main(int argc, char **argv) {
     assert(argc == 2);
     load_maximum_profile(argv[1]);
-#ifdef NOAH_PROFILE_TEST_WIDE_SLOTS
     // The wide build runs only the copies past 64 KiB: the rest of the suite
     // sweeps faults over the maximum copy, which the wide geometry makes
     // more than twice as long without testing anything new.
@@ -2522,7 +2519,6 @@ int main(int argc, char **argv) {
     test_maximum_profile_pull_is_bounded();
     puts("profile split reconciler host tests passed (wide)");
     return 0;
-#endif
     test_maximum_profile_pull_is_bounded();
     test_maximum_profile_prepares_and_commits_on_the_peer();
     test_store_completion_polling_requires_the_matching_full_copy();

@@ -18,6 +18,18 @@ enum {
 };
 
 static noah_profile_store_runtime_state_t store_runtime_state;
+static uint32_t                           flash_wire_requests;
+
+// The flash adapter answers GET 0x0D itself (profile_store_runtime_test.c
+// covers it); the channel only has to route it there first.
+bool noah_qmk_profile_flash_wire_get(uint8_t *data, uint8_t length) {
+    if (!data || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || data[0] != id_custom_get_value || data[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || data[2] != 0x0Du) {
+        return false;
+    }
+    flash_wire_requests++;
+    data[5] = NOAH_PROFILE_WIRE_V1_STATUS_OK;
+    return true;
+}
 static noah_profile_store_record_t        store_runtime_record;
 static bool                               store_runtime_has_committed;
 
@@ -682,7 +694,17 @@ static void test_combo_read_route_without_combo_feature(void) {
     assert(frame[0] == id_unhandled);
 }
 
+static void test_flash_pause_read_routes_to_the_flash_adapter(void) {
+    uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    make_request(frame, 0x0Du, 21u, 0u);
+    flash_wire_requests = 0u;
+    via_custom_value_command_kb(frame, sizeof(frame));
+    assert(flash_wire_requests == 1u && frame[0] == id_custom_get_value && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+}
+
 int main(void) {
+    test_flash_pause_read_routes_to_the_flash_adapter();
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     initialize_live_owner_status();
 #endif
