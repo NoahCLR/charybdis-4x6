@@ -18,6 +18,11 @@
       },
       "indirect_edges": [
         {
+          "caller": "adjustment_inherit",
+          "callee": "noah_profile_settings_defaults_byte",
+          "reason": "The owner reads the authored settings defaults through its configured callback to create the settings domain an adjustment needs."
+        },
+        {
           "caller": "advance_incoming_reuse",
           "callee": "write_candidate",
           "reason": "The scan-owned peer reuse path writes bounded pieces through the shared candidate backend interface; the pinned compiler inlines backend_reuse into this caller."
@@ -439,6 +444,34 @@
         {
           "name": "save abandons its candidate",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "save_step", "fail_save"]
+        },
+        {
+          "name": "automatic save admission",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "automatic_step", "noah_profile_owner_save"]
+        },
+        {
+          "name": "keyboard adjustment commit reads the saved envelope",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "automatic_step", "adjustment_step", "noah_profile_working_copy_commit", "noah_effective_profile_snapshot_read", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "keyboard adjustment creates the inherited settings domain",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "automatic_step", "adjustment_step", "adjustment_inherit", "noah_profile_working_copy_commit", "noah_effective_profile_snapshot_read", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+        },
+        {
+          "name": "keyboard adjustment reads the authored settings defaults",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "automatic_step", "adjustment_step", "adjustment_inherit", "noah_profile_settings_defaults_byte"]
+        },
+        {
+          "name": "DPI adjustment key queues a scalar",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "noah_qmk_profile_adjustment_process", "noah_profile_store_runtime_adjust", "noah_profile_setting_v1_valid"]
+        },
+        {
+          "name": "DPI adjustment feedback projects CPI without EEPROM",
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "noah_qmk_profile_adjustment_process", "maybe_update_pointing_device_cpi", "pointing_device_set_cpi"]
+        },
+        {
+          "name": "keyboard adjustment safe-boundary republication retains pending feedback",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "noah_effective_profile_provider_publish_in_place", "noah_effective_settings_invalidate", "noah_qmk_portable_apply", "projected_setting", "noah_setting"]
         }
       ]
     },

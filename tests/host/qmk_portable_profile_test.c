@@ -19,6 +19,14 @@ keymap_config_t keymap_config;
 // QMK's EEPROM copies must never be written (D-F32); runtime projections are
 // counted apart.
 static unsigned durable_writes, projections;
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+static bool pending_adjustment;
+bool noah_profile_store_runtime_pending_adjustment(uint8_t setting, uint32_t *value) {
+    if (!pending_adjustment || setting != NOAH_SETTING_DEFAULT_DPI) return false;
+    *value = 1800u;
+    return true;
+}
+#endif
 bool            get_auto_mouse_enable(void) {
     return am_enabled;
 }
@@ -89,7 +97,7 @@ void charybdis_cycle_pointer_sniping_dpi(bool forward) {
 }
 void charybdis_cycle_pointer_default_dpi_noeeprom(bool forward) {
     (void)forward;
-    default_dpi = (uint16_t)(default_dpi + 100u);
+    default_dpi = forward ? (default_dpi >= 3400u ? 400u : default_dpi + 200u) : (default_dpi <= 400u ? 3400u : default_dpi - 200u);
     projections++;
 }
 void charybdis_cycle_pointer_sniping_dpi_noeeprom(bool forward) {
@@ -299,7 +307,7 @@ int main(int argc, char **argv) {
     // runtime override beside the stored master.
     view.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
     am_timeout         = 777;
-    default_dpi        = 900;
+    default_dpi        = 600;
     combos             = false;
     // The boot's first look at the compiled defaults waits for discovery.
     noah_effective_settings_boot(true);
@@ -335,6 +343,14 @@ int main(int argc, char **argv) {
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_LAYER_COMBOS * 4) == 0x7fff);
     assert(!memcmp(bytes + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, stored + NOAH_SETTINGS_LAYER_RECORDS_OFFSET, names - NOAH_SETTINGS_LAYER_RECORDS_OFFSET));
     assert(combo_ref_from_layer(15) == 2 && combo_ref_from_layer(14) == 14 && combo_ref_from_layer(16) == 16);
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    pending_adjustment = true;
+    noah_qmk_portable_apply();
+    assert(default_dpi == 1800u && durable_writes == 0u);
+    pending_adjustment = false;
+    noah_qmk_portable_apply();
+    assert(default_dpi == noah_setting(NOAH_SETTING_DEFAULT_DPI, 400u) && durable_writes == 0u);
+#endif
     puts("portable settings readback streams the live domain");
     return 0;
 }

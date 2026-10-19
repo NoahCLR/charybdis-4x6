@@ -869,3 +869,36 @@ writes no EEPROM), and the boot PD cache is reached through
 `noah_effective_pd_invalidate` (`publish_pd_cache` is kept out of line). The
 ordinary manifest fails only on the six inherited handled-key paths
 (1,952–2,304 bytes, unchanged); every path that passed on D-F31 passes.
+
+
+## Automatic Live saves and adjustment keys — D-F32
+
+Automatic saves reuse the working copy and candidate storage; no second
+profile buffer is allocated. Four coalesced adjustment scalars and scheduling
+state live in the owner, with completed keyboard-save status. No regression
+budget changes.
+
+An instrumented right-half build (`NOAH_RESOURCE_CHECKS=yes`, pinned GCC
+15.2.0 image, BK `d280a4471e`) on the reviewed live-edit base `8251af1f` plus
+this change links 4,340 bytes of `.data` and 198,096 bytes of `.bss` in
+SRAM0–3: 202,436 combined, 1,340 below the unchanged 203,776-byte tripwire.
+The fixed prefix is 202,448 and the boot linker/core-memory span is 59,696
+bytes; after its 4,096-byte arena floor the linked margin is 55,600 bytes.
+These are linked figures per half, not runtime free memory or high-water.
+The 96-byte increase over the earlier D-F32 measurement includes that base's
+review fixes as well as automatic-save/adjustment state. The 130,048-byte
+working buffer is unchanged. The resource build stops at the ordinary
+manifest's inherited failures before analysing the left half separately.
+
+The owner manifest passes every path. New reviewed paths: automatic Save
+admission 1,168 bytes; adjustment commit reading the saved envelope 1,392; creating an inherited
+settings domain 1,496 (reading the authored defaults 1,264);
+DPI adjustment queue 1,068; no-EEPROM CPI feedback 1,064; settings
+republication preserving newer pending feedback 1,232. The compiler inlines
+the owner adjustment into the runtime wrapper, and pending-value readback
+into `projected_setting`; the manifest follows those linked frames. The
+largest owner path remains peer chunk write 1,904, with repeated read 1,896
+(the earlier D-F32 figures too). The ordinary manifest still fails only its
+six inherited handled-key paths (1,952–2,304); no path that passed on the
+live-edit base fails here. Neither budget was weakened. Both halves still
+owe allocator/stack high-water and measured flash pauses on the keyboard.

@@ -5,8 +5,8 @@
 // How Ark's edits reach this keyboard. Stored outside the profile, in QMK's
 // EEPROM user datablock on each half (qmk_profile_edit_mode.c), never in a
 // profile, a review or a backup. A keyboard never set is in Live + review.
-// The firmware itself never saves on its own yet: the mode is only recorded
-// and reported until Live mode saves on its own.
+// Live saves after the quiet period; Apply saves only adjustment-key edits;
+// Live + review waits for an explicit Save.
 #pragma once
 
 #include <stdbool.h>

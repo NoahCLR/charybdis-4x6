@@ -48,6 +48,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/split/profile_split_protocol_v1.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_reconciler.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
+        "$ROOT/users/noah/lib/profile/storage/profile_flash_store.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_store.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_transaction.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \

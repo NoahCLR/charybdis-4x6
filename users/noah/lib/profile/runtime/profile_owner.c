@@ -918,6 +918,7 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
 }
 
 static bool save_step(noah_profile_owner_t *owner);
+static bool automatic_step(noah_profile_owner_t *owner);
 
 // The working copy's own scan grant (D-F32): Save, then the edit, then the
 // other half. Out of line, as is everything it calls into, so the scan's
@@ -941,6 +942,9 @@ static __attribute__((noinline)) bool scan_working(noah_profile_owner_t *owner, 
     if (noah_profile_working_sync_store_mode(&owner->working_sync, now_ms)) {
         return true;
     }
+    if (master && automatic_step(owner)) {
+        return true;
+    }
     if (!owner->config.peer_required) {
         return false;
     }
@@ -949,6 +953,19 @@ static __attribute__((noinline)) bool scan_working(noah_profile_owner_t *owner, 
 
 static __attribute__((noinline)) void observe_working(noah_profile_owner_t *owner) {
     (void)noah_profile_working_copy_observe(&owner->working, owner->save.phase == NOAH_PROFILE_OWNER_SAVE_WAIT);
+    if (owner->auto_save.observed_revision != owner->working.revision || !owner->working.active || noah_profile_working_copy_busy(&owner->working) || !owner->config.keyboard_quiet || !owner->config.keyboard_quiet(owner->config.keyboard_quiet_context)) {
+        owner->auto_save.quiet_since = owner->now_ms;
+    }
+    if (owner->auto_save.observed_revision != owner->working.revision) {
+        // Only a published client edit disqualifies an adjustment-only copy;
+        // a refused proposal must not strand the keyboard's earlier edits.
+        if (!owner->auto_save.edit_transaction) owner->auto_save.apply_adjustments_only = false;
+        owner->auto_save.observed_revision = owner->working.revision;
+        owner->auto_save.attempted = false;
+    }
+    if (!owner->working.active && !owner->auto_save.edit_transaction) {
+        owner->auto_save.apply_adjustments_only = false;
+    }
 }
 
 static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_ms, bool activating_boot) {
@@ -1094,12 +1111,20 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
 
 // Candidate frames that would start or feed a candidate while an edit or a
 // save holds the working copy are answered BUSY; ABORT and reads are not.
+// A new Apply (a BEGIN naming a transaction other than the one being run) is
+// refused while a keyboard adjustment awaits publication: published later, it
+// would overwrite what the Apply sets. An Apply already admitted carries on,
+// and adjustments that arrive during it publish after it lands.
+static bool apply_begin_behind_adjustment(const noah_profile_owner_t *owner, const uint8_t *frame, size_t length) {
+    return owner->auto_save.pending != 0u && frame && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && frame[0] == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && frame[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN && (uint16_t)(frame[3] | frame[4] << 8u) != owner->host_transaction.status.transaction_id;
+}
+
 static bool candidate_held_by_working_copy(const noah_profile_owner_t *owner, const uint8_t *frame, size_t length) {
     return owner->working_ready && frame && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && frame[0] == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && frame[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && (frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK) && (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_profile_working_copy_busy(&owner->working));
 }
 
 bool noah_profile_owner_receive(noah_profile_owner_t *owner, uint8_t *frame, size_t length) {
-    if (owner && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED) && candidate_held_by_working_copy(owner, frame, length)) {
+    if (owner && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED) && (candidate_held_by_working_copy(owner, frame, length) || (owner->working_ready && apply_begin_behind_adjustment(owner, frame, length)))) {
         noah_profile_candidate_v1_encode_ack(frame, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY, NOAH_PROFILE_CANDIDATE_V1_ERROR_MAILBOX_BUSY, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U8);
         return true;
     }
@@ -1297,25 +1322,30 @@ noah_profile_working_result_t noah_profile_owner_edit_begin(noah_profile_owner_t
         return NOAH_PROFILE_WORKING_INVALID_STATE;
     }
     // A repeated BEGIN of the edit already admitted is answered as before.
-    if ((profile_held(owner) || halves_apart(owner)) && !(owner->working.phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING && owner->working.transaction_id == transaction_id)) {
+    if ((profile_held(owner) || halves_apart(owner) || owner->auto_save.pending || owner->auto_save.edit_transaction) && !(!owner->auto_save.edit_transaction && owner->working.phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING && owner->working.transaction_id == transaction_id)) {
         return session != owner->working.session || revision != owner->working.revision ? NOAH_PROFILE_WORKING_STALE : NOAH_PROFILE_WORKING_BUSY;
     }
     return note_edit_activity(owner, noah_profile_working_copy_begin(&owner->working, transaction_id, session, revision, splice_count, insert_total, flags, false));
 }
 
 noah_profile_working_result_t noah_profile_owner_edit_splice(noah_profile_owner_t *owner, uint16_t transaction_id, uint8_t index, const noah_profile_working_splice_t *splice) {
+    if (owner && owner->auto_save.edit_transaction) return NOAH_PROFILE_WORKING_BUSY;
     return owner_ready(owner) ? note_edit_activity(owner, noah_profile_working_copy_splice(&owner->working, transaction_id, index, splice)) : NOAH_PROFILE_WORKING_INVALID_STATE;
 }
 
 noah_profile_working_result_t noah_profile_owner_edit_data(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint32_t count) {
+    if (owner && owner->auto_save.edit_transaction) return NOAH_PROFILE_WORKING_BUSY;
     return owner_ready(owner) ? note_edit_activity(owner, noah_profile_working_copy_data(&owner->working, transaction_id, offset, bytes, count)) : NOAH_PROFILE_WORKING_INVALID_STATE;
 }
 
 noah_profile_working_result_t noah_profile_owner_edit_commit(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t crc32) {
-    return owner_ready(owner) ? noah_profile_working_copy_commit(&owner->working, transaction_id, crc32) : NOAH_PROFILE_WORKING_INVALID_STATE;
+    if (owner && owner->auto_save.edit_transaction) return NOAH_PROFILE_WORKING_BUSY;
+    noah_profile_working_result_t result = owner_ready(owner) ? noah_profile_working_copy_commit(&owner->working, transaction_id, crc32) : NOAH_PROFILE_WORKING_INVALID_STATE;
+    return result;
 }
 
 noah_profile_working_result_t noah_profile_owner_edit_abort(noah_profile_owner_t *owner, uint16_t transaction_id) {
+    if (owner && owner->auto_save.edit_transaction) return NOAH_PROFILE_WORKING_BUSY;
     return owner_ready(owner) ? noah_profile_working_copy_abort(&owner->working, transaction_id) : NOAH_PROFILE_WORKING_INVALID_STATE;
 }
 
@@ -1324,7 +1354,7 @@ noah_profile_working_result_t noah_profile_owner_revert(noah_profile_owner_t *ow
         return NOAH_PROFILE_WORKING_INVALID_STATE;
     }
     // Revert never waits for the other half: it follows (profile_working_sync.c).
-    if (profile_held(owner)) {
+    if (profile_held(owner) || owner->auto_save.pending || owner->auto_save.edit_transaction) {
         return NOAH_PROFILE_WORKING_BUSY;
     }
     // An edit still being sent is abandoned: Revert is the way out of one.
@@ -1336,6 +1366,13 @@ noah_profile_working_result_t noah_profile_owner_revert(noah_profile_owner_t *ow
 
 static void finish_save(noah_profile_owner_t *owner, noah_profile_working_result_t result, noah_profile_candidate_v1_error_id_t error) {
     noah_profile_candidate_store_backend_hold_candidates_to(candidate_backend(owner), &owner->candidate_runtime);
+    owner->save.last_automatic = owner->save.automatic;
+    if (owner->save.automatic && result == NOAH_PROFILE_WORKING_OK) {
+        owner->save.keyboard_saves++;
+        owner->save.keyboard_revision = owner->working.revision;
+        owner->save.keyboard_generation = owner->store.committed.generation;
+    }
+    owner->save.automatic = false;
     owner->save.last_transaction_id = owner->save.transaction_id;
     owner->save.last_result         = (uint8_t)result;
     owner->save.last_error          = (uint8_t)error;
@@ -1349,14 +1386,15 @@ noah_profile_working_result_t noah_profile_owner_save(noah_profile_owner_t *owne
         return owner_ready(owner) ? NOAH_PROFILE_WORKING_INVALID_ARGUMENT : NOAH_PROFILE_WORKING_INVALID_STATE;
     }
     if (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE) {
-        return owner->save.transaction_id == transaction_id ? NOAH_PROFILE_WORKING_QUEUED : NOAH_PROFILE_WORKING_BUSY;
+        return !owner->save.automatic && owner->save.transaction_id == transaction_id ? NOAH_PROFILE_WORKING_QUEUED : NOAH_PROFILE_WORKING_BUSY;
     }
     if (session != owner->working.session || revision != owner->working.revision) {
         return NOAH_PROFILE_WORKING_STALE;
     }
-    if (profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working)) {
+    if (profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working) || owner->auto_save.pending || owner->auto_save.edit_transaction) {
         return NOAH_PROFILE_WORKING_BUSY;
     }
+    owner->save.automatic = false;
     owner->save.transaction_id = transaction_id;
     if (!owner->working.active) {
         // Nothing unsaved: no new generation.
@@ -1519,7 +1557,7 @@ noah_profile_working_result_t noah_profile_owner_set_edit_mode(noah_profile_owne
     }
     // Leaving a mode with unsaved edits is the host's question to ask first
     // (Save or Revert); the keyboard does not decide it.
-    if (owner->working.active) {
+    if (owner->working.active || owner->auto_save.pending || owner->auto_save.edit_transaction) {
         return NOAH_PROFILE_WORKING_NOT_CLEAN;
     }
     if (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_profile_working_copy_busy(&owner->working)) {
@@ -1551,7 +1589,8 @@ bool noah_profile_owner_working_status(const noah_profile_owner_t *owner, noah_p
     status->peer_required             = owner->config.peer_required;
     status->peer_converged            = !halves_apart(owner);
     status->mode_conflict             = owner->working_sync.mode_conflict;
-    status->edits_blocked             = profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working);
+    status->adjustment_pending        = owner->auto_save.pending != 0u;
+    status->edits_blocked             = profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working) || owner->auto_save.pending || owner->auto_save.edit_transaction;
     status->storage_paused            = owner->config.storage_paused && owner->config.storage_paused(owner->config.storage_paused_context);
     status->peer_storage_paused       = owner->reconciler.busy_streak != 0u && owner->reconciler.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED;
     status->peer_refused              = noah_profile_working_sync_refused(&owner->working_sync);
@@ -1570,3 +1609,146 @@ bool noah_profile_owner_working_receive(noah_profile_owner_t *owner, const uint8
 #if UINTPTR_MAX == UINT32_MAX
 _Static_assert(sizeof(noah_profile_owner_t) <= NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT, "live-profile owner state exceeded its 32-bit engineering regression policy");
 #endif
+
+// Settings are ordered by their scalar offsets, for a canonical compound edit.
+static const uint8_t adjustment_settings[] = {
+    NOAH_SETTING_DEFAULT_DPI, NOAH_SETTING_SNIPING_DPI,
+    NOAH_SETTING_RGB_MODE, NOAH_SETTING_RGB_COLOR,
+};
+
+bool noah_profile_owner_adjust(noah_profile_owner_t *owner, uint8_t setting, uint32_t value) {
+    if (!owner_ready(owner) || !owner->master || !noah_profile_setting_v1_valid(setting, value, NOAH_SETTINGS_LAYERS)) {
+        return false;
+    }
+    for (uint8_t i = 0u; i < sizeof(adjustment_settings); i++) {
+        if (adjustment_settings[i] == setting) {
+            owner->auto_save.values[i] = value;
+            owner->auto_save.pending |= 1u << i;
+            owner->auto_save.quiet_since = owner->now_ms;
+            owner->auto_save.attempted = false;
+            return true;
+        }
+    }
+    return false; // toggles are never edits
+}
+
+bool noah_profile_owner_pending_adjustment(const noah_profile_owner_t *owner, uint8_t setting, uint32_t *value) {
+    if (!owner || !value) return false;
+    for (uint8_t i = 0u; i < sizeof(adjustment_settings); i++) {
+        if (adjustment_settings[i] == setting && (owner->auto_save.pending & (1u << i))) {
+            *value = owner->auto_save.values[i];
+            return true;
+        }
+    }
+    return false;
+}
+
+static uint16_t automatic_transaction(noah_profile_owner_t *owner) {
+    // Same candidate namespace as a host; avoid the previous finished IDs so
+    // retries cannot mistake a keyboard operation for their own last result.
+    do {
+        owner->auto_save.sequence++;
+    } while (!owner->auto_save.sequence || owner->auto_save.sequence == owner->working.last_transaction_id || owner->auto_save.sequence == owner->save.last_transaction_id || owner->auto_save.sequence == owner->host_transaction.status.transaction_id);
+    return owner->auto_save.sequence;
+}
+
+// The scalar bytes of a settings domain this owner would write: the authored
+// defaults, with the adjusted scalars replaced.
+static uint8_t inherited_settings_byte(const noah_profile_owner_t *owner, uint8_t mask, uint16_t offset) {
+    if (offset >= NOAH_SETTINGS_SCALARS_OFFSET && offset < NOAH_SETTINGS_LAYER_RECORDS_OFFSET) {
+        uint16_t scalar = (uint16_t)((offset - NOAH_SETTINGS_SCALARS_OFFSET) / 4u);
+        for (uint8_t i = 0u; i < sizeof(adjustment_settings); i++) {
+            if ((mask & (1u << i)) && adjustment_settings[i] == scalar) {
+                return (uint8_t)(owner->auto_save.values[i] >> (8u * ((offset - NOAH_SETTINGS_SCALARS_OFFSET) % 4u)));
+            }
+        }
+    }
+    return owner->config.settings_defaults_byte(offset);
+}
+
+// A profile without a settings domain inherits the authored defaults, which
+// leaves nowhere to replace four bytes in. Create the domain from those
+// defaults with the adjusted scalars in it; every other value is unchanged.
+static __attribute__((noinline)) noah_profile_working_result_t adjustment_inherit(noah_profile_owner_t *owner, uint16_t transaction, uint8_t mask, uint16_t length) {
+    noah_profile_working_splice_t splice = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .insert = length, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    uint8_t                       bytes[32];
+    uint32_t                      crc = NOAH_PROFILE_CRC32_INITIAL;
+    noah_profile_working_result_t result = noah_profile_working_copy_splice(&owner->working, transaction, 0u, &splice);
+
+    // First pass: the stream's checksum. Second: the stream itself.
+    for (uint8_t pass = 0u; pass < 2u && result == NOAH_PROFILE_WORKING_OK; pass++) {
+        for (uint16_t offset = 0u; offset < length && result == NOAH_PROFILE_WORKING_OK;) {
+            uint8_t count = length - offset < sizeof(bytes) ? (uint8_t)(length - offset) : (uint8_t)sizeof(bytes);
+            for (uint8_t i = 0u; i < count; i++) bytes[i] = inherited_settings_byte(owner, mask, (uint16_t)(offset + i));
+            if (pass == 0u) crc = noah_profile_crc32_update(crc, bytes, count);
+            else result = noah_profile_working_copy_data(&owner->working, transaction, offset, bytes, count);
+            offset = (uint16_t)(offset + count);
+        }
+    }
+    return result == NOAH_PROFILE_WORKING_OK ? noah_profile_working_copy_commit(&owner->working, transaction, noah_profile_crc32_finish(crc)) : result;
+}
+
+static __attribute__((noinline)) bool adjustment_step(noah_profile_owner_t *owner) {
+    noah_profile_owner_auto_save_t *state = &owner->auto_save;
+    uint8_t bytes[16];
+    uint8_t count = 0u;
+    uint8_t mask = state->pending;
+    uint16_t inherited = 0u;
+    noah_profile_working_status_t working;
+    noah_profile_working_result_t result;
+
+    for (uint8_t i = 0u; i < sizeof(adjustment_settings); i++) {
+        if (mask & (1u << i)) count++;
+    }
+    // The settings domain is optional; a profile without one inherits the
+    // compiled defaults and is given its own before it is adjusted.
+    if (noah_profile_working_copy_status(&owner->working, &working) && !(working.domain_mask & NOAH_PROFILE_DOMAIN_MASK_SETTINGS) && owner->config.settings_defaults_length && owner->config.settings_defaults_byte) {
+        inherited = owner->config.settings_defaults_length();
+    }
+    uint16_t transaction = automatic_transaction(owner);
+    result = noah_profile_working_copy_begin(&owner->working, transaction, owner->working.session, owner->working.revision, inherited ? 1u : count, inherited ? inherited : count * 4u, 0u, false);
+    if (result != NOAH_PROFILE_WORKING_OK) return false;
+    if (inherited) {
+        result = adjustment_inherit(owner, transaction, mask, inherited);
+    } else {
+        count = 0u;
+        for (uint8_t i = 0u; i < sizeof(adjustment_settings); i++) {
+            if (!(mask & (1u << i))) continue;
+            noah_profile_working_splice_t splice = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .offset = NOAH_SETTINGS_SCALARS_OFFSET + adjustment_settings[i] * 4u, .remove = 4u, .insert = 4u};
+            result = noah_profile_working_copy_splice(&owner->working, transaction, count, &splice);
+            if (result != NOAH_PROFILE_WORKING_OK) break;
+            for (uint8_t j = 0u; j < 4u; j++) bytes[count * 4u + j] = (uint8_t)(state->values[i] >> (8u * j));
+            count++;
+        }
+        if (result == NOAH_PROFILE_WORKING_OK) result = noah_profile_working_copy_data(&owner->working, transaction, 0u, bytes, count * 4u);
+        if (result == NOAH_PROFILE_WORKING_OK) result = noah_profile_working_copy_commit(&owner->working, transaction, noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, bytes, count * 4u)));
+    }
+    if (result == NOAH_PROFILE_WORKING_QUEUED) {
+        if (!owner->working.active) state->apply_adjustments_only = true;
+        state->edit_transaction = transaction;
+        state->pending &= (uint8_t)~mask;
+    } else {
+        (void)noah_profile_working_copy_abort(&owner->working, transaction);
+        // Refused (the keyboard cannot store them here): expose the ordinary
+        // edit result, consume this batch, and do not retry each scan.
+        state->pending &= (uint8_t)~mask;
+    }
+    return true;
+}
+
+static __attribute__((noinline)) bool automatic_step(noah_profile_owner_t *owner) {
+    noah_profile_owner_auto_save_t *state = &owner->auto_save;
+    uint8_t mode = owner->working_sync.mode.mode;
+
+    if (state->edit_transaction && !noah_profile_working_copy_busy(&owner->working)) state->edit_transaction = 0u;
+    if (profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working)) return false;
+    if (state->pending) return adjustment_step(owner);
+    if (!owner->working.active || state->attempted || owner->working_sync.mode_conflict || (mode != NOAH_PROFILE_EDIT_MODE_LIVE && !(mode == NOAH_PROFILE_EDIT_MODE_APPLY && state->apply_adjustments_only)) || !owner->config.keyboard_quiet || !owner->config.keyboard_quiet(owner->config.keyboard_quiet_context) || !elapsed_at_least(owner->now_ms, state->quiet_since, NOAH_PROFILE_OWNER_AUTO_SAVE_QUIET_MS)) return false;
+    noah_profile_working_result_t result = noah_profile_owner_save(owner, automatic_transaction(owner), owner->working.session, owner->working.revision);
+    if (result == NOAH_PROFILE_WORKING_QUEUED) {
+        state->attempted = true; // one attempt per edited revision, no wear loop
+        owner->save.automatic = true;
+        return true;
+    }
+    return false;
+}

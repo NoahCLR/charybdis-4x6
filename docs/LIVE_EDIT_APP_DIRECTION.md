@@ -53,7 +53,9 @@ domain and published at a safe boundary, the other half following over a
 split RPC of its own; Save writes the working copy as a new generation through
 the ordinary candidate path, and a replug boots the saved profile. The edit
 mode (Apply, Live, Live + review) is stored on each half outside the profile;
-the firmware does not yet save on its own. The profile is the only durable
+Live saves after 3 seconds without an edit or a held key, even with no client
+connected. DPI and RGB adjustments are working-copy edits, saved automatically
+in Apply and Live and held for Save in Live + review. The profile is the only durable
 owner of the settings QMK holds, and the combos and behaviours toggles are
 runtime overrides beside their stored masters. Hardware acceptance is pending.
 
@@ -127,12 +129,12 @@ not run on hardware either.
   mode commands, the working copy read and the runtime readback are in the
   firmware only; the Ark side is its follow-up. Settings readback (GET `0x07`)
   now reports stored values, and QMK's live ones moved to GET `0x22`.
-- **Adjustment keys are not yet edits (D-F32).** The DPI and RGB keys still
-  move QMK's values and write QMK's EEPROM, which no longer wins at boot. Any
-  settings edit, Revert, Save or Apply pushes the stored DPI and RGB into QMK
-  again, so a key adjustment is undone by the next of those, at once, and by
-  a replug, unless the profile is edited to match. They become working-copy
-  edits when the keyboard learns to save on its own.
+- **Automatic saves and adjustment keys need keyboard acceptance (D-F32).**
+  Edit/wait/replug kept; edit/unplug immediately lost; hold a key past the
+  deadline and release; close the client mid-edit; DPI across a replug;
+  longest erase and program pauses on both halves. Host tests are not this
+  acceptance.
+
 - **Live edits need keyboard acceptance (D-F32).** Edits in every domain
   taking effect on both halves at once, Save surviving a replug, an unsaved
   edit reverting on replug, and typing through an edit undisturbed have run
@@ -1870,8 +1872,8 @@ keymap, macros, behaviours and RGB rebind their readers.
 bit mixed with the boot time) and a revision that advances with every change
 to the working copy's bytes, including Revert and any profile activated from
 outside it, but not Save. Every edit, Save and Revert names both; a stale one
-is refused with the current pair. Keyboard adjustment keys will advance the
-revision once they are edits, so a client learns of them the same way.
+is refused with the current pair. Keyboard adjustment keys advance the revision too, so a client learns of
+them the same way.
 
 **The other half.** Edits travel on their own split RPC, never through the
 durable prepare path: the USB half sends each published edit, the other half
@@ -1911,11 +1913,11 @@ review, stored on each half in QMK's EEPROM user datablock (32 bytes: two
 16-byte records with a counter and CRC-32, the newer valid one counting), never
 in a profile, backup or review. A change takes a counter above both halves';
 the higher counter wins on reconnect, and equal counters that disagree are
-reported until the next change. A change is refused with unsaved edits. QMK's
-EEPROM is wear-levelled flash that may erase, so a half writes a new record
+reported until the next change. A change is refused with unsaved edits or pending adjustments; the client
+finishes Save/Revert first. QMK's EEPROM is wear-levelled flash that may erase, so a half writes a new record
 only when its keyboard is quiet, as before a slot erase (D-F29), never from
 a Profile Wire report or a split RPC; a failed write backs off and is
-reported. In this decision the firmware never saves on its own.
+reported.
 
 **The profile owns what QMK holds** (plan answer 10). Base RGB, default
 layers, keymap options, DPI and auto-mouse are pushed into QMK with its
@@ -1927,7 +1929,39 @@ edit: combos run while the master and QMK's combo flag both allow (the master
 gates `combo_key_record_allowed` and press capture), behaviours while the
 master and the override in `participation.c` both allow, ready for a
 behaviours key. GET `0x22` reads masters, overrides and QMK's live values.
-Adjustment keys keep their behaviour for now (see Open Issues).
+DPI up/down and RGB keys use QMK's no-EEPROM setters for immediate local
+feedback and queue their resulting scalars as compound settings edits. The
+four latest scalar values coalesce while an edit, a save or the other half
+holds the profile. They publish at the ordinary safe boundary and advance
+revision; client edits are BUSY until pending adjustments publish and the
+halves agree, and so is a new Apply (BEGIN answered BUSY, edit status flag 13
+names the cause): an adjustment published after it would overwrite the Apply.
+An Apply already admitted finishes; an adjustment pressed during it publishes
+after it lands, on the profile it activated, and is saved as any adjustment.
+A profile without a settings domain gets one, created from the authored
+defaults with the adjusted scalars, by the adjustment's own edit. New adjustments during Save wait for the next revision; the
+bytes being saved stay immutable. Settings projection retains pending local
+values so a finishing save cannot undo newer key feedback. Participation
+toggles never enter this queue; RGB on/off is a lighting adjustment.
+
+**Automatic saves.** Live saves the working copy after one constant quiet
+interval of 3 seconds: no edit and no held key, with the matrix quiet gate
+(no matrix change for 50 ms) also required. The USB half schedules it, without
+a client heartbeat or connection, only once both halves agree. It drives the
+same Save path above; no second flash path or durability rule exists. Every
+published revision and every held-key scan restarts the interval. Live +
+review never saves automatically; Apply does so only for adjustment-only
+working copies (a client edit disqualifies the copy until Save/Revert/Apply).
+There is at most one automatic attempt per edited revision; failure is
+reported, leaves the working copy unsaved and needs explicit Save or another
+edit before retrying. This prevents an unattended retry/wear loop. Continuous
+edits closer than 3 seconds cause zero saves; even separated quiet intervals
+cannot cause more than 1,200 saves an hour (save/validation time reduces that).
+Status reports the automatic attempt, last save's source, and a counter plus
+revision and generation of completed keyboard saves, since this USB half's
+boot. A replug loses anything not yet durably saved, including an edit made
+less than 3 seconds earlier; a running save has the ordinary old-or-new
+power-loss result.
 
 **A save waiting for a quiet keyboard is not a stall.** The durable-I/O grant
 skips the owner while a save waits to erase (D-F29). The owner's clock now
@@ -1947,7 +1981,8 @@ base is unreleased, so no version moves. Memory: the working copy and its
 state raise the static tripwire by one reviewed increment
 ([memory budgets](architecture/memory-budgets.md#live-edits--d-f32)).
 
-Client follow-up: Ark's live edits and Save. Hardware acceptance owes edits
+Client follow-ups: Ark's live edits and Save; **Live mode in Ark**, including
+mode switching and the "saved by the keyboard" indication. Hardware acceptance owes edits
 in every domain on both halves, Save across a replug, an unsaved edit
 reverting on replug, typing through an edit, and RAM high-water on both
 halves.

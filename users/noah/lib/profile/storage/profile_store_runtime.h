@@ -56,6 +56,8 @@ bool noah_profile_store_runtime_read_keyboard_name(noah_profile_store_t *store, 
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
 // Live edits, Save, Revert and the edit mode (D-F32), for the Profile Wire
 // channel; see profile_owner.h. INVALID_STATE without a working owner.
+bool noah_profile_store_runtime_pending_adjustment(uint8_t setting, uint32_t *value);
+bool noah_profile_store_runtime_adjust(uint8_t setting, uint32_t value);
 noah_profile_working_result_t noah_profile_store_runtime_edit_begin(uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags);
 noah_profile_working_result_t noah_profile_store_runtime_edit_splice(uint16_t transaction_id, uint8_t index, const noah_profile_working_splice_t *splice);
 noah_profile_working_result_t noah_profile_store_runtime_edit_data(uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint32_t count);

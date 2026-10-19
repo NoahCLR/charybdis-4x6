@@ -28,6 +28,9 @@
 #include "../../state/modifiers/keyboard_mod_policy.h"
 #include "../../state/diagnostics/runtime_diag.h"
 #include "slot/origin_registry.h"
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+#    include "../../compat/qmk_profile_adjustments.h"
+#endif
 
 #ifdef NOAH_HOST_TEST_ENV
 bool key_runtime_integration_userspace_feeds_core_key_events(void) {
@@ -270,7 +273,11 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_idle_custom
 }
 
 static bool key_runtime_process_finish(key_runtime_process_ctx_t *ctx, bool keep_processing) {
+#ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
+    if (keep_processing) keep_processing = noah_qmk_profile_adjustment_process(ctx->keycode, ctx->record);
+#else
     (void)ctx;
+#endif
     noah_runtime_diag_scope_leave();
     return keep_processing;
 }
