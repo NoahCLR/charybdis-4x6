@@ -18,8 +18,8 @@ set -eu
 #
 # --no-owner builds the comparison pair without the live-profile owner, for
 # A/B against ordinary behaviour.
-# The split link always runs at QMK's default speed; the faster one garbled
-# split messages (D-L43), so NOAH_SPLIT_BAUD is refused rather than ignored.
+# The split link runs at a fixed 460,800 baud on both halves (D-L43).
+# The removed NOAH_SPLIT_BAUD selector is refused rather than ignored.
 #
 # The pair is always compiled in the image tools/build-image names, the one CI
 # builds releases in, so the firmware flashed here and the firmware users
@@ -116,7 +116,7 @@ elif [ $# -gt 0 ]; then
 fi
 
 if [ -n "${NOAH_SPLIT_BAUD:-}" ]; then
-    echo "NOAH_SPLIT_BAUD was removed: the split link stays at QMK's default speed (D-L43)" >&2
+    echo "NOAH_SPLIT_BAUD was removed: the split link is fixed at 460800 baud (D-L43)" >&2
     exit 1
 fi
 

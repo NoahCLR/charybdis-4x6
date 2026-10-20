@@ -1,4 +1,52 @@
 // Included by the owner harness: actual two-half Save and physical NOR media.
+static void assert_no_automatic_admission_work(noah_profile_owner_t *owner, uint32_t now) {
+    uint32_t checks = noah_profile_owner_test_profile_held_count();
+
+    for (uint32_t scan = 0u; scan < 4096u; scan++) {
+        (void)noah_profile_owner_scan(owner, true, now);
+    }
+    assert(noah_profile_owner_test_profile_held_count() == checks);
+}
+
+static void test_ineligible_auto_saves_skip_admission_work(void) {
+    static noah_profile_owner_t left, right;
+    static memory_t lm, rm;
+    split_link_t ll = {.peer = &right}, rl = {.peer = &left};
+    working_link_t lw = {.peer = &right}, rw = {.peer = &left};
+    uint32_t now = 100000u;
+    uint8_t keymap[KEYMAP_LENGTH] = {0};
+    noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = sizeof(keymap), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+
+    erased_memory(&lm);
+    erased_memory(&rm);
+    boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 99u, &now);
+    scan_until_converged(&left, &right, &now);
+    for (uint8_t mode = 0u; mode < NOAH_PROFILE_EDIT_MODE_COUNT; mode++) {
+        left.working_sync.mode.mode = mode;
+        assert_no_automatic_admission_work(&left, now);
+    }
+    // Finishing an adjustment's bookkeeping must still happen on the
+    // no-work path.
+    left.auto_save.edit_transaction = 7u;
+    assert_no_automatic_admission_work(&left, now);
+    assert(left.auto_save.edit_transaction == 0u);
+
+    left.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW;
+    assert(live_edit(&left, &right, 1u, &create, keymap, sizeof(keymap), &now) == NOAH_PROFILE_WORKING_OK);
+    scan_until_converged(&left, &right, &now);
+    assert(left.working.active && !left.auto_save.apply_adjustments_only);
+    assert_no_automatic_admission_work(&left, now);
+    left.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_APPLY;
+    assert_no_automatic_admission_work(&left, now);
+    left.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_LIVE;
+    left.auto_save.attempted = true;
+    assert_no_automatic_admission_work(&left, now);
+    left.auto_save.attempted = false;
+    left.auto_save.quiet_since = now;
+    assert_no_automatic_admission_work(&left, now);
+    puts("automatic admission snapshots are skipped without an eligible save or adjustment");
+}
+
 static bool auto_quiet = true;
 static bool auto_keyboard_quiet(void *context) {
     (void)context;

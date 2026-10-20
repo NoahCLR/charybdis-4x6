@@ -325,6 +325,10 @@ noah_profile_store_io_t noah_profile_flash_store_read_only_io(noah_profile_flash
     };
 }
 
+bool noah_profile_flash_store_erase_pending(const noah_profile_flash_store_t *flash) {
+    return flash && erase_due(flash, SECTOR_SIZE);
+}
+
 void noah_profile_flash_store_grant_begin(noah_profile_flash_store_t *flash, bool quiet) {
     if (!flash) {
         return;
@@ -335,7 +339,7 @@ void noah_profile_flash_store_grant_begin(noah_profile_flash_store_t *flash, boo
     flash->grant_us         = 0u;
     flash->grant_operations = 0u;
     // Erase a sector ahead, so typing can go on while the writer fills it.
-    if (quiet && erase_due(flash, SECTOR_SIZE)) {
+    if (quiet && noah_profile_flash_store_erase_pending(flash)) {
         (void)erase_next(flash);
     }
 }

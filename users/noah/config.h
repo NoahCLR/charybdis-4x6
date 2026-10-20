@@ -35,7 +35,7 @@
 // or pulled, instead of 10); every other split RPC keeps its 32-byte frames.
 // Each costs 96 bytes of its shared RPC buffer on each half; the transport
 // CRC's staging buffer, sized by the larger of the two, adds 96 once. A full
-// frame alone takes about 5.6 ms on the 230,400-baud link, before the rest of
+// frame alone takes about 2.8 ms on the 460,800-baud link, before the rest of
 // its RPC; QMK's serial timeout applies to each wait for the FIFO, not the
 // whole frame.
 #    define RPC_M2S_BUFFER_SIZE 128

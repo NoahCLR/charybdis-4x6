@@ -17,6 +17,7 @@
 
 #ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
 static uint32_t noah_profile_owner_ready_refresh_count;
+static uint32_t noah_profile_owner_profile_held_count;
 #endif
 
 enum {
@@ -661,6 +662,10 @@ static void refresh_ready_state(noah_profile_owner_t *owner) {
 #ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
 uint32_t noah_profile_owner_test_ready_refresh_count(void) {
     return noah_profile_owner_ready_refresh_count;
+}
+
+uint32_t noah_profile_owner_test_profile_held_count(void) {
+    return noah_profile_owner_profile_held_count;
 }
 #endif
 
@@ -1364,6 +1369,9 @@ static bool owner_ready(const noah_profile_owner_t *owner) {
 static bool profile_held(const noah_profile_owner_t *owner) {
     noah_effective_profile_status_t provider;
 
+#ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
+    noah_profile_owner_profile_held_count++;
+#endif
     // A publication the working copy has not yet looked at (it does at the
     // next scan) may have replaced it.
     return !owner_ready(owner) || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || owner->host_transaction.has_candidate || owner->host_transaction.mailbox.pending || owner->host_cancel_pending || noah_profile_candidate_store_backend_admission_owner(&owner->staging.candidate_backend) != NOAH_PROFILE_STORAGE_ADMISSION_NONE || owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_effective_profile_provider_status(&owner->provider, &provider) != NOAH_EFFECTIVE_PROFILE_OK || provider.has_pending || provider.publication_count != owner->working.publication_count;
@@ -1849,9 +1857,16 @@ static __attribute__((noinline)) bool automatic_step(noah_profile_owner_t *owner
     uint8_t mode = owner->working_sync.mode.mode;
 
     if (state->edit_transaction && !noah_profile_working_copy_busy(&owner->working)) state->edit_transaction = 0u;
+    // Admission takes provider and peer-authority snapshots. Nothing needs
+    // them until an adjustment is pending or an automatic save is due.
+    // Adjustments publish in every edit mode, including onto a saved profile.
+    if (!state->pending) {
+        if (!owner->working.active || state->attempted || owner->working_sync.mode_conflict || (mode != NOAH_PROFILE_EDIT_MODE_LIVE && !(mode == NOAH_PROFILE_EDIT_MODE_APPLY && state->apply_adjustments_only))) return false;
+        if (!elapsed_at_least(owner->now_ms, state->quiet_since, NOAH_PROFILE_OWNER_AUTO_SAVE_QUIET_MS)) return false;
+    }
     if (profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working)) return false;
     if (state->pending) return adjustment_step(owner);
-    if (!owner->working.active || state->attempted || owner->working_sync.mode_conflict || (mode != NOAH_PROFILE_EDIT_MODE_LIVE && !(mode == NOAH_PROFILE_EDIT_MODE_APPLY && state->apply_adjustments_only)) || !owner->config.keyboard_quiet || !owner->config.keyboard_quiet(owner->config.keyboard_quiet_context) || !elapsed_at_least(owner->now_ms, state->quiet_since, NOAH_PROFILE_OWNER_AUTO_SAVE_QUIET_MS)) return false;
+    if (!owner->config.keyboard_quiet || !owner->config.keyboard_quiet(owner->config.keyboard_quiet_context)) return false;
     noah_profile_working_result_t result = noah_profile_owner_save(owner, automatic_transaction(owner), owner->working.session, owner->working.revision);
     if (result == NOAH_PROFILE_WORKING_QUEUED) {
         state->attempted = true; // one attempt per edited revision, no wear loop

@@ -164,8 +164,12 @@ of Ark.
 
 The firmware coalesces split activity messages by default: it sends fewer
 repeated lighting-activity messages to the other half while still reading its
-keys on every scan. The split link always runs at QMK's default 230,400 baud; a
-faster link garbled split messages and was removed (D-L43).
+keys on every scan. Both halves use a fixed 460,800-baud split link, with frame
+CRC enabled by default. Flash both halves together when moving from the earlier
+230,400-baud firmware. The faster link needs renewed hardware acceptance:
+before frame CRC, it produced transport errors and lighting flicker (D-L43).
+CRC rejects corrupted frames; it does not prevent errors or their retry cost.
+The removed `NOAH_SPLIT_BAUD` selector still fails the build.
 
 ```sh
 NOAH_SPLIT_ACTIVITY_COALESCE=no sh tools/build-firmware-pair.sh

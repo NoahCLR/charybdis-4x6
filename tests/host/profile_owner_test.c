@@ -2294,6 +2294,7 @@ static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
 #include "profile_owner_auto_save_test.inc"
 
 int main(void) {
+    test_ineligible_auto_saves_skip_admission_work();
     test_auto_save_modes_and_adjustments();
     test_saving_the_saved_bytes_writes_nothing();
     test_auto_save_hour_bound();

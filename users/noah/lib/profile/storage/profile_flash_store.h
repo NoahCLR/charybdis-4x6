@@ -108,6 +108,9 @@ noah_profile_store_io_t noah_profile_flash_store_read_only_io(noah_profile_flash
 // save has fewer than a sector of erased flash ahead of its writes, erases
 // the next sector.
 void noah_profile_flash_store_grant_begin(noah_profile_flash_store_t *flash, bool quiet);
+// Whether the next grant needs an erase. Lets the caller skip its quiet
+// keyboard check when no erase can run; grant_begin still resets accounting.
+bool noah_profile_flash_store_erase_pending(const noah_profile_flash_store_t *flash);
 // Whether the store's writer may run in this grant (the pause policy above).
 bool                             noah_profile_flash_store_may_write(const noah_profile_flash_store_t *flash);
 // Whether this grant has erased or programmed anything: a grant may give the

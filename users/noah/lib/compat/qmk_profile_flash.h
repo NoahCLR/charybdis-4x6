@@ -22,7 +22,8 @@ enum {
     // Bytes of one half's figures, a full Profile Wire report payload.
     NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE = 25u,
     NOAH_QMK_PROFILE_FLASH_FIGURES_PRESENT = 1u << 0,
-    // How often the USB half pulls the other half's figures.
+    // Minimum interval between requested pulls, including failed attempts.
+    // Page-1 reads queue one pull; no reads means no periodic split traffic.
     NOAH_QMK_PROFILE_FLASH_PEER_PULL_MS = 1000u,
     // How long the matrix must be unchanged, with no key held, before a
     // sector erase may pause the keyboard.
