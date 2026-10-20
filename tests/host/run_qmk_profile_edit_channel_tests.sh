@@ -16,12 +16,13 @@ trap cleanup EXIT INT TERM
 
 build_and_run() {
     name="$1"
-    shift
+    mutation="$2"
+    shift 2
     cc -std=gnu11 -Wall -Wextra -Werror -Wno-unused-parameter "$@" \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DNOAH_LIVE_PROFILE_OWNER_ENABLE \
-        -DNOAH_LIVE_PROFILE_MUTATION_ENABLE \
+        $mutation \
         -DNOAH_PORTABLE_PROFILE_ENABLE \
         -DCOMBO_ENABLE \
         -I"$ROOT" \
@@ -34,5 +35,7 @@ build_and_run() {
     "$BUILD_DIR/qmk_profile_edit_channel_test_$name"
 }
 
-build_and_run normal
-build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
+build_and_run normal -DNOAH_LIVE_PROFILE_MUTATION_ENABLE
+build_and_run sanitized -DNOAH_LIVE_PROFILE_MUTATION_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
+# An owner that cannot edit (NOAH_LIVE_PROFILE_MUTATION=no) still restarts.
+build_and_run read_only ""

@@ -59,6 +59,12 @@ in Apply and Live and held for Save in Live + review. The profile is the only du
 owner of the settings QMK holds, and the combos and behaviours toggles are
 runtime overrides beside their stored masters. Hardware acceptance is pending.
 
+A half whose profile owner stops (a storage, durability, authority,
+conflict, integration or compiled-defaults error, which only a restart
+leaves) says so in edit status, flag 14 for the USB half and 15 for the other
+half, and a client can restart both halves over Raw HID (SET `0x28`) instead
+of asking for a replug (D-F34). Hardware acceptance is pending.
+
 Keymap and macro domains own typing and playback (D-F30), and VIA is not
 supported (D-F31): the firmware answers Raw HID itself, Apply publishes one
 store with no VIA binding, staging or roll-forward, and QMK's logical EEPROM
@@ -124,6 +130,30 @@ profile and sends the rest in chunks of up to 106 bytes (D-F19, D-F28); it has
 not run on hardware either.
 
 ## Open Issues
+
+- **Restart needs keyboard acceptance (D-F34).** Restart with unsaved edits
+  in a normal state: both halves come back, the client puts the edits back
+  and they save. Restart mid-save and mid-edit, in each edit mode. Confirm
+  both halves come back once each, with no watchdog-restart indicator (the
+  runtime watchdog's interplay with QMK's soft reset is unmeasured) and no
+  bootloader drive (the double-tap reset window). To see a stopped owner on
+  the keyboard, a build without the 2026-10-20 fix to taking the other half's
+  copy stops in a Live + review Save after a bootmagic EEPROM clear on the
+  right half; host tests cover every stopped state otherwise.
+- **A USB half that restarts alone can strand the other half's prepared copy
+  (D-F34).** Restarted while the other half holds a durable prepared copy of
+  a save (between its prepared marker and the USB half's commit marker), the
+  USB half forgets the save; the other half's lease releases only a copy
+  still being received, and the metadata it is polled with does not say the
+  sender holds nothing. The halves stay apart (edits and Save BUSY) until the
+  other half restarts too. A restart reaches this only when the other half
+  did not acknowledge it; a watchdog reset of the USB half reaches it as
+  well. Durability is unaffected: each half keeps a whole saved profile.
+  Proposed fix, in the split protocol: the sender's metadata says whether it
+  holds a prepared push, and a receiver whose prepared copy is not yet
+  authorized releases it when its sender says it holds none.
+- **No Ark drives Restart yet (D-F34).** Flags 14 and 15, SET `0x28` and the
+  unacknowledged case are in the firmware only.
 
 - **No Ark drives live edits yet (D-F32).** The edit, Save, Revert and edit
   mode commands, the working copy read and the runtime readback are in the
@@ -2083,3 +2113,76 @@ as dragscroll, volume or pinch, types the key underneath once per press past
 its Double tap. No profile, wire or settings format changes. Client follow-up:
 Ark's built-in tap cells, which stay empty past the deepest tap count because
 the keyboard never reaches those tap counts.
+
+## D-F34 — A stopped keyboard says so, and a client restarts it
+
+A Live + review Save on the keyboard (keyboard check, 2026-10-20) failed in
+the USB half's storage and left its live-profile owner in `STORAGE_ERROR`.
+Every later Save, Revert and edit answered INVALID_STATE, the other half was
+no longer polled (a client read "the other half catching up"), and the only
+way out was a replug, which lost the unsaved edits. The owner failing closed
+was right: after a storage error only a fresh read of flash is known safe.
+What was missing was saying so, and a way to restart without a replug.
+
+**Stopped.** Seven owner states are left by nothing but a restart
+(`noah_profile_owner_stopped`): storage error, durability unknown, lost
+post-commit authority, a concurrent commit, a generation conflict, an
+integration error and a compiled-defaults error. Profile Wire edit status
+page 0 flag 14 reports this half's; flag 15 the other half's, which it now
+says in every working-copy sync reply (flag bit 2) while it keeps answering
+polls and acts on none. A slow save, a save waiting for a quiet keyboard and
+a half catching up are never stopped, so a client can tell them apart. The
+states, their causes and what a restart does are in
+[Profile Wire](architecture/profile-wire-v1.md#a-stopped-keyboard-and-restart).
+
+**Restart.** Profile Wire SET `0x28`, carrying the confirmation "REST" so a
+stray report restarts nothing, restarts both halves: the USB half asks the
+other half on a split RPC of its own (`PUT_KEYBOARD_RESTART`) and waits up to
+250 ms for its acknowledgement, answers the report, and resets itself (QMK's
+`soft_reset_keyboard`) 50 ms later; the other half resets 20 ms after
+acknowledging. Both reset from housekeeping. Nothing on this path reads the
+profile owner, so it is taken in any owner state and edit mode, even when the
+owner never started. It is never automatic: a restart loses what is unsaved
+in RAM, and only a client can keep that (read the working copy, restart, send
+it back as one replacement edit), so the firmware never restarts itself for a
+stopped owner.
+
+**Why it is safe.** A restart is a reset between two main-loop passes, so it
+is exactly as safe as unplugging, which the marker-last rule already makes
+safe anywhere in a save on either half: a slot's commit marker is written
+last, and a power cut leaves the previous saved profile, or the new one once
+the USB half's marker is durable
+([power-loss outcomes](architecture/logical-profile-transaction-v1.md#power-loss-outcomes)).
+QMK handles Raw HID in its main loop after the scan, and housekeeping after
+both; every flash erase and program runs inside the scan's durable-I/O step
+with interrupts off, so neither half's reset falls inside one. Host tests
+restart both halves at 23 points across a save and find both on one whole
+profile, old or new, every time.
+
+**Not covered.** A USB half that restarts alone, when the other half did not
+acknowledge, can leave the other half holding a durable prepared copy nothing
+releases, and the halves apart until it restarts too (in host tests, 9 of 23
+sampled points of a save). Durability holds; liveness does not. It is the
+split protocol's gap, reached today by a watchdog reset of the USB half too,
+and is an open issue with a proposed fix; until then a client whose restart
+was not acknowledged asks for a replug if the halves do not agree.
+
+Considered: restarting the stopped owner in place, without a reset. Rejected:
+a stop can come from state the owner shares (storage admission, the split
+reconciler, QMK's EEPROM driver), and only a reset starts all of it from
+flash. Considered: a feature bit for restart. Rejected under D-F28: the word
+holds build differences only, and the 2.0 base is unreleased (as for D-F32),
+so restart and the flags join it without a version change; firmware without
+them never sets the flags and answers SET `0x28` unhandled.
+
+Wire and split: Profile Wire SET `0x28`, edit status flags 14 and 15 and
+reply byte 17; working-copy sync reply flag bit 2; the `PUT_KEYBOARD_RESTART`
+frame ([split protocol](architecture/profile-split-v1.md#keyboard-restart-d-f34)).
+Memory: 28 bytes of static RAM per half; reviewed stack paths in
+[memory budgets](architecture/memory-budgets.md#keyboard-restart--d-f34).
+
+Client follow-up (Ark): one plain message from flags 14 or 15 in place of
+"not ready" and "catching up", and a Restart button there; keep unsaved
+edits (GET `0x21`, or the draft) and a recovery copy, restart, wait for the
+keyboard, send the edits back as one replacement and leave them unsaved; when
+byte 17 is `0` and the halves do not agree, ask for a replug.

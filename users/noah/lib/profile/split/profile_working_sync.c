@@ -186,7 +186,7 @@ static void fill_status(const noah_profile_working_sync_t *sync, uint8_t *reply)
         put_u32(&reply[REPLY_SAVED_GEN], generation);
         reply[REPLY_SAVED_ORIGIN] = origin;
     }
-    reply[REPLY_FLAGS] = (uint8_t)((status.active ? NOAH_PROFILE_WORKING_SYNC_PEER_ACTIVE : 0u) | (compiled ? NOAH_PROFILE_WORKING_SYNC_PEER_SAVED_COMPILED : 0u));
+    reply[REPLY_FLAGS] = (uint8_t)((status.active ? NOAH_PROFILE_WORKING_SYNC_PEER_ACTIVE : 0u) | (compiled ? NOAH_PROFILE_WORKING_SYNC_PEER_SAVED_COMPILED : 0u) | (sync->stopped ? NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED : 0u));
     put_u32(&reply[REPLY_MODE_COUNTER], sync->mode.counter);
     reply[REPLY_MODE] = sync->mode.mode;
 }
@@ -248,6 +248,10 @@ static uint8_t process_request(noah_profile_working_sync_t *sync, const uint8_t 
     uint32_t                     revision    = get_u32(&request[FRAME_REVISION]);
     const uint8_t               *body        = &request[FRAME_BODY];
 
+    // A stopped half says so and changes nothing (D-F34).
+    if (sync->stopped) {
+        return request[FRAME_KIND] == NOAH_PROFILE_WORKING_SYNC_STATUS ? NOAH_PROFILE_WORKING_OK : NOAH_PROFILE_WORKING_INVALID_STATE;
+    }
     switch (request[FRAME_KIND]) {
         case NOAH_PROFILE_WORKING_SYNC_STATUS:
             return NOAH_PROFILE_WORKING_OK;
@@ -331,7 +335,7 @@ static bool peer_matches(const noah_profile_working_sync_t *sync) {
     const noah_profile_working_peer_t *peer = &sync->peer;
     const noah_profile_working_copy_t *copy = sync->copy;
 
-    return peer->known && peer->session == copy->session && peer->revision == copy->revision && peer->phase == NOAH_PROFILE_WORKING_PHASE_IDLE && ((peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_ACTIVE) != 0u) == copy->active;
+    return peer->known && peer->session == copy->session && peer->revision == copy->revision && peer->phase == NOAH_PROFILE_WORKING_PHASE_IDLE && ((peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_ACTIVE) != 0u) == copy->active && !(peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED);
 }
 
 bool noah_profile_working_sync_converged(const noah_profile_working_sync_t *sync, uint32_t now_ms) {
@@ -357,6 +361,10 @@ bool noah_profile_working_sync_set_mode(noah_profile_working_sync_t *sync, uint8
 
 bool noah_profile_working_sync_refused(const noah_profile_working_sync_t *sync) {
     return sync && sync->copy && sync->copy->active && sync->forward_failed_whole && sync->forward_failed_revision == sync->copy->revision;
+}
+
+bool noah_profile_working_sync_peer_stopped(const noah_profile_working_sync_t *sync, uint32_t now_ms) {
+    return sync && sync->peer.known && (sync->peer.flags & NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED) && !elapsed_at_least(now_ms, sync->peer.seen_at, NOAH_PROFILE_WORKING_SYNC_PEER_TIMEOUT_MS);
 }
 
 static void begin_request(noah_profile_working_sync_t *sync, uint8_t kind, uint16_t transaction, uint32_t session, uint32_t revision) {
@@ -475,7 +483,7 @@ static bool choose_request(noah_profile_working_sync_t *sync, uint32_t now) {
         }
         end_forward(sync, false);
     }
-    if (!peer->known || elapsed_at_least(now, peer->seen_at, sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_WAIT ? RETRY_MS : peer_matches(sync) ? NOAH_PROFILE_WORKING_SYNC_IDLE_POLL_MS : NOAH_PROFILE_WORKING_SYNC_POLL_MS)) {
+    if (!peer->known || elapsed_at_least(now, peer->seen_at, sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_WAIT ? RETRY_MS : peer_matches(sync) || (peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED) ? NOAH_PROFILE_WORKING_SYNC_IDLE_POLL_MS : NOAH_PROFILE_WORKING_SYNC_POLL_MS)) {
         if (!elapsed_at_least(now, sync->last_poll_at, RETRY_MS)) {
             return false;
         }
@@ -483,7 +491,8 @@ static bool choose_request(noah_profile_working_sync_t *sync, uint32_t now) {
         seal_request(sync);
         return true;
     }
-    if (sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_WAIT) {
+    // A stopped other half takes nothing until it restarts: only polled.
+    if (sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_WAIT || (peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED)) {
         return false;
     }
     // The edit mode: the higher counter wins.

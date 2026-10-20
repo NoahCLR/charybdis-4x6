@@ -1,4 +1,5 @@
-// Profile Wire live edits (D-F32): report layouts against a fake owner.
+// Profile Wire live edits (D-F32) and restart (D-F34): report layouts
+// against a fake owner and a fake restart.
 
 #include <assert.h>
 #include <stdint.h>
@@ -24,6 +25,8 @@ static noah_profile_working_result_t       next_result = NOAH_PROFILE_WORKING_OK
 static noah_profile_owner_working_status_t fake;
 static uint8_t                             working[100];
 static bool                                behaviors_override = true;
+static unsigned                            restart_requests;
+static bool                                restart_acknowledged = true;
 static bool                                combos_on          = true;
 
 noah_profile_working_result_t noah_profile_store_runtime_edit_begin(uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags) {
@@ -78,6 +81,10 @@ bool noah_participation_behaviors_override(void) {
 bool is_combo_enabled(void) {
     return combos_on;
 }
+bool noah_qmk_keyboard_restart_request(void) {
+    restart_requests++;
+    return restart_acknowledged;
+}
 uint32_t noah_qmk_portable_live_setting(uint8_t id) {
     return id == NOAH_SETTING_DEFAULT_DPI ? 1600u : id == NOAH_SETTING_RGB_COLOR ? 0x00C8FF55u : 0u;
 }
@@ -109,6 +116,7 @@ static uint32_t u32(const uint8_t *source) {
     return (uint32_t)source[0] | (uint32_t)source[1] << 8u | (uint32_t)source[2] << 16u | (uint32_t)source[3] << 24u;
 }
 
+#if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE)
 static void test_sets(void) {
     // BEGIN: session, revision, count, flags, inserted bytes; the reply names
     // the result and where the working copy is.
@@ -178,8 +186,95 @@ static void test_sets(void) {
     // Other values are not this channel's.
     set(0x10u, 1u);
     assert(!noah_qmk_profile_edit_channel(frame, sizeof(frame)));
+    set(0x29u, 1u);
+    assert(!noah_qmk_profile_edit_channel(frame, sizeof(frame)));
     next_result = NOAH_PROFILE_WORKING_OK;
     puts("edit SET reports decode exactly and answer with the working copy's identity");
+}
+#endif
+
+static void restart_frame(uint16_t transaction, uint32_t confirm) {
+    set(NOAH_PROFILE_WIRE_V1_VALUE_RESTART, transaction);
+    put_u32(&frame[5], confirm);
+}
+
+// Restart (D-F34): only an exact report with the confirmation restarts, in
+// any owner state and edit mode, and the reply says whether the other half
+// took it.
+static void test_restart(void) {
+    noah_profile_owner_working_status_t normal = fake;
+
+    restart_requests = 0u;
+    restart_frame(0x0102u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM);
+    assert(frame[5] == 'R' && frame[6] == 'E' && frame[7] == 'S' && frame[8] == 'T');
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && restart_requests == 1u);
+    assert(frame[0] == 0x07u && frame[2] == 0x28u && frame[3] == 0x02u && frame[4] == 0x01u && frame[5] == NOAH_PROFILE_WORKING_OK);
+    assert(frame[6] == fake.local.phase && u32(&frame[7]) == fake.local.session && u32(&frame[11]) == fake.local.revision && frame[NOAH_PROFILE_EDIT_WIRE_RESTART_PEER] == 1u);
+    for (uint8_t i = NOAH_PROFILE_EDIT_WIRE_RESTART_PEER + 1u; i < sizeof(frame); i++) assert(frame[i] == 0u);
+    restart_acknowledged = false;
+    restart_frame(3u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && restart_requests == 2u && frame[5] == NOAH_PROFILE_WORKING_OK && frame[NOAH_PROFILE_EDIT_WIRE_RESTART_PEER] == 0u);
+    restart_acknowledged = true;
+    // Taken whatever the owner's state and edit mode: stopped on both halves,
+    // in Apply, mid-save.
+    fake.stopped      = true;
+    fake.peer_stopped = true;
+    fake.mode.mode    = NOAH_PROFILE_EDIT_MODE_APPLY;
+    fake.save.phase   = NOAH_PROFILE_OWNER_SAVE_REUSE;
+    restart_frame(4u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && restart_requests == 3u && frame[5] == NOAH_PROFILE_WORKING_OK);
+    // Its reply carries the stopped flags as every edit SET's does.
+    assert((frame[16] & (NOAH_PROFILE_EDIT_WIRE_STOPPED >> 8u)) && (frame[16] & (NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED >> 8u)));
+    fake = normal;
+    // A stray report restarts nothing: a wrong or partial confirmation, a
+    // zero transaction, or anything after the confirmation.
+    const uint32_t wrong[] = {0u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM ^ 1u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM ^ 0x80000000u, 0x52455354u};
+    for (uint8_t i = 0u; i < sizeof(wrong) / sizeof(wrong[0]); i++) {
+        restart_frame(5u, wrong[i]);
+        assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WORKING_INVALID_ARGUMENT && frame[NOAH_PROFILE_EDIT_WIRE_RESTART_PEER] == 0u);
+    }
+    restart_frame(0u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WORKING_INVALID_ARGUMENT);
+    for (uint8_t at = 9u; at < sizeof(frame); at++) {
+        restart_frame(6u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM);
+        frame[at] = 1u;
+        assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WORKING_INVALID_ARGUMENT);
+    }
+    // Another channel, or a GET of the value, is not a restart.
+    restart_frame(7u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM);
+    frame[1] = 1u;
+    assert(!noah_qmk_profile_edit_channel(frame, sizeof(frame)));
+    get(NOAH_PROFILE_WIRE_V1_VALUE_RESTART, 0u);
+    assert(!noah_qmk_profile_edit_channel(frame, sizeof(frame)));
+    assert(restart_requests == 3u);
+    puts("restart takes only the confirmed report, in any state and mode, and says whether the other half took it");
+}
+
+// Flags 14 and 15 (D-F34): a stopped owner on this half, and on the other.
+static void test_stopped_flags(void) {
+    noah_profile_owner_working_status_t normal = fake;
+    const struct { bool stopped, peer_stopped; uint16_t flags; } cases[] = {
+        {false, false, 0u},
+        {true, false, NOAH_PROFILE_EDIT_WIRE_STOPPED},
+        {false, true, NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED},
+        {true, true, NOAH_PROFILE_EDIT_WIRE_STOPPED | NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED},
+    };
+
+    assert(NOAH_PROFILE_EDIT_WIRE_STOPPED == 0x4000u && NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED == 0x8000u && NOAH_PROFILE_EDIT_WIRE_STATUS_FLAGS == 0xFFFFu);
+    for (uint8_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        fake.stopped      = cases[i].stopped;
+        fake.peer_stopped = cases[i].peer_stopped;
+        get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
+        assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+        assert(((frame[9] | frame[10] << 8u) & 0xC000u) == cases[i].flags);
+    }
+    // A save under way is the saving flag, never a stopped one.
+    fake            = normal;
+    fake.save.phase = NOAH_PROFILE_OWNER_SAVE_WAIT;
+    get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && (frame[9] & NOAH_PROFILE_EDIT_WIRE_SAVING) && !(frame[10] & 0xC0u));
+    fake = normal;
+    puts("edit status flags 14 and 15 report a stopped owner on this half and on the other");
 }
 
 static void test_gets(void) {
@@ -259,7 +354,15 @@ int main(void) {
     fake.peer_required         = true;
     fake.peer_converged        = true;
     fake.mode                  = (noah_profile_edit_mode_record_t){.counter = 3u, .mode = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW};
+#if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE)
     test_sets();
+#else
+    // A build that cannot edit still restarts; it takes no edit.
+    set(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_BEGIN, 1u);
+    assert(!noah_qmk_profile_edit_channel(frame, sizeof(frame)));
+#endif
+    test_restart();
+    test_stopped_flags();
     test_gets();
     return 0;
 }

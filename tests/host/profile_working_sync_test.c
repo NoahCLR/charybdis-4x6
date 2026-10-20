@@ -386,6 +386,37 @@ static void test_edit_mode_is_written_on_a_quiet_keyboard(void) {
     puts("the edit mode is written only on a quiet keyboard, and a failing write backs off");
 }
 
+// A half whose owner stopped (D-F34) answers every poll saying so and acts on
+// nothing; the USB half only polls it, once a second, and tells its status.
+static void test_a_stopped_half_says_so_and_takes_nothing(void) {
+    const uint8_t                 key[2] = {0x06u, 0x00u};
+    noah_profile_working_splice_t keymap = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .offset = KEYMAP_KEY, .remove = 2u, .insert = 2u};
+    uint32_t                      before;
+
+    setup();
+    other.sync.stopped = true;
+    usb_edit(1u, &keymap, key, sizeof(key));
+    run(50u);
+    assert(noah_profile_working_sync_peer_stopped(&usb.sync, now) && !noah_profile_working_sync_converged(&usb.sync, now));
+    assert(usb.sync.peer.flags & NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED);
+    // Nothing was adopted, reverted or edited on the stopped half.
+    assert(other.copy.session == 0x2222u && other.copy.revision == 0u && !other.copy.active);
+    before = exchange_count;
+    run(10000u);
+    assert(exchange_count - before <= 2u * 11u && !other.copy.active && other.copy.session == 0x2222u);
+    assert(noah_profile_working_sync_peer_stopped(&usb.sync, now));
+    // Not heard from, it is no longer known to have stopped.
+    other.sync.stopped = false;
+    drop_every         = 1u;
+    run(NOAH_PROFILE_WORKING_SYNC_PEER_TIMEOUT_MS + 10u);
+    assert(!noah_profile_working_sync_peer_stopped(&usb.sync, now));
+    // After a restart it is brought back as any other half is.
+    drop_every = 0u;
+    assert(run_until_converged(20000u));
+    assert_same_profile();
+    puts("a stopped half says so on every reply and takes nothing; the USB half only polls it");
+}
+
 static void test_frames(void) {
     uint8_t frame[NOAH_PROFILE_WORKING_SYNC_FRAME_MAX] = {NOAH_PROFILE_WORKING_SYNC_STATUS};
     uint8_t reply[NOAH_PROFILE_WORKING_SYNC_FRAME_SIZE];
@@ -417,5 +448,6 @@ int main(int argc, char **argv) {
     test_an_edit_the_other_half_refuses_stops();
     test_edit_mode_follows_the_higher_counter();
     test_edit_mode_is_written_on_a_quiet_keyboard();
+    test_a_stopped_half_says_so_and_takes_nothing();
     return 0;
 }

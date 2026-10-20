@@ -286,6 +286,7 @@ void    unregister_code(uint8_t keycode);
 void    register_code16(uint16_t keycode);
 void    unregister_code16(uint16_t keycode);
 void    wait_ms(uint16_t ms);
+void    soft_reset_keyboard(void);
 
 bool     charybdis_get_pointer_dragscroll_enabled(void);
 bool     charybdis_get_pointer_sniping_enabled(void);

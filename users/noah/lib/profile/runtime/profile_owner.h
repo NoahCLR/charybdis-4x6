@@ -264,6 +264,11 @@ void noah_profile_owner_scan_again(noah_profile_owner_t *owner, bool again);
 bool noah_profile_owner_receive(noah_profile_owner_t *owner, uint8_t *frame, size_t length);
 
 noah_profile_owner_state_t         noah_profile_owner_state(const noah_profile_owner_t *owner);
+// The owner stopped (D-F34): a conflict, durability, compiled, storage,
+// integration or authority error, which nothing but a restart leaves (a fresh
+// read of flash at boot). It saves, edits, reverts and follows the other half
+// no more; its status stays readable. A slow save is never one of these.
+bool                               noah_profile_owner_stopped(const noah_profile_owner_t *owner);
 noah_profile_store_result_t        noah_profile_owner_discovery_result(const noah_profile_owner_t *owner);
 const noah_profile_store_record_t *noah_profile_owner_committed(const noah_profile_owner_t *owner);
 
@@ -318,6 +323,8 @@ typedef struct {
     bool                            peer_storage_paused; // the other half's save waits for a quiet keyboard
     bool                            peer_refused;        // the other half refused this working copy, whole
     bool                            mode_store_failed;   // writing the edit mode failed; it is tried again
+    bool                            stopped;             // this half's owner stopped: only a restart clears it (D-F34)
+    bool                            peer_stopped;        // the other half answers that its owner stopped
 } noah_profile_owner_working_status_t;
 
 bool noah_profile_owner_working_status(const noah_profile_owner_t *owner, noah_profile_owner_working_status_t *status);

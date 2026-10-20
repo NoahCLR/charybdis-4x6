@@ -462,6 +462,8 @@ layer set and activity timer; this userspace adds custom split RPCs in
   halves together
 - `PUT_PROFILE_WORKING_SYNC`: live edits that are not saved yet, and the edit
   mode
+- `PUT_KEYBOARD_RESTART`: a restart the app asked for, so both halves restart
+  together
 
 You can forget those packet names immediately. The point is that both halves
 know the same layers, keys, combos, pointing modes, and feedback state, so the
@@ -529,6 +531,18 @@ mixture. Erases wait for no held key and no matrix change for 50 ms; a key
 pressed during a paced save can make it wait longer. A press and release
 entirely inside a flash pause can still be missed. Pause diagnostics on both
 halves are available for the first keyboard checks.
+
+**If the keyboard stops saving.** When saving fails in a way the firmware
+cannot safely carry on from (a flash write that failed, for example), that
+half stops saving: Save, Revert and edits are refused, typing goes on, and
+the keyboard reports that it stopped, for either half. Only a restart gets
+it going again, and you no longer have to unplug for one: the app can
+restart both halves over USB. A restart is exactly as safe as unplugging,
+since a save interrupted anywhere leaves a complete saved profile. Unsaved
+edits do not survive it on the keyboard, but the app reads them first and
+puts them back afterwards. The keyboard never restarts itself. If the other
+half does not answer the restart and the halves disagree afterwards, unplug
+the keyboard and plug it back in. Ark's side of this follows the firmware.
 
 ## Building from source
 

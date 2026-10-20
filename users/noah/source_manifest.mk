@@ -69,6 +69,7 @@ NOAH_COMMON_SOURCES := \
     lib/compat/qmk_effective_combos.c \
     lib/compat/qmk_mod_contract.c \
     lib/compat/qmk_usb_product_name.c \
+    lib/compat/qmk_keyboard_restart.c \
     lib/action/action_kind.c \
     lib/action/action_kind_dispatch.c \
     lib/action/action_lifecycle.c \

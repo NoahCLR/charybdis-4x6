@@ -1140,6 +1140,17 @@ bool noah_profile_owner_storage_busy(const noah_profile_owner_t *owner) {
     return owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || owner->working.phase == NOAH_PROFILE_WORKING_PHASE_LOADING || owner->working.phase == NOAH_PROFILE_WORKING_PHASE_VALIDATING;
 }
 
+// A stopped half (D-F34) still answers the working copy's polls, saying it
+// stopped, so the USB half can tell a client. Out of line: the scan's frame is
+// every storage path's.
+static __attribute__((noinline)) bool answer_stopped(noah_profile_owner_t *owner, bool master) {
+    if (master || !owner->working_ready || !owner->config.peer_required || !noah_profile_owner_stopped(owner)) {
+        return false;
+    }
+    owner->working_sync.stopped = true;
+    return noah_profile_working_sync_peer_scan(&owner->working_sync);
+}
+
 bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t now_ms) {
     noah_profile_validator_v1_result_t validator_result;
 
@@ -1177,7 +1188,7 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
         case NOAH_PROFILE_OWNER_READY_VALIDATED:
             return scan_running(owner, master, now_ms, false);
         default:
-            return false;
+            return answer_stopped(owner, master);
     }
 }
 
@@ -1205,6 +1216,21 @@ bool noah_profile_owner_receive(noah_profile_owner_t *owner, uint8_t *frame, siz
 
 noah_profile_owner_state_t noah_profile_owner_state(const noah_profile_owner_t *owner) {
     return owner ? owner->state : NOAH_PROFILE_OWNER_UNINITIALIZED;
+}
+
+bool noah_profile_owner_stopped(const noah_profile_owner_t *owner) {
+    switch (owner ? owner->state : NOAH_PROFILE_OWNER_UNINITIALIZED) {
+        case NOAH_PROFILE_OWNER_GENERATION_CONFLICT:
+        case NOAH_PROFILE_OWNER_DURABILITY_UNKNOWN:
+        case NOAH_PROFILE_OWNER_COMPILED_ERROR:
+        case NOAH_PROFILE_OWNER_STORAGE_ERROR:
+        case NOAH_PROFILE_OWNER_INTEGRATION_ERROR:
+        case NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST:
+        case NOAH_PROFILE_OWNER_CONCURRENT_COMMIT:
+            return true;
+        default:
+            return false;
+    }
 }
 
 noah_profile_store_result_t noah_profile_owner_discovery_result(const noah_profile_owner_t *owner) {
@@ -1711,6 +1737,8 @@ bool noah_profile_owner_working_status(const noah_profile_owner_t *owner, noah_p
     status->peer_storage_paused       = owner->reconciler.busy_streak != 0u && owner->reconciler.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED;
     status->peer_refused              = noah_profile_working_sync_refused(&owner->working_sync);
     status->mode_store_failed         = owner->working_sync.mode_store_failed;
+    status->stopped                   = noah_profile_owner_stopped(owner);
+    status->peer_stopped              = owner->config.peer_required && noah_profile_working_sync_peer_stopped(&owner->working_sync, owner->now_ms);
     return true;
 }
 

@@ -472,6 +472,18 @@
         {
           "name": "keyboard adjustment safe-boundary republication retains pending feedback",
           "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "scan_working", "noah_effective_profile_provider_publish_in_place", "noah_effective_settings_invalidate", "noah_qmk_portable_apply", "projected_setting", "noah_setting"]
+        },
+        {
+          "name": "restart asks the other half from the Raw HID handler",
+          "functions": ["main", "noah_profile_channel_dispatch", "noah_qmk_keyboard_restart_request", "transaction_rpc_exec", "transport_execute_transaction"]
+        },
+        {
+          "name": "restart resets this half from housekeeping",
+          "functions": ["main", "soft_reset_keyboard", "shutdown_kb", "ws2812_flush"]
+        },
+        {
+          "name": "a stopped half answers the working copy's poll",
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "answer_stopped", "noah_profile_working_sync_peer_scan", "noah_profile_working_copy_status", "noah_effective_profile_provider_copy_active"]
         }
       ]
     },
@@ -505,6 +517,11 @@
           "caller": "slave_rpc_exec_callback",
           "callee": "working_rpc",
           "reason": "QMK dispatches the registered working-copy sync RPC (D-F32): a bounded mailbox copy and a cached reply."
+        },
+        {
+          "caller": "slave_rpc_exec_callback",
+          "callee": "restart_rpc",
+          "reason": "QMK dispatches the registered restart RPC (D-F34): it checks one 8-byte frame, notes the restart and writes the acknowledgement."
         }
       ],
       "paths": [
@@ -519,6 +536,10 @@
         {
           "name": "working copy sync mailbox",
           "functions": ["SlaveThread", "slave_rpc_exec_callback", "working_rpc"]
+        },
+        {
+          "name": "restart RPC",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "restart_rpc", "noah_qmk_keyboard_restart_encode"]
         }
       ]
     }

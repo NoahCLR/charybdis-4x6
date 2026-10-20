@@ -2,10 +2,10 @@
 // Profile Wire: Live Edits (D-F32)
 // ───────────────────────────────────────────────────────────────────────────
 //
-// SET 0x20..0x27 admit edits, Save, Revert and the edit mode; GET 0x20,
-// 0x21, 0x22 and 0x27 read the edit status, the working copy, the runtime
-// overrides and the edit mode. The layouts are in
-// docs/architecture/profile-wire-v1.md, "Live edits".
+// SET 0x20..0x27 admit edits, Save, Revert and the edit mode, and SET 0x28
+// restarts both halves (D-F34); GET 0x20, 0x21, 0x22 and 0x27 read the edit
+// status, the working copy, the runtime overrides and the edit mode. The
+// layouts are in docs/architecture/profile-wire-v1.md, "Live edits".
 #pragma once
 
 #include <stdbool.h>
@@ -40,7 +40,17 @@ enum {
     // A DPI or lighting key's change awaits publication as an edit; a new
     // Apply, edit, Save, Revert and mode change are BUSY until it is.
     NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING = 1u << 13,
-    NOAH_PROFILE_EDIT_WIRE_STATUS_FLAGS     = 0x3FFFu,
+    // This half's profile owner stopped: only a restart clears it (D-F34).
+    NOAH_PROFILE_EDIT_WIRE_STOPPED          = 1u << 14,
+    // The other half answers that its owner stopped (USB half only).
+    NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED     = 1u << 15,
+    NOAH_PROFILE_EDIT_WIRE_STATUS_FLAGS     = 0xFFFFu,
+
+    // SET 0x28 restart: bytes 5..8 carry "REST", little-endian, so a stray
+    // report cannot restart the keyboard. Its reply's byte 17 says whether
+    // the other half acknowledged.
+    NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM = 0x54534552u,
+    NOAH_PROFILE_EDIT_WIRE_RESTART_PEER    = 17u,
 };
 
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)

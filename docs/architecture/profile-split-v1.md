@@ -439,8 +439,15 @@ Every reply is 32 bytes: byte 0 kind with bit 7 set, 1–2 the sequence, 3 the
 result (the working copy's codes, Profile Wire), then the receiver's state:
 4–7 session, 8–11 revision, 12 phase, 13 last result, 14–15 transaction (in
 progress, else last), 16 flags (bit 0 unsaved edits, 1 its saved profile is
-the compiled defaults), 17–20 saved generation, 21 saved origin, 22–25 mode
-counter, 26 mode, 30–31 CRC-16.
+the compiled defaults, 2 its owner stopped), 17–20 saved generation, 21 saved
+origin, 22–25 mode counter, 26 mode, 30–31 CRC-16.
+
+A half whose live-profile owner stopped (D-F34: a state only a restart
+leaves) keeps answering: a status poll with OK, anything else with
+INVALID_STATE, every reply with flag bit 2, and acts on nothing. The USB half
+then sends it nothing but a status poll once a second, counts it apart (no
+edit, Save or mode change waits on it in vain) and reports it as Profile
+Wire edit status flag 15. A stopped USB half sends nothing.
 
 The USB half polls every 100 ms while the halves differ or an edit is on its
 way, every second while they agree, and forgets the other half after 3 s
@@ -476,6 +483,32 @@ when its keyboard is quiet (no key held and the matrix unchanged for 50 ms,
 the rule before a slot erase, D-F29), because QMK's EEPROM is wear-levelled
 flash that may erase. A failed write is tried again after 1 s, the wait
 doubling to 64 s, and reported (edit status flag bit 12) until one succeeds.
+
+## Keyboard restart (D-F34)
+
+A client's restart of both halves (Profile Wire SET `0x28`) reaches the other
+half on `PUT_KEYBOARD_RESTART`, a split RPC of its own. Each half registers
+it from housekeeping at start, apart from the profile owner, so a half takes
+it whatever state its owner is in, or if the owner never started.
+
+Both frames are 8 bytes: byte 0 kind (`1` request, `0x81` acknowledgement),
+1–4 the confirmation `52 45 53 54` ("REST"), 5 version `1`, 6–7 CRC-16
+(CCITT) of bytes 0–5. Each is one fixed sequence of bytes; any other request
+is answered with zeros and changes nothing. The receiving half's callback, on
+the split slave thread, notes the restart and answers the acknowledgement;
+its housekeeping resets the half 20 ms later, between main-loop passes, so
+never inside a flash erase or program. A request repeated before then is
+acknowledged again and keeps the first time. The USB half asks again every
+5 ms until it is acknowledged or 250 ms have passed, so a sector erase (45 ms
+typical) on the other half only delays it, and restarts itself either way.
+
+A USB half that restarts alone can leave the other half holding a durable
+prepared copy of a save no sender will finish: the receiver's lease
+(`NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS`) releases only a copy still being
+received, and a restarted sender neither remembers the copy nor learns of it
+from the metadata it polls. The halves then stay apart until the other half
+restarts too. A watchdog reset of the USB half reaches the same state. See
+the open issue in [the direction](../LIVE_EDIT_APP_DIRECTION.md#open-issues).
 
 ## Remaining Exposure And Acceptance Pieces
 

@@ -65,6 +65,11 @@ typedef struct {
     uint16_t largest_read;
     uint16_t largest_write;
     bool     fail_next_write;
+    // Every read fails: a slot the half cannot read at boot.
+    bool     fail_reads;
+    // The next commit marker written is reported failed, though its byte
+    // landed: the store cannot tell whether the decision is durable.
+    bool     fail_commit_marker;
 } memory_t;
 
 typedef struct {
@@ -83,6 +88,7 @@ static bool paced_copy;
 static uint32_t fake_now;
 
 static uint32_t compiled_reads;
+static bool     compiled_read_fails;
 static bool     key_installed;
 static bool     rgb_installed;
 static bool     rgb_install_allowed = true;
@@ -102,7 +108,7 @@ static uint32_t digest_of(const uint8_t *bytes, size_t length) {
 static bool compiled_read(void *context, size_t offset, uint8_t *target, size_t length) {
     (void)context;
     compiled_reads++;
-    if (!target || length == 0u || offset > sizeof(compiled_blob) || length > sizeof(compiled_blob) - offset) {
+    if (compiled_read_fails || !target || length == 0u || offset > sizeof(compiled_blob) || length > sizeof(compiled_blob) - offset) {
         return false;
     }
     memcpy(target, &compiled_blob[offset], length);
@@ -211,6 +217,7 @@ static bool memory_read(void *context, noah_profile_storage_address_t address, u
     memory_t *memory = context;
     memory->reads++;
     if (length > memory->largest_read) memory->largest_read = length;
+    if (memory->fail_reads) return false;
     if (!target || length == 0u || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) return false;
     memcpy(target, &memory->bytes[address], length);
     return true;
@@ -222,6 +229,12 @@ static bool memory_write(void *context, noah_profile_storage_address_t address, 
     if (length > memory->largest_write) memory->largest_write = length;
     if (memory->fail_next_write) {
         memory->fail_next_write = false;
+        return false;
+    }
+    // A slot's commit marker: header byte 35, value 0x18 (profile_store.c).
+    if (memory->fail_commit_marker && length == 1u && source && source[0] == 0x18u && address % (NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR - NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR) == NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - 1u) {
+        memory->fail_commit_marker = false;
+        memory->bytes[address]     = source[0];
         return false;
     }
     if (!source || length == 0u || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) return false;
@@ -939,7 +952,7 @@ static void test_local_known_commit_failure_aborts_prepared_peer_first(void) {
     for (uint32_t guard = 0u; guard < 2048u && left.state != NOAH_PROFILE_OWNER_STORAGE_ERROR; guard++) {
         scan_pair(&left, &right, &now);
     }
-    assert(left.state == NOAH_PROFILE_OWNER_STORAGE_ERROR);
+    assert(left.state == NOAH_PROFILE_OWNER_STORAGE_ERROR && noah_profile_owner_stopped(&left) && !noah_profile_owner_stopped(&right));
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
     assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
     assert(!left.host_transaction.has_candidate);
@@ -1203,7 +1216,7 @@ static void test_unexpected_newer_postcommit_authority_never_activates(void) {
     assert(noah_profile_split_authority_publish(&left.reconciler.authority, left.committed_descriptor, newer, false));
     left.scheduler_cursor = 0u;
     assert(noah_profile_owner_scan(&left, true, now++));
-    assert(left.state == NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST);
+    assert(left.state == NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST && noah_profile_owner_stopped(&left));
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED);
     assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST);
     assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_HOST);
@@ -1422,7 +1435,7 @@ static void test_partial_runtime_install_rolls_back(void) {
     for (uint32_t guard = 0u; guard < 32u && owner.state == NOAH_PROFILE_OWNER_VALIDATING_COMPILED; guard++) {
         assert(noah_profile_owner_scan(&owner, true, guard));
     }
-    assert(owner.state == NOAH_PROFILE_OWNER_INTEGRATION_ERROR);
+    assert(owner.state == NOAH_PROFILE_OWNER_INTEGRATION_ERROR && noah_profile_owner_stopped(&owner));
     assert(!key_installed && !rgb_installed);
     rgb_install_allowed = true;
 }
@@ -2292,6 +2305,7 @@ static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
 }
 
 #include "profile_owner_auto_save_test.inc"
+#include "profile_owner_stopped_test.inc"
 
 int main(void) {
     test_ineligible_auto_saves_skip_admission_work();
@@ -2337,6 +2351,7 @@ int main(void) {
     test_peer_authority_supersedes_only_precommit_host_generation();
     test_every_precommit_cancel_releases_the_candidate();
     test_decided_commit_is_never_cancelled();
+    test_stopped_owners_and_restarts();
     puts("profile owner host tests passed");
     return 0;
 }

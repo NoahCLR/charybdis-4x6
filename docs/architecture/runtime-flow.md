@@ -625,6 +625,20 @@ text are different stored names, so that change also restarts USB. The half with
 USB never restarts it: QMK disconnected its USB at role detection and latches
 the role, so its USB stays off.
 
+## Keyboard restart
+
+A client restarts the keyboard with Profile Wire SET `0x28` (D-F34),
+normally once edit status flag 14 or 15 says a half's profile owner stopped.
+The Raw HID handler, in QMK's main loop after the scan, checks the
+confirmation and asks the other half on `PUT_KEYBOARD_RESTART`
+(`compat/qmk_keyboard_restart.c`), waiting at most 250 ms for its
+acknowledgement, then answers the report. The other half's split callback
+only notes the request. Each half's housekeeping then calls QMK's
+`soft_reset_keyboard`, the other half 20 ms after acknowledging and the USB
+half 50 ms after answering, so the reset falls between main-loop passes and
+never inside the durable-I/O step's flash erases and programs. Nothing on the
+path reads the profile owner, so a half takes it in any owner state.
+
 ## Test Coverage Map
 
 ```mermaid
@@ -637,5 +651,6 @@ flowchart TD
     split["Split transport"] --> split_tests["split_runtime_sync, profile_split_reconciler, qmk_profile_split_transport"]
     hooks["Hooks and boundaries"] --> boundary_tests["hook_chaining, feature_gate_compile, qmk_contract"]
     usb_name["USB product name"] --> usb_name_tests["qmk_usb_product_name, profile_store_runtime, profile_owner"]
+    restart["Stopped owner and restart"] --> restart_tests["qmk_keyboard_restart, qmk_profile_edit_channel, profile_working_sync, profile_owner"]
     all["Whole userspace"] --> full["run_all_host_tests.sh and qmk compile"]
 ```
