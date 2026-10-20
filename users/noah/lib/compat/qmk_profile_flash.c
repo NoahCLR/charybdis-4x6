@@ -115,7 +115,7 @@ bool noah_qmk_profile_flash_keyboard_quiet(void) {
 void noah_qmk_profile_flash_grant_begin(void) {
     noah_profile_flash_store_t *flash = flash_store();
 
-    noah_profile_flash_store_grant_begin(flash, noah_qmk_profile_flash_keyboard_quiet());
+    noah_profile_flash_store_grant_begin(flash, noah_profile_flash_store_erase_pending(flash) && noah_qmk_profile_flash_keyboard_quiet());
 }
 
 bool noah_qmk_profile_flash_may_write(void) {
@@ -187,6 +187,7 @@ static uint8_t own_physical_half(void) {
 }
 
 static uint8_t noah_qmk_profile_flash_peer[NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE];
+static bool    noah_qmk_profile_flash_peer_requested;
 
 bool noah_qmk_profile_flash_wire_get(uint8_t *data, uint8_t length) {
     noah_profile_flash_diagnostics_t diagnostics;
@@ -209,11 +210,15 @@ bool noah_qmk_profile_flash_wire_get(uint8_t *data, uint8_t length) {
     if (data[4] == 0u) {
         diagnostics = noah_qmk_profile_flash_diagnostics();
         noah_qmk_profile_flash_encode_figures(&diagnostics, own_physical_half(), &data[7]);
-    } else if (noah_qmk_profile_flash_peer[0] & NOAH_QMK_PROFILE_FLASH_FIGURES_PRESENT) {
-        memcpy(&data[7], noah_qmk_profile_flash_peer, NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE);
     } else {
-        data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
-        return true;
+        // Raw HID never waits for the split link. A valid peer read asks
+        // housekeeping for one refresh and returns the last successful pull.
+        noah_qmk_profile_flash_peer_requested = true;
+        if (!(noah_qmk_profile_flash_peer[0] & NOAH_QMK_PROFILE_FLASH_FIGURES_PRESENT)) {
+            data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
+            return true;
+        }
+        memcpy(&data[7], noah_qmk_profile_flash_peer, NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE);
     }
     data[5] = NOAH_PROFILE_WIRE_V1_STATUS_OK;
     data[6] = NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE;
@@ -240,18 +245,22 @@ static void noah_qmk_profile_flash_rpc(uint8_t request_size, const void *request
 
 void noah_qmk_profile_flash_housekeeping(void) {
     static bool     registered;
+    static bool     pull_attempted;
     static uint32_t last_pull;
     uint8_t         figures[NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE];
 
     if (!registered) {
         transaction_register_rpc(PUT_PROFILE_FLASH_DIAGNOSTICS, noah_qmk_profile_flash_rpc);
         registered = true;
-        last_pull  = timer_read32();
     }
-    if (!is_keyboard_master() || timer_elapsed32(last_pull) < NOAH_QMK_PROFILE_FLASH_PEER_PULL_MS) {
+    if (!noah_qmk_profile_flash_peer_requested || !is_keyboard_master() || (pull_attempted && timer_elapsed32(last_pull) < NOAH_QMK_PROFILE_FLASH_PEER_PULL_MS)) {
         return;
     }
-    last_pull = timer_read32();
+    // Coalesce reads and consume even a failed attempt. Without another
+    // page-1 request there is no retry or periodic diagnostic traffic.
+    noah_qmk_profile_flash_peer_requested = false;
+    pull_attempted = true;
+    last_pull      = timer_read32();
     if (transaction_rpc_exec(PUT_PROFILE_FLASH_DIAGNOSTICS, 0u, NULL, sizeof(figures), figures) && (figures[0] & NOAH_QMK_PROFILE_FLASH_FIGURES_PRESENT)) {
         memcpy(noah_qmk_profile_flash_peer, figures, sizeof(figures));
     }

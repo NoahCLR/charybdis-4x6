@@ -1,8 +1,8 @@
-# The split link runs at QMK's default speed. A faster link was tried and
-# rejected: at 460,800 baud it garbled split messages (D-L43), so there is no
-# speed selector, and an old build command that still sets one fails.
+# Both halves use 460,800 baud with frame CRC on by default (D-L43).
+# Keep one fixed speed: an old command using the removed selector must fail.
+OPT_DEFS += -DSERIAL_USART_SPEED=460800
 ifneq ($(strip $(NOAH_SPLIT_BAUD)),)
-    $(error NOAH_SPLIT_BAUD was removed: the split link stays at QMK's default speed (D-L43))
+    $(error NOAH_SPLIT_BAUD was removed: the split link is fixed at 460800 baud (D-L43))
 endif
 
 # Activity coalescing is on by default and needs the fork's activity hook

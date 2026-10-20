@@ -249,8 +249,8 @@ not run on hardware either.
   Before relying on it, time an Apply of a one-key edit and of a full profile
   against the previous firmware (candidate status page 1 reports copy progress and
   retries), watch for split transport failures with 128-byte frames at
-  230,400 baud, and check that typing and pointing on both halves stay smooth
-  while a copy runs: a full request alone takes about 5.6 ms on the link, before
+  460,800 baud, and check that typing and pointing on both halves stay smooth
+  while a copy runs: a full request alone takes about 2.8 ms on the link, before
   the reply and handshake, and
   the receiver writes up to 110 bytes in one scan.
 - **The bigger profiles have not run on hardware** (D-F14). Flashing them
@@ -725,7 +725,7 @@ the profile. See
 [portable profile](architecture/portable-profile-v1.md) for the settings
 domain.
 
-### D-L43 — Split activity optimization, at QMK's default baud
+### D-L43 — Split activity optimization and fixed split baud
 
 Activity timestamp coalescing is on in the default build, which needs the fork's
 activity hook (`noah-userspace-contracts` at `6889960271` or later). It is accepted on hardware; its
@@ -738,14 +738,21 @@ transaction attribution without streaming during capture. See
 [split activity sync](architecture/split-activity-sync.md). Runtime RPC replacement
 and asynchronous scheduling are not built; either needs hardware measurement first.
 
-The split link stays at QMK's default 230,400 baud. 460,800 was built as a paired
-option and removed after hardware comparison on 2026-09-28: with the same code and
+Both halves now use a fixed 460,800-baud link, with the split frame CRC enabled
+by default. This halves nominal frame transmission time relative to the former
+230,400-baud default; it is not a measured improvement to mouse polling.
+Flash both halves together when changing baud. Setting the removed
+`NOAH_SPLIT_BAUD` selector still fails the build.
+
+460,800 was previously built as a paired option and removed after hardware
+comparison on 2026-09-28: with the same code and
 coalescing, profile copies logged roughly 20–30 split transport failures per Apply
 at 460,800 and none across three Applies at 230,400, and the other half's lighting
-flickered, because QMK's lighting sync carries no checksum. Setting
-`NOAH_SPLIT_BAUD` now fails the build. A faster link needs checksummed syncs
-first, and new measurements. The split frame CRC is now in the default build; 460,800
-stays removed until it is accepted on hardware and measured again.
+flickered because lighting sync then had no frame checksum. The default CRC
+now rejects corrupted frames, but cannot prevent electrical errors or retries.
+The faster default has not been accepted on hardware with CRC: measure transport
+failures, typing/pointing cadence and lighting during profile copies before
+claiming a reliability or polling-rate improvement.
 
 ### D-L44 — The app has its own repository and pinned firmware inputs
 
@@ -1288,7 +1295,7 @@ version 2:
   copy's chunk frames grow; every other split RPC, all replies and pulled
   chunks keep their 32-byte frames (until D-F28 grows pulled replies too). It costs 96 bytes more of the shared RPC
   buffer and of the transport CRC's staging buffer on each half. A full
-  request alone takes about 5.6 ms on the 230,400-baud link, before its reply
+  request alone takes about 2.8 ms on the 460,800-baud link, before its reply
   and handshake; hardware acceptance must judge the whole exchange.
 
 The receiver writes at most 110 bytes in a scan, in store writes of at most
@@ -1716,7 +1723,9 @@ pico-sdk's RAM-resident routines, as QMK's wear-leveling driver does; no BK
 change. A sector erase pauses the keyboard for tens of milliseconds (W25Q16JV:
 45 ms typical, 400 ms at worst), so it runs only at the start of a durable-I/O
 grant, at most one per grant, ahead of a save's writes, and only when no key
-is held and the matrix has been unchanged for 50 ms. The profile step runs in
+is held and the matrix has been unchanged for 50 ms. The matrix quiet check
+runs only when an erase is due; idle grants still reset their flash
+accounting without inspecting the matrix. The profile step runs in
 a grant only with at least a page of erased flash ahead of its writes and the
 grant's flash time under a 2 ms budget, which an erase always exceeds; a
 grant programs at most one page. A save therefore waits while the keyboard is busy, and one the keyboard
@@ -1724,8 +1733,13 @@ never lets erase ends at Ark's or the split peer's time limit as a failed
 save; Live mode's quiet period avoids that. Erase suspend is not used. Each
 half measures its longest erase, longest program, most flash time in one
 grant and its last save, readable over Profile Wire custom get `0x0D` (page 0
-this half, page 1 the other, pulled once a second over split RPC
-`PUT_PROFILE_FLASH_DIAGNOSTICS`). These figures replace a separate measurement
+this half, page 1 the other). A page-1 read queues one housekeeping pull over
+split RPC `PUT_PROFILE_FLASH_DIAGNOSTICS`, at most once a second, and returns
+the last successful pull (unavailable until the first). Reads coalesce;
+failed attempts keep the cache but do not retry without another read. There
+is no periodic diagnostic traffic without a reader; the readback and cache
+contract is in [Profile Wire](architecture/profile-wire-v1.md#flash-pauses--get-value-0x0d).
+These figures replace a separate measurement
 probe: the first keyboard session after a save reads the real pauses, and the
 slot size or pacing changes only if they say so.
 
@@ -1995,6 +2009,10 @@ same Save path above; no second flash path or durability rule exists. Every
 published revision and every held-key scan restarts the interval. Live +
 review never saves automatically; Apply does so only for adjustment-only
 working copies (a client edit disqualifies the copy until Save/Revert/Apply).
+The scan checks eligibility and the quiet deadline before taking profile and
+peer-authority snapshots for automatic admission. Pending keyboard
+adjustments still take those checks in every edit mode, even without an
+active working copy; revision and quiet-time observation continue each scan.
 There is at most one automatic attempt per edited revision; failure is
 reported, leaves the working copy unsaved and needs explicit Save or another
 edit before retrying. This prevents an unattended retry/wear loop. Continuous

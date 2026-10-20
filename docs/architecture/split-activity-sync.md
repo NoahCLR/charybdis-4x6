@@ -4,8 +4,11 @@ Activity coalescing is on in the default build. `NOAH_SPLIT_ACTIVITY_COALESCE=no
 builds the uncoalesced comparison firmware. It is accepted on hardware in daily
 use; its measured effect on the report rate is still open. Measure it with the
 recorders below.
-The split link runs at QMK's default 230,400 baud, with no speed selector; see
-D-L43 for why 460,800 was removed.
+Both halves use a fixed 460,800-baud split link, with frame CRC on by default
+and no speed selector. Moving from the earlier 230,400-baud build requires
+flashing both halves. The faster link still needs hardware acceptance with CRC:
+rejected frames can cost retries even though they no longer corrupt lighting
+state. See D-L43 for the earlier hardware findings.
 
 ## Ownership and compatibility
 

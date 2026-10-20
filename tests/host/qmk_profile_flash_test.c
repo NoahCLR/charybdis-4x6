@@ -28,6 +28,8 @@ static slave_callback_t peer_handler;
 static uint8_t          peer_figures[NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE];
 static uint32_t         matrix_idle_ms = 1000u;
 static matrix_row_t     matrix_rows[MATRIX_ROWS];
+static uint32_t         quiet_checks;
+static uint32_t         row_reads;
 
 // QMK's EEPROM magic, kept across simulated reboots as the wear-leveling
 // backing keeps it.
@@ -104,10 +106,12 @@ bool noah_qmk_profile_flash_eeprom_valid(void) {
 }
 
 uint32_t last_matrix_activity_elapsed(void) {
+    quiet_checks++;
     return matrix_idle_ms;
 }
 
 matrix_row_t matrix_get_row(uint8_t row) {
+    row_reads++;
     assert(row < MATRIX_ROWS);
     return matrix_rows[row];
 }
@@ -181,6 +185,18 @@ static void save_a_little(void) {
     noah_qmk_profile_flash_grant_begin();
 }
 
+static void test_idle_grants_do_not_inspect_the_matrix(void) {
+    uint32_t checks = quiet_checks;
+    uint32_t rows   = row_reads;
+
+    for (uint32_t scan = 0u; scan < 4096u; scan++) {
+        noah_qmk_profile_flash_grant_begin();
+        assert(noah_qmk_profile_flash_may_write());
+        assert(!noah_qmk_profile_flash_grant_flashed());
+    }
+    assert(quiet_checks == checks && row_reads == rows);
+}
+
 // No key held and the matrix unchanged for 50 ms: only then may an erase
 // pause the keyboard.
 static void test_erases_wait_for_a_quiet_keyboard(void) {
@@ -205,8 +221,11 @@ static void test_erases_wait_for_a_quiet_keyboard(void) {
     matrix_rows[MATRIX_ROWS - 1u] = 0u;
     noah_qmk_profile_flash_grant_begin();
     assert(operations == 1u && !noah_qmk_profile_flash_may_write());
+    uint32_t checks = quiet_checks;
+    uint32_t rows   = row_reads;
     noah_qmk_profile_flash_grant_begin();
     assert(noah_qmk_profile_flash_may_write());
+    assert(quiet_checks == checks && row_reads == rows);
 }
 
 static void test_own_figures_on_page_zero(void) {
@@ -256,10 +275,6 @@ static void test_peer_figures_are_pulled_by_the_usb_half(void) {
     uint8_t                          answered[NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE];
     noah_profile_flash_diagnostics_t diagnostics = {.longest_erase_us = 51000u, .longest_program_us = 900u, .longest_grant_us = 52000u, .last_save_us = 3000000u, .last_save_flash_us = 2000000u, .saves = 3u};
 
-    // Nothing pulled yet: unavailable.
-    request(frame, 5u, 1u);
-    assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE && frame[6] == 0u);
-
     // Housekeeping registers the handler on both halves; the other half
     // answers with its own figures.
     clock_ms = 100u;
@@ -272,21 +287,52 @@ static void test_peer_figures_are_pulled_by_the_usb_half(void) {
     noah_qmk_profile_flash_housekeeping();
     assert(rpc_calls == 0u);
 
-    // The USB half pulls once a second; a failed pull keeps what it had.
+    // No page-1 demand: neither idle scans nor local/invalid reads cause
+    // peer traffic.
+    master = true;
+    for (uint8_t tick = 0u; tick < 10u; tick++) {
+        clock_ms += NOAH_QMK_PROFILE_FLASH_PEER_PULL_MS;
+        request(frame, 5u, 0u);
+        assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)));
+        request(frame, 0u, 1u);
+        assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
+        request(frame, 5u, NOAH_QMK_PROFILE_FLASH_WIRE_PAGES);
+        assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNKNOWN_PAGE);
+        noah_qmk_profile_flash_housekeeping();
+    }
+    assert(rpc_calls == 0u);
+    // Nothing pulled yet: unavailable. The read only queues the work.
+    request(frame, 5u, 1u);
+    assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE && frame[6] == 0u);
+    assert(rpc_calls == 0u);
+
+    // One deferred attempt per demand, rate limited to once a second;
+    // failure does not leave a perpetual background retry.
     noah_qmk_profile_flash_encode_figures(&diagnostics, NOAH_PHYSICAL_HALF_ORIGIN_LEFT, peer_figures);
     master  = true;
     link_up = false;
     noah_qmk_profile_flash_housekeeping();
     assert(rpc_calls == 1u);
+    clock_ms += 10u * NOAH_QMK_PROFILE_FLASH_PEER_PULL_MS;
+    noah_qmk_profile_flash_housekeeping();
+    assert(rpc_calls == 1u);
     request(frame, 6u, 1u);
     assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE);
     link_up = true;
-    clock_ms += NOAH_QMK_PROFILE_FLASH_PEER_PULL_MS - 1u;
-    noah_qmk_profile_flash_housekeeping();
-    assert(rpc_calls == 1u);
-    clock_ms += 1u;
     noah_qmk_profile_flash_housekeeping();
     assert(rpc_calls == 2u);
+    for (uint8_t read = 0u; read < 10u; read++) {
+        request(frame, 7u, 1u);
+        assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+        noah_qmk_profile_flash_housekeeping();
+    }
+    assert(rpc_calls == 2u);
+    clock_ms += NOAH_QMK_PROFILE_FLASH_PEER_PULL_MS - 1u;
+    noah_qmk_profile_flash_housekeeping();
+    assert(rpc_calls == 2u);
+    clock_ms += 1u;
+    noah_qmk_profile_flash_housekeeping();
+    assert(rpc_calls == 3u);
     request(frame, 7u, 1u);
     assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE);
     assert(memcmp(&frame[7], peer_figures, NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE) == 0);
@@ -294,9 +340,42 @@ static void test_peer_figures_are_pulled_by_the_usb_half(void) {
     link_up = false;
     clock_ms += NOAH_QMK_PROFILE_FLASH_PEER_PULL_MS;
     noah_qmk_profile_flash_housekeeping();
-    assert(rpc_calls == 3u);
+    assert(rpc_calls == 4u);
     request(frame, 8u, 1u);
     assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && load_u32(&frame[9]) == 51000u);
+    // Consume that last request across timer wrap, then stop all traffic.
+    clock_ms = UINT32_MAX - 500u;
+    noah_qmk_profile_flash_housekeeping();
+    assert(rpc_calls == 5u);
+    request(frame, 9u, 1u);
+    assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)));
+    clock_ms += NOAH_QMK_PROFILE_FLASH_PEER_PULL_MS - 1u;
+    noah_qmk_profile_flash_housekeeping();
+    assert(rpc_calls == 5u);
+    clock_ms++;
+    noah_qmk_profile_flash_housekeeping();
+    assert(rpc_calls == 6u);
+    for (uint8_t tick = 0u; tick < 10u; tick++) {
+        clock_ms += NOAH_QMK_PROFILE_FLASH_PEER_PULL_MS;
+        noah_qmk_profile_flash_housekeeping();
+    }
+    assert(rpc_calls == 6u);
+
+    // A later reader first sees the old cache, then the refreshed figures;
+    // the other half never originates a diagnostic pull.
+    diagnostics.longest_erase_us = 54000u;
+    noah_qmk_profile_flash_encode_figures(&diagnostics, NOAH_PHYSICAL_HALF_ORIGIN_LEFT, peer_figures);
+    link_up = true;
+    request(frame, 10u, 1u);
+    assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)) && load_u32(&frame[9]) == 51000u);
+    master = false;
+    noah_qmk_profile_flash_housekeeping();
+    assert(rpc_calls == 6u);
+    master = true;
+    noah_qmk_profile_flash_housekeeping();
+    assert(rpc_calls == 7u);
+    request(frame, 11u, 1u);
+    assert(noah_qmk_profile_flash_wire_get(frame, sizeof(frame)) && load_u32(&frame[9]) == 54000u);
 }
 
 enum {
@@ -410,6 +489,7 @@ static void test_eeprom_reset_forgets_the_saved_profiles(void) {
 }
 
 int main(void) {
+    test_idle_grants_do_not_inspect_the_matrix();
     test_eeprom_reset_forgets_the_saved_profiles();
     memset(region, 0x00, sizeof(region));
     test_own_figures_on_page_zero();

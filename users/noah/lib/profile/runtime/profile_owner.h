@@ -328,4 +328,5 @@ bool noah_profile_owner_working_receive(noah_profile_owner_t *owner, const uint8
 
 #ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
 uint32_t noah_profile_owner_test_ready_refresh_count(void);
+uint32_t noah_profile_owner_test_profile_held_count(void);
 #endif

@@ -1537,8 +1537,16 @@ Each half measures how long its profile slot flash work pauses the keyboard
 channel 0, value `0x0D`, with the usual request id (nonzero), byte page and
 reserved zero bytes 5–31; a malformed request answers status `1`, a page past
 1 status `2`. Page 0 is the half answering USB; page 1 the other half, as the
-USB half last pulled it over the split link (once a second), or status `3`
-until a pull has succeeded. Each page's 25-byte payload, little-endian:
+USB half last pulled it over the split link, or status `3` until a pull has
+succeeded. A valid page-1 request queues one refresh in housekeeping and
+returns the cached figures immediately; the Raw HID handler never waits for
+the split link. Requests coalesce, and pull attempts are at least one second
+apart, including failures. A failed attempt preserves the previous cache and
+does not retry without another page-1 request. With no requests there is no
+periodic diagnostic traffic; page 0 and invalid requests queue nothing.
+To refresh a previously cached value, request page 1, allow housekeeping and
+the rate limit to run, then read it again. Cached figures carry no freshness
+or connection guarantee. Each page's 25-byte payload, little-endian:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
