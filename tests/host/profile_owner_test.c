@@ -2210,6 +2210,87 @@ static void test_an_abandoned_edit_is_aborted_and_revert_ends_one(void) {
     assert(noah_profile_owner_receive(&left, frame, sizeof(frame)) && frame[5] != NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
     puts("an abandoned edit ends at the host timeout, and Revert ends one at once");
 }
+// A half whose own saved profile is gone (an EEPROM clear erases its slot
+// headers) takes the other half's copy when it starts. Its peer store stays
+// COMMITTED afterwards, to answer a sender's retry of the finished copy. The
+// next Apply or Save holds the storage for its own candidate; publishing the
+// taken copy again then failed and stopped the owner with STORAGE_ERROR: the
+// save froze, the other half was no longer polled, and Save, Revert and edits
+// answered INVALID_STATE until a restart (keyboard check, 2026-10-20).
+static void assert_took_the_other_halfs_copy(const noah_profile_owner_t *master, uint32_t generation) {
+    assert(master->state == NOAH_PROFILE_OWNER_READY_VALIDATED && master->committed_descriptor.generation == generation);
+    assert(noah_profile_peer_store_backend_state(&master->peer_store) == NOAH_PROFILE_PEER_STORE_COMMITTED);
+}
+
+static void test_an_apply_after_taking_the_other_halfs_copy_lands(void) {
+    static noah_profile_owner_t left, right;
+    static memory_t             left_memory, right_memory;
+    split_link_t                left_link  = {.peer = &right};
+    split_link_t                right_link = {.peer = &left};
+    uint32_t                    now        = 0u;
+
+    memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
+    memset(right_memory.bytes, 0xff, sizeof(right_memory.bytes));
+    boot_empty_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
+    stage_valid_candidate_pair(&left, &right, 311u, &now);
+    commit_valid_candidate_pair(&left, &right, 311u, 1u, &now);
+    memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
+    reboot_saved_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now, 1u);
+    assert_took_the_other_halfs_copy(&left, 1u);
+    stage_valid_candidate_pair(&left, &right, 312u, &now);
+    commit_valid_candidate_pair(&left, &right, 312u, 2u, &now);
+    assert(left.state == NOAH_PROFILE_OWNER_READY_VALIDATED && right.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
+    puts("an Apply after taking the other half's copy at start lands on both halves");
+}
+
+static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
+    static noah_profile_owner_t left, right;
+    static memory_t             left_memory, right_memory;
+    static uint8_t              keymap[KEYMAP_LENGTH];
+    split_link_t                left_link          = {.peer = &right};
+    split_link_t                right_link         = {.peer = &left};
+    working_link_t              left_working_link  = {.peer = &right};
+    working_link_t              right_working_link = {.peer = &left};
+    noah_profile_working_splice_t create  = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    noah_profile_working_splice_t replace = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .remove = KEYMAP_LENGTH};
+    uint32_t                      now     = 1000u;
+    unsigned                      grants  = 0u;
+
+    erased_memory(&left_memory);
+    erased_memory(&right_memory);
+    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0x5AFE5AFEu, &now);
+    scan_until_converged(&left, &right, &now);
+    for (uint32_t i = 0u; i < KEYMAP_LENGTH; i += 2u) keymap[i] = (uint8_t)(4u + i % 20u);
+    assert(live_edit(&left, &right, 1u, &create, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
+    scan_until_converged(&left, &right, &now);
+    assert(noah_profile_owner_save(&left, 40u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
+    for (uint32_t guard = 0u; guard < 20000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; guard++) scan_pair(&left, &right, &now);
+    scan_until_converged(&left, &right, &now);
+    assert(left.committed_descriptor.generation == 1u && right.committed_descriptor.generation == 1u);
+    // Only the master's slots are erased; both halves restart.
+    erased_memory(&left_memory);
+    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0x5AFE5AFFu, &now);
+    for (uint32_t guard = 0u; guard < 40000u && left.committed_descriptor.generation != 1u; guard++) scan_pair(&left, &right, &now);
+    scan_until_converged(&left, &right, &now);
+    assert_took_the_other_halfs_copy(&left, 1u);
+    keymap[2] ^= 1u;
+    assert(live_edit(&left, &right, 2u, &replace, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
+    scan_until_converged(&left, &right, &now);
+    assert(noah_profile_owner_save(&left, 41u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
+    // Grants as the scheduler gives them, the other half's included.
+    for (; grants < 20000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; grants++) {
+        (void)grant(&right, false, now, &right_memory, &right_link, &right_working_link, true);
+        (void)grant(&left, true, now, &left_memory, &left_link, &left_working_link, true);
+        assert(left.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
+        now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
+    }
+    assert(left.save.last_transaction_id == 41u && left.save.last_result == NOAH_PROFILE_WORKING_OK);
+    scan_until_converged(&left, &right, &now);
+    assert(left.committed_descriptor.generation == 2u && right.committed_descriptor.generation == 2u);
+    assert(left.state == NOAH_PROFILE_OWNER_READY_VALIDATED && right.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
+    puts("a Save after taking the other half's copy at start lands on both halves");
+}
+
 #include "profile_owner_auto_save_test.inc"
 
 int main(void) {
@@ -2222,6 +2303,8 @@ int main(void) {
     test_a_failed_automatic_save_is_reported_and_not_repeated();
     test_live_edit_reaches_both_halves_and_save_writes_both();
     test_repeated_local_steps_save_in_far_fewer_grants();
+    test_a_save_after_taking_the_other_halfs_copy_lands();
+    test_an_apply_after_taking_the_other_halfs_copy_lands();
     test_apply_while_editing_waits_and_a_save_refuses_apart_halves();
     test_an_abandoned_edit_is_aborted_and_revert_ends_one();
     test_partial_runtime_install_rolls_back();
