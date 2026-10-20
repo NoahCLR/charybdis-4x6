@@ -118,6 +118,9 @@ typedef struct {
     bool                           momentary_layer_tap_interrupted;
     bool                           pending_release_emission;
     bool                           release_keycode_mismatched;
+    // The press came past the deepest tap count of a quick run (D-F33): the run
+    // was sent as its first tap, and this press is a single tap of its own.
+    bool                           typing;
     key_runtime_slot_interaction_t interaction;
     key_runtime_slot_phase_t       slot_phase;
 } press_token_t;
@@ -138,10 +141,10 @@ typedef struct {
     bool     tap_branch_has_authored_tap;
     bool     has_more_taps;
     uint8_t  authored_tap_depth;
-    // Set once the tap index has cycled past the deepest authored branch. A
-    // wrapped series sits on branch one again, so tap_count alone can no longer
-    // tell an ongoing gesture from a first tap.
-    bool                 wrapped;
+    // A quick run went past the deepest branch (D-F33). Each further press in
+    // it is a single tap of its own, and sends the first tap, until the
+    // multi-tap window lapses.
+    bool                 typing;
     hold_behavior_t      hold;
     hold_behavior_t      long_hold;
     uint16_t             tap_hold_term_ms;

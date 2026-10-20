@@ -16,7 +16,15 @@ static uint16_t handled_key_resolution_transparent_field_action(const handled_ke
 
     switch (field) {
         case HANDLED_KEY_TRANSPARENT_FIELD_TAP:
-            return resolution->step.tap.present ? resolution->step.tap.action : noah_action_desc_default_tap_action(noah_action_describe(resolution->keycode));
+            if (resolution->step.tap.present) {
+                return resolution->step.tap.action;
+            }
+            // A later count's empty tap repeats the first tap (D-F33), so a
+            // transparent first tap reads through there too.
+            if (resolution->tap_count > 1u && resolution->first_tap.present) {
+                return resolution->first_tap.action;
+            }
+            return noah_action_desc_default_tap_action(noah_action_describe(resolution->keycode));
         case HANDLED_KEY_TRANSPARENT_FIELD_HOLD:
             return resolution->step.hold.present ? resolution->step.hold.action : KC_NO;
         case HANDLED_KEY_TRANSPARENT_FIELD_LONG_HOLD:

@@ -223,7 +223,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
     };
     uint8_t layer         = UINT8_MAX;
     bool    has_more_taps = false;
-    // Branch count for this fake row; the runtime wraps the tap index through it.
+    // Branch count for this fake row; a quick run past it types the first tap.
     uint8_t authored_tap_depth = 1u;
 
     if (keycode == TEST_PENDING_MULTI_TAP_KEY) {

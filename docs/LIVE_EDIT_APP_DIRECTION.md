@@ -165,6 +165,12 @@ not run on hardware either.
   keyboard comes back on its compiled defaults. The build assumes 2 MiB of
   flash; the controller's real size is unmeasured.
 
+- **Repeated taps need keyboard acceptance (D-F33).** Tap Delete (live row
+  with only Double tap holds) one to eight times into a text field and count
+  what goes; hold it after one tap and after four; give Backspace a Double tap
+  of V and tap it one to five times; tap Cmd+V three times; tap mouse button 3
+  three times.
+
 - **Roll order needs hardware acceptance (D-F27).** Type `, `, `. `, `1e` and
   Enter into a letter fast; hold a symbol key into a letter; roll Shift into a
   letter; double-tap-hold GUI into a key; roll the thumbs and `/` as before.
@@ -2023,3 +2029,39 @@ mode switching and the "saved by the keyboard" indication. Hardware acceptance o
 in every domain on both halves, Save across a replug, an unsaved edit
 reverting on replug, typing through an edit, and RAM high-water on both
 halves.
+
+## D-F33 — A run of taps past the deepest tap count types the first tap
+
+A tap count whose step sets no `.tap` repeats the **first tap**: the first
+tap count's `.tap`, or the key's own tap when that is unset too, once per
+press. Before, it repeated the key's own tap even when the first tap count set
+another, so Delete with a first tap of Cmd+Backspace sent Cmd+Backspace on one
+tap and Delete, Delete on two.
+
+A quick run of taps that goes **past the deepest authored tap count is
+typing**. The press past it fires no branch: the taps so far are sent as the
+first tap, once each, and this press and every further one within the
+multi-tap window are single taps of their own, each sending the first tap
+(`tap_series_t.typing`, carried by the press token into the series its tap
+leaves). A held press in a typing run is a first press: the taps before it are
+sent, then it takes the first tap count's hold. So a Backspace whose Double tap
+types V sends Backspace, V, then three Backspaces for one, two and three taps,
+and Delete with only Double tap holds deletes five times for five taps. A run
+that stops at or before the deepest tap count fires that count's branch.
+
+This replaces cycling (`46b8dbe8`), where a row four deep answered a fifth tap
+with its first tap count again so a run of any length sent one action; that
+dropped taps on rows whose later taps are holds or repeats, and sent one
+Escape for three. It also keeps what cycling was for: overshooting never fires
+the branch the run went past, nor a whole gesture plus a partial one. There is
+no setting: the rule's answer is right for every kind of row.
+
+Consequences: a first tap that toggles, such as a pointing-mode or layer lock,
+toggles once per press of an overshooting run, so on a four-deep thumb five
+quick taps lock its first layer and six leave it unlocked. Two quick taps on a
+two-deep row whose Double tap only holds, such as Right Alt's pointing lock,
+toggle it twice. A pointing key whose first tap reads through (`KC_TRNS`), such
+as dragscroll, volume or pinch, types the key underneath once per press past
+its Double tap. No profile, wire or settings format changes. Client follow-up:
+Ark's built-in tap cells, which stay empty past the deepest tap count because
+the keyboard never reaches those tap counts.

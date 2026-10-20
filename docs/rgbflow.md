@@ -91,9 +91,10 @@ copy and paste.
 
 ## 3. The tap phase: taps name the branch
 
-Every tap past the base one names the branch it reaches. The index **cycles**
-through the authored branches, so a run of taps of any length resolves to exactly
-one action.
+Every tap past the base one names the branch it reaches. A tap past the deepest
+branch names none: the run so far is sent as the first tap, and every further
+press in it is a single tap of its own, on the base branch
+([interaction model](INTERACTION_MODEL.md#timing-model), D-F33).
 
 ```mermaid
 flowchart TD
@@ -101,7 +102,7 @@ flowchart TD
     B0 -->|"tap"| B2["branch 2<br>blue #0006FF"]
     B2 -->|"tap"| B3["branch 3<br>magenta #FF00C6"]
     B3 -->|"tap"| B4["branch 4<br>green #00FF00"]
-    B4 -->|"tap"| B0
+    B4 -->|"tap past the deepest<br>run types the first tap"| B0
 
     B2 ==> H["something more specific<br>takes the key<br>see section 4"]
     B3 ==> H
@@ -116,11 +117,9 @@ flowchart TD
 
 Thin arrows are you tapping. The thick arrow is the board advancing on its own.
 
-The wrap is modulo the authored depth: `index = (N-1) mod depth`. A four-branch
-row answers a fifth tap with branch 1 again, a sixth with branch 2. Tapping past
-the deepest branch therefore cannot fire two different actions from one gesture —
-but it also means tapping cannot repeat an action inside one window. To send the
-same branch twice you have to let the window close between attempts.
+So a typing run shows no branch colour after its deepest branch: each further
+press sits on the base branch, which has none. Overshooting never fires the
+branch the run went past.
 
 Deeper counts than the palette provides clamp to the last entry in
 `RGB_TAP_BRANCH_COLORS(...)`. A count with no authored step shows nothing, because

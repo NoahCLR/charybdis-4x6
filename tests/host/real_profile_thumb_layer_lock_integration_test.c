@@ -1589,10 +1589,10 @@ static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) 
     }
 }
 
-// A third press on a two-branch pointer key wraps the tap index back to the base
-// branch instead of ending the gesture, so nothing is deferred and nothing is sent
-// twice. The series simply carries on at count one.
-static void test_pointer_terminal_double_tap_wraps_on_exact_third_press(uint16_t keycode) {
+// A third quick tap goes past the Double tap, the deepest tap count these
+// pointer keys set, so the run types (D-F33): the first tap, the key
+// underneath, three times, and never the Double tap's action.
+static void test_pointer_terminal_third_quick_tap_types_the_first_tap(uint16_t keycode, uint16_t double_tap_action) {
     keypos_t key_pos;
 
     key_pos = test_find_keypos_on_layer(LAYER_POINTER, keycode);
@@ -1606,38 +1606,32 @@ static void test_pointer_terminal_double_tap_wraps_on_exact_third_press(uint16_t
     test_advance_thumb_multi_tap_gap();
     test_run_quick_tap(key_pos);
     test_advance_thumb_multi_tap_gap();
-
-    test_press_resolved(key_pos);
-
-    CHECK(test_tap_code16_count == 0);
-    CHECK(test_delayed_action_count == 0);
-    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
-    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == keycode);
-
+    test_run_quick_tap(key_pos);
     key_runtime_integration_scan();
 
-    CHECK(test_delayed_action_count == 0);
-    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
-
-    test_release_resolved(key_pos);
-
-    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
     CHECK(noah_runtime_debug_slot_has_pending_multi_tap(key_pos));
+    CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
 
     test_flush_pending_tap_branch();
 
+    CHECK(test_delayed_action_count == 3u);
+    for (uint8_t index = 0u; index < 3u; index++) {
+        CHECK(test_delayed_actions[index] == test_delayed_actions[0]);
+    }
+    CHECK(test_delayed_actions[0] != KC_NO && test_delayed_actions[0] != KC_TRNS && test_delayed_actions[0] != double_tap_action);
+    CHECK(noah_runtime_debug_deferred_release_count() == 0u);
     CHECK(pd_mode_local_active_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
+    CHECK(!noah_runtime_debug_slot_has_pending_multi_tap(key_pos));
 }
 
-static void test_pointer_pinch_exact_third_tap_defers_zoom_chord_until_release(void) {
-    test_pointer_terminal_double_tap_wraps_on_exact_third_press(PD_SLOT_5);
+static void test_pointer_pinch_third_quick_tap_types_the_key_underneath(void) {
+    test_pointer_terminal_third_quick_tap_types_the_first_tap(PD_SLOT_5, VIA_MACRO_6);
 }
 
-static void test_pointer_volume_exact_third_tap_defers_mute_until_release(void) {
-    test_pointer_terminal_double_tap_wraps_on_exact_third_press(PD_SLOT_1);
+static void test_pointer_volume_third_quick_tap_types_the_key_underneath(void) {
+    test_pointer_terminal_third_quick_tap_types_the_first_tap(PD_SLOT_1, KC_MUTE);
 }
 
 // Drag Window is a custom key, so find it the way its own tap tier
@@ -1989,13 +1983,10 @@ static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t la
         key_runtime_integration_scan();
         test_assert_direct_dragscroll_quiescent(dragscroll_pos, expected_reset_count);
 
-        if ((iteration % 2u) == 0u) {
-            CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1u);
-            CHECK(noah_runtime_debug_slot_pending_multi_tap_count(dragscroll_pos) == 1u);
-        } else {
-            CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0u);
-            CHECK(noah_runtime_debug_slot_pending_multi_tap_count(dragscroll_pos) == 0u);
-        }
+        // The run counts to the Double tap, the deepest tap count the row
+        // sets; past it every press is a single tap of its own (D-F33).
+        CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1u);
+        CHECK(noah_runtime_debug_slot_pending_multi_tap_count(dragscroll_pos) == (iteration == 1u ? 2u : 1u));
 
         key_runtime_integration_advance(&fake_time, 10u);
     }
@@ -2003,6 +1994,12 @@ static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t la
     key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
     key_runtime_integration_scan();
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+    // Each of the eight taps types the key underneath, once.
+    CHECK(test_delayed_action_count == 8u);
+    for (uint8_t index = 1u; index < ARRAY_SIZE(test_delayed_actions); index++) {
+        CHECK(test_delayed_actions[index] == test_delayed_actions[0]);
+    }
+    CHECK(test_delayed_actions[0] != KC_NO && test_delayed_actions[0] != KC_TRNS);
 }
 
 static void test_nav_dragscroll_repeated_quick_taps_stay_quiescent(void) {
@@ -3985,8 +3982,8 @@ int main(void) {
     test_right_thumb_quadruple_tap_dispatches_previous_track();
     test_pointer_pinch_double_tap_queues_zoom_chord();
     test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly();
-    test_pointer_pinch_exact_third_tap_defers_zoom_chord_until_release();
-    test_pointer_volume_exact_third_tap_defers_mute_until_release();
+    test_pointer_pinch_third_quick_tap_types_the_key_underneath();
+    test_pointer_volume_third_quick_tap_types_the_key_underneath();
     test_pointer_drag_window_tap_falls_through_to_the_base_layer_key();
     test_click_spam_combo_output_keeps_the_pointer_layer_anchored();
     test_click_spam_combo_uses_authored_combo_owner();

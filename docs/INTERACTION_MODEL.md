@@ -154,12 +154,20 @@ Holding is the one thing that resolves early. Crossing a hold threshold enters t
 branch there and then, so the hold tier claims the key without waiting out the
 multi-tap window.
 
-The tap index cycles through the authored branches rather than ending the gesture
-at the deepest one. A row with four branches answers a fifth tap with branch one
-again and a sixth with branch two, so a run of taps of any length resolves to
-exactly one action. The consequence is that tapping cannot repeat an action inside
-one multi-tap window: to send the same branch twice you have to let the window
-close between them.
+A branch that omits `.tap` repeats the first tap: the first branch's `.tap`, or
+the key's own tap when that is omitted too, once per press. An empty second
+branch sends it twice, an empty third three times (D-F33).
+
+**A run of taps past the deepest branch is typing** (D-F33). A press that
+comes within the multi-tap window after the deepest branch fires no branch:
+the taps so far are sent as the first tap, once each, and this press and every
+further one in the run are single taps of their own, each sending the first
+tap, until the window lapses. So a Backspace whose second branch types V sends
+Backspace for one tap, V for two and three Backspaces for three, and Delete
+with holds only on its double tap deletes five times for five taps. A press
+held in a typing run is a first press: the taps before it are sent and it takes
+the first branch's hold. A run that stops at or before the deepest branch fires
+that branch, as before.
 
 Those pending multi-tap windows are tracked per physical key. Once a key is
 released, other handled keys can keep its series alive; while it is still
@@ -410,7 +418,9 @@ A key can define behavior for:
 - fifth tap
 
 Each of those tap counts can also define its own tap, hold, and longer-hold
-behavior.
+behavior. A tap count that defines no tap repeats the first tap, and a run of
+taps past the deepest tap count types the first tap once per press, as set out
+under [Timing Model](#timing-model).
 
 That lets one key combine patterns such as:
 

@@ -268,7 +268,10 @@ really spans both sides.
 Pending multi-tap feedback lights only once the user
 has entered a double-tap or higher branch, and it keeps that branch's color until
 the branch is entered. Reaching the deepest authored branch does not end it, and
-neither does a still-pending hold tier on that branch: nothing has fired yet. The
+neither does a still-pending hold tier on that branch: nothing has fired yet.
+The next press past the deepest branch does end it: the taps so far are sent
+as the first tap and the run types from there, one single tap per press
+(D-F33). The
 base single-tap candidate stays quiet while it waits to see whether another tap
 arrives. Every authored depth waits that same window before its action fires, so
 the branch color is visible for the same length of time wherever you are in the

@@ -188,6 +188,12 @@ uint16_t handled_key_tap_action_behavior(const handled_key_resolution_t *resolut
         return resolution->step.tap.action;
     }
 
+    // An empty tap at a later count repeats the first tap: the one the row sets
+    // there, or the key's own (D-F33).
+    if (resolution->first_tap.present) {
+        return resolution->first_tap.action;
+    }
+
     return handled_key_single_tap_action(resolution);
 }
 
