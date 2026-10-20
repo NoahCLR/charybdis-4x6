@@ -34,6 +34,8 @@ enum {
     NOAH_PROFILE_WIRE_V1_VALUE_REVERT      = 0x26u,
     // GET and SET: the edit mode.
     NOAH_PROFILE_WIRE_V1_VALUE_EDIT_MODE = 0x27u,
+    // SET: restart both halves (D-F34).
+    NOAH_PROFILE_WIRE_V1_VALUE_RESTART = 0x28u,
     // GET values: edit status pages, the working copy (paged like PAYLOAD),
     // and the runtime overrides and QMK's live values.
     NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS = 0x20u,

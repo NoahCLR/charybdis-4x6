@@ -88,6 +88,8 @@ source trace because they rewrite or verify human-facing firmware docs.
   `qmk_profile_split_transport.c/h`
 - Raw HID Profile Wire channel: `qmk_profile_channel.c` (`raw_hid_receive`)
   and `qmk_profile_capabilities.h`
+- Keyboard restart (D-F34): `qmk_keyboard_restart.c/h`, the split RPC that
+  restarts the other half and each half's reset from housekeeping
 - QMK contract wrappers: `qmk_mod_contract.c/h`,
   `qmk_native_report_contract.h` (weak-modifier changes for shared native usages),
   `qmk_auto_mouse_contract.h`, `qmk_pointing_contract.h`

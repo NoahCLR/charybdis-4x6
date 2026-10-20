@@ -19,6 +19,7 @@
 #include "lib/compat/qmk_combo_origin.h"
 #include "lib/compat/qmk_record_admission.h"
 #include "lib/compat/qmk_durable_io.h"
+#include "lib/compat/qmk_keyboard_restart.h"
 #include "lib/compat/qmk_loop_stages.h"
 #include "lib/compat/qmk_profile_flash_hooks.h"
 #include "lib/compat/qmk_portable_profile.h"
@@ -76,6 +77,9 @@ void noah_housekeeping_task_user(void) {
     noah_runtime_diag_heartbeat();
     noah_qmk_usb_product_name_task();
     noah_qmk_profile_flash_housekeeping();
+    // Last: a restart a client asked for runs between main-loop passes, never
+    // inside a flash step (D-F34).
+    noah_qmk_keyboard_restart_task();
 }
 
 void noah_suspend_power_down_user(void) {

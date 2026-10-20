@@ -902,3 +902,39 @@ largest owner path remains peer chunk write 1,904, with repeated read 1,896
 six inherited handled-key paths (1,952–2,304); no path that passed on the
 live-edit base fails here. Neither budget was weakened. Both halves still
 owe allocator/stack high-water and measured flash pauses on the keyboard.
+
+## Keyboard restart — D-F34
+
+The restart's state (whether a restart is due, when it was noted, its delay,
+whether the other half acknowledged, the RPC registration) and the working
+copy sync's stopped flag are the only new RAM; the 8-byte split frames live on
+the stack. An instrumented right-half resource build (`NOAH_RESOURCE_CHECKS=yes`
+`tools/build-firmware-pair.sh`, the pinned build image, BK `d280a4471e`),
+against the same build of `dev` at `ad543e08`:
+
+| | This change | `dev` |
+| --- | ---: | ---: |
+| SRAM0–3 `.data` | 4,412 bytes | 4,400 |
+| SRAM0–3 `.bss` | 198,136 bytes | 198,120 |
+| SRAM0–3 `.data + .bss` | 202,548 bytes | 202,520 |
+| Below the 203,776-byte tripwire | 1,228 bytes | 1,256 |
+| Fixed linked prefix | 202,560 bytes | 202,528 |
+| Linker/core-memory span at boot | 59,584 bytes | 59,616 |
+
+These are linked figures per half, not runtime free memory or high-water.
+No regression budget changes.
+
+Stack (reviewed paths, same ELF). The owner manifest passes every path; its
+largest stays peer chunk write at 1,912 bytes, and no path that `dev` reviews
+grew. Eleven working-copy paths through `scan_working` dropped by 80 bytes:
+the other half's scan of its working-copy mailbox now links out of line,
+since a stopped half calls it too. The restart request is kept out of line
+(`noinline`), because inlined into `noah_profile_channel_dispatch` it widened
+the frame every Raw HID report passes through by 8 bytes. New reviewed paths:
+the restart asking the other half from the Raw HID handler 624 bytes, the
+reset from housekeeping 192, a stopped half answering the working copy's poll
+1,200, and the restart RPC on the split slave thread 88. The ordinary manifest
+fails only on its six inherited handled-key paths (1,960–2,312 bytes), each
+the same as on `dev`. The resource build stops there, before the left half,
+which links the same code and was not analysed separately. Both halves still
+owe allocator and stack high-water on the keyboard.

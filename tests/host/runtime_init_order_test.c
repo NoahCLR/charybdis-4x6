@@ -132,6 +132,10 @@ void noah_qmk_profile_flash_housekeeping(void) {
     test_log_stage("qmk_profile_flash_housekeeping");
 }
 
+void noah_qmk_keyboard_restart_task(void) {
+    test_log_stage("qmk_keyboard_restart_task");
+}
+
 void noah_runtime_diag_scope_enter(noah_runtime_diag_stage_t stage) {
     (void)stage;
 }
@@ -203,6 +207,7 @@ static void test_housekeeping_order(void) {
         "runtime_diag_heartbeat",
         "qmk_usb_product_name_task",
         "qmk_profile_flash_housekeeping",
+        "qmk_keyboard_restart_task",
     };
 
     test_log_reset();

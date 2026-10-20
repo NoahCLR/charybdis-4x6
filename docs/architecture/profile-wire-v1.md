@@ -592,7 +592,8 @@ was never acknowledged, so the USB half released its own side after
 [authority state table](authority-state-table.md#cancelled-prepare-peer)). No
 marker exists on either half, and durable authority is unchanged. Until the
 peer acknowledges the retried ABORT, the keyboard starts no new save or split
-transfer; a peer that never does needs a restart. A decoder that predates the
+transfer; a peer that never does needs a restart (SET `0x28`, below, or a
+replug). A decoder that predates the
 bit rejects the status while it is set, as it rejects any unknown flag.
 
 Bit 9 (D-F28) means a slot holds a profile written in an earlier store format
@@ -1050,6 +1051,7 @@ unhandled reply (command byte `0xFF`).
 | custom set | `0x25` | save the working copy | Live Edits, below |
 | custom set | `0x26` | revert the working copy | Live Edits, below |
 | custom get/set | `0x27` | edit mode | Live Edits, below |
+| custom set | `0x28` | restart both halves | Live Edits, below (D-F34) |
 
 Every mutating operation includes a nonzero transaction id. Candidate begin
 declares schema, length, CRC, digest, and requested domain mask. Chunks include
@@ -1063,7 +1065,9 @@ last operation, and operation sequence.
 
 USB receive context performs exact frame decoding and one bounded mailbox copy
 only. Semantic validation, EEPROM work, safe activation, and split convergence
-run from scan context.
+run from scan context. Restart (SET `0x28`) is the one exception: its handler
+asks the other half over a split RPC, for at most 250 ms, before it answers,
+since the keyboard restarts right after; it touches no profile state.
 
 ## Error Model
 
@@ -1223,7 +1227,8 @@ edited the keyboard runs its saved profile (a committed slot, or the compiled
 defaults when nothing is saved) and the working copy is unused; the first
 edit starts it from the saved profile, and from then until Save, Revert, an
 Apply or a replug the keyboard runs the working copy: it has **unsaved
-edits**. A replug always boots the saved profile.
+edits**. A replug always boots the saved profile, and so does a restart
+(SET `0x28`, below).
 
 ### Identity: session and revision
 
@@ -1301,6 +1306,7 @@ Multi-byte fields are little-endian.
 | `0x25` save | 5–8 session, 9–12 revision |
 | `0x26` revert | 5–8 session, 9–12 revision |
 | `0x27` edit mode | 5 mode: `0` Apply, `1` Live, `2` Live + review |
+| `0x28` restart | 5–8 the confirmation `52 45 53 54` ("REST"); nothing after it (D-F34) |
 
 Splices and data arrive in order; a repeated report whose answer was lost is
 accepted again when it matches what was taken (a data report's bytes are
@@ -1317,6 +1323,7 @@ Every SET is answered in place: bytes 0–4 echoed, then
 | 7–10 | session |
 | 11–14 | revision |
 | 15–16 | edit status flags (page 0) |
+| 17 | restart only: `1` the other half acknowledged and restarts too, `0` it did not answer |
 
 Results: `0` OK, `1` QUEUED (the outcome comes later), `2` STALE, `3` BUSY
 (another edit, a save, an Apply, a publication waiting, a keyboard adjustment
@@ -1391,7 +1398,7 @@ not ready status `3`.
 | ---: | ---: | --- |
 | 0 | 1 | layout, `1` |
 | 1 | 1 | phase |
-| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply; Save is BUSY), 12 writing the edit mode failed and is being retried, 13 a keyboard adjustment (DPI or lighting key) awaits publication: a new Apply, edit, Save, Revert and mode change are BUSY until it publishes; 14–15 zero |
+| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply; Save is BUSY), 12 writing the edit mode failed and is being retried, 13 a keyboard adjustment (DPI or lighting key) awaits publication: a new Apply, edit, Save, Revert and mode change are BUSY until it publishes; 14 this half stopped: only a restart clears it, 15 the other half answers that it stopped (both D-F34, below) |
 | 4 | 4 | session |
 | 8 | 4 | revision |
 | 12 | 4 | saved generation (`0`: compiled defaults) |
@@ -1500,6 +1507,82 @@ if a save was running. Live + review never saves automatically. Apply saves
 only adjustment-only working copies, never a posted client edit mixed into
 one. No host keepalive or disconnect message controls this scheduler.
 
+### A stopped keyboard, and Restart
+
+A half's live-profile owner **stops** in a state nothing but a restart
+leaves, a fresh read of flash at boot (D-F34). Stopped, the half saves,
+edits, reverts and follows the other half no more: Save, Revert, edits and
+the edit mode answer INVALID_STATE, and an Apply is refused. Reads go on:
+edit status, the working copy (GET `0x21`, so a client can keep unsaved
+edits) and the profile status. Edit status page 0 flag 14 says this half
+stopped; flag 15 says the other half answers that it did (it says so in every
+working-copy sync reply, [split protocol](profile-split-v1.md#working-copy-sync-d-f32)).
+A slow save is never either: a save under way is flag 6, a save waiting for a
+quiet keyboard flags 9 and 10, a half catching up flags 2 and 3. A client that
+sees flag 14 or 15 says the keyboard stopped saving and offers Restart.
+
+| Owner state | Reached when | What a restart does |
+| --- | --- | --- |
+| `STORAGE_ERROR` | a slot read, write or readback failed: at boot, in a save, in a copy from the other half, or publishing a record | reads flash afresh: the last whole saved profile runs |
+| `DURABILITY_UNKNOWN` | the commit marker's write or readback failed, so the decision may or may not be durable | boot reads the marker: the old or the new profile runs, and the halves reconcile |
+| `POSTCOMMIT_AUTHORITY_LOST` | after the decision, the other half reported a newer profile | boot reconciliation compares the halves again |
+| `CONCURRENT_COMMIT` | both halves committed one generation, or the other half prepared one that wins | boot reconciliation compares the halves again |
+| `INTEGRATION_ERROR` | a runtime could not install, or the owner could not start | starts it again; a fault in the build returns at once |
+| `GENERATION_CONFLICT` | at boot, two different saved profiles of one generation | nothing: the conflict is in flash and returns at once |
+| `COMPILED_ERROR` | the compiled defaults did not validate | nothing: the fault is in the firmware |
+
+A flag back at once after a restart means the fault is in flash or in the
+firmware; a client says so rather than offering Restart again. An EEPROM
+reset (bootmagic) forgets the saved profiles (D-F29) and so clears a conflict
+in flash, at the cost of the saved profile. An owner that never started
+answers edit status with status `3`, as one still starting does; Restart is
+taken then too.
+
+**Restart**, SET `0x28`: bytes 5–8 the confirmation `52 45 53 54` ("REST"),
+every byte after them zero, a nonzero transaction. Anything else answers
+INVALID_ARGUMENT and restarts nothing. It is taken in any owner state and
+edit mode, mid-save or mid-edit, and reads nothing of the profile. It is
+never automatic: the firmware does not restart itself, however it stopped.
+The USB half sends the other half a restart frame on a split RPC of its own
+([split protocol](profile-split-v1.md#keyboard-restart-d-f34)), asking again
+every 5 ms until it acknowledges or 250 ms have passed, then answers: result
+OK, byte 17 whether the other half acknowledged. 50 ms later, its reply sent,
+it resets (QMK's `soft_reset_keyboard`); the other half resets 20 ms after it
+acknowledged. A restart asked again before the reset answers as the first.
+USB drops and comes back, and each half starts as from power: it reads its
+saved profile, the halves reconcile, and the working copy has a new session.
+Everything in RAM is gone, unsaved edits and runtime toggles included; the
+edit mode is stored and stays. A client that wants unsaved edits back reads
+the working copy first (or has them in its own draft) and sends them as one
+replacement edit once the keyboard is back.
+
+**Why it is safe.** A restart resets each half between two main-loop passes,
+so it is exactly as safe as unplugging: every slot's commit marker is written
+last and a record without it is no candidate at boot, so a power cut anywhere
+in a save leaves the previous saved profile, or the new one once the USB
+half's commit marker is durable, on both halves
+([power-loss outcomes](logical-profile-transaction-v1.md#power-loss-outcomes),
+[storage](storage-and-resource-baseline.md)). QMK handles Raw HID in its main
+loop after the scan, and housekeeping, where each half resets, after both.
+Every flash erase and program runs inside the scan's durable-I/O step with
+interrupts off, so a reset never falls inside one (unplugging can, and the
+store survives that too); the other half's split callback only notes the
+request. Host tests restart both halves at sampled scans across a whole save
+and find both on one whole profile, old or new.
+
+**When the other half does not acknowledge** (byte 17 is `0`: the link is
+down, or that half does not answer), the USB half restarts alone. Each
+half's saved profile is still whole. But a half that held a durable prepared
+copy of the save (between its prepared marker and the USB half's commit
+marker) keeps it, since nothing tells it its sender restarted, and the halves
+stay apart (edits and Save BUSY, flag 2 clear) until it restarts too: an open
+issue of the split protocol (D-F34). A client whose restart was not
+acknowledged, and whose halves do not agree once it is back, asks the user to
+unplug the keyboard and plug it back in, which restarts both.
+
+Restart and flags 14–15 join the unreleased 2.0 base; no version or feature
+bit moves (D-F28). Firmware without them never sets the flags and answers
+SET `0x28` unhandled (command byte `0xFF`), changing nothing.
 
 ### Toggles and the settings QMK holds
 

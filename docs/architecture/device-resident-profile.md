@@ -55,7 +55,10 @@ a revision, over the saved generation it began from. It has no authority at
 boot: a replug runs the saved generation. Live edits carry the session and
 revision they were made against, compare-and-swap at that grain; Save makes
 the working copy a new generation through the same commit path; Revert and
-an Apply end it. The saved profile (GET `0x04`), the compiled defaults
+an Apply end it. A restart (Profile Wire SET `0x28`, D-F34), the way out of
+an owner stopped by a storage or authority error, is a replug without
+unplugging: both halves boot their saved profile, and a client that kept the
+unsaved edits sends them back. The saved profile (GET `0x04`), the compiled defaults
 (`0x05`) and the active one, working copy included (`0x21`), read separately
 ([Profile Wire, Live Edits](profile-wire-v1.md#live-edits)).
 

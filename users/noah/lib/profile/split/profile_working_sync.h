@@ -68,6 +68,9 @@ enum {
     NOAH_PROFILE_WORKING_SYNC_BUSY     = 0xFFu, // an earlier request is still unprocessed
     NOAH_PROFILE_WORKING_SYNC_PEER_ACTIVE         = 1u << 0,
     NOAH_PROFILE_WORKING_SYNC_PEER_SAVED_COMPILED = 1u << 1,
+    // The answering half's profile owner stopped: only a restart clears it
+    // (D-F34). Its replies say where it stopped; it acts on nothing.
+    NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED = 1u << 2,
 };
 
 // One half's working copy as the other sees it.
@@ -139,6 +142,9 @@ typedef struct {
     bool                        mode_store_pending;
     bool                        mode_store_failed;
 
+    // Other half: its owner stopped (D-F34). Requests are still answered, a
+    // status poll with OK and anything else INVALID_STATE, and none acted on.
+    bool                                  stopped;
     // Other half: the mailbox the callback fills and the published reply.
     volatile bool                         mailbox_full;
     uint8_t                               mailbox[NOAH_PROFILE_WORKING_SYNC_FRAME_MAX];
@@ -161,6 +167,9 @@ bool noah_profile_working_sync_set_mode(noah_profile_working_sync_t *sync, uint8
 // The other half refused both the edit and the whole working copy at this
 // revision: the halves stay apart until a Revert or an Apply.
 bool noah_profile_working_sync_refused(const noah_profile_working_sync_t *sync);
+// The other half answers that its owner stopped (D-F34), as last heard and
+// recently.
+bool noah_profile_working_sync_peer_stopped(const noah_profile_working_sync_t *sync, uint32_t now_ms);
 
 // Both halves, one scan grant: writes a pending edit-mode record if the
 // storage allows it now. True when it tried.

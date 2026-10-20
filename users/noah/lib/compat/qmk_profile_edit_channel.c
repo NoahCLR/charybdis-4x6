@@ -10,6 +10,7 @@
 
 #    include <string.h>
 
+#    include "qmk_keyboard_restart.h"
 #    include "qmk_portable_profile.h"
 #    include "../key/behavior/participation.h"
 #    include "../profile/protocol/profile_candidate_v1.h"
@@ -54,7 +55,7 @@ static bool zero_from(const uint8_t *data, uint8_t from) {
 }
 
 static uint16_t status_flags(const noah_profile_owner_working_status_t *status) {
-    return (uint16_t)((status->local.active ? NOAH_PROFILE_EDIT_WIRE_UNSAVED : 0u) | (status->peer_required ? NOAH_PROFILE_EDIT_WIRE_PEER_REQUIRED : 0u) | (status->peer_converged ? NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED : 0u) | (status->peer.known ? NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN : 0u) | (status->edits_blocked ? NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED : 0u) | (status->saved_compiled ? NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED : 0u) | (status->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE ? NOAH_PROFILE_EDIT_WIRE_SAVING : 0u) | (status->mode_conflict ? NOAH_PROFILE_EDIT_WIRE_MODE_CONFLICT : 0u) | ((status->local.phase == NOAH_PROFILE_WORKING_PHASE_WAITING_SAFE || status->local.phase == NOAH_PROFILE_WORKING_PHASE_REVERTING) && status->safe_boundary_reason_mask != 0u ? NOAH_PROFILE_EDIT_WIRE_WAITING_SAFE : 0u) | (status->storage_paused ? NOAH_PROFILE_EDIT_WIRE_STORAGE_PAUSED : 0u) | (status->peer_storage_paused ? NOAH_PROFILE_EDIT_WIRE_PEER_STORAGE_PAUSED : 0u) | (status->peer_refused ? NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED : 0u) | (status->mode_store_failed ? NOAH_PROFILE_EDIT_WIRE_MODE_NOT_STORED : 0u) | (status->adjustment_pending ? NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING : 0u));
+    return (uint16_t)((status->local.active ? NOAH_PROFILE_EDIT_WIRE_UNSAVED : 0u) | (status->peer_required ? NOAH_PROFILE_EDIT_WIRE_PEER_REQUIRED : 0u) | (status->peer_converged ? NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED : 0u) | (status->peer.known ? NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN : 0u) | (status->edits_blocked ? NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED : 0u) | (status->saved_compiled ? NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED : 0u) | (status->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE ? NOAH_PROFILE_EDIT_WIRE_SAVING : 0u) | (status->mode_conflict ? NOAH_PROFILE_EDIT_WIRE_MODE_CONFLICT : 0u) | ((status->local.phase == NOAH_PROFILE_WORKING_PHASE_WAITING_SAFE || status->local.phase == NOAH_PROFILE_WORKING_PHASE_REVERTING) && status->safe_boundary_reason_mask != 0u ? NOAH_PROFILE_EDIT_WIRE_WAITING_SAFE : 0u) | (status->storage_paused ? NOAH_PROFILE_EDIT_WIRE_STORAGE_PAUSED : 0u) | (status->peer_storage_paused ? NOAH_PROFILE_EDIT_WIRE_PEER_STORAGE_PAUSED : 0u) | (status->peer_refused ? NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED : 0u) | (status->mode_store_failed ? NOAH_PROFILE_EDIT_WIRE_MODE_NOT_STORED : 0u) | (status->adjustment_pending ? NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING : 0u) | (status->stopped ? NOAH_PROFILE_EDIT_WIRE_STOPPED : 0u) | (status->peer_stopped ? NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED : 0u));
 }
 
 // The answer to an edit SET: the result, then where the working copy now is,
@@ -70,6 +71,22 @@ static void reply(uint8_t *data, noah_profile_working_result_t result) {
         put_u32(&data[REPLY_REVISION], status.local.revision);
         put_u16(&data[REPLY_FLAGS], status_flags(&status));
     }
+}
+
+// Restart (D-F34): taken in any owner state and edit mode, since it is the
+// way out of a stopped owner; it reads nothing of the profile. The other half
+// is asked first, then this reply goes out, then this half restarts.
+static void handle_restart(uint8_t *data) {
+    uint16_t transaction = (uint16_t)(data[3] | (uint16_t)data[4] << 8u);
+    bool     acknowledged;
+
+    if (transaction == 0u || get_u32(&data[5]) != NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM || !zero_from(data, 9u)) {
+        reply(data, NOAH_PROFILE_WORKING_INVALID_ARGUMENT);
+        return;
+    }
+    acknowledged = noah_qmk_keyboard_restart_request();
+    reply(data, NOAH_PROFILE_WORKING_OK);
+    data[NOAH_PROFILE_EDIT_WIRE_RESTART_PEER] = acknowledged ? 1u : 0u;
 }
 
 #    if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE)
@@ -295,6 +312,10 @@ static bool handle_get(uint8_t *data) {
 bool noah_qmk_profile_edit_channel(uint8_t *data, uint8_t length) {
     if (!data || length != FRAME_SIZE || data[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL) {
         return false;
+    }
+    if (data[0] == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && data[2] == NOAH_PROFILE_WIRE_V1_VALUE_RESTART) {
+        handle_restart(data);
+        return true;
     }
 #    if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE)
     if (data[0] == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET) {

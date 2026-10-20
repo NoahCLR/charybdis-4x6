@@ -67,7 +67,8 @@ unknown) does that until it restarts. The unbounded retry held the host's own
 `ABORT` in the candidate mailbox, and the host timeout, which requires an empty
 mailbox, never ran, so only a power cycle released the keyboard. A peer that
 never acknowledges still needs a restart, but the keyboard now says so instead
-of hanging.
+of hanging, and a client can restart both halves without a replug (Profile
+Wire SET `0x28`, D-F34).
 
 ### Interrupted prepare, peer
 
