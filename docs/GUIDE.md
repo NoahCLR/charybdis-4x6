@@ -216,6 +216,15 @@ vocabulary; the list below shows the other helpers you can use.
 In that example, `CUSTOM_KEY_0` can be placed directly on a layer or emitted by a
 combo. Either way, the behavior row is the same.
 
+A tap count that leaves `.tap` out repeats the first tap: the row's `[0].tap`,
+or the key's own tap when that is left out too, once per press, so an empty
+`[1].tap` sends it twice. A quick run of taps that goes past the deepest
+tap count the row sets is **typing**: every press in it sends the first tap
+once. A Backspace whose `[1].tap` types V sends Backspace for one tap, V for
+two, and three Backspaces for three; a Delete whose rows set only holds on
+its double tap deletes five times for five quick taps. A press held past the
+deepest tap count takes the first tap count's hold, after the taps before it.
+
 `CUSTOM_KEY_0` through `CUSTOM_KEY_127` are custom keys: named keys of your
 own. Each is named in the `CUSTOM_KEYS(KEY, SHORTCUT)` table in `keymap.c` (at
 most 32 bytes of UTF-8, `""` for an unused slot).

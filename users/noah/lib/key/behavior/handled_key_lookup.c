@@ -24,6 +24,7 @@ void handled_key_lookup_row_tap_count_into(uint16_t keycode, uint8_t tap_count, 
         .pd_mode            = handled_key_pd_mode_for_behavior(behavior),
         .has_more_taps      = more,
         .authored_tap_depth = behavior.authored_tap_depth,
+        .first_tap          = behavior.single.tap,
         .flags              = handled_key_flags_from_behavior(behavior),
     };
 }

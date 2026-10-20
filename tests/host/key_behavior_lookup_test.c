@@ -32,6 +32,7 @@ enum {
     TEST_CHAIN_MULTI_TAP_KEY        = SAFE_RANGE + 0x1Cu,
     TEST_STACKED_PD_KEY             = SAFE_RANGE + 0x1Du,
     TEST_OTHER_PD_MODE_KEY          = SAFE_RANGE + 0x1Eu,
+    TEST_REPEAT_KEY                 = SAFE_RANGE + 0x1Fu,
 };
 
 layer_state_t   layer_state;
@@ -168,6 +169,15 @@ const key_behavior_t key_behaviors[] = {
             {
                 [0] = {.tap = TAP_SENDS(KC_TRNS)},
                 [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_OTHER_PD_MODE_KEY)},
+            },
+    },
+    {
+        .keycode = TEST_REPEAT_KEY,
+        .tap_counts =
+            {
+                [0] = {.tap = TAP_SENDS(KC_C)},
+                [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION)},
+                [2] = {.long_hold = TAP_AT_HOLD_THRESHOLD(TEST_LONG_HOLD_ACTION)},
             },
     },
     {
@@ -439,6 +449,27 @@ static void test_row_without_steps_is_no_row(void) {
     CHECK(toggle.authored_tap_depth == 5u && toggle.has_multi_tap);
     CHECK(key_behavior_view_step(&toggle, 5u).tap.action == LOCK_LAYER(4));
     CHECK(toggle.tap_hold_term == 120u && toggle.multi_tap_term == 180u);
+}
+
+// An empty tap at a later count repeats the first tap the row sets, once per
+// press; a row without one repeats the key's own tap (D-F33).
+static void test_empty_later_tap_repeats_the_first_tap(void) {
+    keypos_t                   key_pos = test_keypos(1, 1);
+    handled_key_materialized_t materialized;
+
+    test_reset_keymap();
+    test_set_keymap_key(0, key_pos, TEST_REPEAT_KEY);
+    layer_state = 1u;
+
+    materialized = test_materialize(handled_key_lookup_tap_count(TEST_REPEAT_KEY, 2u), key_pos);
+    CHECK(materialized.tap_action == KC_C);
+    CHECK(materialized.tap_repeat_count == 2u);
+    materialized = test_materialize(handled_key_lookup_tap_count(TEST_REPEAT_KEY, 3u), key_pos);
+    CHECK(materialized.tap_action == KC_C);
+    CHECK(materialized.tap_repeat_count == 3u);
+    materialized = test_materialize(handled_key_lookup_tap_count(KC_DELETE, 2u), key_pos);
+    CHECK(materialized.tap_action == KC_DELETE);
+    CHECK(materialized.tap_repeat_count == 2u);
 }
 
 static void test_plain_pd_mode_key_is_handled_without_authored_behavior(void) {
@@ -901,6 +932,54 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
 
 // The whole table at the shared depth, through the live runtime's row index:
 // the first, middle and last rows, every step of each, and a missing key.
+// A live row with holds only past its first tap count repeats its first tap,
+// read from the row's steps as the compiled table is (D-F33).
+static void test_live_profile_row_empty_later_tap_repeats_its_first_tap(void) {
+    uint8_t                               payload[128];
+    size_t                                written;
+    noah_profile_codec_v1_error_t         codec_error;
+    noah_key_behavior_domain_v1_t         domain;
+    noah_key_behavior_step_v1_t           steps[2];
+    noah_key_behavior_row_v1_t            row;
+    noah_effective_key_behavior_runtime_t runtime;
+    noah_effective_profile_snapshot_t     callback_view = {0};
+    noah_effective_profile_identity_t     active        = {.generation = 9u, .payload_digest = 0x3333u, .kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE};
+    key_behavior_view_t                   behavior;
+    handled_key_materialized_t            materialized;
+
+    steps[0] = (noah_key_behavior_step_v1_t){.tap_index = 0u, .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP};
+    CHECK(noah_profile_action_runtime_v1_from_native(KC_Z, &steps[0].tap) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+    steps[1] = (noah_key_behavior_step_v1_t){
+        .tap_index     = 2u,
+        .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD,
+        .hold =
+            {
+                .mode   = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE,
+                .action = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, .operand = 2u},
+            },
+    };
+    row = (noah_key_behavior_row_v1_t){.allowed_layers = 0xffffu, .steps = steps, .step_count = ARRAY_SIZE(steps)};
+    CHECK(noah_profile_action_runtime_v1_from_native(KC_DELETE, &row.target) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
+    CHECK(noah_key_behavior_domain_v1_encode(&row, 1u, NULL, NULL, payload, sizeof(payload), &written, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
+    CHECK(noah_key_behavior_domain_v1_decode(payload, written, NULL, NULL, &domain, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
+
+    noah_effective_key_behavior_runtime_init(&runtime);
+    CHECK(noah_effective_key_behavior_runtime_install(&runtime));
+    callback_view.identity              = active;
+    callback_view.profile.domain_mask   = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
+    callback_view.profile.key_behaviors = domain;
+    noah_effective_key_behavior_runtime_invalidate(&runtime, 1u, (noah_effective_profile_identity_t){0}, active, &callback_view);
+
+    behavior = key_behavior_lookup(KC_DELETE);
+    CHECK(behavior.source_is_live && behavior.authored_tap_depth == 3u);
+    test_reset_keymap();
+    test_set_keymap_key(0, test_keypos(1, 1), KC_DELETE);
+    layer_state = 1u;
+    materialized = test_materialize(handled_key_lookup_tap_count(KC_DELETE, 2u), test_keypos(1, 1));
+    CHECK(materialized.tap_action == KC_Z && materialized.tap_repeat_count == 2u);
+    noah_effective_key_behavior_runtime_uninstall(&runtime);
+}
+
 static void test_live_profile_full_table_through_the_row_index(void) {
     enum { ROWS = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_ROWS, DEPTH = KEY_BEHAVIOR_MAX_TAP_COUNT };
     static uint8_t                     payload[NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_PAYLOAD_SIZE];
@@ -1035,6 +1114,7 @@ int main(void) {
     test_tap_toggle_layer_holds_and_locks_on_its_toggle_tap();
     test_tap_toggle_layer_defers_to_an_authored_row_and_the_layer_count();
     test_row_without_steps_is_no_row();
+    test_empty_later_tap_repeats_the_first_tap();
     test_plain_pd_mode_key_is_handled_without_authored_behavior();
     test_handled_resolution_searches_authored_rows_once();
     test_pd_mode_lock_stays_out_of_handled_key_runtime();
@@ -1057,6 +1137,7 @@ int main(void) {
     test_transparent_long_hold_uses_lower_explicit_long_hold_action();
     test_momentary_layer_query_matches_hold_materialization();
     test_live_profile_behavior_replaces_compiled_rows_atomically();
+    test_live_profile_row_empty_later_tap_repeats_its_first_tap();
     test_live_profile_full_table_through_the_row_index();
 
     puts("key_behavior_lookup host tests passed");

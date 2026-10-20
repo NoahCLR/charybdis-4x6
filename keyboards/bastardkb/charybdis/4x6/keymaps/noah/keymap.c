@@ -415,12 +415,11 @@
 //   - terminal tap branches wait that same window rather than firing on the
 //     release, so every authored depth shows its branch color for the same
 //     length of time before its action lands
-//   - the tap index cycles through the authored branches: a four-branch row
-//     answers a fifth tap with branch one again, a sixth with branch two, so any
-//     run of taps resolves to exactly one action instead of a whole gesture plus
-//     a partial one. Tapping cannot repeat an action inside one window
-//   - if a non-base branch omits .tap, a quick tap keeps the key's normal tap
-//     behavior; the branch color still shows, but tap-commit feedback is
+//   - a quick run of taps past the deepest branch is typing: no branch fires,
+//     and every press in the run sends the first tap once (D-F33). A held press
+//     in it takes tap_counts[0]'s hold
+//   - if a non-base branch omits .tap, a quick tap repeats the first tap, once
+//     per press; the branch color still shows, but tap-commit feedback is
 //     skipped because no .tap was authored on that branch
 //
 // within one tap index:

@@ -24,6 +24,8 @@ typedef struct {
     pd_mode_mask_t      pd_mode;
     bool                has_more_taps;
     uint8_t             authored_tap_depth;
+    // The first tap count's tap: what an empty tap at a later count repeats.
+    tap_behavior_t      first_tap;
     uint16_t            flags;
 } handled_key_resolution_t;
 
