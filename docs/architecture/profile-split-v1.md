@@ -313,6 +313,18 @@ until it has also advanced the bounded whole-profile adoption validator for
 that exact selected record; the ordinary shell remains read-only and never
 activates the record.
 
+The owner publishes a received record's descriptor once, as the scan step
+that committed it returns, while the half still holds its storage for that
+copy (`PEER` admission). The peer store stays committed after the copy
+activates, so it can answer a sender's retry of the finished copy; that state
+alone is no sign of a new copy. A half that took the other half's copy (at
+start, when its own saved profile is gone, for example after an EEPROM clear)
+used to publish it again at every later reconciler step. During the next Apply
+or Save, which holds the storage for its own candidate, that publication
+failed and stopped the owner with a storage error: the save froze, the other
+half was no longer polled, and Save, Revert and edits answered
+`INVALID_STATE` until a restart (keyboard check, 2026-10-20).
+
 ## Scan-Owned Reconciler And QMK Adapter
 
 `profile_split_reconciler` is caller-owned and payload-independent. Its QMK

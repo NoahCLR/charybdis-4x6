@@ -555,6 +555,18 @@ static bool scan_adoption(noah_profile_owner_t *owner) {
     return true;
 }
 
+// A copy taken from the other half is published as the step that committed
+// it returns, while this half still holds its storage for that copy. The
+// peer store stays COMMITTED after the copy activates (it answers a sender's
+// retry of the finished copy), so its state alone is no sign of a new copy:
+// a later Apply or Save holds the storage for its own candidate, and
+// publishing then stopped the owner with STORAGE_ERROR, frozen until a
+// restart (keyboard check, 2026-10-20). Out of line: it runs in the scan's
+// shared frame.
+static __attribute__((noinline)) bool took_peer_copy(const noah_profile_owner_t *owner) {
+    return noah_profile_candidate_store_backend_admission_owner(&owner->staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER && noah_profile_peer_store_backend_state(&owner->peer_store) == NOAH_PROFILE_PEER_STORE_COMMITTED;
+}
+
 static bool boot_peer_converged(const noah_profile_owner_t *owner) {
     uint8_t unresolved_count = 1u;
 
@@ -579,7 +591,7 @@ static bool scan_boot_reconciliation(noah_profile_owner_t *owner, bool master, u
     }
 
     worked = noah_profile_split_reconciler_scan_mode(&owner->reconciler, master, now_ms, NOAH_PROFILE_SPLIT_RECONCILE_FULL);
-    if (worked && noah_profile_peer_store_backend_state(&owner->peer_store) == NOAH_PROFILE_PEER_STORE_COMMITTED) {
+    if (worked && took_peer_copy(owner)) {
         if (!publish_validated_descriptor(owner)) {
             owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
         }
@@ -1058,7 +1070,7 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
             if (worked && !activating_boot) {
                 note_host_barrier_progress(owner, now_ms);
             }
-            if (worked && noah_profile_peer_store_backend_state(&owner->peer_store) == NOAH_PROFILE_PEER_STORE_COMMITTED) {
+            if (worked && took_peer_copy(owner)) {
                 if (!publish_validated_descriptor(owner) || !noah_profile_split_reconciler_refresh_authority(&owner->reconciler)) {
                     owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
                 }
