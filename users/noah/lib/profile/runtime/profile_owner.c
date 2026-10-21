@@ -1186,26 +1186,171 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
     }
 }
 
-// Candidate frames that would start or feed a candidate while an edit or a
-// save holds the working copy are answered BUSY; ABORT and reads are not.
-// A new Apply (a BEGIN naming a transaction other than the one being run) is
-// refused while a keyboard adjustment awaits publication: published later, it
-// would overwrite what the Apply sets. An Apply already admitted carries on,
-// and adjustments that arrive during it publish after it lands.
-static bool apply_begin_behind_adjustment(const noah_profile_owner_t *owner, const uint8_t *frame, size_t length) {
-    return owner->auto_save.pending != 0u && frame && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && frame[0] == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && frame[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN && (uint16_t)(frame[3] | frame[4] << 8u) != owner->host_transaction.status.transaction_id;
+// ── Admission (D-F32) ───────────────────────────────────────────────────────
+
+static bool owner_ready(const noah_profile_owner_t *owner) {
+    return owner && owner->working_ready && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED);
 }
 
-static bool candidate_held_by_working_copy(const noah_profile_owner_t *owner, const uint8_t *frame, size_t length) {
-    return owner->working_ready && frame && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && frame[0] == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET && frame[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && (frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE || frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK) && (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_profile_working_copy_busy(&owner->working));
+// Something else holds the profile: an Apply's candidate (or its cleanup),
+// a save, or a publication waiting for its boundary.
+static bool profile_held(const noah_profile_owner_t *owner) {
+    noah_effective_profile_status_t provider;
+
+#ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
+    noah_profile_owner_profile_held_count++;
+#endif
+    // A publication the working copy has not yet looked at (it does at the
+    // next scan) may have replaced it.
+    return !owner_ready(owner) || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || owner->host_transaction.has_candidate || owner->host_transaction.mailbox.pending || owner->host_barrier.cancel_pending || noah_profile_candidate_store_backend_admission_owner(&owner->staging.candidate_backend) != NOAH_PROFILE_STORAGE_ADMISSION_NONE || owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_effective_profile_provider_status(&owner->provider, &provider) != NOAH_EFFECTIVE_PROFILE_OK || provider.has_pending || provider.publication_count != owner->working.publication_count;
+}
+
+// The other half does not yet hold the same saved profile and working copy.
+static bool halves_apart(const noah_profile_owner_t *owner) {
+    uint8_t unresolved = 1u;
+
+    return owner->config.peer_required && (!noah_profile_working_sync_converged(&owner->working_sync, owner->now_ms) || !owner_peer_observer((void *)owner, &unresolved) || unresolved != 0u);
+}
+
+typedef enum {
+    OWNER_ADMIT_EDIT,      // a client's begin of an edit
+    OWNER_ADMIT_SAVE,      // a client's Save, and the keyboard's own through noah_profile_owner_save
+    OWNER_ADMIT_REVERT,    // a client's Revert
+    OWNER_ADMIT_MODE,      // a change of edit mode
+    OWNER_ADMIT_KEYBOARD,  // the keyboard's own step: publish queued adjustments, or start its automatic Save
+    OWNER_ADMIT_APPLY,     // a candidate frame that starts or feeds an Apply
+    OWNER_ADMIT_NEW_APPLY, // a candidate begin naming another transaction than the candidate's
+} owner_operation_t;
+
+// A client's request, as admission reads it.
+typedef struct {
+    uint32_t session;
+    uint32_t revision;
+    uint16_t transaction_id;
+} owner_request_t;
+
+// Whether `operation` may start now, and the answer when it may not: one row
+// per operation, its refusals in answer order. Profile Wire ("Live edits",
+// Admission) mirrors it row for row. Terms:
+//   adjusting  a keyboard adjustment is queued, or its edit is in flight
+//   saving     a save runs
+//   editing    the working copy is not idle: an edit is received, loaded,
+//              checked or waits for its boundary, or a Revert waits
+//   unsaved    the working copy holds unsaved edits
+//   held       profile_held: something else holds the profile
+//   apart      halves_apart: the other half does not hold the same copy
+//   stale      the request names another session or revision
+// Rows:
+//   EDIT       the repeat of the client's admitted begin: OK (the working copy
+//              answers it as before); adjusting, held or apart: STALE when
+//              stale, else BUSY; editing: BUSY
+//   SAVE       saving: QUEUED to the client's repeat of the save running, else
+//              BUSY; stale: STALE; adjusting, editing, held or apart: BUSY
+//   REVERT     adjusting or held: BUSY. Never apart: the other half follows.
+//   MODE       unsaved or adjusting: NOT_CLEAN (the client saves or reverts
+//              first); saving, editing or apart: BUSY. A change takes a counter
+//              above both halves', which only a half that hears the other
+//              knows. Not held by an Apply or a publication: the mode is
+//              stored outside the profile.
+//   KEYBOARD   editing, held or apart: BUSY (the step waits)
+//   APPLY      saving or editing: BUSY
+//   NEW_APPLY  an adjustment queued, saving or editing: BUSY. Published after
+//              the Apply, the adjustment would overwrite it; an Apply already
+//              admitted carries on.
+// Edit status flag 4 is the EDIT row asked with no request.
+// Cheap terms first: held and apart take the provider's and the split
+// authority's snapshots, so they come last and only when reached, and the
+// keyboard's step asks only once it has work (automatic_step).
+// Main loop only: a client's operation and the edit status from the Raw HID
+// handler, the keyboard's step from the scan's durable-I/O step. Never from
+// the split callback: the other half follows and admits nothing. Keyboard
+// adjustments are queued without asking (noah_profile_owner_adjust).
+// The caller has answered INVALID_STATE for an owner not ready (the status
+// asks anyway, and held refuses then) and INVALID_ARGUMENT for a malformed
+// request; SAVE needs `request`. Reads only.
+static noah_profile_working_result_t owner_admit(const noah_profile_owner_t *owner, owner_operation_t operation, const owner_request_t *request) {
+    bool adjusting = owner->auto_save.pending != 0u || owner->auto_save.edit_transaction != 0u;
+    bool saving    = owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE;
+    bool editing   = noah_profile_working_copy_busy(&owner->working);
+    bool stale     = request && (request->session != owner->working.session || request->revision != owner->working.revision);
+
+    switch (operation) {
+        case OWNER_ADMIT_EDIT:
+            if (request && !owner->auto_save.edit_transaction && owner->working.phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING && owner->working.transaction_id == request->transaction_id) {
+                return NOAH_PROFILE_WORKING_OK;
+            }
+            if (adjusting || profile_held(owner) || halves_apart(owner)) {
+                return stale ? NOAH_PROFILE_WORKING_STALE : NOAH_PROFILE_WORKING_BUSY;
+            }
+            return editing ? NOAH_PROFILE_WORKING_BUSY : NOAH_PROFILE_WORKING_OK;
+        case OWNER_ADMIT_SAVE:
+            if (saving) {
+                return !owner->save.automatic && owner->save.transaction_id == request->transaction_id ? NOAH_PROFILE_WORKING_QUEUED : NOAH_PROFILE_WORKING_BUSY;
+            }
+            if (stale) {
+                return NOAH_PROFILE_WORKING_STALE;
+            }
+            return adjusting || editing || profile_held(owner) || halves_apart(owner) ? NOAH_PROFILE_WORKING_BUSY : NOAH_PROFILE_WORKING_OK;
+        case OWNER_ADMIT_REVERT:
+            return adjusting || profile_held(owner) ? NOAH_PROFILE_WORKING_BUSY : NOAH_PROFILE_WORKING_OK;
+        case OWNER_ADMIT_MODE:
+            if (owner->working.active || adjusting) {
+                return NOAH_PROFILE_WORKING_NOT_CLEAN;
+            }
+            return saving || editing || halves_apart(owner) ? NOAH_PROFILE_WORKING_BUSY : NOAH_PROFILE_WORKING_OK;
+        case OWNER_ADMIT_KEYBOARD:
+            return editing || profile_held(owner) || halves_apart(owner) ? NOAH_PROFILE_WORKING_BUSY : NOAH_PROFILE_WORKING_OK;
+        case OWNER_ADMIT_APPLY:
+            return saving || editing ? NOAH_PROFILE_WORKING_BUSY : NOAH_PROFILE_WORKING_OK;
+        case OWNER_ADMIT_NEW_APPLY:
+            return owner->auto_save.pending != 0u || saving || editing ? NOAH_PROFILE_WORKING_BUSY : NOAH_PROFILE_WORKING_OK;
+    }
+    // Every operation has its row above; -Wswitch fails one added without.
+    __builtin_unreachable();
+}
+
+// The row a candidate frame asks: APPLY for a begin, chunk, stream chunk,
+// reuse, validate or commit (the one candidate frame sent as a save), and
+// NEW_APPLY for a begin naming another transaction than the candidate's.
+// False for an abort and anything else, which admission never holds.
+static bool candidate_frame_operation(const noah_profile_owner_t *owner, const uint8_t *frame, size_t length, owner_operation_t *operation) {
+    if (!frame || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE || frame[1] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL) {
+        return false;
+    }
+    *operation = OWNER_ADMIT_APPLY;
+    if (frame[0] == NOAH_PROFILE_CANDIDATE_V1_COMMAND_SAVE) {
+        return frame[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT;
+    }
+    if (frame[0] != NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET) {
+        return false;
+    }
+    switch (frame[2]) {
+        case NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN:
+            if ((uint16_t)(frame[3] | frame[4] << 8u) != owner->host_transaction.status.transaction_id) {
+                *operation = OWNER_ADMIT_NEW_APPLY;
+            }
+            return true;
+        case NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK:
+        case NOAH_PROFILE_CANDIDATE_V1_VALUE_STREAM_CHUNK:
+        case NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE:
+        case NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE:
+            return true;
+        default:
+            return false;
+    }
 }
 
 bool noah_profile_owner_receive(noah_profile_owner_t *owner, uint8_t *frame, size_t length) {
-    if (owner && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED) && (candidate_held_by_working_copy(owner, frame, length) || (owner->working_ready && apply_begin_behind_adjustment(owner, frame, length)))) {
+    owner_operation_t operation;
+
+    if (!owner || (owner->state != NOAH_PROFILE_OWNER_READY_COMPILED && owner->state != NOAH_PROFILE_OWNER_READY_VALIDATED)) {
+        return false;
+    }
+    if (owner->working_ready && candidate_frame_operation(owner, frame, length, &operation) && owner_admit(owner, operation, NULL) != NOAH_PROFILE_WORKING_OK) {
         noah_profile_candidate_v1_encode_ack(frame, NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY, NOAH_PROFILE_CANDIDATE_V1_ERROR_MAILBOX_BUSY, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U8);
         return true;
     }
-    return owner && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED) && noah_profile_candidate_transaction_receive(&owner->host_transaction, frame, length);
+    return noah_profile_candidate_transaction_receive(&owner->host_transaction, frame, length);
 }
 
 noah_profile_owner_state_t noah_profile_owner_state(const noah_profile_owner_t *owner) {
@@ -1380,30 +1525,6 @@ bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_pr
 
 // ── Live edits (D-F32) ──────────────────────────────────────────────────────
 
-static bool owner_ready(const noah_profile_owner_t *owner) {
-    return owner && owner->working_ready && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED);
-}
-
-// Something else holds the profile: an Apply's candidate (or its cleanup),
-// a save, or a publication waiting for its boundary.
-static bool profile_held(const noah_profile_owner_t *owner) {
-    noah_effective_profile_status_t provider;
-
-#ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
-    noah_profile_owner_profile_held_count++;
-#endif
-    // A publication the working copy has not yet looked at (it does at the
-    // next scan) may have replaced it.
-    return !owner_ready(owner) || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || owner->host_transaction.has_candidate || owner->host_transaction.mailbox.pending || owner->host_barrier.cancel_pending || noah_profile_candidate_store_backend_admission_owner(&owner->staging.candidate_backend) != NOAH_PROFILE_STORAGE_ADMISSION_NONE || owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_effective_profile_provider_status(&owner->provider, &provider) != NOAH_EFFECTIVE_PROFILE_OK || provider.has_pending || provider.publication_count != owner->working.publication_count;
-}
-
-// The other half does not yet hold the same saved profile and working copy.
-static bool halves_apart(const noah_profile_owner_t *owner) {
-    uint8_t unresolved = 1u;
-
-    return owner->config.peer_required && (!noah_profile_working_sync_converged(&owner->working_sync, owner->now_ms) || !owner_peer_observer((void *)owner, &unresolved) || unresolved != 0u);
-}
-
 // Each frame the edit accepts restarts its lease, on the owner's clock.
 static noah_profile_working_result_t note_edit_activity(noah_profile_owner_t *owner, noah_profile_working_result_t result) {
     if (result == NOAH_PROFILE_WORKING_OK) {
@@ -1413,12 +1534,17 @@ static noah_profile_working_result_t note_edit_activity(noah_profile_owner_t *ow
 }
 
 noah_profile_working_result_t noah_profile_owner_edit_begin(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags) {
+    noah_profile_working_result_t admitted;
+
     if (!owner_ready(owner)) {
         return NOAH_PROFILE_WORKING_INVALID_STATE;
     }
-    // A repeated BEGIN of the edit already admitted is answered as before.
-    if ((profile_held(owner) || halves_apart(owner) || owner->auto_save.pending || owner->auto_save.edit_transaction) && !(!owner->auto_save.edit_transaction && owner->working.phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING && owner->working.transaction_id == transaction_id)) {
-        return session != owner->working.session || revision != owner->working.revision ? NOAH_PROFILE_WORKING_STALE : NOAH_PROFILE_WORKING_BUSY;
+    if (transaction_id == 0u) {
+        return NOAH_PROFILE_WORKING_INVALID_ARGUMENT;
+    }
+    admitted = owner_admit(owner, OWNER_ADMIT_EDIT, &(owner_request_t){.session = session, .revision = revision, .transaction_id = transaction_id});
+    if (admitted != NOAH_PROFILE_WORKING_OK) {
+        return admitted;
     }
     return note_edit_activity(owner, noah_profile_working_copy_begin(&owner->working, transaction_id, session, revision, splice_count, insert_total, flags, false));
 }
@@ -1445,12 +1571,14 @@ noah_profile_working_result_t noah_profile_owner_edit_abort(noah_profile_owner_t
 }
 
 noah_profile_working_result_t noah_profile_owner_revert(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision) {
+    noah_profile_working_result_t admitted;
+
     if (!owner_ready(owner)) {
         return NOAH_PROFILE_WORKING_INVALID_STATE;
     }
-    // Revert never waits for the other half: it follows (profile_working_sync.c).
-    if (profile_held(owner) || owner->auto_save.pending || owner->auto_save.edit_transaction) {
-        return NOAH_PROFILE_WORKING_BUSY;
+    admitted = owner_admit(owner, OWNER_ADMIT_REVERT, NULL);
+    if (admitted != NOAH_PROFILE_WORKING_OK) {
+        return admitted;
     }
     // An edit still being sent is abandoned: Revert is the way out of one.
     if (owner->working.phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING) {
@@ -1476,18 +1604,17 @@ static void finish_save(noah_profile_owner_t *owner, noah_profile_working_result
 
 noah_profile_working_result_t noah_profile_owner_save(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision) {
     noah_effective_profile_snapshot_t active;
+    noah_profile_working_result_t     admitted;
 
-    if (!owner_ready(owner) || transaction_id == 0u) {
-        return owner_ready(owner) ? NOAH_PROFILE_WORKING_INVALID_ARGUMENT : NOAH_PROFILE_WORKING_INVALID_STATE;
+    if (!owner_ready(owner)) {
+        return NOAH_PROFILE_WORKING_INVALID_STATE;
     }
-    if (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE) {
-        return !owner->save.automatic && owner->save.transaction_id == transaction_id ? NOAH_PROFILE_WORKING_QUEUED : NOAH_PROFILE_WORKING_BUSY;
+    if (transaction_id == 0u) {
+        return NOAH_PROFILE_WORKING_INVALID_ARGUMENT;
     }
-    if (session != owner->working.session || revision != owner->working.revision) {
-        return NOAH_PROFILE_WORKING_STALE;
-    }
-    if (profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working) || owner->auto_save.pending || owner->auto_save.edit_transaction) {
-        return NOAH_PROFILE_WORKING_BUSY;
+    admitted = owner_admit(owner, OWNER_ADMIT_SAVE, &(owner_request_t){.session = session, .revision = revision, .transaction_id = transaction_id});
+    if (admitted != NOAH_PROFILE_WORKING_OK) {
+        return admitted;
     }
     owner->save.automatic = false;
     owner->save.transaction_id = transaction_id;
@@ -1685,19 +1812,17 @@ static __attribute__((noinline)) bool save_step(noah_profile_owner_t *owner) {
 }
 
 noah_profile_working_result_t noah_profile_owner_set_edit_mode(noah_profile_owner_t *owner, uint8_t mode) {
+    noah_profile_working_result_t admitted;
+
     if (!owner_ready(owner)) {
         return NOAH_PROFILE_WORKING_INVALID_STATE;
     }
     if (!noah_profile_edit_mode_valid(mode)) {
         return NOAH_PROFILE_WORKING_INVALID_ARGUMENT;
     }
-    // Leaving a mode with unsaved edits is the host's question to ask first
-    // (Save or Revert); the keyboard does not decide it.
-    if (owner->working.active || owner->auto_save.pending || owner->auto_save.edit_transaction) {
-        return NOAH_PROFILE_WORKING_NOT_CLEAN;
-    }
-    if (owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_profile_working_copy_busy(&owner->working)) {
-        return NOAH_PROFILE_WORKING_BUSY;
+    admitted = owner_admit(owner, OWNER_ADMIT_MODE, NULL);
+    if (admitted != NOAH_PROFILE_WORKING_OK) {
+        return admitted;
     }
     return noah_profile_working_sync_set_mode(&owner->working_sync, mode) ? NOAH_PROFILE_WORKING_OK : NOAH_PROFILE_WORKING_READ_ERROR;
 }
@@ -1726,7 +1851,7 @@ bool noah_profile_owner_working_status(const noah_profile_owner_t *owner, noah_p
     status->halves_agree              = !halves_apart(owner);
     status->mode_conflict             = owner->working_sync.mode_conflict;
     status->adjustment_pending        = owner->auto_save.pending != 0u;
-    status->edits_blocked             = profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working) || owner->auto_save.pending || owner->auto_save.edit_transaction;
+    status->edits_blocked             = owner_admit(owner, OWNER_ADMIT_EDIT, NULL) != NOAH_PROFILE_WORKING_OK;
     status->storage_paused            = owner->config.storage_paused && owner->config.storage_paused(owner->config.storage_paused_context);
     status->peer_storage_paused       = owner->reconciler.busy_streak != 0u && owner->reconciler.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED;
     status->peer_refused              = noah_profile_working_sync_refused(&owner->working_sync);
@@ -1886,7 +2011,7 @@ static __attribute__((noinline)) bool automatic_step(noah_profile_owner_t *owner
         if (!owner->working.active || state->attempted || owner->working_sync.mode_conflict || (mode != NOAH_PROFILE_EDIT_MODE_LIVE && !(mode == NOAH_PROFILE_EDIT_MODE_APPLY && state->apply_adjustments_only))) return false;
         if (!elapsed_at_least(owner->now_ms, state->quiet_since, NOAH_PROFILE_OWNER_AUTO_SAVE_QUIET_MS)) return false;
     }
-    if (profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working)) return false;
+    if (owner_admit(owner, OWNER_ADMIT_KEYBOARD, NULL) != NOAH_PROFILE_WORKING_OK) return false;
     if (state->pending) return adjustment_step(owner);
     if (!owner->config.keyboard_quiet || !owner->config.keyboard_quiet(owner->config.keyboard_quiet_context)) return false;
     noah_profile_working_result_t result = noah_profile_owner_save(owner, automatic_transaction(owner), owner->working.session, owner->working.revision);

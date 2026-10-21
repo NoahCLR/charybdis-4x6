@@ -300,9 +300,16 @@ bool                                  noah_profile_owner_status(const noah_profi
 bool                                  noah_profile_owner_usb_restart_safe(noah_profile_owner_t *owner);
 
 // Live edits (D-F32), from the Profile Wire channel on the USB half. Each
-// admission is bounded; the work happens in later scans. A new edit, Save and
-// a mode change wait until nothing else holds the profile (an Apply, a save,
-// an activation) and the other half holds the same working copy.
+// admission is bounded; the work happens in later scans. Every one answers
+// INVALID_STATE first while the owner is not ready or stopped (D-F34), then
+// INVALID_ARGUMENT for a malformed request, then what admission answers:
+// which edit, Save, Revert, mode change, Apply frame or keyboard step may
+// start, and the answer otherwise, is one statement (owner_admit in
+// profile_owner.c, mirrored by Profile Wire "Live edits", Admission). A new
+// edit and Save wait while an adjustment awaits publication, anything else
+// holds the profile, or the other half does not hold the same working copy;
+// a mode change answers NOT_CLEAN with unsaved edits or adjustments, and BUSY
+// while a save or an edit runs and until the halves agree.
 noah_profile_working_result_t noah_profile_owner_edit_begin(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags);
 noah_profile_working_result_t noah_profile_owner_edit_splice(noah_profile_owner_t *owner, uint16_t transaction_id, uint8_t index, const noah_profile_working_splice_t *splice);
 noah_profile_working_result_t noah_profile_owner_edit_data(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint32_t count);
@@ -335,7 +342,7 @@ typedef struct {
     // status flag 2).
     bool                            halves_agree;
     bool                            mode_conflict;
-    bool                            edits_blocked;  // a new edit would be refused BUSY now
+    bool                            edits_blocked;  // admission's edit row refuses a new edit now (flag 4)
     bool                            adjustment_pending; // a keyboard adjustment awaits publication; a new Apply is BUSY
     bool                            storage_paused; // a save here waits for a quiet keyboard
     bool                            peer_storage_paused; // the other half's save waits for a quiet keyboard
