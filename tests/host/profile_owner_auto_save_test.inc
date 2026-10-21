@@ -140,11 +140,6 @@ static void test_auto_save_modes_and_adjustments(void) {
         }
         scan_until_converged(&left, &right, &now);
         uint32_t saves = left.save.keyboard_saves;
-        // Toggle keys cannot enter this path.
-        assert(!noah_profile_owner_adjust(&left, NOAH_SETTING_COMBOS_ENABLED, 0u));
-        assert(!noah_profile_owner_adjust(&left, NOAH_SETTING_BEHAVIORS_ENABLED, 0u));
-        auto_scans(&left, &right, &now, 10000u);
-        assert(left.save.keyboard_saves == saves);
         // Four adjustment scalars are a single compound working-copy edit.
         assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 600u));
         assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 800u));
@@ -195,7 +190,7 @@ static void test_auto_save_modes_and_adjustments(void) {
             assert(left.working.active && left.save.keyboard_saves == saves + 2u);
         }
     }
-    puts("automatic saves: quiet period, held keys, all modes, toggles, compound adjustments, mid-save edits and wrap pass");
+    puts("automatic saves: quiet period, held keys, all modes, compound adjustments, mid-save edits and wrap pass");
 }
 
 static void test_auto_save_hour_bound(void) {
@@ -369,6 +364,7 @@ static void test_apply_waits_behind_a_queued_adjustment(void) {
     uint8_t settings[NOAH_SETTINGS_MIN_SIZE], expected[NOAH_SETTINGS_MIN_SIZE], frame[32];
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .insert = sizeof(settings), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     noah_profile_owner_working_status_t status;
+    uint32_t pending;
     uint32_t now = 1000u;
 
     erased_memory(&lm); erased_memory(&rm); auto_settings(settings);
@@ -385,8 +381,11 @@ static void test_apply_waits_behind_a_queued_adjustment(void) {
     assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && left.committed_descriptor.generation == 1u);
     scan_until_converged(&left, &right, &now);
 
-    // A DPI key queues 800. A new Apply is BUSY while it waits, and says why.
+    // A DPI key queues 800, which settings projection reads back until it
+    // publishes. A new Apply is BUSY while it waits, and says why.
     assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 800u));
+    assert(noah_profile_owner_pending_adjustment(&left, NOAH_SETTING_DEFAULT_DPI, &pending) && pending == 800u);
+    assert(!noah_profile_owner_pending_adjustment(&left, NOAH_SETTING_SNIPING_DPI, &pending));
     assert(noah_profile_owner_working_status(&left, &status) && status.adjustment_pending && status.edits_blocked);
     begin_frame(frame, 9u);
     assert(noah_profile_owner_receive(&left, frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
@@ -396,6 +395,7 @@ static void test_apply_waits_behind_a_queued_adjustment(void) {
     // come back as a save of its own.
     scan_until_converged(&left, &right, &now);
     assert(!left.auto_save.pending && left.working.active && active_scalar(&right, NOAH_SETTING_DEFAULT_DPI) == 800u);
+    assert(!noah_profile_owner_pending_adjustment(&left, NOAH_SETTING_DEFAULT_DPI, &pending));
     assert(noah_profile_owner_working_status(&left, &status) && !status.adjustment_pending);
     stage_valid_candidate_pair(&left, &right, 9u, &now);
     commit_valid_candidate_pair(&left, &right, 9u, 2u, &now);
@@ -424,6 +424,10 @@ static void test_apply_waits_behind_a_queued_adjustment(void) {
     puts("a new Apply waits behind a queued adjustment and says so; one admitted already finishes, then the adjustment follows it");
 }
 
+// Live, with and without a saved settings domain before it was dropped. The
+// bytes an adjustment writes are the schema's (profile_settings_v1_test.c);
+// Apply's creation and save are in test_apply_waits_behind_a_queued_adjustment,
+// and no mode's save depends on whether the edit created the domain.
 static void test_adjustments_without_a_settings_domain(void) {
     static noah_profile_owner_t left, right;
     static memory_t lm, rm;
@@ -431,54 +435,47 @@ static void test_adjustments_without_a_settings_domain(void) {
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .insert = sizeof(settings), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     noah_profile_working_splice_t drop = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .remove = sizeof(settings), .flags = NOAH_PROFILE_WORKING_SPLICE_DROP};
 
-    for (uint8_t mode = 0u; mode < NOAH_PROFILE_EDIT_MODE_COUNT; mode++) {
-        for (uint8_t dropped = 0u; dropped < 2u; dropped++) {
-            split_link_t ll = {.peer = &right}, rl = {.peer = &left};
-            working_link_t lw = {.peer = &right}, rw = {.peer = &left};
-            uint32_t now = 500u;
-            erased_memory(&lm); erased_memory(&rm); auto_settings(settings);
-            boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 120u + mode, &now);
-            scan_until_converged(&left, &right, &now);
-            auto_quiet = true;
-            auto_configure(&left);
-            left.working_sync.mode.mode = right.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_LIVE;
-            if (dropped) {
-                // Saved with settings, then the domain is dropped and saved:
-                // a valid profile that inherits the compiled settings.
-                assert(live_edit(&left, &right, 1u, &create, settings, sizeof(settings), &now) == NOAH_PROFILE_WORKING_OK);
-                auto_run_until(&left, &right, &now, 10000u);
-                assert(left.save.keyboard_saves == 1u && !left.working.active);
-                assert(live_edit(&left, &right, 2u, &drop, settings, 0u, &now) == NOAH_PROFILE_WORKING_OK);
-                auto_run_until(&left, &right, &now, 10000u);
-                assert(left.save.keyboard_saves == 2u && !left.working.active);
-            }
-            left.working_sync.mode.mode = right.working_sync.mode.mode = mode;
-            uint32_t saves = left.save.keyboard_saves, generation = left.committed_descriptor.generation, writes = lm.writes + rm.writes;
-            // Two adjustments coalesce; every other scalar stays the default.
-            assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 800u));
-            assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 1000u));
-            assert(noah_profile_owner_adjust(&left, NOAH_SETTING_RGB_MODE, 0x07010101u));
-            auto_run_until(&left, &right, &now, 2000u);
-            auto_defaults(expected);
-            write_u32(expected + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_DEFAULT_DPI * 4u, 1000u);
-            write_u32(expected + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_RGB_MODE * 4u, 0x07010101u);
-            assert(!left.auto_save.pending && left.working.active && left.working.last_result == NOAH_PROFILE_WORKING_OK);
-            assert_active_settings(&left, expected);
-            assert_active_settings(&right, expected);
-            assert(lm.writes + rm.writes == writes); // an edit alone writes no flash
+    for (uint8_t dropped = 0u; dropped < 2u; dropped++) {
+        split_link_t ll = {.peer = &right}, rl = {.peer = &left};
+        working_link_t lw = {.peer = &right}, rw = {.peer = &left};
+        uint32_t now = 500u;
+        erased_memory(&lm); erased_memory(&rm); auto_settings(settings);
+        boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 120u, &now);
+        scan_until_converged(&left, &right, &now);
+        auto_quiet = true;
+        auto_configure(&left);
+        left.working_sync.mode.mode = right.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_LIVE;
+        if (dropped) {
+            // Saved with settings, then the domain is dropped and saved:
+            // a valid profile that inherits the compiled settings.
+            assert(live_edit(&left, &right, 1u, &create, settings, sizeof(settings), &now) == NOAH_PROFILE_WORKING_OK);
             auto_run_until(&left, &right, &now, 10000u);
-            if (mode == NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW) {
-                assert(left.working.active && left.save.keyboard_saves == saves);
-                continue;
-            }
-            // Live and Apply save an adjustment-only copy; the revision advanced.
-            assert(!left.working.active && left.save.keyboard_saves == saves + 1u && left.committed_descriptor.generation == generation + 1u && right.committed_descriptor.generation == generation + 1u);
-            // A replug boots the saved profile with the adjusted values and every other default.
-            boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 130u, &now);
-            scan_until_converged(&left, &right, &now);
-            assert_active_settings(&left, expected);
-            assert_active_settings(&right, expected);
+            assert(left.save.keyboard_saves == 1u && !left.working.active);
+            assert(live_edit(&left, &right, 2u, &drop, settings, 0u, &now) == NOAH_PROFILE_WORKING_OK);
+            auto_run_until(&left, &right, &now, 10000u);
+            assert(left.save.keyboard_saves == 2u && !left.working.active);
         }
+        uint32_t saves = left.save.keyboard_saves, generation = left.committed_descriptor.generation, writes = lm.writes + rm.writes;
+        // Two adjustments coalesce; every other scalar stays the default.
+        assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 800u));
+        assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 1000u));
+        assert(noah_profile_owner_adjust(&left, NOAH_SETTING_RGB_MODE, 0x07010101u));
+        auto_run_until(&left, &right, &now, 2000u);
+        auto_defaults(expected);
+        write_u32(expected + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_DEFAULT_DPI * 4u, 1000u);
+        write_u32(expected + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_RGB_MODE * 4u, 0x07010101u);
+        assert(!left.auto_save.pending && left.working.active && left.working.last_result == NOAH_PROFILE_WORKING_OK);
+        assert_active_settings(&left, expected);
+        assert_active_settings(&right, expected);
+        assert(lm.writes + rm.writes == writes); // an edit alone writes no flash
+        auto_run_until(&left, &right, &now, 10000u);
+        // Live saves the adjustment-only copy; the revision advanced.
+        assert(!left.working.active && left.save.keyboard_saves == saves + 1u && left.committed_descriptor.generation == generation + 1u && right.committed_descriptor.generation == generation + 1u);
+        // A replug boots the saved profile with the adjusted values and every other default.
+        boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 130u, &now);
+        scan_until_converged(&left, &right, &now);
+        assert_active_settings(&left, expected);
+        assert_active_settings(&right, expected);
     }
     puts("adjustments on a profile without a settings domain create it from the defaults, keep every other value, and save");
 }

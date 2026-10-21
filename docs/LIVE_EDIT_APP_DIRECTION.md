@@ -2026,7 +2026,10 @@ names the cause): an adjustment published after it would overwrite the Apply.
 An Apply already admitted finishes; an adjustment pressed during it publishes
 after it lands, on the profile it activated, and is saved as any adjustment.
 A profile without a settings domain gets one, created from the authored
-defaults with the adjusted scalars, by the adjustment's own edit. New adjustments during Save wait for the next revision; the
+defaults with the adjusted scalars, by the adjustment's own edit. The settings
+schema builds an adjustment's bytes; the queue stays in the owner, because a
+pending adjustment is part of the owner's admission rule, so a separate queue
+module would widen the owner's interface rather than hide anything. New adjustments during Save wait for the next revision; the
 bytes being saved stay immutable. Settings projection retains pending local
 values so a finishing save cannot undo newer key feedback. Participation
 toggles never enter this queue; RGB on/off is a lighting adjustment.

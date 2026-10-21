@@ -1754,37 +1754,27 @@ bool noah_profile_owner_working_receive(noah_profile_owner_t *owner, const uint8
 _Static_assert(sizeof(noah_profile_owner_t) <= NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT, "live-profile owner state exceeded its 32-bit engineering regression policy");
 #endif
 
-// Settings are ordered by their scalar offsets, for a canonical compound edit.
-static const uint8_t adjustment_settings[] = {
-    NOAH_SETTING_DEFAULT_DPI, NOAH_SETTING_SNIPING_DPI,
-    NOAH_SETTING_RGB_MODE, NOAH_SETTING_RGB_COLOR,
-};
+_Static_assert(NOAH_SETTINGS_ADJUSTMENTS <= 8u, "pending holds one bit per adjustment scalar");
+_Static_assert((int)NOAH_SETTINGS_ADJUSTMENTS <= (int)NOAH_PROFILE_WORKING_MAX_SPLICES, "every adjustment scalar is one splice of a single edit");
 
 bool noah_profile_owner_adjust(noah_profile_owner_t *owner, uint8_t setting, uint32_t value) {
     if (!owner_ready(owner) || !owner->master || !noah_profile_setting_v1_valid(setting, value, NOAH_SETTINGS_LAYERS)) {
         return false;
     }
-    for (uint8_t i = 0u; i < sizeof(adjustment_settings); i++) {
-        if (adjustment_settings[i] == setting) {
-            owner->auto_save.values[i] = value;
-            owner->auto_save.pending |= 1u << i;
-            owner->auto_save.quiet_since = owner->now_ms;
-            owner->auto_save.attempted = false;
-            return true;
-        }
-    }
-    return false; // toggles are never edits
+    uint8_t index = noah_profile_settings_v1_adjustment_index(setting);
+    if (index == NOAH_SETTINGS_ADJUSTMENTS) return false; // toggles are never edits
+    owner->auto_save.values[index] = value;
+    owner->auto_save.pending |= (uint8_t)(1u << index);
+    owner->auto_save.quiet_since = owner->now_ms;
+    owner->auto_save.attempted = false;
+    return true;
 }
 
 bool noah_profile_owner_pending_adjustment(const noah_profile_owner_t *owner, uint8_t setting, uint32_t *value) {
-    if (!owner || !value) return false;
-    for (uint8_t i = 0u; i < sizeof(adjustment_settings); i++) {
-        if (adjustment_settings[i] == setting && (owner->auto_save.pending & (1u << i))) {
-            *value = owner->auto_save.values[i];
-            return true;
-        }
-    }
-    return false;
+    uint8_t index = noah_profile_settings_v1_adjustment_index(setting);
+    if (!owner || !value || index == NOAH_SETTINGS_ADJUSTMENTS || !(owner->auto_save.pending & (1u << index))) return false;
+    *value = owner->auto_save.values[index];
+    return true;
 }
 
 static uint16_t automatic_transaction(noah_profile_owner_t *owner) {
@@ -1796,52 +1786,39 @@ static uint16_t automatic_transaction(noah_profile_owner_t *owner) {
     return owner->auto_save.sequence;
 }
 
-// The scalar bytes of a settings domain this owner would write: the authored
-// defaults, with the adjusted scalars replaced.
-static uint8_t inherited_settings_byte(const noah_profile_owner_t *owner, uint8_t mask, uint16_t offset) {
-    if (offset >= NOAH_SETTINGS_SCALARS_OFFSET && offset < NOAH_SETTINGS_LAYER_RECORDS_OFFSET) {
-        uint16_t scalar = (uint16_t)((offset - NOAH_SETTINGS_SCALARS_OFFSET) / 4u);
-        for (uint8_t i = 0u; i < sizeof(adjustment_settings); i++) {
-            if ((mask & (1u << i)) && adjustment_settings[i] == scalar) {
-                return (uint8_t)(owner->auto_save.values[i] >> (8u * ((offset - NOAH_SETTINGS_SCALARS_OFFSET) % 4u)));
-            }
-        }
-    }
-    return owner->config.settings_defaults_byte(offset);
-}
-
 // A profile without a settings domain inherits the authored defaults, which
-// leaves nowhere to replace four bytes in. Create the domain from those
-// defaults with the adjusted scalars in it; every other value is unchanged.
+// leaves no scalar to replace in place. Create the domain as the adjustment's
+// bytes over those defaults (profile_settings_v1.h); every other value is
+// unchanged. The stream's checksum accumulates as each chunk is sent.
 static __attribute__((noinline)) noah_profile_working_result_t adjustment_inherit(noah_profile_owner_t *owner, uint16_t transaction, uint8_t mask, uint16_t length) {
     noah_profile_working_splice_t splice = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .insert = length, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     uint8_t                       bytes[32];
     uint32_t                      crc = NOAH_PROFILE_CRC32_INITIAL;
     noah_profile_working_result_t result = noah_profile_working_copy_splice(&owner->working, transaction, 0u, &splice);
 
-    // First pass: the stream's checksum. Second: the stream itself.
-    for (uint8_t pass = 0u; pass < 2u && result == NOAH_PROFILE_WORKING_OK; pass++) {
-        for (uint16_t offset = 0u; offset < length && result == NOAH_PROFILE_WORKING_OK;) {
-            uint8_t count = length - offset < sizeof(bytes) ? (uint8_t)(length - offset) : (uint8_t)sizeof(bytes);
-            for (uint8_t i = 0u; i < count; i++) bytes[i] = inherited_settings_byte(owner, mask, (uint16_t)(offset + i));
-            if (pass == 0u) crc = noah_profile_crc32_update(crc, bytes, count);
-            else result = noah_profile_working_copy_data(&owner->working, transaction, offset, bytes, count);
-            offset = (uint16_t)(offset + count);
+    for (uint16_t offset = 0u; offset < length && result == NOAH_PROFILE_WORKING_OK;) {
+        uint8_t count = (uint16_t)(length - offset) < sizeof(bytes) ? (uint8_t)(length - offset) : (uint8_t)sizeof(bytes);
+        for (uint8_t i = 0u; i < count; i++) {
+            uint16_t at = (uint16_t)(offset + i);
+            bytes[i]    = noah_profile_settings_v1_adjusted_byte(owner->auto_save.values, mask, at, owner->config.settings_defaults_byte(at));
         }
+        crc    = noah_profile_crc32_update(crc, bytes, count);
+        result = noah_profile_working_copy_data(&owner->working, transaction, offset, bytes, count);
+        offset = (uint16_t)(offset + count);
     }
     return result == NOAH_PROFILE_WORKING_OK ? noah_profile_working_copy_commit(&owner->working, transaction, noah_profile_crc32_finish(crc)) : result;
 }
 
 static __attribute__((noinline)) bool adjustment_step(noah_profile_owner_t *owner) {
     noah_profile_owner_auto_save_t *state = &owner->auto_save;
-    uint8_t bytes[16];
+    uint8_t bytes[NOAH_SETTINGS_ADJUSTMENTS * NOAH_SETTINGS_SCALAR_SIZE];
     uint8_t count = 0u;
     uint8_t mask = state->pending;
     uint16_t inherited = 0u;
     noah_profile_working_status_t working;
     noah_profile_working_result_t result;
 
-    for (uint8_t i = 0u; i < sizeof(adjustment_settings); i++) {
+    for (uint8_t i = 0u; i < NOAH_SETTINGS_ADJUSTMENTS; i++) {
         if (mask & (1u << i)) count++;
     }
     // The settings domain is optional; a profile without one inherits the
@@ -1850,22 +1827,24 @@ static __attribute__((noinline)) bool adjustment_step(noah_profile_owner_t *owne
         inherited = owner->config.settings_defaults_length();
     }
     uint16_t transaction = automatic_transaction(owner);
-    result = noah_profile_working_copy_begin(&owner->working, transaction, owner->working.session, owner->working.revision, inherited ? 1u : count, inherited ? inherited : count * 4u, 0u, false);
+    result = noah_profile_working_copy_begin(&owner->working, transaction, owner->working.session, owner->working.revision, inherited ? 1u : count, inherited ? inherited : count * NOAH_SETTINGS_SCALAR_SIZE, 0u, false);
     if (result != NOAH_PROFILE_WORKING_OK) return false;
     if (inherited) {
         result = adjustment_inherit(owner, transaction, mask, inherited);
     } else {
+        // One splice per adjusted scalar, in adjustment-index order, which is
+        // canonical splice order (profile_settings_v1.h).
         count = 0u;
-        for (uint8_t i = 0u; i < sizeof(adjustment_settings); i++) {
+        for (uint8_t i = 0u; i < NOAH_SETTINGS_ADJUSTMENTS; i++) {
             if (!(mask & (1u << i))) continue;
-            noah_profile_working_splice_t splice = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .offset = NOAH_SETTINGS_SCALARS_OFFSET + adjustment_settings[i] * 4u, .remove = 4u, .insert = 4u};
+            noah_profile_working_splice_t splice = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .offset = noah_profile_settings_v1_scalar_offset(noah_profile_settings_v1_adjustment_id(i)), .remove = NOAH_SETTINGS_SCALAR_SIZE, .insert = NOAH_SETTINGS_SCALAR_SIZE};
             result = noah_profile_working_copy_splice(&owner->working, transaction, count, &splice);
             if (result != NOAH_PROFILE_WORKING_OK) break;
-            for (uint8_t j = 0u; j < 4u; j++) bytes[count * 4u + j] = (uint8_t)(state->values[i] >> (8u * j));
+            for (uint8_t j = 0u; j < NOAH_SETTINGS_SCALAR_SIZE; j++) bytes[count * NOAH_SETTINGS_SCALAR_SIZE + j] = noah_profile_settings_v1_scalar_byte(state->values[i], j);
             count++;
         }
-        if (result == NOAH_PROFILE_WORKING_OK) result = noah_profile_working_copy_data(&owner->working, transaction, 0u, bytes, count * 4u);
-        if (result == NOAH_PROFILE_WORKING_OK) result = noah_profile_working_copy_commit(&owner->working, transaction, noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, bytes, count * 4u)));
+        if (result == NOAH_PROFILE_WORKING_OK) result = noah_profile_working_copy_data(&owner->working, transaction, 0u, bytes, count * NOAH_SETTINGS_SCALAR_SIZE);
+        if (result == NOAH_PROFILE_WORKING_OK) result = noah_profile_working_copy_commit(&owner->working, transaction, noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, bytes, count * NOAH_SETTINGS_SCALAR_SIZE)));
     }
     if (result == NOAH_PROFILE_WORKING_QUEUED) {
         if (!owner->working.active) state->apply_adjustments_only = true;

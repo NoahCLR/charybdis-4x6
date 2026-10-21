@@ -131,6 +131,46 @@ static inline __attribute__((always_inline)) uint32_t noah_profile_settings_v1_s
     return value;
 }
 
+// The adjustment scalars (D-F32): the scalars the keyboard's adjustment keys
+// set (DPI up/down and the RGB keys), by adjustment index. Index order is
+// scalar order, so an edit of any subset has its splices in canonical
+// (ascending offset) order, as the working copy's plan requires. Toggles and
+// every other setting are not adjustment scalars.
+enum { NOAH_SETTINGS_ADJUSTMENTS = 4 };
+_Static_assert(NOAH_SETTING_DEFAULT_DPI < NOAH_SETTING_SNIPING_DPI && NOAH_SETTING_SNIPING_DPI < NOAH_SETTING_RGB_MODE && NOAH_SETTING_RGB_MODE < NOAH_SETTING_RGB_COLOR, "adjustment scalars are listed in scalar order");
+
+// The setting at adjustment index `index`. Precondition:
+// index < NOAH_SETTINGS_ADJUSTMENTS.
+static inline __attribute__((always_inline)) uint8_t noah_profile_settings_v1_adjustment_id(uint8_t index) {
+    static const uint8_t ids[] = {NOAH_SETTING_DEFAULT_DPI, NOAH_SETTING_SNIPING_DPI, NOAH_SETTING_RGB_MODE, NOAH_SETTING_RGB_COLOR};
+    _Static_assert(sizeof(ids) == NOAH_SETTINGS_ADJUSTMENTS, "one setting per adjustment index");
+    return ids[index];
+}
+// The adjustment index of setting `id`, or NOAH_SETTINGS_ADJUSTMENTS when no
+// key adjusts it. Any id is accepted.
+static inline __attribute__((always_inline)) uint8_t noah_profile_settings_v1_adjustment_index(uint8_t id) {
+    uint8_t index = 0u;
+    while (index < NOAH_SETTINGS_ADJUSTMENTS && noah_profile_settings_v1_adjustment_id(index) != id)
+        index++;
+    return index;
+}
+// Byte `offset` of a settings domain after an adjustment. Where `offset` falls
+// in adjustment scalar i and bit i of `mask` is set, that byte of values[i];
+// everywhere else `base`, the domain's own byte at that offset. An adjustment's
+// edit inserts exactly these bytes over what it replaces: each adjusted
+// scalar's NOAH_SETTINGS_SCALAR_SIZE bytes when the profile has a settings
+// domain, or the whole domain over the authored defaults when it has none.
+// Either way every other value is unchanged. Mask bits at or above
+// NOAH_SETTINGS_ADJUSTMENTS are ignored. Values are taken as given: the queue
+// checks each with noah_profile_setting_v1_valid when it is queued, and the
+// working copy validates the domain the edit produces.
+static inline __attribute__((always_inline)) uint8_t noah_profile_settings_v1_adjusted_byte(const uint32_t values[NOAH_SETTINGS_ADJUSTMENTS], uint8_t mask, uint16_t offset, uint8_t base) {
+    uint8_t id, part;
+    if (!noah_profile_settings_v1_scalar_at(offset, &id, &part)) return base;
+    uint8_t index = noah_profile_settings_v1_adjustment_index(id);
+    return index < NOAH_SETTINGS_ADJUSTMENTS && (mask & (1u << index)) ? noah_profile_settings_v1_scalar_byte(values[index], part) : base;
+}
+
 typedef struct {
     uint16_t               offset;
     uint16_t               name; // the name being read, 0..NOAH_SETTINGS_NAME_COUNT
