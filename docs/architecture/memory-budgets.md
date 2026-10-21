@@ -993,13 +993,28 @@ fallback-settlement projection the handled paths use unless named otherwise:
 | Idle custom key stage | 1,040 | 880 inside |
 
 The ordinary manifest (67 and 4 paths) therefore fails on seventeen paths,
-each a key-runtime path, by 40 to 904 bytes. Two exceed the physical
-2,560-byte process stack as well as the policy: press preflight auto-drained
-by 264 bytes and the pointing-mode preemption by 24. Press preflight with its
-plan projected is 32 bytes short of it. The deepest direct-call projection
-beneath a fallback settlement is the preemption, which releases a held
-pointing mode down to the keyboard report: 272 bytes deeper than the reviewed
-tail. A settlement whose own plan auto-drains adds 144. Both apply to every
+each a key-runtime path, by 40 to 904 bytes.
+
+Against the physical stack the figures are frame sums from `main`, so they
+leave out what an interrupt pushes onto the process stack (at least 64 bytes,
+taken at the deepest point). The process stack (0x20040400–0x20040E00) lies
+directly above the 1 KiB interrupt stack, so an overflow lands where the next
+interrupt pushes its frames. Press preflight auto-drained is 264 bytes past
+the 2,560-byte process stack, at least 328 with an interrupt; press preflight
+with its plan projected is 32 bytes inside it, 32 past with an interrupt.
+The existing 2,312-byte handled tail stays 184 bytes inside with an
+interrupt. These are reachable call chains: the auto-drained press preflight
+needs a press while enough keys are active that interrupt planning queues 16
+effects, a tap among them, a pending fallback hold and a pointing-mode press.
+
+The deepest direct-call projection beneath a fallback settlement is the
+preemption, which releases a held pointing mode. The reviewed path is 2,584
+bytes, but it composes the activate branch a release never takes (8 bytes
+too many) and stops at the 6KRO report build (`macro_payload_output_keys`):
+the host driver's send beneath it is called through a function pointer and
+is not reviewed. Reachable as far as the report build, it is 16 bytes past
+the process stack, 80 with an interrupt, and at least 88 (152) once the
+report is sent. A settlement whose own plan auto-drains adds 144. Both apply to every
 fallback-settlement path and compose with auto-drain above it. Auto-drain
 needs a transition whose plan already holds 16 effects; for the fallback
 settlement's own plan, more than 16 keys waiting on fallback holds at once.
