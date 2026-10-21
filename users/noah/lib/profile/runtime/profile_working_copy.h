@@ -44,7 +44,8 @@ enum {
     // the first edit loads it.
     NOAH_PROFILE_WORKING_LOAD_BYTES = 1024u,
     // ...read in pieces no larger than a saved slot's reader takes at once
-    // (the store's I/O bound, NOAH_PROFILE_STORE_IO_CHUNK_MAX).
+    // (the store's I/O bound, NOAH_PROFILE_STORE_IO_CHUNK_MAX, asserted in
+    // profile_working_copy.c).
     NOAH_PROFILE_WORKING_LOAD_PIECE = 32u,
 };
 

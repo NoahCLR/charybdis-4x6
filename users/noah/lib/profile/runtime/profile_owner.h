@@ -90,19 +90,22 @@ typedef struct {
     uint8_t (*settings_defaults_byte)(uint16_t offset);
 } noah_profile_owner_config_t;
 
+// Edit status page 1 byte 13 reports the phase (Profile Wire), so each keeps
+// its value.
 typedef enum {
-    NOAH_PROFILE_OWNER_SAVE_IDLE = 0u,
-    NOAH_PROFILE_OWNER_SAVE_CHECKSUM,
-    NOAH_PROFILE_OWNER_SAVE_BEGIN,
-    NOAH_PROFILE_OWNER_SAVE_REUSE,
-    NOAH_PROFILE_OWNER_SAVE_VALIDATE,
-    NOAH_PROFILE_OWNER_SAVE_COMMIT,
-    NOAH_PROFILE_OWNER_SAVE_WAIT,
+    NOAH_PROFILE_OWNER_SAVE_IDLE     = 0u,
+    NOAH_PROFILE_OWNER_SAVE_CHECKSUM = 1u,
+    NOAH_PROFILE_OWNER_SAVE_BEGIN    = 2u,
+    NOAH_PROFILE_OWNER_SAVE_REUSE    = 3u,
+    NOAH_PROFILE_OWNER_SAVE_VALIDATE = 4u,
+    // Reserved: no save enters it, so it is never reported.
+    NOAH_PROFILE_OWNER_SAVE_RESERVED = 5u,
+    NOAH_PROFILE_OWNER_SAVE_WAIT     = 6u,
     // The working copy's checksums are the saved profile's: its bytes are
     // compared with it, and if they are the same nothing is written.
-    NOAH_PROFILE_OWNER_SAVE_SAME,
+    NOAH_PROFILE_OWNER_SAVE_SAME = 7u,
     // The same bytes: the working copy gives way to the saved profile.
-    NOAH_PROFILE_OWNER_SAVE_SETTLE,
+    NOAH_PROFILE_OWNER_SAVE_SETTLE = 8u,
 } noah_profile_owner_save_phase_t;
 
 // Save (D-F32): the working copy written as a new generation through the
@@ -275,7 +278,6 @@ const noah_profile_store_record_t *noah_profile_owner_committed(const noah_profi
 // Read-only view of the backing store, for bounded host readback of the
 // committed payload. Callers must not mutate through it.
 const noah_profile_store_t           *noah_profile_owner_store(const noah_profile_owner_t *owner);
-noah_profile_candidate_transaction_t *noah_profile_owner_host_transaction(noah_profile_owner_t *owner);
 noah_profile_split_reconciler_t      *noah_profile_owner_split_reconciler(noah_profile_owner_t *owner);
 bool                                  noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_owner_status_t *status);
 // Whether the keyboard may drop off USB now (D-F25): the owner is ready with

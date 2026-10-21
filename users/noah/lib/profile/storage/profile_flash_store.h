@@ -20,8 +20,11 @@
 // - The store's writer may run in a grant only while erased flash lies at
 //   least a page ahead of its writes and the grant has not used its flash
 //   time budget (may_write); so an erase never shares a grant with the
-//   writer, and a save waits while the keyboard is busy. One grant's writes
-//   (at most one split chunk, 106 bytes) program at most one page.
+//   writer, and a save waits while the keyboard is busy. A grant takes no
+//   further store step once one has erased or programmed (grant_flashed),
+//   and one step writes in order at most a page (a REUSE step's share of
+//   its range, a 106-byte split chunk, one commit record), so one grant
+//   programs at most one page.
 //
 // The backend measures the pauses so a keyboard session can read them
 // (diagnostics). Host tests drive a fake that can cut power at any operation.
