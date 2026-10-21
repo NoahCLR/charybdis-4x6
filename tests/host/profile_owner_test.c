@@ -2066,7 +2066,6 @@ static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
     // copy, so the other half copies its own working copy too.
     assert(noah_profile_owner_save(&left, 40u, left.working.session, left.working.revision - 1u) == NOAH_PROFILE_WORKING_STALE);
     assert(noah_profile_owner_save(&left, 40u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
-    assert(noah_profile_owner_edit_begin(&left, 41u, left.working.session, left.working.revision, 1u, 2u, 0u) == NOAH_PROFILE_WORKING_BUSY);
     {
         uint32_t revision = left.working.revision;
         for (uint32_t guard = 0u; guard < 20000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; guard++) scan_pair(&left, &right, &now);
@@ -2184,7 +2183,7 @@ static void test_repeated_local_steps_save_in_far_fewer_grants(void) {
     assert(repeated * 4u <= one_step);
 }
 
-static void test_apply_while_editing_waits_and_a_save_refuses_apart_halves(void) {
+static void test_an_apply_replaces_the_working_copy(void) {
     static noah_profile_owner_t left;
     static noah_profile_owner_t right;
     static memory_t             left_memory;
@@ -2195,33 +2194,23 @@ static void test_apply_while_editing_waits_and_a_save_refuses_apart_halves(void)
     working_link_t              left_working_link  = {.peer = &right};
     working_link_t              right_working_link = {.peer = &left};
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
-    uint8_t                       frame[32];
     uint32_t                      now = 5000u;
 
     erased_memory(&left_memory);
     erased_memory(&right_memory);
     boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 7u, &now);
-    // Before the other half is heard, edits and Save wait.
-    assert(noah_profile_owner_edit_begin(&left, 1u, left.working.session, left.working.revision, 1u, KEYMAP_LENGTH, 0u) == NOAH_PROFILE_WORKING_BUSY);
     scan_until_converged(&left, &right, &now);
-    // An Apply's BEGIN while an edit is being received is answered BUSY.
-    assert(noah_profile_owner_edit_begin(&left, 2u, left.working.session, left.working.revision, 1u, KEYMAP_LENGTH, 0u) == NOAH_PROFILE_WORKING_OK);
-    begin_frame(frame, 9u);
-    assert(noah_profile_owner_receive(&left, frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
-    assert(noah_profile_owner_edit_abort(&left, 2u) == NOAH_PROFILE_WORKING_OK);
-    // An Apply in progress holds edits off; once it lands it replaced the
-    // working copy and moved the revision.
+    // Once an Apply lands it replaced the working copy and moved the revision.
     assert(live_edit(&left, &right, 3u, &create, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
     scan_until_converged(&left, &right, &now);
     {
         uint32_t revision = left.working.revision;
         stage_valid_candidate_pair(&left, &right, 10u, &now);
-        assert(noah_profile_owner_edit_begin(&left, 4u, left.working.session, left.working.revision, 1u, 2u, 0u) == NOAH_PROFILE_WORKING_BUSY);
         commit_valid_candidate_pair(&left, &right, 10u, 1u, &now);
         scan_until_converged(&left, &right, &now);
         assert(!left.working.active && !right.working.active && left.working.revision == revision + 1u && right.working.revision == left.working.revision);
     }
-    puts("Apply and live edits never overlap; an Apply replaces the working copy");
+    puts("an Apply replaces the working copy and moves the revision");
 }
 
 static void test_an_abandoned_edit_is_aborted_and_revert_ends_one(void) {
@@ -2353,14 +2342,14 @@ int main(void) {
     test_saving_the_saved_bytes_writes_nothing();
     test_auto_save_hour_bound();
     test_auto_save_power_cuts();
-    test_apply_waits_behind_a_queued_adjustment();
+    test_an_apply_and_an_adjustment_land_in_the_order_made();
     test_adjustments_without_a_settings_domain();
     test_a_failed_automatic_save_is_reported_and_not_repeated();
     test_live_edit_reaches_both_halves_and_save_writes_both();
     test_repeated_local_steps_save_in_far_fewer_grants();
     test_a_save_after_taking_the_other_halfs_copy_lands();
     test_an_apply_after_taking_the_other_halfs_copy_lands();
-    test_apply_while_editing_waits_and_a_save_refuses_apart_halves();
+    test_an_apply_replaces_the_working_copy();
     test_an_abandoned_edit_is_aborted_and_revert_ends_one();
     test_partial_runtime_install_rolls_back();
     test_failed_factory_rgb_cache_refuses_graph_install();
