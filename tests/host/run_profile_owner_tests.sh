@@ -21,12 +21,15 @@ build_and_run() {
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DNOAH_PROFILE_OWNER_TEST_DIAGNOSTICS \
+        -DNOAH_LIVE_PROFILE_OWNER_ENABLE \
+        -DNOAH_LIVE_PROFILE_MUTATION_ENABLE \
         -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
         "$ROOT/tests/host/profile_owner_test.c" \
+        "$ROOT/users/noah/lib/compat/qmk_profile_edit_channel.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_owner.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
         "$ROOT/users/noah/lib/profile/split/profile_working_sync.c" \

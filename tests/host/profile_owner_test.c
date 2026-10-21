@@ -70,6 +70,15 @@ typedef struct {
     // The next commit marker written is reported failed, though its byte
     // landed: the store cannot tell whether the decision is durable.
     bool     fail_commit_marker;
+    // The half's edit-mode record, kept outside the profile as QMK's user
+    // datablock keeps it (qmk_profile_working.c); counter 0 is none stored.
+    noah_profile_edit_mode_record_t mode;
+    uint32_t mode_writes;
+    bool     fail_mode_writes; // every write of the record fails
+    bool     mode_waits;       // a key is held: the record waits for a quiet keyboard
+    bool     no_mode_storage;  // the half has nowhere to store the edit mode
+    // Edit status flag 9's hook: a save here waits for a quiet keyboard.
+    bool     storage_paused;
 } memory_t;
 
 typedef struct {
@@ -1890,6 +1899,32 @@ static void erased_memory(memory_t *memory) {
     memset(memory->bytes, 0xFF, sizeof(memory->bytes));
 }
 
+static bool mode_load(void *context, noah_profile_edit_mode_record_t *record) {
+    const memory_t *memory = context;
+
+    if (memory->mode.counter == 0u) return false;
+    *record = memory->mode;
+    return true;
+}
+
+static bool mode_store(void *context, const noah_profile_edit_mode_record_t *record) {
+    memory_t *memory = context;
+
+    memory->mode_writes++;
+    if (memory->fail_mode_writes) return false;
+    memory->mode = *record;
+    return true;
+}
+
+static bool mode_may_store(void *context) {
+    return !((const memory_t *)context)->mode_waits;
+}
+
+static noah_profile_edit_mode_storage_t mode_storage(memory_t *memory) {
+    if (memory->no_mode_storage) return (noah_profile_edit_mode_storage_t){0};
+    return (noah_profile_edit_mode_storage_t){.load = mode_load, .store = mode_store, .may_store = mode_may_store, .context = memory};
+}
+
 static void boot_live_pair(noah_profile_owner_t *left, memory_t *left_memory, noah_profile_owner_t *right, memory_t *right_memory, split_link_t *left_link, split_link_t *right_link, working_link_t *left_working_link, working_link_t *right_working_link, uint32_t session, uint32_t *now) {
     assert(noah_profile_owner_init(left, &(noah_profile_owner_config_t){
                                              .store_io                  = {.read = memory_read, .write = memory_write, .context = left_memory},
@@ -1902,6 +1937,9 @@ static void boot_live_pair(noah_profile_owner_t *left, memory_t *left_memory, no
                                              .working_session           = session,
                                              .working_exchange          = working_exchange,
                                              .working_transport_context = left_working_link,
+                                             .edit_mode_storage         = mode_storage(left_memory),
+                                             .storage_paused            = storage_paused_flag,
+                                             .storage_paused_context    = &left_memory->storage_paused,
                                          }));
     assert(noah_profile_owner_init(right, &(noah_profile_owner_config_t){
                                               .store_io                  = {.read = memory_read, .write = memory_write, .context = right_memory},
@@ -1914,6 +1952,9 @@ static void boot_live_pair(noah_profile_owner_t *left, memory_t *left_memory, no
                                               .working_session           = session ^ 0xFFFFu,
                                               .working_exchange          = working_exchange,
                                               .working_transport_context = right_working_link,
+                                              .edit_mode_storage         = mode_storage(right_memory),
+                                              .storage_paused            = storage_paused_flag,
+                                              .storage_paused_context    = &right_memory->storage_paused,
                                           }));
     for (uint32_t guard = 0u; guard < 8192u && (left->state < NOAH_PROFILE_OWNER_READY_COMPILED || left->state > NOAH_PROFILE_OWNER_READY_VALIDATED || right->state < NOAH_PROFILE_OWNER_READY_COMPILED || right->state > NOAH_PROFILE_OWNER_READY_VALIDATED); guard++) {
         scan_pair(left, right, now);
@@ -2066,11 +2107,6 @@ static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
         assert(left_memory.writes + right_memory.writes == writes && !left.working.active && !right.working.active);
     }
     assert_same_active(&left, &right, expected, length);
-
-    // The edit mode is stored outside the profile and refused with unsaved edits.
-    assert(noah_profile_owner_set_edit_mode(&left, NOAH_PROFILE_EDIT_MODE_APPLY) == NOAH_PROFILE_WORKING_READ_ERROR); // no storage in this harness
-    assert(live_edit(&left, &right, 46u, &key, kc_b, sizeof(kc_b), &now) == NOAH_PROFILE_WORKING_OK);
-    assert(noah_profile_owner_set_edit_mode(&left, NOAH_PROFILE_EDIT_MODE_APPLY) == NOAH_PROFILE_WORKING_NOT_CLEAN);
     puts("a live edit reaches both halves without flash; Save writes both by reuse; a replug boots the saved profile; Revert follows on both");
 }
 
@@ -2305,9 +2341,13 @@ static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
 }
 
 #include "profile_owner_auto_save_test.inc"
+#include "profile_owner_admission_test.inc"
 #include "profile_owner_stopped_test.inc"
 
 int main(void) {
+    test_admission_matrix();
+    test_a_mode_change_waits_until_the_halves_agree();
+    test_edit_status_flags_come_from_the_owner();
     test_ineligible_auto_saves_skip_admission_work();
     test_auto_save_modes_and_adjustments();
     test_saving_the_saved_bytes_writes_nothing();
