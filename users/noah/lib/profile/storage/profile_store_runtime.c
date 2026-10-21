@@ -45,7 +45,6 @@ static noah_profile_owner_t runtime_owner;
 // static claim in the firmware (docs/architecture/memory-budgets.md).
 static uint8_t              runtime_working_bytes[NOAH_PROFILE_PAYLOAD_MAX] __attribute__((aligned(4)));
 static bool                 runtime_owner_initialized;
-static bool                 runtime_working_transport_registered;
 static bool                 runtime_transport_registered;
 static bool                 runtime_integration_error;
 #endif
@@ -57,7 +56,6 @@ void noah_profile_store_runtime_init(void) {
     noah_qmk_durable_io_init(&runtime_grant, noah_qmk_profile_flash_store(), NULL);
     runtime_owner_initialized    = false;
     runtime_transport_registered = false;
-    runtime_working_transport_registered = false;
     runtime_integration_error    = false;
     discovery_result             = NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
 #    if defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_USER)
@@ -113,30 +111,22 @@ void noah_profile_store_runtime_init(void) {
 }
 
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
-static bool working_receive(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
-    return noah_profile_owner_working_receive(context, request, request_length, response, response_length);
-}
-#endif
-
-#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
-// Once, as soon as the owner's reconciler exists: both split RPCs. False after
-// an integration error.
+// Once, as soon as the owner has built its reconciler and working copy: both
+// split RPCs. A refusal is a wiring fault (an endpoint missing, or a second
+// registration) that no later scan changes, so it is an integration error,
+// as the owner's own wiring faults are. False after it.
 static __attribute__((noinline)) bool register_transports(void) {
-    if (!runtime_transport_registered) {
-        noah_profile_split_reconciler_t *reconciler = noah_profile_owner_split_reconciler(&runtime_owner);
+    noah_profile_split_reconciler_t *reconciler = noah_profile_owner_split_reconciler(&runtime_owner);
 
-        if (reconciler) {
-            runtime_transport_registered = noah_qmk_profile_split_transport_init(reconciler);
-            if (!runtime_transport_registered) {
-                runtime_integration_error = true;
-                runtime_state             = NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR;
-                return false;
-            }
-        }
+    if (!reconciler) {
+        return true;
     }
-    if (!runtime_working_transport_registered) {
-        runtime_working_transport_registered = noah_qmk_profile_working_transport_init(working_receive, &runtime_owner);
+    if (!noah_qmk_profile_split_transport_init(reconciler, noah_profile_owner_working_sync(&runtime_owner))) {
+        runtime_integration_error = true;
+        runtime_state             = NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR;
+        return false;
     }
+    runtime_transport_registered = true;
     return true;
 }
 #endif
@@ -163,7 +153,7 @@ bool noah_qmk_durable_io_store_step(void *context, bool again, uint32_t now_ms) 
     }
     noah_profile_owner_scan_again(&runtime_owner, again);
     worked = noah_profile_owner_scan(&runtime_owner, is_keyboard_master(), now_ms);
-    if ((!runtime_transport_registered || !runtime_working_transport_registered) && !register_transports()) {
+    if (!runtime_transport_registered && !register_transports()) {
         return true;
     }
     discovery_result = noah_profile_owner_discovery_result(&runtime_owner);

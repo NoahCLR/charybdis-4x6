@@ -11,8 +11,8 @@ static void assert_no_automatic_admission_work(noah_profile_owner_t *owner, uint
 static void test_ineligible_auto_saves_skip_admission_work(void) {
     static noah_profile_owner_t left, right;
     static memory_t lm, rm;
-    split_link_t ll = {.peer = &right}, rl = {.peer = &left};
-    working_link_t lw = {.peer = &right}, rw = {.peer = &left};
+    split_link_t ll = split_link_to(&right), rl = split_link_to(&left);
+    split_fault_link_t lw = working_link_to(&right), rw = working_link_to(&left);
     uint32_t now = 100000u;
     uint8_t keymap[KEYMAP_LENGTH] = {0};
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = sizeof(keymap), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
@@ -104,8 +104,8 @@ static void test_auto_save_modes_and_adjustments(void) {
     noah_profile_working_splice_t dpi = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .offset = NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_DEFAULT_DPI * 4u, .remove = 4u, .insert = 4u};
     uint8_t value[4];
     for (uint8_t mode = 0u; mode < NOAH_PROFILE_EDIT_MODE_COUNT; mode++) {
-        split_link_t ll = {.peer = &right}, rl = {.peer = &left};
-        working_link_t lw = {.peer = &right}, rw = {.peer = &left};
+        split_link_t ll = split_link_to(&right), rl = split_link_to(&left);
+        split_fault_link_t lw = working_link_to(&right), rw = working_link_to(&left);
         uint32_t now = UINT32_MAX - 5000u; // timer wrap is ordinary
         erased_memory(&lm); erased_memory(&rm); auto_settings(settings);
         boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 99u, &now);
@@ -200,8 +200,8 @@ static void test_auto_save_modes_and_adjustments(void) {
 static void test_auto_save_hour_bound(void) {
     static noah_profile_owner_t left, right;
     static memory_t lm, rm;
-    split_link_t ll = {.peer = &right}, rl = {.peer = &left};
-    working_link_t lw = {.peer = &right}, rw = {.peer = &left};
+    split_link_t ll = split_link_to(&right), rl = split_link_to(&left);
+    split_fault_link_t lw = working_link_to(&right), rw = working_link_to(&left);
     uint8_t settings[NOAH_SETTINGS_MIN_SIZE];
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .insert = sizeof(settings), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     uint32_t now = 0u;
@@ -318,8 +318,8 @@ static void auto_run_until(noah_profile_owner_t *left, noah_profile_owner_t *rig
 static void test_apply_waits_behind_a_queued_adjustment(void) {
     static noah_profile_owner_t left, right;
     static memory_t lm, rm;
-    split_link_t ll = {.peer = &right}, rl = {.peer = &left};
-    working_link_t lw = {.peer = &right}, rw = {.peer = &left};
+    split_link_t ll = split_link_to(&right), rl = split_link_to(&left);
+    split_fault_link_t lw = working_link_to(&right), rw = working_link_to(&left);
     uint8_t settings[NOAH_SETTINGS_MIN_SIZE], expected[NOAH_SETTINGS_MIN_SIZE], frame[32];
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .insert = sizeof(settings), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     noah_profile_owner_working_status_t status;
@@ -392,8 +392,8 @@ static void test_adjustments_without_a_settings_domain(void) {
 
     for (uint8_t mode = 0u; mode < NOAH_PROFILE_EDIT_MODE_COUNT; mode++) {
         for (uint8_t dropped = 0u; dropped < 2u; dropped++) {
-            split_link_t ll = {.peer = &right}, rl = {.peer = &left};
-            working_link_t lw = {.peer = &right}, rw = {.peer = &left};
+            split_link_t ll = split_link_to(&right), rl = split_link_to(&left);
+            split_fault_link_t lw = working_link_to(&right), rw = working_link_to(&left);
             uint32_t now = 500u;
             erased_memory(&lm); erased_memory(&rm); auto_settings(settings);
             boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 120u + mode, &now);
@@ -514,8 +514,8 @@ static void test_saving_the_saved_bytes_writes_nothing(void) {
     uint8_t value[4];
 
     for (uint8_t m = 0u; m < sizeof(modes); m++) {
-        split_link_t ll = {.peer = &right}, rl = {.peer = &left};
-        working_link_t lw = {.peer = &right}, rw = {.peer = &left};
+        split_link_t ll = split_link_to(&right), rl = split_link_to(&left);
+        split_fault_link_t lw = working_link_to(&right), rw = working_link_to(&left);
         uint32_t now = 1000u;
         erased_memory(&lm); erased_memory(&rm); auto_settings(settings);
         boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 77u, &now);

@@ -84,8 +84,11 @@ source trace because they rewrite or verify human-facing firmware docs.
 ### `compat/`
 
 - Record admission behind undecided tap/hold keys: `qmk_record_admission.c/h`
-- Combo and split adapters: `qmk_combo_origin.c/h` and
-  `qmk_profile_split_transport.c/h`
+- Combo adapter: `qmk_combo_origin.c/h`
+- Live-profile split RPCs: `qmk_profile_split_transport.c/h`, the QMK side of
+  `PUT_PROFILE_SPLIT_SYNC` and `PUT_PROFILE_WORKING_SYNC`
+- Working copy (D-F32): `qmk_profile_working.c/h`, the boot session and the
+  edit-mode record
 - Raw HID Profile Wire channel: `qmk_profile_channel.c` (`raw_hid_receive`)
   and `qmk_profile_capabilities.h`
 - Keyboard restart (D-F34): `qmk_keyboard_restart.c/h`, the split RPC that
@@ -108,14 +111,27 @@ Each is reconciled against the pinned QMK active/disabled layout at the scan
 boundary, and either promoted exactly once, suppressed, expired after the legal
 buffered-output window, or reset.
 
-The live-profile split adapter (`qmk_profile_split_transport.c`). Its
-callback only forwards exact frames (up to 128 bytes, at QMK's per-call RPC
-length) into the caller-owned profile reconciler and returns cached 32-byte
-replies; scan context owns every profile read,
-write, validation, and marker-last commit step. The transaction id is appended
-after the existing userspace ids. Ordinary firmware leaves the adapter
-unregistered. A side-specific engineering artifact registers it through the
-single owner after compiled-profile validation and graph initialization. That
+The live-profile split adapter (`qmk_profile_split_transport.c`) is the QMK
+side of both of the profile's request/reply RPCs: `PUT_PROFILE_SPLIT_SYNC`
+for the durable reconciler and `PUT_PROFILE_WORKING_SYNC` for the working
+copy's sync. Its exchanges send each request at its own length and read the
+reply length the request asks for, inside the protocol's frame bounds (up to
+128 bytes each way for the reconciler; working-copy requests up to 128 and
+replies of exactly 32), and report every send to the durable-I/O grant first
+(D-F29, "Pacing"). On the other half, its callbacks hand each frame as QMK
+gave it to that protocol's receive, which only copies it into a mailbox and
+answers from a published reply; a request the receive refuses is answered
+with zeros, never with the reply buffer's previous contents. Scan context owns
+every profile read, write, validation, and marker-last commit step. Both
+transaction ids are appended after the existing userspace ids. Ordinary
+firmware leaves the adapter unregistered. A side-specific engineering artifact
+registers both RPCs together, once, through the single owner as soon as its
+reconciler and working copy exist (after compiled-profile validation and graph
+initialization); a refused registration is an integration error, because it
+cannot heal on a later scan. Only the QMK side is shared: each mailbox stays in
+its protocol, because split framing v4 carries no sequence (a retry is matched
+on its whole request) while working-copy frames are matched on kind and
+sequence, and the two release their mailbox at different points. That
 artifact exposes coherent owner capabilities and status through the Raw HID
 Profile Wire channel. Adding the explicit mutation gate couples candidate status and host
 mutation routing to the complete write/commit/activation/peer capability set;
@@ -207,6 +223,11 @@ semantics without taking another platform timer sample.
   comparisons between a store record, a staged candidate and a split
   descriptor. The split reconciler answers whether the other half's storage is
   paused (`noah_profile_split_reconciler_peer_storage_paused`).
+- Split exchange: `split/profile_split_exchange.h`, the one request/reply seam
+  the durable reconciler (`split/profile_split_reconciler.c/h`) and the
+  working copy's sync (`split/profile_working_sync.c/h`) send through. Its
+  adapters are QMK's (`compat/qmk_profile_split_transport.c`) and the host
+  tests' in-memory fault link (`tests/host/split_fault_link.c`).
 
 ### `rgb/`
 

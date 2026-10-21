@@ -28,6 +28,7 @@ build_and_run() {
         -I"$ROOT/tests/host/include" \
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
         "$ROOT/tests/host/profile_split_reconciler_test.c" \
+        "$ROOT/tests/host/split_fault_link.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
