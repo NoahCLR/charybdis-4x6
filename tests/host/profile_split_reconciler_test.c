@@ -1754,6 +1754,40 @@ static void test_a_committing_copy_is_never_released(void) {
     assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_COMMITTED && left.store.committed.generation == descriptor.generation);
 }
 
+// A request that matches the receiver's cached reply waits behind a queued
+// poll. Answered from the cache, a restarted sender's identical new push could
+// pass a poll saying it holds none, which then releases the copy that push
+// had just been told is there.
+static void test_a_cached_reply_waits_behind_a_queued_poll(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    noah_profile_split_descriptor_t old;
+    noah_profile_split_v1_frame_t   reply;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint8_t                         request[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                         response[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                         length;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    old        = compiled_descriptor(&right);
+    descriptor = committed_descriptor(&right, 31u, 1u);
+    (void)run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, 10000u);
+    length = left.reconciler.cached_request_length;
+    assert(length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && length <= sizeof(request));
+    memcpy(request, left.reconciler.cached_request_wire, length);
+
+    assert(noah_profile_split_reconciler_receive(&left.reconciler, request, length, response, sizeof(response)));
+    assert(noah_profile_split_v1_reply_decode(response, sizeof(response), &reply) && !(reply.kind == NOAH_PROFILE_SPLIT_V1_ACK && reply.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY));
+
+    deliver_no_push_poll(&left, &old);
+    assert(noah_profile_split_reconciler_receive(&left.reconciler, request, length, response, sizeof(response)));
+    assert(noah_profile_split_v1_reply_decode(response, sizeof(response), &reply) && reply.kind == NOAH_PROFILE_SPLIT_V1_ACK && reply.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY);
+}
+
 // If the receiver drops its lease mid-copy, the chunks it is then sent are
 // answered BUSY. The sender must not retry one chunk forever: it restarts the
 // copy with PREPARE_BEGIN, which re-creates the lease or resumes a live one.
@@ -2689,6 +2723,7 @@ int main(int argc, char **argv) {
     test_a_paused_sender_keeps_the_prepared_copy();
     test_a_sender_holding_the_push_keeps_the_prepared_copy();
     test_a_committing_copy_is_never_released();
+    test_a_cached_reply_waits_behind_a_queued_poll();
     test_prepared_push_restarts_when_the_receiver_drops_its_lease();
     test_receiver_recovers_after_a_storage_failure();
     test_receiver_recovers_when_its_abort_write_fails();

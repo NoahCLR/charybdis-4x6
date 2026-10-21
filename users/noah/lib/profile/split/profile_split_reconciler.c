@@ -365,7 +365,10 @@ bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reco
         }
         return encode_busy_response(reconciler, &decoded, NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED, response);
     }
-    if (read_cached_response(reconciler, request, request_length, response, response_length)) {
+    // Behind a queued request nothing is answered from the cache: requests
+    // are taken in the order they came, so a poll saying its sender holds no
+    // push is taken before any request of a push begun after it.
+    if (!mailbox_pending(reconciler) && read_cached_response(reconciler, request, request_length, response, response_length)) {
         return true;
     }
     // A full mailbox means this half has not yet processed an earlier request;

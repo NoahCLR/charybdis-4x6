@@ -447,13 +447,16 @@ It releases only a copy exactly `PREPARED` and not being pulled by this half.
 A copy committing, or of unknown durability (`RECONCILE_REQUIRED`), is never
 released. A poll that arrives while the copy is still being validated or
 prepared is taken once that step ends, since the scan advances the store
-before its mailbox, and so releases the copy once prepared. Nothing else
+before its mailbox, and so releases the copy once prepared. A poll that
+finds the mailbox full is answered but not queued, so the release comes at
+the first such poll this half takes. Besides a role change, nothing else
 releases a prepared copy: not time, and not the sender's silence (the
 passive peer timeout invalidates the peer's observation, not the copy).
 
-The claim is exact. The receiver's mailbox holds one request and the sender
-sends one at a time, so a poll is taken before any request of a push begun
-after it, and a copy becomes prepared only by its push's `PREPARE_DURABLE`.
+The claim is exact. The receiver's mailbox holds one request, the sender
+sends one at a time, and nothing is answered from the cached reply while a
+request waits in the mailbox, so a poll is taken before any request of a
+push begun after it, and a copy becomes prepared only by its push's `PREPARE_DURABLE`.
 A poll with bit 5 set therefore never meets a copy of a push its sender
 holds. The release runs in the scan step that takes the poll from the
 mailbox, its one storage operation; the split callback only copies the
@@ -569,8 +572,9 @@ typical) on the other half only delays it, and restarts itself either way.
 A USB half that restarts alone (the other half did not acknowledge), or is
 reset by its watchdog, forgets a save in flight. The other half's copy of it
 ends by itself: one still being received when its lease runs out
-(`NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS`), a prepared one at the restarted
-half's first poll once it has read its saved profile, released if that is
+(`NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS`), a prepared one at the first poll
+the other half takes from the restarted half once it has read its saved
+profile, released if that is
 the old profile and committed by repair if the restarted half's commit
 marker had landed ([An abandoned prepared copy](#an-abandoned-prepared-copy-d-f34)).
 Each half keeps a whole saved profile throughout, and the halves rejoin.

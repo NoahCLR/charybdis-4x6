@@ -139,7 +139,10 @@ not run on hardware either.
   bootloader drive (the double-tap reset window). To see a stopped owner on
   the keyboard, a build without the 2026-10-20 fix to taking the other half's
   copy stops in a Live + review Save after a bootmagic EEPROM clear on the
-  right half; host tests cover every stopped state otherwise.
+  right half; host tests cover every stopped state otherwise. Restart the
+  USB half alone mid-save, with the other half not acknowledging (and by
+  its watchdog, if that can be induced): the halves rejoin by themselves and
+  the next Save works.
 - **No Ark drives Restart yet (D-F34).** Flags 14 and 15, SET `0x28` and the
   unacknowledged case are in the firmware only.
 
@@ -2157,8 +2160,8 @@ flag bit 5, METADATA only), and the other half releases its prepared copy
 when such a poll carries a readable saved profile other than the copy. A
 sender authorizes the commit only after its own commit marker, so when its
 saved profile is the copy the other half keeps it and the sender's repair
-commits it. Nothing else releases a prepared copy: not time, nor silence,
-nor a copy already committing. A USB half restarted alone anywhere in a save
+commits it. Besides a role change, nothing else releases a prepared copy:
+not time, nor silence, and never a copy already committing. A USB half restarted alone anywhere in a save
 rejoins the other half by itself, and Save works again. The bit needs no new
 framing version: a build without it refuses a frame that sets it, and its
 clear bit claims nothing
