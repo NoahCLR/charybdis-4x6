@@ -21,15 +21,19 @@ static __attribute__((noinline)) void key_runtime_process_plan_unmatched_release
     key_runtime_core_effect_plan_push_release_owned_state(plan, key_pos);
 }
 
-static bool key_runtime_process_plan_handled_key_release(uint16_t keycode, keyrecord_t *record, const handled_key_resolution_t *resolution, key_runtime_core_effect_plan_t *plan) {
-    if (key_runtime_core_handle_handled_key_release(keycode, record->event.key, resolution, keyboard_mod_policy_current_state(), plan)) {
-        return true;
-    }
-    if (resolution && handled_key_resolution_is_handled(*resolution)) {
+// Planning is not inlined, so the reducer's locals are off the stack before the
+// plan is projected beneath the caller's frame.
+static __attribute__((noinline)) bool key_runtime_process_plan_handled_key_release(uint16_t keycode, keyrecord_t *record, const handled_key_resolution_t *resolution, key_runtime_core_effect_plan_t *plan) {
+    bool handled = key_runtime_core_handle_handled_key_release(keycode, record->event.key, resolution, keyboard_mod_policy_current_state(), plan);
+
+    if (!handled && resolution && handled_key_resolution_is_handled(*resolution)) {
         key_runtime_process_plan_unmatched_release(record->event.key, resolution, plan);
-        return true;
+        handled = true;
     }
-    return false;
+    if (handled) {
+        key_runtime_deferred_release_defer_dispatch_actions_until_release(record->event.key, plan);
+    }
+    return handled;
 }
 
 bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *record, const handled_key_resolution_t *resolution) {
@@ -43,9 +47,6 @@ bool key_runtime_process_handled_key_release(uint16_t keycode, keyrecord_t *reco
 
     key_runtime_core_effect_plan_init(&plan);
     handled = key_runtime_process_plan_handled_key_release(keycode, record, resolution, &plan);
-    if (handled) {
-        key_runtime_deferred_release_defer_dispatch_actions_until_release(record->event.key, &plan);
-    }
     key_runtime_transition_execute_event_plan("release", &plan, feedback_mark);
     return handled;
 }

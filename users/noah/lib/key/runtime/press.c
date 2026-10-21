@@ -8,6 +8,13 @@
 #include "planning/effect_plan.h"
 #include "reducer/runtime.h"
 
+// Planning is not inlined, so the reducer's locals are off the stack before the
+// plan is projected beneath this frame.
+static __attribute__((noinline)) bool key_runtime_process_plan_handled_key_press(uint16_t keycode, keyrecord_t *record, key_runtime_core_effect_plan_t *plan) {
+    key_runtime_core_effect_plan_init(plan);
+    return key_runtime_core_handle_handled_key_press(keycode, record->event.key, plan);
+}
+
 bool key_runtime_process_handled_key_press(uint16_t keycode, keyrecord_t *record) {
     key_runtime_core_effect_plan_t plan;
     uint32_t                       feedback_mark = key_runtime_transition_feedback_mark();
@@ -17,8 +24,7 @@ bool key_runtime_process_handled_key_press(uint16_t keycode, keyrecord_t *record
         return false;
     }
 
-    key_runtime_core_effect_plan_init(&plan);
-    handled = key_runtime_core_handle_handled_key_press(keycode, record->event.key, &plan);
+    handled = key_runtime_process_plan_handled_key_press(keycode, record, &plan);
     key_runtime_transition_execute_event_plan("press", &plan, feedback_mark);
     return handled;
 }

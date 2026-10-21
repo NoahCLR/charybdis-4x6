@@ -31,7 +31,9 @@ static __attribute__((noinline)) void noah_key_runtime_scan_core(void) {
     key_runtime_transition_execute_event_plan("scan", &plan, feedback_mark);
 }
 
-void noah_key_runtime_scan(void) {
+// Not inlined into matrix_scan(), which would otherwise carry its locals on
+// every scan path, the key runtime's or not.
+__attribute__((noinline)) void noah_key_runtime_scan(void) {
     bool core_work = noah_key_runtime_scan_has_core_work();
 
     if (core_work) {
