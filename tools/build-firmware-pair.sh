@@ -147,7 +147,9 @@ case "${NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS:-}" in
 esac
 
 # Resource acceptance uses an instrumented pair in the same pinned compiler.
-# Keep its artifacts separate from the ordinary flashable pair.
+# Keep its artifacts separate from the ordinary flashable pair. Every gate
+# runs on both halves and reports, whatever an earlier one found, so one
+# failure cannot hide another; the build fails at the end if any gate did.
 RESOURCE_ARGS=""
 case "${NOAH_RESOURCE_CHECKS:-}" in
     ""|no) ;;
@@ -176,6 +178,19 @@ KEYMAP_ROOT="$REPO_ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
 # Isolate this invocation and every QMK generator make calls from that config;
 # otherwise a task worktree can silently build the main checkout instead.
 # Explicit keymap paths also override old keymap symlinks inside the QMK tree.
+
+# resource_gate REPORT COMMAND...: runs one gate into its report beside the
+# pair and prints it. A failure is noted, not fatal, until both halves ran.
+RESOURCE_FAILURES=""
+resource_gate() {
+    gate_report="$1"
+    shift
+    if ! "$@" >"$gate_report" 2>&1; then
+        RESOURCE_FAILURES="$RESOURCE_FAILURES
+  $gate_report"
+    fi
+    cat "$gate_report"
+}
 
 build_half() {
     role="$1"
@@ -215,18 +230,13 @@ build_half() {
         for flags in cflags ldflags; do
             cp "$QMK_ROOT/.build/obj_$target/$flags.txt" "$destdir/$name.$flags.txt"
         done
-        if ! sh "$REPO_ROOT/tests/host/run_firmware_memory_budget_checks.sh" >"$destdir/$name.memory.txt" 2>&1; then
-            cat "$destdir/$name.memory.txt"; return 1
-        fi
-        cat "$destdir/$name.memory.txt"
+        resource_gate "$destdir/$name.memory.txt" \
+            sh "$REPO_ROOT/tests/host/run_firmware_memory_budget_checks.sh"
         for manifest in firmware_stack_budget firmware_stack_budget_live_profile_owner; do
-            if ! python3 "$REPO_ROOT/tools/check_firmware_stack_budget.py" \
+            resource_gate "$destdir/$name.$manifest.txt" \
+                python3 "$REPO_ROOT/tools/check_firmware_stack_budget.py" \
                 --manifest "$REPO_ROOT/tools/$manifest.json" \
-                --elf "$destdir/$name.elf" --map "$destdir/$name.map" \
-                >"$destdir/$name.$manifest.txt" 2>&1; then
-                cat "$destdir/$name.$manifest.txt"; return 1
-            fi
-            cat "$destdir/$name.$manifest.txt"
+                --elf "$destdir/$name.elf" --map "$destdir/$name.map"
         done
     fi
 }
@@ -247,6 +257,12 @@ uncommitted() { [ -z "$(git -C "$1" status --porcelain --ignore-submodules=untra
         echo "sha256 $(python3 -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1], "rb").read()).hexdigest())' "$destdir/$file") $file"
     done
 } > "$destdir/${n}_charybdis${SUFFIX}.build.txt"
+
+if [ -n "$RESOURCE_FAILURES" ]; then
+    echo >&2
+    echo "Resource gates failed; their reports:$RESOURCE_FAILURES" >&2
+    exit 1
+fi
 
 echo
 if [ -n "$OWNER_ARGS" ]; then

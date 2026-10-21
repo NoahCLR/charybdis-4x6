@@ -92,7 +92,10 @@ image. The pair builder checks each half's linked SRAM accounting and both
 reviewed-path stack manifests before compiling the other half. It preserves
 that half's ELF, map, compiler/linker flags and gate reports beside the
 `_resources` pair, so shared QMK output cannot substitute one half's evidence
-for the other's. A failing resource gate stops the build.
+for the other's. Every gate runs on both halves, whatever an earlier one
+found; if any failed, the build then fails and names each failed gate's
+report. `verify` keeps the pair and reports under the worktree's Git
+directory, in `verify/<tree>/builds/`.
 
 Build the ordinary pair with `verify` again without that option before handing
 firmware over. Stack instrumentation changes code generation; its evidence

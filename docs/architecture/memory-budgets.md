@@ -170,16 +170,19 @@ Every memory report must name:
   runtime high-water;
 - the exact fresh build and command that produced it.
 
-Measure the instrumented pair, built as the firmware anyone flashes (from a
-task worktree, with `QMK_ROOT` and `BUILD_ROOT` set):
+Measure the instrumented pair, built as the firmware anyone flashes. From a
+task worktree, run the vault's `verify` with `NOAH_RESOURCE_CHECKS=yes`: it
+sets `QMK_ROOT` and `BUILD_ROOT`, serializes builds, and runs
 
 ```sh
 NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh
 ```
 
-It runs `tests/host/run_firmware_memory_budget_checks.sh` and both
+That build runs `tests/host/run_firmware_memory_budget_checks.sh` and both
 reviewed-path manifests on each half and keeps the ELF, map, flags and reports
-beside the pair. A PASS covers only the paths in `tools/firmware_stack_budget.json`
+beside the pair. Every gate runs on both halves, whatever an earlier one
+found; the build fails afterwards, naming each failed gate's report, if any
+did. A PASS covers only the paths in `tools/firmware_stack_budget.json`
 and `tools/firmware_stack_budget_live_profile_owner.json`. The standalone
 `tests/host/run_firmware_stack_budget_checks.sh` compiles a plain `qmk compile`
 image without the live-profile owner (D-L08), not the flashed pair.
