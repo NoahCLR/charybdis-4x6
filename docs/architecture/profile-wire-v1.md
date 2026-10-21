@@ -1598,7 +1598,9 @@ the stored master and the firmware's behaviours override both allow. An
 override starts allowed at boot, is never saved or reviewed, and reads back
 through GET `0x22` beside its master. DPI up/down and RGB adjustment keys
 use no-EEPROM setters for immediate
-local feedback and queue their four settings scalars as a compound edit.
+local feedback and queue the four adjustment scalars
+([portable profile](portable-profile-v1.md#settings-domain-0x40-version-8)) as
+a compound edit.
 Repeated presses coalesce while another operation holds the working copy;
 an adjustment arriving during Save becomes a subsequent revision. Pending
 adjustments block new client edits, Save, Revert and mode changes until

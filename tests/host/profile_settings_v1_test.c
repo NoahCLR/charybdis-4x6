@@ -148,6 +148,90 @@ static void test_scalars(void) {
     assert(!noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_SNIPING_LAYER, 16, 16));
     assert(noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_SNIPING_LAYER, 15, 16));
 }
+// The scalar encoding against the spec's literal layout: scalar `id` is four
+// little-endian bytes at 8 + 4 * id, and layer records follow at 132.
+static void test_scalar_encoding(void) {
+    assert(NOAH_SETTINGS_LAYER_RECORDS_OFFSET == 132);
+    for (uint8_t id = 0; id < NOAH_SETTINGS_COUNT; id++) {
+        assert(noah_profile_settings_v1_scalar_offset(id) == 8 + 4 * id);
+        for (uint8_t part = 0; part < 4; part++) {
+            uint8_t at_id = 0xff, at_part = 0xff;
+            assert(noah_profile_settings_v1_scalar_at((uint16_t)(8 + 4 * id + part), &at_id, &at_part));
+            assert(at_id == id && at_part == part);
+        }
+    }
+    uint8_t id = 0xee, part = 0xdd;
+    assert(!noah_profile_settings_v1_scalar_at(7, &id, &part) && id == 0xee && part == 0xdd);
+    assert(!noah_profile_settings_v1_scalar_at(132, &id, &part) && id == 0xee && part == 0xdd);
+    static const uint32_t values[] = {0, 1, 0x204060, 0x07010101, UINT32_MAX};
+    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+        uint8_t encoded[4];
+        for (uint8_t j = 0; j < 4; j++) {
+            encoded[j] = noah_profile_settings_v1_scalar_byte(values[i], j);
+            assert(encoded[j] == (uint8_t)(values[i] >> (8 * j)));
+        }
+        assert(noah_profile_settings_v1_scalar_value(encoded) == values[i]);
+    }
+}
+// The scalars the keyboard's adjustment keys set (D-F32), by adjustment index.
+static const uint8_t adjustment_scalars[] = {NOAH_SETTING_DEFAULT_DPI, NOAH_SETTING_SNIPING_DPI, NOAH_SETTING_RGB_MODE, NOAH_SETTING_RGB_COLOR};
+static void test_adjustment_scalars(void) {
+    assert(NOAH_SETTINGS_ADJUSTMENTS == sizeof(adjustment_scalars));
+    for (uint8_t index = 0; index < NOAH_SETTINGS_ADJUSTMENTS; index++)
+        assert(noah_profile_settings_v1_adjustment_id(index) == adjustment_scalars[index]);
+    for (unsigned id = 0; id <= 255; id++) {
+        bool adjusted = memchr(adjustment_scalars, (int)id, sizeof(adjustment_scalars)) != NULL;
+        uint8_t index = noah_profile_settings_v1_adjustment_index((uint8_t)id);
+        assert((index < NOAH_SETTINGS_ADJUSTMENTS) == adjusted);
+        assert(index <= NOAH_SETTINGS_ADJUSTMENTS);
+        if (adjusted) assert(noah_profile_settings_v1_adjustment_id(index) == id);
+    }
+    // Toggle keys flip runtime overrides beside these masters; they never edit.
+    assert(noah_profile_settings_v1_adjustment_index(NOAH_SETTING_COMBOS_ENABLED) == NOAH_SETTINGS_ADJUSTMENTS);
+    assert(noah_profile_settings_v1_adjustment_index(NOAH_SETTING_BEHAVIORS_ENABLED) == NOAH_SETTINGS_ADJUSTMENTS);
+}
+// An adjustment's bytes over a domain: the adjusted scalars, read by the
+// literal layout, and every other byte the domain's own. The in-place edit
+// (each adjusted scalar's four bytes at its offset) produces the same domain,
+// in ascending splice order.
+static void test_adjusted_domain(void) {
+    static const uint32_t values[NOAH_SETTINGS_ADJUSTMENTS] = {800, 300, 0x07010101, 0x204060};
+    static uint8_t base[NOAH_SETTINGS_MAX_SIZE], adjusted[NOAH_SETTINGS_MAX_SIZE], in_place[NOAH_SETTINGS_MAX_SIZE];
+    static bool    replaced[NOAH_SETTINGS_MAX_SIZE];
+    for (uint8_t domain = 0; domain < 2; domain++) {
+        if (domain) named(NOAH_SETTINGS_NAME_MAX, 'z');
+        else defaults(); // empty names, as authored defaults may have
+        uint16_t size = length;
+        memcpy(base, bytes, size);
+        for (unsigned mask = 0; mask <= 15; mask++) {
+            for (uint16_t o = 0; o < size; o++) {
+                adjusted[o] = noah_profile_settings_v1_adjusted_byte(values, (uint8_t)mask, o, base[o]);
+                // High mask bits name no adjustment scalar.
+                assert(noah_profile_settings_v1_adjusted_byte(values, (uint8_t)(mask | 0xF0u), o, base[o]) == adjusted[o]);
+            }
+            memcpy(in_place, base, size);
+            memset(replaced, 0, size);
+            uint16_t previous = 0;
+            for (uint8_t i = 0; i < NOAH_SETTINGS_ADJUSTMENTS; i++) {
+                uint16_t at = (uint16_t)(8 + 4 * adjustment_scalars[i]);
+                assert(at > previous); // canonical splice order
+                previous = at;
+                if (!(mask & (1u << i))) continue;
+                uint32_t value = (uint32_t)adjusted[at] | (uint32_t)adjusted[at + 1] << 8 | (uint32_t)adjusted[at + 2] << 16 | (uint32_t)adjusted[at + 3] << 24;
+                assert(value == values[i]);
+                memset(replaced + at, 1, 4);
+                for (uint8_t j = 0; j < NOAH_SETTINGS_SCALAR_SIZE; j++)
+                    in_place[noah_profile_settings_v1_scalar_offset(noah_profile_settings_v1_adjustment_id(i)) + j] = noah_profile_settings_v1_scalar_byte(values[i], j);
+            }
+            for (uint16_t o = 0; o < size; o++)
+                if (!replaced[o]) assert(adjusted[o] == base[o]);
+            assert(memcmp(adjusted, in_place, size) == 0);
+            if (!mask) assert(memcmp(adjusted, base, size) == 0);
+            memcpy(bytes, adjusted, size);
+            assert(valid());
+        }
+    }
+}
 static void test_layer_records(void) {
     defaults();
     bytes[layer_record(15, NOAH_SETTINGS_LAYER_REFERENCE)] = 0;
@@ -365,6 +449,9 @@ static void test_publication(void) {
 int main(void) {
     noah_effective_settings_set_apply(noah_qmk_portable_apply);
     test_header_and_versions();
+    test_scalar_encoding();
+    test_adjustment_scalars();
+    test_adjusted_domain();
     test_scalars();
     for (uint8_t selected = 0; selected <= 3; selected++) {
         assert(noah_profile_setting_v1_valid(27, selected, 16));

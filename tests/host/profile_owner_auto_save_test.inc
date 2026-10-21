@@ -323,6 +323,7 @@ static void test_apply_waits_behind_a_queued_adjustment(void) {
     uint8_t settings[NOAH_SETTINGS_MIN_SIZE], expected[NOAH_SETTINGS_MIN_SIZE], frame[32];
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .insert = sizeof(settings), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     noah_profile_owner_working_status_t status;
+    uint32_t pending;
     uint32_t now = 1000u;
 
     erased_memory(&lm); erased_memory(&rm); auto_settings(settings);
@@ -339,8 +340,11 @@ static void test_apply_waits_behind_a_queued_adjustment(void) {
     assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && left.committed_descriptor.generation == 1u);
     scan_until_converged(&left, &right, &now);
 
-    // A DPI key queues 800. A new Apply is BUSY while it waits, and says why.
+    // A DPI key queues 800, which settings projection reads back until it
+    // publishes. A new Apply is BUSY while it waits, and says why.
     assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 800u));
+    assert(noah_profile_owner_pending_adjustment(&left, NOAH_SETTING_DEFAULT_DPI, &pending) && pending == 800u);
+    assert(!noah_profile_owner_pending_adjustment(&left, NOAH_SETTING_SNIPING_DPI, &pending));
     assert(noah_profile_owner_working_status(&left, &status) && status.adjustment_pending && status.edits_blocked);
     begin_frame(frame, 9u);
     assert(noah_profile_owner_receive(&left, frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
@@ -350,6 +354,7 @@ static void test_apply_waits_behind_a_queued_adjustment(void) {
     // come back as a save of its own.
     scan_until_converged(&left, &right, &now);
     assert(!left.auto_save.pending && left.working.active && active_scalar(&right, NOAH_SETTING_DEFAULT_DPI) == 800u);
+    assert(!noah_profile_owner_pending_adjustment(&left, NOAH_SETTING_DEFAULT_DPI, &pending));
     assert(noah_profile_owner_working_status(&left, &status) && !status.adjustment_pending);
     stage_valid_candidate_pair(&left, &right, 9u, &now);
     commit_valid_candidate_pair(&left, &right, 9u, 2u, &now);

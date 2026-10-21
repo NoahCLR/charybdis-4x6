@@ -120,10 +120,8 @@ uint16_t noah_profile_settings_defaults_length(void) {
     return length;
 }
 uint8_t noah_profile_settings_defaults_byte(uint16_t offset) {
-    if (offset >= NOAH_SETTINGS_SCALARS_OFFSET && offset < NOAH_SETTINGS_LAYER_RECORDS_OFFSET) {
-        uint8_t id = (offset - NOAH_SETTINGS_SCALARS_OFFSET) / 4u;
-        return noah_profile_settings_default(id) >> (8u * ((offset - NOAH_SETTINGS_SCALARS_OFFSET) % 4u));
-    }
+    uint8_t id, part;
+    if (noah_profile_settings_v1_scalar_at(offset, &id, &part)) return noah_profile_settings_v1_scalar_byte(noah_profile_settings_default(id), part);
     // No profile settings are live: the current version with the keymap's
     // layer, macro and custom-key names and shortcuts and no keyboard name.
     const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
