@@ -387,7 +387,7 @@
         },
         {
           "name": "save erase ahead in a quiet grant",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "erase_next", "rp2040_erase_sector"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_begin", "erase_next", "rp2040_erase_sector"]
         },
         {
           "name": "save write erases unerased flash first",

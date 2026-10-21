@@ -77,19 +77,26 @@ static __attribute__((noinline)) bool noah_qmk_durable_io_repeat(noah_qmk_durabl
     return grant->steps < NOAH_QMK_DURABLE_IO_STEPS_MAX && split_rpcs == grant->split_rpcs && !noah_profile_flash_store_grant_flashed(grant->flash) && noah_qmk_durable_io_store_busy(grant->context) && (uint32_t)(noah_profile_flash_store_now_us(grant->flash) - grant->started_us) < NOAH_QMK_DURABLE_IO_STEP_BUDGET_US;
 }
 
-__attribute__((noinline)) void noah_qmk_durable_io_matrix_scan(noah_qmk_durable_io_grant_t *grant) {
+// Flash pauses are measured, and erases ahead of a save run, per grant; the
+// matrix is inspected only when an erase is due (D-F29). Out of line, beside
+// the step rather than above it: inlined into the scan, the flash store's
+// grant start keeps a second pointer live across the scan's calls, which
+// widens the frame every reviewed storage path carries.
+static __attribute__((noinline)) bool noah_qmk_durable_io_begin(noah_qmk_durable_io_grant_t *grant) {
     noah_profile_flash_store_t *flash = grant->flash;
 
     if (!flash) {
-        return;
+        return false;
     }
-    // Flash pauses are measured, and erases ahead of a save run, per grant;
-    // the matrix is inspected only when an erase is due (D-F29).
     noah_profile_flash_store_grant_begin(flash, noah_profile_flash_store_erase_pending(flash) && noah_qmk_durable_io_keyboard_quiet(grant->context));
     grant->started_us = noah_profile_flash_store_now_us(flash);
     grant->split_rpcs = split_rpcs;
     grant->steps      = 0u;
-    if (!noah_qmk_durable_io_profile_step(grant, true)) {
+    return true;
+}
+
+__attribute__((noinline)) void noah_qmk_durable_io_matrix_scan(noah_qmk_durable_io_grant_t *grant) {
+    if (!noah_qmk_durable_io_begin(grant) || !noah_qmk_durable_io_profile_step(grant, true)) {
         return;
     }
     while (noah_qmk_durable_io_repeat(grant) && noah_qmk_durable_io_profile_step(grant, false)) {
