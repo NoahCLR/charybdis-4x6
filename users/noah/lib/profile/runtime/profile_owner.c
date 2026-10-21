@@ -171,7 +171,7 @@ static bool host_session_cleanup_needed(const noah_profile_owner_t *owner) {
 }
 
 static bool peer_can_supersede_host(const noah_profile_owner_t *owner, const noah_profile_split_descriptor_t *peer) {
-    return owner && peer && peer->readable && peer->has_profile && noah_profile_split_descriptor_valid(peer) && peer->schema_major == NOAH_PROFILE_STORE_SCHEMA_MAJOR && peer->schema_minor == NOAH_PROFILE_STORE_SCHEMA_MINOR && (peer->domain_mask & (uint8_t)~owner->compatibility.allowed_domain_mask) == 0u && peer->compiled_default_digest == owner->compiled.metadata.digest && peer->action_abi_digest == owner->compiled.metadata.action_abi_digest && owner->store.prepare_active && peer->generation >= owner->store.candidate.generation;
+    return owner && peer && peer->readable && peer->has_profile && noah_profile_split_descriptor_valid(peer) && peer->schema_major == NOAH_PROFILE_STORE_SCHEMA_MAJOR && peer->schema_minor == NOAH_PROFILE_STORE_SCHEMA_MINOR && (peer->domain_mask & (uint8_t)~owner->compatibility.allowed_domain_mask) == 0u && peer->compiled_default_digest == owner->compiled.metadata.digest && peer->action_abi_digest == owner->compiled.metadata.action_abi_digest && noah_profile_store_candidate(&owner->store) && peer->generation >= noah_profile_store_candidate(&owner->store)->generation;
 }
 
 static bool supersede_host_precommit(noah_profile_owner_t *owner) {
@@ -181,21 +181,6 @@ static bool supersede_host_precommit(noah_profile_owner_t *owner) {
         return false;
     }
     return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
-}
-
-static bool record_payload_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
-    if (!address) {
-        return false;
-    }
-    if (slot == NOAH_PROFILE_SLOT_A) {
-        *address = (NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
-        return true;
-    }
-    if (slot == NOAH_PROFILE_SLOT_B) {
-        *address = (NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
-        return true;
-    }
-    return false;
 }
 
 static bool local_descriptor(void *context, noah_profile_split_descriptor_t *descriptor) {
@@ -254,8 +239,8 @@ static bool local_read(void *context, const noah_profile_split_descriptor_t *des
     if (!owner || !descriptor || !bytes || length == 0u || !owner->store.io.read) {
         return false;
     }
-    record = owner->store.committed.slot == NOAH_PROFILE_SLOT_NONE ? NULL : &owner->store.committed;
-    if (!noah_profile_record_matches_descriptor(record, descriptor) || !record_payload_start(record->slot, &payload_start) || offset > record->payload_length || length > record->payload_length - offset) {
+    record = noah_profile_store_committed(&owner->store);
+    if (!noah_profile_record_matches_descriptor(record, descriptor) || !noah_profile_store_slot_payload_start(record->slot, &payload_start) || offset > record->payload_length || length > record->payload_length - offset) {
         return false;
     }
     return noah_profile_store_read_span(&owner->store, (payload_start + offset), bytes, length);
@@ -1219,7 +1204,9 @@ const noah_profile_store_t *noah_profile_owner_store(const noah_profile_owner_t 
 }
 
 const noah_profile_store_record_t *noah_profile_owner_committed(const noah_profile_owner_t *owner) {
-    return owner && owner->descriptor_readable && owner->committed_descriptor.has_profile && noah_profile_record_matches_descriptor(&owner->store.committed, &owner->committed_descriptor) ? &owner->store.committed : NULL;
+    const noah_profile_store_record_t *committed = owner ? noah_profile_store_committed(&owner->store) : NULL;
+
+    return owner && owner->descriptor_readable && noah_profile_record_matches_descriptor(committed, &owner->committed_descriptor) ? committed : NULL;
 }
 
 noah_profile_candidate_transaction_t *noah_profile_owner_host_transaction(noah_profile_owner_t *owner) {
@@ -1265,7 +1252,7 @@ bool noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_o
         status->committed     = owner->committed_descriptor;
         status->has_committed = true;
     }
-    status->stored_earlier_format = !committed && owner->store.earlier_format;
+    status->stored_earlier_format = !committed && noah_profile_store_earlier_format(&owner->store);
     if (owner->split_initialized && noah_profile_split_authority_status(&owner->reconciler.authority, &authority)) {
         status->authority_state  = authority.state;
         status->peer             = authority.peer;
@@ -1446,9 +1433,11 @@ static void finish_save(noah_profile_owner_t *owner, noah_profile_working_result
     noah_profile_candidate_store_backend_hold_candidates_to(candidate_backend(owner), &owner->candidate_runtime);
     owner->save.last_automatic = owner->save.automatic;
     if (owner->save.automatic && result == NOAH_PROFILE_WORKING_OK) {
+        const noah_profile_store_record_t *saved = noah_profile_store_committed(&owner->store);
+
         owner->save.keyboard_saves++;
-        owner->save.keyboard_revision = owner->working.revision;
-        owner->save.keyboard_generation = owner->store.committed.generation;
+        owner->save.keyboard_revision   = owner->working.revision;
+        owner->save.keyboard_generation = saved ? saved->generation : 0u;
     }
     owner->save.automatic = false;
     owner->save.last_transaction_id = owner->save.transaction_id;

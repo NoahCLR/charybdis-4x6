@@ -58,12 +58,12 @@ static noah_profile_peer_store_result_t set_terminal(noah_profile_peer_store_bac
 // admission was still held, so every later copy met "prepare in progress"
 // until the half was power cycled.
 static noah_profile_peer_store_result_t abort_rejected(noah_profile_peer_store_backend_t *peer, noah_profile_peer_store_result_t result) {
-    noah_profile_store_t *store = peer->backend ? peer->backend->store : NULL;
+    const noah_profile_store_t *store = peer->backend ? peer->backend->store : NULL;
 
-    if (store && store->prepare_active && peer->interface.abort(peer->interface.context) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
+    if (noah_profile_store_prepare_active(store) && peer->interface.abort(peer->interface.context) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
         result = NOAH_PROFILE_PEER_STORE_STORAGE_ERROR;
     }
-    if (store && !store->prepare_active) {
+    if (store && !noah_profile_store_prepare_active(store)) {
         (void)noah_profile_candidate_store_backend_release_admission(peer->backend, NOAH_PROFILE_STORAGE_ADMISSION_PEER);
     }
     return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, result);
@@ -137,8 +137,9 @@ void noah_profile_peer_store_backend_init(noah_profile_peer_store_backend_t *pee
 }
 
 noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin(noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *descriptor) {
-    noah_profile_store_t          *store;
-    noah_profile_store_candidate_t candidate;
+    const noah_profile_store_t        *store;
+    const noah_profile_store_record_t *committed;
+    noah_profile_store_candidate_t     candidate;
     noah_profile_store_result_t    store_result;
 
     if (!peer || !peer->backend || !peer->backend->store || !descriptor) {
@@ -159,8 +160,9 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin(noah_prof
     if (descriptor->schema_major != store->compatibility.schema_major || descriptor->schema_minor != store->compatibility.schema_minor || descriptor->compiled_default_digest != peer->backend->compiled_default_digest || descriptor->compiled_default_digest != store->compatibility.compiled_default_digest || descriptor->action_abi_digest != store->compatibility.action_abi_digest || descriptor->action_abi_digest != peer->backend->compatibility.action_abi_digest || descriptor->payload_length > peer->backend->compatibility.max_blob_size || (descriptor->domain_mask & (uint8_t)~peer->backend->compatibility.allowed_domain_mask) != 0u || (descriptor->domain_mask & peer->backend->compatibility.required_domain_mask) != peer->backend->compatibility.required_domain_mask) {
         return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, NOAH_PROFILE_PEER_STORE_INCOMPATIBLE);
     }
-    if (store->committed.slot != NOAH_PROFILE_SLOT_NONE) {
-        if (noah_profile_record_matches_descriptor(&store->committed, descriptor)) {
+    committed = noah_profile_store_committed(store);
+    if (committed) {
+        if (noah_profile_record_matches_descriptor(committed, descriptor)) {
             if (peer->backend->validation_complete && peer->backend->committed_available && noah_profile_record_matches_descriptor(&peer->backend->committed_record, descriptor) && validated_profile_matches_descriptor(&peer->backend->validated_profile, descriptor)) {
                 peer->descriptor = *descriptor;
                 peer->metadata.store_format_version = NOAH_PROFILE_STORE_FORMAT_VERSION;
@@ -169,11 +171,11 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin(noah_prof
             }
             return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, NOAH_PROFILE_PEER_STORE_BUSY);
         }
-        if (descriptor->generation < store->committed.generation) {
+        if (descriptor->generation < committed->generation) {
             return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, NOAH_PROFILE_PEER_STORE_STALE);
         }
-        if (descriptor->generation == store->committed.generation) {
-            return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, record_same_tuple(&store->committed, descriptor) ? NOAH_PROFILE_PEER_STORE_CORRUPT : NOAH_PROFILE_PEER_STORE_CONFLICT);
+        if (descriptor->generation == committed->generation) {
+            return set_terminal(peer, NOAH_PROFILE_PEER_STORE_REJECTED, record_same_tuple(committed, descriptor) ? NOAH_PROFILE_PEER_STORE_CORRUPT : NOAH_PROFILE_PEER_STORE_CONFLICT);
         }
     }
 
