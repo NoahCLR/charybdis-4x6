@@ -1033,3 +1033,79 @@ encoding the busy frame 616, of 768. It passes every path on both halves.
 These are reviewed-path estimates for the named paths only, not a global or
 interrupt-stack maximum; stack high-water on both halves remains keyboard
 evidence.
+
+## One effect plan per transition
+
+The key runtime's transitions each hold one effect plan of 16 effects
+(196 bytes, `key_runtime_core_effect_plan_t`) where they held two: the
+streaming transitions kept a core plan beside their transition plan only to
+reach its sink, and the handled press and release copied a buffered core plan
+into a transition plan. The reducer now plans straight into the caller's plan;
+a streaming plan's push projects it through `key_runtime_transition_drain_plan()`
+when it is full, a direct call where the sink was a declared indirect edge.
+The plans sit in frames of their own (`noinline`), so no path carries one it
+does not use: the before-release preflight's is no longer inlined into
+`process_record_user`, nor the scan's into `matrix_scan`, and the handled
+press's and release's planning returns before their plan is projected.
+Instrumented pair (`NOAH_RESOURCE_CHECKS=yes` with the vault's `verify`, pinned
+GCC 15.2.0 image, BK `d280a4471e`); both halves give the same figure for every
+path. Against the previous record:
+
+| | This change | Before |
+| --- | ---: | ---: |
+| SRAM0–3 `.data` | 4,412 bytes | 4,412 |
+| SRAM0–3 `.bss` | 198,128 bytes | 198,136 |
+| SRAM0–3 `.data + .bss` | 202,540 bytes | 202,548 |
+| Below the 203,776-byte tripwire | 1,236 bytes | 1,228 |
+| Fixed linked prefix | 202,552 bytes | 202,560 |
+| Linker/core-memory span at boot | 59,592 bytes | 59,584 |
+
+The frames that carried the plans: `process_record_user` 496 → 96 bytes,
+`noah_key_runtime_settle_pending_fallback_hold` 400 → 216,
+`key_runtime_preflight_record` 440 → the press preflight's
+`key_runtime_preflight_settle_before_press` 264, the release preflight's
+`key_runtime_preflight_settle_before_release` 248 (out of
+`process_record_user`), `noah_key_runtime_scan` 504 → 40 with
+`noah_key_runtime_scan_core` 320, `noah_key_runtime_settle_layer_taps_before_press`
+456 → 72 with its plan's frame 216, and the handled press and release 232 → 216
+and 232, their planning helpers 264 and 256 → 80 and 88.
+
+The ordinary manifest's seventeen failing paths, against the 1,920-byte policy:
+
+| Path | Before | This change |
+| --- | ---: | ---: |
+| Press preflight, missed-scan planning auto-drained | 2,824 | 2,032 (112 over) |
+| Handled press, fallback settlement preempting a held pointing mode | 2,584 | 2,008 (88 over) |
+| Press preflight, its plan projected | 2,528 | 1,792 |
+| Handled press, the fallback settlement's own plan auto-drained | 2,456 | 1,832 |
+| Release preflight, missed-scan planning auto-drained | 2,368 | 1,992 (72 over) |
+| Handled press projection with fallback settlement | 2,312 | 1,736 |
+| Handled release projection with fallback settlement | 2,312 | 1,752 |
+| Handled release, bounded deferred fallback settlement | 2,168 | 1,592 |
+| Held-back record replay into handled press projection | 2,144 | 1,568 |
+| Pointing-mode press stage, a mode's tap | 2,120 | 1,544 |
+| Release preflight, its plan projected | 2,072 | 1,752 |
+| Matrix scan, active-scan planning auto-drained | 2,048 | 1,680 |
+| Layer-tap settlement before a press, auto-drained | 2,016 | 1,624 |
+| Pointing-mode release stage, a mode's tap | 2,016 | 1,440 |
+| Direct action stage | 2,016 | 1,440 |
+| Handled active release decision | 1,976 | 1,408 |
+| Handled pending multi-tap release decision | 1,960 | 1,392 |
+
+Fourteen now pass; no other path grew past the policy, and the ordinary
+manifest's largest passing path is the handled press with its fallback
+settlement's plan auto-drained, 1,832. Three still fail by budget. Each holds
+two plans by design: the plan being projected and, beneath an output it
+projects, the fallback settlement's own plan (216 bytes), which must hold its
+effects until its planning loop ends. The rest of each chain is the reducer's
+scan planning under an auto-drain (some 250 bytes) or the pointing mode's
+release beneath the preemption (some 640), not plans. Against the physical
+2,560-byte process stack the worst, press preflight auto-drained, is 528 bytes
+inside, at least 464 with an interrupt's 64. The preemption, reachable as far
+as the report build (it composes 8 bytes of a branch a release never takes),
+is 2,000 bytes: 560 inside, 496 with an interrupt, and sending the report
+takes at least 72 more. The owner
+manifest passes every path on both halves; its largest stays peer large chunk
+write at 1,912 bytes. These are reviewed-path estimates for the named paths
+only, not a global or interrupt-stack maximum; stack high-water on both halves
+remains keyboard evidence.
