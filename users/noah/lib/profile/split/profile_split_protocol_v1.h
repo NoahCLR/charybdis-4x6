@@ -111,6 +111,11 @@ typedef struct {
     uint32_t                        payload_length;
     uint8_t                         chunk_length;
     uint8_t                         chunk[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX];
+    // METADATA only (descriptor flag bit 5): the half that sent it holds no
+    // prepared push. A master sets it in every poll it sends without one; a
+    // reply and every other kind leave it clear, and clear claims nothing.
+    // It takes the byte the chunk leaves free, so a frame keeps its size.
+    bool                            no_prepared_push;
     // PAYLOAD_REUSE only: fill `reuse_length` bytes at `offset` from the
     // source's bytes at `reuse_source_offset`.
     uint32_t                        reuse_length;

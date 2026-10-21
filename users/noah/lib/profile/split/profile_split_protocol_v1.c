@@ -56,6 +56,10 @@ enum {
     WIRE_FLAG_ORIGIN_HALF      = 1u << 3,
     WIRE_FLAG_PROFILE_OVERRIDE = 1u << 4,
     WIRE_DESCRIPTOR_FLAGS      = WIRE_FLAG_HAS_PROFILE | WIRE_FLAG_READABLE | WIRE_FLAG_ORIGIN_HALF | WIRE_FLAG_PROFILE_OVERRIDE,
+    // Not the descriptor's: the METADATA sender holds no prepared push. Set,
+    // it is refused by a build that does not know it, like any reserved bit,
+    // and clear means what such a build means; so no framing version moved.
+    WIRE_FLAG_NO_PREPARED_PUSH = 1u << 5,
 };
 
 static uint8_t crc8(const uint8_t *bytes, size_t length) {
@@ -166,6 +170,9 @@ static bool frame_shape_valid(const noah_profile_split_v1_frame_t *frame) {
     if (frame->kind != NOAH_PROFILE_SPLIT_V1_ACK && (frame->busy_reason || frame->busy_store_state || frame->busy_owner || frame->busy_admission)) {
         return false;
     }
+    if (frame->kind != NOAH_PROFILE_SPLIT_V1_METADATA && frame->no_prepared_push) {
+        return false;
+    }
     if (descriptor_kind(frame->kind)) {
         if (!noah_profile_split_descriptor_valid(&frame->descriptor) || frame->generation != 0u || frame->payload_digest != 0u || frame->offset != 0u || frame->payload_length != 0u || frame->chunk_length != 0u || !bytes_zero(frame->chunk, sizeof(frame->chunk))) {
             return false;
@@ -199,7 +206,7 @@ uint8_t noah_profile_split_v1_frame_encode(const noah_profile_split_v1_frame_t *
     out[WIRE_KIND]    = (uint8_t)frame->kind;
     out[WIRE_STATUS]  = (uint8_t)frame->status;
     if (descriptor_kind(frame->kind)) {
-        out[WIRE_FLAGS]        = (frame->descriptor.has_profile ? WIRE_FLAG_HAS_PROFILE : 0u) | (frame->descriptor.readable ? WIRE_FLAG_READABLE : 0u) | (frame->descriptor.origin_half ? WIRE_FLAG_ORIGIN_HALF : 0u) | (frame->descriptor.profile_flags ? WIRE_FLAG_PROFILE_OVERRIDE : 0u);
+        out[WIRE_FLAGS]        = (frame->descriptor.has_profile ? WIRE_FLAG_HAS_PROFILE : 0u) | (frame->descriptor.readable ? WIRE_FLAG_READABLE : 0u) | (frame->descriptor.origin_half ? WIRE_FLAG_ORIGIN_HALF : 0u) | (frame->descriptor.profile_flags ? WIRE_FLAG_PROFILE_OVERRIDE : 0u) | (frame->no_prepared_push ? WIRE_FLAG_NO_PREPARED_PUSH : 0u);
         out[WIRE_SCHEMA_MAJOR] = frame->descriptor.schema_major;
         out[WIRE_SCHEMA_MINOR] = frame->descriptor.schema_minor;
         write_u32(&out[WIRE_PAYLOAD_LENGTH], frame->descriptor.payload_length);
@@ -253,10 +260,11 @@ bool noah_profile_split_v1_frame_decode(const uint8_t *wire, uint8_t length, noa
     decoded.kind   = (noah_profile_split_v1_kind_t)wire[WIRE_KIND];
     decoded.status = (noah_profile_split_v1_status_t)wire[WIRE_STATUS];
     if (descriptor_kind(decoded.kind)) {
-        if ((wire[WIRE_FLAGS] & (uint8_t)~WIRE_DESCRIPTOR_FLAGS) != 0u) {
+        if ((wire[WIRE_FLAGS] & (uint8_t)~(WIRE_DESCRIPTOR_FLAGS | WIRE_FLAG_NO_PREPARED_PUSH)) != 0u) {
             return false;
         }
-        decoded.descriptor = (noah_profile_split_descriptor_t){
+        decoded.no_prepared_push = (wire[WIRE_FLAGS] & WIRE_FLAG_NO_PREPARED_PUSH) != 0u;
+        decoded.descriptor       = (noah_profile_split_descriptor_t){
             .generation              = read_u32(&wire[WIRE_GENERATION]),
             .payload_crc32           = read_u32(&wire[WIRE_PAYLOAD_CRC32]),
             .payload_digest          = read_u32(&wire[WIRE_PAYLOAD_DIGEST]),
@@ -344,3 +352,4 @@ _Static_assert(NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE <= NOAH_PROFILE_SPLIT_V1_F
 _Static_assert(NOAH_PROFILE_SPLIT_V1_CHUNK_MAX == 106u, "pushed and pulled chunks share one 128-byte frame");
 _Static_assert(WIRE_ACTION_ABI + 4u + 1u == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE, "a descriptor frame fills one 32-byte frame exactly");
 _Static_assert(WIRE_REUSE_RESERVED + 2u == NOAH_PROFILE_SPLIT_V1_REUSE_FRAME_SIZE, "a reuse frame is its fields, one reserved byte and the CRC");
+_Static_assert(offsetof(noah_profile_split_v1_frame_t, no_prepared_push) + 1u == offsetof(noah_profile_split_v1_frame_t, reuse_length), "the METADATA flag fills the chunk's alignment byte: frames on the scan's stack keep their size");

@@ -8,6 +8,7 @@
 
 #include "../split/profile_split_protocol_v1.h"
 #include "profile_candidate_store_backend.h"
+#include "profile_record_identity.h"
 
 enum {
     // Firmware-state regression policy, not an RP2040 SRAM-capacity claim.
@@ -96,3 +97,56 @@ noah_profile_peer_store_state_t          noah_profile_peer_store_backend_state(c
 noah_profile_peer_store_result_t         noah_profile_peer_store_backend_result(const noah_profile_peer_store_backend_t *peer);
 uint32_t                                 noah_profile_peer_store_backend_next_offset(const noah_profile_peer_store_backend_t *peer);
 const noah_profile_candidate_v1_error_t *noah_profile_peer_store_backend_validation_error(const noah_profile_peer_store_backend_t *peer);
+
+// The peer store answers its own state questions; callers ask these rather
+// than spell out sets of states. Static inline: the compiler may keep one out of line as a small leaf of
+// its own; the reviewed stack paths are measured as built.
+
+// An admitted copy is not finished: it is receiving, being validated,
+// prepared, being made durable or committed, or waits for a boot scan to
+// say whether its commit landed. Until it ends the store answers only for it.
+static inline bool noah_profile_peer_store_backend_holds_copy(const noah_profile_peer_store_backend_t *peer) {
+    noah_profile_peer_store_state_t state = noah_profile_peer_store_backend_state(peer);
+
+    return state == NOAH_PROFILE_PEER_STORE_RECEIVING || state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_PREPARING || state == NOAH_PROFILE_PEER_STORE_PREPARED || state == NOAH_PROFILE_PEER_STORE_COMMITTING || state == NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED;
+}
+
+// A bounded step is due: the store validates the copy, makes its prepared
+// marker durable or commits it, one step per call to step().
+static inline bool noah_profile_peer_store_backend_working(const noah_profile_peer_store_backend_t *peer) {
+    noah_profile_peer_store_state_t state = noah_profile_peer_store_backend_state(peer);
+
+    return state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_PREPARING || state == NOAH_PROFILE_PEER_STORE_COMMITTING;
+}
+
+// The copy can still be abandoned with nothing durable: abort() ends it.
+static inline bool noah_profile_peer_store_backend_abortable(const noah_profile_peer_store_backend_t *peer) {
+    noah_profile_peer_store_state_t state = noah_profile_peer_store_backend_state(peer);
+
+    return state == NOAH_PROFILE_PEER_STORE_RECEIVING || state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_PREPARED;
+}
+
+// The copy is committed and this half's storage is still held for it, so it
+// waits to be published. The store stays COMMITTED after publication (it
+// answers a sender's retry of the finished copy), so its state alone is no
+// sign of a copy to publish: a later Apply or Save holds the storage then.
+static inline bool noah_profile_peer_store_backend_awaiting_activation(const noah_profile_peer_store_backend_t *peer) {
+    return peer && noah_profile_peer_store_backend_state(peer) == NOAH_PROFILE_PEER_STORE_COMMITTED && noah_profile_candidate_store_backend_admission_owner(peer->backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER;
+}
+
+// The copy the store last admitted is this one, by generation, digest and
+// length. Whether the store still holds it is its state's question.
+static inline bool noah_profile_peer_store_backend_copy_matches(const noah_profile_peer_store_backend_t *peer, uint32_t generation, uint32_t payload_digest, uint32_t payload_length) {
+    return peer && peer->descriptor.readable && peer->descriptor.has_profile && peer->descriptor.generation == generation && peer->descriptor.payload_digest == payload_digest && peer->descriptor.payload_length == payload_length;
+}
+
+// A prepared copy its sender has abandoned. `sender_saved` is the saved
+// profile of a sender that holds no prepared push; if it is readable and is
+// not the copy, the sender restarted before its marker or released the push
+// without an acknowledged ABORT, and nothing will ever end the copy, so the
+// caller releases it (D-F34). A sender whose saved profile is the copy
+// commits it as repair. Nothing else abandons a prepared copy: not time, nor
+// silence.
+static inline bool noah_profile_peer_store_backend_prepared_copy_abandoned(const noah_profile_peer_store_backend_t *peer, const noah_profile_split_descriptor_t *sender_saved) {
+    return peer && noah_profile_peer_store_backend_state(peer) == NOAH_PROFILE_PEER_STORE_PREPARED && sender_saved && sender_saved->readable && !noah_profile_descriptor_equal(sender_saved, &peer->descriptor);
+}

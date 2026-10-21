@@ -6,6 +6,7 @@
 
 #include "users/noah/lib/profile/split/profile_split_reconciler.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
+#include "profile_store_committed_fixture.h"
 
 enum {
     ACTION_ABI_DIGEST   = UINT32_C(0x11223344),
@@ -57,6 +58,9 @@ typedef struct {
     uint32_t garble_request_exchange;
     // PAYLOAD_REQUEST frames sent: the cost of pulling the peer's profile.
     uint32_t payload_requests;
+    // METADATA polls sent, and those that said the sender holds no push.
+    uint32_t metadata_requests;
+    uint32_t no_push_claims;
     uint8_t                       previous_response[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
     bool                          connected;
     bool                          corrupt_next_response;
@@ -71,6 +75,8 @@ struct half {
     noah_profile_split_reconciler_t        reconciler;
     link_t                                 link;
     uint32_t                               compiled_digest;
+    // The owner cannot say what it has saved yet, as while it boots.
+    bool                                   descriptor_unreadable;
 };
 
 static uint32_t always_safe(void *context) {
@@ -150,13 +156,12 @@ void noah_profile_split_test_local_validation(void) { local_validations++; }
 static bool local_descriptor(void *context, noah_profile_split_descriptor_t *descriptor) {
     half_t *half = context;
 
-    if (!half || !descriptor) {
+    if (!half || !descriptor || half->descriptor_unreadable) {
         return false;
     }
     *descriptor = compiled_descriptor(half);
-    if (half->store.committed.slot != NOAH_PROFILE_SLOT_NONE) {
-        const noah_profile_store_record_t *record = &half->store.committed;
-
+    const noah_profile_store_record_t *record = noah_profile_store_committed(&half->store);
+    if (record) {
         descriptor->generation              = record->generation;
         descriptor->payload_crc32           = record->payload_crc32;
         descriptor->payload_digest          = record->payload_digest;
@@ -174,17 +179,11 @@ static bool local_descriptor(void *context, noah_profile_split_descriptor_t *des
 }
 
 static bool local_read(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, uint8_t *bytes, uint8_t length) {
-    half_t                        *half = context;
-    noah_profile_storage_address_t base;
+    half_t                            *half   = context;
+    const noah_profile_store_record_t *record = half ? noah_profile_store_committed(&half->store) : NULL;
+    noah_profile_storage_address_t     base;
 
-    if (!half || !descriptor || !bytes || length == 0u || (uint32_t)offset + length > descriptor->payload_length || half->store.committed.slot == NOAH_PROFILE_SLOT_NONE || half->store.committed.generation != descriptor->generation || half->store.committed.payload_digest != descriptor->payload_digest) {
-        return false;
-    }
-    if (half->store.committed.slot == NOAH_PROFILE_SLOT_A) {
-        base = NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE;
-    } else if (half->store.committed.slot == NOAH_PROFILE_SLOT_B) {
-        base = NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE;
-    } else {
+    if (!record || !descriptor || !bytes || length == 0u || (uint32_t)offset + length > descriptor->payload_length || record->generation != descriptor->generation || record->payload_digest != descriptor->payload_digest || !noah_profile_store_slot_payload_start(record->slot, &base)) {
         return false;
     }
     // A chunk is wider than one store read, so it is read in pieces, as the
@@ -226,6 +225,10 @@ static bool exchange(void *context, const uint8_t *request, uint8_t request_leng
     // The requester sizes the reply buffer from its own request.
     noah_profile_split_v1_frame_t sent;
     assert(noah_profile_split_v1_frame_decode(request, request_length, &sent) && noah_profile_split_v1_reply_capacity(&sent) == response_length);
+    if (sent.kind == NOAH_PROFILE_SPLIT_V1_METADATA) {
+        link->metadata_requests++;
+        link->no_push_claims += sent.no_prepared_push;
+    }
     if (link->drop_before_delivery_exchange == link->exchanges) {
         link->drop_before_delivery_exchange = 0u;
         return false;
@@ -389,10 +392,9 @@ static void run_pair_until_converged(half_t *left, half_t *right, bool left_mast
 }
 
 static void assert_records_match(const half_t *left, const half_t *right) {
-    const noah_profile_store_record_t *a = &left->store.committed;
-    const noah_profile_store_record_t *b = &right->store.committed;
+    const noah_profile_store_record_t *a = committed_of(&left->store);
+    const noah_profile_store_record_t *b = committed_of(&right->store);
 
-    assert(a->slot != NOAH_PROFILE_SLOT_NONE && b->slot != NOAH_PROFILE_SLOT_NONE);
     assert(a->generation == b->generation);
     assert(a->origin_half == b->origin_half);
     assert(a->flags == b->flags);
@@ -412,8 +414,8 @@ static void test_compiled_convergence(void) {
     half_storage_init(&right);
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
-    assert(right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&left.store));
+    assert(!noah_profile_store_committed(&right.store));
 }
 
 static void test_newer_master_pushes_exact_record(void) {
@@ -426,7 +428,7 @@ static void test_newer_master_pushes_exact_record(void) {
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
     assert_records_match(&left, &right);
-    assert(left.store.committed.generation == 5u && left.store.committed.origin_half == 1u);
+    assert(committed_generation(&left.store) == 5u && committed_of(&left.store)->origin_half == 1u);
 }
 
 static void test_newer_slave_is_pulled_without_role_authority(void) {
@@ -439,7 +441,7 @@ static void test_newer_slave_is_pulled_without_role_authority(void) {
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
     assert_records_match(&left, &right);
-    assert(right.store.committed.generation == 7u && right.store.committed.origin_half == 0u);
+    assert(committed_generation(&right.store) == 7u && committed_of(&right.store)->origin_half == 0u);
 }
 
 static void test_disconnect_invalidates_then_reconnects(void) {
@@ -495,7 +497,7 @@ static void test_lost_reply_after_admission_is_idempotent(void) {
     right.link.drop_after_delivery_exchange = 2u;
     run_pair_until_converged(&left, &right, false);
     assert_records_match(&left, &right);
-    assert(left.store.committed.generation == 6u && left.store.committed.origin_half == 1u);
+    assert(committed_generation(&left.store) == 6u && committed_of(&left.store)->origin_half == 1u);
 }
 
 static void test_role_change_restarts_and_preserves_physical_origin(void) {
@@ -513,7 +515,7 @@ static void test_role_change_restarts_and_preserves_physical_origin(void) {
     }
     run_pair_until_converged(&left, &right, true);
     assert_records_match(&left, &right);
-    assert(right.store.committed.origin_half == 0u);
+    assert(committed_of(&right.store)->origin_half == 0u);
 }
 
 static void test_concurrent_commit_stops_without_overwrite(void) {
@@ -598,7 +600,7 @@ static void test_max_generation_transfers_without_local_increment(void) {
     pair_init(&left, &right);
     run_pair_until_converged(&left, &right, false);
     assert_records_match(&left, &right);
-    assert(right.store.committed.generation == UINT32_MAX);
+    assert(committed_generation(&right.store) == UINT32_MAX);
 }
 
 static void test_convergence_only_pushes_host_record_without_importing(void) {
@@ -636,7 +638,7 @@ static void test_convergence_only_refuses_newer_peer_import(void) {
         (void)noah_profile_split_reconciler_scan_mode(&right.reconciler, true, now, NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY);
         (void)noah_profile_split_reconciler_scan(&left.reconciler, false, now);
     }
-    assert(right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&right.store));
     assert(right.memory.writes == right_writes);
     assert(noah_profile_candidate_store_backend_admission_owner(&right.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
@@ -751,15 +753,15 @@ static void test_prepared_push_pauses_before_commit_then_authorizes(void) {
 
     run_prepared_push_until_ready(&right, &left, &descriptor, &source);
     assert(source.reads == 1u);
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&left.store));
     assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED);
-    assert(left.store.prepared_durable);
+    assert(noah_profile_store_durably_prepared(&left.store));
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
 
     exchanges_at_barrier = right.link.exchanges;
     assert(!noah_profile_split_reconciler_scan(&right.reconciler, true, 20000u));
     assert(right.link.exchanges == exchanges_at_barrier);
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&left.store));
 
     {
         noah_profile_split_descriptor_t wrong = descriptor;
@@ -769,15 +771,15 @@ static void test_prepared_push_pauses_before_commit_then_authorizes(void) {
     assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
     assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
 
-    for (uint32_t scan = 0u; scan < MAX_SCANS && left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; scan++) {
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !noah_profile_store_committed(&left.store); scan++) {
         uint32_t now = 21000u + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
 
         assert_one_scan_budget(&right, true, now);
         assert_one_scan_budget(&left, false, now);
     }
-    assert(left.store.committed.slot != NOAH_PROFILE_SLOT_NONE);
-    assert(left.store.committed.generation == descriptor.generation);
-    assert(left.store.committed.payload_digest == descriptor.payload_digest);
+    assert(noah_profile_store_committed(&left.store));
+    assert(committed_generation(&left.store) == descriptor.generation);
+    assert(committed_of(&left.store)->payload_digest == descriptor.payload_digest);
 }
 
 // After the commit is authorized, a replayed reply must still end with the
@@ -805,14 +807,14 @@ static void test_authorized_commit_survives_one_replayed_reply(void) {
 
             assert_one_scan_budget(&right, true, now);
             assert_one_scan_budget(&left, false, now);
-            done = left.store.committed.slot != NOAH_PROFILE_SLOT_NONE && !right.reconciler.prepared_push_active;
+            done = noah_profile_store_committed(&left.store) && !right.reconciler.prepared_push_active;
         }
         if (!done) {
             fprintf(stderr, "authorized commit wedged: replayed reply at exchange %u; sender state %u, status %u, push active %u, peer committed %u\n", (unsigned)fault, (unsigned)right.reconciler.state,
-                    (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.prepared_push_active, (unsigned)(left.store.committed.slot != NOAH_PROFILE_SLOT_NONE));
+                    (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.prepared_push_active, (unsigned)(noah_profile_store_committed(&left.store) != NULL));
             assert(!"one replayed reply wedged the authorized commit");
         }
-        assert(left.store.committed.generation == descriptor.generation);
+        assert(committed_generation(&left.store) == descriptor.generation);
         if (right.link.replay_previous_response_exchange != 0u) {
             assert(fault > 2u);
             return;
@@ -843,7 +845,7 @@ static void test_prepared_push_cancel_aborts_peer_lease(void) {
     }
     assert(!right.reconciler.prepared_push_active);
     assert(noah_profile_split_reconciler_prepared_push_cancel(&right.reconciler, &descriptor));
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&left.store));
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
 
@@ -896,7 +898,7 @@ static void test_prepared_abort_is_bounded_when_peer_goes_silent(void) {
     // Released locally, but the peer never confirmed: it may still hold the
     // provisional lease, so the sender remembers and says so.
     assert(peer_cleanup_pending(&right));
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&left.store));
     next = committed_descriptor(&right, 24u, 1u);
     assert(!noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &next, &source, staged_read));
 
@@ -911,7 +913,7 @@ static void test_prepared_abort_is_bounded_when_peer_goes_silent(void) {
     assert(!peer_cleanup_pending(&right));
     assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_IDLE);
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&left.store));
     run_pair_until_converged(&left, &right, false);
     assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &next, &source, staged_read));
 }
@@ -963,7 +965,7 @@ static void test_prepared_abort_is_bounded_when_peer_stays_busy(void) {
     assert(right.link.exchanges > exchanges);
     assert(right.link.exchanges - exchanges <= 2u * (5000u / NOAH_PROFILE_SPLIT_RETRY_MAX_MS) + 2u);
     assert(left.memory.writes + right.memory.writes == writes);
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&left.store));
 }
 
 static void test_maximum_candidate_resolves_within_owner_no_progress_window(void) {
@@ -1075,17 +1077,17 @@ static void test_maximum_profile_prepares_and_commits_on_the_peer(void) {
     assert(noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL));
     fprintf(stderr, "maximum push: longest gap %u ms = %u scans; total %u ms\n", (unsigned)longest_gap, (unsigned)(longest_gap / NOAH_PROFILE_SPLIT_ADMISSION_RETRY_MS), (unsigned)(now - start_at));
     assert(longest_gap < MAX_PREPARE_TIME_MS);
-    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED && left.store.prepared_durable);
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED && noah_profile_store_durably_prepared(&left.store));
+    assert(!noah_profile_store_committed(&left.store));
 
     assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
-    for (uint32_t scan = 0u; scan < MAX_SCANS && left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; scan++) {
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !noah_profile_store_committed(&left.store); scan++) {
         now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
         assert_one_scan_budget(&right, true, now);
         assert_one_scan_budget(&left, false, now);
     }
-    assert(left.store.committed.generation == descriptor.generation);
-    assert(left.store.committed.payload_length == maximum_profile_length && left.store.committed.payload_digest == descriptor.payload_digest);
+    assert(committed_generation(&left.store) == descriptor.generation);
+    assert(committed_of(&left.store)->payload_length == maximum_profile_length && committed_of(&left.store)->payload_digest == descriptor.payload_digest);
 }
 
 // Both halves run on the maximum profile as their active one; right copies
@@ -1130,10 +1132,10 @@ static void reuse_pair_finish_and_commit(reuse_pair_t *pair) {
     }
     assert(noah_profile_split_reconciler_prepared_push_ready(&pair->right.reconciler, NULL));
     assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&pair->right.reconciler, &pair->descriptor));
-    for (uint32_t scan = 0u; scan < MAX_SCANS && pair->left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; scan++) {
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !noah_profile_store_committed(&pair->left.store); scan++) {
         reuse_pair_scan(pair);
     }
-    assert(pair->left.store.committed.generation == pair->descriptor.generation && pair->left.store.committed.payload_digest == pair->descriptor.payload_digest);
+    assert(committed_generation(&pair->left.store) == pair->descriptor.generation && committed_of(&pair->left.store)->payload_digest == pair->descriptor.payload_digest);
 }
 
 static void reuse_pair_prepare_and_commit(reuse_pair_t *pair) {
@@ -1201,7 +1203,7 @@ static void test_lost_exchanges_during_reuse_resume_the_same_copy(void) {
             reuse_pair_scan(&pair);
         }
         assert(pair.left.reconciler.incoming_reuse_active && pair.right.reconciler.outbound_reuse_pending);
-        assert(pair.left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+        assert(!noah_profile_store_committed(&pair.left.store));
         uint32_t drop = pair.right.link.exchanges + 1u;
         if (after) {
             pair.right.link.drop_after_delivery_exchange = drop;
@@ -1521,7 +1523,7 @@ static void run_stale_receive_lease(bool same_length) {
     }
     if (!done) fprintf(stderr, "stale lease (%s length): receiver store %u owner %u | sender state %u status %u retries %u\n", same_length ? "same" : "shorter", (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)left.reconciler.transfer_owner, (unsigned)right.reconciler.state, (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.retry_count);
     assert(done && "the stale lease held the next copy off");
-    assert(noah_profile_peer_store_backend_state(&left.peer_store) != NOAH_PROFILE_PEER_STORE_RECEIVING || left.peer_store.descriptor.generation == next.generation);
+    assert(noah_profile_peer_store_backend_state(&left.peer_store) != NOAH_PROFILE_PEER_STORE_RECEIVING || noah_profile_peer_store_backend_copy_matches(&left.peer_store, next.generation, next.payload_digest, next.payload_length));
 }
 
 // A receiver left holding a half-received lease, here because the sender
@@ -1531,6 +1533,258 @@ static void run_stale_receive_lease(bool same_length) {
 static void test_stale_receive_lease_expires_while_the_link_stays_busy(void) {
     run_stale_receive_lease(false);
     run_stale_receive_lease(true);
+}
+
+static noah_profile_peer_store_state_t receiver_store_state(const half_t *receiver) {
+    return noah_profile_peer_store_backend_state(&receiver->peer_store);
+}
+
+// The receiver holds the copy, prepared or on its way to committed, and never
+// let it go.
+static void assert_copy_kept(const half_t *receiver) {
+    noah_profile_peer_store_state_t state = receiver_store_state(receiver);
+
+    assert(state == NOAH_PROFILE_PEER_STORE_PREPARED || state == NOAH_PROFILE_PEER_STORE_COMMITTING || state == NOAH_PROFILE_PEER_STORE_COMMITTED);
+}
+
+// Authorizes the push at its barrier and scans until the receiver commits it.
+static uint32_t commit_prepared_push(half_t *sender, half_t *receiver, const noah_profile_split_descriptor_t *descriptor, uint32_t now) {
+    assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&sender->reconciler, descriptor));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !noah_profile_store_committed(&receiver->store); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(sender, true, now);
+        assert_one_scan_budget(receiver, false, now);
+        assert_copy_kept(receiver);
+    }
+    assert(noah_profile_store_committed(&receiver->store) && committed_generation(&receiver->store) == descriptor->generation);
+    return now;
+}
+
+// A sender that restarts while its receiver holds the prepared copy forgets
+// the push without cancelling it (D-F34). Restarted before its commit marker,
+// its poll says it holds no push over the old saved profile, and the receiver
+// releases the copy at once, not after any lease: the halves agree again and
+// take the next copy. Until the sender has read what it saved, as while it
+// boots, the claim releases nothing. Restarted after its marker, its saved
+// profile is the copy: the receiver keeps it and the sender's repair commits
+// it without sending it again.
+static void run_restarted_sender(bool sender_saved_the_copy) {
+    half_t                                 left;
+    half_t                                 right;
+    noah_profile_split_descriptor_t        descriptor;
+    noah_profile_split_descriptor_t        next;
+    noah_profile_split_reconciler_config_t config;
+    staged_source_t                        source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                               now;
+    uint32_t                               restarted_at;
+    uint32_t                               claims;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 27u, 1u);
+    now        = run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, 10000u);
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED);
+
+    if (sender_saved_the_copy) {
+        install_profile(&right, descriptor.generation, descriptor.origin_half);
+    }
+    config = right.reconciler.config;
+    noah_profile_split_reconciler_init(&right.reconciler, &config);
+    right.descriptor_unreadable = true;
+    claims                      = right.link.no_push_claims;
+    for (restarted_at = now; now - restarted_at < 2u * NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS; now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED);
+    }
+    assert(right.link.no_push_claims > claims);
+
+    right.descriptor_unreadable = false;
+    for (restarted_at = now; now - restarted_at < MAX_SCANS * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS && !pair_converged(&left, &right); now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        if (sender_saved_the_copy) {
+            assert_copy_kept(&left);
+        }
+    }
+    assert(pair_converged(&left, &right));
+    assert(now - restarted_at < NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS);
+    assert(!noah_profile_store_prepare_active(&left.store) && !noah_profile_store_durably_prepared(&left.store));
+    if (sender_saved_the_copy) {
+        // Committed, it awaits activation like any copy taken.
+        assert(committed_generation(&left.store) == descriptor.generation);
+        assert_records_match(&left, &right);
+        return;
+    }
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_IDLE);
+    assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+    assert(!noah_profile_store_committed(&left.store));
+    next = committed_descriptor(&right, descriptor.generation + 1u, 1u);
+    now  = run_prepared_push_until_ready_at(&right, &left, &next, &source, now);
+    (void)commit_prepared_push(&right, &left, &next, now);
+}
+
+static void test_a_restarted_sender_settles_the_prepared_copy(void) {
+    run_restarted_sender(false);
+    run_restarted_sender(true);
+}
+
+// A sender paused at the barrier while its owner decides is there but silent,
+// past the lease and the peer timeout. Nothing releases the prepared copy
+// meanwhile, and the commit authorized afterwards finds it.
+static void test_a_paused_sender_keeps_the_prepared_copy(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        now;
+    uint32_t                        paused_at;
+    uint32_t                        exchanges;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 28u, 1u);
+    now        = run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, 10000u);
+    exchanges  = right.link.exchanges;
+    for (paused_at = now; now - paused_at < 3u * NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS; now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(right.link.exchanges == exchanges);
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED && noah_profile_store_durably_prepared(&left.store));
+    assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
+    (void)commit_prepared_push(&right, &left, &descriptor, now);
+}
+
+// A sender that holds the push and falls back to its metadata poll, here on a
+// stray STALE reply once the copy is prepared, claims nothing there, before
+// the commit is authorized or after. The receiver keeps the copy and the push
+// resumes at its end without sending any of it again.
+static void test_a_sender_holding_the_push_keeps_the_prepared_copy(void) {
+    const noah_profile_split_v1_frame_t stale = {.kind = NOAH_PROFILE_SPLIT_V1_ERROR, .status = NOAH_PROFILE_SPLIT_V1_STATUS_STALE};
+    half_t                              left;
+    half_t                              right;
+    noah_profile_split_descriptor_t     descriptor;
+    staged_source_t                     source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                            now    = 10000u;
+    uint32_t                            polls;
+    uint32_t                            claims;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 29u, 1u);
+    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && receiver_store_state(&left) != NOAH_PROFILE_PEER_STORE_PREPARED; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED && !noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL));
+    polls                               = right.link.metadata_requests;
+    claims                              = right.link.no_push_claims;
+    right.link.inject_response_exchange = right.link.exchanges + 1u;
+    right.link.injected                 = stale;
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED);
+    }
+    assert(noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL));
+    assert(right.link.metadata_requests > polls && right.link.no_push_claims == claims);
+    assert(source.reads == 1u);
+
+    // The same once the commit is authorized: the stray reply answers the
+    // PREPARE_COMMIT, which never arrives.
+    polls                               = right.link.metadata_requests;
+    right.link.inject_response_exchange = right.link.exchanges + 1u;
+    (void)commit_prepared_push(&right, &left, &descriptor, now);
+    assert(right.link.metadata_requests > polls && right.link.no_push_claims == claims);
+    assert(source.reads == 1u);
+}
+
+// Delivers a METADATA poll from a sender that holds no prepared push over
+// `descriptor`, as a restarted one sends, into the receiver's mailbox.
+static void deliver_no_push_poll(half_t *receiver, const noah_profile_split_descriptor_t *descriptor) {
+    noah_profile_split_v1_frame_t          request = {.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = *descriptor, .no_prepared_push = true};
+    noah_profile_split_reconciler_status_t status;
+    uint8_t                                request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                                response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+
+    assert(noah_profile_split_v1_frame_encode(&request, request_wire, sizeof(request_wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(noah_profile_split_reconciler_receive(&receiver->reconciler, request_wire, sizeof(request_wire), response_wire, sizeof(response_wire)));
+    assert(noah_profile_split_reconciler_status(&receiver->reconciler, &status) && status.mailbox_pending);
+}
+
+// A copy the receiver has begun to commit is the receiver's to finish: a poll
+// saying the sender holds no push releases nothing, while it commits or after.
+static void test_a_committing_copy_is_never_released(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    noah_profile_split_descriptor_t old;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        now;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    old        = compiled_descriptor(&right);
+    descriptor = committed_descriptor(&right, 30u, 1u);
+    now        = run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, 10000u);
+    assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_COMMITTING);
+    deliver_no_push_poll(&left, &old);
+    for (uint32_t scan = 0u; scan < MAX_SCANS && receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_COMMITTING; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_COMMITTED && committed_generation(&left.store) == descriptor.generation);
+    assert_one_scan_budget(&left, false, now);
+    deliver_no_push_poll(&left, &old);
+    assert_one_scan_budget(&left, false, now);
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_COMMITTED && committed_generation(&left.store) == descriptor.generation);
+}
+
+// A request that matches the receiver's cached reply waits behind a queued
+// poll. Answered from the cache, a restarted sender's identical new push could
+// pass a poll saying it holds none, which then releases the copy that push
+// had just been told is there.
+static void test_a_cached_reply_waits_behind_a_queued_poll(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    noah_profile_split_descriptor_t old;
+    noah_profile_split_v1_frame_t   reply;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint8_t                         request[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                         response[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                         length;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    old        = compiled_descriptor(&right);
+    descriptor = committed_descriptor(&right, 31u, 1u);
+    (void)run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, 10000u);
+    length = left.reconciler.cached_request_length;
+    assert(length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && length <= sizeof(request));
+    memcpy(request, left.reconciler.cached_request_wire, length);
+
+    assert(noah_profile_split_reconciler_receive(&left.reconciler, request, length, response, sizeof(response)));
+    assert(noah_profile_split_v1_reply_decode(response, sizeof(response), &reply) && !(reply.kind == NOAH_PROFILE_SPLIT_V1_ACK && reply.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY));
+
+    deliver_no_push_poll(&left, &old);
+    assert(noah_profile_split_reconciler_receive(&left.reconciler, request, length, response, sizeof(response)));
+    assert(noah_profile_split_v1_reply_decode(response, sizeof(response), &reply) && reply.kind == NOAH_PROFILE_SPLIT_V1_ACK && reply.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY);
 }
 
 // If the receiver drops its lease mid-copy, the chunks it is then sent are
@@ -1635,7 +1889,7 @@ static void run_receiver_storage_failures(noah_profile_peer_store_state_t failin
         assert_one_scan_budget(&left, false, now);
         ready = noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL);
     }
-    if (!ready) fprintf(stderr, "after failed storage: receiver store %u admission %u prepare %u | sender state %u status %u\n", (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend), (unsigned)left.store.prepare_active, (unsigned)right.reconciler.state, (unsigned)right.reconciler.last_status);
+    if (!ready) fprintf(stderr, "after failed storage: receiver store %u admission %u prepare %u | sender state %u status %u\n", (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend), (unsigned)noah_profile_store_prepare_active(&left.store), (unsigned)right.reconciler.state, (unsigned)right.reconciler.last_status);
     assert(ready && "the receiver never recovered from the storage failure");
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
 }
@@ -1673,7 +1927,7 @@ static void test_receiver_recovers_when_its_abort_write_fails(void) {
         assert_one_scan_budget(&left, false, now);
         ready = noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL);
     }
-    if (!ready) fprintf(stderr, "after failed abort write: receiver store %u admission %u prepare %u reconcile %u | sender active %u state %u status %u orphan %u busy %u reason %u\n", (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend), (unsigned)left.store.prepare_active, (unsigned)left.store.reconciliation_required, (unsigned)right.reconciler.prepared_push_active, (unsigned)right.reconciler.state, (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.orphan_pending, (unsigned)right.reconciler.busy_streak, (unsigned)right.reconciler.last_busy_reason);
+    if (!ready) fprintf(stderr, "after failed abort write: receiver store %u admission %u prepare %u reconcile %u | sender active %u state %u status %u orphan %u busy %u reason %u\n", (unsigned)noah_profile_peer_store_backend_state(&left.peer_store), (unsigned)noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend), (unsigned)noah_profile_store_prepare_active(&left.store), (unsigned)noah_profile_store_reconciliation_required(&left.store), (unsigned)right.reconciler.prepared_push_active, (unsigned)right.reconciler.state, (unsigned)right.reconciler.last_status, (unsigned)right.reconciler.orphan_pending, (unsigned)right.reconciler.busy_streak, (unsigned)right.reconciler.last_busy_reason);
     assert(ready && "a failed abort write left the receiver unable to take the next copy");
 }
 
@@ -1728,14 +1982,14 @@ static void test_prepared_push_restarts_across_both_half_role_changes(void) {
     assert(right.reconciler.state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN);
     assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
 
-    for (uint32_t scan = 0u; scan < MAX_SCANS && left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; scan++) {
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !noah_profile_store_committed(&left.store); scan++) {
         uint32_t now = 51000u + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
 
         assert_one_scan_budget(&left, false, now);
         assert_one_scan_budget(&right, true, now);
     }
-    assert(left.store.committed.slot != NOAH_PROFILE_SLOT_NONE);
-    assert(left.store.committed.generation == descriptor.generation);
+    assert(noah_profile_store_committed(&left.store));
+    assert(committed_generation(&left.store) == descriptor.generation);
 }
 
 static void test_receiver_durable_prepare_survives_sender_pause(void) {
@@ -1758,21 +2012,21 @@ static void test_receiver_durable_prepare_survives_sender_pause(void) {
     expired_at = left.reconciler.last_peer_activity_at + NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS;
     assert(!noah_profile_split_reconciler_scan(&left.reconciler, false, expired_at));
     assert(noah_profile_peer_store_backend_state(&left.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED);
-    assert(left.store.prepared_durable);
+    assert(noah_profile_store_durably_prepared(&left.store));
     assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
     assert(left.reconciler.transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH);
     assert(!noah_profile_split_reconciler_provisional_peer_descriptor(&left.reconciler, &provisional));
 
     // The sender can authorize the decision later without retransferring.
     assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
-    for (uint32_t scan = 0u; scan < MAX_SCANS && left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; scan++) {
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !noah_profile_store_committed(&left.store); scan++) {
         uint32_t now = expired_at + NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS + scan * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
 
         assert_one_scan_budget(&right, true, now);
         assert_one_scan_budget(&left, false, now);
     }
-    assert(left.store.committed.slot != NOAH_PROFILE_SLOT_NONE);
-    assert(left.store.committed.generation == descriptor.generation);
+    assert(noah_profile_store_committed(&left.store));
+    assert(committed_generation(&left.store) == descriptor.generation);
 }
 
 static void test_prepare_authorize_and_cancel_are_immediate_after_timer_high_bit(void) {
@@ -1924,7 +2178,7 @@ static void test_cancel_refuses_matching_durable_peer(void) {
     assert(right.reconciler.prepared_cancel_refused);
     assert(right.reconciler.prepared_push_active);
     assert(!noah_profile_split_reconciler_prepared_push_cancel(&right.reconciler, &descriptor));
-    assert(left.store.committed.generation == descriptor.generation);
+    assert(committed_generation(&left.store) == descriptor.generation);
 }
 
 static void run_crossed_begin_loser_abort(bool left_sends_first) {
@@ -2257,7 +2511,7 @@ static void test_maximum_profile_pull_is_bounded(void) {
     }
     assert(pair_converged(&left, &right));
     assert_records_match(&left, &right);
-    assert(right.store.committed.payload_length == maximum_profile_length);
+    assert(committed_of(&right.store)->payload_length == maximum_profile_length);
     fprintf(stderr, "maximum pull: %u bytes in %u payload requests, %u exchanges\n", (unsigned)maximum_profile_length, (unsigned)right.link.payload_requests, (unsigned)right.link.exchanges);
     assert(right.link.payload_requests <= 2u * chunks + 4u);
     assert(right.link.exchanges <= 2u * chunks + 64u);
@@ -2297,7 +2551,7 @@ static bool slot_holds(const half_t *half, const uint8_t *bytes, uint32_t length
 // The receiver checked every byte of the copy, then refused the domain.
 static void assert_wide_copy_refused_after_checksums(const half_t *receiver) {
     assert(noah_profile_peer_store_backend_state(&receiver->peer_store) == NOAH_PROFILE_PEER_STORE_REJECTED);
-    assert(receiver->peer_store.result == NOAH_PROFILE_PEER_STORE_VALIDATION_ERROR);
+    assert(noah_profile_peer_store_backend_result(&receiver->peer_store) == NOAH_PROFILE_PEER_STORE_VALIDATION_ERROR);
     // Located whole, past 64 KiB: the end of the RGB domain.
     assert(receiver->peer_store.validation_error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_VALIDATION_REJECTED);
     assert(receiver->peer_store.validation_error.domain_id == NOAH_PROFILE_DOMAIN_V1_RGB && receiver->peer_store.validation_error.byte_offset == WIDE_LENGTH);
@@ -2377,7 +2631,7 @@ static void test_wide_pull_through_the_reconciler(void) {
     assert(right.link.payload_requests <= 2u * chunks_for(WIDE_LENGTH) + 4u);
     assert(slot_holds(&right, wide_profile, WIDE_LENGTH));
     assert_wide_copy_refused_after_checksums(&right);
-    assert(right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&right.store));
 }
 
 // Reuse ranges whose source offsets lie past 65,535 bytes: the receiver
@@ -2464,6 +2718,11 @@ int main(int argc, char **argv) {
     test_prepared_push_survives_one_replayed_reply_anywhere();
     test_prepared_push_resumes_from_the_metadata_poll();
     test_stale_receive_lease_expires_while_the_link_stays_busy();
+    test_a_restarted_sender_settles_the_prepared_copy();
+    test_a_paused_sender_keeps_the_prepared_copy();
+    test_a_sender_holding_the_push_keeps_the_prepared_copy();
+    test_a_committing_copy_is_never_released();
+    test_a_cached_reply_waits_behind_a_queued_poll();
     test_prepared_push_restarts_when_the_receiver_drops_its_lease();
     test_receiver_recovers_after_a_storage_failure();
     test_receiver_recovers_when_its_abort_write_fails();

@@ -6,10 +6,6 @@
 
 #include <string.h>
 
-static bool metadata_equal(const noah_profile_candidate_v1_metadata_t *left, const noah_profile_candidate_v1_metadata_t *right) {
-    return left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->requested_domains == right->requested_domains && left->flags == right->flags && left->payload_length == right->payload_length && left->crc32 == right->crc32 && left->digest == right->digest && left->action_abi_digest == right->action_abi_digest && left->store_format_version == right->store_format_version;
-}
-
 static bool error_equal(const noah_profile_candidate_v1_error_t *left, const noah_profile_candidate_v1_error_t *right) {
     return left->code == right->code && left->domain_id == right->domain_id && left->table_id == right->table_id && left->row_index == right->row_index && left->tap_index == right->tap_index && left->field_id == right->field_id && left->byte_offset == right->byte_offset;
 }
@@ -157,7 +153,7 @@ static bool process_begin(noah_profile_candidate_transaction_t *transaction, con
             set_simple_error(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_POISONED, NOAH_PROFILE_CANDIDATE_V1_LOCATION_NONE_U32);
             return false;
         }
-        if (metadata_equal(&transaction->metadata, metadata)) {
+        if (noah_profile_candidate_v1_metadata_equal(&transaction->metadata, metadata)) {
             clear_error(transaction);
         } else if (transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_COMMITTING || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING || transaction->status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED) {
             // Reject the operation, never the durable decision. Replacing its

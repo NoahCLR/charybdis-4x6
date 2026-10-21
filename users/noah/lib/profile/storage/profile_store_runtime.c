@@ -257,14 +257,7 @@ bool noah_profile_store_runtime_read_committed(uint32_t offset, uint8_t *target,
     }
     // Bounds first: offset and length arrive from the host, so a request that
     // runs past the committed payload is refused rather than clamped.
-    if (offset > record->payload_length || length > record->payload_length - offset) {
-        return false;
-    }
-    if (record->slot == NOAH_PROFILE_SLOT_A) {
-        payload_start = (NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
-    } else if (record->slot == NOAH_PROFILE_SLOT_B) {
-        payload_start = (NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE);
-    } else {
+    if (offset > record->payload_length || length > record->payload_length - offset || !noah_profile_store_slot_payload_start(record->slot, &payload_start)) {
         return false;
     }
     return store->io.read(store->io.context, (payload_start + offset), target, length);
@@ -370,18 +363,15 @@ static bool boot_payload_read(void *context, size_t offset, uint8_t *target, siz
 bool noah_profile_store_runtime_read_keyboard_name(noah_profile_store_t *store, noah_profile_keyboard_name_t *name) {
     noah_profile_store_record_t record;
     noah_profile_domain_range_t settings;
+    boot_payload_t              payload = {.store = store};
 
     if (!name) {
         return false;
     }
     memset(name, 0, sizeof(*name));
-    if (!store || noah_profile_store_boot_select(store, &record) != NOAH_PROFILE_STORE_OK || (record.slot != NOAH_PROFILE_SLOT_A && record.slot != NOAH_PROFILE_SLOT_B)) {
+    if (!store || noah_profile_store_boot_select(store, &record) != NOAH_PROFILE_STORE_OK || !noah_profile_store_slot_payload_start(record.slot, &payload.start)) {
         return false;
     }
-    boot_payload_t payload = {
-        .store = store,
-        .start = (record.slot == NOAH_PROFILE_SLOT_A ? NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR : NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR) + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE,
-    };
     noah_profile_reader_t reader = {.read = boot_payload_read, .context = &payload, .length = record.payload_length};
 
     return noah_profile_blob_v1_find_domain(&reader, 0u, record.payload_length, NOAH_PROFILE_DOMAIN_V1_SETTINGS, &settings) && noah_profile_settings_v1_keyboard_name(&reader, settings.offset, settings.length, name);

@@ -199,6 +199,14 @@ semantics without taking another platform timer sample.
   `split/profile_split_protocol_v1.c/h`. These files define decisions and
   framing only; they do not own QMK RPC, EEPROM transfer, or production
   activation.
+- Storage: the dual-slot store `storage/profile_store.c/h`, which also answers
+  its own state questions and owns slot addressing; the candidate and peer
+  backends `storage/profile_candidate_store_backend.c/h` and
+  `storage/profile_peer_store_backend.c/h`, the peer store answering its own
+  state questions; and `storage/profile_record_identity.h`, the one home of
+  comparisons between a store record, a staged candidate and a split
+  descriptor. The split reconciler answers whether the other half's storage is
+  paused (`noah_profile_split_reconciler_peer_storage_paused`).
 
 ### `rgb/`
 
