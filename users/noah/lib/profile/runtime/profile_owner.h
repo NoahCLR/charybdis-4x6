@@ -147,6 +147,26 @@ typedef union {
     noah_profile_candidate_store_backend_t candidate_backend;
 } noah_profile_owner_staging_t;
 
+// One candidate's distributed prepare barrier and its pre-decision cancel
+// (logical-profile-transaction-v1.md, "Cancellation And Lease Ownership"):
+// what the owner learns of one Apply or Save from PREPARING_PEER until its
+// candidate is released. All zero is no barrier; it is cleared as a unit when
+// the candidate ends, and any field set means cleanup is due. `descriptor`
+// means something only while `descriptor_known`.
+typedef struct {
+    noah_profile_split_descriptor_t      descriptor;
+    noah_profile_candidate_v1_error_id_t cancel_reason;   // NONE unless a cancel was asked
+    uint32_t                             progress_offset; // the copy's last correlated progress
+    uint8_t                              progress_phase;
+    bool                                 descriptor_known : 1;
+    bool                                 started : 1;
+    bool                                 local_published : 1;
+    bool                                 peer_commit_authorized : 1;
+    bool                                 waiting_boundary : 1;
+    bool                                 peer_confirmed : 1;
+    bool                                 cancel_pending : 1;
+} noah_profile_owner_host_barrier_t;
+
 typedef struct {
     noah_profile_owner_config_t               config;
     noah_profile_compiled_v1_t                compiled;
@@ -177,31 +197,23 @@ typedef struct {
     // within the host timeout is aborted, as an abandoned Apply is.
     uint32_t                             edit_activity_at;
     noah_profile_split_descriptor_t      committed_descriptor;
-    noah_profile_split_descriptor_t      host_barrier_descriptor;
+    noah_profile_owner_host_barrier_t    host_barrier;
     noah_profile_candidate_v1_error_t    adoption_error;
-    noah_profile_candidate_v1_error_id_t host_cancel_reason;
     noah_profile_store_result_t          discovery_result;
     noah_profile_owner_state_t           state;
+    // The host candidate's lease, from its first step until it is released:
+    // longer than its barrier, so kept beside it (with host_activity_known).
     uint32_t                             host_last_activity_at;
-    uint32_t                             host_barrier_progress_offset;
     uint8_t                              scheduler_cursor;
     // The subsystem whose step last worked: a repeated step in the same
     // durable-I/O grant visits it alone (D-F29, "Pacing").
     uint8_t                              scheduler_last;
-    uint8_t                              host_barrier_progress_phase;
     bool                                 boot_activation_started : 1;
     bool                                 peer_activation_started : 1;
     bool                                 host_activity_known : 1;
     bool                                 descriptor_readable : 1;
     bool                                 split_initialized : 1;
     bool                                 runtimes_installed : 1;
-    bool                                 host_barrier_descriptor_known : 1;
-    bool                                 host_barrier_started : 1;
-    bool                                 host_barrier_local_published : 1;
-    bool                                 host_barrier_peer_commit_authorized : 1;
-    bool                                 host_barrier_waiting_boundary : 1;
-    bool                                 host_barrier_peer_confirmed : 1;
-    bool                                 host_cancel_pending : 1;
     bool                                 working_ready : 1;
     bool                                 master : 1;
     bool                                 scan_again : 1;
@@ -228,7 +240,10 @@ typedef struct {
     bool                                 has_committed;
     bool                                 candidate_pending;
     bool                                 peer_known;
-    bool                                 peer_converged;
+    // The split authority holds both halves on one saved profile (or both on
+    // the compiled defaults), with nothing in transfer (Profile Wire status
+    // flag 5; D-F25's USB restart check).
+    bool                                 saved_profiles_agree;
     bool                                 transfer_pending;
     bool                                 peer_cleanup_pending;
     // Nothing is committed because a slot holds an earlier store format or retired test layout,
@@ -315,7 +330,10 @@ typedef struct {
     bool                            supported;      // this build and half can edit live
     bool                            saved_compiled; // nothing saved: the compiled defaults
     bool                            peer_required;
-    bool                            peer_converged;
+    // The other half holds this half's saved profile and working copy (same
+    // session and revision, nothing in progress), heard within 3 s (edit
+    // status flag 2).
+    bool                            halves_agree;
     bool                            mode_conflict;
     bool                            edits_blocked;  // a new edit would be refused BUSY now
     bool                            adjustment_pending; // a keyboard adjustment awaits publication; a new Apply is BUSY

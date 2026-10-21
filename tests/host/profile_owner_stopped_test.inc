@@ -167,7 +167,7 @@ static void test_a_half_that_cannot_read_its_slots_stops_and_is_heard(void) {
     assert(right.state == NOAH_PROFILE_OWNER_STORAGE_ERROR && working_status_of(&right).stopped);
     for (uint32_t guard = 0u; guard < 400u && !working_status_of(&left).peer_stopped; guard++) scan_pair(&left, &right, &now);
     status = working_status_of(&left);
-    assert(status.peer_stopped && !status.stopped && !status.peer_converged && status.edits_blocked);
+    assert(status.peer_stopped && !status.stopped && !status.halves_agree && status.edits_blocked);
     assert(noah_profile_owner_edit_begin(&left, 5u, left.working.session, left.working.revision, 1u, 2u, 0u) == NOAH_PROFILE_WORKING_BUSY);
     // Polled once a second (a poll is admitted, then answered), nothing
     // else; while the halves differ it would be ten times as often.
@@ -295,7 +295,7 @@ static void test_a_slow_save_is_never_stopped(void) {
         scan_pair(&left, &right, &now);
         assert_neither_stopped(&left, &right);
     }
-    assert(left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE && left.host_barrier_waiting_boundary);
+    assert(left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE && left.host_barrier.waiting_boundary);
     activation_block_reason = 0u;
     for (uint32_t guard = 0u; guard < 20000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; guard++) {
         scan_pair(&left, &right, &now);
@@ -454,7 +454,7 @@ static void stop_after_the_decision(uint32_t peer_generation, noah_profile_owner
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 110u);
     send_and_scan_pair(&left, &right, frame, &now);
     for (uint32_t guard = 0u; guard < 2048u && left.store.committed.generation != 1u; guard++) scan_pair(&left, &right, &now);
-    for (uint32_t guard = 0u; guard < 32u && (!left.host_barrier_local_published || !left.host_barrier_peer_commit_authorized); guard++) {
+    for (uint32_t guard = 0u; guard < 32u && (!left.host_barrier.local_published || !left.host_barrier.peer_commit_authorized); guard++) {
         left.scheduler_cursor = 0u;
         assert(noah_profile_owner_scan(&left, true, now++));
     }

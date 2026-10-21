@@ -91,7 +91,7 @@ static bool host_staged_read(void *context, const noah_profile_split_descriptor_
     noah_profile_owner_t          *owner = context;
     noah_profile_store_candidate_t candidate;
 
-    if (!owner || !descriptor || !owner->host_barrier_descriptor_known || !descriptor_equal(descriptor, &owner->host_barrier_descriptor)) {
+    if (!owner || !descriptor || !owner->host_barrier.descriptor_known || !descriptor_equal(descriptor, &owner->host_barrier.descriptor)) {
         return false;
     }
     if (!noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate)) {
@@ -131,7 +131,7 @@ static bool host_reuse_plan(void *context, const noah_profile_split_descriptor_t
     noah_profile_candidate_v1_source_t         source;
     noah_profile_candidate_store_reuse_range_t reused;
 
-    if (!owner || !descriptor || !range || !owner->host_barrier_descriptor_known || !descriptor_equal(descriptor, &owner->host_barrier_descriptor) || !noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate)) {
+    if (!owner || !descriptor || !range || !owner->host_barrier.descriptor_known || !descriptor_equal(descriptor, &owner->host_barrier.descriptor) || !noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate)) {
         return false;
     }
     staged = descriptor_from_candidate(&candidate);
@@ -154,7 +154,7 @@ static bool owner_peer_observer(void *context, uint8_t *unresolved_count) {
     if (!owner || !unresolved_count || !owner->descriptor_readable || !owner->split_initialized) {
         return false;
     }
-    if (owner->host_barrier_peer_confirmed && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING && owner->host_barrier_descriptor_known && descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor)) {
+    if (owner->host_barrier.peer_confirmed && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING && owner->host_barrier.descriptor_known && descriptor_equal(&owner->committed_descriptor, &owner->host_barrier.descriptor)) {
         // This Apply already saw the peer durably commit exactly this record
         // before activation was authorized. Activating needs no second, live
         // observation of the peer, so a link lost meanwhile cannot hold it.
@@ -168,25 +168,19 @@ static bool owner_peer_observer(void *context, uint8_t *unresolved_count) {
     return true;
 }
 
+_Static_assert(NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE == 0u, "a cleared host barrier asks no cancel");
+
 static void reset_host_barrier(noah_profile_owner_t *owner) {
-    if (!owner) {
-        return;
-    }
-    memset(&owner->host_barrier_descriptor, 0, sizeof(owner->host_barrier_descriptor));
-    owner->host_barrier_descriptor_known       = false;
-    owner->host_barrier_started                = false;
-    owner->host_barrier_local_published        = false;
-    owner->host_barrier_peer_commit_authorized = false;
-    owner->host_barrier_waiting_boundary       = false;
-    owner->host_barrier_peer_confirmed         = false;
-    owner->host_cancel_reason                  = NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE;
-    owner->host_cancel_pending                 = false;
-    owner->host_barrier_progress_offset        = 0u;
-    owner->host_barrier_progress_phase         = 0u;
+    memset(&owner->host_barrier, 0, sizeof(owner->host_barrier));
+}
+
+// Any field set. The descriptor counts through descriptor_known.
+static bool host_barrier_held(const noah_profile_owner_host_barrier_t *barrier) {
+    return barrier->descriptor_known || barrier->started || barrier->local_published || barrier->peer_commit_authorized || barrier->waiting_boundary || barrier->peer_confirmed || barrier->cancel_pending || barrier->cancel_reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE || barrier->progress_offset != 0u || barrier->progress_phase != 0u;
 }
 
 static bool host_session_cleanup_needed(const noah_profile_owner_t *owner) {
-    return owner && (owner->host_activity_known || owner->host_barrier_descriptor_known || owner->host_barrier_started || owner->host_barrier_local_published || owner->host_barrier_peer_commit_authorized || owner->host_cancel_pending || owner->host_cancel_reason != NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE || owner->host_barrier_progress_offset != 0u);
+    return owner->host_activity_known || host_barrier_held(&owner->host_barrier);
 }
 
 static bool peer_can_supersede_host(const noah_profile_owner_t *owner, const noah_profile_split_descriptor_t *peer) {
@@ -670,10 +664,10 @@ uint32_t noah_profile_owner_test_profile_held_count(void) {
 #endif
 
 static noah_profile_candidate_expire_result_t finish_host_precommit_cancel(noah_profile_owner_t *owner) {
-    if (!owner || !owner->host_cancel_pending || owner->reconciler.prepared_push_active) {
+    if (!owner || !owner->host_barrier.cancel_pending || owner->reconciler.prepared_push_active) {
         return NOAH_PROFILE_CANDIDATE_EXPIRE_NOTHING;
     }
-    switch (owner->host_cancel_reason) {
+    switch (owner->host_barrier.cancel_reason) {
         case NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE:
             if (!host_mailbox_is_matching_abort(owner) || !noah_profile_candidate_transaction_scan(&owner->host_transaction)) {
                 return NOAH_PROFILE_CANDIDATE_EXPIRE_NOTHING;
@@ -698,12 +692,12 @@ static bool advance_host_precommit_cancel(noah_profile_owner_t *owner) {
     noah_profile_candidate_expire_result_t result;
     noah_profile_candidate_v1_error_id_t   reason;
 
-    if (!owner || !owner->host_cancel_pending) {
+    if (!owner || !owner->host_barrier.cancel_pending) {
         return false;
     }
     result = finish_host_precommit_cancel(owner);
     if (result == NOAH_PROFILE_CANDIDATE_EXPIRE_DONE) {
-        reason = owner->host_cancel_reason;
+        reason = owner->host_barrier.cancel_reason;
         reset_host_barrier(owner);
         owner->host_activity_known = false;
         if (reason == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE) {
@@ -730,13 +724,13 @@ static bool request_host_precommit_cancel(noah_profile_owner_t *owner, noah_prof
     if (!host_state_is_precommit(owner->host_transaction.status.state)) {
         return false;
     }
-    if (!owner->host_cancel_pending) {
-        if (owner->host_barrier_started && owner->host_barrier_descriptor_known && !noah_profile_split_reconciler_prepared_push_cancel(&owner->reconciler, &owner->host_barrier_descriptor)) {
+    if (!owner->host_barrier.cancel_pending) {
+        if (owner->host_barrier.started && owner->host_barrier.descriptor_known && !noah_profile_split_reconciler_prepared_push_cancel(&owner->reconciler, &owner->host_barrier.descriptor)) {
             return false;
         }
-        owner->host_cancel_reason  = reason;
-        owner->host_cancel_pending = true;
-    } else if (owner->host_cancel_reason != reason) {
+        owner->host_barrier.cancel_reason  = reason;
+        owner->host_barrier.cancel_pending = true;
+    } else if (owner->host_barrier.cancel_reason != reason) {
         return false;
     }
     if (advance_host_precommit_cancel(owner)) {
@@ -788,15 +782,15 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
         fail_integration(owner);
         return true;
     }
-    if (!owner->host_barrier_descriptor_known) {
-        owner->host_barrier_descriptor       = descriptor;
-        owner->host_barrier_descriptor_known = true;
-    } else if (!descriptor_equal(&owner->host_barrier_descriptor, &descriptor)) {
+    if (!owner->host_barrier.descriptor_known) {
+        owner->host_barrier.descriptor       = descriptor;
+        owner->host_barrier.descriptor_known = true;
+    } else if (!descriptor_equal(&owner->host_barrier.descriptor, &descriptor)) {
         fail_integration(owner);
         return true;
     }
     if (noah_profile_split_reconciler_provisional_peer_descriptor(&owner->reconciler, &provisional_peer)) {
-        if (provisional_peer_wins(owner, &owner->host_barrier_descriptor, &provisional_peer, &conflict)) {
+        if (provisional_peer_wins(owner, &owner->host_barrier.descriptor, &provisional_peer, &conflict)) {
             return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED);
         }
         if (conflict) {
@@ -805,12 +799,12 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
             return true;
         }
     }
-    if (!owner->host_barrier_started) {
-        bool began = noah_profile_split_reconciler_prepared_push_begin(&owner->reconciler, &owner->host_barrier_descriptor, owner, host_staged_read);
+    if (!owner->host_barrier.started) {
+        bool began = noah_profile_split_reconciler_prepared_push_begin(&owner->reconciler, &owner->host_barrier.descriptor, owner, host_staged_read);
         if (!began) {
             return false;
         }
-        owner->host_barrier_started = true;
+        owner->host_barrier.started = true;
         return true;
     }
     {
@@ -825,15 +819,15 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
     if (!noah_profile_split_reconciler_prepared_push_ready(&owner->reconciler, &prepared)) {
         return false;
     }
-    owner->host_barrier_waiting_boundary = false;
-    if (!descriptor_equal(&prepared, &owner->host_barrier_descriptor)) {
+    owner->host_barrier.waiting_boundary = false;
+    if (!descriptor_equal(&prepared, &owner->host_barrier.descriptor)) {
         fail_integration(owner);
     } else if ((noah_profile_activation_policy_safe_boundary(&owner->activation_policy) &
                 ~NOAH_PROFILE_ACTIVATION_REASON_PEER) != 0u) {
         // Waiting here, before anything is durable, lets a held key or locked
         // layer end the Apply cleanly on timeout. Activation waits for the
         // same boundary.
-        owner->host_barrier_waiting_boundary = true;
+        owner->host_barrier.waiting_boundary = true;
         return false;
     } else if (!noah_profile_candidate_transaction_authorize_commit(&owner->host_transaction)) {
         if (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED && owner->host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE) {
@@ -855,11 +849,11 @@ static void note_host_barrier_progress(noah_profile_owner_t *owner, uint32_t now
         owner->host_last_activity_at = now_ms;
         return;
     }
-    if (!owner || !owner->host_barrier_started || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER || !noah_profile_split_reconciler_progress(&owner->reconciler, &offset, &phase) || (offset == owner->host_barrier_progress_offset && phase <= owner->host_barrier_progress_phase)) {
+    if (!owner || !owner->host_barrier.started || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER || !noah_profile_split_reconciler_progress(&owner->reconciler, &offset, &phase) || (offset == owner->host_barrier.progress_offset && phase <= owner->host_barrier.progress_phase)) {
         return;
     }
-    owner->host_barrier_progress_offset = offset;
-    owner->host_barrier_progress_phase  = phase;
+    owner->host_barrier.progress_offset = offset;
+    owner->host_barrier.progress_phase  = phase;
     owner->host_last_activity_at        = now_ms;
     owner->host_activity_known          = true;
 }
@@ -867,7 +861,7 @@ static void note_host_barrier_progress(noah_profile_owner_t *owner, uint32_t now
 static bool host_barrier_exact_convergence(const noah_profile_owner_t *owner) {
     noah_profile_split_authority_status_t authority;
 
-    return owner && owner->host_barrier_descriptor_known && owner->descriptor_readable && descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor) && noah_profile_split_authority_status(&owner->reconciler.authority, &authority) && !authority.transfer_pending && authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED && descriptor_equal(&authority.local, &owner->host_barrier_descriptor) && descriptor_equal(&authority.peer, &owner->host_barrier_descriptor);
+    return owner && owner->host_barrier.descriptor_known && owner->descriptor_readable && descriptor_equal(&owner->committed_descriptor, &owner->host_barrier.descriptor) && noah_profile_split_authority_status(&owner->reconciler.authority, &authority) && !authority.transfer_pending && authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED && descriptor_equal(&authority.local, &owner->host_barrier.descriptor) && descriptor_equal(&authority.peer, &owner->host_barrier.descriptor);
 }
 
 static bool fail_host_postcommit_authority(noah_profile_owner_t *owner, noah_profile_candidate_v1_error_id_t error, noah_profile_owner_state_t state) {
@@ -879,20 +873,20 @@ static bool fail_host_postcommit_authority(noah_profile_owner_t *owner, noah_pro
 }
 
 static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
-    if (!owner || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER || !owner->host_barrier_descriptor_known) {
+    if (!owner || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER || !owner->host_barrier.descriptor_known) {
         return false;
     }
-    if (!owner->host_barrier_local_published) {
-        if (!publish_validated_descriptor(owner) || !descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor) || !noah_profile_split_reconciler_refresh_authority(&owner->reconciler)) {
+    if (!owner->host_barrier.local_published) {
+        if (!publish_validated_descriptor(owner) || !descriptor_equal(&owner->committed_descriptor, &owner->host_barrier.descriptor) || !noah_profile_split_reconciler_refresh_authority(&owner->reconciler)) {
             owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
         } else {
-            owner->host_barrier_local_published = true;
+            owner->host_barrier.local_published = true;
         }
         return true;
     }
-    if (!owner->host_barrier_peer_commit_authorized) {
-        if (noah_profile_split_reconciler_prepared_push_authorize_commit(&owner->reconciler, &owner->host_barrier_descriptor)) {
-            owner->host_barrier_peer_commit_authorized = true;
+    if (!owner->host_barrier.peer_commit_authorized) {
+        if (noah_profile_split_reconciler_prepared_push_authorize_commit(&owner->reconciler, &owner->host_barrier.descriptor)) {
+            owner->host_barrier.peer_commit_authorized = true;
             return true;
         }
         return false;
@@ -901,7 +895,7 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
         noah_profile_split_authority_status_t  authority;
         noah_profile_split_reconciler_status_t reconciler;
 
-        if (noah_profile_split_authority_status(&owner->reconciler.authority, &authority) && descriptor_equal(&authority.local, &owner->host_barrier_descriptor)) {
+        if (noah_profile_split_authority_status(&owner->reconciler.authority, &authority) && descriptor_equal(&authority.local, &owner->host_barrier.descriptor)) {
             if (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER) {
                 return fail_host_postcommit_authority(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST, NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST);
             }
@@ -920,11 +914,11 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
         // Once the peer has been seen holding exactly this commit, losing
         // sight of it again (a lost link, a peer reboot) does not undo that
         // confirmation. Conflicts above still end the Apply.
-        if (!owner->host_barrier_peer_confirmed) {
+        if (!owner->host_barrier.peer_confirmed) {
             return false;
         }
     } else {
-        owner->host_barrier_peer_confirmed = true;
+        owner->host_barrier.peer_confirmed = true;
     }
     // One store (D-F31): once both halves hold the commit, the new profile
     // activates at the next safe boundary. Nothing else has to catch up.
@@ -997,17 +991,17 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
     noah_profile_storage_admission_owner_t admission = noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner));
     uint32_t                               host_timeout_ms;
 
-    if (!activating_boot && owner->host_cancel_pending && advance_host_precommit_cancel(owner)) {
+    if (!activating_boot && owner->host_barrier.cancel_pending && advance_host_precommit_cancel(owner)) {
         return true;
     }
     if (!activating_boot && supersede_host_precommit(owner)) {
         return true;
     }
 
-    host_timeout_ms = owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && owner->host_barrier_started ? NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS : NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS;
+    host_timeout_ms = owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && owner->host_barrier.started ? NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS : NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS;
     // Only the decision is exempt from the lease: from COMMITTING on nothing
     // expires, and the peer keeps the target recovery copy.
-    if (!activating_boot && !owner->host_cancel_pending && admission == NOAH_PROFILE_STORAGE_ADMISSION_HOST && owner->host_activity_known && !owner->host_transaction.mailbox.pending && elapsed_at_least(now_ms, owner->host_last_activity_at, host_timeout_ms) && host_state_is_precommit(owner->host_transaction.status.state) && request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT)) {
+    if (!activating_boot && !owner->host_barrier.cancel_pending && admission == NOAH_PROFILE_STORAGE_ADMISSION_HOST && owner->host_activity_known && !owner->host_transaction.mailbox.pending && elapsed_at_least(now_ms, owner->host_last_activity_at, host_timeout_ms) && host_state_is_precommit(owner->host_transaction.status.state) && request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT)) {
         return true;
     }
 
@@ -1030,7 +1024,7 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
             if (activating_boot) {
                 worked = scan_activation(owner);
             } else if (admission != NOAH_PROFILE_STORAGE_ADMISSION_PEER) {
-                if (owner->host_cancel_pending) {
+                if (owner->host_barrier.cancel_pending) {
                     worked = false;
                 } else if (host_mailbox_is_matching_abort(owner) && host_state_is_precommit(owner->host_transaction.status.state)) {
                     worked = request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
@@ -1053,7 +1047,7 @@ static bool scan_running(noah_profile_owner_t *owner, bool master, uint32_t now_
                     owner->state = NOAH_PROFILE_OWNER_DURABILITY_UNKNOWN;
                     return true;
                 }
-                if (worked && owner->host_barrier_started && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED && owner->host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE) {
+                if (worked && owner->host_barrier.started && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED && owner->host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE) {
                     return request_host_precommit_cancel(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
                 }
                 if (worked && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED && owner->host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED) {
@@ -1290,11 +1284,11 @@ bool noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_o
     }
     status->stored_earlier_format = !committed && owner->store.earlier_format;
     if (owner->split_initialized && noah_profile_split_authority_status(&owner->reconciler.authority, &authority)) {
-        status->authority_state  = authority.state;
-        status->peer             = authority.peer;
-        status->peer_known       = authority.peer.readable;
-        status->transfer_pending = authority.transfer_pending;
-        status->peer_converged   = !authority.transfer_pending && (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED || authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED);
+        status->authority_state      = authority.state;
+        status->peer                 = authority.peer;
+        status->peer_known           = authority.peer.readable;
+        status->transfer_pending     = authority.transfer_pending;
+        status->saved_profiles_agree = !authority.transfer_pending && (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED || authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED);
     }
     if (owner->split_initialized && noah_profile_split_reconciler_status(&owner->reconciler, &reconciler)) {
         status->peer_cleanup_pending = reconciler.peer_cleanup_pending;
@@ -1311,7 +1305,7 @@ bool noah_profile_owner_usb_restart_safe(noah_profile_owner_t *owner) {
     if (owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || owner->host_transaction.has_candidate || owner->host_transaction.mailbox.pending || host_session_cleanup_needed(owner)) {
         return false;
     }
-    if (!noah_profile_owner_status(owner, &status) || status.has_pending || status.transfer_pending || status.peer_cleanup_pending || (owner->config.peer_required && !status.peer_converged)) {
+    if (!noah_profile_owner_status(owner, &status) || status.has_pending || status.transfer_pending || status.peer_cleanup_pending || (owner->config.peer_required && !status.saved_profiles_agree)) {
         return false;
     }
     // A USB restart keeps the working copy, but not an edit or save mid-way.
@@ -1360,7 +1354,7 @@ bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_pr
     *peer = (noah_profile_candidate_v1_peer_status_t){
         .phase                   = peer_phase(&status),
         .last_status             = (uint8_t)status.last_status,
-        .flags                   = (uint8_t)((status.peer_cleanup_pending ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING : 0u) | (status.master ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER : 0u) | (owner->host_barrier_waiting_boundary && (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER || owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER) ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_WAITING_SAFE_BOUNDARY : 0u)),
+        .flags                   = (uint8_t)((status.peer_cleanup_pending ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING : 0u) | (status.master ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER : 0u) | (owner->host_barrier.waiting_boundary && (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER || owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER) ? NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_WAITING_SAFE_BOUNDARY : 0u)),
         .transfer_offset         = status.transfer_offset,
         .transfer_length         = status.transfer_length,
         .retry_count             = status.retry_count,
@@ -1400,7 +1394,7 @@ static bool profile_held(const noah_profile_owner_t *owner) {
 #endif
     // A publication the working copy has not yet looked at (it does at the
     // next scan) may have replaced it.
-    return !owner_ready(owner) || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || owner->host_transaction.has_candidate || owner->host_transaction.mailbox.pending || owner->host_cancel_pending || noah_profile_candidate_store_backend_admission_owner(&owner->staging.candidate_backend) != NOAH_PROFILE_STORAGE_ADMISSION_NONE || owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_effective_profile_provider_status(&owner->provider, &provider) != NOAH_EFFECTIVE_PROFILE_OK || provider.has_pending || provider.publication_count != owner->working.publication_count;
+    return !owner_ready(owner) || owner->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || owner->host_transaction.has_candidate || owner->host_transaction.mailbox.pending || owner->host_barrier.cancel_pending || noah_profile_candidate_store_backend_admission_owner(&owner->staging.candidate_backend) != NOAH_PROFILE_STORAGE_ADMISSION_NONE || owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || noah_effective_profile_provider_status(&owner->provider, &provider) != NOAH_EFFECTIVE_PROFILE_OK || provider.has_pending || provider.publication_count != owner->working.publication_count;
 }
 
 // The other half does not yet hold the same saved profile and working copy.
@@ -1729,7 +1723,7 @@ bool noah_profile_owner_working_status(const noah_profile_owner_t *owner, noah_p
     status->saved_compiled            = saved->generation == 0u;
     status->safe_boundary_reason_mask = provider.safe_boundary_reason_mask;
     status->peer_required             = owner->config.peer_required;
-    status->peer_converged            = !halves_apart(owner);
+    status->halves_agree              = !halves_apart(owner);
     status->mode_conflict             = owner->working_sync.mode_conflict;
     status->adjustment_pending        = owner->auto_save.pending != 0u;
     status->edits_blocked             = profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working) || owner->auto_save.pending || owner->auto_save.edit_transaction;

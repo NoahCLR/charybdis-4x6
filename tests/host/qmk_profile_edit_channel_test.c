@@ -352,7 +352,7 @@ int main(void) {
     fake.peer.mode             = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW;
     fake.peer.mode_counter     = 3u;
     fake.peer_required         = true;
-    fake.peer_converged        = true;
+    fake.halves_agree          = true;
     fake.mode                  = (noah_profile_edit_mode_record_t){.counter = 3u, .mode = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW};
 #if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE)
     test_sets();

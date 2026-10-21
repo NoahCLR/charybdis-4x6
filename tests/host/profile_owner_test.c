@@ -982,16 +982,16 @@ static void test_prepare_uses_extended_no_progress_timeout(void) {
     stage_valid_candidate_pair(&left, &right, 150u, &now);
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 150u);
     send_and_scan_pair(&left, &right, frame, &now);
-    for (uint32_t guard = 0u; guard < 64u && !left.host_barrier_started; guard++) {
+    for (uint32_t guard = 0u; guard < 64u && !left.host_barrier.started; guard++) {
         scan_pair(&left, &right, &now);
     }
-    assert(left.host_barrier_started && left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
+    assert(left.host_barrier.started && left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
     started_at                      = left.host_last_activity_at;
     left.reconciler.next_attempt_at = started_at + NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS + 1000u;
 
     (void)noah_profile_owner_scan(&left, true, started_at + NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
-    assert(!left.host_cancel_pending);
+    assert(!left.host_barrier.cancel_pending);
     assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_HOST);
 
     assert(noah_profile_owner_scan(&left, true, started_at + NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS));
@@ -1036,10 +1036,10 @@ static void test_waiting_for_a_quiet_keyboard_never_ends_a_save(void) {
     stage_valid_candidate_pair(&left, &right, 160u, &now);
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 160u);
     send_and_scan_pair(&left, &right, frame, &now);
-    for (uint32_t guard = 0u; guard < 64u && !left.host_barrier_started; guard++) {
+    for (uint32_t guard = 0u; guard < 64u && !left.host_barrier.started; guard++) {
         scan_pair(&left, &right, &now);
     }
-    assert(left.host_barrier_started && left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
+    assert(left.host_barrier.started && left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
     // The other half's storage stops for 90 s (twice its own lease, half
     // again the copy's no-progress window): its owner gets no scans and its
     // clock stands still; the USB half keeps asking.
@@ -1048,7 +1048,7 @@ static void test_waiting_for_a_quiet_keyboard_never_ends_a_save(void) {
     for (uint32_t elapsed = 0u; elapsed < 90000u; elapsed += 50u) {
         (void)noah_profile_owner_scan(&left, true, now);
         now += 50u;
-        assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && !left.host_cancel_pending);
+        assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && !left.host_barrier.cancel_pending);
     }
     assert(left.reconciler.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED);
     // Quiet again: the copy finishes and both halves commit.
@@ -1078,14 +1078,14 @@ static void test_prepare_phase_progress_extends_only_once(void) {
     stage_valid_candidate_pair(&left, &right, 151u, &now);
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 151u);
     send_and_scan_pair(&left, &right, frame, &now);
-    for (unsigned guard = 0; guard < 64 && !left.host_barrier_started; guard++) scan_pair(&left, &right, &now);
-    assert(left.host_barrier_started);
+    for (unsigned guard = 0; guard < 64 && !left.host_barrier.started; guard++) scan_pair(&left, &right, &now);
+    assert(left.host_barrier.started);
     uint32_t started = left.host_last_activity_at;
     left.reconciler.state = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_DURABLE;
     left.reconciler.transfer_offset = left.reconciler.transfer_descriptor.payload_length;
-    left.host_barrier_progress_offset = left.reconciler.transfer_offset;
+    left.host_barrier.progress_offset = left.reconciler.transfer_offset;
     left.reconciler.prepare_progress_phase = NOAH_PROFILE_PEER_STORE_VALIDATING;
-    left.host_barrier_progress_phase = NOAH_PROFILE_PEER_STORE_VALIDATING;
+    left.host_barrier.progress_phase = NOAH_PROFILE_PEER_STORE_VALIDATING;
     left_link.injected = (noah_profile_split_v1_frame_t){
         .kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY,
         .generation = left.reconciler.transfer_descriptor.generation,
@@ -1102,7 +1102,7 @@ static void test_prepare_phase_progress_extends_only_once(void) {
     left.reconciler.attempt_immediate = true;
     left.scheduler_cursor = 1; // owner split scheduler
     noah_profile_owner_scan(&left, true, now);
-    assert(left.host_last_activity_at == now && left.host_barrier_progress_phase == NOAH_PROFILE_PEER_STORE_PREPARING);
+    assert(left.host_last_activity_at == now && left.host_barrier.progress_phase == NOAH_PROFILE_PEER_STORE_PREPARING);
     uint32_t progressed = now;
     now = started + 70000; // beyond the old whole-copy deadline
     left_link.inject_busy = true;
@@ -1110,10 +1110,10 @@ static void test_prepare_phase_progress_extends_only_once(void) {
     left.scheduler_cursor = 1;
     noah_profile_owner_scan(&left, true, now);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
-    assert(left.host_last_activity_at == progressed && !left.host_cancel_pending);
+    assert(left.host_last_activity_at == progressed && !left.host_barrier.cancel_pending);
     left.reconciler.next_attempt_at = progressed + NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS + 1000;
     noah_profile_owner_scan(&left, true, progressed + NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS);
-    assert(left.host_cancel_pending || left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
+    assert(left.host_barrier.cancel_pending || left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
 }
 
 // The other half fails to store its copy (one flash write). Up to the split
@@ -1155,7 +1155,7 @@ static void run_peer_store_write_failures(uint8_t failures, uint16_t transaction
     if (left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE) {
         noah_profile_split_reconciler_status_t split;
         (void)noah_profile_split_reconciler_status(&left.reconciler, &split);
-        fprintf(stderr, "failures %u armed %u: host state %u error %u cancel %u | split state %u status %u retries %u active %u | peer store %u owner %u admission %u peer owner state %u\n", (unsigned)failures, (unsigned)armed, (unsigned)left.host_transaction.status.state, (unsigned)left.host_transaction.status.error.code, (unsigned)left.host_cancel_pending, (unsigned)split.state, (unsigned)split.last_status, (unsigned)left.reconciler.prepared_storage_retries, (unsigned)split.prepared_push_active, (unsigned)noah_profile_peer_store_backend_state(&right.peer_store), (unsigned)right.reconciler.transfer_owner, (unsigned)noah_profile_candidate_store_backend_admission_owner(&right.staging.candidate_backend), (unsigned)right.state);
+        fprintf(stderr, "failures %u armed %u: host state %u error %u cancel %u | split state %u status %u retries %u active %u | peer store %u owner %u admission %u peer owner state %u\n", (unsigned)failures, (unsigned)armed, (unsigned)left.host_transaction.status.state, (unsigned)left.host_transaction.status.error.code, (unsigned)left.host_barrier.cancel_pending, (unsigned)split.state, (unsigned)split.last_status, (unsigned)left.reconciler.prepared_storage_retries, (unsigned)split.prepared_push_active, (unsigned)noah_profile_peer_store_backend_state(&right.peer_store), (unsigned)right.reconciler.transfer_owner, (unsigned)noah_profile_candidate_store_backend_admission_owner(&right.staging.candidate_backend), (unsigned)right.state);
     }
     assert(armed == failures);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
@@ -1205,11 +1205,11 @@ static void test_unexpected_newer_postcommit_authority_never_activates(void) {
     }
     assert(left.store.committed.generation == 1u);
     assert(right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
-    for (uint32_t guard = 0u; guard < 32u && (!left.host_barrier_local_published || !left.host_barrier_peer_commit_authorized); guard++) {
+    for (uint32_t guard = 0u; guard < 32u && (!left.host_barrier.local_published || !left.host_barrier.peer_commit_authorized); guard++) {
         left.scheduler_cursor = 0u;
         assert(noah_profile_owner_scan(&left, true, now++));
     }
-    assert(left.host_barrier_local_published && left.host_barrier_peer_commit_authorized);
+    assert(left.host_barrier.local_published && left.host_barrier.peer_commit_authorized);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER);
 
     newer = peer_descriptor(&left, 2u);
@@ -1736,9 +1736,9 @@ static void test_link_lost_after_the_peer_commit_was_seen_still_activates(void) 
     // link before the boundary clears. The Apply is confirmed, so this half
     // activates without seeing the peer again.
     activation_block_reason = NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT;
-    for (uint32_t guard = 0u; guard < 4096u && !left.host_barrier_peer_confirmed; guard++)
+    for (uint32_t guard = 0u; guard < 4096u && !left.host_barrier.peer_confirmed; guard++)
         scan_pair(&left, &right, &now);
-    assert(left.host_barrier_peer_confirmed);
+    assert(left.host_barrier.peer_confirmed);
     assert(right.store.committed.generation == left.store.committed.generation);
     left_link.peer  = NULL;
     right_link.peer = NULL;
@@ -1924,7 +1924,7 @@ static void boot_live_pair(noah_profile_owner_t *left, memory_t *left_memory, no
 static bool both_halves_converged(noah_profile_owner_t *left) {
     noah_profile_owner_working_status_t status;
 
-    return noah_profile_owner_working_status(left, &status) && status.peer_converged && !status.edits_blocked;
+    return noah_profile_owner_working_status(left, &status) && status.halves_agree && !status.edits_blocked;
 }
 
 static void scan_until_converged(noah_profile_owner_t *left, noah_profile_owner_t *right, uint32_t *now) {
