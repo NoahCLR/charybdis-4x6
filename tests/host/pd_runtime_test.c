@@ -289,33 +289,33 @@ uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
 
 // Dispatch-test records model the published eight-slot cache. The motion
 // stubs below let this test observe which slot the shared engine selected.
-static const uint8_t test_pd_records[8][96] = {
-    [0] = {[0] = 0, [1] = 2, [4] = 100},
-    [1] = {[0] = 1, [1] = 1, [4] = 120, [5] = 5},
-    [2] = {[0] = 2, [1] = 1, [4] = 220, [5] = 5},
-    [3] = {[0] = 3, [1] = 1, [4] = 64, [5] = 6},
-    [4] = {[0] = 4, [1] = 1, [2] = 1, [4] = 164, [5] = 6},
-    [5] = {[0] = 5, [1] = 2, [4] = 100},
+static const noah_pd_config_t test_pd_records[8] = {
+    [0] = {.id = 0, .kind = NOAH_PD_KIND_SCROLLING, .dpi = 100},
+    [1] = {.id = 1, .kind = NOAH_PD_KIND_DIRECTIONAL, .dpi = 1400},
+    [2] = {.id = 2, .kind = NOAH_PD_KIND_DIRECTIONAL, .dpi = 1500},
+    [3] = {.id = 3, .kind = NOAH_PD_KIND_DIRECTIONAL, .dpi = 1600},
+    [4] = {.id = 4, .kind = NOAH_PD_KIND_DIRECTIONAL, .pointer_layer = NOAH_PD_POINTER_LAYER_PREFER_TYPING, .dpi = 1700},
+    [5] = {.id = 5, .kind = NOAH_PD_KIND_SCROLLING, .dpi = 100},
 };
-static const uint8_t *active_pd_record;
+static const noah_pd_config_t *active_pd_record;
 
-const uint8_t *noah_effective_pd_for_mask(uint32_t mode) {
+const noah_pd_config_t *noah_effective_pd_for_mask(uint32_t mode) {
     for (uint8_t slot = 0; slot < 6; slot++) {
-        if (mode == (UINT32_C(1) << slot)) return test_pd_records[slot];
+        if (mode == (UINT32_C(1) << slot)) return &test_pd_records[slot];
     }
     return NULL;
 }
 
-void noah_pd_engine_enter(const uint8_t *record) { active_pd_record = record; }
+void noah_pd_engine_enter(const noah_pd_config_t *slot) { active_pd_record = slot; }
 void noah_pd_engine_exit(void) {
-    if (active_pd_record && active_pd_record[0] == 1) reset_volume_mode();
+    if (active_pd_record && active_pd_record->id == 1) reset_volume_mode();
     active_pd_record = NULL;
 }
-uint8_t noah_pd_engine_masked_mods(const uint8_t *record) { (void)record; return 0; }
+uint8_t noah_pd_engine_masked_mods(const noah_pd_config_t *slot) { (void)slot; return 0; }
 bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; return false; }
 report_mouse_t noah_pd_engine_motion(report_mouse_t report) {
     if (!active_pd_record) return report;
-    switch (active_pd_record[0]) {
+    switch (active_pd_record->id) {
         case 0: case 5: return handle_dragscroll_mode(report);
         case 1: return handle_volume_mode(report);
         case 2: return handle_brightness_mode(report);

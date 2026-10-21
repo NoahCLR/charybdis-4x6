@@ -863,31 +863,31 @@ void pointing_device_set_cpi(uint16_t cpi) {
     current_cpi = cpi;
 }
 
-static const uint8_t test_pd_records[8][96] = {
-    [0] = {[0] = 0, [1] = 2, [4] = 100},
-    [1] = {[0] = 1, [1] = 1},
-    [2] = {[0] = 2, [1] = 1},
-    [3] = {[0] = 3, [1] = 1},
-    [4] = {[0] = 4, [1] = 1, [2] = 1},
-    [5] = {[0] = 5, [1] = 2, [6] = 8},
+static const noah_pd_config_t test_pd_records[8] = {
+    [0] = {.id = 0, .kind = NOAH_PD_KIND_SCROLLING, .dpi = 100},
+    [1] = {.id = 1, .kind = NOAH_PD_KIND_DIRECTIONAL},
+    [2] = {.id = 2, .kind = NOAH_PD_KIND_DIRECTIONAL},
+    [3] = {.id = 3, .kind = NOAH_PD_KIND_DIRECTIONAL},
+    [4] = {.id = 4, .kind = NOAH_PD_KIND_DIRECTIONAL, .pointer_layer = NOAH_PD_POINTER_LAYER_PREFER_TYPING},
+    [5] = {.id = 5, .kind = NOAH_PD_KIND_SCROLLING, .held_modifiers = MOD_BIT(KC_LEFT_GUI)},
 };
-static const uint8_t *active_pd_record;
+static const noah_pd_config_t *active_pd_record;
 
-const uint8_t *noah_effective_pd_for_mask(uint32_t mode) {
+const noah_pd_config_t *noah_effective_pd_for_mask(uint32_t mode) {
     for (uint8_t slot = 0; slot < 6; slot++) {
-        if (mode == (UINT32_C(1) << slot)) return test_pd_records[slot];
+        if (mode == (UINT32_C(1) << slot)) return &test_pd_records[slot];
     }
     return NULL;
 }
 
 void noah_pd_engine_exit(void) {
-    if (active_pd_record && active_pd_record[0] == 0) reset_dragscroll_count++;
+    if (active_pd_record && active_pd_record->id == 0) reset_dragscroll_count++;
     active_pd_record = NULL;
 }
-void noah_pd_engine_enter(const uint8_t *record) { active_pd_record = record; }
+void noah_pd_engine_enter(const noah_pd_config_t *slot) { active_pd_record = slot; }
 report_mouse_t noah_pd_engine_motion(report_mouse_t report) { return report; }
 bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; return false; }
-uint8_t noah_pd_engine_masked_mods(const uint8_t *record) { (void)record; return 0; }
+uint8_t noah_pd_engine_masked_mods(const noah_pd_config_t *slot) { (void)slot; return 0; }
 
 bool is_keyboard_master(void) {
     return true;

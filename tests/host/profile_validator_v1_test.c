@@ -598,6 +598,72 @@ static void test_combo_domain_v3(void) {
     expect_result(validate(bytes, sizeof(bytes), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
 }
 
+// The firmware's translation as these tests see it: a key is its own keycode
+// and a momentary layer is QMK's MO(n); two keys stand for translations that
+// land on KC_NO and KC_TRNS, and a layer lock is an action this build cannot
+// run.
+enum { TEST_QK_MOMENTARY = 0x5220, TEST_KEY_TO_NO = 0x0070, TEST_KEY_TO_TRNS = 0x0071 };
+static bool translating_to_native(const noah_profile_action_v1_t *action, uint16_t *native) {
+    if (action->kind == NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY) {
+        *native = (uint16_t)(TEST_QK_MOMENTARY + action->operand);
+        return true;
+    }
+    if (action->kind != NOAH_PROFILE_ACTION_V1_QMK_KEYCODE) return false;
+    *native = action->operand == TEST_KEY_TO_NO ? 0u : action->operand == TEST_KEY_TO_TRNS ? 1u : action->operand;
+    return true;
+}
+static const noah_profile_validator_v1_runtime_t translating_runtime = {.combo_to_native = translating_to_native};
+
+static void put_combo_action(uint8_t *at, uint8_t kind, uint16_t operand) {
+    at[0] = kind, at[1] = 0, at[2] = (uint8_t)operand, at[3] = (uint8_t)(operand >> 8);
+}
+
+// The schema alone accepts the row; translated, it cannot run as a QMK combo,
+// so the combo domain is refused at its row.
+static void expect_native_refusal(const uint8_t *bytes, size_t length) {
+    noah_profile_validator_v1_compatibility_t compatible  = compatibility();
+    noah_profile_validator_v1_declaration_t   declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS);
+    noah_profile_validator_v1_error_t         error;
+    compatible.required_domain_mask = 0;
+    expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+    compatible.runtime = &translating_runtime;
+    expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
+    assert(error.domain_id == NOAH_PROFILE_DOMAIN_V1_COMBOS && error.row_index == 0u);
+}
+
+// The firmware translates every action of a row and asks the combo module's
+// native rule, the one the effective combo table asks, so a profile it accepts
+// always materializes its combos.
+static void test_combo_native_rule(void) {
+    enum { DOMAIN = 8 + COMBO_TEST_ROW };
+    uint8_t  bytes[8 + 6 + DOMAIN];
+    size_t   length = combo_profile(bytes, 1, COMBO_TEST_INPUTS, DOMAIN);
+    uint8_t *output = &bytes[22 + 8], *inputs = &bytes[22 + 12];
+    noah_profile_validator_v1_compatibility_t compatible  = compatibility();
+    noah_profile_validator_v1_declaration_t   declaration = declaration_for(bytes, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS);
+    noah_profile_validator_v1_error_t         error;
+    compatible.required_domain_mask = 0;
+    compatible.runtime              = &translating_runtime;
+    assert(length == sizeof(bytes));
+    expect_result(validate(bytes, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
+    // The sixteenth input is QMK's MO(1), the first a momentary layer 1.
+    put_combo_action(inputs, NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, 1);
+    put_combo_action(&inputs[4 * 15], NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, TEST_QK_MOMENTARY + 1);
+    expect_native_refusal(bytes, length);
+    combo_row(&bytes[22], COMBO_TEST_INPUTS, 0, 45, 0xffffu, 41, 4);
+    // An input that runs as KC_TRNS.
+    put_combo_action(&inputs[4 * 7], NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, TEST_KEY_TO_TRNS);
+    expect_native_refusal(bytes, length);
+    combo_row(&bytes[22], COMBO_TEST_INPUTS, 0, 45, 0xffffu, 41, 4);
+    // An output that runs as KC_NO.
+    put_combo_action(output, NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, TEST_KEY_TO_NO);
+    expect_native_refusal(bytes, length);
+    combo_row(&bytes[22], COMBO_TEST_INPUTS, 0, 45, 0xffffu, 41, 4);
+    // An input this build cannot translate.
+    put_combo_action(&inputs[4 * 3], NOAH_PROFILE_ACTION_V1_LAYER_LOCK, 1);
+    expect_native_refusal(bytes, length);
+}
+
 // A profile of one domain: the blob header, its 6-byte envelope, its payload.
 static size_t single_domain_profile(uint8_t *bytes, uint8_t id, uint8_t version, const uint8_t *payload, uint32_t length) {
     const uint8_t head[] = {'N', 'L', 'P', '1', 4, 0, 1, 1, id, version, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), (uint8_t)(length >> 24)};
@@ -764,6 +830,7 @@ int main(int argc, char **argv) {
     test_read_failures(argv[1]);
     test_combo_domain();
     test_combo_domain_v3();
+    test_combo_native_rule();
     test_keymap_domain();
     test_macro_domain();
     puts("profile validator v1 host tests passed");

@@ -190,6 +190,13 @@ int main(int argc, char **argv) {
     v2_report[4] = 4;
     memset(&v2_report[5], 0, 27);
     assert(noah_qmk_combo_readback_get(v2_report, 32) && v2_report[11] == 45 && v2_report[13] == 6);
+    // Distinct actions that run as one key: row 1's second input becomes QMK's
+    // MO(1) beside its momentary layer 1. The table asks the combo module's
+    // native rule, the one the validator asks, and publishes nothing.
+    bytes[8 + 20 + 12 + 4 + 2] = 0x21;
+    bytes[8 + 20 + 12 + 4 + 3] = 0x52;
+    noah_effective_combo_runtime_invalidate(&runtime, 6, second_view.identity, second_view.identity, &second_view);
+    assert(!noah_effective_combo_valid() && combo_count() == 0 && combo_get(0) == NULL);
     // Two rows sharing an output retain independent permissions and readback.
     FILE *permissions = fopen(argv[2], "r");
     assert(permissions && fscanf(permissions, "%128s", encoded) == 1);

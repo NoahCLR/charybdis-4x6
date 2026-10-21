@@ -18,12 +18,13 @@
 
 #ifdef NOAH_PD_PROFILE_ENABLE
 pd_mode_traits_t pd_mode_effective_traits(pd_mode_mask_t mode) {
-    const uint8_t *record = noah_effective_pd_for_mask(mode);
-    if (!record) return PD_MODE_TRAIT_NONE;
-    pd_mode_traits_t traits = record[2] ? PD_MODE_TRAIT_PREFER_TYPING_LAYER : PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED;
-    if (record[1] == 2) {
+    const noah_pd_config_t *slot = noah_effective_pd_for_mask(mode);
+    if (!slot) return PD_MODE_TRAIT_NONE;
+    bool             prefer_typing = slot->pointer_layer == NOAH_PD_POINTER_LAYER_PREFER_TYPING;
+    pd_mode_traits_t traits        = prefer_typing ? PD_MODE_TRAIT_PREFER_TYPING_LAYER : PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED;
+    if (slot->kind == NOAH_PD_KIND_SCROLLING) {
         traits |= PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND;
-        if (!record[2]) traits |= PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE;
+        if (!prefer_typing) traits |= PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE;
     }
     return traits;
 }

@@ -1160,6 +1160,13 @@ Input actions must be distinct, including after native translation;
 no-action/transparent inputs and callback/no-action outputs are rejected.
 Semantic references must exist in the compiled action ABI. Unknown versions,
 unknown flags, a short or overlong row and trailing bytes are rejected.
+The combo module states the native half once
+(`noah_profile_combo_v1_natives_valid`). The whole-profile validator applies it
+to what the firmware's translation hook returns, and the effective combo table
+applies it to the natives it materializes, so a profile the keyboard accepts
+always materializes its combos. The hook stays: calling the translator
+directly would make the QMK-free validator link QMK keycode translation in
+every runner and probe that compiles it.
 
 The output bypass flag does not disable the chord or change its inputs,
 output, timing or chord-layer mask. It is independent of the global output
