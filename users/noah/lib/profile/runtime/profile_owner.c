@@ -812,7 +812,7 @@ static void note_host_barrier_progress(noah_profile_owner_t *owner, uint32_t now
     // The other half waiting for a quiet keyboard before it can erase is not
     // a stalled copy (D-F32): its BUSY_STORAGE_PAUSED keeps the save's
     // deadlines, as its own clock stands still meanwhile.
-    if (owner && owner->reconciler.busy_streak != 0u && owner->reconciler.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED && owner->host_activity_known) {
+    if (owner && noah_profile_split_reconciler_peer_storage_paused(&owner->reconciler) && owner->host_activity_known) {
         owner->host_last_activity_at = now_ms;
         return;
     }
@@ -1696,7 +1696,7 @@ bool noah_profile_owner_working_status(const noah_profile_owner_t *owner, noah_p
     status->adjustment_pending        = owner->auto_save.pending != 0u;
     status->edits_blocked             = profile_held(owner) || halves_apart(owner) || noah_profile_working_copy_busy(&owner->working) || owner->auto_save.pending || owner->auto_save.edit_transaction;
     status->storage_paused            = owner->config.storage_paused && owner->config.storage_paused(owner->config.storage_paused_context);
-    status->peer_storage_paused       = owner->reconciler.busy_streak != 0u && owner->reconciler.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED;
+    status->peer_storage_paused       = noah_profile_split_reconciler_peer_storage_paused(&owner->reconciler);
     status->peer_refused              = noah_profile_working_sync_refused(&owner->working_sync);
     status->mode_store_failed         = owner->working_sync.mode_store_failed;
     status->stopped                   = noah_profile_owner_stopped(owner);

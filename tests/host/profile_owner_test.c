@@ -1050,7 +1050,8 @@ static void test_waiting_for_a_quiet_keyboard_never_ends_a_save(void) {
         now += 50u;
         assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER && !left.host_cancel_pending);
     }
-    assert(left.reconciler.last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED);
+    assert(noah_profile_split_reconciler_peer_storage_paused(&left.reconciler));
+    assert(!noah_profile_split_reconciler_peer_storage_paused(&right.reconciler) && !noah_profile_split_reconciler_peer_storage_paused(NULL));
     // Quiet again: the copy finishes and both halves commit.
     right_storage_paused = false;
     for (uint32_t guard = 0u; guard < 8192u && (left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || right.committed_descriptor.generation != 1u || left.state != NOAH_PROFILE_OWNER_READY_VALIDATED || right.state != NOAH_PROFILE_OWNER_READY_VALIDATED); guard++) {
@@ -1061,6 +1062,7 @@ static void test_waiting_for_a_quiet_keyboard_never_ends_a_save(void) {
     }
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && left.host_transaction.last_committed_transaction_id == 160u);
     assert(left.committed_descriptor.generation == 1u && right.committed_descriptor.generation == 1u);
+    assert(!noah_profile_split_reconciler_peer_storage_paused(&left.reconciler));
 }
 
 // A matching peer may cross the old 60-second whole-prepare duration while
