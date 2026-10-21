@@ -311,7 +311,9 @@ behavior. The key runtime owns that routing; see
 
 Firmware implements whole-payload and single-record cold validators in
 `users/noah/lib/profile/schema/profile_pd_v1.c`; no cache, heap or pointing-path
-decode is introduced. The app codec lives in
+decode is introduced. They take any buffer, aligned or not, and name every byte
+they read by its `noah_pd_config_t` field, so they and the encoder cannot drift
+from the structure. The app codec lives in
 `core/schema/pd-mode-domain-v1.js` in the independent Ark repository. It rejects unknown
 object fields, coercion, explicit null values, truncation, trailing bytes,
 reserved data, incorrect ID order and noncanonical encodings.
@@ -395,11 +397,21 @@ Current sparse PD and its record rules remain the readback/validation contract.
 The effective PD cache reads only on initialization/publication, in chunks of
 at most 20 bytes: the header, then each stored record into its slot's row,
 validating each; omitted slots are materialized disabled with an empty name,
-so the cache always holds 32 rows (3,072 bytes) before becoming ready. A
+so the cache always holds 32 rows (4,096 bytes) before becoming ready. A
 failed read or validation leaves it unavailable; the owner fails closed and
 status does not advertise an active compiled fallback. Motion performs no
 profile storage reads. Activation waits for held/locked modes and intercepted
 button releases, using the existing persistent-intent reason bit.
+
+The cache holds each slot as `noah_pd_config_t`, the structure the authored
+defaults use. It is the 128-byte record byte for byte: `profile_pd_v1.c`
+statically asserts every field's offset against the record table above, its
+2-byte alignment and little-endian byte order. Publication copies validated
+records in unchanged, the pointing engine reads named fields through the
+cache's aligned type, and only the codec reads bytes, naming each by its field.
+A separately decoded copy was not chosen because it would double the 4 KiB
+cache. Reading the earlier byte array as the structure was unsafe only because
+it had no alignment guarantee, which typing the cache provides.
 
 The compiled reader must service PD-only reads directly from the final PD
 payload, whose compiled size the authored slots fix, using the same encoder and validators as full serialization. A
