@@ -154,10 +154,6 @@ typedef union {
 // the candidate ends, and any field set means cleanup is due. `descriptor`
 // means something only while `descriptor_known`.
 typedef struct {
-    noah_profile_split_descriptor_t      descriptor;
-    noah_profile_candidate_v1_error_id_t cancel_reason;   // NONE unless a cancel was asked
-    uint32_t                             progress_offset; // the copy's last correlated progress
-    uint8_t                              progress_phase;
     bool                                 descriptor_known : 1;
     bool                                 started : 1;
     bool                                 local_published : 1;
@@ -165,9 +161,34 @@ typedef struct {
     bool                                 waiting_boundary : 1;
     bool                                 peer_confirmed : 1;
     bool                                 cancel_pending : 1;
+    uint8_t                              progress_phase;
+    noah_profile_candidate_v1_error_id_t cancel_reason;   // NONE unless a cancel was asked
+    uint32_t                             progress_offset; // the copy's last correlated progress
+    noah_profile_split_descriptor_t      descriptor;
 } noah_profile_owner_host_barrier_t;
 
 typedef struct {
+    // Every scan step reads these. First in the owner, each is within a
+    // Thumb-1 load's immediate offset (32 bytes for a byte), so no offset is
+    // held in a register across the scan; 14 KB in, each would need one.
+    bool                                 boot_activation_started : 1;
+    bool                                 peer_activation_started : 1;
+    bool                                 host_activity_known : 1;
+    bool                                 descriptor_readable : 1;
+    bool                                 split_initialized : 1;
+    bool                                 runtimes_installed : 1;
+    bool                                 working_ready : 1;
+    bool                                 master : 1;
+    bool                                 scan_again : 1;
+    uint8_t                              scheduler_cursor;
+    // The subsystem whose step last worked: a repeated step in the same
+    // durable-I/O grant visits it alone (D-F29, "Pacing").
+    uint8_t                              scheduler_last;
+    noah_profile_owner_state_t           state;
+    // The host candidate's lease, from its first step until it is released:
+    // longer than its barrier, so kept beside it (with host_activity_known).
+    uint32_t                             host_last_activity_at;
+    noah_profile_owner_host_barrier_t    host_barrier;
     noah_profile_owner_config_t               config;
     noah_profile_compiled_v1_t                compiled;
     noah_profile_reader_t                     compiled_reader;
@@ -197,26 +218,8 @@ typedef struct {
     // within the host timeout is aborted, as an abandoned Apply is.
     uint32_t                             edit_activity_at;
     noah_profile_split_descriptor_t      committed_descriptor;
-    noah_profile_owner_host_barrier_t    host_barrier;
     noah_profile_candidate_v1_error_t    adoption_error;
     noah_profile_store_result_t          discovery_result;
-    noah_profile_owner_state_t           state;
-    // The host candidate's lease, from its first step until it is released:
-    // longer than its barrier, so kept beside it (with host_activity_known).
-    uint32_t                             host_last_activity_at;
-    uint8_t                              scheduler_cursor;
-    // The subsystem whose step last worked: a repeated step in the same
-    // durable-I/O grant visits it alone (D-F29, "Pacing").
-    uint8_t                              scheduler_last;
-    bool                                 boot_activation_started : 1;
-    bool                                 peer_activation_started : 1;
-    bool                                 host_activity_known : 1;
-    bool                                 descriptor_readable : 1;
-    bool                                 split_initialized : 1;
-    bool                                 runtimes_installed : 1;
-    bool                                 working_ready : 1;
-    bool                                 master : 1;
-    bool                                 scan_again : 1;
 } noah_profile_owner_t;
 
 // Protocol-neutral, caller-owned observation of the complete live-profile
