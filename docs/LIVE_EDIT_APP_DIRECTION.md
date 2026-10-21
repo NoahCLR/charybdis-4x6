@@ -1022,7 +1022,7 @@ that way is noncanonical and refused, so every profile has one encoding. RGB
 keeps one colour row per slot (domain `0x10` version 3, 32 rows, 120 bytes
 more than version 2) because a disabled slot keeps its colour. The firmware
 accepts only RGB v3 and PD v2 in schema 2.0, with unchanged storage geometry;
-the effective cache still holds all 32 slots (3,072 bytes), filled at
+the effective cache still holds all 32 slots (4,096 bytes), filled at
 publication, so pointing never reads storage.
 
 `pd_mode_mask_t` is 32 bits. The split runtime sync carries mode ids, not
