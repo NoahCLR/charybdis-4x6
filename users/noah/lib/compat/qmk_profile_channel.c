@@ -127,7 +127,7 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
             status->peer_origin_half = owner->peer.origin_half;
         }
     }
-    if (owner->peer_converged) {
+    if (owner->saved_profiles_agree) {
         status->state_flags |= NOAH_PROFILE_STATE_PEER_CONVERGED;
     }
     if (owner->peer_cleanup_pending) {
