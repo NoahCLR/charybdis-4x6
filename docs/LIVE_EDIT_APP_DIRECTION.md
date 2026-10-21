@@ -2000,11 +2000,30 @@ review, stored on each half in QMK's EEPROM user datablock (32 bytes: two
 16-byte records with a counter and CRC-32, the newer valid one counting), never
 in a profile, backup or review. A change takes a counter above both halves';
 the higher counter wins on reconnect, and equal counters that disagree are
-reported until the next change. A change is refused with unsaved edits or pending adjustments; the client
-finishes Save/Revert first. QMK's EEPROM is wear-levelled flash that may erase, so a half writes a new record
-only when its keyboard is quiet, as before a slot erase (D-F29), never from
-a Profile Wire report or a split RPC; a failed write backs off and is
-reported.
+reported until the next change. A change is refused NOT_CLEAN with unsaved
+edits or pending adjustments; the client finishes Save/Revert first. It is
+BUSY while a save or an edit runs and until the other half answers and holds
+the same working copy: a half that has not heard the other cannot know a
+counter above both, so a change made on one half alone could lose to the
+other half's higher counter on reconnect. Considered: holding a change while
+anything holds the profile, as an edit is; not done, since the mode is
+stored outside the profile and its write waits for a quiet keyboard whatever
+runs, so the wait would protect nothing. QMK's EEPROM is wear-levelled flash
+that may erase, so a half writes a new record only when its keyboard is
+quiet, as before a slot erase (D-F29), never from a Profile Wire report or a
+split RPC; a failed write backs off and is reported.
+
+**Admission.** Which edit, Save, Revert, mode change, Apply report or
+keyboard step may start, and the answer when it may not, is one statement in
+the owner, one row per operation with its refusals in answer order; edit
+status flag 4 is derived from the edit row, and Profile Wire's admission
+table mirrors it ([Live edits](architecture/profile-wire-v1.md#live-edits)).
+Considered: a separate admission module tested through a stand-in for its
+inputs; dropped, as it would have one production adapter and would have to
+evaluate every condition up front, where the keyboard's automatic admission
+must take no provider or peer snapshot until it has work. Considered: a
+reason byte per refusal; dropped, as BUSY with the cause flags already says
+why, and the unreleased base keeps room for an additive flag.
 
 **The profile owns what QMK holds** (plan answer 10). Base RGB, default
 layers, keymap options, DPI and auto-mouse are pushed into QMK with its
@@ -2073,7 +2092,9 @@ state raise the static tripwire by one reviewed increment
 ([memory budgets](architecture/memory-budgets.md#live-edits--d-f32)).
 
 Client follow-ups: Ark's live edits and Save; **Live mode in Ark**, including
-mode switching and the "saved by the keyboard" indication. Hardware acceptance owes edits
+mode switching (NOT_CLEAN: offer Save or Revert, also while flag 13 is set;
+BUSY: wait for flag 2, flag 6 clear and the phase idle) and the "saved by
+the keyboard" indication. Hardware acceptance owes edits
 in every domain on both halves, Save across a replug, an unsaved edit
 reverting on replug, typing through an edit, and RAM high-water on both
 halves.
