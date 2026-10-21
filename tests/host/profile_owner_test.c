@@ -4,12 +4,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "split_fault_link.h"
 #include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
 #include "users/noah/lib/profile/runtime/profile_owner.h"
 #include "users/noah/lib/profile/runtime/effective_keymap_macros_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/profile/schema/profile_settings_v1.h"
 #include "users/noah/lib/profile/storage/profile_flash_store.h"
+
+_Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= SPLIT_FAULT_LINK_FRAME_MAX && NOAH_PROFILE_WORKING_SYNC_FRAME_MAX <= SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries both protocols' largest frames");
 
 static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
 
@@ -72,16 +75,15 @@ typedef struct {
     bool     fail_commit_marker;
 } memory_t;
 
+// A half's PUT_PROFILE_SPLIT_SYNC link to the other half, and what the copy
+// tests count of the frames it sends.
 typedef struct {
-    noah_profile_owner_t *peer;
-    uint32_t chunk_frames;
-    uint32_t reuse_frames;
-    uint32_t metadata_frames;
-    uint32_t exchanges;
-    uint32_t source_unavailable;
-    uint8_t largest_chunk;
-    bool inject_busy;
-    noah_profile_split_v1_frame_t injected;
+    split_fault_link_t link;
+    uint32_t           chunk_frames;
+    uint32_t           reuse_frames;
+    uint32_t           metadata_frames;
+    uint32_t           source_unavailable;
+    uint8_t            largest_chunk;
 } split_link_t;
 
 static bool paced_copy;
@@ -242,33 +244,44 @@ static bool memory_write(void *context, noah_profile_storage_address_t address, 
     return true;
 }
 
-static bool split_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
-    split_link_t                    *link = context;
-    noah_profile_split_reconciler_t *peer_reconciler;
+// The other half's PUT_PROFILE_SPLIT_SYNC callback body.
+static bool owner_split_receive(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
+    return noah_profile_split_reconciler_receive(noah_profile_owner_split_reconciler(context), request, request_length, response, response_length);
+}
 
-    if (link && link->inject_busy) {
-        link->inject_busy = false;
-        return noah_profile_split_v1_frame_encode(&link->injected, response, response_length) == response_length;
-    }
-    if (!link || !link->peer || !(peer_reconciler = noah_profile_owner_split_reconciler(link->peer))) {
-        return false;
-    }
-    if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK) {
+static split_link_t split_link_to(noah_profile_owner_t *peer) {
+    return (split_link_t){.link = {.receive = owner_split_receive, .peer = peer}};
+}
+
+static bool split_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
+    split_link_t                 *link = context;
+    noah_profile_split_v1_frame_t sent;
+    noah_profile_split_v1_frame_t reply;
+    bool                          result;
+
+    assert(noah_profile_split_v1_frame_decode(request, request_length, &sent));
+    if (sent.kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK) {
         link->chunk_frames++;
-        if (request[20] > link->largest_chunk) link->largest_chunk = request[20];
+        if (sent.chunk_length > link->largest_chunk) link->largest_chunk = sent.chunk_length;
     }
-    if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) link->reuse_frames++;
-    if (request_length > 1u && request[1] == NOAH_PROFILE_SPLIT_V1_METADATA) link->metadata_frames++;
-    link->exchanges++;
-    bool result = noah_profile_split_reconciler_receive(peer_reconciler, request, request_length, response, response_length);
-    if (result && response[2] == NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE) link->source_unavailable++;
+    if (sent.kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) link->reuse_frames++;
+    if (sent.kind == NOAH_PROFILE_SPLIT_V1_METADATA) link->metadata_frames++;
+    result = split_fault_link_exchange(&link->link, request, request_length, response, response_length);
+    if (result && noah_profile_split_v1_reply_decode(response, response_length, &reply) && reply.status == NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE) link->source_unavailable++;
     if (paced_copy) {
         // Model the peer continuing to scan during the master's blocking RPC.
         uint32_t rpc_ms = request_length > NOAH_PROFILE_SPLIT_V1_FRAME_SIZE || response_length > NOAH_PROFILE_SPLIT_V1_FRAME_SIZE ? 9u : 5u;
         for (uint32_t elapsed = 0u; elapsed < rpc_ms; elapsed++)
-            (void)noah_profile_owner_scan(link->peer, false, ++fake_now);
+            (void)noah_profile_owner_scan(link->link.peer, false, ++fake_now);
     }
     return result;
+}
+
+// The exchange numbered `at` answers with `frame`, never delivering its request.
+static void inject_frame(split_fault_link_t *link, const noah_profile_split_v1_frame_t *frame, uint32_t at) {
+    link->injected_length = noah_profile_split_v1_frame_encode(frame, link->injected, sizeof(link->injected));
+    assert(link->injected_length != 0u);
+    link->inject = at;
 }
 
 static void write_u16(uint8_t *target, uint16_t value) {
@@ -514,7 +527,7 @@ static void commit_valid_candidate_pair(noah_profile_owner_t *master, noah_profi
 static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
     noah_profile_owner_t left, right;
     memory_t left_memory = {0}, right_memory = {0};
-    split_link_t left_link = {.peer = &right}, right_link = {.peer = &left};
+    split_link_t left_link = split_link_to(&right), right_link = split_link_to(&left);
     uint32_t now = 0u;
     uint8_t frame[32];
 
@@ -548,7 +561,7 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
     for (uint32_t guard = 0u; guard < 4096u && left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++) scan_pair(&left, &right, &now);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED);
 
-    left_link.chunk_frames = left_link.reuse_frames = left_link.metadata_frames = left_link.exchanges = left_link.source_unavailable = 0u;
+    left_link.chunk_frames = left_link.reuse_frames = left_link.metadata_frames = left_link.link.exchanges = left_link.source_unavailable = 0u;
     uint32_t peer_ready_at = 0u, master_ready_at = 0u, master_scans = 0u;
     paced_copy = true;
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 312u);
@@ -571,7 +584,7 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
     assert(diagnostic.reuse_exchanges == left_link.reuse_frames && diagnostic.source_unavailable_replies == 0u);
     // Every exchange but the periodic metadata one, which may fall due
     // while the copy runs, is the prepared push's.
-    assert(diagnostic.prepared_exchanges == left_link.exchanges - left_link.metadata_frames);
+    assert(diagnostic.prepared_exchanges == left_link.link.exchanges - left_link.metadata_frames);
     assert(diagnostic.prepared_scans > 0u && diagnostic.prepared_scans <= master_scans);
     for (uint32_t guard = 0u; guard < 8192u && (left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || left.state != NOAH_PROFILE_OWNER_READY_VALIDATED || right.state != NOAH_PROFILE_OWNER_READY_VALIDATED || right.committed_descriptor.generation != 2u); guard++) scan_pair(&left, &right, &now);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
@@ -588,7 +601,7 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
 static void test_long_profile_copy_reads_within_the_store_bound(void) {
     noah_profile_owner_t left, right;
     memory_t left_memory = {0}, right_memory = {0};
-    split_link_t left_link = {.peer = &right}, right_link = {.peer = &left};
+    split_link_t left_link = split_link_to(&right), right_link = split_link_to(&left);
     uint32_t now = 0u;
     candidate_blob = long_profile;
     candidate_length = sizeof(long_profile);
@@ -612,8 +625,8 @@ static void test_two_consecutive_live_commits_use_distributed_prepare_barrier(vo
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint32_t             now        = 20000u;
 
     memset(&left_memory, 0, sizeof(left_memory));
@@ -647,8 +660,8 @@ static void test_simultaneous_hosts_choose_stable_physical_origin_before_durabil
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint8_t              frame[32];
     uint32_t             now = 50000u;
 
@@ -701,8 +714,8 @@ static void test_prepared_peer_is_aborted_before_host_timeout_releases_candidate
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint8_t              frame[32];
     uint32_t             now = 70000u;
 
@@ -739,8 +752,8 @@ static void test_host_abort_is_coordinated_at_each_prepare_boundary(void) {
         noah_profile_owner_t right;
         memory_t             left_memory;
         memory_t             right_memory;
-        split_link_t         left_link  = {.peer = &right};
-        split_link_t         right_link = {.peer = &left};
+        split_link_t         left_link  = split_link_to(&right);
+        split_link_t         right_link = split_link_to(&left);
         uint8_t              frame[32];
         uint16_t             transaction_id = (uint16_t)(120u + phase);
         uint32_t             now            = (uint32_t)(120000u + phase * 10000u);
@@ -798,8 +811,8 @@ static void test_host_abort_ends_when_peer_never_acknowledges(void) {
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint8_t              frame[32];
     uint32_t             now = 200000u;
     uint32_t             aborted_at;
@@ -877,8 +890,8 @@ static void test_barrier_mailbox_retries_and_postcommit_abort_do_not_starve(void
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint8_t              frame[32];
     uint32_t             now = 160000u;
     uint32_t             writes_before;
@@ -929,8 +942,8 @@ static void test_local_known_commit_failure_aborts_prepared_peer_first(void) {
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint8_t              frame[32];
     uint32_t             now = 180000u;
 
@@ -968,8 +981,8 @@ static void test_prepare_uses_extended_no_progress_timeout(void) {
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint8_t              frame[32];
     uint32_t             now = 200000u;
     uint32_t             started_at;
@@ -1017,8 +1030,8 @@ static void test_waiting_for_a_quiet_keyboard_never_ends_a_save(void) {
     static noah_profile_owner_t right;
     static memory_t             left_memory;
     static memory_t             right_memory;
-    split_link_t                left_link  = {.peer = &right};
-    split_link_t                right_link = {.peer = &left};
+    split_link_t                left_link  = split_link_to(&right);
+    split_link_t                right_link = split_link_to(&left);
     uint8_t                     frame[32];
     uint32_t                    now = 300000u;
     uint32_t                    right_now;
@@ -1069,7 +1082,7 @@ static void test_waiting_for_a_quiet_keyboard_never_ends_a_save(void) {
 static void test_prepare_phase_progress_extends_only_once(void) {
     noah_profile_owner_t left, right;
     memory_t left_memory = {0}, right_memory = {0};
-    split_link_t left_link = {.peer = &right}, right_link = {.peer = &left};
+    split_link_t left_link = split_link_to(&right), right_link = split_link_to(&left);
     uint32_t now = 300000;
     uint8_t frame[32];
     memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
@@ -1086,7 +1099,7 @@ static void test_prepare_phase_progress_extends_only_once(void) {
     left.host_barrier_progress_offset = left.reconciler.transfer_offset;
     left.reconciler.prepare_progress_phase = NOAH_PROFILE_PEER_STORE_VALIDATING;
     left.host_barrier_progress_phase = NOAH_PROFILE_PEER_STORE_VALIDATING;
-    left_link.injected = (noah_profile_split_v1_frame_t){
+    noah_profile_split_v1_frame_t busy = {
         .kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY,
         .generation = left.reconciler.transfer_descriptor.generation,
         .payload_digest = left.reconciler.transfer_descriptor.payload_digest,
@@ -1098,14 +1111,14 @@ static void test_prepare_phase_progress_extends_only_once(void) {
         .busy_admission = NOAH_PROFILE_STORAGE_ADMISSION_PEER,
     };
     now = started + 50000;
-    left_link.inject_busy = true;
+    inject_frame(&left_link.link, &busy, left_link.link.exchanges + 1u);
     left.reconciler.attempt_immediate = true;
     left.scheduler_cursor = 1; // owner split scheduler
     noah_profile_owner_scan(&left, true, now);
     assert(left.host_last_activity_at == now && left.host_barrier_progress_phase == NOAH_PROFILE_PEER_STORE_PREPARING);
     uint32_t progressed = now;
     now = started + 70000; // beyond the old whole-copy deadline
-    left_link.inject_busy = true;
+    inject_frame(&left_link.link, &busy, left_link.link.exchanges + 1u);
     left.reconciler.attempt_immediate = true;
     left.scheduler_cursor = 1;
     noah_profile_owner_scan(&left, true, now);
@@ -1125,8 +1138,8 @@ static void run_peer_store_write_failures(uint8_t failures, uint16_t transaction
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint8_t              frame[32];
     uint32_t             now      = 300000u;
     uint32_t             started;
@@ -1186,8 +1199,8 @@ static void test_unexpected_newer_postcommit_authority_never_activates(void) {
     noah_effective_profile_status_t provider;
     memory_t                        left_memory;
     memory_t                        right_memory;
-    split_link_t                    left_link  = {.peer = &right};
-    split_link_t                    right_link = {.peer = &left};
+    split_link_t                    left_link  = split_link_to(&right);
+    split_link_t                    right_link = split_link_to(&left);
     noah_profile_split_descriptor_t newer;
     uint8_t                         frame[32];
     uint32_t                        now = 90000u;
@@ -1302,8 +1315,8 @@ static void test_boot_reconciles_different_generations_before_activation(void) {
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint32_t             now        = 1000u;
     uint32_t             left_writes_before_reconciliation;
 
@@ -1485,8 +1498,8 @@ static void test_commit_waits_for_a_safe_boundary_then_activates(void) {
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint8_t              frame[32];
     uint32_t             now = 250000u;
 
@@ -1604,8 +1617,8 @@ static void test_lost_link_after_decision_keeps_typing_and_resumes(void) {
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint32_t             now        = 300000u;
 
     decide_commit(&left, &left_memory, &right, &right_memory, &left_link, &right_link, 211u, &now);
@@ -1614,8 +1627,8 @@ static void test_lost_link_after_decision_keeps_typing_and_resumes(void) {
     // profile stays active on the USB half, which keeps typing it, never
     // activates a commit the peer has not been seen holding, and never fails
     // for good.
-    left_link.peer  = NULL;
-    right_link.peer = NULL;
+    left_link.link.disconnected  = true;
+    right_link.link.disconnected = true;
     for (uint32_t guard = 0u; guard < 4096u; guard++) {
         scan_pair(&left, &right, &now);
         assert(active_generation(&left) != left.store.committed.generation);
@@ -1623,8 +1636,8 @@ static void test_lost_link_after_decision_keeps_typing_and_resumes(void) {
         assert(left.state != NOAH_PROFILE_OWNER_STORAGE_ERROR && left.state != NOAH_PROFILE_OWNER_INTEGRATION_ERROR);
     }
 
-    left_link.peer  = &right;
-    right_link.peer = &left;
+    left_link.link.disconnected  = false;
+    right_link.link.disconnected = false;
     finish_commit(&left, &right, &now);
 }
 
@@ -1633,23 +1646,23 @@ static void test_peer_rebooted_while_unlinked_after_decision_resumes(void) {
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint32_t             now        = 400000u;
 
     decide_commit(&left, &left_memory, &right, &right_memory, &left_link, &right_link, 212u, &now);
 
     // Unplugging the link cable also powers the peer off: it boots again from
     // its durable prepared copy when the cable returns.
-    left_link.peer  = NULL;
-    right_link.peer = NULL;
+    left_link.link.disconnected  = true;
+    right_link.link.disconnected = true;
     for (uint32_t guard = 0u; guard < 256u; guard++) {
         scan_pair(&left, &right, &now);
         assert(active_generation(&left) != left.store.committed.generation);
     }
     init_right_half(&right, &right_memory, &right_link);
-    left_link.peer  = &right;
-    right_link.peer = &left;
+    left_link.link.disconnected  = false;
+    right_link.link.disconnected = false;
     finish_commit(&left, &right, &now);
 }
 
@@ -1658,8 +1671,8 @@ static void test_activation_waits_for_a_safe_boundary_while_typing(void) {
     noah_profile_owner_t        right;
     memory_t                    left_memory;
     memory_t                    right_memory;
-    split_link_t                left_link  = {.peer = &right};
-    split_link_t                right_link = {.peer = &left};
+    split_link_t                left_link  = split_link_to(&right);
+    split_link_t                right_link = split_link_to(&left);
     noah_profile_owner_status_t status;
     uint32_t                    now        = 500000u;
 
@@ -1687,8 +1700,8 @@ static void test_usb_restart_waits_for_a_settled_save(void) {
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint32_t             now        = 600000u;
 
     assert(!noah_profile_owner_usb_restart_safe(NULL));
@@ -1727,8 +1740,8 @@ static void test_link_lost_after_the_peer_commit_was_seen_still_activates(void) 
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint32_t             now        = 700000u;
 
     decide_commit(&left, &left_memory, &right, &right_memory, &left_link, &right_link, 215u, &now);
@@ -1740,8 +1753,8 @@ static void test_link_lost_after_the_peer_commit_was_seen_still_activates(void) 
         scan_pair(&left, &right, &now);
     assert(left.host_barrier_peer_confirmed);
     assert(right.store.committed.generation == left.store.committed.generation);
-    left_link.peer  = NULL;
-    right_link.peer = NULL;
+    left_link.link.disconnected  = true;
+    right_link.link.disconnected = true;
     for (uint32_t guard = 0u; guard < 64u && peer_in_sight(&left); guard++)
         scan_pair(&left, &right, &now);
     assert(!peer_in_sight(&left));
@@ -1754,8 +1767,8 @@ static void test_link_lost_after_the_peer_commit_was_seen_still_activates(void) 
     assert(active_generation(&left) == left.store.committed.generation);
 
     // Reconnecting finds both halves on the same record: nothing to repair.
-    left_link.peer  = &right;
-    right_link.peer = &left;
+    left_link.link.disconnected  = false;
+    right_link.link.disconnected = false;
     for (uint32_t guard = 0u; guard < 1024u; guard++) {
         scan_pair(&left, &right, &now);
         assert(left.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
@@ -1792,8 +1805,8 @@ static void test_every_precommit_cancel_releases_the_candidate(void) {
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint8_t              frame[32];
     uint32_t             now = 250000u;
 
@@ -1848,8 +1861,8 @@ static void test_decided_commit_is_never_cancelled(void) {
     noah_profile_owner_t right;
     memory_t             left_memory;
     memory_t             right_memory;
-    split_link_t         left_link  = {.peer = &right};
-    split_link_t         right_link = {.peer = &left};
+    split_link_t         left_link  = split_link_to(&right);
+    split_link_t         right_link = split_link_to(&left);
     uint8_t              frame[32];
     uint32_t             now = 250000u;
 
@@ -1869,20 +1882,18 @@ static void test_decided_commit_is_never_cancelled(void) {
 
 // ── Live edits and Save (D-F32) ─────────────────────────────────────────────
 
-typedef struct {
-    noah_profile_owner_t *peer;
-    uint32_t              exchanges;
-} working_link_t;
-
 static uint8_t left_working[NOAH_PROFILE_PAYLOAD_MAX];
 static uint8_t right_working[NOAH_PROFILE_PAYLOAD_MAX];
 enum { KEYMAP_LENGTH = 16u * 64u * 2u };
 
-static bool working_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
-    working_link_t *link = context;
+// The other half's PUT_PROFILE_WORKING_SYNC callback body.
+static bool owner_working_receive(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
+    return noah_profile_owner_working_receive(context, request, request_length, response, response_length);
+}
 
-    link->exchanges++;
-    return link->peer && noah_profile_owner_working_receive(link->peer, request, request_length, response, response_length);
+// A half's PUT_PROFILE_WORKING_SYNC link to the other half.
+static split_fault_link_t working_link_to(noah_profile_owner_t *peer) {
+    return (split_fault_link_t){.receive = owner_working_receive, .peer = peer};
 }
 
 static void erased_memory(memory_t *memory) {
@@ -1890,7 +1901,7 @@ static void erased_memory(memory_t *memory) {
     memset(memory->bytes, 0xFF, sizeof(memory->bytes));
 }
 
-static void boot_live_pair(noah_profile_owner_t *left, memory_t *left_memory, noah_profile_owner_t *right, memory_t *right_memory, split_link_t *left_link, split_link_t *right_link, working_link_t *left_working_link, working_link_t *right_working_link, uint32_t session, uint32_t *now) {
+static void boot_live_pair(noah_profile_owner_t *left, memory_t *left_memory, noah_profile_owner_t *right, memory_t *right_memory, split_link_t *left_link, split_link_t *right_link, split_fault_link_t *left_working_link, split_fault_link_t *right_working_link, uint32_t session, uint32_t *now) {
     assert(noah_profile_owner_init(left, &(noah_profile_owner_config_t){
                                              .store_io                  = {.read = memory_read, .write = memory_write, .context = left_memory},
                                              .split_exchange            = split_exchange,
@@ -1900,7 +1911,7 @@ static void boot_live_pair(noah_profile_owner_t *left, memory_t *left_memory, no
                                              .working_bytes             = left_working,
                                              .working_capacity          = sizeof(left_working),
                                              .working_session           = session,
-                                             .working_exchange          = working_exchange,
+                                             .working_exchange          = split_fault_link_exchange,
                                              .working_transport_context = left_working_link,
                                          }));
     assert(noah_profile_owner_init(right, &(noah_profile_owner_config_t){
@@ -1912,7 +1923,7 @@ static void boot_live_pair(noah_profile_owner_t *left, memory_t *left_memory, no
                                               .working_bytes             = right_working,
                                               .working_capacity          = sizeof(right_working),
                                               .working_session           = session ^ 0xFFFFu,
-                                              .working_exchange          = working_exchange,
+                                              .working_exchange          = split_fault_link_exchange,
                                               .working_transport_context = right_working_link,
                                           }));
     for (uint32_t guard = 0u; guard < 8192u && (left->state < NOAH_PROFILE_OWNER_READY_COMPILED || left->state > NOAH_PROFILE_OWNER_READY_VALIDATED || right->state < NOAH_PROFILE_OWNER_READY_COMPILED || right->state > NOAH_PROFILE_OWNER_READY_VALIDATED); guard++) {
@@ -1977,10 +1988,10 @@ static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
     static memory_t             right_memory;
     static uint8_t              keymap[KEYMAP_LENGTH];
     static uint8_t              expected[NOAH_PROFILE_PAYLOAD_MAX];
-    split_link_t                left_link          = {.peer = &right};
-    split_link_t                right_link         = {.peer = &left};
-    working_link_t              left_working_link  = {.peer = &right};
-    working_link_t              right_working_link = {.peer = &left};
+    split_link_t                left_link          = split_link_to(&right);
+    split_link_t                right_link         = split_link_to(&left);
+    split_fault_link_t          left_working_link  = working_link_to(&right);
+    split_fault_link_t          right_working_link = working_link_to(&left);
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     noah_profile_working_splice_t key    = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .offset = 130u, .remove = 2u, .insert = 2u};
     const uint8_t                 kc_b[2] = {0x05u, 0x00u};
@@ -2074,22 +2085,71 @@ static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
     puts("a live edit reaches both halves without flash; Save writes both by reuse; a replug boots the saved profile; Revert follows on both");
 }
 
+// Both links lose replies while a Save runs: every third working-copy reply
+// and every fifth durable one. Each protocol sends again what it did not hear
+// answered, and the Save lands once, on both halves.
+static void test_save_survives_lost_replies_on_both_links(void) {
+    static noah_profile_owner_t left;
+    static noah_profile_owner_t right;
+    static memory_t             left_memory;
+    static memory_t             right_memory;
+    static uint8_t              keymap[KEYMAP_LENGTH];
+    static uint8_t              expected[NOAH_PROFILE_PAYLOAD_MAX];
+    split_link_t                left_link          = split_link_to(&right);
+    split_link_t                right_link         = split_link_to(&left);
+    split_fault_link_t          left_working_link  = working_link_to(&right);
+    split_fault_link_t          right_working_link = working_link_to(&left);
+    noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
+    uint32_t                      now    = 1000u;
+    uint32_t                      length = sizeof(compiled_blob) + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE + KEYMAP_LENGTH;
+    uint32_t                      revision;
+
+    erased_memory(&left_memory);
+    erased_memory(&right_memory);
+    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0x10571057u, &now);
+    scan_until_converged(&left, &right, &now);
+    for (uint32_t i = 0u; i < KEYMAP_LENGTH; i += 2u) keymap[i] = (uint8_t)(7u + i % 23u);
+    assert(live_edit(&left, &right, 1u, &create, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
+    scan_until_converged(&left, &right, &now);
+    memcpy(expected, compiled_blob, sizeof(compiled_blob));
+    expected[6] = 1u;
+    expected[8] = NOAH_PROFILE_DOMAIN_V1_KEYMAP;
+    expected[9] = NOAH_PROFILE_DOMAIN_VERSION_KEYMAP;
+    write_u32(&expected[10], KEYMAP_LENGTH);
+    memcpy(&expected[14], keymap, KEYMAP_LENGTH);
+
+    left_working_link.drop_every = 3u;
+    left_link.link.drop_every    = 5u;
+    left_working_link.exchanges = left_link.link.exchanges = 0u;
+    revision                     = left.working.revision;
+    assert(noah_profile_owner_save(&left, 40u, left.working.session, revision) == NOAH_PROFILE_WORKING_QUEUED);
+    for (uint32_t guard = 0u; guard < 40000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; guard++) scan_pair(&left, &right, &now);
+    assert(left.save.phase == NOAH_PROFILE_OWNER_SAVE_IDLE && left.save.last_result == NOAH_PROFILE_WORKING_OK && left.save.last_transaction_id == 40u);
+    // Both links lost replies during the Save.
+    assert(left_working_link.exchanges >= 3u && left_link.link.exchanges >= 5u);
+    scan_until_converged(&left, &right, &now);
+    assert(left.committed_descriptor.generation == 1u && right.committed_descriptor.generation == 1u);
+    assert(left.committed_descriptor.payload_digest == digest_of(expected, length) && right.committed_descriptor.payload_digest == left.committed_descriptor.payload_digest);
+    assert(!left.working.active && !right.working.active && left.working.revision == revision && right.working.revision == revision);
+    assert_same_active(&left, &right, expected, length);
+    puts("a Save lands once on both halves while both links lose replies");
+}
 
 // One durable-I/O grant as the scheduler gives it (qmk_durable_io.c, D-F29
 // "Pacing"): a step, then more of the subsystem whose step worked (the owner
 // visits it alone) while the half has storage work in progress,
 // until a step finds nothing to do, uses the split link or writes a page's
 // worth (the flash store programs at most one page per grant), or 32 steps.
-static unsigned grant(noah_profile_owner_t *owner, bool master, uint32_t now, const memory_t *memory, const split_link_t *link, const working_link_t *working_link, bool repeat) {
+static unsigned grant(noah_profile_owner_t *owner, bool master, uint32_t now, const memory_t *memory, const split_link_t *link, const split_fault_link_t *working_link, bool repeat) {
     unsigned steps = 0u;
     uint32_t writes = memory->writes;
 
     do {
-        uint32_t exchanges = link->exchanges + working_link->exchanges;
+        uint32_t exchanges = link->link.exchanges + working_link->exchanges;
 
         noah_profile_owner_scan_again(owner, steps != 0u);
         steps++;
-        if (!noah_profile_owner_scan(owner, master, now) || !repeat || link->exchanges + working_link->exchanges != exchanges) break;
+        if (!noah_profile_owner_scan(owner, master, now) || !repeat || link->link.exchanges + working_link->exchanges != exchanges) break;
     } while (steps < 32u && noah_profile_owner_storage_busy(owner) && memory->writes - writes < NOAH_PROFILE_STORAGE_PAGE_SIZE / NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX);
     return steps;
 }
@@ -2105,10 +2165,10 @@ static unsigned save_in_grants(bool repeat) {
     static memory_t             left_memory;
     static memory_t             right_memory;
     static uint8_t              keymap[KEYMAP_LENGTH];
-    split_link_t                left_link          = {.peer = &right};
-    split_link_t                right_link         = {.peer = &left};
-    working_link_t              left_working_link  = {.peer = &right};
-    working_link_t              right_working_link = {.peer = &left};
+    split_link_t                left_link          = split_link_to(&right);
+    split_link_t                right_link         = split_link_to(&left);
+    split_fault_link_t          left_working_link  = working_link_to(&right);
+    split_fault_link_t          right_working_link = working_link_to(&left);
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     uint32_t                      now    = 1000u;
     unsigned                      grants = 0u;
@@ -2154,10 +2214,10 @@ static void test_apply_while_editing_waits_and_a_save_refuses_apart_halves(void)
     static memory_t             left_memory;
     static memory_t             right_memory;
     static uint8_t              keymap[KEYMAP_LENGTH];
-    split_link_t                left_link          = {.peer = &right};
-    split_link_t                right_link         = {.peer = &left};
-    working_link_t              left_working_link  = {.peer = &right};
-    working_link_t              right_working_link = {.peer = &left};
+    split_link_t                left_link          = split_link_to(&right);
+    split_link_t                right_link         = split_link_to(&left);
+    split_fault_link_t          left_working_link  = working_link_to(&right);
+    split_fault_link_t          right_working_link = working_link_to(&left);
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     uint8_t                       frame[32];
     uint32_t                      now = 5000u;
@@ -2193,10 +2253,10 @@ static void test_an_abandoned_edit_is_aborted_and_revert_ends_one(void) {
     static noah_profile_owner_t right;
     static memory_t             left_memory;
     static memory_t             right_memory;
-    split_link_t                left_link          = {.peer = &right};
-    split_link_t                right_link         = {.peer = &left};
-    working_link_t              left_working_link  = {.peer = &right};
-    working_link_t              right_working_link = {.peer = &left};
+    split_link_t                left_link          = split_link_to(&right);
+    split_link_t                right_link         = split_link_to(&left);
+    split_fault_link_t          left_working_link  = working_link_to(&right);
+    split_fault_link_t          right_working_link = working_link_to(&left);
     uint8_t                     frame[32];
     uint32_t                    now = 5000u;
     uint32_t                    started;
@@ -2238,8 +2298,8 @@ static void assert_took_the_other_halfs_copy(const noah_profile_owner_t *master,
 static void test_an_apply_after_taking_the_other_halfs_copy_lands(void) {
     static noah_profile_owner_t left, right;
     static memory_t             left_memory, right_memory;
-    split_link_t                left_link  = {.peer = &right};
-    split_link_t                right_link = {.peer = &left};
+    split_link_t                left_link  = split_link_to(&right);
+    split_link_t                right_link = split_link_to(&left);
     uint32_t                    now        = 0u;
 
     memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
@@ -2260,10 +2320,10 @@ static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
     static noah_profile_owner_t left, right;
     static memory_t             left_memory, right_memory;
     static uint8_t              keymap[KEYMAP_LENGTH];
-    split_link_t                left_link          = {.peer = &right};
-    split_link_t                right_link         = {.peer = &left};
-    working_link_t              left_working_link  = {.peer = &right};
-    working_link_t              right_working_link = {.peer = &left};
+    split_link_t                left_link          = split_link_to(&right);
+    split_link_t                right_link         = split_link_to(&left);
+    split_fault_link_t          left_working_link  = working_link_to(&right);
+    split_fault_link_t          right_working_link = working_link_to(&left);
     noah_profile_working_splice_t create  = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     noah_profile_working_splice_t replace = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .remove = KEYMAP_LENGTH};
     uint32_t                      now     = 1000u;
@@ -2317,6 +2377,7 @@ int main(void) {
     test_adjustments_without_a_settings_domain();
     test_a_failed_automatic_save_is_reported_and_not_repeated();
     test_live_edit_reaches_both_halves_and_save_writes_both();
+    test_save_survives_lost_replies_on_both_links();
     test_repeated_local_steps_save_in_far_fewer_grants();
     test_a_save_after_taking_the_other_halfs_copy_lands();
     test_an_apply_after_taking_the_other_halfs_copy_lands();

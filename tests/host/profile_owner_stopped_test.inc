@@ -97,8 +97,8 @@ static void test_a_storage_failure_in_a_save_stops_the_usb_half_and_says_so(void
     static noah_profile_owner_t left, right;
     static memory_t             lm, rm;
     static uint8_t              keymap[KEYMAP_LENGTH], kept[NOAH_PROFILE_PAYLOAD_MAX], bytes[NOAH_PROFILE_PAYLOAD_MAX];
-    split_link_t                ll = {.peer = &right}, rl = {.peer = &left};
-    working_link_t              lw = {.peer = &right}, rw = {.peer = &left};
+    split_link_t                ll = split_link_to(&right), rl = split_link_to(&left);
+    split_fault_link_t          lw = working_link_to(&right), rw = working_link_to(&left);
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     noah_profile_owner_working_status_t status;
     uint32_t now = 1000u, length;
@@ -155,8 +155,8 @@ static void test_a_storage_failure_in_a_save_stops_the_usb_half_and_says_so(void
 static void test_a_half_that_cannot_read_its_slots_stops_and_is_heard(void) {
     static noah_profile_owner_t left, right;
     static memory_t             lm, rm;
-    split_link_t                ll = {.peer = &right}, rl = {.peer = &left};
-    working_link_t              lw = {.peer = &right}, rw = {.peer = &left};
+    split_link_t                ll = split_link_to(&right), rl = split_link_to(&left);
+    split_fault_link_t          lw = working_link_to(&right), rw = working_link_to(&left);
     noah_profile_owner_working_status_t status;
     uint32_t now = 1000u, exchanges;
 
@@ -199,8 +199,8 @@ static void test_an_unknown_commit_marker_stops_until_a_restart_reads_it(void) {
     static noah_profile_owner_t left, right;
     static memory_t             lm, rm;
     static uint8_t              keymap[KEYMAP_LENGTH], kept[NOAH_PROFILE_PAYLOAD_MAX];
-    split_link_t                ll = {.peer = &right}, rl = {.peer = &left};
-    working_link_t              lw = {.peer = &right}, rw = {.peer = &left};
+    split_link_t                ll = split_link_to(&right), rl = split_link_to(&left);
+    split_fault_link_t          lw = working_link_to(&right), rw = working_link_to(&left);
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     uint32_t now = 1000u, length;
 
@@ -276,8 +276,8 @@ static void test_a_slow_save_is_never_stopped(void) {
     static noah_profile_owner_t left, right;
     static memory_t             lm, rm;
     static uint8_t              keymap[KEYMAP_LENGTH];
-    split_link_t                ll = {.peer = &right}, rl = {.peer = &left};
-    working_link_t              lw = {.peer = &right}, rw = {.peer = &left};
+    split_link_t                ll = split_link_to(&right), rl = split_link_to(&left);
+    split_fault_link_t          lw = working_link_to(&right), rw = working_link_to(&left);
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     uint32_t now = 1000u, started;
 
@@ -305,7 +305,7 @@ static void test_a_slow_save_is_never_stopped(void) {
     puts("a save waiting 20 s for a safe boundary is never reported stopped");
 }
 
-static void init_live_half(noah_profile_owner_t *owner, memory_t *memory, split_link_t *link, working_link_t *working_link, uint8_t origin, uint32_t session) {
+static void init_live_half(noah_profile_owner_t *owner, memory_t *memory, split_link_t *link, split_fault_link_t *working_link, uint8_t origin, uint32_t session) {
     assert(noah_profile_owner_init(owner, &(noah_profile_owner_config_t){
                                               .store_io                  = {.read = memory_read, .write = memory_write, .context = memory},
                                               .split_exchange            = split_exchange,
@@ -315,7 +315,7 @@ static void init_live_half(noah_profile_owner_t *owner, memory_t *memory, split_
                                               .working_bytes             = origin ? right_working : left_working,
                                               .working_capacity          = sizeof(left_working),
                                               .working_session           = session,
-                                              .working_exchange          = working_exchange,
+                                              .working_exchange          = split_fault_link_exchange,
                                               .working_transport_context = working_link,
                                           }));
 }
@@ -367,8 +367,8 @@ static void test_a_restart_anywhere_in_a_save_keeps_a_whole_profile(void) {
     static noah_profile_owner_t left, right;
     static memory_t             lm, rm, saved_lm, saved_rm;
     static uint8_t              keymap[KEYMAP_LENGTH], before[NOAH_PROFILE_PAYLOAD_MAX], after[NOAH_PROFILE_PAYLOAD_MAX];
-    split_link_t                ll = {.peer = &right}, rl = {.peer = &left};
-    working_link_t              lw = {.peer = &right}, rw = {.peer = &left};
+    split_link_t                ll = split_link_to(&right), rl = split_link_to(&left);
+    split_fault_link_t          lw = working_link_to(&right), rw = working_link_to(&left);
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     uint32_t now = 1000u, length, steps = 0u, session = 0x6000u;
     unsigned samples = 0u, newer = 0u, apart = 0u;
@@ -443,7 +443,7 @@ static void test_a_restart_anywhere_in_a_save_keeps_a_whole_profile(void) {
 static void stop_after_the_decision(uint32_t peer_generation, noah_profile_owner_state_t expected) {
     static noah_profile_owner_t left, right;
     static memory_t             lm, rm;
-    split_link_t                ll = {.peer = &right}, rl = {.peer = &left};
+    split_link_t                ll = split_link_to(&right), rl = split_link_to(&left);
     uint8_t                     frame[32];
     uint32_t                    now = 90000u;
 
