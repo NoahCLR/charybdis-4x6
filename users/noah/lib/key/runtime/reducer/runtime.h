@@ -31,7 +31,7 @@
 #define KEY_RUNTIME_CORE_LEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 4u))
 #define KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 2u))
 #define KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY 16u
-#define KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY 14u
+#define KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY 16u
 
 #ifndef KEY_RUNTIME_CORE_TOKEN_ID_MAX
 #    define KEY_RUNTIME_CORE_TOKEN_ID_MAX UINT16_MAX
@@ -155,10 +155,12 @@ typedef struct {
     keyboard_mod_state_t saved_mod_state;
 } tap_series_t;
 
+// The one effect plan: the reducer plans into it and transition.c projects
+// it. A buffered plan keeps every effect for its caller; a streaming plan
+// projects what it holds when it fills (auto-drain) and between a moment's
+// steps (planning/effect_plan.h).
 typedef struct {
     KEY_RUNTIME_EFFECT_QUEUE_FIELDS(KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY);
-    void (*sink)(void *ctx, key_runtime_effect_t effect);
-    void *sink_ctx;
 } key_runtime_core_effect_plan_t;
 
 _Static_assert(sizeof(key_runtime_core_effect_plan_t) <= 196u, "key_runtime_core_effect_plan_t must stay within the approved stack budget");
@@ -416,6 +418,16 @@ void                           key_runtime_core_offer_press_to_mode(keypos_t key
 void                           key_runtime_core_end_mode_offer(keypos_t key_pos, bool consumed);
 bool                           key_runtime_core_press_offered_to_mode(keypos_t key_pos);
 bool                           key_runtime_core_take_intercepted_release(keypos_t key_pos);
+// The reducer's cross-key work happens at two moments. Before a press is
+// resolved, the keys it interrupts settle, then released keys' pending taps it
+// ends are typed: every one for a press without a behaviour, a tap/hold key's
+// for a handled press. Before a release is observed, the key first reaches any
+// hold it was due while its press waited in record admission (D-F01); then a
+// modifier's or layer key's release settles the keys another key's press would
+// settle (D-F27), so their tap still gets it. Each step plans against what the
+// last one projected: a streaming plan projects between the steps.
+void                           key_runtime_core_settle_before_press(uint16_t keycode, keypos_t key_pos, bool press_is_handled, key_runtime_core_effect_plan_t *plan);
+void                           key_runtime_core_settle_before_release(uint16_t keycode, const keyrecord_t *record, uint16_t released_at, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_interrupt_active_keys_on_other_press(keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_foreign_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_flush_foreign_dual_role_multi_tap(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);

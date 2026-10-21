@@ -220,14 +220,21 @@ not run on hardware either.
   press. Whether the next press drops every modifier a held output carries,
   or only a shifted symbol's, is parked with Noah.
 
-- **The reviewed-path stack gate fails on `dev`.** The resource build's stack
-  manifests carry adjacencies the linker no longer makes and miss indirect
-  call sites from `process_record_user`, so the gate fails on `dev` itself;
-  the last passing figures in
-  [memory budgets](architecture/memory-budgets.md) predate this. The
-  manifests need a review against the current linked callers, which should
-  also measure the press and release preflight paths that now plan a waiting
-  key's missed scans (D-F27).
+- **Three key-runtime paths exceed the reviewed-path stack policy.** Each
+  key-runtime transition now holds one effect plan, so no reviewed path
+  reaches the physical 2,560-byte process stack: the worst, press preflight
+  with its plan auto-drained, is 2,032 bytes, at least 464 inside it with an
+  interrupt. The ordinary manifest (`tools/firmware_stack_budget.json`) still
+  fails by budget on three paths of the seventeen that failed: press preflight
+  auto-drained (112 bytes over the 1,920-byte policy), the fallback settlement
+  that releases a held pointing mode (88) and release preflight auto-drained
+  (72) ([memory budgets](architecture/memory-budgets.md#one-effect-plan-per-transition)).
+  Each holds the plan being projected and, beneath it, the fallback
+  settlement's own plan, which must hold its effects until its planning ends;
+  the rest is scan planning or the pointing mode's release, not plans. Bringing
+  them under the policy means a smaller fallback-settlement plan, which changes
+  when it projects, or cheaper frames outside the key runtime. The live-profile
+  owner manifest passes on both halves (worst path 1,912 bytes).
 
 - **A held mod-tap is hidden under a pointing mode that holds its modifier
   (D-F27).** A pointing mode that holds a modifier (a scroll mode's, such as

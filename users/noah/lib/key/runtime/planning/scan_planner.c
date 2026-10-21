@@ -308,22 +308,23 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
     return true;
 }
 
-void key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *state, press_token_t *token, key_runtime_core_effect_plan_t *plan) {
+bool key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *state, press_token_t *token, key_runtime_core_effect_plan_t *plan) {
     keypos_t token_key_pos;
 
     if (!(state && key_runtime_core_scan_token_hold_eligible(state, token) && key_runtime_core_scan_press_token_uses_fallback_hold(token))) {
-        return;
+        return false;
     }
 
     if (key_runtime_core_scan_press_token_has_runtime_owned_state(state, token) || token->resolved_keycode == KC_NO) {
-        return;
+        return false;
     }
 
     token_key_pos = key_runtime_core_scan_press_token_key_pos(state, token);
     if (key_runtime_core_press_offered_to_mode(token_key_pos)) {
-        return;
+        return false;
     }
     key_runtime_core_effect_plan_push_held_action(plan, KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, token_key_pos, token->resolved_keycode);
+    return true;
 }
 
 static void key_runtime_core_scan_clear_confirmed_tap_series_at(key_runtime_core_state_t *state, keypos_t key_pos) {
@@ -539,11 +540,7 @@ bool key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_
     }
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
-        press_token_t *token  = &state->press_tokens[index];
-        uint8_t        before = plan->count;
-
-        key_runtime_core_plan_fallback_hold_activation(state, token, plan);
-        if (plan->count != before) {
+        if (key_runtime_core_plan_fallback_hold_activation(state, &state->press_tokens[index], plan)) {
             settled_any = true;
         }
     }

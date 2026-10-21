@@ -85,7 +85,7 @@ layer," not "old runtime plus new runtime running side by side."
 | [`handled_key.h`](../users/noah/lib/key/behavior/handled_key.h), [`handled_key_lookup.c`](../users/noah/lib/key/behavior/handled_key_lookup.c), [`handled_key_materialize.c`](../users/noah/lib/key/behavior/handled_key_materialize.c) | Resolve authored behavior into `handled_key_resolution_t` and materialize it into runtime interaction contracts. |
 | [`slot/slot_interaction.h`](../users/noah/lib/key/runtime/slot/slot_interaction.h) | Shared interaction contract cached by the reducer after authored behavior materialization. |
 | [`reducer/runtime.h`](../users/noah/lib/key/runtime/reducer/runtime.h), [`reducer/runtime.c`](../users/noah/lib/key/runtime/reducer/runtime.c) | Single-authority runtime state type, reducer entry points, press/tap orchestration, and scan orchestration. |
-| [`planning/effect_plan.h`](../users/noah/lib/key/runtime/planning/effect_plan.h), [`planning/effect_plan.c`](../users/noah/lib/key/runtime/planning/effect_plan.c) | Internal effect-plan initialization, sink buffering, append helpers, tap-commit feedback filtering, and release-plan transfer shared by planning modules. |
+| [`planning/effect_plan.h`](../users/noah/lib/key/runtime/planning/effect_plan.h), [`planning/effect_plan.c`](../users/noah/lib/key/runtime/planning/effect_plan.c) | The one effect plan's initialization, buffered or streaming; push helpers, including a streaming plan's auto-drain and a moment's step boundary; tap-commit feedback filtering; and release-plan transfer shared by planning modules. |
 | [`projection/feedback_projection.h`](../users/noah/lib/key/runtime/projection/feedback_projection.h), [`projection/feedback_projection.c`](../users/noah/lib/key/runtime/projection/feedback_projection.c) | Feedback pulse projection and pulse queueing for key-runtime effects. |
 | [`reducer/ownership_state.h`](../users/noah/lib/key/runtime/reducer/ownership_state.h), [`reducer/ownership_state.c`](../users/noah/lib/key/runtime/reducer/ownership_state.c) | Reducer-owned lease and persistent-intent mechanics, shadow projection recomputation, held/repeat feedback visibility queries, and lock observation updates over `key_runtime_core_state_t` storage. |
 | [`projection/pd_projection.h`](../users/noah/lib/key/runtime/projection/pd_projection.h), [`projection/pd_projection.c`](../users/noah/lib/key/runtime/projection/pd_projection.c) | Key-runtime PD projection for held-action preemption, PD lock-tap effects, and explicit lock-state requests; actual PD mode state remains PD-runtime-owned. |
@@ -98,9 +98,9 @@ layer," not "old runtime plus new runtime running side by side."
 | [`deferred_release.h`](../users/noah/lib/key/runtime/deferred_release.h), [`deferred_release.c`](../users/noah/lib/key/runtime/deferred_release.c) | Adapter that defers blocked release dispatch effects into the core pending-release queue and drains queued dispatches after release/scan execution. |
 | [`keyboard_mod_policy.h`](../users/noah/lib/state/modifiers/keyboard_mod_policy.h), [`keyboard_mod_policy.c`](../users/noah/lib/state/modifiers/keyboard_mod_policy.c) | Shared modifier snapshot, filtering, preservation-window, masked-emit, action-replay, and real-mod masking policy used by action dispatch, key-runtime processing, tap-series capture, deferred release, and PD mode modifier masking. |
 | [`process.c`](../users/noah/lib/key/runtime/process.c) | `process_record_user()` entry flow, preflight ordering, release-keycode recovery, and non-handled release finalization. |
-| [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Cross-key interruption and default-suppression work before the current press proceeds, while unrelated pending multi-tap chains stay position-owned until timeout or same-key reuse. |
+| [`preflight.c`](../users/noah/lib/key/runtime/preflight.c) | Default suppression, and the reducer's moments before a press and before a release, each one streaming plan, while unrelated pending multi-tap chains stay position-owned until timeout or same-key reuse. |
 | [`press.c`](../users/noah/lib/key/runtime/press.c), [`release.c`](../users/noah/lib/key/runtime/release.c), [`scan.c`](../users/noah/lib/key/runtime/scan.c) | Thin press/release/scan orchestration around reducer-owned effect plans. |
-| [`transition.c`](../users/noah/lib/key/runtime/transition.c), [`transition.h`](../users/noah/lib/key/runtime/transition.h) | Effect-plan transport between reducer decisions and concrete effect projection through `projection/projection.c`. |
+| [`transition.c`](../users/noah/lib/key/runtime/transition.c), [`transition.h`](../users/noah/lib/key/runtime/transition.h) | The plan's executor: traces a plan, announces it to split consumers (and a key event's or scan's feedback change that left nothing to project), and projects it through `projection/projection.c`; drains a full streaming plan. |
 | [`planning/effect.h`](../users/noah/lib/key/runtime/planning/effect.h), [`planning/effect_queue.h`](../users/noah/lib/key/runtime/planning/effect_queue.h) | Shared runtime effect vocabulary and queue helper. |
 | [`held_action.c`](../users/noah/lib/key/ownership/held_action.c), [`held_repeat.c`](../users/noah/lib/key/ownership/held_repeat.c), [`layer_ownership.c`](../users/noah/lib/state/ownership/layer_ownership.c), [`keyboard_mod_ownership.c`](../users/noah/lib/state/ownership/keyboard_mod_ownership.c) | External ownership registries projected by runtime effects. |
 | [`pd_mode_key_runtime_bridge.h`](../users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.h), [`pd_mode_key_runtime_bridge.c`](../users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c) | Narrow PD-to-key-runtime observer bridge for changed local PD lock state. |
@@ -308,6 +308,15 @@ does the cross-key work that must happen before the current press resolves:
   its release-time hold, once due) before the press goes out (D-F27)
 - leave unrelated pending multi-tap chains live until their own timeout or
   same-key continuation resolves them
+
+The cross-key work is the reducer's, taken at two moments, each one call with
+one streaming plan: `key_runtime_core_settle_before_press()` (the keys the
+press interrupts, then the pending taps it ends) and
+`key_runtime_core_settle_before_release()` (the key's missed holds, then the
+D-F27 settlement of a modifier's or layer key's release). A moment projects
+between its steps, so each step plans against what the last one projected:
+whether a releasing key holds a layer or modifiers is asked of the hold its
+missed scans just turned on.
 
 Behavior change note: the preflight path changed on `2026-04-20`. Before that
 change, a foreign press explicitly flushed unrelated pending multi-tap chains.

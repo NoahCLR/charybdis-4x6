@@ -23,9 +23,10 @@ noah_profile_store_runtime_state_t noah_profile_store_runtime_state(void);
 noah_profile_store_result_t        noah_profile_store_runtime_discovery_result(void);
 const noah_profile_store_record_t *noah_profile_store_runtime_committed(void);
 
-// Bounded read of the committed payload for host readback. Refuses any range
-// outside the committed record, so a malformed host request cannot walk
-// storage. Returns false when nothing is committed.
+// Bounded read of the committed payload for host readback, in one store read:
+// length is at most NOAH_PROFILE_STORE_IO_CHUNK_MAX. Refuses any range outside
+// the committed record, so a malformed host request cannot walk storage.
+// Returns false when nothing is committed.
 bool noah_profile_store_runtime_read_committed(uint32_t offset, uint8_t *target, uint32_t length);
 
 // The compiled defaults this firmware was built with. A keyboard with no

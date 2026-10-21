@@ -1418,7 +1418,7 @@ not ready status `3`.
 | 4 | 4 | its session |
 | 8 | 4 | its revision |
 | 12 | 1 | its flags: bit 0 unsaved edits, 1 its saved profile is the compiled defaults |
-| 13 | 1 | save phase (`0` idle; `7` and `8` a save that found nothing to write) |
+| 13 | 1 | save phase: `0` idle, `1` checksumming the working copy, `2`–`4` beginning, filling and validating its candidate, `6` waiting for its commit; `7` and `8` a save that found nothing to write (comparing, then returning to the saved profile). `5` is reserved and never reported |
 | 14 | 1 | last save's result |
 | 15 | 1 | last save's candidate error id (`0` none) |
 | 16 | 2 | save transaction in progress |

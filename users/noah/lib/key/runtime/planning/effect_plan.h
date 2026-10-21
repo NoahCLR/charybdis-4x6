@@ -2,8 +2,15 @@
 
 #include "../reducer/runtime.h"
 
+// A buffered plan keeps every effect for its caller, and drops what does not
+// fit. A streaming plan hands its effects to transition.c as planning goes:
+// when it is full, the next push first projects what it holds (auto-drain),
+// and a reducer moment projects it between its steps (end_step), so each step
+// plans against what the last one did. Projecting mid-planning is what lets a
+// streaming plan carry any number of effects in one fixed plan.
 void key_runtime_core_effect_plan_init(key_runtime_core_effect_plan_t *plan);
-void key_runtime_core_effect_plan_init_with_sink(key_runtime_core_effect_plan_t *plan, void (*sink)(void *ctx, key_runtime_effect_t effect), void *sink_ctx);
+void key_runtime_core_effect_plan_init_streaming(key_runtime_core_effect_plan_t *plan);
+void key_runtime_core_effect_plan_end_step(key_runtime_core_effect_plan_t *plan);
 void key_runtime_core_effect_plan_push_dispatch_action(key_runtime_core_effect_plan_t *plan, keypos_t key_pos, uint16_t action);
 void key_runtime_core_effect_plan_push_held_action(key_runtime_core_effect_plan_t *plan, key_runtime_effect_kind_t kind, keypos_t key_pos, uint16_t action);
 void key_runtime_core_effect_plan_push_release_owned_state(key_runtime_core_effect_plan_t *plan, keypos_t key_pos);
