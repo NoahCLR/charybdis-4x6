@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "users/noah/lib/compat/qmk_durable_io.h"
 #include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
 #include "users/noah/lib/profile/runtime/profile_owner.h"
 #include "users/noah/lib/profile/runtime/effective_keymap_macros_runtime.h"
@@ -248,6 +249,8 @@ static bool split_exchange(void *context, const uint8_t *request, uint8_t reques
     split_link_t                    *link = context;
     noah_profile_split_reconciler_t *peer_reconciler;
 
+    // As the keyboard's transport: the grant repeats no step that used the link.
+    noah_qmk_durable_io_note_split_rpc();
     if (link && link->inject_busy) {
         link->inject_busy = false;
         return noah_profile_split_v1_frame_encode(&link->injected, response, response_length) == response_length;
@@ -362,9 +365,168 @@ static void boot_empty(noah_profile_owner_t *owner, memory_t *memory) {
     assert(!(owner->compatibility.runtime && owner->compatibility.runtime->placement_supported));
 }
 
+// ── Halves on NOR flash, scanned through the durable-I/O grant ─────────────
+//
+// A half the keyboard's way: its slots behind the real flash store over a
+// fake NOR chip, and every scan one real grant (qmk_durable_io.c, D-F29
+// "Pacing", D-F32) whose store hooks step the owner as the profile store
+// runtime does. Its owner sees the grant's clock, which leaves out grants
+// the step could not run, and answers the other half's busy check with the
+// grant's pause.
+
+typedef struct {
+    uint8_t bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
+    bool programmed[NOAH_PROFILE_STORAGE_REGION_SIZE / NOAH_PROFILE_STORAGE_PAGE_SIZE];
+    uint32_t operations, cut, clock;
+    // From this attempt on (1-based, 0 never) erase and program fail and leave
+    // the media as they were: a refusing chip, not a power cut.
+    uint32_t attempts, fail_from;
+    bool off, halfway;
+} nor_chip_t;
+
+static void nor_erased(nor_chip_t *chip) {
+    memset(chip, 0, sizeof(*chip));
+    memset(chip->bytes, 0xFF, sizeof(chip->bytes));
+}
+
+static bool nor_erase(void *context, uint32_t offset) {
+    nor_chip_t *chip = context;
+    assert(!chip->off && offset % NOAH_PROFILE_STORAGE_SECTOR_SIZE == 0u);
+    chip->attempts++;
+    if (chip->fail_from && chip->attempts >= chip->fail_from) return false;
+    chip->operations++;
+    chip->clock += 45000u;
+    bool cut = chip->operations == chip->cut;
+    uint32_t count = cut ? (chip->halfway ? NOAH_PROFILE_STORAGE_SECTOR_SIZE / 2u : 0u) : NOAH_PROFILE_STORAGE_SECTOR_SIZE;
+    memset(chip->bytes + offset, 255, count);
+    memset(chip->programmed + offset / NOAH_PROFILE_STORAGE_PAGE_SIZE, 0, count / NOAH_PROFILE_STORAGE_PAGE_SIZE);
+    chip->off = cut;
+    return !cut;
+}
+
+static bool nor_program(void *context, uint32_t offset, const uint8_t *bytes) {
+    nor_chip_t *chip = context;
+    assert(!chip->off && offset % NOAH_PROFILE_STORAGE_PAGE_SIZE == 0u && !chip->programmed[offset / NOAH_PROFILE_STORAGE_PAGE_SIZE]);
+    chip->attempts++;
+    if (chip->fail_from && chip->attempts >= chip->fail_from) return false;
+    chip->programmed[offset / NOAH_PROFILE_STORAGE_PAGE_SIZE] = true;
+    chip->operations++;
+    chip->clock += 800u;
+    bool cut = chip->operations == chip->cut;
+    uint32_t count = cut ? (chip->halfway ? NOAH_PROFILE_STORAGE_PAGE_SIZE / 2u : 0u) : NOAH_PROFILE_STORAGE_PAGE_SIZE;
+    for (uint32_t i = 0u; i < count; i++) {
+        assert((chip->bytes[offset + i] & bytes[i]) == bytes[i]);
+        chip->bytes[offset + i] &= bytes[i];
+    }
+    chip->off = cut;
+    return !cut;
+}
+
+static void nor_read(void *context, uint32_t offset, uint8_t *bytes, uint32_t count) {
+    nor_chip_t *chip = context;
+    memcpy(bytes, chip->bytes + offset, count);
+}
+
+static uint32_t nor_clock(void *context) { return ((nor_chip_t *)context)->clock; }
+
+typedef struct {
+    noah_profile_owner_t       *owner;
+    nor_chip_t                 *chip;
+    bool                        master;
+    // The store never says it has work in progress, so each grant gives one
+    // step: the pacing before local steps repeated.
+    bool                        one_step;
+    noah_profile_flash_store_t  flash;
+    noah_qmk_durable_io_grant_t grant;
+} flash_half_t;
+
+// The two halves of a flash pair, and the single half of the automatic-save
+// tests on physical media.
+static flash_half_t flash_left, flash_right, flash_single;
+// The scan clock the grant reads (timer_read32).
+static uint32_t grant_now;
+// Erases wait for this; the automatic-save tests also give it the owner.
+static bool auto_quiet = true;
+
+uint32_t timer_read32(void) {
+    return grant_now;
+}
+
+static flash_half_t *flash_half_of(const noah_profile_owner_t *owner) {
+    flash_half_t *halves[] = {&flash_left, &flash_right, &flash_single};
+
+    for (size_t i = 0u; i < sizeof(halves) / sizeof(halves[0]); i++) {
+        if (owner && halves[i]->owner == owner) return halves[i];
+    }
+    return NULL;
+}
+
+// The half's hooks, as the profile store runtime defines them.
+bool noah_qmk_durable_io_store_step(void *context, bool again, uint32_t now_ms) {
+    flash_half_t *half = context;
+
+    noah_profile_owner_scan_again(half->owner, again);
+    return noah_profile_owner_scan(half->owner, half->master, now_ms);
+}
+
+bool noah_qmk_durable_io_store_busy(void *context) {
+    flash_half_t *half = context;
+
+    return !half->one_step && noah_profile_owner_storage_busy(half->owner);
+}
+
+bool noah_qmk_durable_io_keyboard_quiet(void *context) {
+    (void)context;
+    return auto_quiet;
+}
+
+// Gives `owner` slots on `chip` (its contents kept) and its grant; the owner
+// starts afterwards on the I/O flash_boot gives.
+static void flash_attach(flash_half_t *half, noah_profile_owner_t *owner, nor_chip_t *chip, bool master) {
+    *half = (flash_half_t){.owner = owner, .chip = chip, .master = master};
+}
+
+// A start of the half: the flash store and grant begin afresh in RAM; the
+// chip keeps what was written.
+static noah_profile_store_io_t flash_boot(flash_half_t *half) {
+    noah_profile_flash_store_init(&half->flash, (noah_profile_flash_driver_t){.read = nor_read, .erase_sector = nor_erase, .program_page = nor_program, .now_us = nor_clock, .context = half->chip});
+    noah_qmk_durable_io_init(&half->grant, &half->flash, half);
+    return noah_profile_flash_store_io(&half->flash);
+}
+
+static void flash_detach(flash_half_t *half) {
+    memset(half, 0, sizeof(*half));
+}
+
+// One scan of a half: a grant if its slots are on flash, else the owner's
+// scan directly.
+static void scan_half(noah_profile_owner_t *owner, bool master, uint32_t now) {
+    flash_half_t *half = flash_half_of(owner);
+
+    if (!half) {
+        (void)noah_profile_owner_scan(owner, master, now);
+        return;
+    }
+    grant_now = now;
+    noah_qmk_durable_io_matrix_scan(&half->grant);
+}
+
+// The store I/O and pause callback a pair half starts with.
+static void pair_storage(noah_profile_owner_config_t *config, noah_profile_owner_t *owner, memory_t *memory) {
+    flash_half_t *half = flash_half_of(owner);
+
+    if (half) {
+        config->store_io               = flash_boot(half);
+        config->storage_paused         = noah_qmk_durable_io_storage_paused;
+        config->storage_paused_context = &half->grant;
+    } else {
+        config->store_io = (noah_profile_store_io_t){.read = memory_read, .write = memory_write, .context = memory};
+    }
+}
+
 static void scan_pair(noah_profile_owner_t *master, noah_profile_owner_t *peer, uint32_t *now) {
-    (void)noah_profile_owner_scan(peer, false, *now);
-    (void)noah_profile_owner_scan(master, true, *now);
+    scan_half(peer, false, *now);
+    scan_half(master, true, *now);
     *now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
 }
 
@@ -1883,6 +2045,7 @@ enum { KEYMAP_LENGTH = 16u * 64u * 2u };
 static bool working_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
     working_link_t *link = context;
 
+    noah_qmk_durable_io_note_split_rpc();
     link->exchanges++;
     return link->peer && noah_profile_owner_working_receive(link->peer, request, request_length, response, response_length);
 }
@@ -1893,30 +2056,33 @@ static void erased_memory(memory_t *memory) {
 }
 
 static void boot_live_pair(noah_profile_owner_t *left, memory_t *left_memory, noah_profile_owner_t *right, memory_t *right_memory, split_link_t *left_link, split_link_t *right_link, working_link_t *left_working_link, working_link_t *right_working_link, uint32_t session, uint32_t *now) {
-    assert(noah_profile_owner_init(left, &(noah_profile_owner_config_t){
-                                             .store_io                  = {.read = memory_read, .write = memory_write, .context = left_memory},
-                                             .split_exchange            = split_exchange,
-                                             .split_transport_context   = left_link,
-                                             .origin_half               = 0u,
-                                             .peer_required             = true,
-                                             .working_bytes             = left_working,
-                                             .working_capacity          = sizeof(left_working),
-                                             .working_session           = session,
-                                             .working_exchange          = working_exchange,
-                                             .working_transport_context = left_working_link,
-                                         }));
-    assert(noah_profile_owner_init(right, &(noah_profile_owner_config_t){
-                                              .store_io                  = {.read = memory_read, .write = memory_write, .context = right_memory},
-                                              .split_exchange            = split_exchange,
-                                              .split_transport_context   = right_link,
-                                              .origin_half               = 1u,
-                                              .peer_required             = true,
-                                              .working_bytes             = right_working,
-                                              .working_capacity          = sizeof(right_working),
-                                              .working_session           = session ^ 0xFFFFu,
-                                              .working_exchange          = working_exchange,
-                                              .working_transport_context = right_working_link,
-                                          }));
+    noah_profile_owner_config_t left_config = {
+        .split_exchange            = split_exchange,
+        .split_transport_context   = left_link,
+        .origin_half               = 0u,
+        .peer_required             = true,
+        .working_bytes             = left_working,
+        .working_capacity          = sizeof(left_working),
+        .working_session           = session,
+        .working_exchange          = working_exchange,
+        .working_transport_context = left_working_link,
+    };
+    noah_profile_owner_config_t right_config = {
+        .split_exchange            = split_exchange,
+        .split_transport_context   = right_link,
+        .origin_half               = 1u,
+        .peer_required             = true,
+        .working_bytes             = right_working,
+        .working_capacity          = sizeof(right_working),
+        .working_session           = session ^ 0xFFFFu,
+        .working_exchange          = working_exchange,
+        .working_transport_context = right_working_link,
+    };
+
+    pair_storage(&left_config, left, left_memory);
+    pair_storage(&right_config, right, right_memory);
+    assert(noah_profile_owner_init(left, &left_config));
+    assert(noah_profile_owner_init(right, &right_config));
     for (uint32_t guard = 0u; guard < 8192u && (left->state < NOAH_PROFILE_OWNER_READY_COMPILED || left->state > NOAH_PROFILE_OWNER_READY_VALIDATED || right->state < NOAH_PROFILE_OWNER_READY_COMPILED || right->state > NOAH_PROFILE_OWNER_READY_VALIDATED); guard++) {
         scan_pair(left, right, now);
     }
@@ -2077,35 +2243,17 @@ static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
 }
 
 
-// One durable-I/O grant as the scheduler gives it (qmk_durable_io.c, D-F29
-// "Pacing"): a step, then more of the subsystem whose step worked (the owner
-// visits it alone) while the half has storage work in progress,
-// until a step finds nothing to do, uses the split link or writes a page's
-// worth (the flash store programs at most one page per grant), or 32 steps.
-static unsigned grant(noah_profile_owner_t *owner, bool master, uint32_t now, const memory_t *memory, const split_link_t *link, const working_link_t *working_link, bool repeat) {
-    unsigned steps = 0u;
-    uint32_t writes = memory->writes;
-
-    do {
-        uint32_t exchanges = link->exchanges + working_link->exchanges;
-
-        noah_profile_owner_scan_again(owner, steps != 0u);
-        steps++;
-        if (!noah_profile_owner_scan(owner, master, now) || !repeat || link->exchanges + working_link->exchanges != exchanges) break;
-    } while (steps < 32u && noah_profile_owner_storage_busy(owner) && memory->writes - writes < NOAH_PROFILE_STORAGE_PAGE_SIZE / NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX);
-    return steps;
-}
-
 // A save took seconds of scans on the keyboard though its flash took 0.1 s
 // (keyboard check, 2026-10-19): one small step per scan. With local steps
 // repeated within a grant it lands in far fewer grants, and the same as
 // before on both halves; neither half reports work in progress before or
-// after it.
+// after it. Both halves on flash, every scan a grant; without repeats the
+// store never says it has work in progress, so each grant gives one step.
 static unsigned save_in_grants(bool repeat) {
     static noah_profile_owner_t left;
     static noah_profile_owner_t right;
-    static memory_t             left_memory;
-    static memory_t             right_memory;
+    static nor_chip_t           left_chip;
+    static nor_chip_t           right_chip;
     static uint8_t              keymap[KEYMAP_LENGTH];
     split_link_t                left_link          = {.peer = &right};
     split_link_t                right_link         = {.peer = &left};
@@ -2116,9 +2264,11 @@ static unsigned save_in_grants(bool repeat) {
     unsigned                      grants = 0u;
     bool                          right_busy = false;
 
-    erased_memory(&left_memory);
-    erased_memory(&right_memory);
-    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0x5AFE5AFEu, &now);
+    nor_erased(&left_chip);
+    nor_erased(&right_chip);
+    flash_attach(&flash_left, &left, &left_chip, true);
+    flash_attach(&flash_right, &right, &right_chip, false);
+    boot_live_pair(&left, NULL, &right, NULL, &left_link, &right_link, &left_working_link, &right_working_link, 0x5AFE5AFEu, &now);
     scan_until_converged(&left, &right, &now);
     for (uint32_t i = 0u; i < KEYMAP_LENGTH; i += 2u) keymap[i] = (uint8_t)(4u + i % 20u);
     assert(live_edit(&left, &right, 1u, &create, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
@@ -2126,12 +2276,14 @@ static unsigned save_in_grants(bool repeat) {
     assert(!noah_profile_owner_storage_busy(&left) && !noah_profile_owner_storage_busy(&right));
     assert(noah_profile_owner_save(&left, 40u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
     assert(noah_profile_owner_storage_busy(&left));
+    flash_left.one_step = flash_right.one_step = !repeat;
     for (; grants < 100000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; grants++) {
-        (void)grant(&right, false, now, &right_memory, &right_link, &right_working_link, repeat);
+        scan_half(&right, false, now);
         right_busy = right_busy || noah_profile_owner_storage_busy(&right);
-        (void)grant(&left, true, now, &left_memory, &left_link, &left_working_link, repeat);
+        scan_half(&left, true, now);
         now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
     }
+    flash_left.one_step = flash_right.one_step = false;
     assert(left.save.phase == NOAH_PROFILE_OWNER_SAVE_IDLE && left.save.last_result == NOAH_PROFILE_WORKING_OK && left.save.last_transaction_id == 40u);
     assert(right_busy);
     scan_until_converged(&left, &right, &now);
@@ -2139,6 +2291,8 @@ static unsigned save_in_grants(bool repeat) {
     assert(left.committed_descriptor.payload_digest == right.committed_descriptor.payload_digest);
     assert(!left.working.active && !right.working.active);
     assert(!noah_profile_owner_storage_busy(&left) && !noah_profile_owner_storage_busy(&right));
+    flash_detach(&flash_left);
+    flash_detach(&flash_right);
     return grants;
 }
 
@@ -2260,7 +2414,7 @@ static void test_an_apply_after_taking_the_other_halfs_copy_lands(void) {
 
 static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
     static noah_profile_owner_t left, right;
-    static memory_t             left_memory, right_memory;
+    static nor_chip_t           left_chip, right_chip;
     static uint8_t              keymap[KEYMAP_LENGTH];
     split_link_t                left_link          = {.peer = &right};
     split_link_t                right_link         = {.peer = &left};
@@ -2271,9 +2425,12 @@ static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
     uint32_t                      now     = 1000u;
     unsigned                      grants  = 0u;
 
-    erased_memory(&left_memory);
-    erased_memory(&right_memory);
-    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0x5AFE5AFEu, &now);
+    // Both halves on flash, every scan a grant, the other half's included.
+    nor_erased(&left_chip);
+    nor_erased(&right_chip);
+    flash_attach(&flash_left, &left, &left_chip, true);
+    flash_attach(&flash_right, &right, &right_chip, false);
+    boot_live_pair(&left, NULL, &right, NULL, &left_link, &right_link, &left_working_link, &right_working_link, 0x5AFE5AFEu, &now);
     scan_until_converged(&left, &right, &now);
     for (uint32_t i = 0u; i < KEYMAP_LENGTH; i += 2u) keymap[i] = (uint8_t)(4u + i % 20u);
     assert(live_edit(&left, &right, 1u, &create, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
@@ -2283,8 +2440,8 @@ static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
     scan_until_converged(&left, &right, &now);
     assert(left.committed_descriptor.generation == 1u && right.committed_descriptor.generation == 1u);
     // Only the master's slots are erased; both halves restart.
-    erased_memory(&left_memory);
-    boot_live_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &left_working_link, &right_working_link, 0x5AFE5AFFu, &now);
+    nor_erased(&left_chip);
+    boot_live_pair(&left, NULL, &right, NULL, &left_link, &right_link, &left_working_link, &right_working_link, 0x5AFE5AFFu, &now);
     for (uint32_t guard = 0u; guard < 40000u && left.committed_descriptor.generation != 1u; guard++) scan_pair(&left, &right, &now);
     scan_until_converged(&left, &right, &now);
     assert_took_the_other_halfs_copy(&left, 1u);
@@ -2292,17 +2449,16 @@ static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
     assert(live_edit(&left, &right, 2u, &replace, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
     scan_until_converged(&left, &right, &now);
     assert(noah_profile_owner_save(&left, 41u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
-    // Grants as the scheduler gives them, the other half's included.
     for (; grants < 20000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; grants++) {
-        (void)grant(&right, false, now, &right_memory, &right_link, &right_working_link, true);
-        (void)grant(&left, true, now, &left_memory, &left_link, &left_working_link, true);
+        scan_pair(&left, &right, &now);
         assert(left.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
-        now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
     }
     assert(left.save.last_transaction_id == 41u && left.save.last_result == NOAH_PROFILE_WORKING_OK);
     scan_until_converged(&left, &right, &now);
     assert(left.committed_descriptor.generation == 2u && right.committed_descriptor.generation == 2u);
     assert(left.state == NOAH_PROFILE_OWNER_READY_VALIDATED && right.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
+    flash_detach(&flash_left);
+    flash_detach(&flash_right);
     puts("a Save after taking the other half's copy at start lands on both halves");
 }
 
