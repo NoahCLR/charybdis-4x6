@@ -96,7 +96,7 @@ Metadata, prepare begin, prepare commit, and abort use this layout:
 | 0 | 1 | framing version, `4` |
 | 1 | 1 | frame kind |
 | 2 | 1 | status |
-| 3 | 1 | bit 0 has committed profile; bit 1 metadata readable; bit 2 reserved zero (a VIA-bound record until D-F31); bit 3 stable physical origin half; bit 4 the persistent override flag; bits 5–7 zero |
+| 3 | 1 | bit 0 has committed profile; bit 1 metadata readable; bit 2 reserved zero (a VIA-bound record until D-F31); bit 3 stable physical origin half; bit 4 the persistent override flag; bit 5 in METADATA only, its sender holds no prepared push (D-F34), zero in every other kind; bits 6–7 zero |
 | 4 | 1 | schema major, exactly the current schema major |
 | 5 | 1 | schema minor, exactly the current schema minor |
 | 6 | 1 | Profile Wire domain mask derived from the canonical payload |
@@ -113,10 +113,15 @@ domain mask in byte 30 beside a 16-bit length; version 3 packs both into the
 flags byte (the store allows one persistent flag, override) to make room for a
 32-bit length.
 
+Bit 5 is not the descriptor's: it says what the half that sent a METADATA
+frame holds, beside any descriptor, unreadable included
+([An abandoned prepared copy](#an-abandoned-prepared-copy-d-f34)).
+
 A readable compiled-default descriptor has no committed profile. Its
 generation, payload length, payload identities, persistent flags, and origin
 are all zero, while schema and firmware compatibility digests remain present.
-An unreadable descriptor is entirely zero apart from the frame header. A
+An unreadable descriptor is entirely zero apart from the frame header and
+bit 5. A
 committed descriptor requires a nonzero generation, a blob-sized payload, a
 valid physical origin, and only known persistent flags. Its domain mask may
 contain only advertised RGB, key-behavior, combo, settings and PD bits and must match the domains found by
@@ -405,6 +410,65 @@ plus `NOAH_PHYSICAL_HALF=right`. The physical setting overrides handedness in
   boundary and registers the split transport exactly once. The additional
   mutation gate exposes the path only in labeled hardware-test artifacts.
 
+## An abandoned prepared copy (D-F34)
+
+A prepared copy (the receiver's store `PREPARED`: every byte validated, its
+prepared marker durable, no commit asked for) is ended only by its push:
+`PREPARE_COMMIT` commits it and `ABORT` releases it. The receive lease never
+times it, since a sender pauses at the barrier, sending nothing, for as long
+as its owner takes to write its own commit marker. A push lives in its
+sender's RAM, so a sender that restarts (a USB half restarted alone, or by
+its watchdog) forgets it without ending it. The copy then held the
+receiver's storage, and the halves apart, until the receiver restarted too.
+
+So a METADATA request says when its sender holds no prepared push: bit 5 of
+byte 3. A master sets it in every poll while it holds none: from boot, and
+from the end of a push (it converged, its `ABORT` was acknowledged or
+answered with a storage error, it was cancelled before its `PREPARE_BEGIN`
+was sent, or it was released with its `ABORT` unacknowledged) until the next
+push begins. From the start of a push to its end the bit is clear, through
+the pause at the barrier, a fall back to the metadata poll and an `ABORT`
+under way. Clear claims nothing: a METADATA reply, every other kind and a
+build that does not know the bit all send it clear.
+
+The receiver releases the copy, writing its invalid commit marker and giving
+back its `PEER` admission, when it takes a poll with bit 5 set whose
+descriptor:
+
+- is readable: the sender has read what it saved. A sender still booting
+  releases nothing;
+- is not the copy. A sender authorizes the commit only once its own commit
+  marker is durable, so a sender whose saved profile is the copy decided to
+  commit it. It is the newer half, and its repair commits the copy:
+  `PREPARE_BEGIN` is answered at the copy's end and `PREPARE_COMMIT` follows,
+  with no byte sent again.
+
+It releases only a copy exactly `PREPARED` and not being pulled by this half.
+A copy committing, or of unknown durability (`RECONCILE_REQUIRED`), is never
+released. A poll that arrives while the copy is still being validated or
+prepared is taken once that step ends, since the scan advances the store
+before its mailbox, and so releases the copy once prepared. Nothing else
+releases a prepared copy: not time, and not the sender's silence (the
+passive peer timeout invalidates the peer's observation, not the copy).
+
+The claim is exact. The receiver's mailbox holds one request and the sender
+sends one at a time, so a poll is taken before any request of a push begun
+after it, and a copy becomes prepared only by its push's `PREPARE_DURABLE`.
+A poll with bit 5 set therefore never meets a copy of a push its sender
+holds. The release runs in the scan step that takes the poll from the
+mailbox, its one storage operation; the split callback only copies the
+request there, as for every request.
+
+**No framing version moved.** A version moves when a frame both builds
+accept would mean different things to them. Every receiver refuses a
+descriptor frame with an unknown flag bit set, so a build without bit 5
+refuses a poll that sets it as an invalid frame and the halves fail closed,
+as they do on a version mismatch; and such a build never sets the bit, which
+a build with it reads as no claim, as the older build meant. Both halves run
+one build in any case, so this holds even for a pair that should not exist.
+It is also why the bit says "holds none" rather than "holds one": the clear
+bit, the only one an older build sends, is the reading that releases nothing.
+
 ## Working copy sync (D-F32)
 
 Live edits change each half's working copy in RAM (see
@@ -502,13 +566,14 @@ acknowledged again and keeps the first time. The USB half asks again every
 5 ms until it is acknowledged or 250 ms have passed, so a sector erase (45 ms
 typical) on the other half only delays it, and restarts itself either way.
 
-A USB half that restarts alone can leave the other half holding a durable
-prepared copy of a save no sender will finish: the receiver's lease
-(`NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS`) releases only a copy still being
-received, and a restarted sender neither remembers the copy nor learns of it
-from the metadata it polls. The halves then stay apart until the other half
-restarts too. A watchdog reset of the USB half reaches the same state. See
-the open issue in [the direction](../LIVE_EDIT_APP_DIRECTION.md#open-issues).
+A USB half that restarts alone (the other half did not acknowledge), or is
+reset by its watchdog, forgets a save in flight. The other half's copy of it
+ends by itself: one still being received when its lease runs out
+(`NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS`), a prepared one at the restarted
+half's first poll once it has read its saved profile, released if that is
+the old profile and committed by repair if the restarted half's commit
+marker had landed ([An abandoned prepared copy](#an-abandoned-prepared-copy-d-f34)).
+Each half keeps a whole saved profile throughout, and the halves rejoin.
 
 ## Remaining Exposure And Acceptance Pieces
 

@@ -1572,13 +1572,13 @@ and find both on one whole profile, old or new.
 
 **When the other half does not acknowledge** (byte 17 is `0`: the link is
 down, or that half does not answer), the USB half restarts alone. Each
-half's saved profile is still whole. But a half that held a durable prepared
-copy of the save (between its prepared marker and the USB half's commit
-marker) keeps it, since nothing tells it its sender restarted, and the halves
-stay apart (edits and Save BUSY, flag 2 clear) until it restarts too: an open
-issue of the split protocol (D-F34). A client whose restart was not
-acknowledged, and whose halves do not agree once it is back, asks the user to
-unplug the keyboard and plug it back in, which restarts both.
+half's saved profile is still whole, and the halves rejoin once the link
+answers: the other half's copy of a save in flight is released, or committed
+when the USB half's commit marker had landed, as soon as the restarted half
+polls it ([split protocol](profile-split-v1.md#an-abandoned-prepared-copy-d-f34)).
+A client whose restart was not acknowledged, and whose other half still does
+not answer once it is back, asks the user to unplug the keyboard and plug it
+back in, which restarts both.
 
 Restart and flags 14–15 join the unreleased 2.0 base; no version or feature
 bit moves (D-F28). Firmware without them never sets the flags and answers

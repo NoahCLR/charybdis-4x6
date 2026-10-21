@@ -174,6 +174,7 @@ static void assert_round_trip(const noah_profile_split_v1_frame_t *expected) {
     assert(noah_profile_split_v1_frame_decode(wire, length, &decoded));
     assert(decoded.kind == expected->kind);
     assert(decoded.status == expected->status);
+    assert(decoded.no_prepared_push == expected->no_prepared_push);
     assert_descriptors_equal(&decoded.descriptor, &expected->descriptor);
     assert(decoded.generation == expected->generation);
     assert(decoded.payload_digest == expected->payload_digest);
@@ -496,6 +497,50 @@ static void test_protocol_descriptor_flags(void) {
     assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
 }
 
+// Flag bit 5 is a METADATA frame's alone: its sender holds no prepared push
+// (D-F34). It rides beside any descriptor, committed, compiled or unreadable,
+// and stays reserved in every other kind, where it is refused as before.
+static void test_protocol_no_prepared_push_flag(void) {
+    const noah_profile_split_descriptor_t descriptors[] = {committed_descriptor(9u, 1u, UINT32_C(0x01020304)), compiled_descriptor(), {0}};
+    const noah_profile_split_v1_kind_t    others[]      = {NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE, NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT, NOAH_PROFILE_SPLIT_V1_ABORT};
+    noah_profile_split_v1_frame_t         frame         = {.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK};
+    noah_profile_split_v1_frame_t         decoded;
+    uint8_t                               wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                               clear[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+
+    for (unsigned index = 0u; index < sizeof(descriptors) / sizeof(descriptors[0]); index++) {
+        frame.descriptor       = descriptors[index];
+        frame.no_prepared_push = false;
+        assert(noah_profile_split_v1_frame_encode(&frame, clear, sizeof(clear)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+        assert_round_trip(&frame);
+        frame.no_prepared_push = true;
+        assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+        // The same frame with bit 5 of byte 3 set, and nothing else.
+        assert(wire[3] == (uint8_t)(clear[3] | 0x20u) && memcmp(&wire[4], &clear[4], NOAH_PROFILE_SPLIT_V1_FRAME_SIZE - 5u) == 0);
+        assert_round_trip(&frame);
+        // Bits 2, 6 and 7 stay refused beside it.
+        for (uint8_t bit = 2u; bit < 8u; bit = bit == 2u ? 6u : (uint8_t)(bit + 1u)) {
+            assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+            wire[3] = (uint8_t)(wire[3] | (1u << bit));
+            refresh_crc(wire);
+            assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+        }
+    }
+    frame.descriptor = committed_descriptor(9u, 1u, UINT32_C(0x01020304));
+    for (unsigned index = 0u; index < sizeof(others) / sizeof(others[0]); index++) {
+        frame.kind             = others[index];
+        frame.no_prepared_push = false;
+        assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+        wire[3] = (uint8_t)(wire[3] | 0x20u);
+        refresh_crc(wire);
+        assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
+        frame.no_prepared_push = true;
+        assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == 0u);
+    }
+    // A transfer frame has no descriptor to carry it either.
+    assert(noah_profile_split_v1_frame_encode(&(noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_ACK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = 8u, .no_prepared_push = true}, wire, sizeof(wire)) == 0u);
+}
+
 // A pulled chunk travels in a reply as large as a pushed one (D-F28): the
 // requester sizes the reply buffer from its PAYLOAD_REQUEST, and the peer's
 // reply starts it, the rest zero.
@@ -594,6 +639,7 @@ static void test_protocol_over_64_kib(void) {
 int main(void) {
     test_protocol_over_64_kib();
     test_protocol_descriptor_flags();
+    test_protocol_no_prepared_push_flag();
     test_authority_decision_table();
     test_authority_publication_and_activation_observer();
     test_protocol_golden_frames();
