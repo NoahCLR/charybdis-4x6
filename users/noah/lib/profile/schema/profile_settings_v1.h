@@ -35,8 +35,10 @@ enum {
     NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS = 64,
     NOAH_SETTINGS_PLACEMENT_BYTES      = 8,
     NOAH_SETTINGS_LAYER_RECORD_SIZE    = 1 + 2 * NOAH_SETTINGS_PLACEMENT_BYTES,
+    // A scalar is four little-endian bytes, in scalar-ID order after the header.
+    NOAH_SETTINGS_SCALAR_SIZE          = 4,
     NOAH_SETTINGS_SCALARS_OFFSET       = NOAH_SETTINGS_HEADER_SIZE,
-    NOAH_SETTINGS_LAYER_RECORDS_OFFSET = NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTINGS_COUNT * 4,
+    NOAH_SETTINGS_LAYER_RECORDS_OFFSET = NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTINGS_COUNT * NOAH_SETTINGS_SCALAR_SIZE,
     NOAH_SETTINGS_SHORTCUTS_OFFSET     = NOAH_SETTINGS_LAYER_RECORDS_OFFSET + NOAH_SETTINGS_LAYERS * NOAH_SETTINGS_LAYER_RECORD_SIZE,
     NOAH_SETTINGS_SHORTCUT_SIZE        = NOAH_CUSTOM_KEY_SHORTCUT_SIZE,
     NOAH_SETTINGS_FIXED_SIZE           = NOAH_SETTINGS_SHORTCUTS_OFFSET + NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS * NOAH_SETTINGS_SHORTCUT_SIZE,
@@ -89,6 +91,45 @@ typedef enum {
     NOAH_SETTING_LAYER_COMBOS,
 } noah_setting_id_t;
 
+// The scalar encoding, the one home of the scalar layout: scalar `id` is
+// NOAH_SETTINGS_SCALAR_SIZE little-endian bytes at
+// noah_profile_settings_v1_scalar_offset(id). Callers name a scalar by ID and
+// never compute its offset or byte order. These helpers are pure and hold no
+// state, so any context may call them: key processing and the Raw HID handler
+// on the main loop, the scan's durable-I/O step, or the split RPC callback on
+// SlaveThread. They are always inlined, so none adds a frame to a reviewed
+// stack path.
+
+// Domain offset of scalar `id`. Precondition: id < NOAH_SETTINGS_COUNT.
+static inline __attribute__((always_inline)) uint16_t noah_profile_settings_v1_scalar_offset(uint8_t id) {
+    return (uint16_t)(NOAH_SETTINGS_SCALARS_OFFSET + id * NOAH_SETTINGS_SCALAR_SIZE);
+}
+// The scalar that holds domain byte `offset`, and that byte's place in it (0
+// is the lowest byte). False, leaving *id and *part unwritten, for an offset
+// outside the scalars: the header, layer records, shortcuts or names.
+static inline __attribute__((always_inline)) bool noah_profile_settings_v1_scalar_at(uint16_t offset, uint8_t *id, uint8_t *part) {
+    if (offset < NOAH_SETTINGS_SCALARS_OFFSET || offset >= NOAH_SETTINGS_LAYER_RECORDS_OFFSET) return false;
+    *id   = (uint8_t)((offset - NOAH_SETTINGS_SCALARS_OFFSET) / NOAH_SETTINGS_SCALAR_SIZE);
+    *part = (uint8_t)((offset - NOAH_SETTINGS_SCALARS_OFFSET) % NOAH_SETTINGS_SCALAR_SIZE);
+    return true;
+}
+// Byte `part` (0..NOAH_SETTINGS_SCALAR_SIZE-1) of a scalar's encoding.
+static inline __attribute__((always_inline)) uint8_t noah_profile_settings_v1_scalar_byte(uint32_t value, uint8_t part) {
+    return (uint8_t)(value >> (8u * part));
+}
+// What encoded byte `part` contributes to its scalar's value. A value is its
+// bytes' contributions together, so a reader that sees one byte at a time ORs
+// them as they come.
+static inline __attribute__((always_inline)) uint32_t noah_profile_settings_v1_scalar_bits(uint8_t byte, uint8_t part) {
+    return (uint32_t)byte << (8u * part);
+}
+// A scalar's value from its NOAH_SETTINGS_SCALAR_SIZE encoded bytes.
+static inline __attribute__((always_inline)) uint32_t noah_profile_settings_v1_scalar_value(const uint8_t *bytes) {
+    uint32_t value = 0u;
+    for (uint8_t part = 0u; part < NOAH_SETTINGS_SCALAR_SIZE; part++)
+        value |= noah_profile_settings_v1_scalar_bits(bytes[part], part);
+    return value;
+}
 
 typedef struct {
     uint16_t               offset;

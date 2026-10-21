@@ -148,6 +148,31 @@ static void test_scalars(void) {
     assert(!noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_SNIPING_LAYER, 16, 16));
     assert(noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_SNIPING_LAYER, 15, 16));
 }
+// The scalar encoding against the spec's literal layout: scalar `id` is four
+// little-endian bytes at 8 + 4 * id, and layer records follow at 132.
+static void test_scalar_encoding(void) {
+    assert(NOAH_SETTINGS_LAYER_RECORDS_OFFSET == 132);
+    for (uint8_t id = 0; id < NOAH_SETTINGS_COUNT; id++) {
+        assert(noah_profile_settings_v1_scalar_offset(id) == 8 + 4 * id);
+        for (uint8_t part = 0; part < 4; part++) {
+            uint8_t at_id = 0xff, at_part = 0xff;
+            assert(noah_profile_settings_v1_scalar_at((uint16_t)(8 + 4 * id + part), &at_id, &at_part));
+            assert(at_id == id && at_part == part);
+        }
+    }
+    uint8_t id = 0xee, part = 0xdd;
+    assert(!noah_profile_settings_v1_scalar_at(7, &id, &part) && id == 0xee && part == 0xdd);
+    assert(!noah_profile_settings_v1_scalar_at(132, &id, &part) && id == 0xee && part == 0xdd);
+    static const uint32_t values[] = {0, 1, 0x204060, 0x07010101, UINT32_MAX};
+    for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); i++) {
+        uint8_t encoded[4];
+        for (uint8_t j = 0; j < 4; j++) {
+            encoded[j] = noah_profile_settings_v1_scalar_byte(values[i], j);
+            assert(encoded[j] == (uint8_t)(values[i] >> (8 * j)));
+        }
+        assert(noah_profile_settings_v1_scalar_value(encoded) == values[i]);
+    }
+}
 static void test_layer_records(void) {
     defaults();
     bytes[layer_record(15, NOAH_SETTINGS_LAYER_REFERENCE)] = 0;
@@ -365,6 +390,7 @@ static void test_publication(void) {
 int main(void) {
     noah_effective_settings_set_apply(noah_qmk_portable_apply);
     test_header_and_versions();
+    test_scalar_encoding();
     test_scalars();
     for (uint8_t selected = 0; selected <= 3; selected++) {
         assert(noah_profile_setting_v1_valid(27, selected, 16));
