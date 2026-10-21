@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "profile_split_authority.h"
+#include "profile_split_exchange.h"
 #include "profile_split_protocol_v1.h"
 #include "../storage/profile_peer_store_backend.h"
 #include "../storage/profile_storage_layout.h"
@@ -82,11 +83,6 @@ typedef enum {
 
 typedef bool (*noah_profile_split_local_descriptor_fn)(void *context, noah_profile_split_descriptor_t *descriptor);
 typedef bool (*noah_profile_split_local_read_fn)(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, uint8_t *bytes, uint8_t length);
-// Sends one request of request_length bytes (32 up to the largest frame) and
-// receives the peer's reply into response_length bytes, the request's
-// noah_profile_split_v1_reply_capacity (32, or up to the largest frame for a
-// PAYLOAD_REQUEST).
-typedef bool (*noah_profile_split_exchange_fn)(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length);
 
 // A range of a prepared copy the peer can fill from its own active profile:
 // destination `offset` in the copy, `source_offset` in the named source.
@@ -106,6 +102,9 @@ typedef struct {
     noah_profile_split_local_descriptor_fn local_descriptor;
     noah_profile_split_local_read_fn       local_read;
     void                                  *transport_context;
+    // Sends one request of 32 bytes up to the largest frame and reads the
+    // reply into the request's noah_profile_split_v1_reply_capacity (32, or
+    // up to the largest frame for a PAYLOAD_REQUEST).
     noah_profile_split_exchange_fn         exchange;
     noah_profile_peer_store_backend_t     *peer_store;
     // Optional. A prepared push asks it which ranges the peer can copy from
