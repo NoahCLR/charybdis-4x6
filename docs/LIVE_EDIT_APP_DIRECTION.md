@@ -220,14 +220,23 @@ not run on hardware either.
   press. Whether the next press drops every modifier a held output carries,
   or only a shifted symbol's, is parked with Noah.
 
-- **The reviewed-path stack gate fails on `dev`.** The resource build's stack
-  manifests carry adjacencies the linker no longer makes and miss indirect
-  call sites from `process_record_user`, so the gate fails on `dev` itself;
-  the last passing figures in
-  [memory budgets](architecture/memory-budgets.md) predate this. The
-  manifests need a review against the current linked callers, which should
-  also measure the press and release preflight paths that now plan a waiting
-  key's missed scans (D-F27).
+- **The reviewed-path stack gate fails on `dev`.** The ordinary manifest
+  (`tools/firmware_stack_budget.json`) fails only on budget: six handled-key
+  main-process paths take 1,960–2,312 bytes against the 1,920-byte
+  reviewed-path policy. The live-profile owner manifest passes; its worst
+  path, peer chunk write, takes 1,912 bytes. `NOAH_RESOURCE_CHECKS=yes
+  tools/build-firmware-pair.sh` stops at the ordinary manifest, before the
+  owner manifest runs and before the left half is built, so the owner manifest
+  has to be run on its own against the preserved right-half ELF
+  ([memory budgets](architecture/memory-budgets.md)). The ordinary manifest
+  also has no reviewed path for three kinds of key work: the press and release
+  preflight that plans a waiting key's missed scans (D-F27), entered through
+  `key_runtime_preflight_settle_before_release` and the `preflight` stage of
+  `noah_process_record_user`'s stage table (nine indirect stage calls, of
+  which the manifest declares two); `noah_key_runtime_settle_layer_taps_before_press`;
+  and the projection a streaming transition wrapper runs when a full plan
+  auto-drains (`transition.c`). The six paths need to come under the policy,
+  and those three need reviewed paths.
 
 - **A held mod-tap is hidden under a pointing mode that holds its modifier
   (D-F27).** A pointing mode that holds a modifier (a scroll mode's, such as
