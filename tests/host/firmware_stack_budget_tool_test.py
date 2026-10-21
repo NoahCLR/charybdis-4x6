@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 import sys
 import tempfile
 import unittest
@@ -296,6 +297,29 @@ class FirmwareStackBudgetToolTest(unittest.TestCase):
             {context.name for context in live_owner_manifest.contexts},
             {"main_process", "split_slave_thread"},
         )
+
+    def test_ordinary_manifest_reviews_every_process_stage_the_table_dispatches(self):
+        # noah_process_record_user calls its first stage by name and the rest
+        # through its stage table, a loop LTO inlines into process_record_user:
+        # each of those is an indirect edge the manifest declares and a path uses.
+        source = (ROOT / "users/noah/lib/key/runtime/process.c").read_text(encoding="utf-8")
+        table = re.search(r"key_runtime_process_stage_entry_t stages\[\] = \{(.*?)\};", source, re.S)
+        self.assertIsNotNone(table)
+        handlers = re.findall(r"\.handler = (\w+)", table.group(1))
+        self.assertIn(f"{handlers[0]}(&ctx)", source)
+        self.assertIn("for (uint8_t index = 1; index < ARRAY_SIZE(stages); index++)", source)
+
+        manifest = stack_budget.load_manifest(ROOT / "tools" / "firmware_stack_budget.json")
+        main = next(context for context in manifest.contexts if context.name == "main_process")
+        declared = {edge.callee for edge in main.indirect_edges if edge.caller == "process_record_user"}
+        self.assertEqual(declared, set(handlers[1:]))
+        reviewed = {
+            callee
+            for path in main.paths
+            for caller, callee in zip(path.functions, path.functions[1:])
+            if caller == "process_record_user"
+        }
+        self.assertLessEqual(declared, reviewed)
 
 
 if __name__ == "__main__":
