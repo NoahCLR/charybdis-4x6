@@ -309,6 +309,17 @@ marker-last commit advance through the existing bounded scan-step interfaces.
 Success is reported only after marker readback and an explicit field-by-field
 comparison of the durable record, excluding only the local slot number.
 
+The peer store answers its own state questions, and the reconciler and owner
+ask them rather than spell out sets of states: whether it holds an unfinished
+copy (`holds_copy`), has a bounded step due (`working`), can still abort the
+copy with nothing durable (`abortable`), holds a committed copy whose
+storage is still held for it so it waits to be published
+(`awaiting_activation`), or last admitted a given copy (`copy_matches`).
+They are static inline in `profile_peer_store_backend.h`, so the reviewed
+stack paths gain no frame. The identity comparisons between a store record,
+a staged candidate and a split descriptor live in one header,
+`profile_record_identity.h`.
+
 The store now treats compiled-default digest as boot and candidate
 compatibility, derives the domain mask from the checksummed canonical payload,
 and latches an unconfirmed final marker as reconciliation-required. No later
@@ -444,7 +455,9 @@ descriptor:
   with no byte sent again.
 
 It releases only a copy exactly `PREPARED` and not being pulled by this half.
-A copy committing, or of unknown durability (`RECONCILE_REQUIRED`), is never
+The peer store answers whether a poll's descriptor abandons its prepared
+copy (`noah_profile_peer_store_backend_prepared_copy_abandoned`); the
+reconciler adds only bit 5 and the pull. A copy committing, or of unknown durability (`RECONCILE_REQUIRED`), is never
 released. A poll that arrives while the copy is still being validated or
 prepared is taken once that step ends, since the scan advances the store
 before its mailbox, and so releases the copy once prepared. A poll that
