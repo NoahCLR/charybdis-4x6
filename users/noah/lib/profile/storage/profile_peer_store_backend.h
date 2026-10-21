@@ -99,8 +99,8 @@ uint32_t                                 noah_profile_peer_store_backend_next_of
 const noah_profile_candidate_v1_error_t *noah_profile_peer_store_backend_validation_error(const noah_profile_peer_store_backend_t *peer);
 
 // The peer store answers its own state questions; callers ask these rather
-// than spell out sets of states. Static inline: they run on reviewed stack
-// paths and add no frame.
+// than spell out sets of states. Static inline: the compiler may keep one out of line as a small leaf of
+// its own; the reviewed stack paths are measured as built.
 
 // An admitted copy is not finished: it is receiving, being validated,
 // prepared, being made durable or committed, or waits for a boot scan to

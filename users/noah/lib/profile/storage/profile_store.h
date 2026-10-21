@@ -229,8 +229,8 @@ static inline __attribute__((always_inline)) bool noah_profile_store_slot_payloa
 }
 
 // The store answers its own state questions; callers ask these rather than
-// read its fields. Static inline: they run on reviewed stack paths and add
-// no frame.
+// read its fields. Static inline: the compiler may keep one out of line as a small leaf of
+// its own; the reviewed stack paths are measured as built.
 
 // The record boot selection chose or the last commit made, or NULL while
 // the keyboard holds no saved profile.

@@ -6,8 +6,8 @@
 // domain mask, schema, payload length, checksums and compatibility digests.
 // The store holds it as a record (with the slot it lives in) or, while it is
 // staged, as a candidate; the halves exchange it as a split descriptor. Every
-// comparison between those forms lives here. Static inline: they run on
-// reviewed stack paths and add no frame.
+// comparison between those forms lives here. Static inline: the compiler may keep one out of line as a small leaf of
+// its own; the reviewed stack paths are measured as built.
 #pragma once
 
 #include <stdbool.h>
