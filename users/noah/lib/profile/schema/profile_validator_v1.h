@@ -111,6 +111,12 @@ typedef enum {
 // Checks the schema cannot make on its own, supplied by the firmware runtime.
 // Either hook may be NULL, which checks nothing.
 typedef struct {
+    // Translates one action to the QMK keycode this build runs; false if the
+    // build cannot run it. The schema links no QMK translation, so firmware
+    // injects it (the action runtime's, through the compiled defaults) and
+    // tests inject their own. The validator applies
+    // noah_profile_combo_v1_natives_valid to the results for every combo row
+    // and rejects the combo domain at that row (INVALID_ACTION).
     bool (*combo_to_native)(const noah_profile_action_v1_t *action, uint16_t *native);
     // Whether the keyboard can run an action where the profile places it. Only
     // a candidate the keyboard is asked to save is held to it; a committed
@@ -134,8 +140,8 @@ typedef struct {
     uint8_t  via_macro_slot_count;
     uint8_t  custom_key_count;
 
-    // Optional firmware translation gate. Rejects native aliases of the same
-    // combo input and actions the installed engine cannot execute.
+    // Optional firmware checks (above): combo rows translated under the combo
+    // module's native rule, and where actions are placed.
     const noah_profile_validator_v1_runtime_t *runtime;
     noah_key_behavior_limits_v1_t behavior_limits;
     noah_profile_rgb_v1_limits_t  rgb_limits;

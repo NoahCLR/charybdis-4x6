@@ -59,13 +59,12 @@ void noah_effective_combo_runtime_invalidate(void *context, uint32_t publication
         runtime->flags[index]          = row.flags;
         runtime->allowed_layers[index] = row.allowed_layers;
         runtime->rows[index].keys      = runtime->inputs[index];
-        if (noah_profile_action_runtime_v1_to_native(&row.output, &runtime->rows[index].keycode) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK || !runtime->rows[index].keycode) return;
-        for (uint8_t member = 0; member < row.input_count; member++) {
-            uint16_t *key = &runtime->inputs[index][member];
-            if (noah_profile_action_runtime_v1_to_native(&row.inputs[member], key) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK || *key <= 1u) return;
-            for (uint8_t prior = 0; prior < member; prior++)
-                if (runtime->inputs[index][prior] == *key) return;
-        }
+        // The validator applies the same native rule to the same translation,
+        // so a profile it accepted materializes every combo.
+        if (noah_profile_action_runtime_v1_to_native(&row.output, &runtime->rows[index].keycode) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK) return;
+        for (uint8_t member = 0; member < row.input_count; member++)
+            if (noah_profile_action_runtime_v1_to_native(&row.inputs[member], &runtime->inputs[index][member]) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK) return;
+        if (!noah_profile_combo_v1_natives_valid(runtime->rows[index].keycode, runtime->inputs[index], row.input_count)) return;
     }
     runtime->count = header.row_count;
     runtime->valid = true;

@@ -399,15 +399,15 @@ static noah_profile_validator_v1_result_t validate_combos(noah_profile_validator
     if (!action_reference_is_valid(validator, &row.output) || !placement_is_supported(validator, &row.output, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_COMBO_OUTPUT)) goto invalid;
     for (uint8_t input = 0; input < row.input_count; input++)
         if (!action_reference_is_valid(validator, &row.inputs[input])) goto invalid;
+    // The row runs as the keycodes this build translates it to, under the
+    // combo module's native rule: the one the effective combo table applies.
     if (validator->compatibility.runtime && validator->compatibility.runtime->combo_to_native) {
         bool (*to_native)(const noah_profile_action_v1_t *, uint16_t *) = validator->compatibility.runtime->combo_to_native;
         uint16_t native[NOAH_PROFILE_COMBO_V1_MAX_INPUTS], output;
-        if (!to_native(&row.output, &output) || !output) goto invalid;
-        for (uint8_t input = 0; input < row.input_count; input++) {
-            if (!to_native(&row.inputs[input], &native[input]) || native[input] <= 1u) goto invalid;
-            for (uint8_t prior = 0; prior < input; prior++)
-                if (native[prior] == native[input]) goto invalid;
-        }
+        if (!to_native(&row.output, &output)) goto invalid;
+        for (uint8_t input = 0; input < row.input_count; input++)
+            if (!to_native(&row.inputs[input], &native[input])) goto invalid;
+        if (!noah_profile_combo_v1_natives_valid(output, native, row.input_count)) goto invalid;
     }
     return NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
 invalid:
