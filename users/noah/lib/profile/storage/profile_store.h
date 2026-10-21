@@ -208,8 +208,11 @@ typedef struct {
 
 // Where a slot starts in the slot region: its header first, then its payload.
 // The one home of slot addressing; the flash backend places these addresses
-// on flash pages (D-F29). False for no slot.
-static inline bool noah_profile_store_slot_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
+// on flash pages (D-F29). False for no slot. Always inlined: as a call, its
+// out-parameter would hold the caller's address on its stack, and the
+// owner's scan entry, which adopts a committed record, is on every reviewed
+// storage path's frame.
+static inline __attribute__((always_inline)) bool noah_profile_store_slot_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
     if (!address || (slot != NOAH_PROFILE_SLOT_A && slot != NOAH_PROFILE_SLOT_B)) {
         return false;
     }
@@ -217,7 +220,7 @@ static inline bool noah_profile_store_slot_start(noah_profile_slot_t slot, noah_
     return true;
 }
 
-static inline bool noah_profile_store_slot_payload_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
+static inline __attribute__((always_inline)) bool noah_profile_store_slot_payload_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
     if (!noah_profile_store_slot_start(slot, address)) {
         return false;
     }
