@@ -7,6 +7,7 @@
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/profile/storage/profile_peer_store_backend.h"
 #include "users/noah/lib/profile/storage/profile_record_identity.h"
+#include "profile_store_committed_fixture.h"
 
 enum {
     ACTION_ABI_DIGEST = UINT32_C(0x11223344),
@@ -168,11 +169,11 @@ static void test_exact_identity_commit_reboot_and_idempotence(void) {
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 0u, empty_profile, sizeof(empty_profile)) == NOAH_PROFILE_PEER_STORE_OK);
     assert(finish_commit(&fixture, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
     assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_COMMITTED);
-    assert(fixture.store.committed.generation == 5u);
-    assert(fixture.store.committed.origin_half == 0u);
-    assert(fixture.store.committed.flags == NOAH_PROFILE_STORE_FLAG_OVERRIDE);
-    assert(fixture.store.committed.domain_mask == 0u);
-    assert(fixture.store.committed.compiled_default_digest == fixture.compiled_digest);
+    assert(committed_generation(&fixture.store) == 5u);
+    assert(committed_of(&fixture.store)->origin_half == 0u);
+    assert(committed_of(&fixture.store)->flags == NOAH_PROFILE_STORE_FLAG_OVERRIDE);
+    assert(committed_of(&fixture.store)->domain_mask == 0u);
+    assert(committed_of(&fixture.store)->compiled_default_digest == fixture.compiled_digest);
     writes_after_commit = fixture.memory.writes;
     assert(noah_profile_peer_store_backend_begin(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED);
     assert(fixture.memory.writes == writes_after_commit);
@@ -201,7 +202,7 @@ static void test_reset_record_preserves_zero_flags_without_activation(void) {
     descriptor = descriptor_for(&fixture, 9u, 1u, 0u, 0u);
     transfer_payload(&fixture, &descriptor);
     assert(finish_commit(&fixture, &descriptor) == NOAH_PROFILE_PEER_STORE_OK);
-    assert(fixture.store.committed.flags == 0u);
+    assert(committed_of(&fixture.store)->flags == 0u);
     assert(!fixture.candidate_backend.activation_requested);
     assert(noah_effective_profile_provider_status(&fixture.provider, &status) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS);
@@ -272,8 +273,8 @@ static void test_domain_mismatch_rejects_without_commit(void) {
     descriptor = descriptor_for(&fixture, 1u, 0u, NOAH_PROFILE_STORE_FLAG_OVERRIDE, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB);
     transfer_payload(&fixture, &descriptor);
     assert(finish_commit(&fixture, &descriptor) == NOAH_PROFILE_PEER_STORE_VALIDATION_ERROR);
-    assert(fixture.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
-    assert(!fixture.store.prepare_active && !fixture.provider.backing_reuse_in_progress);
+    assert(!noah_profile_store_committed(&fixture.store));
+    assert(!noah_profile_store_prepare_active(&fixture.store) && !fixture.provider.backing_reuse_in_progress);
     assert(noah_profile_peer_store_backend_validation_error(&fixture.peer) != NULL);
 }
 
@@ -309,7 +310,7 @@ static void test_durability_unknown_requires_boot_reconciliation(void) {
     assert(selected.generation == descriptor.generation && selected.origin_half == descriptor.origin_half);
     assert(selected.payload_crc32 == descriptor.payload_crc32 && selected.payload_digest == descriptor.payload_digest);
     assert(selected.compiled_default_digest == descriptor.compiled_default_digest && selected.action_abi_digest == descriptor.action_abi_digest);
-    assert(!fixture.store.reconciliation_required);
+    assert(!noah_profile_store_reconciliation_required(&fixture.store));
     noah_profile_peer_store_backend_init(&restarted_peer, &fixture.candidate_backend);
     assert(noah_profile_peer_store_backend_begin(&restarted_peer, &descriptor) == NOAH_PROFILE_PEER_STORE_BUSY);
 }
@@ -357,11 +358,11 @@ static void test_reuse_fills_ranges_from_the_active_profile(void) {
 
     // One full chunk and its exact repeat.
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 0u, target, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) == NOAH_PROFILE_PEER_STORE_OK);
-    assert(fixture.peer.next_offset == NOAH_PROFILE_SPLIT_V1_CHUNK_MAX);
+    assert(noah_profile_peer_store_backend_next_offset(&fixture.peer) == NOAH_PROFILE_SPLIT_V1_CHUNK_MAX);
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 0u, target, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) == NOAH_PROFILE_PEER_STORE_OK);
     // ...then the bytes up to the reuse range.
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, NOAH_PROFILE_SPLIT_V1_CHUNK_MAX, &target[NOAH_PROFILE_SPLIT_V1_CHUNK_MAX], (uint8_t)(110u - NOAH_PROFILE_SPLIT_V1_CHUNK_MAX)) == NOAH_PROFILE_PEER_STORE_OK);
-    assert(fixture.peer.next_offset == 110u);
+    assert(noah_profile_peer_store_backend_next_offset(&fixture.peer) == 110u);
 
     // A source this half's active profile is not leaves the copy open.
     wrong = source;
@@ -371,24 +372,24 @@ static void test_reuse_fills_ranges_from_the_active_profile(void) {
     assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &wrong, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_SOURCE_UNAVAILABLE);
     // Past the source's end.
     assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &source, 290u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_SOURCE_UNAVAILABLE);
-    assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_RECEIVING && fixture.peer.next_offset == 110u);
+    assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_RECEIVING && noah_profile_peer_store_backend_next_offset(&fixture.peer) == 110u);
 
     // The range is copied a budget at a time, continuing from the next offset.
     assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &source, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_OK);
-    assert(fixture.peer.next_offset == 160u);
+    assert(noah_profile_peer_store_backend_next_offset(&fixture.peer) == 160u);
     assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &source, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_OK);
-    assert(fixture.peer.next_offset == 210u);
+    assert(noah_profile_peer_store_backend_next_offset(&fixture.peer) == 210u);
     assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &source, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_OK);
-    assert(fixture.peer.next_offset == 230u);
+    assert(noah_profile_peer_store_backend_next_offset(&fixture.peer) == 230u);
     // A finished range asked again changes nothing.
     assert(noah_profile_peer_store_backend_reuse(&fixture.peer, descriptor.generation, descriptor.payload_digest, 110u, &source, 150u, 230u, 50u) == NOAH_PROFILE_PEER_STORE_OK);
-    assert(fixture.peer.next_offset == 230u);
+    assert(noah_profile_peer_store_backend_next_offset(&fixture.peer) == 230u);
 
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 230u, &target[230], NOAH_PROFILE_SPLIT_V1_CHUNK_MAX) == NOAH_PROFILE_PEER_STORE_OK);
     assert(noah_profile_peer_store_backend_write(&fixture.peer, descriptor.generation, descriptor.payload_digest, 230u + NOAH_PROFILE_SPLIT_V1_CHUNK_MAX, &target[230u + NOAH_PROFILE_SPLIT_V1_CHUNK_MAX], (uint8_t)(sizeof(target) - 230u - NOAH_PROFILE_SPLIT_V1_CHUNK_MAX)) == NOAH_PROFILE_PEER_STORE_OK);
-    assert(fixture.peer.next_offset == sizeof(target));
+    assert(noah_profile_peer_store_backend_next_offset(&fixture.peer) == sizeof(target));
     assert(staged_equals(&fixture, target, sizeof(target)));
-    assert(fixture.store.candidate_written == sizeof(target));
+    assert(noah_profile_store_fully_staged(&fixture.store));
     // The store's running checksums cover exactly the staged bytes.
     assert(noah_profile_crc32_finish(fixture.store.candidate_crc32_state) == descriptor.payload_crc32 && fixture.store.candidate_digest_state == descriptor.payload_digest);
 
@@ -453,7 +454,7 @@ static void test_copy_over_64_kib(void) {
         offset += length;
     }
     assert(noah_profile_peer_store_backend_next_offset(&fixture.peer) == WIDE);
-    assert(fixture.store.candidate_written == WIDE);
+    assert(noah_profile_store_fully_staged(&fixture.store));
     assert(staged_equals(&fixture, target, WIDE));
     assert(noah_profile_crc32_finish(fixture.store.candidate_crc32_state) == descriptor.payload_crc32 && fixture.store.candidate_digest_state == descriptor.payload_digest);
     // Past the declared length is a range error, not a wrap.
@@ -514,7 +515,7 @@ static void test_validation_over_64_kib(void) {
             assert(fixture.peer.validation_error.domain_id == NOAH_PROFILE_DOMAIN_V1_RGB && fixture.peer.validation_error.byte_offset == WIDE);
         }
         assert(noah_profile_candidate_store_backend_admission_owner(&fixture.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
-        assert(fixture.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+        assert(!noah_profile_store_committed(&fixture.store));
     }
 }
 

@@ -318,13 +318,13 @@ static void test_auto_save_power_cuts(void) {
     auto_flash_edit(1u, true, &now);
     assert(noah_profile_owner_save(&auto_owner, 2u, auto_owner.working.session, auto_owner.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
     for (uint32_t guard = 0u; guard < 20000u && auto_owner.save.phase; guard++) auto_flash_scan(&now);
-    assert(auto_owner.save.last_result == NOAH_PROFILE_WORKING_OK && auto_owner.store.committed.generation == 1u);
+    assert(auto_owner.save.last_result == NOAH_PROFILE_WORKING_OK && committed_generation(&auto_owner.store) == 1u);
     auto_chip.operations = 0u;
     auto_snapshot = auto_chip;
     auto_owner.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_LIVE;
     auto_flash_edit(3u, false, &now);
     for (uint32_t guard = 0u; guard < 20000u && !auto_owner.save.keyboard_saves; guard++) auto_flash_scan(&now);
-    assert(auto_owner.save.keyboard_saves == 1u && auto_owner.store.committed.generation == 2u);
+    assert(auto_owner.save.keyboard_saves == 1u && committed_generation(&auto_owner.store) == 2u);
     uint32_t operations = auto_chip.operations;
     assert(operations >= 8u); // header, payload, markers and erases all traversed
     for (uint32_t cut = 1u; cut <= operations; cut++) {
@@ -338,8 +338,8 @@ static void test_auto_save_power_cuts(void) {
             auto_flash_boot(&now);
             // A torn last marker may already make generation 2 durable;
             // otherwise generation 1 must remain valid, never defaults.
-            assert(auto_owner.store.committed.generation == 1u || auto_owner.store.committed.generation == 2u);
-            assert(active_scalar(&auto_owner, NOAH_SETTING_DEFAULT_DPI) == (auto_owner.store.committed.generation == 1u ? 400u : 800u));
+            assert(committed_generation(&auto_owner.store) == 1u || committed_generation(&auto_owner.store) == 2u);
+            assert(active_scalar(&auto_owner, NOAH_SETTING_DEFAULT_DPI) == (committed_generation(&auto_owner.store) == 1u ? 400u : 800u));
         }
     }
     printf("automatic save: power cut before/halfway through all %u physical erase/program operations preserves a complete profile\n", operations);
@@ -497,7 +497,7 @@ static void test_a_failed_automatic_save_is_reported_and_not_repeated(void) {
         auto_flash_edit(1u, true, &now);
         assert(noah_profile_owner_save(&auto_owner, 2u, auto_owner.working.session, auto_owner.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
         for (uint32_t guard = 0u; guard < 20000u && auto_owner.save.phase; guard++) auto_flash_scan(&now);
-        assert(auto_owner.save.last_result == NOAH_PROFILE_WORKING_OK && auto_owner.store.committed.generation == 1u);
+        assert(auto_owner.save.last_result == NOAH_PROFILE_WORKING_OK && committed_generation(&auto_owner.store) == 1u);
         auto_owner.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_LIVE;
 
         // The chip refuses every write from now on.
@@ -506,7 +506,7 @@ static void test_a_failed_automatic_save_is_reported_and_not_repeated(void) {
         uint32_t revision = auto_owner.working.revision;
         auto_flash_run_attempt(&now);
         assert(auto_owner.save.last_automatic && auto_owner.save.last_result != NOAH_PROFILE_WORKING_OK && auto_owner.save.last_error != 0u);
-        assert(auto_owner.save.keyboard_saves == 0u && auto_owner.store.committed.generation == 1u);
+        assert(auto_owner.save.keyboard_saves == 0u && committed_generation(&auto_owner.store) == 1u);
         assert(auto_owner.working.active && auto_owner.working.revision == revision);
         // Reported through the ordinary Save status, and the edit stays unsaved.
         noah_profile_owner_working_status_t status;
@@ -534,7 +534,7 @@ static void test_a_failed_automatic_save_is_reported_and_not_repeated(void) {
             assert(auto_owner.save.keyboard_saves == 1u && auto_owner.save.last_automatic && auto_owner.save.last_result == NOAH_PROFILE_WORKING_OK);
         }
         for (uint32_t guard = 0u; guard < 20000u && (auto_owner.save.phase || auto_owner.working.active); guard++) auto_flash_scan(&now);
-        assert(!auto_owner.working.active && auto_owner.store.committed.generation == 2u);
+        assert(!auto_owner.working.active && committed_generation(&auto_owner.store) == 2u);
         assert(active_scalar(&auto_owner, NOAH_SETTING_DEFAULT_DPI) == (explicit_retry ? 800u : 1000u));
     }
     puts("a failed automatic save is reported, not repeated for its revision, and an explicit Save or a new edit retries it");

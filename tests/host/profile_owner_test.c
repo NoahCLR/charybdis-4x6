@@ -10,6 +10,7 @@
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/profile/schema/profile_settings_v1.h"
 #include "users/noah/lib/profile/storage/profile_flash_store.h"
+#include "profile_store_committed_fixture.h"
 
 static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
 
@@ -488,10 +489,10 @@ static void commit_valid_candidate_pair(noah_profile_owner_t *master, noah_profi
     assert(master->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
 
     for (uint32_t guard = 0u; guard < 4096u && (master->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || master->state != NOAH_PROFILE_OWNER_READY_VALIDATED || peer->state != NOAH_PROFILE_OWNER_READY_VALIDATED || master->committed_descriptor.generation != expected_generation || peer->committed_descriptor.generation != expected_generation); guard++) {
-        if (master->store.committed.generation != expected_generation && peer->store.prepare_active && peer->store.candidate_written == peer->store.candidate.payload_length && noah_profile_peer_store_backend_state(&peer->peer_store) == NOAH_PROFILE_PEER_STORE_RECEIVING) {
+        if (committed_generation(&master->store) != expected_generation && noah_profile_store_prepare_active(&peer->store) && noah_profile_store_fully_staged(&peer->store) && noah_profile_peer_store_backend_state(&peer->peer_store) == NOAH_PROFILE_PEER_STORE_RECEIVING) {
             saw_peer_prepared_before_local = true;
         }
-        if (master->store.committed.generation == expected_generation && peer->store.committed.generation != expected_generation) {
+        if (committed_generation(&master->store) == expected_generation && committed_generation(&peer->store) != expected_generation) {
             saw_local_durable_before_peer = true;
             assert(noah_effective_profile_provider_status(&master->provider, &master_provider) == NOAH_EFFECTIVE_PROFILE_OK);
             assert(master_provider.active.generation != expected_generation);
@@ -559,7 +560,7 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
         (void)noah_profile_owner_scan(&left, true, now);
         master_scans++;
         now = fake_now + 1u;
-        if (!peer_ready_at && right.peer_store.state == NOAH_PROFILE_PEER_STORE_PREPARED) peer_ready_at = now;
+        if (!peer_ready_at && noah_profile_peer_store_backend_state(&right.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED) peer_ready_at = now;
         if (noah_profile_split_reconciler_prepared_push_ready(&left.reconciler, NULL)) master_ready_at = now;
     }
     paced_copy = false;
@@ -693,7 +694,7 @@ static void test_simultaneous_hosts_choose_stable_physical_origin_before_durabil
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(right.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(right.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED);
-    assert(left.store.committed.origin_half == 0u && right.store.committed.origin_half == 0u);
+    assert(committed_of(&left.store)->origin_half == 0u && committed_of(&right.store)->origin_half == 0u);
 }
 
 static void test_prepared_peer_is_aborted_before_host_timeout_releases_candidate(void) {
@@ -718,8 +719,8 @@ static void test_prepared_peer_is_aborted_before_host_timeout_releases_candidate
         scan_pair(&left, &right, &now);
     }
     assert(noah_profile_split_reconciler_prepared_push_ready(&left.reconciler, NULL));
-    assert(right.store.prepare_active);
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE && right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(noah_profile_store_prepare_active(&right.store));
+    assert(!noah_profile_store_committed(&left.store) && !noah_profile_store_committed(&right.store));
 
     now = left.host_last_activity_at + NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS;
     assert(noah_profile_owner_scan(&left, true, now));
@@ -728,7 +729,7 @@ static void test_prepared_peer_is_aborted_before_host_timeout_releases_candidate
     }
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
-    assert(!left.store.prepare_active && !right.store.prepare_active);
+    assert(!noah_profile_store_prepare_active(&left.store) && !noah_profile_store_prepare_active(&right.store));
     assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
     assert(noah_profile_candidate_store_backend_admission_owner(&right.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
 }
@@ -756,10 +757,10 @@ static void test_host_abort_is_coordinated_at_each_prepare_boundary(void) {
         assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
 
         if (phase == 1u) {
-            for (uint32_t guard = 0u; guard < 1024u && !(right.store.prepare_active && right.store.candidate_written < right.store.candidate.payload_length); guard++) {
+            for (uint32_t guard = 0u; guard < 1024u && !(noah_profile_store_prepare_active(&right.store) && !noah_profile_store_fully_staged(&right.store)); guard++) {
                 scan_pair(&left, &right, &now);
             }
-            assert(right.store.prepare_active && right.store.candidate_written < right.store.candidate.payload_length);
+            assert(noah_profile_store_prepare_active(&right.store) && !noah_profile_store_fully_staged(&right.store));
         } else if (phase == 2u) {
             for (uint32_t guard = 0u; guard < 1024u && !noah_profile_split_reconciler_prepared_push_ready(&left.reconciler, NULL); guard++) {
                 scan_pair(&left, &right, &now);
@@ -775,8 +776,8 @@ static void test_host_abort_is_coordinated_at_each_prepare_boundary(void) {
         assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
         assert(left.host_transaction.status.last_operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_ABORT);
         assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
-        assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE && right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
-        assert(!left.store.prepare_active && !right.store.prepare_active);
+        assert(!noah_profile_store_committed(&left.store) && !noah_profile_store_committed(&right.store));
+        assert(!noah_profile_store_prepare_active(&left.store) && !noah_profile_store_prepare_active(&right.store));
         assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
         assert(noah_profile_candidate_store_backend_admission_owner(&right.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
     }
@@ -840,10 +841,10 @@ static void test_host_abort_ends_when_peer_never_acknowledges(void) {
     assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
     assert(!left.host_transaction.mailbox.pending);
     assert(now - aborted_at <= NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS + 2u * NOAH_PROFILE_SPLIT_RETRY_MAX_MS);
-    assert(!left.store.prepare_active);
+    assert(!noah_profile_store_prepare_active(&left.store));
     assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
     // Nothing became durable on either half.
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE && right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&left.store) && !noah_profile_store_committed(&right.store));
     assert(owner_peer_cleanup_pending(&left));
     {
         noah_profile_candidate_v1_peer_status_t peer;
@@ -868,7 +869,7 @@ static void test_host_abort_ends_when_peer_never_acknowledges(void) {
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
     assert(now - aborted_at <= NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS + 2u * NOAH_PROFILE_SPLIT_RETRY_MAX_MS);
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE && right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&left.store) && !noah_profile_store_committed(&right.store));
     assert(owner_peer_cleanup_pending(&left));
 }
 
@@ -895,7 +896,7 @@ static void test_barrier_mailbox_retries_and_postcommit_abort_do_not_starve(void
         scan_pair(&left, &right, &now);
     }
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_CONVERGING_PEER);
-    assert(left.store.committed.generation == 1u);
+    assert(committed_generation(&left.store) == 1u);
 
     writes_before = left_memory.writes;
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 130u);
@@ -946,7 +947,7 @@ static void test_local_known_commit_failure_aborts_prepared_peer_first(void) {
         scan_pair(&left, &right, &now);
     }
     assert(noah_profile_split_reconciler_prepared_push_ready(&left.reconciler, NULL));
-    assert(right.store.prepare_active && right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(noah_profile_store_prepare_active(&right.store) && !noah_profile_store_committed(&right.store));
 
     left_memory.fail_next_write = true;
     for (uint32_t guard = 0u; guard < 2048u && left.state != NOAH_PROFILE_OWNER_STORAGE_ERROR; guard++) {
@@ -956,8 +957,8 @@ static void test_local_known_commit_failure_aborts_prepared_peer_first(void) {
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
     assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_STORAGE_FAILURE);
     assert(!left.host_transaction.has_candidate);
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE && right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
-    assert(!left.store.prepare_active && !right.store.prepare_active);
+    assert(!noah_profile_store_committed(&left.store) && !noah_profile_store_committed(&right.store));
+    assert(!noah_profile_store_prepare_active(&left.store) && !noah_profile_store_prepare_active(&right.store));
     assert(noah_profile_candidate_store_backend_admission_owner(&left.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
     assert(noah_profile_candidate_store_backend_admission_owner(&right.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
     assert(!left.reconciler.prepared_push_active);
@@ -1170,7 +1171,7 @@ static void run_peer_store_write_failures(uint8_t failures, uint16_t transaction
     }
     assert(left.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED);
     assert((uint32_t)(now - started) < NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS / 4u);
-    assert(!left.store.committed.generation && !right.store.committed.generation);
+    assert(!committed_generation(&left.store) && !committed_generation(&right.store));
     assert(noah_profile_candidate_store_backend_admission_owner(&right.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
     // Nothing was saved, and the next Apply goes through.
     stage_valid_candidate_pair(&left, &right, (uint16_t)(transaction_id + 1u), &now);
@@ -1202,11 +1203,11 @@ static void test_unexpected_newer_postcommit_authority_never_activates(void) {
     stage_valid_candidate_pair(&left, &right, 110u, &now);
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 110u);
     send_and_scan_pair(&left, &right, frame, &now);
-    for (uint32_t guard = 0u; guard < 2048u && left.store.committed.generation != 1u; guard++) {
+    for (uint32_t guard = 0u; guard < 2048u && committed_generation(&left.store) != 1u; guard++) {
         scan_pair(&left, &right, &now);
     }
-    assert(left.store.committed.generation == 1u);
-    assert(right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(committed_generation(&left.store) == 1u);
+    assert(!noah_profile_store_committed(&right.store));
     for (uint32_t guard = 0u; guard < 32u && (!left.host_barrier_local_published || !left.host_barrier_peer_commit_authorized); guard++) {
         left.scheduler_cursor = 0u;
         assert(noah_profile_owner_scan(&left, true, now++));
@@ -1375,7 +1376,7 @@ static void test_peer_authority_supersedes_only_precommit_host_generation(void) 
 
     begin_frame(frame, 71u);
     send_and_scan(&owner, frame, now++);
-    assert(owner.store.candidate.generation == 2u);
+    assert(noah_profile_store_candidate(&owner.store) && noah_profile_store_candidate(&owner.store)->generation == 2u);
     publish_peer(&owner, 1u);
     (void)noah_profile_owner_scan(&owner, true, now++);
     assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
@@ -1395,7 +1396,7 @@ static void test_peer_authority_supersedes_only_precommit_host_generation(void) 
     // Supersession invalidates only the inactive prepared slot's marker; it
     // never starts marker-last commit or changes the prior durable record.
     assert(memory.writes == writes_before_commit + 1u);
-    assert(owner.store.committed.generation == 1u);
+    assert(committed_generation(&owner.store) == 1u);
     assert(noah_profile_candidate_store_backend_admission_owner(&owner.staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
     assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(owner.host_transaction.status.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_SUPERSEDED);
@@ -1518,7 +1519,7 @@ static void test_commit_waits_for_a_safe_boundary_then_activates(void) {
     for (uint32_t guard = 0u; guard < 10u; guard++)
         scan_pair(&left, &right, &now);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
-    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    assert(!noah_profile_store_committed(&left.store));
     {
         noah_profile_candidate_v1_peer_status_t peer;
 
@@ -1528,21 +1529,21 @@ static void test_commit_waits_for_a_safe_boundary_then_activates(void) {
         assert(peer.phase != NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BINDING);
     }
     activation_block_reason = 0u;
-    for (uint32_t guard = 0u; guard < 4096u && left.store.committed.slot == NOAH_PROFILE_SLOT_NONE; guard++)
+    for (uint32_t guard = 0u; guard < 4096u && !noah_profile_store_committed(&left.store); guard++)
         scan_pair(&left, &right, &now);
-    assert(left.store.committed.slot != NOAH_PROFILE_SLOT_NONE);
-    assert(right.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
-    assert(right.store.prepared_durable);
-    assert(right.store.candidate.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
+    assert(noah_profile_store_committed(&left.store));
+    assert(!noah_profile_store_committed(&right.store));
+    assert(noah_profile_store_durably_prepared(&right.store));
+    assert(noah_profile_store_candidate(&right.store)->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
     assert(left.state != NOAH_PROFILE_OWNER_READY_VALIDATED);
 
     for (uint32_t guard = 0u; guard < 4096u && (left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || left.state != NOAH_PROFILE_OWNER_READY_VALIDATED); guard++)
         scan_pair(&left, &right, &now);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(left.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
-    assert(left.store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
-    assert(right.store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
-    assert(right.store.committed.generation == left.store.committed.generation);
+    assert(committed_of(&left.store)->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
+    assert(committed_of(&right.store)->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
+    assert(committed_generation(&right.store) == committed_generation(&left.store));
 }
 
 static void init_right_half(noah_profile_owner_t *right, memory_t *right_memory, split_link_t *right_link) {
@@ -1584,11 +1585,11 @@ static void decide_commit(noah_profile_owner_t *left, memory_t *left_memory, noa
         scan_pair(left, right, now);
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, transaction_id);
     send_and_scan_pair(left, right, frame, now);
-    for (uint32_t guard = 0u; guard < 4096u && left->store.committed.slot == NOAH_PROFILE_SLOT_NONE; guard++)
+    for (uint32_t guard = 0u; guard < 4096u && !noah_profile_store_committed(&left->store); guard++)
         scan_pair(left, right, now);
-    assert(left->store.committed.slot != NOAH_PROFILE_SLOT_NONE);
-    assert(right->store.committed.slot == NOAH_PROFILE_SLOT_NONE && right->store.prepared_durable);
-    assert(active_generation(left) != left->store.committed.generation);
+    assert(noah_profile_store_committed(&left->store));
+    assert(!noah_profile_store_committed(&right->store) && noah_profile_store_durably_prepared(&right->store));
+    assert(active_generation(left) != committed_generation(&left->store));
 }
 
 static void finish_commit(noah_profile_owner_t *left, noah_profile_owner_t *right, uint32_t *now) {
@@ -1596,9 +1597,9 @@ static void finish_commit(noah_profile_owner_t *left, noah_profile_owner_t *righ
         scan_pair(left, right, now);
     assert(left->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(left->state == NOAH_PROFILE_OWNER_READY_VALIDATED);
-    assert(right->store.committed.format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
-    assert(right->store.committed.generation == left->store.committed.generation);
-    assert(active_generation(left) == left->store.committed.generation);
+    assert(committed_of(&right->store)->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION);
+    assert(committed_generation(&right->store) == committed_generation(&left->store));
+    assert(active_generation(left) == committed_generation(&left->store));
 }
 
 static void test_lost_link_after_decision_keeps_typing_and_resumes(void) {
@@ -1620,7 +1621,7 @@ static void test_lost_link_after_decision_keeps_typing_and_resumes(void) {
     right_link.peer = NULL;
     for (uint32_t guard = 0u; guard < 4096u; guard++) {
         scan_pair(&left, &right, &now);
-        assert(active_generation(&left) != left.store.committed.generation);
+        assert(active_generation(&left) != committed_generation(&left.store));
         assert(left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_AUTHORITY_FAILED);
         assert(left.state != NOAH_PROFILE_OWNER_STORAGE_ERROR && left.state != NOAH_PROFILE_OWNER_INTEGRATION_ERROR);
     }
@@ -1647,7 +1648,7 @@ static void test_peer_rebooted_while_unlinked_after_decision_resumes(void) {
     right_link.peer = NULL;
     for (uint32_t guard = 0u; guard < 256u; guard++) {
         scan_pair(&left, &right, &now);
-        assert(active_generation(&left) != left.store.committed.generation);
+        assert(active_generation(&left) != committed_generation(&left.store));
     }
     init_right_half(&right, &right_memory, &right_link);
     left_link.peer  = &right;
@@ -1672,11 +1673,11 @@ static void test_activation_waits_for_a_safe_boundary_while_typing(void) {
     activation_block_reason = NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT;
     for (uint32_t guard = 0u; guard < 4096u; guard++)
         scan_pair(&left, &right, &now);
-    assert(right.store.committed.generation == left.store.committed.generation);
-    assert(active_generation(&left) != left.store.committed.generation);
+    assert(committed_generation(&right.store) == committed_generation(&left.store));
+    assert(active_generation(&left) != committed_generation(&left.store));
     assert(left.state != NOAH_PROFILE_OWNER_READY_VALIDATED || left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(noah_profile_owner_status(&left, &status));
-    assert(status.has_committed && status.committed.generation == left.store.committed.generation);
+    assert(status.has_committed && status.committed.generation == committed_generation(&left.store));
 
     activation_block_reason = 0u;
     finish_commit(&left, &right, &now);
@@ -1741,19 +1742,19 @@ static void test_link_lost_after_the_peer_commit_was_seen_still_activates(void) 
     for (uint32_t guard = 0u; guard < 4096u && !left.host_barrier_peer_confirmed; guard++)
         scan_pair(&left, &right, &now);
     assert(left.host_barrier_peer_confirmed);
-    assert(right.store.committed.generation == left.store.committed.generation);
+    assert(committed_generation(&right.store) == committed_generation(&left.store));
     left_link.peer  = NULL;
     right_link.peer = NULL;
     for (uint32_t guard = 0u; guard < 64u && peer_in_sight(&left); guard++)
         scan_pair(&left, &right, &now);
     assert(!peer_in_sight(&left));
-    assert(active_generation(&left) != left.store.committed.generation);
+    assert(active_generation(&left) != committed_generation(&left.store));
     activation_block_reason = 0u;
     for (uint32_t guard = 0u; guard < 1024u && (left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE || left.state != NOAH_PROFILE_OWNER_READY_VALIDATED); guard++)
         scan_pair(&left, &right, &now);
     assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     assert(left.state == NOAH_PROFILE_OWNER_READY_VALIDATED);
-    assert(active_generation(&left) == left.store.committed.generation);
+    assert(active_generation(&left) == committed_generation(&left.store));
 
     // Reconnecting finds both halves on the same record: nothing to repair.
     left_link.peer  = &right;
