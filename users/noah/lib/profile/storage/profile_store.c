@@ -203,43 +203,6 @@ static bool shape_complete(const noah_profile_envelope_t *walk, uint8_t mask) {
     return noah_profile_envelope_finish(walk, NULL) == NOAH_PROFILE_CODEC_V1_OK && walk->mask == mask;
 }
 
-static noah_profile_store_result_t validate_blob_shape(noah_profile_store_t *store, noah_profile_storage_address_t payload_start, noah_profile_store_record_t *record) {
-    noah_profile_envelope_t walk;
-    if (!io_read(store, payload_start, store->scratch, PROFILE_BLOB_HEADER_SIZE)) return NOAH_PROFILE_STORE_IO_ERROR;
-    if (!shape_header(&walk, store->scratch, record->payload_length)) return NOAH_PROFILE_STORE_INVALID_PAYLOAD;
-    while (walk.index < walk.count) {
-        if (walk.byte_length - walk.offset < DOMAIN_ENVELOPE_SIZE) return NOAH_PROFILE_STORE_INVALID_PAYLOAD;
-        if (!io_read(store, (payload_start + walk.offset), store->scratch, DOMAIN_ENVELOPE_SIZE)) return NOAH_PROFILE_STORE_IO_ERROR;
-        if (!shape_domain(&walk, store->scratch)) return NOAH_PROFILE_STORE_INVALID_PAYLOAD;
-    }
-    return shape_complete(&walk, record->domain_mask) ? NOAH_PROFILE_STORE_OK : NOAH_PROFILE_STORE_INVALID_PAYLOAD;
-}
-
-static noah_profile_store_result_t validate_payload(noah_profile_store_t *store, noah_profile_storage_address_t payload_start, noah_profile_store_record_t *record) {
-    uint32_t offset = 0u;
-    uint32_t crc    = NOAH_PROFILE_CRC32_INITIAL;
-    uint32_t digest = NOAH_PROFILE_FNV1A_INITIAL;
-
-    while (offset < record->payload_length) {
-        uint32_t length = record->payload_length - offset;
-
-        if (length > NOAH_PROFILE_STORE_IO_CHUNK_MAX) {
-            length = NOAH_PROFILE_STORE_IO_CHUNK_MAX;
-        }
-        if (!io_read(store, (payload_start + offset), store->scratch, length)) {
-            return NOAH_PROFILE_STORE_IO_ERROR;
-        }
-        crc    = noah_profile_crc32_update(crc, store->scratch, length);
-        digest = noah_profile_fnv1a_update(digest, store->scratch, length);
-        offset += length;
-    }
-    if (noah_profile_crc32_finish(crc) != record->payload_crc32) {
-        return NOAH_PROFILE_STORE_CHECKSUM_MISMATCH;
-    }
-    record->payload_digest = digest;
-    return validate_blob_shape(store, payload_start, record);
-}
-
 void noah_profile_store_init(noah_profile_store_t *store, noah_profile_store_io_t io, noah_profile_store_compatibility_t compatibility) {
     if (!store) {
         return;
@@ -298,23 +261,6 @@ static noah_profile_store_result_t finish_prepare(noah_profile_store_t *store, n
     store->commit_offset        = 0u;
     release_result              = end_reuse(store);
     return release_result == NOAH_PROFILE_STORE_OK ? result : release_result;
-}
-
-noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_t *store, noah_profile_slot_t slot, bool require_commit, noah_profile_store_record_t *record) {
-    noah_profile_store_result_t result;
-    noah_profile_storage_address_t start;
-
-    if (!store || !record || !store->io.read || !noah_profile_store_slot_start(slot, &start)) {
-        return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
-    }
-    if (!noah_profile_store_read_span(store, start, store->scratch, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE)) {
-        return NOAH_PROFILE_STORE_IO_ERROR;
-    }
-    result = decode_header(store, slot, store->scratch, require_commit, record);
-    if (result != NOAH_PROFILE_STORE_OK) {
-        return result;
-    }
-    return validate_payload(store, (start + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE), record);
 }
 
 noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t *store, noah_profile_store_record_t *selected) {

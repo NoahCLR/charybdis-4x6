@@ -304,7 +304,6 @@ noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t 
 // result is idempotent.
 noah_profile_store_result_t noah_profile_store_boot_select_begin(noah_profile_store_t *store);
 noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *selected);
-noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_t *store, noah_profile_slot_t slot, bool require_commit, noah_profile_store_record_t *record);
 noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate);
 noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_t *store, uint32_t offset, const uint8_t *bytes, uint32_t length);
 // Validates the staged payload and persists transaction intent without making
