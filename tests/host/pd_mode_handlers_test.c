@@ -792,21 +792,34 @@ uint8_t keyboard_mod_ownership_managed_only_mask(uint8_t mods) {
     for (uint8_t bit = 0; bit < 8; bit++) if (engine_mod_owners[bit]) result |= (1u << bit);
     return result & mods;
 }
+// One of the frozen version-1 presets as the cache holds it: a record's first
+// 96 bytes, which version 1 shares with the current record but for its name.
+enum { FIXTURE_DRAGSCROLL = 0, FIXTURE_VOLUME = 1, FIXTURE_ARROW = 4 };
+static noah_pd_config_t fixture_slot(uint8_t preset) {
+    noah_pd_config_t slot = {0};
+    memcpy(&slot, pd_engine_fixture + 8 + preset * NOAH_PROFILE_PD_V1_MODE_SIZE, NOAH_PROFILE_PD_V1_MODE_SIZE);
+    slot.name_length = 0;
+    memset(slot.name_reserved, 0, sizeof(slot.name_reserved));
+    return slot;
+}
+
 // The directional engine, on the Arrow slot (left/right/up/down arrows) with
 // both thresholds at 10 so one step is one report of 10 counts.
-static void directional_slot(uint8_t slot[96], uint8_t axis, uint8_t empty_policy, bool diagonals) {
-    memcpy(slot, pd_engine_fixture + 8 + 4 * 96, 96);
-    slot[3]  = axis;
-    slot[32] = 10; slot[33] = 0;
-    slot[34] = 10; slot[35] = 0;
-    memset(slot + 70, 0, 20);
+static noah_pd_config_t directional_slot(uint8_t axis, uint8_t empty_policy, bool diagonals) {
+    noah_pd_config_t slot = fixture_slot(FIXTURE_ARROW);
+    slot.axis             = axis;
+    slot.threshold_x      = 10;
+    slot.threshold_y      = 10;
+    memset(slot.diagonals, 0, sizeof(slot.diagonals));
     if (diagonals) {
-        slot[70] = KC_HOME; // up-left
-        slot[74] = KC_PGUP; // up-right
-        slot[78] = KC_END;  // down-left
-        slot[82] = KC_PGDN; // down-right
+        slot.diagonals[NOAH_PD_DIAGONAL_UP_LEFT].keycode    = KC_HOME;
+        slot.diagonals[NOAH_PD_DIAGONAL_UP_RIGHT].keycode   = KC_PGUP;
+        slot.diagonals[NOAH_PD_DIAGONAL_DOWN_LEFT].keycode  = KC_END;
+        slot.diagonals[NOAH_PD_DIAGONAL_DOWN_RIGHT].keycode = KC_PGDN;
     }
-    slot[86] = axis == NOAH_PD_AXIS_EIGHT ? empty_policy : 0;
+    slot.empty_direction  = axis == NOAH_PD_AXIS_EIGHT ? empty_policy : NOAH_PD_EMPTY_DIRECTION_NEAREST;
+    slot.direction_output = NOAH_PD_DIRECTION_OUTPUT_REPEAT;
+    return slot;
 }
 
 // The engine's clock for these tests; test_clear_logs() resets the fixture's.
@@ -839,12 +852,10 @@ static uint8_t directional_run(int16_t x, int16_t y, uint8_t reports, uint16_t k
 }
 
 static void test_configured_eight_directions(void) {
-    uint8_t slot[96];
-
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NEAREST, true);
+    noah_pd_config_t slot = directional_slot(NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NEAREST, true);
     test_reset_stubs();
     directional_clock = 1000u;
-    noah_pd_engine_enter(slot);
+    noah_pd_engine_enter(&slot);
 
     // A diagonal move gives diagonal taps only: no straight taps in between,
     // even when it leans off 45 degrees (27 here) or wobbles.
@@ -892,15 +903,15 @@ static void test_configured_eight_directions(void) {
     // Empty diagonals. Nearest: the quadrant splits at 45 degrees, as in
     // dominant axis, so a 40-degree move is horizontal and a 50-degree one
     // vertical.
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NEAREST, false);
-    noah_pd_engine_enter(slot);
+    slot = directional_slot(NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NEAREST, false);
+    noah_pd_engine_enter(&slot);
     CHECK(directional_run(12, -10, 4, KC_RIGHT) >= 3);
     directional_clock += 500u;
     CHECK(directional_run(10, -12, 4, KC_UP) >= 3);
     // Both: each diagonal step taps the two straight directions, the one the
     // movement leans toward first.
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_BOTH, false);
-    noah_pd_engine_enter(slot);
+    slot = directional_slot(NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_BOTH, false);
+    noah_pd_engine_enter(&slot);
     const struct { int16_t x, y; uint16_t lean, other; } both_leans[] = {{10, -8, KC_RIGHT, KC_UP}, {8, -10, KC_UP, KC_RIGHT}};
     for (uint8_t lean = 0; lean < 2; lean++) {
         uint8_t both = 0;
@@ -914,8 +925,8 @@ static void test_configured_eight_directions(void) {
         CHECK(both >= 4);
     }
     // Nothing: the diagonal is a dead zone.
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NOTHING, false);
-    noah_pd_engine_enter(slot);
+    slot = directional_slot(NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NOTHING, false);
+    noah_pd_engine_enter(&slot);
     CHECK(directional_run(10, -10, 4, KC_NO) == 0);
     noah_pd_engine_exit();
 }
@@ -923,33 +934,31 @@ static void test_configured_eight_directions(void) {
 // Every directional mode is the engine; the policy for an empty direction
 // applies to straight directions too, and a single axis counts only itself.
 static void test_configured_empty_directions_and_single_axes(void) {
-    uint8_t slot[96];
-
     // Dominant axis with "left" empty. Nearest: its share goes to up and down,
     // so a move leaning up-left taps up, at the rate of its upward part.
-    directional_slot(slot, NOAH_PD_AXIS_DOMINANT, 0, false);
-    slot[36] = 0; // left
-    slot[86] = NOAH_PD_EMPTY_DIRECTION_NEAREST;
+    noah_pd_config_t slot = directional_slot(NOAH_PD_AXIS_DOMINANT, 0, false);
+    slot.directions[NOAH_PD_DIRECTION_LEFT] = (noah_pd_tap_t){0};
+    slot.empty_direction                    = NOAH_PD_EMPTY_DIRECTION_NEAREST;
     test_reset_stubs();
     directional_clock = 1000u;
-    noah_pd_engine_enter(slot);
+    noah_pd_engine_enter(&slot);
     uint8_t up = directional_run(-10, -5, 8, KC_UP);
     CHECK(up >= 3 && up <= 5);
     // Nothing: moving left is a dead zone.
-    slot[86] = NOAH_PD_EMPTY_DIRECTION_NOTHING;
-    noah_pd_engine_enter(slot);
+    slot.empty_direction = NOAH_PD_EMPTY_DIRECTION_NOTHING;
+    noah_pd_engine_enter(&slot);
     CHECK(directional_run(-10, -3, 6, KC_NO) == 0);
     // Without diagonals a straight direction has no compass neighbours, so
     // "both" acts as nearest.
-    slot[86] = NOAH_PD_EMPTY_DIRECTION_BOTH;
-    noah_pd_engine_enter(slot);
+    slot.empty_direction = NOAH_PD_EMPTY_DIRECTION_BOTH;
+    noah_pd_engine_enter(&slot);
     CHECK(directional_run(-10, -5, 8, KC_UP) >= 3);
     // In eight directions an empty straight direction sends its two
     // diagonals, the one the movement leans toward first: left leaning up taps
     // up-left then down-left, left leaning down the other way round.
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_BOTH, true);
-    slot[36] = 0; // left
-    noah_pd_engine_enter(slot);
+    slot = directional_slot(NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_BOTH, true);
+    slot.directions[NOAH_PD_DIRECTION_LEFT] = (noah_pd_tap_t){0};
+    noah_pd_engine_enter(&slot);
     const struct { int16_t y; uint16_t lean, other; } leans[] = {{-2, KC_HOME, KC_END}, {2, KC_END, KC_HOME}};
     for (uint8_t lean = 0; lean < 2; lean++) {
         uint8_t pairs = 0;
@@ -964,10 +973,11 @@ static void test_configured_empty_directions_and_single_axes(void) {
     }
 
     // Horizontal only counts the horizontal part of any move.
-    directional_slot(slot, NOAH_PD_AXIS_HORIZONTAL, 0, false);
-    slot[34] = slot[35] = 0;
-    memset(slot + 44, 0, 8); // up, down
-    noah_pd_engine_enter(slot);
+    slot = directional_slot(NOAH_PD_AXIS_HORIZONTAL, 0, false);
+    slot.threshold_y                        = 0;
+    slot.directions[NOAH_PD_DIRECTION_UP]   = (noah_pd_tap_t){0};
+    slot.directions[NOAH_PD_DIRECTION_DOWN] = (noah_pd_tap_t){0};
+    noah_pd_engine_enter(&slot);
     CHECK(directional_run(3, 10, 10, KC_RIGHT) == 3);
     CHECK(directional_run(-10, 10, 2, KC_LEFT) == 2);
     noah_pd_engine_exit();
@@ -975,12 +985,10 @@ static void test_configured_empty_directions_and_single_axes(void) {
 
 // Dominant axis is the same engine with four directions.
 static void test_configured_dominant_axis(void) {
-    uint8_t slot[96];
-
-    directional_slot(slot, NOAH_PD_AXIS_DOMINANT, 0, true); // diagonal slots are ignored
+    noah_pd_config_t slot = directional_slot(NOAH_PD_AXIS_DOMINANT, 0, true); // diagonal slots are ignored
     test_reset_stubs();
     directional_clock = 1000u;
-    noah_pd_engine_enter(slot);
+    noah_pd_engine_enter(&slot);
     CHECK(directional_run(10, 0, 3, KC_RIGHT) == 3);
     // Held right, a move drifting up to 50 degrees stays right...
     CHECK(directional_run(10, 11, 4, KC_RIGHT) >= 3);
@@ -1002,8 +1010,8 @@ static void test_configured_dominant_axis(void) {
     directional_move(6, 0);
     CHECK(tap_call_count == 1 && tapped(0) == KC_RIGHT);
     // Each axis counts in its own threshold.
-    slot[34] = 40;
-    noah_pd_engine_enter(slot);
+    slot.threshold_y = 40;
+    noah_pd_engine_enter(&slot);
     CHECK(directional_run(0, 20, 4, KC_DOWN) == 2);
     noah_pd_engine_exit();
 }
@@ -1012,13 +1020,11 @@ static void test_configured_dominant_axis(void) {
 // movement; after that only motion back against the direction that sent may
 // send, and a pause or the mode ending starts the next movement.
 static void test_configured_once_per_movement(void) {
-    uint8_t slot[96];
-
-    directional_slot(slot, NOAH_PD_AXIS_DOMINANT, 0, false);
-    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    noah_pd_config_t slot = directional_slot(NOAH_PD_AXIS_DOMINANT, 0, false);
+    slot.direction_output = NOAH_PD_DIRECTION_OUTPUT_ONCE;
     test_reset_stubs();
     directional_clock = 1000u;
-    noah_pd_engine_enter(slot);
+    noah_pd_engine_enter(&slot);
     // However far it goes, a movement sends one shortcut, and still reports
     // drain nothing.
     CHECK(directional_run(10, 0, 6, KC_RIGHT) == 1);
@@ -1054,21 +1060,21 @@ static void test_configured_once_per_movement(void) {
     directional_clock += 100u;
     CHECK(directional_run(10, 0, 3, KC_RIGHT) == 0);
     // Entering the mode again starts afresh.
-    noah_pd_engine_enter(slot);
+    noah_pd_engine_enter(&slot);
     CHECK(directional_run(10, 0, 3, KC_RIGHT) == 1);
 
     // A dead zone sends nothing, so it does not spend the movement: turning
     // from an empty diagonal to a straight direction still sends once.
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NOTHING, false);
-    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
-    noah_pd_engine_enter(slot);
+    slot = directional_slot(NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NOTHING, false);
+    slot.direction_output = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    noah_pd_engine_enter(&slot);
     CHECK(directional_run(10, -10, 4, KC_NO) == 0);
     CHECK(directional_run(10, 0, 6, KC_RIGHT) == 1);
     // A diagonal is spent the same way: a stray report more than 90 degrees
     // from it sends nothing, and a 90-degree turn is not back against it.
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NEAREST, true);
-    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
-    noah_pd_engine_enter(slot);
+    slot = directional_slot(NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_NEAREST, true);
+    slot.direction_output = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    noah_pd_engine_enter(&slot);
     CHECK(directional_run(10, 10, 4, KC_PGDN) == 1);
     directional_move(0, -1);
     CHECK(tap_call_count == 0);
@@ -1076,9 +1082,9 @@ static void test_configured_once_per_movement(void) {
     CHECK(directional_run(-10, -10, 4, KC_HOME) == 1);
     CHECK(directional_run(10, -10, 4, KC_PGUP) == 0);
     // Both neighbours are one step's output: one pair, then nothing.
-    directional_slot(slot, NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_BOTH, false);
-    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
-    noah_pd_engine_enter(slot);
+    slot = directional_slot(NOAH_PD_AXIS_EIGHT, NOAH_PD_EMPTY_DIRECTION_BOTH, false);
+    slot.direction_output = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    noah_pd_engine_enter(&slot);
     uint8_t pairs = 0;
     for (uint8_t i = 0; i < 6; i++) {
         directional_move(10, -8);
@@ -1093,14 +1099,13 @@ static void test_configured_once_per_movement(void) {
 // gesture on the other axis is dropped whole: it sends nothing, and its drift
 // on the allowed axis is decayed as usual instead of building into a scroll.
 static void test_configured_scroll_one_axis(void) {
-    uint8_t        slot[96];
-    report_mouse_t report;
-    uint32_t       now = 1000u;
-    memcpy(slot, pd_engine_fixture + 8, 96); // Dragscroll
+    noah_pd_config_t slot = fixture_slot(FIXTURE_DRAGSCROLL);
+    report_mouse_t   report;
+    uint32_t         now = 1000u;
     test_reset_stubs();
 
-    slot[3] = NOAH_PD_SCROLL_VERTICAL;
-    noah_pd_engine_enter(slot);
+    slot.axis = NOAH_PD_SCROLL_VERTICAL;
+    noah_pd_engine_enter(&slot);
     for (uint8_t i = 0; i < 12; i++) {
         fake_time32 = now += 20u;
         report      = noah_pd_engine_motion((report_mouse_t){.x = 18, .y = 3});
@@ -1110,8 +1115,8 @@ static void test_configured_scroll_one_axis(void) {
     report      = noah_pd_engine_motion((report_mouse_t){.x = 2, .y = -24});
     CHECK(report.h == 0 && report.v != 0);
 
-    slot[3] = NOAH_PD_SCROLL_HORIZONTAL;
-    noah_pd_engine_enter(slot);
+    slot.axis = NOAH_PD_SCROLL_HORIZONTAL;
+    noah_pd_engine_enter(&slot);
     for (uint8_t i = 0; i < 12; i++) {
         fake_time32 = now += 20u;
         report      = noah_pd_engine_motion((report_mouse_t){.x = 3, .y = -24});
@@ -1122,8 +1127,8 @@ static void test_configured_scroll_one_axis(void) {
     CHECK(report.h != 0 && report.v == 0);
 
     // Both axes, as every existing profile: the same swipes scroll.
-    slot[3] = NOAH_PD_SCROLL_BOTH;
-    noah_pd_engine_enter(slot);
+    slot.axis = NOAH_PD_SCROLL_BOTH;
+    noah_pd_engine_enter(&slot);
     fake_time32 = now += 200u;
     report      = noah_pd_engine_motion((report_mouse_t){.x = 18, .y = 3});
     CHECK(report.h != 0 && report.v == 0);
@@ -1131,11 +1136,10 @@ static void test_configured_scroll_one_axis(void) {
 }
 
 static void test_configured_release_ownership_and_custom_slot(void) {
-    uint8_t slot[96];
-    memcpy(slot, pd_engine_fixture + 8 + 4 * 96, 96);
-    slot[0] = 7; // Identity/name do not select Arrow's behavior.
+    noah_pd_config_t slot = fixture_slot(FIXTURE_ARROW);
+    slot.id               = 7; // Identity/name do not select Arrow's behavior.
     test_reset_stubs();
-    noah_pd_engine_enter(slot);
+    noah_pd_engine_enter(&slot);
     keyrecord_t first = test_record(true), second = test_record(true);
     second.event.key.col++;
     CHECK(noah_pd_engine_key(MS_BTN1, &first));
@@ -1145,7 +1149,7 @@ static void test_configured_release_ownership_and_custom_slot(void) {
     CHECK(noah_pd_engine_key(MS_BTN1, &first));
     CHECK(engine_mod_owners[5] == 1 && (fake_mods & MOD_BIT(KC_RIGHT_SHIFT)));
     // Switching releases old owned output but retains the old release route.
-    noah_pd_engine_enter(slot);
+    noah_pd_engine_enter(&slot);
     CHECK(engine_mod_owners[5] == 0 && noah_pd_engine_pending_release());
     first.event.pressed = true;
     CHECK(noah_pd_engine_key(MS_BTN1, &first));
@@ -1162,11 +1166,12 @@ static void test_configured_release_ownership_and_custom_slot(void) {
     first.event.pressed = false;
     CHECK(noah_pd_engine_key(MS_BTN2, &first));
     CHECK(!noah_pd_engine_pending_release());
-    memcpy(slot, pd_engine_fixture + 8 + 1 * 96, 96);
-    slot[0] = 7;
-    slot[34] = 1; slot[35] = 0;
-    slot[44] = KC_A; slot[48] = KC_B;
-    noah_pd_engine_enter(slot);
+    slot                                            = fixture_slot(FIXTURE_VOLUME);
+    slot.id                                         = 7;
+    slot.threshold_y                                = 1;
+    slot.directions[NOAH_PD_DIRECTION_UP].keycode   = KC_A;
+    slot.directions[NOAH_PD_DIRECTION_DOWN].keycode = KC_B;
+    noah_pd_engine_enter(&slot);
     test_clear_logs();
     noah_pd_engine_motion((report_mouse_t){.y = INT16_MAX});
     CHECK(tap_call_count == 4 && tap_calls[0].keycode == KC_B);
@@ -1190,19 +1195,14 @@ static void click_move(int16_t x, int16_t y) {
 // policy, never through QMK's key processing, and paced like any other output.
 // The in-progress report loses its motion before a click, and only for one.
 static void test_configured_mouse_button_clicks(void) {
-    uint8_t slot[96];
-
-    directional_slot(slot, NOAH_PD_AXIS_DOMINANT, 0, false);
-    const uint8_t straight[4][4] = {
-        {0xd3, 0, 1, MOD_BIT(KC_LEFT_SHIFT)}, // left: button 3, Shift hidden
-        {0xd4, 0, 0, 0},                      // right: button 4, modifiers kept
-        {0xd1, 0, 2, 0},                      // up: button 1, exact
-        {KC_DOWN, 0, 0, 0},                   // down: a key, as before
-    };
-    memcpy(slot + 36, straight, sizeof(straight));
+    noah_pd_config_t slot = directional_slot(NOAH_PD_AXIS_DOMINANT, 0, false);
+    slot.directions[NOAH_PD_DIRECTION_LEFT]  = (noah_pd_tap_t){MS_BTN3, NOAH_PD_TAP_MASK, MOD_BIT(KC_LEFT_SHIFT)}; // Shift hidden
+    slot.directions[NOAH_PD_DIRECTION_RIGHT] = (noah_pd_tap_t){MS_BTN4, NOAH_PD_TAP_INHERIT, 0};                // modifiers kept
+    slot.directions[NOAH_PD_DIRECTION_UP]    = (noah_pd_tap_t){MS_BTN1, NOAH_PD_TAP_EXACT, 0};
+    slot.directions[NOAH_PD_DIRECTION_DOWN]  = (noah_pd_tap_t){KC_DOWN, NOAH_PD_TAP_INHERIT, 0};                // a key, as before
     test_reset_stubs();
     directional_clock = 1000u;
-    noah_pd_engine_enter(slot);
+    noah_pd_engine_enter(&slot);
 
     for (uint8_t i = 0; i < 3; i++) {
         click_move(10, 0);
@@ -1225,8 +1225,8 @@ static void test_configured_mouse_button_clicks(void) {
     CHECK(pending_report.y == 10);
 
     // Once per movement: one click however far the movement goes.
-    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
-    noah_pd_engine_enter(slot);
+    slot.direction_output = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    noah_pd_engine_enter(&slot);
     directional_clock += 500u;
     uint8_t clicks = 0;
     for (uint8_t i = 0; i < 6; i++) {
@@ -1237,13 +1237,10 @@ static void test_configured_mouse_button_clicks(void) {
 
     // Button overrides: a button tapping its own number clicks once, with no
     // second pass through the override; its release sends nothing.
-    memset(slot + 52, 0, 18);
-    slot[52] = 2;
-    slot[54] = 0xd1;
-    slot[58] = 2;
-    slot[60] = 0xd4;
-    slot[62] = 2;
-    noah_pd_engine_enter(slot);
+    slot.buttons[0] = (noah_pd_button_t){.kind = NOAH_PD_BUTTON_TAP, .tap = {MS_BTN1, NOAH_PD_TAP_INHERIT, 0}};
+    slot.buttons[1] = (noah_pd_button_t){.kind = NOAH_PD_BUTTON_TAP, .tap = {MS_BTN4, NOAH_PD_TAP_EXACT, 0}};
+    slot.buttons[2] = (noah_pd_button_t){0};
+    noah_pd_engine_enter(&slot);
     keyrecord_t button = test_record(true);
     test_clear_logs();
     CHECK(noah_pd_engine_key(MS_BTN1, &button));
@@ -1262,13 +1259,12 @@ static void test_configured_mouse_button_clicks(void) {
 #endif
 
 static void test_configured_macro_start_accounting(void) {
-    uint8_t slot[96];
-    directional_slot(slot, NOAH_PD_AXIS_HORIZONTAL, 0, false);
-    memset(slot + 36, 0, 16);
-    slot[40] = 0x7f; slot[41] = 0x77; // right: last VIA macro
-    slot[87] = NOAH_PD_DIRECTION_OUTPUT_ONCE;
+    noah_pd_config_t slot = directional_slot(NOAH_PD_AXIS_HORIZONTAL, 0, false);
+    memset(slot.directions, 0, sizeof(slot.directions));
+    slot.directions[NOAH_PD_DIRECTION_RIGHT].keycode = 0x777f; // the last macro
+    slot.direction_output = NOAH_PD_DIRECTION_OUTPUT_ONCE;
     test_reset_stubs();
-    noah_pd_engine_enter(slot);
+    noah_pd_engine_enter(&slot);
     macro_start_result = false; // empty, busy or invalid: movement unspent
     for (uint8_t i = 0; i < 2; i++) {
         click_move(10, 0);

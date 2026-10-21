@@ -26,11 +26,11 @@ static uint16_t fake_default_dpi;
 static uint16_t fake_sniping_dpi;
 static uint16_t fake_last_cpi;
 
-static const uint8_t trace_pd_record[96] = {[1] = 1};
-const uint8_t *noah_effective_pd_for_mask(uint32_t mode) { return mode && !(mode & (mode - 1u)) ? trace_pd_record : NULL; }
-void noah_pd_engine_enter(const uint8_t *record) { (void)record; }
+static const noah_pd_config_t trace_pd_slot = {.kind = NOAH_PD_KIND_DIRECTIONAL};
+const noah_pd_config_t *noah_effective_pd_for_mask(uint32_t mode) { return mode && !(mode & (mode - 1u)) ? &trace_pd_slot : NULL; }
+void noah_pd_engine_enter(const noah_pd_config_t *slot) { (void)slot; }
 void noah_pd_engine_exit(void) {}
-uint8_t noah_pd_engine_masked_mods(const uint8_t *record) { (void)record; return 0; }
+uint8_t noah_pd_engine_masked_mods(const noah_pd_config_t *slot) { (void)slot; return 0; }
 bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; return false; }
 
 static uint8_t                          rpc_register_count;
