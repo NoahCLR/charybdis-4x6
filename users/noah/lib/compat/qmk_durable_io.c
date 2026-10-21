@@ -1,47 +1,69 @@
 // ──────────────────────────────────────────────────────────────────────────
-// QMK Scan-Owned Durable-I/O Scheduler
+// QMK Scan-Owned Durable-I/O Grant
 // ──────────────────────────────────────────────────────────────────────────
+
+#include QMK_KEYBOARD_H // IWYU pragma: keep (timer_read32)
 
 #include "qmk_durable_io.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "qmk_profile_flash_hooks.h"
-#include "../profile/storage/profile_store_runtime_hooks.h"
+#if UINTPTR_MAX == UINT32_MAX
+_Static_assert(sizeof(noah_qmk_durable_io_grant_t) <= NOAH_QMK_DURABLE_IO_STATE_BUDGET_32BIT, "one half's durable-I/O grant exceeds its 32-bit RAM policy");
+#endif
+_Static_assert(NOAH_QMK_DURABLE_IO_STEPS_MAX <= UINT8_MAX, "a grant counts its steps in a byte");
 
 static uint32_t split_rpcs;
-// The grant in progress: kept here rather than in the scan's frame, which
-// every reviewed storage path carries (tools/firmware_stack_budget*.json).
-static uint32_t grant_started_us;
-static uint32_t grant_rpcs;
-static uint8_t  grant_steps;
 
-// The profile store's step waits while its flash says so: a save needs a
-// sector erased and the keyboard is busy, or the grant's flash time is spent
-// (D-F29). It and the scan stay out of line in every build, so the flashed
-// firmware has the call shape the reviewed stack paths name
-// (tools/firmware_stack_budget*.json).
-static __attribute__((noinline)) bool noah_qmk_durable_io_profile_step(bool first_in_grant) {
-    bool may_write = noah_qmk_profile_flash_may_write();
+// The owner's clock (D-F32): the scan clock less every interval the step was
+// not allowed to run, across the millisecond timer's wrap.
+static uint32_t owner_now(const noah_qmk_durable_io_grant_t *grant, uint32_t now) {
+    return now - grant->paused_total - (grant->paused ? now - grant->paused_since : 0u);
+}
 
-    // Time the step may not run is not the owner's time (D-F32), told once
-    // per grant.
+// Once per grant, before its first step: whether the step may not run. Out
+// of line, as the step and the repeat are: inlined into the step, it widens
+// the frame every reviewed storage path carries (memory-budgets.md, D-F32).
+static __attribute__((noinline)) void noah_qmk_durable_io_note_paused(noah_qmk_durable_io_grant_t *grant, bool paused) {
+    uint32_t now = timer_read32();
+
+    if (paused && !grant->paused) {
+        grant->paused_since = now;
+        grant->paused       = true;
+    } else if (!paused && grant->paused) {
+        grant->paused_total += now - grant->paused_since;
+        grant->paused = false;
+    }
+}
+
+// The store's step waits while its flash says so: a save needs a sector
+// erased and the keyboard is busy, or the grant's flash time is spent (D-F29).
+static __attribute__((noinline)) bool noah_qmk_durable_io_profile_step(noah_qmk_durable_io_grant_t *grant, bool first_in_grant) {
+    bool may_write = noah_profile_flash_store_may_write(grant->flash);
+
     if (first_in_grant) {
-        noah_profile_store_runtime_note_storage_paused(!may_write);
+        noah_qmk_durable_io_note_paused(grant, !may_write);
     }
     if (!may_write) {
         return false;
     }
     // A repeated step visits only the subsystem whose step just worked.
-    noah_profile_store_runtime_scan_again(!first_in_grant);
-    return noah_profile_store_runtime_matrix_scan_step();
+    return noah_qmk_durable_io_store_step(grant->context, !first_in_grant, owner_now(grant, timer_read32()));
 }
 
-void noah_qmk_durable_io_init(void) {}
+void noah_qmk_durable_io_init(noah_qmk_durable_io_grant_t *grant, noah_profile_flash_store_t *flash, void *context) {
+    *grant = (noah_qmk_durable_io_grant_t){.flash = flash, .context = context};
+}
 
 void noah_qmk_durable_io_note_split_rpc(void) {
     split_rpcs++;
+}
+
+bool noah_qmk_durable_io_storage_paused(void *context) {
+    const noah_qmk_durable_io_grant_t *grant = context;
+
+    return grant->paused;
 }
 
 // A save copies and checks its bytes in small steps; one per scan made a 6 KB
@@ -50,21 +72,26 @@ void noah_qmk_durable_io_note_split_rpc(void) {
 // in progress, never after an erase or a program (still at most one of either
 // per grant), nor after a step that used the split link (the other half
 // answers at its own pace), within the time budget and step limit.
-static __attribute__((noinline)) bool noah_qmk_durable_io_repeat(void) {
-    grant_steps++;
-    return grant_steps < NOAH_QMK_DURABLE_IO_STEPS_MAX && split_rpcs == grant_rpcs && !noah_qmk_profile_flash_grant_flashed() && noah_profile_store_runtime_storage_busy() && (uint32_t)(noah_qmk_profile_flash_now_us() - grant_started_us) < NOAH_QMK_DURABLE_IO_STEP_BUDGET_US;
+static __attribute__((noinline)) bool noah_qmk_durable_io_repeat(noah_qmk_durable_io_grant_t *grant) {
+    grant->steps++;
+    return grant->steps < NOAH_QMK_DURABLE_IO_STEPS_MAX && split_rpcs == grant->split_rpcs && !noah_profile_flash_store_grant_flashed(grant->flash) && noah_qmk_durable_io_store_busy(grant->context) && (uint32_t)(noah_profile_flash_store_now_us(grant->flash) - grant->started_us) < NOAH_QMK_DURABLE_IO_STEP_BUDGET_US;
 }
 
-__attribute__((noinline)) void noah_qmk_durable_io_matrix_scan(void) {
-    // The profile store is the only durable owner left (D-F31). Flash pauses
-    // are measured, and erases ahead of a save run, per grant (D-F29).
-    noah_qmk_profile_flash_grant_begin();
-    grant_started_us = noah_qmk_profile_flash_now_us();
-    grant_rpcs       = split_rpcs;
-    grant_steps      = 0u;
-    if (!noah_qmk_durable_io_profile_step(true)) {
+__attribute__((noinline)) void noah_qmk_durable_io_matrix_scan(noah_qmk_durable_io_grant_t *grant) {
+    noah_profile_flash_store_t *flash = grant->flash;
+
+    if (!flash) {
         return;
     }
-    while (noah_qmk_durable_io_repeat() && noah_qmk_durable_io_profile_step(false)) {
+    // Flash pauses are measured, and erases ahead of a save run, per grant;
+    // the matrix is inspected only when an erase is due (D-F29).
+    noah_profile_flash_store_grant_begin(flash, noah_profile_flash_store_erase_pending(flash) && noah_qmk_durable_io_keyboard_quiet(grant->context));
+    grant->started_us = noah_profile_flash_store_now_us(flash);
+    grant->split_rpcs = split_rpcs;
+    grant->steps      = 0u;
+    if (!noah_qmk_durable_io_profile_step(grant, true)) {
+        return;
+    }
+    while (noah_qmk_durable_io_repeat(grant) && noah_qmk_durable_io_profile_step(grant, false)) {
     }
 }

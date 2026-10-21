@@ -1,8 +1,9 @@
-// QMK flash adapter (D-F29): the shared backend instance, erases only on a
-// quiet keyboard, the EEPROM reset that forgets the saved profiles even when
-// a boot is interrupted, the flash pause read on Profile Wire (custom get
+// QMK flash adapter (D-F29): the shared backend instance, the quiet-keyboard
+// check erases wait for, the EEPROM reset that forgets the saved profiles even
+// when a boot is interrupted, the flash pause read on Profile Wire (custom get
 // 0x0D) and the USB half's pull of the other half's figures over the split
-// link.
+// link. When a grant asks for the check is the durable-I/O grant's
+// (qmk_durable_io_test.c).
 
 #include <assert.h>
 #include <stdbool.h>
@@ -14,7 +15,6 @@
 #include "transactions.h"
 #include "users/noah/lib/compat/qmk_physical_half.h"
 #include "users/noah/lib/compat/qmk_profile_flash.h"
-#include "users/noah/lib/compat/qmk_profile_flash_hooks.h"
 #include "users/noah/lib/profile/protocol/profile_wire_v1.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 
@@ -28,8 +28,6 @@ static slave_callback_t peer_handler;
 static uint8_t          peer_figures[NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE];
 static uint32_t         matrix_idle_ms = 1000u;
 static matrix_row_t     matrix_rows[MATRIX_ROWS];
-static uint32_t         quiet_checks;
-static uint32_t         row_reads;
 
 // QMK's EEPROM magic, kept across simulated reboots as the wear-leveling
 // backing keeps it.
@@ -106,12 +104,10 @@ bool noah_qmk_profile_flash_eeprom_valid(void) {
 }
 
 uint32_t last_matrix_activity_elapsed(void) {
-    quiet_checks++;
     return matrix_idle_ms;
 }
 
 matrix_row_t matrix_get_row(uint8_t row) {
-    row_reads++;
     assert(row < MATRIX_ROWS);
     return matrix_rows[row];
 }
@@ -169,39 +165,29 @@ static uint32_t load_u32(const uint8_t *bytes) {
     return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8u) | ((uint32_t)bytes[2] << 16u) | ((uint32_t)bytes[3] << 24u);
 }
 
+// A save through the instance boot discovery, the owner and the grant share,
+// in grants on a quiet keyboard.
 static void save_a_little(void) {
-    noah_profile_store_io_t io      = noah_qmk_profile_flash_io();
-    uint8_t                 bytes[] = {1u, 2u, 3u, 4u};
+    noah_profile_flash_store_t *flash   = noah_qmk_profile_flash_store();
+    noah_profile_store_io_t     io      = noah_qmk_profile_flash_io();
+    uint8_t                     bytes[] = {1u, 2u, 3u, 4u};
 
+    assert(io.context == flash && noah_qmk_profile_flash_read_only_io().context == flash && noah_qmk_profile_flash_store() == flash);
     assert(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, 8000u));
     // The first quiet grant erases the header sector; the writer runs in the
     // next.
-    noah_qmk_profile_flash_grant_begin();
-    assert(!noah_qmk_profile_flash_may_write());
-    noah_qmk_profile_flash_grant_begin();
-    assert(noah_qmk_profile_flash_may_write());
+    noah_profile_flash_store_grant_begin(flash, true);
+    assert(!noah_profile_flash_store_may_write(flash));
+    noah_profile_flash_store_grant_begin(flash, true);
+    assert(noah_profile_flash_store_may_write(flash));
     assert(io.write(io.context, NOAH_PROFILE_STORAGE_SECTOR_SIZE + 4u, bytes, sizeof(bytes)));
     assert(io.sync(io.context));
-    noah_qmk_profile_flash_grant_begin();
-}
-
-static void test_idle_grants_do_not_inspect_the_matrix(void) {
-    uint32_t checks = quiet_checks;
-    uint32_t rows   = row_reads;
-
-    for (uint32_t scan = 0u; scan < 4096u; scan++) {
-        noah_qmk_profile_flash_grant_begin();
-        assert(noah_qmk_profile_flash_may_write());
-        assert(!noah_qmk_profile_flash_grant_flashed());
-    }
-    assert(quiet_checks == checks && row_reads == rows);
+    noah_profile_flash_store_grant_begin(flash, true);
 }
 
 // No key held and the matrix unchanged for 50 ms: only then may an erase
 // pause the keyboard.
 static void test_erases_wait_for_a_quiet_keyboard(void) {
-    noah_profile_store_io_t io = noah_qmk_profile_flash_io();
-
     matrix_idle_ms = NOAH_QMK_PROFILE_FLASH_QUIET_MS;
     assert(noah_qmk_profile_flash_keyboard_quiet());
     matrix_idle_ms = NOAH_QMK_PROFILE_FLASH_QUIET_MS - 1u;
@@ -209,23 +195,8 @@ static void test_erases_wait_for_a_quiet_keyboard(void) {
     matrix_idle_ms                 = 1000u;
     matrix_rows[MATRIX_ROWS - 1u] = 1u;
     assert(!noah_qmk_profile_flash_keyboard_quiet());
-
-    // A key held: a save's header sector waits, and so does its writer.
-    operations = 0u;
-    assert(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR, 64u));
-    for (uint8_t scan = 0u; scan < 5u; scan++) {
-        noah_qmk_profile_flash_grant_begin();
-        assert(!noah_qmk_profile_flash_may_write());
-    }
-    assert(operations == 0u);
     matrix_rows[MATRIX_ROWS - 1u] = 0u;
-    noah_qmk_profile_flash_grant_begin();
-    assert(operations == 1u && !noah_qmk_profile_flash_may_write());
-    uint32_t checks = quiet_checks;
-    uint32_t rows   = row_reads;
-    noah_qmk_profile_flash_grant_begin();
-    assert(noah_qmk_profile_flash_may_write());
-    assert(quiet_checks == checks && row_reads == rows);
+    assert(noah_qmk_profile_flash_keyboard_quiet());
 }
 
 static void test_own_figures_on_page_zero(void) {
@@ -489,7 +460,6 @@ static void test_eeprom_reset_forgets_the_saved_profiles(void) {
 }
 
 int main(void) {
-    test_idle_grants_do_not_inspect_the_matrix();
     test_eeprom_reset_forgets_the_saved_profiles();
     memset(region, 0x00, sizeof(region));
     test_own_figures_on_page_zero();
