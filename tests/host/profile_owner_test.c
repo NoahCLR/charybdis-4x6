@@ -1888,7 +1888,7 @@ enum { KEYMAP_LENGTH = 16u * 64u * 2u };
 
 // The other half's PUT_PROFILE_WORKING_SYNC callback body.
 static bool owner_working_receive(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
-    return noah_profile_owner_working_receive(context, request, request_length, response, response_length);
+    return noah_profile_working_sync_receive(noah_profile_owner_working_sync(context), request, request_length, response, response_length);
 }
 
 // A half's PUT_PROFILE_WORKING_SYNC link to the other half.

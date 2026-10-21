@@ -277,6 +277,10 @@ const noah_profile_store_record_t *noah_profile_owner_committed(const noah_profi
 const noah_profile_store_t           *noah_profile_owner_store(const noah_profile_owner_t *owner);
 noah_profile_candidate_transaction_t *noah_profile_owner_host_transaction(noah_profile_owner_t *owner);
 noah_profile_split_reconciler_t      *noah_profile_owner_split_reconciler(noah_profile_owner_t *owner);
+// The working copy's sync: this half's end of PUT_PROFILE_WORKING_SYNC. NULL
+// until the owner's graph is initialized, as noah_profile_owner_split_reconciler,
+// and in an owner configured without a working copy.
+noah_profile_working_sync_t          *noah_profile_owner_working_sync(noah_profile_owner_t *owner);
 bool                                  noah_profile_owner_status(const noah_profile_owner_t *owner, noah_profile_owner_status_t *status);
 // Whether the keyboard may drop off USB now (D-F25): the owner is ready with
 // no candidate, save, activation or cleanup in flight, both halves hold the
@@ -330,8 +334,6 @@ typedef struct {
 bool noah_profile_owner_working_status(const noah_profile_owner_t *owner, noah_profile_owner_working_status_t *status);
 // Reads the profile now active (the working copy, or the saved profile).
 bool noah_profile_owner_working_read(const noah_profile_owner_t *owner, uint32_t offset, uint8_t *bytes, uint32_t length);
-// The other half's RPC callback for the working copy's sync.
-bool noah_profile_owner_working_receive(noah_profile_owner_t *owner, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length);
 
 #ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
 uint32_t noah_profile_owner_test_ready_refresh_count(void);
