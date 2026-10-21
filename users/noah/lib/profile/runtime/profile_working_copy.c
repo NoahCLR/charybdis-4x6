@@ -882,4 +882,4 @@ bool noah_profile_working_copy_status(const noah_profile_working_copy_t *copy, n
 }
 
 // A saved slot's reader reads the store directly, a load piece at a time.
-_Static_assert(NOAH_PROFILE_WORKING_LOAD_PIECE <= NOAH_PROFILE_STORE_IO_CHUNK_MAX, "a load piece is one store read");
+_Static_assert((uint32_t)NOAH_PROFILE_WORKING_LOAD_PIECE <= (uint32_t)NOAH_PROFILE_STORE_IO_CHUNK_MAX, "a load piece is one store read");

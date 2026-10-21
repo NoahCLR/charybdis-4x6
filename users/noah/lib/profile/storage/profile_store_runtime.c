@@ -287,7 +287,7 @@ bool noah_profile_store_runtime_read_committed(uint32_t offset, uint8_t *target,
 
 // The Profile Wire channel reads the committed payload a chunk at a time,
 // and one store read covers a chunk.
-_Static_assert(NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE <= NOAH_PROFILE_STORE_IO_CHUNK_MAX, "a Profile Wire readback chunk is one store read");
+_Static_assert((uint32_t)NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE <= (uint32_t)NOAH_PROFILE_STORE_IO_CHUNK_MAX, "a Profile Wire readback chunk is one store read");
 
 // Opened lazily on first use rather than in the scan path: computing the
 // compiled digest walks the authored tables. The boot keyboard-name read and
