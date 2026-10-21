@@ -648,7 +648,7 @@ flowchart TD
     key_runtime["Key runtime reducer/planner/projection"] --> runtime_tests["release matrix, scenario, integration harness, modifier hold, layer lock"]
     pd["Pointing and PD runtime"] --> pd_tests["pd_mode, pd_runtime, handlers, key-runtime integration, pointer layer policy"]
     rgb["RGB rendering"] --> rgb_tests["rgb_validation, rgb_layer_render"]
-    split["Split transport"] --> split_tests["split_runtime_sync, profile_split_reconciler, qmk_profile_split_transport"]
+    split["Split transport"] --> split_tests["split_runtime_sync, profile_split_reconciler, profile_working_sync, qmk_profile_split_transport"]
     hooks["Hooks and boundaries"] --> boundary_tests["hook_chaining, feature_gate_compile, qmk_contract"]
     usb_name["USB product name"] --> usb_name_tests["qmk_usb_product_name, profile_store_runtime, profile_owner"]
     restart["Stopped owner and restart"] --> restart_tests["qmk_keyboard_restart, qmk_profile_edit_channel, profile_working_sync, profile_owner"]
