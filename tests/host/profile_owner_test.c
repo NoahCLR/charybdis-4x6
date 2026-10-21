@@ -2301,7 +2301,11 @@ static void test_repeated_local_steps_save_in_far_fewer_grants(void) {
     unsigned repeated = save_in_grants(true);
 
     printf("a save of a %u-byte profile: %u grants with one step each, %u with repeated local steps\n", (unsigned)(sizeof(compiled_blob) + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE + KEYMAP_LENGTH), one_step, repeated);
-    assert(repeated * 4u <= one_step);
+    // Through the real grant on NOR flash, every erase and page program ends
+    // its grant, and each half's header erase takes one of its own, so the
+    // repeats save about 3.5x the grants (132 against 38); the earlier
+    // hand-copied grant over byte-writable memory let programs share grants.
+    assert(repeated * 3u <= one_step);
 }
 
 static void test_apply_while_editing_waits_and_a_save_refuses_apart_halves(void) {
