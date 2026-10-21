@@ -18,7 +18,6 @@
 #include "lib/macro/macro_payload.h"
 #include "lib/compat/qmk_combo_origin.h"
 #include "lib/compat/qmk_record_admission.h"
-#include "lib/compat/qmk_durable_io.h"
 #include "lib/compat/qmk_keyboard_restart.h"
 #include "lib/compat/qmk_loop_stages.h"
 #include "lib/compat/qmk_profile_flash_hooks.h"
@@ -50,7 +49,7 @@ void noah_matrix_scan_user(void) {
     noah_runtime_cadence_note_matrix_scan();
 #endif
     noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_DURABLE_IO);
-    noah_qmk_durable_io_matrix_scan();
+    noah_profile_store_runtime_matrix_scan();
 
     noah_runtime_diag_stage_mark(NOAH_RUNTIME_DIAG_STAGE_KEY_RUNTIME);
     noah_qmk_combo_origin_scan();
@@ -66,10 +65,10 @@ void noah_matrix_scan_user(void) {
 }
 
 void noah_matrix_slave_scan_user(void) {
-    // QMK does not call matrix_scan_user() on the slave half. Keep the
-    // durable receiver scheduler alive there without running master-side key,
+    // QMK does not call matrix_scan_user() on the slave half. Keep its
+    // durable-I/O grant running there without running master-side key,
     // macro, or shared-state senders a second time.
-    noah_qmk_durable_io_matrix_scan();
+    noah_profile_store_runtime_matrix_scan();
 }
 
 void noah_housekeeping_task_user(void) {
@@ -104,7 +103,7 @@ void noah_keyboard_post_init_user(void) {
 #if defined(NOAH_PD_PROFILE_ENABLE) && !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
         noah_runtime_init_compiled_pd,
 #endif
-        noah_rgb_runtime_post_init, split_runtime_sync_init, noah_qmk_durable_io_init,
+        noah_rgb_runtime_post_init, split_runtime_sync_init,
 #if defined(NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS_ENABLE)
         noah_qmk_loop_stages_init,
 #endif

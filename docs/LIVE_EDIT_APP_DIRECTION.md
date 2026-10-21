@@ -1805,8 +1805,11 @@ step takes up to twelve validator calls of at most 20 bytes each; the commit's
 payload readback reads up to 256 bytes a step. CRC-32 takes four bits at a time
 from a 16-entry table rather than one bit per loop, the same result for any
 bytes. In the owner's two-half host test a 2 KB save took 1,006 grants with
-one 20-byte step per scan; it takes 131 with page-sized steps, and 29 when they
-also repeat. On the keyboard a Save of the 6,432-byte profile now takes 1.0 s
+one 20-byte step per scan; it took 131 with page-sized steps, and 29 when they
+also repeated, under a hand-made grant over byte-writable memory. Through the
+real grant on NOR flash, where the erase ahead and every page program (the
+header's and each marker's included) end their grant, it takes 132 and 38.
+On the keyboard a Save of the 6,432-byte profile now takes 1.0 s
 (0.9 s on the USB half, 0.5 s on the other) and a 37,232-byte one 4.6 s (4.5 s
 and 2.2 s), with the same flash time as before. Each half's copy of the large
 one takes 1.3–1.6 s, close to what the pauses allow: ten sector erases, each

@@ -33,6 +33,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/profile/storage/profile_store_runtime.c" \
     "$ROOT/users/noah/lib/profile/storage/profile_flash_store.c" \
     "$ROOT/users/noah/lib/compat/qmk_profile_flash.c" \
+    "$ROOT/users/noah/lib/compat/qmk_durable_io.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
     -o "$BIN"
 

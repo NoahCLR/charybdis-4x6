@@ -1,8 +1,10 @@
-// QMK flash adapter (D-F29): the shared backend instance, erases only on a
-// quiet keyboard, the EEPROM reset that forgets the saved profiles even when
-// a boot is interrupted, the flash pause read on Profile Wire (custom get
+// QMK flash adapter (D-F29): the shared backend instance, the quiet-keyboard
+// check erases wait for, the EEPROM reset that forgets the saved profiles even
+// when a boot is interrupted, the flash pause read on Profile Wire (custom get
 // 0x0D) and the USB half's pull of the other half's figures over the split
-// link.
+// link. When a grant asks for the check is the durable-I/O grant's
+// (qmk_durable_io_test.c); here the real grant runs over the adapter's
+// instance and check, as the profile store runtime binds them.
 
 #include <assert.h>
 #include <stdbool.h>
@@ -12,9 +14,9 @@
 
 #include QMK_KEYBOARD_H
 #include "transactions.h"
+#include "users/noah/lib/compat/qmk_durable_io.h"
 #include "users/noah/lib/compat/qmk_physical_half.h"
 #include "users/noah/lib/compat/qmk_profile_flash.h"
-#include "users/noah/lib/compat/qmk_profile_flash_hooks.h"
 #include "users/noah/lib/profile/protocol/profile_wire_v1.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 
@@ -156,6 +158,30 @@ bool transaction_rpc_send(int8_t transaction_id, uint8_t request_size, const voi
     return false;
 }
 
+// The half's grant hooks: the adapter's quiet-keyboard check, as the profile
+// store runtime gives it, and a store that only counts its steps.
+static noah_qmk_durable_io_grant_t grant;
+static uint32_t                    store_steps;
+
+bool noah_qmk_durable_io_keyboard_quiet(void *context) {
+    (void)context;
+    return noah_qmk_profile_flash_keyboard_quiet();
+}
+
+bool noah_qmk_durable_io_store_step(void *context, bool again, uint32_t now_ms) {
+    (void)context;
+    (void)again;
+    (void)now_ms;
+    assert(noah_profile_flash_store_may_write(noah_qmk_profile_flash_store()));
+    store_steps++;
+    return true;
+}
+
+bool noah_qmk_durable_io_store_busy(void *context) {
+    (void)context;
+    return false;
+}
+
 static void request(uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE], uint8_t request_id, uint8_t page) {
     memset(frame, 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE);
     frame[0] = NOAH_PROFILE_WIRE_V1_COMMAND_GET;
@@ -169,30 +195,36 @@ static uint32_t load_u32(const uint8_t *bytes) {
     return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8u) | ((uint32_t)bytes[2] << 16u) | ((uint32_t)bytes[3] << 24u);
 }
 
+// A save through the instance boot discovery, the owner and the grant share,
+// in grants on a quiet keyboard.
 static void save_a_little(void) {
-    noah_profile_store_io_t io      = noah_qmk_profile_flash_io();
-    uint8_t                 bytes[] = {1u, 2u, 3u, 4u};
+    noah_profile_flash_store_t *flash   = noah_qmk_profile_flash_store();
+    noah_profile_store_io_t     io      = noah_qmk_profile_flash_io();
+    uint8_t                     bytes[] = {1u, 2u, 3u, 4u};
 
+    assert(io.context == flash && noah_qmk_profile_flash_read_only_io().context == flash && noah_qmk_profile_flash_store() == flash);
     assert(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, 8000u));
     // The first quiet grant erases the header sector; the writer runs in the
     // next.
-    noah_qmk_profile_flash_grant_begin();
-    assert(!noah_qmk_profile_flash_may_write());
-    noah_qmk_profile_flash_grant_begin();
-    assert(noah_qmk_profile_flash_may_write());
+    noah_profile_flash_store_grant_begin(flash, true);
+    assert(!noah_profile_flash_store_may_write(flash));
+    noah_profile_flash_store_grant_begin(flash, true);
+    assert(noah_profile_flash_store_may_write(flash));
     assert(io.write(io.context, NOAH_PROFILE_STORAGE_SECTOR_SIZE + 4u, bytes, sizeof(bytes)));
     assert(io.sync(io.context));
-    noah_qmk_profile_flash_grant_begin();
+    noah_profile_flash_store_grant_begin(flash, true);
 }
 
+// With no erase due a grant steps the store and never reads the matrix.
 static void test_idle_grants_do_not_inspect_the_matrix(void) {
     uint32_t checks = quiet_checks;
     uint32_t rows   = row_reads;
 
+    noah_qmk_durable_io_init(&grant, noah_qmk_profile_flash_store(), NULL);
+    store_steps = 0u;
     for (uint32_t scan = 0u; scan < 4096u; scan++) {
-        noah_qmk_profile_flash_grant_begin();
-        assert(noah_qmk_profile_flash_may_write());
-        assert(!noah_qmk_profile_flash_grant_flashed());
+        noah_qmk_durable_io_matrix_scan(&grant);
+        assert(store_steps == scan + 1u && !noah_qmk_durable_io_storage_paused(&grant));
     }
     assert(quiet_checks == checks && row_reads == rows);
 }
@@ -210,21 +242,26 @@ static void test_erases_wait_for_a_quiet_keyboard(void) {
     matrix_rows[MATRIX_ROWS - 1u] = 1u;
     assert(!noah_qmk_profile_flash_keyboard_quiet());
 
-    // A key held: a save's header sector waits, and so does its writer.
-    operations = 0u;
+    // Through the grant: a key held keeps a save's header sector waiting, and
+    // so its writer, and the grant notes the pause.
+    noah_qmk_durable_io_init(&grant, noah_qmk_profile_flash_store(), NULL);
+    operations  = 0u;
+    store_steps = 0u;
     assert(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR, 64u));
     for (uint8_t scan = 0u; scan < 5u; scan++) {
-        noah_qmk_profile_flash_grant_begin();
-        assert(!noah_qmk_profile_flash_may_write());
+        noah_qmk_durable_io_matrix_scan(&grant);
+        assert(store_steps == 0u && noah_qmk_durable_io_storage_paused(&grant));
     }
     assert(operations == 0u);
+    // Released, the next grant erases and still gives no step; the one after
+    // runs the writer without reading the matrix.
     matrix_rows[MATRIX_ROWS - 1u] = 0u;
-    noah_qmk_profile_flash_grant_begin();
-    assert(operations == 1u && !noah_qmk_profile_flash_may_write());
+    noah_qmk_durable_io_matrix_scan(&grant);
+    assert(operations == 1u && store_steps == 0u && noah_qmk_durable_io_storage_paused(&grant));
     uint32_t checks = quiet_checks;
     uint32_t rows   = row_reads;
-    noah_qmk_profile_flash_grant_begin();
-    assert(noah_qmk_profile_flash_may_write());
+    noah_qmk_durable_io_matrix_scan(&grant);
+    assert(store_steps == 1u && !noah_qmk_durable_io_storage_paused(&grant));
     assert(quiet_checks == checks && row_reads == rows);
 }
 
@@ -489,12 +526,12 @@ static void test_eeprom_reset_forgets_the_saved_profiles(void) {
 }
 
 int main(void) {
-    test_idle_grants_do_not_inspect_the_matrix();
     test_eeprom_reset_forgets_the_saved_profiles();
     memset(region, 0x00, sizeof(region));
     test_own_figures_on_page_zero();
     test_requests_are_checked();
     test_peer_figures_are_pulled_by_the_usb_half();
+    test_idle_grants_do_not_inspect_the_matrix();
     test_erases_wait_for_a_quiet_keyboard();
     puts("qmk profile flash adapter tests passed");
     return 0;

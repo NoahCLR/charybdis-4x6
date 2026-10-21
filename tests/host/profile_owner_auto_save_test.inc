@@ -47,7 +47,6 @@ static void test_ineligible_auto_saves_skip_admission_work(void) {
     puts("automatic admission snapshots are skipped without an eligible save or adjustment");
 }
 
-static bool auto_quiet = true;
 static bool auto_keyboard_quiet(void *context) {
     (void)context;
     return auto_quiet;
@@ -235,64 +234,19 @@ static void test_auto_save_hour_bound(void) {
     puts("continuous editing: zero saves/hour; separated quiet periods: at most 1200 saves/hour");
 }
 
-typedef struct {
-    uint8_t bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
-    bool programmed[NOAH_PROFILE_STORAGE_REGION_SIZE / NOAH_PROFILE_STORAGE_PAGE_SIZE];
-    uint32_t operations, cut, clock;
-    // From this attempt on (1-based, 0 never) erase and program fail and leave
-    // the media as they were: a refusing chip, not a power cut.
-    uint32_t attempts, fail_from;
-    bool off, halfway;
-} auto_flash_t;
-static auto_flash_t auto_chip, auto_snapshot;
-static noah_profile_flash_store_t auto_flash;
+// One half on physical media: its slots behind the real flash store over a
+// NOR chip, every scan one real grant.
+static nor_chip_t auto_chip, auto_snapshot;
 static noah_profile_owner_t auto_owner;
 static uint8_t auto_working[NOAH_PROFILE_PAYLOAD_MAX];
 
-static bool auto_erase(void *context, uint32_t offset) {
-    auto_flash_t *chip = context;
-    assert(!chip->off && offset % NOAH_PROFILE_STORAGE_SECTOR_SIZE == 0u);
-    chip->attempts++;
-    if (chip->fail_from && chip->attempts >= chip->fail_from) return false;
-    chip->operations++;
-    chip->clock += 45000u;
-    bool cut = chip->operations == chip->cut;
-    uint32_t count = cut ? (chip->halfway ? NOAH_PROFILE_STORAGE_SECTOR_SIZE / 2u : 0u) : NOAH_PROFILE_STORAGE_SECTOR_SIZE;
-    memset(chip->bytes + offset, 255, count);
-    memset(chip->programmed + offset / NOAH_PROFILE_STORAGE_PAGE_SIZE, 0, count / NOAH_PROFILE_STORAGE_PAGE_SIZE);
-    chip->off = cut;
-    return !cut;
-}
-static bool auto_program(void *context, uint32_t offset, const uint8_t *bytes) {
-    auto_flash_t *chip = context;
-    assert(!chip->off && offset % NOAH_PROFILE_STORAGE_PAGE_SIZE == 0u && !chip->programmed[offset / NOAH_PROFILE_STORAGE_PAGE_SIZE]);
-    chip->attempts++;
-    if (chip->fail_from && chip->attempts >= chip->fail_from) return false;
-    chip->programmed[offset / NOAH_PROFILE_STORAGE_PAGE_SIZE] = true;
-    chip->operations++;
-    chip->clock += 800u;
-    bool cut = chip->operations == chip->cut;
-    uint32_t count = cut ? (chip->halfway ? NOAH_PROFILE_STORAGE_PAGE_SIZE / 2u : 0u) : NOAH_PROFILE_STORAGE_PAGE_SIZE;
-    for (uint32_t i = 0u; i < count; i++) {
-        assert((chip->bytes[offset + i] & bytes[i]) == bytes[i]);
-        chip->bytes[offset + i] &= bytes[i];
-    }
-    chip->off = cut;
-    return !cut;
-}
-static void auto_read(void *context, uint32_t offset, uint8_t *bytes, uint32_t count) {
-    auto_flash_t *chip = context;
-    memcpy(bytes, chip->bytes + offset, count);
-}
-static uint32_t auto_clock(void *context) { return ((auto_flash_t *)context)->clock; }
 static void auto_flash_scan(uint32_t *now) {
-    noah_profile_flash_store_grant_begin(&auto_flash, auto_quiet);
-    if (!auto_chip.off && noah_profile_flash_store_may_write(&auto_flash)) (void)noah_profile_owner_scan(&auto_owner, true, *now);
+    if (!auto_chip.off) scan_half(&auto_owner, true, *now);
     (*now)++;
 }
 static void auto_flash_boot(uint32_t *now) {
-    noah_profile_flash_store_init(&auto_flash, (noah_profile_flash_driver_t){.read = auto_read, .erase_sector = auto_erase, .program_page = auto_program, .now_us = auto_clock, .context = &auto_chip});
-    assert(noah_profile_owner_init(&auto_owner, &(noah_profile_owner_config_t){.store_io = noah_profile_flash_store_io(&auto_flash), .origin_half = 0u, .working_bytes = auto_working, .working_capacity = sizeof(auto_working), .working_session = 123u, .keyboard_quiet = auto_keyboard_quiet, .settings_defaults_length = auto_defaults_length, .settings_defaults_byte = auto_defaults_byte}));
+    flash_attach(&flash_single, &auto_owner, &auto_chip, true);
+    assert(noah_profile_owner_init(&auto_owner, &(noah_profile_owner_config_t){.store_io = flash_boot(&flash_single), .origin_half = 0u, .working_bytes = auto_working, .working_capacity = sizeof(auto_working), .working_session = 123u, .storage_paused = noah_qmk_durable_io_storage_paused, .storage_paused_context = &flash_single.grant, .keyboard_quiet = noah_qmk_durable_io_keyboard_quiet, .settings_defaults_length = auto_defaults_length, .settings_defaults_byte = auto_defaults_byte}));
     for (uint32_t guard = 0u; guard < 20000u && auto_owner.state != NOAH_PROFILE_OWNER_READY_COMPILED && auto_owner.state != NOAH_PROFILE_OWNER_READY_VALIDATED; guard++) auto_flash_scan(now);
     assert(auto_owner.working_ready);
     for (uint8_t settle = 0u; settle < 4u; settle++) auto_flash_scan(now);
@@ -313,7 +267,7 @@ static void auto_flash_edit(uint16_t transaction, bool create, uint32_t *now) {
 }
 static void test_auto_save_power_cuts(void) {
     uint32_t now = 0u;
-    memset(&auto_chip, 0, sizeof(auto_chip)); memset(auto_chip.bytes, 255, sizeof(auto_chip.bytes));
+    nor_erased(&auto_chip);
     auto_flash_boot(&now);
     auto_flash_edit(1u, true, &now);
     assert(noah_profile_owner_save(&auto_owner, 2u, auto_owner.working.session, auto_owner.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
@@ -492,7 +446,7 @@ static void auto_flash_run_attempt(uint32_t *now) {
 static void test_a_failed_automatic_save_is_reported_and_not_repeated(void) {
     for (uint8_t explicit_retry = 0u; explicit_retry < 2u; explicit_retry++) {
         uint32_t now = 0u;
-        memset(&auto_chip, 0, sizeof(auto_chip)); memset(auto_chip.bytes, 255, sizeof(auto_chip.bytes));
+        nor_erased(&auto_chip);
         auto_flash_boot(&now);
         auto_flash_edit(1u, true, &now);
         assert(noah_profile_owner_save(&auto_owner, 2u, auto_owner.working.session, auto_owner.working.revision) == NOAH_PROFILE_WORKING_QUEUED);

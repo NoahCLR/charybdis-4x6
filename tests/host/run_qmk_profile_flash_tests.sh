@@ -25,6 +25,7 @@ build_and_run() {
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \
         "$ROOT/tests/host/qmk_profile_flash_test.c" \
+        "$ROOT/users/noah/lib/compat/qmk_durable_io.c" \
         "$ROOT/users/noah/lib/compat/qmk_profile_flash.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_flash_store.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_store.c" \

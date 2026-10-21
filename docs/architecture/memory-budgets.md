@@ -693,7 +693,9 @@ the new base at `86d7fd89`. Both manifests now name the flash backend: reads
 (`flash_read`, `read_flash`, `rp2040_read`), writes and page programs
 (`flash_write`, `write_flash`, `flush`, `rp2040_program_page`), syncs
 (`io_sync`, `flash_sync`), the erase ahead of a save
-(`noah_qmk_durable_io_matrix_scan` → `erase_next` → `rp2040_erase_sector`) and
+(`noah_qmk_durable_io_matrix_scan` → `noah_qmk_durable_io_begin` →
+`erase_next` → `rp2040_erase_sector`; the grant's start became its own
+out-of-line step when the grant became one module) and
 the boot-time forget (`main` → `rp2040_erase_sector`); the profile step is
 reached through `noah_qmk_durable_io_profile_step`, its flash gate, into which
 the compiler inlines the store runtime step. Paths stop at the driver
