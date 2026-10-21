@@ -22,7 +22,7 @@ static bool descriptor_correlation_matches(const noah_profile_split_descriptor_t
 // meaningless to the sender, and one past the request's length cannot even be
 // encoded, which turned BUSY into an INVALID_FRAME that stopped the sender.
 static uint32_t busy_offset(const noah_profile_peer_store_backend_t *store, uint32_t generation, uint32_t payload_digest, uint32_t payload_length) {
-    return descriptor_correlation_matches(&store->descriptor, generation, payload_digest, payload_length) ? noah_profile_peer_store_backend_next_offset(store) : 0u;
+    return noah_profile_peer_store_backend_copy_matches(store, generation, payload_digest, payload_length) ? noah_profile_peer_store_backend_next_offset(store) : 0u;
 }
 
 static void clear_provisional_peer(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor) {
@@ -188,13 +188,11 @@ static void transfer_reply(noah_profile_split_v1_frame_t *reply, noah_profile_sp
 // Why the store's answer to this copy is BUSY, for the sender's diagnostics.
 static noah_profile_split_v1_busy_reason_t store_busy_reason(const noah_profile_split_reconciler_t *reconciler, uint32_t generation, uint32_t payload_digest, uint32_t payload_length) {
     const noah_profile_peer_store_backend_t *store = reconciler->config.peer_store;
-    noah_profile_peer_store_state_t          state = noah_profile_peer_store_backend_state(store);
-    bool                                     held  = state == NOAH_PROFILE_PEER_STORE_RECEIVING || state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_PREPARING || state == NOAH_PROFILE_PEER_STORE_PREPARED || state == NOAH_PROFILE_PEER_STORE_COMMITTING || state == NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED;
 
-    if (held && !descriptor_correlation_matches(&store->descriptor, generation, payload_digest, payload_length)) {
+    if (noah_profile_peer_store_backend_holds_copy(store) && !noah_profile_peer_store_backend_copy_matches(store, generation, payload_digest, payload_length)) {
         return NOAH_PROFILE_SPLIT_V1_BUSY_OTHER_COPY;
     }
-    if (state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_PREPARING || state == NOAH_PROFILE_PEER_STORE_COMMITTING) {
+    if (noah_profile_peer_store_backend_working(store)) {
         return NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING;
     }
     return NOAH_PROFILE_SPLIT_V1_BUSY_NO_LEASE;
@@ -397,15 +395,11 @@ static bool release_remote_prepare(noah_profile_split_reconciler_t *reconciler) 
 
 // Only the push that sent a prepared copy commits or cancels it, and its
 // sender authorizes the commit only once its own saved profile is the copy.
-// A sender that holds no push and has read a saved profile other than the
-// copy restarted before its marker, or released the push without an
-// acknowledged ABORT: nothing will ever end the copy, so this releases it
-// (D-F34). A sender whose saved profile is the copy commits it as repair.
-// Nothing else releases a prepared copy: not time, nor silence.
+// A poll saying its sender holds no push carries that sender's saved
+// profile; the peer store answers whether that abandons its prepared copy
+// (D-F34), and this half releases it unless it is pulling.
 static bool prepared_copy_abandoned(const noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request) {
-    const noah_profile_peer_store_backend_t *store = reconciler->config.peer_store;
-
-    return request->no_prepared_push && request->descriptor.readable && !noah_profile_descriptor_equal(&request->descriptor, &store->descriptor) && reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && noah_profile_peer_store_backend_state(store) == NOAH_PROFILE_PEER_STORE_PREPARED;
+    return request->no_prepared_push && reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && noah_profile_peer_store_backend_prepared_copy_abandoned(reconciler->config.peer_store, &request->descriptor);
 }
 
 static __attribute__((noinline)) void process_metadata(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request) {
@@ -468,7 +462,7 @@ static __attribute__((noinline)) void process_payload_chunk(noah_profile_split_r
     noah_profile_peer_store_result_t result;
     noah_profile_split_v1_frame_t    response;
 
-    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH || !descriptor_correlation_matches(&reconciler->config.peer_store->descriptor, request->generation, request->payload_digest, request->payload_length)) {
+    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH || !noah_profile_peer_store_backend_copy_matches(reconciler->config.peer_store, request->generation, request->payload_digest, request->payload_length)) {
         busy_reply(&response, reconciler, store_busy_reason(reconciler, request->generation, request->payload_digest, request->payload_length), request->generation, request->payload_digest, request->payload_length);
         cache_response(reconciler, request_wire, request_length, &response);
         publish_authority(reconciler);
@@ -555,7 +549,7 @@ static __attribute__((noinline)) void cache_reuse_busy_reply(noah_profile_split_
 }
 
 static __attribute__((noinline)) void process_payload_reuse(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, const noah_profile_split_v1_frame_t *request, uint32_t now) {
-    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH || !descriptor_correlation_matches(&reconciler->config.peer_store->descriptor, request->generation, request->payload_digest, request->payload_length)) {
+    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH || !noah_profile_peer_store_backend_copy_matches(reconciler->config.peer_store, request->generation, request->payload_digest, request->payload_length)) {
         cache_reuse_busy_reply(reconciler, request_wire, request_length, request);
         return;
     }
@@ -599,15 +593,16 @@ static __attribute__((noinline)) void process_prepare_commit(noah_profile_split_
 static __attribute__((noinline)) void process_abort(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, const noah_profile_split_v1_frame_t *request) {
     noah_profile_peer_store_result_t result;
     noah_profile_split_v1_frame_t    response;
-    noah_profile_peer_store_state_t  state        = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
-    bool                             matches_live = noah_profile_descriptor_equal(&reconciler->config.peer_store->descriptor, &request->descriptor);
+    const noah_profile_peer_store_backend_t *store        = reconciler->config.peer_store;
+    bool                                     matches_live = noah_profile_descriptor_equal(&store->descriptor, &request->descriptor);
 
     clear_provisional_peer(reconciler, &request->descriptor);
-    if ((state == NOAH_PROFILE_PEER_STORE_RECEIVING || state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_PREPARED) && matches_live) {
+    if (noah_profile_peer_store_backend_abortable(store) && matches_live) {
         result = noah_profile_peer_store_backend_abort(reconciler->config.peer_store, &request->descriptor);
-    } else if (state == NOAH_PROFILE_PEER_STORE_PREPARING || state == NOAH_PROFILE_PEER_STORE_COMMITTING || state == NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED || ((state == NOAH_PROFILE_PEER_STORE_RECEIVING || state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_PREPARED) && !matches_live)) {
+    } else if (noah_profile_peer_store_backend_holds_copy(store)) {
+        // Another copy, or this one past the point an abort can end it.
         result = NOAH_PROFILE_PEER_STORE_BUSY;
-    } else if (state == NOAH_PROFILE_PEER_STORE_COMMITTED && matches_live) {
+    } else if (noah_profile_peer_store_backend_state(store) == NOAH_PROFILE_PEER_STORE_COMMITTED && matches_live) {
         // A no-op abort is successful only when the descriptor was never
         // admitted provisionally. Never report success for matching durable
         // state because the sender cannot safely infer that no marker landed.
@@ -667,7 +662,7 @@ static __attribute__((noinline)) void process_payload_request(noah_profile_split
 static void note_lease_activity(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request, uint32_t now) {
     bool framed = request->kind == NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN || request->kind == NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE || request->kind == NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT || request->kind == NOAH_PROFILE_SPLIT_V1_ABORT;
 
-    if ((framed || request->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK || request->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) && noah_profile_peer_store_backend_state(reconciler->config.peer_store) == NOAH_PROFILE_PEER_STORE_RECEIVING && descriptor_correlation_matches(&reconciler->config.peer_store->descriptor, framed ? request->descriptor.generation : request->generation, framed ? request->descriptor.payload_digest : request->payload_digest, framed ? request->descriptor.payload_length : request->payload_length)) {
+    if ((framed || request->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK || request->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) && noah_profile_peer_store_backend_state(reconciler->config.peer_store) == NOAH_PROFILE_PEER_STORE_RECEIVING && noah_profile_peer_store_backend_copy_matches(reconciler->config.peer_store, framed ? request->descriptor.generation : request->generation, framed ? request->descriptor.payload_digest : request->payload_digest, framed ? request->descriptor.payload_length : request->payload_length)) {
         reconciler->lease_activity_at    = now;
         reconciler->lease_activity_known = true;
     }
@@ -774,14 +769,12 @@ static void update_remote_commit_response(noah_profile_split_reconciler_t *recon
 }
 
 static void release_transient_busy_response(noah_profile_split_reconciler_t *reconciler) {
-    noah_profile_split_v1_frame_t   response;
-    noah_profile_peer_store_state_t state;
+    noah_profile_split_v1_frame_t response;
 
     if (!reconciler->cached_response_valid || !noah_profile_split_v1_frame_decode(reconciler->cached_response_wire, reconciler->cached_response_length, &response) || !response_busy(&response)) {
         return;
     }
-    state = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
-    if (reconciler->incoming_reuse_active || state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_PREPARING || state == NOAH_PROFILE_PEER_STORE_COMMITTING) {
+    if (reconciler->incoming_reuse_active || noah_profile_peer_store_backend_working(reconciler->config.peer_store)) {
         return;
     }
     // BUSY is cached long enough for one byte-identical retry to observe it.
@@ -796,7 +789,7 @@ static bool advance_store_transfer(noah_profile_split_reconciler_t *reconciler) 
     noah_profile_peer_store_state_t  state = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
     noah_profile_peer_store_result_t result;
 
-    if (state != NOAH_PROFILE_PEER_STORE_VALIDATING && state != NOAH_PROFILE_PEER_STORE_PREPARING && state != NOAH_PROFILE_PEER_STORE_COMMITTING) {
+    if (!noah_profile_peer_store_backend_working(reconciler->config.peer_store)) {
         return false;
     }
     result = noah_profile_peer_store_backend_step(reconciler->config.peer_store, NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX);
@@ -1505,12 +1498,10 @@ static void pull_commit_step(noah_profile_split_reconciler_t *reconciler) {
 }
 
 static bool abort_transfer_for_role_change(noah_profile_split_reconciler_t *reconciler) {
-    noah_profile_peer_store_state_t state = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
-
     if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_NONE) {
         return false;
     }
-    if (state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_RECEIVING || state == NOAH_PROFILE_PEER_STORE_PREPARED) {
+    if (noah_profile_peer_store_backend_abortable(reconciler->config.peer_store)) {
         (void)noah_profile_peer_store_backend_abort(reconciler->config.peer_store, &reconciler->config.peer_store->descriptor);
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
         return true;

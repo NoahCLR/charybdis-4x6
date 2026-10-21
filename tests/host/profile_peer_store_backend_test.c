@@ -296,7 +296,10 @@ static void test_durability_unknown_requires_boot_reconciliation(void) {
     assert(result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS);
     fixture.memory.fail_reads = true;
     assert(noah_profile_peer_store_backend_step(&fixture.peer, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET) == NOAH_PROFILE_PEER_STORE_DURABILITY_UNKNOWN);
-    assert(fixture.store.reconciliation_required);
+    assert(noah_profile_store_reconciliation_required(&fixture.store));
+    // Waiting on a boot scan, the copy is still held, but neither bounded
+    // work nor an abort can end it.
+    assert(noah_profile_peer_store_backend_holds_copy(&fixture.peer) && !noah_profile_peer_store_backend_working(&fixture.peer) && !noah_profile_peer_store_backend_abortable(&fixture.peer));
     assert(noah_profile_peer_store_backend_abort(&fixture.peer, &descriptor) == NOAH_PROFILE_PEER_STORE_DURABILITY_UNKNOWN);
 
     noah_profile_peer_store_backend_init(&restarted_peer, &fixture.candidate_backend);
@@ -621,7 +624,96 @@ static void test_identity_forms_compare_one_tuple(void) {
     }
 }
 
+// The peer store answers its own state questions through a whole prepared
+// copy: idle, receiving, validating and preparing, prepared (and whether a
+// sender holding no push has abandoned it), committing, committed and
+// waiting to be published, then published.
+static void test_peer_store_answers_its_state_questions(void) {
+    fixture_t                               fixture;
+    noah_profile_split_descriptor_t         descriptor;
+    noah_profile_split_descriptor_t         other;
+    noah_profile_split_descriptor_t         unreadable = {0};
+    noah_profile_peer_store_result_t        result;
+    noah_profile_candidate_backend_result_t activation;
+    uint16_t                                steps = 0u;
+    bool                                    saw_working = false;
+
+    assert(!noah_profile_peer_store_backend_holds_copy(NULL) && !noah_profile_peer_store_backend_working(NULL) && !noah_profile_peer_store_backend_abortable(NULL));
+    assert(!noah_profile_peer_store_backend_awaiting_activation(NULL) && !noah_profile_peer_store_backend_copy_matches(NULL, 1u, 1u, 1u) && !noah_profile_peer_store_backend_prepared_copy_abandoned(NULL, &unreadable));
+
+    fixture_init(&fixture);
+    descriptor = descriptor_for(&fixture, 5u, 0u, NOAH_PROFILE_STORE_FLAG_OVERRIDE, 0u);
+    other      = descriptor_for(&fixture, 4u, 1u, NOAH_PROFILE_STORE_FLAG_OVERRIDE, 0u);
+    assert(!noah_profile_peer_store_backend_holds_copy(&fixture.peer) && !noah_profile_peer_store_backend_working(&fixture.peer) && !noah_profile_peer_store_backend_abortable(&fixture.peer));
+    assert(!noah_profile_peer_store_backend_copy_matches(&fixture.peer, descriptor.generation, descriptor.payload_digest, descriptor.payload_length));
+
+    // Receiving: the copy is held and can be abandoned, and is this one.
+    transfer_payload(&fixture, &descriptor);
+    assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_RECEIVING);
+    assert(noah_profile_peer_store_backend_holds_copy(&fixture.peer) && noah_profile_peer_store_backend_abortable(&fixture.peer) && !noah_profile_peer_store_backend_working(&fixture.peer));
+    assert(noah_profile_peer_store_backend_copy_matches(&fixture.peer, descriptor.generation, descriptor.payload_digest, descriptor.payload_length));
+    assert(!noah_profile_peer_store_backend_copy_matches(&fixture.peer, descriptor.generation + 1u, descriptor.payload_digest, descriptor.payload_length));
+    assert(!noah_profile_peer_store_backend_copy_matches(&fixture.peer, descriptor.generation, descriptor.payload_digest ^ 1u, descriptor.payload_length));
+    assert(!noah_profile_peer_store_backend_copy_matches(&fixture.peer, descriptor.generation, descriptor.payload_digest, descriptor.payload_length + 1u));
+    // Only a prepared copy can be abandoned.
+    assert(!noah_profile_peer_store_backend_prepared_copy_abandoned(&fixture.peer, &other));
+
+    // Validating and making the prepared marker durable are bounded work;
+    // validation can still be abandoned, the durable marker write cannot.
+    result = noah_profile_peer_store_backend_prepare_durable_begin(&fixture.peer, &descriptor);
+    while (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
+        noah_profile_peer_store_state_t state = noah_profile_peer_store_backend_state(&fixture.peer);
+
+        assert(++steps < 128u);
+        assert(noah_profile_peer_store_backend_working(&fixture.peer) && noah_profile_peer_store_backend_holds_copy(&fixture.peer));
+        assert(noah_profile_peer_store_backend_abortable(&fixture.peer) == (state == NOAH_PROFILE_PEER_STORE_VALIDATING));
+        saw_working = true;
+        result      = noah_profile_peer_store_backend_step(&fixture.peer, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
+    }
+    assert(result == NOAH_PROFILE_PEER_STORE_OK && saw_working);
+
+    // Prepared: held, abortable, and waiting for a decision, not working.
+    assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_PREPARED);
+    assert(noah_profile_peer_store_backend_holds_copy(&fixture.peer) && noah_profile_peer_store_backend_abortable(&fixture.peer) && !noah_profile_peer_store_backend_working(&fixture.peer));
+    assert(!noah_profile_peer_store_backend_awaiting_activation(&fixture.peer));
+    // A sender holding no push abandons the copy only when its saved profile
+    // is readable and is not the copy.
+    assert(noah_profile_peer_store_backend_prepared_copy_abandoned(&fixture.peer, &other));
+    assert(!noah_profile_peer_store_backend_prepared_copy_abandoned(&fixture.peer, &descriptor));
+    assert(!noah_profile_peer_store_backend_prepared_copy_abandoned(&fixture.peer, &unreadable));
+    assert(!noah_profile_peer_store_backend_prepared_copy_abandoned(&fixture.peer, NULL));
+
+    // Committing is bounded work past the point an abort can end it.
+    steps  = 0u;
+    result = noah_profile_peer_store_backend_prepared_commit_begin(&fixture.peer, &descriptor);
+    while (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
+        assert(++steps < 128u);
+        assert(noah_profile_peer_store_backend_working(&fixture.peer) && noah_profile_peer_store_backend_holds_copy(&fixture.peer) && !noah_profile_peer_store_backend_abortable(&fixture.peer));
+        result = noah_profile_peer_store_backend_step(&fixture.peer, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET);
+    }
+    assert(result == NOAH_PROFILE_PEER_STORE_OK);
+
+    // Committed with this half's storage still held: it waits to be published.
+    assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_COMMITTED);
+    assert(!noah_profile_peer_store_backend_holds_copy(&fixture.peer) && !noah_profile_peer_store_backend_working(&fixture.peer) && !noah_profile_peer_store_backend_abortable(&fixture.peer));
+    assert(noah_profile_peer_store_backend_awaiting_activation(&fixture.peer));
+    assert(!noah_profile_peer_store_backend_prepared_copy_abandoned(&fixture.peer, &other));
+
+    // Published, the store stays COMMITTED for a sender's retry, but no
+    // longer waits: the storage is free for the next candidate.
+    steps      = 0u;
+    activation = noah_profile_candidate_store_backend_activation_begin(&fixture.candidate_backend, NOAH_PROFILE_STORAGE_ADMISSION_PEER);
+    while (noah_profile_candidate_store_backend_admission_owner(&fixture.candidate_backend) != NOAH_PROFILE_STORAGE_ADMISSION_NONE) {
+        assert(++steps < 128u);
+        assert(activation == NOAH_PROFILE_CANDIDATE_BACKEND_OK || activation == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS);
+        activation = noah_profile_candidate_store_backend_activation_step(&fixture.candidate_backend, NOAH_PROFILE_STORAGE_ADMISSION_PEER);
+    }
+    assert(noah_profile_peer_store_backend_state(&fixture.peer) == NOAH_PROFILE_PEER_STORE_COMMITTED);
+    assert(!noah_profile_peer_store_backend_awaiting_activation(&fixture.peer));
+}
+
 int main(void) {
+    test_peer_store_answers_its_state_questions();
     test_identity_forms_compare_one_tuple();
     test_copy_over_64_kib();
     test_validation_over_64_kib();

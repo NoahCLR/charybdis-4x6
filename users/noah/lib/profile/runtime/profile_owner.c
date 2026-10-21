@@ -520,14 +520,13 @@ static bool scan_adoption(noah_profile_owner_t *owner) {
 
 // A copy taken from the other half is published as the step that committed
 // it returns, while this half still holds its storage for that copy. The
-// peer store stays COMMITTED after the copy activates (it answers a sender's
-// retry of the finished copy), so its state alone is no sign of a new copy:
-// a later Apply or Save holds the storage for its own candidate, and
-// publishing then stopped the owner with STORAGE_ERROR, frozen until a
-// restart (keyboard check, 2026-10-20). Out of line: it runs in the scan's
-// shared frame.
+// peer store's COMMITTED state alone is no sign of a new copy: publishing
+// once a later Apply or Save held the storage for its own candidate stopped
+// the owner with STORAGE_ERROR, frozen until a restart (keyboard check,
+// 2026-10-20). The peer store answers the whole question. Out of line: it
+// runs in the scan's shared frame.
 static __attribute__((noinline)) bool took_peer_copy(const noah_profile_owner_t *owner) {
-    return noah_profile_candidate_store_backend_admission_owner(&owner->staging.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER && noah_profile_peer_store_backend_state(&owner->peer_store) == NOAH_PROFILE_PEER_STORE_COMMITTED;
+    return noah_profile_peer_store_backend_awaiting_activation(&owner->peer_store);
 }
 
 static bool boot_peer_converged(const noah_profile_owner_t *owner) {
@@ -587,7 +586,7 @@ static bool scan_activation(noah_profile_owner_t *owner) {
 static bool scan_peer_activation(noah_profile_owner_t *owner) {
     noah_profile_candidate_backend_result_t result;
 
-    if (noah_profile_candidate_store_backend_admission_owner(candidate_backend(owner)) != NOAH_PROFILE_STORAGE_ADMISSION_PEER || noah_profile_peer_store_backend_state(&owner->peer_store) != NOAH_PROFILE_PEER_STORE_COMMITTED) {
+    if (!noah_profile_peer_store_backend_awaiting_activation(&owner->peer_store)) {
         owner->peer_activation_started = false;
         return false;
     }
@@ -1065,8 +1064,6 @@ void noah_profile_owner_scan_again(noah_profile_owner_t *owner, bool again) {
 }
 
 bool noah_profile_owner_storage_busy(const noah_profile_owner_t *owner) {
-    noah_profile_peer_store_state_t peer;
-
     if (!owner) {
         return false;
     }
@@ -1095,8 +1092,7 @@ bool noah_profile_owner_storage_busy(const noah_profile_owner_t *owner) {
         default:
             break;
     }
-    peer = noah_profile_peer_store_backend_state(&owner->peer_store);
-    if (peer == NOAH_PROFILE_PEER_STORE_RECEIVING || peer == NOAH_PROFILE_PEER_STORE_VALIDATING || peer == NOAH_PROFILE_PEER_STORE_PREPARING || peer == NOAH_PROFILE_PEER_STORE_COMMITTING) {
+    if (noah_profile_peer_store_backend_state(&owner->peer_store) == NOAH_PROFILE_PEER_STORE_RECEIVING || noah_profile_peer_store_backend_working(&owner->peer_store)) {
         return true;
     }
     return owner->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE || owner->working.phase == NOAH_PROFILE_WORKING_PHASE_LOADING || owner->working.phase == NOAH_PROFILE_WORKING_PHASE_VALIDATING;

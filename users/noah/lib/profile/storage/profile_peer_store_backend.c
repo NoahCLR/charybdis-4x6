@@ -145,7 +145,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_begin(noah_prof
     if (!peer || !peer->backend || !peer->backend->store || !descriptor) {
         return NOAH_PROFILE_PEER_STORE_INVALID_METADATA;
     }
-    if (peer->state == NOAH_PROFILE_PEER_STORE_RECEIVING || peer->state == NOAH_PROFILE_PEER_STORE_VALIDATING || peer->state == NOAH_PROFILE_PEER_STORE_PREPARING || peer->state == NOAH_PROFILE_PEER_STORE_PREPARED || peer->state == NOAH_PROFILE_PEER_STORE_COMMITTING || peer->state == NOAH_PROFILE_PEER_STORE_RECONCILE_REQUIRED) {
+    if (noah_profile_peer_store_backend_holds_copy(peer)) {
         if (!noah_profile_descriptor_equal(&peer->descriptor, descriptor)) return NOAH_PROFILE_PEER_STORE_BUSY;
         return state_result(peer);
     }
@@ -431,7 +431,7 @@ noah_profile_peer_store_result_t noah_profile_peer_store_backend_abort(noah_prof
     if (peer->state == NOAH_PROFILE_PEER_STORE_COMMITTED) {
         return NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED;
     }
-    if (peer->state != NOAH_PROFILE_PEER_STORE_RECEIVING && peer->state != NOAH_PROFILE_PEER_STORE_VALIDATING && peer->state != NOAH_PROFILE_PEER_STORE_PREPARED) {
+    if (!noah_profile_peer_store_backend_abortable(peer)) {
         return state_result(peer);
     }
     if (peer->interface.abort(peer->interface.context) != NOAH_PROFILE_CANDIDATE_BACKEND_OK) {
