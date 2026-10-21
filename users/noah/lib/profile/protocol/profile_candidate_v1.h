@@ -131,6 +131,13 @@ typedef struct {
     uint8_t  store_format_version;
 } noah_profile_candidate_v1_metadata_t;
 
+// Two candidate declarations are the same. The one home of this comparison:
+// the store-free transaction and the store backend both ask it. Static
+// inline, so it adds no frame on a reviewed stack path.
+static inline bool noah_profile_candidate_v1_metadata_equal(const noah_profile_candidate_v1_metadata_t *left, const noah_profile_candidate_v1_metadata_t *right) {
+    return left && right && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->requested_domains == right->requested_domains && left->flags == right->flags && left->payload_length == right->payload_length && left->crc32 == right->crc32 && left->digest == right->digest && left->action_abi_digest == right->action_abi_digest && left->store_format_version == right->store_format_version;
+}
+
 typedef struct {
     noah_profile_candidate_v1_error_id_t code;
     uint8_t                              frame_offset;

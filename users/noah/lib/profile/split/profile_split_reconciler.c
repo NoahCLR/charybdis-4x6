@@ -7,13 +7,11 @@
 #include <limits.h>
 #include <string.h>
 
+#include "../storage/profile_record_identity.h"
+
 static noah_profile_split_descriptor_t unreadable_descriptor(void);
 static void                            invalidate_peer(noah_profile_split_reconciler_t *reconciler);
 static void                            cache_response(noah_profile_split_reconciler_t *reconciler, const uint8_t *request, uint8_t request_length, const noah_profile_split_v1_frame_t *response);
-
-static bool descriptor_equal(const noah_profile_split_descriptor_t *left, const noah_profile_split_descriptor_t *right) {
-    return left && right && left->generation == right->generation && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->payload_length == right->payload_length && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->profile_flags == right->profile_flags && left->origin_half == right->origin_half && left->readable == right->readable && left->has_profile == right->has_profile;
-}
 
 static bool descriptor_correlation_matches(const noah_profile_split_descriptor_t *descriptor, uint32_t generation, uint32_t payload_digest, uint32_t payload_length) {
     return descriptor && descriptor->readable && descriptor->has_profile && descriptor->generation == generation && descriptor->payload_digest == payload_digest && descriptor->payload_length == payload_length;
@@ -28,7 +26,7 @@ static uint32_t busy_offset(const noah_profile_peer_store_backend_t *store, uint
 }
 
 static void clear_provisional_peer(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor) {
-    if (reconciler && reconciler->provisional_peer_descriptor_known && (!descriptor || descriptor_equal(&reconciler->provisional_peer_descriptor, descriptor))) {
+    if (reconciler && reconciler->provisional_peer_descriptor_known && (!descriptor || noah_profile_descriptor_equal(&reconciler->provisional_peer_descriptor, descriptor))) {
         reconciler->provisional_peer_descriptor       = unreadable_descriptor();
         reconciler->provisional_peer_descriptor_known = false;
     }
@@ -79,7 +77,7 @@ static bool refresh_local(noah_profile_split_reconciler_t *reconciler) {
     if (!reconciler->config.local_descriptor || !reconciler->config.local_descriptor(reconciler->config.local_context, &descriptor)) {
         descriptor = unreadable_descriptor();
     }
-    if (descriptor_equal(&descriptor, &reconciler->local_descriptor)) {
+    if (noah_profile_descriptor_equal(&descriptor, &reconciler->local_descriptor)) {
         return false;
     }
 #    ifdef NOAH_PROFILE_SPLIT_TEST_HOOKS
@@ -87,7 +85,7 @@ static bool refresh_local(noah_profile_split_reconciler_t *reconciler) {
 #    endif
     if (!noah_profile_split_descriptor_valid(&descriptor)) {
         descriptor = unreadable_descriptor();
-        if (descriptor_equal(&descriptor, &reconciler->local_descriptor)) {
+        if (noah_profile_descriptor_equal(&descriptor, &reconciler->local_descriptor)) {
             return false;
         }
     }
@@ -407,7 +405,7 @@ static bool release_remote_prepare(noah_profile_split_reconciler_t *reconciler) 
 static bool prepared_copy_abandoned(const noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request) {
     const noah_profile_peer_store_backend_t *store = reconciler->config.peer_store;
 
-    return request->no_prepared_push && request->descriptor.readable && !descriptor_equal(&request->descriptor, &store->descriptor) && reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && noah_profile_peer_store_backend_state(store) == NOAH_PROFILE_PEER_STORE_PREPARED;
+    return request->no_prepared_push && request->descriptor.readable && !noah_profile_descriptor_equal(&request->descriptor, &store->descriptor) && reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && noah_profile_peer_store_backend_state(store) == NOAH_PROFILE_PEER_STORE_PREPARED;
 }
 
 static __attribute__((noinline)) void process_metadata(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request) {
@@ -602,7 +600,7 @@ static __attribute__((noinline)) void process_abort(noah_profile_split_reconcile
     noah_profile_peer_store_result_t result;
     noah_profile_split_v1_frame_t    response;
     noah_profile_peer_store_state_t  state        = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
-    bool                             matches_live = descriptor_equal(&reconciler->config.peer_store->descriptor, &request->descriptor);
+    bool                             matches_live = noah_profile_descriptor_equal(&reconciler->config.peer_store->descriptor, &request->descriptor);
 
     clear_provisional_peer(reconciler, &request->descriptor);
     if ((state == NOAH_PROFILE_PEER_STORE_RECEIVING || state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_PREPARED) && matches_live) {
@@ -998,9 +996,9 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
     switch (authority_state) {
         case NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED:
         case NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED:
-            if (reconciler->prepared_push_active && descriptor_equal(&reconciler->local_descriptor, &reconciler->transfer_descriptor) && descriptor_equal(&reconciler->peer_descriptor, &reconciler->transfer_descriptor)) {
+            if (reconciler->prepared_push_active && noah_profile_descriptor_equal(&reconciler->local_descriptor, &reconciler->transfer_descriptor) && noah_profile_descriptor_equal(&reconciler->peer_descriptor, &reconciler->transfer_descriptor)) {
                 clear_prepared_push(reconciler);
-            } else if (reconciler->prepared_push_active && !descriptor_equal(&reconciler->peer_descriptor, &reconciler->transfer_descriptor)) {
+            } else if (reconciler->prepared_push_active && !noah_profile_descriptor_equal(&reconciler->peer_descriptor, &reconciler->transfer_descriptor)) {
                 // Both halves still agree on the old profile and the peer does
                 // not hold this copy yet. Only a clear or a cancel ends a
                 // prepared push; parking it here leaves the host transaction
@@ -1148,7 +1146,7 @@ static void push_read(noah_profile_split_reconciler_t *reconciler) {
     } else {
         refresh_local(reconciler);
         refresh_metadata_response(reconciler);
-        if (!descriptor_equal(&reconciler->local_descriptor, &reconciler->transfer_descriptor)) {
+        if (!noah_profile_descriptor_equal(&reconciler->local_descriptor, &reconciler->transfer_descriptor)) {
             reconciler->state = NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER;
             publish_authority(reconciler);
             return;
@@ -1401,7 +1399,7 @@ static void pull_begin(noah_profile_split_reconciler_t *reconciler, uint32_t now
     noah_profile_peer_store_result_t result;
     noah_profile_peer_store_state_t  state = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
 
-    if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && (state == NOAH_PROFILE_PEER_STORE_RECEIVING || state == NOAH_PROFILE_PEER_STORE_VALIDATING) && !descriptor_equal(&reconciler->config.peer_store->descriptor, &reconciler->transfer_descriptor)) {
+    if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && (state == NOAH_PROFILE_PEER_STORE_RECEIVING || state == NOAH_PROFILE_PEER_STORE_VALIDATING) && !noah_profile_descriptor_equal(&reconciler->config.peer_store->descriptor, &reconciler->transfer_descriptor)) {
         result = noah_profile_peer_store_backend_abort(reconciler->config.peer_store, &reconciler->config.peer_store->descriptor);
         if (result != NOAH_PROFILE_PEER_STORE_OK) {
             stop_with_status(reconciler, map_peer_error(result));
@@ -1673,7 +1671,7 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
             metadata_exchange(reconciler, now_ms, mode);
             return true;
         case NOAH_PROFILE_SPLIT_RECONCILER_STOPPED:
-            if (!descriptor_equal(&reconciler->local_descriptor, &reconciler->stopped_local_descriptor)) {
+            if (!noah_profile_descriptor_equal(&reconciler->local_descriptor, &reconciler->stopped_local_descriptor)) {
                 reconciler->state = NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER;
                 note_progress(reconciler, now_ms);
                 publish_authority(reconciler);
@@ -1696,7 +1694,7 @@ bool noah_profile_split_reconciler_prepared_push_begin(noah_profile_split_reconc
         return false;
     }
     if (reconciler->prepared_push_active) {
-        return descriptor_equal(&reconciler->transfer_descriptor, descriptor);
+        return noah_profile_descriptor_equal(&reconciler->transfer_descriptor, descriptor);
     }
     // The peer may still hold a released push's lease; a second provisional
     // transfer would only meet BUSY. Wait for its cleanup to be confirmed.
@@ -1749,7 +1747,7 @@ bool noah_profile_split_reconciler_prepared_push_ready(const noah_profile_split_
 }
 
 bool noah_profile_split_reconciler_prepared_push_authorize_commit(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor) {
-    if (!(reconciler && reconciler->initialized && descriptor && reconciler->prepared_push_active && descriptor_equal(&reconciler->transfer_descriptor, descriptor))) {
+    if (!(reconciler && reconciler->initialized && descriptor && reconciler->prepared_push_active && noah_profile_descriptor_equal(&reconciler->transfer_descriptor, descriptor))) {
         return false;
     }
     if (reconciler->prepared_commit_authorized) {
@@ -1766,7 +1764,7 @@ bool noah_profile_split_reconciler_prepared_push_authorize_commit(noah_profile_s
 }
 
 bool noah_profile_split_reconciler_prepared_push_cancel(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor) {
-    if (!(reconciler && reconciler->initialized && descriptor && descriptor_equal(&reconciler->transfer_descriptor, descriptor))) {
+    if (!(reconciler && reconciler->initialized && descriptor && noah_profile_descriptor_equal(&reconciler->transfer_descriptor, descriptor))) {
         return false;
     }
     if (reconciler->prepared_cancel_refused) {

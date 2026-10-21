@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "profile_checksum.h"
+#include "profile_record_identity.h"
 
 // Store format 6 (D-F28). The 36-byte header has no room for a magic, so the
 // format is keyed into the header CRC16 (its first input byte is the format
@@ -128,10 +129,6 @@ static bool invalidate_target(noah_profile_store_t *store, noah_profile_storage_
 
 static bool generation_is_newer(uint32_t candidate, uint32_t current) {
     return candidate != 0u && candidate > current;
-}
-
-static bool record_identity_equal(const noah_profile_store_record_t *lhs, const noah_profile_store_record_t *rhs) {
-    return lhs->format_version == rhs->format_version && lhs->schema_major == rhs->schema_major && lhs->schema_minor == rhs->schema_minor && lhs->domain_mask == rhs->domain_mask && lhs->flags == rhs->flags && lhs->payload_length == rhs->payload_length && lhs->generation == rhs->generation && lhs->origin_half == rhs->origin_half && lhs->payload_crc32 == rhs->payload_crc32 && lhs->payload_digest == rhs->payload_digest && lhs->compiled_default_digest == rhs->compiled_default_digest && lhs->action_abi_digest == rhs->action_abi_digest;
 }
 
 static uint16_t header_crc16(const uint8_t *header) {
@@ -404,7 +401,7 @@ static noah_profile_store_result_t boot_finish_selection(noah_profile_store_t *s
         store->boot_scanned = true;
         *selected           = store->boot_slot_a;
         store->boot_result  = NOAH_PROFILE_STORE_OK;
-    } else if (slot_b->generation > store->boot_slot_a.generation || record_identity_equal(&store->boot_slot_a, slot_b)) {
+    } else if (slot_b->generation > store->boot_slot_a.generation || noah_profile_record_same_profile(&store->boot_slot_a, slot_b)) {
         store->boot_scanned = true;
         *selected           = *slot_b;
         store->boot_result  = NOAH_PROFILE_STORE_OK;

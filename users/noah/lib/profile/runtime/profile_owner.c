@@ -13,6 +13,7 @@
 #include <string.h>
 
 #include "../storage/profile_checksum.h"
+#include "../storage/profile_record_identity.h"
 #include "../storage/profile_storage_layout.h"
 
 #ifdef NOAH_PROFILE_OWNER_TEST_DIAGNOSTICS
@@ -60,10 +61,6 @@ static bool host_mailbox_is_matching_abort(const noah_profile_owner_t *owner) {
     return owner && owner->host_transaction.mailbox.pending && owner->host_transaction.mailbox.command.operation == NOAH_PROFILE_CANDIDATE_V1_OPERATION_ABORT && owner->host_transaction.mailbox.command.transaction_id == owner->host_transaction.status.transaction_id;
 }
 
-static bool descriptor_equal(const noah_profile_split_descriptor_t *left, const noah_profile_split_descriptor_t *right) {
-    return left && right && left->generation == right->generation && left->payload_crc32 == right->payload_crc32 && left->payload_digest == right->payload_digest && left->compiled_default_digest == right->compiled_default_digest && left->action_abi_digest == right->action_abi_digest && left->payload_length == right->payload_length && left->schema_major == right->schema_major && left->schema_minor == right->schema_minor && left->domain_mask == right->domain_mask && left->profile_flags == right->profile_flags && left->origin_half == right->origin_half && left->readable == right->readable && left->has_profile == right->has_profile;
-}
-
 static noah_profile_split_descriptor_t descriptor_from_candidate(const noah_profile_store_candidate_t *candidate) {
     if (!candidate) {
         return (noah_profile_split_descriptor_t){0};
@@ -91,7 +88,7 @@ static bool host_staged_read(void *context, const noah_profile_split_descriptor_
     noah_profile_owner_t          *owner = context;
     noah_profile_store_candidate_t candidate;
 
-    if (!owner || !descriptor || !owner->host_barrier_descriptor_known || !descriptor_equal(descriptor, &owner->host_barrier_descriptor)) {
+    if (!owner || !descriptor || !owner->host_barrier_descriptor_known || !noah_profile_descriptor_equal(descriptor, &owner->host_barrier_descriptor)) {
         return false;
     }
     if (!noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate)) {
@@ -100,21 +97,7 @@ static bool host_staged_read(void *context, const noah_profile_split_descriptor_
         // because it rebooted, is sent the copy again from that record.
         return local_read(context, descriptor, offset, bytes, length);
     }
-    if (!descriptor_equal(descriptor, &(noah_profile_split_descriptor_t){
-                                          .generation              = candidate.generation,
-                                          .payload_crc32           = candidate.payload_crc32,
-                                          .payload_digest          = candidate.payload_digest,
-                                          .compiled_default_digest = candidate.compiled_default_digest,
-                                          .action_abi_digest       = candidate.action_abi_digest,
-                                          .payload_length          = candidate.payload_length,
-                                          .schema_major            = candidate.schema_major,
-                                          .schema_minor            = candidate.schema_minor,
-                                          .domain_mask             = candidate.domain_mask,
-                                          .profile_flags           = candidate.flags,
-                                          .origin_half             = candidate.origin_half,
-                                          .readable                = true,
-                                          .has_profile             = true,
-                                      })) {
+    if (!noah_profile_candidate_matches_descriptor(&candidate, descriptor)) {
         return false;
     }
     return noah_profile_candidate_store_backend_staged_read(candidate_backend(owner), &candidate, offset, bytes, length);
@@ -127,15 +110,13 @@ static bool host_staged_read(void *context, const noah_profile_split_descriptor_
 static bool host_reuse_plan(void *context, const noah_profile_split_descriptor_t *descriptor, uint32_t offset, noah_profile_split_reuse_range_t *range) {
     noah_profile_owner_t                      *owner = context;
     noah_profile_store_candidate_t             candidate;
-    noah_profile_split_descriptor_t            staged;
     noah_profile_candidate_v1_source_t         source;
     noah_profile_candidate_store_reuse_range_t reused;
 
-    if (!owner || !descriptor || !range || !owner->host_barrier_descriptor_known || !descriptor_equal(descriptor, &owner->host_barrier_descriptor) || !noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate)) {
+    if (!owner || !descriptor || !range || !owner->host_barrier_descriptor_known || !noah_profile_descriptor_equal(descriptor, &owner->host_barrier_descriptor) || !noah_profile_candidate_store_backend_staged_candidate(candidate_backend(owner), &candidate)) {
         return false;
     }
-    staged = descriptor_from_candidate(&candidate);
-    if (!descriptor_equal(descriptor, &staged) || !noah_profile_candidate_store_backend_staged_reuse(candidate_backend(owner), &candidate, offset, &source, &reused)) {
+    if (!noah_profile_candidate_matches_descriptor(&candidate, descriptor) || !noah_profile_candidate_store_backend_staged_reuse(candidate_backend(owner), &candidate, offset, &source, &reused)) {
         return false;
     }
     *range = (noah_profile_split_reuse_range_t){
@@ -154,7 +135,7 @@ static bool owner_peer_observer(void *context, uint8_t *unresolved_count) {
     if (!owner || !unresolved_count || !owner->descriptor_readable || !owner->split_initialized) {
         return false;
     }
-    if (owner->host_barrier_peer_confirmed && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING && owner->host_barrier_descriptor_known && descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor)) {
+    if (owner->host_barrier_peer_confirmed && owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_ACTIVATING && owner->host_barrier_descriptor_known && noah_profile_descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor)) {
         // This Apply already saw the peer durably commit exactly this record
         // before activation was authorized. Activating needs no second, live
         // observation of the peer, so a link lost meanwhile cannot hold it.
@@ -164,7 +145,7 @@ static bool owner_peer_observer(void *context, uint8_t *unresolved_count) {
     if (!noah_profile_split_authority_status(&owner->reconciler.authority, &authority)) {
         return false;
     }
-    *unresolved_count = !authority.transfer_pending && descriptor_equal(&authority.local, &owner->committed_descriptor) && descriptor_equal(&authority.peer, &owner->committed_descriptor) && (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED || authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED) ? 0u : 1u;
+    *unresolved_count = !authority.transfer_pending && noah_profile_descriptor_equal(&authority.local, &owner->committed_descriptor) && noah_profile_descriptor_equal(&authority.peer, &owner->committed_descriptor) && (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED || authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED) ? 0u : 1u;
     return true;
 }
 
@@ -215,10 +196,6 @@ static bool record_payload_start(noah_profile_slot_t slot, noah_profile_storage_
         return true;
     }
     return false;
-}
-
-static bool record_matches_descriptor(const noah_profile_store_record_t *record, const noah_profile_split_descriptor_t *descriptor) {
-    return record && descriptor && descriptor->readable && descriptor->has_profile && record->slot != NOAH_PROFILE_SLOT_NONE && record->schema_major == descriptor->schema_major && record->schema_minor == descriptor->schema_minor && record->domain_mask == descriptor->domain_mask && record->flags == descriptor->profile_flags && record->payload_length == descriptor->payload_length && record->generation == descriptor->generation && record->origin_half == descriptor->origin_half && record->payload_crc32 == descriptor->payload_crc32 && record->payload_digest == descriptor->payload_digest && record->compiled_default_digest == descriptor->compiled_default_digest && record->action_abi_digest == descriptor->action_abi_digest && record->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION;
 }
 
 static bool local_descriptor(void *context, noah_profile_split_descriptor_t *descriptor) {
@@ -278,7 +255,7 @@ static bool local_read(void *context, const noah_profile_split_descriptor_t *des
         return false;
     }
     record = owner->store.committed.slot == NOAH_PROFILE_SLOT_NONE ? NULL : &owner->store.committed;
-    if (!record_matches_descriptor(record, descriptor) || !record_payload_start(record->slot, &payload_start) || offset > record->payload_length || length > record->payload_length - offset) {
+    if (!noah_profile_record_matches_descriptor(record, descriptor) || !record_payload_start(record->slot, &payload_start) || offset > record->payload_length || length > record->payload_length - offset) {
         return false;
     }
     return noah_profile_store_read_span(&owner->store, (payload_start + offset), bytes, length);
@@ -791,7 +768,7 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
     if (!owner->host_barrier_descriptor_known) {
         owner->host_barrier_descriptor       = descriptor;
         owner->host_barrier_descriptor_known = true;
-    } else if (!descriptor_equal(&owner->host_barrier_descriptor, &descriptor)) {
+    } else if (!noah_profile_descriptor_equal(&owner->host_barrier_descriptor, &descriptor)) {
         fail_integration(owner);
         return true;
     }
@@ -826,7 +803,7 @@ static bool begin_or_advance_host_barrier(noah_profile_owner_t *owner) {
         return false;
     }
     owner->host_barrier_waiting_boundary = false;
-    if (!descriptor_equal(&prepared, &owner->host_barrier_descriptor)) {
+    if (!noah_profile_descriptor_equal(&prepared, &owner->host_barrier_descriptor)) {
         fail_integration(owner);
     } else if ((noah_profile_activation_policy_safe_boundary(&owner->activation_policy) &
                 ~NOAH_PROFILE_ACTIVATION_REASON_PEER) != 0u) {
@@ -867,7 +844,7 @@ static void note_host_barrier_progress(noah_profile_owner_t *owner, uint32_t now
 static bool host_barrier_exact_convergence(const noah_profile_owner_t *owner) {
     noah_profile_split_authority_status_t authority;
 
-    return owner && owner->host_barrier_descriptor_known && owner->descriptor_readable && descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor) && noah_profile_split_authority_status(&owner->reconciler.authority, &authority) && !authority.transfer_pending && authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED && descriptor_equal(&authority.local, &owner->host_barrier_descriptor) && descriptor_equal(&authority.peer, &owner->host_barrier_descriptor);
+    return owner && owner->host_barrier_descriptor_known && owner->descriptor_readable && noah_profile_descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor) && noah_profile_split_authority_status(&owner->reconciler.authority, &authority) && !authority.transfer_pending && authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED && noah_profile_descriptor_equal(&authority.local, &owner->host_barrier_descriptor) && noah_profile_descriptor_equal(&authority.peer, &owner->host_barrier_descriptor);
 }
 
 static bool fail_host_postcommit_authority(noah_profile_owner_t *owner, noah_profile_candidate_v1_error_id_t error, noah_profile_owner_state_t state) {
@@ -883,7 +860,7 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
         return false;
     }
     if (!owner->host_barrier_local_published) {
-        if (!publish_validated_descriptor(owner) || !descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor) || !noah_profile_split_reconciler_refresh_authority(&owner->reconciler)) {
+        if (!publish_validated_descriptor(owner) || !noah_profile_descriptor_equal(&owner->committed_descriptor, &owner->host_barrier_descriptor) || !noah_profile_split_reconciler_refresh_authority(&owner->reconciler)) {
             owner->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
         } else {
             owner->host_barrier_local_published = true;
@@ -901,7 +878,7 @@ static bool advance_host_postcommit_barrier(noah_profile_owner_t *owner) {
         noah_profile_split_authority_status_t  authority;
         noah_profile_split_reconciler_status_t reconciler;
 
-        if (noah_profile_split_authority_status(&owner->reconciler.authority, &authority) && descriptor_equal(&authority.local, &owner->host_barrier_descriptor)) {
+        if (noah_profile_split_authority_status(&owner->reconciler.authority, &authority) && noah_profile_descriptor_equal(&authority.local, &owner->host_barrier_descriptor)) {
             if (authority.state == NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER) {
                 return fail_host_postcommit_authority(owner, NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST, NOAH_PROFILE_OWNER_POSTCOMMIT_AUTHORITY_LOST);
             }
@@ -1242,7 +1219,7 @@ const noah_profile_store_t *noah_profile_owner_store(const noah_profile_owner_t 
 }
 
 const noah_profile_store_record_t *noah_profile_owner_committed(const noah_profile_owner_t *owner) {
-    return owner && owner->descriptor_readable && owner->committed_descriptor.has_profile && record_matches_descriptor(&owner->store.committed, &owner->committed_descriptor) ? &owner->store.committed : NULL;
+    return owner && owner->descriptor_readable && owner->committed_descriptor.has_profile && noah_profile_record_matches_descriptor(&owner->store.committed, &owner->committed_descriptor) ? &owner->store.committed : NULL;
 }
 
 noah_profile_candidate_transaction_t *noah_profile_owner_host_transaction(noah_profile_owner_t *owner) {

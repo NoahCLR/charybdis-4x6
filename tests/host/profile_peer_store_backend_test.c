@@ -6,6 +6,7 @@
 
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/profile/storage/profile_peer_store_backend.h"
+#include "users/noah/lib/profile/storage/profile_record_identity.h"
 
 enum {
     ACTION_ABI_DIGEST = UINT32_C(0x11223344),
@@ -514,7 +515,114 @@ static void test_validation_over_64_kib(void) {
     }
 }
 
+// A record, a staged candidate and a split descriptor are one identity in
+// three forms; each comparison checks every field of the tuple, and only a
+// readable profile descriptor names a record or a candidate.
+static void test_identity_forms_compare_one_tuple(void) {
+    noah_profile_store_candidate_t  candidate = {
+        .format_version          = NOAH_PROFILE_STORE_FORMAT_VERSION,
+        .schema_major            = NOAH_PROFILE_STORE_SCHEMA_MAJOR,
+        .schema_minor            = NOAH_PROFILE_STORE_SCHEMA_MINOR,
+        .domain_mask             = 3u,
+        .flags                   = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
+        .payload_length          = 40u,
+        .generation              = 9u,
+        .origin_half             = 1u,
+        .payload_crc32           = 0x01020304u,
+        .payload_digest          = 0x05060708u,
+        .compiled_default_digest = 0x090a0b0cu,
+        .action_abi_digest       = ACTION_ABI_DIGEST,
+    };
+    noah_profile_store_record_t     record = {
+        .slot                    = NOAH_PROFILE_SLOT_B,
+        .format_version          = candidate.format_version,
+        .schema_major            = candidate.schema_major,
+        .schema_minor            = candidate.schema_minor,
+        .domain_mask             = candidate.domain_mask,
+        .flags                   = candidate.flags,
+        .payload_length          = candidate.payload_length,
+        .generation              = candidate.generation,
+        .origin_half             = candidate.origin_half,
+        .payload_crc32           = candidate.payload_crc32,
+        .payload_digest          = candidate.payload_digest,
+        .compiled_default_digest = candidate.compiled_default_digest,
+        .action_abi_digest       = candidate.action_abi_digest,
+    };
+    noah_profile_split_descriptor_t descriptor = {
+        .generation              = candidate.generation,
+        .payload_crc32           = candidate.payload_crc32,
+        .payload_digest          = candidate.payload_digest,
+        .compiled_default_digest = candidate.compiled_default_digest,
+        .action_abi_digest       = candidate.action_abi_digest,
+        .payload_length          = candidate.payload_length,
+        .schema_major            = candidate.schema_major,
+        .schema_minor            = candidate.schema_minor,
+        .domain_mask             = candidate.domain_mask,
+        .profile_flags           = candidate.flags,
+        .origin_half             = candidate.origin_half,
+        .readable                = true,
+        .has_profile             = true,
+    };
+    noah_profile_store_record_t     other_slot = record;
+    noah_profile_split_descriptor_t changed;
+    noah_profile_store_record_t     changed_record;
+    noah_profile_store_candidate_t  changed_candidate;
+
+    assert(noah_profile_record_matches_descriptor(&record, &descriptor));
+    assert(noah_profile_candidate_matches_descriptor(&candidate, &descriptor));
+    assert(noah_profile_descriptor_equal(&descriptor, &descriptor));
+    assert(noah_profile_record_equal(&record, &record) && noah_profile_candidate_equal(&candidate, &candidate));
+    // The same saved profile in the other slot is the same profile, not the same record.
+    other_slot.slot = NOAH_PROFILE_SLOT_A;
+    assert(noah_profile_record_same_profile(&record, &other_slot) && !noah_profile_record_equal(&record, &other_slot));
+    assert(noah_profile_record_matches_descriptor(&other_slot, &descriptor));
+    // Nothing compares equal to nothing.
+    assert(!noah_profile_record_equal(NULL, &record) && !noah_profile_record_same_profile(&record, NULL) && !noah_profile_candidate_equal(&candidate, NULL));
+    assert(!noah_profile_descriptor_equal(NULL, &descriptor) && !noah_profile_record_matches_descriptor(NULL, &descriptor) && !noah_profile_candidate_matches_descriptor(&candidate, NULL));
+    // A record that is in no slot, or in another store format, is named by no descriptor.
+    changed_record      = record;
+    changed_record.slot = NOAH_PROFILE_SLOT_NONE;
+    assert(!noah_profile_record_matches_descriptor(&changed_record, &descriptor));
+    changed_record                = record;
+    changed_record.format_version = (uint8_t)(NOAH_PROFILE_STORE_FORMAT_VERSION + 1u);
+    assert(!noah_profile_record_matches_descriptor(&changed_record, &descriptor) && !noah_profile_record_same_profile(&changed_record, &record));
+    // An unreadable descriptor, or one that says no profile, names nothing,
+    // and readability is part of descriptor equality.
+    changed          = descriptor;
+    changed.readable = false;
+    assert(!noah_profile_record_matches_descriptor(&record, &changed) && !noah_profile_candidate_matches_descriptor(&candidate, &changed) && !noah_profile_descriptor_equal(&changed, &descriptor));
+    changed             = descriptor;
+    changed.has_profile = false;
+    assert(!noah_profile_record_matches_descriptor(&record, &changed) && !noah_profile_candidate_matches_descriptor(&candidate, &changed) && !noah_profile_descriptor_equal(&changed, &descriptor));
+    // Every field of the tuple counts.
+    for (uint8_t field = 0u; field < 11u; field++) {
+        changed           = descriptor;
+        changed_record    = record;
+        changed_candidate = candidate;
+        switch (field) {
+            case 0: changed.generation++; changed_record.generation++; changed_candidate.generation++; break;
+            case 1: changed.payload_crc32 ^= 1u; changed_record.payload_crc32 ^= 1u; changed_candidate.payload_crc32 ^= 1u; break;
+            case 2: changed.payload_digest ^= 1u; changed_record.payload_digest ^= 1u; changed_candidate.payload_digest ^= 1u; break;
+            case 3: changed.compiled_default_digest ^= 1u; changed_record.compiled_default_digest ^= 1u; changed_candidate.compiled_default_digest ^= 1u; break;
+            case 4: changed.action_abi_digest ^= 1u; changed_record.action_abi_digest ^= 1u; changed_candidate.action_abi_digest ^= 1u; break;
+            case 5: changed.payload_length++; changed_record.payload_length++; changed_candidate.payload_length++; break;
+            case 6: changed.schema_major++; changed_record.schema_major++; changed_candidate.schema_major++; break;
+            case 7: changed.schema_minor++; changed_record.schema_minor++; changed_candidate.schema_minor++; break;
+            case 8: changed.domain_mask ^= 4u; changed_record.domain_mask ^= 4u; changed_candidate.domain_mask ^= 4u; break;
+            case 9: changed.profile_flags ^= 1u; changed_record.flags ^= 1u; changed_candidate.flags ^= 1u; break;
+            default: changed.origin_half ^= 1u; changed_record.origin_half ^= 1u; changed_candidate.origin_half ^= 1u; break;
+        }
+        assert(!noah_profile_descriptor_equal(&changed, &descriptor));
+        assert(!noah_profile_record_matches_descriptor(&record, &changed) && !noah_profile_candidate_matches_descriptor(&candidate, &changed));
+        assert(!noah_profile_record_matches_descriptor(&changed_record, &descriptor) && !noah_profile_candidate_matches_descriptor(&changed_candidate, &descriptor));
+        assert(!noah_profile_record_same_profile(&changed_record, &record) && !noah_profile_candidate_equal(&changed_candidate, &candidate));
+        // The changed forms still agree with one another.
+        assert(noah_profile_record_matches_descriptor(&changed_record, &changed) && noah_profile_candidate_matches_descriptor(&changed_candidate, &changed));
+    }
+}
+
 int main(void) {
+    test_identity_forms_compare_one_tuple();
     test_copy_over_64_kib();
     test_validation_over_64_kib();
     test_exact_identity_commit_reboot_and_idempotence();
