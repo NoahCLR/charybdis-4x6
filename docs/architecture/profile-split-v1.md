@@ -315,8 +315,7 @@ copy (`holds_copy`), has a bounded step due (`working`), can still abort the
 copy with nothing durable (`abortable`), holds a committed copy whose
 storage is still held for it so it waits to be published
 (`awaiting_activation`), or last admitted a given copy (`copy_matches`).
-They are static inline in `profile_peer_store_backend.h`, so the reviewed
-stack paths gain no frame. The identity comparisons between a store record,
+They are static inline in `profile_peer_store_backend.h`; the compiler may keep one out of line as a small leaf of its own, and the reviewed stack paths are measured as built. The identity comparisons between a store record,
 a staged candidate and a split descriptor live in one header,
 `profile_record_identity.h`.
 

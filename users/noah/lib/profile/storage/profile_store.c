@@ -136,11 +136,11 @@ static void encode_header(uint8_t *header, const noah_profile_store_candidate_t 
     write_u16(&header[LOGICAL_HEADER_CRC16], header_crc16(header));
 }
 
-static noah_profile_store_result_t decode_header(noah_profile_store_t *store, noah_profile_slot_t slot, const uint8_t *header, bool require_commit, noah_profile_store_record_t *record) {
+static noah_profile_store_result_t decode_header(noah_profile_store_t *store, noah_profile_slot_t slot, const uint8_t *header, noah_profile_store_record_t *record) {
     if (header_is_earlier_format(header)) {
         return NOAH_PROFILE_STORE_EARLIER_FORMAT;
     }
-    if (require_commit && header[LOGICAL_HEADER_MARKER] != logical_commit_marker) {
+    if (header[LOGICAL_HEADER_MARKER] != logical_commit_marker) {
         return NOAH_PROFILE_STORE_INVALID_HEADER;
     }
     // Earlier format-6 test builds used a 32-byte header. Its old marker
@@ -420,7 +420,7 @@ noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_sto
         }
         store->boot_offset += count;
         if (store->boot_offset < NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE) return NOAH_PROFILE_STORE_IN_PROGRESS;
-        result = decode_header(store, slot, store->scratch, true, &store->boot_current);
+        result = decode_header(store, slot, store->scratch, &store->boot_current);
         if (result != NOAH_PROFILE_STORE_OK) {
             return boot_finish_slot(store, result, selected);
         }

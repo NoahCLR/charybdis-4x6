@@ -757,10 +757,10 @@ static void test_host_abort_is_coordinated_at_each_prepare_boundary(void) {
         assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_PREPARING_PEER);
 
         if (phase == 1u) {
-            for (uint32_t guard = 0u; guard < 1024u && !(noah_profile_store_prepare_active(&right.store) && !noah_profile_store_fully_staged(&right.store)); guard++) {
+            for (uint32_t guard = 0u; guard < 1024u && !(noah_profile_store_prepare_active(&right.store) && right.store.candidate_written < right.store.candidate.payload_length); guard++) {
                 scan_pair(&left, &right, &now);
             }
-            assert(noah_profile_store_prepare_active(&right.store) && !noah_profile_store_fully_staged(&right.store));
+            assert(noah_profile_store_prepare_active(&right.store) && right.store.candidate_written < right.store.candidate.payload_length); // bytes still missing
         } else if (phase == 2u) {
             for (uint32_t guard = 0u; guard < 1024u && !noah_profile_split_reconciler_prepared_push_ready(&left.reconciler, NULL); guard++) {
                 scan_pair(&left, &right, &now);

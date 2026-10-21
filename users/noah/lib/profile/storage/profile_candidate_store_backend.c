@@ -149,7 +149,7 @@ static noah_profile_candidate_backend_result_t read_candidate(void *context, uin
     noah_profile_candidate_store_backend_t *backend = context;
     noah_profile_storage_address_t  payload_start;
 
-    return noah_profile_store_candidate_payload_start(backend->store, &payload_start) && staged_reader_read(backend->store, (size_t)payload_start + offset, bytes, length) ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
+    return backend && noah_profile_store_candidate_payload_start(backend->store, &payload_start) && staged_reader_read(backend->store, (size_t)payload_start + offset, bytes, length) ? NOAH_PROFILE_CANDIDATE_BACKEND_OK : NOAH_PROFILE_CANDIDATE_BACKEND_IO_ERROR;
 }
 
 noah_profile_candidate_backend_result_t noah_profile_candidate_store_backend_read_active(noah_profile_candidate_store_backend_t *backend, noah_profile_storage_admission_owner_t owner, const noah_profile_candidate_v1_source_t *source, uint32_t offset, uint8_t *bytes, uint8_t length) {
