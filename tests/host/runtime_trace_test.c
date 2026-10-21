@@ -298,7 +298,7 @@ static void test_ring_buffer_retains_recent_tail_when_full(void) {
 
 static void test_key_runtime_and_layer_ownership_share_one_trace_buffer(void) {
     noah_runtime_trace_snapshot_t snapshot;
-    key_runtime_transition_plan_t plan = {
+    key_runtime_core_effect_plan_t plan = {
         .count      = 2u,
         .overflowed = true,
     };

@@ -13,12 +13,12 @@ static uint8_t key_runtime_trace_stage_id(const char *stage) {
         return NOAH_TRACE_KEY_RUNTIME_STAGE_UNKNOWN;
     }
 
-    if (strcmp(stage, "preflight:interrupt_active_key") == 0) {
-        return NOAH_TRACE_KEY_RUNTIME_STAGE_INTERRUPT_ACTIVE_KEY;
+    if (strcmp(stage, "preflight:before_press") == 0) {
+        return NOAH_TRACE_KEY_RUNTIME_STAGE_BEFORE_PRESS;
     }
 
-    if (strcmp(stage, "preflight:flush_multi_tap") == 0) {
-        return NOAH_TRACE_KEY_RUNTIME_STAGE_FLUSH_MULTI_TAP;
+    if (strcmp(stage, "preflight:before_release") == 0) {
+        return NOAH_TRACE_KEY_RUNTIME_STAGE_BEFORE_RELEASE;
     }
 
     if (strcmp(stage, "press") == 0) {
@@ -36,7 +36,7 @@ static uint8_t key_runtime_trace_stage_id(const char *stage) {
     return NOAH_TRACE_KEY_RUNTIME_STAGE_UNKNOWN;
 }
 
-static void key_runtime_trace_emit_plan_event(const char *stage, const key_runtime_transition_plan_t *plan) {
+static void key_runtime_trace_emit_plan_event(const char *stage, const key_runtime_core_effect_plan_t *plan) {
     uint16_t detail = 0;
 
     if (plan) {
@@ -193,7 +193,7 @@ void key_runtime_trace_message(const char *stage, const char *message) {
     uprintf("Key runtime trace [%s] %s\n", stage, message);
 }
 
-void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan_t *plan) {
+void key_runtime_trace_plan(const char *stage, const key_runtime_core_effect_plan_t *plan) {
     key_runtime_trace_emit_plan_event(stage, plan);
 
     if (!plan) {
@@ -295,7 +295,7 @@ void key_runtime_trace_message(const char *stage, const char *message) {
     (void)message;
 }
 
-void key_runtime_trace_plan(const char *stage, const key_runtime_transition_plan_t *plan) {
+void key_runtime_trace_plan(const char *stage, const key_runtime_core_effect_plan_t *plan) {
     key_runtime_trace_emit_plan_event(stage, plan);
 }
 
