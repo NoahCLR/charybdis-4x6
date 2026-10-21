@@ -2093,7 +2093,8 @@ state raise the static tripwire by one reviewed increment
 
 Client follow-ups: Ark's live edits and Save; **Live mode in Ark**, including
 mode switching (NOT_CLEAN: offer Save or Revert, also while flag 13 is set;
-BUSY: wait for flag 2, flag 6 clear and the phase idle) and the "saved by
+BUSY: wait for flag 2, flag 6 clear and the phase idle; with flag 11 set,
+Revert or Apply first, and with flag 15, restart) and the "saved by
 the keyboard" indication. Hardware acceptance owes edits
 in every domain on both halves, Save across a replug, an unsaved edit
 reverting on replug, typing through an edit, and RAM high-water on both

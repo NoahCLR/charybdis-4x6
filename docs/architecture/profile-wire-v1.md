@@ -1342,8 +1342,9 @@ validating, `4` waiting for a safe boundary, `5` reverting.
 **Admission.** Which edit, Save, Revert, mode change or Apply report may
 start, and the answer when it may not, is one rule per operation, its
 refusals in the order they are answered. Every edit SET answers
-INVALID_STATE first when this half's owner is not ready or has stopped, then
-INVALID_ARGUMENT for a malformed report, then:
+INVALID_ARGUMENT first for a malformed report (transaction 0, non-zero
+padding), then INVALID_STATE when this half's owner is not ready or has
+stopped, then INVALID_ARGUMENT for a value the owner refuses, then:
 
 | Operation | Refused, in this order |
 | --- | --- |
@@ -1414,7 +1415,7 @@ not ready status `3`.
 | ---: | ---: | --- |
 | 0 | 1 | layout, `1` |
 | 1 | 1 | phase |
-| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply; Save is BUSY), 12 writing the edit mode failed and is being retried, 13 a keyboard adjustment (DPI or lighting key) awaits publication: a new Apply, edit, Save and Revert are BUSY and a mode change NOT_CLEAN until it publishes; 14 this half stopped: only a restart clears it, 15 the other half answers that it stopped (both D-F34, below) |
+| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply; Save is BUSY), 12 writing the edit mode failed and is being retried, 13 a keyboard adjustment (DPI or lighting key) awaits publication: a new Apply, edit, Save and Revert are BUSY and a mode change NOT_CLEAN until it publishes, and then, as any unsaved edit, until it is saved or reverted; 14 this half stopped: only a restart clears it, 15 the other half answers that it stopped (both D-F34, below) |
 | 4 | 4 | session |
 | 8 | 4 | revision |
 | 12 | 4 | saved generation (`0`: compiled defaults) |

@@ -40,8 +40,8 @@ enum {
     // Writing the edit mode failed on this half; it is tried again.
     NOAH_PROFILE_EDIT_WIRE_MODE_NOT_STORED  = 1u << 12,
     // A DPI or lighting key's change awaits publication as an edit; a new
-    // Apply, edit, Save and Revert are BUSY and a mode change NOT_CLEAN
-    // until it is.
+    // Apply, edit, Save and Revert are BUSY until it is, and a mode change
+    // NOT_CLEAN until it is saved or reverted.
     NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING = 1u << 13,
     // This half's profile owner stopped: only a restart clears it (D-F34).
     NOAH_PROFILE_EDIT_WIRE_STOPPED          = 1u << 14,
