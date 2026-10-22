@@ -134,6 +134,14 @@ jobs:
     name: Agreement with Ark main
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    # In the build image like the other jobs, so the contract probe compiles in
+    # place: on the bare runner its Docker re-run copied this checkout, with
+    # Ark and BK nested inside it, and could not.
+    container:
+      image: ghcr.io/noahclr/charybdis-build:qmk-cli-1.2.0-gcc15.2.0-r2@sha256:c1b25ac9a7ccaa8d31ba443a3ea308b959edef67e165fc91517d746ccc869957
+    env:
+      # Already in the build image: host runners and the pair build run in place.
+      NOAH_IN_BUILD_IMAGE: 1
     steps:
       - name: Checkout firmware
         uses: actions/checkout@v6
@@ -175,6 +183,12 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version-file: .ci/ark/.nvmrc
+
+      - name: Configure Git safe directories
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/.ci/ark"
+          git config --global --add safe.directory "$GITHUB_WORKSPACE/.ci/qmk"
 
       - name: Judge this firmware's contract with Ark ${{ steps.ark.outputs.ref }}
         run: node .ci/ark/scripts/check-agreement.js --firmware "$GITHUB_WORKSPACE" --qmk .ci/qmk --markdown "$RUNNER_TEMP/agreement.md"

@@ -49,6 +49,9 @@ if [ "$noah_in_image" = 0 ]; then
     noah_gid="$(id -g)"
     noah_direct="${noah_writes_checkout:-0}"
     [ "${NOAH_WRITE_AUTHORED_MACRO_BANK:-}" != 1 ] || noah_direct=1
+    # A QMK inside the checkout would be copied with it, over its own mount (a
+    # CI job that checks BK out inside the firmware checkout): use the mounts.
+    case "$noah_qmk/" in "$noah_repo"/*) noah_direct=1 ;; esac
 
     noah_run="docker run --rm --network none --user $noah_uid:$noah_gid -e HOME=/tmp -e PYTHONDONTWRITEBYTECODE=1 -e NOAH_IN_BUILD_IMAGE=1"
     noah_run="$noah_run -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=*"

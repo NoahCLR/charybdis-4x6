@@ -94,6 +94,10 @@ if [ "$in_image" = 0 ]; then
     # checkouts, so an attempt to download anything fails instead of changing
     # the pair. Docker fetches the pinned image itself before the container runs.
     . "$REPO_ROOT/tools/qmk-copies.sh"
+    case "$QMK_ROOT/" in "$REPO_ROOT"/*)
+        echo "BK at $QMK_ROOT is inside this checkout; outside the build image the pair builds from copies of both, so put BK beside it." >&2
+        exit 1 ;;
+    esac
     uid="$(id -u)"
     gid="$(id -g)"
     # Git reads the copies through the mounted Git directories, read-only:

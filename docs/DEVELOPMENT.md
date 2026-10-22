@@ -86,8 +86,10 @@ named by the commit alone. `tools/build-firmware-pair.sh` compiles the same
 copies, BK copied into memory from its volume, and writes only the pair into
 `BUILD_ROOT`: it never touches BK's output path, so pair builds in several
 worktrees, and a pair build beside the host suite, run at once without a lock.
-CI's container jobs set `NOAH_IN_BUILD_IMAGE=1` and build and test in their
-checkouts.
+Every CI job that builds or tests, the agreement check with Ark included, runs
+in the image and sets `NOAH_IN_BUILD_IMAGE=1`, so it builds and tests in its
+checkouts. A BK checked out inside the firmware checkout is used in place by
+the host tests; the pair build refuses it outside the image.
 `NOAH_BUILD_IMAGE=<image>` runs the tests, or `tools/build-firmware-pair.sh`
 builds, in an image that is not pinned, such as one `tools/make-build-image.sh`
 has built; output says so, and the pair's note names it.
