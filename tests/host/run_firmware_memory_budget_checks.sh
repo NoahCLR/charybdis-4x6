@@ -23,11 +23,11 @@ if find "$ROOT/users/noah" "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah
     exit 1
 fi
 
-# The PD geometry adds 2 KiB of wear-level cache plus the bounded mode cache.
-# Keep the old artifact policy intact; select the reviewed increments only from
-# this artifact's recorded compiler flags (never its target name): 3 KiB for
-# the eight-slot PD profile, then 4 KiB for 32 slots (the 32-slot mode cache and
-# 32-bit mode masks). D-F14 then mirrors 140 KiB of logical EEPROM instead
+# Every artifact carries the 32-slot PD profile engine. The policy is the
+# 56 KiB pre-PD baseline plus each reviewed increment: 3 KiB for the
+# eight-slot PD profile (2 KiB of wear-level cache plus the bounded mode
+# cache), then 4 KiB for 32 slots (the 32-slot mode cache and 32-bit mode
+# masks). D-F14 then mirrors 140 KiB of logical EEPROM instead
 # of 18 KiB, 124,928 more cache bytes, and its capacities (128 combos of
 # sixteen inputs, the behaviour row index, 272 names, 128-byte pointing
 # records) another 20 KiB over the 17,400 bytes they linked at. D-F29 moves
@@ -39,11 +39,7 @@ fi
 # policy, not capacity. See
 # docs/architecture/memory-budgets.md for linked accounting and the
 # outstanding physical high-water release gate.
-STATIC_RAM_POLICY=57344
-CFLAGS_FILE="$QMK_ROOT/.build/obj_$TARGET/cflags.txt"
-if [ -f "$CFLAGS_FILE" ] && grep -Eq '(^|[[:space:]])-DNOAH_PD_PROFILE_ENABLE([[:space:]]|$)' "$CFLAGS_FILE"; then
-    STATIC_RAM_POLICY=$((60416 + 4096 + 124928 + 20480 - 106496 - 32768 + 133120))
-fi
+STATIC_RAM_POLICY=$((57344 + 3072 + 4096 + 124928 + 20480 - 106496 - 32768 + 133120))
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \
     --elf "$ELF" \

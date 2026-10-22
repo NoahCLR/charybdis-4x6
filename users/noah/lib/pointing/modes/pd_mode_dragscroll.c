@@ -7,11 +7,10 @@
 #if defined(POINTING_DEVICE_ENABLE)
 
 #    include "pd_mode_handler_common.h"
-#    include "../defs/pd_mode_defaults.h"
+#    include "pd_mode_configured.h"
 
 #    include <stdbool.h>
 #    include <limits.h>
-
 
 #    ifndef MOUSE_REPORT_HV_MIN
 #        define MOUSE_REPORT_HV_MIN INT8_MIN
@@ -24,7 +23,7 @@
 //
 // Reachable residuals are tiny: dragscroll_consume() drains whole steps and
 // leaves less than one divisor behind, the cross-axis decay zeroes the idle
-// axis, and NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS discards everything after a pause.
+// axis, and the slot's expiry discards everything after a pause.
 // The cap only guards the degenerate case where motion never resolves into an
 // axis lock, so nothing ever drains while reports keep arriving. It sits far
 // above any residual real motion can build, so it cannot change scroll feel,
@@ -32,7 +31,7 @@
 // delta still cannot overflow.
 #    define NOAH_DRAGSCROLL_BUFFER_LIMIT ((int32_t)1 << 24)
 
-_Static_assert(NOAH_DRAGSCROLL_BUFFER_LIMIT > NOAH_DRAGSCROLL_DIVISOR_H && NOAH_DRAGSCROLL_BUFFER_LIMIT > NOAH_DRAGSCROLL_DIVISOR_V, "dragscroll residual cap must exceed one drained scroll step");
+_Static_assert(NOAH_DRAGSCROLL_BUFFER_LIMIT > UINT16_MAX, "dragscroll residual cap must exceed any slot's scroll step");
 _Static_assert(NOAH_DRAGSCROLL_BUFFER_LIMIT <= INT32_MAX - ((int32_t)INT16_MAX + 1), "dragscroll residual cap must leave headroom for one full mouse report delta");
 
 typedef enum {
@@ -77,30 +76,23 @@ static void dragscroll_accumulate(int32_t *buffer, int32_t delta) {
     *buffer += delta;
 }
 
-// The configured engine supplies an immutable, validated slot for one poll;
-// without one, the compiled tuning applies. A field is one of the slot's.
-#ifdef NOAH_PD_PROFILE_ENABLE
-#    include "pd_mode_configured.h"
+// The configured engine supplies an immutable, validated slot for one poll.
+// Every tuning value is one of the slot's fields.
 static const noah_pd_config_t *configured_scroll;
-#    define scroll_u16(field, fallback) ((uint16_t)(configured_scroll ? configured_scroll->field : (fallback)))
-#    define scroll_u8(field, fallback) ((uint8_t)(configured_scroll ? configured_scroll->field : (fallback)))
+#    define scroll_u16(field) ((uint16_t)configured_scroll->field)
+#    define scroll_u8(field) ((uint8_t)configured_scroll->field)
 // Whether the slot scrolls this axis (both, horizontal only or vertical only).
 static bool dragscroll_axis_scrolls(dragscroll_axis_t locked) {
-    uint8_t axes = scroll_u8(axis, NOAH_PD_SCROLL_BOTH);
+    uint8_t axes = scroll_u8(axis);
     return axes == NOAH_PD_SCROLL_BOTH || (axes == NOAH_PD_SCROLL_HORIZONTAL) == (locked == DRAGSCROLL_AXIS_X);
 }
-#else
-#    define scroll_u16(field, fallback) (fallback)
-#    define scroll_u8(field, fallback) (fallback)
-#    define dragscroll_axis_scrolls(axis) true
-#endif
 
 static int32_t dragscroll_axis_threshold(dragscroll_axis_t axis) {
-    return axis == DRAGSCROLL_AXIS_X ? scroll_u16(scroll.threshold_h, NOAH_DRAGSCROLL_THRESHOLD_H) : scroll_u16(scroll.threshold_v, NOAH_DRAGSCROLL_THRESHOLD_V);
+    return axis == DRAGSCROLL_AXIS_X ? scroll_u16(scroll.threshold_h) : scroll_u16(scroll.threshold_v);
 }
 
 static int32_t dragscroll_axis_divisor(dragscroll_axis_t axis) {
-    int32_t divisor = axis == DRAGSCROLL_AXIS_X ? scroll_u16(scroll.divisor_h, NOAH_DRAGSCROLL_DIVISOR_H) : scroll_u16(scroll.divisor_v, NOAH_DRAGSCROLL_DIVISOR_V);
+    int32_t divisor = axis == DRAGSCROLL_AXIS_X ? scroll_u16(scroll.divisor_h) : scroll_u16(scroll.divisor_v);
     return divisor > 0 ? divisor : 1;
 }
 
@@ -113,11 +105,11 @@ static bool dragscroll_axis_ratio_satisfied(int32_t axis_abs, int32_t other_abs,
 }
 
 static bool dragscroll_axis_meets_start(dragscroll_axis_t axis, int32_t axis_abs, int32_t other_abs) {
-    return dragscroll_axis_above_threshold(axis, axis_abs) && dragscroll_axis_ratio_satisfied(axis_abs, other_abs, scroll_u8(scroll_policy.start_num, NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM), scroll_u8(scroll_policy.start_den, NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN));
+    return dragscroll_axis_above_threshold(axis, axis_abs) && dragscroll_axis_ratio_satisfied(axis_abs, other_abs, scroll_u8(scroll_policy.start_num), scroll_u8(scroll_policy.start_den));
 }
 
 static bool dragscroll_axis_meets_sustain(dragscroll_axis_t axis, int32_t axis_abs, int32_t other_abs) {
-    return dragscroll_axis_above_threshold(axis, axis_abs) && dragscroll_axis_ratio_satisfied(axis_abs, other_abs, scroll_u8(scroll_policy.sustain_num, NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM), scroll_u8(scroll_policy.sustain_den, NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN));
+    return dragscroll_axis_above_threshold(axis, axis_abs) && dragscroll_axis_ratio_satisfied(axis_abs, other_abs, scroll_u8(scroll_policy.sustain_num), scroll_u8(scroll_policy.sustain_den));
 }
 
 static int32_t dragscroll_consume(int32_t *buffer, dragscroll_axis_t axis) {
@@ -149,7 +141,7 @@ static void dragscroll_decay_cross_axis(int32_t *buffer, dragscroll_axis_t axis)
         return;
     }
 
-    *buffer /= scroll_u8(scroll_policy.decay, NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR);
+    *buffer /= scroll_u8(scroll_policy.decay);
     if (!dragscroll_axis_above_threshold(axis, dragscroll_abs32(*buffer))) {
         *buffer = 0;
     }
@@ -171,7 +163,7 @@ static dragscroll_axis_t dragscroll_choose_start_axis(int32_t abs_x, int32_t abs
 }
 
 static bool dragscroll_gesture_active(bool had_motion, uint32_t motion_age) {
-    return had_motion || motion_age <= scroll_u16(scroll.axis_timeout_ms, NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS);
+    return had_motion || motion_age <= scroll_u16(scroll.axis_timeout_ms);
 }
 
 static dragscroll_axis_t dragscroll_opposite_axis(dragscroll_axis_t axis) {
@@ -262,19 +254,19 @@ static void dragscroll_expire_prior_state(uint32_t prior_motion_age) {
         return;
     }
 
-    if (prior_motion_age > scroll_u16(scroll.expiry_ms, NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS)) {
+    if (prior_motion_age > scroll_u16(scroll.expiry_ms)) {
         dragscroll_state.buffer_x    = 0;
         dragscroll_state.buffer_y    = 0;
         dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
         return;
     }
 
-    if (prior_motion_age > scroll_u16(scroll.axis_timeout_ms, NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS)) {
+    if (prior_motion_age > scroll_u16(scroll.axis_timeout_ms)) {
         dragscroll_state.locked_axis = DRAGSCROLL_AXIS_NONE;
     }
 }
 
-report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
+static report_mouse_t dragscroll_step(report_mouse_t mouse_report) {
     bool     had_motion       = mouse_report.x != 0 || mouse_report.y != 0;
     uint32_t now              = timer_read32();
     uint32_t prior_motion_age = now - dragscroll_state.last_motion_time;
@@ -284,14 +276,7 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
     dragscroll_expire_prior_state(prior_motion_age);
 
     if (had_motion) {
-        uint8_t invert = 0u;
-#    ifdef NOAH_DRAGSCROLL_REVERSE_X
-        invert |= 1u;
-#    endif
-#    ifdef NOAH_DRAGSCROLL_REVERSE_Y
-        invert |= 2u;
-#    endif
-        invert = scroll_u8(scroll_policy.invert, invert);
+        uint8_t invert = scroll_u8(scroll_policy.invert);
         dragscroll_accumulate(&dragscroll_state.buffer_x, (invert & 1u) ? -(int32_t)mouse_report.x : (int32_t)mouse_report.x);
         dragscroll_accumulate(&dragscroll_state.buffer_y, (invert & 2u) ? -(int32_t)mouse_report.y : (int32_t)mouse_report.y);
 
@@ -301,7 +286,7 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
     mouse_report.x = 0;
     mouse_report.y = 0;
 
-    if (now - dragscroll_state.last_scroll_time < scroll_u16(scroll.interval_ms, NOAH_DRAGSCROLL_RATE_LIMIT_MS)) {
+    if (now - dragscroll_state.last_scroll_time < scroll_u16(scroll.interval_ms)) {
         return mouse_report;
     }
 
@@ -317,24 +302,18 @@ report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
     return mouse_report;
 }
 
-#ifdef NOAH_PD_PROFILE_ENABLE
 report_mouse_t noah_pd_configured_scroll(const noah_pd_config_t *slot, report_mouse_t report) {
     configured_scroll = slot;
-    report = handle_dragscroll_mode(report);
+    report = dragscroll_step(report);
     configured_scroll = NULL;
     return report;
 }
-#endif
 
 void reset_dragscroll_mode(void) {
     dragscroll_state = (dragscroll_state_t){0};
 }
 
 #else
-
-report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
-    return mouse_report;
-}
 
 void reset_dragscroll_mode(void) {}
 

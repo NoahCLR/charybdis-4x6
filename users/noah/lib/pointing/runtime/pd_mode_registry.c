@@ -16,7 +16,6 @@
 #include "../modes/pd_mode_configured.h"
 #include "../../profile/runtime/effective_pd_runtime.h"
 
-#ifdef NOAH_PD_PROFILE_ENABLE
 pd_mode_traits_t pd_mode_effective_traits(pd_mode_mask_t mode) {
     const noah_pd_config_t *slot = noah_effective_pd_for_mask(mode);
     if (!slot) return PD_MODE_TRAIT_NONE;
@@ -28,14 +27,9 @@ pd_mode_traits_t pd_mode_effective_traits(pd_mode_mask_t mode) {
     }
     return traits;
 }
-#endif
+
 static inline bool pd_mode_registry_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     return (pd_mode_effective_traits(mode) & trait) == trait;
-#else
-    const pd_mode_def_t *def = pd_mode_lookup(mode);
-    return def && (def->traits & trait) == trait;
-#endif
 }
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
@@ -67,10 +61,6 @@ static const pd_mode_lifecycle_hooks_t pd_mode_auto_mouse_lock_toggle_hooks = {
     .on_lock   = pd_mode_scroll_lock_attach_auto_mouse,
     .on_unlock = pd_mode_scroll_lock_detach_auto_mouse,
 };
-
-#    define PD_MODE_LIFECYCLE_AUTO_MOUSE_LOCK (&pd_mode_auto_mouse_lock_toggle_hooks)
-#else
-#    define PD_MODE_LIFECYCLE_AUTO_MOUSE_LOCK NULL
 #endif
 
 // The manifest fixes deployed action identities. Motion and policy are read
@@ -80,35 +70,20 @@ const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_RE
 #undef NOAH_PD_MODE_REGISTRY_ROW
 
 static const pd_mode_lifecycle_hooks_t *pd_mode_lifecycle_hooks_for_mode(pd_mode_mask_t mode) {
-#ifdef NOAH_PD_PROFILE_ENABLE
-#    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     return pd_mode_has_trait(mode, PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE) ? &pd_mode_auto_mouse_lock_toggle_hooks : NULL;
-#    else
+#else
     (void)mode;
     return NULL;
-#    endif
-#else
-    const pd_mode_def_t *def = pd_mode_lookup(mode);
-    return def ? def->lifecycle : NULL;
 #endif
 }
 
 static uint8_t pd_mode_lifecycle_buffered_tap_masked_real_mods(pd_mode_mask_t mode) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     return noah_pd_engine_masked_mods(noah_effective_pd_for_mask(mode));
-#else
-    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
-    return hooks && hooks->buffered_tap_masked_real_mods ? hooks->buffered_tap_masked_real_mods(mode) : 0;
-#endif
 }
 
 static uint8_t pd_mode_lifecycle_keyboard_event_masked_real_mods(pd_mode_mask_t mode) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     return noah_pd_engine_masked_mods(noah_effective_pd_for_mask(mode));
-#else
-    const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
-    return hooks && hooks->keyboard_event_masked_real_mods ? hooks->keyboard_event_masked_real_mods(mode) : 0;
-#endif
 }
 
 static void pd_mode_run_lifecycle_callback(void (*callback)(pd_mode_mask_t mode), pd_mode_mask_t mode) {
@@ -118,17 +93,13 @@ static void pd_mode_run_lifecycle_callback(void (*callback)(pd_mode_mask_t mode)
 }
 
 void pd_mode_registry_run_activate_hooks(pd_mode_mask_t mode) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     noah_pd_engine_enter(noah_effective_pd_for_mask(mode));
-#endif
     const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
     pd_mode_run_lifecycle_callback(hooks ? hooks->on_activate : NULL, mode);
 }
 
 void pd_mode_registry_run_deactivate_hooks(pd_mode_mask_t mode) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     noah_pd_engine_exit();
-#endif
     const pd_mode_lifecycle_hooks_t *hooks = pd_mode_lifecycle_hooks_for_mode(mode);
     pd_mode_run_lifecycle_callback(hooks ? hooks->on_deactivate : NULL, mode);
 }

@@ -5,11 +5,9 @@
 #include <string.h>
 #include "users/noah/lib/key/behavior/participation.h"
 #include "users/noah/lib/profile/runtime/effective_key_behavior_runtime.h"
-#ifdef NOAH_PD_PROFILE_ENABLE
 #include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "profile_test_blob.h"
 #include "users/noah/lib/pointing/modes/pd_mode_configured.h"
-#endif
 
 #include "key_runtime_integration_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
@@ -350,7 +348,6 @@ static uint16_t              current_cpi;
 static uint16_t              default_dpi;
 static uint16_t              sniping_dpi;
 static uint8_t               split_sync_count;
-static uint8_t               reset_volume_count;
 static uint8_t               layer_state_set_count;
 static uint8_t               layer_off_count;
 static uint8_t               fake_mods;
@@ -456,7 +453,6 @@ static void test_configure_pinch_transparent_profile_path(keypos_t key_pos) {
     layer_state = test_layer_mask(TEST_LAYER_BASE) | test_layer_mask(TEST_LAYER_POINTER);
 }
 
-#ifdef NOAH_PD_PROFILE_ENABLE
 // Every slot's record, edited in place; publication stores the sparse
 // version-2 domain the profile would carry.
 static uint8_t configured_pd_records[NOAH_PROFILE_PD_V1_SLOT_COUNT][NOAH_PROFILE_PD_V1_RECORD_SIZE];
@@ -496,16 +492,9 @@ report_mouse_t noah_pd_configured_scroll(const noah_pd_config_t *slot, report_mo
     (void)slot;
     return report; // Motion parity is covered by pd_mode_handlers_test.
 }
-// Configured directional modes reset their shared engine, never legacy state.
-#define EXPECT_VOLUME_RESETS(count) CHECK(reset_volume_count == 0)
-#else
-#define EXPECT_VOLUME_RESETS(count) CHECK(reset_volume_count == (count))
-#endif
 
 static void test_reset_state(void) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     load_configured_pd();
-#endif
     noah_runtime_reset_for_test();
 #ifdef NOAH_TEST_QMK_GESTURES
     noah_qmk_combo_origin_reset();
@@ -550,7 +539,6 @@ static void test_reset_state(void) {
     default_dpi                            = 900;
     sniping_dpi                            = 350;
     split_sync_count                       = 0;
-    reset_volume_count                     = 0;
     layer_state_set_count                  = 0;
     layer_off_count                        = 0;
     layer_state                            = test_layer_mask(TEST_LAYER_BASE);
@@ -1207,52 +1195,9 @@ void pointing_device_set_cpi(uint16_t cpi) {
     current_cpi = cpi;
 }
 
-report_mouse_t handle_volume_mode(report_mouse_t mouse_report) {
-    return mouse_report;
-}
-
-report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report) {
-    return mouse_report;
-}
-
-report_mouse_t handle_brightness_mode(report_mouse_t mouse_report) {
-    return mouse_report;
-}
-
-report_mouse_t handle_zoom_mode(report_mouse_t mouse_report) {
-    return mouse_report;
-}
-
-report_mouse_t handle_arrow_mode(report_mouse_t mouse_report) {
-    return mouse_report;
-}
-
-// Historical key-event fake for the action lifecycle scenarios below. The
-// configured firmware routes button overrides through the shared engine.
-bool handle_arrow_mode_key(uint16_t keycode, keyrecord_t *record) {
-    if (keycode < QK_MOUSE_BUTTON_1 || keycode > QK_MOUSE_BUTTON_1 + 2u) {
-        return false;
-    }
-    if (record->event.pressed && keycode == MS_BTN2) {
-        noah_emit_literal_tap(G(KC_C), NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
-    }
-    if (record->event.pressed && keycode == MS_BTN3) {
-        noah_emit_literal_tap(G(KC_V), NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
-    }
-    return true;
-}
-
-void reset_volume_mode(void) {
-    reset_volume_count++;
-}
-
 void reset_dragscroll_mode(void) {
     reset_dragscroll_count++;
 }
-
-void reset_brightness_mode(void) {}
-void reset_zoom_mode(void) {}
-void reset_arrow_mode(void) {}
 
 static void test_activate_gui_double_tap_alt_hold(keypos_t gui_pos) {
     const key_runtime_integration_step_t initial_tap_steps[] = {
@@ -1330,7 +1275,6 @@ static void test_authored_single_press_preserves_default_pd_mode_hold(void) {
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
-    EXPECT_VOLUME_RESETS(1);
     CHECK(current_cpi == default_dpi);
 }
 
@@ -1488,7 +1432,6 @@ static void test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_
     CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, true));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
-    EXPECT_VOLUME_RESETS(0);
 
     key_runtime_integration_run(&fake_time, press_and_interrupt, ARRAY_SIZE(press_and_interrupt));
     CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
@@ -1496,7 +1439,6 @@ static void test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_
     CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_1);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_1);
-    EXPECT_VOLUME_RESETS(1);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
     CHECK(pd_mode_local_active_snapshot() == 0);
@@ -1505,7 +1447,6 @@ static void test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_
     CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
-    EXPECT_VOLUME_RESETS(2);
 }
 
 static void test_authored_pd_mode_hold_dispatches_authored_tap_key_immediately(void) {
@@ -1633,7 +1574,6 @@ static void test_authored_hold_action_activates_pd_mode_while_held(void) {
     CHECK(pd_mode_local_locked_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
-    EXPECT_VOLUME_RESETS(1);
     CHECK(current_cpi == default_dpi);
 }
 
@@ -1659,7 +1599,6 @@ static void test_authored_double_tap_lock_locks_pd_mode(void) {
     CHECK(pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(pd_mode_local_locked(PD_MODE_VOLUME));
     CHECK(noah_runtime_debug_slot_owner_keycode(test_keypos(1, 2)) == KC_NO);
-    EXPECT_VOLUME_RESETS(1);
 }
 
 static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
@@ -1678,7 +1617,6 @@ static void test_authored_second_press_hold_branches_into_other_pd_mode(void) {
     CHECK(!pd_mode_local_active(PD_MODE_VOLUME));
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_1);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_2);
-    EXPECT_VOLUME_RESETS(1);
 
     key_runtime_integration_run(&fake_time, &scenario[6], 2);
     CHECK(pd_mode_local_active_snapshot() == 0);
@@ -1827,11 +1765,7 @@ static void test_dragscroll_child_overlap_stays_quiescent(uint16_t parent_keycod
         CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
-#ifdef NOAH_PD_PROFILE_ENABLE
         CHECK(reset_dragscroll_count == 1); // Entry clears the shared scroll accumulator.
-#else
-        CHECK(reset_dragscroll_count == 0);
-#endif
 
         key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
         key_runtime_integration_scan();
@@ -1855,11 +1789,7 @@ static void test_dragscroll_child_overlap_stays_quiescent(uint16_t parent_keycod
         }
 
         key_runtime_integration_scan();
-#ifdef NOAH_PD_PROFILE_ENABLE
         CHECK(reset_dragscroll_count == 2); // Entry and exit each reset the engine.
-#else
-        CHECK(reset_dragscroll_count == 1);
-#endif
         test_assert_pd_overlap_quiescent(parent_pos, child_pos);
 
         CHECK(key_runtime_integration_process_record(KC_C, test_keypos(0, 1), true));
@@ -2282,7 +2212,6 @@ static void test_gui_double_tap_hold_with_authored_pd_hold_keeps_processed_child
     }
 }
 
-#ifdef NOAH_PD_PROFILE_ENABLE
 static void test_upper_slot_hold_lock_dpi_and_disabled_slot(uint8_t slot) {
     keypos_t       pos  = test_keypos(0, 0);
     pd_mode_mask_t mode = pd_mode_mask_from_id(slot);
@@ -2322,7 +2251,6 @@ static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
     test_upper_slot_hold_lock_dpi_and_disabled_slot(31);
     CHECK(pd_mode_mask_from_id(31) == (pd_mode_mask_t)PD_MODE_SLOT_31);
 }
-#endif
 
 // ── Mouse buttons a pointing mode consumes ─────────────────────────────────
 //
@@ -2346,9 +2274,7 @@ static void test_assert_button_quiescent(keypos_t pos) {
     CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
     CHECK(fake_mods == 0 && fake_managed_mods == 0);
     CHECK(!key_runtime_core_take_intercepted_release(pos));
-#ifdef NOAH_PD_PROFILE_ENABLE
     CHECK(!noah_pd_engine_pending_release());
-#endif
 }
 
 // While consumed, a held button holds nothing of its own at any point.
@@ -2395,9 +2321,7 @@ static void test_consumed_buttons_run_no_authored_behavior(void) {
     test_reset_state();
     test_lock_arrow();
     CHECK(!key_runtime_integration_process_record(MS_BTN1, shift_pos, true));
-#ifdef NOAH_PD_PROFILE_ENABLE
     CHECK((fake_mods & MOD_BIT(KC_RIGHT_SHIFT)) != 0);
-#endif
     test_hold_consumed_button(MS_BTN1, shift_pos, TEST_PD_TAP_HOLD_TERM + 40u);
     test_release_and_settle(MS_BTN1, shift_pos);
     CHECK(tap_code16_count == 0u);
@@ -2473,7 +2397,6 @@ static void test_consumed_button_is_an_ordinary_interrupting_press(void) {
     CHECK(last_tap_code16 == KC_A);
 }
 
-#ifdef NOAH_PD_PROFILE_ENABLE
 // A slot may simply consume a button; its behavior must not run either.
 static void test_configured_consume_button_runs_nothing(void) {
     keypos_t pos = test_keypos(4, 0);
@@ -2515,6 +2438,7 @@ static void test_configured_button_click_runs_no_behaviour(void) {
     test_assert_button_quiescent(pos);
 }
 
+#ifndef NOAH_TEST_QMK_GESTURES
 // ── Fallback holds settled before an output (D-F27) ────────────────────────
 //
 // KC_F20 and KC_F21 author only a tap, so each falls back to holding itself.
@@ -5283,16 +5207,14 @@ int main(int argc, char **argv) {
     test_consumed_buttons_run_no_authored_behavior();
     test_button_release_follows_its_press_across_mode_changes();
     test_consumed_button_is_an_ordinary_interrupting_press();
-#ifdef NOAH_PD_PROFILE_ENABLE
     test_configured_consume_button_runs_nothing();
     test_configured_button_click_runs_no_behaviour();
+#ifndef NOAH_TEST_QMK_GESTURES
     test_mode_tap_registers_held_key_fallback_hold_first();
     test_mode_tap_registers_every_due_fallback_hold_in_key_order();
     test_mode_tap_registers_only_due_fallback_holds();
 #endif
-#ifdef NOAH_PD_PROFILE_ENABLE
     test_last_slot_hold_lock_dpi_and_disabled_slot();
-#endif
     test_authored_single_press_preserves_default_pd_mode_hold();
     test_authored_single_press_pd_mode_hold_dispatches_plain_taps_immediately();
     test_raw_lt_hold_dispatches_authored_tap_key_immediately();

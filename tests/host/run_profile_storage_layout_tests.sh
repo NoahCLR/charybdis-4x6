@@ -22,7 +22,6 @@ compile_layout() {
     shift 2
 
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
-        -DNOAH_PD_PROFILE_ENABLE \
         -DMCU_RP \
         -DRGB_MATRIX_ENABLE \
         -DMATRIX_ROWS=10 \

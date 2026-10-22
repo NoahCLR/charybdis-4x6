@@ -19,7 +19,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DNOAH_RUNTIME_TRACE_ENABLE \
     -DPOINTING_DEVICE_ENABLE \
-    -DNOAH_PD_PROFILE_ENABLE \
     -DSPLIT_TRANSACTION_IDS_USER \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

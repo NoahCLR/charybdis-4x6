@@ -99,7 +99,8 @@ cold readback workspace. These avoid profile-reader calls during ordinary key,
 macro, pointer and RGB execution. They do not enlarge logical EEPROM. The
 incremental validator and provider state policies are 360 and 784 bytes.
 
-Current automated policy is a 57,344-byte `.data + .bss` tripwire and a
+The automated policy then was a 57,344-byte `.data + .bss` tripwire (now
+203,776, below) and a
 4,096-byte minimum boot core-memory span. BSS alone is informational unless
 `--max-static-bss` is explicitly provided. The older policy failures above are
 historical, not the current gate thresholds. Neither current policy is the
@@ -228,9 +229,9 @@ The fresh right-half schema-2 ELF (`bastardkb_charybdis_4x6_noah_pd8_right`)
 links 4,152 bytes of `.data` and 54,556 bytes of `.bss`: 58,708 bytes combined.
 This fails the previous 57,344-byte policy by 1,364 bytes. We explicitly budget
 3,072 additional bytes for this feature, making its regression tripwire 60,416
-bytes. The measurement leaves 1,708 bytes of policy margin. The legacy geometry
-keeps its original tripwire; the gate selects the increment only when the ELF's
-recorded compiler flags enable `NOAH_PD_PROFILE_ENABLE`.
+bytes. The measurement leaves 1,708 bytes of policy margin. Every firmware build
+carries the slot engine (D-L40), so the gate applies the increment to every
+artifact; there is no build without it to keep the original tripwire for.
 
 The SRAM0–3 fixed prefix is 58,712 bytes and its boot linker/core-memory span is
 203,432 bytes. Fixed linked occupancy across the unique SRAM banks is 66,168
@@ -365,8 +366,8 @@ runtime, pd-mode state and owner tables) by 1,272, the profile owner by 24, and
 the compiled serializer's canonical behaviour order (64 rows, worked out once)
 by 68. The 63,732 bytes fail the 60,416-byte tripwire by 3,316. We explicitly budget
 4,096 additional bytes for this feature, making the schema-2 tripwire 64,512
-bytes and leaving 780 bytes of policy margin; the gate still selects it only
-from the ELF's recorded `NOAH_PD_PROFILE_ENABLE` flag. As with the eight-slot
+bytes and leaving 780 bytes of policy margin; like the eight-slot increment,
+the gate applies it to every artifact. As with the eight-slot
 increment, this is a regression policy, not a statement of capacity: the
 boot span still leaves 198,400 bytes of SRAM0–3 to the core allocator, and an
 ELF analysis on 2026-10-06 found that the only runtime allocation from it is

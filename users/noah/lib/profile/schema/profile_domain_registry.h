@@ -37,16 +37,6 @@ enum {
 #undef NOAH_DOMAIN_MASK
 };
 
-#ifdef NOAH_PD_PROFILE_ENABLE
-#    define NOAH_PROFILE_ENABLED_PD_MASK NOAH_PROFILE_DOMAIN_MASK_PD
-#else
-#    define NOAH_PROFILE_ENABLED_PD_MASK 0u
-#endif
-
-enum {
-    NOAH_PROFILE_ENABLED_DOMAIN_MASK = (NOAH_PROFILE_DOMAIN_MASK_ALL & ~NOAH_PROFILE_DOMAIN_MASK_PD) | NOAH_PROFILE_ENABLED_PD_MASK,
-};
-
 typedef struct {
     uint8_t id, index, mask, version;
 } noah_profile_domain_shape_t;

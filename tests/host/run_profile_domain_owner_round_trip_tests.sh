@@ -102,5 +102,5 @@ build_and_run() {
         -o "$bin"
     "$bin" "$BUILD_DIR/populated.bin" "$ROOT/tests/fixtures/maximum_profile_v4.fixture"
 }
-build_and_run normal -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE
-build_and_run sanitized -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer
+build_and_run normal -DNOAH_PORTABLE_PROFILE_ENABLE
+build_and_run sanitized -DNOAH_PORTABLE_PROFILE_ENABLE -fsanitize=address,undefined -fno-omit-frame-pointer

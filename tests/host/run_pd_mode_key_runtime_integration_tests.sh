@@ -84,6 +84,14 @@ compile_test() {
     "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_trace.c" \
     "$ROOT/users/noah/lib/split/runtime_sync_dirty.c" \
+    "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+    "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
+    "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
+    "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
+    "$ROOT/users/noah/lib/pointing/modes/pd_mode_configured.c" \
     -o "$bin"
 }
 
@@ -116,14 +124,6 @@ if [ "${NOAH_TEST_QMK_GESTURES:-0}" = 1 ]; then
     exit
 fi
 
-compile_test "$BUILD_DIR/configured" -DNOAH_PD_PROFILE_ENABLE \
-    "$ROOT/tests/host/profile_macro_provider_stub.c" \
-    "$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah/pd_config.c" \
-    "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
-    "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
-    "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
-    "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
-    "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
-    "$ROOT/users/noah/lib/pointing/modes/pd_mode_configured.c"
+compile_test "$BUILD_DIR/configured" \
+    "$ROOT/tests/host/profile_macro_provider_stub.c"
 "$BUILD_DIR/configured"

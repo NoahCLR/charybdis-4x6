@@ -433,15 +433,10 @@ static noah_profile_validator_v1_result_t validate_settings(noah_profile_validat
 }
 
 static noah_profile_validator_v1_result_t validate_pd(noah_profile_validator_v1_t *v, noah_profile_validator_v1_error_t *error) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     noah_profile_pd_v1_error_t detail;
     noah_profile_pd_v1_iteration_t result = noah_profile_pd_v1_iterator_step(&v->domain_validation.pd, &v->reader, v->base_offset + v->payload.offset, v->payload.length, &detail);
     if (result == NOAH_PROFILE_PD_V1_REJECTED) return reject_simple(v, detail.code == NOAH_PROFILE_PD_V1_READ_ERROR ? NOAH_PROFILE_VALIDATOR_V1_READ_ERROR : NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN, v->payload.offset + detail.offset, error);
     return noah_profile_pd_v1_iterator_complete(&v->domain_validation.pd) ? NOAH_PROFILE_VALIDATOR_V1_VALID : NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;
-#else
-    // A build without pointing profiles never allows the domain's header.
-    return reject_simple(v, NOAH_PROFILE_VALIDATOR_V1_UNSUPPORTED_DOMAIN, v->payload.offset, error);
-#endif
 }
 
 static noah_profile_validator_v1_result_t reject_record(noah_profile_validator_v1_t *v, size_t offset, uint8_t domain_id, uint8_t table_id, uint16_t row_index, noah_profile_validator_v1_error_t *error) {

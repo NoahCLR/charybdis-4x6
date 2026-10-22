@@ -13,7 +13,7 @@ PY
 for sanitizer in normal sanitized; do
     flags=""
     if [ "$sanitizer" = sanitized ]; then flags="-fsanitize=address,undefined -fno-omit-frame-pointer"; fi
-    cc -std=c11 -Wall -Wextra -Werror -pedantic $flags -DNOAH_PD_PROFILE_ENABLE \
+    cc -std=c11 -Wall -Wextra -Werror -pedantic $flags \
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/pd_profile_integration_test.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
@@ -35,7 +35,7 @@ for sanitizer in normal sanitized; do
 done
 # The record layout, alignment and byte-order assertions hold on the target too.
 for source in schema/profile_validator_v1.c schema/profile_pd_v1.c runtime/effective_pd_runtime.c; do
-    arm-none-eabi-gcc -std=c11 -Wall -Wextra -Werror -pedantic -DNOAH_PD_PROFILE_ENABLE \
+    arm-none-eabi-gcc -std=c11 -Wall -Wextra -Werror -pedantic \
         -mcpu=cortex-m0plus -mthumb -I"$ROOT/users/noah" \
         -c "$ROOT/users/noah/lib/profile/$source" -o "$BUILD_DIR/$(basename "$source" .c).o"
 done

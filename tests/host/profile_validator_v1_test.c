@@ -231,6 +231,11 @@ static void test_identity_capacity_and_masks(const char *fixture_path) {
 
     declaration = declaration_for(empty, sizeof(empty), 0u);
     compatible  = noah_profile_validator_v1_default_compatibility(ACTION_ABI_DIGEST);
+    // The keyboard's own compatibility requires the pointing domain, so an
+    // empty profile is missing it; with nothing required it is valid.
+    assert(compatible.required_domain_mask == NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD);
+    expect_result(validate(empty, sizeof(empty), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_MISSING_DOMAIN);
+    compatible.required_domain_mask = 0u;
     expect_result(validate(empty, sizeof(empty), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
     compatible.required_domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     expect_result(validate(empty, sizeof(empty), &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_MISSING_DOMAIN);

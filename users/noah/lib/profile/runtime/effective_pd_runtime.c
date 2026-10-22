@@ -1,5 +1,4 @@
 #include "effective_pd_runtime.h"
-#ifdef NOAH_PD_PROFILE_ENABLE
 #include <string.h>
 
 // The validated records themselves: the structure is the record byte for byte
@@ -63,4 +62,3 @@ void noah_effective_pd_invalidate(void *context, uint32_t publication, noah_effe
     ready = false;
     ready = view && publish_pd_cache(view);
 }
-#endif

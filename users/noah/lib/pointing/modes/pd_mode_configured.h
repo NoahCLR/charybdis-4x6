@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#if defined(NOAH_PD_PROFILE_ENABLE) && defined(POINTING_DEVICE_ENABLE)
+#if defined(POINTING_DEVICE_ENABLE)
 #    include "../../profile/schema/profile_pd_v1.h"
 // slot: from noah_effective_pd_for_mask (in tests, any noah_pd_config_t). The
 // engine trusts its kind, axis, policies and taps as the validator admits

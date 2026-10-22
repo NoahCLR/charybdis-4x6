@@ -1,4 +1,3 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // QMK Pointing Contract Compatibility
 // ────────────────────────────────────────────────────────────────────────────
@@ -14,10 +13,6 @@
 #include <stdint.h>
 
 #if defined(POINTING_DEVICE_ENABLE)
-#    ifndef CHARYBDIS_DRAGSCROLL_DPI
-#        define CHARYBDIS_DRAGSCROLL_DPI 100
-#    endif
-
 static inline bool noah_qmk_contract_pointer_sniping_enabled(void) {
     return charybdis_get_pointer_sniping_enabled();
 }
@@ -32,10 +27,6 @@ static inline uint16_t noah_qmk_contract_pointer_default_dpi(void) {
 
 static inline uint16_t noah_qmk_contract_pointer_sniping_dpi(void) {
     return charybdis_get_pointer_sniping_dpi();
-}
-
-static inline uint16_t noah_qmk_contract_pointer_dragscroll_dpi(void) {
-    return noah_setting(NOAH_SETTING_DRAGSCROLL_DPI, CHARYBDIS_DRAGSCROLL_DPI);
 }
 
 // QMK sends a mouse button's report at once, from the report the pointing task
@@ -66,10 +57,6 @@ static inline uint16_t noah_qmk_contract_pointer_default_dpi(void) {
 }
 
 static inline uint16_t noah_qmk_contract_pointer_sniping_dpi(void) {
-    return 0;
-}
-
-static inline uint16_t noah_qmk_contract_pointer_dragscroll_dpi(void) {
     return 0;
 }
 

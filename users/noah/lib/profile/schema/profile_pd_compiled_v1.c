@@ -6,7 +6,6 @@
 
 #include "profile_pd_v1.h"
 
-#ifdef NOAH_PD_PROFILE_ENABLE
 // The sparse version-2 domain stores only the slots a profile uses.
 static uint16_t pd_payload_size(void) {
     return (uint16_t)(NOAH_PROFILE_PD_V1_HEADER_SIZE + (size_t)noah_profile_pd_v1_default_record_count(noah_pd_defaults) * NOAH_PROFILE_PD_V1_RECORD_SIZE);
@@ -28,11 +27,3 @@ noah_profile_compiled_v1_result_t noah_profile_pd_compiled_v1_write(compiled_wri
     }
     return writer->result;
 }
-#else
-// Without pointing profiles the compiled profile has no pointing domain.
-noah_profile_compiled_v1_result_t noah_profile_pd_compiled_v1_write(compiled_writer_t *writer, noah_profile_compiled_v1_error_t *error) {
-    (void)writer;
-    (void)error;
-    return NOAH_PROFILE_COMPILED_V1_OK;
-}
-#endif

@@ -8,7 +8,10 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/pointing/modes/pd_mode_handler_common.h"
+#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
 #include "users/noah/lib/pointing/modes/pd_mode_handlers.h"
+#include "users/noah/lib/pointing/defs/pd_mode_defaults.h"
+#include "users/noah/lib/profile/schema/profile_pd_v1.h"
 #include "users/noah/lib/state/modifiers/keyboard_mod_state.h"
 
 #define TEST_MAX_CALLS 8
@@ -113,6 +116,32 @@ static void test_clear_logs(void) {
     click_call_count = 0;
     macro_start_count = 0;
     pending_report   = (report_mouse_t){0};
+}
+
+// Every scrolling slot runs one engine. These tests drive it through the
+// keyboard's own Dragscroll slot, whose tuning is the NOAH_DRAGSCROLL_* surface
+// the timings below are written in.
+static report_mouse_t dragscroll(report_mouse_t report) {
+    return noah_pd_configured_scroll(&noah_pd_defaults[0], report);
+}
+
+static void test_dragscroll_slot_carries_the_authored_tuning(void) {
+    const noah_pd_config_t *slot = &noah_pd_defaults[0];
+    uint8_t                 invert = 0u;
+
+#ifdef NOAH_DRAGSCROLL_REVERSE_X
+    invert |= 1u;
+#endif
+#ifdef NOAH_DRAGSCROLL_REVERSE_Y
+    invert |= 2u;
+#endif
+    CHECK(slot->kind == NOAH_PD_KIND_SCROLLING && slot->axis == NOAH_PD_SCROLL_BOTH);
+    CHECK(slot->scroll.threshold_h == NOAH_DRAGSCROLL_THRESHOLD_H && slot->scroll.threshold_v == NOAH_DRAGSCROLL_THRESHOLD_V);
+    CHECK(slot->scroll.divisor_h == NOAH_DRAGSCROLL_DIVISOR_H && slot->scroll.divisor_v == NOAH_DRAGSCROLL_DIVISOR_V);
+    CHECK(slot->scroll.interval_ms == NOAH_DRAGSCROLL_RATE_LIMIT_MS && slot->scroll.expiry_ms == NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS && slot->scroll.axis_timeout_ms == NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS);
+    CHECK(slot->scroll_policy.start_num == NOAH_DRAGSCROLL_LOCK_START_RATIO_NUM && slot->scroll_policy.start_den == NOAH_DRAGSCROLL_LOCK_START_RATIO_DEN);
+    CHECK(slot->scroll_policy.sustain_num == NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_NUM && slot->scroll_policy.sustain_den == NOAH_DRAGSCROLL_LOCK_SUSTAIN_RATIO_DEN);
+    CHECK(slot->scroll_policy.decay == NOAH_DRAGSCROLL_CROSS_AXIS_DECAY_DIVISOR && slot->scroll_policy.invert == invert);
 }
 
 static void test_reset_stubs(void) {
@@ -255,7 +284,7 @@ static void test_dragscroll_prime_horizontal_lock_with_residual(uint32_t start_t
     report_mouse_t report;
 
     fake_time32 = start_time;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 18,
         .y = 0,
     });
@@ -263,7 +292,7 @@ static void test_dragscroll_prime_horizontal_lock_with_residual(uint32_t start_t
     CHECK(report.v == 0);
 
     fake_time32 = start_time + 1u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 6,
         .y = 0,
     });
@@ -273,7 +302,7 @@ static void test_dragscroll_prime_horizontal_lock_with_residual(uint32_t start_t
 
 static void test_dragscroll_drive_reports(int16_t dx, int16_t dy, uint32_t count) {
     for (uint32_t index = 0; index < count; index++) {
-        (void)handle_dragscroll_mode((report_mouse_t){
+        (void)dragscroll((report_mouse_t){
             .x = dx,
             .y = dy,
         });
@@ -286,7 +315,7 @@ static void test_dragscroll_horizontal_lock_filters_vertical_jitter(void) {
     report_mouse_t report;
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 18,
         .y = 2,
     });
@@ -296,7 +325,7 @@ static void test_dragscroll_horizontal_lock_filters_vertical_jitter(void) {
     CHECK(report.v == 0);
 
     fake_time32 = 1040u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 6,
         .y = 4,
     });
@@ -310,7 +339,7 @@ static void test_dragscroll_vertical_lock_filters_horizontal_jitter(void) {
     report_mouse_t report;
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 2,
         .y = -24,
     });
@@ -318,7 +347,7 @@ static void test_dragscroll_vertical_lock_filters_horizontal_jitter(void) {
     CHECK(report.v == 3);
 
     fake_time32 = 1040u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 5,
         .y = -8,
     });
@@ -332,7 +361,7 @@ static void test_dragscroll_near_diagonal_motion_waits_for_dominant_axis(void) {
     report_mouse_t report;
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 8,
         .y = 7,
     });
@@ -340,7 +369,7 @@ static void test_dragscroll_near_diagonal_motion_waits_for_dominant_axis(void) {
     CHECK(report.v == 0);
 
     fake_time32 = 1040u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 6,
         .y = 0,
     });
@@ -354,7 +383,7 @@ static void test_dragscroll_opposite_axis_does_not_steal_active_lock(void) {
     report_mouse_t report;
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 22,
         .y = 1,
     });
@@ -362,7 +391,7 @@ static void test_dragscroll_opposite_axis_does_not_steal_active_lock(void) {
     CHECK(report.v == 0);
 
     fake_time32 = 1040u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 11,
         .y = 12,
     });
@@ -376,7 +405,7 @@ static void test_dragscroll_ambiguous_wobble_keeps_existing_lock(void) {
     report_mouse_t report;
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 18,
         .y = 1,
     });
@@ -384,7 +413,7 @@ static void test_dragscroll_ambiguous_wobble_keeps_existing_lock(void) {
     CHECK(report.v == 0);
 
     fake_time32 = 1040u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 7,
         .y = 7,
     });
@@ -398,7 +427,7 @@ static void test_dragscroll_lock_releases_after_pause_and_switches_axes_cleanly(
     report_mouse_t report;
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 18,
         .y = 1,
     });
@@ -406,7 +435,7 @@ static void test_dragscroll_lock_releases_after_pause_and_switches_axes_cleanly(
     CHECK(report.v == 0);
 
     fake_time32 = 1080u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = 0,
     });
@@ -414,7 +443,7 @@ static void test_dragscroll_lock_releases_after_pause_and_switches_axes_cleanly(
     CHECK(report.v == 0);
 
     fake_time32 = 1100u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = -24,
     });
@@ -429,7 +458,7 @@ static void test_dragscroll_lock_timeout_boundary_uses_prior_motion_age(void) {
     test_dragscroll_prime_horizontal_lock_with_residual(1020u);
 
     fake_time32 = 1021u + NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = -4,
     });
@@ -440,7 +469,7 @@ static void test_dragscroll_lock_timeout_boundary_uses_prior_motion_age(void) {
     test_dragscroll_prime_horizontal_lock_with_residual(1020u);
 
     fake_time32 = 1021u + NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS + 1u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = -4,
     });
@@ -455,7 +484,7 @@ static void test_dragscroll_buffer_timeout_boundary_preserves_then_expires_resid
     test_dragscroll_prime_horizontal_lock_with_residual(1020u);
 
     fake_time32 = 1021u + NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = -4,
     });
@@ -463,7 +492,7 @@ static void test_dragscroll_buffer_timeout_boundary_preserves_then_expires_resid
     CHECK(report.v == 0);
 
     fake_time32 += NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report = handle_dragscroll_mode((report_mouse_t){
+    report = dragscroll((report_mouse_t){
         .x = 6,
         .y = 0,
     });
@@ -474,7 +503,7 @@ static void test_dragscroll_buffer_timeout_boundary_preserves_then_expires_resid
     test_dragscroll_prime_horizontal_lock_with_residual(1020u);
 
     fake_time32 = 1021u + NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS + 1u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = -4,
     });
@@ -482,7 +511,7 @@ static void test_dragscroll_buffer_timeout_boundary_preserves_then_expires_resid
     CHECK(report.v == 0);
 
     fake_time32 += NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report = handle_dragscroll_mode((report_mouse_t){
+    report = dragscroll((report_mouse_t){
         .x = 0,
         .y = -4,
     });
@@ -497,12 +526,12 @@ static void test_dragscroll_no_motion_expires_stale_state(void) {
     test_dragscroll_prime_horizontal_lock_with_residual(1020u);
 
     fake_time32 = 1021u + NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS + 1u;
-    report      = handle_dragscroll_mode((report_mouse_t){0});
+    report      = dragscroll((report_mouse_t){0});
     CHECK(report.h == 0);
     CHECK(report.v == 0);
 
     fake_time32 += NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report = handle_dragscroll_mode((report_mouse_t){
+    report = dragscroll((report_mouse_t){
         .x = 0,
         .y = -8,
     });
@@ -517,7 +546,7 @@ static void test_dragscroll_first_post_expiry_report_can_emit_new_axis(void) {
     test_dragscroll_prime_horizontal_lock_with_residual(1020u);
 
     fake_time32 = 1021u + NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS + 1u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = -16,
     });
@@ -531,21 +560,21 @@ static void test_dragscroll_rate_limit_boundary_is_inclusive(void) {
     test_reset_stubs();
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 18,
         .y = 0,
     });
     CHECK(report.h == 3);
 
     fake_time32 = 1020u + NOAH_DRAGSCROLL_RATE_LIMIT_MS - 1u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 6,
         .y = 0,
     });
     CHECK(report.h == 0);
 
     fake_time32 = 1020u + NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report      = handle_dragscroll_mode((report_mouse_t){0});
+    report      = dragscroll((report_mouse_t){0});
     CHECK(report.h == 1);
     CHECK(report.v == 0);
 }
@@ -558,7 +587,7 @@ static void test_dragscroll_prior_motion_age_is_wrap_safe(void) {
     test_dragscroll_prime_horizontal_lock_with_residual(start_time);
 
     fake_time32 = start_time + 1u + NOAH_DRAGSCROLL_LOCK_TIMEOUT_MS + 1u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = -4,
     });
@@ -569,7 +598,7 @@ static void test_dragscroll_prior_motion_age_is_wrap_safe(void) {
 static void test_dragscroll_uses_one_timer_sample_per_invocation(void) {
     test_reset_stubs();
 
-    (void)handle_dragscroll_mode((report_mouse_t){
+    (void)dragscroll((report_mouse_t){
         .x = 18,
         .y = 0,
     });
@@ -584,7 +613,7 @@ static void test_dragscroll_uses_different_horizontal_and_vertical_divisors(void
     report_mouse_t report;
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 12,
         .y = 0,
     });
@@ -594,7 +623,7 @@ static void test_dragscroll_uses_different_horizontal_and_vertical_divisors(void
     reset_dragscroll_mode();
 
     fake_time32 = 1040u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = -12,
     });
@@ -608,7 +637,7 @@ static void test_dragscroll_cross_axis_decay_prevents_residual_leakage(void) {
     report_mouse_t report;
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 18,
         .y = 8,
     });
@@ -616,7 +645,7 @@ static void test_dragscroll_cross_axis_decay_prevents_residual_leakage(void) {
     CHECK(report.v == 0);
 
     fake_time32 = 1040u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 6,
         .y = 0,
     });
@@ -624,7 +653,7 @@ static void test_dragscroll_cross_axis_decay_prevents_residual_leakage(void) {
     CHECK(report.v == 0);
 
     fake_time32 = 1060u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = 0,
     });
@@ -638,7 +667,7 @@ static void test_dragscroll_extreme_input_saturates_instead_of_wrapping(void) {
     test_reset_stubs();
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = INT16_MAX,
     });
     CHECK(report.h > 0);
@@ -648,7 +677,7 @@ static void test_dragscroll_extreme_input_saturates_instead_of_wrapping(void) {
     test_dragscroll_drive_reports(INT16_MAX, 0, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
 
     fake_time32 = 1020u + NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report      = handle_dragscroll_mode((report_mouse_t){0});
+    report      = dragscroll((report_mouse_t){0});
     CHECK(report.h > 0);
     CHECK(report.v == 0);
 
@@ -657,7 +686,7 @@ static void test_dragscroll_extreme_input_saturates_instead_of_wrapping(void) {
     test_dragscroll_drive_reports(INT16_MAX, 0, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
 
     fake_time32 = 1020u + 2u * NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report      = handle_dragscroll_mode((report_mouse_t){0});
+    report      = dragscroll((report_mouse_t){0});
     CHECK(report.h > 0);
     CHECK(report.v == 0);
 }
@@ -670,7 +699,7 @@ static void test_dragscroll_reverse_axis_extremes_saturate_in_both_directions(vo
     // NOAH_DRAGSCROLL_REVERSE_Y subtracts the report, so positive vertical input
     // drives the residual buffer negative.
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .y = INT16_MAX,
     });
     CHECK(report.h == 0);
@@ -679,7 +708,7 @@ static void test_dragscroll_reverse_axis_extremes_saturate_in_both_directions(vo
     test_dragscroll_drive_reports(0, INT16_MAX, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
 
     fake_time32 = 1020u + NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report      = handle_dragscroll_mode((report_mouse_t){0});
+    report      = dragscroll((report_mouse_t){0});
     CHECK(report.h == 0);
     CHECK(report.v < 0);
 
@@ -688,7 +717,7 @@ static void test_dragscroll_reverse_axis_extremes_saturate_in_both_directions(vo
     test_dragscroll_drive_reports(0, INT16_MIN, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
 
     fake_time32 = 1020u + 2u * NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report      = handle_dragscroll_mode((report_mouse_t){0});
+    report      = dragscroll((report_mouse_t){0});
     CHECK(report.h == 0);
     CHECK(report.v > 0);
 }
@@ -699,7 +728,7 @@ static void test_dragscroll_saturated_buffer_expires_after_pause(void) {
     test_reset_stubs();
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = INT16_MAX,
     });
     CHECK(report.h > 0);
@@ -707,12 +736,12 @@ static void test_dragscroll_saturated_buffer_expires_after_pause(void) {
     test_dragscroll_drive_reports(INT16_MAX, 0, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
 
     fake_time32 = 1020u + NOAH_DRAGSCROLL_BUFFER_EXPIRE_MS + 1u;
-    report      = handle_dragscroll_mode((report_mouse_t){0});
+    report      = dragscroll((report_mouse_t){0});
     CHECK(report.h == 0);
     CHECK(report.v == 0);
 
     fake_time32 += NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report = handle_dragscroll_mode((report_mouse_t){
+    report = dragscroll((report_mouse_t){
         .y = -24,
     });
     CHECK(report.h == 0);
@@ -726,7 +755,7 @@ static void test_dragscroll_saturating_accumulator(void) {
     test_reset_stubs();
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .y = INT16_MIN,
     });
     CHECK(report.h == 0);
@@ -735,14 +764,14 @@ static void test_dragscroll_saturating_accumulator(void) {
     test_dragscroll_drive_reports(0, INT16_MIN, TEST_DRAGSCROLL_OVERFLOW_REPORTS);
 
     fake_time32 = 1020u + NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report      = handle_dragscroll_mode((report_mouse_t){0});
+    report      = dragscroll((report_mouse_t){0});
     CHECK(report.h == 0);
     CHECK(report.v > 0);
 
     reset_dragscroll_mode();
 
     fake_time32 += NOAH_DRAGSCROLL_RATE_LIMIT_MS;
-    report = handle_dragscroll_mode((report_mouse_t){
+    report = dragscroll((report_mouse_t){
         .y = -24,
     });
     CHECK(report.h == 0);
@@ -755,7 +784,7 @@ static void test_dragscroll_reset_clears_buffers_and_lock_state(void) {
     report_mouse_t report;
 
     fake_time32 = 1020u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 18,
         .y = 1,
     });
@@ -765,7 +794,7 @@ static void test_dragscroll_reset_clears_buffers_and_lock_state(void) {
     reset_dragscroll_mode();
 
     fake_time32 = 1040u;
-    report      = handle_dragscroll_mode((report_mouse_t){
+    report      = dragscroll((report_mouse_t){
         .x = 0,
         .y = -16,
     });
@@ -773,10 +802,7 @@ static void test_dragscroll_reset_clears_buffers_and_lock_state(void) {
     CHECK(report.v == 2);
 }
 
-#ifdef NOAH_PD_PROFILE_ENABLE
-#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
 #include "pd_mode_engine_fixture.h"
-#include "users/noah/lib/profile/schema/profile_pd_v1.h"
 static uint8_t engine_mod_owners[8];
 void keyboard_mod_ownership_register(uint16_t key) {
     CHECK(key >= KC_LEFT_CTRL && key <= KC_RIGHT_GUI);
@@ -1256,7 +1282,6 @@ static void test_configured_mouse_button_clicks(void) {
     CHECK(!noah_pd_engine_pending_release());
     noah_pd_engine_exit();
 }
-#endif
 
 static void test_configured_macro_start_accounting(void) {
     noah_pd_config_t slot = directional_slot(NOAH_PD_AXIS_HORIZONTAL, 0, false);
@@ -1281,6 +1306,7 @@ static void test_configured_macro_start_accounting(void) {
 }
 
 int main(void) {
+    test_dragscroll_slot_carries_the_authored_tuning();
     test_configured_release_ownership_and_custom_slot();
     test_configured_eight_directions();
     test_configured_dominant_axis();

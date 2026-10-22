@@ -24,7 +24,6 @@ fi
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DPOINTING_DEVICE_ENABLE \
-    -DNOAH_PD_PROFILE_ENABLE \
     -ffunction-sections -fdata-sections "$LINK_DEAD_SECTIONS" \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

@@ -187,7 +187,8 @@
 #    define NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX 2
 
 // Local drag-scroll tuning (DPI for the scroll speed lives in the keymap config).
-// The repo-owned NOAH_DRAGSCROLL_* surface controls the local gesture handler.
+// The repo-owned NOAH_DRAGSCROLL_* surface is the compiled scrolling slots'
+// tuning (pd_config.c); a profile's slots carry their own.
 //   Thresholds     = start moving one axis intentionally before it scrolls
 //   Divisors       = counts per emitted scroll unit
 //   Start ratio    = dominance needed to begin a one-axis gesture

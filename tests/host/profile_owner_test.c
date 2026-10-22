@@ -10,16 +10,22 @@
 #include "users/noah/lib/profile/runtime/profile_owner.h"
 #include "users/noah/lib/profile/runtime/effective_keymap_macros_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
+#include "users/noah/lib/profile/schema/profile_pd_v1.h"
 #include "users/noah/lib/profile/schema/profile_settings_v1.h"
 #include "users/noah/lib/profile/storage/profile_flash_store.h"
 #include "profile_store_committed_fixture.h"
 
 _Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= SPLIT_FAULT_LINK_FRAME_MAX && NOAH_PROFILE_WORKING_SYNC_FRAME_MAX <= SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries both protocols' largest frames");
 
-static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
+// Every profile the keyboard runs carries its pointing slots (the PD domain);
+// these carry it with every slot disabled.
+#define TEST_PD_DOMAIN NOAH_PROFILE_DOMAIN_V1_PD, NOAH_PROFILE_DOMAIN_VERSION_PD, NOAH_PROFILE_PD_V1_HEADER_SIZE, 0u, 0u, 0u, \
+                       NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0u, 0u, 0u, 0u, 0u
+
+static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, TEST_PD_DOMAIN};
 
 static const uint8_t long_profile[] = {
-    0x4eu, 0x4cu, 0x50u, 0x31u, 0x04u, 0x00u, 0x01u, 0x01u, 0x10u, 0x04u, 0x4fu, 0x02u, 0x00u, 0x00u, 0x04u, 0x00u,
+    0x4eu, 0x4cu, 0x50u, 0x31u, 0x04u, 0x00u, 0x02u, 0x01u, 0x10u, 0x04u, 0x4fu, 0x02u, 0x00u, 0x00u, 0x04u, 0x00u,
     0x1fu, 0x00u, 0x10u, 0x10u, 0x0cu, 0x20u, 0x0cu, 0x00u, 0x04u, 0x08u, 0x3au, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u,
     0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x01u, 0x01u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u,
     0x02u, 0x02u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x03u, 0x03u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
@@ -57,11 +63,12 @@ static const uint8_t long_profile[] = {
     0x94u, 0xffu, 0xc8u, 0x01u, 0x03u, 0x00u, 0x00u, 0xffu, 0xc8u, 0x04u, 0x01u, 0x1eu, 0xffu, 0xc8u, 0x05u, 0x02u,
     0x3cu, 0xffu, 0xc8u, 0x06u, 0x03u, 0x5au, 0xffu, 0xc8u, 0x07u, 0xffu, 0x78u, 0xffu, 0xc8u, 0x08u, 0x00u, 0x96u,
     0xffu, 0xc8u, 0x09u, 0x01u, 0xb4u, 0xffu, 0xc8u, 0x0au, 0x02u, 0xd2u, 0xffu, 0xc8u, 0x0bu,
+    TEST_PD_DOMAIN,
 };
 
 static const uint8_t *candidate_blob = compiled_blob;
 static uint32_t candidate_length = sizeof(compiled_blob);
-static uint8_t candidate_domains;
+static uint8_t candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_PD;
 
 typedef struct {
     uint8_t  bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];
@@ -138,7 +145,7 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_com
                 .digest            = digest_of(compiled_blob, sizeof(compiled_blob)),
                 .action_abi_digest = UINT32_C(0x12345678),
                 .byte_length       = sizeof(compiled_blob),
-                .domain_mask       = 0u,
+                .domain_mask       = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD,
             },
     };
     return NOAH_PROFILE_COMPILED_V1_OK;
@@ -158,8 +165,8 @@ bool noah_profile_action_placement_v1_supported(const noah_profile_action_v1_t *
 
 bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *profile, noah_profile_validator_v1_compatibility_t *compatibility) {
     if (!profile || !compatibility) return false;
-    *compatibility                      = noah_profile_validator_v1_default_compatibility(profile->metadata.action_abi_digest);
-    compatibility->required_domain_mask = 0u;
+    // As the keyboard's own: every profile must carry the PD domain.
+    *compatibility = noah_profile_validator_v1_default_compatibility(profile->metadata.action_abi_digest);
     return true;
 }
 
@@ -340,15 +347,20 @@ static void begin_frame(uint8_t frame[32], uint16_t transaction_id) {
     write_u32(&frame[20], declaration.action_abi_digest);
 }
 
-static void chunk_frame(uint8_t frame[32], uint16_t transaction_id) {
+// One chunk of the compiled blob from `offset`; returns its length. The blob
+// is longer than one chunk, so callers send it chunk by chunk.
+static uint8_t chunk_frame(uint8_t frame[32], uint16_t transaction_id, uint32_t offset) {
+    uint8_t piece = sizeof(compiled_blob) - offset < NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX ? (uint8_t)(sizeof(compiled_blob) - offset) : NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX;
+
     memset(frame, 0, 32u);
     frame[0] = NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET;
     frame[1] = NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL;
     frame[2] = NOAH_PROFILE_CANDIDATE_V1_VALUE_CHUNK;
     write_u16(&frame[3], transaction_id);
-    write_u32(&frame[5], 0u);
-    frame[9] = sizeof(compiled_blob);
-    memcpy(&frame[10], compiled_blob, sizeof(compiled_blob));
+    write_u32(&frame[5], offset);
+    frame[9] = piece;
+    memcpy(&frame[10], compiled_blob + offset, piece);
+    return piece;
 }
 
 static void simple_frame(uint8_t frame[32], uint8_t value, uint16_t transaction_id) {
@@ -589,8 +601,10 @@ static void commit_blob(noah_profile_owner_t *owner, uint16_t transaction_id, ui
 
     begin_frame(frame, transaction_id);
     send_and_scan(owner, frame, (*now)++);
-    chunk_frame(frame, transaction_id);
-    send_and_scan(owner, frame, (*now)++);
+    for (uint32_t offset = 0u; offset < sizeof(compiled_blob);) {
+        offset += chunk_frame(frame, transaction_id, offset);
+        send_and_scan(owner, frame, (*now)++);
+    }
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, transaction_id);
     send_and_scan(owner, frame, (*now)++);
     while (owner->host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING)
@@ -707,7 +721,7 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
 
     candidate_blob = long_profile;
     candidate_length = sizeof(long_profile);
-    candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB;
+    candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB | NOAH_PROFILE_CANDIDATE_V1_DOMAIN_PD;
     memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
     memset(right_memory.bytes, 0xff, sizeof(right_memory.bytes));
     boot_empty_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);
@@ -769,7 +783,7 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
     reboot_saved_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now, 2u);
     candidate_blob = compiled_blob;
     candidate_length = sizeof(compiled_blob);
-    candidate_domains = 0u;
+    candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_PD;
 }
 
 static void test_long_profile_copy_reads_within_the_store_bound(void) {
@@ -779,7 +793,7 @@ static void test_long_profile_copy_reads_within_the_store_bound(void) {
     uint32_t now = 0u;
     candidate_blob = long_profile;
     candidate_length = sizeof(long_profile);
-    candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB;
+    candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB | NOAH_PROFILE_CANDIDATE_V1_DOMAIN_PD;
     _Static_assert(NOAH_PROFILE_SPLIT_V1_CHUNK_MAX == 106u && NOAH_PROFILE_SPLIT_V1_CHUNK_MAX > NOAH_PROFILE_STORE_IO_CHUNK_MAX, "copy chunks must exceed the bounded store read");
     memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
     memset(right_memory.bytes, 0xff, sizeof(right_memory.bytes));
@@ -791,7 +805,7 @@ static void test_long_profile_copy_reads_within_the_store_bound(void) {
     assert(left_memory.largest_read <= NOAH_PROFILE_STORE_IO_CHUNK_MAX && right_memory.largest_read <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
     candidate_blob = compiled_blob;
     candidate_length = sizeof(compiled_blob);
-    candidate_domains = 0u;
+    candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_PD;
 }
 
 static void test_two_consecutive_live_commits_use_distributed_prepare_barrier(void) {
@@ -847,8 +861,10 @@ static void test_simultaneous_hosts_choose_stable_physical_origin_before_durabil
 
     begin_frame(frame, 90u);
     queue_candidate_operation_dual(&left, &left, &right, frame, &now);
-    chunk_frame(frame, 90u);
-    queue_candidate_operation_dual(&left, &left, &right, frame, &now);
+    for (uint32_t offset = 0u; offset < sizeof(compiled_blob);) {
+        offset += chunk_frame(frame, 90u, offset);
+        queue_candidate_operation_dual(&left, &left, &right, frame, &now);
+    }
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 90u);
     queue_candidate_operation_dual(&left, &left, &right, frame, &now);
     while (left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING)
@@ -857,8 +873,10 @@ static void test_simultaneous_hosts_choose_stable_physical_origin_before_durabil
 
     begin_frame(frame, 91u);
     queue_candidate_operation_dual(&right, &left, &right, frame, &now);
-    chunk_frame(frame, 91u);
-    queue_candidate_operation_dual(&right, &left, &right, frame, &now);
+    for (uint32_t offset = 0u; offset < sizeof(compiled_blob);) {
+        offset += chunk_frame(frame, 91u, offset);
+        queue_candidate_operation_dual(&right, &left, &right, frame, &now);
+    }
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 91u);
     queue_candidate_operation_dual(&right, &left, &right, frame, &now);
     while (right.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING)
@@ -1567,8 +1585,10 @@ static void test_peer_authority_supersedes_only_precommit_host_generation(void) 
     (void)noah_profile_owner_scan(&owner, true, now++);
     assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING);
 
-    chunk_frame(frame, 71u);
-    send_and_scan(&owner, frame, now++);
+    for (uint32_t offset = 0u; offset < sizeof(compiled_blob);) {
+        offset += chunk_frame(frame, 71u, offset);
+        send_and_scan(&owner, frame, now++);
+    }
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 71u);
     send_and_scan(&owner, frame, now++);
     while (owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATING)
@@ -1688,8 +1708,10 @@ static void test_commit_waits_for_a_safe_boundary_then_activates(void) {
 
     begin_frame(frame, 201u);
     send_and_scan_pair(&left, &right, frame, &now);
-    chunk_frame(frame, 201u);
-    send_and_scan_pair(&left, &right, frame, &now);
+    for (uint32_t offset = 0u; offset < sizeof(compiled_blob);) {
+        offset += chunk_frame(frame, 201u, offset);
+        send_and_scan_pair(&left, &right, frame, &now);
+    }
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 201u);
     send_and_scan_pair(&left, &right, frame, &now);
     for (uint32_t guard = 0u; guard < 64u && left.host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++)
@@ -1763,8 +1785,10 @@ static void decide_commit(noah_profile_owner_t *left, memory_t *left_memory, noa
 
     begin_frame(frame, transaction_id);
     send_and_scan_pair(left, right, frame, now);
-    chunk_frame(frame, transaction_id);
-    send_and_scan_pair(left, right, frame, now);
+    for (uint32_t offset = 0u; offset < sizeof(compiled_blob);) {
+        offset += chunk_frame(frame, transaction_id, offset);
+        send_and_scan_pair(left, right, frame, now);
+    }
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, transaction_id);
     send_and_scan_pair(left, right, frame, now);
     for (uint32_t guard = 0u; guard < 64u && left->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++)
@@ -1964,8 +1988,10 @@ static void validate_candidate(noah_profile_owner_t *left, memory_t *left_memory
     boot_empty_pair(left, left_memory, right, right_memory, left_link, right_link, now);
     begin_frame(frame, 201u);
     send_and_scan_pair(left, right, frame, now);
-    chunk_frame(frame, 201u);
-    send_and_scan_pair(left, right, frame, now);
+    for (uint32_t offset = 0u; offset < sizeof(compiled_blob);) {
+        offset += chunk_frame(frame, 201u, offset);
+        send_and_scan_pair(left, right, frame, now);
+    }
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_VALIDATE, 201u);
     send_and_scan_pair(left, right, frame, now);
     for (uint32_t guard = 0u; guard < 64u && left->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_VALIDATED; guard++)
@@ -2199,6 +2225,17 @@ static void assert_same_active(noah_profile_owner_t *left, noah_profile_owner_t 
     assert(memcmp(bytes, expected, length) == 0);
 }
 
+// The compiled profile with a keymap domain after its last: what a first
+// edit that creates the keymap leaves active.
+static void expect_compiled_with_keymap(uint8_t *expected, const uint8_t *keymap) {
+    memcpy(expected, compiled_blob, sizeof(compiled_blob));
+    expected[6] = (uint8_t)(compiled_blob[6] + 1u);
+    expected[sizeof(compiled_blob)]      = NOAH_PROFILE_DOMAIN_V1_KEYMAP;
+    expected[sizeof(compiled_blob) + 1u] = NOAH_PROFILE_DOMAIN_VERSION_KEYMAP;
+    write_u32(&expected[sizeof(compiled_blob) + 2u], KEYMAP_LENGTH);
+    memcpy(&expected[sizeof(compiled_blob) + NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE], keymap, KEYMAP_LENGTH);
+}
+
 static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
     static noah_profile_owner_t left;
     static noah_profile_owner_t right;
@@ -2234,12 +2271,7 @@ static void test_live_edit_reaches_both_halves_and_save_writes_both(void) {
         scan_until_converged(&left, &right, &now);
         assert(left_memory.writes == left_writes && right_memory.writes == right_writes);
     }
-    memcpy(expected, compiled_blob, sizeof(compiled_blob));
-    expected[6] = 1u;
-    expected[8] = NOAH_PROFILE_DOMAIN_V1_KEYMAP;
-    expected[9] = NOAH_PROFILE_DOMAIN_VERSION_KEYMAP;
-    write_u32(&expected[10], KEYMAP_LENGTH);
-    memcpy(&expected[14], keymap, KEYMAP_LENGTH);
+    expect_compiled_with_keymap(expected, keymap);
     assert_same_active(&left, &right, expected, length);
     assert(left.working.active && right.working.active && right.working.revision == left.working.revision);
     // The keyboard reads keys from the working copy.
@@ -2323,12 +2355,7 @@ static void test_save_survives_lost_replies_on_both_links(void) {
     for (uint32_t i = 0u; i < KEYMAP_LENGTH; i += 2u) keymap[i] = (uint8_t)(7u + i % 23u);
     assert(live_edit(&left, &right, 1u, &create, keymap, KEYMAP_LENGTH, &now) == NOAH_PROFILE_WORKING_OK);
     scan_until_converged(&left, &right, &now);
-    memcpy(expected, compiled_blob, sizeof(compiled_blob));
-    expected[6] = 1u;
-    expected[8] = NOAH_PROFILE_DOMAIN_V1_KEYMAP;
-    expected[9] = NOAH_PROFILE_DOMAIN_VERSION_KEYMAP;
-    write_u32(&expected[10], KEYMAP_LENGTH);
-    memcpy(&expected[14], keymap, KEYMAP_LENGTH);
+    expect_compiled_with_keymap(expected, keymap);
 
     left_working_link.drop_every = 3u;
     left_link.link.drop_every    = 5u;

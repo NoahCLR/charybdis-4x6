@@ -26,12 +26,6 @@ int main(void) {
         assert(pd_mode_id_from_mask(mode->mode_flag) == i);
         assert(mode->keycode == (uint16_t)(0x7e80 + i));
         assert(mode->lock_action == (uint16_t)(0x7ea0 + i));
-        assert(mode->handler == NULL);
-        assert(mode->key_handler == NULL);
-        assert(mode->reset == NULL);
-        assert(mode->dpi == 0);
-        assert(mode->traits == PD_MODE_TRAIT_NONE);
-        assert(mode->lifecycle == NULL);
     }
     return 0;
 }

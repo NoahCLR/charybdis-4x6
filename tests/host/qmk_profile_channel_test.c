@@ -116,6 +116,13 @@ bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status
     return true;
 }
 
+// Whether the active profile's pointing slots are published.
+static bool pd_ready = true;
+
+bool noah_effective_pd_ready(void) {
+    return pd_ready;
+}
+
 static void initialize_live_owner_status(void) {
     memset(&live_owner_status, 0, sizeof(live_owner_status));
     live_owner_status.owner_state             = NOAH_PROFILE_OWNER_READY_VALIDATED;
@@ -404,6 +411,22 @@ static void test_status_surfaces_coherent_owner_snapshot(void) {
         assert(read_u32(&frame[WIRE_PAYLOAD]) == 99u && frame[WIRE_PAYLOAD + 4u] == saved.origin);
         live_owner_status.active = saved;
     }
+
+    // Until the active profile's pointing slots are published, nothing is
+    // running yet: no active digest or generation, never "compiled defaults",
+    // and the activation reported failed.
+    pd_ready = false;
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x49u, 0u);
+    channel(frame, sizeof(frame));
+    assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+    assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == (expected_flags | NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE));
+    assert(read_u32(&frame[WIRE_PAYLOAD + 12u]) == 0u);
+    assert(frame[WIRE_PAYLOAD + 24u] == NOAH_PROFILE_ACTIVE_PENDING);
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x4Au, 1u);
+    channel(frame, sizeof(frame));
+    assert(read_u32(&frame[WIRE_PAYLOAD]) == 0u);
+    assert(frame[WIRE_PAYLOAD + 22u] == NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED);
+    pd_ready = true;
 }
 #endif
 

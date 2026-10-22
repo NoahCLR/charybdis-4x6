@@ -17,10 +17,6 @@ static inline bool pd_mode_policy_mode_keeps_auto_mouse_anchored(pd_mode_mask_t 
     return pd_mode_has_trait(mode, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED);
 }
 
-static inline bool pd_mode_policy_mode_uses_dragscroll_backend(pd_mode_mask_t mode) {
-    return pd_mode_has_trait(mode, PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND);
-}
-
 static inline bool pd_mode_policy_snapshot_prefers_typing_layer(pd_mode_snapshot_t snapshot) {
     return snapshot.local.active_mode != 0 && pd_mode_policy_mode_prefers_typing_layer(snapshot.local.active_mode);
 }

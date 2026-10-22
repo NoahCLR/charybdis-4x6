@@ -257,14 +257,11 @@ static void fail_integration(noah_profile_owner_t *owner) {
 
 // One invalidator per runtime that follows the active profile.
 enum {
-    OWNER_INVALIDATOR_COUNT = 3u
+    OWNER_INVALIDATOR_COUNT = 4u
 #ifdef COMBO_ENABLE
                               + 1u
 #endif
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
-                              + 1u
-#endif
-#ifdef NOAH_PD_PROFILE_ENABLE
                               + 1u
 #endif
 };
@@ -309,9 +306,7 @@ static __attribute__((noinline)) bool initialize_runtime_graph(noah_profile_owne
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
     invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){.callback = noah_effective_settings_invalidate, .context = &owner->compiled_snapshot};
 #endif
-#ifdef NOAH_PD_PROFILE_ENABLE
     invalidators[invalidator_count++] = (noah_effective_profile_invalidator_t){.callback = noah_effective_pd_invalidate, .context = NULL};
-#endif
     observer         = owner->config.peer_required ? owner_peer_observer : no_peer_observer;
     observer_context = owner->config.peer_required ? owner : NULL;
     noah_profile_activation_policy_init(&owner->activation_policy, observer, observer_context);
@@ -334,10 +329,8 @@ static __attribute__((noinline)) bool initialize_runtime_graph(noah_profile_owne
     noah_effective_settings_boot(false);
     if (!noah_effective_settings_length()) return false;
 #endif
-#ifdef NOAH_PD_PROFILE_ENABLE
     noah_effective_pd_invalidate(NULL, 0u, owner->compiled_snapshot.identity, owner->compiled_snapshot.identity, &owner->compiled_snapshot);
     if (!noah_effective_pd_ready()) return false;
-#endif
 
     noah_profile_store_init(&owner->store, owner->config.store_io,
                             (noah_profile_store_compatibility_t){
@@ -1113,12 +1106,10 @@ bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t 
     }
     owner->now_ms = now_ms;
     owner->master = master;
-#ifdef NOAH_PD_PROFILE_ENABLE
     if (owner->runtimes_installed && !noah_effective_pd_ready()) {
         owner->state = NOAH_PROFILE_OWNER_INTEGRATION_ERROR;
         return false;
     }
-#endif
     switch (owner->state) {
         case NOAH_PROFILE_OWNER_VALIDATING_COMPILED:
             validator_result = noah_profile_validator_v1_step(&owner->staging.compiled_validator, NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET, NULL);

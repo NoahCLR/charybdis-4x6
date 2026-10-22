@@ -120,17 +120,8 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
 #    endif
 
     if (active_mode_id != 0) {
-#ifdef NOAH_PD_PROFILE_ENABLE
         output = noah_pd_engine_motion(mouse_report);
         goto done;
-#else
-        const pd_mode_def_t *active_mode = pd_mode_lookup(active_mode_id);
-
-        if (active_mode && active_mode->handler) {
-            output = active_mode->handler(mouse_report);
-            goto done;
-        }
-#endif
     }
 
     output = mouse_report;
