@@ -97,6 +97,34 @@ static uint8_t wire_begin(noah_profile_owner_t *owner, uint16_t transaction, uin
     return wire_set(owner, NOAH_PROFILE_WIRE_V1_VALUE_EDIT_BEGIN, transaction, fields, sizeof(fields));
 }
 
+// An edit's later frames, each for `transaction`: a splice (one setting
+// replaced), data (two bytes), its commit and an abort.
+static uint8_t wire_splice(noah_profile_owner_t *owner, uint16_t transaction) {
+    uint8_t fields[15] = {0};
+
+    fields[1] = NOAH_PROFILE_DOMAIN_V1_SETTINGS;
+    write_u32(&fields[7], 2u);
+    write_u32(&fields[11], 2u);
+    return wire_set(owner, NOAH_PROFILE_WIRE_V1_VALUE_EDIT_SPLICE, transaction, fields, sizeof(fields));
+}
+
+static uint8_t wire_data(noah_profile_owner_t *owner, uint16_t transaction) {
+    uint8_t fields[7] = {0};
+
+    fields[4] = 2u;
+    return wire_set(owner, NOAH_PROFILE_WIRE_V1_VALUE_EDIT_DATA, transaction, fields, sizeof(fields));
+}
+
+static uint8_t wire_commit(noah_profile_owner_t *owner, uint16_t transaction) {
+    uint8_t fields[4] = {0};
+
+    return wire_set(owner, NOAH_PROFILE_WIRE_V1_VALUE_EDIT_COMMIT, transaction, fields, sizeof(fields));
+}
+
+static uint8_t wire_abort(noah_profile_owner_t *owner, uint16_t transaction) {
+    return wire_set(owner, NOAH_PROFILE_WIRE_V1_VALUE_EDIT_ABORT, transaction, NULL, 0u);
+}
+
 static uint8_t wire_mode(noah_profile_owner_t *owner, uint16_t transaction, uint8_t mode) {
     return wire_set(owner, NOAH_PROFILE_WIRE_V1_VALUE_EDIT_MODE, transaction, &mode, 1u);
 }
@@ -497,6 +525,36 @@ static void test_a_mode_change_waits_until_the_halves_agree(void) {
     wire_get(left, NOAH_PROFILE_WIRE_V1_VALUE_EDIT_MODE, 0u, page);
     assert(page[0] == NOAH_PROFILE_EDIT_MODE_LIVE && page[1] == 6u && page[5] == NOAH_PROFILE_EDIT_MODE_LIVE && page[6] == 6u && page[10] == (1u | 4u));
     puts("a mode change waits until the halves agree, then takes a counter above both and is stored on both");
+}
+
+// The halves also disagree while an Apply copies its profile to the other
+// half, with nothing unsaved anywhere: the mode waits for that too, and is
+// taken once the Apply lands.
+static void test_a_mode_change_waits_for_an_apply_copying_to_the_other_half(void) {
+    noah_profile_owner_t *left  = reach(ROW_QUIET);
+    noah_profile_owner_t *right = &rig.right;
+    uint8_t               frame[32];
+    bool                  asked = false;
+
+    stage_valid_candidate_pair(left, right, RIG_APPLY, &rig.now);
+    simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, RIG_APPLY);
+    send_and_scan_pair(left, right, frame, &rig.now);
+    for (uint32_t guard = 0u; guard < 4096u && left->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE; guard++) {
+        if (!asked && !(wire_flags(left) & NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED)) {
+            assert(!left->working.active && !left->auto_save.pending && left->save.phase == NOAH_PROFILE_OWNER_SAVE_IDLE);
+            assert(noah_profile_working_sync_converged(&left->working_sync, left->now_ms));
+            assert(wire_mode(left, 1u, NOAH_PROFILE_EDIT_MODE_APPLY) == NOAH_PROFILE_WORKING_BUSY);
+            asked = true;
+        }
+        scan_pair(left, right, &rig.now);
+    }
+    assert(asked);
+    scan_until_converged(left, right, &rig.now);
+    assert(committed_generation(&left->store) == 1u && committed_generation(&right->store) == 1u);
+    assert(wire_mode(left, 2u, NOAH_PROFILE_EDIT_MODE_APPLY) == NOAH_PROFILE_WORKING_OK);
+    rig_scans(1000u);
+    assert(right->working_sync.mode.mode == NOAH_PROFILE_EDIT_MODE_APPLY && right->working_sync.mode.counter == left->working_sync.mode.counter);
+    puts("a mode change waits while an Apply copies to the other half, and is taken on both once it lands");
 }
 
 // The edit status flags the matrix does not pin, composed from real owner

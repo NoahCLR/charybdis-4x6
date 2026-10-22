@@ -50,6 +50,30 @@ static void assert_stays_stopped(noah_profile_owner_t *stopped, noah_profile_own
     assert_refused_stopped(stopped, wire_named(stopped, NOAH_PROFILE_WIRE_V1_VALUE_SAVE, 901u, session, revision));
     assert_refused_stopped(stopped, wire_named(stopped, NOAH_PROFILE_WIRE_V1_VALUE_REVERT, 902u, session, revision));
     assert_refused_stopped(stopped, wire_mode(stopped, 903u, NOAH_PROFILE_EDIT_MODE_LIVE));
+    assert_refused_stopped(stopped, wire_splice(stopped, 904u));
+    assert_refused_stopped(stopped, wire_data(stopped, 904u));
+    assert_refused_stopped(stopped, wire_commit(stopped, 904u));
+    assert_refused_stopped(stopped, wire_abort(stopped, 904u));
+}
+
+// A stop while the keyboard's own adjustment edit waits at its boundary: the
+// edit never finishes, and every edit frame still answers INVALID_STATE
+// first (profile_owner.h), not BUSY for the adjustment.
+static void test_a_stop_during_an_adjustment_edit_refuses_edits_first(void) {
+    noah_profile_owner_t *left = reach(ROW_ADJUSTMENT_IN_FLIGHT);
+    uint16_t              adjustment = left->auto_save.edit_transaction;
+
+    // As a storage failure in the scan leaves it (the stop itself is the
+    // storage tests' above).
+    left->state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
+    assert(noah_profile_owner_stopped(left) && left->auto_save.edit_transaction == adjustment);
+    activation_block_reason = 0u;
+    assert_stays_stopped(left, left, &rig.right, &rig.now);
+    // Stopped scans leave the adjustment's edit in flight.
+    assert(left->auto_save.edit_transaction == adjustment);
+    assert_refused_stopped(left, wire_splice(left, adjustment));
+    assert_refused_stopped(left, wire_abort(left, adjustment));
+    puts("a stop while the keyboard's adjustment edit waits refuses every edit frame as stopped");
 }
 
 static void test_only_states_a_restart_leaves_are_stopped(void) {
@@ -503,6 +527,7 @@ static void test_a_failed_runtime_install_stops_the_owner(void) {
 
 static void test_stopped_owners_and_restarts(void) {
     test_only_states_a_restart_leaves_are_stopped();
+    test_a_stop_during_an_adjustment_edit_refuses_edits_first();
     test_a_storage_failure_in_a_save_stops_the_usb_half_and_says_so();
     test_a_half_that_cannot_read_its_slots_stops_and_is_heard();
     test_an_unknown_commit_marker_stops_until_a_restart_reads_it();
