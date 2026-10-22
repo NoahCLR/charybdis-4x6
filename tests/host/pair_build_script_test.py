@@ -293,6 +293,19 @@ if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
             self.assertIn('--exclude=./.build', ' '.join(args))
             self.assertIn(f'--tmpfs', args)
 
+    def test_bk_inside_the_checkout_is_refused_outside_the_image(self):
+        # Its copy would land on its own mount; CI builds such a layout in the image.
+        with tempfile.TemporaryDirectory(prefix='pair-docker-') as tmp:
+            base = Path(tmp).resolve()
+            source, qmk, builds, pinned, env = self.docker_fixture(base)
+            nested = source / 'qmk_firmware'
+            qmk.rename(nested)
+            refused = subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base, capture_output=True, text=True,
+                                     env=dict(env, QMK_ROOT=str(nested)))
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn('inside this checkout', refused.stderr)
+            self.assertFalse((base / 'docker.json').exists(), 'nothing ran in Docker')
+
     def test_vs_code_builds_the_checkouts_as_they_are(self):
         # VS Code's pair tasks are development builds: the BK checkout beside this
         # one need not be at the pin. verify, CI and releases build at the pin.
@@ -564,6 +577,17 @@ class InBuildImage(unittest.TestCase):
         self.run_runner('run_example_tests.sh', FAKE_VOLUMES=json.dumps({f'charybdis-host-qmk-{self.head}': 'x'}))
         self.assertIn(f'charybdis-host-qmk-{self.head}:{self.qmk}', self.runner_call())
         self.assertTrue(any('flock' in call for call in self.calls()), 'the copy is made under a lock')
+
+    def test_a_qmk_inside_the_checkout_is_used_in_place(self):
+        # Copying the checkout would write over QMK's own mount, or its volume.
+        nested = self.repo / 'qmk_firmware'
+        shutil.copytree(self.qmk, nested)
+        self.run_runner('run_example_tests.sh', QMK_ROOT=str(nested),
+                        FAKE_VOLUMES=json.dumps({f'charybdis-host-qmk-{self.head}': 'x'}))
+        call = ' '.join(self.runner_call())
+        self.assertNotIn('--tmpfs', call)
+        self.assertIn(f'-v {self.repo}:{self.repo}', call)
+        self.assertIn(f'-v {nested}:{nested}', call)
 
     def test_untracked_files_in_qmk_are_copied_every_run(self):
         # A volume is named by the commit only, so it cannot hold a new file.
