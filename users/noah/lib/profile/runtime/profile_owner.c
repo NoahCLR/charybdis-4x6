@@ -1507,25 +1507,35 @@ noah_profile_working_result_t noah_profile_owner_edit_begin(noah_profile_owner_t
     return note_edit_activity(owner, noah_profile_working_copy_begin(&owner->working, transaction_id, session, revision, splice_count, insert_total, flags, false));
 }
 
+// An edit's later frames answer INVALID_STATE first, as its begin does,
+// then BUSY while the keyboard's own adjustment edit holds the working copy.
+static noah_profile_working_result_t edit_frame_refused(const noah_profile_owner_t *owner) {
+    if (!owner_ready(owner)) return NOAH_PROFILE_WORKING_INVALID_STATE;
+    return owner->auto_save.edit_transaction ? NOAH_PROFILE_WORKING_BUSY : NOAH_PROFILE_WORKING_OK;
+}
+
 noah_profile_working_result_t noah_profile_owner_edit_splice(noah_profile_owner_t *owner, uint16_t transaction_id, uint8_t index, const noah_profile_working_splice_t *splice) {
-    if (owner && owner->auto_save.edit_transaction) return NOAH_PROFILE_WORKING_BUSY;
-    return owner_ready(owner) ? note_edit_activity(owner, noah_profile_working_copy_splice(&owner->working, transaction_id, index, splice)) : NOAH_PROFILE_WORKING_INVALID_STATE;
+    noah_profile_working_result_t refused = edit_frame_refused(owner);
+
+    return refused != NOAH_PROFILE_WORKING_OK ? refused : note_edit_activity(owner, noah_profile_working_copy_splice(&owner->working, transaction_id, index, splice));
 }
 
 noah_profile_working_result_t noah_profile_owner_edit_data(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint32_t count) {
-    if (owner && owner->auto_save.edit_transaction) return NOAH_PROFILE_WORKING_BUSY;
-    return owner_ready(owner) ? note_edit_activity(owner, noah_profile_working_copy_data(&owner->working, transaction_id, offset, bytes, count)) : NOAH_PROFILE_WORKING_INVALID_STATE;
+    noah_profile_working_result_t refused = edit_frame_refused(owner);
+
+    return refused != NOAH_PROFILE_WORKING_OK ? refused : note_edit_activity(owner, noah_profile_working_copy_data(&owner->working, transaction_id, offset, bytes, count));
 }
 
 noah_profile_working_result_t noah_profile_owner_edit_commit(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t crc32) {
-    if (owner && owner->auto_save.edit_transaction) return NOAH_PROFILE_WORKING_BUSY;
-    noah_profile_working_result_t result = owner_ready(owner) ? noah_profile_working_copy_commit(&owner->working, transaction_id, crc32) : NOAH_PROFILE_WORKING_INVALID_STATE;
-    return result;
+    noah_profile_working_result_t refused = edit_frame_refused(owner);
+
+    return refused != NOAH_PROFILE_WORKING_OK ? refused : noah_profile_working_copy_commit(&owner->working, transaction_id, crc32);
 }
 
 noah_profile_working_result_t noah_profile_owner_edit_abort(noah_profile_owner_t *owner, uint16_t transaction_id) {
-    if (owner && owner->auto_save.edit_transaction) return NOAH_PROFILE_WORKING_BUSY;
-    return owner_ready(owner) ? noah_profile_working_copy_abort(&owner->working, transaction_id) : NOAH_PROFILE_WORKING_INVALID_STATE;
+    noah_profile_working_result_t refused = edit_frame_refused(owner);
+
+    return refused != NOAH_PROFILE_WORKING_OK ? refused : noah_profile_working_copy_abort(&owner->working, transaction_id);
 }
 
 noah_profile_working_result_t noah_profile_owner_revert(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision) {

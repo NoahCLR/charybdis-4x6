@@ -2567,6 +2567,7 @@ static void test_a_save_after_taking_the_other_halfs_copy_lands(void) {
 int main(void) {
     test_admission_matrix();
     test_a_mode_change_waits_until_the_halves_agree();
+    test_a_mode_change_waits_for_an_apply_copying_to_the_other_half();
     test_edit_status_flags_come_from_the_owner();
     test_ineligible_auto_saves_skip_admission_work();
     test_auto_save_modes_and_adjustments();
