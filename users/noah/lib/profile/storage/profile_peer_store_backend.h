@@ -119,7 +119,8 @@ static inline bool noah_profile_peer_store_backend_working(const noah_profile_pe
     return state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_PREPARING || state == NOAH_PROFILE_PEER_STORE_COMMITTING;
 }
 
-// The copy can still be abandoned with nothing durable: abort() ends it.
+// The copy can still be abandoned: no commit decision is durable yet (a
+// PREPARED copy's prepared marker is), and abort() ends it.
 static inline bool noah_profile_peer_store_backend_abortable(const noah_profile_peer_store_backend_t *peer) {
     noah_profile_peer_store_state_t state = noah_profile_peer_store_backend_state(peer);
 
