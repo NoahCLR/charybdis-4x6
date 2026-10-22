@@ -112,6 +112,9 @@ static uint16_t      gesture_test_code;
 static uint8_t       gesture_resolution_layer;
 static keypos_t      gesture_resolution_pos;
 static uint16_t      gesture_resolution_base;
+// When set, the resolution position's keycode on Sym, below the resolution
+// layer, in place of gesture_resolution_base.
+static uint16_t      gesture_resolution_sym;
 // The keycode of the last physical press the record path processed.
 static uint16_t      gesture_processed_press;
 // The layer each position's press resolves from (QMK's layer_switch_get_layer())
@@ -229,6 +232,11 @@ const key_behavior_t key_behaviors[] = {
     {.keycode = KC_1, .tap_hold_term = 150, .tap_counts[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXLM)}},
     {.keycode = KC_INSERT, .tap_hold_term = 150, .tap_counts = {[0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_ESCAPE))}, [1] = {.tap = TAP_SENDS(S(KC_GRAVE))}}},
     {.keycode = KC_LEFT, .tap_hold_term = 150, .tap_counts[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}},
+    // Dual-role rows whose hold is not the keycode's own: an MT that holds a
+    // plain key, and an LT whose second press holds no layer, only a long hold
+    // that types Y.
+    {.keycode = MT(MOD_LCTL, KC_C), .tap_hold_term = 100, .tap_counts[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_B)}},
+    {.keycode = LT(TEST_LAYER_SYM, KC_K), .tap_hold_term = 100, .longer_hold_term = 200, .tap_counts[1] = {.tap = TAP_SENDS(KC_X), .long_hold = TAP_AT_HOLD_THRESHOLD(KC_Y)}},
 #endif
     {
         .keycode        = KC_RIGHT_ALT,
@@ -474,6 +482,7 @@ static void test_reset_state(void) {
     gesture_resolution_layer = 2;
     gesture_resolution_pos   = (keypos_t){.row = 3, .col = 0};
     gesture_resolution_base  = KC_Z;
+    gesture_resolution_sym   = KC_NO;
     memset(gesture_source_layers, 0, sizeof(gesture_source_layers));
     memset(gesture_layer_cache, 0, sizeof(gesture_layer_cache));
     gesture_live_row        = false;
@@ -596,7 +605,10 @@ uint16_t gesture_keycode(uint8_t row, uint8_t col);
 uint16_t keycode_at_keymap_location(uint8_t layer_num, uint8_t row, uint8_t column) {
 #ifdef NOAH_TEST_QMK_GESTURES
     // Userspace combo origin must see the same members QMK's combo engine does.
-    if (gesture_layer_resolution && row == gesture_resolution_pos.row && column == gesture_resolution_pos.col) return layer_num == gesture_resolution_layer ? gesture_keycode(row, column) : gesture_resolution_base;
+    if (gesture_layer_resolution && row == gesture_resolution_pos.row && column == gesture_resolution_pos.col) {
+        if (layer_num == gesture_resolution_layer) return gesture_keycode(row, column);
+        return layer_num == TEST_LAYER_SYM && gesture_resolution_sym ? gesture_resolution_sym : gesture_resolution_base;
+    }
     if (row == 2 || row == 3 || (row >= 4 && row < 6)) return gesture_keycode(row, column);
 #endif
     return test_keymap[layer_num][row][column];
@@ -3437,6 +3449,68 @@ static void test_qmk_modifier_release_settles_own_output_key(void) {
     gesture_second_code = KC_NO;
 }
 
+// A dual-role key's release waits or settles by what its row's hold holds,
+// not by its keycode family (D-F27): an MT whose row holds B holds no
+// modifier, and an LT on a second press whose branch holds no layer holds
+// none, so their releases go at once and settle nothing.
+static void test_qmk_row_hold_not_keycode_decides_release(void) {
+    const uint16_t mt = MT(MOD_LCTL, KC_C), lt = LT(TEST_LAYER_SYM, KC_K);
+
+    // B, held past MT's hold time, lets go at once while LT(Sym, J) is
+    // undecided, before J's tap.
+    test_reset_state(); fake_time = 40000; gesture_out_count = 0;
+    gesture_test_code = gesture_empty_row = LT(TEST_LAYER_SYM, KC_J);
+    gesture_second_code = mt; gesture_track_admission = true;
+    gesture_registered = gesture_unregistered = KC_NO;
+    gesture_at(3, 3, true); gesture_advance(150);
+    CHECK(gesture_registered == KC_B);
+    gesture_at(3, 0, true); gesture_advance(20);
+    gesture_at(3, 3, false);
+    if (noah_record_admission_held_count() != 0 || gesture_unregistered != KC_B) fprintf(stderr, "mt holding B released: held=%u unregistered=0x%04x\n", (unsigned)noah_record_admission_held_count(), gesture_unregistered);
+    CHECK(noah_record_admission_held_count() == 0);
+    CHECK(gesture_unregistered == KC_B);
+    gesture_advance(20); gesture_at(3, 0, false); gesture_advance(500);
+    if (!gesture_out_is("RT", (const uint16_t[]){KC_B, KC_J})) gesture_out_dump("mt holding B rolled off lt");
+    CHECK(gesture_out_is("RT", (const uint16_t[]){KC_B, KC_J}));
+    CHECK(gesture_out[1].mods == 0);
+    gesture_assert_admission_quiescent();
+
+    // Its release settles no `1` pressed after it: 1 types at its own release.
+    gesture_second_code = mt;
+    const gesture_step_t mt_settle[] = {{0,3,3,true}, {150,3,0,true}, {170,3,3,false}, {190,3,0,false}};
+    gesture_run(KC_1, mt_settle, ARRAY_SIZE(mt_settle), 600);
+    if (!(gesture_out_is("RT", (const uint16_t[]){KC_B, KC_1}) && gesture_out[1].at == 40190)) gesture_out_dump("mt holding B over 1");
+    CHECK(gesture_out_is("RT", (const uint16_t[]){KC_B, KC_1}));
+    CHECK(gesture_out[1].at == 40190);
+    gesture_assert_admission_quiescent();
+
+    // LT tapped, then pressed again and held to its long hold, which types Y
+    // and holds nothing. Its release settles no `1` pressed after it.
+    gesture_second_code = lt;
+    const gesture_step_t lt_settle[] = {{0,3,3,true}, {30,3,3,false}, {60,3,3,true}, {280,3,0,true}, {300,3,3,false}, {320,3,0,false}};
+    gesture_run(KC_1, lt_settle, ARRAY_SIZE(lt_settle), 700);
+    if (!(gesture_out_is("TT", (const uint16_t[]){KC_Y, KC_1}) && gesture_out[1].at == 40320)) gesture_out_dump("lt second hold over 1");
+    CHECK(gesture_out_is("TT", (const uint16_t[]){KC_Y, KC_1}));
+    CHECK(gesture_out[1].at == 40320);
+    CHECK(!layer_state_cmp(gesture_out[1].layers, TEST_LAYER_SYM));
+    gesture_assert_admission_quiescent();
+
+    // Nor does a key pressed after it resolve as if Sym were on: under Nav, a
+    // tap the row leaves transparent falls through to the base layer's Z,
+    // not to Sym's W.
+    const gesture_step_t lt_resolve[] = {{0,3,3,true}, {30,3,3,false}, {60,3,3,true}, {280,3,0,true}, {300,3,0,false}, {320,3,3,false}};
+    test_reset_state(); fake_time = 40000; gesture_out_count = 0;
+    gesture_test_code = MT(MOD_LCTL, KC_H); gesture_layer_resolution = true;
+    gesture_resolution_layer = TEST_LAYER_NAV; gesture_resolution_sym = KC_W;
+    layer_state |= test_layer_mask(TEST_LAYER_NAV);
+    gesture_play(lt_resolve, ARRAY_SIZE(lt_resolve), 700);
+    if (!gesture_out_is("TT", (const uint16_t[]){KC_Y, KC_Z})) gesture_out_dump("transparent tap after lt second hold");
+    CHECK(gesture_out_is("TT", (const uint16_t[]){KC_Y, KC_Z}));
+    layer_state &= ~test_layer_mask(TEST_LAYER_NAV);
+    gesture_assert_admission_quiescent();
+    gesture_second_code = KC_NO;
+}
+
 // A key whose release waits cannot reach a later hold tier meanwhile: it
 // was released before its long hold, so the long hold never fires.
 static void test_qmk_waiting_release_stops_later_hold_tiers(void) {
@@ -4854,6 +4928,7 @@ int main(int argc, char **argv) {
         else if (strcmp(regression, "combo-release") == 0) test_qmk_combo_modifier_release_waits_for_undecided_key();
         else if (strcmp(regression, "held-symbol") == 0) test_qmk_symbol_key_held_past_its_hold_while_waiting();
         else if (strcmp(regression, "waiting-modifier-hold") == 0) test_qmk_modifier_hold_reached_while_waiting_settles_next_key();
+        else if (strcmp(regression, "row-hold-release") == 0) test_qmk_row_hold_not_keycode_decides_release();
         else CHECK(false);
         return 0;
     }
@@ -4922,6 +4997,7 @@ int main(int argc, char **argv) {
     test_qmk_layer_release_waits_for_undecided_key();
     test_qmk_waiting_release_stops_later_hold_tiers();
     test_qmk_modifier_release_settles_own_output_key();
+    test_qmk_row_hold_not_keycode_decides_release();
     test_qmk_admission_overload();
     test_qmk_admission_replay_waits_for_nested_decision();
     test_qmk_waiting_key_uses_hold_layer();

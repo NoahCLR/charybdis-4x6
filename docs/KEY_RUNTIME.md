@@ -418,9 +418,18 @@ The existing `compat/qmk_mod_contract.h` owns that conversion through
 `noah_qmk_mods_to_report_mask()` for the shadow lease path. It interprets
 encoding only; QMK still owns Magic remapping.
 
+An `LT` or `MT` key held past its hold time takes a shadow layer or modifier
+lease only when its hold at that tap count is the keycode's own, held until
+release (D-F27): a row whose hold is something else (B, a mouse button,
+another layer), or a later tap count with no hold, takes none, and what the
+key holds is what its hold registers. Release classes and the layers a later
+key resolves on read those leases, so a keycode-family lease would claim a
+modifier or layer the key does not hold.
+
 `run_key_runtime_physical_ownership_integration_tests.sh` compares shadow
 report/managed masks with the real applied modifier ledger for every nonempty
-left/right modifier subset, taps and holds, through release and quiescence.
+left/right modifier subset, taps and holds, through release and quiescence,
+and an MT whose row holds a plain key, which holds no modifier.
 Every MT is the runtime's (D-F27), so its hold is a managed owner, never a
 physical one. Its synchronous delivery timestamps require scan-time
 hold promotion. `run_qmk_gesture_pipeline_tests.sh` covers delayed delivery

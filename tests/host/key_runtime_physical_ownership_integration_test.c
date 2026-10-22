@@ -626,6 +626,25 @@ static void test_mod_tap_shadow_matches_applied_ownership(void) {
             test_authored_mod_tap = (test_behavior_row_t){0};
         }
     }
+
+    // A row whose hold is not the MT's own modifiers holds none of them: the
+    // shadow follows what the hold holds, not the keycode family (D-F27).
+    const uint16_t code = MT(MOD_LCTL, KC_Q);
+    test_authored_mod_tap = (test_behavior_row_t){
+        .keycode = code,
+        .single = {.tap = TAP_SENDS(KC_Q), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_B)},
+    };
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(code, pos, true));
+    key_runtime_integration_advance(&fake_time, TEST_HOLD_TERM + 1u);
+    key_runtime_integration_scan();
+    CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_B);
+    test_assert_mod_tap_projection(0u);
+    CHECK(!key_runtime_integration_process_record(code, pos, false));
+    key_runtime_integration_advance(&fake_time, 400u);
+    key_runtime_integration_scan();
+    test_assert_mod_tap_quiescent();
+    test_authored_mod_tap = (test_behavior_row_t){0};
 }
 
 // Native ACT_LMODS/ACT_RMODS with KC_NO or a modifier uses add_mods/del_mods,
