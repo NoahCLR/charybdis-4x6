@@ -320,13 +320,15 @@ static void init_live_half(noah_profile_owner_t *owner, memory_t *memory, split_
                                           }));
 }
 
-static void edit_then_save(noah_profile_owner_t *left, noah_profile_owner_t *right, uint32_t *now) {
+// Edits one key to `keycode` as transaction `transaction`, and saves as the
+// next one.
+static void edit_then_save(noah_profile_owner_t *left, noah_profile_owner_t *right, uint16_t transaction, uint8_t keycode, uint32_t *now) {
     noah_profile_working_splice_t key = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .offset = 130u, .remove = 2u, .insert = 2u};
-    const uint8_t                 kc[2] = {0x05u, 0x00u};
+    const uint8_t                 kc[2] = {keycode, 0x00u};
 
-    assert(live_edit(left, right, 41u, &key, kc, sizeof(kc), now) == NOAH_PROFILE_WORKING_OK);
+    assert(live_edit(left, right, transaction, &key, kc, sizeof(kc), now) == NOAH_PROFILE_WORKING_OK);
     scan_until_converged(left, right, now);
-    assert(noah_profile_owner_save(left, 42u, left->working.session, left->working.revision) == NOAH_PROFILE_WORKING_QUEUED);
+    assert(noah_profile_owner_save(left, (uint16_t)(transaction + 1u), left->working.session, left->working.revision) == NOAH_PROFILE_WORKING_QUEUED);
 }
 
 static bool pair_settled(noah_profile_owner_t *left, noah_profile_owner_t *right) {
@@ -357,12 +359,10 @@ static uint32_t assert_whole_saved(const noah_profile_owner_t *owner, const uint
 // operations (marker-last, logical-profile-transaction-v1.md "Power-Loss
 // Outcomes"). Restarted at sampled scans across a whole save, both halves
 // come back on one profile, the saved one or the new one, whole. The USB
-// half restarted alone (the other half did not acknowledge) leaves each half
-// a whole saved profile too; the halves agree once the other half restarts
-// as well. Until then they may stay apart: a prepared copy the other half
-// holds for a sender that restarted before its commit marker is released by
-// nothing (an open issue of the split protocol, D-F34), which is why a
-// client tells the user to unplug when the other half did not acknowledge.
+// half restarted alone (the other half did not acknowledge) does too, and
+// the halves rejoin by themselves: a prepared copy the other half holds for
+// a sender that restarted before its commit marker is released at the
+// sender's first poll (D-F34), and the next Save works.
 static void test_a_restart_anywhere_in_a_save_keeps_a_whole_profile(void) {
     static noah_profile_owner_t left, right;
     static memory_t             lm, rm, saved_lm, saved_rm;
@@ -370,8 +370,9 @@ static void test_a_restart_anywhere_in_a_save_keeps_a_whole_profile(void) {
     split_link_t                ll = {.peer = &right}, rl = {.peer = &left};
     working_link_t              lw = {.peer = &right}, rw = {.peer = &left};
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
-    uint32_t now = 1000u, length, steps = 0u, session = 0x6000u;
-    unsigned samples = 0u, newer = 0u, apart = 0u;
+    uint32_t now = 1000u, length, steps = 0u, session = 0x6000u, restarted_at, longest = 0u;
+    unsigned samples = 0u, newer = 0u, released = 0u;
+    bool     prepared = false;
 
     // Generation 1, saved on both halves.
     erased_memory(&lm);
@@ -389,7 +390,7 @@ static void test_a_restart_anywhere_in_a_save_keeps_a_whole_profile(void) {
     saved_lm = lm;
     saved_rm = rm;
     // How many scans a save of one more edit takes, start to settled.
-    edit_then_save(&left, &right, &now);
+    edit_then_save(&left, &right, 41u, 0x05u, &now);
     read_active(&left, after, length);
     assert(memcmp(before, after, length) != 0);
     for (; steps < 40000u && !(pair_settled(&left, &right) && left.committed_descriptor.generation == 2u); steps++) scan_pair(&left, &right, &now);
@@ -403,27 +404,23 @@ static void test_a_restart_anywhere_in_a_save_keeps_a_whole_profile(void) {
             rm = saved_rm;
             boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, session++, &now);
             scan_until_converged(&left, &right, &now);
-            edit_then_save(&left, &right, &now);
+            edit_then_save(&left, &right, 41u, 0x05u, &now);
             for (uint32_t scan = 0u; scan < cut; scan++) {
                 scan_pair(&left, &right, &now);
                 assert_neither_stopped(&left, &right);
             }
             if (usb_only) {
+                noah_profile_peer_store_state_t held = noah_profile_peer_store_backend_state(&right.peer_store);
+
+                prepared = held == NOAH_PROFILE_PEER_STORE_VALIDATING || held == NOAH_PROFILE_PEER_STORE_PREPARING || held == NOAH_PROFILE_PEER_STORE_PREPARED;
                 init_live_half(&left, &lm, &ll, &lw, 0u, session++);
-                // Well past every lease and retry: 100 s.
-                for (uint32_t scan = 0u; scan < 100000u / NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS && !pair_settled(&left, &right); scan++) scan_pair(&left, &right, &now);
-                assert_neither_stopped(&left, &right);
-                (void)assert_whole_saved(&left, before, after, length);
-                (void)assert_whole_saved(&right, before, after, length);
-                if (!pair_settled(&left, &right)) {
-                    apart++;
-                    boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, session++, &now);
-                }
             } else {
                 boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, session++, &now);
             }
+            restarted_at = now;
             for (uint32_t guard = 0u; guard < 40000u && !pair_settled(&left, &right); guard++) scan_pair(&left, &right, &now);
             assert(pair_settled(&left, &right));
+            if (now - restarted_at > longest) longest = now - restarted_at;
             generation = assert_whole_saved(&left, before, after, length);
             assert(assert_whole_saved(&right, before, after, length) == generation);
             assert(!left.working.active && !right.working.active);
@@ -431,10 +428,21 @@ static void test_a_restart_anywhere_in_a_save_keeps_a_whole_profile(void) {
             assert_same_active(&left, &right, generation == 1u ? before : after, length);
             newer += generation == 2u;
             samples++;
+            if (usb_only) {
+                // The other half was preparing the new profile or held it
+                // prepared, and the USB half came back without it: only the
+                // release let them rejoin.
+                released += prepared && generation == 1u;
+                // Save works again: one more edit saves on both halves.
+                edit_then_save(&left, &right, 43u, 0x2Au, &now);
+                for (uint32_t guard = 0u; guard < 40000u && !(pair_settled(&left, &right) && left.committed_descriptor.generation == generation + 1u); guard++) scan_pair(&left, &right, &now);
+                assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && pair_settled(&left, &right));
+                assert(left.committed_descriptor.generation == generation + 1u && right.committed_descriptor.generation == generation + 1u);
+            }
         }
     }
-    assert(newer != 0u && newer != samples);
-    printf("a restart at %u points of a %u-scan save left one whole profile on both halves (the new one %u times); restarted alone, the USB half left them apart until the other half restarted %u times\n", samples, (unsigned)steps, newer, apart);
+    assert(newer != 0u && newer != samples && released != 0u);
+    printf("a restart at %u points of a %u-scan save left one whole profile on both halves (the new one %u times), settled within %u ms; restarted alone, the USB half rejoined the other half and saved again, %u times after it released a prepared copy\n", samples, (unsigned)steps, newer, (unsigned)longest, released);
 }
 
 // The other half's view of the USB half after the decision changes under it:

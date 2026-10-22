@@ -57,6 +57,9 @@ typedef struct {
     uint32_t garble_request_exchange;
     // PAYLOAD_REQUEST frames sent: the cost of pulling the peer's profile.
     uint32_t payload_requests;
+    // METADATA polls sent, and those that said the sender holds no push.
+    uint32_t metadata_requests;
+    uint32_t no_push_claims;
     uint8_t                       previous_response[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
     bool                          connected;
     bool                          corrupt_next_response;
@@ -71,6 +74,8 @@ struct half {
     noah_profile_split_reconciler_t        reconciler;
     link_t                                 link;
     uint32_t                               compiled_digest;
+    // The owner cannot say what it has saved yet, as while it boots.
+    bool                                   descriptor_unreadable;
 };
 
 static uint32_t always_safe(void *context) {
@@ -150,7 +155,7 @@ void noah_profile_split_test_local_validation(void) { local_validations++; }
 static bool local_descriptor(void *context, noah_profile_split_descriptor_t *descriptor) {
     half_t *half = context;
 
-    if (!half || !descriptor) {
+    if (!half || !descriptor || half->descriptor_unreadable) {
         return false;
     }
     *descriptor = compiled_descriptor(half);
@@ -226,6 +231,10 @@ static bool exchange(void *context, const uint8_t *request, uint8_t request_leng
     // The requester sizes the reply buffer from its own request.
     noah_profile_split_v1_frame_t sent;
     assert(noah_profile_split_v1_frame_decode(request, request_length, &sent) && noah_profile_split_v1_reply_capacity(&sent) == response_length);
+    if (sent.kind == NOAH_PROFILE_SPLIT_V1_METADATA) {
+        link->metadata_requests++;
+        link->no_push_claims += sent.no_prepared_push;
+    }
     if (link->drop_before_delivery_exchange == link->exchanges) {
         link->drop_before_delivery_exchange = 0u;
         return false;
@@ -1533,6 +1542,258 @@ static void test_stale_receive_lease_expires_while_the_link_stays_busy(void) {
     run_stale_receive_lease(true);
 }
 
+static noah_profile_peer_store_state_t receiver_store_state(const half_t *receiver) {
+    return noah_profile_peer_store_backend_state(&receiver->peer_store);
+}
+
+// The receiver holds the copy, prepared or on its way to committed, and never
+// let it go.
+static void assert_copy_kept(const half_t *receiver) {
+    noah_profile_peer_store_state_t state = receiver_store_state(receiver);
+
+    assert(state == NOAH_PROFILE_PEER_STORE_PREPARED || state == NOAH_PROFILE_PEER_STORE_COMMITTING || state == NOAH_PROFILE_PEER_STORE_COMMITTED);
+}
+
+// Authorizes the push at its barrier and scans until the receiver commits it.
+static uint32_t commit_prepared_push(half_t *sender, half_t *receiver, const noah_profile_split_descriptor_t *descriptor, uint32_t now) {
+    assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&sender->reconciler, descriptor));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && receiver->store.committed.slot == NOAH_PROFILE_SLOT_NONE; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(sender, true, now);
+        assert_one_scan_budget(receiver, false, now);
+        assert_copy_kept(receiver);
+    }
+    assert(receiver->store.committed.slot != NOAH_PROFILE_SLOT_NONE && receiver->store.committed.generation == descriptor->generation);
+    return now;
+}
+
+// A sender that restarts while its receiver holds the prepared copy forgets
+// the push without cancelling it (D-F34). Restarted before its commit marker,
+// its poll says it holds no push over the old saved profile, and the receiver
+// releases the copy at once, not after any lease: the halves agree again and
+// take the next copy. Until the sender has read what it saved, as while it
+// boots, the claim releases nothing. Restarted after its marker, its saved
+// profile is the copy: the receiver keeps it and the sender's repair commits
+// it without sending it again.
+static void run_restarted_sender(bool sender_saved_the_copy) {
+    half_t                                 left;
+    half_t                                 right;
+    noah_profile_split_descriptor_t        descriptor;
+    noah_profile_split_descriptor_t        next;
+    noah_profile_split_reconciler_config_t config;
+    staged_source_t                        source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                               now;
+    uint32_t                               restarted_at;
+    uint32_t                               claims;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 27u, 1u);
+    now        = run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, 10000u);
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED);
+
+    if (sender_saved_the_copy) {
+        install_profile(&right, descriptor.generation, descriptor.origin_half);
+    }
+    config = right.reconciler.config;
+    noah_profile_split_reconciler_init(&right.reconciler, &config);
+    right.descriptor_unreadable = true;
+    claims                      = right.link.no_push_claims;
+    for (restarted_at = now; now - restarted_at < 2u * NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS; now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED);
+    }
+    assert(right.link.no_push_claims > claims);
+
+    right.descriptor_unreadable = false;
+    for (restarted_at = now; now - restarted_at < MAX_SCANS * NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS && !pair_converged(&left, &right); now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        if (sender_saved_the_copy) {
+            assert_copy_kept(&left);
+        }
+    }
+    assert(pair_converged(&left, &right));
+    assert(now - restarted_at < NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS);
+    assert(!left.store.prepare_active && !left.store.prepared_durable);
+    if (sender_saved_the_copy) {
+        // Committed, it awaits activation like any copy taken.
+        assert(left.store.committed.generation == descriptor.generation);
+        assert_records_match(&left, &right);
+        return;
+    }
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_IDLE);
+    assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_NONE);
+    assert(left.store.committed.slot == NOAH_PROFILE_SLOT_NONE);
+    next = committed_descriptor(&right, descriptor.generation + 1u, 1u);
+    now  = run_prepared_push_until_ready_at(&right, &left, &next, &source, now);
+    (void)commit_prepared_push(&right, &left, &next, now);
+}
+
+static void test_a_restarted_sender_settles_the_prepared_copy(void) {
+    run_restarted_sender(false);
+    run_restarted_sender(true);
+}
+
+// A sender paused at the barrier while its owner decides is there but silent,
+// past the lease and the peer timeout. Nothing releases the prepared copy
+// meanwhile, and the commit authorized afterwards finds it.
+static void test_a_paused_sender_keeps_the_prepared_copy(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        now;
+    uint32_t                        paused_at;
+    uint32_t                        exchanges;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 28u, 1u);
+    now        = run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, 10000u);
+    exchanges  = right.link.exchanges;
+    for (paused_at = now; now - paused_at < 3u * NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS; now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(right.link.exchanges == exchanges);
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED && left.store.prepared_durable);
+    assert(noah_profile_candidate_store_backend_admission_owner(&left.candidate_backend) == NOAH_PROFILE_STORAGE_ADMISSION_PEER);
+    (void)commit_prepared_push(&right, &left, &descriptor, now);
+}
+
+// A sender that holds the push and falls back to its metadata poll, here on a
+// stray STALE reply once the copy is prepared, claims nothing there, before
+// the commit is authorized or after. The receiver keeps the copy and the push
+// resumes at its end without sending any of it again.
+static void test_a_sender_holding_the_push_keeps_the_prepared_copy(void) {
+    const noah_profile_split_v1_frame_t stale = {.kind = NOAH_PROFILE_SPLIT_V1_ERROR, .status = NOAH_PROFILE_SPLIT_V1_STATUS_STALE};
+    half_t                              left;
+    half_t                              right;
+    noah_profile_split_descriptor_t     descriptor;
+    staged_source_t                     source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                            now    = 10000u;
+    uint32_t                            polls;
+    uint32_t                            claims;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    descriptor = committed_descriptor(&right, 29u, 1u);
+    assert(noah_profile_split_reconciler_prepared_push_begin(&right.reconciler, &descriptor, &source, staged_read));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && receiver_store_state(&left) != NOAH_PROFILE_PEER_STORE_PREPARED; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED && !noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL));
+    polls                               = right.link.metadata_requests;
+    claims                              = right.link.no_push_claims;
+    right.link.inject_response_exchange = right.link.exchanges + 1u;
+    right.link.injected                 = stale;
+    for (uint32_t scan = 0u; scan < MAX_SCANS && !noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL); scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+        assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED);
+    }
+    assert(noah_profile_split_reconciler_prepared_push_ready(&right.reconciler, NULL));
+    assert(right.link.metadata_requests > polls && right.link.no_push_claims == claims);
+    assert(source.reads == 1u);
+
+    // The same once the commit is authorized: the stray reply answers the
+    // PREPARE_COMMIT, which never arrives.
+    polls                               = right.link.metadata_requests;
+    right.link.inject_response_exchange = right.link.exchanges + 1u;
+    (void)commit_prepared_push(&right, &left, &descriptor, now);
+    assert(right.link.metadata_requests > polls && right.link.no_push_claims == claims);
+    assert(source.reads == 1u);
+}
+
+// Delivers a METADATA poll from a sender that holds no prepared push over
+// `descriptor`, as a restarted one sends, into the receiver's mailbox.
+static void deliver_no_push_poll(half_t *receiver, const noah_profile_split_descriptor_t *descriptor) {
+    noah_profile_split_v1_frame_t          request = {.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = *descriptor, .no_prepared_push = true};
+    noah_profile_split_reconciler_status_t status;
+    uint8_t                                request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+    uint8_t                                response_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
+
+    assert(noah_profile_split_v1_frame_encode(&request, request_wire, sizeof(request_wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
+    assert(noah_profile_split_reconciler_receive(&receiver->reconciler, request_wire, sizeof(request_wire), response_wire, sizeof(response_wire)));
+    assert(noah_profile_split_reconciler_status(&receiver->reconciler, &status) && status.mailbox_pending);
+}
+
+// A copy the receiver has begun to commit is the receiver's to finish: a poll
+// saying the sender holds no push releases nothing, while it commits or after.
+static void test_a_committing_copy_is_never_released(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    noah_profile_split_descriptor_t old;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint32_t                        now;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    old        = compiled_descriptor(&right);
+    descriptor = committed_descriptor(&right, 30u, 1u);
+    now        = run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, 10000u);
+    assert(noah_profile_split_reconciler_prepared_push_authorize_commit(&right.reconciler, &descriptor));
+    for (uint32_t scan = 0u; scan < MAX_SCANS && receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_PREPARED; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&right, true, now);
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_COMMITTING);
+    deliver_no_push_poll(&left, &old);
+    for (uint32_t scan = 0u; scan < MAX_SCANS && receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_COMMITTING; scan++, now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+        assert_one_scan_budget(&left, false, now);
+    }
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_COMMITTED && left.store.committed.generation == descriptor.generation);
+    assert_one_scan_budget(&left, false, now);
+    deliver_no_push_poll(&left, &old);
+    assert_one_scan_budget(&left, false, now);
+    assert(receiver_store_state(&left) == NOAH_PROFILE_PEER_STORE_COMMITTED && left.store.committed.generation == descriptor.generation);
+}
+
+// A request that matches the receiver's cached reply waits behind a queued
+// poll. Answered from the cache, a restarted sender's identical new push could
+// pass a poll saying it holds none, which then releases the copy that push
+// had just been told is there.
+static void test_a_cached_reply_waits_behind_a_queued_poll(void) {
+    half_t                          left;
+    half_t                          right;
+    noah_profile_split_descriptor_t descriptor;
+    noah_profile_split_descriptor_t old;
+    noah_profile_split_v1_frame_t   reply;
+    staged_source_t                 source = {.bytes = empty_profile, .length = sizeof(empty_profile)};
+    uint8_t                         request[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                         response[NOAH_PROFILE_SPLIT_V1_FRAME_MAX];
+    uint8_t                         length;
+
+    half_storage_init(&left);
+    half_storage_init(&right);
+    pair_init(&left, &right);
+    run_pair_until_converged(&left, &right, false);
+    old        = compiled_descriptor(&right);
+    descriptor = committed_descriptor(&right, 31u, 1u);
+    (void)run_prepared_push_until_ready_at(&right, &left, &descriptor, &source, 10000u);
+    length = left.reconciler.cached_request_length;
+    assert(length >= NOAH_PROFILE_SPLIT_V1_FRAME_SIZE && length <= sizeof(request));
+    memcpy(request, left.reconciler.cached_request_wire, length);
+
+    assert(noah_profile_split_reconciler_receive(&left.reconciler, request, length, response, sizeof(response)));
+    assert(noah_profile_split_v1_reply_decode(response, sizeof(response), &reply) && !(reply.kind == NOAH_PROFILE_SPLIT_V1_ACK && reply.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY));
+
+    deliver_no_push_poll(&left, &old);
+    assert(noah_profile_split_reconciler_receive(&left.reconciler, request, length, response, sizeof(response)));
+    assert(noah_profile_split_v1_reply_decode(response, sizeof(response), &reply) && reply.kind == NOAH_PROFILE_SPLIT_V1_ACK && reply.status == NOAH_PROFILE_SPLIT_V1_STATUS_BUSY);
+}
+
 // If the receiver drops its lease mid-copy, the chunks it is then sent are
 // answered BUSY. The sender must not retry one chunk forever: it restarts the
 // copy with PREPARE_BEGIN, which re-creates the lease or resumes a live one.
@@ -2464,6 +2725,11 @@ int main(int argc, char **argv) {
     test_prepared_push_survives_one_replayed_reply_anywhere();
     test_prepared_push_resumes_from_the_metadata_poll();
     test_stale_receive_lease_expires_while_the_link_stays_busy();
+    test_a_restarted_sender_settles_the_prepared_copy();
+    test_a_paused_sender_keeps_the_prepared_copy();
+    test_a_sender_holding_the_push_keeps_the_prepared_copy();
+    test_a_committing_copy_is_never_released();
+    test_a_cached_reply_waits_behind_a_queued_poll();
     test_prepared_push_restarts_when_the_receiver_drops_its_lease();
     test_receiver_recovers_after_a_storage_failure();
     test_receiver_recovers_when_its_abort_write_fails();

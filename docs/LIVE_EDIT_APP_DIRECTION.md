@@ -139,19 +139,10 @@ not run on hardware either.
   bootloader drive (the double-tap reset window). To see a stopped owner on
   the keyboard, a build without the 2026-10-20 fix to taking the other half's
   copy stops in a Live + review Save after a bootmagic EEPROM clear on the
-  right half; host tests cover every stopped state otherwise.
-- **A USB half that restarts alone can strand the other half's prepared copy
-  (D-F34).** Restarted while the other half holds a durable prepared copy of
-  a save (between its prepared marker and the USB half's commit marker), the
-  USB half forgets the save; the other half's lease releases only a copy
-  still being received, and the metadata it is polled with does not say the
-  sender holds nothing. The halves stay apart (edits and Save BUSY) until the
-  other half restarts too. A restart reaches this only when the other half
-  did not acknowledge it; a watchdog reset of the USB half reaches it as
-  well. Durability is unaffected: each half keeps a whole saved profile.
-  Proposed fix, in the split protocol: the sender's metadata says whether it
-  holds a prepared push, and a receiver whose prepared copy is not yet
-  authorized releases it when its sender says it holds none.
+  right half; host tests cover every stopped state otherwise. Restart the
+  USB half alone mid-save, with the other half not acknowledging (and by
+  its watchdog, if that can be induced): the halves rejoin by themselves and
+  the next Save works.
 - **No Ark drives Restart yet (D-F34).** Flags 14 and 15, SET `0x28` and the
   unacknowledged case are in the firmware only.
 
@@ -2169,14 +2160,25 @@ with interrupts off, so neither half's reset falls inside one. Host tests
 restart both halves at 23 points across a save and find both on one whole
 profile, old or new, every time.
 
-**Not covered.** A USB half that restarts alone, when the other half did not
-acknowledge, can leave the other half holding a durable prepared copy nothing
-releases, and the halves apart until it restarts too (in host tests, 9 of 23
-sampled points of a save). Durability holds; liveness does not. It is the
-split protocol's gap, reached today by a watchdog reset of the USB half too,
-and is an open issue with a proposed fix; until then a client whose restart
-was not acknowledged asks for a replug if the halves do not agree.
+**Restarting alone.** A USB half that restarts alone (the other half did not
+acknowledge, or its watchdog reset it) forgets a save in flight, while the
+other half may hold a durable prepared copy of it that only the forgotten
+push could commit or cancel. That copy used to hold the other half's
+storage, and the halves apart, until it restarted too. Now the USB
+half's metadata poll says when it holds no prepared push (split descriptor
+flag bit 5, METADATA only), and the other half releases its prepared copy
+when such a poll carries a readable saved profile other than the copy. A
+sender authorizes the commit only after its own commit marker, so when its
+saved profile is the copy the other half keeps it and the sender's repair
+commits it. Besides a role change, nothing else releases a prepared copy:
+not time, nor silence, and never a copy already committing. A USB half restarted alone anywhere in a save
+rejoins the other half by itself, and Save works again. The bit needs no new
+framing version: a build without it refuses a frame that sets it, and its
+clear bit claims nothing
+([split protocol](architecture/profile-split-v1.md#an-abandoned-prepared-copy-d-f34)).
 
+Considered: a lease on prepared copies. Rejected: a sender that is there
+pauses at the barrier, silent, while its owner writes its own marker.
 Considered: restarting the stopped owner in place, without a reset. Rejected:
 a stop can come from state the owner shares (storage admission, the split
 reconciler, QMK's EEPROM driver), and only a reset starts all of it from
@@ -2187,7 +2189,8 @@ them never sets the flags and answers SET `0x28` unhandled.
 
 Wire and split: Profile Wire SET `0x28`, edit status flags 14 and 15 and
 reply byte 17; working-copy sync reply flag bit 2; the `PUT_KEYBOARD_RESTART`
-frame ([split protocol](architecture/profile-split-v1.md#keyboard-restart-d-f34)).
+frame ([split protocol](architecture/profile-split-v1.md#keyboard-restart-d-f34));
+split descriptor flag bit 5 in METADATA.
 Memory: 28 bytes of static RAM per half; reviewed stack paths in
 [memory budgets](architecture/memory-budgets.md#keyboard-restart--d-f34).
 
@@ -2195,4 +2198,5 @@ Client follow-up (Ark): one plain message from flags 14 or 15 in place of
 "not ready" and "catching up", and a Restart button there; keep unsaved
 edits (GET `0x21`, or the draft) and a recovery copy, restart, wait for the
 keyboard, send the edits back as one replacement and leave them unsaved; when
-byte 17 is `0` and the halves do not agree, ask for a replug.
+byte 17 is `0` and the other half still does not answer once the keyboard is
+back, ask for a replug.
