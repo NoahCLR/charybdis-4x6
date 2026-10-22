@@ -39,11 +39,11 @@ flowchart TD
     physical --> process_user["process_record_user"]
     process_user --> normalize["Compatibility: combo origin normalizes event key"]
     normalize --> observe["Authoritative: reducer observes physical event"]
-    observe --> preflight["Planned: preflight interrupts and protects shared modifier releases"]
+    observe --> preflight["Planned: preflight suppresses shared modifier presses, then the reducer's moment before a press"]
     preflight --> pd_handler["PD key handler is offered the press; a consumed press becomes inert"]
     pd_handler --> lookup["key/behavior handled_key_lookup"]
     lookup --> press_plan["Planned: reducer press effect plan"]
-    press_plan --> transition["Transition plan transport"]
+    press_plan --> transition["Transition: the one plan traced, announced, projected"]
     transition --> projection["Projected: apply effects"]
     projection --> action["Action dispatch or macro"]
     projection --> held["Held action or repeat registry"]
@@ -142,14 +142,15 @@ momentary owner for the rest of the physical hold.
 ```mermaid
 flowchart TD
     release["Physical key release"] --> normalize["Compatibility: combo origin normalizes release"]
-    normalize --> observe["Authoritative: reducer observes release"]
+    normalize --> before_release["Planned: the reducer's moment before a release"]
+    before_release --> observe["Authoritative: reducer observes release"]
     observe --> recover["process.c recovers resolved press keycode"]
     recover --> lookup["key/behavior lookup if handled"]
     lookup --> release_planner["Planned: release_planner resolves semantics"]
     release_planner --> release_effects["Planned: active release or pending multi-tap effects"]
     release_effects --> defer["Adapter: deferred_release may queue blocked dispatch"]
     defer --> queue["Authoritative queue: pending_release_queue"]
-    defer --> transition["Transition plan transport"]
+    defer --> transition["Transition: the one plan traced, announced, projected"]
     transition --> projection["Projected: action/layer/PD/feedback effects"]
     projection --> drain["Drain pending release dispatches after blockers clear"]
 ```
@@ -172,7 +173,7 @@ flowchart TD
     init --> key_scan["Master-only: key/runtime/scan.c"]
     key_scan --> reducer_scan["Authoritative reducer scan state"]
     reducer_scan --> scan_plan["Planned: scan_planner and tap_series helpers"]
-    scan_plan --> transition["Transition plan transport"]
+    scan_plan --> transition["Transition: the one plan, streamed"]
     transition --> projection["Projected effects"]
     projection --> pending["Drain pending release queue"]
     init --> split["Master-only: split/runtime_sync_tick"]
@@ -232,7 +233,7 @@ expiry, pending release draining, split heartbeats, and held repeat ticking.
 flowchart LR
     event["QMK event"] --> reducer["Authoritative reducer state"]
     reducer --> planner["Planned effects"]
-    planner --> transition["Stack-backed transition plan"]
+    planner --> transition["One stack-held effect plan"]
     transition --> projector["Projected side effects"]
     projector --> qmk_state["QMK reports, layers, mods, macros, PD, RGB feedback"]
     qmk_state --> debug["Debug/trace snapshots"]
@@ -241,6 +242,16 @@ flowchart LR
 
 The reducer stores truth. Planners decide. Projection writes outward. Debug and
 trace read state but do not mutate reducer facts.
+
+Each transition holds one effect plan on the stack, of 16 effects, which the
+reducer plans into directly and `transition.c` executes: traced, announced to
+split consumers and projected. The handled press and release plan into a
+buffered plan, which keeps every effect until it is executed, so the release
+can defer blocked dispatches. The reducer's moments before a press and before
+a release, the scan, fallback-hold settlement and layer-tap settlement plan into
+a streaming plan, which projects what it holds when it fills (auto-drain) and
+between a moment's steps, so each step plans against what the last one
+projected. No frame holds a plan it does not fill.
 
 ## Pointing-Device Flow
 

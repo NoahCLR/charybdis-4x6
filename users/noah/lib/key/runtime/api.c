@@ -5,24 +5,35 @@
 #include "api.h"
 #include "transition.h"
 #include "reducer/runtime.h"
+#include "planning/effect_plan.h"
 #include "../behavior/key_behavior_lookup.h"
 #include "../behavior/participation.h"
 #include "../../compat/qmk_source_layer_contract.h"
 
 bool noah_key_runtime_settle_pending_fallback_hold(void) {
-    key_runtime_transition_plan_t plan;
-    bool                          settled_any;
+    key_runtime_core_effect_plan_t plan;
+    bool                           settled_any;
 
-    key_runtime_transition_plan_init(&plan);
-    settled_any = key_runtime_transition_settle_pending_fallback_hold(&plan);
-    key_runtime_transition_execute_plan(&plan);
+    key_runtime_core_effect_plan_init_streaming(&plan);
+    settled_any = key_runtime_core_settle_pending_fallback_hold(&plan);
+    key_runtime_transition_execute_plan(NULL, &plan);
+    return settled_any;
+}
+
+// Not inlined, so a press with no layer tap to settle carries no plan through
+// its behaviour lookup.
+static __attribute__((noinline)) bool noah_key_runtime_settle_foreign_layer_taps(keypos_t key_pos) {
+    key_runtime_core_effect_plan_t plan;
+    bool                           settled_any;
+
+    key_runtime_core_effect_plan_init_streaming(&plan);
+    settled_any = key_runtime_core_flush_foreign_layer_multi_tap(key_pos, &plan);
+    key_runtime_transition_execute_plan(NULL, &plan);
     return settled_any;
 }
 
 bool noah_key_runtime_settle_layer_taps_before_press(keyrecord_t *record) {
-    key_runtime_transition_plan_t plan;
-    bool                          settled_any;
-    uint16_t                      keycode;
+    uint16_t keycode;
 
     // Without another key's pending layer tap an ordinary press costs no lookup.
     if (!(record && record->event.type == KEY_EVENT && record->event.pressed && key_runtime_core_flush_foreign_layer_multi_tap(record->event.key, NULL))) {
@@ -35,10 +46,7 @@ bool noah_key_runtime_settle_layer_taps_before_press(keyrecord_t *record) {
         return false;
     }
 
-    key_runtime_transition_plan_init(&plan);
-    settled_any = key_runtime_transition_flush_foreign_layer_multi_tap(record->event.key, &plan);
-    key_runtime_transition_execute_plan(&plan);
-    return settled_any;
+    return noah_key_runtime_settle_foreign_layer_taps(record->event.key);
 }
 
 void noah_key_runtime_activity_snapshot(noah_key_runtime_activity_snapshot_t *out) {

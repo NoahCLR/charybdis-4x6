@@ -1184,6 +1184,38 @@ void key_runtime_core_plan_missed_scans_before_release(keypos_t key_pos, uint16_
     }
 }
 
+void key_runtime_core_settle_before_press(uint16_t keycode, keypos_t key_pos, bool press_is_handled, key_runtime_core_effect_plan_t *plan) {
+    if (key_runtime_core_has_other_active_press_token(key_pos)) {
+        key_runtime_core_interrupt_active_keys_on_other_press(key_pos, plan);
+        key_runtime_core_effect_plan_end_step(plan);
+    }
+    if (press_is_handled) {
+        // Handled keys keep independent series alive, except a tap/hold key's:
+        // its pending tap is typed before the key that followed it.
+        key_runtime_core_flush_foreign_dual_role_multi_tap(keycode, key_pos, plan);
+    } else {
+        key_runtime_core_flush_foreign_multi_tap(keycode, key_pos, plan);
+    }
+}
+
+void key_runtime_core_settle_before_release(uint16_t keycode, const keyrecord_t *record, uint16_t released_at, key_runtime_core_effect_plan_t *plan) {
+    if (!record || record->event.pressed) {
+        return;
+    }
+    // A combo output's times count from its dispatch, so it has no missed
+    // hold to catch up.
+    if (record->event.type == KEY_EVENT) {
+        key_runtime_core_plan_missed_scans_before_release(record->event.key, released_at, plan);
+        key_runtime_core_effect_plan_end_step(plan);
+    }
+    // Whether the key holds a layer or modifiers is asked of what that hold
+    // projected.
+    if (!key_runtime_core_has_other_active_press_token(record->event.key) || !key_runtime_core_release_is_mods_or_layer(keycode, record)) {
+        return;
+    }
+    key_runtime_core_settle_active_keys_on_other_release(record->event.key, released_at, plan);
+}
+
 void key_runtime_core_flush_active_keys_except(keypos_t key_pos, key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_state_t *state = key_runtime_core_state();
 
