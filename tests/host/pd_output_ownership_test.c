@@ -13,7 +13,7 @@ static bool down[256];
 static unsigned presses, releases;
 static bool verify_tap_mods;
 static uint8_t expected_tap_mods;
-static uint8_t slot[96];
+static noah_pd_config_t slot;
 
 HOST_RUNTIME_FIXTURE_DEFINE_BASIC_QMK_STUBS(fixture)
 
@@ -35,7 +35,7 @@ bool noah_key_runtime_settle_pending_fallback_hold(void) { return false; }
 void noah_action_tap(uint16_t key) { assert(false); }
 void noah_action_tap_at(keypos_t pos, uint16_t key) { assert(false); }
 bool noah_profile_macro_start(uint16_t key) { return false; }
-report_mouse_t noah_pd_configured_scroll(const uint8_t *record, report_mouse_t report) { return report; }
+report_mouse_t noah_pd_configured_scroll(const noah_pd_config_t *scrolling, report_mouse_t report) { return report; }
 void reset_dragscroll_mode(void) {}
 report_mouse_t pointing_device_get_report(void) { return (report_mouse_t){0}; }
 void pointing_device_set_report(report_mouse_t report) {}
@@ -78,17 +78,18 @@ static void check_shared_output(uint16_t output, uint8_t policy, bool physical, 
     host_runtime_fixture_reset(&fixture);
     owned_keycode_reset_for_test();
     memset(down, 0, sizeof(down));
-    memset(slot, 0, sizeof(slot));
     presses = releases = 0;
-    slot[1] = 1; // directional
-    slot[3] = 1; // horizontal
-    slot[32] = slot[34] = 1;
-    slot[40] = slot[54] = (uint8_t)output;
-    slot[41] = slot[55] = (uint8_t)(output >> 8u);
-    slot[42] = slot[56] = policy;
-    slot[43] = slot[57] = policy == 1 ? MOD_BIT(KC_LEFT_CTRL) : 0;
-    slot[52] = 2; // button 1 taps
-    noah_pd_engine_enter(slot);
+    // Motion to the right and button 1 both tap the output.
+    noah_pd_tap_t tap = {output, policy, policy == NOAH_PD_TAP_MASK ? MOD_BIT(KC_LEFT_CTRL) : 0};
+    slot = (noah_pd_config_t){
+        .kind        = NOAH_PD_KIND_DIRECTIONAL,
+        .axis        = NOAH_PD_AXIS_HORIZONTAL,
+        .threshold_x = 1,
+        .threshold_y = 1,
+        .directions  = {[NOAH_PD_DIRECTION_RIGHT] = tap},
+        .buttons     = {{.kind = NOAH_PD_BUTTON_TAP, .tap = tap}},
+    };
+    noah_pd_engine_enter(&slot);
     fixture.mods = MOD_BIT(KC_LEFT_CTRL);
     owned_keycode_lease_t hold = {0};
     keyrecord_t record = {.event = {.type = KEY_EVENT, .pressed = true, .key = {.row = 2, .col = 2}}};
@@ -116,7 +117,7 @@ static void check_shared_output(uint16_t output, uint8_t policy, bool physical, 
     }
     assert(!down[KC_LEFT] && releases == 1);
     // With no other owner, the same output produces one balanced tap.
-    noah_pd_engine_enter(slot);
+    noah_pd_engine_enter(&slot);
     verify_tap_mods = true;
     emit(button);
     verify_tap_mods = false;

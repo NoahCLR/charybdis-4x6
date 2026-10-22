@@ -54,6 +54,16 @@ typedef struct {
 // its fixed part and every input.
 noah_profile_codec_v1_result_t noah_profile_combo_v1_decode_header(const uint8_t *bytes, uint32_t payload_length, noah_profile_combo_v1_header_t *header);
 noah_profile_codec_v1_result_t noah_profile_combo_v1_decode_row(const uint8_t *bytes, const noah_profile_action_v1_limits_t *limits, noah_profile_combo_v1_row_t *row);
+// The native half of the row rule decode_row applies to semantic actions:
+// whether a row whose output and inputs translate to these QMK keycodes can run
+// as a QMK combo. The output is nonzero. No input is 0 (KC_NO, which ends QMK's
+// key list) or 1 (KC_TRNS), and no two inputs are the same key, which catches
+// one action kind translating to another kind's keycode. Callers translate
+// every action first; a failed translation rejects the row before this is
+// asked. The whole-profile validator and the effective combo table both ask
+// it, so a profile the validator accepts always materializes its combos.
+// Pure: false for NULL inputs; any context.
+bool noah_profile_combo_v1_natives_valid(uint16_t output, const uint16_t *inputs, uint8_t input_count);
 // Readers take the domain's validated payload range within the blob at
 // blob_base_offset. Rows vary in length, so read_row walks the rows before it;
 // a whole-table reader iterates instead.

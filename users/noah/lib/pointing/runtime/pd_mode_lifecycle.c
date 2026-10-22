@@ -91,9 +91,9 @@ void pd_mode_apply_active_dpi(void) {
     bool                 sniping     = pd_mode_auto_sniping_layer_active() || noah_qmk_contract_pointer_sniping_enabled();
 
 #ifdef NOAH_PD_PROFILE_ENABLE
-    const uint8_t *configured = noah_effective_pd_for_mask(snapshot.local.active_mode);
-    uint16_t mode_dpi = configured ? (uint16_t)configured[4] | (uint16_t)configured[5] << 8 : 0;
-    if (configured && configured[1] == 2) {
+    const noah_pd_config_t *configured = noah_effective_pd_for_mask(snapshot.local.active_mode);
+    uint16_t                mode_dpi   = configured ? configured->dpi : 0;
+    if (configured && configured->kind == NOAH_PD_KIND_SCROLLING) {
         pointing_device_set_cpi(mode_dpi ? mode_dpi : noah_qmk_contract_pointer_default_dpi());
         return;
     }

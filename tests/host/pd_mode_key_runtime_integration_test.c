@@ -450,8 +450,8 @@ static void load_configured_pd(void) {
     for (uint8_t i = 0; i < NOAH_PROFILE_PD_V1_SLOT_COUNT; i++) noah_profile_pd_v1_encode_record(&noah_pd_defaults[i], configured_pd_records[i]);
     publish_configured_pd();
 }
-report_mouse_t noah_pd_configured_scroll(const uint8_t *record, report_mouse_t report) {
-    (void)record;
+report_mouse_t noah_pd_configured_scroll(const noah_pd_config_t *slot, report_mouse_t report) {
+    (void)slot;
     return report; // Motion parity is covered by pd_mode_handlers_test.
 }
 // Configured directional modes reset their shared engine, never legacy state.
@@ -2378,7 +2378,9 @@ static void test_configured_consume_button_runs_nothing(void) {
     keypos_t pos = test_keypos(4, 0);
 
     test_reset_state();
-    configured_pd_records[1][52] = 1u; // Volume consumes button 1.
+    noah_pd_config_t volume = noah_pd_defaults[1];
+    volume.buttons[0]       = (noah_pd_button_t){.kind = NOAH_PD_BUTTON_CONSUME};
+    noah_profile_pd_v1_encode_record(&volume, configured_pd_records[1]);
     publish_configured_pd();
     action_dispatch(PD_SLOT_1_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);
@@ -2396,9 +2398,9 @@ static void test_configured_button_click_runs_no_behaviour(void) {
     keypos_t pos = test_keypos(4, 0);
 
     test_reset_state();
-    memset(configured_pd_records[1] + 52, 0, 6);
-    configured_pd_records[1][52] = 2u;    // Volume's button 1 taps
-    configured_pd_records[1][54] = 0xd3u; // button 3
+    noah_pd_config_t volume = noah_pd_defaults[1];
+    volume.buttons[0]       = (noah_pd_button_t){.kind = NOAH_PD_BUTTON_TAP, .tap = {.keycode = MS_BTN3}};
+    noah_profile_pd_v1_encode_record(&volume, configured_pd_records[1]);
     publish_configured_pd();
     action_dispatch(PD_SLOT_1_LOCK);
     CHECK(pd_mode_local_locked_snapshot() == PD_MODE_VOLUME);

@@ -33,6 +33,9 @@ for sanitizer in normal sanitized; do
         -o "$BUILD_DIR/test"
     "$BUILD_DIR/test" "$BUILD_DIR/presets.bin" "$BUILD_DIR/full.bin"
 done
-arm-none-eabi-gcc -std=c11 -Wall -Wextra -Werror -pedantic -DNOAH_PD_PROFILE_ENABLE \
-    -mcpu=cortex-m0plus -mthumb -I"$ROOT/users/noah" \
-    -c "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" -o "$BUILD_DIR/validator.o"
+# The record layout, alignment and byte-order assertions hold on the target too.
+for source in schema/profile_validator_v1.c schema/profile_pd_v1.c runtime/effective_pd_runtime.c; do
+    arm-none-eabi-gcc -std=c11 -Wall -Wextra -Werror -pedantic -DNOAH_PD_PROFILE_ENABLE \
+        -mcpu=cortex-m0plus -mthumb -I"$ROOT/users/noah" \
+        -c "$ROOT/users/noah/lib/profile/$source" -o "$BUILD_DIR/$(basename "$source" .c).o"
+done
