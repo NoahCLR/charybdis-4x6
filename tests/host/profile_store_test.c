@@ -52,14 +52,17 @@ static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
 static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 3u, 0u, 0u, 0u, 1u, 2u, 3u};
 static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, 0x20u, NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, 2u, 0u, 0u, 0u, 4u, 5u};
 
+// The flash backend refuses a read or write over the store's I/O bound; one
+// here fails the test.
 static bool fake_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     fake_eeprom_t *memory = context;
 
+    CHECK(length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
     memory->read_calls++;
     memory->last_read_length = length;
     memory->read_bytes += length;
     if (length > memory->largest_read_length) memory->largest_read_length = length;
-    if (memory->fail_reads || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) {
+    if (memory->fail_reads || (uint32_t)address + length > sizeof(memory->bytes)) {
         return false;
     }
     memcpy(target, &memory->bytes[address], length);
@@ -84,6 +87,7 @@ static bool fake_write(void *context, noah_profile_storage_address_t address, co
     fake_eeprom_t *memory  = context;
     uint16_t       written = length;
 
+    CHECK(length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
     memory->write_calls++;
     memory->last_write_address = address;
     memory->last_write_length  = length;

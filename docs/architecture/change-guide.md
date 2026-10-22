@@ -27,7 +27,7 @@ directory and the existing domain docs.
 | Change the Raw HID channel | `compat/qmk_profile_channel.c`, `compat/qmk_profile_capabilities.h` | VIA hooks (VIA is not supported, D-F31) | Profile Wire and channel tests (`run_profile_wire_v1_tests.sh`), feature gate, contract probe |
 | Change hook wiring | `users/noah/hooks.c`, `users/noah/runtime_init.c` | keymap-local hooks without chaining | hook chaining, runtime init order, feature gate |
 | Change source/build wiring | `users/noah/source_manifest.mk` and mirrored host support as needed | one-off test runner source lists | feature gate compile, targeted host tests, full host suite, firmware compile |
-| Change stack-sensitive runtime phases or target stack configuration | runtime owner plus `tools/firmware_stack_budget.json` when call topology changes | per-function frame guesses or host-only `sizeof` checks | matching runtime tests, `run_firmware_stack_budget_tool_tests.sh`, full host suite, fresh instrumented firmware compile, `run_firmware_stack_budget_checks.sh` |
+| Change stack-sensitive runtime phases or target stack configuration | runtime owner plus `tools/firmware_stack_budget.json` or `tools/firmware_stack_budget_live_profile_owner.json` when call topology changes | per-function frame guesses or host-only `sizeof` checks | matching runtime tests, `run_firmware_stack_budget_tool_tests.sh`, full host suite, `NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh` ([memory budgets](./memory-budgets.md#required-reporting)) |
 
 ## Anti-Patterns
 
@@ -78,7 +78,7 @@ checks before handoff when source/build behavior changed.
 | Macros, QMK contracts | `run_qmk_contract_checks.sh`, `run_action_lifecycle_tests.sh`, `run_qmk_portable_profile_tests.sh`, `run_macro_payload_tests.sh`, `run_macro_payload_engine_tests.sh`, `run_macro_slot_provider_tests.sh`, `run_profile_keymap_macros_runtime_tests.sh` |
 | Shared runtime or tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |
 | Source manifests or boundaries | `run_feature_gate_compile_tests.sh` |
-| Target stack topology or budget | `run_firmware_stack_budget_tool_tests.sh`; after a fresh instrumented target build, `run_firmware_stack_budget_checks.sh` |
+| Target stack topology or budget | `run_firmware_stack_budget_tool_tests.sh`; then `NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh`, which runs both reviewed-path manifests on each half of the flashed pair (the standalone `run_firmware_stack_budget_checks.sh` compiles a plain `qmk compile` image without the live-profile owner, D-L08) |
 | Target macro or RP2040 SRAM-bank policy | Read [memory-budgets.md](./memory-budgets.md); run `run_firmware_memory_budget_tool_tests.sh`; after a fresh ordinary target build, run `run_firmware_memory_budget_checks.sh`; keep physical capacity, linked occupancy, policy margin, and runtime high-water distinct |
 
 For docs-only changes, run `git diff --check` and a stale-path audit. Host tests

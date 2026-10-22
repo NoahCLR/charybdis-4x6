@@ -34,9 +34,12 @@ static uint32_t always_safe(void *context) {
     return 0u;
 }
 
+// The flash backend refuses a read or write over the store's I/O bound; one
+// here fails the test.
 static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     memory_t *memory = context;
 
+    assert(length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
     memory->reads++;
     if (memory->fail_reads || !target || length == 0u || (uint32_t)address + length > sizeof(memory->bytes)) {
         return false;
@@ -48,6 +51,7 @@ static bool memory_read(void *context, noah_profile_storage_address_t address, u
 static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length) {
     memory_t *memory = context;
 
+    assert(length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
     memory->writes++;
     if (!source || length == 0u || (uint32_t)address + length > sizeof(memory->bytes)) {
         return false;

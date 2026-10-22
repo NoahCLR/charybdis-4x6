@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "../storage/profile_checksum.h"
+#include "../storage/profile_store.h"
 
 static void put_u32(uint8_t *target, uint32_t value) {
     target[0] = (uint8_t)value;
@@ -879,3 +880,6 @@ bool noah_profile_working_copy_status(const noah_profile_working_copy_t *copy, n
     }
     return true;
 }
+
+// A saved slot's reader reads the store directly, a load piece at a time.
+_Static_assert((uint32_t)NOAH_PROFILE_WORKING_LOAD_PIECE <= (uint32_t)NOAH_PROFILE_STORE_IO_CHUNK_MAX, "a load piece is one store read");

@@ -45,7 +45,7 @@ void noah_qmk_portable_apply(void) {}
 static uint8_t eeprom[NOAH_PROFILE_STORAGE_REGION_SIZE];
 static bool    memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     (void)context;
-    assert(length <= 32 && (size_t)address + length <= sizeof(eeprom));
+    assert(length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX && (size_t)address + length <= sizeof(eeprom));
     memcpy(target, eeprom + address, length);
     return true;
 }
