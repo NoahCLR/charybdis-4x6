@@ -16,7 +16,10 @@ uint32_t key_runtime_transition_feedback_mark(void) {
     return state ? state->next_feedback_sequence : 0u;
 }
 
-void key_runtime_transition_drain_plan(key_runtime_core_effect_plan_t *plan) {
+// Not inlined: it is the one frame between a plan and each projected effect
+// on the reviewed stack paths, for the execute below and for a streaming
+// plan's auto-drain alike.
+__attribute__((noinline)) void key_runtime_transition_drain_plan(key_runtime_core_effect_plan_t *plan) {
     if (!plan) {
         return;
     }

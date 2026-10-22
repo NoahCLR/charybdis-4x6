@@ -446,7 +446,11 @@ void                           key_runtime_core_flush_active_keys_except(keypos_
 bool                           key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_pos, key_runtime_core_effect_plan_t *plan);
 bool                           key_runtime_core_handle_handled_key_release(keypos_t key_pos, const handled_key_resolution_t *resolution, keyboard_mod_state_t keyboard_mod_state, key_runtime_core_effect_plan_t *plan);
 void                           key_runtime_core_scan(key_runtime_core_effect_plan_t *plan, uint16_t now);
-bool                           key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan);
+// The handled keys whose fallback hold is due now, as bits of their press
+// token index, decided for all of them at once; true if any. The effect that
+// registers one is key_runtime_core_fallback_hold_effect(index).
+bool                           key_runtime_core_pending_fallback_holds(uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT]);
+bool                           key_runtime_core_fallback_hold_effect(uint16_t index, key_runtime_effect_t *effect);
 
 static inline void key_runtime_core_state_reset(key_runtime_core_state_t *state) {
     if (!state) {

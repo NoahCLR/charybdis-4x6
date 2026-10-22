@@ -1100,7 +1100,8 @@ manifest's largest passing path is the handled press with its fallback
 settlement's plan auto-drained, 1,832. Three still fail by budget. Each holds
 two plans by design: the plan being projected and, beneath an output it
 projects, the fallback settlement's own plan (216 bytes), which must hold its
-effects until its planning loop ends. The rest of each chain is the reducer's
+effects until its planning loop ends (no longer: the settlement holds no plan,
+[below](#fallback-settlement-holds-no-plan)). The rest of each chain is the reducer's
 scan planning under an auto-drain (some 250 bytes) or the pointing mode's
 release beneath the preemption (some 640), not plans. Against the physical
 2,560-byte process stack the worst, press preflight auto-drained, is 528 bytes
@@ -1112,3 +1113,36 @@ manifest passes every path on both halves; its largest stays peer large chunk
 write at 1,912 bytes. These are reviewed-path estimates for the named paths
 only, not a global or interrupt-stack maximum; stack high-water on both halves
 remains keyboard evidence.
+
+## Fallback settlement holds no plan
+
+Every output the runtime emits first registers the handled keys' due
+fallback holds (D-F27). The settlement decides which are due for every key
+first, as its plan did, keeps them as one bit per press token (eight bytes for
+the 60 tokens), and projects each registration in key order, announced and
+traced as before; it builds no effect plan. Beneath the projection of an
+output, that removes the second plan from every reviewed path that settles.
+The plan drain is kept out of line, as before, so the paths name one frame
+between a plan and its effects.
+
+Measured on the linked right half with the pinned firmware compiler, against
+the integration of the ten changes before it (the left half is the same):
+
+| Path | Before | This change |
+| --- | ---: | ---: |
+| Press preflight, missed-scan planning auto-drained | 2,032 (112 over) | 1,856 |
+| Handled press, fallback settlement preempting a held pointing mode | 2,008 (88 over) | 1,832 |
+| Release preflight, missed-scan planning auto-drained | 1,992 (72 over) | 1,816 |
+| Press preflight, its plan projected | 1,792 | 1,616 |
+| Handled press and release projection with fallback settlement | 1,736 and 1,752 | 1,560 and 1,576 |
+
+Eighteen settlement paths are 176 bytes smaller and none grew. The ordinary
+manifest passes every path on both halves for the first time; its worst path,
+press preflight auto-drained, is 1,856 bytes of the 1,920-byte policy. The
+path that modelled the settlement plan's own auto-drain now names the
+decision that replaced it (1,144). No owner-manifest path changed; that
+manifest's one failure is its stale `storage_paused` path name, fixed apart
+from this change. These are
+reviewed-path estimates for the named paths only, not a global or
+interrupt-stack maximum; stack high-water on both halves remains keyboard
+evidence.
