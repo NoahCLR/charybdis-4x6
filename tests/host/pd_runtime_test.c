@@ -231,7 +231,7 @@ void auto_mouse_toggle(void) {
 }
 
 void auto_mouse_keyevent(bool pressed) {
-    (void)pressed;
+    auto_mouse_key_tracker += pressed ? 1 : -1;
     auto_mouse_keyevent_calls++;
 }
 
@@ -675,6 +675,25 @@ static void test_an_empty_slot_hold_key_owns_nothing(void) {
     CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, false));
 }
 
+// A locked mode with no toggle of its own holds one count on QMK's tracker.
+// QMK zeroes it whenever it resets auto-mouse, as a live settings edit that
+// changes the auto-mouse timeout does; the unlock then takes back nothing.
+static void test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset(void) {
+    test_reset_stubs();
+    auto_mouse_enabled = true;
+
+    CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, true));
+    CHECK(auto_mouse_key_tracker == 1 && auto_mouse_keyevent_calls == 1);
+    auto_mouse_key_tracker = 0;
+    CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, false));
+    CHECK(auto_mouse_key_tracker == 0 && auto_mouse_keyevent_calls == 1);
+
+    // Without a reset the unlock takes its count back.
+    CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, true));
+    CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, false));
+    CHECK(auto_mouse_key_tracker == 0 && auto_mouse_keyevent_calls == 3);
+}
+
 int main(void) {
     test_pointing_device_init_enables_auto_mouse_and_default_layer();
     test_pointing_device_task_returns_original_report_without_local_mode();
@@ -694,5 +713,6 @@ int main(void) {
     test_layer_state_set_enables_sniping_and_blocks_dpi_restore_while_sniping_layer_active();
     test_is_mouse_record_user_delegates_pointer_layer_policy();
     test_an_empty_slot_hold_key_owns_nothing();
+    test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset();
     return 0;
 }

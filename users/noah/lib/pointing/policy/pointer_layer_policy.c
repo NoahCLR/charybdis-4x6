@@ -121,14 +121,19 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
 // auto-mouse layer, so neither QMK's timeout nor its reset on the next
 // non-mouse key turns off a layer the runtime still owns. QMK counts its own
 // MO()/TT() keys, but a behaviour's MO() hold never reaches it as a keycode.
-// QMK zeroes the tracker when auto-mouse is switched off or retargeted, so the
-// count is only taken back while one is there to take.
+// QMK zeroes the tracker whenever it resets auto-mouse: switched off,
+// retargeted, or given another timeout or debounce (a live settings edit,
+// D-F32). So the count is only taken back while one is there to take, and
+// one found gone while the layer is still owned is taken again.
 static bool layer_ownership_anchor_active;
 
 void pointer_layer_policy_sync_layer_ownership_anchor(void) {
     uint8_t auto_mouse_layer = noah_qmk_contract_auto_mouse_layer();
     bool    should_anchor    = noah_qmk_contract_auto_mouse_enabled() && (layer_ownership_is_locked(auto_mouse_layer) || layer_ownership_is_held(auto_mouse_layer));
 
+    if (layer_ownership_anchor_active && noah_qmk_contract_auto_mouse_key_tracker() <= 0) {
+        layer_ownership_anchor_active = false;
+    }
     if (should_anchor == layer_ownership_anchor_active) {
         return;
     }
