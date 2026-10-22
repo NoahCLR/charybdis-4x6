@@ -633,6 +633,48 @@ static void test_is_mouse_record_user_delegates_pointer_layer_policy(void) {
     CHECK(!noah_is_mouse_record_user(PD_SLOT_4, &record));
 }
 
+// A slot with no record (here slot 7) is inert: its hold key neither
+// activates a mode nor becomes the active mode's owner, and leaves nothing
+// behind when released.
+static void test_an_empty_slot_hold_key_owns_nothing(void) {
+    const keypos_t volume_key = {.row = 1, .col = 2};
+    const keypos_t empty_key  = {.row = 6, .col = 3};
+    keypos_t       owner;
+
+    test_reset_stubs();
+    CHECK(pd_mode_for_keycode(PD_SLOT_0 + 7u) != 0 && !noah_effective_pd_for_mask(pd_mode_for_keycode(PD_SLOT_0 + 7u)));
+
+    // With nothing active.
+    (void)pd_mode_handle_keycode_press_at(PD_SLOT_0 + 7u, empty_key);
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(!pd_mode_local_owner_key_pos_snapshot(&owner));
+    CHECK(pd_mode_snapshot().local.owner_sides == SPLIT_SIDE_MASK_NONE);
+    (void)pd_mode_handle_keycode_release_at(PD_SLOT_0 + 7u, empty_key);
+    CHECK(!pd_mode_local_owner_key_pos_snapshot(&owner));
+
+    // While another mode is held: its owner stays its own.
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, volume_key));
+    CHECK(pd_mode_local_owner_key_pos_snapshot(&owner) && owner.row == volume_key.row && owner.col == volume_key.col);
+    (void)pd_mode_handle_keycode_press_at(PD_SLOT_0 + 7u, empty_key);
+    CHECK(pd_mode_local_active_snapshot() == PD_MODE_VOLUME);
+    CHECK(pd_mode_local_owner_key_pos_snapshot(&owner) && owner.row == volume_key.row && owner.col == volume_key.col);
+    (void)pd_mode_handle_keycode_release_at(PD_SLOT_0 + 7u, empty_key);
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, volume_key));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(!pd_mode_local_owner_key_pos_snapshot(&owner));
+    CHECK(pd_mode_snapshot().local.owner_sides == SPLIT_SIDE_MASK_NONE);
+
+    // While a mode is locked by its lock action, which leaves it no owner
+    // key: the empty slot's key does not become one.
+    CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, true));
+    CHECK(!pd_mode_local_owner_key_pos_snapshot(&owner));
+    (void)pd_mode_handle_keycode_press_at(PD_SLOT_0 + 7u, empty_key);
+    CHECK(pd_mode_local_locked(PD_MODE_VOLUME) && !pd_mode_local_owner_key_pos_snapshot(&owner));
+    CHECK(pd_mode_snapshot().local.owner_sides == SPLIT_SIDE_MASK_NONE);
+    (void)pd_mode_handle_keycode_release_at(PD_SLOT_0 + 7u, empty_key);
+    CHECK(pd_mode_set_lock_state(PD_MODE_VOLUME, false));
+}
+
 int main(void) {
     test_pointing_device_init_enables_auto_mouse_and_default_layer();
     test_pointing_device_task_returns_original_report_without_local_mode();
@@ -651,5 +693,6 @@ int main(void) {
     test_layer_state_set_strips_pointer_layer_for_arrow_mode();
     test_layer_state_set_enables_sniping_and_blocks_dpi_restore_while_sniping_layer_active();
     test_is_mouse_record_user_delegates_pointer_layer_policy();
+    test_an_empty_slot_hold_key_owns_nothing();
     return 0;
 }
