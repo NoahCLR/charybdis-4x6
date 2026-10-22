@@ -900,11 +900,19 @@ void key_runtime_core_press_token_attach_press_leases(key_runtime_core_state_t *
     }
 }
 
+// An LT or MT key held past its hold time holds its layer or modifiers only
+// when its hold at this tap count is the keycode's own, held until release
+// (D-F27). A row whose hold is something else, or a later tap count with no
+// hold, holds neither: what it holds is what its hold registers.
+static bool key_runtime_core_press_token_holds_keycode_hold(const press_token_t *token) {
+    return token->interaction.binding.hold.present && token->interaction.binding.hold.action == noah_action_keycode_dual_role_hold(token->resolved_keycode) && handled_key_hold_semantics_registers_held(token->interaction.contract.hold);
+}
+
 void key_runtime_core_press_token_attach_hold_leases(key_runtime_core_state_t *state, const press_token_t *token) {
     bool     changed = false;
     keypos_t token_key_pos;
 
-    if (!(state && token && token->active && token->phase == PRESS_TOKEN_PHASE_HELD)) {
+    if (!(state && token && token->active && token->phase == PRESS_TOKEN_PHASE_HELD && key_runtime_core_press_token_holds_keycode_hold(token))) {
         return;
     }
 

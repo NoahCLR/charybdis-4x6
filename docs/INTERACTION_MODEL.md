@@ -237,13 +237,15 @@ beyond the tap/hold key's release.
 A key pressed before a class-1 key and released while it is undecided waits
 too when it is a modifier or layer key, as QMK keeps it in its tapping buffer:
 a modifier key, plain or with its own row (Left GUI), a mods-only key
-(`C(KC_NO)`), `MO()`, `LT()`, `LM()`, an `MT()` or `OSM()` held as its
-modifier, or a handled key holding a layer or modifiers at that moment (a
-thumb held for its layer, Shift holding itself, a custom key holding a
-shortcut of modifiers alone). The undecided key's tap or
-hold goes out with that modifier or layer still on, then the release follows:
-press Cmd, press F, let go of Cmd, then F, and it types Cmd+F; let go of the
-thumb before a key pressed on its layer and that key still taps on the layer.
+(`C(KC_NO)`), `MO()`, `LM()`, an `LT()` held for its layer, an `MT()` or
+`OSM()` held as its modifier, or a handled key holding a layer or modifiers at
+that moment (a thumb held for its layer, Shift holding itself, a custom key
+holding a shortcut of modifiers alone). An `MT()` whose row holds a plain key,
+or an `LT()` on a press that holds no layer, is not one. The undecided key's
+tap or hold goes out with that modifier or layer still on, then the release
+follows: press Cmd, press F, let go of Cmd, then F, and it types Cmd+F; let
+go of the thumb before a key pressed on its layer and that key still taps on
+the layer.
 The release of any other key pressed earlier goes at once, as in QMK. While it
 waits, a released key reaches no later hold tier. A chord counts the same way,
 by what its output holds: let go of the GUI chord N + M before J and it types
