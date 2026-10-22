@@ -525,8 +525,8 @@
         },
         {
           "caller": "noah_qmk_profile_split_rpc",
-          "callee": "storage_paused",
-          "reason": "With its mailbox full, the reconciler's busy reply asks the store runtime's injected storage_paused callback whether a save is waiting for a quiet keyboard (STORAGE_PAUSED)."
+          "callee": "noah_qmk_durable_io_storage_paused",
+          "reason": "With its mailbox full, the reconciler's busy reply asks its injected storage_paused callback, the durable-I/O grant's (qmk_durable_io.c, D-F29), whether a save is waiting for a quiet keyboard (STORAGE_PAUSED)."
         }
       ],
       "paths": [
@@ -548,7 +548,7 @@
         },
         {
           "name": "profile split busy reply asks whether storage is paused",
-          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_profile_split_rpc", "storage_paused"]
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_profile_split_rpc", "noah_qmk_durable_io_storage_paused"]
         },
         {
           "name": "profile split busy reply encoding",

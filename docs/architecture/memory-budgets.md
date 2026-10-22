@@ -1030,7 +1030,8 @@ its transition and core plans), `key_runtime_preflight_record` 440,
 to the key-runtime refactor; no budget changes and no path was dropped.
 
 The owner manifest adds the split slave thread's busy reply when its mailbox
-is full: asking the store runtime's `storage_paused` callback 288 bytes and
+is full: asking the durable-I/O grant whether storage is paused
+(`noah_qmk_durable_io_storage_paused`) 288 bytes and
 encoding the busy frame 616, of 768. It passes every path on both halves.
 These are reviewed-path estimates for the named paths only, not a global or
 interrupt-stack maximum; stack high-water on both halves remains keyboard
