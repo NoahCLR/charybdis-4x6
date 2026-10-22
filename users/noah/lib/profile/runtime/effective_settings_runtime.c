@@ -17,8 +17,7 @@ bool noah_effective_settings_is_booting(void) {
 }
 uint32_t noah_setting(uint8_t id, uint32_t fallback) {
     if (!settings_length || id >= NOAH_SETTINGS_COUNT) return fallback;
-    const uint8_t *p = &settings[8 + id * 4];
-    return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
+    return noah_profile_settings_v1_scalar_value(&settings[noah_profile_settings_v1_scalar_offset(id)]);
 }
 // One byte of a layer's fixed record (its combo reference layer or one of its
 // placement bitmaps). Before any settings are live, the compiled defaults.

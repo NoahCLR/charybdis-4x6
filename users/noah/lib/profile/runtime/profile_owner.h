@@ -13,6 +13,7 @@
 #include "effective_combo_runtime.h"
 #include "profile_activation_policy.h"
 #include "../schema/profile_compiled_defaults_v1.h"
+#include "../schema/profile_settings_v1.h"
 #include "profile_edit_mode.h"
 #include "profile_working_copy.h"
 #include "../split/profile_split_reconciler.h"
@@ -129,15 +130,16 @@ typedef struct {
     uint8_t  last_error;  // noah_profile_candidate_v1_error_id_t of a failed save
 } noah_profile_owner_save_t;
 
-// Four adjustment scalars, coalesced while another edit or Save holds RAM.
-// They never mutate the bytes a save is reading.
+// The adjustment scalars' latest values (profile_settings_v1.h), coalesced
+// while another edit, a Save or the other half holds the profile. They never
+// change the bytes a save is reading.
 typedef struct {
-    uint32_t values[4];
+    uint32_t values[NOAH_SETTINGS_ADJUSTMENTS]; // by adjustment index
     uint32_t quiet_since;
     uint32_t observed_revision;
     uint16_t sequence;
     uint16_t edit_transaction;
-    uint8_t pending;
+    uint8_t pending; // bit i: values[i] awaits publication
     bool apply_adjustments_only;
     bool attempted;
 } noah_profile_owner_auto_save_t;
@@ -302,9 +304,15 @@ noah_profile_working_result_t noah_profile_owner_revert(noah_profile_owner_t *ow
 noah_profile_working_result_t noah_profile_owner_save(noah_profile_owner_t *owner, uint16_t transaction_id, uint32_t session, uint32_t revision);
 noah_profile_working_result_t noah_profile_owner_set_edit_mode(noah_profile_owner_t *owner, uint8_t mode);
 
-// A keyboard adjustment queues one of DEFAULT_DPI, SNIPING_DPI, RGB_MODE or
-// RGB_COLOR. Repeated keys coalesce; the next available edit publishes them.
+// Called from key processing (main loop). Queues one adjustment scalar
+// (profile_settings_v1.h). False for any other setting (toggles are never
+// edits), an invalid value, a half that is not master, or an owner that is not
+// ready. Repeated keys coalesce to the latest value, and the next available
+// edit publishes them at the ordinary safe boundary, advancing the revision.
+// Never gated by edit mode.
 bool noah_profile_owner_adjust(noah_profile_owner_t *owner, uint8_t setting, uint32_t value);
+// The queued, unpublished value of an adjustment scalar, which settings
+// projection keeps as newer local feedback. False when none is pending.
 bool noah_profile_owner_pending_adjustment(const noah_profile_owner_t *owner, uint8_t setting, uint32_t *value);
 
 typedef struct {

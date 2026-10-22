@@ -35,8 +35,10 @@ enum {
     NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS = 64,
     NOAH_SETTINGS_PLACEMENT_BYTES      = 8,
     NOAH_SETTINGS_LAYER_RECORD_SIZE    = 1 + 2 * NOAH_SETTINGS_PLACEMENT_BYTES,
+    // A scalar is four little-endian bytes, in scalar-ID order after the header.
+    NOAH_SETTINGS_SCALAR_SIZE          = 4,
     NOAH_SETTINGS_SCALARS_OFFSET       = NOAH_SETTINGS_HEADER_SIZE,
-    NOAH_SETTINGS_LAYER_RECORDS_OFFSET = NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTINGS_COUNT * 4,
+    NOAH_SETTINGS_LAYER_RECORDS_OFFSET = NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTINGS_COUNT * NOAH_SETTINGS_SCALAR_SIZE,
     NOAH_SETTINGS_SHORTCUTS_OFFSET     = NOAH_SETTINGS_LAYER_RECORDS_OFFSET + NOAH_SETTINGS_LAYERS * NOAH_SETTINGS_LAYER_RECORD_SIZE,
     NOAH_SETTINGS_SHORTCUT_SIZE        = NOAH_CUSTOM_KEY_SHORTCUT_SIZE,
     NOAH_SETTINGS_FIXED_SIZE           = NOAH_SETTINGS_SHORTCUTS_OFFSET + NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS * NOAH_SETTINGS_SHORTCUT_SIZE,
@@ -89,6 +91,85 @@ typedef enum {
     NOAH_SETTING_LAYER_COMBOS,
 } noah_setting_id_t;
 
+// The scalar encoding, the one home of the scalar layout: scalar `id` is
+// NOAH_SETTINGS_SCALAR_SIZE little-endian bytes at
+// noah_profile_settings_v1_scalar_offset(id). Callers name a scalar by ID and
+// never compute its offset or byte order. These helpers are pure and hold no
+// state, so any context may call them: key processing and the Raw HID handler
+// on the main loop, the scan's durable-I/O step, or the split RPC callback on
+// SlaveThread. They are always inlined, so none adds a frame to a reviewed
+// stack path.
+
+// Domain offset of scalar `id`. Precondition: id < NOAH_SETTINGS_COUNT.
+static inline __attribute__((always_inline)) uint16_t noah_profile_settings_v1_scalar_offset(uint8_t id) {
+    return (uint16_t)(NOAH_SETTINGS_SCALARS_OFFSET + id * NOAH_SETTINGS_SCALAR_SIZE);
+}
+// The scalar that holds domain byte `offset`, and that byte's place in it (0
+// is the lowest byte). False, leaving *id and *part unwritten, for an offset
+// outside the scalars: the header, layer records, shortcuts or names.
+static inline __attribute__((always_inline)) bool noah_profile_settings_v1_scalar_at(uint16_t offset, uint8_t *id, uint8_t *part) {
+    if (offset < NOAH_SETTINGS_SCALARS_OFFSET || offset >= NOAH_SETTINGS_LAYER_RECORDS_OFFSET) return false;
+    *id   = (uint8_t)((offset - NOAH_SETTINGS_SCALARS_OFFSET) / NOAH_SETTINGS_SCALAR_SIZE);
+    *part = (uint8_t)((offset - NOAH_SETTINGS_SCALARS_OFFSET) % NOAH_SETTINGS_SCALAR_SIZE);
+    return true;
+}
+// Byte `part` (0..NOAH_SETTINGS_SCALAR_SIZE-1) of a scalar's encoding.
+static inline __attribute__((always_inline)) uint8_t noah_profile_settings_v1_scalar_byte(uint32_t value, uint8_t part) {
+    return (uint8_t)(value >> (8u * part));
+}
+// What encoded byte `part` contributes to its scalar's value. A value is its
+// bytes' contributions together, so a reader that sees one byte at a time ORs
+// them as they come.
+static inline __attribute__((always_inline)) uint32_t noah_profile_settings_v1_scalar_bits(uint8_t byte, uint8_t part) {
+    return (uint32_t)byte << (8u * part);
+}
+// A scalar's value from its NOAH_SETTINGS_SCALAR_SIZE encoded bytes.
+static inline __attribute__((always_inline)) uint32_t noah_profile_settings_v1_scalar_value(const uint8_t *bytes) {
+    uint32_t value = 0u;
+    for (uint8_t part = 0u; part < NOAH_SETTINGS_SCALAR_SIZE; part++)
+        value |= noah_profile_settings_v1_scalar_bits(bytes[part], part);
+    return value;
+}
+
+// The adjustment scalars (D-F32): the scalars the keyboard's adjustment keys
+// set (DPI up/down and the RGB keys), by adjustment index. Index order is
+// scalar order, so an edit of any subset has its splices in canonical
+// (ascending offset) order, as the working copy's plan requires. Toggles and
+// every other setting are not adjustment scalars.
+enum { NOAH_SETTINGS_ADJUSTMENTS = 4 };
+_Static_assert(NOAH_SETTING_DEFAULT_DPI < NOAH_SETTING_SNIPING_DPI && NOAH_SETTING_SNIPING_DPI < NOAH_SETTING_RGB_MODE && NOAH_SETTING_RGB_MODE < NOAH_SETTING_RGB_COLOR, "adjustment scalars are listed in scalar order");
+
+// The setting at adjustment index `index`. Precondition:
+// index < NOAH_SETTINGS_ADJUSTMENTS.
+static inline __attribute__((always_inline)) uint8_t noah_profile_settings_v1_adjustment_id(uint8_t index) {
+    static const uint8_t ids[] = {NOAH_SETTING_DEFAULT_DPI, NOAH_SETTING_SNIPING_DPI, NOAH_SETTING_RGB_MODE, NOAH_SETTING_RGB_COLOR};
+    _Static_assert(sizeof(ids) == NOAH_SETTINGS_ADJUSTMENTS, "one setting per adjustment index");
+    return ids[index];
+}
+// The adjustment index of setting `id`, or NOAH_SETTINGS_ADJUSTMENTS when no
+// key adjusts it. Any id is accepted.
+static inline __attribute__((always_inline)) uint8_t noah_profile_settings_v1_adjustment_index(uint8_t id) {
+    uint8_t index = 0u;
+    while (index < NOAH_SETTINGS_ADJUSTMENTS && noah_profile_settings_v1_adjustment_id(index) != id)
+        index++;
+    return index;
+}
+// Byte `offset` of a settings domain after an adjustment. Where `offset` falls
+// in adjustment scalar i and bit i of `mask` is set, that byte of values[i];
+// everywhere else `base`, the domain's own byte at that offset. An adjustment's
+// edit inserts exactly these bytes over what it replaces: each adjusted
+// scalar's NOAH_SETTINGS_SCALAR_SIZE bytes when the profile has a settings
+// domain, or the whole domain over the authored defaults when it has none.
+// Either way every other value is unchanged. Mask bits at or above
+// NOAH_SETTINGS_ADJUSTMENTS are ignored. Values are taken as given: the queue
+// checks each with noah_profile_setting_v1_valid when it is queued, and the
+// working copy validates the domain the edit produces.
+static inline __attribute__((always_inline)) uint8_t noah_profile_settings_v1_adjusted_byte(const uint32_t values[NOAH_SETTINGS_ADJUSTMENTS], uint8_t mask, uint16_t offset, uint8_t base) {
+    uint8_t id, part;
+    if (!noah_profile_settings_v1_scalar_at(offset, &id, &part)) return base;
+    uint8_t index = noah_profile_settings_v1_adjustment_index(id);
+    return index < NOAH_SETTINGS_ADJUSTMENTS && (mask & (1u << index)) ? noah_profile_settings_v1_scalar_byte(values[index], part) : base;
+}
 
 typedef struct {
     uint16_t               offset;

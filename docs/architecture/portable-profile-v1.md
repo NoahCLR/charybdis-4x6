@@ -188,6 +188,13 @@ of 200; sniping DPI is 100–400 in steps of 100. The default-layer mask (23) is
 nonzero with bits only in 0–15. The layer masks (29, 30) reject bits 16 and
 above; an empty mask is allowed.
 
+Scalars 18, 19, 21 and 22 are the **adjustment scalars**, the ones the
+keyboard's DPI and RGB adjustment keys set (D-F32). They are listed in scalar
+order, so an edit of any of them has its splices in canonical order. The
+settings schema (`profile_settings_v1.h`) holds the scalar encoding, this list
+and an adjustment's bytes: the adjusted scalars over the domain they land in,
+or over the authored defaults when the profile has none.
+
 Compiled defaults set scalar 28 to 1 and scalars 29 and 30 to `0xffff`; every
 layer refers combos to itself and every bitmap is zero. So a profile that never sets the participation controls behaves as
 version 5 did. The keymap's `config.h` authors the rest of what is not QMK's
