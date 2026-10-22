@@ -72,7 +72,7 @@ blocking, and `Pair build` can be started on demand to build any commit.
 Host tests run in the build image `tools/build-image` names, the one the pair
 is built in and CI runs (D-F05), with its GCC, sanitizers, Python, Node and
 ripgrep. Every `tests/host/run_*.sh` sources `tests/host/in_build_image.sh`
-first: started on the Mac, it runs the runner in that image with Docker,
+(a host test refuses a runner that does not), first: started on the Mac, it runs the runner in that image with Docker,
 without network; inside the image (CI, or one runner calling another) it
 does nothing. The image is pulled once, on a Mac's first run; after that no
 test needs the network. Compiling through Docker's file sharing with macOS is several

@@ -573,6 +573,14 @@ class InBuildImage(unittest.TestCase):
     def runner_call(self):
         return [call for call in self.calls() if call[0] == 'run' and 'flock' not in call][-1]
 
+    def test_every_runner_runs_in_the_build_image(self):
+        # A runner without the guard would compile with whatever the Mac has,
+        # and pass where CI fails (D-F05).
+        line = '. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"'
+        missing = [runner.name for runner in sorted((REPO / 'tests/host').glob('run_*.sh'))
+                   if line not in runner.read_text().splitlines()]
+        self.assertEqual(missing, [], 'each tests/host runner sources in_build_image.sh at top level')
+
     def test_a_clean_qmk_is_read_from_its_commit_volume(self):
         self.run_runner('run_example_tests.sh', FAKE_VOLUMES=json.dumps({f'charybdis-host-qmk-{self.head}': 'x'}))
         self.assertIn(f'charybdis-host-qmk-{self.head}:{self.qmk}', self.runner_call())
