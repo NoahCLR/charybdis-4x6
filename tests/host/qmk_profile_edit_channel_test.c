@@ -1,5 +1,6 @@
 // Profile Wire live edits (D-F32) and restart (D-F34): report layouts
-// against a fake owner and a fake restart.
+// against a fake owner and a fake restart. Answers and flags composed from a
+// real owner are the owner harness's (profile_owner_admission_test.inc).
 
 #include <assert.h>
 #include <stdint.h>
@@ -88,6 +89,10 @@ bool noah_qmk_keyboard_restart_request(void) {
 uint32_t noah_qmk_portable_live_setting(uint8_t id) {
     return id == NOAH_SETTING_DEFAULT_DPI ? 1600u : id == NOAH_SETTING_RGB_COLOR ? 0x00C8FF55u : 0u;
 }
+
+// Edit status page 0's flags are wire bits (profile-wire-v1.md, "Live edits").
+_Static_assert(NOAH_PROFILE_EDIT_WIRE_UNSAVED == 0x0001u && NOAH_PROFILE_EDIT_WIRE_PEER_REQUIRED == 0x0002u && NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED == 0x0004u && NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN == 0x0008u && NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED == 0x0010u && NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED == 0x0020u && NOAH_PROFILE_EDIT_WIRE_SAVING == 0x0040u && NOAH_PROFILE_EDIT_WIRE_MODE_CONFLICT == 0x0080u, "edit status flags 0-7");
+_Static_assert(NOAH_PROFILE_EDIT_WIRE_WAITING_SAFE == 0x0100u && NOAH_PROFILE_EDIT_WIRE_STORAGE_PAUSED == 0x0200u && NOAH_PROFILE_EDIT_WIRE_PEER_STORAGE_PAUSED == 0x0400u && NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED == 0x0800u && NOAH_PROFILE_EDIT_WIRE_MODE_NOT_STORED == 0x1000u && NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING == 0x2000u && NOAH_PROFILE_EDIT_WIRE_STOPPED == 0x4000u && NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED == 0x8000u && NOAH_PROFILE_EDIT_WIRE_STATUS_FLAGS == 0xFFFFu, "edit status flags 8-15");
 
 static uint8_t frame[32];
 
@@ -250,45 +255,26 @@ static void test_restart(void) {
     puts("restart takes only the confirmed report, in any state and mode, and says whether the other half took it");
 }
 
-// Flags 14 and 15 (D-F34): a stopped owner on this half, and on the other.
-static void test_stopped_flags(void) {
-    noah_profile_owner_working_status_t normal = fake;
-    const struct { bool stopped, peer_stopped; uint16_t flags; } cases[] = {
-        {false, false, 0u},
-        {true, false, NOAH_PROFILE_EDIT_WIRE_STOPPED},
-        {false, true, NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED},
-        {true, true, NOAH_PROFILE_EDIT_WIRE_STOPPED | NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED},
-    };
-
-    assert(NOAH_PROFILE_EDIT_WIRE_STOPPED == 0x4000u && NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED == 0x8000u && NOAH_PROFILE_EDIT_WIRE_STATUS_FLAGS == 0xFFFFu);
-    for (uint8_t i = 0u; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        fake.stopped      = cases[i].stopped;
-        fake.peer_stopped = cases[i].peer_stopped;
-        get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
-        assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
-        assert(((frame[9] | frame[10] << 8u) & 0xC000u) == cases[i].flags);
-    }
-    // A save under way is the saving flag, never a stopped one.
-    fake            = normal;
-    fake.save.phase = NOAH_PROFILE_OWNER_SAVE_WAIT;
-    get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
-    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && (frame[9] & NOAH_PROFILE_EDIT_WIRE_SAVING) && !(frame[10] & 0xC0u));
-    fake = normal;
-    puts("edit status flags 14 and 15 report a stopped owner on this half and on the other");
-}
-
 static void test_gets(void) {
     get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
     assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
     assert(frame[7] == NOAH_PROFILE_EDIT_WIRE_STATUS_LAYOUT && frame[8] == fake.local.phase && u32(&frame[11]) == fake.local.session && u32(&frame[15]) == fake.local.revision && u32(&frame[19]) == fake.saved_generation);
     assert(frame[29] == NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW);
-    assert((frame[9] & NOAH_PROFILE_EDIT_WIRE_UNSAVED) && (frame[9] & NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED));
-    // A keyboard adjustment waiting to publish is flag 13 (a new Apply is BUSY meanwhile).
-    assert(!(frame[10] & (NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING >> 8u)));
-    fake.adjustment_pending = true;
-    get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
-    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && (frame[10] & (NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING >> 8u)) && NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING == 0x2000u);
-    fake.adjustment_pending = false;
+    // The owner harness composes every flag from a real owner, but for the
+    // other half's paused save and its refusal of a whole copy, which no
+    // single-process pair reaches: their bits, packed here.
+    {
+        uint16_t flags = (uint16_t)(frame[9] | frame[10] << 8u);
+
+        fake.peer_storage_paused = true;
+        get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
+        assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && (frame[9] | frame[10] << 8u) == (flags | NOAH_PROFILE_EDIT_WIRE_PEER_STORAGE_PAUSED));
+        fake.peer_storage_paused = false;
+        fake.peer_refused        = true;
+        get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
+        assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && (frame[9] | frame[10] << 8u) == (flags | NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED));
+        fake.peer_refused = false;
+    }
     get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 1u);
     assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && u32(&frame[11]) == fake.peer.session && u32(&frame[15]) == fake.peer.revision);
     get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 2u);
@@ -352,7 +338,6 @@ int main(void) {
     fake.peer.mode             = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW;
     fake.peer.mode_counter     = 3u;
     fake.peer_required         = true;
-    fake.peer_converged        = true;
     fake.mode                  = (noah_profile_edit_mode_record_t){.counter = 3u, .mode = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW};
 #if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE)
     test_sets();
@@ -362,7 +347,6 @@ int main(void) {
     assert(!noah_qmk_profile_edit_channel(frame, sizeof(frame)));
 #endif
     test_restart();
-    test_stopped_flags();
     test_gets();
     return 0;
 }

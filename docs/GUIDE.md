@@ -484,6 +484,7 @@ live mode, an edit takes effect on both halves at the next safe boundary:
 the keyboard waits while a key or layer is held, so nothing changes under
 your fingers. Each keyboard remembers its edit mode outside the profile,
 so a backup or review never changes that choice. The default is Live + review.
+Changing it needs nothing unsaved and both halves connected and in agreement.
 
 - **Apply:** Ark keeps edits in its draft until you review and Apply. Apply
   saves the complete profile on both halves and replaces any working copy.

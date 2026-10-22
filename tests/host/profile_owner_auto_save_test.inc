@@ -169,10 +169,8 @@ static void test_auto_save_modes_and_adjustments(void) {
         }
         for (uint32_t guard = 0u; guard < 10000u && !left.save.phase; guard++) scan_pair(&left, &right, &now);
         assert(left.save.phase && left.save.automatic);
-        assert(noah_profile_owner_save(&left, left.save.transaction_id, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_BUSY);
-        // A host edit is refused while Save reads the frozen RAM; adjustment
-        // keys are queued and become the next revision after Save finishes.
-        assert(noah_profile_owner_edit_begin(&left, 40u, left.working.session, left.working.revision, 1u, 4u, 0u) == NOAH_PROFILE_WORKING_BUSY);
+        // Adjustment keys pressed while Save reads the frozen RAM are queued
+        // and become the next revision after Save finishes.
         assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 1000u));
         for (uint32_t guard = 0u; guard < 20000u && left.save.phase; guard++) scan_pair(&left, &right, &now);
         assert(left.save.keyboard_saves == saves + 1u && left.save.keyboard_revision == adjustment_revision);
@@ -315,12 +313,12 @@ static void auto_run_until(noah_profile_owner_t *left, noah_profile_owner_t *rig
     scan_until_converged(left, right, now);
 }
 
-static void test_apply_waits_behind_a_queued_adjustment(void) {
+static void test_an_apply_and_an_adjustment_land_in_the_order_made(void) {
     static noah_profile_owner_t left, right;
     static memory_t lm, rm;
     split_link_t ll = split_link_to(&right), rl = split_link_to(&left);
     split_fault_link_t lw = working_link_to(&right), rw = working_link_to(&left);
-    uint8_t settings[NOAH_SETTINGS_MIN_SIZE], expected[NOAH_SETTINGS_MIN_SIZE], frame[32];
+    uint8_t settings[NOAH_SETTINGS_MIN_SIZE], expected[NOAH_SETTINGS_MIN_SIZE];
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_SETTINGS, .insert = sizeof(settings), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     noah_profile_owner_working_status_t status;
     uint32_t pending;
@@ -340,18 +338,13 @@ static void test_apply_waits_behind_a_queued_adjustment(void) {
     assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && left.committed_descriptor.generation == 1u);
     scan_until_converged(&left, &right, &now);
 
-    // A DPI key queues 800, which settings projection reads back until it
-    // publishes. A new Apply is BUSY while it waits, and says why.
+    // A DPI key queues 800; a new Apply waits until it publishes (the
+    // admission matrix). It publishes, still unsaved; the Apply is then
+    // admitted, and it is the later act: it replaces the adjustment, which
+    // must not come back as a save of its own.
     assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 800u));
     assert(noah_profile_owner_pending_adjustment(&left, NOAH_SETTING_DEFAULT_DPI, &pending) && pending == 800u);
     assert(!noah_profile_owner_pending_adjustment(&left, NOAH_SETTING_SNIPING_DPI, &pending));
-    assert(noah_profile_owner_working_status(&left, &status) && status.adjustment_pending && status.edits_blocked);
-    begin_frame(frame, 9u);
-    assert(noah_profile_owner_receive(&left, frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
-    assert(left.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && !left.host_transaction.has_candidate);
-    // The adjustment publishes (still unsaved); the Apply is then admitted,
-    // and it is the later act: it replaces the adjustment, which must not
-    // come back as a save of its own.
     scan_until_converged(&left, &right, &now);
     assert(!left.auto_save.pending && left.working.active && active_scalar(&right, NOAH_SETTING_DEFAULT_DPI) == 800u);
     assert(!noah_profile_owner_pending_adjustment(&left, NOAH_SETTING_DEFAULT_DPI, &pending));
@@ -367,8 +360,6 @@ static void test_apply_waits_behind_a_queued_adjustment(void) {
     // defaults gain it) and is saved by the keyboard in Apply mode.
     stage_valid_candidate_pair(&left, &right, 10u, &now);
     assert(noah_profile_owner_adjust(&left, NOAH_SETTING_SNIPING_DPI, 300u));
-    begin_frame(frame, 11u);
-    assert(noah_profile_owner_receive(&left, frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_CANDIDATE_V1_ADMISSION_BUSY);
     commit_valid_candidate_pair(&left, &right, 10u, 3u, &now);
     assert(left.auto_save.pending);
     scan_until_converged(&left, &right, &now);
@@ -380,7 +371,7 @@ static void test_apply_waits_behind_a_queued_adjustment(void) {
     auto_run_until(&left, &right, &now, 10000u);
     assert(left.save.keyboard_saves == 1u && !left.working.active && left.committed_descriptor.generation == 4u && right.committed_descriptor.generation == 4u);
     assert_active_settings(&left, expected);
-    puts("a new Apply waits behind a queued adjustment and says so; one admitted already finishes, then the adjustment follows it");
+    puts("an Apply admitted once a queued adjustment publishes replaces it; one admitted already finishes, then the adjustment follows it");
 }
 
 static void test_adjustments_without_a_settings_domain(void) {
