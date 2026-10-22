@@ -496,6 +496,30 @@ static void test_layer_lock_anchor_is_not_taken_back_after_qmk_reset(void) {
     CHECK(fake_auto_mouse_key_tracker == 0);
 }
 
+// QMK also resets auto-mouse when its timeout changes, as a live settings
+// edit does (set_auto_mouse_timeout), while the layer stays locked: the next
+// sync takes the count again, and the unlock takes back only that one.
+static void test_layer_lock_anchor_is_taken_again_after_a_qmk_reset_it_survives(void) {
+    test_reset_stubs();
+
+    fake_locked_layers = (layer_state_t)1u << 4;
+    pointer_layer_policy_sync_layer_ownership_anchor();
+    CHECK(fake_auto_mouse_key_tracker == 1);
+
+    fake_auto_mouse_key_tracker = 0;
+    fake_auto_mouse_toggle      = false;
+    pointer_layer_policy_sync_layer_ownership_anchor();
+    CHECK(auto_mouse_keyevent_calls == 2 && auto_mouse_keyevent_pressed[1]);
+    CHECK(fake_auto_mouse_key_tracker == 1);
+    pointer_layer_policy_sync_layer_ownership_anchor();
+    CHECK(auto_mouse_keyevent_calls == 2);
+
+    fake_locked_layers = 0;
+    pointer_layer_policy_sync_layer_ownership_anchor();
+    CHECK(auto_mouse_keyevent_calls == 3 && !auto_mouse_keyevent_pressed[2]);
+    CHECK(fake_auto_mouse_key_tracker == 0);
+}
+
 // A behaviour's MO() hold of the auto-mouse layer reaches QMK only as a layer
 // change, so the runtime anchors it like a lock, once, for as long as it is
 // held; a lock and a hold together still count once.
@@ -588,6 +612,7 @@ int main(void) {
     test_pointer_layer_lock_anchors_auto_mouse_once();
     test_layer_lock_anchor_needs_the_auto_mouse_layer_and_auto_mouse_on();
     test_layer_lock_anchor_is_not_taken_back_after_qmk_reset();
+    test_layer_lock_anchor_is_taken_again_after_a_qmk_reset_it_survives();
     test_held_auto_mouse_layer_anchors_like_a_lock();
     test_layer_change_syncs_the_layer_lock_anchor();
     test_take_back_undoes_qmks_toggle_on_its_layer_keys();

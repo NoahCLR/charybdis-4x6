@@ -31,8 +31,12 @@ static void pd_mode_auto_mouse_sync_anchor(bool should_anchor) {
     // tracker anchor to behave like their physically-held form. Ordinary held
     // pd-mode keys already participate in QMK's mouse-record path, and scroll-
     // like lock paths that own auto-mouse_toggle() should not also push a
-    // tracker-style anchor here.
-    noah_qmk_contract_auto_mouse_keyevent(should_anchor);
+    // tracker-style anchor here. QMK zeroes the tracker whenever it resets
+    // auto-mouse (a live settings edit can), so the count is only taken back
+    // while one is there to take.
+    if (should_anchor || noah_qmk_contract_auto_mouse_key_tracker() > 0) {
+        noah_qmk_contract_auto_mouse_keyevent(should_anchor);
+    }
     state->synthetic_auto_mouse_anchor_active = should_anchor;
 }
 
