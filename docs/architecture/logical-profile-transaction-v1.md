@@ -92,7 +92,10 @@ restart, while the USB half keeps typing the old generation if it has not
 rebooted; after reboot it types compiled defaults until reconciliation. Unplugging the
 link cable also powers the peer off. A peer that rebooted keeps its durable
 prepared record but not its volatile leases, so the USB half sends the copy
-again from its own committed record before the authorized commit.
+again from its own committed record before the authorized commit. A USB half
+that restarts alone ends the peer's prepared copy at the first of its metadata polls the peer takes
+once it has read its own record: discarded before its commit marker,
+committed after it ([split protocol](profile-split-v1.md#an-abandoned-prepared-copy-d-f34)).
 
 ## Cancellation And Lease Ownership
 

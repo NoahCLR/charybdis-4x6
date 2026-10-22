@@ -365,7 +365,10 @@ bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reco
         }
         return encode_busy_response(reconciler, &decoded, NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED, response);
     }
-    if (read_cached_response(reconciler, request, request_length, response, response_length)) {
+    // Behind a queued request nothing is answered from the cache: requests
+    // are taken in the order they came, so a poll saying its sender holds no
+    // push is taken before any request of a push begun after it.
+    if (!mailbox_pending(reconciler) && read_cached_response(reconciler, request, request_length, response, response_length)) {
         return true;
     }
     // A full mailbox means this half has not yet processed an earlier request;
@@ -377,9 +380,42 @@ bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reco
     return encode_busy_response(reconciler, &decoded, reconciler->config.storage_paused && reconciler->config.storage_paused(reconciler->config.storage_paused_context) ? NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED : NOAH_PROFILE_SPLIT_V1_BUSY_MAILBOX_FULL, response);
 }
 
+// Ends the copy this half receives or holds prepared, and gives its storage
+// back; a failed abort leaves the store's own rejection and says why.
+static bool release_remote_prepare(noah_profile_split_reconciler_t *reconciler) {
+    noah_profile_peer_store_result_t result;
+
+    clear_provisional_peer(reconciler, &reconciler->config.peer_store->descriptor);
+    result = noah_profile_peer_store_backend_abort(reconciler->config.peer_store, &reconciler->config.peer_store->descriptor);
+    if (result != NOAH_PROFILE_PEER_STORE_OK) {
+        reconciler->last_status = map_peer_error(result);
+        return false;
+    }
+    reconciler->transfer_owner       = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
+    reconciler->lease_activity_known = false;
+    invalidate_cached_response(reconciler);
+    return true;
+}
+
+// Only the push that sent a prepared copy commits or cancels it, and its
+// sender authorizes the commit only once its own saved profile is the copy.
+// A sender that holds no push and has read a saved profile other than the
+// copy restarted before its marker, or released the push without an
+// acknowledged ABORT: nothing will ever end the copy, so this releases it
+// (D-F34). A sender whose saved profile is the copy commits it as repair.
+// Nothing else releases a prepared copy: not time, nor silence.
+static bool prepared_copy_abandoned(const noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request) {
+    const noah_profile_peer_store_backend_t *store = reconciler->config.peer_store;
+
+    return request->no_prepared_push && request->descriptor.readable && !descriptor_equal(&request->descriptor, &store->descriptor) && reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && noah_profile_peer_store_backend_state(store) == NOAH_PROFILE_PEER_STORE_PREPARED;
+}
+
 static __attribute__((noinline)) void process_metadata(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request) {
     reconciler->peer_descriptor = request->descriptor;
     clear_provisional_peer(reconciler, &request->descriptor);
+    if (prepared_copy_abandoned(reconciler, request)) {
+        (void)release_remote_prepare(reconciler);
+    }
     publish_authority(reconciler);
 }
 
@@ -779,23 +815,16 @@ static bool advance_store_transfer(noah_profile_split_reconciler_t *reconciler) 
 }
 
 static bool expire_remote_prepare(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
-    noah_profile_peer_store_result_t result;
-
     // A lease this half is not pulling itself expires once its own copy has
     // been quiet for the lease time, whatever else crosses the link. That
     // includes a lease no transfer owns any more.
     if (!(reconciler && reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && reconciler->lease_activity_known && noah_profile_peer_store_backend_state(reconciler->config.peer_store) == NOAH_PROFILE_PEER_STORE_RECEIVING && deadline_reached(now, reconciler->lease_activity_at + NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS))) {
         return false;
     }
-    result = noah_profile_peer_store_backend_abort(reconciler->config.peer_store, &reconciler->config.peer_store->descriptor);
-    if (result != NOAH_PROFILE_PEER_STORE_OK) {
-        reconciler->last_status = map_peer_error(result);
+    if (!release_remote_prepare(reconciler)) {
         publish_authority(reconciler);
         return true;
     }
-    reconciler->transfer_owner       = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
-    reconciler->lease_activity_known = false;
-    invalidate_cached_response(reconciler);
     reconciler->peer_activity_known = false;
     invalidate_peer(reconciler);
     return true;
@@ -1038,7 +1067,9 @@ static void metadata_exchange(noah_profile_split_reconciler_t *reconciler, uint3
 
     refresh_local(reconciler);
     refresh_metadata_response(reconciler);
-    request = (noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = reconciler->local_descriptor};
+    // From the start of a prepared push to its end (clear_prepared_push), the
+    // poll claims nothing; outside one, and from boot, it says none is held.
+    request = (noah_profile_split_v1_frame_t){.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = reconciler->local_descriptor, .no_prepared_push = !reconciler->prepared_push_active};
     if (!rpc_exchange(reconciler, &request, &response, now)) {
         return;
     }
