@@ -21,12 +21,14 @@
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/api.h"
+#include "users/noah/lib/split/runtime_sync_dirty.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/key/runtime/projection/projection.h"
 #include "users/noah/lib/key/runtime/reducer/ownership_state.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/key/runtime/reducer/state_query.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
+#include "users/noah/lib/state/diagnostics/runtime_trace.h"
 #include "users/noah/lib/state/shared/runtime_reset.h"
 #include "users/noah/noah_runtime.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
@@ -335,6 +337,11 @@ const key_behavior_t key_behaviors[] = {
     {.keycode = MS_BTN3, .multi_tap_term = 100, .tap_hold_term = 100, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}}},
     {.keycode = MS_BTN1, .tap_hold_term = TEST_PD_TAP_HOLD_TERM, .multi_tap_term = TEST_PD_MULTI_TAP_TERM, .tap_counts[0] = {.tap = TAP_SENDS(KC_A), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)}},
     {.keycode = MS_BTN2, .tap_hold_term = TEST_PD_TAP_HOLD_TERM, .multi_tap_term = TEST_PD_MULTI_TAP_TERM, .tap_counts[0] = {.hold = REPEAT_WHILE_HELD(KC_B, 20)}},
+#ifndef NOAH_TEST_QMK_GESTURES
+    // Keys whose only step is a tap: each falls back to holding itself.
+    {.keycode = KC_F20, .tap_counts[0] = {.tap = TAP_SENDS(KC_F23)}},
+    {.keycode = KC_F21, .tap_counts[0] = {.tap = TAP_SENDS(KC_F24)}},
+#endif
 };
 const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
 
@@ -370,6 +377,19 @@ static uint16_t              last_tap_code16;
 static uint8_t               reset_dragscroll_count;
 static uint16_t              last_delayed_action;
 static delayed_action_mods_t last_delayed_mods;
+#ifndef NOAH_TEST_QMK_GESTURES
+// What reached the host, in order: 'R' a key registered, 'U' one let go, 'T'
+// a tap.
+typedef struct {
+    char     kind;
+    uint16_t code;
+} host_out_t;
+static host_out_t host_out[16];
+static uint8_t    host_out_count;
+static void       host_out_add(char kind, uint16_t code) {
+    if (host_out_count < ARRAY_SIZE(host_out)) host_out[host_out_count++] = (host_out_t){kind, code};
+}
+#endif
 
 typedef enum {
     TEST_RELEASE_TARGET_CHILD = 0,
@@ -558,6 +578,9 @@ static void test_reset_state(void) {
     reset_dragscroll_count                 = 0;
     last_delayed_action                    = KC_NO;
     last_delayed_mods                      = (delayed_action_mods_t){0};
+#ifndef NOAH_TEST_QMK_GESTURES
+    host_out_count = 0;
+#endif
 }
 
 static __attribute__((unused)) keyrecord_t test_record(keypos_t key_pos, bool pressed) {
@@ -691,6 +714,8 @@ static uint8_t gesture_report_mods(void) {
 void tap_code16(uint16_t keycode) {
 #ifdef NOAH_TEST_QMK_GESTURES
     gesture_out_add('T', keycode);
+#else
+    host_out_add('T', keycode);
 #endif
     tap_code16_count++;
     last_tap_code16 = keycode;
@@ -713,6 +738,8 @@ void register_code16(uint16_t keycode) {
     gesture_out_add('R', keycode);
     gesture_registered = keycode;
     gesture_host_mods |= noah_qmk_real_mods_for_keycode(keycode);
+#else
+    host_out_add('R', keycode);
 #endif
     (void)keycode;
 }
@@ -721,6 +748,8 @@ void unregister_code16(uint16_t keycode) {
 #ifdef NOAH_TEST_QMK_GESTURES
     gesture_unregistered = keycode;
     gesture_host_mods &= (uint8_t)~noah_qmk_real_mods_for_keycode(keycode);
+#else
+    host_out_add('U', keycode);
 #endif
     (void)keycode;
 }
@@ -2484,6 +2513,173 @@ static void test_configured_button_click_runs_no_behaviour(void) {
     key_runtime_integration_scan();
     CHECK(tap_code16_count == 1u && last_tap_code16 == MS_BTN3);
     test_assert_button_quiescent(pos);
+}
+
+// ── Fallback holds settled before an output (D-F27) ────────────────────────
+//
+// KC_F20 and KC_F21 author only a tap, so each falls back to holding itself.
+// Before an output the runtime sends, every handled key whose fallback hold is
+// due has it registered, in key order (by position), and then the output goes
+// out. A physical press registers the earlier keys' holds at its own
+// preflight, so several are due at once only for presses that reach the
+// reducer without one: those are begun through its event input here. Arrow's
+// motion taps are the output.
+
+static bool host_out_is(uint8_t index, char kind, uint16_t code) {
+    return index < host_out_count && host_out[index].kind == kind && host_out[index].code == code;
+}
+
+static uint8_t host_out_count_of(char kind, uint16_t code) {
+    uint8_t count = 0;
+
+    for (uint8_t index = 0; index < host_out_count; index++) {
+        count += host_out[index].kind == kind && host_out[index].code == code;
+    }
+    return count;
+}
+
+// The registrations the runtime traced since the last trace reset: how many,
+// and whether they were announced as effects 0, 1, ... of one settlement.
+static uint8_t test_traced_fallback_registrations(void) {
+    noah_runtime_trace_snapshot_t snapshot;
+    uint8_t                       count = 0;
+
+    noah_runtime_trace_snapshot(&snapshot);
+    CHECK(!snapshot.overflowed);
+    for (uint16_t index = 0; index < snapshot.count; index++) {
+        const noah_runtime_trace_entry_t *entry = &snapshot.entries[index];
+
+        if (entry->kind == NOAH_TRACE_KEY_RUNTIME && entry->event == NOAH_TRACE_KEY_RUNTIME_EVENT_EFFECT_EXECUTE && entry->a == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER) {
+            CHECK(entry->b == count);
+            count++;
+        }
+    }
+    return count;
+}
+
+static void test_begin_press_without_preflight(uint16_t keycode, keypos_t pos) {
+    key_runtime_core_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_KEY_DOWN, .data.key_event = {.keycode = keycode, .key_pos = pos}}, fake_time);
+}
+
+// One threshold step right under Arrow: it taps KC_RIGHT.
+static void test_arrow_step_right(void) {
+    (void)noah_pointing_device_task_user((report_mouse_t){.x = noah_pd_defaults[4].threshold_x});
+}
+
+// Decided as a hold, the key's release lets the hold go and types no tap.
+static void test_release_fallback_hold(uint16_t keycode, uint16_t tap, keypos_t pos) {
+    test_release_and_settle(keycode, pos);
+    CHECK(host_out_count_of('U', keycode) == 1u);
+    CHECK(host_out_count_of('T', tap) == 0u);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_NO);
+}
+
+// A held key's fallback hold goes out before a mode's tap, and the key is then
+// a hold: its release lets the hold go and types no tap.
+static void test_mode_tap_registers_held_key_fallback_hold_first(void) {
+    keypos_t pos = test_keypos(1, 0);
+
+    test_reset_state();
+    test_lock_arrow();
+    CHECK(!key_runtime_integration_process_record(KC_F20, pos, true));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_NO && host_out_count == 0u);
+    noah_runtime_trace_reset();
+    split_runtime_sync_clear_key_feedback_semantic_dirty();
+    split_runtime_sync_clear_key_feedback_branch_dirty();
+    test_arrow_step_right();
+    // The registration is announced to the other half's feedback.
+    CHECK(split_runtime_sync_key_feedback_semantic_is_dirty());
+    CHECK(test_traced_fallback_registrations() == 1u);
+    CHECK(host_out_count == 2u);
+    CHECK(host_out_is(0, 'R', KC_F20));
+    CHECK(host_out_is(1, 'T', KC_RIGHT));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_F20);
+    test_release_fallback_hold(KC_F20, KC_F23, pos);
+    test_assert_button_quiescent(pos);
+}
+
+// Two keys due at once both register before the tap, in key order rather than
+// press order, each once.
+static void test_mode_tap_registers_every_due_fallback_hold_in_key_order(void) {
+    keypos_t later_pos   = test_keypos(3, 0);
+    keypos_t earlier_pos = test_keypos(1, 0);
+
+    test_reset_state();
+    test_lock_arrow();
+    CHECK(!key_runtime_integration_process_record(KC_F20, later_pos, true));
+    key_runtime_integration_advance(&fake_time, 10u);
+    test_begin_press_without_preflight(KC_F21, earlier_pos);
+    CHECK(host_out_count == 0u);
+    noah_runtime_trace_reset();
+    test_arrow_step_right();
+    CHECK(test_traced_fallback_registrations() == 2u);
+    CHECK(host_out_count == 3u);
+    CHECK(host_out_is(0, 'R', KC_F21));
+    CHECK(host_out_is(1, 'R', KC_F20));
+    CHECK(host_out_is(2, 'T', KC_RIGHT));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(earlier_pos) == KC_F21);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(later_pos) == KC_F20);
+
+    // The next tap finds nothing due.
+    noah_runtime_trace_reset();
+    test_arrow_step_right();
+    CHECK(test_traced_fallback_registrations() == 0u);
+    CHECK(host_out_count == 4u && host_out_is(3, 'T', KC_RIGHT));
+    test_release_fallback_hold(KC_F21, KC_F24, earlier_pos);
+    test_release_fallback_hold(KC_F20, KC_F23, later_pos);
+    test_assert_button_quiescent(earlier_pos);
+    test_assert_button_quiescent(later_pos);
+}
+
+// Only due holds register: a key whose hold is already on (a later press
+// registered it) is not registered again, and a press offered to the mode
+// whose tap goes out holds nothing of its own.
+static void test_mode_tap_registers_only_due_fallback_holds(void) {
+    keypos_t    first_pos  = test_keypos(1, 0);
+    keypos_t    second_pos = test_keypos(3, 0);
+    keypos_t    button_pos = test_keypos(4, 2);
+    keyrecord_t button     = test_record(button_pos, true);
+
+    test_reset_state();
+    test_lock_arrow();
+    CHECK(!key_runtime_integration_process_record(KC_F20, first_pos, true));
+    CHECK(!key_runtime_integration_process_record(KC_F21, second_pos, true));
+    CHECK(host_out_count == 1u && host_out_is(0, 'R', KC_F20));
+    noah_runtime_trace_reset();
+    test_arrow_step_right();
+    CHECK(test_traced_fallback_registrations() == 1u);
+    CHECK(host_out_count == 3u);
+    CHECK(host_out_is(1, 'R', KC_F21));
+    CHECK(host_out_is(2, 'T', KC_RIGHT));
+    CHECK(host_out_count_of('R', KC_F20) == 1u);
+    test_release_fallback_hold(KC_F21, KC_F24, second_pos);
+    test_release_fallback_hold(KC_F20, KC_F23, first_pos);
+    test_assert_button_quiescent(first_pos);
+    test_assert_button_quiescent(second_pos);
+
+    // Button 3's factory row falls back to holding the button. Offered to
+    // Arrow, which taps paste for it, the press is the mode's: the tap
+    // registers the other due key's hold and not the button's. This is the
+    // record path's mode stage for a press begun without preflight.
+    test_reset_state();
+    test_lock_arrow();
+    test_begin_press_without_preflight(KC_F20, first_pos);
+    test_begin_press_without_preflight(MS_BTN3, button_pos);
+    button.event.time = fake_time;
+    noah_runtime_trace_reset();
+    key_runtime_core_offer_press_to_mode(button_pos);
+    CHECK(pd_mode_handle_key_event(MS_BTN3, &button));
+    key_runtime_core_end_mode_offer(button_pos, true);
+    CHECK(test_traced_fallback_registrations() == 1u);
+    CHECK(host_out_count == 2u);
+    CHECK(host_out_is(0, 'R', KC_F20));
+    CHECK(host_out_is(1, 'T', G(KC_V)));
+    CHECK(noah_runtime_debug_slot_held_action_keycode(first_pos) == KC_F20);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(button_pos) == KC_NO);
+    test_release_and_settle(MS_BTN3, button_pos);
+    test_release_fallback_hold(KC_F20, KC_F23, first_pos);
+    test_assert_button_quiescent(button_pos);
+    test_assert_button_quiescent(first_pos);
 }
 #endif
 
@@ -5090,6 +5286,9 @@ int main(int argc, char **argv) {
 #ifdef NOAH_PD_PROFILE_ENABLE
     test_configured_consume_button_runs_nothing();
     test_configured_button_click_runs_no_behaviour();
+    test_mode_tap_registers_held_key_fallback_hold_first();
+    test_mode_tap_registers_every_due_fallback_hold_in_key_order();
+    test_mode_tap_registers_only_due_fallback_holds();
 #endif
 #ifdef NOAH_PD_PROFILE_ENABLE
     test_last_slot_hold_lock_dpi_and_disabled_slot();

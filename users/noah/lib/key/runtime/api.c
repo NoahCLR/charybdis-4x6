@@ -6,18 +6,35 @@
 #include "transition.h"
 #include "reducer/runtime.h"
 #include "planning/effect_plan.h"
+#include "projection/projection.h"
+#include "trace.h"
 #include "../behavior/key_behavior_lookup.h"
 #include "../behavior/participation.h"
 #include "../../compat/qmk_source_layer_contract.h"
+#include "../../split/runtime_sync.h"
 
+// Which are due is decided for all keys first, as one plan would decide them
+// (projecting one may preempt another key's pointing mode); each is then
+// announced, traced and projected in key order. No plan is held: this runs
+// beneath the projection of an output, on the reviewed stack paths.
 bool noah_key_runtime_settle_pending_fallback_hold(void) {
-    key_runtime_core_effect_plan_t plan;
-    bool                           settled_any;
+    uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT];
+    uint8_t  projected = 0u;
 
-    key_runtime_core_effect_plan_init_streaming(&plan);
-    settled_any = key_runtime_core_settle_pending_fallback_hold(&plan);
-    key_runtime_transition_execute_plan(NULL, &plan);
-    return settled_any;
+    if (!key_runtime_core_pending_fallback_holds(due)) {
+        return false;
+    }
+    split_runtime_sync_notify_key_feedback_dirty();
+    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
+        key_runtime_effect_t effect;
+
+        if (!(due[index / 32u] & (UINT32_C(1) << (index % 32u))) || !key_runtime_core_fallback_hold_effect(index, &effect)) {
+            continue;
+        }
+        key_runtime_trace_effect_execute(projected++, &effect);
+        key_runtime_core_project_effect(&effect);
+    }
+    return true;
 }
 
 // Not inlined, so a press with no layer tap to settle carries no plan through

@@ -252,10 +252,13 @@ reducer plans into directly and `transition.c` executes: traced, announced to
 split consumers and projected. The handled press and release plan into a
 buffered plan, which keeps every effect until it is executed, so the release
 can defer blocked dispatches. The reducer's moments before a press and before
-a release, the scan, fallback-hold settlement and layer-tap settlement plan into
-a streaming plan, which projects what it holds when it fills (auto-drain) and
-between a moment's steps, so each step plans against what the last one
-projected. No frame holds a plan it does not fill.
+a release, the scan and layer-tap settlement plan into a streaming plan, which
+projects what it holds when it fills (auto-drain) and between a moment's
+steps, so each step plans against what the last one projected. No frame holds
+a plan it does not fill. Fallback-hold settlement, which runs before every
+output and so beneath the projection of another plan's effect, holds no plan:
+it decides which keys' holds are due for all of them, then announces, traces
+and projects each registration in key order (`api.c`).
 
 ## Pointing-Device Flow
 

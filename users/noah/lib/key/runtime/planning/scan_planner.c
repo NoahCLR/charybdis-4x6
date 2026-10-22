@@ -308,9 +308,9 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
     return true;
 }
 
-bool key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *state, press_token_t *token, key_runtime_core_effect_plan_t *plan) {
-    keypos_t token_key_pos;
-
+// Whether `token`'s fallback hold is due now: it registers its resolved
+// keycode at its key.
+static bool key_runtime_core_fallback_hold_due(key_runtime_core_state_t *state, const press_token_t *token) {
     if (!(state && key_runtime_core_scan_token_hold_eligible(state, token) && key_runtime_core_scan_press_token_uses_fallback_hold(token))) {
         return false;
     }
@@ -319,11 +319,23 @@ bool key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *st
         return false;
     }
 
-    token_key_pos = key_runtime_core_scan_press_token_key_pos(state, token);
-    if (key_runtime_core_press_offered_to_mode(token_key_pos)) {
+    return !key_runtime_core_press_offered_to_mode(key_runtime_core_scan_press_token_key_pos(state, token));
+}
+
+static key_runtime_effect_t key_runtime_core_fallback_hold_register(const key_runtime_core_state_t *state, const press_token_t *token) {
+    return (key_runtime_effect_t){
+        .kind             = KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER,
+        .data.held_action = {.key_pos = key_runtime_core_scan_press_token_key_pos(state, token), .action = token->resolved_keycode},
+    };
+}
+
+bool key_runtime_core_plan_fallback_hold_activation(key_runtime_core_state_t *state, press_token_t *token, key_runtime_core_effect_plan_t *plan) {
+    if (!key_runtime_core_fallback_hold_due(state, token)) {
         return false;
     }
-    key_runtime_core_effect_plan_push_held_action(plan, KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER, token_key_pos, token->resolved_keycode);
+    key_runtime_effect_t effect = key_runtime_core_fallback_hold_register(state, token);
+
+    key_runtime_core_effect_plan_push_held_action(plan, effect.kind, effect.data.held_action.key_pos, effect.data.held_action.action);
     return true;
 }
 
@@ -528,19 +540,34 @@ void key_runtime_core_plan_missed_scans_for_token(key_runtime_core_state_t *stat
     state->current_time = current_time;
 }
 
-bool key_runtime_core_settle_pending_fallback_hold(key_runtime_core_effect_plan_t *plan) {
-    key_runtime_core_state_t *state       = key_runtime_core_state();
-    bool                      settled_any = false;
+// Not inlined: the reviewed stack paths name it beneath an output.
+__attribute__((noinline)) bool key_runtime_core_pending_fallback_holds(uint32_t due[KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT]) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+    bool                      any   = false;
 
-    if (!(state && plan)) {
+    for (uint16_t word = 0; word < KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT; word++) {
+        due[word] = 0u;
+    }
+    if (!state) {
         return false;
     }
 
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY; index++) {
-        if (key_runtime_core_plan_fallback_hold_activation(state, &state->press_tokens[index], plan)) {
-            settled_any = true;
+        if (key_runtime_core_fallback_hold_due(state, &state->press_tokens[index])) {
+            due[index / 32u] |= UINT32_C(1) << (index % 32u);
+            any = true;
         }
     }
 
-    return settled_any;
+    return any;
+}
+
+bool key_runtime_core_fallback_hold_effect(uint16_t index, key_runtime_effect_t *effect) {
+    key_runtime_core_state_t *state = key_runtime_core_state();
+
+    if (!(state && effect && index < KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY)) {
+        return false;
+    }
+    *effect = key_runtime_core_fallback_hold_register(state, &state->press_tokens[index]);
+    return true;
 }
