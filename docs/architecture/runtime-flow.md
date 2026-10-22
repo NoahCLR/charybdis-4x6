@@ -19,7 +19,8 @@ flowchart TD
     runtime --> pointing["pointing/runtime/pd_runtime.c pointing hook"]
     runtime --> rgb["rgb/core/rgb_runtime.c RGB hook"]
     runtime --> layer["pointing runtime + layer ownership hook"]
-    init --> durable_io["compat/qmk_durable_io.c profile store step"]
+    init --> store_runtime["profile/storage/profile_store_runtime.c matrix scan"]
+    store_runtime --> durable_io["compat/qmk_durable_io.c durable-I/O grant"]
     init --> combo_scan["compat/qmk_combo_origin.c lifecycle reconciliation"]
     init --> key_scan["key/runtime/scan.c"]
     init --> split_sync["split/runtime_sync.c"]
@@ -167,8 +168,9 @@ or drain effects but must not re-decide release semantics.
 flowchart TD
     master_scan["master: matrix_scan_user"] --> init["runtime_init.c"]
     slave_scan["slave: matrix_slave_scan_user"] --> init
-    init --> durable["Both halves: durable-I/O grant"]
-    durable --> discovery["Profile store: boot discovery, owner and split copy step"]
+    init --> store_scan["Both halves: profile store runtime matrix scan"]
+    store_scan --> durable["This half's durable-I/O grant"]
+    durable --> discovery["Store steps: boot discovery, or the owner's scan and split copy"]
     init --> combo["Master-only: retire suppressed/expired combo origins"]
     init --> key_scan["Master-only: key/runtime/scan.c"]
     key_scan --> reducer_scan["Authoritative reducer scan state"]
@@ -194,22 +196,24 @@ reader now seeks by domain (D-F12), emitting only intersecting domain payloads
 for each chunk; effective caches warm through that same representation.
 
 The profile split RPC callback only validates, queues and returns bounded
-responses; it never touches flash. The durable-I/O scheduler opens one flash
-grant per matrix scan and gives the profile store one step in it, then more
-while the store has local work in progress, until a step finds nothing to do,
-erases or programs, or uses the split link, for at most 1 ms and 32 steps
-(D-F29, "Pacing"); the profile store is its only owner since VIA left (D-F31).
+responses; it never touches flash. Each matrix scan runs the half's
+durable-I/O grant (`qmk_durable_io.c`), which the profile store runtime owns
+and binds to the half's slot flash: it opens one flash grant and gives the
+profile store one step in it, then more while the store has local work in
+progress, until a step finds nothing to do, erases or programs, or uses the
+split link, for at most 1 ms and 32 steps (D-F29, "Pacing"); the profile
+store is its only owner since VIA left (D-F31).
 
 QMK routes master and slave scans through different user hooks. The master
 uses `matrix_scan_user()` and runs the complete runtime pipeline; the slave
-uses `matrix_slave_scan_user()` and runs only the durable-I/O scheduler. This
+uses `matrix_slave_scan_user()` and runs only the durable-I/O grant. This
 second path is required for incremental profile-owner initialization, profile
 RPC registration, and profile receiver mailbox processing on the slave.
 
 The profile store exposes a one-read-per-step boot selector and the candidate
 backend exposes bounded whole-profile adoption of its exact selected record.
 Ordinary firmware retains the read-only discovery shell. The side-specific
-engineering artifact replaces that scheduler entry with the single profile
+engineering artifact replaces that grant's store step with the single profile
 owner, which incrementally validates compiled defaults, selects and adopts a
 durable record, fully reconciles a boot-selected record before requesting its
 activation, and then rotates at most one host, split, or peer-activation step.

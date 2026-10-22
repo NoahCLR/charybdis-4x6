@@ -7,10 +7,10 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "../../compat/qmk_durable_io.h"
 #include "../../compat/qmk_profile_flash.h"
 #include "../protocol/profile_wire_v1.h"
 #include "../schema/profile_compiled_defaults_v1.h"
-#include "profile_paused_clock.h"
 
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
 #    include "../../compat/qmk_physical_half.h"
@@ -24,33 +24,16 @@
 
 static noah_profile_store_runtime_state_t runtime_state;
 static noah_profile_store_result_t        discovery_result;
-#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
-// The owner's clock stops while its storage step is not allowed to run.
-static noah_profile_paused_clock_t runtime_clock;
-static volatile bool               runtime_storage_paused;
+// This half's durable-I/O grant, in both builds: the store's turn at the slot
+// flash once per scan, with the owner's clock and its pause (D-F29, D-F32).
+static noah_qmk_durable_io_grant_t runtime_grant;
 
-// Out of line, as the registration below: both run inside the durable-I/O
-// step, whose frame every reviewed storage path carries.
-__attribute__((noinline)) void noah_profile_store_runtime_note_storage_paused(bool paused) {
-    runtime_storage_paused = paused;
-    noah_profile_paused_clock_note(&runtime_clock, paused, timer_read32());
-}
-
-static bool keyboard_quiet(void *context) {
+// The half's keyboard for its grant's erases and, with an owner, for the
+// owner's automatic saves.
+bool noah_qmk_durable_io_keyboard_quiet(void *context) {
     (void)context;
     return noah_qmk_profile_flash_keyboard_quiet();
 }
-
-static bool storage_paused(void *context) {
-    (void)context;
-    return runtime_storage_paused;
-}
-#else
-// A store without an owner keeps no timers.
-void noah_profile_store_runtime_note_storage_paused(bool paused) {
-    (void)paused;
-}
-#endif
 
 #if !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
 static noah_profile_store_t runtime_store;
@@ -71,6 +54,7 @@ void noah_profile_store_runtime_init(void) {
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
     uint8_t origin;
 
+    noah_qmk_durable_io_init(&runtime_grant, noah_qmk_profile_flash_store(), NULL);
     runtime_owner_initialized    = false;
     runtime_transport_registered = false;
     runtime_working_transport_registered = false;
@@ -88,8 +72,9 @@ void noah_profile_store_runtime_init(void) {
                                                                                                 .working_session         = noah_qmk_profile_working_session(),
                                                                                                 .working_exchange        = noah_qmk_profile_working_transport_exchange,
                                                                                                 .edit_mode_storage       = noah_qmk_edit_mode_storage(),
-                                                                                                .storage_paused          = storage_paused,
-                                                                                                .keyboard_quiet          = keyboard_quiet,
+                                                                                                .storage_paused          = noah_qmk_durable_io_storage_paused,
+                                                                                                .storage_paused_context  = &runtime_grant,
+                                                                                                .keyboard_quiet          = noah_qmk_durable_io_keyboard_quiet,
 #        ifdef NOAH_PORTABLE_PROFILE_ENABLE
                                                                                                 .settings_defaults_length = noah_profile_settings_defaults_length,
                                                                                                 .settings_defaults_byte   = noah_profile_settings_defaults_byte,
@@ -109,6 +94,7 @@ void noah_profile_store_runtime_init(void) {
 #else
     noah_profile_compiled_v1_t compiled;
 
+    noah_qmk_durable_io_init(&runtime_grant, noah_qmk_profile_flash_store(), NULL);
     if (noah_profile_compiled_v1_open(&compiled, NULL) != NOAH_PROFILE_COMPILED_V1_OK) {
         discovery_result = NOAH_PROFILE_STORE_INVALID_PAYLOAD;
         runtime_state    = NOAH_PROFILE_STORE_RUNTIME_STORAGE_ERROR;
@@ -155,7 +141,8 @@ static __attribute__((noinline)) bool register_transports(void) {
 }
 #endif
 
-bool noah_profile_store_runtime_storage_busy(void) {
+bool noah_qmk_durable_io_store_busy(void *context) {
+    (void)context;
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
     return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_storage_busy(&runtime_owner);
 #else
@@ -164,24 +151,18 @@ bool noah_profile_store_runtime_storage_busy(void) {
 #endif
 }
 
-void noah_profile_store_runtime_scan_again(bool again) {
-#if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
-    if (runtime_owner_initialized && !runtime_integration_error) {
-        noah_profile_owner_scan_again(&runtime_owner, again);
-    }
-#else
-    (void)again;
-#endif
-}
-
-bool noah_profile_store_runtime_matrix_scan_step(void) {
+// The grant's step: inlined into it (noah_qmk_durable_io_profile_step), so
+// the reviewed stack paths go on from the step into the owner's scan.
+bool noah_qmk_durable_io_store_step(void *context, bool again, uint32_t now_ms) {
+    (void)context;
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
     bool worked;
 
     if (!runtime_owner_initialized || runtime_integration_error) {
         return false;
     }
-    worked = noah_profile_owner_scan(&runtime_owner, is_keyboard_master(), noah_profile_paused_clock_now(&runtime_clock, timer_read32()));
+    noah_profile_owner_scan_again(&runtime_owner, again);
+    worked = noah_profile_owner_scan(&runtime_owner, is_keyboard_master(), now_ms);
     if ((!runtime_transport_registered || !runtime_working_transport_registered) && !register_transports()) {
         return true;
     }
@@ -213,6 +194,10 @@ bool noah_profile_store_runtime_matrix_scan_step(void) {
     }
     return worked;
 #else
+    // Without an owner the store keeps no timers and has no subsystem to
+    // repeat.
+    (void)again;
+    (void)now_ms;
     if (runtime_state != NOAH_PROFILE_STORE_RUNTIME_DISCOVERY_PENDING) {
         return false;
     }
@@ -237,7 +222,7 @@ bool noah_profile_store_runtime_matrix_scan_step(void) {
 }
 
 void noah_profile_store_runtime_matrix_scan(void) {
-    (void)noah_profile_store_runtime_matrix_scan_step();
+    noah_qmk_durable_io_matrix_scan(&runtime_grant);
 }
 
 noah_profile_store_runtime_state_t noah_profile_store_runtime_state(void) {

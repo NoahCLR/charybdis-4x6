@@ -81,7 +81,7 @@ bool noah_qmk_profile_flash_eeprom_valid(void) {
 static noah_profile_flash_store_t noah_qmk_profile_flash;
 static bool                       noah_qmk_profile_flash_ready;
 
-static noah_profile_flash_store_t *flash_store(void) {
+noah_profile_flash_store_t *noah_qmk_profile_flash_store(void) {
     if (!noah_qmk_profile_flash_ready) {
         noah_profile_flash_store_init(&noah_qmk_profile_flash, noah_qmk_profile_flash_driver());
         noah_qmk_profile_flash_ready = true;
@@ -90,11 +90,11 @@ static noah_profile_flash_store_t *flash_store(void) {
 }
 
 noah_profile_store_io_t noah_qmk_profile_flash_read_only_io(void) {
-    return noah_profile_flash_store_read_only_io(flash_store());
+    return noah_profile_flash_store_read_only_io(noah_qmk_profile_flash_store());
 }
 
 noah_profile_store_io_t noah_qmk_profile_flash_io(void) {
-    return noah_profile_flash_store_io(flash_store());
+    return noah_profile_flash_store_io(noah_qmk_profile_flash_store());
 }
 
 // No key held, and the matrix unchanged for the quiet time: an erase now
@@ -112,28 +112,8 @@ bool noah_qmk_profile_flash_keyboard_quiet(void) {
     return true;
 }
 
-void noah_qmk_profile_flash_grant_begin(void) {
-    noah_profile_flash_store_t *flash = flash_store();
-
-    noah_profile_flash_store_grant_begin(flash, noah_profile_flash_store_erase_pending(flash) && noah_qmk_profile_flash_keyboard_quiet());
-}
-
-bool noah_qmk_profile_flash_may_write(void) {
-    return noah_profile_flash_store_may_write(flash_store());
-}
-
-bool noah_qmk_profile_flash_grant_flashed(void) {
-    return noah_profile_flash_store_grant_flashed(flash_store());
-}
-
-uint32_t noah_qmk_profile_flash_now_us(void) {
-    noah_profile_flash_store_t *flash = flash_store();
-
-    return flash->driver.now_us ? flash->driver.now_us(flash->driver.context) : 0u;
-}
-
 noah_profile_flash_diagnostics_t noah_qmk_profile_flash_diagnostics(void) {
-    return noah_profile_flash_store_diagnostics(flash_store());
+    return noah_profile_flash_store_diagnostics(noah_qmk_profile_flash_store());
 }
 
 void noah_qmk_profile_flash_forget_slots(void) {

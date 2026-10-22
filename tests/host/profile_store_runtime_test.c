@@ -92,6 +92,12 @@ matrix_row_t matrix_get_row(uint8_t row) {
     return 0u;
 }
 
+// The durable-I/O grant's scan clock; a store without an owner keeps no
+// timers, so it never moves here.
+uint32_t timer_read32(void) {
+    return 0u;
+}
+
 // Other flash images, written and read through backends of their own as a
 // keyboard's flash would be.
 static void image_read(void *context, uint32_t offset, uint8_t *target, uint32_t length) {

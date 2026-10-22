@@ -246,15 +246,16 @@ bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_pr
 // canonical profile. It performs no EEPROM or split-transport I/O.
 bool noah_profile_owner_init(noah_profile_owner_t *owner, const noah_profile_owner_config_t *config);
 
-// One scan grant performs at most one validator/store/provider operation or
-// one split exchange. `master` is current transport role; `now_ms` is the
-// caller's wrapping millisecond clock.
+// One step of the half's durable-I/O grant (qmk_durable_io.h): at most one
+// validator/store/provider operation or one split exchange. `master` is
+// current transport role; `now_ms` is the caller's wrapping millisecond
+// clock (on the keyboard the grant's, which leaves out paused grants).
 bool noah_profile_owner_scan(noah_profile_owner_t *owner, bool master, uint32_t now_ms);
 // Whether this half has storage work in progress that its steps move on
 // locally: boot validation and discovery, this half's candidate (a save or an
 // Apply), the copy it receives from the other half, or the working copy
-// loading or checking an edit. The durable-I/O scheduler repeats steps within
-// one grant only then (D-F29, "Pacing").
+// loading or checking an edit. The durable-I/O grant repeats its steps only
+// then (D-F29, "Pacing").
 bool noah_profile_owner_storage_busy(const noah_profile_owner_t *owner);
 // The next scan repeats a step within the same grant: it visits the subsystem
 // whose step last worked first, so the code it runs stays the same (on the
