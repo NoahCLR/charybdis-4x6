@@ -34,7 +34,9 @@ firmware gate:
   rejection vector `tests/fixtures/client-regression/portable.bin.pd5` from the
   checkout.
 - Ark's agreement check runs `tests/host/run_contract_probe.sh`, which states
-  the capability pages, the BK pin and every fixture's hash.
+  the capability pages, the BK pin and every fixture's hash. Like every host
+  runner it runs in the build image, so outside it Docker must be running;
+  `--output FILE` may name any path.
 - Ark's `upstream/` snapshot pins wire fixtures under `tests/fixtures/` and the
   wire, domain, transaction and resource specs under `docs/architecture/`.
 

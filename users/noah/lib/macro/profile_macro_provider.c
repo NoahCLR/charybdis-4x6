@@ -49,7 +49,7 @@ static __attribute__((noinline)) bool profile_macro_provider_find_slot(uint8_t s
         if (base >= size) {
             return false;
         }
-        uint16_t length = size - base < sizeof(chunk) ? (uint16_t)(size - base) : (uint16_t)sizeof(chunk);
+        uint16_t length = (size_t)(size - base) < sizeof(chunk) ? (uint16_t)(size - base) : (uint16_t)sizeof(chunk);
         if (!noah_effective_macro_bank_read(base, chunk, length)) return false;
         for (uint16_t index = 0; index < length && slot > 0; index++) {
             if (chunk[index] == 0) {

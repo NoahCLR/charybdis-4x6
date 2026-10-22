@@ -4,6 +4,9 @@
 # Keep it separate from run_all_host_tests.sh, which must remain host-only.
 
 set -eu
+# It writes into QMK (a qmk compile), so it works on the checkouts themselves.
+noah_writes_checkout=1
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 HOST_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(CDPATH= cd -- "$HOST_ROOT/../.." && pwd)"

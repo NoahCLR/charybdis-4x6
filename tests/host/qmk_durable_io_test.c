@@ -23,7 +23,7 @@ enum {
     SAVE_LENGTH = NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + 2u * NOAH_PROFILE_STORAGE_SECTOR_SIZE,
 };
 
-_Static_assert(CHIP_ERASE_US > NOAH_PROFILE_FLASH_GRANT_BUDGET_US && CHIP_PROGRAM_US < NOAH_PROFILE_FLASH_GRANT_BUDGET_US, "the chip's costs straddle the flash-time budget as the RP2040's do");
+_Static_assert((unsigned)CHIP_ERASE_US > (unsigned)NOAH_PROFILE_FLASH_GRANT_BUDGET_US && (unsigned)CHIP_PROGRAM_US < (unsigned)NOAH_PROFILE_FLASH_GRANT_BUDGET_US, "the chip's costs straddle the flash-time budget as the RP2040's do");
 
 typedef struct {
     uint8_t  bytes[NOAH_PROFILE_STORAGE_REGION_SIZE];

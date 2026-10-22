@@ -2,6 +2,7 @@
 # Firmware macro sizing against a frozen regression corpus. Ark owns the
 # separate comparison against its current encoder and size estimator.
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"

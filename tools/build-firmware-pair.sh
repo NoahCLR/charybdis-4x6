@@ -28,12 +28,22 @@ set -eu
 # build is reproducible: QMK's version stamps are fixed (SKIP_VERSION) and
 # source paths are mapped, so one commit and BK pin give the same bytes on any
 # machine. A note beside the pair records the inputs, compiler and hashes.
+#
+# Run with Docker, it compiles copies of the checkout and BK held in memory at
+# their own paths (tools/qmk-copies.sh), more than twice as fast as through
+# macOS file sharing, and the only thing it writes is the pair in BUILD_ROOT.
+# Outside the build image it writes nothing into BK, so builds in several
+# worktrees can run at once: the vault's verify reads that sentence and then
+# takes no build lock. Inside the image (CI) it builds in the checkouts.
 
 REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 QMK_ROOT="${QMK_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/../bastardkb-qmk" && pwd)}"
 BUILD_ROOT="${BUILD_ROOT:-$(CDPATH= cd -- "$REPO_ROOT/.." && pwd)/builds}"
 ARTIFACT="$QMK_ROOT/bastardkb_charybdis_4x6_noah.uf2"
-IMAGE="$(sed -n '1p' "$REPO_ROOT/tools/build-image")"
+# NOAH_BUILD_IMAGE builds in another image, such as one tools/make-build-image.sh
+# has built but not yet published, to compare its pair before pinning it. The
+# note names the image used.
+IMAGE="${NOAH_BUILD_IMAGE:-$(sed -n '1p' "$REPO_ROOT/tools/build-image")}"
 
 # The pair is firmware and BK compiled together, so it is built only against
 # the BK commit qmk-pin.json names, from a clean checkout. verify and CI check
@@ -83,23 +93,35 @@ if [ "$in_image" = 0 ]; then
     # No network: everything the build reads is in the image and the mounted
     # checkouts, so an attempt to download anything fails instead of changing
     # the pair. Docker fetches the pinned image itself before the container runs.
-    set -- run --rm --network none --user "$(id -u):$(id -g)" -e HOME=/tmp -e NOAH_IN_BUILD_IMAGE=1 \
-        -e "QMK_ROOT=$QMK_ROOT" -e "BUILD_ROOT=$BUILD_ROOT" \
+    . "$REPO_ROOT/tools/qmk-copies.sh"
+    uid="$(id -u)"
+    gid="$(id -g)"
+    # Git reads the copies through the mounted Git directories, read-only:
+    # GIT_OPTIONAL_LOCKS=0 keeps git status from refreshing their indexes.
+    set -- run --rm --network none --user "$uid:$gid" -e HOME=/tmp -e NOAH_IN_BUILD_IMAGE=1 \
+        -e "QMK_ROOT=$QMK_ROOT" -e "BUILD_ROOT=$BUILD_ROOT" -e GIT_OPTIONAL_LOCKS=0 \
         -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e "GIT_CONFIG_VALUE_0=*"
     for var in $(env | sed -n 's/^\(NOAH_[A-Z0-9_]*\)=.*/\1/p'); do
         [ "$var" = NOAH_IN_BUILD_IMAGE ] || set -- "$@" -e "$var"
     done
+    volume="$(noah_qmk_volume "$QMK_ROOT" "$IMAGE")"
+    set -- "$@" --tmpfs "$REPO_ROOT:uid=$uid,gid=$gid,exec" -v "$REPO_ROOT:/mnt/noah/repo:ro" \
+        --tmpfs "$QMK_ROOT:uid=$uid,gid=$gid,exec" -v "${volume:-$QMK_ROOT}:/mnt/noah/qmk:ro"
     mounted=" "
-    for dir in "$REPO_ROOT" "$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)" \
-               "$QMK_ROOT" "$(git -C "$QMK_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$QMK_ROOT")" \
-               "$BUILD_ROOT"; do
+    for dir in "$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)" \
+               "$(git -C "$QMK_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"; do
+        [ -n "$dir" ] || continue
         case "$mounted" in *" $dir "*) continue ;; esac
         mounted="$mounted$dir "
-        set -- "$@" -v "$dir:$dir"
+        set -- "$@" -v "$dir:$dir:ro"
     done
-    set -- "$@" -w "$REPO_ROOT" "$IMAGE" sh "$REPO_ROOT/tools/build-firmware-pair.sh"
+    set -- "$@" -v "$BUILD_ROOT:$BUILD_ROOT"
+    copy="tar -C /mnt/noah/repo $(noah_skip_git "$REPO_ROOT") -cf - . | tar -C '$REPO_ROOT' -xf - &&"
+    copy="$copy tar -C /mnt/noah/qmk $(noah_qmk_copy_excludes "$volume" "$QMK_ROOT") -cf - . | tar -C '$QMK_ROOT' -xf -"
+    # Paths here have no spaces (checkouts and worktrees under the workspace).
+    set -- "$@" -w / "$IMAGE" sh -c "$copy && cd '$REPO_ROOT' && exec sh tools/build-firmware-pair.sh \"\$@\"" pair
     [ -z "$first" ] || set -- "$@" "$first"
-    echo "Building in $IMAGE..."
+    echo "Building in $IMAGE${NOAH_BUILD_IMAGE:+ (NOAH_BUILD_IMAGE, not the pinned image)}, from copies in memory..."
     exec docker "$@"
 fi
 

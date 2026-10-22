@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 KEYMAP_PATH_ARG="${1:-keyboards/bastardkb/charybdis/4x6/keymaps/noah}"

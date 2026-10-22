@@ -185,7 +185,7 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
         if (chunk_length == 0u || chunk_length > NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 9u);
         }
-        if (command->payload.chunk.offset > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE - chunk_length) {
+        if (command->payload.chunk.offset > (uint32_t)NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE - chunk_length) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 5u);
         }
         memcpy(command->payload.chunk.bytes, &frame[10], chunk_length);

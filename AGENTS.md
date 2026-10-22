@@ -93,7 +93,7 @@ hardware acceptance — is under "Current Firmware Status" in
 Required verification workflow:
 
 1. Treat tests and compile checks as required checkpoints throughout the work, not a one-time end-of-task ceremony.
-2. Run targeted host tests repeatedly while working on a subsystem. Prefer the concrete runners in `tests/host/` over guessing from `run_<area>_tests.sh`.
+2. Run targeted host tests repeatedly while working on a subsystem. Prefer the concrete runners in `tests/host/` over guessing from `run_<area>_tests.sh`. Every runner runs itself in the build image `tools/build-image` names (Docker must be running), so a local result is CI's; never compile or run a host test with the Mac's compiler directly.
 3. Use the subsystem runners that match the files and behavior you touched:
    - key runtime: `sh tests/host/run_participation_tests.sh`, `sh tests/host/run_key_runtime_release_matrix_tests.sh`, `sh tests/host/run_key_runtime_modifier_hold_integration_tests.sh`, `sh tests/host/run_pd_mode_key_runtime_integration_tests.sh`, `sh tests/host/run_key_runtime_layer_lock_integration_tests.sh`, `sh tests/host/run_key_runtime_scenario_tests.sh`, `sh tests/host/run_key_runtime_integration_harness_tests.sh`, `sh tests/host/run_tap_depth_eight_tests.sh` (the second tap-depth configuration)
    - pointing / pd mode: `sh tests/host/run_pd_mode_tests.sh`, `sh tests/host/run_pd_mode_handlers_tests.sh`, `sh tests/host/run_pd_runtime_tests.sh`, `sh tests/host/run_pointer_layer_policy_tests.sh`, `sh tests/host/run_split_runtime_sync_tests.sh`
@@ -118,9 +118,10 @@ Required verification workflow:
    pin; Docker must be running, and the script never falls back to the host
    compiler. Keep every workflow's `image:` equal to `tools/build-image`, which pins the image by digest (D-F05). From a task worktree, set `QMK_ROOT` to the QMK
    checkout and `BUILD_ROOT` to an output folder, or run the work-queue vault's
-   `_agents/bin/verify`, which runs steps 4–7 as they apply, sets both and
-   serializes builds: every agent shares QMK's one output path, so two
-   concurrent builds would overwrite each other's firmware. Land with the
+   `_agents/bin/verify`, which runs steps 4–7 as they apply and sets both.
+   Outside the image the script compiles copies of the checkout and BK held in
+   memory and writes only the pair, so builds in several worktrees and the
+   host suite can run at the same time. Land with the
    vault's `_agents/bin/land`, which re-verifies the landed tree if it changed,
    merges the task's pull request and files the pair and its build note under
    `builds/dev/`.

@@ -12,15 +12,21 @@
 
 set -eu
 
-ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
-KEYMAP_PATH="$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
-OUTPUT=""
-if [ "${1:-}" = "--output" ] && [ -n "${2:-}" ]; then
-    OUTPUT="$2"
+# FILE is written here, from what the probe prints: run outside the build
+# image, the probe runs in Docker, which sees only the checkouts, and FILE may
+# be anywhere (a client's temporary directory, say).
+if [ "${1:-}" = "--output" ] && [ -n "${2:-}" ] && [ $# -eq 2 ]; then
+    sh "$0" >"$2.partial" || { rm -f "$2.partial"; exit 1; }
+    mv "$2.partial" "$2"
+    exit 0
 elif [ $# -gt 0 ]; then
     echo "Usage: sh tests/host/run_contract_probe.sh [--output FILE]" >&2
     exit 1
 fi
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
+
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+KEYMAP_PATH="$ROOT/keyboards/bastardkb/charybdis/4x6/keymaps/noah"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 
@@ -87,11 +93,11 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 
 "$BUILD_DIR/contract_probe" >"$BUILD_DIR/pages.json"
 
-python3 - "$ROOT" "$BUILD_DIR/pages.json" "${OUTPUT:-}" <<'PY'
+python3 - "$ROOT" "$BUILD_DIR/pages.json" <<'PY'
 import hashlib, json, subprocess, sys
 from pathlib import Path
 
-root, pages, output = Path(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
+root, pages = Path(sys.argv[1]), Path(sys.argv[2])
 report = json.loads(pages.read_text())
 capability_pages = [bytes.fromhex(page) for page in report["capabilityPages"]]
 assert len(capability_pages) == capability_pages[0][1], "Contract probe must report every advertised capability page"
@@ -101,9 +107,5 @@ report["firmwareCommit"] = subprocess.run(["git", "-C", str(root), "rev-parse", 
 report["qmkPin"] = json.loads((root / "qmk-pin.json").read_text())
 report["fixtures"] = {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
                       for path in sorted((root / "tests/fixtures").rglob("*")) if path.is_file()}
-text = json.dumps(report, indent=2) + "\n"
-if output:
-    Path(output).write_text(text)
-else:
-    sys.stdout.write(text)
+sys.stdout.write(json.dumps(report, indent=2) + "\n")
 PY

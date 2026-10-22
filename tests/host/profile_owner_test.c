@@ -15,7 +15,7 @@
 #include "users/noah/lib/profile/storage/profile_flash_store.h"
 #include "profile_store_committed_fixture.h"
 
-_Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= SPLIT_FAULT_LINK_FRAME_MAX && NOAH_PROFILE_WORKING_SYNC_FRAME_MAX <= SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries both protocols' largest frames");
+_Static_assert((unsigned)NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= (unsigned)SPLIT_FAULT_LINK_FRAME_MAX && (unsigned)NOAH_PROFILE_WORKING_SYNC_FRAME_MAX <= (unsigned)SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries both protocols' largest frames");
 
 // Every profile the keyboard runs carries its pointing slots (the PD domain);
 // these carry it with every slot disabled.
@@ -794,7 +794,7 @@ static void test_long_profile_copy_reads_within_the_store_bound(void) {
     candidate_blob = long_profile;
     candidate_length = sizeof(long_profile);
     candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB | NOAH_PROFILE_CANDIDATE_V1_DOMAIN_PD;
-    _Static_assert(NOAH_PROFILE_SPLIT_V1_CHUNK_MAX == 106u && NOAH_PROFILE_SPLIT_V1_CHUNK_MAX > NOAH_PROFILE_STORE_IO_CHUNK_MAX, "copy chunks must exceed the bounded store read");
+    _Static_assert(NOAH_PROFILE_SPLIT_V1_CHUNK_MAX == 106u && (unsigned)NOAH_PROFILE_SPLIT_V1_CHUNK_MAX > (unsigned)NOAH_PROFILE_STORE_IO_CHUNK_MAX, "copy chunks must exceed the bounded store read");
     memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
     memset(right_memory.bytes, 0xff, sizeof(right_memory.bytes));
     boot_empty_pair(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now);

@@ -928,14 +928,15 @@ The image is our own, `ghcr.io/noahclr/charybdis-build`, built from QMK's
 official `qmk_cli` image (QMK CLI 1.2.0 and QMK's `arm-none-eabi-gcc` 15.2.0,
 toolchain release `v15.2.0-1`, on Debian 13; index `sha256:b7d7fa8f…`) by
 [`tools/build-image.dockerfile`](../tools/build-image.dockerfile). It changes
-one thing. QMK builds its toolchain separately for each host, and the official
+one thing and adds two files. QMK builds its toolchain separately for each host, and the official
 image's `linux/arm64` variant links different ARM target code (newlib, libgcc,
 startup files) from its `linux/amd64` variant, so a Mac building natively and
 CI built different pairs from the same inputs. Our image gives both platforms
 the amd64 variant's target files and keeps each platform's native compiler
 programs, which generate the same code: a Mac builds at native speed and CI's
-pair equals it byte for byte. Nothing upstream can move or delete the image, and
-it changes only when we choose. Earlier pairs, including every release before
+pair equals it byte for byte. The two files are the host suite's tools
+(below). Nothing upstream can move or delete the image, and it changes only
+when we choose. Earlier pairs, including every release before
 it, were built in `ghcr.io/noahclr/qmk_base_container:debian13-qmk1.1.8`, a
 modified base image with Debian's GCC 14.2.1. That package and its archived fork
 remain the record of those builds.
@@ -945,16 +946,57 @@ remain the record of those builds.
 cannot change the compiler. Each machine builds in its own platform's variant.
 `sh tools/make-build-image.sh <tag>` builds both platforms from the Dockerfile,
 refuses a tag that already exists, checks that their target files are
-byte-identical, pushes only then, and prints the reference to put in
+byte-identical and that the tools run without network, runs the host suite in
+the new image on the Mac, builds the pair in it with every resource gate (BK at
+the pin), and builds the pinned image's pair from the same sources to say
+whether the bytes changed; it pushes only then, and pins the pushed digest in
 `tools/build-image` and every workflow's `image:` (a host test keeps them equal,
 pinned and in our package). To move to a newer official image, read its index
 digest with `docker buildx imagetools inspect ghcr.io/qmk/qmk_cli:latest` (the
 top-level `Digest`), put it in the Dockerfile's `QMK_CLI`, and run the script
-with a new tag. Then build a pair on the Mac and compare it with CI's pair for
-the same firmware commit and BK pin, which every release does: different bytes
-mean the platforms diverged. Compare it too with a pair from the previous
-image: different bytes there mean the compiler changed, so record the memory
-effect in [memory budgets](architecture/memory-budgets.md).
+with a new tag; nothing else in the Dockerfile changes. If the script reports
+that the pair changed, the compiler changed: record the memory effect in
+[memory budgets](architecture/memory-budgets.md). The script checks the Mac's
+platform; CI's pair for the same firmware commit and BK pin, which every release
+compares with the Mac's, shows whether the platforms diverged. If the official
+image moves Python to a new minor version, the vault's `vpython` moves first:
+its `verify` holds a new pin to the tools' Python.
+
+The host tests run in the same image (amended 2026-10-22). Locally they ran with
+the Mac's clang and in CI with the image's GCC, so a change could pass `verify`
+and fail CI: nightly CI failed on GCC-only `-Wsign-compare` errors while every
+local run passed. Every host runner now runs itself in the image
+with Docker (`tests/host/in_build_image.sh`), without network and never on the
+host's compiler, so one test result holds for both. The image carries what the
+suite calls beyond QMK's own tools, ripgrep and Node, so neither CI nor a local
+run installs anything at run time. They are the projects' own release binaries
+(Node's LTS line, ripgrep's static build), pinned by version and SHA-256 in the
+Dockerfile, so the image builds the same from that file on any day, needs no
+package manager, and depends on nothing in the base image but its C library.
+Adding them changes no file a pair build reads: the image is the official one's
+layers, then the target files, then one layer holding only `node` and `rg`.
+Considered: Debian's packages, from the base image's apt. Dropped: a rebuild for
+a newer QMK image would install whatever the mirror held that day, and edits
+the system's package and library state the compiler runs on. Considered too: a
+separate image for the tests. Dropped: two images to publish and pin on every
+QMK update, for no gain once the tools change nothing the pair reads. Considered: keeping the Mac's clang for
+speed. Dropped: in the image, on copies of the checkouts rather than macOS file
+sharing, the suite runs its checks side by side in well under a minute, against
+several minutes for the serial host run, and clang and GCC disagree on
+warnings.
+
+The pair builds from the same copies (amended 2026-10-22). Started outside the
+image, `tools/build-firmware-pair.sh` compiles a copy of the checkout and of BK
+held in memory at their own paths, BK taken from the host tests' volume for its
+commit or, with local changes, from the checkout for that build
+(`tools/qmk-copies.sh`); CI builds in its checkouts as before. It is more than
+twice as fast as compiling through macOS file sharing, and the pair is the same
+bytes, since paths do not change. It writes nothing into BK, only the pair into
+`BUILD_ROOT`, so local pair builds no longer share QMK's output path: builds in
+several worktrees, and a build beside the host suite, run at once without a
+lock. Considered: keeping the build in the BK checkout under the vault's build
+lock. Dropped: every `verify` then waited for every other one's pair, and the
+compile itself was most of a `verify`.
 
 ## D-F06 — CI runs for releases; the release gate may run Ark's agreement check
 

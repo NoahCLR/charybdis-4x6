@@ -1,6 +1,7 @@
 #!/bin/sh
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 
@@ -285,24 +286,30 @@ check_runtime_sealing_boundaries() {
     fi
 }
 
+# Each variant's sources compile side by side, one per CPU; any failure fails
+# the variant, with the compiler's message.
+COMPILE_JOBS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)"
+
 compile_variant() {
     config_header="$1"
     extra_flags="$2"
     sources="$3"
+    export ROOT config_header extra_flags
 
-    # Intentional word splitting for flag and source lists.
+    # Intentional word splitting for the source list (in the printf) and the
+    # flag list (inside the compile).
     # shellcheck disable=SC2086
-    for src in $sources; do
+    printf '%s\n' $sources | xargs -P "$COMPILE_JOBS" -I{} sh -c '
         cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic -fsyntax-only \
-            -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+            "-DQMK_KEYBOARD_H=\"qmk_stub.h\"" \
             -DQMK_STUB_SUPPRESS_LAYER_COUNT \
             $extra_flags \
             -I"$ROOT" \
             -I"$ROOT/users/noah" \
             -I"$ROOT/tests/host/include" \
             -include "$ROOT/$config_header" \
-            "$ROOT/$src"
-    done
+            "$ROOT/$1"
+    ' compile {}
 }
 
 compile_variant_must_fail() {

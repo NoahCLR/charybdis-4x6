@@ -3,6 +3,7 @@
 # Target-only check: run after a fresh ordinary firmware compile.
 
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 
 HOST_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 ROOT="$(CDPATH= cd -- "$HOST_ROOT/../.." && pwd)"
