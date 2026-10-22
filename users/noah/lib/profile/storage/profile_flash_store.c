@@ -19,7 +19,7 @@ enum {
 
 #define NO_PAGE UINT32_MAX
 
-static uint32_t now_us(const noah_profile_flash_store_t *flash) {
+uint32_t noah_profile_flash_store_now_us(const noah_profile_flash_store_t *flash) {
     return flash->driver.now_us ? flash->driver.now_us(flash->driver.context) : 0u;
 }
 
@@ -34,9 +34,9 @@ static void account(noah_profile_flash_store_t *flash, uint32_t elapsed) {
 }
 
 static bool erase_sector(noah_profile_flash_store_t *flash, uint32_t offset) {
-    uint32_t started = now_us(flash);
+    uint32_t started = noah_profile_flash_store_now_us(flash);
     bool     ok      = flash->driver.erase_sector(flash->driver.context, offset);
-    uint32_t elapsed = now_us(flash) - started;
+    uint32_t elapsed = noah_profile_flash_store_now_us(flash) - started;
 
     account(flash, elapsed);
     if (elapsed > flash->diagnostics.longest_erase_us) {
@@ -49,9 +49,9 @@ static bool erase_sector(noah_profile_flash_store_t *flash, uint32_t offset) {
 }
 
 static bool program_page(noah_profile_flash_store_t *flash) {
-    uint32_t started = now_us(flash);
+    uint32_t started = noah_profile_flash_store_now_us(flash);
     bool     ok      = flash->driver.program_page(flash->driver.context, flash->page_offset, flash->page);
-    uint32_t elapsed = now_us(flash) - started;
+    uint32_t elapsed = noah_profile_flash_store_now_us(flash) - started;
 
     account(flash, elapsed);
     if (elapsed > flash->diagnostics.longest_program_us) {
@@ -270,7 +270,7 @@ static bool flash_reset(void *context, noah_profile_storage_address_t address, u
     flash->erased_end      = address;
     flash->frontier        = address;
     flash->save_active     = true;
-    flash->save_started_us = now_us(flash);
+    flash->save_started_us = noah_profile_flash_store_now_us(flash);
     flash->save_flash_us   = 0u;
     if (flash->diagnostics.saves != UINT16_MAX) {
         flash->diagnostics.saves++;
@@ -287,7 +287,7 @@ static bool flash_sync(void *context) {
     }
     ok = !flash->failed && flush(flash);
     if (flash->save_active) {
-        flash->diagnostics.last_save_us       = now_us(flash) - flash->save_started_us;
+        flash->diagnostics.last_save_us       = noah_profile_flash_store_now_us(flash) - flash->save_started_us;
         flash->diagnostics.last_save_flash_us = flash->save_flash_us;
     }
     return ok;

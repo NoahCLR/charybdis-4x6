@@ -3,8 +3,8 @@
 // ───────────────────────────────────────────────────────────────────────────
 //
 // The profile store's storage on this half: the slot region in the RP2040's
-// flash (D-F29), one backend instance shared by boot discovery and the owner,
-// and its pause diagnostics on Profile Wire.
+// flash (D-F29), one backend instance shared by boot discovery, the owner and
+// the durable-I/O grant, and its pause diagnostics on Profile Wire.
 // ───────────────────────────────────────────────────────────────────────────
 #pragma once
 
@@ -33,6 +33,10 @@ enum {
 // The flash this adapter drives: the RP2040's on the keyboard; a host test
 // links its own.
 noah_profile_flash_driver_t noah_qmk_profile_flash_driver(void);
+
+// This half's slot flash store, initialised on first use: the one instance
+// boot discovery, the owner and the durable-I/O grant share.
+noah_profile_flash_store_t *noah_qmk_profile_flash_store(void);
 
 // Boot discovery reads alone; the owner gets the writable form.
 noah_profile_store_io_t noah_qmk_profile_flash_read_only_io(void);

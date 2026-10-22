@@ -14,9 +14,10 @@
 // The pause policy:
 //
 // - A sector erase (tens of milliseconds, at worst hundreds) runs only from
-//   grant_begin, at most one per durable-I/O grant, and only when the caller
-//   says the keyboard is quiet. A save's reset erases nothing; its sectors are
-//   erased ahead of its writes, the header sector first.
+//   grant_begin, at most one per durable-I/O grant (qmk_durable_io.h), and
+//   only when the caller says the keyboard is quiet. A save's reset erases
+//   nothing; its sectors are erased ahead of its writes, the header sector
+//   first.
 // - The store's writer may run in a grant only while erased flash lies at
 //   least a page ahead of its writes and the grant has not used its flash
 //   time budget (may_write); so an erase never shares a grant with the
@@ -120,4 +121,8 @@ bool                             noah_profile_flash_store_may_write(const noah_p
 // store more local steps only until it has, so a grant still erases at most
 // one sector or programs at most one page (D-F29).
 bool                             noah_profile_flash_store_grant_flashed(const noah_profile_flash_store_t *flash);
+// The flash's microsecond clock: the driver's, or 0 without one. It keeps
+// counting while a flash operation runs, so the durable-I/O grant times its
+// repeated steps with it.
+uint32_t                         noah_profile_flash_store_now_us(const noah_profile_flash_store_t *flash);
 noah_profile_flash_diagnostics_t noah_profile_flash_store_diagnostics(const noah_profile_flash_store_t *flash);
