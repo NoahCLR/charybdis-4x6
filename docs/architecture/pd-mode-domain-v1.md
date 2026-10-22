@@ -23,8 +23,9 @@ and restore preserve them without the repository.
 - Normal cursor movement is the fallback outside the slot bank. Auto-sniping
   stays a layer/CPI policy and uses no slot.
 - There are two engine families, **directional** (four or eight directions,
-  single axis or dominant axis; see D-L24 and D-L28 in the
-  [direction](../LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
+  single axis or dominant axis; see
+  [D-F42](../adr/0042-directional-modes-read-eight-directions.md) and
+  [D-F45](../adr/0045-one-directional-engine.md)) and **scrolling**. Optional
   modifier and mouse-button policies cover Arrow and Pinch. No behavior depends
   on a slot's name.
 

@@ -33,12 +33,13 @@ The direction is one sentence: **the keyboard becomes the source of truth, and
 Ark becomes a client of the keyboard rather than a client of the
 repository.**
 
-Read [`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md)
-before doing architecture work. It carries the firmware's status, open issues
-and decisions, and says who owns what. The technical authority is
+Read the decisions in [`docs/adr/`](./docs/adr/) that touch the area before
+doing architecture work. The technical authority is
 [`docs/architecture/device-resident-profile.md`](./docs/architecture/device-resident-profile.md).
-The product goal, the app's status and the app's decisions belong to the
-Charybdis Ark repository; no firmware task needs them.
+Firmware owns the device: its runtime, its stored profile, the wire and split
+protocols and the specs under `docs/architecture/`. The product goal, the app's
+status and the app's decisions (cited as D-L…) belong to the Charybdis Ark
+repository; no firmware task needs them.
 
 ### The tools, and the line between them
 
@@ -56,9 +57,8 @@ Charybdis Ark repository; no firmware task needs them.
 Ark reads everything it edits from the keyboard, keeps every change in
 one reviewed draft with undo and redo, and applies it to both halves through a
 recovery-first logical transaction; complete profiles back up and restore. The
-firmware's remaining work — physical interruption acceptance and broad
-hardware acceptance — is under "Current Firmware Status" in
-[`docs/LIVE_EDIT_APP_DIRECTION.md`](./docs/LIVE_EDIT_APP_DIRECTION.md).
+firmware's remaining work, mostly hardware acceptance, is queued in the
+work-queue vault.
 
 ## Start Here
 
@@ -72,7 +72,7 @@ hardware acceptance — is under "Current Firmware Status" in
 - If the task depends on upstream QMK behavior or build wiring, inspect the selected QMK checkout instead of guessing how upstream behaves. Use the local workspace map in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees) to locate it.
 - `README.md` is a short pitch for Charybdis owners, in Noah's personal voice: what the firmware does with Charybdis Ark named in its first paragraph, how to get started from a release, one short C example, the docs list, credits, and the build video at the bottom. Keep it short; depth goes in [`docs/GUIDE.md`](docs/GUIDE.md) (the full behaviour vocabulary, lighting, split sync, building from source) or the topic docs it links. Keep development material out of it: repositories and branches, CI, pins, contracts, comparison and diagnostic builds, release mechanics and agent workflow go in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md); app behaviour belongs in Ark (its README and `docs/GUIDE.md`). The files under `docs/` are the rest of the documentation set.
 - For doc fixes, doc updates, doc audits, or user-facing explanation work, check `README.md` and the relevant files under `docs/` first.
-- For refactors or runtime architecture work, read `docs/LIVE_EDIT_APP_DIRECTION.md` first. It carries the current direction, the decisions behind it, and what is deliberately left undesigned.
+- For refactors or runtime architecture work, read the ADRs in `docs/adr/` that touch the area first.
 - The durable specs live under `docs/architecture/`: the Profile Wire and split protocols, the authority state tables, the storage and resource baseline, the PD-mode domain, and the field classification. Treat those as the contract; change them deliberately.
 - This repo no longer keeps dated review folders or finding registers. Record decisions in the doc they govern, next to the thing they constrain.
 - Work is queued, refined and planned in the work-queue vault, `charybdis-notes` beside this checkout (see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees)). When a task comes from it, follow that vault's `AGENTS.md` for claiming and status; this file still governs every change in this repo. Active plans live there, not under `docs/`.
@@ -111,7 +111,7 @@ Required verification workflow:
    `sh tests/host/run_all_host_tests.sh`
 7. Build the flashable pair only after all required host tests for that pass are green:
    `sh tools/build-firmware-pair.sh`. A plain `qmk compile` is not enough: it
-   builds a generic image without the live-profile owner (D-L08), which is not
+   builds a generic image without the live-profile owner (D-F35), which is not
    the firmware anyone flashes. The script builds in Docker, in the image
    `tools/build-image` names, the one CI builds releases in, so local and
    released pairs share a compiler and are byte-identical for one commit and BK
@@ -158,8 +158,8 @@ Repo-specific guardrails:
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update the relevant files under `docs/` in the same pass, and `README.md` when a user-facing capability changed (development workflow changes go in `docs/DEVELOPMENT.md`).
 - If `VIA_MACROS()` in a profile's `keymap.c` changes, regenerate its `authored_macro_bank.h` in the same pass with `NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh` (pass the keymap path for another profile). Real-profile validation refuses a stale copy.
-- If architectural work lands, record it in the doc it governs in the same pass: a new or amended firmware decision in `docs/LIVE_EDIT_APP_DIRECTION.md` (numbered from D-F01; keep "Current Firmware Status" and "Open Issues" current), or the matching spec under `docs/architecture/`. App decisions and app status belong to Ark; a D-L heading here marked as an app decision is only a pointer.
-- Write decisions and contracts, not logs: verification runs, build numbers, test counts and dated progress notes belong in commit messages. When a plan in the work-queue vault is finished, fold what still constrains the code into the spec it produced and delete the plan (D-L07).
+- If architectural work lands, record it in the same pass: a new or amended firmware decision as an ADR in `docs/adr/` (the next number, cited as D-F<n>; see `docs/agents/domain.md`), or the matching spec under `docs/architecture/`. App decisions and app status belong to Ark.
+- Write decisions and contracts, not logs: verification runs, build numbers, test counts and dated progress notes belong in commit messages. When a plan in the work-queue vault is finished, fold what still constrains the code into the spec it produced and delete the plan.
 
 ## RP2040 Resource Truth
 
@@ -217,3 +217,17 @@ the `Promotion from dev`, `Host suite (GCC)`, `Pair build` and
 shared vault's `release` opens it and only `release --publish` merges it, when
 Noah asks; never push `main` directly or bypass protection. CI runs only on
 those pull requests and nightly, never on `dev`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in Noah's private notes vault beside the checkout, not on GitHub. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The triage roles are the vault's `status` and `kind` fields. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the root. See `docs/agents/domain.md`.
