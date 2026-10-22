@@ -23,16 +23,13 @@ build_test() {
     cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
         "$@" \
         -DSPLIT_KEYBOARD \
-    -DQMK_KEYBOARD_H='"qmk_stub.h"' \
-    -DNOAH_PROFILE_SPLIT_TRANSPORT_TEST \
+        -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+        -DNOAH_PROFILE_SPLIT_TRANSPORT_TEST \
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         -I"$ROOT/tests/host/include" \
         "$ROOT/tests/host/qmk_profile_split_transport_test.c" \
-        "$ROOT/users/noah/lib/profile/split/profile_split_authority.c" \
-        "$ROOT/users/noah/lib/profile/split/profile_split_protocol_v1.c" \
-        "$ROOT/users/noah/lib/profile/split/profile_split_reconciler.c" \
         "$ROOT/users/noah/lib/compat/qmk_profile_split_transport.c" \
         -o "$output"
 }

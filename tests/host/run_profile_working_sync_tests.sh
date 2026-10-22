@@ -25,6 +25,7 @@ build_and_run() {
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/profile_working_sync_test.c" \
+        "$ROOT/tests/host/split_fault_link.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
         "$ROOT/users/noah/lib/profile/split/profile_working_sync.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
