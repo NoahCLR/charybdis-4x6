@@ -1706,8 +1706,8 @@ bool noah_profile_owner_working_read(const noah_profile_owner_t *owner, uint32_t
     return owner && owner->working_ready && noah_profile_working_copy_read(&owner->working, offset, bytes, length);
 }
 
-bool noah_profile_owner_working_receive(noah_profile_owner_t *owner, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
-    return owner && owner->working_ready && noah_profile_working_sync_receive(&owner->working_sync, request, request_length, response, response_length);
+noah_profile_working_sync_t *noah_profile_owner_working_sync(noah_profile_owner_t *owner) {
+    return owner && owner->working_ready ? &owner->working_sync : NULL;
 }
 
 #if UINTPTR_MAX == UINT32_MAX

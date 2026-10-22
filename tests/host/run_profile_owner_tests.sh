@@ -28,6 +28,7 @@ build_and_run() {
         -include "$ROOT/tests/host/include/noah_compile_config.h" \
         "$ROOT/tests/host/profile_owner_test.c" \
         "$ROOT/users/noah/lib/compat/qmk_durable_io.c" \
+        "$ROOT/tests/host/split_fault_link.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_owner.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
         "$ROOT/users/noah/lib/profile/split/profile_working_sync.c" \

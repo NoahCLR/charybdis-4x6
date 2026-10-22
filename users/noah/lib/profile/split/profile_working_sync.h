@@ -31,7 +31,7 @@
 #include "../runtime/profile_edit_mode.h"
 #include "../runtime/profile_working_copy.h"
 #include "../../state/shared/runtime_publication.h"
-#include "profile_split_reconciler.h"
+#include "profile_split_exchange.h"
 
 enum {
     NOAH_PROFILE_WORKING_SYNC_FRAME_SIZE  = 32u,

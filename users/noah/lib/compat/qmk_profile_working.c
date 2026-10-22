@@ -5,7 +5,6 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "qmk_profile_working.h"
-#include "qmk_durable_io.h"
 
 #include <string.h>
 
@@ -134,68 +133,5 @@ noah_profile_edit_mode_storage_t noah_qmk_edit_mode_storage(void) {
 #else
 noah_profile_edit_mode_storage_t noah_qmk_edit_mode_storage(void) {
     return (noah_profile_edit_mode_storage_t){0};
-}
-#endif
-
-#if defined(SPLIT_TRANSACTION_IDS_USER) && !defined(NOAH_HOST_QMK_STUB_NO_TRANSACTIONS)
-#    include "transactions.h" // QMK
-#    include "../profile/split/profile_working_sync.h"
-
-_Static_assert(NOAH_PROFILE_WORKING_SYNC_FRAME_MAX <= RPC_M2S_BUFFER_SIZE, "the largest working-sync frame fits one split RPC");
-
-static noah_qmk_profile_working_receive_fn working_receive;
-static void                               *working_context;
-
-static void working_rpc(uint8_t request_size, const void *request, uint8_t response_size, void *response) {
-    if (!(response && response_size >= 32u && working_receive && working_receive(working_context, request, request_size, response, response_size))) {
-        if (response && response_size != 0u) {
-            memset(response, 0, response_size);
-        }
-    }
-}
-
-bool noah_qmk_profile_working_transport_init(noah_qmk_profile_working_receive_fn receive, void *context) {
-    if (!receive) {
-        return false;
-    }
-    if (working_receive) {
-        return working_receive == receive && working_context == context;
-    }
-    working_receive = receive;
-    working_context = context;
-    transaction_register_rpc(PUT_PROFILE_WORKING_SYNC, working_rpc);
-    return true;
-}
-
-bool noah_qmk_profile_working_transport_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
-    (void)context;
-    if (!request || !response || request_length < 32u || request_length > RPC_M2S_BUFFER_SIZE || response_length < 32u || response_length > RPC_S2M_BUFFER_SIZE) {
-        return false;
-    }
-    // The durable-I/O grant repeats no step after one that used the link.
-    noah_qmk_durable_io_note_split_rpc();
-    return transaction_rpc_exec(PUT_PROFILE_WORKING_SYNC, request_length, request, response_length, response);
-}
-
-#    ifdef NOAH_PROFILE_SPLIT_TRANSPORT_TEST
-void noah_qmk_profile_working_transport_reset_for_test(void) {
-    working_receive = NULL;
-    working_context = NULL;
-}
-#    endif
-#else
-bool noah_qmk_profile_working_transport_init(noah_qmk_profile_working_receive_fn receive, void *context) {
-    (void)receive;
-    (void)context;
-    return false;
-}
-
-bool noah_qmk_profile_working_transport_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
-    (void)context;
-    (void)request;
-    (void)request_length;
-    (void)response;
-    (void)response_length;
-    return false;
 }
 #endif
