@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "users/noah/noah_runtime.h"
+#include "users/noah/lib/key/runtime/slot/origin_registry.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/modes/pd_mode_configured.h"
 #include "users/noah/lib/pointing/modes/pd_mode_handlers.h"
@@ -694,6 +695,242 @@ static void test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset(void)
     CHECK(auto_mouse_key_tracker == 0 && auto_mouse_keyevent_calls == 3);
 }
 
+static bool test_owner_key_is(keypos_t expected) {
+    keypos_t owner;
+
+    return pd_mode_local_owner_key_pos_snapshot(&owner) && owner.row == expected.row && owner.col == expected.col;
+}
+
+static bool test_owner_bitmap_is(const keypos_t *keys, uint8_t key_count) {
+    uint8_t expected[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t local[KEY_ORIGIN_BITMAP_SIZE];
+    uint8_t display[KEY_ORIGIN_BITMAP_SIZE];
+    bool    has_local;
+    bool    has_display;
+
+    key_origin_bitmap_clear(expected);
+    for (uint8_t index = 0; index < key_count; index++) {
+        key_origin_bitmap_add_keypos(expected, keys[index]);
+    }
+
+    has_local   = pd_mode_local_owner_bitmap_snapshot(local);
+    has_display = pd_mode_display_owner_bitmap_snapshot(display);
+    for (uint8_t index = 0; index < KEY_ORIGIN_BITMAP_SIZE; index++) {
+        if (local[index] != expected[index] || display[index] != expected[index]) {
+            return false;
+        }
+    }
+
+    return has_local == (key_count != 0u) && has_display == has_local;
+}
+
+static bool test_owner_sides_are(split_side_mask_t sides) {
+    return pd_mode_local_owner_sides_snapshot() == sides && pd_mode_display_owner_sides_snapshot() == sides && pd_mode_snapshot().local.owner_sides == sides;
+}
+
+// Every key holding the active mode owns it: the owner keys are all of them,
+// the owner sides are the halves they are on, and the mode lasts until the
+// last of them is released.
+static void test_two_keys_holding_one_mode_both_own_it(void) {
+    const keypos_t left_key     = {.row = 1, .col = 2};
+    const keypos_t right_key    = {.row = 5, .col = 1};
+    const keypos_t both_keys[2] = {left_key, right_key};
+
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, left_key));
+    CHECK(pd_mode_local_active(PD_MODE_VOLUME));
+    CHECK(test_owner_key_is(left_key));
+    CHECK(test_owner_bitmap_is(&left_key, 1));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_LEFT));
+
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, right_key));
+    CHECK(pd_mode_local_active(PD_MODE_VOLUME));
+    CHECK(test_owner_bitmap_is(both_keys, 2));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_BOTH));
+
+    // Releasing one keeps the mode, owned by the other.
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, left_key));
+    CHECK(pd_mode_local_active(PD_MODE_VOLUME));
+    CHECK(test_owner_key_is(right_key));
+    CHECK(test_owner_bitmap_is(&right_key, 1));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_RIGHT));
+
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, right_key));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(!test_owner_key_is(right_key));
+    CHECK(test_owner_bitmap_is(NULL, 0));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_NONE));
+}
+
+// The single owner key (what combo feedback compares against) is the key that
+// took the mode first, not the lowest matrix position. (After an interleaved
+// release a later key takes a released key's place ahead of an earlier one:
+// test_a_later_key_takes_a_released_owners_place.)
+static void test_the_owner_key_is_the_first_key_to_hold_the_mode(void) {
+    const keypos_t first_key  = {.row = 5, .col = 1};
+    const keypos_t second_key = {.row = 1, .col = 2};
+
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, first_key));
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, second_key));
+    CHECK(test_owner_key_is(first_key));
+
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, first_key));
+    CHECK(test_owner_key_is(second_key));
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, second_key));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+}
+
+// The owners form a list in which a press takes the lowest free entry, and the
+// first entry in use is the owner key. So a key pressed after an earlier
+// owner's release takes that owner's place ahead of a key still held.
+static void test_a_later_key_takes_a_released_owners_place(void) {
+    const keypos_t first_key  = {.row = 1, .col = 2};
+    const keypos_t second_key = {.row = 0, .col = 0};
+    const keypos_t third_key  = {.row = 6, .col = 5};
+
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, first_key));
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, second_key));
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, first_key));
+    CHECK(test_owner_key_is(second_key));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_LEFT));
+
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, third_key));
+    CHECK(test_owner_key_is(third_key));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_BOTH));
+
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, third_key));
+    CHECK(test_owner_key_is(second_key));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_LEFT));
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, second_key));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+}
+
+// A key pressed again while it already holds the mode is still one owner: its
+// one release ends the mode.
+static void test_a_repeated_press_is_one_owner(void) {
+    const keypos_t key = {.row = 2, .col = 3};
+
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, key));
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, key));
+    CHECK(test_owner_bitmap_is(&key, 1));
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, key));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_NONE));
+}
+
+// A key held for another mode gives the mode up: the new mode's key is its
+// only owner, and releasing the old key changes nothing.
+static void test_a_new_mode_drops_the_old_modes_owners(void) {
+    const keypos_t volume_key = {.row = 1, .col = 2};
+    const keypos_t zoom_key   = {.row = 6, .col = 0};
+
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, volume_key));
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_3, zoom_key));
+    CHECK(pd_mode_local_active(PD_MODE_ZOOM));
+    CHECK(test_owner_key_is(zoom_key));
+    CHECK(test_owner_bitmap_is(&zoom_key, 1));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_RIGHT));
+
+    (void)pd_mode_handle_keycode_release_at(PD_SLOT_1, volume_key);
+    CHECK(pd_mode_local_active(PD_MODE_ZOOM));
+    CHECK(test_owner_key_is(zoom_key));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_RIGHT));
+
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_3, zoom_key));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(test_owner_bitmap_is(NULL, 0));
+}
+
+// Locking a held mode with a lock key makes the lock key its only owner; the
+// keys that held it no longer own it, and their release keeps the lock.
+static void test_a_lock_key_replaces_the_holding_owners(void) {
+    const keypos_t left_key  = {.row = 1, .col = 2};
+    const keypos_t right_key = {.row = 5, .col = 1};
+    const keypos_t lock_key  = {.row = 7, .col = 7};
+
+    test_reset_stubs();
+
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, left_key));
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, right_key));
+    CHECK(pd_mode_set_lock_state_at(PD_MODE_VOLUME, true, lock_key));
+    CHECK(pd_mode_local_locked(PD_MODE_VOLUME));
+    CHECK(test_owner_key_is(lock_key));
+    CHECK(test_owner_bitmap_is(&lock_key, 1));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_RIGHT));
+
+    (void)pd_mode_handle_keycode_release_at(PD_SLOT_1, left_key);
+    (void)pd_mode_handle_keycode_release_at(PD_SLOT_1, right_key);
+    CHECK(pd_mode_local_locked(PD_MODE_VOLUME));
+    CHECK(test_owner_key_is(lock_key));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_RIGHT));
+
+    CHECK(pd_mode_set_lock_state_at(PD_MODE_VOLUME, false, lock_key));
+    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(!test_owner_key_is(lock_key));
+    CHECK(test_owner_bitmap_is(NULL, 0));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_NONE));
+}
+
+// A combo output's owner key stands for its whole footprint: the owner keys are
+// the footprint and the owner sides are every half it covers.
+static void test_a_combo_owner_owns_its_footprint(void) {
+    const keypos_t owner_key    = {.row = 2, .col = 0};
+    const keypos_t member_key   = {.row = 6, .col = 4};
+    const keypos_t footprint[2] = {owner_key, member_key};
+    uint8_t        bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset_stubs();
+    key_origin_registry_reset();
+    key_origin_bitmap_clear(bitmap);
+    key_origin_bitmap_add_keypos(bitmap, owner_key);
+    key_origin_bitmap_add_keypos(bitmap, member_key);
+    CHECK(key_origin_registry_set_bitmap(owner_key, bitmap));
+
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, owner_key));
+    CHECK(test_owner_key_is(owner_key));
+    CHECK(test_owner_bitmap_is(footprint, 2));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_BOTH));
+
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, owner_key));
+    CHECK(test_owner_bitmap_is(NULL, 0));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_NONE));
+    key_origin_registry_reset();
+}
+
+// An owner's sides are its footprint's when it pressed: a combo footprint
+// rewritten while the key is held does not move them.
+static void test_owner_sides_are_taken_at_the_press(void) {
+    const keypos_t owner_key  = {.row = 2, .col = 0};
+    const keypos_t member_key = {.row = 6, .col = 4};
+    const keypos_t later_key  = {.row = 1, .col = 2};
+    uint8_t        bitmap[KEY_ORIGIN_BITMAP_SIZE];
+
+    test_reset_stubs();
+    key_origin_registry_reset();
+    key_origin_bitmap_clear(bitmap);
+    key_origin_bitmap_add_keypos(bitmap, owner_key);
+    key_origin_bitmap_add_keypos(bitmap, member_key);
+    CHECK(key_origin_registry_set_bitmap(owner_key, bitmap));
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, owner_key));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_BOTH));
+
+    CHECK(key_origin_registry_set_bitmap(owner_key, NULL));
+    CHECK(pd_mode_handle_keycode_press_at(PD_SLOT_1, later_key));
+    CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_BOTH));
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, later_key));
+    CHECK(pd_mode_handle_keycode_release_at(PD_SLOT_1, owner_key));
+    key_origin_registry_reset();
+}
+
 int main(void) {
     test_pointing_device_init_enables_auto_mouse_and_default_layer();
     test_pointing_device_task_returns_original_report_without_local_mode();
@@ -714,5 +951,13 @@ int main(void) {
     test_is_mouse_record_user_delegates_pointer_layer_policy();
     test_an_empty_slot_hold_key_owns_nothing();
     test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset();
+    test_two_keys_holding_one_mode_both_own_it();
+    test_the_owner_key_is_the_first_key_to_hold_the_mode();
+    test_a_later_key_takes_a_released_owners_place();
+    test_a_repeated_press_is_one_owner();
+    test_a_new_mode_drops_the_old_modes_owners();
+    test_a_lock_key_replaces_the_holding_owners();
+    test_a_combo_owner_owns_its_footprint();
+    test_owner_sides_are_taken_at_the_press();
     return 0;
 }

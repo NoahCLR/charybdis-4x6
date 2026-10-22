@@ -10,6 +10,9 @@
 
 #include "../defs/pd_modes.h"
 
+// Only pd_mode_apply_command's transitions call these: each change of the
+// active mode there also clears the mode's owner list, whose entries record no
+// mode of their own (pd_mode_state.c).
 void pd_mode_set(pd_mode_mask_t mode);
 void pd_mode_clear(pd_mode_mask_t mode);
 void pd_mode_set_locked(pd_mode_mask_t mode);
