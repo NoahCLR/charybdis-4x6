@@ -422,10 +422,7 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
                 }
             }
             if (series) {
-                series->resolved     = true;
-                series->pending_hold = false;
-                series->hold         = hold_behavior_none();
-                series->long_hold    = hold_behavior_none();
+                key_runtime_core_tap_series_resolve(series);
             }
             return;
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_NONE:

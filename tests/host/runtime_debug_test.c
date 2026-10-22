@@ -747,6 +747,20 @@ static void test_stage_pending_multi_tap(keypos_t key_pos) {
     CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, false));
 }
 
+// A first tap through the record path: its release decision starts the series.
+static void test_tap_through_records(keypos_t key_pos) {
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, true));
+    fake_time = (uint16_t)(fake_time + 10u);
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, false));
+}
+
+// A first tap, then a second press that joins its series and stays down.
+static void test_tap_then_press_through_records(keypos_t key_pos) {
+    test_tap_through_records(key_pos);
+    fake_time = (uint16_t)(fake_time + 20u);
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, true));
+}
+
 static void test_debug_reports_slot_phase_and_momentary_layer_interrupt_state(void) {
     keypos_t layer_key = test_keypos(0, 0);
     keypos_t other_key = test_keypos(0, 1);
@@ -1186,14 +1200,14 @@ static void test_key_runtime_core_unmatched_release_uses_shadow_inclusive_hold_c
     test_set_keymap_key(1u, key_pos, MO(3));
 
     key_runtime_core_effect_plan_init(&plan);
-    CHECK(key_runtime_core_handle_handled_key_release(TEST_TRANSPARENT_HOLD_KEY, key_pos, &resolution, (keyboard_mod_state_t){0}, &plan));
+    CHECK(key_runtime_core_handle_handled_key_release(key_pos, &resolution, (keyboard_mod_state_t){0}, &plan));
     CHECK(plan.count == 2u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_LAYER_RELEASE);
     CHECK(plan.items[1].kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
 
     state->shadow_projection.layer_state = 0u;
     key_runtime_core_effect_plan_init(&plan);
-    CHECK(key_runtime_core_handle_handled_key_release(TEST_TRANSPARENT_HOLD_KEY, key_pos, &resolution, (keyboard_mod_state_t){0}, &plan));
+    CHECK(key_runtime_core_handle_handled_key_release(key_pos, &resolution, (keyboard_mod_state_t){0}, &plan));
     CHECK(plan.count == 1u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY);
 }
@@ -1210,7 +1224,7 @@ static void test_key_runtime_core_active_release_uses_token_layer_contract_not_f
     fake_time = (uint16_t)(fake_time + 5u);
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, KC_C, key_pos, fake_time);
     key_runtime_core_effect_plan_init(&plan);
-    CHECK(key_runtime_core_handle_handled_key_release(KC_C, key_pos, &layer_resolution, (keyboard_mod_state_t){0}, &plan));
+    CHECK(key_runtime_core_handle_handled_key_release(key_pos, &layer_resolution, (keyboard_mod_state_t){0}, &plan));
     CHECK(!test_effect_plan_contains(&plan, KEY_RUNTIME_EFFECT_LAYER_RELEASE));
 
     test_reset_stubs();
@@ -1219,7 +1233,7 @@ static void test_key_runtime_core_active_release_uses_token_layer_contract_not_f
     fake_time = (uint16_t)(fake_time + 5u);
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_INTERRUPTED_LAYER_KEY, key_pos, fake_time);
     key_runtime_core_effect_plan_init(&plan);
-    CHECK(key_runtime_core_handle_handled_key_release(TEST_INTERRUPTED_LAYER_KEY, key_pos, &plain_resolution, (keyboard_mod_state_t){0}, &plan));
+    CHECK(key_runtime_core_handle_handled_key_release(key_pos, &plain_resolution, (keyboard_mod_state_t){0}, &plan));
     CHECK(test_effect_plan_contains(&plan, KEY_RUNTIME_EFFECT_LAYER_RELEASE));
 }
 
@@ -1453,17 +1467,11 @@ static void test_key_runtime_core_active_release_effect_plan_buffers_multi_tap(v
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
 
     CHECK(key_runtime_core_resolve_active_release(key_pos, &resolution));
-    CHECK(key_runtime_core_plan_active_release_effects(key_pos, TEST_PENDING_MULTI_TAP_KEY, &resolution, &plan));
-    CHECK(plan.settlement == KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_RESET);
+    CHECK(key_runtime_core_plan_active_release_effects(key_pos, &resolution, &plan));
+    // The plan decides that the series starts; the reducer fills it from the
+    // released press token (test_key_runtime_core_direct_active_release_helper_seeds_pending_multi_tap).
+    CHECK(plan.settlement == KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_START_TAP_SERIES);
     CHECK(plan.count == 0u);
-    CHECK(plan.pending_multi_tap_seed.active);
-    CHECK(plan.pending_multi_tap_seed.keycode == TEST_PENDING_MULTI_TAP_KEY);
-    CHECK(test_keypos_equal(plan.pending_multi_tap_seed.key_pos, key_pos));
-    CHECK(plan.pending_multi_tap_seed.tap_action == TEST_ACTION);
-    CHECK(plan.pending_multi_tap_seed.tap_repeat_count == 1u);
-    CHECK(plan.pending_multi_tap_seed.tap_hold_term == 120u);
-    CHECK(plan.pending_multi_tap_seed.multi_tap_term == 180u);
-    CHECK(plan.pending_multi_tap_seed.has_more_taps);
 }
 
 static void test_key_runtime_core_active_release_effect_plan_releases_layer_and_taps(void) {
@@ -1479,9 +1487,8 @@ static void test_key_runtime_core_active_release_effect_plan_releases_layer_and_
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_INTERRUPTED_LAYER_KEY, key_pos, fake_time);
 
     CHECK(key_runtime_core_resolve_active_release(key_pos, &resolution));
-    CHECK(key_runtime_core_plan_active_release_effects(key_pos, TEST_INTERRUPTED_LAYER_KEY, &resolution, &plan));
+    CHECK(key_runtime_core_plan_active_release_effects(key_pos, &resolution, &plan));
     CHECK(plan.settlement == KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_RESET);
-    CHECK(!plan.pending_multi_tap_seed.active);
     CHECK(plan.count == 2u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_LAYER_RELEASE);
     CHECK(test_keypos_equal(plan.items[0].data.key_pos, key_pos));
@@ -1508,7 +1515,7 @@ static void test_key_runtime_core_direct_active_release_helper_seeds_pending_mul
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
     key_runtime_core_effect_plan_init(&plan);
     handled_key_resolution_t resolution = test_handled_key_resolution(TEST_PENDING_MULTI_TAP_KEY, 1u);
-    CHECK(key_runtime_core_handle_handled_key_release(TEST_PENDING_MULTI_TAP_KEY, key_pos, &resolution, (keyboard_mod_state_t){0}, &plan));
+    CHECK(key_runtime_core_handle_handled_key_release(key_pos, &resolution, (keyboard_mod_state_t){0}, &plan));
     CHECK(plan.count == 0u);
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(series != NULL);
@@ -1516,6 +1523,13 @@ static void test_key_runtime_core_direct_active_release_helper_seeds_pending_mul
     CHECK(series->keycode == TEST_PENDING_MULTI_TAP_KEY);
     CHECK(series->tap_count == 1u);
     CHECK(!series->pending_hold);
+    CHECK(series->single_action == TEST_ACTION);
+    CHECK(series->tap_action == TEST_ACTION);
+    CHECK(series->tap_repeat_count == 1u);
+    CHECK(series->tap_hold_term_ms == 120u);
+    CHECK(series->tap_term_ms == 180u);
+    CHECK(series->has_more_taps);
+    CHECK(series->last_tap_at == fake_time);
 
     token = key_runtime_core_press_token_at(key_pos);
     CHECK(token != NULL);
@@ -2248,11 +2262,7 @@ static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_hol
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
-    fake_time = (uint16_t)(fake_time + 10u);
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
-    fake_time = (uint16_t)(fake_time + 20u);
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    test_tap_then_press_through_records(key_pos);
 
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(series != NULL);
@@ -2281,11 +2291,7 @@ static void test_key_runtime_core_pending_multi_tap_scan_resolution_promotes_lon
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
-    fake_time = (uint16_t)(fake_time + 10u);
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
-    fake_time = (uint16_t)(fake_time + 20u);
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    test_tap_then_press_through_records(key_pos);
 
     fake_time = (uint16_t)(fake_time + CUSTOM_LONGER_HOLD_TERM);
     key_runtime_core_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, fake_time);
@@ -2309,9 +2315,7 @@ static void test_key_runtime_core_pending_multi_tap_scan_resolution_flushes_expi
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
-    fake_time = (uint16_t)(fake_time + 10u);
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    test_tap_through_records(key_pos);
 
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(series != NULL);
@@ -2446,9 +2450,7 @@ static void test_key_runtime_core_tap_series_state_stays_independent_from_active
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
-    fake_time = (uint16_t)(fake_time + 10u);
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    test_tap_through_records(key_pos);
 
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(series != NULL);
@@ -2457,8 +2459,9 @@ static void test_key_runtime_core_tap_series_state_stays_independent_from_active
     CHECK(series->tap_count == 1u);
     CHECK(!series->pending_hold);
 
+    // The press decision joins the series.
     fake_time = (uint16_t)(fake_time + 20u);
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
+    CHECK(!test_process_record(TEST_PENDING_MULTI_TAP_KEY, key_pos, true));
     token  = key_runtime_core_press_token_at(key_pos);
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(token != NULL);
@@ -2466,7 +2469,7 @@ static void test_key_runtime_core_tap_series_state_stays_independent_from_active
     CHECK(token->interaction.selection.tap_count == 2u);
     CHECK(series != NULL);
     CHECK(series->active);
-    CHECK(series->tap_count == 1u);
+    CHECK(series->tap_count == 2u);
     CHECK(series->pending_hold);
 
     key_runtime_core_apply_event(&advance, fake_time);
@@ -2478,6 +2481,8 @@ static void test_key_runtime_core_tap_series_state_stays_independent_from_active
     CHECK(token->active);
     CHECK(token->phase == PRESS_TOKEN_PHASE_HELD);
 
+    // The release is observed alone, with no release decision: the token is
+    // retired and the series outlives it, its pending hold ended.
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_UP, TEST_PENDING_MULTI_TAP_KEY, key_pos, fake_time);
 
     token  = key_runtime_core_press_token_at(key_pos);
@@ -2487,7 +2492,7 @@ static void test_key_runtime_core_tap_series_state_stays_independent_from_active
     CHECK(token->phase == PRESS_TOKEN_PHASE_RELEASED);
     CHECK(series != NULL);
     CHECK(series->active);
-    CHECK(series->tap_count == 1u);
+    CHECK(series->tap_count == 2u);
     CHECK(!series->pending_hold);
 
     snapshot = key_runtime_core_projection_snapshot_capture();
@@ -2500,9 +2505,10 @@ static void test_key_runtime_core_tap_series_state_stays_independent_from_active
     key_runtime_core_apply_event(&scan, fake_time);
 
     CHECK(key_runtime_core_resolve_pending_multi_tap_scan(key_pos, &resolution));
+    // The series still resolves with its token gone. (These raw core events
+    // never fire the hold the firmware's scan would, so what it flushes here
+    // is no contract; the scenario and release-matrix runners pin that.)
     CHECK(resolution.outcome == KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_FLUSH);
-    CHECK(resolution.action == TEST_ACTION);
-    CHECK(resolution.repeat_count == 1u);
 
     series = key_runtime_core_tap_series_at(key_pos);
     CHECK(series != NULL);

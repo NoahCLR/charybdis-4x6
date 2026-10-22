@@ -57,6 +57,9 @@ enum {
     TEST_LAYER_HOLD_KEY    = CUSTOM_KEY_0 + 0x12,
     // A custom key whose shortcut is a held Hyper: modifiers only (D-F26).
     TEST_SHORTCUT_KEY      = CUSTOM_KEY_0 + 0x13,
+    // Three tap counts deep, a hold at the second; its multi-tap window is
+    // shorter than its hold, so a tap can outlast the window.
+    TEST_TRIPLE_TAP_KEY    = CUSTOM_KEY_0 + 0x14,
     TEST_PD_TAP_HOLD_TERM  = 120,
     TEST_PD_MULTI_TAP_TERM = 150,
     TEST_LAYER_BASE        = 0,
@@ -285,6 +288,17 @@ const key_behavior_t key_behaviors[] = {
         .tap_counts[0] =
             {
                 .tap = TAP_SENDS(KC_J),
+            },
+    },
+    {
+        .keycode        = TEST_TRIPLE_TAP_KEY,
+        .tap_hold_term  = 200,
+        .multi_tap_term = 100,
+        .tap_counts =
+            {
+                [0] = {.tap = TAP_SENDS(KC_A)},
+                [1] = {.tap = TAP_SENDS(KC_B), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_C)},
+                [2] = {.tap = TAP_SENDS(KC_J)},
             },
     },
     {
@@ -1943,6 +1957,52 @@ static void test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processi
 
     CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, false));
     CHECK(!pd_mode_local_active(PD_MODE_PINCH));
+}
+
+// A run of taps typed while pinch holds its Gui keeps the Gui out of what it
+// types, as a plain key pressed under pinch does, however long a tap in the run
+// is held short of its hold: the series keeps the modifiers of its first tap.
+static void test_pinch_masks_mode_owned_gui_from_a_tap_run(void) {
+    keypos_t pinch_key_pos = test_keypos(2, 4);
+    keypos_t key_pos       = test_keypos(0, 2);
+
+    for (uint8_t long_middle_tap = 0u; long_middle_tap <= 1u; long_middle_tap++) {
+        test_reset_state();
+        test_configure_pinch_transparent_profile_path(pinch_key_pos);
+
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, true));
+        key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
+        key_runtime_integration_scan();
+        test_flush_pending_tap_branch();
+        CHECK(pd_mode_local_active(PD_MODE_PINCH));
+        CHECK(fake_mods == MOD_BIT(KC_LEFT_GUI));
+
+        CHECK(!key_runtime_integration_process_record(TEST_TRIPLE_TAP_KEY, key_pos, true));
+        key_runtime_integration_advance(&fake_time, 10);
+        CHECK(!key_runtime_integration_process_record(TEST_TRIPLE_TAP_KEY, key_pos, false));
+        key_runtime_integration_advance(&fake_time, 40);
+        CHECK(!key_runtime_integration_process_record(TEST_TRIPLE_TAP_KEY, key_pos, true));
+        // Past the 100 ms multi-tap window, short of the 200 ms hold.
+        for (uint8_t scan = 0u; scan < (long_middle_tap ? 13u : 1u); scan++) {
+            key_runtime_integration_advance(&fake_time, 10);
+            key_runtime_integration_scan();
+        }
+        CHECK(!key_runtime_integration_process_record(TEST_TRIPLE_TAP_KEY, key_pos, false));
+        key_runtime_integration_advance(&fake_time, 40);
+        CHECK(!key_runtime_integration_process_record(TEST_TRIPLE_TAP_KEY, key_pos, true));
+        key_runtime_integration_advance(&fake_time, 10);
+        CHECK(!key_runtime_integration_process_record(TEST_TRIPLE_TAP_KEY, key_pos, false));
+        CHECK(delayed_action_count == 0);
+
+        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, false));
+        CHECK(!pd_mode_local_active(PD_MODE_PINCH));
+        key_runtime_integration_advance(&fake_time, 101);
+        key_runtime_integration_scan();
+        CHECK(delayed_action_count == 1);
+        CHECK(last_delayed_action == KC_J);
+        CHECK(last_delayed_mods.real == 0);
+        CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
+    }
 }
 
 static void test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain_key_processing(void) {
@@ -5056,6 +5116,7 @@ int main(int argc, char **argv) {
     test_pinch_single_tap_defers_mode_owned_gui_from_delayed_replay();
     test_pinch_single_tap_preserves_physically_held_gui_on_delayed_replay();
     test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processing();
+    test_pinch_masks_mode_owned_gui_from_a_tap_run();
     test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain_key_processing();
     test_pinch_double_tap_hold_zoom_branch_keeps_projection_coherent();
     test_volume_pinch_zoom_volume_alternation_keeps_projection_coherent();

@@ -206,13 +206,13 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key
         }
         handled = key_runtime_process_handled_key_press(ctx->runtime_keycode, ctx->record);
     } else {
-        handled = key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, NULL);
+        handled = key_runtime_process_handled_key_release(ctx->record, NULL);
         if (!handled) {
             resolution = key_runtime_process_resolution(ctx);
             if (!handled_key_resolution_is_handled(*resolution)) {
                 return KEY_RUNTIME_PROCESS_NEXT;
             }
-            handled = key_runtime_process_handled_key_release(ctx->runtime_keycode, ctx->record, resolution);
+            handled = key_runtime_process_handled_key_release(ctx->record, resolution);
         }
         if (handled) {
             key_runtime_deferred_release_drain_dispatches();

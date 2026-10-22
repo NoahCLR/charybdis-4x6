@@ -258,7 +258,7 @@ bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_
     return true;
 }
 
-bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t keycode, const key_runtime_core_active_release_resolution_t *resolution, key_runtime_core_release_effect_plan_t *out) {
+bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, const key_runtime_core_active_release_resolution_t *resolution, key_runtime_core_release_effect_plan_t *out) {
     key_runtime_release_contract_t contract;
 
     if (out) {
@@ -294,20 +294,7 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, uint16_t key
             }
             switch (contract.tap.outcome) {
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_BUFFER_MULTI_TAP:
-                    out->pending_multi_tap_seed = (key_runtime_core_pending_multi_tap_seed_t){
-                        .active                       = true,
-                        .keycode                      = keycode,
-                        .key_pos                      = key_pos,
-                        .tap_count                    = resolution->interaction->selection.tap_count,
-                        .tap_action                   = contract.tap.action,
-                        .tap_repeat_count             = contract.tap.repeat_count,
-                        .tap_branch_has_authored_step = key_behavior_step_present(resolution->interaction->selection.step),
-                        .tap_branch_has_authored_tap  = resolution->interaction->selection.step.tap.present,
-                        .tap_hold_term                = resolution->interaction->binding.tap_hold_term,
-                        .multi_tap_term               = resolution->interaction->binding.multi_tap_term,
-                        .has_more_taps                = resolution->interaction->binding.has_more_taps,
-                        .authored_tap_depth           = resolution->interaction->binding.authored_tap_depth,
-                    };
+                    out->settlement = KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_START_TAP_SERIES;
                     return true;
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
                     key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, key_pos, contract.tap.action);
