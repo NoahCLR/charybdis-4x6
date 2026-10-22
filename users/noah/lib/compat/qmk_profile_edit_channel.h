@@ -21,8 +21,10 @@ enum {
     // Edit status page 0 flags.
     NOAH_PROFILE_EDIT_WIRE_UNSAVED          = 1u << 0,
     NOAH_PROFILE_EDIT_WIRE_PEER_REQUIRED    = 1u << 1,
+    // The other half holds this session and revision with nothing in progress.
     NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED   = 1u << 2,
     NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN       = 1u << 3,
+    // Admission's edit begin would refuse a new edit now.
     NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED    = 1u << 4,
     NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED   = 1u << 5,
     NOAH_PROFILE_EDIT_WIRE_SAVING           = 1u << 6,
@@ -38,7 +40,8 @@ enum {
     // Writing the edit mode failed on this half; it is tried again.
     NOAH_PROFILE_EDIT_WIRE_MODE_NOT_STORED  = 1u << 12,
     // A DPI or lighting key's change awaits publication as an edit; a new
-    // Apply, edit, Save, Revert and mode change are BUSY until it is.
+    // Apply, edit, Save and Revert are BUSY until it is, and a mode change
+    // NOT_CLEAN until it is saved or reverted.
     NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING = 1u << 13,
     // This half's profile owner stopped: only a restart clears it (D-F34).
     NOAH_PROFILE_EDIT_WIRE_STOPPED          = 1u << 14,

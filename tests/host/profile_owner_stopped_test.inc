@@ -21,9 +21,19 @@ static void assert_neither_stopped(const noah_profile_owner_t *left, const noah_
     assert(!usb.stopped && !usb.peer_stopped && !other.stopped && !noah_profile_owner_stopped(left) && !noah_profile_owner_stopped(right));
 }
 
+// A refusal through the wire from a stopped half: INVALID_STATE, and the reply
+// says the half stopped and edits wait, when it has a working copy to report on.
+static void assert_refused_stopped(const noah_profile_owner_t *stopped, uint8_t answer) {
+    const uint16_t said = NOAH_PROFILE_EDIT_WIRE_STOPPED | NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED;
+
+    assert(answer == NOAH_PROFILE_WORKING_INVALID_STATE);
+    assert(stopped->working_ready ? (wire_reply_flags() & said) == said : wire_reply_flags() == 0u);
+}
+
 // Scans change nothing, and Save, Revert, edits and the edit mode are refused.
 static void assert_stays_stopped(noah_profile_owner_t *stopped, noah_profile_owner_t *master, noah_profile_owner_t *peer, uint32_t *now) {
     noah_profile_owner_state_t state = stopped->state;
+    uint32_t                   session, revision;
 
     assert(noah_profile_owner_stopped(stopped));
     for (unsigned scan = 0u; scan < 400u; scan++) {
@@ -34,15 +44,12 @@ static void assert_stays_stopped(noah_profile_owner_t *stopped, noah_profile_own
         }
     }
     assert(stopped->state == state && noah_profile_owner_stopped(stopped));
-    assert(noah_profile_owner_edit_begin(stopped, 900u, stopped->working.session, stopped->working.revision, 1u, 2u, 0u) == NOAH_PROFILE_WORKING_INVALID_STATE);
-    assert(noah_profile_owner_save(stopped, 901u, stopped->working.session, stopped->working.revision) == NOAH_PROFILE_WORKING_INVALID_STATE);
-    assert(noah_profile_owner_revert(stopped, 902u, stopped->working.session, stopped->working.revision) == NOAH_PROFILE_WORKING_INVALID_STATE);
-    assert(noah_profile_owner_set_edit_mode(stopped, NOAH_PROFILE_EDIT_MODE_LIVE) == NOAH_PROFILE_WORKING_INVALID_STATE);
-    if (stopped->working_ready) {
-        noah_profile_owner_working_status_t status = working_status_of(stopped);
-
-        assert(status.stopped && status.edits_blocked);
-    }
+    session  = stopped->working.session;
+    revision = stopped->working.revision;
+    assert_refused_stopped(stopped, wire_begin(stopped, 900u, session, revision));
+    assert_refused_stopped(stopped, wire_named(stopped, NOAH_PROFILE_WIRE_V1_VALUE_SAVE, 901u, session, revision));
+    assert_refused_stopped(stopped, wire_named(stopped, NOAH_PROFILE_WIRE_V1_VALUE_REVERT, 902u, session, revision));
+    assert_refused_stopped(stopped, wire_mode(stopped, 903u, NOAH_PROFILE_EDIT_MODE_LIVE));
 }
 
 static void test_only_states_a_restart_leaves_are_stopped(void) {
@@ -100,8 +107,8 @@ static void test_a_storage_failure_in_a_save_stops_the_usb_half_and_says_so(void
     split_link_t                ll = split_link_to(&right), rl = split_link_to(&left);
     split_fault_link_t          lw = working_link_to(&right), rw = working_link_to(&left);
     noah_profile_working_splice_t create = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = KEYMAP_LENGTH, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
-    noah_profile_owner_working_status_t status;
     uint32_t now = 1000u, length;
+    uint16_t flags;
 
     erased_memory(&lm);
     erased_memory(&rm);
@@ -122,8 +129,8 @@ static void test_a_storage_failure_in_a_save_stops_the_usb_half_and_says_so(void
     lm.fail_next_write = true;
     for (uint32_t guard = 0u; guard < 4096u && left.state != NOAH_PROFILE_OWNER_STORAGE_ERROR; guard++) scan_pair(&left, &right, &now);
     assert(left.state == NOAH_PROFILE_OWNER_STORAGE_ERROR);
-    status = working_status_of(&left);
-    assert(status.stopped && !status.peer_stopped && status.local.active && status.edits_blocked);
+    flags = wire_flags(&left);
+    assert((flags & NOAH_PROFILE_EDIT_WIRE_STOPPED) && !(flags & NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED) && (flags & NOAH_PROFILE_EDIT_WIRE_UNSAVED) && (flags & NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED));
     assert(!working_status_of(&right).stopped);
     assert_stays_stopped(&left, &left, &right, &now);
     // The unsaved edits are still there to read back.
@@ -157,18 +164,18 @@ static void test_a_half_that_cannot_read_its_slots_stops_and_is_heard(void) {
     static memory_t             lm, rm;
     split_link_t                ll = split_link_to(&right), rl = split_link_to(&left);
     split_fault_link_t          lw = working_link_to(&right), rw = working_link_to(&left);
-    noah_profile_owner_working_status_t status;
     uint32_t now = 1000u, exchanges;
+    uint16_t flags;
 
     erased_memory(&lm);
     erased_memory(&rm);
     rm.fail_reads = true;
     boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 0x5703u, &now);
     assert(right.state == NOAH_PROFILE_OWNER_STORAGE_ERROR && working_status_of(&right).stopped);
-    for (uint32_t guard = 0u; guard < 400u && !working_status_of(&left).peer_stopped; guard++) scan_pair(&left, &right, &now);
-    status = working_status_of(&left);
-    assert(status.peer_stopped && !status.stopped && !status.peer_converged && status.edits_blocked);
-    assert(noah_profile_owner_edit_begin(&left, 5u, left.working.session, left.working.revision, 1u, 2u, 0u) == NOAH_PROFILE_WORKING_BUSY);
+    for (uint32_t guard = 0u; guard < 400u && !(wire_flags(&left) & NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED); guard++) scan_pair(&left, &right, &now);
+    flags = wire_flags(&left);
+    assert((flags & NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED) && !(flags & NOAH_PROFILE_EDIT_WIRE_STOPPED) && !(flags & NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED) && (flags & NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED));
+    assert(wire_begin(&left, 5u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_BUSY);
     // Polled once a second (a poll is admitted, then answered), nothing
     // else; while the halves differ it would be ten times as often.
     exchanges = lw.exchanges;
@@ -185,8 +192,8 @@ static void test_a_half_that_cannot_read_its_slots_stops_and_is_heard(void) {
     lm.fail_reads = true;
     boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 0x5705u, &now);
     assert(left.state == NOAH_PROFILE_OWNER_STORAGE_ERROR);
-    status = working_status_of(&left);
-    assert(status.stopped && !status.peer_stopped);
+    flags = wire_flags(&left);
+    assert((flags & NOAH_PROFILE_EDIT_WIRE_STOPPED) && !(flags & NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED));
     assert_stays_stopped(&left, &left, &right, &now);
     lm.fail_reads = false;
     puts("a half that cannot read its slots stops; the USB half hears the other half say so and only polls it; a restart clears it");
@@ -295,7 +302,7 @@ static void test_a_slow_save_is_never_stopped(void) {
         scan_pair(&left, &right, &now);
         assert_neither_stopped(&left, &right);
     }
-    assert(left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE && left.host_barrier_waiting_boundary);
+    assert(left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE && left.host_barrier.waiting_boundary);
     activation_block_reason = 0u;
     for (uint32_t guard = 0u; guard < 20000u && left.save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; guard++) {
         scan_pair(&left, &right, &now);
@@ -461,8 +468,8 @@ static void stop_after_the_decision(uint32_t peer_generation, noah_profile_owner
     stage_valid_candidate_pair(&left, &right, 110u, &now);
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 110u);
     send_and_scan_pair(&left, &right, frame, &now);
-    for (uint32_t guard = 0u; guard < 2048u && committed_generation(&left.store) != 1u; guard++) scan_pair(&left, &right, &now);
-    for (uint32_t guard = 0u; guard < 32u && (!left.host_barrier_local_published || !left.host_barrier_peer_commit_authorized); guard++) {
+    for (uint32_t guard = 0u; guard < 2048u && left.store.committed.generation != 1u; guard++) scan_pair(&left, &right, &now);
+    for (uint32_t guard = 0u; guard < 32u && (!left.host_barrier.local_published || !left.host_barrier.peer_commit_authorized); guard++) {
         left.scheduler_cursor = 0u;
         assert(noah_profile_owner_scan(&left, true, now++));
     }

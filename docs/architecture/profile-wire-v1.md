@@ -1333,11 +1333,12 @@ Every SET is answered in place: bytes 0–4 echoed, then
 | 17 | restart only: `1` the other half acknowledged and restarts too, `0` it did not answer |
 
 Results: `0` OK, `1` QUEUED (the outcome comes later), `2` STALE, `3` BUSY
-(another edit, a save, an Apply, a publication waiting, a keyboard adjustment
-waiting to publish, or the other half not yet holding the same working copy), `4` INVALID_ARGUMENT (a malformed report
+(see Admission, below), `4` INVALID_ARGUMENT (a malformed report
 too), `5` INVALID_STATE, `6` WRONG_TRANSACTION, `7` OUT_OF_ORDER, `8`
 CAPACITY_EXCEEDED, `9` CHECKSUM_MISMATCH, `10` UNSUPPORTED_DOMAIN, `11`
-INVALID_SPLICE, `12` VALIDATION_REJECTED (page 2 says where), `13` NOT_CLEAN,
+INVALID_SPLICE, `12` VALIDATION_REJECTED (page 2 says where), `13` NOT_CLEAN
+(a mode change with unsaved edits or a keyboard adjustment not yet saved; a
+replacement over unsaved edits),
 `14` READ_ERROR (also: this half has nowhere to store the edit mode), `15`
 ABORTED (a save, an Apply or the other half's newer profile replaced the
 profile the edit was made against, or the edit was left unfinished: a
@@ -1345,16 +1346,32 @@ Revert, or no accepted report for 15 s), `16` PUBLICATION_FAILED. Phases: `0` id
 receiving, `2` loading (the first edit copying the saved profile), `3`
 validating, `4` waiting for a safe boundary, `5` reverting.
 
-A new edit, Save and a mode change are BUSY while anything else holds the
-profile and until the other half holds the same session and revision; an
-edit that has begun carries on. Revert never waits for the other half, which
-follows. An edit being received (phase `1`) holds a lease: with no accepted
-begin, splice or data report for 15 s on the keyboard's clock (which, as for
-an Apply, stops while storage waits for a quiet keyboard), the keyboard
-aborts it, last result ABORTED. A client that lost track of its edit can
-also Revert: Revert aborts an edit being received, then reverts. While an edit is being received or checked, or a save runs, a
-candidate's begin, chunk, reuse, validate and commit are answered BUSY; abort
-is not.
+**Admission.** Which edit, Save, Revert, mode change or Apply report may
+start, and the answer when it may not, is one rule per operation, its
+refusals in the order they are answered. Every edit SET answers
+INVALID_ARGUMENT first for a malformed report (transaction 0, non-zero
+padding), then INVALID_STATE when this half's owner is not ready or has
+stopped, then INVALID_ARGUMENT for a value the owner refuses, then:
+
+| Operation | Refused, in this order |
+| --- | --- |
+| Edit begin | A repeat of the begin already admitted is answered as before. STALE, else BUSY, while a keyboard adjustment awaits or is being published, anything else holds the profile (an Apply's candidate, a save, a publication waiting for its boundary) or the other half does not hold the same session and revision; then BUSY while another edit is received, loaded, checked or waits, or a Revert waits. |
+| Save | QUEUED to the client's repeat of the save it started, BUSY to anything else while a save runs; then STALE; then BUSY on the edit begin's holders, or while an edit is in progress. |
+| Revert | BUSY while a keyboard adjustment awaits or is being published, or anything else holds the profile. It never waits for the other half, which follows. It aborts an edit being received, then reverts. |
+| Edit mode | NOT_CLEAN with unsaved edits or a keyboard adjustment not yet saved; then BUSY while a save runs or an edit is in progress, and until the other half holds the same session and revision: a change takes a counter above both halves' (Edit mode, below), which only a half that hears the other knows. An Apply does not hold it by itself, since the mode is stored outside the profile; while an Apply copies to the other half, the halves do not agree. |
+| Apply | A candidate's begin, chunk, stream chunk, reuse, validate and commit are answered BUSY (error `MAILBOX_BUSY`) while an edit is received, loaded, checked or waits, or a save runs; the begin of a new Apply (a transaction other than the one running) also while a keyboard adjustment awaits publication. Abort and reads never are. |
+
+The keyboard's own steps, publishing queued adjustments and starting Live's
+automatic save, wait while anything holds the profile, the halves disagree or
+an edit is in progress. Flag 4 of the edit status is the edit begin's answer
+to a new edit naming the current identity.
+
+An edit that has begun carries on. An edit being received (phase `1`) holds a
+lease: with no accepted begin, splice or data report for 15 s on the
+keyboard's clock (which, as for an Apply, stops while storage waits for a
+quiet keyboard), the keyboard aborts it, last result ABORTED. A client that
+lost track of its edit can also Revert: Revert aborts an edit being
+received, then reverts.
 
 ### Save
 
@@ -1405,7 +1422,7 @@ not ready status `3`.
 | ---: | ---: | --- |
 | 0 | 1 | layout, `1` |
 | 1 | 1 | phase |
-| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply; Save is BUSY), 12 writing the edit mode failed and is being retried, 13 a keyboard adjustment (DPI or lighting key) awaits publication: a new Apply, edit, Save, Revert and mode change are BUSY until it publishes; 14 this half stopped: only a restart clears it, 15 the other half answers that it stopped (both D-F34, below) |
+| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply; Save is BUSY), 12 writing the edit mode failed and is being retried, 13 a keyboard adjustment (DPI or lighting key) awaits publication: a new Apply, edit, Save and Revert are BUSY and a mode change NOT_CLEAN until it publishes, and then, as any unsaved edit, until it is saved or reverted; 14 this half stopped: only a restart clears it, 15 the other half answers that it stopped (both D-F34, below) |
 | 4 | 4 | session |
 | 8 | 4 | revision |
 | 12 | 4 | saved generation (`0`: compiled defaults) |
@@ -1493,8 +1510,12 @@ zero bytes, a counter, CRC-32 of the first twelve), the newer valid one
 counting, a write going to the other and read back. A change takes a counter
 above both halves'; the USB half sends it to the other half, and on
 reconnect the higher counter wins. Equal counters that disagree are a
-conflict the next change resolves. A change is refused NOT_CLEAN with unsaved
-edits: the client asks Save or Revert first. A change is answered OK at
+conflict the next change resolves. A change answers NOT_CLEAN with unsaved
+edits or a keyboard adjustment not yet saved (the client asks Save or Revert
+first), and BUSY while a save runs or an edit is in progress and until the
+halves agree: a half that has not heard the other cannot know a counter
+above both, and a change made by one half alone could lose to the other
+half's higher counter on reconnect. A change is answered OK at
 once and takes effect at once; each half writes it to its EEPROM when its
 keyboard is quiet (no key held, the matrix unchanged for 50 ms), and a failed
 write is retried with a growing wait and reported by status flag 12 until it
@@ -1610,8 +1631,8 @@ local feedback and queue the four adjustment scalars
 a compound edit.
 Repeated presses coalesce while another operation holds the working copy;
 an adjustment arriving during Save becomes a subsequent revision. Pending
-adjustments block new client edits, Save, Revert and mode changes until
-published; review sees the ordinary stored working-copy settings afterwards.
+adjustments make new client edits, Save and Revert BUSY and a mode change
+NOT_CLEAN until published; review sees the ordinary stored working-copy settings afterwards.
 Settings projection retains newer pending local values during an older
 publication. The settings domain is optional (a profile without one inherits
 the authored defaults), yet an adjustment replaces bytes inside one: when the
