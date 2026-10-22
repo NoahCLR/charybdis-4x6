@@ -173,7 +173,7 @@ Every memory report must name:
 
 Measure the instrumented pair, built as the firmware anyone flashes. From a
 task worktree, run the vault's `verify` with `NOAH_RESOURCE_CHECKS=yes`: it
-sets `QMK_ROOT` and `BUILD_ROOT`, serializes builds, and runs
+sets `QMK_ROOT` and `BUILD_ROOT` and runs
 
 ```sh
 NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh

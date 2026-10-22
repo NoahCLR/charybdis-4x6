@@ -12,7 +12,7 @@
 #include "users/noah/lib/profile/split/profile_working_sync.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 
-_Static_assert(NOAH_PROFILE_WORKING_SYNC_FRAME_MAX <= SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries the largest working-sync frame");
+_Static_assert((unsigned)NOAH_PROFILE_WORKING_SYNC_FRAME_MAX <= (unsigned)SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries the largest working-sync frame");
 
 enum {
     ACTION_ABI_DIGEST = 0x2468ACE0u,

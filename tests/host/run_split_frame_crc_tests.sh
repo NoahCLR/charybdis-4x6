@@ -2,6 +2,7 @@
 # The fork's split serial protocol with the frame CRC, driven over a
 # fault-injectable link (split_frame_crc_test.py).
 set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"

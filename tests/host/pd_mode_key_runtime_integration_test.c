@@ -4013,11 +4013,11 @@ static void test_qmk_admission_overload_combo_release(void) {
     gesture_at(5, 3, true); gesture_advance(1); gesture_at(5, 4, true); gesture_advance(55);
     CHECK(gesture_combo_output_count == 1 && gesture_combo_outputs[0] == G(KC_A));
     CHECK(noah_record_admission_held_count() == 1);
-    for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY - 1; col++) gesture_at(2, col, true);
+    for (int col = 0; col < (int)NOAH_RECORD_ADMISSION_CAPACITY - 1; col++) gesture_at(2, (uint8_t)col, true);
     CHECK(noah_record_admission_held_count() == NOAH_RECORD_ADMISSION_CAPACITY);
     gesture_at(5, 3, false); gesture_at(5, 4, false);
     gesture_at(3, 0, false);
-    for (uint8_t col = 0; col < NOAH_RECORD_ADMISSION_CAPACITY - 1; col++) gesture_at(2, col, false);
+    for (int col = 0; col < (int)NOAH_RECORD_ADMISSION_CAPACITY - 1; col++) gesture_at(2, (uint8_t)col, false);
     gesture_advance(500);
     uint8_t combo_records = 0;
     for (uint8_t i = 0; i < gesture_admitted_count; i++) {

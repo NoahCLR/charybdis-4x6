@@ -60,7 +60,7 @@ Ark checkout; Ark owns the optional cross-repository integration tests.
 ## Tests and CI
 
 CI runs for releases, not for development (D-F06). A release's `dev` → `main`
-pull request runs the complete host suite with GCC in the QMK container, builds
+pull request runs the complete host suite in the build image, builds
 the side-specific pair in the release image at the pinned BK commit
 (`Pair build`, kept as the `firmware-pair` artifact with its SHA-256) and checks
 agreement with the Ark release it will sit next to. The shared vault's
@@ -69,11 +69,48 @@ If publication is interrupted, rerun the same command: it resumes. The same
 workflow (`.github/workflows/ci.yml`) also runs nightly on `dev`, never
 blocking, and `Pair build` can be started on demand to build any commit.
 
-Development runs the host suite with macOS clang; CI runs it with GCC in the
-QMK container on the promotion pull request and nightly. Host tests put QMK's directories on
-`C_INCLUDE_PATH`, so both compilers treat QMK as third-party system headers: a
+Host tests run in the build image `tools/build-image` names, the one the pair
+is built in and CI runs (D-F05), with its GCC, sanitizers, Python, Node and
+ripgrep. Every `tests/host/run_*.sh` sources `tests/host/in_build_image.sh`
+first: started on the Mac, it runs the runner in that image with Docker,
+without network; inside the image (CI, or one runner calling another) it
+does nothing. The image is pulled once, on a Mac's first run; after that no
+test needs the network. Compiling through Docker's file sharing with macOS is several
+times slower than on the image's own disk, so the runner reads copies at the
+original paths (`tools/qmk-copies.sh`): the checkout is copied into memory each
+run, and QMK into a Docker volume once per commit
+(`charybdis-host-qmk-<commit>`, about a gigabyte and half a minute; making one
+removes all but the three newest). A QMK with local changes, untracked files or
+submodules not at their commits is copied each run instead, since a volume is
+named by the commit alone. `tools/build-firmware-pair.sh` compiles the same
+copies, BK copied into memory from its volume, and writes only the pair into
+`BUILD_ROOT`: it never touches BK's output path, so pair builds in several
+worktrees, and a pair build beside the host suite, run at once without a lock.
+CI's container jobs set `NOAH_IN_BUILD_IMAGE=1` and build and test in their
+checkouts.
+`NOAH_BUILD_IMAGE=<image>` runs the tests, or `tools/build-firmware-pair.sh`
+builds, in an image that is not pinned, such as one `tools/make-build-image.sh`
+has built; output says so, and the pair's note names it.
+`run_contract_probe.sh --output FILE` writes FILE outside the container, so a
+client can name any path. Git directories are mounted. A runner that writes into the checkout or QMK
+(`run_all_profile_compile_tests.sh`, the stack-budget checks, or real-profile
+validation with `NOAH_WRITE_AUTHORED_MACRO_BANK=1`) works on the checkouts
+themselves. Docker must be running; nothing falls back to the Mac's clang,
+so a local pass and CI's are the same compiler. Undefined behaviour halts the
+test that reaches it (`UBSAN_OPTIONS=halt_on_error=1`). Host tests put QMK's
+directories on `C_INCLUDE_PATH`, so QMK is third-party system headers: a
 warning inside QMK cannot fail a build, while warnings in our own sources and
 test shims remain errors.
+
+`run_all_host_tests.sh` runs its checks side by side, `NOAH_HOST_TEST_JOBS` at
+a time (default: one per CPU the image sees); each check compiles into its own
+temporary directory. Output is printed in list order when all have finished,
+and each failed check's output is repeated under its name.
+`NOAH_HOST_TEST_JOBS=1` runs them one at a time, and `NOAH_HOST_TEST_TIMES=1`
+lists the slowest. The feature-gate and tap-depth-eight runners also work side
+by side inside. The split frame CRC harness,
+which times a real thread against a 20 ms deadline, runs alone after the
+others.
 
 The pair builder isolates QMK CLI configuration for the compiler and its code
 generators, so saved `overlay_dir`/`qmk_home` values cannot redirect a task build

@@ -9,7 +9,7 @@
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "profile_store_committed_fixture.h"
 
-_Static_assert(NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries the largest split frame");
+_Static_assert((unsigned)NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= (unsigned)SPLIT_FAULT_LINK_FRAME_MAX, "the fault link carries the largest split frame");
 
 enum {
     ACTION_ABI_DIGEST   = UINT32_C(0x11223344),

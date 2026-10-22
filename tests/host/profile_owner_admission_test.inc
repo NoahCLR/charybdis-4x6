@@ -66,7 +66,9 @@ static uint8_t wire_set(noah_profile_owner_t *owner, uint8_t value, uint16_t tra
     wire[1] = NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL;
     wire[2] = value;
     write_u16(&wire[3], transaction);
-    memcpy(&wire[5], fields, length);
+    if (length != 0u) {
+        memcpy(&wire[5], fields, length);
+    }
     wire_owner = owner;
     assert(noah_qmk_profile_edit_channel(wire, sizeof(wire)));
     return wire[5];
