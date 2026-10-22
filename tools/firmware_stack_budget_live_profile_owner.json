@@ -522,6 +522,11 @@
           "caller": "slave_rpc_exec_callback",
           "callee": "restart_rpc",
           "reason": "QMK dispatches the registered restart RPC (D-F34): it checks one 8-byte frame, notes the restart and writes the acknowledgement."
+        },
+        {
+          "caller": "noah_qmk_profile_split_rpc",
+          "callee": "storage_paused",
+          "reason": "With its mailbox full, the reconciler's busy reply asks the store runtime's injected storage_paused callback whether a save is waiting for a quiet keyboard (STORAGE_PAUSED)."
         }
       ],
       "paths": [
@@ -540,6 +545,14 @@
         {
           "name": "restart RPC",
           "functions": ["SlaveThread", "slave_rpc_exec_callback", "restart_rpc", "noah_qmk_keyboard_restart_encode"]
+        },
+        {
+          "name": "profile split busy reply asks whether storage is paused",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_profile_split_rpc", "storage_paused"]
+        },
+        {
+          "name": "profile split busy reply encoding",
+          "functions": ["SlaveThread", "slave_rpc_exec_callback", "noah_qmk_profile_split_rpc", "encode_busy_response", "noah_profile_split_v1_frame_encode", "noah_profile_split_v1_frame_length", "frame_shape_valid", "noah_profile_split_descriptor_valid"]
         }
       ]
     }

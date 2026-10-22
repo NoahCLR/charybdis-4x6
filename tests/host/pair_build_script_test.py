@@ -77,16 +77,19 @@ if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
             subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base, env=env, check=True)
             calls = [json.loads(line) for line in (base / 'calls').read_text().splitlines()]
             # Resource gates must check and preserve EACH half before QMK's
-            # shared output is overwritten. A gate failure stops the pair.
+            # shared output is overwritten. PAIR_TEST_FAIL names the gates
+            # that fail, as half:gate.
             (source / 'tests/host').mkdir(parents=True)
             (source / 'tests/host/run_firmware_memory_budget_checks.sh').write_text(
-                '#!/bin/sh\ncat "$QMK_ROOT/.build/bastardkb_charybdis_4x6_noah.elf"\n')
+                '#!/bin/sh\nhalf="$(cat "$QMK_ROOT/.build/bastardkb_charybdis_4x6_noah.elf")"\necho "$half"\n'
+                'case " ${PAIR_TEST_FAIL:-} " in *" $half:memory "*) exit 1 ;; esac\n')
             (source / 'tools/check_firmware_stack_budget.py').write_text(
                 "import argparse, os\nfrom pathlib import Path\n"
                 "p=argparse.ArgumentParser();p.add_argument('--manifest');p.add_argument('--elf');p.add_argument('--map');a=p.parse_args()\n"
                 "half=Path(a.elf).read_text();assert Path(a.map).read_text()==half\n"
                 "print(half)\n"
-                "raise SystemExit(1 if os.environ.get('PAIR_TEST_RESOURCE_FAIL')==half else 0)\n")
+                "gate=half+':'+Path(a.manifest).stem\n"
+                "raise SystemExit(1 if gate in os.environ.get('PAIR_TEST_FAIL','').split() else 0)\n")
             resource_env = dict(env, NOAH_RESOURCE_CHECKS='yes')
             subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base, env=resource_env,
                            capture_output=True, text=True, check=True)
@@ -95,11 +98,23 @@ if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
                                   'firmware_stack_budget.txt', 'firmware_stack_budget_live_profile_owner.txt'):
                     content = (base / 'builds/test-pair' / f'1_charybdis_{half}_resources.{extension}').read_text()
                     self.assertEqual(content.strip(), half)
+            # A failing gate hides no other: every gate runs on both halves and
+            # reports, and the build fails at the end naming each failed report.
             failed = subprocess.run(['sh', source / 'tools/build-firmware-pair.sh'], cwd=base,
-                                    env=dict(resource_env, PAIR_TEST_RESOURCE_FAIL='right'),
+                                    env=dict(resource_env, PAIR_TEST_FAIL='right:firmware_stack_budget left:memory'),
                                     capture_output=True, text=True)
             self.assertNotEqual(failed.returncode, 0)
-            self.assertFalse((base / 'builds/test-pair/2_charybdis_left_resources.uf2').exists())
+            self.assertNotIn('Built the', failed.stdout)
+            self.assertTrue((base / 'builds/test-pair/2_charybdis_left_resources.uf2').exists())
+            reports = {'memory.txt', 'firmware_stack_budget.txt', 'firmware_stack_budget_live_profile_owner.txt'}
+            for half in ('right', 'left'):
+                for report in reports:
+                    content = (base / 'builds/test-pair' / f'2_charybdis_{half}_resources.{report}').read_text()
+                    self.assertEqual(content.strip(), half)
+            named = {line.strip() for line in failed.stderr.splitlines() if line.startswith('  ')}
+            self.assertEqual(named, {str(base / 'builds/test-pair' / f'2_charybdis_{gate}')
+                                     for gate in ('right_resources.firmware_stack_budget.txt',
+                                                  'left_resources.memory.txt')})
             # A BK that is not the pin (moved, or locally changed) is refused,
             # unless explicitly allowed for a trial.
             (qmk / 'hook.c').write_text('void hook(void) {}\n')
