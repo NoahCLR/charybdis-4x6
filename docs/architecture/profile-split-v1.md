@@ -312,7 +312,8 @@ comparison of the durable record, excluding only the local slot number.
 The peer store answers its own state questions, and the reconciler and owner
 ask them rather than spell out sets of states: whether it holds an unfinished
 copy (`holds_copy`), has a bounded step due (`working`), can still abort the
-copy with nothing durable (`abortable`), holds a committed copy whose
+copy because no commit decision is durable yet, though a prepared copy's
+marker is (`abortable`), holds a committed copy whose
 storage is still held for it so it waits to be published
 (`awaiting_activation`), or last admitted a given copy (`copy_matches`).
 They are static inline in `profile_peer_store_backend.h`; the compiler may keep one out of line as a small leaf of its own, and the reviewed stack paths are measured as built. The identity comparisons between a store record,
