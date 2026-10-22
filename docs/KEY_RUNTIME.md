@@ -143,7 +143,16 @@ helper.
 
 Pending multi-tap state is owned by `tap_series_t` inside `key_runtime_core`,
 while pending multi-tap release decisions are owned by
-`planning/release_planner.c`.
+`planning/release_planner.c`. The reducer's tap-series section in
+`reducer/runtime.c` holds the series' transitions, and fills it from a press token
+in one place: a handled press joins its key's series; the release decision for
+a first tap starts it (the plan's settlement says so, and the series takes the
+released token and the modifiers the release was planned under, a pointing
+mode's mask applied); a later tap's decision preserves or ends it; observing
+a hold's release ends its pending hold. Typing a series' first tap
+(`type_first_tap`) and the release and scan planners' clears also write it.
+Scan planning marks a series resolved through `planning/tap_series.h`, and
+`planning/tap_series_flush.c` flushes and clears.
 Do not add a second state machine for multi-tap sequencing; new behavior should
 extend the core reducer and its release/scan planning tests.
 
@@ -172,7 +181,7 @@ QMK-facing applied registries. Use these labels when changing runtime behavior:
 | Runtime fact | Authoritative owner | Projected or compatibility surface | Write direction and guardrail |
 | --- | --- | --- | --- |
 | Physical press identity and active key phase | `press_token_t` in `key_runtime_core` | debug and trace snapshots | Physical events are observed into core first; other registries must not create or mutate press tokens. Nonzero IDs are allocated against every live owner store before press mutation, with exhaustion exposed in the projection snapshot. Covered by runtime debug's production and tiny-domain builds, key runtime scenario, release matrix, and integration harness tests. |
-| Pending multi-tap chain state | `tap_series_t` in `key_runtime_core` | `planning/tap_series_flush.c` plans explicit flushes; `planning/scan_planner.c` owns scan-time thresholds; release planner reads the state | Core stores the chain; `planning/tap_series_flush.c` flushes expired or foreign chains, `planning/scan_planner.c` resolves scan-time hold/flush outcomes, and `planning/release_planner.c` resolves release decisions over it. Covered by release matrix, scenario, runtime debug, and integration harness tests. |
+| Pending multi-tap chain state | `tap_series_t` in `key_runtime_core` | `planning/tap_series_flush.c` plans explicit flushes; `planning/scan_planner.c` owns scan-time thresholds; release planner reads the state | Core stores and writes the chain (join on press, start/preserve/end from the release decision's settlement, hold release); `planning/tap_series_flush.c` flushes expired or foreign chains, `planning/scan_planner.c` resolves scan-time hold/flush outcomes, and `planning/release_planner.c` resolves release decisions over it and returns a settlement, never a copy of the series. Covered by release matrix, scenario, runtime debug, and integration harness tests. |
 | Release semantics | `planning/release_planner.c` | `deferred_release.c` adapts blocked dispatches into the core pending-release queue | Planner owns quick release, fallback suppression, buffered base tap, active releases, and pending multi-tap releases; adapters must not re-decide those semantics. |
 | Pending release dispatch queue | Index-linked `pending_release_t` slots in `key_runtime_core`, with mechanics in `queue/pending_release_queue.c` | `deferred_release.c`, `release.c`, and `scan.c` drain through the adapter | Queue storage stays core-owned because blockers are press-token facts. Head/tail linkage defines FIFO order independently of uptime; one unlink path owns reconnection, count changes, and pending-emission token cleanup. Covered directly by the pending-release queue runner and by release matrix/runtime debug integration tests. |
 | Runtime inspection and blocker queries | `key_runtime_core_state_t` read through `reducer/state_query.c` | `debug.c`, `feedback.c`, projection snapshots, preflight, and deferred release transport | Query code reads reducer-owned state and reports derived facts; it must not mutate press, tap, lease, or pending-release storage. Covered by runtime debug, release matrix, scenario, trace, and integration harness tests. |

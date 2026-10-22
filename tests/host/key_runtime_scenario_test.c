@@ -539,6 +539,51 @@ static void test_press_past_the_deepest_tap_count_sends_the_run_first(void) {
     CHECK(noah_runtime_debug_slot_pending_multi_tap_count(key_pos) == 1u);
 }
 
+// How long a tap in the run is held does not change what the run types: a
+// middle tap held past the multi-tap window, still short of the hold, keeps
+// the series it joined, so a run past the deepest tap count still types the
+// first tap, never the middle tap count's.
+static void test_long_middle_tap_keeps_the_run_typing_the_first_tap(void) {
+    static const key_runtime_scenario_multi_tap_entry_t entries[] = {
+        {.tap_count = 2, .step = {.tap = TAP_SENDS(TEST_ALT_ACTION), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION)}},
+        {.tap_count = 3, .step = {.tap = TAP_SENDS(TEST_ALT_ACTION_TWO)}},
+    };
+    static const key_runtime_scenario_step_t run[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        // Held 130 ms: past the 120 ms multi-tap window, short of the 150 ms hold.
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(65),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_ADVANCE(65),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(40),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 2, 3),
+        KEY_RUNTIME_SCENARIO_ADVANCE(121),
+        KEY_RUNTIME_SCENARIO_SCAN(),
+    };
+    key_behavior_view_t behavior = test_pressable_handled_key(TEST_MULTI_TAP_KEY);
+
+    behavior.has_multi_tap      = true;
+    behavior.authored_tap_depth = 3u;
+    behavior.single.tap         = (tap_behavior_t)TAP_SENDS(TEST_TAP_ACTION);
+    key_runtime_scenario_reset();
+    key_runtime_scenario_add_pending_multi_tap_behavior(behavior, entries, ARRAY_SIZE(entries));
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(run, ARRAY_SIZE(run));
+
+    CHECK(test_sent_count(TEST_TAP_ACTION) == 4u);
+    CHECK(test_sent_count(TEST_ALT_ACTION) == 0u);
+    CHECK(test_sent_count(TEST_ALT_ACTION_TWO) == 0u);
+    CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(2, 3)));
+}
+
 static void test_momentary_layer_key_tracks_press_and_release_events(void) {
     static const key_runtime_scenario_step_t scenario[] = {
         KEY_RUNTIME_SCENARIO_PRESS(MO(3), 2, 4),
@@ -1208,6 +1253,7 @@ int main(void) {
     test_hold_past_the_deepest_tap_count_takes_the_single_tap_hold();
     test_empty_tap_count_repeats_the_first_tap();
     test_press_past_the_deepest_tap_count_sends_the_run_first();
+    test_long_middle_tap_keeps_the_run_typing_the_first_tap();
     test_momentary_layer_key_tracks_press_and_release_events();
     test_threshold_hold_registers_and_releases_owned_state();
     test_replaced_press_token_still_releases_owned_state();
