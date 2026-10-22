@@ -73,8 +73,8 @@ Pre-process still tracks which physical modifier keys are down, which is the
 separate question masking policy asks. A mod-tap is not one: every `MT()` is
 the runtime's (D-F27), and its hold is a managed owner of its modifiers, as
 any behaviour's hold is, so a pointing mode that holds the same modifier
-masks it (see Open Issues in
-[LIVE_EDIT_APP_DIRECTION](../LIVE_EDIT_APP_DIRECTION.md#open-issues)). A
+masks it; whether a key's own modifier hold should count as physical is
+still open. A
 tapped mod-tap never holds a modifier.
 
 Physical modifier-only combinations (`KC_MEH`, `KC_HYPR`, or a modifier

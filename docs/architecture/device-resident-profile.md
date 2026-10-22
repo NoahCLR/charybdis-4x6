@@ -41,7 +41,7 @@ authority. The three C files remain:
 
 Ark never reads or writes them. Its durable representation is the
 portable profile; `.c` import and export are outside the app (D-L09, an app
-decision in Ark's direction). Connecting a keyboard never
+decision in Ark's repository). Connecting a keyboard never
 silently overwrites the keyboard or a draft.
 
 Every editor draft records the device generation and digest it was based on. A
@@ -165,9 +165,8 @@ physical capacity.
 
 ## Implementation Sequence
 
-The delivery slices are in Ark's product goal and the product's status in
-Ark's direction; the firmware's status is in the
-[firmware direction](../LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
+The delivery slices and the product's status are Ark's; the firmware's
+remaining work, mostly hardware acceptance, is queued in the work-queue vault.
 The one-store commit and recovery ordering are implemented (D-F31). The
 active phase is
 acceptance: reboot, reconnect, applicable USB/role configurations,

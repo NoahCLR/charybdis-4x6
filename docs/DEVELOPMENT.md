@@ -173,6 +173,25 @@ It lists the BK commits since the old pin and what changed by area: hooks and
 core, keycode numbering, VIA, RGB matrix, the Charybdis board and submodules.
 Keycode or RGB changes need an Ark follow-up; this firmware does not build BK's VIA code (D-F31).
 
+## The build image
+
+`tools/build-image` names the image every pair is built and every host test
+runs in (D-F05), by its multi-arch index digest; every workflow's `image:`
+equals it, which a host test checks. A pair is reproducible: QMK's version
+stamps are fixed (`SKIP_VERSION`, so the `QK_VERSION` keycode prints
+placeholders) and source paths are mapped, so one userspace commit and BK pin
+give the same bytes on any machine, and each pair's note records its inputs,
+image and SHA-256.
+
+Build and publish a new image only with `sh tools/make-build-image.sh <tag>`;
+its header says what it checks before it pushes and pins. To move to a newer
+official QMK image, read its index digest (`docker buildx imagetools inspect
+ghcr.io/qmk/qmk_cli:latest`, the top-level `Digest`), set it as `QMK_CLI` in
+`tools/build-image.dockerfile`, and run the script with a new tag. If it
+reports that the pair changed, the compiler changed: record the memory effect
+in [memory budgets](architecture/memory-budgets.md). If the official image
+moves Python to a new minor version, the vault's `vpython` moves first.
+
 ## The firmware contract
 
 `sh tests/host/run_contract_probe.sh` states what this firmware promises a
@@ -191,10 +210,8 @@ client's agreement check judges it.
 The app's current guide is `README.md` in the independent Ark checkout listed
 under [local repositories](#local-repositories-and-worktrees) above; its `docs/`
 directory owns app development guidance. Earlier in-tree guides remain in Git
-history.
-The direction, the decisions behind it, and what is deliberately left
-undesigned are in
-[`docs/LIVE_EDIT_APP_DIRECTION.md`](LIVE_EDIT_APP_DIRECTION.md).
+history. Firmware decisions are ADRs in [`docs/adr/`](adr/), cited as D-F…;
+D-L… citations are Ark's decisions, in Ark's repository.
 
 Firmware builds and host tests do not require Ark. The independent Ark
 repo owns the optional `npm run test:compat` integration gate for joint protocol
@@ -210,7 +227,7 @@ repeated lighting-activity messages to the other half while still reading its
 keys on every scan. Both halves use a fixed 460,800-baud split link, with frame
 CRC enabled by default. Flash both halves together when moving from the earlier
 230,400-baud firmware. The faster link needs renewed hardware acceptance:
-before frame CRC, it produced transport errors and lighting flicker (D-L43).
+before frame CRC, it produced transport errors and lighting flicker (D-F52).
 CRC rejects corrupted frames; it does not prevent errors or their retry cost.
 The removed `NOAH_SPLIT_BAUD` selector still fails the build.
 
@@ -258,8 +275,7 @@ Physical migration, power-interruption, pointing cadence and stack high-water
 acceptance remain release gates; see the
 [PD-mode domain contract](architecture/pd-mode-domain-v1.md#hardware-acceptance).
 Physical gesture acceptance (the Button 3 double-hold failure and
-combo/tapping interactions on the current layout) is also still open; see the
-[open issues](LIVE_EDIT_APP_DIRECTION.md#open-issues).
+combo/tapping interactions on the current layout) is also still open.
 
 ## Protected main promotions
 

@@ -186,7 +186,7 @@ found; the build fails afterwards, naming each failed gate's report, if any
 did. A PASS covers only the paths in `tools/firmware_stack_budget.json`
 and `tools/firmware_stack_budget_live_profile_owner.json`. The standalone
 `tests/host/run_firmware_stack_budget_checks.sh` compiles a plain `qmk compile`
-image without the live-profile owner (D-L08), not the flashed pair.
+image without the live-profile owner (D-F35), not the flashed pair.
 
 ## Portable-Profile Stack Acceptance — 2026-09-08
 
@@ -230,7 +230,7 @@ links 4,152 bytes of `.data` and 54,556 bytes of `.bss`: 58,708 bytes combined.
 This fails the previous 57,344-byte policy by 1,364 bytes. We explicitly budget
 3,072 additional bytes for this feature, making its regression tripwire 60,416
 bytes. The measurement leaves 1,708 bytes of policy margin. Every firmware build
-carries the slot engine (D-L40), so the gate applies the increment to every
+carries the slot engine (D-F49), so the gate applies the increment to every
 artifact; there is no build without it to keep the original tripwire for.
 
 The SRAM0–3 fixed prefix is 58,712 bytes and its boot linker/core-memory span is
@@ -611,10 +611,10 @@ of 768. SRAM0–3 `.data + .bss` is 208,352 bytes per half, 1,568 below the
 are link-time values for the named paths only, not runtime high-water or a
 global or interrupt-stack maximum.
 
-Later changes no longer pass the reviewed-path gate: the records below from
-D-F29 on say which paths go over the policy (an
-[open issue](../LIVE_EDIT_APP_DIRECTION.md#open-issues)). Until the gate
-passes again, the figures above are the last ones it accepted.
+Later changes did not pass the reviewed-path gate: the records below from
+D-F29 on say which paths went over the policy, until
+[Fallback settlement holds no plan](#fallback-settlement-holds-no-plan)
+brought every path back inside it.
 
 ## The new base: 32-bit profile lengths — D-F28, 2026-10-19
 
@@ -639,8 +639,7 @@ the split reconciler by 36 to its 896-byte allowance exactly, the store by
 transaction by 8. The owner's engineering policy rises from 11,264 to 11,520
 bytes and the validator's from 384 to 400; neither is a physical SRAM limit.
 These are link-time values, not runtime high-water; the reviewed-path stack
-gate was not run for this change (it already fails on `dev`, an
-[open issue](../LIVE_EDIT_APP_DIRECTION.md#open-issues)).
+gate was not run for this change (it already failed on `dev` then).
 
 Pulled chunks then moved into replies as large as pushed ones (D-F28), which
 costs 184 bytes more per half in the same build: QMK's slave-to-master RPC

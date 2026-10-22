@@ -7,7 +7,8 @@ set -eu
 # not what a plain `qmk compile` produces. The live-profile owner needs
 # NOAH_PHYSICAL_HALF, since durable profile origin identity is side-specific,
 # so a build without it silently omits the owner and the keyboard has no
-# committed profile to read. See docs/LIVE_EDIT_APP_DIRECTION.md, D-L08.
+# committed profile to read. See D-F35
+# (docs/adr/0035-live-profile-owner-on-by-default.md).
 #
 # NOAH_PHYSICAL_HALF is deliberately not derived from FORCE_MASTER/FORCE_SLAVE.
 # Those select the transport role, which can swap at runtime; the physical half
@@ -18,7 +19,7 @@ set -eu
 #
 # --no-owner builds the comparison pair without the live-profile owner, for
 # A/B against ordinary behaviour.
-# The split link runs at a fixed 460,800 baud on both halves (D-L43).
+# The split link runs at a fixed 460,800 baud on both halves (D-F52).
 # The removed NOAH_SPLIT_BAUD selector is refused rather than ignored.
 #
 # The pair is always compiled in the image tools/build-image names, the one CI
@@ -142,7 +143,7 @@ elif [ $# -gt 0 ]; then
 fi
 
 if [ -n "${NOAH_SPLIT_BAUD:-}" ]; then
-    echo "NOAH_SPLIT_BAUD was removed: the split link is fixed at 460800 baud (D-L43)" >&2
+    echo "NOAH_SPLIT_BAUD was removed: the split link is fixed at 460800 baud (D-F52)" >&2
     exit 1
 fi
 

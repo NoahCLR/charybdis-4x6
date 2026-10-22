@@ -80,7 +80,7 @@ checks before handoff when source/build behavior changed.
 | Shared runtime or tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_diag_tests.sh`, `run_runtime_trace_tests.sh` |
 | Live-profile split RPCs | `run_qmk_profile_split_transport_tests.sh`, `run_profile_split_reconciler_tests.sh`, `run_profile_working_sync_tests.sh`, `run_profile_owner_tests.sh`, `run_profile_store_runtime_owner_tests.sh` |
 | Source manifests or boundaries | `run_feature_gate_compile_tests.sh` |
-| Target stack topology or budget | `run_firmware_stack_budget_tool_tests.sh`; then `NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh`, which runs both reviewed-path manifests on each half of the flashed pair (the standalone `run_firmware_stack_budget_checks.sh` compiles a plain `qmk compile` image without the live-profile owner, D-L08) |
+| Target stack topology or budget | `run_firmware_stack_budget_tool_tests.sh`; then `NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh`, which runs both reviewed-path manifests on each half of the flashed pair (the standalone `run_firmware_stack_budget_checks.sh` compiles a plain `qmk compile` image without the live-profile owner, D-F35) |
 | Target macro or RP2040 SRAM-bank policy | Read [memory-budgets.md](./memory-budgets.md); run `run_firmware_memory_budget_tool_tests.sh`; after a fresh ordinary target build, run `run_firmware_memory_budget_checks.sh`; keep physical capacity, linked occupancy, policy margin, and runtime high-water distinct |
 
 For docs-only changes, run `git diff --check` and a stale-path audit. Host tests
@@ -98,4 +98,4 @@ source manifest, build wiring, or generated firmware input changed.
 - `run_all_host_tests.sh` passes and `sh tools/build-firmware-pair.sh` builds
   the flashable pair for runtime, authored profile, build, or
   firmware-behavior changes; a plain `qmk compile` is not the firmware anyone
-  flashes (D-L08).
+  flashes (D-F35).

@@ -87,7 +87,7 @@ That keymap chooses:
 - `TAPPING_TERM` for QMK's dual-role keys: `LT()`, `MT()`, `TT()`, `OSL()`
   and `OSM()`. The runtime decides their tap or hold; QMK's tapping engine
   classifies none of them. With a live profile the dual-role setting
-  (settings id 0) replaces it (D-L38)
+  (settings id 0) replaces it (D-F47)
 - `CUSTOM_TAP_HOLD_TERM`, the tap/hold setting, for every other row
 - `CUSTOM_LONGER_HOLD_TERM`
 - `CUSTOM_MULTI_TAP_TERM`

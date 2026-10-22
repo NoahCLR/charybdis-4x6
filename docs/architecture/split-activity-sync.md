@@ -8,7 +8,7 @@ Both halves use a fixed 460,800-baud split link, with frame CRC on by default
 and no speed selector. Moving from the earlier 230,400-baud build requires
 flashing both halves. The faster link still needs hardware acceptance with CRC:
 rejected frames can cost retries even though they no longer corrupt lighting
-state. See D-L43 for the earlier hardware findings.
+state. See D-F52 for the earlier hardware findings.
 
 ## Ownership and compatibility
 

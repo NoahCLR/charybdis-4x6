@@ -1,8 +1,8 @@
-# Both halves use 460,800 baud with frame CRC on by default (D-L43).
+# Both halves use 460,800 baud with frame CRC on by default (D-F52).
 # Keep one fixed speed: an old command using the removed selector must fail.
 OPT_DEFS += -DSERIAL_USART_SPEED=460800
 ifneq ($(strip $(NOAH_SPLIT_BAUD)),)
-    $(error NOAH_SPLIT_BAUD was removed: the split link is fixed at 460800 baud (D-L43))
+    $(error NOAH_SPLIT_BAUD was removed: the split link is fixed at 460800 baud (D-F52))
 endif
 
 # Activity coalescing is on by default and needs the fork's activity hook
