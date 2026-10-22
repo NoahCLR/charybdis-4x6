@@ -111,14 +111,12 @@ lighting model, split sync and the build details.
 ## Docs
 
 - [Firmware guide](docs/GUIDE.md): the long version of this page
-- [My keymap](docs/KEYMAP.md) and its
-  [generated overview](docs/KEYMAP-OVERVIEW.md)
+- [My keymap](docs/KEYMAP.md)
 - [Tap, hold and multi-tap](docs/INTERACTION_MODEL.md),
   [pointing modes](docs/POINTER_MODES.md) and
   [lighting](docs/RGB_CONFIG.md), in depth
 - [Third-party apps in my setup](docs/MY_SETUP.md)
-- [Hook overrides](docs/HOOK_OVERRIDES.md) and
-  [profile introspection](docs/tooling/PROFILE_INTROSPECT.md), for authoring in C
+- [Hook overrides](docs/HOOK_OVERRIDES.md), for authoring in C
 - [Development](docs/DEVELOPMENT.md) and the
   [architecture](docs/architecture/README.md), for working on the firmware
   itself

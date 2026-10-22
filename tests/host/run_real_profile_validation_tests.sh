@@ -117,8 +117,8 @@ run_validation_variant() {
     fi
 }
 
-# profile_introspect.py --write regenerates the authored macro bank: the first
-# variant writes it, the next compiles and checks the result. A placeholder
+# NOAH_WRITE_AUTHORED_MACRO_BANK=1 regenerates the authored macro bank: the
+# first variant writes it, the next compiles and checks the result. A placeholder
 # lets a profile without one compile the first time.
 if [ "${NOAH_WRITE_AUTHORED_MACRO_BANK:-}" = 1 ] && [ ! -f "$KEYMAP_PATH_ABS/authored_macro_bank.h" ]; then
     printf '#pragma once\n\n#define NOAH_AUTHORED_MACRO_BANK 0\n' >"$KEYMAP_PATH_ABS/authored_macro_bank.h"

@@ -49,7 +49,7 @@ Charybdis Ark repository; no firmware task needs them.
   The app runtime must never read firmware source; developer inspection and
   Ark-owned integration tests may read explicitly selected firmware checkouts.
 - Authored C profiles remain firmware source, edited directly and checked by
-  firmware validation and introspection tools.
+  firmware validation.
 
 ### Where we are
 
@@ -156,7 +156,7 @@ Repo-specific guardrails:
 - When adding a new firmware source file that should participate in the userspace build, wire it into `users/noah/source_manifest.mk` in the same pass. If host compile gates or test runners mirror that build surface, update them too.
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update the relevant files under `docs/` in the same pass, and `README.md` when a user-facing capability changed (development workflow changes go in `docs/DEVELOPMENT.md`).
-- If any authored input to `tools/profile_introspect.py` changes, regenerate the introspection outputs in the same pass with `python3 tools/profile_introspect.py --write` and verify them with `python3 tools/profile_introspect.py --check`. Current authored inputs are `keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h`, `users/noah/config.h`, `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`, and the shared pd-mode manifest `users/noah/lib/pointing/defs/pd_mode_manifest.h`.
+- If `VIA_MACROS()` in a profile's `keymap.c` changes, regenerate its `authored_macro_bank.h` in the same pass with `NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh` (pass the keymap path for another profile). Real-profile validation refuses a stale copy.
 - If architectural work lands, record it in the doc it governs in the same pass: a new or amended firmware decision in `docs/LIVE_EDIT_APP_DIRECTION.md` (numbered from D-F01; keep "Current Firmware Status" and "Open Issues" current), or the matching spec under `docs/architecture/`. App decisions and app status belong to Ark; a D-L heading here marked as an app decision is only a pointer.
 - Write decisions and contracts, not logs: verification runs, build numbers, test counts and dated progress notes belong in commit messages. When a plan in the work-queue vault is finished, fold what still constrains the code into the spec it produced and delete the plan (D-L07).
 

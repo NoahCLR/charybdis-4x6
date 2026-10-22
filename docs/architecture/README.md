@@ -6,7 +6,6 @@ split sync, RGB rendering, profile tooling, or the tests that enforce those
 contracts.
 
 The root `README.md` stays focused on user-facing setup and profile behavior.
-The generated `docs/KEYMAP-OVERVIEW.md` shows the current authored profile.
 This directory explains how the runtime is shaped and where changes belong.
 
 The [split activity sync contract](split-activity-sync.md) covers the implemented
@@ -83,7 +82,7 @@ The main rule is:
 
 | Runtime fact | Owner | Readers or projections |
 | --- | --- | --- |
-| Compiled profile defaults | keymap-owned files under `keyboards/.../keymaps/noah/` | firmware compilation, compiled-defaults readback, validation, profile introspection |
+| Compiled profile defaults | keymap-owned files under `keyboards/.../keymaps/noah/` | firmware compilation, compiled-defaults readback, validation |
 | Active committed live profile | one generation of the profile store, keymap and macros included (D-F31) | effective runtime views, key lookup, macro playback, Charybdis Ark readback |
 | Action classification and dispatch semantics | `users/noah/lib/action/` | key behavior materialization, key runtime, macro dispatch, direct action taps |
 | QMK and fork compatibility assumptions | `users/noah/lib/compat/` | runtime entry flow, combo origin normalization, the Raw HID channel, QMK contract checks |

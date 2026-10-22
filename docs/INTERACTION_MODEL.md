@@ -4,8 +4,7 @@ This document explains the shared interaction semantics supported by the
 `noah` userspace.
 
 It is about the interaction model, not the current physical layout, exact
-bindings, or profile-specific timing tweaks. For the visual snapshot, see
-[KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md). For the current authored profile,
+bindings, or profile-specific timing tweaks. For the current authored profile,
 see [KEYMAP.md](./KEYMAP.md). For the maintainer-facing runtime map behind
 these semantics, see [KEY_RUNTIME.md](./KEY_RUNTIME.md).
 

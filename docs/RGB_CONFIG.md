@@ -4,9 +4,8 @@ Most authored RGB configuration in this repo lives in
 [`keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c).
 
 Use this doc when you want to change colors, LED groups, auto-mouse fade
-visuals, combo feedback, or key-behavior feedback colors. If you only want to
-see what the current profile looks like, start with
-[KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md).
+visuals, combo feedback, or key-behavior feedback colors. To see what a
+connected keyboard's profile looks like, open it in Charybdis Ark.
 
 For the cross-system runtime ownership and RGB render flow, see
 [architecture/README.md](./architecture/README.md) and
@@ -415,8 +414,7 @@ The branch color is the floor of the tap phase, not a priority. Any concrete
 action state outranks it: a pending hold tier at `tap_hold_term`, the tap a
 release would send once the multi-tap window closes, an active hold. The branch
 color is what shows while the branch has named nothing more specific than
-itself. Inline C comments next to those `HSV(...)` arguments are allowed and are
-ignored by the profile introspector.
+itself. Inline C comments next to those `HSV(...)` arguments are allowed.
 
 The `tap_commit_mode` field controls which committed tap-count branches pulse with
 `tap_committed_color`:
@@ -718,13 +716,10 @@ Comment out `RGB_AUTOMOUSE_GRADIENT_ENABLE` in the active keymap [`config.h`](..
 
 ## Verification
 
-RGB authoring changes affect generated profile docs, profile validation, and
-the RGB render tests. For `rgb_config.c` changes, use:
+RGB authoring changes affect profile validation and the RGB render tests. For
+`rgb_config.c` changes, use:
 
 ```sh
-python3 tools/profile_introspect.py --write
-python3 tools/profile_introspect.py --check
-sh tests/host/run_profile_introspection_checks.sh
 sh tests/host/run_rgb_validation_tests.sh
 sh tests/host/run_rgb_layer_render_tests.sh
 sh tests/host/run_real_profile_validation_tests.sh

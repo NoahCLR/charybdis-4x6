@@ -1903,7 +1903,7 @@ An EEPROM reset still forgets the saved profiles (D-F29).
 
 Kept: the authored macro aliases `VIA_MACRO_0`–`VIA_MACRO_127`, the authored
 tables behind them and the action kind named after VIA macros. Renaming them
-would change authored data, introspection and Ark's mirrors without changing
+would change authored data and Ark's mirrors without changing
 behaviour; the names are historical.
 
 Client follow-up (Ark on the new base): drop the VIA protocol and
