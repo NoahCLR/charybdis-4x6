@@ -11,8 +11,9 @@
 // locked and no consumed button release pending, so an engine holding a slot
 // never sees it change. Movement and key paths do no storage read, decode,
 // copy or allocation.
-// Main loop only (pointing task, key processing, scan); split RPC callbacks
-// never read it.
+// Read on the main loop (pointing task, key processing, scan). The split
+// sync receive also reaches it, through pd_mode_apply_command's snapshot of
+// the active mode's traits, and discards what it read.
 // NULL until ready, or for a slot past the last.
 const noah_pd_config_t *noah_effective_pd_record(uint8_t slot);
 // mode is a pd_mode_mask_t (one bit per slot); the profile layer does not

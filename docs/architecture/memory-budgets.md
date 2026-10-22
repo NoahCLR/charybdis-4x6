@@ -1141,9 +1141,35 @@ Eighteen settlement paths are 176 bytes smaller and none grew. The ordinary
 manifest passes every path on both halves for the first time; its worst path,
 press preflight auto-drained, is 1,856 bytes of the 1,920-byte policy. The
 path that modelled the settlement plan's own auto-drain now names the
-decision that replaced it (1,144). No owner-manifest path changed; that
-manifest's one failure is its stale `storage_paused` path name, fixed apart
-from this change. These are
+decision that replaced it (1,144). No owner-manifest path changed. These are
 reviewed-path estimates for the named paths only, not a global or
 interrupt-stack maximum; stack high-water on both halves remains keyboard
 evidence.
+
+## Pointing-mode owners as one list
+
+The owners of the active pointing mode are one ordered list of
+`{key index + 1, press-time sides}`, two bytes per entry for the 60 keys,
+where each of 60 entries held 12 bytes including a mode of its own. Every
+change of the active mode clears the owners, so the per-entry mode modelled
+nothing. The list keeps the first owner first, which combo lighting reads.
+
+Measured on the instrumented pair of the firmware that carries this change
+and those landed with it (`NOAH_RESOURCE_CHECKS=yes` with the vault's `verify`, pinned GCC 15.2.0 image,
+BK `d280a4471e`; both halves give the same figures):
+
+| | Per half |
+| --- | ---: |
+| SRAM0–3 `.data + .bss` | 201,940 bytes |
+| Below the 203,776-byte tripwire | 1,836 bytes |
+| Change from the list | −608 bytes |
+
+Both manifests pass every path on both halves. The ordinary manifest's worst
+is press preflight with missed-scan planning auto-drained, 1,856 bytes of the
+1,920-byte policy; the owner manifest's is peer large chunk candidate write,
+1,912 bytes. On its own the list moved three main-loop paths by 8 bytes, in
+functions it does not change: LTO kept a loop-invariant address in one more
+stack slot under the smaller `.bss`. With the fallback settlement holding no
+plan (above), each of them is inside the policy. These are reviewed-path
+estimates for the named paths only, not a global or interrupt-stack maximum;
+stack and allocator high-water on both halves remain keyboard evidence.
