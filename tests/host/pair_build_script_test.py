@@ -277,8 +277,8 @@ if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
             self.assertNotEqual(stopped.returncode, 0)
             self.assertIn('Docker is not running', stopped.stderr)
 
-    def test_a_changed_bk_is_copied_from_the_checkout_for_that_build(self):
-        # A volume is named by the commit alone, so it cannot hold a local change.
+    def test_a_changed_bk_is_copied_once_into_a_volume_named_by_its_changes(self):
+        # The host tests of the same run read that volume too: one copy.
         with tempfile.TemporaryDirectory(prefix='pair-docker-') as tmp:
             base = Path(tmp).resolve()
             source, qmk, builds, pinned, env = self.docker_fixture(base)
@@ -287,10 +287,11 @@ if 'NOAH_STACK_BUDGET_ENABLE=yes' in sys.argv:
                            env=dict(env, NOAH_ALLOW_UNPINNED_QMK='1'))
             calls, args = self.build_call(base)
             mounts = {args[i + 1] for i, arg in enumerate(args) if arg == '-v'}
-            self.assertIn(f'{qmk}:/mnt/noah/qmk:ro', mounts)
-            self.assertFalse([m for m in mounts if m.startswith('charybdis-host-qmk-')])
-            self.assertFalse(any('flock' in call for call in calls), 'no volume is made for a changed BK')
-            self.assertIn('--exclude=./.build', ' '.join(args))
+            changed = [m for m in mounts if m.startswith(f'charybdis-host-qmk-{pinned}-')]
+            self.assertEqual(len(changed), 1, mounts)
+            self.assertTrue(changed[0].endswith(':/mnt/noah/qmk:ro'))
+            self.assertNotIn(f'{qmk}:/mnt/noah/qmk:ro', mounts)
+            self.assertTrue(any('flock' in call for call in calls), 'the copy is made under a lock')
             self.assertIn(f'--tmpfs', args)
 
     def test_bk_inside_the_checkout_is_refused_outside_the_image(self):
@@ -367,15 +368,17 @@ else:
 """
 
 FAKE_SUITE = """#!/bin/sh
-echo "suite $NOAH_BUILD_IMAGE" >>"$FAKE_DOCKER_LOG"
+echo "suite $NOAH_BUILD_IMAGE ${DOCKER_DEFAULT_PLATFORM:-native}" >>"$FAKE_DOCKER_LOG"
+[ "$DOCKER_DEFAULT_PLATFORM" = "${FAKE_SUITE_FAILS_ON:-none}" ] && exit 1
 exit "${FAKE_SUITE_FAIL:-0}"
 """
 
 FAKE_PAIR = """#!/bin/sh
-echo "pair $NOAH_BUILD_IMAGE resources=$NOAH_RESOURCE_CHECKS" >>"$FAKE_DOCKER_LOG"
+echo "pair $NOAH_BUILD_IMAGE resources=$NOAH_RESOURCE_CHECKS ${DOCKER_DEFAULT_PLATFORM:-native}" >>"$FAKE_DOCKER_LOG"
 [ "$NOAH_RESOURCE_CHECKS" = yes ] && [ -n "${FAKE_GATE_FAILS:-}" ] && exit 1
 mkdir -p "$BUILD_ROOT/branch"
 bytes=same; [ "$NOAH_BUILD_IMAGE" = "${FAKE_CHANGED_IMAGE:-}" ] && bytes=changed
+[ "$DOCKER_DEFAULT_PLATFORM" = "${FAKE_DIVERGING_PLATFORM:-none}" ] && bytes=diverged
 printf %s "$bytes" > "$BUILD_ROOT/branch/1_charybdis_right.uf2"
 printf left > "$BUILD_ROOT/branch/1_charybdis_left.uf2"
 """
@@ -403,6 +406,18 @@ class MakeBuildImage(unittest.TestCase):
             shutil.copyfile(REPO / 'tools' / tool, repo / 'tools' / tool)
         (repo / 'tools/build-image').write_text(OLD + '\n')
         (repo / '.github/workflows/ci.yml').write_text(WORKFLOW)
+        # BK at the pin, which the pairs build against.
+        qmk = Path(tmp) / 'qmk'
+        if not qmk.exists():
+            qmk.mkdir()
+            git = lambda *args: subprocess.run(['git', '-C', str(qmk), '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                                                *args], check=True, capture_output=True, text=True).stdout.strip()
+            git('init', '-q')
+            git('commit', '--allow-empty', '-qm', 'bk')
+        head = subprocess.run(['git', '-C', str(qmk), 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()
+        (repo / 'qmk-pin.json').write_text(json.dumps({'repository': 'https://github.com/NoahCLR/bastardkb-qmk',
+                                                      'commit': env.pop('PIN', head)}, indent=2))
+        env.setdefault('QMK_ROOT', str(qmk))
         (repo / 'tests/host/run_all_host_tests.sh').write_text(FAKE_SUITE)
         (repo / 'tools/build-firmware-pair.sh').write_text(FAKE_PAIR)
         docker = fakebin / 'docker'
@@ -429,13 +444,16 @@ class MakeBuildImage(unittest.TestCase):
             self.assertEqual(done.stdout.strip().splitlines()[-1], pin)
             order = [call.split()[0] if call.split()[0] != 'buildx' else ' '.join(call.split()[:2])
                      for call in self.calls(tmp)]
-            self.assertEqual(order[1:], ['buildx build', 'run', 'run', 'run', 'run', 'suite', 'pair', 'pair', 'pair', 'push',
-                                         'buildx imagetools'],
+            self.assertEqual(order[1:], ['buildx build', 'run', 'run', 'run', 'run', 'suite', 'suite',
+                                         'pair', 'pair', 'pair', 'pair', 'push', 'buildx imagetools'],
                              'both platforms, the host suite and the pair are checked before anything is pushed')
-            self.assertIn(f'suite {TAG}', self.calls(tmp), 'the suite runs in the new image')
-            # The pair with every resource gate, then the ordinary pair in each image.
+            self.assertEqual([call for call in self.calls(tmp) if call.startswith('suite')],
+                             [f'suite {TAG} linux/amd64', f'suite {TAG} linux/arm64'], 'the suite runs on both platforms')
+            # The pair with every resource gate, the ordinary pair on each
+            # platform, then the pinned image's pair to compare with.
             self.assertEqual([call for call in self.calls(tmp) if call.startswith('pair')],
-                             [f'pair {TAG} resources=yes', f'pair {TAG} resources=no', f'pair {OLD} resources=no'])
+                             [f'pair {TAG} resources=yes native', f'pair {TAG} resources=no linux/amd64',
+                              f'pair {TAG} resources=no linux/arm64', f'pair {OLD} resources=no native'])
             self.assertIn('byte-identical', done.stderr)
             image, workflow = self.pinned(tmp)
             self.assertEqual(image, pin + '\n')
@@ -470,6 +488,23 @@ class MakeBuildImage(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='make-image-') as tmp:
             failed = self.run_make(tmp, 'qmk-cli-1.2.0-gcc15.2.0-r1', FAKE_SUITE_FAIL='1')
             self.assert_nothing_pushed(tmp, failed, 'host suite failed')
+
+    def test_pushes_nothing_when_the_suite_fails_on_the_other_platform(self):
+        with tempfile.TemporaryDirectory(prefix='make-image-') as tmp:
+            failed = self.run_make(tmp, 'qmk-cli-1.2.0-gcc15.2.0-r1', FAKE_SUITE_FAILS_ON='linux/amd64')
+            self.assert_nothing_pushed(tmp, failed, 'host suite failed')
+
+    def test_pushes_nothing_when_the_platforms_build_different_pairs(self):
+        with tempfile.TemporaryDirectory(prefix='make-image-') as tmp:
+            failed = self.run_make(tmp, 'qmk-cli-1.2.0-gcc15.2.0-r1', FAKE_DIVERGING_PLATFORM='linux/arm64')
+            self.assert_nothing_pushed(tmp, failed, 'build different pairs')
+
+    def test_refuses_before_building_without_bk_at_the_pin(self):
+        with tempfile.TemporaryDirectory(prefix='make-image-') as tmp:
+            refused = self.run_make(tmp, 'qmk-cli-1.2.0-gcc15.2.0-r1', PIN='f' * 40)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn('set QMK_ROOT to a clean BK checkout at the pin', refused.stderr)
+            self.assertFalse(any(call.startswith('buildx build') for call in self.calls(tmp)))
 
     def test_pushes_nothing_when_a_resource_gate_fails_in_the_new_image(self):
         with tempfile.TemporaryDirectory(prefix='make-image-') as tmp:
@@ -597,13 +632,28 @@ class InBuildImage(unittest.TestCase):
         self.assertIn(f'-v {self.repo}:{self.repo}', call)
         self.assertIn(f'-v {nested}:{nested}', call)
 
-    def test_untracked_files_in_qmk_are_copied_every_run(self):
-        # A volume is named by the commit only, so it cannot hold a new file.
+    def changed_volume(self):
+        mount = [arg for arg in self.runner_call() if arg.endswith(f':{self.qmk}')]
+        self.assertEqual(len(mount), 1, self.runner_call())
+        return mount[0].split(':')[0]
+
+    def test_a_changed_qmk_gets_a_volume_named_by_its_changes(self):
+        # A volume named by the commit alone cannot hold a new file, so local
+        # changes name their own; the same changes find the same volume.
         (self.qmk / 'quantum/new_header.h').write_text('')
         self.run_runner('run_example_tests.sh')
-        call = ' '.join(self.runner_call())
-        self.assertIn(f'--tmpfs {self.qmk}:', call)
-        self.assertNotIn('charybdis-host-qmk-', call)
+        first = self.changed_volume()
+        self.assertRegex(first, f'^charybdis-host-qmk-{self.head}-[0-9a-f]{{12}}$')
+        self.assertNotIn('--tmpfs ' + str(self.qmk), ' '.join(self.runner_call()))
+        self.run_runner('run_example_tests.sh')
+        self.assertEqual(self.changed_volume(), first)
+        (self.qmk / 'quantum/new_header.h').write_text('#define CHANGED\n')
+        self.run_runner('run_example_tests.sh')
+        edited = self.changed_volume()
+        self.assertNotEqual(edited, first, 'new content is a new volume')
+        (self.qmk / 'quantum/keycodes.h').write_text('// tracked edit\n')
+        self.run_runner('run_example_tests.sh')
+        self.assertNotIn(self.changed_volume(), (first, edited), 'a tracked edit is a new volume')
 
     def test_a_new_volume_keeps_the_three_newest(self):
         volumes = {f'charybdis-host-qmk-{n}': f'2026-10-0{n}T00:00:00Z' for n in range(1, 6)}

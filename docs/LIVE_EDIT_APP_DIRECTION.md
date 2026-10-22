@@ -947,18 +947,19 @@ cannot change the compiler. Each machine builds in its own platform's variant.
 `sh tools/make-build-image.sh <tag>` builds both platforms from the Dockerfile,
 refuses a tag that already exists, checks that their target files are
 byte-identical and that the tools run without network, runs the host suite in
-the new image on the Mac, builds the pair in it with every resource gate (BK at
-the pin), and builds the pinned image's pair from the same sources to say
-whether the bytes changed; it pushes only then, and pins the pushed digest in
+both platforms of the new image on the Mac (the other one emulated), builds the
+pair with every resource gate, builds it on each platform and refuses
+platforms whose pairs differ, and builds the pinned image's pair from the same
+sources to say whether the bytes changed (BK at the pin, `QMK_ROOT`, checked
+before anything is built); it pushes only then, and pins the pushed digest in
 `tools/build-image` and every workflow's `image:` (a host test keeps them equal,
 pinned and in our package). To move to a newer official image, read its index
 digest with `docker buildx imagetools inspect ghcr.io/qmk/qmk_cli:latest` (the
 top-level `Digest`), put it in the Dockerfile's `QMK_CLI`, and run the script
 with a new tag; nothing else in the Dockerfile changes. If the script reports
 that the pair changed, the compiler changed: record the memory effect in
-[memory budgets](architecture/memory-budgets.md). The script checks the Mac's
-platform; CI's pair for the same firmware commit and BK pin, which every release
-compares with the Mac's, shows whether the platforms diverged. If the official
+[memory budgets](architecture/memory-budgets.md). Every release still compares
+CI's pair with the Mac's for the same firmware commit and BK pin. If the official
 image moves Python to a new minor version, the vault's `vpython` moves first:
 its `verify` holds a new pin to the tools' Python.
 
@@ -988,8 +989,7 @@ warnings.
 The pair builds from the same copies (amended 2026-10-22). Started outside the
 image, `tools/build-firmware-pair.sh` compiles a copy of the checkout and of BK
 held in memory at their own paths, BK taken from the host tests' volume for its
-commit or, with local changes, from the checkout for that build
-(`tools/qmk-copies.sh`); CI builds in its checkouts as before. It is more than
+commit, or for its commit and local changes (`tools/qmk-copies.sh`); CI builds in its checkouts as before. It is more than
 twice as fast as compiling through macOS file sharing, and the pair is the same
 bytes, since paths do not change. It writes nothing into BK, only the pair into
 `BUILD_ROOT`, so local pair builds no longer share QMK's output path: builds in

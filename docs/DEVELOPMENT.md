@@ -81,8 +81,9 @@ original paths (`tools/qmk-copies.sh`): the checkout is copied into memory each
 run, and QMK into a Docker volume once per commit
 (`charybdis-host-qmk-<commit>`, about a gigabyte and half a minute; making one
 removes all but the three newest). A QMK with local changes, untracked files or
-submodules not at their commits is copied each run instead, since a volume is
-named by the commit alone. `tools/build-firmware-pair.sh` compiles the same
+submodules not at their commits gets a volume named by its commit and a hash of
+those changes, made once and shared by the host tests and the pair build of a
+run. `tools/build-firmware-pair.sh` compiles the same
 copies, BK copied into memory from its volume, and writes only the pair into
 `BUILD_ROOT`: it never touches BK's output path, so pair builds in several
 worktrees, and a pair build beside the host suite, run at once without a lock.
