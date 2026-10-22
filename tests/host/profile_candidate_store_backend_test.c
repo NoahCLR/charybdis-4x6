@@ -6,6 +6,7 @@
 
 #include "users/noah/lib/profile/storage/profile_candidate_store_backend.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
+#include "profile_store_committed_fixture.h"
 
 enum {
     ACTION_ABI_DIGEST = 0x11223344u,
@@ -434,9 +435,9 @@ static void test_runtime_rollback_pins_store_target_until_active_backing_moves(v
     interface = noah_profile_candidate_store_backend_interface(&backend);
 
     deploy_empty(&backend, &interface, &provider, &metadata);
-    assert(store.committed.slot == NOAH_PROFILE_SLOT_A && store.committed.generation == 1u);
+    assert(committed_of(&store)->slot == NOAH_PROFILE_SLOT_A && committed_generation(&store) == 1u);
     deploy_empty(&backend, &interface, &provider, &metadata);
-    assert(store.committed.slot == NOAH_PROFILE_SLOT_B && store.committed.generation == 2u);
+    assert(committed_of(&store)->slot == NOAH_PROFILE_SLOT_B && committed_generation(&store) == 2u);
 
     assert(noah_effective_profile_provider_request_rollback(&provider) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
@@ -446,7 +447,7 @@ static void test_runtime_rollback_pins_store_target_until_active_backing_moves(v
     memcpy(marker_before, &eeprom_bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE], sizeof(marker_before));
     assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_BUSY);
     assert(memcmp(marker_before, &eeprom_bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR + NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE - NOAH_PROFILE_STORAGE_COMMIT_MARKER_SIZE], sizeof(marker_before)) == 0);
-    assert(!store.prepare_active && !store.reuse_active);
+    assert(noah_profile_store_settled(&store));
     assert(noah_effective_profile_provider_status(&provider, &status) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(status.active.generation == 1u && !status.backing_reuse_in_progress);
 
@@ -705,7 +706,7 @@ static void test_override_disabled_commit_activates_compiled_fallback(void) {
     assert(noah_effective_profile_provider_poll(&provider) == NOAH_EFFECTIVE_PROFILE_PUBLISHED);
     assert(noah_effective_profile_provider_status(&provider, &status) == NOAH_EFFECTIVE_PROFILE_OK);
     assert(status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS);
-    assert(store.committed.flags == 0u && store.committed.generation == 2u);
+    assert(committed_of(&store)->flags == 0u && committed_generation(&store) == 2u);
     assert(noah_profile_candidate_store_backend_release_admission(&backend, NOAH_PROFILE_STORAGE_ADMISSION_PEER));
 }
 

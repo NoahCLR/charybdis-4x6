@@ -204,7 +204,19 @@ Inactive-slot commit ordering is:
 
 At boot, firmware selects the newest valid compatible slot. If neither slot is
 valid, it uses compiled defaults. Interrupted writes never invalidate the
-previous valid slot.
+previous valid slot. Boot selection is the only path that validates and adopts a
+saved slot from scratch; it runs the header, checksum and shape checks in bounded steps,
+and the store says what it found in each slot (`boot_slot_result`).
+
+The store answers its own state questions, and its callers ask them rather
+than read its fields: the committed record, whether a prepare is active,
+whether the store is settled (no prepare and no outstanding destructive-write
+reservation), the admitted candidate, whether the payload is fully staged,
+whether it is durably prepared and waiting for a decision, and whether a final
+marker awaits a boot scan (`profile_store.h`). They are static inline;
+the compiler may keep one out of line as a small leaf of its own, and the reviewed stack paths are measured as built. Slot addressing (a slot's start, and its
+payload's after the 36-byte header) has its one home there too; where those
+addresses fall on flash pages stays with the flash backend (D-F29).
 
 Generation counters are strictly monotonic unsigned 32-bit values. Zero is
 invalid and `UINT32_MAX` is an exhausted terminal generation: v1 never wraps to
