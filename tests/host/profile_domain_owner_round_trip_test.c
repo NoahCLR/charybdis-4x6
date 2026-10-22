@@ -11,6 +11,7 @@
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/noah_keymap.h"
+#include "profile_store_committed_fixture.h"
 
 #define PD_ROW(name, key) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = key, .lock_action = key##_LOCK},
 const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(PD_ROW)};
@@ -191,13 +192,13 @@ static uint8_t submit(size_t length) {
 // owner is then abandoned mid-commit, as a keyboard losing power would be.
 static bool commit(void) {
     uint8_t  frame[32];
-    uint32_t prior = owner.store.committed.generation;
+    uint32_t prior = committed_generation(&owner.store);
     frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT);
     assert(noah_profile_owner_receive(&owner, frame, 32));
-    for (unsigned i = 0; i < 1000000u && !(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && owner.store.committed.generation != prior && !owner.host_transaction.mailbox.pending) && !power_lost(); i++)
+    for (unsigned i = 0; i < 1000000u && !(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && committed_generation(&owner.store) != prior && !owner.host_transaction.mailbox.pending) && !power_lost(); i++)
         tick();
     if (power_lost()) return false;
-    assert(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && owner.store.committed.generation == prior + 1u);
+    assert(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && committed_generation(&owner.store) == prior + 1u);
     assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     return true;
 }
@@ -441,13 +442,13 @@ static void test_maximum_profile(void) {
         uint8_t state = submit(maximum_length);
         if (state != NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED) fprintf(stderr, "maximum profile with %s was not refused (state %u)\n", mutations[i].what, state);
         assert(state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
-        assert(owner.store.committed.generation == 1);
+        assert(committed_generation(&owner.store) == 1);
         assert_published(maximum, &expected, 1);
     }
     // A truncated profile: its declared length cuts the last domain short.
     memcpy(candidate, maximum, maximum_length);
     assert(submit(maximum_length - 1) == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
-    assert(owner.store.committed.generation == 1);
+    assert(committed_generation(&owner.store) == 1);
     assert_published(maximum, &expected, 1);
     puts("maximum profile: every table at its maximum saved, booted and published whole; over-limit, malformed and truncated copies refused");
     uninstall();
@@ -504,11 +505,11 @@ static void test_maximum_save_interrupted(bool reuse) {
         cut_at = UINT32_MAX;
         reboot();
         until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);
-        if (owner.store.committed.generation == 1) {
+        if (committed_generation(&owner.store) == 1) {
             assert_published(maximum, &expected, 1);
             prior_boots++;
         } else {
-            assert(owner.store.committed.generation == 2);
+            assert(committed_generation(&owner.store) == 2);
             assert(cut >= staged);
             assert_published(edited_bytes, &edited, 2);
             new_boots++;

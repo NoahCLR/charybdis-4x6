@@ -245,7 +245,7 @@ static void test_two_profiles_of_one_generation_stop_the_owner(void) {
     commit_blob(&first, 61u, &now);
     boot_single(&second, &b, 1u, &now);
     commit_blob(&second, 62u, &now);
-    assert(first.store.committed.slot == NOAH_PROFILE_SLOT_A && second.store.committed.slot == NOAH_PROFILE_SLOT_A);
+    assert(committed_of(&first.store)->slot == NOAH_PROFILE_SLOT_A && committed_of(&second.store)->slot == NOAH_PROFILE_SLOT_A);
     memcpy(&a.bytes[NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR], &b.bytes[NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR], NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR - NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR);
     boot_single(&owner, &a, 0u, &now);
     assert(owner.state == NOAH_PROFILE_OWNER_GENERATION_CONFLICT);
@@ -342,7 +342,7 @@ static uint32_t assert_whole_saved(const noah_profile_owner_t *owner, const uint
     noah_effective_profile_snapshot_t saved;
     uint32_t                          generation = owner->committed_descriptor.generation;
 
-    assert(owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED && (generation == 1u || generation == 2u) && owner->store.committed.generation == generation);
+    assert(owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED && (generation == 1u || generation == 2u) && committed_generation(&owner->store) == generation);
     saved = owner->working.active ? owner->working.saved : (noah_effective_profile_snapshot_t){0};
     if (!owner->working.active) {
         assert(noah_effective_profile_provider_copy_active(&owner->provider, &saved) == NOAH_EFFECTIVE_PROFILE_OK);
@@ -461,7 +461,7 @@ static void stop_after_the_decision(uint32_t peer_generation, noah_profile_owner
     stage_valid_candidate_pair(&left, &right, 110u, &now);
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 110u);
     send_and_scan_pair(&left, &right, frame, &now);
-    for (uint32_t guard = 0u; guard < 2048u && left.store.committed.generation != 1u; guard++) scan_pair(&left, &right, &now);
+    for (uint32_t guard = 0u; guard < 2048u && committed_generation(&left.store) != 1u; guard++) scan_pair(&left, &right, &now);
     for (uint32_t guard = 0u; guard < 32u && (!left.host_barrier_local_published || !left.host_barrier_peer_commit_authorized); guard++) {
         left.scheduler_cursor = 0u;
         assert(noah_profile_owner_scan(&left, true, now++));

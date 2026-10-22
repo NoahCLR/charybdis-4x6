@@ -300,6 +300,14 @@ bool                                  noah_profile_split_reconciler_status(const
 // whole status onto the scan path's stack.
 bool noah_profile_split_reconciler_progress(const noah_profile_split_reconciler_t *reconciler, uint32_t *transfer_offset, uint8_t *prepare_progress_phase);
 
+// The other half's storage is paused: the latest of an unbroken run of BUSY
+// replies said it waits for a quiet keyboard before it can erase
+// (BUSY_STORAGE_PAUSED, D-F32). That is not a stalled copy. Static inline:
+// the owner asks it on the scan path.
+static inline bool noah_profile_split_reconciler_peer_storage_paused(const noah_profile_split_reconciler_t *reconciler) {
+    return reconciler && reconciler->busy_streak != 0u && reconciler->last_busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED;
+}
+
 #ifdef NOAH_PROFILE_SPLIT_TEST_HOOKS
 void noah_profile_split_test_local_validation(void);
 #endif

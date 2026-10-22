@@ -206,6 +206,95 @@ typedef struct {
     noah_profile_envelope_t           boot_envelope;
 } noah_profile_store_t;
 
+// Where a slot starts in the slot region: its header first, then its payload.
+// The one home of slot addressing; the flash backend places these addresses
+// on flash pages (D-F29). False for no slot. Always inlined: as a call, its
+// out-parameter would hold the caller's address on its stack, and the
+// owner's scan entry, which adopts a committed record, is on every reviewed
+// storage path's frame.
+static inline __attribute__((always_inline)) bool noah_profile_store_slot_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
+    if (!address || (slot != NOAH_PROFILE_SLOT_A && slot != NOAH_PROFILE_SLOT_B)) {
+        return false;
+    }
+    *address = slot == NOAH_PROFILE_SLOT_A ? NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR : NOAH_PROFILE_STORAGE_SLOT_B_START_ADDR;
+    return true;
+}
+
+static inline __attribute__((always_inline)) bool noah_profile_store_slot_payload_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
+    if (!noah_profile_store_slot_start(slot, address)) {
+        return false;
+    }
+    *address += NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE;
+    return true;
+}
+
+// The store answers its own state questions; callers ask these rather than
+// read its fields. Static inline: the compiler may keep one out of line as a small leaf of
+// its own; the reviewed stack paths are measured as built.
+
+// The record boot selection chose or the last commit made, or NULL while
+// the keyboard holds no saved profile.
+static inline const noah_profile_store_record_t *noah_profile_store_committed(const noah_profile_store_t *store) {
+    return store && store->committed.slot != NOAH_PROFILE_SLOT_NONE ? &store->committed : NULL;
+}
+
+// A prepare is admitted and has not finished or been aborted: the candidate
+// slot is out of boot selection and no other prepare can begin.
+static inline bool noah_profile_store_prepare_active(const noah_profile_store_t *store) {
+    return store && store->prepare_active;
+}
+
+// No prepare is open and no destructive-write reservation is outstanding
+// (an end callback that failed leaves one): boot selection may run and a
+// committed record may be adopted or published.
+static inline bool noah_profile_store_settled(const noah_profile_store_t *store) {
+    return store && !store->prepare_active && !store->reuse_active;
+}
+
+// The admitted candidate's identity while a prepare is active, else NULL.
+static inline const noah_profile_store_candidate_t *noah_profile_store_candidate(const noah_profile_store_t *store) {
+    return noah_profile_store_prepare_active(store) ? &store->candidate : NULL;
+}
+
+// Where the candidate slot's payload starts, for reading back what was
+// staged in it.
+static inline bool noah_profile_store_candidate_payload_start(const noah_profile_store_t *store, noah_profile_storage_address_t *address) {
+    return store && noah_profile_store_slot_payload_start(store->candidate_slot, address);
+}
+
+// Every declared payload byte of the active prepare is written and no commit
+// phase is running: the staged payload can be validated or read back.
+static inline bool noah_profile_store_fully_staged(const noah_profile_store_t *store) {
+    return noah_profile_store_prepare_active(store) && store->commit_phase == NOAH_PROFILE_STORE_COMMIT_IDLE && store->candidate_written == store->candidate.payload_length;
+}
+
+// The prepared marker is durable and nothing has begun since: the prepare
+// waits for its decision, and may still commit or abort.
+static inline bool noah_profile_store_durably_prepared(const noah_profile_store_t *store) {
+    return noah_profile_store_prepare_active(store) && store->prepared_durable && store->commit_phase == NOAH_PROFILE_STORE_COMMIT_IDLE;
+}
+
+// A final marker write could not be confirmed: only a boot scan can say
+// whether it landed, and until then no prepare begins.
+static inline bool noah_profile_store_reconciliation_required(const noah_profile_store_t *store) {
+    return store && store->reconciliation_required;
+}
+
+// A slot holds an earlier store format and boot selection adopted nothing,
+// so the keyboard runs its compiled defaults (D-F28).
+static inline bool noah_profile_store_earlier_format(const noah_profile_store_t *store) {
+    return store && store->earlier_format;
+}
+
+// What boot selection found in a slot: OK for a record it could adopt, or
+// why it refused the slot. Meaningful once selection is done.
+static inline noah_profile_store_result_t noah_profile_store_boot_slot_result(const noah_profile_store_t *store, noah_profile_slot_t slot) {
+    if (!store || store->boot_phase != NOAH_PROFILE_STORE_BOOT_DONE || (slot != NOAH_PROFILE_SLOT_A && slot != NOAH_PROFILE_SLOT_B)) {
+        return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
+    }
+    return slot == NOAH_PROFILE_SLOT_A ? store->boot_slot_a_result : store->boot_slot_b_result;
+}
+
 // Reads any span of the slot region, in reads of at most
 // NOAH_PROFILE_STORE_IO_CHUNK_MAX bytes.
 bool                        noah_profile_store_read_span(const noah_profile_store_t *store, noah_profile_storage_address_t address, uint8_t *target, uint32_t length);
@@ -218,7 +307,6 @@ noah_profile_store_result_t noah_profile_store_boot_select(noah_profile_store_t 
 // result is idempotent.
 noah_profile_store_result_t noah_profile_store_boot_select_begin(noah_profile_store_t *store);
 noah_profile_store_result_t noah_profile_store_boot_select_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *selected);
-noah_profile_store_result_t noah_profile_store_validate_slot(noah_profile_store_t *store, noah_profile_slot_t slot, bool require_commit, noah_profile_store_record_t *record);
 noah_profile_store_result_t noah_profile_store_prepare_begin(noah_profile_store_t *store, const noah_profile_store_candidate_t *candidate);
 noah_profile_store_result_t noah_profile_store_prepare_write(noah_profile_store_t *store, uint32_t offset, const uint8_t *bytes, uint32_t length);
 // Validates the staged payload and persists transaction intent without making
