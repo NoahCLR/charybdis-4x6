@@ -386,9 +386,12 @@ policy decides when one may run.
   erase never shares a grant with the writer, and a save simply waits while
   the keyboard is busy. Should a write still reach unerased flash, the backend
   erases first rather than write it.
-- **A grant programs at most one page.** The writer's grant writes at most
-  one split chunk (106 bytes) in store writes of at most 20, so its pages fill
-  at most once; each commit step writes one record and syncs it.
+- **A grant programs at most one page.** A grant repeats the store's steps
+  only until one erases or programs (D-F29, "Pacing"), and a step writes, in
+  order and in store writes of at most 20 bytes, at most a page: a REUSE step
+  copies up to 256 bytes of its range, a received split chunk is at most 106
+  bytes, and each commit step writes one record and syncs it. So a step fills
+  at most one page, and a grant programs at most one.
 
 A save waits while the keyboard cannot safely erase. D-F32 excludes that
 wait from the owner's host and split no-progress clocks: the waiting half

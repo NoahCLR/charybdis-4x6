@@ -232,8 +232,10 @@ noah_profile_store_result_t noah_profile_store_prepared_commit_begin(noah_profil
 noah_profile_store_result_t noah_profile_store_prepared_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *committed);
 // Starts and advances a marker-last commit without unbounded scan work. Begin
 // performs no storage I/O. This compatibility API runs both durable prepare and
-// decision phases. Each step performs exactly one read or write of at most
-// byte_budget bytes; byte_budget must be 1..20. The final OK step returns the
+// decision phases. Each step performs one read or write of at most
+// byte_budget bytes, except the payload readback, which reads up to a flash
+// page (NOAH_PROFILE_STORAGE_PAGE_SIZE) a step in reads of at most
+// byte_budget; byte_budget must be 1..20. The final OK step returns the
 // committed record and releases the destructive-backing reservation.
 noah_profile_store_result_t noah_profile_store_prepare_commit_begin(noah_profile_store_t *store);
 noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *committed);

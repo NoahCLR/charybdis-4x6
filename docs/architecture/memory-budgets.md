@@ -607,10 +607,10 @@ of 768. SRAM0–3 `.data + .bss` is 208,352 bytes per half, 1,568 below the
 are link-time values for the named paths only, not runtime high-water or a
 global or interrupt-stack maximum.
 
-Later changes no longer pass the reviewed-path gate: the manifests carry
-adjacencies the linker no longer makes and miss indirect call sites from
-`process_record_user` (an [open issue](../LIVE_EDIT_APP_DIRECTION.md#open-issues)).
-Until they are reviewed, the figures above are the last ones the gate accepted.
+Later changes no longer pass the reviewed-path gate: the records below from
+D-F29 on say which paths go over the policy (an
+[open issue](../LIVE_EDIT_APP_DIRECTION.md#open-issues)). Until the gate
+passes again, the figures above are the last ones it accepted.
 
 ## The new base: 32-bit profile lengths — D-F28, 2026-10-19
 

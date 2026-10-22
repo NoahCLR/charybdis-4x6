@@ -556,12 +556,13 @@ static bool scan_adoption(noah_profile_owner_t *owner) {
     return true;
 }
 
-// A copy taken from the other half is published as the step that committed
-// it returns, while this half still holds its storage for that copy. The
-// peer store stays COMMITTED after the copy activates (it answers a sender's
-// retry of the finished copy), so its state alone is no sign of a new copy:
-// a later Apply or Save holds the storage for its own candidate, and
-// publishing then stopped the owner with STORAGE_ERROR, frozen until a
+// A copy taken from the other half is published while this half still holds
+// its storage for that copy: as the step that committed it returns, and again
+// (the same descriptor) after each later step that works until it activates.
+// The peer store stays COMMITTED after the copy activates (it answers a
+// sender's retry of the finished copy), so its state alone is no sign of a
+// new copy: a later Apply or Save holds the storage for its own candidate,
+// and publishing then stopped the owner with STORAGE_ERROR, frozen until a
 // restart (keyboard check, 2026-10-20). Out of line: it runs in the scan's
 // shared frame.
 static __attribute__((noinline)) bool took_peer_copy(const noah_profile_owner_t *owner) {
@@ -1243,10 +1244,6 @@ const noah_profile_store_t *noah_profile_owner_store(const noah_profile_owner_t 
 
 const noah_profile_store_record_t *noah_profile_owner_committed(const noah_profile_owner_t *owner) {
     return owner && owner->descriptor_readable && owner->committed_descriptor.has_profile && record_matches_descriptor(&owner->store.committed, &owner->committed_descriptor) ? &owner->store.committed : NULL;
-}
-
-noah_profile_candidate_transaction_t *noah_profile_owner_host_transaction(noah_profile_owner_t *owner) {
-    return owner && (owner->state == NOAH_PROFILE_OWNER_READY_COMPILED || owner->state == NOAH_PROFILE_OWNER_READY_VALIDATED) ? &owner->host_transaction : NULL;
 }
 
 noah_profile_split_reconciler_t *noah_profile_owner_split_reconciler(noah_profile_owner_t *owner) {

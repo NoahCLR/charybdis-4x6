@@ -30,9 +30,12 @@ static uint32_t always_safe(void *context) {
     return safe_boundary_reasons;
 }
 
+// The flash backend refuses a read or write over the store's I/O bound; one
+// here fails the test.
 static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     uint8_t *bytes = context;
 
+    assert(length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
     if (!target || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_REGION_SIZE) {
         return false;
     }
@@ -46,6 +49,7 @@ static bool memory_read(void *context, noah_profile_storage_address_t address, u
 static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length) {
     uint8_t *bytes = context;
 
+    assert(length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
     if (!source || length == 0u || (uint32_t)address + length > NOAH_PROFILE_STORAGE_REGION_SIZE) {
         return false;
     }
@@ -266,6 +270,43 @@ static void test_validated_host_candidate_is_a_provisional_split_source(void) {
 
     assert(interface.commit_begin(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_IN_PROGRESS);
     assert(!noah_profile_candidate_store_backend_staged_candidate(&backend, &staged));
+}
+
+// A peer-copy chunk is wider than one store read; the staged candidate is
+// read in pieces the store takes (the fake fails a wider read).
+static void test_staged_read_wider_than_one_store_read(void) {
+    noah_profile_store_t                   store;
+    noah_profile_candidate_store_backend_t backend;
+    noah_effective_profile_provider_t      provider;
+    noah_profile_candidate_backend_t       interface;
+    noah_profile_candidate_v1_metadata_t   metadata = metadata_for(behavior_profile, sizeof(behavior_profile) - 1u);
+    noah_profile_candidate_v1_error_t      error    = noah_profile_candidate_v1_no_error();
+    noah_profile_store_candidate_t         staged;
+    uint8_t                                bytes[sizeof(behavior_profile) - 1u];
+
+    _Static_assert(sizeof(bytes) > 2u * NOAH_PROFILE_STORE_IO_CHUNK_MAX, "the read spans more than two store reads");
+    memset(eeprom_bytes, 0xff, sizeof(eeprom_bytes));
+    init_store(&store);
+    init_backend(&backend, &store, &provider, init_provider(&provider));
+    backend.compatibility.allowed_domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
+    interface                                 = noah_profile_candidate_store_backend_interface(&backend);
+    metadata.requested_domains                = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
+
+    assert(interface.begin(interface.context, &metadata) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+    for (uint16_t offset = 0u; offset < metadata.payload_length;) {
+        uint8_t length = (uint8_t)(metadata.payload_length - offset);
+        if (length > NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX) length = NOAH_PROFILE_CANDIDATE_V1_CHUNK_MAX;
+        assert(interface.write(interface.context, offset, &behavior_profile[offset], length) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
+        offset = (uint16_t)(offset + length);
+    }
+    assert(validate_to_completion(&interface, &metadata, &error) == NOAH_PROFILE_CANDIDATE_BACKEND_VALID);
+    assert(noah_profile_candidate_store_backend_staged_candidate(&backend, &staged));
+
+    eeprom_largest_read_length = 0u;
+    assert(noah_profile_candidate_store_backend_staged_read(&backend, &staged, 0u, bytes, sizeof(bytes)));
+    assert(memcmp(bytes, behavior_profile, sizeof(bytes)) == 0);
+    assert(eeprom_largest_read_length == NOAH_PROFILE_STORE_IO_CHUNK_MAX);
+    assert(interface.abort(interface.context) == NOAH_PROFILE_CANDIDATE_BACKEND_OK);
 }
 
 static void test_activation_request_retries_after_transient_provider_reuse(void) {
@@ -862,6 +903,7 @@ int main(void) {
     test_reuse_source_checks_active_identity_and_lease();
     test_stage_validate_and_commit();
     test_validated_host_candidate_is_a_provisional_split_source();
+    test_staged_read_wider_than_one_store_read();
     test_activation_request_retries_after_transient_provider_reuse();
     test_checksum_rejection_and_abort_preserve_last_known_good();
     test_committed_view_keeps_its_slot_when_next_candidate_starts();

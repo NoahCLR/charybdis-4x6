@@ -194,8 +194,10 @@ for each chunk; effective caches warm through that same representation.
 
 The profile split RPC callback only validates, queues and returns bounded
 responses; it never touches flash. The durable-I/O scheduler opens one flash
-grant per matrix scan and gives the profile store at most one step in it; the
-profile store is its only owner since VIA left (D-F31).
+grant per matrix scan and gives the profile store one step in it, then more
+while the store has local work in progress, until a step finds nothing to do,
+erases or programs, or uses the split link, for at most 1 ms and 32 steps
+(D-F29, "Pacing"); the profile store is its only owner since VIA left (D-F31).
 
 QMK routes master and slave scans through different user hooks. The master
 uses `matrix_scan_user()` and runs the complete runtime pipeline; the slave

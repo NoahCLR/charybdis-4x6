@@ -211,20 +211,22 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
     return activation_block_reason | (policy && policy->initialized && policy->peer_observer && policy->peer_observer(policy->peer_context, &unresolved) && unresolved == 0u ? 0u : NOAH_PROFILE_ACTIVATION_REASON_PEER);
 }
 
-// Reads and writes are bounded as the flash adapter bounds them
-// (qmk_profile_flash.c).
+// The flash backend refuses a read or write over the store's I/O bound; one
+// here fails the test.
 static bool memory_read(void *context, noah_profile_storage_address_t address, uint8_t *target, uint32_t length) {
     memory_t *memory = context;
+    assert(length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
     memory->reads++;
     if (length > memory->largest_read) memory->largest_read = length;
     if (memory->fail_reads) return false;
-    if (!target || length == 0u || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) return false;
+    if (!target || length == 0u || (uint32_t)address + length > sizeof(memory->bytes)) return false;
     memcpy(target, &memory->bytes[address], length);
     return true;
 }
 
 static bool memory_write(void *context, noah_profile_storage_address_t address, const uint8_t *source, uint32_t length) {
     memory_t *memory = context;
+    assert(length <= NOAH_PROFILE_STORE_IO_CHUNK_MAX);
     memory->writes++;
     if (length > memory->largest_write) memory->largest_write = length;
     if (memory->fail_next_write) {
@@ -237,7 +239,7 @@ static bool memory_write(void *context, noah_profile_storage_address_t address, 
         memory->bytes[address]     = source[0];
         return false;
     }
-    if (!source || length == 0u || length > NOAH_PROFILE_STORE_IO_CHUNK_MAX || (uint32_t)address + length > sizeof(memory->bytes)) return false;
+    if (!source || length == 0u || (uint32_t)address + length > sizeof(memory->bytes)) return false;
     memcpy(&memory->bytes[address], source, length);
     return true;
 }
