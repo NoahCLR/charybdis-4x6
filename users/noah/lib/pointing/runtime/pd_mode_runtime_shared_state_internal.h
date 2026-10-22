@@ -9,18 +9,22 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "../../key/runtime/slot/keypos_codec.h"
 #include "../../key/runtime/slot/origin_registry.h"
 #include "../../state/shared/runtime_publication.h"
 #include "../defs/pd_mode_flags.h"
 
-#define PD_MODE_OWNER_SLOT_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
+#define PD_MODE_OWNER_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
 
+// One key holding the active mode. `key` is the key's packed matrix index plus
+// one, so zero marks a free entry and the zero-initialised runtime context
+// starts with no owners. `owner_sides` is the side mask the key's press
+// reported. An entry carries no mode: every change of the active mode clears
+// the list, so every entry belongs to the active mode.
 typedef struct {
-    bool              active;
-    pd_mode_mask_t    mode;
-    keypos_t          key_pos;
+    uint8_t           key;
     split_side_mask_t owner_sides;
-} pd_mode_owner_slot_t;
+} pd_mode_owner_entry_t;
 
 // Mirrored pd-mode identity for the non-master half's UI. The split worker
 // context publishes this whole group at once, so it is grouped in one struct
@@ -37,6 +41,8 @@ typedef struct {
 typedef struct {
     pd_mode_mask_t local_active_mode;
     pd_mode_mask_t local_locked_mode;
+    // The single owner key and owner sides: those of the owners below while
+    // any key holds the mode, otherwise the key that locked or activated it.
     bool           local_owner_key_pos_valid;
     keypos_t       local_owner_key_pos;
 #ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
@@ -47,7 +53,9 @@ typedef struct {
     // generation, so readers always copy a slot the worker is not touching.
     pd_mode_remote_display_state_t        remote_display[2];
     noah_runtime_publication_generation_t remote_display_generation;
-    pd_mode_owner_slot_t                  local_key_owners[PD_MODE_OWNER_SLOT_CAPACITY];
+    // The keys holding the active mode. A press takes the lowest free entry,
+    // and the first entry in use gives the single owner key above.
+    pd_mode_owner_entry_t                 local_owners[PD_MODE_OWNER_CAPACITY];
     bool                                  synthetic_auto_mouse_anchor_active;
     bool                                  active_dpi_sync_pending;
     bool                                  auto_sniping_layer_active;
