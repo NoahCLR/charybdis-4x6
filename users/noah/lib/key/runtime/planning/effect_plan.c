@@ -4,9 +4,14 @@
 
 #include "effect_plan.h"
 #include "release_internal.h"
+#include "../transition.h"
 
 #include "../../../action/action_dispatch.h"
 #include "../../../pointing/defs/pd_modes.h"
+
+enum {
+    KEY_RUNTIME_CORE_EFFECT_PLAN_FLAG_STREAMING = 1u << 0,
+};
 
 void key_runtime_core_effect_plan_init(key_runtime_core_effect_plan_t *plan) {
     if (!plan) {
@@ -16,14 +21,21 @@ void key_runtime_core_effect_plan_init(key_runtime_core_effect_plan_t *plan) {
     *plan = (key_runtime_core_effect_plan_t){0};
 }
 
-void key_runtime_core_effect_plan_init_with_sink(key_runtime_core_effect_plan_t *plan, void (*sink)(void *ctx, key_runtime_effect_t effect), void *sink_ctx) {
+void key_runtime_core_effect_plan_init_streaming(key_runtime_core_effect_plan_t *plan) {
     key_runtime_core_effect_plan_init(plan);
-    if (!plan) {
-        return;
+    if (plan) {
+        plan->flags = KEY_RUNTIME_CORE_EFFECT_PLAN_FLAG_STREAMING;
     }
+}
 
-    plan->sink     = sink;
-    plan->sink_ctx = sink_ctx;
+static bool key_runtime_core_effect_plan_streaming(const key_runtime_core_effect_plan_t *plan) {
+    return (plan->flags & KEY_RUNTIME_CORE_EFFECT_PLAN_FLAG_STREAMING) != 0u;
+}
+
+void key_runtime_core_effect_plan_end_step(key_runtime_core_effect_plan_t *plan) {
+    if (plan && key_runtime_core_effect_plan_streaming(plan)) {
+        key_runtime_transition_execute_plan(NULL, plan);
+    }
 }
 
 static void key_runtime_core_effect_plan_push(key_runtime_core_effect_plan_t *plan, key_runtime_effect_t effect) {
@@ -31,9 +43,8 @@ static void key_runtime_core_effect_plan_push(key_runtime_core_effect_plan_t *pl
         return;
     }
 
-    if (plan->sink) {
-        plan->sink(plan->sink_ctx, effect);
-        return;
+    if (plan->count >= ARRAY_SIZE(plan->items) && key_runtime_core_effect_plan_streaming(plan)) {
+        key_runtime_transition_drain_plan(plan);
     }
 
     if (plan->count < ARRAY_SIZE(plan->items)) {

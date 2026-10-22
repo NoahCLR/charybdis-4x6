@@ -9,35 +9,33 @@
 #include "../../action/action_dispatch.h"
 #include "reducer/state_query.h"
 #include "reducer/ownership_state.h"
+#include "planning/effect_plan.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../compat/qmk_gesture_timing.h"
 
-// Runs before the runtime observes the release. A physical key first reaches
-// any hold it was due before its release while its press waited in record
-// admission (D-F01); a combo output's times count from its dispatch, so it
-// has none to catch up. Then, while the key still holds its layer or
-// modifiers, a key that another key's press would settle as a tap is
-// settled, so its tap still gets them (D-F27).
-void key_runtime_preflight_settle_before_release(uint16_t keycode, keyrecord_t *record) {
-    key_runtime_transition_plan_t plan;
-    uint16_t                      released_at = noah_qmk_gesture_event_time(record);
+// Runs before the runtime observes the release, at the reducer's moment
+// before a release (key_runtime_core_settle_before_release()). Not inlined:
+// process_record_user() calls it for every release, and its plan must not stay
+// on the stack beneath the stages that follow.
+__attribute__((noinline)) void key_runtime_preflight_settle_before_release(uint16_t keycode, keyrecord_t *record) {
+    key_runtime_core_effect_plan_t plan;
 
     if (record->event.pressed) {
         return;
     }
-    if (record->event.type == KEY_EVENT) {
-        key_runtime_transition_plan_init(&plan);
-        key_runtime_transition_plan_missed_scans_before_release(record->event.key, released_at, &plan);
-        key_runtime_trace_plan("preflight:missed_scans_before_release", &plan);
-        key_runtime_transition_execute_plan(&plan);
-    }
-    if (!key_runtime_core_has_other_active_press_token(record->event.key) || !key_runtime_core_release_is_mods_or_layer(keycode, record)) {
-        return;
-    }
-    key_runtime_transition_plan_init(&plan);
-    key_runtime_transition_settle_active_keys_on_other_release(record->event.key, released_at, &plan);
-    key_runtime_trace_plan("preflight:settle_on_mods_or_layer_release", &plan);
-    key_runtime_transition_execute_plan(&plan);
+    key_runtime_core_effect_plan_init_streaming(&plan);
+    key_runtime_core_settle_before_release(keycode, record, noah_qmk_gesture_event_time(record), &plan);
+    key_runtime_transition_execute_plan("preflight:before_release", &plan);
+}
+
+// The reducer's moment before a press (key_runtime_core_settle_before_press()).
+// Not inlined, so its plan is off the stack once the press goes on.
+static __attribute__((noinline)) void key_runtime_preflight_settle_before_press(uint16_t keycode, keyrecord_t *record, bool press_is_handled) {
+    key_runtime_core_effect_plan_t plan;
+
+    key_runtime_core_effect_plan_init_streaming(&plan);
+    key_runtime_core_settle_before_press(keycode, record->event.key, press_is_handled, &plan);
+    key_runtime_transition_execute_plan("preflight:before_press", &plan);
 }
 
 bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record, bool press_is_handled) {
@@ -57,31 +55,8 @@ bool key_runtime_preflight_record(uint16_t keycode, keyrecord_t *record, bool pr
         }
     }
 
-    if (record->event.pressed && key_runtime_core_has_other_active_press_token(record->event.key)) {
-        key_runtime_transition_plan_t plan;
-
-        key_runtime_transition_plan_init(&plan);
-        key_runtime_transition_interrupt_active_keys_on_other_press(record->event.key, &plan);
-        key_runtime_trace_plan("preflight:interrupt_active_key", &plan);
-        key_runtime_transition_execute_plan(&plan);
-    }
-
-    if (record->event.pressed && !press_is_handled) {
-        key_runtime_transition_plan_t plan;
-
-        key_runtime_transition_plan_init(&plan);
-        key_runtime_transition_flush_foreign_multi_tap(keycode, record->event.key, &plan);
-        key_runtime_trace_plan("preflight:flush_foreign_multi_tap", &plan);
-        key_runtime_transition_execute_plan(&plan);
-    } else if (record->event.pressed) {
-        // Handled keys keep independent series alive, except a tap/hold key's:
-        // its pending tap is typed before the key that followed it.
-        key_runtime_transition_plan_t plan;
-
-        key_runtime_transition_plan_init(&plan);
-        key_runtime_transition_flush_foreign_dual_role_multi_tap(keycode, record->event.key, &plan);
-        key_runtime_trace_plan("preflight:flush_foreign_dual_role_multi_tap", &plan);
-        key_runtime_transition_execute_plan(&plan);
+    if (record->event.pressed) {
+        key_runtime_preflight_settle_before_press(keycode, record, press_is_handled);
     }
 
     return true;

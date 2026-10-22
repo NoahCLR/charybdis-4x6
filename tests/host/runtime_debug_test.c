@@ -2334,7 +2334,7 @@ static void test_key_runtime_core_pending_multi_tap_scan_resolution_flushes_expi
 }
 
 static void test_key_runtime_core_transition_flush_foreign_multi_tap_clears_shadow_series(void) {
-    key_runtime_transition_plan_t plan;
+    key_runtime_core_effect_plan_t plan;
     const tap_series_t           *series;
     keypos_t                      pending_key = test_keypos(5, 3);
     keypos_t                      other_key   = test_keypos(5, 4);
@@ -2347,8 +2347,8 @@ static void test_key_runtime_core_transition_flush_foreign_multi_tap_clears_shad
     CHECK(series != NULL);
     CHECK(series->active);
 
-    key_runtime_transition_plan_init(&plan);
-    key_runtime_transition_flush_foreign_multi_tap(TEST_RELEASE_PRIMARY_KEY, other_key, &plan);
+    key_runtime_core_effect_plan_init_streaming(&plan);
+    key_runtime_core_flush_foreign_multi_tap(TEST_RELEASE_PRIMARY_KEY, other_key, &plan);
 
     CHECK(plan.count == 1u);
     CHECK(plan.items[0].kind == KEY_RUNTIME_EFFECT_DELAYED_ACTION);
@@ -2365,7 +2365,7 @@ static void test_key_runtime_transition_flush_multi_tap_chunks_without_dropping_
         SERIES_COUNT = KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY + 5u,
     };
 
-    key_runtime_transition_plan_t plan;
+    key_runtime_core_effect_plan_t plan;
     key_runtime_core_state_t     *state;
 
     test_reset_stubs();
@@ -2389,18 +2389,18 @@ static void test_key_runtime_transition_flush_multi_tap_chunks_without_dropping_
         state->tap_series_count++;
     }
 
-    key_runtime_transition_plan_init(&plan);
-    key_runtime_transition_flush_multi_tap(&plan);
+    key_runtime_core_effect_plan_init_streaming(&plan);
+    key_runtime_core_flush_multi_tap(&plan);
     CHECK(!plan.overflowed);
     CHECK(state->tap_series_count == 0u);
 
-    key_runtime_transition_execute_plan(&plan);
+    key_runtime_transition_execute_plan(NULL, &plan);
     CHECK(delayed_action_count == SERIES_COUNT);
     CHECK(last_delayed_action == TEST_ACTION);
 }
 
 static void test_key_runtime_core_transition_flush_active_keys_retires_shadow_token(void) {
-    key_runtime_transition_plan_t plan;
+    key_runtime_core_effect_plan_t plan;
     const press_token_t          *token;
     projection_snapshot_t         snapshot;
     keypos_t                      active_key = test_keypos(5, 5);
@@ -2414,8 +2414,8 @@ static void test_key_runtime_core_transition_flush_active_keys_retires_shadow_to
     CHECK(token != NULL);
     CHECK(token->active);
 
-    key_runtime_transition_plan_init(&plan);
-    key_runtime_transition_flush_active_keys_except(survivor, &plan);
+    key_runtime_core_effect_plan_init_streaming(&plan);
+    key_runtime_core_flush_active_keys_except(survivor, &plan);
 
     token = key_runtime_core_press_token_at(active_key);
     CHECK(token != NULL);
@@ -3105,7 +3105,7 @@ static void test_key_runtime_core_runtime_owned_state_leases_track_and_clear(voi
 
 static void test_key_runtime_core_transition_execute_plan_updates_owned_state_leases(void) {
     projection_snapshot_t         snapshot;
-    key_runtime_transition_plan_t plan = {
+    key_runtime_core_effect_plan_t plan = {
         .count = 2u,
         .items =
             {
@@ -3130,7 +3130,7 @@ static void test_key_runtime_core_transition_execute_plan_updates_owned_state_le
                     },
             },
     };
-    key_runtime_transition_plan_t release_plan = {
+    key_runtime_core_effect_plan_t release_plan = {
         .count = 1u,
         .items =
             {
@@ -3145,11 +3145,11 @@ static void test_key_runtime_core_transition_execute_plan_updates_owned_state_le
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    key_runtime_transition_execute_plan(&plan);
+    key_runtime_transition_execute_plan(NULL, &plan);
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_lease_count == 2u);
 
-    key_runtime_transition_execute_plan(&release_plan);
+    key_runtime_transition_execute_plan(NULL, &release_plan);
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_lease_count == 0u);
 }

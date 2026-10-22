@@ -4762,6 +4762,46 @@ static void test_qmk_symbol_key_held_past_its_hold_while_waiting(void) {
         gesture_assert_admission_quiescent();
     }
 }
+
+// A key whose hold is a modifier, then G, both wait behind an undecided key;
+// the modifier key is let go past its hold time and before G. Its release
+// waiting behind it in admission keeps G's replayed press from turning the
+// hold on, so the hold (the Hyper shortcut, the fallback hold of a Hyper key
+// with a tap row) goes on only when the release catches up the scans the key
+// missed. That hold is what makes the release a modifier's: it settles G as a
+// tap that still gets Hyper, as Cmd let go before F types Cmd+F (D-F01,
+// D-F27). The moment before a release asks whether the key holds modifiers
+// only after projecting the hold its missed scans planned. (A plain GUI key
+// would not tell: its press already holds GUI.)
+static void test_qmk_modifier_hold_reached_while_waiting_settles_next_key(void) {
+    const uint8_t  hyper    = 0x0f;
+    const uint16_t starts[] = {30000, 65500};
+    for (unsigned start = 0; start < ARRAY_SIZE(starts); start++) {
+        test_reset_state(); fake_time = starts[start]; gesture_out_count = 0;
+        gesture_test_code = gesture_empty_row = LT(TEST_LAYER_SYM, KC_J);
+        gesture_empty_row_term = 300;
+        gesture_second_code = gesture_tap_only_row = TEST_SHORTCUT_KEY; gesture_tap_only_action = KC_C;
+        gesture_symbol_row = KC_G; gesture_track_admission = true;
+        gesture_at(3,0,true); gesture_advance(10);
+        gesture_at(3,3,true); gesture_advance(110);  // the Hyper key
+        gesture_at(2,2,true); gesture_advance(110);  // G, 150 ms hold
+        gesture_at(3,3,false);                       // past the Hyper key's hold, G short of its own
+        CHECK(noah_record_admission_held_count() == 3);
+        CHECK(gesture_report_mods() == 0);
+        gesture_advance(20);
+        gesture_at(3,0,false); gesture_advance(1);   // J's tap replays the rest
+        CHECK(noah_record_admission_held_count() == 0);
+        if (!(gesture_tap_went_out_with(KC_G, hyper, UINT8_MAX) && gesture_tap_count(KC_G) == 1)) gesture_out_dump("hyper hold reached while waiting");
+        CHECK(gesture_tap_went_out_with(KC_G, hyper, UINT8_MAX));
+        CHECK(gesture_tap_count(KC_G) == 1 && gesture_tap_count(KC_C) == 0);
+        CHECK(gesture_report_mods() == 0);
+        gesture_advance(10); gesture_at(2,2,false); gesture_advance(500);
+        gesture_second_code = KC_NO;
+        CHECK(gesture_tap_count(KC_G) == 1);
+        CHECK(gesture_report_mods() == 0);
+        gesture_assert_admission_quiescent();
+    }
+}
 #endif
 
 extern bool key_runtime_test_macro_protected;
@@ -4811,6 +4851,7 @@ int main(int argc, char **argv) {
         else if (strcmp(regression, "shortcut-release") == 0) test_qmk_modifier_shortcut_release_applies_to_the_next_key();
         else if (strcmp(regression, "combo-release") == 0) test_qmk_combo_modifier_release_waits_for_undecided_key();
         else if (strcmp(regression, "held-symbol") == 0) test_qmk_symbol_key_held_past_its_hold_while_waiting();
+        else if (strcmp(regression, "waiting-modifier-hold") == 0) test_qmk_modifier_hold_reached_while_waiting_settles_next_key();
         else CHECK(false);
         return 0;
     }
@@ -4899,6 +4940,7 @@ int main(int argc, char **argv) {
     test_qmk_modifier_shortcut_release_applies_to_the_next_key();
     test_qmk_combo_modifier_release_waits_for_undecided_key();
     test_qmk_symbol_key_held_past_its_hold_while_waiting();
+    test_qmk_modifier_hold_reached_while_waiting_settles_next_key();
     puts("QMK gesture pipeline tests passed");
     return 0;
 #endif
