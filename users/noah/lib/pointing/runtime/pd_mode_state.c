@@ -619,7 +619,9 @@ pd_mode_apply_result_t pd_mode_apply_command(pd_mode_command_t command) {
 
                 noah_runtime_trace_emit(NOAH_TRACE_PD_MODE, NOAH_TRACE_PD_MODE_EVENT_KEY_PRESS, mode, pd_mode_trace_pack_keypos(pd_mode_command_owner_key_pos(command)));
                 split_sync_required = pd_mode_apply_activate_mode(mode);
-                if (!locked_same_mode) {
+                // A slot with no record never activates, so its key owns
+                // nothing: an owner is recorded only for the active mode.
+                if (!locked_same_mode && pd_mode_local_active(mode)) {
                     if (split_sync_required) {
                         (void)pd_mode_clear_local_key_owners();
                     }
