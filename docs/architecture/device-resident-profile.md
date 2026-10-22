@@ -68,8 +68,8 @@ The canonical schema-4 profile includes keymap domain `0x60` v1 (16 × 60
 little-endian keycodes) and macro domain `0x70` v1 (128 streams in the existing
 bank encoding, up to 34,903 bytes). Authored C remains the compiled default for
 both; the authored macros are also generated already in the bank encoding
-(`authored_macro_bank.h`, rebuilt with the firmware's encoder by
-`tools/profile_introspect.py --write` and checked by real-profile validation),
+(`authored_macro_bank.h`, rebuilt with the firmware's encoder by real-profile
+validation run with `NOAH_WRITE_AUTHORED_MACRO_BANK=1`, which otherwise checks it),
 so writing the compiled defaults copies bytes and compiles no macro. Domain
 omission falls back to those authored defaults, just as for the other optional
 domains, and so does a domain bit whose range cannot be found. Complete exports

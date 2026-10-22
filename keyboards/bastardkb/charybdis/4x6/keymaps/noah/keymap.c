@@ -938,8 +938,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format on
 };
 
-// VIA_MACROS() above in the bank encoding; tools/profile_introspect.py --write
-// regenerates it.
+// VIA_MACROS() above in the bank encoding. Regenerate it with
+// NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh.
 #include "authored_macro_bank.h"
 
 // Expand the authored macro tables, combo table, and derived counts above

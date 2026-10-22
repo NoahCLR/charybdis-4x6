@@ -25,17 +25,15 @@ for this pack because they define how QMK reaches the runtime.
 | `users/noah/runtime_init.c` | Userspace init, scan, and housekeeping orchestration | Integration order | `run_runtime_init_order_tests.sh`, runtime debug/diag/trace tests |
 | `users/noah/hooks.c` | Weak QMK hook defaults that call `noah_*` helpers | Hook integration | `run_hook_chaining_tests.sh`, feature gate compile |
 | `users/noah/noah_runtime.h` | Public userspace entry surface for keymap hook chaining | Boundary contract | hook chaining and compile gates |
-| `users/noah/config.h` | Shared userspace config defaults and feature knobs | Configuration input | profile introspection and real-profile validation when relevant |
+| `users/noah/config.h` | Shared userspace config defaults and feature knobs | Configuration input | real-profile validation when relevant |
 
-## Tooling And Generated Docs
+## Tooling
 
 These files are not runtime packages, but they are part of the maintained
-source trace because they rewrite or verify human-facing firmware docs.
+source trace because they rewrite or verify firmware source.
 
 | Surface | Responsibility | Writes | Primary checks |
 | --- | --- | --- | --- |
-| `tools/profile_introspect.py` | Parse selected authored profile inputs and render generated visual profile reports | default `docs/KEYMAP-OVERVIEW.md` plus optional `docs/profiles/<name>/KEYMAP-OVERVIEW.md` and matching SVG assets | `python3 tools/profile_introspect.py --check`, `python3 tools/profile_introspect.py --keymap <name> --check`, `run_profile_introspection_checks.sh`, full host suite |
-| `tools/via_to_qmk_layout.py` | Convert VIA export JSON back into selected source-owned keymap blocks | optionally selected profile `keymap.c` `VIA_MACROS(MACRO)` and `keymaps[][]` | script preview/write review, real-profile validation, full host suite when source changes |
 | `tools/check_firmware_stack_budget.py` and `tools/firmware_stack_budget.json` | Reconcile target stack symbols/artifacts and enforce reviewed stack contexts, call edges, indirect edges, and reserves | read-only report; no source output | `run_firmware_stack_budget_tool_tests.sh`; fresh instrumented target build plus `run_firmware_stack_budget_checks.sh` |
 | `tools/host_layouts/build.py` | Derive each host layout's character table from the raw sources in `tools/host_layouts/sources/` (read by `extract_macos.swift`, `extract_xkb.sh` and `--import-qmk`) and generate the C tables | `tests/fixtures/host_layouts_v1.json`, `users/noah/lib/macro/host_layout_tables.c` | `run_host_layout_tests.sh` (`--check`) |
 | `tools/check_firmware_memory_budget.py` | Report RP2040 per-bank linked accounting and enforce compact macro symbols plus explicit SRAM0–3 `.bss`, `.data + .bss`, and boot core-memory-span regression policies defined in [memory-budgets.md](./memory-budgets.md) against a fresh ordinary target ELF | read-only report; no source output | `run_firmware_memory_budget_tool_tests.sh`; fresh ordinary target build plus `run_firmware_memory_budget_checks.sh` |
@@ -55,7 +53,7 @@ source trace because they rewrite or verify human-facing firmware docs.
 | `key/runtime/queue/` | Pending release dispatch queue | Authoritative queue inside key runtime | Deferred dispatch effects, release blockers | Ordered pending release snapshots and drains | release matrix, runtime debug, scenario tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/slot/` | Per-key-position helpers | Helper data, not independent authority | Key positions, combo origins, materialized behavior | Packed key positions, origin bitmaps, slot interaction contracts | combo origin, PD, RGB, split, key-runtime tests | [KEY_RUNTIME](../KEY_RUNTIME.md) |
 | `key/runtime/trace/` and top-level `trace.*` | Runtime tracing | Diagnostic only | Runtime events, transition plans, projection snapshots | Trace entries and optional console output | `run_runtime_trace_tests.sh`, key-runtime trace variants | [KEY_RUNTIME](../KEY_RUNTIME.md) |
-| `macro/` | Profile macro provider, payload parser, compact slot metadata, one pinned shared IR, scan-driven playback, and host layout tables ([host-layouts-v1](./host-layouts-v1.md)) | Macro payload validation and one-active execution lifecycle | `VIA_MACRO_n` (a historical name), payload strings, the profile macro domain, matrix scans | Lease-backed macro output, bounded cleanup | macro payload/engine/provider and profile keymap/macro tests | [KEYMAP](../KEYMAP.md), [runtime-flow](./runtime-flow.md), [VIA_TO_QMK](../tooling/VIA_TO_QMK.md) |
+| `macro/` | Profile macro provider, payload parser, compact slot metadata, one pinned shared IR, scan-driven playback, and host layout tables ([host-layouts-v1](./host-layouts-v1.md)) | Macro payload validation and one-active execution lifecycle | `VIA_MACRO_n` (a historical name), payload strings, the profile macro domain, matrix scans | Lease-backed macro output, bounded cleanup | macro payload/engine/provider and profile keymap/macro tests | [KEYMAP](../KEYMAP.md), [runtime-flow](./runtime-flow.md) |
 | `pointing/defs/` | PD mode manifest and generated keycodes | Authored PD identity | PD mode manifest macros | Mode ids, flags, keycodes, lock keycodes | PD mode and profile validation tests | [ADDING_PD_MODE](../ADDING_PD_MODE.md), [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/modes/` | Configured directional engine and shared dragscroll algorithm | Validated effective slot records | Mouse reports and mode lifecycle transitions | Transformed reports and bounded synthetic actions | `run_pd_mode_handlers_tests.sh`, `run_pd_mode_tests.sh` | [POINTER_MODES](../POINTER_MODES.md) |
 | `pointing/policy/` | Pointer layer and PD policy rules | Policy helper | Layer state, keycodes, PD traits | Pointer layer activation, mouse-record classification | `run_pointer_layer_policy_tests.sh`, PD/key-runtime integration tests | [POINTER_MODES](../POINTER_MODES.md) |
@@ -276,8 +274,10 @@ The authored profile boundary is intentionally outside `users/noah/lib/`:
 - `keyboards/bastardkb/charybdis/4x6/keymaps/noah/rgb_config.c` owns authored
   RGB colors, LED groups, and render-stage configuration.
 
-Changes to these authored inputs must run profile introspection and real-profile
-validation as described in [change-guide.md](./change-guide.md).
+Changes to these authored inputs must run real-profile validation as described
+in [change-guide.md](./change-guide.md). A `VIA_MACROS()` change also
+regenerates `authored_macro_bank.h` with
+`NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh`.
 
 ## Host Test Runner Inventory
 
@@ -287,7 +287,7 @@ Use the runner that matches the behavior touched while iterating, then use
 | Area | Runners |
 | --- | --- |
 | Action lifecycle and dispatch | `run_action_dispatch_tests.sh`, `run_action_lifecycle_tests.sh`, `run_delayed_action_tests.sh`, `run_owned_keycode_tests.sh` |
-| Key behavior, authored profile validation, and generated overview | `run_profile_introspection_checks.sh`, `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_all_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
+| Key behavior and authored profile validation | `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_all_profile_validation_tests.sh`, `run_real_profile_thumb_layer_lock_integration_tests.sh` |
 | Key runtime | `run_key_runtime_release_matrix_tests.sh`, `run_key_runtime_modifier_hold_integration_tests.sh`, `run_pd_mode_key_runtime_integration_tests.sh`, `run_key_runtime_layer_lock_integration_tests.sh`, `run_key_runtime_scenario_tests.sh`, `run_key_runtime_integration_harness_tests.sh` |
 | Hooks, ownership, and boundaries | `run_hook_chaining_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh`, `run_feature_gate_compile_tests.sh` |
 | Macro and QMK compatibility | `run_macro_payload_tests.sh`, `run_qmk_portable_profile_tests.sh`, `run_profile_keymap_macros_runtime_tests.sh`, `run_action_lifecycle_tests.sh`, `run_qmk_combo_origin_tests.sh`, `run_profile_wire_v1_tests.sh` (the Raw HID channel) |

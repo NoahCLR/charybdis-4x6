@@ -9,12 +9,11 @@ transparent fallthrough and RGB coverage all use the active matrix; macro
 playback uses its bank. VIA is not supported (D-F31): the profile is the only
 copy, and a client for the new base is required to edit these domains. The
 `VIA_MACRO_n` names are historical. After changing `VIA_MACROS`, run
-`tools/profile_introspect.py --write`: it also regenerates
-`authored_macro_bank.h`, the same macros already in the bank encoding, which
-the compiled defaults copy.
+`NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh`:
+it regenerates `authored_macro_bank.h`, the same macros already in the bank
+encoding, which the compiled defaults copy.
 
-If you want the fastest visual snapshot, start with
-[KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md). The top-level [README](../README.md),
+The top-level [README](../README.md),
 the [firmware guide](./GUIDE.md) and [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) explain what the shared
 userspace can do; this file explains how the current profile uses those
 capabilities.
@@ -523,13 +522,10 @@ simply personal shortcuts rather than standard macOS conventions.
 
 ## Verification
 
-When this profile changes, regenerate the visual report and run the authored
-profile checks before the full host suite:
+When this profile changes, run the authored profile checks before the full
+host suite:
 
 ```sh
-python3 tools/profile_introspect.py --write
-python3 tools/profile_introspect.py --check
-sh tests/host/run_profile_introspection_checks.sh
 sh tests/host/run_key_behavior_lookup_tests.sh
 sh tests/host/run_key_behavior_validation_tests.sh
 sh tests/host/run_keymap_validation_tests.sh
@@ -544,8 +540,6 @@ sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh
 
 ## Related Files
 
-- [KEYMAP-OVERVIEW.md](./KEYMAP-OVERVIEW.md): generated visual snapshot of the
-  current profile
 - [`keymap.c`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/keymap.c):
   current authored layout, combos, macros, and `key_behaviors[]`
 - [`config.h`](../keyboards/bastardkb/charybdis/4x6/keymaps/noah/config.h):
@@ -555,7 +549,3 @@ sh tests/host/run_real_profile_thumb_layer_lock_integration_tests.sh
 - [INTERACTION_MODEL.md](./INTERACTION_MODEL.md): shared interaction semantics
 - [POINTER_MODES.md](./POINTER_MODES.md): raw pointing-device behavior after a
   mode is active
-- [tooling/VIA_TO_QMK.md](./tooling/VIA_TO_QMK.md): VIA export round-trip
-  workflow for the current keymap source
-- [tooling/PROFILE_INTROSPECT.md](./tooling/PROFILE_INTROSPECT.md): how the
-  generated overview and SVG assets are refreshed and verified

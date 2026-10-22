@@ -68,18 +68,6 @@
             ]
         },
         {
-            "label": "Generate Layout Overview",
-            "type": "process",
-            "command": "python3",
-            "args": [
-                "${workspaceFolder}/tools/profile_introspect.py"
-            ],
-            "problemMatcher": [],
-            "options": {
-                "cwd": "${workspaceFolder}"
-            }
-        },
-        {
             "label": "Format repo",
             "type": "process",
             "command": "bash",

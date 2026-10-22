@@ -129,11 +129,12 @@ earlier firmware and its backup if you may want to go back.
 
 Edit compiled defaults directly in `keymap.c`, `config.h`, and `rgb_config.c`
 under `keyboards/bastardkb/charybdis/4x6/keymaps/<name>/`. Validate authored
-changes with the firmware host tests and regenerate their read-only overview
-with `python3 tools/profile_introspect.py --keymap <name> --write`.
-For the default profile, see [KEYMAP-OVERVIEW.md](KEYMAP-OVERVIEW.md) and
-[KEYMAP.md](KEYMAP.md). On a connected keyboard, the committed device
-profile is the source of truth; edit it with Charybdis Ark.
+changes with the firmware host tests. After changing `VIA_MACROS()`, regenerate
+the profile's `authored_macro_bank.h` with
+`NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh <keymap path>`.
+For the default profile, see [KEYMAP.md](KEYMAP.md). On a connected keyboard,
+the committed device profile is the source of truth; edit it with Charybdis
+Ark.
 
 ### The keymap model
 
