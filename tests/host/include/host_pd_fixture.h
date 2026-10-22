@@ -70,6 +70,8 @@ static inline split_side_mask_t host_runtime_fixture_display_owner_sides(bool is
 #endif
 }
 
+// Traits come from a mode's effective slot, which the fixture does not model:
+// its modes carry none.
 static inline pd_mode_snapshot_view_t host_runtime_fixture_pd_mode_view(const pd_mode_def_t *defs, uint8_t count, pd_mode_mask_t active_mode, pd_mode_mask_t locked_mode) {
     pd_mode_snapshot_view_t view = {
         .active_mode  = active_mode,
@@ -77,10 +79,6 @@ static inline pd_mode_snapshot_view_t host_runtime_fixture_pd_mode_view(const pd
         .active_index = host_runtime_fixture_pd_mode_index(defs, count, active_mode),
         .locked_index = host_runtime_fixture_pd_mode_index(defs, count, locked_mode),
     };
-
-    if (view.active_index < count) {
-        view.active_traits = defs[view.active_index].traits;
-    }
 
     return view;
 }

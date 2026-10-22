@@ -681,8 +681,18 @@ old-geometry firmware bridge builds are retired. Every firmware build uses the
 schema-2 slot engine (eight slots then; 32 since D-F09). The ordinary side-specific pair owns a live profile;
 an owner-free generic or comparison image warms the same engine from validated
 compiled slot records. The mode registry keeps deployed hold and lock keycode
-identities, but no per-preset callbacks. `NOAH_PD_PROFILE=no` and the five-layer
-snapshot-bridge option are rejected instead of quietly producing old firmware.
+identities, but no per-preset callbacks. No build option produces the old
+firmware: `NOAH_PD_PROFILE` is not read, and the five-layer snapshot-bridge
+option is gone.
+
+The engine is not a build switch. The PD domain, its validation and the
+effective slot cache are compiled into every image, and every profile the
+keyboard validates must carry the PD domain; there is no `NOAH_PD_PROFILE_ENABLE`
+define and no off branch, so host tests compile what the keyboard runs. The
+separate `POINTING_DEVICE_ENABLE` gate stays for the host tests that compile
+without a pointing device (the activation policy then has no pointing mode to
+wait for); every firmware target has one, and a firmware without it is not a
+supported build.
 
 This removes the in-repository extraction path for an already deployed old
 storage geometry. Retain old firmware and backups outside this build if they

@@ -24,7 +24,7 @@ PY
 build_and_run() {
     name="$1"
     shift
-    cc -std=c11 -Wall -Wextra -Werror -pedantic -DNOAH_PD_PROFILE_ENABLE "$@" \
+    cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/profile_rgb_v4_test.c" \
@@ -38,7 +38,7 @@ build_and_run normal
 build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
 
 ARM_CC="${ARM_CC:-arm-none-eabi-gcc}"
-"$ARM_CC" -std=c11 -Wall -Wextra -Werror -pedantic -DNOAH_PD_PROFILE_ENABLE \
+"$ARM_CC" -std=c11 -Wall -Wextra -Werror -pedantic \
     -mcpu=cortex-m0plus -mthumb \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

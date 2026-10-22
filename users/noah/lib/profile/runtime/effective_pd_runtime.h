@@ -1,6 +1,5 @@
 #pragma once
 #include "../schema/profile_pd_v1.h"
-#ifdef NOAH_PD_PROFILE_ENABLE
 #include "effective_profile_provider.h"
 // Every slot's effective configuration, warm in RAM: the 32 validated records,
 // held as noah_pd_config_t so their fields read directly and aligned. A slot
@@ -24,4 +23,3 @@ bool noah_effective_pd_ready(void);
 // Factory-only images have no profile owner to publish the compiled generation.
 void noah_effective_pd_load_compiled_defaults(const noah_pd_config_t defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT]);
 void noah_effective_pd_invalidate(void *context, uint32_t publication, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *view);
-#endif

@@ -20,10 +20,10 @@ enum {
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS = NOAH_PROFILE_DOMAIN_MASK_KEY_BEHAVIORS,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS      = NOAH_PROFILE_DOMAIN_MASK_SETTINGS,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_COMBOS        = NOAH_PROFILE_DOMAIN_MASK_COMBOS,
-    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD = NOAH_PROFILE_ENABLED_PD_MASK,
+    NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD            = NOAH_PROFILE_DOMAIN_MASK_PD,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEYMAP        = NOAH_PROFILE_DOMAIN_MASK_KEYMAP,
     NOAH_PROFILE_VALIDATOR_V1_DOMAIN_MACROS        = NOAH_PROFILE_DOMAIN_MASK_MACROS,
-    NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS = NOAH_PROFILE_ENABLED_DOMAIN_MASK,
+    NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS        = NOAH_PROFILE_DOMAIN_MASK_ALL,
     NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX        = 20u,
     NOAH_PROFILE_VALIDATOR_V1_CHECKSUM_CHUNK_MAX   = NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX,
     // Regression policy for the payload-independent 32-bit scan state. This
@@ -161,11 +161,9 @@ typedef struct {
 } noah_profile_validator_v1_profile_t;
 
 typedef union {
-#ifdef NOAH_PD_PROFILE_ENABLE
     // A sparse PD domain record by record: index counts records read, count
     // is the header's record count and minimum the lowest ID the next may use.
     noah_profile_pd_v1_iterator_t pd;
-#endif
     noah_profile_settings_v1_validation_t    settings;
     noah_profile_combo_v1_validation_t       combos;
     noah_profile_rgb_v1_validation_t         rgb;

@@ -18,7 +18,6 @@ trap cleanup EXIT INT TERM
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DPOINTING_DEVICE_ENABLE \
-    -DNOAH_PD_PROFILE_ENABLE \
     -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE \
     -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
     -DCHARYBDIS_AUTO_SNIPING_ENABLE \

@@ -46,7 +46,6 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_LIVE_PROFILE_OWNER_ENABLE \
     -DNOAH_LIVE_PROFILE_MUTATION_ENABLE \
     -DNOAH_PORTABLE_PROFILE_ENABLE \
-    -DNOAH_PD_PROFILE_ENABLE \
     -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

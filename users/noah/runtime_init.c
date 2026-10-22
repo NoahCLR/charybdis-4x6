@@ -32,7 +32,7 @@
 
 typedef void (*noah_runtime_init_stage_fn_t)(void);
 
-#if defined(NOAH_PD_PROFILE_ENABLE) && !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+#if !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
 static void noah_runtime_init_compiled_pd(void) {
     noah_effective_pd_load_compiled_defaults(noah_pd_defaults);
 }
@@ -100,7 +100,7 @@ void noah_keyboard_pre_init_user(void) {
 void noah_keyboard_post_init_user(void) {
     static const noah_runtime_init_stage_fn_t stages[] = {
         noah_runtime_shared_state_post_init, key_origin_registry_init, noah_qmk_combo_origin_init, noah_record_admission_reset, macro_payload_engine_init, noah_qmk_portable_storage_init, noah_profile_store_runtime_init,
-#if defined(NOAH_PD_PROFILE_ENABLE) && !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
+#if !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
         noah_runtime_init_compiled_pd,
 #endif
         noah_rgb_runtime_post_init, split_runtime_sync_init,

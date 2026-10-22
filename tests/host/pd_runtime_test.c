@@ -13,6 +13,7 @@
 #include "host_runtime_reset_fixture.h"
 
 // Local dispatch fakes let this test observe the configured slot selection.
+report_mouse_t handle_dragscroll_mode(report_mouse_t mouse_report);
 report_mouse_t handle_volume_mode(report_mouse_t mouse_report);
 report_mouse_t handle_brightness_mode(report_mouse_t mouse_report);
 report_mouse_t handle_zoom_mode(report_mouse_t mouse_report);

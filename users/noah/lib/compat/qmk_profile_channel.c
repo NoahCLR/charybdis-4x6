@@ -95,7 +95,6 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
         status->active_digest = owner->compiled_default_digest;
         status->active_kind   = NOAH_PROFILE_ACTIVE_COMPILED_ONLY;
     }
-#ifdef NOAH_PD_PROFILE_ENABLE
     if (!noah_effective_pd_ready()) {
         status->state_flags |= NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE;
         status->state_flags &= (uint16_t)~NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT;
@@ -104,7 +103,6 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
         status->active_kind = NOAH_PROFILE_ACTIVE_PENDING;
         status->last_error = NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED;
     }
-#endif
     if (owner->has_pending) {
         status->pending_digest = owner->pending.payload_digest;
     }

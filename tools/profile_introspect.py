@@ -765,13 +765,6 @@ def parse_config_layers(text: str) -> list[str]:
 
 
 def parse_config_macros(text: str) -> dict[str, str]:
-    # Every supported firmware build defines NOAH_PD_PROFILE_ENABLE. Keep the
-    # schema-2 side of these host-fixture compatibility branches when showing
-    # the configuration that actually runs on the keyboard.
-    pd_branch = re.compile(
-        r"(?ms)^[ \t]*#[ \t]*ifdef NOAH_PD_PROFILE_ENABLE[ \t]*\n(?P<active>.*?)^[ \t]*#[ \t]*else[ \t]*\n.*?^[ \t]*#[ \t]*endif[ \t]*$"
-    )
-    text = pd_branch.sub(lambda match: match.group("active"), text)
     values: dict[str, str] = {}
     pattern = re.compile(
         r"^\s*#\s*define\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)(?P<params>\([^)\n]*\))?(?:[ \t]+(?P<value>[^\n]+?))?[ \t]*$",

@@ -343,7 +343,6 @@ static void test_real_authored_profile(void) {
         assert(!memcmp(slice, output + offset, length));
     }
     assert(!noah_profile_reader_read(&reader, output_length - 1u, slice, 2u));
-#ifdef NOAH_PD_PROFILE_ENABLE
     // Boot and compiled fallback must warm the real PD cache without replaying
     // canonical behavior sorting for every 20-byte read in the same scan.
     noah_effective_profile_snapshot_t snapshot = {.reader = reader};
@@ -383,7 +382,6 @@ static void test_real_authored_profile(void) {
         assert(memcmp(slice, output + offset, length) == 0);
     }
     assert(behavior_visits == 0);
-#endif
     noah_profile_rgb_v1_view_t cached_rgb;
     memset(domain_writes, 0, sizeof(domain_writes));
     assert(noah_profile_rgb_compiled_v1_view());
@@ -498,10 +496,8 @@ static void validate_portable_import(const noah_profile_compiled_v1_t *compiled,
     assert(validator.profile.domain_mask == NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS);
     noah_profile_domain_range_t settings, pd;
     assert(noah_profile_blob_v1_find_domain(&validator.reader, 0, validator.profile.byte_length, NOAH_PROFILE_DOMAIN_V1_SETTINGS, &settings) && settings.length >= 344);
-#ifdef NOAH_PD_PROFILE_ENABLE
     assert(noah_profile_blob_v1_find_domain(&validator.reader, 0, validator.profile.byte_length, NOAH_PROFILE_DOMAIN_V1_PD, &pd));
     assert(pd.length >= NOAH_PROFILE_PD_V1_HEADER_SIZE && (pd.length - NOAH_PROFILE_PD_V1_HEADER_SIZE) % NOAH_PROFILE_PD_V1_RECORD_SIZE == 0u);
-#endif
 }
 
 int main(int argc, char **argv) {

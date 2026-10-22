@@ -15,6 +15,7 @@
 #include "users/noah/lib/compat/qmk_profile_flash.h"
 #include "users/noah/lib/compat/qmk_profile_split_transport.h"
 #include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
+#include "users/noah/lib/profile/schema/profile_pd_v1.h"
 #include "users/noah/lib/profile/split/profile_split_protocol_v1.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/profile/storage/profile_store_runtime.h"
@@ -26,7 +27,13 @@ enum {
     BOOT_SCANS = 256u,
 };
 
-static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
+// Every profile the keyboard runs carries its pointing slots (the PD domain);
+// this one carries it with every slot disabled.
+static const uint8_t compiled_blob[] = {
+    'N', 'L', 'P', '1', 4u, 0u, 1u, 1u,
+    NOAH_PROFILE_DOMAIN_V1_PD, NOAH_PROFILE_DOMAIN_VERSION_PD, NOAH_PROFILE_PD_V1_HEADER_SIZE, 0u, 0u, 0u,
+    NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0u, 0u, 0u, 0u, 0u,
+};
 
 // ── The compiled defaults and the owner's runtimes, stubbed ─────────────────
 
@@ -53,7 +60,7 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_com
                 .digest            = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, compiled_blob, sizeof(compiled_blob)),
                 .action_abi_digest = UINT32_C(0x12345678),
                 .byte_length       = sizeof(compiled_blob),
-                .domain_mask       = 0u,
+                .domain_mask       = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD,
             },
     };
     return NOAH_PROFILE_COMPILED_V1_OK;
@@ -71,8 +78,8 @@ bool noah_profile_action_placement_v1_supported(const noah_profile_action_v1_t *
 
 bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *profile, noah_profile_validator_v1_compatibility_t *compatibility) {
     if (!profile || !compatibility) return false;
-    *compatibility                      = noah_profile_validator_v1_default_compatibility(profile->metadata.action_abi_digest);
-    compatibility->required_domain_mask = 0u;
+    // As the keyboard's own: every profile must carry the PD domain.
+    *compatibility = noah_profile_validator_v1_default_compatibility(profile->metadata.action_abi_digest);
     return true;
 }
 

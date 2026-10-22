@@ -1,6 +1,6 @@
 #include "pd_mode_configured.h"
 
-#if defined(NOAH_PD_PROFILE_ENABLE) && defined(POINTING_DEVICE_ENABLE)
+#if defined(POINTING_DEVICE_ENABLE)
 #include "pd_mode_handler_common.h"
 #include "pd_mode_handlers.h"
 #include "../../compat/qmk_pointing_contract.h"

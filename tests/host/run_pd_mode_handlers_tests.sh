@@ -24,7 +24,7 @@ fixture=json.loads(Path(sys.argv[1], 'tests/fixtures/pd_mode_domain_v1.json').re
 Path(sys.argv[2]).write_text('static const unsigned char pd_engine_fixture[] = {' + ','.join(str(b) for b in bytes.fromhex(fixture['hex'])) + '};\n')
 PYFIX
 
-cc -DNOAH_PD_PROFILE_ENABLE -I"$BUILD_DIR" -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
+cc -I"$BUILD_DIR" -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -DPOINTING_DEVICE_ENABLE \
     -I"$ROOT" \
@@ -45,7 +45,7 @@ cc -DNOAH_PD_PROFILE_ENABLE -I"$BUILD_DIR" -std=c11 -Wall -Wextra -Werror -Wno-u
 # Drive the real configured engine, emitters and basic ownership ledger together.
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -fsanitize=address,undefined -fno-omit-frame-pointer \
-    -DNOAH_PD_PROFILE_ENABLE -DPOINTING_DEVICE_ENABLE -DCOMBO_ENABLE \
+    -DPOINTING_DEVICE_ENABLE -DCOMBO_ENABLE \
     -DQMK_KEYBOARD_H='"qmk_stub.h"' \
     -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
     -include "$ROOT/tests/host/include/noah_compile_config_no_automouse.h" \
@@ -64,7 +64,6 @@ expect_config_compile_failure() {
     shift
 
     if cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -pedantic \
-        -DNOAH_PD_PROFILE_ENABLE \
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -DPOINTING_DEVICE_ENABLE \
         -I"$ROOT" \

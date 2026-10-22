@@ -298,9 +298,7 @@ static bool pd_mode_apply_deactivate_other_unlocked(pd_mode_mask_t keep_mode) {
 }
 
 static bool pd_mode_apply_activate_mode(pd_mode_mask_t mode) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     if (!noah_effective_pd_for_mask(mode)) return false;
-#endif
     bool changed = false;
 
     if (!mode) {
@@ -328,9 +326,7 @@ static bool pd_mode_apply_deactivate_mode(pd_mode_mask_t mode) {
 }
 
 static bool pd_mode_apply_lock_mode(pd_mode_mask_t mode) {
-#ifdef NOAH_PD_PROFILE_ENABLE
     if (!noah_effective_pd_for_mask(mode)) return false;
-#endif
     bool changed = false;
 
     if (!mode) {

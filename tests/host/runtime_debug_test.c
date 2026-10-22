@@ -17,6 +17,7 @@
 #include "users/noah/lib/key/runtime/transition.h"
 #include "users/noah/lib/pointing/defs/pd_modes.h"
 #include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
+#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
 #include "users/noah/lib/key/runtime/planning/effect_plan.h"
 #include "users/noah/lib/key/runtime/reducer/ownership_state.h"
 #include "users/noah/lib/key/runtime/queue/pending_release_queue.h"
@@ -565,22 +566,26 @@ const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
             .mode_flag   = PD_MODE_DRAGSCROLL,
             .keycode     = PD_SLOT_0,
             .lock_action = PD_SLOT_0_LOCK,
-            .traits      = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE,
         },
     [PD_MODE_INDEX_VOLUME] =
         {
             .mode_flag   = PD_MODE_VOLUME,
             .keycode     = PD_SLOT_1,
             .lock_action = PD_SLOT_1_LOCK,
-            .traits      = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED,
         },
     [PD_MODE_INDEX_ARROW] =
         {
             .mode_flag   = PD_MODE_ARROW,
             .keycode     = PD_SLOT_4,
             .lock_action = PD_SLOT_4_LOCK,
-            .traits      = PD_MODE_TRAIT_PREFER_TYPING_LAYER,
         },
+};
+
+// The policy each mode's effective slot implies, standing in for the registry.
+static const pd_mode_traits_t test_pd_mode_traits[PD_MODE_COUNT] = {
+    [PD_MODE_INDEX_DRAGSCROLL] = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE,
+    [PD_MODE_INDEX_VOLUME]     = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED,
+    [PD_MODE_INDEX_ARROW]      = PD_MODE_TRAIT_PREFER_TYPING_LAYER,
 };
 
 const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode) {
@@ -607,8 +612,19 @@ bool is_pd_mode_lock_action(uint16_t action) {
 }
 
 bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
-    const pd_mode_def_t *def = pd_mode_lookup(mode);
-    return def != NULL && (def->traits & trait) == trait;
+    return (pd_mode_effective_traits(mode) & trait) == trait;
+}
+
+pd_mode_traits_t pd_mode_effective_traits(pd_mode_mask_t mode) {
+    uint8_t index = test_pd_mode_index(mode);
+    return index < PD_MODE_COUNT ? test_pd_mode_traits[index] : PD_MODE_TRAIT_NONE;
+}
+
+// The three modes above have a configured slot; every other slot is disabled.
+static const noah_pd_config_t test_pd_configured_slot = {.kind = NOAH_PD_KIND_DIRECTIONAL};
+
+const noah_pd_config_t *noah_effective_pd_for_mask(uint32_t mode) {
+    return test_pd_mode_index(mode) < PD_MODE_COUNT ? &test_pd_configured_slot : NULL;
 }
 
 bool pd_any_active_mode_has_trait(pd_mode_traits_t trait) {
