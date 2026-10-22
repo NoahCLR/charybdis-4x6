@@ -8,17 +8,12 @@
 #include "../../key/runtime/api.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
 #include "../../state/modifiers/keyboard_mod_policy.h"
-#include "../../profile/schema/profile_pd_v1.h"
 
-static const uint8_t *active;
+static const noah_pd_config_t *active;
 // Per-origin release ownership survives mode replacement. A consumed bit is
 // retained after releasing modifiers so an old release cannot hit a new mode.
 static struct { uint8_t modifiers; bool consumed; } buttons[MATRIX_ROWS][MATRIX_COLS];
 static uint8_t scroll_modifiers;
-
-static uint16_t u16(const uint8_t *p) {
-    return (uint16_t)p[0] | (uint16_t)p[1] << 8u;
-}
 
 static void owned_modifiers(uint8_t mask, bool pressed) {
     for (uint8_t bit = 0; bit < 8; bit++) {
@@ -31,8 +26,8 @@ static void owned_modifiers(uint8_t mask, bool pressed) {
 // A mouse button clicks through the owned ledger, never through QMK's key
 // processing, so it cannot reach a mode's button overrides or release a button
 // held elsewhere.
-static bool emit_tap(const uint8_t *tap) {
-    uint16_t key = u16(tap);
+static bool emit_tap(const noah_pd_tap_t *tap) {
+    uint16_t key = tap->keycode;
     if (!key) return false;
     if (IS_QK_MACRO(key)) {
         // Playback continues across scans, so only inherited modifiers apply.
@@ -41,10 +36,10 @@ static bool emit_tap(const uint8_t *tap) {
     }
     if (IS_MOUSEKEY_BUTTON(key)) {
         noah_qmk_contract_pointer_drop_pending_motion();
-        noah_emit_owned_click(key, tap[2] == 1u ? tap[3] : 0u, tap[2] == 2u);
-    } else if (tap[2] == 1u) {
-        noah_emit_literal_tap_with_masked_keyboard_mods(key, tap[3], true);
-    } else if (tap[2] == 2u) {
+        noah_emit_owned_click(key, tap->policy == NOAH_PD_TAP_MASK ? tap->mask : 0u, tap->policy == NOAH_PD_TAP_EXACT);
+    } else if (tap->policy == NOAH_PD_TAP_MASK) {
+        noah_emit_literal_tap_with_masked_keyboard_mods(key, tap->mask, true);
+    } else if (tap->policy == NOAH_PD_TAP_EXACT) {
         noah_emit_literal_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS_AND_PRESERVE_MODS);
     } else {
         noah_emit_literal_tap(key, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
@@ -59,7 +54,7 @@ static bool emit_tap(const uint8_t *tap) {
 // straight ones, eight directions all eight. Motion toward a direction that
 // does not exist goes to the nearest one that does, which for a single axis is
 // exactly counting that axis. A direction that exists but has no shortcut
-// follows the empty-direction policy (byte 86).
+// follows the slot's empty_direction policy.
 //
 // Motion is counted in units of threshold_x * threshold_y, so each axis moves
 // in steps of its own threshold and a straight direction accumulates the
@@ -73,17 +68,17 @@ static bool emit_tap(const uint8_t *tap) {
 // releases it at once; after DIRECTION_IDLE_MS still, the next move chooses
 // afresh and keeps its progress only if it continues the same way.
 //
-// Byte 87 says how often a direction sends: once per threshold step, or once
-// per movement. A movement starts on the first motion after the mode starts or
-// after DIRECTION_IDLE_MS still, and the first step that sends anything spends
-// it in the direction that sent. From then on only a direction pointing back
-// against that one, more than 90 degrees from it, may send, and its sending
-// spends the movement in turn; any other motion is dropped rather than banked,
-// so the next movement starts from nothing. A stray report against the held
-// direction releases the hold, but sends only if it alone carries a whole step
-// back, so a long move with one wobble does not send twice. A step that sends
-// nothing, in a dead zone or with both neighbours empty, leaves the movement
-// unspent.
+// The slot's direction_output says how often a direction sends: once per
+// threshold step, or once per movement. A movement starts on the first motion
+// after the mode starts or after DIRECTION_IDLE_MS still, and the first step
+// that sends anything spends it in the direction that sent. From then on only a
+// direction pointing back against that one, more than 90 degrees from it, may
+// send, and its sending spends the movement in turn; any other motion is
+// dropped rather than banked, so the next movement starts from nothing. A stray
+// report against the held direction releases the hold, but sends only if it
+// alone carries a whole step back, so a long move with one wobble does not send
+// twice. A step that sends nothing, in a dead zone or with both neighbours
+// empty, leaves the movement unspent.
 enum {
     DIRECTION_IDLE_MS = 150,
     DIRECTION_NONE    = 0xff,
@@ -95,9 +90,12 @@ enum {
 // 6 up, 7 up-right; even ones are straight. Report y grows downward.
 static const int8_t  direction_x[8] = {1, 1, 0, -1, -1, -1, 0, 1};
 static const int8_t  direction_y[8] = {0, 1, 1, 1, 0, -1, -1, -1};
-// The record's straight slots are left, right, up, down.
-enum { SLOT_LEFT = 0, SLOT_RIGHT, SLOT_UP, SLOT_DOWN };
-static const uint8_t straight_slot[8] = {SLOT_RIGHT, 0, SLOT_DOWN, 0, SLOT_LEFT, 0, SLOT_UP, 0};
+// Each direction's tap in the slot: even ones in directions[], odd ones in
+// diagonals[].
+static const uint8_t record_slot[8] = {
+    NOAH_PD_DIRECTION_RIGHT, NOAH_PD_DIAGONAL_DOWN_RIGHT, NOAH_PD_DIRECTION_DOWN, NOAH_PD_DIAGONAL_DOWN_LEFT,
+    NOAH_PD_DIRECTION_LEFT,  NOAH_PD_DIAGONAL_UP_LEFT,    NOAH_PD_DIRECTION_UP,   NOAH_PD_DIAGONAL_UP_RIGHT,
+};
 static const uint8_t axis_directions[4] = {
     [NOAH_PD_AXIS_VERTICAL] = 1u << 2 | 1u << 6,
     [NOAH_PD_AXIS_HORIZONTAL] = 1u << 0 | 1u << 4,
@@ -117,10 +115,8 @@ typedef struct {
 } direction_state_t;
 static direction_state_t direction;
 
-// Diagonal slots are stored up-left, up-right, down-left, down-right.
-static const uint8_t *direction_slot(uint8_t dir) {
-    if (!(dir & 1u)) return active + 36u + straight_slot[dir] * 4u;
-    return active + 70u + ((direction_y[dir] < 0 ? 0u : 2u) + (direction_x[dir] < 0 ? 0u : 1u)) * 4u;
+static const noah_pd_tap_t *direction_slot(uint8_t dir) {
+    return dir & 1u ? &active->diagonals[record_slot[dir]] : &active->directions[record_slot[dir]];
 }
 
 // The directions a heading may be given: those the axis policy has, less the
@@ -128,10 +124,10 @@ static const uint8_t *direction_slot(uint8_t dir) {
 // direction when both its compass neighbours, 45 degrees either side, exist;
 // only eight directions has them, so elsewhere it acts as nearest.
 static uint8_t available_directions(void) {
-    uint8_t mask = axis_directions[active[3] & 3u], empty = active[86];
+    uint8_t mask = axis_directions[active->axis & 3u], empty = active->empty_direction;
     for (uint8_t dir = 0; dir < 8; dir++) {
-        if (!(mask & (1u << dir)) || u16(direction_slot(dir))) continue;
-        if (empty == NOAH_PD_EMPTY_DIRECTION_NEAREST || (empty == NOAH_PD_EMPTY_DIRECTION_BOTH && active[3] != NOAH_PD_AXIS_EIGHT)) mask &= (uint8_t)~(1u << dir);
+        if (!(mask & (1u << dir)) || direction_slot(dir)->keycode) continue;
+        if (empty == NOAH_PD_EMPTY_DIRECTION_NEAREST || (empty == NOAH_PD_EMPTY_DIRECTION_BOTH && active->axis != NOAH_PD_AXIS_EIGHT)) mask &= (uint8_t)~(1u << dir);
     }
     return mask;
 }
@@ -176,12 +172,12 @@ static uint8_t choose_direction(int64_t x, int64_t y, uint8_t available) {
 
 // One threshold step toward `dir`; returns whether it sent anything.
 static bool directional_step(uint8_t dir, uint8_t *budget) {
-    const uint8_t *slot = direction_slot(dir);
-    bool           sent = false;
-    if (u16(slot)) {
+    const noah_pd_tap_t *slot = direction_slot(dir);
+    bool                 sent = false;
+    if (slot->keycode) {
         sent = emit_tap(slot);
         (*budget)--;
-    } else if (active[86] == NOAH_PD_EMPTY_DIRECTION_BOTH) {
+    } else if (active->empty_direction == NOAH_PD_EMPTY_DIRECTION_BOTH) {
         // Both compass neighbours: a diagonal's two straight directions, a
         // straight direction's two diagonals. An empty neighbour sends nothing.
         // The one the movement leans toward goes first.
@@ -212,7 +208,7 @@ static bool directional_blocked(void) {
 // blocked direction drops its progress instead.
 static void directional_drain(int64_t step, uint8_t *budget) {
     while (*budget && !directional_blocked() && direction.progress >= step) {
-        if (directional_step(direction.held, budget) && active[87] == NOAH_PD_DIRECTION_OUTPUT_ONCE) {
+        if (directional_step(direction.held, budget) && active->direction_output == NOAH_PD_DIRECTION_OUTPUT_ONCE) {
             direction.spent     = true;
             direction.spent_dir = direction.held;
         }
@@ -222,7 +218,7 @@ static void directional_drain(int64_t step, uint8_t *budget) {
 }
 
 static void directional(report_mouse_t report) {
-    int64_t  sx = u16(active + 32) ? u16(active + 32) : 1, sy = u16(active + 34) ? u16(active + 34) : 1;
+    int64_t  sx = active->threshold_x ? active->threshold_x : 1, sy = active->threshold_y ? active->threshold_y : 1;
     int64_t  step   = sx * sy;
     uint8_t  budget = NOAH_PD_MODE_MAX_TAPS_PER_TICK, available = available_directions();
     uint32_t now;
@@ -286,21 +282,21 @@ void noah_pd_engine_exit(void) {
     reset_dragscroll_mode();
 }
 
-void noah_pd_engine_enter(const uint8_t *record) {
+void noah_pd_engine_enter(const noah_pd_config_t *slot) {
     noah_pd_engine_exit();
-    if (!record || !record[1]) return;
-    active = record;
-    scroll_modifiers = record[1] == 2u ? record[6] : 0u;
+    if (!slot || slot->kind == NOAH_PD_KIND_DISABLED) return;
+    active = slot;
+    scroll_modifiers = slot->kind == NOAH_PD_KIND_SCROLLING ? slot->held_modifiers : 0u;
     owned_modifiers(scroll_modifiers, true);
 }
 
-uint8_t noah_pd_engine_masked_mods(const uint8_t *record) {
-    return record && record[1] == 2u ? keyboard_mod_policy_managed_only_mask(record[6]) : 0u;
+uint8_t noah_pd_engine_masked_mods(const noah_pd_config_t *slot) {
+    return slot && slot->kind == NOAH_PD_KIND_SCROLLING ? keyboard_mod_policy_managed_only_mask(slot->held_modifiers) : 0u;
 }
 
 report_mouse_t noah_pd_engine_motion(report_mouse_t report) {
     if (!active) return report;
-    if (active[1] == 2u) return noah_pd_configured_scroll(active, report);
+    if (active->kind == NOAH_PD_KIND_SCROLLING) return noah_pd_configured_scroll(active, report);
     directional(report);
     return pd_mode_freeze_mouse();
 }
@@ -317,13 +313,13 @@ bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) {
         return true;
     }
     if (!active || !record->event.pressed || keycode < QK_MOUSE_BUTTON_1 || keycode > QK_MOUSE_BUTTON_1 + 2u) return false;
-    const uint8_t *button = active + 52u + (keycode - QK_MOUSE_BUTTON_1) * 6u;
-    if (!button[0]) return false;
+    const noah_pd_button_t *button = &active->buttons[keycode - QK_MOUSE_BUTTON_1];
+    if (button->kind == NOAH_PD_BUTTON_PASS) return false;
     buttons[row][col].consumed = true;
-    if (button[0] == 2u) emit_tap(button + 2);
-    if (button[0] == 3u) {
-        buttons[row][col].modifiers = button[1];
-        owned_modifiers(button[1], true);
+    if (button->kind == NOAH_PD_BUTTON_TAP) emit_tap(&button->tap);
+    if (button->kind == NOAH_PD_BUTTON_HOLD_MODIFIERS) {
+        buttons[row][col].modifiers = button->modifiers;
+        owned_modifiers(button->modifiers, true);
     }
     return true;
 }

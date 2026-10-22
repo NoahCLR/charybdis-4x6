@@ -357,20 +357,22 @@ static void test_real_authored_profile(void) {
     const uint8_t *pd_payload = decoded.domains[4].payload;
     assert(decoded.domains[4].version == NOAH_PROFILE_PD_V1_VERSION);
     assert(pd_payload[0] == NOAH_PROFILE_PD_V1_VERSION && pd_payload[1] == 32 && pd_payload[2] == NOAH_PROFILE_PD_V1_RECORD_SIZE && decoded.domains[4].payload_length == 8u + (size_t)NOAH_PROFILE_PD_V1_RECORD_SIZE * pd_payload[3]);
+    // A stored slot is its wire record byte for byte.
     uint8_t stored = 0;
     for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
-        const uint8_t *record = noah_effective_pd_record(slot);
-        assert(record && record[0] == slot);
+        const noah_pd_config_t *record  = noah_effective_pd_record(slot);
+        const noah_pd_config_t  omitted = {.id = slot};
+        assert(record && record->id == slot);
         if (stored < pd_payload[3] && pd_payload[8 + stored * NOAH_PROFILE_PD_V1_RECORD_SIZE] == slot) {
             assert(memcmp(record, pd_payload + 8 + stored * NOAH_PROFILE_PD_V1_RECORD_SIZE, NOAH_PROFILE_PD_V1_RECORD_SIZE) == 0);
             stored++;
         } else {
-            for (size_t i = 1; i < NOAH_PROFILE_PD_V1_RECORD_SIZE; i++) assert(record[i] == 0);
+            assert(memcmp(record, &omitted, sizeof(omitted)) == 0);
         }
     }
     assert(stored == pd_payload[3]);
     // Slots 0..7 carry the authored presets; slots 8..31 are empty.
-    assert(pd_payload[3] == 8 && noah_effective_pd_record(7)[1] == 1 && noah_effective_pd_record(8)[1] == 0);
+    assert(pd_payload[3] == 8 && noah_effective_pd_record(7)->kind == NOAH_PD_KIND_DIRECTIONAL && noah_effective_pd_record(8)->kind == NOAH_PD_KIND_DISABLED);
     fprintf(stderr, "compiled PD cache warmup: %zu behavior-row sorts\n", behavior_visits);
     assert(behavior_visits == 0);
     // Exercise every PD byte and record boundary against the full golden stream.

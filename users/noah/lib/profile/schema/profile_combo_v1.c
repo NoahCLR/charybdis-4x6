@@ -52,6 +52,20 @@ noah_profile_codec_v1_result_t noah_profile_combo_v1_decode_row(const uint8_t *b
     return NOAH_PROFILE_CODEC_V1_OK;
 }
 
+// QMK's keycodes for no key, which ends a combo's key list, and for a
+// transparent key, which no physical press reports.
+enum { QMK_KC_NO = 0x0000u, QMK_KC_TRANSPARENT = 0x0001u };
+
+bool noah_profile_combo_v1_natives_valid(uint16_t output, const uint16_t *inputs, uint8_t input_count) {
+    if (!inputs || output == QMK_KC_NO) return false;
+    for (uint8_t input = 0; input < input_count; input++) {
+        if (inputs[input] == QMK_KC_NO || inputs[input] == QMK_KC_TRANSPARENT) return false;
+        for (uint8_t prior = 0; prior < input; prior++)
+            if (inputs[prior] == inputs[input]) return false;
+    }
+    return true;
+}
+
 bool noah_profile_combo_v1_read_header(const noah_profile_reader_t *reader, size_t blob_base_offset, noah_profile_domain_range_t payload, noah_profile_combo_v1_header_t *header) {
     uint8_t bytes[NOAH_PROFILE_COMBO_V2_HEADER_SIZE];
     if (payload.length < NOAH_PROFILE_COMBO_V2_HEADER_SIZE || blob_base_offset > SIZE_MAX - payload.offset || !noah_profile_reader_read(reader, blob_base_offset + payload.offset, bytes, sizeof(bytes))) return false;

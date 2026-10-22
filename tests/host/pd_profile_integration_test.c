@@ -90,17 +90,18 @@ static void publish(noah_effective_profile_snapshot_t *snapshot) {
     noah_effective_pd_invalidate(NULL, 0, identity, identity, snapshot);
 }
 
-// Stored slots appear in the cache as stored; every omitted slot reads as
-// disabled with an empty name, and none of them can be activated.
+// Stored slots appear in the cache as stored, byte for byte: the typed cache
+// holds the wire record itself. Every omitted slot reads as disabled with an
+// empty name, and none of them can be activated.
 static void assert_cache_matches_domain(void) {
     uint8_t count = blob[14 + 3];
     uint8_t next  = 0;
     for (uint8_t index = 0; index <= count; index++) {
         uint8_t stored = index < count ? blob[14 + 8 + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE] : NOAH_PROFILE_PD_V1_SLOT_COUNT;
         for (; next < stored; next++) {
-            const uint8_t *record = noah_effective_pd_record(next);
-            assert(record && record[0] == next);
-            for (size_t i = 1; i < NOAH_PROFILE_PD_V1_RECORD_SIZE; i++) assert(record[i] == 0);
+            const noah_pd_config_t *slot    = noah_effective_pd_record(next);
+            const noah_pd_config_t  omitted = {.id = next};
+            assert(slot && memcmp(slot, &omitted, sizeof(omitted)) == 0);
             assert(!noah_effective_pd_for_mask(UINT32_C(1) << next));
         }
         if (index < count) {
@@ -124,7 +125,7 @@ int main(int argc, char **argv) {
     factory[31].id = 31;
     noah_effective_pd_load_compiled_defaults(factory);
     assert(noah_effective_pd_ready());
-    assert(noah_effective_pd_for_mask(1)[34] == 60);
+    assert(noah_effective_pd_for_mask(1)->threshold_y == 60);
     assert(!noah_effective_pd_for_mask(2));
     // Slot 31 is reached through the mask's top bit.
     assert(noah_effective_pd_for_mask(UINT32_C(0x80000000)) == noah_effective_pd_record(31));
@@ -144,10 +145,10 @@ int main(int argc, char **argv) {
     assert(noah_profile_blob_v1_find_domain(&reader, 0, reader.length, NOAH_PROFILE_DOMAIN_V1_PD, &pd) && pd.offset == 14 && pd.length == presets_length && profile.domain_mask == 16);
     publish(&snapshot);
     assert(noah_effective_pd_ready());
-    assert(noah_effective_pd_for_mask(1)[1] == 2);
-    assert(noah_effective_pd_for_mask(16)[3] == 2);
-    assert(noah_effective_pd_for_mask(64)[3] == 1);
-    assert(noah_effective_pd_for_mask(128)[3] == 1);
+    assert(noah_effective_pd_for_mask(1)->kind == NOAH_PD_KIND_SCROLLING);
+    assert(noah_effective_pd_for_mask(16)->axis == NOAH_PD_AXIS_DOMINANT);
+    assert(noah_effective_pd_for_mask(64)->axis == NOAH_PD_AXIS_HORIZONTAL);
+    assert(noah_effective_pd_for_mask(128)->axis == NOAH_PD_AXIS_HORIZONTAL);
     assert(!noah_effective_pd_for_mask(256));
     assert(!noah_effective_pd_for_mask(3));
     assert_cache_matches_domain();
@@ -206,7 +207,7 @@ int main(int argc, char **argv) {
     publish(&snapshot);
     assert(noah_effective_pd_ready());
     assert_cache_matches_domain();
-    assert(noah_effective_pd_record(31)[8] != 0);
+    assert(noah_effective_pd_record(31)->name_length != 0);
 
     // No slot stored: all 32 disabled, none activatable.
     memcpy(blob + 14, (uint8_t[]){NOAH_PROFILE_PD_V1_VERSION, 32, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0, 0, 0, 0, 0}, 8);
