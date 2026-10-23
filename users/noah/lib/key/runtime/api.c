@@ -56,7 +56,7 @@ bool noah_key_runtime_settle_layer_taps_before_press(keyrecord_t *record) {
     if (!(record && record->event.type == KEY_EVENT && record->event.pressed && key_runtime_core_flush_foreign_layer_multi_tap(record->event.key, NULL))) {
         return false;
     }
-    // Handled keys keep independent series alive (INTERACTION_MODEL.md): only a
+    // Handled keys keep independent series alive (key-press.md, "A press"): only a
     // press that settles pending taps anyway settles these before it resolves.
     keycode = get_record_keycode(record, false);
     if ((noah_participation_behavior(keycode, noah_qmk_contract_resolve_source_layer(record->event.key), record->event.key) ? key_behavior_lookup(keycode) : key_behavior_lookup_without_row(keycode)).handled) {

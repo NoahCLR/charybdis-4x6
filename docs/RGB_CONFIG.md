@@ -8,8 +8,8 @@ visuals, combo feedback, or key-behavior feedback colors. To see what a
 connected keyboard's profile looks like, open it in Charybdis Ark.
 
 For the cross-system runtime ownership and RGB render flow, see
-[architecture/README.md](./architecture/README.md) and
-[architecture/runtime-flow.md](./architecture/runtime-flow.md).
+[the RGB render](./architecture/rgb-render.md) and
+[the architecture overview](./architecture/README.md).
 
 ## Common Starting Points
 

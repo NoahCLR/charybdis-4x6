@@ -13,4 +13,4 @@ modified keycode uses, which releases exactly what it took. A behaviour step
 on another key may send a custom key and sends its shortcut only, never its
 behaviour, so steps never chain (revising D-F51). Bytes:
 [`profile-wire-v1/settings-domain.md`](../spec/profile-wire-v1/settings-domain.md#custom-key-shortcuts); behaviour:
-[`runtime-flow.md`](../architecture/runtime-flow.md).
+[`key-press.md`](../architecture/key-press.md#from-an-action-to-the-report).

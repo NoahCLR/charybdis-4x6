@@ -8,7 +8,7 @@ only copy of the macros the firmware keeps; VIA is not supported (D-F31,
 [ADR](../../adr/0043-macros-have-names-user-macros-retired.md)). The domain
 id, envelope and byte order are [blob and digests](blob-and-digests.md)'s; how
 domains make a profile is [the device-resident profile](../device-resident-profile.md)'s;
-how a macro plays is [runtime flow](../../architecture/runtime-flow.md#macro-flow)'s.
+how a macro plays is [macro playback](../../architecture/macro-playback.md)'s.
 Refusal codes are named in [errors](errors.md).
 
 ## Bank layout
@@ -49,7 +49,7 @@ The protection step (D-F17,
 [ADR](../../adr/0017-per-macro-protection-isolates-keyboard-output.md)) sets
 the macro's uninterruptible playback: no prefix is automatic, `p = 1` on and
 `p = 2` off; any other `p` is refused. What each policy does is
-[runtime flow](../../architecture/runtime-flow.md#macro-flow)'s.
+[macro playback](../../architecture/macro-playback.md#uninterruptible-playback)'s.
 
 Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_macro_payload_tests.sh` (`macro_payload_test.c`).
 

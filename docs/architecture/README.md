@@ -1,138 +1,102 @@
-# Userspace Architecture
+# The firmware's architecture
 
-This is the maintainer and agent entry point for the userspace architecture. It
-is for changes that touch runtime ownership, source layout, QMK integration,
-split sync, RGB rendering, profile tooling, or the tests that enforce those
-contracts.
+This repository is a userspace runtime for the Charybdis 4x6, compiled into
+QMK through the BK fork, not only a keymap. The authored profile in the keymap
+folder says what the keyboard does; the runtime under `users/noah/` turns QMK's
+events into decisions and projects them back into QMK's reports, layers and
+LEDs. The profile a half runs is the device-resident one (D-F12, D-F30): the
+compiled defaults until a client saves another, kept in that half's profile
+slots and converged across both halves. Words are the
+[glossary](../../GLOSSARY.md)'s; contracts are the [specs](../spec/README.md);
+decisions are the [ADRs](../adr/).
 
-The root `README.md` stays focused on user-facing setup and profile behavior.
-This directory explains how the runtime is shaped and where changes belong.
+The rule every module follows: **each runtime fact has one owner.** Everything
+else reads it, projects it, mirrors it or adapts QMK to it.
 
-The [split activity sync contract](../spec/split-activity-sync.md) covers the implemented
-default activity policy and opt-in diagnostics; recorded captures live under
-[`measurements/pointing-cadence/`](../../measurements/pointing-cadence/README.md).
+## The parts
 
-## How To Use This Pack
+| Part | What it is |
+| --- | --- |
+| `keyboards/bastardkb/charybdis/4x6/keymaps/noah/` | The authored profile as data: `keymap.c` (layers, combos, `key_behaviors[]`, `VIA_MACROS()`, custom keys), `config.h` (timing, layer ids, pointer tuning), `rgb_config.c`, `pd_config.c`, and the generated `authored_macro_bank.h`. `keymap.c` and `rgb_config.c` include `noah_keymap.h`; `pd_config.c` includes the pointing schema and defaults headers instead |
+| `users/noah/noah_keymap.h` | The authoring surface: ids (`noah_keymap_ids.h`), behaviour macros, `keymap_materialize.h` (turns the authored tables into the symbols the runtime reads) and the lighting helpers |
+| `users/noah/hooks.c`, `noah_runtime.h` | Weak QMK `*_user` hooks, each calling its `noah_*` helper; a keymap that overrides one chains back into it |
+| `users/noah/runtime_init.c` | Init, scan and housekeeping order: which module runs when, on which half |
+| `users/noah/lib/` | The runtime packages below |
+| `users/noah/source_manifest.mk`, `rules.mk` | The source list the firmware and the host compile gates share, and the build options (D-F35) |
+| BK (`qmk-pin.json`) | QMK with the hooks this runtime needs, pinned to one commit (D-F04) |
 
-- Start with this file when you need the ownership model.
-- Use [source-map.md](./source-map.md) when you need to find the right package
-  or understand what a tool writes.
-- Use [change-guide.md](./change-guide.md) when you know the behavior you want
-  to change and need the edit point plus checks.
-- Use [runtime-flow.md](./runtime-flow.md) when a bug crosses press/release,
-  scan, RGB, pointing-device, split, or macro boundaries.
-- Use [the specs](../spec/README.md) for every contract: Profile Wire and the
-  split protocol, the domains, the profile transaction, where the profile is
-  stored, the portable profile, host layouts, and the
-  [resource policy](../spec/resource-policy.md) before interpreting target
-  RAM, allocator, EEPROM-cache, or stack numbers.
-- Use [ark-compatibility.md](./ark-compatibility.md) for firmware's
-  independence from Ark and what Ark consumes from this repository.
-- The complete user experience and first-grade control-software completion
-  bar that the device-profile architecture serves are in Charybdis Ark's
-  `docs/PRODUCT_GOAL.md`.
+## Who owns what
 
-The source trace covers:
-
-- firmware entry and build wiring in `users/noah/source_manifest.mk`,
-  `users/noah/runtime_init.c`, and `users/noah/hooks.c`
-- runtime packages under `users/noah/lib/`
-- authored profile files under `keyboards/bastardkb/charybdis/4x6/keymaps/noah/`
-- repo-local profile tooling under `tools/`
-- generated documentation/media surfaces under `docs/`
-- host test runners under `tests/host/`
-
-## Mental Model
-
-This repo is a Charybdis-specific userspace runtime, not only a keymap. Authored
-profile data describes what the board should do. Runtime packages turn QMK
-events into deterministic behavior, then project explicit effects back into QMK
-state, ownership ledgers, split sync, RGB, macros, and pointing-device modes.
-
-The main rule is:
-
-> Runtime truth is owned by one explicit owner. Everything else reads it,
-> projects it, or adapts QMK/fork behavior into it.
-
-## Ownership Map
-
-| Runtime fact | Owner | Readers or projections |
+| Runtime fact | Owner | Read or projected by |
 | --- | --- | --- |
-| Compiled profile defaults | keymap-owned files under `keyboards/.../keymaps/noah/` | firmware compilation, compiled-defaults readback, validation |
-| Active committed live profile | one generation of the profile store, keymap and macros included (D-F31) | effective runtime views, key lookup, macro playback, Charybdis Ark readback |
-| Action classification and dispatch semantics | `users/noah/lib/action/` | key behavior materialization, key runtime, macro dispatch, direct action taps |
-| QMK and fork compatibility assumptions | `users/noah/lib/compat/` | runtime entry flow, combo origin normalization, the Raw HID channel, QMK contract checks |
-| Authored key-behavior lookup and materialization | `users/noah/lib/key/behavior/` | key-runtime press planning and validation |
-| Active key-runtime state | `users/noah/lib/key/runtime/reducer/` | key-runtime planning, debug, feedback, projection |
-| Release, scan, tap-series, and effect planning | `users/noah/lib/key/runtime/planning/` | top-level key-runtime wrappers and transition plans |
-| QMK-facing effect application | `users/noah/lib/key/runtime/projection/` | action dispatch, held/repeat registries, layer ownership, PD mode state, feedback |
-| Pending release dispatch queue | `users/noah/lib/key/runtime/queue/` | release/scan adapters and runtime debug |
-| Held action and repeat applied registries | `users/noah/lib/key/ownership/` | key-runtime projection and housekeeping |
-| Macro payload parsing and the profile macro provider | `users/noah/lib/macro/` | action lifecycle, process flow, macro playback |
-| PD mode definitions, state, policy, and handlers | `users/noah/lib/pointing/` | key runtime, pointing hook, RGB, split sync |
-| RGB rendering and validation | `users/noah/lib/rgb/` | RGB hook, authored RGB config, split/runtime feedback snapshots |
-| Shared storage, diagnostics, modifier policy, layer/mod ownership | `users/noah/lib/state/` | all runtime owners through narrow surfaces |
-| Split runtime packets | `users/noah/lib/split/` | master/slave RGB, PD, preview, combo, key-feedback mirroring |
+| The profile each half saves, runs and copies; the working copy | `lib/profile/` ([profile flow](profile-flow.md)) | every runtime, through the `profile/runtime/effective_*_runtime.c` views |
+| What an action is and how it is dispatched; literal report usages | `lib/action/` | key runtime, macros, pointing outputs |
+| A key's effective behaviour and its participation | `lib/key/behavior/` | the key runtime's planners, validation |
+| Presses, tap series, leases, pending releases | `lib/key/runtime/reducer/` ([key press](key-press.md)) | planners, projection, feedback, trace |
+| Release, scan and tap-series decisions | `lib/key/runtime/planning/` | `transition.c`, which projects them |
+| Applied held actions and repeats | `lib/key/ownership/` | projection, housekeeping |
+| Applied layers and modifiers | `lib/state/ownership/`, `lib/state/modifiers/` | QMK's layer state and reports |
+| Macro playback | `lib/macro/` ([macro playback](macro-playback.md)) | action lifecycle, input guard |
+| Pointing mode state and handlers | `lib/pointing/runtime/`, `lib/pointing/modes/` ([pointer report](pointer-report.md)) | key runtime bridge, lighting, split sync |
+| What QMK and the fork promise | `lib/compat/` ([its README](../../users/noah/lib/compat/README.md)) | everything that touches QMK |
+| The lit frame | `lib/rgb/` ([RGB render](rgb-render.md)) | nothing: it only draws |
+| Runtime state on the slave half | `lib/split/` | lighting and pointing on the slave half: it only mirrors |
+| Shared storage, diagnostics, trace | `lib/state/shared/`, `lib/state/diagnostics/` | owners, through narrow accessors |
 
-## Flow Overview
+## Layering
 
-```mermaid
-flowchart TD
-    profile["Authored profile data"] --> behavior["key/behavior materialization"]
-    qmk["QMK hook events"] --> hooks["users/noah/hooks.c"]
-    hooks --> runtime_init["users/noah/runtime_init.c"]
-    hooks --> key_process["key/runtime/process.c"]
-    key_process --> reducer["key/runtime/reducer"]
-    behavior --> reducer
-    reducer --> planning["key/runtime/planning"]
-    planning --> transition["key/runtime/transition.c"]
-    transition --> projection["key/runtime/projection"]
-    projection --> action["action dispatch"]
-    projection --> ownership["ownership ledgers"]
-    projection --> pd["PD runtime"]
-    projection --> feedback["feedback state"]
-    feedback --> rgb["RGB runtime"]
-    feedback --> split["split sync"]
-    pd --> rgb
-    pd --> split
-```
+- **Authored data stays data.** The keymap folder holds tables written the
+  way a person authors them; runtime modules never include `noah_keymap.h`,
+  and keymap files never include `noah_runtime.h`
+  (`run_feature_gate_compile_tests.sh`).
+- **QMK is reached through `compat/`.** A fork-specific hook, a QMK internal
+  or a QMK data shape is adapted once there, with a contract check in
+  `run_qmk_contract_checks.sh`. Adapters normalise; they decide nothing.
+- **Reducer, planner, projection.** Physical events enter the reducer first;
+  planners decide; projection applies effects to the ledgers; only a ledger's
+  aggregate transitions reach QMK's report (D-F55).
+- **The profile is read through views.** A runtime asks its effective view,
+  never the store or the compiled tables directly, so an activation swaps
+  every reader at one safe boundary (D-F40).
+- **Callbacks copy, the scan works.** Candidate frames and split RPCs are
+  copied into a mailbox; a live edit does only bounded RAM work on the working
+  copy in its callback. Validation, flash and split sends run in bounded steps
+  from the matrix scan, never in a callback (D-F54).
+- **Lighting and split sync own nothing.** They draw or mirror a fact another
+  module owns; the slave half draws what the master half computed (D-F58).
 
-## Where To Change Common Behavior
+## Where new work goes
 
-| Goal | Primary edit point | Detailed guide |
-| --- | --- | --- |
-| Change authored key behavior | `keymap.c` `key_behaviors[]` | [change-guide.md](./change-guide.md), [Interaction Model](../INTERACTION_MODEL.md) |
-| Change release or multi-tap semantics | `key/runtime/planning/` and reducer tests | [runtime-flow.md](./runtime-flow.md), [Key Runtime](../KEY_RUNTIME.md) |
-| Change modifier handling | `state/modifiers/` or `state/ownership/keyboard_mod_ownership.*` | [change-guide.md](./change-guide.md) |
-| Configure a PD slot | Charybdis Ark or factory `pd_config.c` | [Adding a Pointing Mode](../ADDING_PD_MODE.md) |
-| Change RGB rendering | `rgb_config.c` for authored colors, `users/noah/lib/rgb/` for render logic | [RGB Configuration](../RGB_CONFIG.md) |
-| Change split mirroring | `users/noah/lib/split/runtime_sync.*` | [runtime-flow.md](./runtime-flow.md) |
-| Change macro behavior | `keymap.c` `VIA_MACROS(MACRO)` defaults or `users/noah/lib/macro/` | [change-guide.md](./change-guide.md) |
-| Change hook wiring | `users/noah/hooks.c`, `users/noah/runtime_init.c` | [Hook Overrides](../HOOK_OVERRIDES.md) |
-| Change target memory, EEPROM size, or stack policy | resource owner plus the matching budget tool | [resource-policy.md](../spec/resource-policy.md), [change-guide.md](./change-guide.md) |
+| Change | Where |
+| --- | --- |
+| A key's behaviour, a combo, a macro's default, a colour | the keymap folder's data; run real-profile validation |
+| What a behaviour means, or a new keycode the runtime owns | `lib/key/behavior/`, or a matcher in `lib/action/action_kind.c` |
+| Release, hold or multi-tap timing | `lib/key/runtime/planning/`, with reducer support if state changes |
+| Layer or modifier ownership | `lib/state/ownership/`, `lib/state/modifiers/` |
+| A pointing engine or mode | the [pointing domain](../spec/pd-mode-domain-v1.md), `lib/pointing/modes/`, `lib/pointing/runtime/` |
+| A lighting stage | `lib/rgb/stages/` ([`rgb/README.md`](../../users/noah/lib/rgb/README.md)) |
+| A profile domain, Profile Wire request or split exchange | `lib/profile/` and its spec, with the QMK side in `lib/compat/` |
+| A QMK or fork assumption | `lib/compat/`, with its contract check |
+| A hook | `users/noah/hooks.c` and `runtime_init.c` |
+| A source file | `users/noah/source_manifest.mk`, in the same change |
+| RAM, flash or stack | the [resource policy](../spec/resource-policy.md) and its gates |
 
-## Documents In This Pack
+## Flows that cross modules
 
-- [runtime-flow.md](./runtime-flow.md) traces user-visible runtime flows and
-  marks authoritative state, planned effects, projected state, and compatibility
-  adapters.
-- [source-map.md](./source-map.md) maps source packages and profile tooling to
-  responsibilities, mutation ownership, side effects, tests, and existing docs.
-- [change-guide.md](./change-guide.md) tells future maintainers and agents where
-  to make common changes and which checks to run.
-- [The specs](../spec/README.md) hold every contract the firmware keeps.
+- [A key press](key-press.md): from the QMK hook through the reducer, planners
+  and projection to the report, and the scan that settles holds and multi-taps.
+- [The profile](profile-flow.md): boot, a client's Apply, Save and live edits,
+  and how the halves end converged.
+- [The RGB render](rgb-render.md): where each stage's truth comes from and how
+  the slave half draws the same.
+- [Macro playback](macro-playback.md): from the key that starts a macro to the
+  keys it types.
+- [A pointer report](pointer-report.md): from the sensor through the pointing
+  runtime and its modes to the host, and how the pointer layer is steered.
 
-## Architecture Rules
-
-- Do not create a second owner for an existing runtime fact.
-- Feed physical events into the reducer before projecting side effects.
-- Add new release, scan, tap-series, or effect decisions to planners, not to
-  adapters.
-- Treat compatibility modules as adapters. They normalize QMK behavior; they do
-  not own runtime truth.
-- Keep keymap-authored data in the keymap tree and shared runtime policy under
-  `users/noah/`.
-- Keep internal shared storage under `state/shared/`; new callers should prefer
-  debug, ownership, modifier, split, or runtime APIs.
-- When behavior changes, update the closest domain doc and the tests named in
-  [change-guide.md](./change-guide.md).
+Module internals sit beside their code: [`key/runtime/`](../../users/noah/lib/key/runtime/README.md),
+[`compat/`](../../users/noah/lib/compat/README.md),
+[`profile/`](../../users/noah/lib/profile/README.md),
+[`macro/`](../../users/noah/lib/macro/README.md),
+[`pointing/`](../../users/noah/lib/pointing/README.md),
+[`rgb/`](../../users/noah/lib/rgb/README.md).

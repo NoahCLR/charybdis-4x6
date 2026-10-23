@@ -9,7 +9,7 @@ can type. This file covers the catalogue, strokes, the fixture that carries
 the data, how it is derived, the C tables and how to change them. Settings
 scalar 27 selects a layout
 ([settings domain](profile-wire-v1/settings-domain.md#scalars)); typing through
-it is [runtime flow](../architecture/runtime-flow.md#macro-flow)'s.
+it is [macro playback](../architecture/macro-playback.md#typing-through-the-host-layout)'s.
 
 ## Catalogue
 

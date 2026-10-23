@@ -249,7 +249,8 @@ static bool key_feedback_tap_branch_is_non_base(uint8_t tap_count) {
 // resolves, which is the instant the action path takes the key over. Both edges
 // are events the runtime observes directly, so there is no derived settle moment
 // to get wrong and no way for the color to claim an outcome the engine has not
-// reached. A further tap simply renames the branch. See docs/rgbflow.md.
+// reached. A further tap simply renames the branch. See
+// docs/architecture/rgb-render.md.
 //
 // The base tap stays quiet because branch 0 needs no color of its own; one tap
 // does not show the user meant to enter a tap branch at all.

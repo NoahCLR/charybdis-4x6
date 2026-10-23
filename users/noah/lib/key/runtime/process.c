@@ -499,7 +499,7 @@ void noah_post_process_record_user(uint16_t keycode, keyrecord_t *record) {
 // the runtime handles is QMK's tap key. The only tap actions it does not handle
 // are TT() and OSL() to layers 16-31: the firmware refuses them wherever it
 // validates a keymap, and since VIA left (D-F31) nothing else writes one; QMK
-// would still decide it (KEY_RUNTIME.md, "Physical-event timing").
+// would still decide it (D-F47; key-press.md, "The one tap key QMK still decides").
 bool is_tap_keycode_user(uint16_t keycode, bool default_tap) {
     return default_tap && !key_behavior_lookup(keycode).handled;
 }

@@ -8,4 +8,4 @@ under the layout latched when it starts, since a stray key would corrupt the
 entry; natively typed text stays interruptible. While a macro is protected,
 new physical presses are ignored until released and never replayed, keyboard
 output carries only the macro's keys, and held modifiers resume afterwards.
-Rules: [`runtime-flow.md`](../architecture/runtime-flow.md).
+Rules: [`macro-playback.md`](../architecture/macro-playback.md#uninterruptible-playback).

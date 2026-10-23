@@ -19,7 +19,8 @@ is at most the build's `RGB_MATRIX_MAXIMUM_BRIGHTNESS`, which GET `0x08`
 page 1 reports (D-F38, [ADR](../adr/0038-keyboard-reports-its-brightness-limit.md);
 [editor metadata](profile-wire-v1/settings-domain.md#editor-metadata--get-0x08)).
 Black (`0, 0, 0`) is literal black, except in a group row
-([below](#group-rows)).
+([below](#group-rows)) and in a layer colour, where saturation and value `0`
+at any hue paints nothing ([drawing](#drawing)).
 
 Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_fields_features_and_surfaces`), `tests/fixtures/rgb_domain_v1.fixture`.
 
@@ -102,7 +103,7 @@ Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `tes
 | layer colour mode | `0` all keys; `1` only keys mapped on this layer (neither `KC_NO` nor `KC_TRNS`) |
 | locality | `0` both halves; `1` left half; `2` right half; `3` the half of the key that caused it; `4` only the keys that caused it |
 | auto-mouse fade mode | `0` fade toward the layers beneath, the background effect where none paints; `1` toward them, the end colour where none paints; `2` toward the end colour on every key |
-| tap-commit policy | `0` off; `1` a committed tap of tap count 2 or more flashes, unless it is a layer or pointing action |
+| tap-commit policy | `0` off; `1` a committed tap of tap count 2 or more pulses, unless it is a layer or pointing action |
 | layer and pointing selector | a layer below the layer-colour count, a slot below 32, or `0xff` all |
 | key-feedback semantic | `0` tap branch pending, `1` tap committed, `2` hold, `3` long hold, `0xff` all |
 
@@ -127,12 +128,14 @@ Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `tes
 
 ## Group rows
 
-A group row paints its group in its colour when its selector matches (the
-active layer, the active slot, the key-feedback semantic, or `0xff`); combo
-group rows have no selector. Rows keep their stored order, since a later row
-repaints an earlier one where they overlap. In a group row, black means the
-stage's own colour (the layer's, the slot's, the feedback colour). Every row
-names a group below `G`.
+A group row paints its group in its colour when its selector matches (a
+layer that is on, the running slot, a key-feedback semantic shown, or `0xff`);
+combo group rows have no selector. Rows paint after their stage's own colour
+and keep their stored order, since a later row repaints an earlier one where
+they overlap; key-feedback rows with semantic `0xff` all paint before the rows
+naming one semantic. In a group row, black means the stage's own colour (the
+layer's, the slot's, the feedback colour), so a black layer row on a layer
+whose colour is black paints nothing; a coloured row still paints. Every row names a group below `G`.
 
 Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_preview_preserves_later_group_override_order`, the `*_led_groups_*` tests; `rgb_pd_effective_test.c`; `rgb_combo_effective_test.c`).
 
@@ -205,6 +208,65 @@ of at most 11 bytes, holding the counts and the previous bitmap, never the
 payload.
 
 Held by: `tests/host/run_profile_rgb_v1_tests.sh` (`profile_rgb_v1_test.c`, `test_incremental_error_locations`, `test_reader_is_bounded`, `test_incremental_reader_budget_and_failures`), `tests/host/run_profile_rgb_v4_tests.sh` (`profile_rgb_v4_test.c`), `tests/fixtures/rgb_domain_v4.json` (`invalid`).
+
+## Drawing
+
+Each half draws its own LEDs every frame, over the background effect, in this
+order. A later stage covers an earlier one where both paint; where a stage
+paints nothing, what is beneath shows.
+
+1. **Layer**: every layer that is on, the base layer always, lowest first, so
+   a higher layer covers a lower one; a black layer colour paints nothing.
+   Then the layer rows.
+2. **Auto-mouse fade**, in place of the layer stage while the pointer layer
+   is on and the fade has begun. It begins after the auto-mouse fade delay,
+   blends from the layer stage toward its mode's end over the rest of the
+   auto-mouse timeout, and holds the end until the pointer layer turns off.
+   It does not run while a pointing mode is locked or auto-mouse is off.
+3. **Combo feedback, beneath**: active combos whose output owns the layer
+   preview or the running pointing mode, so those stages cover them.
+4. **Layer preview**: while a key whose hold enters a layer (held until
+   release) is down and could still become a tap, that layer's colour and
+   rows as though it were on. It draws the layer stage's data, so it follows
+   the layer bit.
+5. **Pointing mode**: the running slot's colour in its locality, then its
+   rows.
+6. **Combo feedback, above**: every other active combo. A combo whose output
+   holds a momentary layer paints in neither; the layer stage shows the hold.
+7. **Key feedback**, below.
+
+After the stages, in an image built with the write path
+(`NOAH_PORTABLE_PROFILE_ENABLE`), a half turns every LED off once the last
+input on either half is older than the lighting idle timeout. For five seconds after boot
+every LED is white at value 150 and no stage draws.
+
+Key feedback names the state of a key that has a behaviour, painted on every
+key that produced it (all of a combo's keys):
+
+| Semantic | Shown while | Colour |
+| --- | --- | --- |
+| tap branch pending | a run of two or more taps sits on a branch that authors a step, until the run resolves | that tap count's tap-branch colour |
+| tap committed | a tap-commit pulse; or the key is held on a branch with a tap and no hold, once the multi tap window has passed since the press | tap committed |
+| hold | the hold tier's action is held or repeating (flashing), or reached and still to send (steady), or a hold pulse | hold |
+| long hold | the same on the long hold tier | long hold |
+
+- On one key the highest wins: tap committed, long hold, hold, tap branch
+  pending.
+- Key feedback paints nothing for the base branch, a tap count with no
+  authored step, the hold of a layer or pointing action (its own stage shows
+  it), a hold that previews a layer, a hold the engine supplies where no
+  behaviour authors one, or a pending tap branch on keys an active combo's
+  feedback covers.
+- Flashing shows in alternate flash half-periods from the moment the action
+  registered. A pulse lasts one half-period; one arriving during another
+  follows it.
+- Locality `4` paints each key in its own state. Locality `3` paints each half
+  in the state of the newest feedback touching that half, and `0`, `1` and `2`
+  in the state of the newest feedback anywhere. Newest is the latest to begin;
+  while it is in its flash-off phase nothing paints, rather than an older
+  state. A group row follows the newest feedback of its semantic.
+
+Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_render_order_*`, `test_combo_*_stays_*`, `test_runtime_boot_indicator_overrides_scene`, the `*automouse*` and `*timeout*` tests, `test_newest_global_feedback_owner_wins_over_older_higher_priority`, `test_key_half_feedback_follows_newest_owner_without_visible_fallback`; `rgb_base_underlay_test.c`), `tests/host/run_runtime_debug_tests.sh` (`runtime_debug_test.c`, the `test_key_feedback_*` and `test_display_preview_*` tests, `test_split_term_branch_names_its_tap_at_the_accept_window`, `test_long_hold_only_branch_keeps_branch_color_until_long_hold`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_active_combo_partition_*`).
 
 ## Compiled lighting and the running view
 

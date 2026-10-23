@@ -20,5 +20,4 @@ Considered: Debian's packages for the tools (a rebuild would install whatever
 the mirror held that day), a separate test image (two images to pin for no
 gain), and keeping the Mac's clang (it warns differently). Local builds and
 tests compile in-memory copies of the checkout and BK, so several worktrees
-build at once without a lock. Procedure: [`DEVELOPMENT.md`](../DEVELOPMENT.md),
-"The build image".
+build at once without a lock. Procedure: [`development.md`](../development.md#the-build-image).

@@ -9,4 +9,4 @@ runs from the scan and holds its modifiers through the fork's report-only
 modifier override, so the live modifier owners show again afterwards instead
 of being released. The host OS and Unicode use are settings the user chooses;
 the firmware does not detect the host's input source. Rules:
-[`runtime-flow.md`](../architecture/runtime-flow.md).
+[`macro-playback.md`](../architecture/macro-playback.md#unicode-entry).
