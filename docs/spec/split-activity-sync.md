@@ -83,9 +83,9 @@ build's packed C struct, sent whole.
   (50 ms, doubling to 1,000 ms) no packet is built; the next pass is a
   recovery probe that sends the latest state. A role change clears the
   backoff.
-- The slave half applies a packet only at its exact size, and publishes each
-  domain under its own generation; readers copy a whole domain or keep what
-  they had.
+- The slave half drops a packet shorter than its struct; a longer one is
+  logged and its leading bytes applied. It publishes each domain under its
+  own generation; readers copy a whole domain or keep what they had.
 
 Held by: `tests/host/run_split_runtime_sync_tests.sh` (`split_runtime_sync_test.c`).
 

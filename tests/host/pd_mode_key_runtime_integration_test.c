@@ -4873,7 +4873,7 @@ static void test_qmk_keys_holding_from_the_press_hold_no_keys_back(void) {
 
 // MO(), TT() and OSL() turn their layer on at the press. A key pressed while
 // one is down lands on that layer and cancels its quick tap, even a tap its
-// row authors (INTERACTION_MODEL.md, foreign-key interruption); tapped alone
+// row authors (D-F02, D-F27); tapped alone
 // it sends that tap.
 static void test_qmk_interrupted_momentary_layer_row_sends_no_tap(void) {
     const uint16_t keys[] = {MO(TEST_LAYER_NAV), TT(TEST_LAYER_NAV), OSL(TEST_LAYER_NAV)};

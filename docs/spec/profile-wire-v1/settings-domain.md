@@ -151,7 +151,7 @@ Both zero means no shortcut; modifiers alone and a key alone are shortcuts.
 Modifier keys belong in the mask; media, system, mouse-movement and every
 non-basic keycode are refused. The firmware does not check that a behaviour
 step naming a custom key has a shortcut; one without sends nothing. What a
-shortcut does is [runtime flow](../../architecture/runtime-flow.md)'s.
+shortcut does is [key press](../../architecture/key-press.md#from-an-action-to-the-report)'s.
 
 Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_test.c`).
 
@@ -176,10 +176,34 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 ## Keyboard name
 
 The last name is the keyboard's name (D-F25,
-[ADR](../../adr/0025-keyboard-name-is-usb-product-string.md)). The firmware
-serves it as the USB product string; empty means QMK's built-in
-`keyboard_name`. When a new name reaches the host is
-[runtime flow](../../architecture/runtime-flow.md#usb-product-name)'s.
+[ADR](../../adr/0025-keyboard-name-is-usb-product-string.md)). A build with
+saves serves it as the USB product string through the BK fork's runtime
+product string hook (`USB_PRODUCT_STRING_USER`, `usb_product_string_user()`);
+empty means QMK's built-in product string. The manufacturer and serial
+number never change.
+
+Hosts read the string only when they enumerate the keyboard:
+
+- Before USB starts (`keyboard_pre_init`), both halves read the name of the
+  saved profile boot selection chooses, which checks the record's checksum
+  and compatibility but not the other half; with nothing saved, the compiled
+  defaults' name (`NOAH_KEYBOARD_NAME`).
+- When the active profile's name differs from the one USB enumerated with (an
+  Apply or Save renamed the keyboard, or the halves reconciled to a profile
+  other than the one read at boot), the master half restarts its USB driver
+  (QMK's `restart_usb_driver`, 50 ms off the bus) once all of these hold:
+  its owner is ready with no candidate, save, edit, activation or cleanup in
+  flight, both halves hold the same saved profile, and the
+  [safe boundary](../authority-state-table.md#safe-boundary) reports no
+  reason; no Raw HID report has arrived for 1 s, so a client finishes the
+  reads that follow its Apply; USB is enumerated and not suspended.
+- The new string is built in a second buffer and served by switching to it
+  just before the restart, so a host never reads a half-written string.
+- One change of the name is one restart, and an unchanged name never
+  restarts. A name that cannot be encoded serves the built-in string and
+  settles the same way. The empty name and a stored name equal to the
+  built-in text are different names, so a change between them restarts too.
+- The slave half never restarts USB: its USB stays off as QMK left it.
 
 Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_test.c`), `tests/host/run_qmk_usb_product_name_tests.sh`, `tests/host/run_qmk_usb_product_name_owner_tests.sh`.
 

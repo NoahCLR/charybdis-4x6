@@ -8,4 +8,4 @@ tracked firmware file outside prose and frozen fixtures names the app;
 CI's release gate (D-F06). Firmware owns frozen regression vectors in
 `tests/fixtures/client-regression/`; Ark owns cross-repository integration and
 reads explicitly selected firmware checkouts. Contract:
-[`ark-compatibility.md`](../architecture/ark-compatibility.md).
+[`development.md`](../development.md#independence-from-ark).

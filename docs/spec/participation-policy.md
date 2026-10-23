@@ -149,7 +149,7 @@ output behind native tapping, and travels with the output's record through
 tapping and admission to its release. Each delivered output takes the oldest
 fired completion not yet delivered, so two chords with one output that wait
 together keep their own decisions
-([pairing](../KEY_RUNTIME.md#combo-origin-compatibility-contract)). A change
+([pairing](../../users/noah/lib/compat/README.md#combo-origin-pairing)). A change
 to a switch, a definition or the layers cannot reclassify a completed output
 or lose its release; a suppressed completion drops its permission. When the
 origin cannot be reconstructed, the output bypasses its behaviour if any

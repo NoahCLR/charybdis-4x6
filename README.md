@@ -117,7 +117,7 @@ lighting model, split sync and the build details.
   [lighting](docs/RGB_CONFIG.md), in depth
 - [Third-party apps in my setup](docs/MY_SETUP.md)
 - [Hook overrides](docs/HOOK_OVERRIDES.md), for authoring in C
-- [Development](docs/DEVELOPMENT.md) and the
+- [Development](docs/development.md) and the
   [architecture](docs/architecture/README.md), for working on the firmware
   itself
 

@@ -506,8 +506,9 @@ another producer's key or leave its own key registered.
 
 Macro text supports canonical UTF-8. Select the
 host setup in the saved profile before playing non-ASCII text; ASCII-only mode
-remains the default. See [runtime flow](architecture/runtime-flow.md) for the
-encoding, program limit, ownership and host-entry requirements. Malformed
+remains the default. The encoding and limits are the
+[macro domain](spec/profile-wire-v1/macro-domain.md)'s; ownership and host
+entry are [macro playback](architecture/macro-playback.md)'s. Malformed
 slots produce no partial typing and remain cached invalid until a mutation.
 
 
