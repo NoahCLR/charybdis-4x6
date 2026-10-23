@@ -23,7 +23,7 @@ typedef struct {
     hold_behavior_t hold;
     hold_behavior_t long_hold;
     uint16_t        tap_hold_term;
-    uint16_t        longer_hold_term;
+    uint16_t        long_hold_term;
     uint16_t        multi_tap_term;
     bool            has_more_taps;
     uint8_t         authored_tap_depth;
@@ -44,9 +44,9 @@ static inline key_runtime_slot_interaction_t key_runtime_slot_interaction_defaul
     return (key_runtime_slot_interaction_t){
         .binding =
             {
-                .tap_hold_term    = noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM),
-                .longer_hold_term = noah_setting(NOAH_SETTING_LONG_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM),
-                .multi_tap_term   = noah_setting(NOAH_SETTING_MULTI_TAP_TERM, CUSTOM_MULTI_TAP_TERM),
+                .tap_hold_term  = noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM),
+                .long_hold_term = noah_setting(NOAH_SETTING_LONG_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM),
+                .multi_tap_term = noah_setting(NOAH_SETTING_MULTI_TAP_TERM, CUSTOM_MULTI_TAP_TERM),
             },
         .layer = UINT8_MAX,
         .contract =
@@ -87,7 +87,7 @@ static inline void key_runtime_slot_interaction_from_materialized_into(const han
                 .hold                  = materialized->hold,
                 .long_hold             = materialized->long_hold,
                 .tap_hold_term         = materialized->authored.tap_hold_term,
-                .longer_hold_term      = materialized->authored.longer_hold_term,
+                .long_hold_term        = materialized->authored.long_hold_term,
                 .multi_tap_term        = materialized->authored.multi_tap_term,
                 .has_more_taps         = materialized->tap_has_more_taps,
                 .authored_tap_depth    = materialized->authored.authored_tap_depth,

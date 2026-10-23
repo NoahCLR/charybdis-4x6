@@ -22,10 +22,10 @@ enum {
     TEST_PD_MODE_KEY           = CUSTOM_KEY_0 + 0x2A,
     TEST_OTHER_LAYER           = 3,
     TEST_TAP_HOLD_TERM_MS      = 120,
-    TEST_LONGER_HOLD_TERM_MS   = 240,
+    TEST_LONG_HOLD_TERM_MS     = 240,
     TEST_MULTI_TAP_TERM_MS     = 150,
     TEST_TAP_SETUP_ELAPSED_MS  = TEST_TAP_HOLD_TERM_MS + 1,
-    TEST_LONG_SETUP_ELAPSED_MS = TEST_LONGER_HOLD_TERM_MS + 1,
+    TEST_LONG_SETUP_ELAPSED_MS = TEST_LONG_HOLD_TERM_MS + 1,
 };
 
 typedef enum {
@@ -122,9 +122,9 @@ static keypos_t test_keypos(uint8_t row, uint8_t col) {
 static key_behavior_view_t test_pressable_handled_key(uint16_t keycode) {
     key_behavior_view_t behavior = key_runtime_scenario_pressable_handled_key(keycode);
 
-    behavior.tap_hold_term    = TEST_TAP_HOLD_TERM_MS;
-    behavior.longer_hold_term = TEST_LONGER_HOLD_TERM_MS;
-    behavior.multi_tap_term   = TEST_MULTI_TAP_TERM_MS;
+    behavior.tap_hold_term  = TEST_TAP_HOLD_TERM_MS;
+    behavior.long_hold_term = TEST_LONG_HOLD_TERM_MS;
+    behavior.multi_tap_term = TEST_MULTI_TAP_TERM_MS;
     return behavior;
 }
 
@@ -443,7 +443,7 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
             .expected        = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, false),
         },
         {
-            .name            = "release long wins over primary after longer term",
+            .name            = "release long wins over primary after long hold term",
             .hold            = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
             .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
@@ -452,7 +452,7 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
             .expected        = TEST_EXPECT_ACTION(TEST_RELEASE_LONG, false),
         },
         {
-            .name            = "release primary still wins before longer term",
+            .name            = "release primary still wins before long hold term",
             .hold            = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY)),
             .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
@@ -470,7 +470,7 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
             .expected        = TEST_EXPECT_NONE(),
         },
         {
-            .name            = "threshold hold releases long action after longer term",
+            .name            = "threshold hold releases long action after long hold term",
             .hold            = HOLD_INIT(TAP_AT_HOLD_THRESHOLD(TEST_THRESHOLD_ACTION)),
             .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
@@ -488,7 +488,7 @@ static void test_active_and_pending_release_semantics_stay_equivalent(void) {
             .expected        = TEST_EXPECT_HELD(TEST_HELD_ACTION, true),
         },
         {
-            .name            = "held lifecycle releases owned state and long action after longer term",
+            .name            = "held lifecycle releases owned state and long action after long hold term",
             .hold            = HOLD_INIT(PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HELD_ACTION)),
             .long_hold       = HOLD_INIT(TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG)),
             .active_setup    = TEST_ACTIVE_SETUP_SCAN_AT_TAP,
@@ -604,11 +604,11 @@ static void test_release_with_live_held_sibling_dispatches_immediately(void) {
     key_runtime_scenario_reset();
     test_configure_tap_release_key(TEST_ACTIVE_KEY, TEST_RELEASE_PRIMARY);
     key_runtime_scenario_add_behavior_view((key_behavior_view_t){
-        .keycode          = TEST_SIBLING_KEY,
-        .handled          = true,
-        .tap_hold_term    = TEST_TAP_HOLD_TERM_MS,
-        .longer_hold_term = TEST_LONGER_HOLD_TERM_MS,
-        .multi_tap_term   = TEST_MULTI_TAP_TERM_MS,
+        .keycode        = TEST_SIBLING_KEY,
+        .handled        = true,
+        .tap_hold_term  = TEST_TAP_HOLD_TERM_MS,
+        .long_hold_term = TEST_LONG_HOLD_TERM_MS,
+        .multi_tap_term = TEST_MULTI_TAP_TERM_MS,
         .single =
             {
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_SIBLING_TAP_ACTION),
@@ -963,12 +963,12 @@ static void test_pending_multi_tap_release_with_live_tap_release_sibling_keeps_h
 
 static void test_release_timing_intervals(void) {
     // Ark may prune a release-only hold only when no release can choose it.
-    for (uint16_t longer = 99; longer <= 101; longer++) {
+    for (uint16_t long_hold_term = 99; long_hold_term <= 101; long_hold_term++) {
         for (uint16_t elapsed = 99; elapsed <= 102; elapsed++) {
             key_runtime_scenario_reset();
             key_behavior_view_t behavior = test_pressable_handled_key(TEST_ACTIVE_KEY);
             behavior.tap_hold_term = 100;
-            behavior.longer_hold_term = longer;
+            behavior.long_hold_term = long_hold_term;
             behavior.single.tap = (tap_behavior_t)TAP_SENDS(KC_A);
             behavior.single.hold = (hold_behavior_t)TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_PRIMARY);
             behavior.single.long_hold = (hold_behavior_t)TAP_ON_RELEASE_AFTER_HOLD(TEST_RELEASE_LONG);
@@ -983,7 +983,7 @@ static void test_release_timing_intervals(void) {
             key_runtime_scenario_step_t release[] = {KEY_RUNTIME_SCENARIO_RELEASE(TEST_ACTIVE_KEY, 1, 1)};
             test_run_steps(release, ARRAY_SIZE(release));
             test_release_summary_t result = test_release_summary_from_effects("release interval", test_keypos(1, 1), KC_NO);
-            uint16_t expected = elapsed < 100 ? KC_A : elapsed >= longer ? TEST_RELEASE_LONG : TEST_RELEASE_PRIMARY;
+            uint16_t expected = elapsed < 100 ? KC_A : elapsed >= long_hold_term ? TEST_RELEASE_LONG : TEST_RELEASE_PRIMARY;
             CHECK_CASE("release interval", result.action == expected);
         }
     }

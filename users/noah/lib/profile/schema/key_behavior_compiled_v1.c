@@ -95,23 +95,23 @@ static noah_profile_compiled_v1_result_t canonical_behavior_order(noah_profile_c
 static noah_profile_compiled_v1_result_t map_hold(const hold_behavior_t *source, noah_key_behavior_hold_v1_t *target, uint8_t row, uint8_t step, noah_profile_compiled_v1_error_t *error) {
     noah_profile_compiled_v1_result_t result;
     if (!source->present || !target) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, step);
-    switch (source->mode) {
+    switch (source->style) {
         case HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE:
-            target->mode = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE;
+            target->style = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE;
             break;
         case HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD:
-            target->mode = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD;
+            target->style = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD;
             break;
         case HOLD_BEHAVIOR_REPEAT_WHILE_HELD:
-            target->mode = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD;
+            target->style = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD;
             break;
         case HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD:
-            target->mode = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD;
+            target->style = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD;
             break;
         default:
             return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, step);
     }
-    if (source->repeat_hz > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ || (target->mode == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD ? source->repeat_hz == 0u : source->repeat_hz != 0u)) {
+    if (source->repeat_hz > NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ || (target->style == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD ? source->repeat_hz == 0u : source->repeat_hz != 0u)) {
         return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_BEHAVIOR, NOAH_PROFILE_COMPILED_V1_SURFACE_KEY_BEHAVIOR, row, step);
     }
     target->repeat_hz = (uint8_t)source->repeat_hz;
@@ -123,7 +123,7 @@ static noah_profile_compiled_v1_result_t map_hold(const hold_behavior_t *source,
 }
 
 static bool emit_hold(compiled_writer_t *writer, const noah_key_behavior_hold_v1_t *hold) {
-    return emit_u8(writer, hold->mode) && emit_u8(writer, hold->repeat_hz) && emit_action(writer, &hold->action);
+    return emit_u8(writer, hold->style) && emit_u8(writer, hold->repeat_hz) && emit_action(writer, &hold->action);
 }
 
 static noah_profile_compiled_v1_result_t behavior_payload_size(size_t *length, uint16_t *populated_steps, noah_profile_compiled_v1_error_t *error) {

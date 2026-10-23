@@ -667,7 +667,7 @@ static void test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata(void)
     materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
     CHECK(materialized.hold.present);
     CHECK(materialized.hold.action == TEST_PD_MODE_KEY);
-    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
+    CHECK(materialized.hold.style == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
     CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT);
     CHECK(materialized.pd_mode == 1u);
 }
@@ -684,7 +684,7 @@ static void test_stacked_pd_first_tap_defers_implicit_hold_until_threshold(void)
     materialized = test_materialize(handled_key_lookup(TEST_STACKED_PD_KEY), key_pos);
     CHECK(materialized.hold.present);
     CHECK(materialized.hold.action == TEST_STACKED_PD_KEY);
-    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
+    CHECK(materialized.hold.style == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
     CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
     CHECK((materialized.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) == 0);
     CHECK(materialized.pd_mode == 1u);
@@ -692,7 +692,7 @@ static void test_stacked_pd_first_tap_defers_implicit_hold_until_threshold(void)
     materialized = test_materialize(handled_key_lookup_tap_count(TEST_STACKED_PD_KEY, 2), key_pos);
     CHECK(materialized.hold.present);
     CHECK(materialized.hold.action == TEST_OTHER_PD_MODE_KEY);
-    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
+    CHECK(materialized.hold.style == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
     CHECK(materialized.pd_mode == 1u);
 }
 
@@ -710,7 +710,7 @@ static void test_transparent_hold_uses_lower_layer_tap_metadata(void) {
     materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
     CHECK(materialized.hold.present);
     CHECK(materialized.hold.action == MO(3));
-    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
+    CHECK(materialized.hold.style == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
     CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
     CHECK(materialized.layer == UINT8_MAX);
     CHECK((materialized.flags & HANDLED_KEY_FLAG_MOMENTARY_LAYER) == 0);
@@ -746,7 +746,7 @@ static void test_transparent_hold_chains_through_lower_authored_transparency(voi
     materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
     CHECK(materialized.hold.present);
     CHECK(materialized.hold.action == TEST_HOLD_ACTION);
-    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD);
+    CHECK(materialized.hold.style == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD);
 }
 
 static void test_transparent_hold_uses_current_tap_count_for_lower_handled_key(void) {
@@ -761,7 +761,7 @@ static void test_transparent_hold_uses_current_tap_count_for_lower_handled_key(v
     materialized = test_materialize(handled_key_lookup_tap_count(TEST_TRANSPARENT_HOLD_KEY, 2), key_pos);
     CHECK(materialized.hold.present);
     CHECK(materialized.hold.action == TEST_TAP_ACTION);
-    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD);
+    CHECK(materialized.hold.style == HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD);
 }
 
 static void test_transparent_long_hold_uses_lower_explicit_long_hold_action(void) {
@@ -776,7 +776,7 @@ static void test_transparent_long_hold_uses_lower_explicit_long_hold_action(void
     materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_LONG_HOLD_KEY), key_pos);
     CHECK(materialized.long_hold.present);
     CHECK(materialized.long_hold.action == TEST_LONG_HOLD_ACTION);
-    CHECK(materialized.long_hold.mode == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD);
+    CHECK(materialized.long_hold.style == HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD);
 }
 
 static void test_momentary_layer_query_matches_hold_materialization(void) {
@@ -866,7 +866,7 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
         .tap           = tap_zero,
         .hold =
             {
-                .mode   = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE,
+                .style  = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE,
                 .action = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, .operand = 2u},
             },
     };
@@ -876,13 +876,13 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
         .tap           = tap_one,
     };
     rows[0] = (noah_key_behavior_row_v1_t){
-        .target           = target,
-        .tap_hold_term    = 123u,
-        .longer_hold_term = 456u,
-        .multi_tap_term   = 78u,
-        .flags            = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE,
-        .steps            = steps,
-        .step_count       = ARRAY_SIZE(steps),
+        .target         = target,
+        .tap_hold_term  = 123u,
+        .long_hold_term = 456u,
+        .multi_tap_term = 78u,
+        .flags          = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE,
+        .steps          = steps,
+        .step_count     = ARRAY_SIZE(steps),
     };
     CHECK(noah_key_behavior_domain_v1_encode(rows, ARRAY_SIZE(rows), NULL, NULL, payload, sizeof(payload), &written, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
     CHECK(noah_key_behavior_domain_v1_decode(payload, written, NULL, NULL, &domain, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
@@ -896,7 +896,7 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
 
     behavior = key_behavior_lookup(TEST_MULTI_TAP_KEY);
     CHECK(behavior.source_is_live && behavior.config == NULL && behavior.handled);
-    CHECK(behavior.tap_hold_term == 123u && behavior.longer_hold_term == 456u && behavior.multi_tap_term == 78u);
+    CHECK(behavior.tap_hold_term == 123u && behavior.long_hold_term == 456u && behavior.multi_tap_term == 78u);
     CHECK(behavior.has_multi_tap && behavior.authored_tap_depth == 2u);
     CHECK(behavior.single.tap.present && behavior.single.tap.action == KC_Z);
     CHECK(behavior.single.hold.present && behavior.single.hold.action == MO(2));
@@ -954,7 +954,7 @@ static void test_live_profile_row_empty_later_tap_repeats_its_first_tap(void) {
         .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD,
         .hold =
             {
-                .mode   = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE,
+                .style  = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE,
                 .action = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, .operand = 2u},
             },
     };
@@ -1044,7 +1044,7 @@ static void test_custom_key_shortcut_without_a_row_holds_from_the_press(void) {
     materialized = test_materialize(resolution, key_pos);
     CHECK(materialized.tap_action == KC_NO);
     CHECK(materialized.hold.present && materialized.hold.action == CUSTOM_KEY_101);
-    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
+    CHECK(materialized.hold.style == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
     CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT);
 
     // Without a shortcut or a row it stays out of the handled runtime.
@@ -1075,7 +1075,7 @@ static void test_custom_key_shortcut_fills_unauthored_cells_of_its_row(void) {
     materialized = test_materialize(bypassed, key_pos);
     CHECK(materialized.tap_action == KC_NO);
     CHECK(materialized.hold.present && materialized.hold.action == CUSTOM_KEY_100);
-    CHECK(materialized.hold.mode == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
+    CHECK(materialized.hold.style == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
 }
 
 // Read through a transparent cell, a custom key with a shortcut is the lower

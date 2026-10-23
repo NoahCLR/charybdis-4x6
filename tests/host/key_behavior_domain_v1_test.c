@@ -116,12 +116,12 @@ static size_t encode_representative(uint8_t *output, size_t capacity, noah_profi
             .tap_index     = 2u,
             .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP | NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_LONG_HOLD,
             .tap           = {.kind = NOAH_PROFILE_ACTION_V1_VIA_MACRO, .operand = 10u},
-            .long_hold     = {.mode = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD, .action = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_LOCK, .operand = 3u}},
+            .long_hold     = {.style = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD, .action = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_LOCK, .operand = 3u}},
         },
         {
             .tap_index     = 0u,
             .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD,
-            .hold          = {.mode = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD, .repeat_hz = 25u, .action = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x28u}},
+            .hold          = {.style = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD, .repeat_hz = 25u, .action = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x28u}},
         },
     };
     static const noah_key_behavior_step_v1_t pd_steps[] = {
@@ -131,14 +131,14 @@ static size_t encode_representative(uint8_t *output, size_t capacity, noah_profi
         // Disabled, and allowed on layers 0 and 2 only: both kept as stored.
         {.target = {.kind = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, .operand = 2u}, .flags = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_DISABLED, .allowed_layers = 0x0005u, .steps = pd_steps, .step_count = 1u},
         {
-            .target           = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x1234u},
-            .tap_hold_term    = 150u,
-            .longer_hold_term = 400u,
-            .multi_tap_term   = 175u,
-            .flags            = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE,
-            .allowed_layers   = 0xffffu,
-            .steps            = qmk_steps,
-            .step_count       = 2u,
+            .target         = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x1234u},
+            .tap_hold_term  = 150u,
+            .long_hold_term = 400u,
+            .multi_tap_term = 175u,
+            .flags          = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE,
+            .allowed_layers = 0xffffu,
+            .steps          = qmk_steps,
+            .step_count     = 2u,
         },
     };
     size_t written;
@@ -305,7 +305,7 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
 
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 0u, &row, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(row.target.kind == NOAH_PROFILE_ACTION_V1_QMK_KEYCODE && row.target.operand == 0x1234u);
-    assert(row.tap_hold_term == 150u && row.longer_hold_term == 400u && row.multi_tap_term == 175u);
+    assert(row.tap_hold_term == 150u && row.long_hold_term == 400u && row.multi_tap_term == 175u);
     assert(row.flags == NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE && row.step_count == 2u && row.allowed_layers == 0xffffu);
     noah_profile_action_v1_t target = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x1234u};
     expect_result(noah_key_behavior_domain_v1_find_target(&domain, &target, &found_row, &found, &error), NOAH_PROFILE_CODEC_V1_OK);
@@ -320,10 +320,10 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     expect_result(noah_key_behavior_domain_v1_step_in_row(&domain, &forged_row, 0u, &step, &error), NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT);
     expect_result(noah_key_behavior_domain_v1_step_at(&domain, 0u, 0u, &step, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(step.tap_index == 0u && step.presence_mask == NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD);
-    assert(step.hold.mode == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && step.hold.repeat_hz == 25u && step.hold.action.operand == 0x28u);
+    assert(step.hold.style == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && step.hold.repeat_hz == 25u && step.hold.action.operand == 0x28u);
     expect_result(noah_key_behavior_domain_v1_step_at(&domain, 0u, 1u, &step, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(step.tap_index == 2u && step.tap.kind == NOAH_PROFILE_ACTION_V1_VIA_MACRO && step.tap.operand == 10u);
-    assert(step.long_hold.mode == NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD && step.long_hold.action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK);
+    assert(step.long_hold.style == NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD && step.long_hold.action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK);
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 1u, &row, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(row.target.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && row.target.operand == 2u && row.step_count == 1u);
     assert(row.flags == NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_DISABLED && row.allowed_layers == 0x0005u);
@@ -542,7 +542,7 @@ static void test_encode_rejections(void) {
     expect_result(noah_key_behavior_domain_v1_encode(NULL, 0u, &limits, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
 }
 
-static void test_hold_modes_and_timing(void) {
+static void test_hold_styles_and_timing(void) {
     uint8_t                         output[128];
     size_t                          written;
     noah_profile_codec_v1_error_t   error;
@@ -552,35 +552,35 @@ static void test_hold_modes_and_timing(void) {
         .tap_index     = 0u,
         .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD | NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_LONG_HOLD,
         .hold          = {.action = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 2u}},
-        .long_hold     = {.mode = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD, .action = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 3u}},
+        .long_hold     = {.style = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD, .action = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 3u}},
     };
     noah_key_behavior_row_v1_t row = {
-        .target           = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 1u},
-        .tap_hold_term    = UINT16_MAX,
-        .longer_hold_term = UINT16_MAX,
-        .multi_tap_term   = UINT16_MAX,
-        .steps            = &step,
-        .step_count       = 1u,
+        .target         = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 1u},
+        .tap_hold_term  = UINT16_MAX,
+        .long_hold_term = UINT16_MAX,
+        .multi_tap_term = UINT16_MAX,
+        .steps          = &step,
+        .step_count     = 1u,
     };
 
-    for (uint8_t mode = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE; mode <= NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD; mode++) {
-        step.hold.mode      = mode;
-        step.hold.repeat_hz = mode == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD ? 100u : 0u;
+    for (uint8_t style = NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE; style <= NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD; style++) {
+        step.hold.style     = style;
+        step.hold.repeat_hz = style == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD ? 100u : 0u;
         expect_result(noah_key_behavior_domain_v1_encode(&row, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_OK);
         expect_result(noah_key_behavior_domain_v1_decode(output, written, NULL, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_OK);
         expect_result(noah_key_behavior_domain_v1_row_at(&domain, 0u, &decoded_row, &error), NOAH_PROFILE_CODEC_V1_OK);
-        assert(decoded_row.tap_hold_term == UINT16_MAX && decoded_row.longer_hold_term == UINT16_MAX && decoded_row.multi_tap_term == UINT16_MAX);
+        assert(decoded_row.tap_hold_term == UINT16_MAX && decoded_row.long_hold_term == UINT16_MAX && decoded_row.multi_tap_term == UINT16_MAX);
     }
-    step.hold.mode = 0u;
+    step.hold.style = 0u;
     expect_result(noah_key_behavior_domain_v1_encode(&row, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE);
-    step.hold.mode = 5u;
+    step.hold.style = 5u;
     expect_result(noah_key_behavior_domain_v1_encode(&row, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE);
-    step.hold.mode      = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD;
+    step.hold.style     = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD;
     step.hold.repeat_hz = 0u;
     expect_result(noah_key_behavior_domain_v1_encode(&row, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE);
     step.hold.repeat_hz = 101u;
     expect_result(noah_key_behavior_domain_v1_encode(&row, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE);
-    step.hold.mode      = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD;
+    step.hold.style     = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD;
     step.hold.repeat_hz = 1u;
     expect_result(noah_key_behavior_domain_v1_encode(&row, 1u, NULL, NULL, output, sizeof(output), &written, &error), NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE);
     step.hold.repeat_hz = 0u;
@@ -702,7 +702,7 @@ int main(int argc, char **argv) {
     test_reader_failures(argv[1]);
     test_decode_rejections(argv[1]);
     test_encode_rejections();
-    test_hold_modes_and_timing();
+    test_hold_styles_and_timing();
     test_maximum_counts();
     test_malformed_corpus();
     puts("key behavior domain v1 tests passed");

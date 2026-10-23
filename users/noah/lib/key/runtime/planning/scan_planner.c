@@ -129,7 +129,7 @@ static bool key_runtime_core_press_token_active_scan_should_mark_release_hold_pe
         return true;
     }
 
-    return !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term;
+    return !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.long_hold_term;
 }
 
 static bool key_runtime_core_scan_press_token_has_pending_hold_series(const key_runtime_core_state_t *state, const press_token_t *token) {
@@ -188,7 +188,7 @@ void key_runtime_core_press_token_refresh_slot_phase_for_scan(key_runtime_core_s
 
     switch (token->slot_phase) {
         case KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW:
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_press_token_commit_hold_phase(state, token, true, true);
                 return;
             }
@@ -203,7 +203,7 @@ void key_runtime_core_press_token_refresh_slot_phase_for_scan(key_runtime_core_s
             }
             return;
         case KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW:
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_press_token_commit_hold_phase(state, token, true, true);
                 return;
             }
@@ -214,7 +214,7 @@ void key_runtime_core_press_token_refresh_slot_phase_for_scan(key_runtime_core_s
             return;
         case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
         case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_press_token_commit_hold_phase(state, token, true, true);
             }
             return;
@@ -283,7 +283,7 @@ bool key_runtime_core_resolve_pending_multi_tap_scan(keypos_t key_pos, key_runti
         return true;
     }
 
-    if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+    if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
         *out = (key_runtime_core_pending_multi_tap_scan_resolution_t){
             .outcome        = KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_LONG_HOLD,
             .hold           = token->interaction.binding.long_hold,
@@ -427,7 +427,7 @@ void key_runtime_core_plan_pending_multi_tap_scan_for_key(key_runtime_core_state
         case KEY_RUNTIME_CORE_PENDING_MULTI_TAP_SCAN_OUTCOME_RELEASE_HOLD_PENDING:
             if (token) {
                 key_runtime_core_press_token_mark_release_hold_pending(state, token);
-                if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && key_runtime_core_scan_elapsed(token->pressed_at, state->current_time) >= token->interaction.binding.longer_hold_term) {
+                if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && key_runtime_core_scan_elapsed(token->pressed_at, state->current_time) >= token->interaction.binding.long_hold_term) {
                     key_runtime_core_tap_series_clear(state, series);
                     key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.long_hold, token->interaction.contract.long_hold, true, true, plan);
                     return;
@@ -466,7 +466,7 @@ void key_runtime_core_plan_active_scan_for_token(key_runtime_core_state_t *state
                 return;
             }
 
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_scan_clear_confirmed_tap_series_at(state, token_key_pos);
                 key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.long_hold, token->interaction.contract.long_hold, true, true, plan);
                 return;
@@ -488,14 +488,14 @@ void key_runtime_core_plan_active_scan_for_token(key_runtime_core_state_t *state
                 }
                 key_runtime_core_press_token_commit_hold_phase(state, token, !token->interaction.binding.long_hold.present, false);
             }
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_scan_clear_confirmed_tap_series_at(state, token_key_pos);
                 key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.long_hold, token->interaction.contract.long_hold, true, true, plan);
             }
             return;
         case KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING:
         case KEY_RUNTIME_SLOT_PHASE_HOLD_TIER_ACTIVE:
-            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.longer_hold_term) {
+            if (handled_key_hold_contract_fires_at_threshold(token->interaction.contract.long_hold) && elapsed >= token->interaction.binding.long_hold_term) {
                 key_runtime_core_scan_clear_confirmed_tap_series_at(state, token_key_pos);
                 key_runtime_core_plan_threshold_hold_effects(state, token, token->interaction.binding.long_hold, token->interaction.contract.long_hold, true, true, plan);
             }
@@ -523,9 +523,9 @@ void key_runtime_core_plan_missed_scans_for_token(key_runtime_core_state_t *stat
     }
     current_time  = state->current_time;
     thresholds[0] = token->interaction.binding.tap_hold_term;
-    thresholds[1] = token->interaction.binding.longer_hold_term;
+    thresholds[1] = token->interaction.binding.long_hold_term;
     if (thresholds[1] < thresholds[0]) {
-        thresholds[0] = token->interaction.binding.longer_hold_term;
+        thresholds[0] = token->interaction.binding.long_hold_term;
         thresholds[1] = token->interaction.binding.tap_hold_term;
     }
     for (uint8_t index = 0; index < 2u; index++) {

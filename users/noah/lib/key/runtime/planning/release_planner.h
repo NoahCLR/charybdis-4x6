@@ -143,20 +143,20 @@ static inline bool key_runtime_release_hold_contract_has_any_action(key_runtime_
     return contract.primary_action != KC_NO || contract.long_action != KC_NO;
 }
 
-static inline bool key_runtime_release_hold_contract_long_ready(key_runtime_release_hold_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
-    return contract.long_action != KC_NO && elapsed >= longer_hold_term;
+static inline bool key_runtime_release_hold_contract_long_ready(key_runtime_release_hold_contract_t contract, uint16_t elapsed, uint16_t long_hold_term) {
+    return contract.long_action != KC_NO && elapsed >= long_hold_term;
 }
 
-static inline uint16_t key_runtime_release_hold_contract_select_action(key_runtime_release_hold_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
-    if (key_runtime_release_hold_contract_long_ready(contract, elapsed, longer_hold_term)) {
+static inline uint16_t key_runtime_release_hold_contract_select_action(key_runtime_release_hold_contract_t contract, uint16_t elapsed, uint16_t long_hold_term) {
+    if (key_runtime_release_hold_contract_long_ready(contract, elapsed, long_hold_term)) {
         return contract.long_action;
     }
 
     return contract.primary_action;
 }
 
-static inline uint16_t key_runtime_release_contract_select_hold_action(key_runtime_release_contract_t contract, uint16_t elapsed, uint16_t longer_hold_term) {
-    return key_runtime_release_hold_contract_select_action(contract.hold, elapsed, longer_hold_term);
+static inline uint16_t key_runtime_release_contract_select_hold_action(key_runtime_release_contract_t contract, uint16_t elapsed, uint16_t long_hold_term) {
+    return key_runtime_release_hold_contract_select_action(contract.hold, elapsed, long_hold_term);
 }
 
 static inline key_runtime_release_semantics_t key_runtime_release_semantics_for_phase(key_runtime_slot_phase_t phase) {
@@ -235,7 +235,7 @@ static inline pd_mode_mask_t key_runtime_release_query_lock_tap_mode(const key_r
 
 static inline bool key_runtime_release_query_long_hold_ready(const key_runtime_release_query_t *query) {
     key_runtime_release_contract_t contract = key_runtime_release_contract_for_interaction(query ? query->interaction : NULL);
-    return query && query->interaction && key_runtime_release_hold_contract_long_ready(contract.hold, query->elapsed, query->interaction->binding.longer_hold_term);
+    return query && query->interaction && key_runtime_release_hold_contract_long_ready(contract.hold, query->elapsed, query->interaction->binding.long_hold_term);
 }
 
 static inline key_runtime_release_decision_t key_runtime_release_decision_base(const key_runtime_release_query_t *query) {
@@ -312,12 +312,12 @@ static inline key_runtime_release_decision_t key_runtime_release_decide(const ke
     switch (query->semantics.hold_action_mode) {
         case KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_PRIMARY_ONLY:
             if (key_runtime_release_hold_contract_has_primary_action(contract.hold)) {
-                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction->binding.longer_hold_term));
+                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction->binding.long_hold_term));
             }
             break;
         case KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION:
             if (key_runtime_release_hold_contract_has_any_action(contract.hold)) {
-                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction->binding.longer_hold_term));
+                return key_runtime_release_decision_action(query, key_runtime_release_contract_select_hold_action(contract, query->elapsed, query->interaction->binding.long_hold_term));
             }
             break;
         case KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_NONE:

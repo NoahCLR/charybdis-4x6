@@ -18,7 +18,7 @@ typedef struct {
     uint8_t             tap_count;
     key_behavior_step_t step;
     uint16_t            tap_hold_term;
-    uint16_t            longer_hold_term;
+    uint16_t            long_hold_term;
     uint16_t            multi_tap_term;
     uint8_t             layer;
     pd_mode_mask_t      pd_mode;
@@ -152,4 +152,4 @@ bool                           handled_key_resolution_has_multi_tap(handled_key_
 bool                           handled_key_resolution_is_momentary_layer(handled_key_resolution_t resolution);
 bool                           handled_key_resolution_is_layer_tap(handled_key_resolution_t resolution);
 uint16_t                       handled_key_resolution_tap_hold_term(handled_key_resolution_t resolution);
-uint16_t                       handled_key_resolution_longer_hold_term(handled_key_resolution_t resolution);
+uint16_t                       handled_key_resolution_long_hold_term(handled_key_resolution_t resolution);

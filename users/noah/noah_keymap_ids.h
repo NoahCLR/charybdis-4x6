@@ -185,7 +185,7 @@ _Static_assert((QK_MACRO_0 + VIA_MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "VIA mac
 // name and shortcut come from CUSTOM_KEYS in keymap.c until Charybdis Ark
 // changes them. A behaviour step may send one; it sends only its shortcut.
 // PD_SLOT_n holds a configurable pointing slot; add a key_behaviors[] row for
-// explicit tap, hold, longer-hold or multi-tap behavior on top of that default.
+// explicit tap, hold, long-hold or multi-tap behavior on top of that default.
 // LOCK_LAYER(n) toggles a layer lock from actions authored in key_behaviors[].
 
 #define NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE (SAFE_RANGE + 0x00)

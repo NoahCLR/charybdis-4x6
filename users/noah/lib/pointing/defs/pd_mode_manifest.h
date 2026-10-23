@@ -15,7 +15,9 @@ enum {
 
 // The configurable pointing slots in ID order. Slot n holds with PD_SLOT_n and
 // toggles with PD_SLOT_n_LOCK (noah_keymap_ids.h). Thirty-two fill both
-// keycode blocks; slots 6..31 carry no factory identity.
+// keycode blocks. The names here only name the slot's C constants
+// (PD_MODE_*, PD_MODE_INDEX_*); a slot's name and settings come from the
+// keymap's compiled defaults (noah_pd_defaults in pd_config.c).
 #define NOAH_PD_MODE_LIST(PDM) \
     PDM(DRAGSCROLL, PD_SLOT_0) \
     PDM(VOLUME, PD_SLOT_1)     \

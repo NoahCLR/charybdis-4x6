@@ -80,26 +80,26 @@ static size_t build_maximum_behavior_profile(void) {
                 .tap           = qmk_action(action_base),
                 .hold =
                     {
-                        .mode      = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD,
+                        .style     = NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD,
                         .repeat_hz = NOAH_KEY_BEHAVIOR_DOMAIN_V1_MAX_REPEAT_HZ,
                         .action    = qmk_action((uint16_t)(action_base + 1u)),
                     },
                 .long_hold =
                     {
-                        .mode   = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD,
+                        .style  = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD,
                         .action = qmk_action((uint16_t)(action_base + 2u)),
                     },
             };
         }
         rows[row_index] = (noah_key_behavior_row_v1_t){
-            .target           = qmk_action((uint16_t)(0x100u + row_index)),
-            .tap_hold_term    = 0xffffu,
-            .longer_hold_term = 0xffffu,
-            .multi_tap_term   = 0xffffu,
-            .flags            = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE,
-            .allowed_layers   = 0xffffu,
-            .steps            = steps[row_index],
-            .step_count       = TEST_STEPS_PER_ROW,
+            .target         = qmk_action((uint16_t)(0x100u + row_index)),
+            .tap_hold_term  = 0xffffu,
+            .long_hold_term = 0xffffu,
+            .multi_tap_term = 0xffffu,
+            .flags          = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_AUTO_MOUSE,
+            .allowed_layers = 0xffffu,
+            .steps          = steps[row_index],
+            .step_count     = TEST_STEPS_PER_ROW,
         };
     }
 

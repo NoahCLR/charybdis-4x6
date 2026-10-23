@@ -694,7 +694,7 @@ static void test_action_placement_rules(void) {
     }
 
     // Layer holds need a held key: a key, a press-and-hold branch or a combo,
-    // never a tap or another hold mode.
+    // never a tap or another hold style.
     CHECK(noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_KEY));
     CHECK(noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD));
     CHECK(!noah_action_supported_at(MO(2), NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER));

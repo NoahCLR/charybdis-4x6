@@ -58,17 +58,17 @@ typedef enum {
     NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_LENGTH,
     NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET,
     NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_HOLD_TERM,
-    NOAH_KEY_BEHAVIOR_FIELD_V1_LONGER_HOLD_TERM,
+    NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_TERM,
     NOAH_KEY_BEHAVIOR_FIELD_V1_MULTI_TAP_TERM,
     NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_FLAGS,
     NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_STEP_COUNT,
     NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_INDEX,
     NOAH_KEY_BEHAVIOR_FIELD_V1_PRESENCE_MASK,
     NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION,
-    NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_MODE,
+    NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_STYLE,
     NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_REPEAT,
     NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_ACTION,
-    NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_MODE,
+    NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_STYLE,
     NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_REPEAT,
     NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION,
     NOAH_KEY_BEHAVIOR_FIELD_V1_ALLOWED_LAYERS,
@@ -83,7 +83,7 @@ typedef struct {
 } noah_key_behavior_limits_v1_t;
 
 typedef struct {
-    uint8_t                  mode;
+    uint8_t                  style;
     uint8_t                  repeat_hz;
     noah_profile_action_v1_t action;
 } noah_key_behavior_hold_v1_t;
@@ -99,7 +99,7 @@ typedef struct {
 typedef struct {
     noah_profile_action_v1_t           target;
     uint16_t                           tap_hold_term;
-    uint16_t                           longer_hold_term;
+    uint16_t                           long_hold_term;
     uint16_t                           multi_tap_term;
     uint8_t                            flags;
     // One bit per layer it may act on; bits past the bank are zero.
@@ -126,7 +126,7 @@ typedef struct {
     uint8_t                  target_bytes[NOAH_PROFILE_BLOB_V1_ACTION_SIZE];
     noah_profile_action_v1_t target;
     uint16_t                 tap_hold_term;
-    uint16_t                 longer_hold_term;
+    uint16_t                 long_hold_term;
     uint16_t                 multi_tap_term;
     uint8_t                  flags;
     uint8_t                  step_count;
@@ -170,7 +170,7 @@ typedef struct {
     uint8_t                  row_index;
     uint8_t                  step_index;
     uint8_t                  field_id;
-    uint8_t                  hold_mode; // NOAH_KEY_BEHAVIOR_HOLD_V1_* for a hold or long-hold action, else 0
+    uint8_t                  hold_style; // NOAH_KEY_BEHAVIOR_HOLD_V1_* for a hold or long-hold action, else 0
 } noah_key_behavior_domain_v1_action_event_t;
 
 // Caller-owned, payload-independent incremental validation state. Fields are
@@ -197,7 +197,7 @@ typedef struct {
     uint8_t                                        current_presence_mask;
     bool                                           have_previous_target;
     bool                                           action_event_available;
-    uint8_t                                        current_hold_mode;
+    uint8_t                                        current_hold_style;
 } noah_key_behavior_domain_v1_validation_t;
 
 noah_key_behavior_limits_v1_t noah_key_behavior_domain_v1_default_limits(void);

@@ -132,7 +132,7 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
         return (hold_behavior_t){
             .present = true,
             .action  = resolution->keycode,
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+            .style   = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
         };
     }
 
@@ -140,7 +140,7 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
         return (hold_behavior_t){
             .present = true,
             .action  = resolution->keycode,
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+            .style   = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
         };
     }
 
@@ -150,7 +150,7 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
         return (hold_behavior_t){
             .present = true,
             .action  = noah_action_keycode_layer_mod_mods(resolution->keycode),
-            .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+            .style   = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
         };
     }
 
@@ -158,7 +158,7 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
         return (hold_behavior_t){
             .present = true,
             .action  = noah_action_keycode_dual_role_hold(resolution->keycode),
-            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+            .style   = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
         };
     }
 
@@ -168,7 +168,7 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
         return (hold_behavior_t){
             .present = true,
             .action  = resolution->keycode,
-            .mode    = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
+            .style   = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE,
         };
     }
 

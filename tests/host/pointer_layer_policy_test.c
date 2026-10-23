@@ -236,7 +236,7 @@ static void test_auto_mouse_key_record(uint16_t keycode, uint8_t row, bool press
     }
 }
 
-// A key resolved from the auto-mouse layer keeps that layer through its own
+// A key resolved from the pointer layer keeps that layer through its own
 // record, so QMK's action lookup agrees with the keycode every hook saw, then
 // gets the reset QMK would have given it on the press.
 static void test_auto_mouse_layer_key_resets_after_its_record(void) {
@@ -520,7 +520,7 @@ static void test_layer_lock_anchor_is_taken_again_after_a_qmk_reset_it_survives(
     CHECK(fake_auto_mouse_key_tracker == 0);
 }
 
-// A behaviour's MO() hold of the auto-mouse layer reaches QMK only as a layer
+// A behaviour's MO() hold of the pointer layer reaches QMK only as a layer
 // change, so the runtime anchors it like a lock, once, for as long as it is
 // held; a lock and a hold together still count once.
 static void test_held_auto_mouse_layer_anchors_like_a_lock(void) {
@@ -543,7 +543,7 @@ static void test_held_auto_mouse_layer_anchors_like_a_lock(void) {
     CHECK(auto_mouse_keyevent_calls == 2 && !auto_mouse_keyevent_pressed[1]);
     CHECK(fake_auto_mouse_key_tracker == 0);
 
-    fake_held_layers = (layer_state_t)1u << 2; // not the auto-mouse layer
+    fake_held_layers = (layer_state_t)1u << 2; // not the pointer layer
     pointer_layer_policy_sync_layer_ownership_anchor();
     CHECK(auto_mouse_keyevent_calls == 2);
 }

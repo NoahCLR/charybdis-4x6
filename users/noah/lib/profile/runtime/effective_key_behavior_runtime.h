@@ -59,7 +59,7 @@ typedef struct {
     uint8_t             step_count;
     uint8_t             authored_tap_depth;
     uint16_t            tap_hold_term;
-    uint16_t            longer_hold_term;
+    uint16_t            long_hold_term;
     uint16_t            multi_tap_term;
     uint32_t            allowed_layers; // participation: the layers the row may act on
     key_behavior_step_t single;

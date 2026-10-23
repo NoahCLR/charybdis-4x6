@@ -267,12 +267,12 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
     }
 
     return (key_behavior_view_t){
-        .keycode          = keycode,
-        .handled          = true,
-        .tap_hold_term    = TEST_HOLD_TERM,
-        .longer_hold_term = 350,
-        .multi_tap_term   = 120,
-        .single           = row->single,
+        .keycode        = keycode,
+        .handled        = true,
+        .tap_hold_term  = TEST_HOLD_TERM,
+        .long_hold_term = 350,
+        .multi_tap_term = 120,
+        .single         = row->single,
     };
 }
 

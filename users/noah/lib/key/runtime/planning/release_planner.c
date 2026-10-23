@@ -169,12 +169,12 @@ static bool key_runtime_core_release_hold_action_feedback_kind(const press_token
         return false;
     }
 
-    release_action = key_runtime_release_contract_select_hold_action(contract, elapsed, token->interaction.binding.longer_hold_term);
+    release_action = key_runtime_release_contract_select_hold_action(contract, elapsed, token->interaction.binding.long_hold_term);
     if (release_action != action) {
         return false;
     }
 
-    long_hold_level = key_runtime_release_hold_contract_long_ready(contract.hold, elapsed, token->interaction.binding.longer_hold_term);
+    long_hold_level = key_runtime_release_hold_contract_long_ready(contract.hold, elapsed, token->interaction.binding.long_hold_term);
     if (out_kind) {
         *out_kind = key_runtime_core_release_hold_feedback_pulse_kind(long_hold_level);
     }
@@ -364,7 +364,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
     preserve_chain                    = preserve_chain_available && elapsed < token->interaction.binding.tap_hold_term && (token->interaction.binding.has_more_taps || terminal_tap_only_feedback_window);
     tap_branch_feedback_on_release    = series_tap_count > 1u && token->slot_phase != KEY_RUNTIME_SLOT_PHASE_RELEASE_HOLD_PENDING;
 
-    if (token->interaction.contract.hold.release_action != KC_NO ? elapsed >= token->interaction.binding.tap_hold_term : !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.longer_hold_term) {
+    if (token->interaction.contract.hold.release_action != KC_NO ? elapsed >= token->interaction.binding.tap_hold_term : !token->interaction.binding.hold.present && token->interaction.contract.long_hold.release_action != KC_NO && elapsed >= token->interaction.binding.long_hold_term) {
         semantics.hold_action_mode = KEY_RUNTIME_RELEASE_HOLD_ACTION_MODE_SELECT_HOLD_ACTION;
     }
 

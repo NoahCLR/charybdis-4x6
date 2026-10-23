@@ -64,9 +64,9 @@ static void test_check_feedback_pulse(uint8_t index, key_feedback_pulse_kind_t k
 static key_behavior_view_t test_pressable_handled_key(uint16_t keycode) {
     key_behavior_view_t behavior = key_runtime_scenario_pressable_handled_key(keycode);
 
-    behavior.tap_hold_term    = 150;
-    behavior.longer_hold_term = 350;
-    behavior.multi_tap_term   = 120;
+    behavior.tap_hold_term  = 150;
+    behavior.long_hold_term = 350;
+    behavior.multi_tap_term = 120;
     return behavior;
 }
 
@@ -163,7 +163,7 @@ static void test_configure_immediate_hold_key(uint16_t keycode, uint16_t hold_ac
     behavior.single.hold = (hold_behavior_t){
         .present = true,
         .action  = hold_action,
-        .mode    = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
+        .style   = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE,
     };
     behavior.single.long_hold = long_hold;
     key_runtime_scenario_add_behavior_view(behavior);
@@ -613,11 +613,11 @@ static void test_threshold_hold_registers_and_releases_owned_state(void) {
 
     key_runtime_scenario_reset();
     key_runtime_scenario_add_behavior_view((key_behavior_view_t){
-        .keycode          = TEST_HOLD_KEY,
-        .handled          = true,
-        .tap_hold_term    = 150,
-        .longer_hold_term = 350,
-        .multi_tap_term   = 120,
+        .keycode        = TEST_HOLD_KEY,
+        .handled        = true,
+        .tap_hold_term  = 150,
+        .long_hold_term = 350,
+        .multi_tap_term = 120,
         .single =
             {
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION),
@@ -652,11 +652,11 @@ static void test_replaced_press_token_still_releases_owned_state(void) {
 
     key_runtime_scenario_reset();
     key_runtime_scenario_add_behavior_view((key_behavior_view_t){
-        .keycode          = TEST_HOLD_KEY,
-        .handled          = true,
-        .tap_hold_term    = 150,
-        .longer_hold_term = 350,
-        .multi_tap_term   = 120,
+        .keycode        = TEST_HOLD_KEY,
+        .handled        = true,
+        .tap_hold_term  = 150,
+        .long_hold_term = 350,
+        .multi_tap_term = 120,
         .single =
             {
                 .hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION),
