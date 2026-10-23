@@ -11,4 +11,4 @@ the decision is ignored at boot, so the previous generation stays authority,
 and a decided target is recovered from the other half's prepared copy. Once
 decided, the keyboard refuses a cancel, even if the host never saw the
 decision (D-F48). Since D-F31 the profile is the only store. Contract:
-[`logical-profile-transaction-v1.md`](../architecture/logical-profile-transaction-v1.md).
+[`logical-profile-transaction-v1.md`](../spec/logical-profile-transaction-v1.md).

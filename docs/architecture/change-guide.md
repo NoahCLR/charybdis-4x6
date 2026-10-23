@@ -28,7 +28,7 @@ directory and the existing domain docs.
 | Change the Raw HID channel | `compat/qmk_profile_channel.c`, `compat/qmk_profile_capabilities.h` | VIA hooks (VIA is not supported, D-F31) | Profile Wire and channel tests (`run_profile_wire_v1_tests.sh`), feature gate, contract probe |
 | Change hook wiring | `users/noah/hooks.c`, `users/noah/runtime_init.c` | keymap-local hooks without chaining | hook chaining, runtime init order, feature gate |
 | Change source/build wiring | `users/noah/source_manifest.mk` and mirrored host support as needed | one-off test runner source lists | feature gate compile, targeted host tests, full host suite, firmware compile |
-| Change stack-sensitive runtime phases or target stack configuration | runtime owner plus `tools/firmware_stack_budget.json` or `tools/firmware_stack_budget_live_profile_owner.json` when call topology changes | per-function frame guesses or host-only `sizeof` checks | matching runtime tests, `run_firmware_stack_budget_tool_tests.sh`, full host suite, `NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh` ([memory budgets](./memory-budgets.md#required-reporting)) |
+| Change stack-sensitive runtime phases or target stack configuration | runtime owner plus `tools/firmware_stack_budget.json` or `tools/firmware_stack_budget_live_profile_owner.json` when call topology changes | per-function frame guesses or host-only `sizeof` checks | matching runtime tests, `run_firmware_stack_budget_tool_tests.sh`, full host suite, `NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh` ([resource policy](../spec/resource-policy.md#running-the-gates)) |
 
 ## Anti-Patterns
 
@@ -81,7 +81,7 @@ checks before handoff when source/build behavior changed.
 | Live-profile split RPCs | `run_qmk_profile_split_transport_tests.sh`, `run_profile_split_reconciler_tests.sh`, `run_profile_working_sync_tests.sh`, `run_profile_owner_tests.sh`, `run_profile_store_runtime_owner_tests.sh` |
 | Source manifests or boundaries | `run_feature_gate_compile_tests.sh` |
 | Target stack topology or budget | `run_firmware_stack_budget_tool_tests.sh`; then `NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh`, which runs both reviewed-path manifests on each half of the flashed pair (the standalone `run_firmware_stack_budget_checks.sh` compiles a plain `qmk compile` image without the live-profile owner, D-F35) |
-| Target macro or RP2040 SRAM-bank policy | Read [memory-budgets.md](./memory-budgets.md); run `run_firmware_memory_budget_tool_tests.sh`; after a fresh ordinary target build, run `run_firmware_memory_budget_checks.sh`; keep physical capacity, linked occupancy, policy margin, and runtime high-water distinct |
+| Target macro or RP2040 SRAM-bank policy | Read [resource-policy.md](../spec/resource-policy.md); run `run_firmware_memory_budget_tool_tests.sh`; after a fresh ordinary target build, run `run_firmware_memory_budget_checks.sh`; keep physical capacity, linked occupancy, policy margin, and runtime high-water distinct |
 
 For docs-only changes, run `git diff --check` and a stale-path audit. Host tests
 and firmware compile can be skipped when no runtime source, authored input,

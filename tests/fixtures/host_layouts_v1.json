@@ -1,7 +1,7 @@
 {
  "format": 1,
  "generator": "tools/host_layouts/build.py",
- "spec": "docs/architecture/host-layouts-v1.md",
+ "spec": "docs/spec/host-layouts-v1.md",
  "layouts": [
   {
    "id": 0,

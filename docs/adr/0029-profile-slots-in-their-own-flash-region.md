@@ -23,4 +23,4 @@ An EEPROM reset still returns the keyboard to its compiled defaults:
 `keyboard_pre_init` erases both slot headers when QMK's EEPROM magic is not
 valid. Chosen over a bigger emulated EEPROM (all of it in RAM) and over
 erasing a whole slot up front (one long pause). Geometry and rules:
-[`storage-and-resource-baseline.md`](../architecture/storage-and-resource-baseline.md).
+[`device-resident-profile.md`](../spec/device-resident-profile.md#where-the-profile-is-stored).

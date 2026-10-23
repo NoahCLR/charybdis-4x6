@@ -9,4 +9,4 @@ stores only the slots that say something. An omitted slot is disabled and
 unnamed, and storing one that way is refused, so every profile has one
 encoding. Lighting keeps a colour row for every slot, since a disabled slot
 keeps its colour, and the effective cache holds all 32 so pointing never reads
-storage. Layout: [`pd-mode-domain-v1.md`](../architecture/pd-mode-domain-v1.md).
+storage. Layout: [`pd-mode-domain-v1.md`](../spec/pd-mode-domain-v1.md).

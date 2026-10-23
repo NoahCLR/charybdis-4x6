@@ -8,7 +8,7 @@ contracts.
 The root `README.md` stays focused on user-facing setup and profile behavior.
 This directory explains how the runtime is shaped and where changes belong.
 
-The [split activity sync contract](split-activity-sync.md) covers the implemented
+The [split activity sync contract](../spec/split-activity-sync.md) covers the implemented
 default activity policy and opt-in diagnostics; recorded captures live under
 [`measurements/pointing-cadence/`](../../measurements/pointing-cadence/README.md).
 
@@ -21,37 +21,13 @@ default activity policy and opt-in diagnostics; recorded captures live under
   to change and need the edit point plus checks.
 - Use [runtime-flow.md](./runtime-flow.md) when a bug crosses press/release,
   scan, RGB, pointing-device, split, or macro boundaries.
-- Use [host-layouts-v1.md](./host-layouts-v1.md) for the host keyboard layout
-  catalogue: which keys type each character on each computer layout.
-- Use [memory-budgets.md](./memory-budgets.md) before interpreting target RAM,
-  allocator, EEPROM-cache, or stack numbers.
-- Use [profile-wire-v1.md](./profile-wire-v1.md) and
-  [profile-split-v1.md](./profile-split-v1.md) for the HID and split protocols
-  Ark speaks.
-- Use [authority-state-table.md](./authority-state-table.md) for source, device,
-  and split authority plus safe activation.
-- Use
-  [storage-and-resource-baseline.md](./storage-and-resource-baseline.md) for
-  EEPROM maps, storage ceilings, and the measured resource baseline.
-- Use [field-classification.md](./field-classification.md) for which settings
-  are live-editable, structurally bounded, or compiled-only.
-- Use [pd-mode-domain-v1.md](./pd-mode-domain-v1.md) for the 32
-  configurable pointing slots: scope, factory presets, runtime publication
-  rules, the sparse domain codec (version 3), validation, capacity evidence,
-  storage/ABI contract and the remaining hardware acceptance.
-- Use [rgb-domain-v1.md](./rgb-domain-v1.md) for the RGB domain's encoding.
-- Use [portable-profile-v1.md](./portable-profile-v1.md) for the portable
-  profile document: the settings domain, readback commands and layer order.
-- Use [participation-policy.md](./participation-policy.md) for when a press
-  uses its shared behaviour or joins a combo, and when a combo output uses
-  its behaviour.
-- Use [logical-profile-transaction-v1.md](./logical-profile-transaction-v1.md)
-  for the atomic both-halves Apply: the commit decision, the output fence,
-  power-loss outcomes and cancellation.
+- Use [the specs](../spec/README.md) for every contract: Profile Wire and the
+  split protocol, the domains, the profile transaction, where the profile is
+  stored, the portable profile, host layouts, and the
+  [resource policy](../spec/resource-policy.md) before interpreting target
+  RAM, allocator, EEPROM-cache, or stack numbers.
 - Use [ark-compatibility.md](./ark-compatibility.md) for firmware's
   independence from Ark and what Ark consumes from this repository.
-- Use [device-resident-profile.md](./device-resident-profile.md) for the live
-  app's authority, readback, device operations, and performance contracts.
 - The complete user experience and first-grade control-software completion
   bar that the device-profile architecture serves are in Charybdis Ark's
   `docs/PRODUCT_GOAL.md`.
@@ -133,7 +109,7 @@ flowchart TD
 | Change split mirroring | `users/noah/lib/split/runtime_sync.*` | [runtime-flow.md](./runtime-flow.md) |
 | Change macro behavior | `keymap.c` `VIA_MACROS(MACRO)` defaults or `users/noah/lib/macro/` | [change-guide.md](./change-guide.md) |
 | Change hook wiring | `users/noah/hooks.c`, `users/noah/runtime_init.c` | [Hook Overrides](../HOOK_OVERRIDES.md) |
-| Change target memory, EEPROM size, or stack policy | resource owner plus the matching budget tool | [memory-budgets.md](./memory-budgets.md), [change-guide.md](./change-guide.md) |
+| Change target memory, EEPROM size, or stack policy | resource owner plus the matching budget tool | [resource-policy.md](../spec/resource-policy.md), [change-guide.md](./change-guide.md) |
 
 ## Documents In This Pack
 
@@ -144,11 +120,7 @@ flowchart TD
   responsibilities, mutation ownership, side effects, tests, and existing docs.
 - [change-guide.md](./change-guide.md) tells future maintainers and agents where
   to make common changes and which checks to run.
-- [memory-budgets.md](./memory-budgets.md) separates RP2040 physical banks,
-  linked occupancy, regression policies, and runtime high-water evidence.
-- [device-resident-profile.md](./device-resident-profile.md) defines the
-  device-first live-profile target and the boundary between device authority and
-  compiled/source representation.
+- [The specs](../spec/README.md) hold every contract the firmware keeps.
 
 ## Architecture Rules
 

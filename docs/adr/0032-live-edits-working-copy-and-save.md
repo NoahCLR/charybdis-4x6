@@ -20,5 +20,4 @@ EEPROM user datablock, outside the profile. Live saves after 3 s with no edit
 and no held key, with at most one automatic attempt per revision so a failure
 cannot loop. The profile is the only durable owner of the settings QMK holds:
 they reach QMK through its no-EEPROM setters, and the DPI and lighting keys
-become settings edits. Contracts: [`profile-wire-v1.md`](../architecture/profile-wire-v1.md),
-"Live edits"; [`profile-split-v1.md`](../architecture/profile-split-v1.md).
+become settings edits. Contracts: [`profile-wire-v1/live-edits.md`](../spec/profile-wire-v1/live-edits.md); [`profile-split-v1.md`](../spec/profile-split-v1.md).

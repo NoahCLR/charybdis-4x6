@@ -112,7 +112,7 @@ if same_pair "$pairs/new-$first" "$pairs/old"; then
     echo "The pair is byte-identical in $target and the pinned image." >&2
 else
     echo "The pair differs from the pinned image's: the compiler changed. Once it is pinned," >&2
-    echo "record the memory effect in docs/architecture/memory-budgets.md (D-F05)." >&2
+    echo "run the resource gates and record the memory effect in the commit that pins it (docs/spec/resource-policy.md, D-F05)." >&2
 fi
 
 docker push "$target"

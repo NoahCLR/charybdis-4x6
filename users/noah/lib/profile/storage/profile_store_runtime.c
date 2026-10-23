@@ -42,7 +42,7 @@ static noah_profile_store_t runtime_store;
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
 static noah_profile_owner_t runtime_owner;
 // The working copy (D-F32): one slot payload of RAM per half, the largest
-// static claim in the firmware (docs/architecture/memory-budgets.md).
+// static claim in the firmware (docs/spec/resource-policy.md).
 static uint8_t              runtime_working_bytes[NOAH_PROFILE_PAYLOAD_MAX] __attribute__((aligned(4)));
 static bool                 runtime_owner_initialized;
 static bool                 runtime_transport_registered;

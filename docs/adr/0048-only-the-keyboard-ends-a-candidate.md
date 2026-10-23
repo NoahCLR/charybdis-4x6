@@ -9,5 +9,5 @@ a candidate: every cancel before the decision (host abort, lease expiry,
 supersession, a failed copy) releases it and aborts the other half's prepared
 copy, without waiting for an absent peer, whose ABORT completes when the link
 returns. After the decision nothing cancels, whatever the host saw. Contract:
-[`logical-profile-transaction-v1.md`](../architecture/logical-profile-transaction-v1.md),
-"Cancellation and lease ownership".
+[`logical-profile-transaction-v1.md`](../spec/logical-profile-transaction-v1.md),
+"Cancellation".

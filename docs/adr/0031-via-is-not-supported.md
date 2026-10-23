@@ -11,5 +11,5 @@ handler takes comes back with command byte `0xFF`, VIA's own "unhandled", and
 the keyboard identifies itself by its capability page alone. The authored
 `VIA_MACRO_n` aliases keep their historical names, since renaming them would
 change authored data without changing behaviour. Contracts:
-[`profile-wire-v1.md`](../architecture/profile-wire-v1.md),
-[`logical-profile-transaction-v1.md`](../architecture/logical-profile-transaction-v1.md).
+[`profile-wire-v1/hid-channel.md`](../spec/profile-wire-v1/hid-channel.md),
+[`logical-profile-transaction-v1.md`](../spec/logical-profile-transaction-v1.md).

@@ -11,4 +11,4 @@ list of accepted settings versions, which drifted from the validators' (one
 definition since D-F11 and D-F13). A failed store on the other half is retried
 from the start up to twice, safe because nothing is durable before the
 commit, and then the Apply fails as `PEER_TRANSFER_FAILED`; busy replies say
-why. Contract: [`profile-split-v1.md`](../architecture/profile-split-v1.md).
+why. Contract: [`profile-split-v1.md`](../spec/profile-split-v1.md).

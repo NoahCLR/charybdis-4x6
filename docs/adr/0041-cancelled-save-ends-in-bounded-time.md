@@ -8,5 +8,5 @@ without limit. Now the USB half waits at most 15 s, then releases its own
 side, reports *peer cleanup pending* in its status, keeps retrying the ABORT
 in idle slots, and starts no new save or split transfer until the peer
 acknowledges. Contracts:
-[`authority-state-table.md`](../architecture/authority-state-table.md),
-[`profile-wire-v1.md`](../architecture/profile-wire-v1.md).
+[`authority-state-table.md`](../spec/authority-state-table.md),
+[`profile-wire-v1/candidate-transfer.md`](../spec/profile-wire-v1/candidate-transfer.md).

@@ -161,7 +161,7 @@ enum charybdis_keymap_layers {
 // The computer macros type into: 0 Auto, 1 macOS, 2 Windows, 3 Linux.
 #define NOAH_DEFAULT_HOST_OS 1
 // The host layout macro text is typed through (an ID from
-// docs/architecture/host-layouts-v1.md; 0 US, 2 macOS Dutch).
+// docs/spec/host-layouts-v1.md; 0 US, 2 macOS Dutch).
 #define NOAH_DEFAULT_HOST_LAYOUT 2
 // 1 types characters the layout lacks through the host's Unicode entry.
 #define NOAH_DEFAULT_UNICODE_PLAYBACK 0

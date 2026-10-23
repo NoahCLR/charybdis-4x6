@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // The one place that decides whether a press uses its keycode's behaviour
-// row and whether it may join a combo (docs/architecture/participation-
+// row and whether it may join a combo (docs/spec/participation-
 // policy.md, D-F14). Every applicable scope must allow it: the master, the
 // press's source layer, the definition, and the placement (source layer, key
 // position). Callers pass the press context and act on the answer; none

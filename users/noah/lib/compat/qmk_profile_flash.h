@@ -55,6 +55,6 @@ bool noah_qmk_profile_flash_eeprom_valid(void);
 
 bool noah_qmk_profile_flash_keyboard_quiet(void);
 
-// One half's figures as Profile Wire carries them (profile-wire-v1.md,
+// One half's figures as Profile Wire carries them (docs/spec/profile-wire-v1/hid-channel.md,
 // "Flash pauses").
 void noah_qmk_profile_flash_encode_figures(const noah_profile_flash_diagnostics_t *diagnostics, uint8_t physical_half, uint8_t target[NOAH_QMK_PROFILE_FLASH_FIGURES_SIZE]);

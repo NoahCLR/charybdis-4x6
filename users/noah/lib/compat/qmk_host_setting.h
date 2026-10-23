@@ -5,7 +5,7 @@
 // settings validator can include it. Host IDs are portable settings values,
 // not QMK's os_variant_t numbering. Bits 0..1 select Auto/macOS/Windows/Linux;
 // bit 8 enables Unicode entry; bits 16..23 name the host layout
-// (docs/architecture/host-layouts-v1.md) and bit 24 says macOS classified the
+// (docs/spec/host-layouts-v1.md) and bit 24 says macOS classified the
 // keyboard as ISO.
 enum { NOAH_HOST_AUTO = 0, NOAH_HOST_MACOS = 1, NOAH_HOST_WINDOWS = 2, NOAH_HOST_LINUX = 3,
        NOAH_HOST_UNICODE_ENABLED = 0x100 };

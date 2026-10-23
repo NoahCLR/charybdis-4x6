@@ -64,7 +64,7 @@ typedef enum {
 
 // The feature word holds only what a build genuinely varies by (D-F28).
 // Everything this base does is implied by its protocol and schema versions;
-// what each bit of the earlier word meant is recorded in profile-wire-v1.md.
+// every Profile Wire 1 bit is retired (docs/spec/profile-wire-v1/hid-channel.md).
 // No firmware behaviour depends on a bit: the word only describes the build.
 enum {
     // One half of a split keyboard: a save copies the profile to the other

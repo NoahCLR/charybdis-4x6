@@ -315,7 +315,7 @@ independent of whether the layer stage is enabled.
 ## Split Sync Flow
 
 QMK activity timestamp traffic has an admission policy, on by default, separate from
-these runtime snapshot domains; see [split activity sync](split-activity-sync.md).
+these runtime snapshot domains; see [split activity sync](../spec/split-activity-sync.md).
 
 ```mermaid
 flowchart TD
@@ -408,7 +408,7 @@ Unicode playback. All other bits must be zero. The settings-v6 shape and zero
 defaults are unchanged: Auto with Unicode off. Clients require bit 21 before
 writing non-ASCII bytes or nonzero scalar 27. Older firmware rejects them.
 Feature bit 22 adds the host layout to scalar 27: bits 16–23 name a layout
-from the [host layout catalogue](host-layouts-v1.md), 0 (US) by default, and
+from the [host layout catalogue](../spec/host-layouts-v1.md), 0 (US) by default, and
 bit 24 says macOS classified the keyboard as ISO. An ID past the catalogue and
 any other bit are rejected. Clients require bit 22 before writing bits 16–24.
 
@@ -419,10 +419,10 @@ before output if that OS is unknown. The layout, ISO flag and entry method are
 latched at playback start, so a later setting or detection change cannot
 switch them mid-macro. Detection
 cannot establish active input sources or installed helpers. Host readback is
-specified in [Profile Wire](profile-wire-v1.md#host-os-readback).
+specified in [Profile Wire](../spec/profile-wire-v1/hid-channel.md#host-os--get-0x0b).
 
 Text is typed through the selected host layout. Each character, ASCII or not,
-is looked up in that layout's table ([host layouts](host-layouts-v1.md)) and
+is looked up in that layout's table ([host layouts](../spec/host-layouts-v1.md)) and
 typed with the strokes listed there. A stroke is one key with optional Shift
 and AltGr (Right Alt; Option on macOS); a character takes one stroke, or a
 dead key then Space or a letter. Tab and newline are Tab and Enter. Layout 0

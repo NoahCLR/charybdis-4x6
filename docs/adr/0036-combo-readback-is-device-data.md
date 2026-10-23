@@ -6,4 +6,4 @@ A client reads the combo table the connected half actually runs (GET `0x06`),
 with each combo's effective timing, rules, enable and allowed layers, instead
 of inferring it from source, and a digest catches a change mid-read. Firmware
 callback outputs and custom trigger and release hooks are reported as opaque,
-not interpreted. Pages: [`profile-wire-v1.md`](../architecture/profile-wire-v1.md).
+not interpreted. Pages: [`profile-wire-v1/combo-domain.md`](../spec/profile-wire-v1/combo-domain.md#native-combo-readback--get-0x06).

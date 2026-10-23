@@ -24,7 +24,7 @@ static uint32_t owner_now(const noah_qmk_durable_io_grant_t *grant, uint32_t now
 
 // Once per grant, before its first step: whether the step may not run. Out
 // of line, as the step and the repeat are: inlined into the step, it widens
-// the frame every reviewed storage path carries (memory-budgets.md, D-F32).
+// the frame every reviewed storage path carries (docs/spec/resource-policy.md, D-F32).
 static __attribute__((noinline)) void noah_qmk_durable_io_note_paused(noah_qmk_durable_io_grant_t *grant, bool paused) {
     uint32_t now = timer_read32();
 

@@ -19,7 +19,7 @@ Single-context:
 /
 ├── GLOSSARY.md
 ├── docs/adr/            firmware decisions: 0001-<slug>.md, …
-├── docs/architecture/   contracts: Profile Wire, the split protocol, storage, domains
+├── docs/spec/           contracts: Profile Wire, the split protocol, storage, domains
 └── users/noah/, keyboards/bastardkb/charybdis/4x6/keymaps/
 ```
 

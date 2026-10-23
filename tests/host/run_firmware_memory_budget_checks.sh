@@ -38,8 +38,7 @@ fi
 # D-F32 adds the working copy, one slot payload of RAM (130,048 bytes), and
 # its edit, sync and save state: one reviewed 130 KiB increment. All are
 # policy, not capacity. See
-# docs/architecture/memory-budgets.md for linked accounting and the
-# outstanding physical high-water release gate.
+# docs/spec/resource-policy.md for what each policy is and how to report it.
 STATIC_RAM_POLICY=$((57344 + 3072 + 4096 + 124928 + 20480 - 106496 - 32768 + 133120))
 
 "$PYTHON" "$ROOT/tools/check_firmware_memory_budget.py" \

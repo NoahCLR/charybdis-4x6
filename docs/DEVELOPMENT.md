@@ -188,8 +188,9 @@ its header says what it checks before it pushes and pins. To move to a newer
 official QMK image, read its index digest (`docker buildx imagetools inspect
 ghcr.io/qmk/qmk_cli:latest`, the top-level `Digest`), set it as `QMK_CLI` in
 `tools/build-image.dockerfile`, and run the script with a new tag. If it
-reports that the pair changed, the compiler changed: record the memory effect
-in [memory budgets](architecture/memory-budgets.md). If the official image
+reports that the pair changed, the compiler changed: run the resource gates and
+record the memory effect in the commit that pins the image
+([resource policy](spec/resource-policy.md#running-the-gates)). If the official image
 moves Python to a new minor version, the vault's `vpython` moves first.
 
 ## The firmware contract
@@ -243,7 +244,7 @@ built with and without the checksum refuse each other at the handshake. For a me
 transaction recorder, `_diagnostic`) and `NOAH_PROFILE_PERFORMANCE_DIAGNOSTICS=yes`
 (the pointing-cadence recorder with per-stage loop timing, `_cadence`), then run
 `node tools/capture-split-diagnostics.cjs` after flashing; it reads both. Build with Homebrew Python 3.12+ on PATH for the profile tooling.
-See [the activity contract](architecture/split-activity-sync.md), and follow
+See [the activity contract](spec/split-activity-sync.md), and follow
 [the capture procedure](../measurements/pointing-cadence/README.md) so captures
 compare; recorded sets live under [`measurements/`](../measurements/README.md).
 
@@ -272,8 +273,7 @@ Ark on the new base can drive such a build.
 ## Open release gates
 
 Physical migration, power-interruption, pointing cadence and stack high-water
-acceptance remain release gates; see the
-[PD-mode domain contract](architecture/pd-mode-domain-v1.md#hardware-acceptance).
+acceptance remain release gates.
 Physical gesture acceptance (the Button 3 double-hold failure and
 combo/tapping interactions on the current layout) is also still open.
 

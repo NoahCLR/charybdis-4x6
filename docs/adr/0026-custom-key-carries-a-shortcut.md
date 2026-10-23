@@ -12,5 +12,5 @@ modifiers must sit on one side: it is held through the owned output a literal
 modified keycode uses, which releases exactly what it took. A behaviour step
 on another key may send a custom key and sends its shortcut only, never its
 behaviour, so steps never chain (revising D-F51). Bytes:
-[`portable-profile-v1.md`](../architecture/portable-profile-v1.md); behaviour:
+[`profile-wire-v1/settings-domain.md`](../spec/profile-wire-v1/settings-domain.md#custom-key-shortcuts); behaviour:
 [`runtime-flow.md`](../architecture/runtime-flow.md).

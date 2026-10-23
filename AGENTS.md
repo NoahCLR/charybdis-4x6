@@ -35,9 +35,9 @@ repository.**
 
 Read the decisions in [`docs/adr/`](./docs/adr/) that touch the area before
 doing architecture work. The technical authority is
-[`docs/architecture/device-resident-profile.md`](./docs/architecture/device-resident-profile.md).
+[`docs/spec/device-resident-profile.md`](./docs/spec/device-resident-profile.md).
 Firmware owns the device: its runtime, its stored profile, the wire and split
-protocols and the specs under `docs/architecture/`. The product goal, the app's
+protocols and the specs under `docs/spec/`. The product goal, the app's
 status and the app's decisions (cited as D-L…) belong to the Charybdis Ark
 repository; no firmware task needs them.
 
@@ -73,7 +73,7 @@ work-queue vault.
 - `README.md` is a short pitch for Charybdis owners, in Noah's personal voice: what the firmware does with Charybdis Ark named in its first paragraph, how to get started from a release, one short C example, the docs list, credits, and the build video at the bottom. Keep it short; depth goes in [`docs/GUIDE.md`](docs/GUIDE.md) (the full behaviour vocabulary, lighting, split sync, building from source) or the topic docs it links. Keep development material out of it: repositories and branches, CI, pins, contracts, comparison and diagnostic builds, release mechanics and agent workflow go in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md); app behaviour belongs in Ark (its README and `docs/GUIDE.md`). The files under `docs/` are the rest of the documentation set.
 - For doc fixes, doc updates, doc audits, or user-facing explanation work, check `README.md` and the relevant files under `docs/` first.
 - For refactors or runtime architecture work, read the ADRs in `docs/adr/` that touch the area first.
-- The durable specs live under `docs/architecture/`: the Profile Wire and split protocols, the authority state tables, the storage and resource baseline, the PD-mode domain, and the field classification. Treat those as the contract; change them deliberately.
+- The durable specs live under `docs/spec/`: the Profile Wire and split protocols, the authority state tables, storage and the resource policy, the PD-mode domain, and the field classification. Treat those as the contract; change them deliberately.
 - This repo no longer keeps dated review folders or finding registers. Record decisions in the doc they govern, next to the thing they constrain.
 - Work is queued, refined and planned in the work-queue vault, `charybdis-notes` beside this checkout (see [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md#local-repositories-and-worktrees)). When a task comes from it, follow that vault's `AGENTS.md` for claiming and status; this file still governs every change in this repo. Active plans live there, not under `docs/`.
 - Hardware measurements are the exception: raw captures live under `measurements/<subject>/YYYY-MM-DD-<label>/` with a set record, captured with the subject's procedure. Read [`measurements/README.md`](./measurements/README.md) before taking or quoting a measurement; never edit a capture file.
@@ -158,12 +158,12 @@ Repo-specific guardrails:
 - Prefer small, local changes over generic runtime rewrites unless the task explicitly requires runtime architecture work.
 - If behavior, workflows, setup steps, or user-facing capabilities changed, update the relevant files under `docs/` in the same pass, and `README.md` when a user-facing capability changed (development workflow changes go in `docs/DEVELOPMENT.md`).
 - If `VIA_MACROS()` in a profile's `keymap.c` changes, regenerate its `authored_macro_bank.h` in the same pass with `NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh` (pass the keymap path for another profile). Real-profile validation refuses a stale copy.
-- If architectural work lands, record it in the same pass: a new or amended firmware decision as an ADR in `docs/adr/` (the next number, cited as D-F<n>; see `docs/agents/domain.md`), or the matching spec under `docs/architecture/`. App decisions and app status belong to Ark.
+- If architectural work lands, record it in the same pass: a new or amended firmware decision as an ADR in `docs/adr/` (the next number, cited as D-F<n>; see `docs/agents/domain.md`), or the matching spec under `docs/spec/`. App decisions and app status belong to Ark.
 - Write decisions and contracts, not logs: verification runs, build numbers, test counts and dated progress notes belong in commit messages. When a plan in the work-queue vault is finished, fold what still constrains the code into the spec it produced and delete the plan.
 
 ## RP2040 Resource Truth
 
-- Read `docs/architecture/memory-budgets.md` before interpreting or reporting
+- Read `docs/spec/resource-policy.md` before interpreting or reporting
   firmware RAM, allocator, EEPROM-cache, or stack values.
 - Report resources per keyboard half. Each half has its own RP2040 and its own
   270,336 bytes of physical SRAM: 262,144 bytes in SRAM0–3 plus 4,096 bytes
