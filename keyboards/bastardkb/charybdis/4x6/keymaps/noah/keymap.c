@@ -570,7 +570,6 @@ const key_behavior_t
             {.keycode = KC_LEFT_SHIFT, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_CAPS)}}},
             {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(PD_SLOT_4_LOCK)}, [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_6)}}},
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
-            {.keycode = KC_DEL},
             {.keycode = KC_LEFT_GUI, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)}, [2] = {.tap = TAP_SENDS(OSM(MOD_LSFT))}}},
 
             // ─── Layer-Tap Keys ──────────────────────────────────────────────────────────────
