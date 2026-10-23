@@ -220,7 +220,7 @@ static uint16_t key_runtime_core_default_hold_term(void) {
     return noah_setting(NOAH_SETTING_TAP_HOLD_TERM, CUSTOM_TAP_HOLD_TERM);
 }
 
-static uint16_t key_runtime_core_default_longer_hold_term(void) {
+static uint16_t key_runtime_core_default_long_hold_term(void) {
     return noah_setting(NOAH_SETTING_LONG_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM);
 }
 
@@ -585,7 +585,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
     key_runtime_slot_interaction_t interaction = key_runtime_slot_interaction_default();
     handled_key_resolution_ctx_t   ctx;
     uint16_t                       hold_term_ms;
-    uint16_t                       longer_hold_term_ms;
+    uint16_t                       long_hold_term_ms;
     uint16_t                       token_id;
     uint8_t                        tap_count                   = 1u;
     bool                           handled                     = false;
@@ -634,15 +634,15 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
     handled_key_lookup_row_tap_count_into(event->keycode, tap_count, !event->bypass_row, &resolution);
     handled = handled_key_resolution_is_handled(resolution);
     handled_key_materialized_default_into(&resolution, &materialized);
-    hold_term_ms        = key_runtime_core_default_hold_term();
-    longer_hold_term_ms = key_runtime_core_default_longer_hold_term();
+    hold_term_ms      = key_runtime_core_default_hold_term();
+    long_hold_term_ms = key_runtime_core_default_long_hold_term();
 
     if (handled) {
         ctx = handled_key_resolution_ctx_make(event->key_pos, key_runtime_core_resolution_layers(state));
         handled_key_materialize_into(&resolution, &ctx, &materialized);
         key_runtime_slot_interaction_from_materialized_into(&materialized, &interaction);
         hold_term_ms                = handled_key_resolution_tap_hold_term(resolution);
-        longer_hold_term_ms         = handled_key_resolution_longer_hold_term(resolution);
+        long_hold_term_ms           = handled_key_resolution_long_hold_term(resolution);
         tap_outcome_available       = handled_key_resolution_has_multi_tap(resolution) || materialized.tap_action != KC_NO;
         pd_mode_was_locked_on_press = materialized.pd_mode != 0 && state->shadow_projection.pd_mode_local_locked == materialized.pd_mode;
         slot_phase                  = hold_registers_on_press(materialized.hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
@@ -671,7 +671,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
         .observed_release_keycode    = KC_NO,
         .pressed_at                  = now,
         .hold_term_ms                = hold_term_ms,
-        .longer_hold_term_ms         = longer_hold_term_ms,
+        .long_hold_term_ms           = long_hold_term_ms,
         .feedback_sequence           = key_runtime_core_state_next_feedback_sequence(state),
         .phase                       = PRESS_TOKEN_PHASE_PRESSED,
         .feedback_level              = KEY_RUNTIME_CORE_FEEDBACK_LEVEL_PRESS,
@@ -942,7 +942,7 @@ static bool key_runtime_core_press_token_settles_on_other_press(const press_toke
 static uint16_t key_runtime_core_press_token_release_hold_action(const press_token_t *token, uint16_t elapsed) {
     const key_runtime_slot_interaction_t *interaction = &token->interaction;
 
-    if (interaction->contract.long_hold.release_action != KC_NO && elapsed >= interaction->binding.longer_hold_term) {
+    if (interaction->contract.long_hold.release_action != KC_NO && elapsed >= interaction->binding.long_hold_term) {
         return interaction->contract.long_hold.release_action;
     }
     if (interaction->contract.hold.release_action != KC_NO && elapsed >= interaction->binding.tap_hold_term) {
@@ -972,7 +972,7 @@ static void key_runtime_core_settle_on_other_press(key_runtime_core_state_t *sta
     if (!(series && series->active && series->keycode == token->resolved_keycode && !series->resolved)) {
         series = NULL;
     }
-    first_hold_term = token->interaction.binding.hold.present ? token->interaction.binding.tap_hold_term : token->interaction.binding.longer_hold_term;
+    first_hold_term = token->interaction.binding.hold.present ? token->interaction.binding.tap_hold_term : token->interaction.binding.long_hold_term;
     tap_pending     = (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW || (token->slot_phase == KEY_RUNTIME_SLOT_PHASE_HOLD_COMPLETE && series)) && !((token->interaction.binding.hold.present || token->interaction.binding.long_hold.present) && elapsed >= first_hold_term);
 
     if (tap_pending && series) {

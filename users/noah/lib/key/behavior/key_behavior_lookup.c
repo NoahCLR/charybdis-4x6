@@ -137,11 +137,11 @@ static bool key_behavior_keycode_supported(uint16_t keycode) {
     return noah_action_supported_at(keycode, NOAH_ACTION_PLACEMENT_KEY);
 }
 
-static bool key_behavior_action_supported(uint16_t action, hold_behavior_mode_t hold_mode) {
+static bool key_behavior_action_supported(uint16_t action, hold_style_t hold_style) {
     noah_action_placement_t placement = NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP;
 
-    if (hold_mode != HOLD_BEHAVIOR_NONE) {
-        placement = hold_mode == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE ? NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD : NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER;
+    if (hold_style != HOLD_BEHAVIOR_NONE) {
+        placement = hold_style == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE ? NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD : NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER;
     }
 
     return noah_action_supported_at(action, placement);
@@ -156,7 +156,7 @@ static void key_behavior_log_invalid_keycode(uint8_t index, uint16_t keycode) {
 #endif
 }
 
-static void key_behavior_log_invalid_action(uint8_t index, uint8_t tap_count, const char *field, uint16_t action, hold_behavior_mode_t hold_mode) {
+static void key_behavior_log_invalid_action(uint8_t index, uint8_t tap_count, const char *field, uint16_t action, hold_style_t hold_style) {
 #ifdef CONSOLE_ENABLE
     uprintf("Unsupported key_behaviors[%u].tap_counts[%u].%s action 0x%04X; layer actions are supported as TG()/TO()/OSL()/LOCK_LAYER() taps or PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer))\n", (unsigned int)index, (unsigned int)tap_count, field, (unsigned int)action);
 #else
@@ -164,7 +164,7 @@ static void key_behavior_log_invalid_action(uint8_t index, uint8_t tap_count, co
     (void)tap_count;
     (void)field;
     (void)action;
-    (void)hold_mode;
+    (void)hold_style;
 #endif
 }
 
@@ -279,9 +279,9 @@ static key_behavior_view_t key_behavior_view_build(uint16_t keycode, bool use_ro
         tap_term = config->tap_hold_term;
     }
 
-    uint16_t longer_term = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.longer_hold_term ? live.longer_hold_term : (config && config->longer_hold_term ? config->longer_hold_term : noah_setting(NOAH_SETTING_LONG_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM));
-    uint16_t multi_term  = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.multi_tap_term ? live.multi_tap_term : (config && config->multi_tap_term ? config->multi_tap_term : noah_setting(NOAH_SETTING_MULTI_TAP_TERM, CUSTOM_MULTI_TAP_TERM));
-    uint8_t  tap_depth   = row_steps ? row_depth : key_behavior_tap_toggle_depth(keycode);
+    uint16_t long_hold_term = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.long_hold_term ? live.long_hold_term : (config && config->longer_hold_term ? config->longer_hold_term : noah_setting(NOAH_SETTING_LONG_HOLD_TERM, CUSTOM_LONGER_HOLD_TERM));
+    uint16_t multi_term     = live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && live.multi_tap_term ? live.multi_tap_term : (config && config->multi_tap_term ? config->multi_tap_term : noah_setting(NOAH_SETTING_MULTI_TAP_TERM, CUSTOM_MULTI_TAP_TERM));
+    uint8_t  tap_depth      = row_steps ? row_depth : key_behavior_tap_toggle_depth(keycode);
     return (key_behavior_view_t){
         .config             = row_steps ? config : NULL,
         .source_epoch       = live.epoch,
@@ -294,7 +294,7 @@ static key_behavior_view_t key_behavior_view_build(uint16_t keycode, bool use_ro
         .has_multi_tap      = tap_depth > 1u,
         .authored_tap_depth = tap_depth,
         .tap_hold_term      = tap_term,
-        .longer_hold_term   = longer_term,
+        .long_hold_term     = long_hold_term,
         .multi_tap_term     = multi_term,
         .single             = row_steps ? (live_result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? live.single : config->tap_counts[0]) : key_behavior_tap_toggle_step(keycode, 1u),
     };
@@ -343,20 +343,20 @@ uint8_t key_behavior_validate_all(void) {
                 error_count = key_behavior_error_count_increment(error_count);
             }
 
-            if (step.hold.present && !key_behavior_action_supported(step.hold.action, step.hold.mode)) {
-                key_behavior_log_invalid_action(i, tap_index, "hold", step.hold.action, step.hold.mode);
+            if (step.hold.present && !key_behavior_action_supported(step.hold.action, step.hold.style)) {
+                key_behavior_log_invalid_action(i, tap_index, "hold", step.hold.action, step.hold.style);
                 error_count = key_behavior_error_count_increment(error_count);
             }
-            if (step.hold.present && step.hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && !hold_repeat_rate_valid(step.hold.repeat_hz)) {
+            if (step.hold.present && step.hold.style == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && !hold_repeat_rate_valid(step.hold.repeat_hz)) {
                 key_behavior_log_invalid_repeat_rate(i, tap_index, "hold");
                 error_count = key_behavior_error_count_increment(error_count);
             }
 
-            if (step.long_hold.present && !key_behavior_action_supported(step.long_hold.action, step.long_hold.mode)) {
-                key_behavior_log_invalid_action(i, tap_index, "long_hold", step.long_hold.action, step.long_hold.mode);
+            if (step.long_hold.present && !key_behavior_action_supported(step.long_hold.action, step.long_hold.style)) {
+                key_behavior_log_invalid_action(i, tap_index, "long_hold", step.long_hold.action, step.long_hold.style);
                 error_count = key_behavior_error_count_increment(error_count);
             }
-            if (step.long_hold.present && step.long_hold.mode == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && !hold_repeat_rate_valid(step.long_hold.repeat_hz)) {
+            if (step.long_hold.present && step.long_hold.style == HOLD_BEHAVIOR_REPEAT_WHILE_HELD && !hold_repeat_rate_valid(step.long_hold.repeat_hz)) {
                 key_behavior_log_invalid_repeat_rate(i, tap_index, "long_hold");
                 error_count = key_behavior_error_count_increment(error_count);
             }

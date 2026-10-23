@@ -106,7 +106,7 @@ static void split_runtime_sync_elapsed_internal(uint16_t raw_elapsed, bool force
 static uint16_t split_runtime_sync_auto_mouse_elapsed(uint32_t now) {
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
     // Deliberately ungated. is_auto_mouse_active() reports "the pointer is in
-    // use right now", not "the auto-mouse layer is on": QMK recomputes it from
+    // use right now", not "the pointer layer is on": QMK recomputes it from
     // each mouse report, so it goes false the moment movement stops while the
     // activity timer keeps counting toward the timeout. The fade renders that
     // timeout, so gating on it zeroed the progress the slave mirrors for

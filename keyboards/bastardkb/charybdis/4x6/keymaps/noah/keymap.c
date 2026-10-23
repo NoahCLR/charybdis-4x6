@@ -383,7 +383,7 @@
 //   - CUSTOM_TAP_HOLD_TERM = 150 ms
 //     default first hold threshold for every other key_behavior row
 //   - CUSTOM_LONGER_HOLD_TERM = 400 ms
-//     default longer-hold threshold
+//     default long hold threshold
 //   - CUSTOM_MULTI_TAP_TERM = 150 ms
 //     max gap allowed between taps in a multi-tap sequence
 //   - KEY_BEHAVIOR_MAX_TAP_COUNT = 5
@@ -391,7 +391,7 @@
 //
 // per-key timing overrides:
 //   - .tap_hold_term overrides the first hold threshold for that row
-//   - .longer_hold_term overrides the longer-hold threshold
+//   - .longer_hold_term overrides the long hold threshold
 //   - .multi_tap_term overrides the max gap between taps
 //   - omit them (or leave them 0) to use the defaults above
 //   - for LT()/MT()/OSM()/TT()/OSL() rows, omitted .tap_hold_term falls back
@@ -425,7 +425,7 @@
 // within one tap index:
 //   - .tap is the tap tier
 //   - .hold is the normal hold tier
-//   - .long_hold is the longer-hold tier
+//   - .long_hold is the long-hold tier
 // omit .tap to keep the key's normal tap behavior for that tap index
 // if .tap is set but hold/long_hold are omitted, keys that already have a
 // default held path keep using it. Stacked pd-mode rows are contained: if a
@@ -443,7 +443,7 @@
 //     color once .multi_tap_term has run out, and a branch authoring no .tap keeps
 //     the branch color until its hold threshold because it has nothing else to name
 //   - an authored .hold tier can show hold-tier feedback while pending/active
-//   - an authored .long_hold tier can show longer-hold-tier feedback when it
+//   - an authored .long_hold tier can show long-hold-tier feedback when it
 //     commits or stays active
 //   - a missing .hold tier stays visually quiet even if .long_hold exists
 //   - primary momentary layer access uses the layer color itself rather than a
@@ -482,7 +482,7 @@
 //     keep the lower active layer's tap output at this physical key while the
 //     authored row still owns this tap count's timing and branching
 //
-// hold-tier and long-hold-tier actions accept the same three helpers:
+// hold-tier and long-hold-tier actions take one of four hold styles:
 //   PRESS_AND_HOLD_UNTIL_RELEASE(action)
 //     normal keys/modifiers:
 //       cross .tap_hold_term -> press/register action
@@ -491,7 +491,7 @@
 //       cross .tap_hold_term -> send action once immediately
 //       release the key -> do nothing
 //     use this for modifiers or keys you want to stay down while held;
-//     macros use the same helper for a held-triggered one-shot
+//     macros use the same hold style for a held-triggered one-shot
 //     PRESS_AND_HOLD_UNTIL_RELEASE(KC_TRNS) uses the lower active layer's
 //     actual hold-tier behavior at the same key; if that lower key is a
 //     momentary layer or pd mode, its normal hold ownership comes through
@@ -516,8 +516,8 @@
 //   TAP_ON_RELEASE_AFTER_HOLD(action)
 //     cross .tap_hold_term -> qualify the hold, but do nothing yet
 //     release the key -> send action once
-//     use this when the key should stay quiet while held, or when a longer
-//     hold should still be able to replace the shorter hold action
+//     use this when the key should stay quiet while held, or when a long
+//     hold should still be able to replace the hold action
 //     TAP_ON_RELEASE_AFTER_HOLD(KC_TRNS) releases into the lower active
 //     layer's same-tier behavior at this physical key
 //     with .long_hold configured, this creates a clean middle tier:
@@ -528,7 +528,7 @@
 // {
 //     .keycode = KC_EXAMPLE,
 //     .tap_hold_term = 150, // overrides the default tap-vs-hold threshold for this key
-//     .longer_hold_term = 400, // overrides the default longer hold threshold for this key
+//     .longer_hold_term = 400, // overrides the default long hold threshold for this key
 //     .multi_tap_term = 150, // overrides the default multi-tap threshold for this key
 //     .tap_counts =
 //         {

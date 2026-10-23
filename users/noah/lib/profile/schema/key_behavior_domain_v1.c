@@ -133,15 +133,15 @@ static noah_profile_codec_v1_result_t read_action(const decode_context_t *contex
     return decode_action_bytes(bytes, offset, &context->action_limits, target, row_index, step_index, field_id, action, error);
 }
 
-static noah_profile_codec_v1_result_t validate_hold_values(const noah_key_behavior_hold_v1_t *hold, const noah_key_behavior_limits_v1_t *limits, const noah_profile_action_v1_limits_t *action_limits, uint8_t row_index, uint8_t step_index, uint8_t mode_field, uint8_t repeat_field, uint8_t action_field, noah_profile_codec_v1_error_t *error) {
+static noah_profile_codec_v1_result_t validate_hold_values(const noah_key_behavior_hold_v1_t *hold, const noah_key_behavior_limits_v1_t *limits, const noah_profile_action_v1_limits_t *action_limits, uint8_t row_index, uint8_t step_index, uint8_t style_field, uint8_t repeat_field, uint8_t action_field, noah_profile_codec_v1_error_t *error) {
     uint8_t                        action_bytes[NOAH_PROFILE_BLOB_V1_ACTION_SIZE];
     noah_profile_codec_v1_error_t  action_error;
     noah_profile_codec_v1_result_t result;
 
-    if (hold->mode < NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE || hold->mode > NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE, 0u, row_index, step_index, mode_field);
+    if (hold->style < NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE || hold->style > NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD) {
+        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE, 0u, row_index, step_index, style_field);
     }
-    if ((hold->mode == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && (hold->repeat_hz == 0u || hold->repeat_hz > limits->max_repeat_hz)) || (hold->mode != NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && hold->repeat_hz != 0u)) {
+    if ((hold->style == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && (hold->repeat_hz == 0u || hold->repeat_hz > limits->max_repeat_hz)) || (hold->style != NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && hold->repeat_hz != 0u)) {
         return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE, 0u, row_index, step_index, repeat_field);
     }
     result = noah_profile_action_v1_encode(&hold->action, action_limits, action_bytes, &action_error);
@@ -156,22 +156,22 @@ static noah_profile_codec_v1_result_t validate_hold_values(const noah_key_behavi
 
 static noah_profile_codec_v1_result_t decode_hold(const decode_context_t *context, size_t offset, size_t end, uint8_t row_index, uint8_t step_index, bool long_hold, noah_key_behavior_hold_v1_t *hold, noah_profile_codec_v1_error_t *error) {
     uint8_t fields[2];
-    uint8_t mode_field   = long_hold ? NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_MODE : NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_MODE;
+    uint8_t style_field  = long_hold ? NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_STYLE : NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_STYLE;
     uint8_t repeat_field = long_hold ? NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_REPEAT : NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_REPEAT;
     uint8_t action_field = long_hold ? NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION : NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_ACTION;
 
     if (offset > end || NOAH_KEY_BEHAVIOR_DOMAIN_V1_HOLD_SIZE > end - offset) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_TRUNCATED, offset, row_index, step_index, mode_field);
+        return fail(error, NOAH_PROFILE_CODEC_V1_TRUNCATED, offset, row_index, step_index, style_field);
     }
-    if (read_bytes(context, offset, fields, sizeof(fields), row_index, step_index, mode_field, error) != NOAH_PROFILE_CODEC_V1_OK) {
+    if (read_bytes(context, offset, fields, sizeof(fields), row_index, step_index, style_field, error) != NOAH_PROFILE_CODEC_V1_OK) {
         return error ? error->code : NOAH_PROFILE_CODEC_V1_READ_ERROR;
     }
-    hold->mode      = fields[0];
+    hold->style     = fields[0];
     hold->repeat_hz = fields[1];
-    if (hold->mode < NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE || hold->mode > NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD) {
-        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE, offset, row_index, step_index, mode_field);
+    if (hold->style < NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE || hold->style > NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD) {
+        return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE, offset, row_index, step_index, style_field);
     }
-    if ((hold->mode == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && (hold->repeat_hz == 0u || hold->repeat_hz > context->limits.max_repeat_hz)) || (hold->mode != NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && hold->repeat_hz != 0u)) {
+    if ((hold->style == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && (hold->repeat_hz == 0u || hold->repeat_hz > context->limits.max_repeat_hz)) || (hold->style != NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && hold->repeat_hz != 0u)) {
         return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE, offset + 1u, row_index, step_index, repeat_field);
     }
     return read_action(context, offset + 2u, end, false, row_index, step_index, action_field, &hold->action, error);
@@ -259,16 +259,16 @@ static noah_profile_codec_v1_result_t decode_row_fixed(const decode_context_t *c
         return result;
     }
     memcpy(row->target_bytes, fixed, sizeof(row->target_bytes));
-    row->row_index        = row_index;
-    row->tap_hold_term    = read_u16(&fixed[4]);
-    row->longer_hold_term = read_u16(&fixed[6]);
-    row->multi_tap_term   = read_u16(&fixed[8]);
-    row->flags            = fixed[10];
-    row->step_count       = fixed[11];
-    row->allowed_layers   = read_u32(&fixed[12]);
-    row->row_offset       = offset;
-    row->steps_offset     = body_start + NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE;
-    row->row_end          = row_end;
+    row->row_index      = row_index;
+    row->tap_hold_term  = read_u16(&fixed[4]);
+    row->long_hold_term = read_u16(&fixed[6]);
+    row->multi_tap_term = read_u16(&fixed[8]);
+    row->flags          = fixed[10];
+    row->step_count     = fixed[11];
+    row->allowed_layers = read_u32(&fixed[12]);
+    row->row_offset     = offset;
+    row->steps_offset   = body_start + NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FIXED_SIZE;
+    row->row_end        = row_end;
     if ((row->flags & (uint8_t)~NOAH_KEY_BEHAVIOR_DOMAIN_V1_KNOWN_ROW_FLAGS) != 0u) {
         return fail(error, NOAH_PROFILE_CODEC_V1_RESERVED_FLAGS, body_start + 10u, row_index, UINT8_MAX, NOAH_KEY_BEHAVIOR_FIELD_V1_ROW_FLAGS);
     }
@@ -321,13 +321,13 @@ static noah_key_behavior_domain_v1_validation_result_t validation_read(noah_key_
     return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
 }
 
-static void publish_action_event(noah_key_behavior_domain_v1_validation_t *validation, const noah_profile_action_v1_t *action, size_t offset, uint8_t row_index, uint8_t step_index, uint8_t field_id, uint8_t hold_mode) {
+static void publish_action_event(noah_key_behavior_domain_v1_validation_t *validation, const noah_profile_action_v1_t *action, size_t offset, uint8_t row_index, uint8_t step_index, uint8_t field_id, uint8_t hold_style) {
     validation->action_event.action     = *action;
     validation->action_event.offset     = offset;
     validation->action_event.row_index  = row_index;
     validation->action_event.step_index = step_index;
     validation->action_event.field_id   = field_id;
-    validation->action_event.hold_mode  = hold_mode;
+    validation->action_event.hold_style = hold_style;
     validation->action_event_available  = true;
 }
 
@@ -582,21 +582,21 @@ noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_vali
         case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HOLD_FIELDS:
         case NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_FIELDS: {
             bool    long_hold     = validation->phase == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_FIELDS;
-            uint8_t mode_field    = long_hold ? NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_MODE : NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_MODE;
+            uint8_t style_field   = long_hold ? NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_STYLE : NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_STYLE;
             uint8_t repeat_field  = long_hold ? NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_REPEAT : NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_REPEAT;
             size_t  fields_offset = validation->branch_offset;
 
             if (fields_offset > validation->row_end || NOAH_KEY_BEHAVIOR_DOMAIN_V1_HOLD_SIZE > validation->row_end - fields_offset) {
-                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_TRUNCATED, fields_offset, validation->row_index, validation->step_index, mode_field, error);
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_TRUNCATED, fields_offset, validation->row_index, validation->step_index, style_field, error);
             }
-            if (validation_read(validation, fields_offset, bytes, 2u, validation->row_index, validation->step_index, mode_field, error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED) return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
+            if (validation_read(validation, fields_offset, bytes, 2u, validation->row_index, validation->step_index, style_field, error) == NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED) return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_REJECTED;
             if (bytes[0] < NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE || bytes[0] > NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD) {
-                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE, fields_offset, validation->row_index, validation->step_index, mode_field, error);
+                return validation_reject(validation, NOAH_PROFILE_CODEC_V1_INVALID_HOLD_MODE, fields_offset, validation->row_index, validation->step_index, style_field, error);
             }
             if ((bytes[0] == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && (bytes[1] == 0u || bytes[1] > validation->candidate.limits.max_repeat_hz)) || (bytes[0] != NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && bytes[1] != 0u)) {
                 return validation_reject(validation, NOAH_PROFILE_CODEC_V1_INVALID_REPEAT_RATE, fields_offset + 1u, validation->row_index, validation->step_index, repeat_field, error);
             }
-            validation->current_hold_mode = bytes[0];
+            validation->current_hold_style = bytes[0];
             validation->branch_offset += 2u;
             validation->phase = long_hold ? NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_LONG_HOLD_ACTION : NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_PHASE_STEP_HOLD_ACTION;
             return NOAH_KEY_BEHAVIOR_DOMAIN_V1_VALIDATION_IN_PROGRESS;
@@ -618,7 +618,7 @@ noah_key_behavior_domain_v1_validation_result_t noah_key_behavior_domain_v1_vali
             clear_error(&action_error);
             result = decode_action_bytes(bytes, action_offset, &validation->candidate.action_limits, false, validation->row_index, validation->step_index, field, &action, &action_error);
             if (result != NOAH_PROFILE_CODEC_V1_OK) return validation_reject_error(validation, &action_error, error);
-            publish_action_event(validation, &action, action_offset, validation->row_index, validation->step_index, field, validation->current_hold_mode);
+            publish_action_event(validation, &action, action_offset, validation->row_index, validation->step_index, field, validation->current_hold_style);
             validation->branch_offset += NOAH_PROFILE_BLOB_V1_ACTION_SIZE;
             if (long_hold) return validation_finish_step(validation, error);
             return validation_advance_after_hold(validation, error);
@@ -840,7 +840,7 @@ noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_find_target_indexed(c
 }
 
 static bool row_view_equal(const noah_key_behavior_row_v1_view_t *left, const noah_key_behavior_row_v1_view_t *right) {
-    return left && right && left->row_index == right->row_index && memcmp(left->target_bytes, right->target_bytes, sizeof(left->target_bytes)) == 0 && left->target.kind == right->target.kind && left->target.flags == right->target.flags && left->target.operand == right->target.operand && left->tap_hold_term == right->tap_hold_term && left->longer_hold_term == right->longer_hold_term && left->multi_tap_term == right->multi_tap_term && left->flags == right->flags && left->step_count == right->step_count && left->allowed_layers == right->allowed_layers && left->row_offset == right->row_offset && left->steps_offset == right->steps_offset && left->row_end == right->row_end;
+    return left && right && left->row_index == right->row_index && memcmp(left->target_bytes, right->target_bytes, sizeof(left->target_bytes)) == 0 && left->target.kind == right->target.kind && left->target.flags == right->target.flags && left->target.operand == right->target.operand && left->tap_hold_term == right->tap_hold_term && left->long_hold_term == right->long_hold_term && left->multi_tap_term == right->multi_tap_term && left->flags == right->flags && left->step_count == right->step_count && left->allowed_layers == right->allowed_layers && left->row_offset == right->row_offset && left->steps_offset == right->steps_offset && left->row_end == right->row_end;
 }
 
 // Steps past a step from its header alone: its branches' sizes follow from
@@ -959,13 +959,13 @@ static noah_profile_codec_v1_result_t validate_step_value(const noah_key_behavio
         }
     }
     if ((step->presence_mask & NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD) != 0u) {
-        result = validate_hold_values(&step->hold, limits, action_limits, row_index, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_MODE, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_REPEAT, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_ACTION, error);
+        result = validate_hold_values(&step->hold, limits, action_limits, row_index, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_STYLE, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_REPEAT, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_ACTION, error);
         if (result != NOAH_PROFILE_CODEC_V1_OK) {
             return result;
         }
     }
     if ((step->presence_mask & NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_LONG_HOLD) != 0u) {
-        result = validate_hold_values(&step->long_hold, limits, action_limits, row_index, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_MODE, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_REPEAT, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION, error);
+        result = validate_hold_values(&step->long_hold, limits, action_limits, row_index, step_index, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_STYLE, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_REPEAT, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION, error);
         if (result != NOAH_PROFILE_CODEC_V1_OK) {
             return result;
         }
@@ -986,7 +986,7 @@ static void write_action(uint8_t *output, const noah_profile_action_v1_t *action
 }
 
 static void write_hold(uint8_t *output, const noah_key_behavior_hold_v1_t *hold) {
-    output[0] = hold->mode;
+    output[0] = hold->style;
     output[1] = hold->repeat_hz;
     write_action(&output[2], &hold->action);
 }
@@ -1089,7 +1089,7 @@ noah_profile_codec_v1_result_t noah_key_behavior_domain_v1_encode(const noah_key
         offset += NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_LENGTH_SIZE;
         write_action(&output[offset], &row->target);
         write_u16(&output[offset + 4u], row->tap_hold_term);
-        write_u16(&output[offset + 6u], row->longer_hold_term);
+        write_u16(&output[offset + 6u], row->long_hold_term);
         write_u16(&output[offset + 8u], row->multi_tap_term);
         output[offset + 10u] = row->flags;
         output[offset + 11u] = (uint8_t)row->step_count;

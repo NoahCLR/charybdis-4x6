@@ -547,7 +547,7 @@ bool key_runtime_core_hold_is_complete_at(keypos_t key_pos) {
 
 // The single gate for hold progress. A physical release already queued in QMK
 // ends the gesture at its physical time; delayed delivery must not let a scan
-// invent a longer hold. Every tap/hold transition checks this, not the queue.
+// stretch a hold. Every tap/hold transition checks this, not the queue.
 // A release record admission holds back is queued as well, except the
 // release of a key admission is waiting for: overload can replay that key's
 // press ahead of its held release, and only its own decision frees the queue.

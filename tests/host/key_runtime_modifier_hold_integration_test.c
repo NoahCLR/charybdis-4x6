@@ -224,7 +224,7 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
         .has_multi_tap      = keycode == TEST_MULTI_TAP_KEY,
         .authored_tap_depth = keycode == TEST_MULTI_TAP_KEY ? 3u : (NOAH_KEYCODE_IS_CUSTOM_KEY(keycode) ? 0u : 1u),
         .tap_hold_term      = keycode == TEST_MULTI_TAP_KEY ? 120 : 0,
-        .longer_hold_term   = keycode == TEST_MULTI_TAP_KEY ? 240 : 0,
+        .long_hold_term     = keycode == TEST_MULTI_TAP_KEY ? 240 : 0,
         .multi_tap_term     = keycode == TEST_MULTI_TAP_KEY ? 150 : 0,
     };
 }

@@ -62,8 +62,8 @@ bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
 
 // QMK resolves a record's keycode, process_auto_mouse() then turns its layer
 // off for a non-mouse press, and the default handler looks the action up a
-// second time. A press resolved from the auto-mouse layer would run the key
-// beneath it while every hook before that saw the auto-mouse layer's key. It
+// second time. A press resolved from the pointer layer would run the key
+// beneath it while every hook before that saw the pointer layer's key. It
 // counts as a mouse key for its own record instead, so both lookups agree,
 // and settles as soon as the record is processed with the reset QMK skipped.
 static bool deferred_reset_pending;
@@ -118,7 +118,7 @@ void pointer_layer_policy_note_action(uint16_t action, bool pressed) {
 }
 
 // One count on QMK's key tracker while the runtime locks or holds the
-// auto-mouse layer, so neither QMK's timeout nor its reset on the next
+// pointer layer, so neither QMK's timeout nor its reset on the next
 // non-mouse key turns off a layer the runtime still owns. QMK counts its own
 // MO()/TT() keys, but a behaviour's MO() hold never reaches it as a keycode.
 // QMK zeroes the tracker whenever it resets auto-mouse: switched off,
@@ -177,7 +177,7 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
         return state;
     }
 
-    // Keep the configured auto-mouse layer alive while anchored. Outside the
+    // Keep the configured pointer layer alive while anchored. Outside the
     // sniping exception above, overlap with other keyboard layers is allowed.
     if (auto_mouse_anchored) {
         state |= auto_mouse_mask;

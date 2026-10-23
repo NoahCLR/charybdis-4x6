@@ -214,7 +214,7 @@ key_behavior_view_t key_behavior_lookup(uint16_t keycode) {
             .has_multi_tap      = true,
             .authored_tap_depth = 2u,
             .tap_hold_term      = 150,
-            .longer_hold_term   = 350,
+            .long_hold_term     = 350,
             .multi_tap_term     = 120,
             .single =
                 {

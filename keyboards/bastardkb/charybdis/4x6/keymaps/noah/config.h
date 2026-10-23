@@ -56,12 +56,12 @@ enum charybdis_keymap_layers {
 // Single key timeline:
 //   < CUSTOM_TAP_HOLD_TERM                         = tap (send plain key)
 //   CUSTOM_TAP_HOLD_TERM – CUSTOM_LONGER_HOLD_TERM = hold (shifted / alt action)
-//   > CUSTOM_LONGER_HOLD_TERM                      = longer hold (third-tier action)
+//   > CUSTOM_LONGER_HOLD_TERM                      = long hold (third-tier action)
 //
 // Multi-tap: each tap must arrive within CUSTOM_MULTI_TAP_TERM of the previous.
 #define KEY_BEHAVIOR_MAX_TAP_COUNT 5 // max tap-count entries per key (single through quintuple)
 #define CUSTOM_TAP_HOLD_TERM 150     // tap vs hold boundary (ms)
-#define CUSTOM_LONGER_HOLD_TERM 400  // hold vs longer-hold boundary (ms)
+#define CUSTOM_LONGER_HOLD_TERM 400  // hold vs long-hold boundary (ms)
 #define CUSTOM_MULTI_TAP_TERM 150    // max gap between consecutive taps (ms)
 
 // ─── Pointing device ────────────────────────────────────────────────────────
@@ -145,8 +145,8 @@ enum charybdis_keymap_layers {
 #    define RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS 200
 
 // Auto-mouse timeout fade overlay.
-// Fades from the authored auto-mouse layer rendering toward its destination
-// state as the auto-mouse layer times out.
+// Fades from the authored pointer layer rendering toward its destination
+// state as auto-mouse times out.
 // Comment out RGB_AUTOMOUSE_GRADIENT_ENABLE to disable.
 #    ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 #        define RGB_AUTOMOUSE_GRADIENT_ENABLE

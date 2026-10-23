@@ -106,7 +106,7 @@ typedef struct {
     uint16_t                       pressed_at;
     uint16_t                       released_at;
     uint16_t                       hold_term_ms;
-    uint16_t                       longer_hold_term_ms;
+    uint16_t                       long_hold_term_ms;
     uint32_t                       feedback_sequence;
     press_token_phase_t            phase;
     uint8_t                        feedback_level;

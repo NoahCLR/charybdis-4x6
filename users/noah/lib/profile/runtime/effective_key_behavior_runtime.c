@@ -118,18 +118,18 @@ static noah_effective_key_behavior_result_t convert_hold(const noah_key_behavior
         .action    = native_action,
         .repeat_hz = source->repeat_hz,
     };
-    switch (source->mode) {
+    switch (source->style) {
         case NOAH_KEY_BEHAVIOR_HOLD_V1_PRESS_AND_HOLD_UNTIL_RELEASE:
-            target->mode = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE;
+            target->style = HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE;
             break;
         case NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD:
-            target->mode = HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD;
+            target->style = HOLD_BEHAVIOR_TAP_AT_HOLD_THRESHOLD;
             break;
         case NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD:
-            target->mode = HOLD_BEHAVIOR_REPEAT_WHILE_HELD;
+            target->style = HOLD_BEHAVIOR_REPEAT_WHILE_HELD;
             break;
         case NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_ON_RELEASE_AFTER_HOLD:
-            target->mode = HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD;
+            target->style = HOLD_BEHAVIOR_TAP_ON_RELEASE_AFTER_HOLD;
             break;
         default:
             *target = hold_behavior_none();
@@ -194,14 +194,14 @@ noah_effective_key_behavior_result_t noah_effective_key_behavior_runtime_lookup(
         return result == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK ? NOAH_EFFECTIVE_KEY_BEHAVIOR_NOT_FOUND : result;
     }
 
-    row->epoch            = snapshot.epoch;
-    row->row_index        = encoded_row.row_index;
-    row->flags            = encoded_row.flags;
-    row->step_count       = encoded_row.step_count;
-    row->tap_hold_term    = encoded_row.tap_hold_term;
-    row->longer_hold_term = encoded_row.longer_hold_term;
-    row->multi_tap_term   = encoded_row.multi_tap_term;
-    row->allowed_layers   = encoded_row.allowed_layers;
+    row->epoch          = snapshot.epoch;
+    row->row_index      = encoded_row.row_index;
+    row->flags          = encoded_row.flags;
+    row->step_count     = encoded_row.step_count;
+    row->tap_hold_term  = encoded_row.tap_hold_term;
+    row->long_hold_term = encoded_row.long_hold_term;
+    row->multi_tap_term = encoded_row.multi_tap_term;
+    row->allowed_layers = encoded_row.allowed_layers;
     for (uint8_t index = 0u; index < encoded_row.step_count; index++) {
         noah_key_behavior_step_v1_t encoded_step;
         key_behavior_step_t         native_step;

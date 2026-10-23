@@ -142,13 +142,13 @@ static const layer_led_group_t layer_led_groups_data[] = RGB_LED_GROUP_TABLE(
 //
 // ─── Auto-mouse timeout fade ────────────────────────────────────────────────
 //
-// Auto-mouse starts from the authored auto-mouse layer rendering above and
+// Auto-mouse starts from the authored pointer layer rendering above and
 // fades toward the destination configured below. The first AUTOMOUSE_RGB_DEAD_TIME
 // ms are dead time; only the remaining portion of AUTO_MOUSE_TIME animates.
 //
 // .mode chooses how the fade picks its destination:
 //   - FOLLOW_REAL_DESTINATION = land on the real rendered board state after
-//     the auto-mouse layer drops out
+//     the pointer layer drops out
 //   - END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW = keep the real destination where
 //     layers paint, but use end_color for keys that would otherwise reveal the
 //     base RGB effect

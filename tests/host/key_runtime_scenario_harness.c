@@ -121,7 +121,7 @@ static key_behavior_view_t key_runtime_scenario_default_behavior(uint16_t keycod
         .is_layer_tap       = false,
         .has_multi_tap      = false,
         .tap_hold_term      = CUSTOM_TAP_HOLD_TERM,
-        .longer_hold_term   = CUSTOM_LONGER_HOLD_TERM,
+        .long_hold_term     = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term     = CUSTOM_MULTI_TAP_TERM,
     };
 }
@@ -169,8 +169,8 @@ void key_runtime_scenario_add_behavior_view(key_behavior_view_t behavior) {
     if (behavior.tap_hold_term == 0) {
         behavior.tap_hold_term = CUSTOM_TAP_HOLD_TERM;
     }
-    if (behavior.longer_hold_term == 0) {
-        behavior.longer_hold_term = CUSTOM_LONGER_HOLD_TERM;
+    if (behavior.long_hold_term == 0) {
+        behavior.long_hold_term = CUSTOM_LONGER_HOLD_TERM;
     }
     if (behavior.multi_tap_term == 0) {
         behavior.multi_tap_term = CUSTOM_MULTI_TAP_TERM;

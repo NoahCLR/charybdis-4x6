@@ -415,7 +415,7 @@ static key_feedback_semantic_t key_feedback_semantic_for_token(const press_token
     }
 
     held_action            = key_runtime_core_held_action_keycode_at(key_pos);
-    bool long_hold_reached = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.longer_hold_term;
+    bool long_hold_reached = token->interaction.binding.long_hold.present && timer_elapsed(token->pressed_at) >= token->interaction.binding.long_hold_term;
 
     if (held_action != KC_NO) {
         handled_key_hold_semantics_t active_contract = key_feedback_registered_hold_contract(token->interaction, held_action, long_hold_reached);

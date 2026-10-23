@@ -358,7 +358,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         .tap_count          = tap_count,
         .step               = step,
         .tap_hold_term      = (keycode == TEST_PENDING_MULTI_TAP_KEY || keycode == TEST_SPLIT_TERM_TAP_KEY) ? 120 : CUSTOM_TAP_HOLD_TERM,
-        .longer_hold_term   = CUSTOM_LONGER_HOLD_TERM,
+        .long_hold_term     = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term     = (keycode == TEST_PENDING_MULTI_TAP_KEY || keycode == TEST_SPLIT_TERM_TAP_KEY) ? 180 : CUSTOM_MULTI_TAP_TERM,
         .layer              = layer,
         .pd_mode            = pd_mode_for_keycode(keycode),

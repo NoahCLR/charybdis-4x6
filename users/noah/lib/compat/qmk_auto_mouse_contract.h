@@ -41,7 +41,7 @@ static inline bool noah_qmk_contract_auto_mouse_active(void) {
     return is_auto_mouse_active();
 }
 
-// Whether trackball movement may activate the auto-mouse layer at all. QMK
+// Whether trackball movement may activate the pointer layer at all. QMK
 // zeroes the activity timer when this turns off, so elapsed time is only
 // meaningful while it is on.
 static inline bool noah_qmk_contract_auto_mouse_enabled(void) {

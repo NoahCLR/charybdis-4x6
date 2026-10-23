@@ -2782,7 +2782,7 @@ noah_effective_key_behavior_result_t noah_effective_key_behavior_lookup(uint16_t
         row->allowed_layers = UINT32_MAX;
         row->authored_tap_depth = 1;
         row->tap_hold_term = 100;
-        row->longer_hold_term = 300;
+        row->long_hold_term = 300;
         row->single = (key_behavior_step_t){.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MO(TEST_LAYER_SYM)), .long_hold = TAP_AT_HOLD_THRESHOLD(KC_X)};
         return NOAH_EFFECTIVE_KEY_BEHAVIOR_OK;
     }

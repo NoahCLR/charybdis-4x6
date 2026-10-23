@@ -127,7 +127,7 @@ static uint8_t test_highest_active_layer(void) {
     return LAYER_BASE;
 }
 
-// A key a test puts on the Pointing layer in place of the profile's.
+// A key a test puts on the pointer layer in place of the profile's.
 static uint16_t test_pointer_key_override = KC_NO;
 static keypos_t test_pointer_key_override_pos;
 
@@ -3924,7 +3924,7 @@ static void test_tap_toggle_taps_lock_and_holds_are_momentary(void) {
     test_assert_thumb_runtime_quiescent(key_pos);
 }
 
-// A behaviour's MO() hold of the Pointing (auto-mouse) layer reaches QMK only
+// A behaviour's MO() hold of the pointer layer reaches QMK only
 // as a layer change. The runtime counts it on QMK's auto-mouse tracker while it
 // is held, so QMK's timeout and non-mouse-key reset cannot turn the layer off
 // under the held key.
