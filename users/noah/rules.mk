@@ -4,6 +4,13 @@
 # full ruleset for the current Charybdis keymap, including feature toggles and
 # reusable runtime sources.
 
+# VIA is not supported (D-F31). QMK reads this file after the keymap's rules,
+# so a VIA_ENABLE from either, or the command line, stops the build here,
+# before profile validation runs.
+ifeq ($(strip $(VIA_ENABLE)),yes)
+    $(error VIA is not supported (D-F31): remove VIA_ENABLE = yes; clients edit the profile over Profile Wire)
+endif
+
 NOAH_USERSPACE_ROOT := $(if $(QMK_USERSPACE),$(QMK_USERSPACE),$(abspath $(USER_PATH)/../..))
 NOAH_PROFILE_VALIDATION_RESULT := $(shell log="$$(mktemp "$${TMPDIR:-/tmp}/noah-profile-validation.XXXXXX")"; cd "$(NOAH_USERSPACE_ROOT)" && sh tests/host/run_real_profile_validation_tests.sh "$(KEYMAP_PATH)" >"$$log" 2>&1; status=$$?; if [ $$status -ne 0 ]; then cat "$$log" >&2; echo failed; fi; rm -f "$$log")
 
@@ -14,8 +21,8 @@ endif
 include $(USER_PATH)/source_manifest.mk
 include $(USER_PATH)/lib/compat/qmk_split_transport.mk
 
-# VIA is not supported (D-F31). The firmware answers Raw HID itself: hosts
-# speak Profile Wire on QMK's Raw HID interface (usage page 0xFF60).
+# The firmware answers Raw HID itself (D-F31): clients speak Profile Wire on
+# QMK's Raw HID interface (usage page 0xFF60).
 RAW_ENABLE = yes
 # VIA used to switch these on; the firmware still uses them. Bootmagic comes
 # from the keyboard's own definition.

@@ -55,8 +55,8 @@ while you work, then the gates below before handing back.
 | Pointing | `run_pd_mode_tests.sh`, `run_pd_mode_handlers_tests.sh`, `run_pd_runtime_tests.sh`, `run_pointer_layer_policy_tests.sh`, `run_split_runtime_sync_tests.sh` |
 | Authored profile | `run_key_behavior_lookup_tests.sh`, `run_key_behavior_validation_tests.sh`, `run_keymap_validation_tests.sh`, `run_real_profile_validation_tests.sh` |
 | Lighting | `run_rgb_validation_tests.sh`, `run_rgb_layer_render_tests.sh` |
-| Hooks and ownership | `run_hook_chaining_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_owned_keycode_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh` |
-| Macros, Raw HID, QMK contracts | `run_qmk_contract_checks.sh`, `run_action_lifecycle_tests.sh`, `run_qmk_portable_profile_tests.sh`, `run_macro_payload_tests.sh`, `run_profile_keymap_macros_runtime_tests.sh`, `run_profile_wire_v1_tests.sh` |
+| Hooks and ownership | `run_hook_chaining_tests.sh`, `run_hook_override_tests.sh`, `run_keyboard_mod_ownership_tests.sh`, `run_owned_keycode_tests.sh`, `run_held_action_tests.sh`, `run_layer_ownership_tests.sh` |
+| Macros, Raw HID, QMK contracts | `run_qmk_contract_checks.sh`, `run_compat_boundary_tests.sh`, `run_action_lifecycle_tests.sh`, `run_qmk_portable_profile_tests.sh`, `run_macro_payload_tests.sh`, `run_profile_keymap_macros_runtime_tests.sh`, `run_profile_wire_v1_tests.sh` |
 | Shared runtime and tracing | `run_runtime_init_order_tests.sh`, `run_runtime_debug_tests.sh`, `run_runtime_trace_tests.sh` |
 
 Each flow in [architecture](architecture/README.md) ends with the runners that
@@ -68,7 +68,8 @@ hold it. Then, as they apply:
    `NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh`
    (pass the keymap path for another profile); validation refuses a stale copy.
 2. Runtime wiring, source lists, compat surfaces or header boundaries changed:
-   `run_feature_gate_compile_tests.sh`.
+   `run_feature_gate_compile_tests.sh`, and `run_source_manifest_tests.sh` for
+   source lists.
 3. Always, before handing back: `run_all_host_tests.sh`.
 4. Then the flashable pair: `sh tools/build-firmware-pair.sh`. A plain
    `qmk compile` builds a generic image without the live-profile owner

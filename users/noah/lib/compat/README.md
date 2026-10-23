@@ -5,6 +5,13 @@ Every assumption about the BK commit `qmk-pin.json` names lives here, pinned by
 QMK's records and queues so the runtime can decide. Where these sit on a key
 press is [key-press.md](../../../../docs/architecture/key-press.md).
 
+`run_compat_boundary_tests.sh` keeps it the only place: it fails, naming file
+and symbol, when userspace or keymap C outside this folder names a fork-only
+or internal QMK symbol compat adapts. A hook QMK calls by name that lives
+with its owner (`process_record_admit_user()` in `hooks.c`, the tapping and
+report hooks) is allowlisted there with its reason. Adapting a new fork hook
+or QMK internal here adds its name to the check's `SYMBOLS`.
+
 ## Record admission
 
 `qmk_record_admission.c` holds records back behind an undecided tap/hold key

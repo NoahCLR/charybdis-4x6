@@ -42,8 +42,9 @@ and any skipped, and for boundary work the contracts touched.
 - Edit only this repository unless the task names a sibling. Read QMK
   behaviour in the BK checkout. A BK change lands in BK first, then is
   re-pinned here with `sh tools/pin-qmk.sh`.
-- A new source file is wired into `users/noah/source_manifest.mk`, and into
-  any host runner or compile gate that mirrors it, in the same change.
+- A new source file is listed in `users/noah/source_manifest.mk` (held by
+  `run_source_manifest_tests.sh`) and wired into any host runner or compile
+  gate that mirrors it, in the same change.
 - Never flash firmware or Apply a profile to verify a change; host tests and
   the pair never prove hardware acceptance.
 - Read [`measurements/README.md`](measurements/README.md) before taking or
