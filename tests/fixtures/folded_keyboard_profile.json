@@ -1,5 +1,5 @@
 {
- "description": "Noah's keyboard profile as the authored defaults must reproduce it, in tests/host/profile_logical_form.py's logical form. Derived from his backup of 2026-10-19 (portable document version 3: profile schema 3.0, action ABI 0x837cf479, sixteen layers, 128 macro streams) by decoding it with the schema-3 codecs; the schema-3 and schema-4 domain versions are the same, so every value carries over unchanged. tests/host/folded_keyboard_profile_test.py compares the compiled defaults with it, domain by domain.",
+ "description": "Noah's keyboard profile as the authored defaults must reproduce it, in tests/host/profile_logical_form.py's logical form. Derived from his backup of 2026-10-19 (portable document version 3: profile schema 3.0, action ABI 0x837cf479, sixteen layers, 128 macro streams) by decoding it with the schema-3 codecs; the schema-3 and schema-4 domain versions are the same, so every value carries over unchanged. The backup's empty Delete row (0x004c, no steps) is left out, as the authored defaults dropped it: a row without steps is no row (firmware D-F27), so no key changes. tests/host/folded_keyboard_profile_test.py compares the compiled defaults with it, domain by domain.",
  "differences": [],
  "domains": {
   "rgb": {
@@ -710,15 +710,6 @@
     "tapHoldTerm": 150,
     "longerHoldTerm": 0,
     "multiTapTerm": 100,
-    "flags": 0,
-    "allowedLayers": 65535,
-    "steps": []
-   },
-   {
-    "key": "0x004c",
-    "tapHoldTerm": 0,
-    "longerHoldTerm": 0,
-    "multiTapTerm": 0,
     "flags": 0,
     "allowedLayers": 65535,
     "steps": []
