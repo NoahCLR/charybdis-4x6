@@ -8,7 +8,7 @@ the bank and its steps are the
 ## Layout
 
 - `profile_macro_provider.c`: the 128 slots' source, the active profile's bank
-  or the authored `VIA_MACROS()` strings, and the entry points
+  or the authored `MACROS()` strings, and the entry points
   `noah_profile_macro_start` and `noah_profile_macro_try_play`.
 - `macro_slot_provider.c`: slot metadata and the one shared window; preflight
   over every window before a start.

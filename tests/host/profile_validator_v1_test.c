@@ -117,7 +117,7 @@ static noah_profile_validator_v1_compatibility_t compatibility(void) {
     value.allowed_domain_mask               = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS;
     value.logical_layer_count               = 3u;
     value.supported_pd_mode_mask            = 63u;
-    value.via_macro_slot_count              = 11u;
+    value.macro_slot_count                  = 11u;
     value.custom_key_count        = 3u;
     value.rgb_limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL;
     value.rgb_limits.logical_layer_count    = value.logical_layer_count;
@@ -337,9 +337,9 @@ static void test_stable_action_cross_references(const char *fixture_path) {
     declaration                     = declaration_for(behavior, length, NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
     expect_result(validate(behavior, length, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_VALID);
 
-    compatible.via_macro_slot_count = 10u;
+    compatible.macro_slot_count = 10u;
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION);
-    compatible.via_macro_slot_count           = 11u;
+    compatible.macro_slot_count               = 11u;
     compatible.logical_layer_count            = 2u;
     compatible.rgb_limits.logical_layer_count = 2u;
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION);
@@ -683,7 +683,7 @@ static noah_profile_validator_v1_compatibility_t single_domain_compatibility(voi
     compatible.logical_layer_count                       = 16u;
     compatible.rgb_limits.logical_layer_count            = 16u;
     compatible.placement_positions                       = 60u;
-    compatible.via_macro_slot_count                      = NOAH_PROFILE_MACROS_V1_SLOTS;
+    compatible.macro_slot_count                          = NOAH_PROFILE_MACROS_V1_SLOTS;
     return compatible;
 }
 
@@ -786,7 +786,7 @@ static void test_macro_domain(void) {
     expect_result(validate_macro_bank(MACRO_BYTES(0, 'a'), 127u, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
     assert(error.row_index == 127u);
 
-    // Shortening VIA macros can leave old bytes beyond the final slot. Keep
+    // Shortening macros can leave old bytes beyond the final slot. Keep
     // those exact bank bytes, but still require the final validity sentinel.
     uint8_t padded[131] = {0};
     padded[128] = 1; padded[129] = 0xff;

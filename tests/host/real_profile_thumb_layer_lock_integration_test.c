@@ -1552,7 +1552,7 @@ static void test_pointer_pinch_double_tap_queues_zoom_chord(void) {
 
     CHECK(test_tap_code16_count == 0);
     CHECK(test_delayed_action_count == 1);
-    CHECK(test_last_delayed_action == VIA_MACRO_6);
+    CHECK(test_last_delayed_action == MACRO_6);
     CHECK(pd_mode_local_active_snapshot() == 0);
     test_assert_thumb_runtime_quiescent(pinch_pos);
 }
@@ -1580,7 +1580,7 @@ static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) 
 
         CHECK(test_tap_code16_count == 0);
         CHECK(test_delayed_action_count == (uint16_t)(salvo + 1u));
-        CHECK(test_last_delayed_action == VIA_MACRO_6);
+        CHECK(test_last_delayed_action == MACRO_6);
         CHECK(pd_mode_local_active_snapshot() == 0);
         test_assert_thumb_runtime_quiescent(pinch_pos);
 
@@ -1627,7 +1627,7 @@ static void test_pointer_terminal_third_quick_tap_types_the_first_tap(uint16_t k
 }
 
 static void test_pointer_pinch_third_quick_tap_types_the_key_underneath(void) {
-    test_pointer_terminal_third_quick_tap_types_the_first_tap(PD_SLOT_5, VIA_MACRO_6);
+    test_pointer_terminal_third_quick_tap_types_the_first_tap(PD_SLOT_5, MACRO_6);
 }
 
 static void test_pointer_volume_third_quick_tap_types_the_key_underneath(void) {

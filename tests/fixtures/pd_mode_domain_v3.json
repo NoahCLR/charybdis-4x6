@@ -834,8 +834,8 @@
       "hex": "032080010000000007010001000000000d000000000000000000000000000000000000000000000028000000d3000000d400010200000000000000000200d10002000200d80000000200d200000000000000000000000000000000000000000000000000000000004d6f75736520627574746f6e7300000000000000000000000000000000000000"
     },
     {
-      "name": "via-macros",
-      "description": "VIA macros 0 and 127 from straight directions, a diagonal and a button override, inherit only (feature bit 29).",
+      "name": "macros",
+      "description": "Macros 0 and 127 from straight directions, a diagonal and a button override, inherit only (feature bit 29).",
       "slots": [
         {
           "id": 7,

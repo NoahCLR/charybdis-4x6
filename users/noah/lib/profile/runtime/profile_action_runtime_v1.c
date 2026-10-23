@@ -26,9 +26,9 @@ noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_from_nati
         return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
     }
     if (IS_QK_MACRO(native_action)) {
-        action->kind    = NOAH_PROFILE_ACTION_V1_VIA_MACRO;
+        action->kind    = NOAH_PROFILE_ACTION_V1_MACRO;
         action->operand = (uint16_t)(native_action - QK_MACRO_0);
-        return action->operand < VIA_MACRO_SLOT_COUNT ? NOAH_PROFILE_ACTION_RUNTIME_V1_OK : NOAH_PROFILE_ACTION_RUNTIME_V1_UNSUPPORTED;
+        return action->operand < MACRO_SLOT_COUNT ? NOAH_PROFILE_ACTION_RUNTIME_V1_OK : NOAH_PROFILE_ACTION_RUNTIME_V1_UNSUPPORTED;
     }
     if (native_action >= LAYER_LOCK_BASE && native_action < LAYER_LOCK_BASE + LAYER_COUNT) {
         action->kind    = NOAH_PROFILE_ACTION_V1_LAYER_LOCK;
@@ -87,8 +87,8 @@ noah_profile_action_runtime_v1_result_t noah_profile_action_runtime_v1_to_native
             if (action->operand >= PD_MODE_COUNT) break;
             *native_action = pd_modes[action->operand].lock_action;
             return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
-        case NOAH_PROFILE_ACTION_V1_VIA_MACRO:
-            if (action->operand >= VIA_MACRO_SLOT_COUNT) break;
+        case NOAH_PROFILE_ACTION_V1_MACRO:
+            if (action->operand >= MACRO_SLOT_COUNT) break;
             *native_action = (uint16_t)(QK_MACRO_0 + action->operand);
             return NOAH_PROFILE_ACTION_RUNTIME_V1_OK;
         case NOAH_PROFILE_ACTION_V1_CUSTOM_KEY:

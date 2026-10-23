@@ -207,7 +207,7 @@ acceleration, modified mouse buttons, modified consumer or system codes,
 layer and pointing keycodes, custom keys. No output of a mode can activate a
 mode or leave a hold unbalanced.
 
-Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`), `tests/fixtures/pd_mode_domain_v3.json` (`mouse-buttons`, `via-macros`, `mouse-movement-tap`, `modified-mouse-button-tap`, `macro-*`).
+Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`), `tests/fixtures/pd_mode_domain_v3.json` (`mouse-buttons`, `macros`, `mouse-movement-tap`, `modified-mouse-button-tap`, `macro-*`).
 
 ## Mouse buttons
 

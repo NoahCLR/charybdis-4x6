@@ -80,7 +80,7 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, noa
     emit_u8(&writer, NOAH_PROFILE_ACTION_V1_CUSTOM_KEY);
     emit_u8(&writer, LAYER_COUNT);
     emit_u8(&writer, PD_MODE_COUNT);
-    emit_u8(&writer, VIA_MACRO_SLOT_COUNT);
+    emit_u8(&writer, MACRO_SLOT_COUNT);
     emit_u8(&writer, NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS);
 #ifdef NOAH_FIRMWARE_VERSION
     emit_u32(&writer, NOAH_FIRMWARE_VERSION);
@@ -278,7 +278,7 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     result.logical_layer_count               = LAYER_COUNT;
     result.placement_positions               = MATRIX_ROWS * MATRIX_COLS;
     result.supported_pd_mode_mask            = UINT32_MAX >> (32u - PD_MODE_COUNT);
-    result.via_macro_slot_count              = VIA_MACRO_SLOT_COUNT;
+    result.macro_slot_count                  = MACRO_SLOT_COUNT;
     result.custom_key_count                  = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     result.rgb_limits.logical_layer_count    = LAYER_COUNT;
     result.rgb_limits.supported_pd_mode_mask = result.supported_pd_mode_mask;

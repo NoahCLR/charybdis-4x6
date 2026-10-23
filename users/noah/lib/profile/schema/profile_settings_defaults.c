@@ -93,7 +93,7 @@ uint32_t noah_profile_settings_default(uint8_t id) {
 // The keymap's names fill a settings domain that no profile has stored.
 _Static_assert((int)LAYER_COUNT == (int)NOAH_SETTINGS_LAYERS, "Settings name every layer of the bank");
 _Static_assert(NOAH_LAYER_NAME_SIZE == NOAH_SETTINGS_NAME_MAX + 1u, "A layer name is at most 32 bytes");
-_Static_assert(VIA_MACRO_SLOT_COUNT == NOAH_SETTINGS_MACRO_NAMES, "Settings name every VIA macro");
+_Static_assert(MACRO_SLOT_COUNT == NOAH_SETTINGS_MACRO_NAMES, "Settings name every macro");
 _Static_assert(NOAH_MACRO_NAME_SIZE == NOAH_SETTINGS_NAME_MAX + 1u, "A macro or custom-key name is at most 32 bytes");
 _Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_SETTINGS_CUSTOM_KEY_NAMES, "Settings name every custom key");
 _Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, "Settings hold every custom key's shortcut");
@@ -110,7 +110,7 @@ static const char *record_name(uint16_t record) {
     if (record == NOAH_SETTINGS_KEYBOARD_NAME_RECORD) return NOAH_KEYBOARD_NAME;
     if (record < NOAH_SETTINGS_LAYERS) return layer_names[record];
     record -= NOAH_SETTINGS_LAYERS;
-    if (record < NOAH_SETTINGS_MACRO_NAMES) return via_macro_names[record];
+    if (record < NOAH_SETTINGS_MACRO_NAMES) return macro_names[record];
     return custom_key_names[record - NOAH_SETTINGS_MACRO_NAMES];
 }
 uint16_t noah_profile_settings_defaults_length(void) {

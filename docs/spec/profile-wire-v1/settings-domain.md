@@ -213,7 +213,7 @@ A profile may omit this domain; the compiled defaults' settings then run. They
 are the header with flags zero, the scalars in the table above, every layer
 referring combos to itself with both bitmaps zero, the shortcuts of the
 keymap's `CUSTOM_KEYS` rows, and the keymap's names: `layer_names[]`, each
-`VIA_MACROS` row's name, each `CUSTOM_KEYS` row's name, and
+`MACROS` row's name, each `CUSTOM_KEYS` row's name, and
 `NOAH_KEYBOARD_NAME` (empty unless the keymap's `config.h` sets it). The
 keymap's `config.h` may also author `NOAH_RGB_IDLE_TIMEOUT_MS` and the host
 settings `NOAH_DEFAULT_HOST_OS`, `NOAH_DEFAULT_HOST_LAYOUT`,

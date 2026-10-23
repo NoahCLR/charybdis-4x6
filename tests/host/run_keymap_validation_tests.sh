@@ -59,7 +59,7 @@ for bad in \
     'SHORTCUT(CUSTOM_KEY_9, "", SHORTCUT_NO_MODS, KC_AUDIO_MUTE)' \
     'SHORTCUT(CUSTOM_KEY_9, "", SHORTCUT_NO_MODS, MS_UP)' \
     'SHORTCUT(CUSTOM_KEY_9, "", SHORTCUT_NO_MODS, KC_NO)' \
-    'SHORTCUT(VIA_MACRO_0, "", SHORTCUT_NO_MODS, KC_A)'; do
+    'SHORTCUT(MACRO_0, "", SHORTCUT_NO_MODS, KC_A)'; do
     if shortcut_rows "-DSHORTCUT_ROW_BAD(SHORTCUT)=$bad" 2>/dev/null; then
         echo "a bad CUSTOM_KEYS shortcut row compiled: $bad" >&2
         exit 1

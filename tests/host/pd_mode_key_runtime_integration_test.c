@@ -48,7 +48,7 @@
 #ifndef KC_DOT
 #    define KC_DOT 0x0037u
 #endif
-#define TEST_PINCH_ZOOM_TAP VIA_MACRO_6
+#define TEST_PINCH_ZOOM_TAP MACRO_6
 #    define TEST_PINCH_SINGLE_STEP {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_5)}
 
 enum {

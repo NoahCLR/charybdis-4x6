@@ -9,7 +9,7 @@
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [0] = {{KC_A}}, [15] = {{KC_Z}},
 };
-const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT] = {[0] = "authored", [127] = "last"};
+const char *const macro_payloads[MACRO_SLOT_COUNT] = {[0] = "authored", [127] = "last"};
 static unsigned invalidations, windows;
 static uint8_t first_text;
 static bool fail_reads;

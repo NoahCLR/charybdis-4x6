@@ -5,9 +5,9 @@
 
 #define _KEYMAP_CONCAT_INNER(a_, b_) a_##b_
 #define _KEYMAP_CONCAT(a_, b_) _KEYMAP_CONCAT_INNER(a_, b_)
-#define _KEYMAP_VIA_MACRO_PAYLOAD_ENTRY(keycode_, name_, payload_) [((keycode_) - VIA_MACRO_0)] = (payload_),
-#define _KEYMAP_VIA_MACRO_NAME_ENTRY(keycode_, name_, payload_) [((keycode_) - VIA_MACRO_0)] = name_,
-#define _KEYMAP_VIA_MACRO_NAME_CHECK(keycode_, name_, payload_) _Static_assert(sizeof(name_) <= NOAH_MACRO_NAME_SIZE, #keycode_ ": a macro name holds at most 32 bytes of UTF-8");
+#define _KEYMAP_MACRO_PAYLOAD_ENTRY(keycode_, name_, payload_) [((keycode_) - MACRO_0)] = (payload_),
+#define _KEYMAP_MACRO_NAME_ENTRY(keycode_, name_, payload_) [((keycode_) - MACRO_0)] = name_,
+#define _KEYMAP_MACRO_NAME_CHECK(keycode_, name_, payload_) _Static_assert(sizeof(name_) <= NOAH_MACRO_NAME_SIZE, #keycode_ ": a macro name holds at most 32 bytes of UTF-8");
 #define _KEYMAP_CUSTOM_KEY_NAME_ENTRY(keycode_, name_) [((keycode_) - CUSTOM_KEY_0)] = name_,
 #define _KEYMAP_CUSTOM_KEY_NAME_CHECK(keycode_, name_)                                                                         \
     _Static_assert(NOAH_KEYCODE_IS_CUSTOM_KEY(keycode_), #keycode_ ": CUSTOM_KEYS rows name custom keys");                      \
@@ -99,9 +99,9 @@
     CUSTOM_KEYS(_KEYMAP_CUSTOM_KEY_NAME_CHECK, _KEYMAP_CUSTOM_KEY_SHORTCUT_CHECK)                                                \
     const char custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {CUSTOM_KEYS(_KEYMAP_CUSTOM_KEY_NAME_ENTRY, _KEYMAP_CUSTOM_KEY_SHORTCUT_NAME_ENTRY)}; \
     const uint8_t custom_key_shortcuts[CUSTOM_KEY_SLOT_COUNT][NOAH_CUSTOM_KEY_SHORTCUT_SIZE] = {CUSTOM_KEYS(_KEYMAP_CUSTOM_KEY_NO_SHORTCUT, _KEYMAP_CUSTOM_KEY_SHORTCUT_ENTRY)}; \
-    VIA_MACROS(_KEYMAP_VIA_MACRO_NAME_CHECK)                                                                                    \
-    const char *const via_macro_payloads[VIA_MACRO_SLOT_COUNT]                 = {VIA_MACROS(_KEYMAP_VIA_MACRO_PAYLOAD_ENTRY)}; \
-    const char        via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {VIA_MACROS(_KEYMAP_VIA_MACRO_NAME_ENTRY)}; \
+    MACROS(_KEYMAP_MACRO_NAME_CHECK)                                                                                            \
+    const char *const macro_payloads[MACRO_SLOT_COUNT]                      = {MACROS(_KEYMAP_MACRO_PAYLOAD_ENTRY)};            \
+    const char        macro_names[MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE]   = {MACROS(_KEYMAP_MACRO_NAME_ENTRY)};               \
     const uint8_t     authored_macro_bank[]                                 = {NOAH_AUTHORED_MACRO_BANK};        \
     const uint16_t    authored_macro_bank_size                              = sizeof(authored_macro_bank);      \
     _KEYMAP_COMBO_DATA()                                                                                                        \

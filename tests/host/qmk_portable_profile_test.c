@@ -130,7 +130,7 @@ void noah_qmk_portable_apply_lighting(uint32_t mode, uint32_t color) {
 // The keymap's names, up to the 32-byte limit and in multibyte UTF-8.
 #define NAME_32 "Thirty-two bytes of name, exact!"
 _Static_assert(sizeof(NAME_32) == 33, "NAME_32 is the longest name");
-const char via_macro_names[VIA_MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {[5] = "Drag Screenshot", [63] = NAME_32};
+const char macro_names[MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE]           = {[5] = "Drag Screenshot", [63] = NAME_32};
 const char layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE]              = {"Base", [7] = "\xc3\x89t\xc3\xa9", [15] = NAME_32};
 const char custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE] = {[0] = "Right Thumb", [63] = "Last"};
 // The keymap's shortcuts (D-F26): mixed sides with a key, modifiers alone, a
@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
     uint8_t  bytes[NOAH_SETTINGS_MAX_SIZE], stored[NOAH_SETTINGS_MAX_SIZE] = {0};
     uint16_t length;
 
-    // The VIA macro map (GET 0x0c) left with VIA (D-F31): not served, and
+    // The VIA store's macro map (GET 0x0c) left with VIA (D-F31): not served, and
     // the request is left as it was.
     memset(frame, 0, sizeof(frame));
     frame[0] = 8u;
@@ -255,7 +255,7 @@ int main(int argc, char **argv) {
     // and the keyboard's, which is empty until someone names it.
     uint8_t *name = expected + NOAH_SETTINGS_FIXED_SIZE;
     for (uint16_t index = 0; index < NOAH_SETTINGS_NAME_COUNT; index++) {
-        const char *text        = index == NOAH_SETTINGS_KEYBOARD_NAME_RECORD ? "" : index < NOAH_SETTINGS_LAYERS ? layer_names[index] : index < NOAH_SETTINGS_LAYERS + NOAH_SETTINGS_MACRO_NAMES ? via_macro_names[index - NOAH_SETTINGS_LAYERS] : custom_key_names[index - NOAH_SETTINGS_LAYERS - NOAH_SETTINGS_MACRO_NAMES];
+        const char *text        = index == NOAH_SETTINGS_KEYBOARD_NAME_RECORD ? "" : index < NOAH_SETTINGS_LAYERS ? layer_names[index] : index < NOAH_SETTINGS_LAYERS + NOAH_SETTINGS_MACRO_NAMES ? macro_names[index - NOAH_SETTINGS_LAYERS] : custom_key_names[index - NOAH_SETTINGS_LAYERS - NOAH_SETTINGS_MACRO_NAMES];
         uint8_t     name_length = (uint8_t)strlen(text);
         *name++                 = name_length;
         memcpy(name, text, name_length);
