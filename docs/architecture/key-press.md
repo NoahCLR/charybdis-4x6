@@ -6,7 +6,7 @@ path together. The reducer's own state and ownership map are in
 [`key/runtime/README.md`](../../users/noah/lib/key/runtime/README.md); record
 admission and combo origins are in
 [`compat/README.md`](../../users/noah/lib/compat/README.md). What a person
-authoring keys sees is in [INTERACTION_MODEL.md](../INTERACTION_MODEL.md).
+authoring keys sees is in [What keys can do](../guide/keys.md).
 
 The rule: **planners decide, projection applies, adapters adapt.** The reducer
 plans effects into one plan; `transition.c` projects them into the ledgers;

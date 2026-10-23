@@ -11,4 +11,4 @@ through layer and modifier ownership. Each acts the same on a key, in a
 behaviour and as a combo output, and both halves refuse a profile that places
 them where keymap validation forbids. `DF()` and `PDF()` stay refused: layer 0
 is the base, and `TO()` covers the need. Contract:
-[`INTERACTION_MODEL.md`](../INTERACTION_MODEL.md).
+[What keys can do](../guide/keys.md#layer-keys).

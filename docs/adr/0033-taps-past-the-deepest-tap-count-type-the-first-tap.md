@@ -10,4 +10,4 @@ first tap count, which sent one action for a run of any length, dropped taps
 on rows whose later counts hold or repeat, and sent one Escape for three.
 Like cycling, an overshooting run never fires the branch it went past. There
 is no setting; a first tap that toggles a lock toggles once per press.
-Contract: [`INTERACTION_MODEL.md`](../INTERACTION_MODEL.md).
+Contract: [What keys can do](../guide/keys.md#tap-counts).

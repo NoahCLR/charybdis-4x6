@@ -31,5 +31,4 @@ quick-tap repeat.
 **Rows without steps**: a row without steps is no row, so a plain key with
 one stays QMK's, and adding or dropping an empty row never changes a key.
 
-Contract: [`INTERACTION_MODEL.md`](../INTERACTION_MODEL.md), "Keys pressed
-while a tap/hold key is undecided".
+Contract: [What keys can do](../guide/keys.md#pressing-another-key-before-a-hold-decides).

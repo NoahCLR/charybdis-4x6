@@ -2,7 +2,7 @@
 
 How this repository is worked on, checked, pinned and released. What the
 firmware does and how to configure it is in the [README](../README.md) and the
-[firmware guide](GUIDE.md); how the code is shaped is in
+[firmware guide](guide/README.md); how the code is shaped is in
 [architecture](architecture/README.md). The editor's build, test and
 compilation-database tasks are in the [VS Code workflow](../.vscode/README.md).
 

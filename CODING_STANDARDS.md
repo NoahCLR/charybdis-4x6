@@ -92,9 +92,9 @@ are in [architecture](docs/architecture/README.md).
   `docs/architecture/`, a module's internals in a `README.md` beside it.
   Verification runs, counts and dated progress belong in commit messages.
 - A change to what a person authoring or using the keyboard sees updates
-  `docs/GUIDE.md` or the topic doc it links, and `README.md` when a capability
-  changes. The README stays a short pitch in Noah's voice; development
-  material goes in `docs/development.md`.
+  the page of the [firmware guide](docs/guide/README.md) it touches, and
+  `README.md` when a capability changes. The README stays a short pitch in
+  Noah's voice; development material goes in `docs/development.md`.
 - A change to a wire format, fixture bytes, a spec's contract, or the probes
   and sources Ark compiles names the Ark follow-up
   ([independence](docs/development.md#independence-from-ark)).

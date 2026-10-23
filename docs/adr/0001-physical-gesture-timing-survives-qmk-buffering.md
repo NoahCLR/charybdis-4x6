@@ -8,5 +8,4 @@ cannot use up a repeated-tap window or stretch a hold that was already
 released. Userspace asks QMK's existing queues whether a continuation is
 waiting rather than keeping a second buffer, and one engine, the key runtime,
 decides every handled key. The timing model is in
-[`INTERACTION_MODEL.md`](../INTERACTION_MODEL.md), "Physical gestures and
-buffered delivery".
+[What keys can do](../guide/keys.md#timing-follows-your-fingers).
