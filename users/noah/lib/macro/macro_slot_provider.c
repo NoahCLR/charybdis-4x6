@@ -63,36 +63,6 @@ static bool macro_slot_provider_load_next(void *context) {
     return macro_slot_active_metadata && !macro_slot_active_stale && macro_slot_provider_load_window(&macro_slot_active_provider, macro_slot_active_slot);
 }
 
-bool macro_slot_provider_validate(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot) {
-    if (!metadata || !macro_slot_provider_slot_in_range(provider, slot) || !provider->load_ir) {
-        return false;
-    }
-    if (metadata[slot].state == MACRO_SLOT_CACHE_VALID) {
-        return true;
-    }
-    if (metadata[slot].state == MACRO_SLOT_CACHE_INVALID || macro_slot_active_metadata) {
-        return false;
-    }
-    return macro_slot_provider_compile(provider, metadata, slot, NULL);
-}
-
-bool macro_slot_provider_encode_write(const macro_slot_provider_t *provider, macro_slot_metadata_t *metadata, uint8_t slot, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {
-    if (written) {
-        *written = 0;
-    }
-
-    // The encoder writes one window; a macro longer than that is not re-encoded.
-    if (!write_byte || macro_slot_active_metadata || !macro_slot_provider_compile(provider, metadata, slot, NULL) || macro_slot_active_cursor.offset != 0u) {
-        return false;
-    }
-
-    if (macro_slot_active_ir.length == 0u && macro_slot_active_ir.protection == 0u) {
-        return true;
-    }
-
-    return macro_payload_encode_ir_write(&macro_slot_active_ir, write_byte, context, written);
-}
-
 static void macro_slot_provider_finish(macro_payload_finish_result_t result, void *context) {
     macro_slot_metadata_t *slot = (macro_slot_metadata_t *)context;
 

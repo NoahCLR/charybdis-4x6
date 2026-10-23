@@ -9,7 +9,6 @@ enum {
     PD_MODE_TRAIT_NONE                        = 0,
     PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED    = (pd_mode_traits_t)1u << 0,
     PD_MODE_TRAIT_PREFER_TYPING_LAYER         = (pd_mode_traits_t)1u << 1,
-    PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND   = (pd_mode_traits_t)1u << 2,
     PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE = (pd_mode_traits_t)1u << 3,
 };
 

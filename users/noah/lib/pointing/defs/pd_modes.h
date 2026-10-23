@@ -58,7 +58,6 @@ typedef struct {
     bool               handled;
     bool               local_state_changed;
     bool               display_state_changed;
-    bool               split_sync_required;
 } pd_mode_apply_result_t;
 
 extern const pd_mode_def_t pd_modes[PD_MODE_COUNT];

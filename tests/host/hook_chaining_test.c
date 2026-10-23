@@ -7,7 +7,6 @@
 #include "users/noah/noah_runtime.h"
 
 void           eeconfig_init_user(void);
-bool           get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record);
 bool           process_record_admit_user(keyrecord_t *record);
 bool           pre_process_record_user(uint16_t keycode, keyrecord_t *record);
 bool           process_record_user(uint16_t keycode, keyrecord_t *record);
@@ -80,7 +79,6 @@ typedef enum {
 
 typedef struct {
     unsigned                   eeconfig_calls;
-    unsigned                   hold_calls;
     unsigned                   pre_process_calls;
     unsigned                   process_calls;
     unsigned                   post_process_calls;
@@ -95,7 +93,6 @@ typedef struct {
     unsigned                   pointing_init_calls;
     unsigned                   mouse_record_calls;
     unsigned                   rgb_calls;
-    bool                       hold_force_true;
     bool                       pre_process_keep_processing;
     bool                       process_keep_processing;
     hook_process_chain_style_t process_chain_style;
@@ -229,13 +226,6 @@ bool noah_rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) 
 void eeconfig_init_user(void) {
     hook_override_state.eeconfig_calls++;
     noah_eeconfig_init_user();
-}
-
-bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    hook_override_state.hold_calls++;
-    (void)keycode;
-    (void)record;
-    return hook_override_state.hold_force_true;
 }
 
 bool pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
@@ -373,8 +363,6 @@ static void test_weak_defaults_use_expected_shared_behavior(void) {
     CHECK(noah_hook_stub_state.admit_calls == 1 && noah_hook_stub_state.admit_record == &record);
 #endif
 
-    CHECK(!get_hold_on_other_key_press(0x1234u, &record));
-
     CHECK(pre_process_record_user(0x2222u, &record));
     CHECK(noah_hook_stub_state.pre_process_calls == 1);
     CHECK(noah_hook_stub_state.pre_process_keycode == 0x2222u);
@@ -454,7 +442,6 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     noah_hook_stub_state.mouse_record_return_value  = false;
     noah_hook_stub_state.rgb_return_value           = false;
 
-    hook_override_state.hold_force_true             = true;
     hook_override_state.pre_process_keep_processing = false;
     hook_override_state.process_keep_processing     = false;
     hook_override_state.layer_state_extra_bits      = 0x00000080u;
@@ -467,9 +454,6 @@ static void test_strong_overrides_can_chain_to_noah_helpers(void) {
     eeconfig_init_user();
     CHECK(hook_override_state.eeconfig_calls == 1);
     CHECK(noah_hook_stub_state.eeconfig_calls == 1);
-
-    CHECK(get_hold_on_other_key_press(0x4567u, &record));
-    CHECK(hook_override_state.hold_calls == 1);
 
     CHECK(!pre_process_record_user(0x5555u, &record));
     CHECK(hook_override_state.pre_process_calls == 1);

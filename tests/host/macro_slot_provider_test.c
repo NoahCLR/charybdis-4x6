@@ -21,16 +21,6 @@ static uint8_t                      preflight_window_calls;
 static uint8_t                      preflight_fail_window = UINT8_MAX;
 static uint8_t                      cancel_calls;
 
-bool macro_payload_encode_ir_write(const macro_payload_ir_t *ir, macro_payload_write_byte_fn write_byte, void *context, uint16_t *written) {
-    (void)ir;
-    (void)write_byte;
-    (void)context;
-    if (written) {
-        *written = 0u;
-    }
-    return false;
-}
-
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
     exit(1);
@@ -185,25 +175,6 @@ static void test_playback_preflight_rejection_is_retried(void) {
     test_finish_active();
 }
 
-static void test_invalid_result_is_cached_until_invalidation(void) {
-    const macro_slot_provider_t provider    = {.slot_count = 1u, .load_ir = test_load_ir};
-    macro_slot_metadata_t       metadata[1] = {0};
-
-    load_call_count = 0u;
-    load_succeeds   = false;
-    CHECK(!macro_slot_provider_validate(&provider, metadata, 0u));
-    CHECK(metadata[0].state == MACRO_SLOT_CACHE_INVALID);
-    CHECK(load_call_count == 1u);
-    CHECK(!macro_slot_provider_validate(&provider, metadata, 0u));
-    CHECK(load_call_count == 1u);
-
-    macro_slot_provider_invalidate(&provider, metadata, 0u);
-    load_succeeds = true;
-    CHECK(macro_slot_provider_validate(&provider, metadata, 0u));
-    CHECK(metadata[0].state == MACRO_SLOT_CACHE_VALID);
-    CHECK(load_call_count == 2u);
-}
-
 static void test_reset(void) {
     source_byte            = 'A';
     load_call_count        = 0u;
@@ -218,6 +189,27 @@ static void test_reset(void) {
     preflight_window_calls = 0u;
     preflight_fail_window  = UINT8_MAX;
     cancel_calls           = 0u;
+}
+
+static void test_invalid_result_is_cached_until_invalidation(void) {
+    const macro_slot_provider_t provider    = {.slot_count = 1u, .load_ir = test_load_ir};
+    macro_slot_metadata_t       metadata[1] = {0};
+
+    test_reset();
+    load_succeeds = false;
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(metadata[0].state == MACRO_SLOT_CACHE_INVALID);
+    CHECK(load_call_count == 1u);
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_INVALID);
+    CHECK(load_call_count == 1u);
+    CHECK(captured_ir == NULL);
+
+    macro_slot_provider_invalidate(&provider, metadata, 0u);
+    load_succeeds = true;
+    CHECK(macro_slot_provider_start(&provider, metadata, 0u, MACRO_PAYLOAD_TEXT_OUTPUT_DELAYED, 7u, MACRO_PAYLOAD_SOURCE_SLOT) == MACRO_PAYLOAD_START_STARTED);
+    CHECK(metadata[0].state == MACRO_SLOT_CACHE_VALID);
+    CHECK(load_call_count == 2u);
+    test_finish_active();
 }
 
 static void test_long_macro_checks_every_window_then_plays_from_the_first(void) {

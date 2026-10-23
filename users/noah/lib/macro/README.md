@@ -67,5 +67,3 @@ reads the first two to find the safe boundary.
 `macro_payload_unicode_caps_lock` are weak, so a test fixes the host. A
 direct start (`macro_payload_start_ir` with an IR, source `DIRECT`) plays only
 in host tests; firmware calls it only for the busy answer.
-`macro_slot_provider_validate` has callers only in host tests;
-`macro_slot_provider_encode_write` has no callers at all.

@@ -44,6 +44,12 @@
 #ifndef RGB_LAYER_RENDER_TEST_WORKLOAD
 #    define RGB_LAYER_RENDER_TEST_WORKLOAD 0
 #endif
+#ifndef RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT
+#    define RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT 0
+#endif
+#if RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT && !defined(NOAH_PORTABLE_PROFILE_ENABLE)
+#    error "The idle timeout is a profile setting: its variant builds with NOAH_PORTABLE_PROFILE_ENABLE"
+#endif
 #if (RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY_HALF + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_KEY + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_LEFT_HALF + RGB_LAYER_RENDER_TEST_KEY_FEEDBACK_RIGHT_HALF) > 1
 #    error "Only one key-feedback render test mode variant may be enabled at a time"
 #endif
@@ -682,6 +688,63 @@ static bool render_output_range(uint8_t led_min, uint8_t led_max) {
 static bool render_output(void) {
     return render_output_range(0, RGB_MATRIX_LED_COUNT);
 }
+
+#if RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT
+static uint32_t fake_lighting_timeout_ms;
+static uint32_t fake_input_idle_ms;
+
+uint32_t noah_setting(uint8_t id, uint32_t fallback) {
+    return id == NOAH_SETTING_RGB_TIMEOUT ? fake_lighting_timeout_ms : fallback;
+}
+
+uint32_t last_input_activity_elapsed(void) {
+    return fake_input_idle_ms;
+}
+
+static void check_every_led(rgb_t expected) {
+    for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
+        check_led(led, expected);
+    }
+}
+
+static void test_lighting_goes_dark_after_idle_timeout_and_returns_on_activity(void) {
+    rgb_t lit;
+
+    test_reset();
+    fake_lighting_timeout_ms = 1000u;
+    fake_input_idle_ms       = 0u;
+    layer_state              = (layer_state_t)1u << LAYER_SYM;
+    lit                      = rgb_from_hsv(layer_colors[LAYER_SYM].color);
+
+    CHECK(render_output());
+    check_every_led(lit);
+
+    fake_input_idle_ms = 1000u;
+    CHECK(render_output());
+    check_every_led(lit);
+
+    fake_input_idle_ms = 1001u;
+    for (uint8_t led = 0; led < RGB_MATRIX_LED_COUNT; led++) {
+        ws2812_leds[led] = (ws2812_led_t){.r = 5, .g = 6, .b = 7};
+    }
+    CHECK(render_output());
+    check_every_led((rgb_t){0, 0, 0});
+
+    fake_input_idle_ms = 0u;
+    CHECK(render_output());
+    check_every_led(lit);
+}
+
+static void test_zero_lighting_timeout_never_goes_dark(void) {
+    test_reset();
+    fake_lighting_timeout_ms = 0u;
+    fake_input_idle_ms       = UINT32_MAX;
+    layer_state              = (layer_state_t)1u << LAYER_SYM;
+
+    CHECK(render_output());
+    check_every_led(rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+#endif
 
 #if RGB_LAYER_RENDER_TEST_LAYER_GROUPS
 static void test_map_num_preview_leds(void) {
@@ -2375,6 +2438,14 @@ static void test_workload_render_contract(void) {
 #endif
 
 int main(int argc, char **argv) {
+#if RGB_LAYER_RENDER_TEST_IDLE_TIMEOUT
+    (void)argc;
+    (void)argv;
+    test_lighting_goes_dark_after_idle_timeout_and_returns_on_activity();
+    test_zero_lighting_timeout_never_goes_dark();
+    puts("rgb_layer_render idle timeout passed");
+    return 0;
+#endif
 #if RGB_LAYER_RENDER_TEST_WORKLOAD
     (void)argc;
     (void)argv;

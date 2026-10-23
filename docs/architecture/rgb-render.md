@@ -186,7 +186,8 @@ timestamps (QMK's split sync, the latter coalesced).
 ## Tests that hold it
 
 - `run_rgb_layer_render_tests.sh`: the stages and their order on both halves,
-  remote snapshots, localities, newest owner, auto-mouse fade, chunked frames.
+  remote snapshots, localities, newest owner, auto-mouse fade, chunked frames,
+  the idle timeout.
 - `run_effective_rgb_runtime_tests.sh`: the double bank, stale frames.
 - `run_rgb_validation_tests.sh`, `run_profile_rgb_v1_tests.sh`,
   `run_profile_rgb_v4_tests.sh`: the lighting domain and authored tables.

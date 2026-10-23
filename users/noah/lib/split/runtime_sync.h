@@ -9,9 +9,10 @@
 // - authored key-feedback truth (semantic state + broad owner state + tap branch state)
 //
 // The master periodically re-sends each surface as a heartbeat so a rebooted
-// or rejoined half can recover even if the relevant state did not change. Heavy
-// combo/key-feedback surfaces are rebuilt only while active, dirty, forced, or
-// heartbeat-due so idle scans do not spend time deriving unchanged RGB packets.
+// or rejoined half can recover even if the relevant state did not change. The
+// combo packet is built every pass and sent only when it changed, is forced, or
+// its heartbeat is due. The heavier key-feedback packets are built only while
+// active, dirty, forced, or heartbeat-due, so idle scans do not derive them.
 // A shared transport-health gate stops a send pass after its first failure and
 // suppresses packet building until a bounded recovery-probe deadline.
 //
