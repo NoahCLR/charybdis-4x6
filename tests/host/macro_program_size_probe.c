@@ -1,4 +1,4 @@
-// Reads one VIA macro per line as hex and prints the program length the
+// Reads one macro per line as hex and prints the program length the
 // firmware's decoder compiles it to, summed over the windows it plays in, or
 // -1 when it refuses the macro. The app's macroProgramBytes() is checked
 // against this output.

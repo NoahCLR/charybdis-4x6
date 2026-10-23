@@ -311,7 +311,7 @@ static void test_action_descriptor_classifies_common_actions(void) {
     noah_action_desc_t qmk_behavior = noah_action_describe(OSM(MOD_LSFT));
     noah_action_desc_t pd_key       = noah_action_describe(PD_SLOT_4);
     noah_action_desc_t pd_lock      = noah_action_describe(PD_SLOT_4_LOCK);
-    noah_action_desc_t macro_action = noah_action_describe(VIA_MACRO_0);
+    noah_action_desc_t macro_action = noah_action_describe(MACRO_0);
     noah_action_desc_t custom       = noah_action_describe(CUSTOM_KEY_0 + 1);
     noah_action_desc_t literal      = noah_action_describe(KC_C);
 
@@ -748,12 +748,12 @@ static void test_last_layer_actions(void) {
     CHECK(!noah_action_supported_at(LOCK_LAYER(LAYER_COUNT), NOAH_ACTION_PLACEMENT_KEY));
 }
 
-// VIA macros fill QMK's QK_MACRO range, 128 of them (D-F14): every one is a
+// Macros fill QMK's QK_MACRO range, 128 of them (D-F14): every one is a
 // key, a behaviour action and a combo output, and maps to and from the profile
 // by its slot; past the last there is no macro.
-static void test_via_macro_bank_ends_at_127(void) {
+static void test_macro_bank_ends_at_127(void) {
     static const uint8_t slots[] = {0, 31, 32, 63, 64, 127};
-    CHECK(VIA_MACRO_SLOT_COUNT == 128 && QK_MACRO_0 + 127 == QK_MACRO_MAX);
+    CHECK(MACRO_SLOT_COUNT == 128 && QK_MACRO_0 + 127 == QK_MACRO_MAX);
     for (uint8_t i = 0; i < ARRAY_SIZE(slots); i++) {
         uint16_t                 macro = (uint16_t)(QK_MACRO_0 + slots[i]);
         noah_profile_action_v1_t action;
@@ -762,10 +762,10 @@ static void test_via_macro_bank_ends_at_127(void) {
         CHECK(noah_action_supported_at(macro, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP));
         CHECK(noah_action_supported_at(macro, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT));
         CHECK(noah_profile_action_runtime_v1_from_native(macro, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
-        CHECK(action.kind == NOAH_PROFILE_ACTION_V1_VIA_MACRO && action.operand == slots[i]);
+        CHECK(action.kind == NOAH_PROFILE_ACTION_V1_MACRO && action.operand == slots[i]);
         CHECK(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && native == macro);
     }
-    noah_profile_action_v1_t past = {.kind = NOAH_PROFILE_ACTION_V1_VIA_MACRO, .operand = 128};
+    noah_profile_action_v1_t past = {.kind = NOAH_PROFILE_ACTION_V1_MACRO, .operand = 128};
     uint16_t                 native = 0;
     CHECK(noah_profile_action_runtime_v1_to_native(&past, &native) != NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
     CHECK(!IS_QK_MACRO(QK_MACRO_MAX + 1u));
@@ -943,7 +943,7 @@ int main(void) {
     test_saved_profile_placement_matches_the_rules();
     test_unassigned_userspace_codes_are_refused_everywhere();
     test_last_layer_actions();
-    test_via_macro_bank_ends_at_127();
+    test_macro_bank_ends_at_127();
     test_custom_key_block_holds_128();
     test_custom_key_shortcut_is_its_native_action();
     test_action_descriptor_classifies_common_actions();

@@ -124,7 +124,7 @@ static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_a
     value.logical_layer_count                       = LAYER_COUNT;
     value.placement_positions = MATRIX_ROWS * MATRIX_COLS;
     value.supported_pd_mode_mask                    = UINT32_MAX >> (32u - PD_MODE_COUNT);
-    value.via_macro_slot_count                      = VIA_MACRO_SLOT_COUNT;
+    value.macro_slot_count                          = MACRO_SLOT_COUNT;
     value.custom_key_count                = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     value.rgb_limits.logical_layer_count            = LAYER_COUNT;
     value.rgb_limits.supported_pd_mode_mask         = value.supported_pd_mode_mask;
@@ -220,7 +220,7 @@ static void validate_whole_profile(const noah_profile_compiled_v1_t *profile) {
 }
 
 static void test_keymap_placement_policy(void) {
-    const uint16_t accepted[] = {KC_NO, KC_TRNS, KC_A, MO(15), TT(15), OSL(15), TG(15), TO(15), VIA_MACRO_127, CUSTOM_KEY_127};
+    const uint16_t accepted[] = {KC_NO, KC_TRNS, KC_A, MO(15), TT(15), OSL(15), TG(15), TO(15), MACRO_127, CUSTOM_KEY_127};
     const uint16_t refused[] = {MO(16), TT(16), TT(31), OSL(16), OSL(31), TG(16), TO(16), DF(1)};
     for (size_t i = 0; i < sizeof(accepted) / sizeof(*accepted); i++) {
         noah_profile_action_v1_t action = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = accepted[i]};
@@ -268,7 +268,7 @@ static void test_real_authored_profile(void) {
     assert(runtime_compatibility.action_abi_digest == profile.metadata.action_abi_digest);
     assert(runtime_compatibility.logical_layer_count == LAYER_COUNT);
     assert(PD_MODE_COUNT == 32 && runtime_compatibility.supported_pd_mode_mask == UINT32_MAX);
-    assert(runtime_compatibility.via_macro_slot_count == VIA_MACRO_SLOT_COUNT);
+    assert(runtime_compatibility.macro_slot_count == MACRO_SLOT_COUNT);
     assert(runtime_compatibility.custom_key_count == NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS);
     assert(runtime_compatibility.rgb_limits.logical_layer_count == LAYER_COUNT);
     assert(runtime_compatibility.rgb_limits.maximum_brightness == RGB_MATRIX_MAXIMUM_BRIGHTNESS);
@@ -301,10 +301,10 @@ static void test_real_authored_profile(void) {
             }
     const noah_profile_domain_v1_t *bank = &decoded.domains[NOAH_PROFILE_DOMAIN_INDEX_MACROS];
     size_t bank_offset = 0;
-    for (uint8_t slot = 0; slot < VIA_MACRO_SLOT_COUNT; slot++) {
+    for (uint8_t slot = 0; slot < MACRO_SLOT_COUNT; slot++) {
         uint8_t encoded[1024];
         uint16_t count = 0;
-        if (via_macro_payloads[slot] && *via_macro_payloads[slot]) assert(macro_payload_encode(via_macro_payloads[slot], encoded, sizeof(encoded), &count));
+        if (macro_payloads[slot] && *macro_payloads[slot]) assert(macro_payload_encode(macro_payloads[slot], encoded, sizeof(encoded), &count));
         assert(bank_offset + count < bank->payload_length);
         assert(!memcmp(bank->payload + bank_offset, encoded, count));
         bank_offset += count;
@@ -418,13 +418,13 @@ static void test_semantic_action_translation(void) {
     assert(noah_profile_compiled_v1_action(KC_A, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_QMK_KEYCODE && action.operand == KC_A);
     assert(noah_profile_compiled_v1_action(MO(LAYER_NAV), &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY && action.operand == LAYER_NAV);
     assert(noah_profile_compiled_v1_action(LOCK_LAYER(LAYER_SYM), &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK && action.operand == LAYER_SYM);
-    assert(noah_profile_compiled_v1_action(VIA_MACRO_10, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_VIA_MACRO && action.operand == 10u);
+    assert(noah_profile_compiled_v1_action(MACRO_10, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_MACRO && action.operand == 10u);
     assert(noah_profile_compiled_v1_action(CUSTOM_KEY_7, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_CUSTOM_KEY && action.operand == 7u);
     assert(noah_profile_compiled_v1_action(pd_modes[PD_MODE_INDEX_ZOOM].keycode, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && action.operand == PD_MODE_INDEX_ZOOM);
     assert(noah_profile_compiled_v1_action(pd_modes[PD_MODE_INDEX_ARROW].lock_action, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK && action.operand == PD_MODE_INDEX_ARROW);
 
     const uint16_t round_trip_actions[] = {
-        KC_NO, KC_A, MO(LAYER_NAV), LOCK_LAYER(LAYER_SYM), VIA_MACRO_10, CUSTOM_KEY_7, CUSTOM_KEY_63, pd_modes[PD_MODE_INDEX_ZOOM].keycode, pd_modes[PD_MODE_INDEX_ARROW].lock_action,
+        KC_NO, KC_A, MO(LAYER_NAV), LOCK_LAYER(LAYER_SYM), MACRO_10, CUSTOM_KEY_7, CUSTOM_KEY_63, pd_modes[PD_MODE_INDEX_ZOOM].keycode, pd_modes[PD_MODE_INDEX_ARROW].lock_action,
     };
     for (size_t index = 0u; index < ARRAY_SIZE(round_trip_actions); index++) {
         assert(noah_profile_action_runtime_v1_from_native(round_trip_actions[index], &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);

@@ -38,8 +38,8 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 | `layer_names[]` | profile data | settings `0x40`, layer names 0–15 |
 | `CUSTOM_KEYS`: each row's name | profile data | settings `0x40`, custom-key names |
 | `CUSTOM_KEYS`: a `SHORTCUT` row's modifiers and key | profile data | settings `0x40`, custom-key shortcuts (D-F26, [ADR](../adr/0026-custom-key-carries-a-shortcut.md)) |
-| `VIA_MACROS`: each row's payload | profile data | macros `0x70`; generated in the bank encoding as `authored_macro_bank.h` |
-| `VIA_MACROS`: each row's name | profile data | settings `0x40`, macro names (D-F43, [ADR](../adr/0043-macros-have-names-user-macros-retired.md)) |
+| `MACROS`: each row's payload | profile data | macros `0x70`; generated in the bank encoding as `authored_macro_bank.h` |
+| `MACROS`: each row's name | profile data | settings `0x40`, macro names (D-F43, [ADR](../adr/0043-macros-have-names-user-macros-retired.md)) |
 | `COMBOS`: each row's inputs and output | profile data | combos `0x30`, a row |
 | `COMBOS`: `COMBO_WINDOW`'s window; a `COMBO` row follows the default window | profile data | combos `0x30`, the row's window (`0` follows the default) |
 | `key_behaviors[]`: `.keycode` | profile data | key behaviours `0x20`, the row's target |
@@ -47,7 +47,7 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 | `key_behaviors[]`: `.keeps_auto_mouse_anchored` | profile data | the row's flag bit 0 |
 | `key_behaviors[]`: `tap_counts[]` tap, hold and long hold, their hold style and repeat rate | profile data | the row's steps |
 | The 128 custom-key slots, the 128 macro slots, the userspace keycode blocks | ceiling | the action-ABI digest ([blob and digests](profile-wire-v1/blob-and-digests.md#action-abi-digest)); D-F51, [ADR](../adr/0051-userspace-keycodes-in-fixed-blocks.md) |
-| `LAYER_*`, `VIA_MACRO_n`, `CUSTOM_KEY_n` names in C | source-only | the profile stores numbers |
+| `LAYER_*`, `MACRO_n`, `CUSTOM_KEY_n` names in C | source-only | the profile stores numbers |
 
 The compiled defaults enable every authored behaviour and combo on every
 layer of the bank, with no placement switched off; disabling, the allowed
@@ -60,7 +60,7 @@ settings domain's UTF-8 names,
 layer names and the keyboard name are UTF-8 of at most 32 bytes without C0
 controls or DEL, every
 keymap position is a keycode the keymap may hold, and `authored_macro_bank.h`
-equals `VIA_MACROS()` encoded by the firmware's macro compiler.
+equals `MACROS()` encoded by the firmware's macro compiler.
 
 Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, `folded_keyboard_profile_test.py`), `tests/host/run_real_profile_validation_tests.sh` (`real_profile_validation_test.c`).
 

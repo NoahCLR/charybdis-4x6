@@ -115,7 +115,7 @@ static size_t encode_representative(uint8_t *output, size_t capacity, noah_profi
         {
             .tap_index     = 2u,
             .presence_mask = NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_TAP | NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_LONG_HOLD,
-            .tap           = {.kind = NOAH_PROFILE_ACTION_V1_VIA_MACRO, .operand = 10u},
+            .tap           = {.kind = NOAH_PROFILE_ACTION_V1_MACRO, .operand = 10u},
             .long_hold     = {.style = NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD, .action = {.kind = NOAH_PROFILE_ACTION_V1_LAYER_LOCK, .operand = 3u}},
         },
         {
@@ -200,7 +200,7 @@ static void test_incremental_validation(const char *fixture_path) {
         NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_ACTION, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION,
     };
     static const uint8_t expected_kinds[] = {
-        NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_VIA_MACRO, NOAH_PROFILE_ACTION_V1_LAYER_LOCK, NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, NOAH_PROFILE_ACTION_V1_CUSTOM_KEY,
+        NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_MACRO, NOAH_PROFILE_ACTION_V1_LAYER_LOCK, NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, NOAH_PROFILE_ACTION_V1_CUSTOM_KEY,
     };
     static const uint16_t                           expected_operands[] = {0x1234u, 0x28u, 10u, 3u, 2u, 2u};
     uint8_t                                         payload[TEST_BUFFER_SIZE];
@@ -322,7 +322,7 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     assert(step.tap_index == 0u && step.presence_mask == NOAH_KEY_BEHAVIOR_DOMAIN_V1_STEP_HAS_HOLD);
     assert(step.hold.style == NOAH_KEY_BEHAVIOR_HOLD_V1_REPEAT_WHILE_HELD && step.hold.repeat_hz == 25u && step.hold.action.operand == 0x28u);
     expect_result(noah_key_behavior_domain_v1_step_at(&domain, 0u, 1u, &step, &error), NOAH_PROFILE_CODEC_V1_OK);
-    assert(step.tap_index == 2u && step.tap.kind == NOAH_PROFILE_ACTION_V1_VIA_MACRO && step.tap.operand == 10u);
+    assert(step.tap_index == 2u && step.tap.kind == NOAH_PROFILE_ACTION_V1_MACRO && step.tap.operand == 10u);
     assert(step.long_hold.style == NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD && step.long_hold.action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK);
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 1u, &row, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(row.target.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && row.target.operand == 2u && row.step_count == 1u);

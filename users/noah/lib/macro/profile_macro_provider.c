@@ -12,7 +12,7 @@
 #    define NOAH_MACRO_SLOT_DELAY TAP_CODE_DELAY
 #endif
 
-static macro_slot_metadata_t profile_macro_slots[VIA_MACRO_SLOT_COUNT];
+static macro_slot_metadata_t profile_macro_slots[MACRO_SLOT_COUNT];
 
 // Where the macro being loaded starts, found by its first window; later
 // windows of the same playback reuse it instead of walking the bank again.
@@ -26,7 +26,7 @@ static struct {
 static bool profile_macro_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir, macro_payload_stream_cursor_t *cursor, void *context);
 
 static const macro_slot_provider_t profile_macro_provider = {
-    .slot_count = VIA_MACRO_SLOT_COUNT,
+    .slot_count = MACRO_SLOT_COUNT,
     .load_ir = profile_macro_provider_load_ir,
 };
 
@@ -37,7 +37,7 @@ static __attribute__((noinline)) bool profile_macro_provider_find_slot(uint8_t s
     uint16_t base = 0;
     uint8_t  chunk[32];
 
-    if (!offset || !remaining || slot >= VIA_MACRO_SLOT_COUNT || size == 0) {
+    if (!offset || !remaining || slot >= MACRO_SLOT_COUNT || size == 0) {
         return false;
     }
 
@@ -71,7 +71,7 @@ static bool profile_macro_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir,
         return false;
     }
     if (!noah_effective_macro_bank_is_live()) {
-        const char *payload = via_macro_payloads[slot];
+        const char *payload = macro_payloads[slot];
         if (!payload || !*payload) { *ir = (macro_payload_ir_t){0}; return true; }
         return macro_payload_compile(payload, ir);
     }

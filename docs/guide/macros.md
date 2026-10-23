@@ -2,9 +2,8 @@
 
 A **macro** is a named sequence the keyboard plays back: text, keys and
 chords, delays, and key presses and releases of their own. There are 128
-macro slots, `VIA_MACRO_0` to `VIA_MACRO_127` (the name is historical: VIA is
-not supported). A macro can sit on a key, be a behaviour's tap or hold, a
-combo's output, or a pointing mode's direction. Ark's
+macro slots, `MACRO_0` to `MACRO_127`. A macro can sit on a key, be a
+behaviour's tap or hold, a combo's output, or a pointing mode's direction. Ark's
 [Macros](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/macros.md)
 page writes and records them.
 

@@ -25,7 +25,7 @@ enum {
     NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION = NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS,
     NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS   = 16u,
     NOAH_PROFILE_ACTION_V1_MAX_PD_MODES         = NOAH_PROFILE_PD_COUNT,
-    NOAH_PROFILE_ACTION_V1_MAX_VIA_MACRO_SLOTS  = 128u,
+    NOAH_PROFILE_ACTION_V1_MAX_MACRO_SLOTS      = 128u,
     NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS      = 128u,
 };
 
@@ -43,7 +43,7 @@ typedef enum {
     NOAH_PROFILE_ACTION_V1_LAYER_LOCK        = 3u,
     NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY = 4u,
     NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK      = 5u,
-    NOAH_PROFILE_ACTION_V1_VIA_MACRO         = 6u,
+    NOAH_PROFILE_ACTION_V1_MACRO             = 6u,
     // Kind 7 named the retired user macros in earlier action vocabularies;
     // this vocabulary (a different action ABI digest) gives it to custom keys.
     NOAH_PROFILE_ACTION_V1_CUSTOM_KEY = 7u,
@@ -146,7 +146,7 @@ typedef struct {
 typedef struct {
     uint32_t max_logical_layers;
     uint32_t max_pd_modes;
-    uint32_t max_via_macro_slots;
+    uint32_t max_macro_slots;
     uint32_t max_custom_keys;
 } noah_profile_action_v1_limits_t;
 

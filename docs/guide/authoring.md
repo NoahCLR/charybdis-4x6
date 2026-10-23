@@ -57,8 +57,8 @@ key is a basic key (`KC_A` to `KC_EXSEL`), a mouse button (`MS_BTN1` to
 
 ### Macros
 
-`VIA_MACROS(MACRO)` lists all 128 macros as
-`MACRO(VIA_MACRO_n, "name", "payload")`. In the payload:
+`MACROS(MACRO)` lists all 128 macros as
+`MACRO(MACRO_n, "name", "payload")`. In the payload:
 
 - plain text is typed as it stands: `hello`;
 - `{KC_A}` taps a key and `{KC_LGUI,KC_SPC}` a chord;
@@ -67,7 +67,7 @@ key is a basic key (`KC_A` to `KC_EXSEL`), a mouse button (`MS_BTN1` to
 - `{250}` waits 250 ms.
 
 ```c
-MACRO(VIA_MACRO_10, "Select All + Copy", "{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}")
+MACRO(MACRO_10, "Select All + Copy", "{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}")
 ```
 
 After changing the macros, regenerate `authored_macro_bank.h`:

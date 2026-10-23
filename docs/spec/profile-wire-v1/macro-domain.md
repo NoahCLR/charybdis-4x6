@@ -81,7 +81,7 @@ Held by: `tests/host/run_profile_keymap_macros_runtime_tests.sh` (`profile_keyma
 ## Absent domain and compiled defaults
 
 A profile without this domain, or whose domain range cannot be found, plays
-the authored macros: each `VIA_MACROS()` row's payload in `keymap.c`, compiled
+the authored macros: each `MACROS()` row's payload in `keymap.c`, compiled
 by the firmware's macro compiler. The compiled defaults' domain is the
 authored bank in this encoding (`authored_macro_bank.h`), which real-profile
 validation refuses when it is stale.

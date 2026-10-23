@@ -11,7 +11,7 @@ are in [architecture](docs/architecture/README.md).
 ### Where code lives
 
 - The keymap folder holds the authored profile as data, written the way a
-  person authors it and attached to the thing it names (`MACRO(VIA_MACRO_0,
+  person authors it and attached to the thing it names (`MACRO(MACRO_0,
   "Spotlight", "…")`, `COMBO_WINDOW(out, keys, 100)`, `layer_names[]` by layer
   symbol). Index-parallel arrays, packed wire values, schema headers, magic
   sizes and a value repeated from `config.h` are all signs the data is shaped
@@ -108,7 +108,7 @@ are in [architecture](docs/architecture/README.md).
 | Every tracked `.c` file under `users/noah/` is in a source list of `source_manifest.mk` or allowlisted with how it is built; every listed file exists | `run_source_manifest_tests.sh` |
 | Every firmware build runs real-profile validation and fails with it | `users/noah/rules.mk`; `run_feature_gate_compile_tests.sh` checks `rules.mk` still calls it |
 | Authored data places only supported actions, with no raw layer actions | `noah_action_supported_at()` in `run_keymap_validation_tests.sh` and `run_real_profile_validation_tests.sh` |
-| `authored_macro_bank.h` matches the profile's `VIA_MACROS()` | `run_real_profile_validation_tests.sh` |
+| `authored_macro_bank.h` matches the profile's `MACROS()` | `run_real_profile_validation_tests.sh` |
 | The weak hook defaults call their `noah_*` helpers, and a test override that chains keeps the behaviour | `run_hook_chaining_tests.sh` |
 | Any other userspace or keymap file that defines one of those hooks calls the `noah_*` helpers its default calls, or replaces it on purpose with `// Replaces noah_<helper>(): <why>` in its body ([hook overrides](docs/guide/hooks.md#replacing-a-default)) | `run_hook_override_tests.sh` |
 | The fork-only and internal QMK symbols `compat/` adapts appear nowhere else in userspace or keymap C, except allowlisted hooks QMK calls by name | `run_compat_boundary_tests.sh` |

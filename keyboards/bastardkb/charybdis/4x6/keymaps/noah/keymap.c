@@ -4,7 +4,7 @@
 //
 // This translation unit owns the authored keymap data:
 //   - CUSTOM_KEYS(KEY, SHORTCUT), each custom key's name and shortcut
-//   - VIA_MACROS(MACRO), with each macro's name
+//   - MACROS(MACRO), with each macro's name
 //   - COMBOS(COMBO, COMBO_WINDOW)
 //   - key_behaviors[]
 //   - layer_names[]
@@ -167,11 +167,10 @@
     KEY(CUSTOM_KEY_127, "")
 
 // ─── Macros ─────────────────────────────────────────────────────────────────
-// VIA_MACRO_0–127 are the authored aliases for the 128 macro slots (the name
-// is historical; VIA is not supported, D-F31).
+// MACRO_0–127 are the authored aliases for the 128 macro slots.
 // All 128 slots are listed here so the slot limit stays visible in keymap.c.
 // Each row is:
-//   MACRO(VIA_MACRO_n, "name", "payload")
+//   MACRO(MACRO_n, "name", "payload")
 // The name is what Charybdis Ark shows for the macro: at most 32 bytes of
 // UTF-8. Use empty strings for an unused slot. The payloads are the macro
 // domain of the compiled default profile, which a keyboard with no saved
@@ -184,135 +183,135 @@
 //   - {250} wait 250 ms before the next macro step
 //     e.g. {KC_A}{250}{KC_B} pauses between A and B; other keys pressed
 //     during the delay are queued
-#define VIA_MACROS(MACRO)                                                          \
-    MACRO(VIA_MACRO_0, "Spotlight", "{KC_LGUI,KC_SPC}")                            \
-    MACRO(VIA_MACRO_1, "AI Chat", "{KC_LALT,KC_SPC}")                              \
-    MACRO(VIA_MACRO_2, "Warp Terminal", "{KC_LALT,KC_LGUI,KC_SPC}")                \
-    MACRO(VIA_MACRO_3, "OCR Copy", "{KC_LCTL,KC_LALT,KC_LGUI,KC_C}")               \
-    MACRO(VIA_MACRO_4, "Drag Screenshot", "{KC_LCTL,KC_LALT,KC_LGUI,KC_X}")        \
-    MACRO(VIA_MACRO_5, "Emoji", "{KC_LCTL,KC_LGUI,KC_SPC}")                        \
-    MACRO(VIA_MACRO_6, "Zoom Screen", "{KC_LALT,KC_LGUI,KC_8}")                    \
-    MACRO(VIA_MACRO_7, "Clipboard History", "{KC_LCTL,KC_LALT,KC_LGUI,KC_V}")      \
-    MACRO(VIA_MACRO_8, "VS Code Preview MD", "{KC_LSFT,KC_LGUI,KC_V}")             \
-    MACRO(VIA_MACRO_9, "VS Code Run Task", "{KC_LSFT,KC_LGUI,KC_P}")               \
-    MACRO(VIA_MACRO_10, "Select All + Copy", "{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}")   \
-    MACRO(VIA_MACRO_11, "Select All", "{KC_LGUI,KC_A}")                            \
-    MACRO(VIA_MACRO_12, "Copy", "{KC_LGUI,KC_C}")                                  \
-    MACRO(VIA_MACRO_13, "Paste", "{KC_LGUI,KC_V}")                                 \
-    MACRO(VIA_MACRO_14, "Cut", "{KC_LGUI,KC_X}")                                   \
-    MACRO(VIA_MACRO_15, "Undo", "{KC_LGUI,KC_Z}")                                  \
-    MACRO(VIA_MACRO_16, "Redo", "{KC_LSFT,KC_LGUI,KC_Z}")                          \
-    MACRO(VIA_MACRO_17, "", "")                                                    \
-    MACRO(VIA_MACRO_18, "", "")                                                    \
-    MACRO(VIA_MACRO_19, "T3 Code", "{+KC_LGUI}{KC_TAB}{120}t3 code{-KC_LGUI}")     \
-    MACRO(VIA_MACRO_20, "", "")                                                    \
-    MACRO(VIA_MACRO_21, "", "")                                                    \
-    MACRO(VIA_MACRO_22, "", "")                                                    \
-    MACRO(VIA_MACRO_23, "", "")                                                    \
-    MACRO(VIA_MACRO_24, "", "")                                                    \
-    MACRO(VIA_MACRO_25, "", "")                                                    \
-    MACRO(VIA_MACRO_26, "", "")                                                    \
-    MACRO(VIA_MACRO_27, "", "")                                                    \
-    MACRO(VIA_MACRO_28, "", "")                                                    \
-    MACRO(VIA_MACRO_29, "", "")                                                    \
-    MACRO(VIA_MACRO_30, "", "")                                                    \
-    MACRO(VIA_MACRO_31, "", "")                                                    \
-    MACRO(VIA_MACRO_32, "", "")                                                    \
-    MACRO(VIA_MACRO_33, "", "")                                                    \
-    MACRO(VIA_MACRO_34, "", "")                                                    \
-    MACRO(VIA_MACRO_35, "", "")                                                    \
-    MACRO(VIA_MACRO_36, "", "")                                                    \
-    MACRO(VIA_MACRO_37, "", "")                                                    \
-    MACRO(VIA_MACRO_38, "", "")                                                    \
-    MACRO(VIA_MACRO_39, "", "")                                                    \
-    MACRO(VIA_MACRO_40, "", "")                                                    \
-    MACRO(VIA_MACRO_41, "", "")                                                    \
-    MACRO(VIA_MACRO_42, "", "")                                                    \
-    MACRO(VIA_MACRO_43, "", "")                                                    \
-    MACRO(VIA_MACRO_44, "", "")                                                    \
-    MACRO(VIA_MACRO_45, "", "")                                                    \
-    MACRO(VIA_MACRO_46, "", "")                                                    \
-    MACRO(VIA_MACRO_47, "", "")                                                    \
-    MACRO(VIA_MACRO_48, "", "")                                                    \
-    MACRO(VIA_MACRO_49, "", "")                                                    \
-    MACRO(VIA_MACRO_50, "", "")                                                    \
-    MACRO(VIA_MACRO_51, "", "")                                                    \
-    MACRO(VIA_MACRO_52, "", "")                                                    \
-    MACRO(VIA_MACRO_53, "", "")                                                    \
-    MACRO(VIA_MACRO_54, "", "")                                                    \
-    MACRO(VIA_MACRO_55, "", "")                                                    \
-    MACRO(VIA_MACRO_56, "", "")                                                    \
-    MACRO(VIA_MACRO_57, "", "")                                                    \
-    MACRO(VIA_MACRO_58, "", "")                                                    \
-    MACRO(VIA_MACRO_59, "", "")                                                    \
-    MACRO(VIA_MACRO_60, "", "")                                                    \
-    MACRO(VIA_MACRO_61, "", "")                                                    \
-    MACRO(VIA_MACRO_62, "", "")                                                    \
-    MACRO(VIA_MACRO_63, "", "")                                                    \
-    MACRO(VIA_MACRO_64, "", "")                                                    \
-    MACRO(VIA_MACRO_65, "", "")                                                    \
-    MACRO(VIA_MACRO_66, "", "")                                                    \
-    MACRO(VIA_MACRO_67, "", "")                                                    \
-    MACRO(VIA_MACRO_68, "", "")                                                    \
-    MACRO(VIA_MACRO_69, "", "")                                                    \
-    MACRO(VIA_MACRO_70, "", "")                                                    \
-    MACRO(VIA_MACRO_71, "", "")                                                    \
-    MACRO(VIA_MACRO_72, "", "")                                                    \
-    MACRO(VIA_MACRO_73, "", "")                                                    \
-    MACRO(VIA_MACRO_74, "", "")                                                    \
-    MACRO(VIA_MACRO_75, "", "")                                                    \
-    MACRO(VIA_MACRO_76, "", "")                                                    \
-    MACRO(VIA_MACRO_77, "", "")                                                    \
-    MACRO(VIA_MACRO_78, "", "")                                                    \
-    MACRO(VIA_MACRO_79, "", "")                                                    \
-    MACRO(VIA_MACRO_80, "", "")                                                    \
-    MACRO(VIA_MACRO_81, "", "")                                                    \
-    MACRO(VIA_MACRO_82, "", "")                                                    \
-    MACRO(VIA_MACRO_83, "", "")                                                    \
-    MACRO(VIA_MACRO_84, "", "")                                                    \
-    MACRO(VIA_MACRO_85, "", "")                                                    \
-    MACRO(VIA_MACRO_86, "", "")                                                    \
-    MACRO(VIA_MACRO_87, "", "")                                                    \
-    MACRO(VIA_MACRO_88, "", "")                                                    \
-    MACRO(VIA_MACRO_89, "", "")                                                    \
-    MACRO(VIA_MACRO_90, "", "")                                                    \
-    MACRO(VIA_MACRO_91, "", "")                                                    \
-    MACRO(VIA_MACRO_92, "", "")                                                    \
-    MACRO(VIA_MACRO_93, "", "")                                                    \
-    MACRO(VIA_MACRO_94, "", "")                                                    \
-    MACRO(VIA_MACRO_95, "", "")                                                    \
-    MACRO(VIA_MACRO_96, "", "")                                                    \
-    MACRO(VIA_MACRO_97, "", "")                                                    \
-    MACRO(VIA_MACRO_98, "", "")                                                    \
-    MACRO(VIA_MACRO_99, "", "")                                                    \
-    MACRO(VIA_MACRO_100, "", "")                                                   \
-    MACRO(VIA_MACRO_101, "", "")                                                   \
-    MACRO(VIA_MACRO_102, "", "")                                                   \
-    MACRO(VIA_MACRO_103, "", "")                                                   \
-    MACRO(VIA_MACRO_104, "", "")                                                   \
-    MACRO(VIA_MACRO_105, "", "")                                                   \
-    MACRO(VIA_MACRO_106, "", "")                                                   \
-    MACRO(VIA_MACRO_107, "", "")                                                   \
-    MACRO(VIA_MACRO_108, "", "")                                                   \
-    MACRO(VIA_MACRO_109, "", "")                                                   \
-    MACRO(VIA_MACRO_110, "", "")                                                   \
-    MACRO(VIA_MACRO_111, "", "")                                                   \
-    MACRO(VIA_MACRO_112, "", "")                                                   \
-    MACRO(VIA_MACRO_113, "", "")                                                   \
-    MACRO(VIA_MACRO_114, "", "")                                                   \
-    MACRO(VIA_MACRO_115, "", "")                                                   \
-    MACRO(VIA_MACRO_116, "", "")                                                   \
-    MACRO(VIA_MACRO_117, "", "")                                                   \
-    MACRO(VIA_MACRO_118, "", "")                                                   \
-    MACRO(VIA_MACRO_119, "", "")                                                   \
-    MACRO(VIA_MACRO_120, "", "")                                                   \
-    MACRO(VIA_MACRO_121, "", "")                                                   \
-    MACRO(VIA_MACRO_122, "", "")                                                   \
-    MACRO(VIA_MACRO_123, "", "")                                                   \
-    MACRO(VIA_MACRO_124, "", "")                                                   \
-    MACRO(VIA_MACRO_125, "", "")                                                   \
-    MACRO(VIA_MACRO_126, "", "")                                                   \
-    MACRO(VIA_MACRO_127, "", "")
+#define MACROS(MACRO)                                                              \
+    MACRO(MACRO_0, "Spotlight", "{KC_LGUI,KC_SPC}")                                \
+    MACRO(MACRO_1, "AI Chat", "{KC_LALT,KC_SPC}")                                  \
+    MACRO(MACRO_2, "Warp Terminal", "{KC_LALT,KC_LGUI,KC_SPC}")                    \
+    MACRO(MACRO_3, "OCR Copy", "{KC_LCTL,KC_LALT,KC_LGUI,KC_C}")                   \
+    MACRO(MACRO_4, "Drag Screenshot", "{KC_LCTL,KC_LALT,KC_LGUI,KC_X}")            \
+    MACRO(MACRO_5, "Emoji", "{KC_LCTL,KC_LGUI,KC_SPC}")                            \
+    MACRO(MACRO_6, "Zoom Screen", "{KC_LALT,KC_LGUI,KC_8}")                        \
+    MACRO(MACRO_7, "Clipboard History", "{KC_LCTL,KC_LALT,KC_LGUI,KC_V}")          \
+    MACRO(MACRO_8, "VS Code Preview MD", "{KC_LSFT,KC_LGUI,KC_V}")                 \
+    MACRO(MACRO_9, "VS Code Run Task", "{KC_LSFT,KC_LGUI,KC_P}")                   \
+    MACRO(MACRO_10, "Select All + Copy", "{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}")       \
+    MACRO(MACRO_11, "Select All", "{KC_LGUI,KC_A}")                                \
+    MACRO(MACRO_12, "Copy", "{KC_LGUI,KC_C}")                                      \
+    MACRO(MACRO_13, "Paste", "{KC_LGUI,KC_V}")                                     \
+    MACRO(MACRO_14, "Cut", "{KC_LGUI,KC_X}")                                       \
+    MACRO(MACRO_15, "Undo", "{KC_LGUI,KC_Z}")                                      \
+    MACRO(MACRO_16, "Redo", "{KC_LSFT,KC_LGUI,KC_Z}")                              \
+    MACRO(MACRO_17, "", "")                                                        \
+    MACRO(MACRO_18, "", "")                                                        \
+    MACRO(MACRO_19, "T3 Code", "{+KC_LGUI}{KC_TAB}{120}t3 code{-KC_LGUI}")         \
+    MACRO(MACRO_20, "", "")                                                        \
+    MACRO(MACRO_21, "", "")                                                        \
+    MACRO(MACRO_22, "", "")                                                        \
+    MACRO(MACRO_23, "", "")                                                        \
+    MACRO(MACRO_24, "", "")                                                        \
+    MACRO(MACRO_25, "", "")                                                        \
+    MACRO(MACRO_26, "", "")                                                        \
+    MACRO(MACRO_27, "", "")                                                        \
+    MACRO(MACRO_28, "", "")                                                        \
+    MACRO(MACRO_29, "", "")                                                        \
+    MACRO(MACRO_30, "", "")                                                        \
+    MACRO(MACRO_31, "", "")                                                        \
+    MACRO(MACRO_32, "", "")                                                        \
+    MACRO(MACRO_33, "", "")                                                        \
+    MACRO(MACRO_34, "", "")                                                        \
+    MACRO(MACRO_35, "", "")                                                        \
+    MACRO(MACRO_36, "", "")                                                        \
+    MACRO(MACRO_37, "", "")                                                        \
+    MACRO(MACRO_38, "", "")                                                        \
+    MACRO(MACRO_39, "", "")                                                        \
+    MACRO(MACRO_40, "", "")                                                        \
+    MACRO(MACRO_41, "", "")                                                        \
+    MACRO(MACRO_42, "", "")                                                        \
+    MACRO(MACRO_43, "", "")                                                        \
+    MACRO(MACRO_44, "", "")                                                        \
+    MACRO(MACRO_45, "", "")                                                        \
+    MACRO(MACRO_46, "", "")                                                        \
+    MACRO(MACRO_47, "", "")                                                        \
+    MACRO(MACRO_48, "", "")                                                        \
+    MACRO(MACRO_49, "", "")                                                        \
+    MACRO(MACRO_50, "", "")                                                        \
+    MACRO(MACRO_51, "", "")                                                        \
+    MACRO(MACRO_52, "", "")                                                        \
+    MACRO(MACRO_53, "", "")                                                        \
+    MACRO(MACRO_54, "", "")                                                        \
+    MACRO(MACRO_55, "", "")                                                        \
+    MACRO(MACRO_56, "", "")                                                        \
+    MACRO(MACRO_57, "", "")                                                        \
+    MACRO(MACRO_58, "", "")                                                        \
+    MACRO(MACRO_59, "", "")                                                        \
+    MACRO(MACRO_60, "", "")                                                        \
+    MACRO(MACRO_61, "", "")                                                        \
+    MACRO(MACRO_62, "", "")                                                        \
+    MACRO(MACRO_63, "", "")                                                        \
+    MACRO(MACRO_64, "", "")                                                        \
+    MACRO(MACRO_65, "", "")                                                        \
+    MACRO(MACRO_66, "", "")                                                        \
+    MACRO(MACRO_67, "", "")                                                        \
+    MACRO(MACRO_68, "", "")                                                        \
+    MACRO(MACRO_69, "", "")                                                        \
+    MACRO(MACRO_70, "", "")                                                        \
+    MACRO(MACRO_71, "", "")                                                        \
+    MACRO(MACRO_72, "", "")                                                        \
+    MACRO(MACRO_73, "", "")                                                        \
+    MACRO(MACRO_74, "", "")                                                        \
+    MACRO(MACRO_75, "", "")                                                        \
+    MACRO(MACRO_76, "", "")                                                        \
+    MACRO(MACRO_77, "", "")                                                        \
+    MACRO(MACRO_78, "", "")                                                        \
+    MACRO(MACRO_79, "", "")                                                        \
+    MACRO(MACRO_80, "", "")                                                        \
+    MACRO(MACRO_81, "", "")                                                        \
+    MACRO(MACRO_82, "", "")                                                        \
+    MACRO(MACRO_83, "", "")                                                        \
+    MACRO(MACRO_84, "", "")                                                        \
+    MACRO(MACRO_85, "", "")                                                        \
+    MACRO(MACRO_86, "", "")                                                        \
+    MACRO(MACRO_87, "", "")                                                        \
+    MACRO(MACRO_88, "", "")                                                        \
+    MACRO(MACRO_89, "", "")                                                        \
+    MACRO(MACRO_90, "", "")                                                        \
+    MACRO(MACRO_91, "", "")                                                        \
+    MACRO(MACRO_92, "", "")                                                        \
+    MACRO(MACRO_93, "", "")                                                        \
+    MACRO(MACRO_94, "", "")                                                        \
+    MACRO(MACRO_95, "", "")                                                        \
+    MACRO(MACRO_96, "", "")                                                        \
+    MACRO(MACRO_97, "", "")                                                        \
+    MACRO(MACRO_98, "", "")                                                        \
+    MACRO(MACRO_99, "", "")                                                        \
+    MACRO(MACRO_100, "", "")                                                       \
+    MACRO(MACRO_101, "", "")                                                       \
+    MACRO(MACRO_102, "", "")                                                       \
+    MACRO(MACRO_103, "", "")                                                       \
+    MACRO(MACRO_104, "", "")                                                       \
+    MACRO(MACRO_105, "", "")                                                       \
+    MACRO(MACRO_106, "", "")                                                       \
+    MACRO(MACRO_107, "", "")                                                       \
+    MACRO(MACRO_108, "", "")                                                       \
+    MACRO(MACRO_109, "", "")                                                       \
+    MACRO(MACRO_110, "", "")                                                       \
+    MACRO(MACRO_111, "", "")                                                       \
+    MACRO(MACRO_112, "", "")                                                       \
+    MACRO(MACRO_113, "", "")                                                       \
+    MACRO(MACRO_114, "", "")                                                       \
+    MACRO(MACRO_115, "", "")                                                       \
+    MACRO(MACRO_116, "", "")                                                       \
+    MACRO(MACRO_117, "", "")                                                       \
+    MACRO(MACRO_118, "", "")                                                       \
+    MACRO(MACRO_119, "", "")                                                       \
+    MACRO(MACRO_120, "", "")                                                       \
+    MACRO(MACRO_121, "", "")                                                       \
+    MACRO(MACRO_122, "", "")                                                       \
+    MACRO(MACRO_123, "", "")                                                       \
+    MACRO(MACRO_124, "", "")                                                       \
+    MACRO(MACRO_125, "", "")                                                       \
+    MACRO(MACRO_126, "", "")                                                       \
+    MACRO(MACRO_127, "", "")
 
 // ─── Combos ─────────────────────────────────────────────────────────────────
 //
@@ -324,7 +323,7 @@
 // COMBO follows COMBO_TERM; COMBO_WINDOW gives that combo its own window.
 //
 // Valid combo outputs include plain keycodes, custom keys (CUSTOM_KEY_n),
-// VIA macros (VIA_MACRO_n), MO(layer) (the layer stays on while the combo is
+// macros (MACRO_n), MO(layer) (the layer stays on while the combo is
 // held), LOCK_LAYER(...), explicit pd-mode lock keycodes such as
 // PD_SLOT_4_LOCK, and keycodes that also have rows in key_behaviors[].
 //
@@ -463,9 +462,9 @@
 //   - Use the generated *_LOCK keycode to toggle a pointer-mode lock.
 //     Activating the same mode again unlocks it; pressing, holding or locking
 //     any other pointer-mode key also clears the previous lock.
-//   - Use VIA_MACRO_n for a macro, as a key or as the action in any helper:
-//     TAP_SENDS(VIA_MACRO_n), PRESS_AND_HOLD_UNTIL_RELEASE(VIA_MACRO_n).
-//     Its default contents come from VIA_MACROS(MACRO) above.
+//   - Use MACRO_n for a macro, as a key or as the action in any helper:
+//     TAP_SENDS(MACRO_n), PRESS_AND_HOLD_UNTIL_RELEASE(MACRO_n).
+//     Its default contents come from MACROS(MACRO) above.
 //   - A custom key (CUSTOM_KEY_n) as an action sends only its shortcut, never
 //     its own behaviour (D-F26). As a key it is the keycode of its own row,
 //     placed on a layer or emitted by a combo.
@@ -579,8 +578,8 @@ const key_behavior_t
             // ─── Navigation-Layer Overrides ─────────────────────────────────────────────────
             {.keycode = KC_LEFT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_LEFT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_LEFT))}}},
             {.keycode = KC_RIGHT, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_RIGHT)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_RIGHT))}}},
-            {.keycode = G(KC_C), .tap_counts = {[1] = {.tap = TAP_SENDS(VIA_MACRO_10)}}},
-            {.keycode = G(KC_V), .tap_counts = {[1] = {.tap = TAP_SENDS(VIA_MACRO_7)}}},
+            {.keycode = G(KC_C), .tap_counts = {[1] = {.tap = TAP_SENDS(MACRO_10)}}},
+            {.keycode = G(KC_V), .tap_counts = {[1] = {.tap = TAP_SENDS(MACRO_7)}}},
 
             // ─── Mouse-Button Keys ──────────────────────────────────────────────────────────
             {.keycode = MS_BTN3, .multi_tap_term = 100, .tap_hold_term = 100, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}}},
@@ -592,7 +591,7 @@ const key_behavior_t
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(KC_TRNS)},
-                        [1] = {.tap = TAP_SENDS(VIA_MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_3)},
+                        [1] = {.tap = TAP_SENDS(MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_3)},
                     },
             },
             {.keycode = PD_SLOT_1, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
@@ -735,7 +734,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
             KC_LEFT_SHIFT,           _______,           _______,           _______,         KC_ESCAPE,           _______,              _______,           _______,   KC_LEFT_BRACKET,  KC_RIGHT_BRACKET,           KC_DQUO,       KC_KP_EQUAL,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-              VIA_MACRO_5,           _______,       VIA_MACRO_4,       VIA_MACRO_3,       VIA_MACRO_8,       VIA_MACRO_9,              _______,           _______,           KC_LCBR,           KC_RCBR,           _______,           _______,
+              MACRO_5,           _______,       MACRO_4,       MACRO_3,       MACRO_8,       MACRO_9,              _______,           _______,           KC_LCBR,           KC_RCBR,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                            _______,           _______,           _______,              _______,           _______,
                                                                                               _______,           _______,              _______
@@ -744,13 +743,13 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     [LAYER_NAV] = LAYOUT(
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-                  _______,           _______,           _______,       VIA_MACRO_7,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
+                  _______,           _______,           _______,       MACRO_7,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           G(KC_Q),           G(KC_W),      VIA_MACRO_11,           _______,           _______,          VIA_MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           _______,           _______,
+                  _______,           G(KC_Q),           G(KC_W),      MACRO_11,           _______,           _______,          MACRO_2,           G(KC_C),             KC_UP,           G(KC_V),           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-            KC_LEFT_SHIFT,      VIA_MACRO_16,           _______,      VIA_MACRO_12,           _______,           _______,          VIA_MACRO_1,           KC_LEFT,           KC_DOWN,          KC_RIGHT,           _______,           _______,
+            KC_LEFT_SHIFT,      MACRO_16,           _______,      MACRO_12,           _______,           _______,          MACRO_1,           KC_LEFT,           KC_DOWN,          KC_RIGHT,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-              KC_LEFT_ALT,      VIA_MACRO_15,      VIA_MACRO_14,      VIA_MACRO_13,           _______,           _______,          VIA_MACRO_0,           MS_BTN1,           MS_BTN2,         PD_SLOT_0,           _______,           _______,
+              KC_LEFT_ALT,      MACRO_15,      MACRO_14,      MACRO_13,           _______,           _______,          MACRO_0,           MS_BTN1,           MS_BTN2,         PD_SLOT_0,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                            _______,           _______,           _______,              _______,           _______,
                                                                                               _______,           _______,              _______
@@ -776,11 +775,11 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮ ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
                   _______,             KC_F1,             KC_F2,             KC_F3,             KC_F4,             KC_F5,                KC_F6,             KC_F7,             KC_F8,             KC_F9,            KC_F10,            KC_F11,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,          VIA_MACRO_2,           _______,           _______,           _______,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,          MACRO_2,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              G(KC_U),           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,         VIA_MACRO_19,           G(KC_1),           G(KC_2),           G(KC_3),           G(KC_4),           G(KC_5),
+                  _______,           _______,           _______,           _______,           _______,           _______,         MACRO_19,           G(KC_1),           G(KC_2),           G(KC_3),           G(KC_4),           G(KC_5),
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                            _______,           _______,           _______,              _______,           _______,
                                                                                               _______,           _______,              _______
@@ -939,7 +938,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     // clang-format on
 };
 
-// VIA_MACROS() above in the bank encoding. Regenerate it with
+// MACROS() above in the bank encoding. Regenerate it with
 // NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh.
 #include "authored_macro_bank.h"
 

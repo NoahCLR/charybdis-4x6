@@ -137,7 +137,7 @@ typedef struct {
     uint8_t  logical_layer_count;
     // Matrix positions each settings placement bitmap covers (rows × columns).
     uint8_t  placement_positions;
-    uint8_t  via_macro_slot_count;
+    uint8_t  macro_slot_count;
     uint8_t  custom_key_count;
 
     // Optional firmware checks (above): combo rows translated under the combo

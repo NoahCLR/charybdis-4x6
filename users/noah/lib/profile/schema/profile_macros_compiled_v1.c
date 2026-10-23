@@ -1,5 +1,5 @@
 // ────────────────────────────────────────────────────────────────────────────
-// Compiled Macros — the authored VIA_MACROS() payloads as domain 0x70
+// Compiled Macros — the authored MACROS() payloads as domain 0x70
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "profile_compiled_writer.h"
@@ -7,7 +7,7 @@
 #include "profile_macros_v1.h"
 #include "noah_keymap_ids.h"
 
-_Static_assert(VIA_MACRO_SLOT_COUNT == NOAH_PROFILE_MACROS_V1_SLOTS, "the macro domain holds every macro slot");
+_Static_assert(MACRO_SLOT_COUNT == NOAH_PROFILE_MACROS_V1_SLOTS, "the macro domain holds every macro slot");
 
 // The authored macros already in the bank encoding, each ending with its
 // terminator, the bank encoding VIA's dynamic macros used (D-F30, D-F31).

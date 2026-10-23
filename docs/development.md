@@ -63,7 +63,7 @@ Each flow in [architecture](architecture/README.md) ends with the runners that
 hold it. Then, as they apply:
 
 1. Authored keymap, combo, macro or lighting data changed:
-   `run_real_profile_validation_tests.sh`. A `VIA_MACROS()` change regenerates
+   `run_real_profile_validation_tests.sh`. A `MACROS()` change regenerates
    the profile's `authored_macro_bank.h` with
    `NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh`
    (pass the keymap path for another profile); validation refuses a stale copy.

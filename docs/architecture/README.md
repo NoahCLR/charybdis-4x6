@@ -17,7 +17,7 @@ else reads it, projects it, mirrors it or adapts QMK to it.
 
 | Part | What it is |
 | --- | --- |
-| `keyboards/bastardkb/charybdis/4x6/keymaps/noah/` | The authored profile as data: `keymap.c` (layers, combos, `key_behaviors[]`, `VIA_MACROS()`, custom keys), `config.h` (timing, layer ids, pointer tuning), `rgb_config.c`, `pd_config.c`, and the generated `authored_macro_bank.h`. `keymap.c` and `rgb_config.c` include `noah_keymap.h`; `pd_config.c` includes the pointing schema and defaults headers instead |
+| `keyboards/bastardkb/charybdis/4x6/keymaps/noah/` | The authored profile as data: `keymap.c` (layers, combos, `key_behaviors[]`, `MACROS()`, custom keys), `config.h` (timing, layer ids, pointer tuning), `rgb_config.c`, `pd_config.c`, and the generated `authored_macro_bank.h`. `keymap.c` and `rgb_config.c` include `noah_keymap.h`; `pd_config.c` includes the pointing schema and defaults headers instead |
 | `users/noah/noah_keymap.h` | The authoring surface: ids (`noah_keymap_ids.h`), behaviour macros, `keymap_materialize.h` (turns the authored tables into the symbols the runtime reads) and the lighting helpers |
 | `users/noah/hooks.c`, `noah_runtime.h` | Weak QMK `*_user` hooks, each calling its `noah_*` helper; a keymap that overrides one chains back into it |
 | `users/noah/runtime_init.c` | Init, scan and housekeeping order: which module runs when, on which half |

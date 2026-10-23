@@ -24,7 +24,7 @@ flowchart TD
     start --> provider["macro_slot_provider_start: preflight every window, keep the first"]
     provider --> source{"active profile has a macro domain?"}
     source -->|yes| bank["walk the active bank, decode a 512-byte window"]
-    source -->|no| authored["compile the VIA_MACROS() string"]
+    source -->|no| authored["compile the MACROS() string"]
     provider --> engine["macro_payload_start_windows (macro_payload_run.c)"]
     scan["noah_matrix_scan_user → macro_payload_engine_scan"] --> engine
     engine --> leases["owned_keycode leases"]
@@ -66,8 +66,8 @@ one-byte metadata (unchecked, valid, invalid), `profile_macro_slots`;
    domain (`noah_effective_macro_bank_is_live`), the provider walks the bank's
    terminators 32 bytes at a time to the slot's start and decodes a window
    from there (`macro_payload_decode_qmk_window`).
-   Otherwise it compiles the slot's authored `VIA_MACROS()` string
-   (`via_macro_payloads`) into one window.
+   Otherwise it compiles the slot's authored `MACROS()` string
+   (`macro_payloads`) into one window.
 3. **Preflight, before any output.** `macro_payload_preflight_begin` latches
    the host; `macro_slot_provider_compile` then decodes every window and
    checks each against it, carrying held-key balance across windows, and
@@ -190,7 +190,7 @@ steps and never reaches `macro/`. Its path is
 - Layouts: the fixture and its generator
   ([host-layouts-v1.md](../spec/host-layouts-v1.md#changing-the-data)), never
   `host_layout_tables.c` by hand.
-- Default macros: `VIA_MACROS()` in `keymap.c`, then regenerate
+- Default macros: `MACROS()` in `keymap.c`, then regenerate
   `authored_macro_bank.h` (`AGENTS.md`).
 
 ## Tests that hold it
