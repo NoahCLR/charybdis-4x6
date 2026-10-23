@@ -83,9 +83,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 `process_record_admit_user()` is a hook of my BK fork, and its helper is
 declared in `users/noah/lib/compat/qmk_record_admission.h`.
-`get_hold_on_other_key_press()` has no helper: the weak default returns
-`false`, and QMK never asks it in this build, since the firmware decides
-every dual-role key itself.
 
 To keep the pointer layer on for a key of your own, set
 `.keeps_auto_mouse_anchored = true` on its behaviour instead of overriding

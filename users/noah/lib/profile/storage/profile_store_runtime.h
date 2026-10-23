@@ -36,8 +36,9 @@ bool noah_profile_store_runtime_read_committed(uint32_t offset, uint8_t *target,
 bool noah_profile_store_runtime_compiled_metadata(noah_profile_compiled_v1_metadata_t *metadata);
 bool noah_profile_store_runtime_read_compiled(uint32_t offset, uint8_t *target, uint32_t length);
 
-// Narrow engineering bridge. Ordinary/read-only builds return false; the
-// static runtime owner is never exposed for direct mutation.
+// The profile channel's way to the live-profile owner. A build without the
+// owner (no half, or NOAH_LIVE_PROFILE_OWNER=no) returns false; the static
+// runtime owner is never exposed for direct mutation.
 bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status);
 bool noah_profile_store_runtime_candidate_status(noah_profile_candidate_v1_status_t *status);
 bool noah_profile_store_runtime_peer_transfer(noah_profile_candidate_v1_peer_status_t *peer);

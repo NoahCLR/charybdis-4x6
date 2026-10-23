@@ -39,7 +39,7 @@ else reads it, projects it, mirrors it or adapts QMK to it.
 | Macro playback | `lib/macro/` ([macro playback](macro-playback.md)) | action lifecycle, input guard |
 | Pointing mode state and handlers | `lib/pointing/runtime/`, `lib/pointing/modes/` ([pointer report](pointer-report.md)) | key runtime bridge, lighting, split sync |
 | What QMK and the fork promise | `lib/compat/` ([its README](../../users/noah/lib/compat/README.md)) | everything that touches QMK |
-| The lit frame | `lib/rgb/` ([RGB render](rgb-render.md)) | nothing: it only draws |
+| The lit frame | `lib/rgb/` ([lighting render](rgb-render.md)) | nothing: it only draws |
 | Runtime state on the slave half | `lib/split/` | lighting and pointing on the slave half: it only mirrors |
 | Shared storage, diagnostics, trace | `lib/state/shared/`, `lib/state/diagnostics/` | owners, through narrow accessors |
 
@@ -87,8 +87,8 @@ else reads it, projects it, mirrors it or adapts QMK to it.
   and projection to the report, and the scan that settles holds and multi-taps.
 - [The profile](profile-flow.md): boot, a client's Apply, Save and live edits,
   and how the halves end converged.
-- [The RGB render](rgb-render.md): where each stage's truth comes from and how
-  the slave half draws the same.
+- [The lighting render](rgb-render.md): where each stage's truth comes from and
+  how the slave half draws the same.
 - [Macro playback](macro-playback.md): from the key that starts a macro to the
   keys it types.
 - [A pointer report](pointer-report.md): from the sensor through the pointing

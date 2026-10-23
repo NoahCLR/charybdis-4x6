@@ -32,8 +32,8 @@ display state in two banks under a publication counter, and three flags
 (synthetic auto-mouse anchor, DPI sync pending, auto-sniping layer).
 
 - Local state changes only through `pd_mode_apply_command()`; each command
-  returns a before-and-after snapshot. Its `split_sync_required` has no
-  reader: split sync samples the state on its own tick.
+  returns a before-and-after snapshot. Split sync samples the state on its
+  own tick.
 - The display banks are written only by the split callback
   (`PD_MODE_COMMAND_REMOTE_SNAPSHOT`); a reader copies the bank the
   counter selects and retries if it moved
@@ -50,8 +50,7 @@ display state in two banks under a publication counter, and three flags
 keep the pointer layer anchored or prefer typing (the slot's pointer-layer
 byte), and for a scrolling slot that does not prefer typing, a lock that owns
 QMK's auto-mouse toggle. The registry attaches the lock hooks only to that
-last trait. `PD_MODE_TRAIT_ENABLE_DRAGSCROLL_BACKEND` is set for scrolling
-slots and read nowhere.
+last trait.
 
 ## Host-test seams
 

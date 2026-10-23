@@ -9,12 +9,6 @@ __attribute__((weak)) void eeconfig_init_user(void) {
     noah_eeconfig_init_user();
 }
 
-__attribute__((weak)) bool get_hold_on_other_key_press(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-    return false;
-}
-
 // Fork hook at the top of process_record (after combos and native tapping).
 __attribute__((weak)) bool process_record_admit_user(keyrecord_t *record) {
     return noah_record_admission_admit(record);

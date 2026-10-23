@@ -160,8 +160,9 @@ NOAH_POINTING_CONFIGURED_SOURCES := \
 NOAH_AUTOMOUSE_SOURCES := \
     lib/rgb/automouse/rgb_automouse.c
 
-# Allocated only by explicit side-specific engineering builds. Keeping this
-# out of NOAH_COMMON_SOURCES preserves the reviewed normal-firmware footprint.
+# Compiled into every build that knows its half, unless NOAH_LIVE_PROFILE_OWNER
+# is `no` (users/noah/rules.mk, D-F35). Kept out of NOAH_COMMON_SOURCES because
+# a build with no half cannot carry the owner.
 NOAH_LIVE_PROFILE_OWNER_SOURCES := \
     lib/profile/runtime/profile_owner.c \
     lib/profile/runtime/profile_action_placement_v1.c

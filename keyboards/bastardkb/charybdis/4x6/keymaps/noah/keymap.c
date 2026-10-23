@@ -178,7 +178,7 @@
 // profile plays. A profile saved from Charybdis Ark keeps its own names and
 // payloads.
 // Payload syntax:
-//   - text {hello} sends "hello" one key at a time
+//   - bare text such as hello sends "hello" one key at a time
 //   - {KC_A} tap one key, {KC_LGUI,KC_SPC} tap a chord
 //   - {+KC_LGUI} key down, {-KC_LGUI} key up
 //   - {250} wait 250 ms before the next macro step
@@ -456,17 +456,19 @@
 //     independently and can stay active together.
 //   - Use PRESS_AND_HOLD_UNTIL_RELEASE(MO(layer)) for a momentary layer hold
 //     owned by the custom runtime.
-//   - Raw TG()/TO()/TT()/OSL()/LM()/LT() actions inside key_behaviors[] are
-//     intentionally unsupported because they bypass layer ownership. LT()
-//     remains supported as the keycode of a key_behavior row itself.
+//   - TG(), TO() and OSL() work as taps, and TT() as
+//     PRESS_AND_HOLD_UNTIL_RELEASE(TT(layer)). LM() and LT() are refused as
+//     actions inside key_behaviors[]; LT() remains supported as the keycode
+//     of a key_behavior row itself.
 //   - Use the generated *_LOCK keycode to toggle a pointer-mode lock.
 //     Activating the same mode again unlocks it; pressing, holding or locking
 //     any other pointer-mode key also clears the previous lock.
 //   - Use VIA_MACRO_n for a macro, as a key or as the action in any helper:
 //     TAP_SENDS(VIA_MACRO_n), PRESS_AND_HOLD_UNTIL_RELEASE(VIA_MACRO_n).
 //     Its default contents come from VIA_MACROS(MACRO) above.
-//   - A custom key (CUSTOM_KEY_n) is not an action: it is the keycode of its
-//     own row, placed on a layer or emitted by a combo.
+//   - A custom key (CUSTOM_KEY_n) as an action sends only its shortcut, never
+//     its own behaviour (D-F26). As a key it is the keycode of its own row,
+//     placed on a layer or emitted by a combo.
 //   - Modded keycodes like G(KC_RIGHT), A(KC_LEFT), or S(KC_1) let one action
 //     send GUI, Alt, Shift, and similar variants without adding separate keys.
 //     Custom held actions decompose those into owned real mods plus the base

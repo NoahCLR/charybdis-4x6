@@ -53,7 +53,7 @@ typedef struct {
     bool                                 transfer_pending;
 } noah_profile_split_authority_status_t;
 
-// Caller-owned state. A future QMK split owner publishes one complete local /
+// Caller-owned state. The split reconciler publishes one complete local /
 // peer observation after each metadata exchange or transfer transition.
 typedef struct {
     noah_runtime_publication_generation_t publication_sequence;

@@ -82,11 +82,11 @@ enum charybdis_keymap_layers {
 #    define PD_MODE_ZOOM_DPI 400
 #    define PD_MODE_ARROW_DPI 400
 
-// Default pointer DPI ladder: 800, 1000, 1200, …
+// Normal DPI ladder: 400 to 3,400 in steps of 200.
 #    define CHARYBDIS_MINIMUM_DEFAULT_DPI 400
 #    define CHARYBDIS_DEFAULT_DPI_CONFIG_STEP 200
 
-// Sniping DPI ladder: 200, 300, 400, 500.
+// Sniping DPI ladder: 100 to 400 in steps of 100.
 #    define CHARYBDIS_MINIMUM_SNIPING_DPI 100
 #    define CHARYBDIS_SNIPING_DPI_CONFIG_STEP 100
 

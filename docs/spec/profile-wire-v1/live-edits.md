@@ -468,10 +468,10 @@ Held by: `tests/host/run_profile_working_sync_tests.sh` (`test_edit_mode_follows
 
 In Live the master half saves the working copy itself after 3 s without a
 published revision and without a held key, the matrix also quiet for 50 ms,
-with no client connected. Every held-key scan and every published revision
-restarts the interval. It starts only when the keyboard step is admitted
-([admission](#admission)) and the edit modes do not conflict, through the
-ordinary Save. There is at most one automatic attempt per revision: a failed
+whether or not a client is connected. Every held-key scan and every published
+revision restarts the interval. It starts only when the keyboard step is
+admitted ([admission](#admission)) and the edit modes do not conflict, through
+the ordinary Save. There is at most one automatic attempt per revision: a failed
 attempt leaves the working copy unsaved and is reported as any Save is, and
 only an explicit Save, a new edit or a new adjustment tries again. Unplugging
 before it completes loses the unsaved edits; a save already running has the
