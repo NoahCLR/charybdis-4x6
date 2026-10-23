@@ -51,7 +51,8 @@ else reads it, projects it, mirrors it or adapts QMK to it.
   (`run_feature_gate_compile_tests.sh`).
 - **QMK is reached through `compat/`.** A fork-specific hook, a QMK internal
   or a QMK data shape is adapted once there, with a contract check in
-  `run_qmk_contract_checks.sh`. Adapters normalise; they decide nothing.
+  `run_qmk_contract_checks.sh`; `run_compat_boundary_tests.sh` refuses the
+  symbols it adapts anywhere else. Adapters normalise; they decide nothing.
 - **Reducer, planner, projection.** Physical events enter the reducer first;
   planners decide; projection applies effects to the ledgers; only a ledger's
   aggregate transitions reach QMK's report (D-F55).

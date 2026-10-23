@@ -60,6 +60,23 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 }
 ```
 
+## Replacing a default
+
+To drop the runtime's work in a hook on purpose, say so in the override's
+body, naming the helper it no longer calls and why:
+
+```c
+void pointing_device_init_user(void) {
+    // Replaces noah_pointing_device_init_user(): this keyboard has no auto-mouse.
+}
+```
+
+`sh tests/host/run_hook_override_tests.sh` fails, naming the file and hook,
+when an override of a hook in `hooks.c` neither calls the helpers its default
+calls (for `process_record_user()`, the finalize helper too) nor carries that
+comment. Where in the override the helper is called is still yours to
+get right.
+
 ## The hooks
 
 | QMK hook | Helper | What breaks without it |
@@ -82,7 +99,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 | `rgb_matrix_indicators_advanced_user()` | `noah_rgb_matrix_indicators_advanced_user()` | all lighting above the background effect |
 
 `process_record_admit_user()` is a hook of my BK fork, and its helper is
-declared in `users/noah/lib/compat/qmk_record_admission.h`.
+declared in `users/noah/lib/compat/qmk_record_admission.h`. A fork hook
+named outside `lib/compat/` fails `run_compat_boundary_tests.sh`, so an
+override of this one also goes on that check's allowlist, with its reason.
 
 To keep the pointer layer on for a key of your own, set
 `.keeps_auto_mouse_anchored = true` on its behaviour instead of overriding
@@ -97,4 +116,5 @@ the report filters macro playback uses, and in the pair
 `is_keyboard_master_impl()` (which half leads) and `is_keyboard_left_impl()`
 (which half each file is).
 
-`sh tests/host/run_hook_chaining_tests.sh` checks that the defaults chain.
+`sh tests/host/run_hook_chaining_tests.sh` checks that the defaults chain;
+`sh tests/host/run_hook_override_tests.sh` checks every override (above).
