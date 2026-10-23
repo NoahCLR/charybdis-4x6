@@ -6,7 +6,7 @@
 // Developer tool, macOS only. Keys are named by the HID usage QMK sends and
 // mapped to the virtual key macOS assigns to an ANSI-classified keyboard; the
 // ISO swap of KC_GRV and KC_NUBS is applied at lookup time
-// (docs/architecture/host-layouts-v1.md).
+// (docs/spec/host-layouts-v1.md).
 
 import Carbon
 import Foundation

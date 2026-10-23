@@ -14,5 +14,5 @@ The capability feature word holds only what a build genuinely varies by
 2026-10-19): every Profile Wire 1 bit is retired, and a later capability
 raises the minor version instead. A slot in an earlier format is never read
 or converted: the keyboard runs its compiled defaults and its status says so.
-Contracts: [`profile-wire-v1.md`](../architecture/profile-wire-v1.md),
-[`profile-split-v1.md`](../architecture/profile-split-v1.md).
+Contracts: [`profile-wire-v1/`](../spec/profile-wire-v1/README.md),
+[`profile-split-v1.md`](../spec/profile-split-v1.md).

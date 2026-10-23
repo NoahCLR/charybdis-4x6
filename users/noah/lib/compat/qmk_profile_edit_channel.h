@@ -5,7 +5,7 @@
 // SET 0x20..0x27 admit edits, Save, Revert and the edit mode, and SET 0x28
 // restarts both halves (D-F34); GET 0x20, 0x21, 0x22 and 0x27 read the edit
 // status, the working copy, the runtime overrides and the edit mode. The
-// layouts are in docs/architecture/profile-wire-v1.md, "Live edits".
+// layouts are in docs/spec/profile-wire-v1/live-edits.md.
 #pragma once
 
 #include <stdbool.h>

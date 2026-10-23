@@ -4,7 +4,7 @@ For ordinary mode creation, use **Charybdis Ark → Pointing modes**. The
 keyboard has 32 fixed device-owned slots. Directional keys and shortcuts,
 scrolling, modifier policies, button overrides, DPI and RGB are profile data;
 editing them requires no C and no reflash. See [Pointer Modes](POINTER_MODES.md)
-and the [PD-mode domain contract](architecture/pd-mode-domain-v1.md).
+and the [PD-mode domain contract](spec/pd-mode-domain-v1.md).
 
 The first eight slots hold the factory Dragscroll, Volume, Brightness, Zoom,
 Arrow, Pinch, Undo / Redo and Back / Forward presets; the other 24 start

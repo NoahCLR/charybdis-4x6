@@ -153,7 +153,7 @@ typedef union {
 } noah_profile_owner_staging_t;
 
 // One candidate's distributed prepare barrier and its pre-decision cancel
-// (logical-profile-transaction-v1.md, "Cancellation And Lease Ownership"):
+// (docs/spec/logical-profile-transaction-v1.md, "Cancellation"):
 // what the owner learns of one Apply or Save from PREPARING_PEER until its
 // candidate is released. All zero is no barrier; it is cleared as a unit when
 // the candidate ends, and any field set means cleanup is due. `descriptor`

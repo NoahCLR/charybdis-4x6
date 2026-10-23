@@ -9,4 +9,4 @@ packed bytes and unknown bits survive unrelated edits. QMK ignores mode and
 colour changes while lighting is off, so the firmware turns lighting on
 without saving, applies the settings at the safe boundary and then restores
 the requested on/off state: lighting edits apply while lighting is off. Pages:
-[`portable-profile-v1.md`](../architecture/portable-profile-v1.md).
+[`profile-wire-v1/settings-domain.md`](../spec/profile-wire-v1/settings-domain.md#editor-metadata--get-0x08).

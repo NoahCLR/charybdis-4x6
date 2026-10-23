@@ -580,7 +580,7 @@ QMK then gives `is_tap_record_user` the last word per record, with its own
 answer and the keycode hook's. Userspace keeps the keycode hook's answer: a
 placement that bypasses a key's behaviour row ignores the row, and the key is
 still the runtime's with its default
-([participation policy](architecture/participation-policy.md)). The record
+([participation policy](spec/participation-policy.md)). The record
 hook stays for what it settles as a record leaves the queue: a waiting press's
 participation and a combo output's origin. No userspace path reads a tap
 decision of QMK's.

@@ -11,4 +11,4 @@ selector fails the build. Without CRC, 460,800 baud logged 20–30 transport
 failures per Apply and made the other half's lighting flicker (2026-09-28),
 so CRC came first; it rejects corrupted frames but cannot prevent them, and
 halving frame time is not a measured gain in pointing rate. Contract:
-[`split-activity-sync.md`](../architecture/split-activity-sync.md).
+[`split-activity-sync.md`](../spec/split-activity-sync.md).

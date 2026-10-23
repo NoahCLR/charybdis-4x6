@@ -387,8 +387,8 @@ static uint32_t assert_whole_saved(const noah_profile_owner_t *owner, const uint
 }
 
 // The restart is a reset between scans, as unplugging is between flash
-// operations (marker-last, logical-profile-transaction-v1.md "Power-Loss
-// Outcomes"). Restarted at sampled scans across a whole save, both halves
+// operations (marker-last, docs/spec/logical-profile-transaction-v1.md "Power loss
+// and restarts"). Restarted at sampled scans across a whole save, both halves
 // come back on one profile, the saved one or the new one, whole. The USB
 // half restarted alone (the other half did not acknowledge) does too, and
 // the halves rejoin by themselves: a prepared copy the other half holds for

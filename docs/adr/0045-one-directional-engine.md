@@ -9,4 +9,4 @@ run one engine: a smoothed heading, measured against each axis's own
 threshold, picks a direction and holds it until the heading is clearly
 elsewhere, and only progress along it counts. The axis policy says only which
 directions exist; motion toward a missing one goes to the nearest one that
-exists. Rules: [`pd-mode-domain-v1.md`](../architecture/pd-mode-domain-v1.md).
+exists. Rules: [`pd-mode-domain-v1.md`](../spec/pd-mode-domain-v1.md).

@@ -8,4 +8,4 @@ and a save, a backup and the other half carry them with the rest of the
 profile. The compiled defaults encode the authored keymap and macros; a
 profile without either domain uses the authored defaults without serializing
 them on the key or playback path. This left VIA's store with nothing to hold
-(D-F31). Layout: [`device-resident-profile.md`](../architecture/device-resident-profile.md).
+(D-F31). Layout: [`device-resident-profile.md`](../spec/device-resident-profile.md).

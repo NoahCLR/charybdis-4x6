@@ -607,8 +607,8 @@ earlier firmware cannot be restored onto this one.
 Executable custom combo hooks and unsupported macro content cannot be
 represented as profile data; export reports these explicitly instead of
 producing an incomplete file. The
-[portable profile contract](architecture/portable-profile-v1.md) records format
-limits, compatibility, restore ordering and remaining hardware checks.
+[portable profile contract](spec/portable-profile-v1.md) records what a
+backup holds, compatibility and restore ordering.
 
 ## Text macros and your keyboard layout
 

@@ -8,8 +8,8 @@ The profile grew in one transition, so a user upgrades once: sixteen layers,
 Formats are counted, so a later firmware can raise a limit, and one supported
 tap depth (five) bounds behaviour steps. Behaviours and combos gained
 participation controls at four scopes
-([`participation-policy.md`](../architecture/participation-policy.md)); BK gained the hooks
+([`participation-policy.md`](../spec/participation-policy.md)); BK gained the hooks
 they need (`is_tap_record_user()`, a press-context byte through its queues, a
 combo member-record gate). D-F29 replaced its EEPROM geometry and D-F31 its VIA
 region. Ceilings and the maximum profile:
-[`storage-and-resource-baseline.md`](../architecture/storage-and-resource-baseline.md).
+[`device-resident-profile.md`](../spec/device-resident-profile.md#ceilings-and-the-maximum-profile).

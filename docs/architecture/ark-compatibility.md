@@ -38,7 +38,7 @@ firmware gate:
   runner it runs in the build image, so outside it Docker must be running;
   `--output FILE` may name any path.
 - Ark's `upstream/` snapshot pins wire fixtures under `tests/fixtures/` and the
-  wire, domain, transaction and resource specs under `docs/architecture/`.
+  wire, domain, transaction and resource specs under `docs/spec/`.
 
 A firmware change that alters a wire format, fixture bytes or a spec's contract,
 or that moves or rewires those probes and sources, is complete on the firmware

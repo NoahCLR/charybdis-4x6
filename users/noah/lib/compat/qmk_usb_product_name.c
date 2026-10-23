@@ -97,7 +97,7 @@ static void serve(const noah_profile_keyboard_name_t *name) {
 // LTO inlines a function called once into its caller, and both entry points
 // are reached from main. Each keeps a frame of its own, so the boot name read
 // and the restart checks' snapshots never sit under main's key paths
-// (memory-budgets.md).
+// (docs/spec/resource-policy.md).
 __attribute__((noinline)) void noah_qmk_usb_product_name_pre_init(void) {
     noah_profile_keyboard_name_t name;
 

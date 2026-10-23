@@ -9,8 +9,8 @@ authored choices, see [KEYMAP.md](./KEYMAP.md). For the shared tap / hold /
 multi-tap model, see [INTERACTION_MODEL.md](./INTERACTION_MODEL.md) and the
 [firmware guide](./GUIDE.md#authoring-the-profile-in-c).
 
-The [PD-mode domain contract](architecture/pd-mode-domain-v1.md) specifies the
-32 configurable slots and the remaining hardware acceptance checks. Side-specific schema-2 firmware exposes 32 slots in
+The [PD-mode domain contract](spec/pd-mode-domain-v1.md) specifies the
+32 configurable slots. Side-specific schema-2 firmware exposes 32 slots in
 Charybdis Ark → Pointing modes. The six defaults below are records in those
 slots, followed by Undo / Redo in slot 6 and empty slots 7–31; their names do not
 select special code. Undo / Redo uses horizontal motion at 100 DPI and a
@@ -280,4 +280,4 @@ A direction, diagonal or button tap override can start a macro (D-F23),
 with inherited modifiers only. Busy triggers are dropped. Every step is allowed;
 Once per movement is useful for longer macros. Empty slots send nothing and do
 not spend a movement. Mouse clicks inside a macro bypass the mode's button
-overrides; see [the PD contract](architecture/pd-mode-domain-v1.md#taps-modifiers-and-buttons).
+overrides; see [the PD contract](spec/pd-mode-domain-v1.md#outputs).

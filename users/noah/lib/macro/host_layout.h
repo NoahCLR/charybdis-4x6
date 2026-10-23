@@ -5,7 +5,7 @@
 
 // Host keyboard layouts: for each layout, the key strokes that type each
 // character it can type. The tables are generated from
-// tests/fixtures/host_layouts_v1.json; see docs/architecture/host-layouts-v1.md.
+// tests/fixtures/host_layouts_v1.json; see docs/spec/host-layouts-v1.md.
 
 // A stroke is one basic keycode tapped with optional Shift and AltGr. AltGr is
 // Right Alt, which is Option on macOS. Zero means no stroke.

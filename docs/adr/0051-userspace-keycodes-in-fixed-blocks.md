@@ -9,4 +9,4 @@ so growth changes storage and masks, never another keycode. The keymap's
 hand-numbered keys became **custom keys**: named keys that do what their
 behaviour row says, and since D-F26 their shortcut. The renumbering refused
 older saved profiles by action ABI digest rather than reinterpreting them.
-Blocks: [`pd-mode-domain-v1.md`](../architecture/pd-mode-domain-v1.md).
+Blocks: [`pd-mode-domain-v1.md`](../spec/pd-mode-domain-v1.md).

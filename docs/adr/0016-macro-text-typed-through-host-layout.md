@@ -11,4 +11,4 @@ US is the default and types what earlier firmware typed. The catalogue is
 data: one versioned fixture, generated from macOS's, Linux's and QMK's Windows
 layout definitions, generates the C tables, and clients read the same fixture,
 so labels and typing cannot disagree
-([`host-layouts-v1.md`](../architecture/host-layouts-v1.md)).
+([`host-layouts-v1.md`](../spec/host-layouts-v1.md)).

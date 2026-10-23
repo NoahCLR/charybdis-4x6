@@ -17,5 +17,5 @@ the halves rejoin.
 Considered: a lease on prepared copies (a sender that is there pauses
 silently at the barrier), restarting the owner in place (a stop can come from
 state it shares; only a reset starts all of it from flash), and a feature bit
-(D-F28). Contracts: [`profile-wire-v1.md`](../architecture/profile-wire-v1.md), "A stopped
-keyboard, and Restart"; [`profile-split-v1.md`](../architecture/profile-split-v1.md).
+(D-F28). Contracts: [`profile-wire-v1/live-edits.md`](../spec/profile-wire-v1/live-edits.md), "A stopped
+keyboard" and "Restart"; [`profile-split-v1.md`](../spec/profile-split-v1.md).

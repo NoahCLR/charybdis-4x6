@@ -516,7 +516,7 @@ class MakeBuildImage(unittest.TestCase):
             done = self.run_make(tmp, 'qmk-cli-1.2.0-gcc15.2.0-r1', FAKE_CHANGED_IMAGE=TAG)
             self.assertEqual(done.returncode, 0, done.stderr)
             self.assertIn('the compiler changed', done.stderr)
-            self.assertIn('memory-budgets.md', done.stderr)
+            self.assertIn('resource-policy.md', done.stderr)
 
     def test_the_dockerfile_takes_target_files_from_the_official_amd64_variant(self):
         dockerfile = (REPO / 'tools/build-image.dockerfile').read_text()
