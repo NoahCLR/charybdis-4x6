@@ -12,7 +12,7 @@ and state is a spec's under [`docs/spec/`](../../../../docs/spec/README.md).
 | `schema/` | The blob and its envelope walker, the domain registry, each domain's codec and compiled writer, the whole-profile validator, the compiled defaults |
 | `storage/` | The dual-slot store and its flash backend and layout, checksums, the candidate transaction and its store backend, the backend for a copy from the other half, and `profile_store_runtime.c`, the static home of the one owner |
 | `split/` | The split authority, the profile split framing, the reconciler, the working copy's protocol, and the one exchange seam both send through |
-| `runtime/` | The owner, the provider of the active profile, the activation policy, the working copy, and the `effective_*_runtime.c` views other packages read |
+| `runtime/` | The owner, the provider of the active profile, the activation policy, the working copy, and the `active_profile_*_runtime.c` views other packages read |
 
 ## Conventions
 
@@ -20,7 +20,7 @@ and state is a spec's under [`docs/spec/`](../../../../docs/spec/README.md).
   from `noah_profile_owner_scan`, never from a callback. Budgets live beside
   the machine: `NOAH_PROFILE_CANDIDATE_SCAN_BYTE_BUDGET`,
   `NOAH_PROFILE_WORKING_LOAD_BYTES`, `NOAH_PROFILE_WORKING_VALIDATION_STEPS`,
-  `NOAH_PROFILE_SPLIT_PEER_SCAN_BYTES`.
+  `NOAH_PROFILE_SPLIT_OTHER_HALF_SCAN_BYTES`.
 - **Receive is a copy.** Each `*_receive` (candidate transaction, reconciler,
   working-copy protocol) decodes exactly one frame into a one-frame mailbox
   and answers from a published reply; the scan does the work.

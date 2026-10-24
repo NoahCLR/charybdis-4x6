@@ -31,7 +31,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     $MODIFIER_HOLD_SUPPORT_SOURCES \
     "$ROOT/users/noah/lib/profile/runtime/profile_activation_policy.c" \
     "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_provider.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \

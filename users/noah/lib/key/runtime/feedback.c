@@ -1,4 +1,4 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Key Runtime Feedback
 // ────────────────────────────────────────────────────────────────────────────
@@ -16,7 +16,7 @@
 #include "reducer/state_query.h"
 
 #ifdef POINTING_DEVICE_ENABLE
-#    include "../../pointing/defs/pd_modes.h"
+#    include "../../pointing/defs/pointing_modes.h"
 #endif
 
 #ifdef KEY_FEEDBACK_TEST_INSTRUMENTATION
@@ -638,7 +638,7 @@ void combo_feedback_bitmaps(uint8_t *out_underlay_bitmap, uint8_t *out_overlay_b
 
     (void)key_runtime_core_preview_owner_key_pos(&preview_owner_key_pos);
 #ifdef POINTING_DEVICE_ENABLE
-    (void)pd_mode_local_owner_key_pos_snapshot(&pd_owner_key_pos);
+    (void)pointing_mode_local_owner_key_pos_snapshot(&pd_owner_key_pos);
 #endif
     layer_ownership_momentary_owner_bitmap(layer_owner_bitmap);
     noah_qmk_combo_origin_active_bitmaps_partitioned(preview_owner_key_pos, pd_owner_key_pos, layer_owner_bitmap, out_underlay_bitmap, out_overlay_bitmap);

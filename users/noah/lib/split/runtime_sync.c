@@ -12,7 +12,7 @@
 #        include "print.h"
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
-#        include "../pointing/defs/pd_modes.h"
+#        include "../pointing/defs/pointing_modes.h"
 #    endif
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
 #        include "../rgb/automouse/rgb_automouse.h"
@@ -137,24 +137,24 @@ static split_runtime_base_sync_packet_t split_runtime_sync_build_base_packet(uin
         .automouse_progress = 0,
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
-        .active_mode_id = pd_mode_id_from_mask(pd_mode_local_active_snapshot()),
-        .locked_mode_id = pd_mode_id_from_mask(pd_mode_local_locked_snapshot()),
-#        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-        .pd_mode_owner_sides = pd_mode_local_owner_sides_snapshot(),
+        .active_mode_id = pointing_mode_id_from_mask(pointing_mode_local_active_snapshot()),
+        .locked_mode_id = pointing_mode_id_from_mask(pointing_mode_local_locked_snapshot()),
+#        ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+        .pointing_mode_owner_sides = pointing_mode_local_owner_sides_snapshot(),
 #        endif
 #    else
-        .active_mode_id = PD_MODE_ID_NONE,
-        .locked_mode_id = PD_MODE_ID_NONE,
-#        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-        .pd_mode_owner_sides = SPLIT_SIDE_MASK_NONE,
+        .active_mode_id = POINTING_MODE_ID_NONE,
+        .locked_mode_id = POINTING_MODE_ID_NONE,
+#        ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+        .pointing_mode_owner_sides = SPLIT_SIDE_MASK_NONE,
 #        endif
 #    endif
         .key_preview_layer = key_feedback_preview_layer(),
     };
 
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_ACTIVE_HALF_ENABLE)
-    if (packet.pd_mode_owner_sides != SPLIT_SIDE_MASK_NONE) {
-        (void)pd_mode_local_owner_bitmap_snapshot(packet.pd_mode_owner_bitmap);
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_ACTIVE_HALF_ENABLE)
+    if (packet.pointing_mode_owner_sides != SPLIT_SIDE_MASK_NONE) {
+        (void)pointing_mode_local_owner_bitmap_snapshot(packet.pointing_mode_owner_bitmap);
     }
 #    endif
 
@@ -192,9 +192,9 @@ static bool split_runtime_base_packet_is_active(const split_runtime_base_sync_pa
         return false;
     }
 
-    return pkt->automouse_progress != 0u || pkt->active_mode_id != PD_MODE_ID_NONE || pkt->locked_mode_id != PD_MODE_ID_NONE
-#    ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-           || pkt->pd_mode_owner_sides != SPLIT_SIDE_MASK_NONE || key_origin_bitmap_has_any(pkt->pd_mode_owner_bitmap)
+    return pkt->automouse_progress != 0u || pkt->active_mode_id != POINTING_MODE_ID_NONE || pkt->locked_mode_id != POINTING_MODE_ID_NONE
+#    ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+           || pkt->pointing_mode_owner_sides != SPLIT_SIDE_MASK_NONE || key_origin_bitmap_has_any(pkt->pointing_mode_owner_bitmap)
 #    endif
            || pkt->key_preview_layer != UINT8_MAX;
 }
@@ -288,7 +288,7 @@ static bool split_runtime_sync_broadcast_base(const split_runtime_base_sync_pack
         split_runtime_base_last_sent = *pkt;
         split_runtime_base_sent_once = true;
         split_runtime_base_last_send = now;
-        noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SEND, pd_mode_mask_from_id(pkt->active_mode_id), pd_mode_mask_from_id(pkt->locked_mode_id));
+        noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SEND, pointing_mode_mask_from_id(pkt->active_mode_id), pointing_mode_mask_from_id(pkt->locked_mode_id));
         return true;
     }
 
@@ -369,20 +369,20 @@ static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_si
     split_runtime_sync_remote.active_mode_id     = packet->active_mode_id;
     split_runtime_sync_remote.locked_mode_id     = packet->locked_mode_id;
     split_runtime_sync_publish_seam_reached(SPLIT_RUNTIME_SYNC_DOMAIN_BASE);
-#    ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    split_runtime_sync_remote.pd_mode_owner_sides = packet->pd_mode_owner_sides;
-    key_origin_bitmap_copy(split_runtime_sync_remote.pd_mode_owner_bitmap, packet->pd_mode_owner_bitmap);
+#    ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+    split_runtime_sync_remote.pointing_mode_owner_sides = packet->pointing_mode_owner_sides;
+    key_origin_bitmap_copy(split_runtime_sync_remote.pointing_mode_owner_bitmap, packet->pointing_mode_owner_bitmap);
 #    endif
     split_runtime_sync_remote.key_preview_layer = packet->key_preview_layer;
     noah_runtime_publication_end(&split_runtime_sync_remote.base_generation);
 
-    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, pd_mode_mask_from_id(packet->active_mode_id), pd_mode_mask_from_id(packet->locked_mode_id));
+    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, pointing_mode_mask_from_id(packet->active_mode_id), pointing_mode_mask_from_id(packet->locked_mode_id));
 #    ifdef POINTING_DEVICE_ENABLE
-    pd_mode_apply_remote_mode_ids_with_owner_bitmap(packet->active_mode_id, packet->locked_mode_id,
-#        ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-                                                    packet->pd_mode_owner_sides, packet->pd_mode_owner_bitmap
+    pointing_mode_apply_remote_mode_ids_with_owner_bitmap(packet->active_mode_id, packet->locked_mode_id,
+#        ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+                                                          packet->pointing_mode_owner_sides, packet->pointing_mode_owner_bitmap
 #        else
-                                                    SPLIT_SIDE_MASK_NONE, NULL
+                                                          SPLIT_SIDE_MASK_NONE, NULL
 #        endif
     );
 #    endif

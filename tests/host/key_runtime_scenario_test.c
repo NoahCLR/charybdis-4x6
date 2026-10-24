@@ -21,7 +21,7 @@ enum {
     TEST_HOLD_KEY_THREE    = CUSTOM_KEY_0 + 0x36,
     TEST_HOLD_ACTION_TWO   = CUSTOM_KEY_0 + 0x37,
     TEST_HOLD_ACTION_THREE = CUSTOM_KEY_0 + 0x38,
-    TEST_PD_MODE_KEY       = CUSTOM_KEY_0 + 0x39,
+    TEST_POINTING_MODE_KEY = CUSTOM_KEY_0 + 0x39,
     TEST_MULTI_TAP_KEY_TWO = CUSTOM_KEY_0 + 0x3A,
     TEST_TAP_ACTION_TWO    = CUSTOM_KEY_0 + 0x3B,
     TEST_ALT_ACTION_TWO    = CUSTOM_KEY_0 + 0x3C,
@@ -981,25 +981,25 @@ static void test_repeat_hold_with_intermediate_scans_starts_once_and_releases_on
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 0)) == KC_NO);
 }
 
-static void test_same_locked_pd_mode_quick_tap_unlocks_on_press_without_tap_release(void) {
+static void test_same_locked_pointing_mode_quick_tap_unlocks_on_press_without_tap_release(void) {
     static const key_runtime_scenario_step_t press_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 6, 1),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_POINTING_MODE_KEY, 6, 1),
     };
     static const key_runtime_scenario_step_t release_steps[] = {
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 6, 1),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_POINTING_MODE_KEY, 6, 1),
     };
 
     key_runtime_scenario_reset();
-    key_runtime_scenario_define_pd_mode_key(TEST_PD_MODE_KEY, PD_MODE_VOLUME, true);
+    key_runtime_scenario_define_pointing_mode_key(TEST_POINTING_MODE_KEY, POINTING_MODE_VOLUME, true);
 
     key_runtime_scenario_run(press_steps, ARRAY_SIZE(press_steps));
-    CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
+    CHECK(!pointing_mode_local_locked(POINTING_MODE_VOLUME));
     CHECK(key_runtime_scenario_effect_count() == 2);
-    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE);
-    CHECK(key_runtime_scenario_effect_at(0)->data.pd_mode_lock_state.pd_mode == PD_MODE_VOLUME);
-    CHECK(!key_runtime_scenario_effect_at(0)->data.pd_mode_lock_state.locked);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_STATE);
+    CHECK(key_runtime_scenario_effect_at(0)->data.pointing_mode_lock_state.pointing_mode == POINTING_MODE_VOLUME);
+    CHECK(!key_runtime_scenario_effect_at(0)->data.pointing_mode_lock_state.locked);
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
-    CHECK(key_runtime_scenario_effect_at(1)->data.held_action.action == TEST_PD_MODE_KEY);
+    CHECK(key_runtime_scenario_effect_at(1)->data.held_action.action == TEST_POINTING_MODE_KEY);
 
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
@@ -1010,32 +1010,32 @@ static void test_same_locked_pd_mode_quick_tap_unlocks_on_press_without_tap_rele
     CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 1)) == KC_NO);
 }
 
-static void test_same_locked_pd_mode_hold_becomes_momentary_until_release(void) {
+static void test_same_locked_pointing_mode_hold_becomes_momentary_until_release(void) {
     static const key_runtime_scenario_step_t press_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 6, 2),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_POINTING_MODE_KEY, 6, 2),
     };
     static const key_runtime_scenario_step_t hold_steps[] = {
         KEY_RUNTIME_SCENARIO_ADVANCE(CUSTOM_TAP_HOLD_TERM + 1),
         KEY_RUNTIME_SCENARIO_SCAN(),
     };
     static const key_runtime_scenario_step_t release_steps[] = {
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 6, 2),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_POINTING_MODE_KEY, 6, 2),
     };
 
     key_runtime_scenario_reset();
-    key_runtime_scenario_define_pd_mode_key(TEST_PD_MODE_KEY, PD_MODE_VOLUME, true);
+    key_runtime_scenario_define_pointing_mode_key(TEST_POINTING_MODE_KEY, POINTING_MODE_VOLUME, true);
 
     key_runtime_scenario_run(press_steps, ARRAY_SIZE(press_steps));
-    CHECK(!pd_mode_local_locked(PD_MODE_VOLUME));
-    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == TEST_PD_MODE_KEY);
+    CHECK(!pointing_mode_local_locked(POINTING_MODE_VOLUME));
+    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == TEST_POINTING_MODE_KEY);
     CHECK(key_runtime_scenario_effect_count() == 2);
-    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE);
-    CHECK(!key_runtime_scenario_effect_at(0)->data.pd_mode_lock_state.locked);
+    CHECK(key_runtime_scenario_effect_at(0)->kind == KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_STATE);
+    CHECK(!key_runtime_scenario_effect_at(0)->data.pointing_mode_lock_state.locked);
     CHECK(key_runtime_scenario_effect_at(1)->kind == KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER);
 
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(hold_steps, ARRAY_SIZE(hold_steps));
-    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == TEST_PD_MODE_KEY);
+    CHECK(key_runtime_scenario_slot_owner_keycode(test_keypos(6, 2)) == TEST_POINTING_MODE_KEY);
     CHECK(key_runtime_scenario_effect_count() == 0);
 
     key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
@@ -1268,8 +1268,8 @@ int main(void) {
     test_double_tap_hold_can_toggle_same_layer_lock_twice();
     test_double_tap_threshold_hold_with_intermediate_scan_registers_once();
     test_repeat_hold_with_intermediate_scans_starts_once_and_releases_once();
-    test_same_locked_pd_mode_quick_tap_unlocks_on_press_without_tap_release();
-    test_same_locked_pd_mode_hold_becomes_momentary_until_release();
+    test_same_locked_pointing_mode_quick_tap_unlocks_on_press_without_tap_release();
+    test_same_locked_pointing_mode_hold_becomes_momentary_until_release();
     test_physical_basic_key_survives_synthetic_tap_at_real_hook_order();
     test_managed_basic_key_suppresses_overlapping_physical_defaults();
 

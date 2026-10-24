@@ -63,14 +63,14 @@ noah_profile_rgb_v1_limits_t noah_profile_rgb_v1_default_limits(void) {
         .max_logical_layers     = NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS,
         .maximum_brightness     = UINT8_MAX,
         .tap_branch_color_count = NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS,
-        .supported_pd_mode_mask = NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL,
+        .supported_pointing_mode_mask = NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL,
     };
     return limits;
 }
 
 static noah_profile_rgb_v1_result_t resolve_limits(const noah_profile_rgb_v1_limits_t *supplied, noah_profile_rgb_v1_limits_t *limits, noah_profile_rgb_v1_error_t *error) {
     *limits = supplied ? *supplied : noah_profile_rgb_v1_default_limits();
-    if ((limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) != 0u || limits->max_payload_size == 0u || !noah_profile_size_within(limits->max_payload_size, NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE) || limits->max_logical_layers > NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS || limits->logical_layer_count > limits->max_logical_layers || limits->tap_branch_color_count == 0u || limits->tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u) {
+    if ((limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) != 0u || limits->max_payload_size == 0u || !noah_profile_size_within(limits->max_payload_size, NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE) || limits->max_logical_layers > NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS || limits->logical_layer_count > limits->max_logical_layers || limits->tap_branch_color_count == 0u || limits->tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (limits->supported_pointing_mode_mask & ~NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL) != 0u) {
         return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
     }
     return NOAH_PROFILE_RGB_V1_OK;
@@ -142,7 +142,7 @@ static noah_profile_rgb_v1_result_t validate_group_row(const noah_profile_rgb_v1
     if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_LAYER_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && bytes[0] >= view->layer_color_count) {
         return fail(error, NOAH_PROFILE_RGB_V1_INVALID_SELECTOR, offset, table, row, NOAH_PROFILE_RGB_V1_FIELD_SELECTOR);
     }
-    if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_PD_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && (bytes[0] >= NOAH_PROFILE_RGB_V1_MAX_PD_MODES || (view->limits.supported_pd_mode_mask & (UINT32_C(1) << bytes[0])) == 0u)) {
+    if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_PD_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && (bytes[0] >= NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES || (view->limits.supported_pointing_mode_mask & (UINT32_C(1) << bytes[0])) == 0u)) {
         return fail(error, NOAH_PROFILE_RGB_V1_INVALID_SELECTOR, offset, table, row, NOAH_PROFILE_RGB_V1_FIELD_SELECTOR);
     }
     if (selector_kind == NOAH_PROFILE_RGB_V1_TABLE_KEY_GROUPS && bytes[0] != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && bytes[0] > 3u) {
@@ -258,7 +258,7 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
             candidate->combo_group_count      = bytes[9];
             candidate->tap_branch_color_count = bytes[10];
             candidate->key_group_count        = bytes[11];
-            if (candidate->group_count > NOAH_PROFILE_RGB_V1_MAX_GROUPS || candidate->layer_color_count > candidate->limits.max_logical_layers || candidate->pd_color_count > NOAH_PROFILE_RGB_V1_MAX_PD_MODES || candidate->tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (uint16_t)candidate->layer_group_count + candidate->pd_group_count + candidate->combo_group_count + candidate->key_group_count > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED, 4u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+            if (candidate->group_count > NOAH_PROFILE_RGB_V1_MAX_GROUPS || candidate->layer_color_count > candidate->limits.max_logical_layers || candidate->pd_color_count > NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES || candidate->tap_branch_color_count > NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS || (uint16_t)candidate->layer_group_count + candidate->pd_group_count + candidate->combo_group_count + candidate->key_group_count > NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED, 4u, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
             expected_length = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + (size_t)candidate->group_count * NOAH_PROFILE_RGB_V1_GROUP_RECORD_SIZE + (size_t)candidate->layer_color_count * NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE + (size_t)candidate->layer_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + (size_t)candidate->pd_color_count * NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE + (size_t)candidate->pd_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + (size_t)candidate->combo_group_count * NOAH_PROFILE_RGB_V1_COMBO_GROUP_RECORD_SIZE + (size_t)candidate->tap_branch_color_count * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE + (size_t)candidate->key_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
             if (candidate->byte_length < expected_length) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_TRUNCATED, candidate->byte_length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
             if (candidate->byte_length > expected_length) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_TRAILING_BYTES, expected_length, NOAH_PROFILE_RGB_V1_TABLE_HEADER, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
@@ -328,7 +328,7 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
                 result = read_bytes(candidate, offset, bytes, NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID, &captured);
                 if (result != NOAH_PROFILE_RGB_V1_OK) return validation_reject_captured(validation, error, &captured);
                 pd_id = bytes[0];
-                if (pd_id >= NOAH_PROFILE_RGB_V1_MAX_PD_MODES || (candidate->limits.supported_pd_mode_mask & (UINT32_C(1) << pd_id)) == 0u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ID, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID);
+                if (pd_id >= NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES || (candidate->limits.supported_pointing_mode_mask & (UINT32_C(1) << pd_id)) == 0u) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INVALID_ID, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID);
                 if ((int16_t)pd_id <= validation->previous_pd_id) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_NONCANONICAL_ORDER, offset, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, validation->row, NOAH_PROFILE_RGB_V1_FIELD_ID);
                 validation->observed_pd_mask |= UINT32_C(1) << pd_id;
                 validation->previous_pd_id   = (int8_t)pd_id;
@@ -338,8 +338,8 @@ noah_profile_rgb_v1_validation_result_t noah_profile_rgb_v1_validation_step(noah
                 validation->row++;
                 if (validation->row < candidate->pd_color_count) return NOAH_PROFILE_RGB_V1_VALIDATION_IN_PROGRESS;
             }
-            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_PD_MODE) != 0u) {
-                if (validation->observed_pd_mask != candidate->limits.supported_pd_mode_mask) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE, 7u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
+            if ((candidate->limits.compiled_stage_mask & NOAH_PROFILE_RGB_V1_STAGE_POINTING_MODE) != 0u) {
+                if (validation->observed_pd_mask != candidate->limits.supported_pointing_mode_mask) return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_INCOMPLETE_SURFACE, 7u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
             } else if (candidate->pd_color_count != 0u || candidate->pd_group_count != 0u) {
                 return validation_reject(validation, error, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA, 7u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, UINT8_MAX, NOAH_PROFILE_RGB_V1_FIELD_COUNT);
             }
@@ -535,7 +535,7 @@ noah_profile_rgb_v1_result_t noah_profile_rgb_v1_pd_color_at(const noah_profile_
     if (!row) return fail(error, NOAH_PROFILE_RGB_V1_INVALID_ARGUMENT, 0u, NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, index, NOAH_PROFILE_RGB_V1_FIELD_HEADER);
     result = accessor_read(view, RGB_SECTION_PD_COLORS, index, view ? view->pd_color_count : 0u, sizeof(bytes), NOAH_PROFILE_RGB_V1_TABLE_PD_COLORS, bytes, error);
     if (result == NOAH_PROFILE_RGB_V1_OK) {
-        row->pd_mode_id = bytes[0];
+        row->pointing_mode_id = bytes[0];
         row->color      = hsv_from_bytes(&bytes[1]);
         row->locality   = bytes[4];
     }

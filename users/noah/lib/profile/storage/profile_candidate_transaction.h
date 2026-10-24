@@ -133,15 +133,16 @@ bool noah_profile_candidate_transaction_scan(noah_profile_candidate_transaction_
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_expire_precommit(noah_profile_candidate_transaction_t *transaction);
 
 // Split-authority cleanup for a host candidate that lost to an already newer
-// peer before marker-last commit began. Unlike inactivity expiry, this scan-
-// owned operation may discard one acknowledged but unprocessed mailbox item so
-// a queued commit cannot cross the newly observed durable-authority boundary.
+// other half before marker-last commit began. Unlike inactivity expiry, this
+// scan-owned operation may discard one acknowledged but unprocessed mailbox
+// item so a queued commit cannot cross the newly observed durable-authority
+// boundary.
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_supersede_precommit(noah_profile_candidate_transaction_t *transaction);
 // Deterministic simultaneous-host arbitration. The losing physical origin
 // aborts only its still-provisional candidate and reports a distinct status.
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_yield_precommit(noah_profile_candidate_transaction_t *transaction);
 // The copy to the other half stopped for good before any commit.
-noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_peer_failed_precommit(noah_profile_candidate_transaction_t *transaction);
+noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_other_half_failed_precommit(noah_profile_candidate_transaction_t *transaction);
 
 // Fail closed after local marker-last durability. This retains the candidate
 // and backend lease/backing so a two-slot runtime cannot overwrite the active
@@ -151,8 +152,8 @@ bool noah_profile_candidate_transaction_fail_postcommit(noah_profile_candidate_t
 
 // Releases a candidate whose local commit failed before marker durability was
 // possible while retaining its terminal STORAGE_FAILURE status for the host.
-// The split owner calls this only after confirming that any provisional peer
-// copy has been aborted. Durable/ambiguous states are refused.
+// The split owner calls this only after confirming that any provisional copy
+// to the other half has been aborted. Durable/ambiguous states are refused.
 noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_cleanup_failed_precommit(noah_profile_candidate_transaction_t *transaction);
 
 void noah_profile_candidate_transaction_status(const noah_profile_candidate_transaction_t *transaction, noah_profile_candidate_v1_status_t *status);

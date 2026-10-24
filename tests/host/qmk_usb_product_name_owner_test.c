@@ -9,31 +9,31 @@
 
 #include "users/noah/lib/compat/qmk_usb_product_name.h"
 #include "users/noah/lib/profile/runtime/profile_owner.h"
-#include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 #include "users/noah/lib/profile/schema/profile_settings_defaults.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
 #include "users/noah/lib/profile/storage/profile_store_runtime.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/noah_keymap.h"
 
-#define PD_ROW(name, key) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = key, .lock_action = key##_LOCK},
-const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(PD_ROW)};
+#define PD_ROW(name, key) [POINTING_MODE_INDEX_##name] = {.mode_flag = POINTING_MODE_##name, .keycode = key, .lock_action = key##_LOCK},
+const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {NOAH_POINTING_MODE_LIST(PD_ROW)};
 #undef PD_ROW
 
-bool is_pd_mode_lock_action(uint16_t action) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++)
-        if (pd_modes[i].lock_action == action) return true;
+bool is_pointing_mode_lock_action(uint16_t action) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++)
+        if (pointing_modes[i].lock_action == action) return true;
     return false;
 }
-pd_mode_mask_t pd_mode_for_keycode(uint16_t key) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++)
-        if (pd_modes[i].keycode == key) return pd_modes[i].mode_flag;
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t key) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++)
+        if (pointing_modes[i].keycode == key) return pointing_modes[i].mode_flag;
     return 0;
 }
-void noah_profile_activation_policy_init(noah_profile_activation_policy_t *policy, noah_profile_activation_peer_observer_fn observer, void *context) {
+void noah_profile_activation_policy_init(noah_profile_activation_policy_t *policy, noah_profile_activation_other_half_observer_fn observer, void *context) {
     memset(policy, 0, sizeof(*policy));
-    policy->peer_observer = observer;
-    policy->peer_context  = context;
+    policy->other_half_observer = observer;
+    policy->other_half_context = context;
     policy->initialized   = true;
 }
 uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
@@ -77,7 +77,7 @@ static uint8_t              working[NOAH_PROFILE_PAYLOAD_MAX];
 static uint32_t             now = 1000u;
 static unsigned             restarts;
 
-// The USB half, enumerated, with the app silent: every gate but the name is
+// The master half, enumerated, with the app silent: every gate but the name is
 // open, so any difference between the live and the enumerated name restarts.
 bool is_keyboard_master(void) {
     return true;
@@ -135,9 +135,9 @@ static void boot(void) {
         .settings_defaults_length = noah_profile_settings_defaults_length,
         .settings_defaults_byte   = noah_profile_settings_defaults_byte,
     };
-    noah_effective_key_behavior_runtime_uninstall(&owner.key_behaviors);
-    noah_effective_rgb_runtime_uninstall(&owner.rgb);
-    noah_effective_combo_runtime_uninstall(&owner.combos);
+    noah_active_profile_key_behavior_runtime_uninstall(&owner.key_behaviors);
+    noah_active_profile_rgb_runtime_uninstall(&owner.rgb);
+    noah_active_profile_combo_runtime_uninstall(&owner.combos);
     noah_qmk_usb_product_name_pre_init();
     assert(noah_profile_owner_init(&owner, &config));
     for (unsigned i = 0; i < 1000000u && owner.state != NOAH_PROFILE_OWNER_READY_COMPILED && owner.state != NOAH_PROFILE_OWNER_READY_VALIDATED; i++)
@@ -248,7 +248,7 @@ static void test_the_name_only_changes_when_the_profile_names_it(void) {
 }
 
 int main(void) {
-    noah_effective_settings_set_apply(noah_qmk_portable_apply);
+    noah_active_profile_settings_set_apply(noah_qmk_portable_apply);
     test_the_name_only_changes_when_the_profile_names_it();
     return 0;
 }

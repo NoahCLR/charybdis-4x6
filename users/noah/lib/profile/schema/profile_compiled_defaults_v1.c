@@ -13,7 +13,7 @@
 #include "../storage/profile_checksum.h"
 #include "noah_keymap_ids.h"
 #include "lib/key/behavior/key_behavior.h"
-#include "lib/pointing/defs/pd_modes.h"
+#include "lib/pointing/defs/pointing_modes.h"
 #include "lib/rgb/core/rgb_helpers.h"
 
 typedef struct {
@@ -79,7 +79,7 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, noa
     emit_u8(&writer, NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR);
     emit_u8(&writer, NOAH_PROFILE_ACTION_V1_CUSTOM_KEY);
     emit_u8(&writer, LAYER_COUNT);
-    emit_u8(&writer, PD_MODE_COUNT);
+    emit_u8(&writer, POINTING_MODE_COUNT);
     emit_u8(&writer, MACRO_SLOT_COUNT);
     emit_u8(&writer, NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS);
 #ifdef NOAH_FIRMWARE_VERSION
@@ -101,12 +101,12 @@ static noah_profile_compiled_v1_result_t action_abi_digest(uint32_t *digest, noa
         emit_u16(&writer, MO(layer));
         emit_u16(&writer, LOCK_LAYER(layer));
     }
-    for (uint8_t id = 0u; id < PD_MODE_COUNT; id++) {
+    for (uint8_t id = 0u; id < POINTING_MODE_COUNT; id++) {
         emit_u8(&writer, id);
         // The whole 32-bit flag: slots 16..31 have no bits in a u16.
-        emit_u32(&writer, pd_modes[id].mode_flag);
-        emit_u16(&writer, pd_modes[id].keycode);
-        emit_u16(&writer, pd_modes[id].lock_action);
+        emit_u32(&writer, pointing_modes[id].mode_flag);
+        emit_u16(&writer, pointing_modes[id].keycode);
+        emit_u16(&writer, pointing_modes[id].lock_action);
     }
     emit_u16(&writer, NOAH_KEYCODE_USERSPACE_END);
     emit_u16(&writer, UINT16_MAX);
@@ -277,11 +277,11 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     result.required_domain_mask              = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
     result.logical_layer_count               = LAYER_COUNT;
     result.placement_positions               = MATRIX_ROWS * MATRIX_COLS;
-    result.supported_pd_mode_mask            = UINT32_MAX >> (32u - PD_MODE_COUNT);
+    result.supported_pointing_mode_mask      = UINT32_MAX >> (32u - POINTING_MODE_COUNT);
     result.macro_slot_count                  = MACRO_SLOT_COUNT;
     result.custom_key_count                  = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     result.rgb_limits.logical_layer_count    = LAYER_COUNT;
-    result.rgb_limits.supported_pd_mode_mask = result.supported_pd_mode_mask;
+    result.rgb_limits.supported_pointing_mode_mask = result.supported_pointing_mode_mask;
     result.rgb_limits.tap_branch_color_count = KEY_BEHAVIOR_MAX_TAP_COUNT - 1u;
 #if defined(RGB_MATRIX_ENABLE)
     result.rgb_limits.maximum_brightness  = RGB_MATRIX_MAXIMUM_BRIGHTNESS;

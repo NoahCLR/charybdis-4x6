@@ -198,19 +198,19 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return true;
 }
 
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
     (void)action;
     return NULL;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
 void noah_action_tap(uint16_t action) {
@@ -289,16 +289,16 @@ void tap_code16(uint16_t keycode) {
     test_trace('T');
 }
 
-#define NOAH_PD_MODE_TEST_ROW(name, mode_keycode) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
-const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_TEST_ROW)};
-#undef NOAH_PD_MODE_TEST_ROW
+#define NOAH_POINTING_MODE_TEST_ROW(name, mode_keycode) [POINTING_MODE_INDEX_##name] = {.mode_flag = POINTING_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
+const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {NOAH_POINTING_MODE_LIST(NOAH_POINTING_MODE_TEST_ROW)};
+#undef NOAH_POINTING_MODE_TEST_ROW
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     return action == PD_SLOT_4_LOCK;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    return keycode == PD_SLOT_4 ? PD_MODE_ARROW : 0;
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
+    return keycode == PD_SLOT_4 ? POINTING_MODE_ARROW : 0;
 }
 
 static void test_action_descriptor_classifies_common_actions(void) {
@@ -493,9 +493,9 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supports_fallback_hold(qmk_behavior));
     CHECK(noah_action_desc_default_tap_action(qmk_behavior) == OSM(MOD_LSFT));
 
-    CHECK(pd_key.pd_mode == PD_MODE_ARROW);
-    CHECK(pd_key.kind == NOAH_ACTION_KIND_PD_MODE_HOLD);
-    CHECK(noah_action_desc_is_pd_mode_action(pd_key));
+    CHECK(pd_key.pointing_mode == POINTING_MODE_ARROW);
+    CHECK(pd_key.kind == NOAH_ACTION_KIND_POINTING_MODE_HOLD);
+    CHECK(noah_action_desc_is_pointing_mode_action(pd_key));
     CHECK(noah_action_desc_supported_as_behavior_keycode(pd_key));
     CHECK(noah_action_desc_supported_as_authored_action(pd_key, NOAH_ACTION_AUTHORED_USE_TAP));
     CHECK(noah_action_desc_supported_as_authored_action(pd_key, NOAH_ACTION_AUTHORED_USE_HOLD_PRESS_AND_HOLD));
@@ -510,9 +510,9 @@ static void test_action_descriptor_classifies_common_actions(void) {
     CHECK(!noah_action_desc_supports_fallback_hold(pd_key));
     CHECK(noah_action_desc_default_tap_action(pd_key) == KC_NO);
 
-    CHECK(pd_lock.kind == NOAH_ACTION_KIND_PD_MODE_LOCK);
+    CHECK(pd_lock.kind == NOAH_ACTION_KIND_POINTING_MODE_LOCK);
     CHECK(noah_action_desc_is_press_only(pd_lock));
-    CHECK(noah_action_desc_has_capability(pd_lock, NOAH_ACTION_CAP_PD_MODE_AFFECTING));
+    CHECK(noah_action_desc_has_capability(pd_lock, NOAH_ACTION_CAP_POINTING_MODE_AFFECTING));
     CHECK(noah_action_desc_consumes_direct_press(pd_lock));
     CHECK(!noah_action_desc_is_runtime_handled_keycode(pd_lock));
     CHECK(!noah_action_desc_uses_held_lifecycle_for_press_and_hold(pd_lock));
@@ -834,7 +834,7 @@ static void test_custom_key_shortcut_is_its_native_action(void) {
 static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
     // The retired custom-key block (D-F14) is unassigned: its first and last
     // codes invoke nothing, neither a custom key nor a pointing hold.
-    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + PD_MODE_COUNT, NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED - 1, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, NOAH_KEYCODE_CUSTOM_KEY_BASE - 1, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + 63, CUSTOM_KEY_127 + 1, QK_USER_MAX};
+    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED - 1, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, NOAH_KEYCODE_CUSTOM_KEY_BASE - 1, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + 63, CUSTOM_KEY_127 + 1, QK_USER_MAX};
     const noah_action_placement_t placements[] = {NOAH_ACTION_PLACEMENT_KEY, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT};
     for (uint8_t i = 0; i < ARRAY_SIZE(unassigned); i++) {
         CHECK(noah_action_describe(unassigned[i]).kind == NOAH_ACTION_KIND_UNASSIGNED_USER);
@@ -843,8 +843,8 @@ static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
     }
     CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_describe(CUSTOM_KEY_127).kind == NOAH_ACTION_KIND_CUSTOM_KEY);
-    CHECK(noah_action_describe(PD_SLOT_4).kind == NOAH_ACTION_KIND_PD_MODE_HOLD);
-    CHECK(noah_action_describe(PD_SLOT_4_LOCK).kind == NOAH_ACTION_KIND_PD_MODE_LOCK);
+    CHECK(noah_action_describe(PD_SLOT_4).kind == NOAH_ACTION_KIND_POINTING_MODE_HOLD);
+    CHECK(noah_action_describe(PD_SLOT_4_LOCK).kind == NOAH_ACTION_KIND_POINTING_MODE_LOCK);
     CHECK(noah_action_describe(LOCK_LAYER(LAYER_COUNT - 1)).kind == NOAH_ACTION_KIND_LAYER_LOCK);
     CHECK(noah_action_describe(QK_USER - 1).kind != NOAH_ACTION_KIND_UNASSIGNED_USER);
 

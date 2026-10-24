@@ -7,7 +7,7 @@
 //   2. the auto-mouse base-stage transition
 //   3. later overlay surfaces
 //
-// Want to change layer, LED-group, automouse, pd-mode, or key-behavior
+// Want to change layer, LED-group, automouse, pointing-mode, or key-behavior
 // feedback colors? Edit this file.
 // Want to change the rendering logic?  Edit users/noah/lib/rgb/core/rgb_runtime.c
 // and the stage modules under users/noah/lib/rgb/.
@@ -19,7 +19,7 @@
 //   - Stage color tables define each renderer's normal color.
 //   - LED group tables repaint selected LEDs after that stage's normal render.
 //   - RGB_*_GROUP_ALL rows match every active item in that stage; they do not
-//     create layer, pd-mode, combo, or key-feedback state by themselves.
+//     create layer, pointing-mode, combo, or key-feedback state by themselves.
 //   - In LED group tables only, HSV(0, 0, 0) means inherit the active stage
 //     color. Nonzero HSV values override the stage color for that LED group.
 //   - In normal color tables, HSV(0, 0, 0) is just an authored black/off color.
@@ -28,7 +28,7 @@
 //
 // ────────────────────────────────────────────────────────────────────────────
 
-#include "noah_keymap.h" // layer enum, PD_MODE_* constants, hsv_t, rgb config types, RGB config helpers
+#include "noah_keymap.h" // layer enum, POINTING_MODE_* constants, hsv_t, rgb config types, RGB config helpers
 
 #if defined(RGB_MATRIX_ENABLE)
 
@@ -156,8 +156,8 @@ static const layer_led_group_t layer_led_groups_data[] = RGB_LED_GROUP_TABLE(
 //     key while the automouse renderer is active
 //
 // .end_color is used only by the END_COLOR_* modes above. Later overlays such
-// as pd-mode color or key feedback can still repaint on top of the visible
-// result.
+// as pointing-mode color or key feedback can still repaint on top of the
+// visible result.
 #    ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
 const automouse_fade_end_config_t automouse_fade_end_config = {
     .mode      = FOLLOW_REAL_DESTINATION,
@@ -167,95 +167,97 @@ const automouse_fade_end_config_t automouse_fade_end_config = {
 
 // ─── Pointing device mode colors ────────────────────────────────────────────
 //
-// Overlay colors for the active trackball mode.
+// Overlay colors for the active pointing mode.
 // Each entry is tagged with its pointing mode so the order doesn't need to
-// match pd_modes[] — adding or reordering modes won't silently break colors.
+// match pointing_modes[] — adding or reordering modes won't silently break
+// colors.
 //
 // Locality decides where the overlay paints:
 //   - RGB_BOTH_HALVES = mirror the PD color across both halves
 //   - RGB_LEFT_HALF = always paint the left half
 //   - RGB_RIGHT_HALF = always paint the right half
 //   - RGB_KEY_HALF = paint the half or halves containing the key footprint
-//     that triggered the current effective PD mode
+//     that triggered the current effective pointing mode
 //   - RGB_KEYS_ONLY = paint the key footprint that triggered the current
-//     effective PD mode; combo-driven triggers paint every combo key
+//     effective pointing mode; combo-driven triggers paint every combo key
 //
 // { .pointing_mode = ..., .color = HSV(hue, sat, val), .locality = ... }
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-const pd_mode_color_t pd_mode_colors[] = {
-    {.pointing_mode = PD_MODE_SLOT_6, .color = HSV(19, 255, 200), .locality = RGB_KEY_HALF},
-    {.pointing_mode = PD_MODE_SLOT_7, .color = HSV(200, 193, 108), .locality = RGB_RIGHT_HALF},
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+const pointing_mode_color_t pointing_mode_colors[] = {
+    {.pointing_mode = POINTING_MODE_SLOT_6, .color = HSV(19, 255, 200), .locality = RGB_KEY_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_7, .color = HSV(200, 193, 108), .locality = RGB_RIGHT_HALF},
     {
-        .pointing_mode = PD_MODE_DRAGSCROLL,
+        .pointing_mode = POINTING_MODE_DRAGSCROLL,
         .color         = HSV(21, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
     },
     {
-        .pointing_mode = PD_MODE_VOLUME,
+        .pointing_mode = POINTING_MODE_VOLUME,
         .color         = HSV(43, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
     },
     {
-        .pointing_mode = PD_MODE_BRIGHTNESS,
+        .pointing_mode = POINTING_MODE_BRIGHTNESS,
         .color         = HSV(213, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
     },
     {
-        .pointing_mode = PD_MODE_ARROW,
+        .pointing_mode = POINTING_MODE_ARROW,
         .color         = HSV(127, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
     },
     {
-        .pointing_mode = PD_MODE_PINCH,
+        .pointing_mode = POINTING_MODE_PINCH,
         .color         = HSV(55, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
     },
     {
-        .pointing_mode = PD_MODE_ZOOM,
+        .pointing_mode = POINTING_MODE_ZOOM,
         .color         = HSV(70, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS),
         .locality      = RGB_RIGHT_HALF,
     },
     // Slots 8..31 start uncoloured; every slot keeps a row.
-    {.pointing_mode = PD_MODE_SLOT_8, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_9, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_10, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_11, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_12, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_13, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_14, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_15, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_16, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_17, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_18, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_19, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_20, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_21, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_22, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_23, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_24, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_25, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_26, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_27, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_28, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_29, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_30, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
-    {.pointing_mode = PD_MODE_SLOT_31, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_8, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_9, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_10, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_11, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_12, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_13, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_14, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_15, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_16, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_17, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_18, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_19, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_20, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_21, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_22, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_23, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_24, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_25, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_26, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_27, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_28, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_29, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_30, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
+    {.pointing_mode = POINTING_MODE_SLOT_31, .color = HSV(0, 0, 0), .locality = RGB_RIGHT_HALF},
 };
 
 // ─── Pointing-Device Mode LED Groups ────────────────────────────────────────
 //
 // Paint specific LEDs while a pointing mode feedback state is active. These
-// groups repaint after the active pd-mode locality render. Use
-// RGB_PD_MODE_GROUP_ALL to make one group row follow whichever pointing mode is
-// currently active; it does not create pd-mode feedback when none is active.
+// groups repaint after the active pointing-mode locality render. Use
+// RGB_POINTING_MODE_GROUP_ALL to make one group row follow whichever pointing
+// mode is currently active; it does not create pointing-mode feedback when none
+// is active.
 //
 // In LED group rows, HSV(0, 0, 0) inherits the active pointing-mode color. Use
 // a nonzero HSV value only when the group should override that stage color.
-static const pd_mode_led_group_t pd_mode_led_groups_data[] = RGB_LED_GROUP_TABLE(
-    // { .pointing_mode = PD_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
-    // { .pointing_mode = RGB_PD_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS },
-    {.pointing_mode = RGB_PD_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS}, );
-#    endif // POINTING_DEVICE_ENABLE && RGB_PD_MODE_FEEDBACK_ENABLE
+static const pointing_mode_led_group_t pointing_mode_led_groups_data[] = RGB_LED_GROUP_TABLE(
+    // { .pointing_mode = POINTING_MODE_VOLUME, .color = HSV(85, 255, RGB_MATRIX_MAXIMUM_BRIGHTNESS), .led_group = RGB_LED_GROUP_TRACKBALL },
+    // { .pointing_mode = RGB_POINTING_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS },
+    {.pointing_mode = RGB_POINTING_MODE_GROUP_ALL, .color = HSV(0, 0, 0), .led_group = RGB_LED_GROUP_THUMBS}, );
+#    endif // POINTING_DEVICE_ENABLE && RGB_POINTING_MODE_FEEDBACK_ENABLE
 
 // ─── Combo feedback ────────────────────────────────────────────────────────
 //

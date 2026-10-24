@@ -53,15 +53,15 @@ Held by: `tests/host/run_qmk_profile_split_transport_tests.sh` (`qmk_profile_spl
 ## Framing
 
 - Byte 0 of every `PUT_PROFILE_SPLIT_SYNC` frame is the framing version, `4`.
-  A frame of any other version is refused; a half on another build reads its
-  sibling's frames as invalid and reports it unreadable.
+  A frame of any other version is refused; a half on another build reads the
+  other half's frames as invalid and reports it unreadable.
 - Every frame is 32 bytes except a payload chunk and a payload reuse. A
   payload chunk is its 21-byte header, the chunk and the CRC: 22 + n bytes for
   an n-byte chunk, never under 32 (a shorter chunk is zero-padded). A payload
   reuse is 44 bytes. The largest frame is 128 bytes, so a chunk carries at
   most 106 bytes, pushed as a request or pulled as a reply (D-F28,
   [0028](../adr/0028-new-base-32-bit-profile-lengths.md); D-F19,
-  [0019](../adr/0019-peer-copy-reuses-what-the-other-half-has.md)).
+  [0019](../adr/0019-the-copy-reuses-what-the-other-half-has.md)).
 - The last byte is a CRC8, polynomial `0x07`, initial value 0, over every
   byte before it. Multi-byte values are little-endian. Every offset and length
   is 32 bits. Every reserved or unused byte is zero, and a frame with a
@@ -108,7 +108,7 @@ Held by: `tests/host/run_profile_split_foundation_tests.sh` (`profile_split_foun
 | `INCOMPATIBLE` | `2` | schema, compiled-default digest, action-ABI digest, size or domain mask is not this build's |
 | `STALE` | `3` | the copy is older than the receiver's saved profile, or a pull names a profile the sender no longer holds |
 | `CONFLICT` | `4` | equal generation from the other origin; an `ABORT` for a copy already committed |
-| `CORRUPT` | `5` | equal generation and origin that disagree; a repeated chunk whose bytes differ; a committed record that reads back differently |
+| `CORRUPT` | `5` | equal generation and origin that disagree; a repeated chunk whose bytes differ; a saved record that reads back differently |
 | `BUSY` | `6` | in `ACK` only |
 | `RANGE_ERROR` | `7` | a gap, partial overlap or out-of-range chunk |
 | `DIGEST_MISMATCH` | `8` | defined; this build never sends it |
@@ -126,7 +126,7 @@ How the sender takes an error:
 - Anything else stops the reconciler with that status. A stopped reconciler
   resumes the metadata poll once this half's own saved profile changes.
 
-Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`profile_split_reconciler_test.c`), `tests/host/run_profile_peer_store_backend_tests.sh` (`profile_peer_store_backend_test.c`).
+Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`profile_split_reconciler_test.c`), `tests/host/run_profile_other_half_store_backend_tests.sh` (`profile_other_half_store_backend_test.c`).
 
 ## Descriptor frame
 
@@ -314,7 +314,7 @@ Sending ranges:
   source-unavailable replies, prepared-push scans and exchanges
   ([candidate-transfer.md](profile-wire-v1/candidate-transfer.md)).
 
-Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`profile_split_reconciler_test.c`: `test_reuse_*`, `test_an_unencodable_reuse_plan_sends_bytes`, `test_wide_reuse_through_the_reconciler`), `tests/host/run_profile_peer_store_backend_tests.sh` (`test_reuse_fills_ranges_from_the_active_profile`), `tests/host/run_profile_owner_tests.sh` (`test_committed_reuse_saves_both_halves_and_reboots`).
+Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`profile_split_reconciler_test.c`: `test_reuse_*`, `test_an_unencodable_reuse_plan_sends_bytes`, `test_wide_reuse_through_the_reconciler`), `tests/host/run_profile_other_half_store_backend_tests.sh` (`test_reuse_fills_ranges_from_the_active_profile`), `tests/host/run_profile_owner_tests.sh` (`test_saved_reuse_saves_both_halves_and_reboots`).
 
 ## Requests and replies
 
@@ -354,13 +354,13 @@ Each half compares its own descriptor with the other half's:
 | --- | --- |
 | either descriptor invalid | invalid metadata |
 | this half unreadable | local unreadable |
-| the other half unreadable | peer unreadable |
+| the other half unreadable | other half unreadable |
 | schema, compiled-default or action-ABI digest differ | incompatible |
 | neither has a saved profile | compiled converged |
 | only one has a saved profile, or one has the higher generation | that half newer |
 | equal generation, different origin | concurrent commit |
 | equal generation and origin, any of CRC, digest, length, domain mask or flags differ | corrupt same tuple |
-| otherwise | committed converged |
+| otherwise | saved converged |
 
 - Unreadable, invalid and incompatible fail closed. Incompatible, concurrent
   commit and corrupt same tuple stop the reconciler with `INCOMPATIBLE`,
@@ -370,7 +370,7 @@ Each half compares its own descriptor with the other half's:
   profile wins.
 - Each comparison is published as one coherent snapshot. The activation
   observer counts the slave half unresolved unless the snapshot is compiled
-  or committed converged with no transfer pending, and treats a failed read
+  or saved converged with no transfer pending, and treats a failed read
   as unresolved. Invalid metadata is itself published, so an older converged
   result never outlives a malformed observation.
 - This half's descriptor is read every scan, also during backoff. A changed
@@ -416,7 +416,7 @@ uses, holding its storage admission as `PEER`.
 - The receive lease: a copy still being received is aborted, and its
   admission released, 3 s (`NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS`) after the
   last request for that copy, whatever else crosses the link (D-F44,
-  [0044](../adr/0044-stale-peer-copy-cannot-hold-off-later-copies.md)). The
+  [0044](../adr/0044-stale-copy-cannot-hold-off-later-copies.md)). The
   lease never ends a copy being validated, prepared, committed or of unknown
   durability.
 - `ABORT` ends a copy still receiving, validating or prepared and answers
@@ -429,7 +429,7 @@ uses, holding its storage admission as `PEER`.
   stays committed afterwards to answer a retry of the finished copy, so that
   state alone is never published.
 
-Held by: `tests/host/run_profile_peer_store_backend_tests.sh` (`profile_peer_store_backend_test.c`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_stale_receive_lease_expires_while_the_link_stays_busy`, `test_receiver_recovers_when_its_abort_write_fails`, `test_receiver_recovers_after_a_storage_failure`, `test_cancel_after_prepare_rejection_is_idempotent`, `test_cancel_refuses_matching_durable_peer`), `tests/host/run_profile_owner_tests.sh` (`test_an_apply_after_taking_the_other_halfs_copy_lands`, `test_a_save_after_taking_the_other_halfs_copy_lands`).
+Held by: `tests/host/run_profile_other_half_store_backend_tests.sh` (`profile_other_half_store_backend_test.c`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_stale_receive_lease_expires_while_the_link_stays_busy`, `test_receiver_recovers_when_its_abort_write_fails`, `test_receiver_recovers_after_a_storage_failure`, `test_cancel_after_prepare_rejection_is_idempotent`, `test_cancel_refuses_matching_durable_other_half`), `tests/host/run_profile_owner_tests.sh` (`test_an_apply_after_taking_the_other_halfs_copy_lands`, `test_a_save_after_taking_the_other_halfs_copy_lands`).
 
 ## Repair and pull
 
@@ -447,7 +447,7 @@ Without a prepared push, the master half repairs whatever differs:
   but `METADATA`, `PAYLOAD_REQUEST` and `ABORT` with `BUSY`, convergence
   only.
 - The slave half invalidates its view of the master half 3 s
-  (`NOAH_PROFILE_SPLIT_PEER_TIMEOUT_MS`) after the last request it took.
+  (`NOAH_PROFILE_SPLIT_OTHER_HALF_TIMEOUT_MS`) after the last request it took.
 
 Each scan the reconciler does at most one exchange, one received chunk, one
 scan's share of a reuse range, one validation step (reads of at most 20
@@ -510,7 +510,7 @@ Recovery:
   [0041](../adr/0041-cancelled-save-ends-in-bounded-time.md)). A push whose
   commit is authorized cannot be cancelled.
 
-Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_push_*`, `test_authorized_commit_survives_one_replayed_reply`, `test_store_completion_polling_requires_the_matching_full_copy`, `test_maximum_candidate_resolves_within_owner_no_progress_window`, `test_prepared_abort_is_bounded_when_peer_goes_silent`, `test_prepared_abort_is_bounded_when_peer_stays_busy`, `test_receiver_durable_prepare_survives_sender_pause`), `tests/host/run_profile_owner_tests.sh` (`test_peer_store_write_failure_retries_then_fails_fast`, `test_host_abort_ends_when_peer_never_acknowledges`).
+Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_push_*`, `test_authorized_commit_survives_one_replayed_reply`, `test_store_completion_polling_requires_the_matching_full_copy`, `test_maximum_candidate_resolves_within_owner_no_progress_window`, `test_prepared_abort_is_bounded_when_other_half_goes_silent`, `test_prepared_abort_is_bounded_when_other_half_stays_busy`, `test_receiver_durable_prepare_survives_sender_pause`), `tests/host/run_profile_owner_tests.sh` (`test_other_half_store_write_failure_retries_then_fails_fast`, `test_host_abort_ends_when_other_half_never_acknowledges`).
 
 ## An abandoned prepared copy
 

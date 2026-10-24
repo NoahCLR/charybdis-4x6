@@ -18,9 +18,9 @@
 enum { SPLIT_FAULT_LINK_FRAME_MAX = 128u };
 
 typedef struct {
-    noah_profile_split_exchange_fn receive;   // the other half's receive (the RPC callback's body)
-    void                          *peer;      // its context
-    uint32_t                       exchanges; // requests offered; a fault names the 1-based exchange it hits
+    noah_profile_split_exchange_fn receive;    // the other half's receive (the RPC callback's body)
+    void                          *other_half; // its context
+    uint32_t                       exchanges;  // requests offered; a fault names the 1-based exchange it hits
     // One-shot faults, each cleared when it fires (0 is none).
     uint32_t drop_before_delivery; // the request never arrives: no reply
     uint32_t drop_after_delivery;  // the other half takes it; its reply is lost

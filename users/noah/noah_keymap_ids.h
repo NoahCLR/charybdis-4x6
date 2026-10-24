@@ -12,7 +12,7 @@
 #include "quantum_keycodes.h"
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "lib/pointing/defs/pd_mode_manifest.h"
+#include "lib/pointing/defs/pointing_mode_manifest.h"
 #include "lib/action/custom_key_shortcut.h"
 
 // ─── Layers ─────────────────────────────────────────────────────────────────
@@ -333,15 +333,15 @@ enum {
 
 enum {
     NOAH_KEYCODE_PD_HOLD_BEFORE = NOAH_KEYCODE_PD_HOLD_BASE - 1,
-#define NOAH_PD_MODE_KEYCODE(name, keycode) keycode,
-    NOAH_PD_MODE_LIST(NOAH_PD_MODE_KEYCODE)
-#undef NOAH_PD_MODE_KEYCODE
+#define NOAH_POINTING_MODE_KEYCODE(name, keycode) keycode,
+    NOAH_POINTING_MODE_LIST(NOAH_POINTING_MODE_KEYCODE)
+#undef NOAH_POINTING_MODE_KEYCODE
 };
 enum {
     NOAH_KEYCODE_PD_LOCK_BEFORE = NOAH_KEYCODE_PD_LOCK_BASE - 1,
-#define NOAH_PD_MODE_LOCK_KEYCODE(name, keycode) keycode##_LOCK,
-    NOAH_PD_MODE_LIST(NOAH_PD_MODE_LOCK_KEYCODE)
-#undef NOAH_PD_MODE_LOCK_KEYCODE
+#define NOAH_POINTING_MODE_LOCK_KEYCODE(name, keycode) keycode##_LOCK,
+    NOAH_POINTING_MODE_LIST(NOAH_POINTING_MODE_LOCK_KEYCODE)
+#undef NOAH_POINTING_MODE_LOCK_KEYCODE
 };
 #define LAYER_LOCK_BASE NOAH_KEYCODE_LAYER_LOCK_BASE
 
@@ -353,8 +353,8 @@ _Static_assert(PD_SLOT_0_LOCK == 0x7ea0 && PD_SLOT_31_LOCK == 0x7ebf && PD_SLOT_
 _Static_assert(LAYER_COUNT <= NOAH_KEYCODE_LAYER_LOCK_RESERVED && NOAH_KEYCODE_LAYER_LOCK_BASE + NOAH_KEYCODE_LAYER_LOCK_RESERVED == NOAH_KEYCODE_USERSPACE_END, "layer locks stay inside their block");
 _Static_assert(NOAH_KEYCODE_USERSPACE_END - 1 <= QK_USER_MAX, "userspace keycodes stay in QMK's user range");
 
-#define PD_MODE_KEYCODE_COUNT PD_MODE_COUNT
-#define PD_MODE_LOCK_KEYCODE_COUNT PD_MODE_COUNT
+#define POINTING_MODE_KEYCODE_COUNT POINTING_MODE_COUNT
+#define POINTING_MODE_LOCK_KEYCODE_COUNT POINTING_MODE_COUNT
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
 #define NOAH_KEYCODE_IS_CUSTOM_KEY(keycode_) ((keycode_) >= CUSTOM_KEY_0 && (keycode_) <= CUSTOM_KEY_127)
 

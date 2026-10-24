@@ -74,8 +74,8 @@ Every table is lighting `0x10` profile data when its stage is compiled:
 | `RGB_SAVED_LED_GROUP_TABLE`: reusable groups | reusable groups: id and LED bitmap | always |
 | `RGB_LED_GROUP_TABLE` of layer group rows | layer group rows: selector, HSV, group | always |
 | `automouse_fade_end_config`: mode, end HSV | auto-mouse fade | `RGB_AUTOMOUSE_GRADIENT_ENABLE` |
-| `pd_mode_colors[]`: slot, HSV, locality | pointing colours, one per pointing slot | `RGB_PD_MODE_FEEDBACK_ENABLE` |
-| pointing group rows | pointing group rows: selector, HSV, group | `RGB_PD_MODE_FEEDBACK_ENABLE` |
+| `pointing_mode_colors[]`: slot, HSV, locality | pointing colours, one per pointing slot | `RGB_POINTING_MODE_FEEDBACK_ENABLE` |
+| pointing group rows | pointing group rows: selector, HSV, group | `RGB_POINTING_MODE_FEEDBACK_ENABLE` |
 | `combo_feedback_colors`: HSV, locality | combo feedback | `RGB_COMBO_FEEDBACK_ENABLE` |
 | combo group rows | combo group rows: HSV, group | `RGB_COMBO_FEEDBACK_ENABLE` |
 | `key_behavior_feedback_colors`: `RGB_TAP_BRANCH_COLORS` | tap-branch colours, one per tap count past the first | `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` |
@@ -100,7 +100,7 @@ Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_valida
 | `KEY_BEHAVIOR_MAX_TAP_COUNT` | ceiling | the tap depth ([key behaviours](profile-wire-v1/key-behavior-domain.md#ceilings)) |
 | `CHARYBDIS_MINIMUM_DEFAULT_DPI`, `CHARYBDIS_MINIMUM_SNIPING_DPI` | profile data | settings scalars 18 and 19 |
 | `CHARYBDIS_DEFAULT_DPI_CONFIG_STEP`, `CHARYBDIS_SNIPING_DPI_CONFIG_STEP` | capability | QMK's DPI ladders; the settings domain accepts 400–3,400 in steps of 200 and 100–400 in steps of 100 |
-| `CHARYBDIS_DRAGSCROLL_DPI`, `PD_MODE_VOLUME_DPI`, `PD_MODE_BRIGHTNESS_DPI`, `PD_MODE_ZOOM_DPI`, `PD_MODE_ARROW_DPI` | profile data | pointing slots' DPI, through `pd_config.c` |
+| `CHARYBDIS_DRAGSCROLL_DPI`, `POINTING_MODE_VOLUME_DPI`, `POINTING_MODE_BRIGHTNESS_DPI`, `POINTING_MODE_ZOOM_DPI`, `POINTING_MODE_ARROW_DPI` | profile data | pointing slots' DPI, through `pd_config.c` |
 | `CHARYBDIS_AUTO_SNIPING_ENABLE` | capability | |
 | `CHARYBDIS_AUTO_SNIPING_LAYER` | profile data | settings scalar 9 |
 | `POINTING_DEVICE_AUTO_MOUSE_ENABLE` | capability | |
@@ -110,7 +110,7 @@ Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_valida
 | `RGB_MATRIX_MAXIMUM_BRIGHTNESS` | ceiling | QMK clamps brightness to it; GET `0x08` page 1 reports it (D-F38, [ADR](../adr/0038-keyboard-reports-its-brightness-limit.md)) |
 | `RGB_MATRIX_LED_FLUSH_LIMIT` | ceiling | the shortest interval between LED updates, and the auto-mouse fade's step |
 | `NOAH_RGB_IDLE_TIMEOUT_MS` | profile data | settings scalar 17; QMK's `RGB_MATRIX_TIMEOUT` is `0` in builds that save |
-| `RGB_PD_MODE_FEEDBACK_ENABLE`, `RGB_COMBO_FEEDBACK_ENABLE`, `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE` | capability | the lighting stages the build compiles |
+| `RGB_POINTING_MODE_FEEDBACK_ENABLE`, `RGB_COMBO_FEEDBACK_ENABLE`, `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE`, `RGB_AUTOMOUSE_GRADIENT_ENABLE` | capability | the lighting stages the build compiles |
 | `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` | profile data | settings scalar 15 |
 | `AUTOMOUSE_RGB_DEAD_TIME` | profile data | settings scalar 16 |
 | `NOAH_DEFAULT_HOST_OS`, `NOAH_DEFAULT_HOST_LAYOUT`, `NOAH_DEFAULT_UNICODE_PLAYBACK`, `NOAH_DEFAULT_MACOS_ISO` | profile data | settings scalar 27 |
@@ -128,7 +128,7 @@ Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_t
 | Authored | Class | Where it lives |
 | --- | --- | --- |
 | `noah_pd_defaults[]`: each slot's name, movement, pointer-layer policy, axis, DPI, held modifiers, thresholds, directional outputs, mouse-button overrides, scroll tuning | profile data | pointing `0x50`; a disabled slot without a name is not stored |
-| `NOAH_DRAGSCROLL_*` in `users/noah/config.h`, the thresholds in `pd_mode_defaults.h` | profile data | the scrolling and directional slots' fields, through `noah_pd_defaults[]` |
+| `NOAH_DRAGSCROLL_*` in `users/noah/config.h`, the thresholds in `pointing_mode_defaults.h` | profile data | the scrolling and directional slots' fields, through `noah_pd_defaults[]` |
 | The 32 pointing slots | ceiling | part of the action-ABI digest (D-F09, [ADR](../adr/0009-thirty-two-pointing-slots-stored-sparsely.md)) |
 | The scrolling and directional movement code, its per-scan output limits | capability | |
 

@@ -6,7 +6,7 @@
 #include "deferred_release.h"
 #include "trace.h"
 #include "transition.h"
-#include "../../pointing/defs/pd_modes.h"
+#include "../../pointing/defs/pointing_modes.h"
 #include "planning/effect_plan.h"
 #include "reducer/state_query.h"
 
@@ -43,5 +43,5 @@ __attribute__((noinline)) void noah_key_runtime_scan(void) {
     if (core_work || key_runtime_deferred_release_has_pending_dispatches()) {
         key_runtime_deferred_release_drain_dispatches();
     }
-    pd_mode_service_active_dpi_sync();
+    pointing_mode_service_active_dpi_sync();
 }

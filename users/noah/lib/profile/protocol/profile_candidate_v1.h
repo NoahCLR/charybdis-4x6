@@ -73,7 +73,7 @@ typedef enum {
     NOAH_PROFILE_CANDIDATE_V1_ERROR_POSTCOMMIT_AUTHORITY_LOST,
     NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_COMMIT_CONFLICT,
     // The copy to the other half stopped for good before any commit (after
-    // its storage retries); candidate status page 1 says what the peer
+    // its storage retries); candidate status page 1 says what the other half
     // answered last. Nothing was saved on either half.
     NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED,
 } noah_profile_candidate_v1_error_id_t;
@@ -156,7 +156,7 @@ typedef struct {
     uint32_t generation;
     uint32_t digest;
     uint32_t crc32;
-    uint8_t  kind; // compiled (0), committed (1) or the working copy (2, D-F32).
+    uint8_t  kind; // compiled (0), saved (1) or the working copy (2, D-F32).
     uint8_t  origin;
 } noah_profile_candidate_v1_source_t;
 
@@ -209,36 +209,36 @@ bool noah_profile_candidate_v1_handle_status_get(const noah_profile_candidate_v1
 // waits out PREPARING_PEER blind. The phase is a stable wire enum, mapped
 // from the split reconciler's internal states by the owner.
 typedef enum {
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_IDLE = 0u,
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BINDING,    // retired with VIA (D-F31), never reported
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_BEGINNING,  // PREPARE_BEGIN not yet admitted
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING,    // payload bytes in flight
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_PREPARING,  // peer validating and writing its prepared copy
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_PREPARED,   // peer holds a complete inactive copy
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_COMMITTING, // peer commit authorized, converging
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_ABORTING,   // cancelling the peer's copy
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_STOPPED,    // reconciler stopped; last_status says why
-    NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_WAITING,    // retrying the link between steps
-} noah_profile_candidate_v1_peer_phase_t;
+    NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_IDLE = 0u,
+    NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_BINDING,    // retired with VIA (D-F31), never reported
+    NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_BEGINNING,  // PREPARE_BEGIN not yet admitted
+    NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_SENDING,    // payload bytes in flight
+    NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_PREPARING,  // other half validating and writing its prepared copy
+    NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_PREPARED,   // other half holds a complete inactive copy
+    NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_COMMITTING, // other-half commit authorized, converging
+    NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_ABORTING,   // cancelling the other half's copy
+    NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_STOPPED,    // reconciler stopped; last_status says why
+    NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_WAITING,    // retrying the link between steps
+} noah_profile_candidate_v1_copy_phase_t;
 
 enum {
-    NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING = 1u << 0,
-    NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER          = 1u << 1,
+    NOAH_PROFILE_CANDIDATE_V1_COPY_FLAG_PEER_CLEANUP_PENDING = 1u << 0,
+    NOAH_PROFILE_CANDIDATE_V1_COPY_FLAG_MASTER          = 1u << 1,
     // The commit decision, or the ACCEPT after it, waits for held keys,
     // locked layers, one-shots or macros to finish on this half.
-    NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_WAITING_SAFE_BOUNDARY = 1u << 2,
-    NOAH_PROFILE_CANDIDATE_V1_PEER_FLAGS_KNOWN          = 0x07u,
+    NOAH_PROFILE_CANDIDATE_V1_COPY_FLAG_WAITING_SAFE_BOUNDARY = 1u << 2,
+    NOAH_PROFILE_CANDIDATE_V1_COPY_FLAGS_KNOWN          = 0x07u,
 };
 
 typedef struct {
-    noah_profile_candidate_v1_peer_phase_t phase;
-    uint8_t                                last_status; // noah_profile_split_v1_status_t of the last peer answer
+    noah_profile_candidate_v1_copy_phase_t phase;
+    uint8_t                                last_status; // noah_profile_split_v1_status_t of the last other-half answer
     uint8_t                                flags;
     uint32_t                               transfer_offset;
     uint32_t                               transfer_length;
     uint32_t                               retry_count;             // cumulative since boot
     uint32_t                               transport_failure_count; // cumulative since boot
-    // The peer's last ACK/BUSY: BUSY replies in a row, why
+    // The other half's last ACK/BUSY: BUSY replies in a row, why
     // (noah_profile_split_v1_busy_reason_t), and its store state and transfer
     // owner then. Diagnostics for a copy that is not moving.
     uint16_t                               busy_streak;
@@ -253,10 +253,10 @@ typedef struct {
     uint32_t                               prepared_scans;
     uint32_t                               prepared_exchanges;
     bool                                   reuse_unavailable;
-} noah_profile_candidate_v1_peer_status_t;
+} noah_profile_candidate_v1_copy_status_t;
 
 // Handles value 0x18 pages 1 and 2, and returns false for anything else so the
 // caller falls through to the page-0 codec.
-bool noah_profile_candidate_v1_handle_peer_status_get(const noah_profile_candidate_v1_peer_status_t *peer, uint8_t *frame, size_t length);
+bool noah_profile_candidate_v1_handle_copy_status_get(const noah_profile_candidate_v1_copy_status_t *other_half, uint8_t *frame, size_t length);
 
 noah_profile_candidate_v1_error_t noah_profile_candidate_v1_no_error(void);

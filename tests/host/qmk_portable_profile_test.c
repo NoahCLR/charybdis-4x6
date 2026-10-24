@@ -3,7 +3,7 @@
 #include <string.h>
 #include "portable_profile_keyboard.h"
 #include "users/noah/lib/compat/qmk_portable_profile.h"
-#include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 #include "users/noah/lib/profile/schema/profile_settings_defaults.h"
 #include "profile_test_blob.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
@@ -294,7 +294,7 @@ int main(int argc, char **argv) {
     }
     static uint8_t                    blob[NOAH_PROFILE_TEST_BLOB_PAYLOAD_OFFSET + sizeof(stored)];
     size_t                            total = noah_profile_test_blob_wrap(blob, sizeof(blob), NOAH_PROFILE_DOMAIN_V1_SETTINGS, stored, names);
-    noah_effective_profile_snapshot_t view  = {0};
+    noah_active_profile_snapshot_t view     = {0};
     assert(total);
     view.reader               = noah_profile_reader_from_memory(blob, total);
     view.profile.domain_mask  = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_SETTINGS;
@@ -305,28 +305,28 @@ int main(int argc, char **argv) {
     // the compiled defaults, even at boot, are pushed into QMK, and nothing
     // reaches QMK's EEPROM. Combos on/off is not pushed: QMK's flag is the
     // runtime override beside the stored master.
-    view.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
+    view.identity.kind = NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
     am_timeout         = 777;
     default_dpi        = 600;
     combos             = false;
     // The boot's first look at the compiled defaults waits for discovery.
-    noah_effective_settings_boot(true);
-    noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
+    noah_active_profile_settings_boot(true);
+    noah_active_profile_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
     assert(am_timeout == 777 && projections == 0);
-    noah_effective_settings_boot(false);
-    noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
+    noah_active_profile_settings_boot(false);
+    noah_active_profile_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
     assert(am_timeout == 1200 && default_dpi == 1200 && durable_writes == 0 && projections == 4 && !combos);
     assert(default_layer_state == 1u);
-    view.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE;
-    noah_effective_settings_invalidate(NULL, 2, view.identity, view.identity, &view);
+    view.identity.kind = NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE;
+    noah_active_profile_settings_invalidate(NULL, 2, view.identity, view.identity, &view);
     assert(durable_writes == 0 && projections == 5 && !combos);
     // A working-copy edit that left settings alone projects nothing again.
-    view.identity.kind        = NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY;
+    view.identity.kind        = NOAH_ACTIVE_PROFILE_KIND_WORKING_COPY;
     view.changed_domain_mask = NOAH_PROFILE_DOMAIN_MASK_KEYMAP;
-    noah_effective_settings_invalidate(NULL, 3, view.identity, view.identity, &view);
+    noah_active_profile_settings_invalidate(NULL, 3, view.identity, view.identity, &view);
     assert(projections == 5);
     view.changed_domain_mask = NOAH_PROFILE_DOMAIN_MASK_SETTINGS;
-    noah_effective_settings_invalidate(NULL, 4, view.identity, view.identity, &view);
+    noah_active_profile_settings_invalidate(NULL, 4, view.identity, view.identity, &view);
     assert(projections == 6 && durable_writes == 0);
     am_timeout = 900; // a key moving QMK's value shows in the runtime readback only
     assert(noah_qmk_portable_live_setting(NOAH_SETTING_AUTO_MOUSE_TIMEOUT) == 900 && noah_qmk_portable_live_setting(NOAH_SETTING_COMBOS_ENABLED) == 0u);

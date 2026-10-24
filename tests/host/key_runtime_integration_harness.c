@@ -5,7 +5,7 @@
 #include "users/noah/lib/pointing/policy/pointer_layer_policy.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/key/runtime/trace/core_trace.h"
 #include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/noah_runtime.h"
@@ -106,34 +106,34 @@ __attribute__((weak)) report_mouse_t noah_pointing_device_task_user(report_mouse
     return mouse_report;
 }
 
-__attribute__((weak)) void pd_mode_apply_remote_snapshot(pd_mode_mask_t active_flags, pd_mode_mask_t locked_flags) {
+__attribute__((weak)) void pointing_mode_apply_remote_snapshot(pointing_mode_mask_t active_flags, pointing_mode_mask_t locked_flags) {
     (void)active_flags;
     (void)locked_flags;
 }
 
-__attribute__((weak)) void pd_mode_service_active_dpi_sync(void) {}
+__attribute__((weak)) void pointing_mode_service_active_dpi_sync(void) {}
 
-__attribute__((weak)) uint8_t pd_mode_active_keyboard_event_masked_real_mods(void) {
+__attribute__((weak)) uint8_t pointing_mode_active_keyboard_event_masked_real_mods(void) {
     return 0u;
 }
 
-__attribute__((weak)) pd_mode_mask_t pd_mode_local_active_snapshot(void) {
+__attribute__((weak)) pointing_mode_mask_t pointing_mode_local_active_snapshot(void) {
     return 0u;
 }
 
-__attribute__((weak)) pd_mode_mask_t pd_mode_local_locked_snapshot(void) {
+__attribute__((weak)) pointing_mode_mask_t pointing_mode_local_locked_snapshot(void) {
     return 0u;
 }
 
-__attribute__((weak)) pd_mode_mask_t pd_mode_display_active_snapshot(void) {
+__attribute__((weak)) pointing_mode_mask_t pointing_mode_display_active_snapshot(void) {
     return 0u;
 }
 
-__attribute__((weak)) pd_mode_mask_t pd_mode_display_locked_snapshot(void) {
+__attribute__((weak)) pointing_mode_mask_t pointing_mode_display_locked_snapshot(void) {
     return 0u;
 }
 
-__attribute__((weak)) bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
+__attribute__((weak)) bool pointing_mode_has_trait(pointing_mode_mask_t mode, pointing_mode_traits_t trait) {
     (void)mode;
     (void)trait;
     return false;
@@ -306,7 +306,7 @@ bool key_runtime_integration_apply_core_event(uint16_t *time, const runtime_even
         case RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT:
             key_runtime_core_trace_record_input_event(event);
             key_runtime_integration_shadow_core_apply_event(event, time ? *time : timer_read());
-            pd_mode_apply_remote_snapshot(event->data.remote_snapshot.active_mode, event->data.remote_snapshot.locked_mode);
+            pointing_mode_apply_remote_snapshot(event->data.remote_snapshot.active_mode, event->data.remote_snapshot.locked_mode);
             key_runtime_core_trace_capture_projection();
             return true;
     }

@@ -5,35 +5,35 @@
 
 #include "users/noah/lib/profile/runtime/profile_owner.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
-#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
-#include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
-#include "users/noah/lib/profile/runtime/effective_keymap_macros_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_keymap_macros_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/noah_keymap.h"
-#include "profile_store_committed_fixture.h"
+#include "profile_store_saved_fixture.h"
 
-#define PD_ROW(name, key) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = key, .lock_action = key##_LOCK},
-const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(PD_ROW)};
+#define PD_ROW(name, key) [POINTING_MODE_INDEX_##name] = {.mode_flag = POINTING_MODE_##name, .keycode = key, .lock_action = key##_LOCK},
+const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {NOAH_POINTING_MODE_LIST(PD_ROW)};
 #undef PD_ROW
 
-bool is_pd_mode_lock_action(uint16_t action) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++)
-        if (pd_modes[i].lock_action == action) return true;
+bool is_pointing_mode_lock_action(uint16_t action) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++)
+        if (pointing_modes[i].lock_action == action) return true;
     return false;
 }
-pd_mode_mask_t pd_mode_for_keycode(uint16_t key) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++)
-        if (pd_modes[i].keycode == key) return pd_modes[i].mode_flag;
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t key) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++)
+        if (pointing_modes[i].keycode == key) return pointing_modes[i].mode_flag;
     return 0;
 }
 
 // Hardware eligibility is the injected seam. Domain writing, validation,
 // storage and caches are real.
-void noah_profile_activation_policy_init(noah_profile_activation_policy_t *policy, noah_profile_activation_peer_observer_fn observer, void *context) {
+void noah_profile_activation_policy_init(noah_profile_activation_policy_t *policy, noah_profile_activation_other_half_observer_fn observer, void *context) {
     memset(policy, 0, sizeof(*policy));
-    policy->peer_observer = observer;
-    policy->peer_context  = context;
+    policy->other_half_observer = observer;
+    policy->other_half_context = context;
     policy->initialized   = true;
 }
 uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
@@ -125,8 +125,8 @@ static uint32_t validation_scans;
 static size_t reused_bytes;
 static uint8_t submit_transfer(size_t length, bool reuse) {
     uint8_t frame[32];
-    noah_effective_profile_snapshot_t source;
-    if (reuse) assert(noah_effective_profile_provider_copy_active(&owner.provider, &source) == NOAH_EFFECTIVE_PROFILE_OK);
+    noah_active_profile_snapshot_t source;
+    if (reuse) assert(noah_active_profile_provider_copy_active(&owner.provider, &source) == NOAH_ACTIVE_PROFILE_OK);
     reused_bytes = 0;
     frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN);
     frame[5] = NOAH_PROFILE_SCHEMA_MAJOR;
@@ -145,7 +145,7 @@ static uint8_t submit_transfer(size_t length, bool reuse) {
                 if (count > sizeof(bytes)) count = sizeof(bytes);
                 if (count > NOAH_PROFILE_CANDIDATE_V1_REUSE_MAX - equal) count = NOAH_PROFILE_CANDIDATE_V1_REUSE_MAX - equal;
                 if (count > source.profile.byte_length - offset - equal) count = source.profile.byte_length - offset - equal;
-                assert(noah_effective_profile_snapshot_read(&source, offset + equal, bytes, count));
+                assert(noah_active_profile_snapshot_read(&source, offset + equal, bytes, count));
                 size_t same = 0;
                 while (same < count && bytes[same] == candidate[offset + equal + same]) same++;
                 equal += same;
@@ -192,13 +192,13 @@ static uint8_t submit(size_t length) {
 // owner is then abandoned mid-commit, as a keyboard losing power would be.
 static bool commit(void) {
     uint8_t  frame[32];
-    uint32_t prior = committed_generation(&owner.store);
+    uint32_t prior = saved_generation(&owner.store);
     frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT);
     assert(noah_profile_owner_receive(&owner, frame, 32));
-    for (unsigned i = 0; i < 1000000u && !(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && committed_generation(&owner.store) != prior && !owner.host_transaction.mailbox.pending) && !power_lost(); i++)
+    for (unsigned i = 0; i < 1000000u && !(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && saved_generation(&owner.store) != prior && !owner.host_transaction.mailbox.pending) && !power_lost(); i++)
         tick();
     if (power_lost()) return false;
-    assert(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && committed_generation(&owner.store) == prior + 1u);
+    assert(owner.state == NOAH_PROFILE_OWNER_READY_VALIDATED && saved_generation(&owner.store) == prior + 1u);
     assert(owner.host_transaction.status.state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE);
     return true;
 }
@@ -213,8 +213,8 @@ static void save(size_t length) {
 }
 // expected is decoded from base, so a later candidate edit cannot change it.
 static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *expected, uint32_t generation) {
-    noah_effective_profile_snapshot_t active;
-    assert(noah_effective_profile_provider_copy_active(&owner.provider, &active) == NOAH_EFFECTIVE_PROFILE_OK);
+    noah_active_profile_snapshot_t active;
+    assert(noah_active_profile_provider_copy_active(&owner.provider, &active) == NOAH_ACTIVE_PROFILE_OK);
     assert(active.profile.domain_mask == NOAH_PROFILE_DOMAIN_MASK_ALL && active.profile.domain_count == NOAH_PROFILE_DOMAIN_REGISTRY_COUNT);
     assert(active.identity.generation == generation && active.identity.payload_digest == expected->digest);
     // Check every domain through the published owner reader, not store internals.
@@ -226,7 +226,7 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
         for (size_t done = 0; done < domain->payload_length; done += 20) {
             size_t count = domain->payload_length - done;
             if (count > 20) count = 20;
-            assert(noah_effective_profile_snapshot_read(&active, offset + done, bytes + done, count));
+            assert(noah_active_profile_snapshot_read(&active, offset + done, bytes + done, count));
         }
         for (size_t j = 0; j < domain->payload_length; j++)
             if (bytes[j] != domain->payload[j]) {
@@ -235,7 +235,7 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
             }
         assert(memcmp(bytes, domain->payload, domain->payload_length) == 0);
         if (domain->id == NOAH_PROFILE_DOMAIN_V1_KEYMAP) {
-            assert(noah_effective_keymap_is_live() && domain->payload_length == 1920);
+            assert(noah_active_profile_keymap_is_live() && domain->payload_length == 1920);
             for (uint8_t layer = 0; layer < LAYER_COUNT; layer++)
                 for (uint8_t row = 0; row < MATRIX_ROWS; row++)
                     for (uint8_t col = 0; col < MATRIX_COLS; col++) {
@@ -246,14 +246,14 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
         }
         if (domain->id == NOAH_PROFILE_DOMAIN_V1_MACROS) {
             uint8_t byte;
-            assert(noah_effective_macro_bank_is_live() && noah_effective_macro_bank_length() == domain->payload_length);
-            assert(noah_effective_macro_bank_read(0, &byte, 1u) && byte == domain->payload[0]);
-            assert(noah_effective_macro_bank_read(domain->payload_length - 1, &byte, 1u) && byte == 0);
+            assert(noah_active_profile_macro_bank_is_live() && noah_active_profile_macro_bank_length() == domain->payload_length);
+            assert(noah_active_profile_macro_bank_read(0, &byte, 1u) && byte == domain->payload[0]);
+            assert(noah_active_profile_macro_bank_read(domain->payload_length - 1, &byte, 1u) && byte == 0);
         }
         if (domain->id == NOAH_PROFILE_DOMAIN_V1_SETTINGS) {
-            assert(noah_effective_settings_length() == domain->payload_length);
+            assert(noah_active_profile_settings_length() == domain->payload_length);
             for (size_t j = 0; j < domain->payload_length; j++)
-                assert(noah_effective_settings_byte(j) == domain->payload[j]);
+                assert(noah_active_profile_settings_byte(j) == domain->payload[j]);
         }
     }
     // A stored slot publishes its record; the profiles here omit only slots
@@ -268,13 +268,13 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
         noah_profile_pd_v1_encode_record(&noah_pd_defaults[slot], record);
         for (size_t at = NOAH_PROFILE_PD_V1_HEADER_SIZE; at < pd->payload_length; at += NOAH_PROFILE_PD_V1_RECORD_SIZE)
             if (pd->payload[at] == slot) stored = pd->payload + at;
-        assert(noah_effective_pd_record(slot) && memcmp(noah_effective_pd_record(slot), stored ? stored : record, NOAH_PROFILE_PD_V1_RECORD_SIZE) == 0);
+        assert(noah_active_profile_pd_record(slot) && memcmp(noah_active_profile_pd_record(slot), stored ? stored : record, NOAH_PROFILE_PD_V1_RECORD_SIZE) == 0);
     }
-    noah_effective_rgb_frame_t rgb;
-    assert(noah_effective_rgb_runtime_capture_frame(&owner.rgb, &rgb) == NOAH_EFFECTIVE_RGB_OK && rgb.live && rgb.valid);
+    noah_active_profile_rgb_frame_t rgb;
+    assert(noah_active_profile_rgb_runtime_capture_frame(&owner.rgb, &rgb) == NOAH_ACTIVE_PROFILE_RGB_OK && rgb.live && rgb.valid);
     assert(rgb.identity.payload_digest == expected->digest);
-    noah_effective_key_behavior_snapshot_t behaviors;
-    assert(noah_effective_key_behavior_runtime_status(&owner.key_behaviors, &behaviors) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && behaviors.live && behaviors.valid);
+    noah_active_profile_key_behavior_snapshot_t behaviors;
+    assert(noah_active_profile_key_behavior_runtime_status(&owner.key_behaviors, &behaviors) == NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_OK && behaviors.live && behaviors.valid);
     assert(behaviors.identity.payload_digest == expected->digest && behaviors.live && behaviors.indexed);
     for (size_t i = 0; i < expected->domain_count; i++)
         if (expected->domains[i].id == NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS) assert(behaviors.domain.row_count == expected->domains[i].payload[0]);
@@ -282,27 +282,27 @@ static void assert_published(const uint8_t *base, const noah_profile_blob_v1_t *
     assert(noah_profile_blob_v1_find_domain(&active.reader, active.base_offset, active.profile.byte_length, NOAH_PROFILE_DOMAIN_V1_COMBOS, &combos));
     noah_profile_combo_v1_header_t combo_header;
     assert(noah_profile_combo_v1_read_header(&active.reader, active.base_offset, combos, &combo_header));
-    assert(noah_effective_combo_valid() && owner.combos.live && owner.combos.count == combo_header.row_count);
+    assert(noah_active_profile_combo_valid() && owner.combos.live && owner.combos.count == combo_header.row_count);
     for (uint8_t i = 0; i < owner.combos.count; i++) {
         noah_profile_combo_v1_row_t row;
         uint16_t                    output;
         assert(noah_profile_combo_v1_read_row(&active.reader, active.base_offset, combos, i, &row));
         assert(noah_profile_action_runtime_v1_to_native(&row.output, &output) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
-        assert(noah_effective_combo_get(i)->keycode == output);
-        assert(noah_effective_combo_allowed_layers(i) == row.allowed_layers);
-        assert(noah_effective_combo_flags(i) == row.flags);
+        assert(noah_active_profile_combo_get(i)->keycode == output);
+        assert(noah_active_profile_combo_allowed_layers(i) == row.allowed_layers);
+        assert(noah_active_profile_combo_flags(i) == row.flags);
         for (uint8_t j = 0; j < row.input_count; j++) {
             uint16_t input;
             assert(noah_profile_action_runtime_v1_to_native(&row.inputs[j], &input) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
-            assert(noah_effective_combo_get(i)->keys[j] == input);
+            assert(noah_active_profile_combo_get(i)->keys[j] == input);
         }
-        assert(noah_effective_combo_get(i)->keys[row.input_count] == COMBO_END);
+        assert(noah_active_profile_combo_get(i)->keys[row.input_count] == COMBO_END);
     }
 }
 static void uninstall(void) {
-    noah_effective_key_behavior_runtime_uninstall(&owner.key_behaviors);
-    noah_effective_rgb_runtime_uninstall(&owner.rgb);
-    noah_effective_combo_runtime_uninstall(&owner.combos);
+    noah_active_profile_key_behavior_runtime_uninstall(&owner.key_behaviors);
+    noah_active_profile_rgb_runtime_uninstall(&owner.rgb);
+    noah_active_profile_combo_runtime_uninstall(&owner.combos);
 }
 static void reboot(void) {
     uninstall();
@@ -342,27 +342,27 @@ static void assert_maximum_edges(void) {
     static const uint8_t custom_keys[] = {0, 63, 64, 127};
     for (size_t i = 0; i < sizeof(custom_keys); i++) {
         uint8_t                           slot = custom_keys[i];
-        noah_effective_key_behavior_row_t row;
+        noah_active_profile_key_behavior_row_t row;
         key_behavior_step_t               step;
-        assert(noah_effective_key_behavior_runtime_lookup(&owner.key_behaviors, CUSTOM_KEY_0 + slot, &row) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK);
+        assert(noah_active_profile_key_behavior_runtime_lookup(&owner.key_behaviors, CUSTOM_KEY_0 + slot, &row) == NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_OK);
         assert(row.row_index == slot && row.step_count == KEY_BEHAVIOR_MAX_TAP_COUNT && row.tap_hold_term == 150 + slot);
         assert(row.allowed_layers == (slot % 3 ? 0xffffu : (1u << 7) | (1u << 8) | (1u << 15)));
-        assert(noah_effective_key_behavior_runtime_step(&owner.key_behaviors, row.epoch, row.row_index, KEY_BEHAVIOR_MAX_TAP_COUNT, &step) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK);
+        assert(noah_active_profile_key_behavior_runtime_step(&owner.key_behaviors, row.epoch, row.row_index, KEY_BEHAVIOR_MAX_TAP_COUNT, &step) == NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_OK);
         assert(step.tap.present && step.tap.action == 0x04 + (slot + 4) % 0x60);
         assert(step.hold.present && step.hold.action == MO(2));
         assert(step.long_hold.present && step.long_hold.action == QK_MACRO_0 + (uint16_t)((uint8_t[]){0, 63, 64, 127}[(slot + 4) % 4]));
     }
-    noah_effective_key_behavior_row_t none;
-    assert(noah_effective_key_behavior_runtime_lookup(&owner.key_behaviors, CUSTOM_KEY_0 + 128, &none) == NOAH_EFFECTIVE_KEY_BEHAVIOR_NOT_FOUND);
+    noah_active_profile_key_behavior_row_t none;
+    assert(noah_active_profile_key_behavior_runtime_lookup(&owner.key_behaviors, CUSTOM_KEY_0 + 128, &none) == NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_NOT_FOUND);
     static const uint8_t combo_rows[] = {31, 32, 63, 64, 127};
-    assert(noah_effective_combo_count() == 128);
+    assert(noah_active_profile_combo_count() == 128);
     for (size_t i = 0; i < sizeof(combo_rows); i++) {
         uint8_t  index = combo_rows[i];
-        combo_t *combo = noah_effective_combo_get(index);
+        combo_t *combo = noah_active_profile_combo_get(index);
         assert(combo && combo->keys[15] == 0x04 + (3 * index + 15) % 0x60 && combo->keys[16] == COMBO_END);
     }
-    assert(noah_effective_combo_get(0)->keycode == QK_MACRO_0 && noah_effective_combo_get(63)->keycode == QK_MACRO_0 + 63 && noah_effective_combo_get(127)->keycode == CUSTOM_KEY_0 + 0);
-    assert(noah_effective_combo_get(1)->keycode == CUSTOM_KEY_0 + 126 && !noah_effective_combo_get(128));
+    assert(noah_active_profile_combo_get(0)->keycode == QK_MACRO_0 && noah_active_profile_combo_get(63)->keycode == QK_MACRO_0 + 63 && noah_active_profile_combo_get(127)->keycode == CUSTOM_KEY_0 + 0);
+    assert(noah_active_profile_combo_get(1)->keycode == CUSTOM_KEY_0 + 126 && !noah_active_profile_combo_get(128));
     assert(noah_setting(NOAH_SETTING_AUTO_MOUSE_LAYER, 0) == 15 && noah_setting(NOAH_SETTING_LAYER_COMBOS, 0) == 0x7fff);
 }
 
@@ -392,9 +392,9 @@ static void test_maximum_profile(void) {
     use_maximum(&expected);
     save(maximum_length);
     printf("maximum profile: %u bytes validated in %u scans\n", (unsigned)maximum_length, (unsigned)validation_scans);
-    // One validator step a scan, each one read of at most 20 bytes. The peer's
-    // copy of this validation is the longest stretch a split prepare spends
-    // without transfer progress, inside the owner's no-progress window.
+    // One validator step a scan, each one read of at most 20 bytes. The other
+    // half's copy of this validation is the longest stretch a split prepare
+    // spends without transfer progress, inside the owner's no-progress window.
     // Keep the prior table-work bound and add only the two bounded passes
     // over the new domains (checksum and semantic decoding), plus envelopes.
     const uint32_t extra_steps = (1920u + 34903u + 12u + 19u) / 20u + (1920u + 19u) / 20u + (34903u + 19u) / 20u + 2u;
@@ -442,19 +442,19 @@ static void test_maximum_profile(void) {
         uint8_t state = submit(maximum_length);
         if (state != NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED) fprintf(stderr, "maximum profile with %s was not refused (state %u)\n", mutations[i].what, state);
         assert(state == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
-        assert(committed_generation(&owner.store) == 1);
+        assert(saved_generation(&owner.store) == 1);
         assert_published(maximum, &expected, 1);
     }
     // A truncated profile: its declared length cuts the last domain short.
     memcpy(candidate, maximum, maximum_length);
     assert(submit(maximum_length - 1) == NOAH_PROFILE_CANDIDATE_V1_STATE_REJECTED);
-    assert(committed_generation(&owner.store) == 1);
+    assert(saved_generation(&owner.store) == 1);
     assert_published(maximum, &expected, 1);
     puts("maximum profile: every table at its maximum saved, booted and published whole; over-limit, malformed and truncated copies refused");
     uninstall();
 }
 
-// Lost power at sampled writes of a maximum save over a committed profile,
+// Lost power at sampled writes of a maximum save over a saved profile,
 // at every write of its commit, and just after its last: the next boot
 // publishes the prior generation or the new one, whole, and the new one only
 // once its commit has begun.
@@ -505,11 +505,11 @@ static void test_maximum_save_interrupted(bool reuse) {
         cut_at = UINT32_MAX;
         reboot();
         until_state(NOAH_PROFILE_OWNER_READY_VALIDATED);
-        if (committed_generation(&owner.store) == 1) {
+        if (saved_generation(&owner.store) == 1) {
             assert_published(maximum, &expected, 1);
             prior_boots++;
         } else {
-            assert(committed_generation(&owner.store) == 2);
+            assert(saved_generation(&owner.store) == 2);
             assert(cut >= staged);
             assert_published(edited_bytes, &edited, 2);
             new_boots++;
@@ -521,7 +521,7 @@ static void test_maximum_save_interrupted(bool reuse) {
 }
 
 int main(int argc, char **argv) {
-    noah_effective_settings_set_apply(noah_qmk_portable_apply);
+    noah_active_profile_settings_set_apply(noah_qmk_portable_apply);
     assert(argc == 3);
     load_maximum(argv[2]);
     test_maximum_profile();
@@ -538,20 +538,20 @@ int main(int argc, char **argv) {
         assert(owner.compiled.metadata.domain_mask == NOAH_PROFILE_DOMAIN_MASK_ALL);
         assert(owner.combos.valid && owner.combos.live && owner.combos.count == noah_combo_count);
         for (uint16_t i = 0; i < noah_combo_count; i++) {
-            combo_t *cached = noah_effective_combo_get(i);
+            combo_t *cached = noah_active_profile_combo_get(i);
             assert(cached && cached->keycode == key_combos[i].keycode);
-            assert(noah_effective_combo_follows_default(i) == (noah_combo_terms[i] == 0));
-            assert(noah_effective_combo_term(i) == (noah_combo_terms[i] ? noah_combo_terms[i] : COMBO_TERM));
+            assert(noah_active_profile_combo_follows_default(i) == (noah_combo_terms[i] == 0));
+            assert(noah_active_profile_combo_term(i) == (noah_combo_terms[i] ? noah_combo_terms[i] : COMBO_TERM));
             for (uint8_t j = 0; j < 5; j++) {
                 uint16_t authored = pgm_read_word(&key_combos[i].keys[j]);
                 assert(cached->keys[j] == authored);
                 if (authored == COMBO_END) break;
             }
         }
-        assert(noah_effective_settings_length() > 0 && noah_setting(NOAH_SETTING_TAPPING_TERM, 0) == TAPPING_TERM);
-        noah_effective_rgb_frame_t factory_rgb;
-        assert(noah_effective_rgb_runtime_capture_frame(&owner.rgb, &factory_rgb) == NOAH_EFFECTIVE_RGB_OK);
-        assert(factory_rgb.identity.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS && factory_rgb.view.reader.read != owner.compiled_reader.read);
+        assert(noah_active_profile_settings_length() > 0 && noah_setting(NOAH_SETTING_TAPPING_TERM, 0) == TAPPING_TERM);
+        noah_active_profile_rgb_frame_t factory_rgb;
+        assert(noah_active_profile_rgb_runtime_capture_frame(&owner.rgb, &factory_rgb) == NOAH_ACTIVE_PROFILE_RGB_OK);
+        assert(factory_rgb.identity.kind == NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS && factory_rgb.view.reader.read != owner.compiled_reader.read);
         assert(noah_profile_compiled_v1_write(&owner.compiled, collect, NULL, NULL) == NOAH_PROFILE_COMPILED_V1_OK);
         noah_profile_blob_v1_t compiled, fixture, expected;
         assert(noah_profile_blob_v1_decode(compiled_bytes, collected, &compiled, NULL) == NOAH_PROFILE_CODEC_V1_OK);

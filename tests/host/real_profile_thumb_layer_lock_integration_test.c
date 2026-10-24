@@ -15,9 +15,9 @@
 #include "users/noah/lib/key/runtime/delayed_action.h"
 #include "users/noah/lib/key/runtime/feedback.h"
 #include "users/noah/lib/key/runtime/slot/origin_registry.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
-#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
-#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
+#include "users/noah/lib/pointing/modes/pointing_mode_configured.h"
+#include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
 #include "users/noah/lib/key/runtime/projection/projection.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/key/runtime/reducer/state_query.h"
@@ -873,7 +873,7 @@ static const noah_pd_config_t test_pd_records[8] = {
 };
 static const noah_pd_config_t *active_pd_record;
 
-const noah_pd_config_t *noah_effective_pd_for_mask(uint32_t mode) {
+const noah_pd_config_t *noah_active_profile_pd_for_mask(uint32_t mode) {
     for (uint8_t slot = 0; slot < 6; slot++) {
         if (mode == (UINT32_C(1) << slot)) return &test_pd_records[slot];
     }
@@ -1553,7 +1553,7 @@ static void test_pointer_pinch_double_tap_queues_zoom_chord(void) {
     CHECK(test_tap_code16_count == 0);
     CHECK(test_delayed_action_count == 1);
     CHECK(test_last_delayed_action == MACRO_6);
-    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == 0);
     test_assert_thumb_runtime_quiescent(pinch_pos);
 }
 
@@ -1581,7 +1581,7 @@ static void test_pointer_pinch_double_tap_salvos_queue_zoom_chord_cleanly(void) 
         CHECK(test_tap_code16_count == 0);
         CHECK(test_delayed_action_count == (uint16_t)(salvo + 1u));
         CHECK(test_last_delayed_action == MACRO_6);
-        CHECK(pd_mode_local_active_snapshot() == 0);
+        CHECK(pointing_mode_local_active_snapshot() == 0);
         test_assert_thumb_runtime_quiescent(pinch_pos);
 
         key_runtime_integration_advance(&fake_time, CUSTOM_MULTI_TAP_TERM + 1);
@@ -1620,7 +1620,7 @@ static void test_pointer_terminal_third_quick_tap_types_the_first_tap(uint16_t k
     }
     CHECK(test_delayed_actions[0] != KC_NO && test_delayed_actions[0] != KC_TRNS && test_delayed_actions[0] != double_tap_action);
     CHECK(noah_runtime_debug_deferred_release_count() == 0u);
-    CHECK(pd_mode_local_active_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
     CHECK(!noah_runtime_debug_slot_has_pending_multi_tap(key_pos));
@@ -1842,7 +1842,7 @@ static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
     // typed. Once held past its term, Nav keys dispatch immediately.
     test_press_resolved(nav_hold_pos);
     CHECK(!test_layer_active(LAYER_NAV));
-    CHECK(!pd_mode_auto_sniping_layer_active());
+    CHECK(!pointing_mode_auto_sniping_layer_active());
 
     key_runtime_integration_advance(&fake_time, key_behavior_lookup(nav_hold_keycode).tap_hold_term - 1u);
     key_runtime_integration_scan();
@@ -1851,7 +1851,7 @@ static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
     key_runtime_integration_advance(&fake_time, 1u);
     key_runtime_integration_scan();
     CHECK(test_layer_active(LAYER_NAV));
-    CHECK(pd_mode_auto_sniping_layer_active());
+    CHECK(pointing_mode_auto_sniping_layer_active());
     CHECK(!sniping_enabled);
 
     key_runtime_integration_scan();
@@ -1874,7 +1874,7 @@ static void test_right_nav_layer_hold_dispatches_nav_taps_immediately(void) {
     CHECK(test_tap_code16_count == 1);
     CHECK(test_delayed_action_count == 0);
     CHECK(test_last_delayed_action == KC_NO);
-    CHECK(!pd_mode_auto_sniping_layer_active());
+    CHECK(!pointing_mode_auto_sniping_layer_active());
     CHECK(!sniping_enabled);
     CHECK(current_cpi == charybdis_get_pointer_default_dpi());
 }
@@ -1924,8 +1924,8 @@ static void test_assert_dragscroll_overlap_quiescent(keypos_t parent_pos, keypos
     CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == KC_NO);
     CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
     CHECK(!test_layer_active(LAYER_NAV));
-    CHECK(pd_mode_local_active_snapshot() == 0);
-    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == 0);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(reset_dragscroll_count == 1);
     CHECK(current_cpi == charybdis_get_pointer_default_dpi());
     CHECK(fake_mods == 0);
@@ -1945,8 +1945,8 @@ static void test_assert_direct_dragscroll_quiescent(keypos_t dragscroll_pos, uin
     CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == KC_NO);
     CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == KC_NO);
     CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
-    CHECK(pd_mode_local_active_snapshot() == 0);
-    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == 0);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(reset_dragscroll_count == expected_reset_count);
     CHECK(fake_mods == 0);
     CHECK(fake_weak_mods == 0);
@@ -1971,9 +1971,9 @@ static void test_direct_dragscroll_repeated_quick_taps_stay_quiescent(uint8_t la
         CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
 
         test_press_resolved(dragscroll_pos);
-        if (pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL) {
+        if (pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL) {
             expected_reset_count++;
-            CHECK(pd_mode_local_locked_snapshot() == 0);
+            CHECK(pointing_mode_local_locked_snapshot() == 0);
             CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
             CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
             CHECK(auto_mouse_key_tracker == 1);
@@ -2020,16 +2020,16 @@ static void test_same_locked_nav_dragscroll_press_unlocks_and_holds_until_releas
     layer_state = noah_layer_state_set_user(test_layer_mask(LAYER_BASE) | test_layer_mask(LAYER_NAV));
     CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
 
-    CHECK(pd_mode_set_lock_state(PD_MODE_DRAGSCROLL, true));
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_DRAGSCROLL);
+    CHECK(pointing_mode_set_lock_state(POINTING_MODE_DRAGSCROLL, true));
+    CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+    CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_DRAGSCROLL);
     CHECK(reset_dragscroll_count == 0u);
 
     previous_tap_count = test_tap_code16_count;
     test_press_resolved(dragscroll_pos);
 
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
     CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
     CHECK(test_tap_code16_count == previous_tap_count);
@@ -2037,8 +2037,8 @@ static void test_same_locked_nav_dragscroll_press_unlocks_and_holds_until_releas
 
     key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(test_tap_code16_count == previous_tap_count);
 
     test_release_resolved(dragscroll_pos);
@@ -2069,8 +2069,8 @@ static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool re
         CHECK(test_layer_active(LAYER_NAV));
         CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
         test_press_resolved(dragscroll_pos);
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-        CHECK(pd_mode_local_locked_snapshot() == 0);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+        CHECK(pointing_mode_local_locked_snapshot() == 0);
         CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
@@ -2079,7 +2079,7 @@ static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool re
 
         key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
         key_runtime_integration_scan();
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
         CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
@@ -2088,7 +2088,7 @@ static void test_dragscroll_overlap_stays_quiescent(keypos_t parent_pos, bool re
         if (release_parent_first) {
             test_release_resolved(parent_pos);
             CHECK(noah_runtime_debug_slot_owner_keycode(parent_pos) == KC_NO);
-            CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+            CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
         }
 
         test_release_resolved(dragscroll_pos);
@@ -2246,8 +2246,8 @@ static void test_gui_double_tap_hold_with_right_alt_arrow_mode_lock_stays_usable
         test_delayed_actions_dispatch = true;
         test_flush_pending_tap_branch();
         test_delayed_actions_dispatch = false;
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_ARROW);
-        CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_ARROW);
+        CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_ARROW);
         CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_NO);
         CHECK(noah_runtime_debug_slot_held_action_keycode(right_alt_pos) == KC_NO);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
@@ -2271,9 +2271,9 @@ static void test_gui_double_tap_hold_with_right_alt_arrow_mode_lock_stays_usable
         CHECK(key_runtime_integration_process_record(KC_C, follow_on_pos, true));
         CHECK(key_runtime_integration_process_record(KC_C, follow_on_pos, false));
 
-        CHECK(pd_mode_toggle_lock_state(PD_MODE_ARROW));
-        CHECK(pd_mode_local_active_snapshot() == 0);
-        CHECK(pd_mode_local_locked_snapshot() == 0);
+        CHECK(pointing_mode_toggle_lock_state(POINTING_MODE_ARROW));
+        CHECK(pointing_mode_local_active_snapshot() == 0);
+        CHECK(pointing_mode_local_locked_snapshot() == 0);
         CHECK(noah_runtime_debug_active_slot_count() == 0);
         CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
@@ -2311,8 +2311,8 @@ static void test_assert_gui_dragscroll_overlap_quiescent(keypos_t gui_pos, keypo
     CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
     CHECK(!test_layer_active(LAYER_NAV));
     CHECK(!test_layer_locked(LAYER_NAV));
-    CHECK(pd_mode_local_active_snapshot() == 0);
-    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pointing_mode_local_active_snapshot() == 0);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(reset_dragscroll_count == 1);
     CHECK(current_cpi == charybdis_get_pointer_default_dpi());
     CHECK(fake_mods == 0);
@@ -2593,12 +2593,12 @@ static void test_gui_pending_double_tap_hold_with_nav_dragscroll_keeps_runtime_q
         CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
 
         test_press_resolved(dragscroll_pos);
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
         CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
 
         test_commit_pending_gui_double_tap_alt_hold(gui_pos);
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
         for (uint8_t release_index = 0; release_index < ARRAY_SIZE(release_order->order); release_index++) {
@@ -2787,8 +2787,8 @@ static void test_gui_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent
         CHECK(test_resolve_keycode(dragscroll_pos) == PD_SLOT_0);
 
         test_press_resolved(dragscroll_pos);
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
-        CHECK(pd_mode_local_locked_snapshot() == 0);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
+        CHECK(pointing_mode_local_locked_snapshot() == 0);
         CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
@@ -2796,7 +2796,7 @@ static void test_gui_double_tap_hold_with_nav_dragscroll_keeps_runtime_quiescent
 
         key_runtime_integration_advance(&fake_time, CUSTOM_TAP_HOLD_TERM + 1);
         key_runtime_integration_scan();
-        CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+        CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
         CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
@@ -2869,7 +2869,7 @@ static void test_nav_dragscroll_hold_keeps_arrow_taps_immediate(keypos_t parent_
     test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
 
     test_press_resolved(dragscroll_pos);
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+    CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
     CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
     CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
 
@@ -2919,7 +2919,7 @@ static void test_gui_double_tap_hold_with_nav_dragscroll_active_keeps_arrow_taps
     test_activate_nav_parent_hold(parent_pos, parent_keycode, requires_threshold_scan);
 
     test_press_resolved(dragscroll_pos);
-    CHECK(pd_mode_local_active_snapshot() == PD_MODE_DRAGSCROLL);
+    CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
     CHECK(noah_runtime_debug_slot_owner_keycode(dragscroll_pos) == PD_SLOT_0);
     CHECK(noah_runtime_debug_slot_held_action_keycode(dragscroll_pos) == PD_SLOT_0);
 

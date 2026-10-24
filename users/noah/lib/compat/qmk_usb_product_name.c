@@ -10,7 +10,7 @@
 
 #if defined(USB_PRODUCT_STRING_USER) && defined(NOAH_LIVE_PROFILE_OWNER_ENABLE) && defined(NOAH_PORTABLE_PROFILE_ENABLE)
 #    define NOAH_QMK_USB_PRODUCT_NAME_ENABLE
-#    include "../profile/runtime/effective_settings_runtime.h"
+#    include "../profile/runtime/active_profile_settings_runtime.h"
 #    include "../profile/schema/profile_settings_defaults.h"
 #    include "../profile/storage/profile_store_runtime.h"
 #    if defined(NOAH_HOST_QMK_STUB)
@@ -117,9 +117,9 @@ __attribute__((noinline)) void noah_qmk_usb_product_name_task(void) {
     if (!is_keyboard_master()) {
         return;
     }
-    uint32_t publication = noah_effective_settings_publication();
+    uint32_t publication = noah_active_profile_settings_publication();
     if (!live_known || publication != live_publication) {
-        noah_effective_settings_keyboard_name(&live);
+        noah_active_profile_settings_keyboard_name(&live);
         live_publication = publication;
         live_known       = true;
     }

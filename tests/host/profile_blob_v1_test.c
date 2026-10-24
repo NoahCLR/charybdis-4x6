@@ -17,7 +17,7 @@ typedef struct {
 } action_fixture_t;
 
 static const action_fixture_t action_fixtures[] = {
-    {"NONE", NOAH_PROFILE_ACTION_V1_NONE}, {"QMK_KEYCODE", NOAH_PROFILE_ACTION_V1_QMK_KEYCODE}, {"LAYER_MOMENTARY", NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY}, {"LAYER_LOCK", NOAH_PROFILE_ACTION_V1_LAYER_LOCK}, {"PD_MODE_MOMENTARY", NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY}, {"PD_MODE_LOCK", NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK}, {"MACRO", NOAH_PROFILE_ACTION_V1_MACRO}, {"CUSTOM_KEY", NOAH_PROFILE_ACTION_V1_CUSTOM_KEY},
+    {"NONE", NOAH_PROFILE_ACTION_V1_NONE}, {"QMK_KEYCODE", NOAH_PROFILE_ACTION_V1_QMK_KEYCODE}, {"LAYER_MOMENTARY", NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY}, {"LAYER_LOCK", NOAH_PROFILE_ACTION_V1_LAYER_LOCK}, {"PD_MODE_MOMENTARY", NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY}, {"PD_MODE_LOCK", NOAH_PROFILE_ACTION_V1_POINTING_MODE_LOCK}, {"MACRO", NOAH_PROFILE_ACTION_V1_MACRO}, {"CUSTOM_KEY", NOAH_PROFILE_ACTION_V1_CUSTOM_KEY},
 };
 
 #define expect_result(actual, expected) expect_result_at(actual, expected, __LINE__)
@@ -343,8 +343,8 @@ static void test_action_rejections_and_streams(void) {
     expect_result(noah_profile_action_v1_encode(&action, NULL, bytes, &error), NOAH_PROFILE_CODEC_V1_OK);
     expect_invalid_operand(NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY, 16u, NULL);
     expect_invalid_operand(NOAH_PROFILE_ACTION_V1_LAYER_LOCK, 16u, NULL);
-    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, 32u, NULL);
-    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK, 32u, NULL);
+    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY, 32u, NULL);
+    expect_invalid_operand(NOAH_PROFILE_ACTION_V1_POINTING_MODE_LOCK, 32u, NULL);
     // Macros 0..127: 127 encodes, 128 is refused.
     action = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_MACRO, .operand = 127u};
     expect_result(noah_profile_action_v1_encode(&action, NULL, bytes, &error), NOAH_PROFILE_CODEC_V1_OK);

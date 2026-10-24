@@ -306,14 +306,14 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return false;
 }
 
-bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+bool key_behavior_future_tap_path_has_foreign_pointing_mode(uint16_t keycode, uint8_t count, pointing_mode_mask_t base_mode) {
     (void)keycode;
     (void)count;
     (void)base_mode;
     return false;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
 }
@@ -339,35 +339,35 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
     dispatch_delayed_action(action, mods);
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
 }
 
-bool pd_mode_local_locked(pd_mode_mask_t mode) {
+bool pointing_mode_local_locked(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
-bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
+bool pointing_mode_set_lock_state(pointing_mode_mask_t mode, bool locked) {
     (void)mode;
     (void)locked;
     return false;
 }
 
-bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+bool pointing_mode_set_lock_state_at(pointing_mode_mask_t mode, bool locked, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_set_lock_state(mode, locked);
+    return pointing_mode_set_lock_state(mode, locked);
 }
 
 void split_runtime_sync(void) {}
@@ -398,7 +398,7 @@ bool noah_synthetic_record_active(void) {
     return false;
 }
 
-bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
+bool pointing_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
     return false;

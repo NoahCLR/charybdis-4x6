@@ -11,9 +11,9 @@ __attribute__((weak)) const uint8_t                saved_led_group_count = 0;
 __attribute__((weak)) const layer_led_group_t *const layer_led_groups      = 0;
 __attribute__((weak)) const uint8_t                  layer_led_group_count = 0;
 
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-__attribute__((weak)) const pd_mode_led_group_t *const pd_mode_led_groups      = 0;
-__attribute__((weak)) const uint8_t                    pd_mode_led_group_count = 0;
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+__attribute__((weak)) const pointing_mode_led_group_t *const pointing_mode_led_groups      = 0;
+__attribute__((weak)) const uint8_t                          pointing_mode_led_group_count = 0;
 #    endif
 
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)

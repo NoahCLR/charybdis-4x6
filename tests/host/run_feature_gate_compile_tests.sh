@@ -17,7 +17,7 @@ RGB_SOURCES="$(noah_source_manifest_raw_paths "$ROOT" NOAH_RGB_KEYMAP_SOURCES)"
 COMMON_SOURCES="$COMMON_SOURCES $(noah_source_manifest_raw_paths "$ROOT" NOAH_PROFILE_KEYMAP_SOURCES)"
 AUTOMOUSE_SOURCES="$(noah_source_manifest_userspace_paths "$ROOT" NOAH_AUTOMOUSE_SOURCES)"
 PROFILE_KEYMAP_PATHS="$(charybdis_profile_keymap_paths "$ROOT")"
-PROFILE_WIRE_COMPILE_SOURCES="users/noah/lib/profile/runtime/profile_owner.c users/noah/lib/profile/runtime/profile_action_placement_v1.c users/noah/lib/profile/storage/profile_store_runtime.c users/noah/lib/profile/storage/profile_candidate_transaction.c users/noah/lib/profile/storage/profile_candidate_store_backend.c users/noah/lib/profile/storage/profile_peer_store_backend.c users/noah/lib/profile/split/profile_split_authority.c users/noah/lib/profile/split/profile_split_protocol_v1.c users/noah/lib/profile/split/profile_split_reconciler.c users/noah/lib/profile/protocol/profile_wire_v1.c users/noah/lib/profile/protocol/profile_candidate_v1.c users/noah/lib/profile/storage/profile_flash_store.c users/noah/lib/compat/qmk_profile_flash.c users/noah/lib/compat/qmk_durable_io.c users/noah/lib/compat/qmk_profile_split_transport.c users/noah/lib/compat/qmk_profile_working.c users/noah/lib/compat/qmk_profile_channel.c users/noah/lib/compat/qmk_combo_readback.c users/noah/lib/compat/qmk_profile_adjustments.c"
+PROFILE_WIRE_COMPILE_SOURCES="users/noah/lib/profile/runtime/profile_owner.c users/noah/lib/profile/runtime/profile_action_placement_v1.c users/noah/lib/profile/storage/profile_store_runtime.c users/noah/lib/profile/storage/profile_candidate_transaction.c users/noah/lib/profile/storage/profile_candidate_store_backend.c users/noah/lib/profile/storage/profile_other_half_store_backend.c users/noah/lib/profile/split/profile_split_authority.c users/noah/lib/profile/split/profile_split_protocol_v1.c users/noah/lib/profile/split/profile_split_reconciler.c users/noah/lib/profile/protocol/profile_wire_v1.c users/noah/lib/profile/protocol/profile_candidate_v1.c users/noah/lib/profile/storage/profile_flash_store.c users/noah/lib/compat/qmk_profile_flash.c users/noah/lib/compat/qmk_durable_io.c users/noah/lib/compat/qmk_profile_split_transport.c users/noah/lib/compat/qmk_profile_working.c users/noah/lib/compat/qmk_profile_channel.c users/noah/lib/compat/qmk_combo_readback.c users/noah/lib/compat/qmk_profile_adjustments.c"
 
 POINTING_TEST_FLAGS="-DPOINTING_DEVICE_ENABLE"
 RGB_TEST_FLAGS="-DRGB_MATRIX_ENABLE -DRGB_MATRIX_WS2812"
@@ -144,21 +144,21 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    if repo_owned_code_includes '#include ".*pd_mode_runtime_shared_state\.h"' >/dev/null; then
+    if repo_owned_code_includes '#include ".*pointing_mode_runtime_shared_state\.h"' >/dev/null; then
         echo "repo-owned code must not include removed public pd runtime shared-state header" >&2
-        repo_owned_code_includes '#include ".*pd_mode_runtime_shared_state\.h"' >&2
+        repo_owned_code_includes '#include ".*pointing_mode_runtime_shared_state\.h"' >&2
         exit 1
     fi
 
-    if host_test_includes '#include ".*pd_mode_runtime_shared_state_internal\.h"' >/dev/null; then
+    if host_test_includes '#include ".*pointing_mode_runtime_shared_state_internal\.h"' >/dev/null; then
         echo "host tests must not include internal pd runtime storage headers" >&2
-        host_test_includes '#include ".*pd_mode_runtime_shared_state_internal\.h"' >&2
+        host_test_includes '#include ".*pointing_mode_runtime_shared_state_internal\.h"' >&2
         exit 1
     fi
 
     pd_runtime_internal_prod_violations="$(
         repo_owned_production_include_violations \
-            '#include ".*pd_mode_runtime_shared_state_internal\.h"' \
+            '#include ".*pointing_mode_runtime_shared_state_internal\.h"' \
             '^(users/noah/lib/state/shared/|users/noah/lib/pointing/runtime/)'
     )"
     if [ -n "$pd_runtime_internal_prod_violations" ]; then
@@ -167,7 +167,7 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    pd_runtime_key_core_bridge_allowlist='^users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge\.c:'
+    pd_runtime_key_core_bridge_allowlist='^users/noah/lib/pointing/runtime/pointing_mode_key_runtime_bridge\.c:'
     pd_runtime_key_core_include_violations="$(
         (
             cd "$ROOT"
@@ -179,7 +179,7 @@ check_runtime_sealing_boundaries() {
         )
     )"
     if [ -n "$pd_runtime_key_core_include_violations" ]; then
-        echo "pd runtime modules must reach key-runtime core through pd_mode_key_runtime_bridge.c" >&2
+        echo "pd runtime modules must reach key-runtime core through pointing_mode_key_runtime_bridge.c" >&2
         printf '%s\n' "$pd_runtime_key_core_include_violations" >&2
         exit 1
     fi
@@ -187,11 +187,11 @@ check_runtime_sealing_boundaries() {
     pd_runtime_key_core_call_violations="$(
         (
             cd "$ROOT"
-            rg -n 'key_runtime_core_observe_pd_mode_lock_state' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
+            rg -n 'key_runtime_core_observe_pointing_mode_lock_state' users/noah/lib/pointing/runtime | grep -Ev "$pd_runtime_key_core_bridge_allowlist" || true
         )
     )"
     if [ -n "$pd_runtime_key_core_call_violations" ]; then
-        echo "pd runtime modules must observe pd lock state through pd_mode_key_runtime_bridge.c" >&2
+        echo "pd runtime modules must observe pd lock state through pointing_mode_key_runtime_bridge.c" >&2
         printf '%s\n' "$pd_runtime_key_core_call_violations" >&2
         exit 1
     fi
@@ -241,47 +241,47 @@ check_runtime_sealing_boundaries() {
         exit 1
     fi
 
-    pd_mode_buffered_tap_internal_test_allowlist='^(tests/host/pd_mode_test\.c:)'
-    pd_mode_buffered_tap_internal_test_violations="$(
-        host_test_includes '#include ".*pd_mode_buffered_tap_internal\.h"' | grep -Ev "$pd_mode_buffered_tap_internal_test_allowlist" || true
+    pointing_mode_buffered_tap_internal_test_allowlist='^(tests/host/pointing_mode_test\.c:)'
+    pointing_mode_buffered_tap_internal_test_violations="$(
+        host_test_includes '#include ".*pointing_mode_buffered_tap_internal\.h"' | grep -Ev "$pointing_mode_buffered_tap_internal_test_allowlist" || true
     )"
-    if [ -n "$pd_mode_buffered_tap_internal_test_violations" ]; then
-        echo "only the pd-mode white-box host suite may include pd_mode_buffered_tap_internal.h" >&2
-        printf '%s\n' "$pd_mode_buffered_tap_internal_test_violations" >&2
+    if [ -n "$pointing_mode_buffered_tap_internal_test_violations" ]; then
+        echo "only the pointing-mode white-box host suite may include pointing_mode_buffered_tap_internal.h" >&2
+        printf '%s\n' "$pointing_mode_buffered_tap_internal_test_violations" >&2
         exit 1
     fi
 
-    pd_mode_buffered_tap_internal_prod_allowlist='^users/noah/lib/pointing/runtime/'
-    pd_mode_buffered_tap_internal_prod_violations="$(
+    pointing_mode_buffered_tap_internal_prod_allowlist='^users/noah/lib/pointing/runtime/'
+    pointing_mode_buffered_tap_internal_prod_violations="$(
         repo_owned_production_include_violations \
-            '#include ".*pd_mode_buffered_tap_internal\.h"' \
-            "$pd_mode_buffered_tap_internal_prod_allowlist"
+            '#include ".*pointing_mode_buffered_tap_internal\.h"' \
+            "$pointing_mode_buffered_tap_internal_prod_allowlist"
     )"
-    if [ -n "$pd_mode_buffered_tap_internal_prod_violations" ]; then
-        echo "only pd runtime owner modules may include pd_mode_buffered_tap_internal.h in repo-owned production code" >&2
-        printf '%s\n' "$pd_mode_buffered_tap_internal_prod_violations" >&2
+    if [ -n "$pointing_mode_buffered_tap_internal_prod_violations" ]; then
+        echo "only pd runtime owner modules may include pointing_mode_buffered_tap_internal.h in repo-owned production code" >&2
+        printf '%s\n' "$pointing_mode_buffered_tap_internal_prod_violations" >&2
         exit 1
     fi
 
-    pd_mode_keyboard_event_internal_test_allowlist='^(tests/host/pd_mode_test\.c:)'
-    pd_mode_keyboard_event_internal_test_violations="$(
-        host_test_includes '#include ".*pd_mode_keyboard_event_internal\.h"' | grep -Ev "$pd_mode_keyboard_event_internal_test_allowlist" || true
+    pointing_mode_keyboard_event_internal_test_allowlist='^(tests/host/pointing_mode_test\.c:)'
+    pointing_mode_keyboard_event_internal_test_violations="$(
+        host_test_includes '#include ".*pointing_mode_keyboard_event_internal\.h"' | grep -Ev "$pointing_mode_keyboard_event_internal_test_allowlist" || true
     )"
-    if [ -n "$pd_mode_keyboard_event_internal_test_violations" ]; then
-        echo "only the pd-mode white-box host suite may include pd_mode_keyboard_event_internal.h" >&2
-        printf '%s\n' "$pd_mode_keyboard_event_internal_test_violations" >&2
+    if [ -n "$pointing_mode_keyboard_event_internal_test_violations" ]; then
+        echo "only the pointing-mode white-box host suite may include pointing_mode_keyboard_event_internal.h" >&2
+        printf '%s\n' "$pointing_mode_keyboard_event_internal_test_violations" >&2
         exit 1
     fi
 
-    pd_mode_keyboard_event_internal_prod_allowlist='^(users/noah/lib/pointing/runtime/|users/noah/lib/key/runtime/process\.c:)'
-    pd_mode_keyboard_event_internal_prod_violations="$(
+    pointing_mode_keyboard_event_internal_prod_allowlist='^(users/noah/lib/pointing/runtime/|users/noah/lib/key/runtime/process\.c:)'
+    pointing_mode_keyboard_event_internal_prod_violations="$(
         repo_owned_production_include_violations \
-            '#include ".*pd_mode_keyboard_event_internal\.h"' \
-            "$pd_mode_keyboard_event_internal_prod_allowlist"
+            '#include ".*pointing_mode_keyboard_event_internal\.h"' \
+            "$pointing_mode_keyboard_event_internal_prod_allowlist"
     )"
-    if [ -n "$pd_mode_keyboard_event_internal_prod_violations" ]; then
-        echo "only pd runtime owner modules and process.c may include pd_mode_keyboard_event_internal.h in repo-owned production code" >&2
-        printf '%s\n' "$pd_mode_keyboard_event_internal_prod_violations" >&2
+    if [ -n "$pointing_mode_keyboard_event_internal_prod_violations" ]; then
+        echo "only pd runtime owner modules and process.c may include pointing_mode_keyboard_event_internal.h in repo-owned production code" >&2
+        printf '%s\n' "$pointing_mode_keyboard_event_internal_prod_violations" >&2
         exit 1
     fi
 }

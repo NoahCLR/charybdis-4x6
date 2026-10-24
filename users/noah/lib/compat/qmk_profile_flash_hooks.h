@@ -19,5 +19,5 @@ void noah_qmk_profile_flash_pre_init(void);
 bool noah_qmk_profile_flash_wire_get(uint8_t *data, uint8_t length);
 
 // Housekeeping on both halves: registers the split pull's handler, and on
-// the USB half pulls the other half's figures once a second.
+// the master half pulls the other half's figures once a second.
 void noah_qmk_profile_flash_housekeeping(void);

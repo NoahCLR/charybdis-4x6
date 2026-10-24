@@ -700,7 +700,7 @@ noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_yield_
     return cancel_precommit(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_PREPARE_YIELDED, true);
 }
 
-noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_peer_failed_precommit(noah_profile_candidate_transaction_t *transaction) {
+noah_profile_candidate_expire_result_t noah_profile_candidate_transaction_other_half_failed_precommit(noah_profile_candidate_transaction_t *transaction) {
     return cancel_precommit(transaction, NOAH_PROFILE_CANDIDATE_V1_ERROR_PEER_TRANSFER_FAILED, true);
 }
 

@@ -74,7 +74,7 @@ The decision is held by the press's owner through its release and any pending
 gesture. A layer change while the key is held cannot move it to another owner
 or lose its release.
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`pd_mode_key_runtime_integration_test.c`, `test_qmk_bypassed_authored_layer_tap_keeps_default`, `test_qmk_bypassed_custom_key_does_nothing`, `test_qmk_tapping_engine_classifies_no_supported_key`).
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_qmk_bypassed_authored_layer_tap_keeps_default`, `test_qmk_bypassed_custom_key_does_nothing`, `test_qmk_tapping_engine_classifies_no_supported_key`).
 
 ## A press that waited
 
@@ -93,7 +93,7 @@ that decision, even when the position is pressed again before the release is
 delivered. A delivered press that record admission holds back settles again
 when it is replayed.
 
-Held by: `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_qmk_queued_participation_is_per_press`, `test_qmk_waiting_key_participates_on_hold_layer`, `test_qmk_waiting_key_uses_hold_layer`, `test_qmk_buffered_member_uses_hold_layer`), `tests/host/run_participation_tests.sh` (`test_record_context_is_immutable`).
+Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_qmk_queued_participation_is_per_press`, `test_qmk_waiting_key_participates_on_hold_layer`, `test_qmk_waiting_key_uses_hold_layer`, `test_qmk_buffered_member_uses_hold_layer`), `tests/host/run_participation_tests.sh` (`test_record_context_is_immutable`).
 
 ## Combo decision
 
@@ -117,7 +117,7 @@ source layer as the permission context. A policy change while a chord is
 partly pressed settles ordinary keys once, and an active combo's output still
 gets its release.
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_combo_rows`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_qmk_excluded_duplicate_preserves_chord`, `test_qmk_excluded_member_keeps_chord_from_forming`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`).
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_combo_rows`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_qmk_excluded_duplicate_preserves_chord`, `test_qmk_excluded_member_keeps_chord_from_forming`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`).
 
 ## Combo outputs
 
@@ -155,12 +155,12 @@ or lose its release; a suppressed completion drops its permission. When the
 origin cannot be reconstructed, the output bypasses its behaviour if any
 combo with that output bypasses it.
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_generated_outputs`, `test_combo_output_permissions`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_qmk_combo_output_permissions`, `test_qmk_same_output_chords_wait_together`, `test_qmk_generated_custom_uses_owner_layer`, `test_qmk_combo_output_gui_behaviour`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_output_permission_survives_queues_and_release`), `tests/fixtures/combo_output_behaviors_v1.fixture`.
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_generated_outputs`, `test_combo_output_permissions`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_qmk_combo_output_permissions`, `test_qmk_same_output_chords_wait_together`, `test_qmk_generated_custom_uses_owner_layer`, `test_qmk_combo_output_gui_behaviour`), `tests/host/run_qmk_combo_origin_tests.sh` (`qmk_combo_origin_test.c`, `test_output_permission_survives_queues_and_release`), `tests/fixtures/combo_output_behaviors_v1.fixture`.
 
 ## Where it runs
 
 `users/noah/lib/key/behavior/participation.{c,h}` owns the decision; callers
-pass the press and act on the answer. It reads the effective settings,
+pass the press and act on the answer. It reads the active profile's settings,
 behaviour and combo views, never storage.
 
 - **At the press**, the pre-process hook reads the source layer, asks both
@@ -191,4 +191,4 @@ The `user_data` byte:
 | 4 | uses its behaviour | uses its behaviour |
 | 0–3 | source layer | origin layer |
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_record_context_is_immutable`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_qmk_queued_participation_is_per_press`, `test_qmk_combo_origin_survives_delivery_after_deactivation`).
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`, `test_record_context_is_immutable`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_qmk_queued_participation_is_per_press`, `test_qmk_combo_origin_survives_delivery_after_deactivation`).

@@ -1,4 +1,4 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Auto-Mouse RGB Timeout Fade
 // ────────────────────────────────────────────────────────────────────────────

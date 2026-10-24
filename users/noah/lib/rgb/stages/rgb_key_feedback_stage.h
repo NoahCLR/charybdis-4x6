@@ -3,7 +3,7 @@
 // ────────────────────────────────────────────────────────────────────────────
 //
 // Shared key-feedback overlay stage. It composes packed runtime semantics with
-// one captured effective profile frame before the top-level runtime applies
+// one captured frame of the active profile before the top-level runtime applies
 // any LEDs.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
@@ -16,9 +16,9 @@
 #include "rgb_layer_stage.h"
 
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
-bool rgb_runtime_key_feedback_stage_render_effective_frame(rgb_runtime_frame_t *frame, const noah_effective_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max);
+bool rgb_runtime_key_feedback_stage_render_active_profile_frame(rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max);
 #else
-static inline bool rgb_runtime_key_feedback_stage_render_effective_frame(void *frame, const noah_effective_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
+static inline bool rgb_runtime_key_feedback_stage_render_active_profile_frame(void *frame, const noah_active_profile_rgb_frame_t *profile_frame, const uint8_t *semantic_map, const uint8_t *tap_branch_map, const uint8_t *flash_visibility_bitmap, const uint8_t *broad_owner_map, uint8_t led_min, uint8_t led_max) {
     (void)frame;
     (void)profile_frame;
     (void)semantic_map;

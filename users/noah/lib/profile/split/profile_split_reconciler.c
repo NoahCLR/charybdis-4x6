@@ -10,7 +10,7 @@
 #include "../storage/profile_record_identity.h"
 
 static noah_profile_split_descriptor_t unreadable_descriptor(void);
-static void                            invalidate_peer(noah_profile_split_reconciler_t *reconciler);
+static void                            invalidate_other_half(noah_profile_split_reconciler_t *reconciler);
 static void                            cache_response(noah_profile_split_reconciler_t *reconciler, const uint8_t *request, uint8_t request_length, const noah_profile_split_v1_frame_t *response);
 
 static bool descriptor_correlation_matches(const noah_profile_split_descriptor_t *descriptor, uint32_t generation, uint32_t payload_digest, uint32_t payload_length) {
@@ -21,21 +21,21 @@ static bool descriptor_correlation_matches(const noah_profile_split_descriptor_t
 // request is for the copy the store holds: another copy's offset would be
 // meaningless to the sender, and one past the request's length cannot even be
 // encoded, which turned BUSY into an INVALID_FRAME that stopped the sender.
-static uint32_t busy_offset(const noah_profile_peer_store_backend_t *store, uint32_t generation, uint32_t payload_digest, uint32_t payload_length) {
-    return noah_profile_peer_store_backend_copy_matches(store, generation, payload_digest, payload_length) ? noah_profile_peer_store_backend_next_offset(store) : 0u;
+static uint32_t busy_offset(const noah_profile_other_half_store_backend_t *store, uint32_t generation, uint32_t payload_digest, uint32_t payload_length) {
+    return noah_profile_other_half_store_backend_copy_matches(store, generation, payload_digest, payload_length) ? noah_profile_other_half_store_backend_next_offset(store) : 0u;
 }
 
-static void clear_provisional_peer(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor) {
-    if (reconciler && reconciler->provisional_peer_descriptor_known && (!descriptor || noah_profile_descriptor_equal(&reconciler->provisional_peer_descriptor, descriptor))) {
-        reconciler->provisional_peer_descriptor       = unreadable_descriptor();
-        reconciler->provisional_peer_descriptor_known = false;
+static void clear_provisional_other_half(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor) {
+    if (reconciler && reconciler->provisional_other_half_descriptor_known && (!descriptor || noah_profile_descriptor_equal(&reconciler->provisional_other_half_descriptor, descriptor))) {
+        reconciler->provisional_other_half_descriptor = unreadable_descriptor();
+        reconciler->provisional_other_half_descriptor_known = false;
     }
 }
 
-static void observe_provisional_peer(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor) {
+static void observe_provisional_other_half(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_descriptor_t *descriptor) {
     if (reconciler && noah_profile_split_descriptor_valid(descriptor) && descriptor->readable && descriptor->has_profile) {
-        reconciler->provisional_peer_descriptor       = *descriptor;
-        reconciler->provisional_peer_descriptor_known = true;
+        reconciler->provisional_other_half_descriptor = *descriptor;
+        reconciler->provisional_other_half_descriptor_known = true;
     }
 }
 
@@ -170,7 +170,7 @@ static bool transfer_pending(const noah_profile_split_reconciler_t *reconciler) 
 }
 
 static void publish_authority(noah_profile_split_reconciler_t *reconciler) {
-    (void)noah_profile_split_authority_publish(&reconciler->authority, reconciler->local_descriptor, reconciler->peer_descriptor, transfer_pending(reconciler));
+    (void)noah_profile_split_authority_publish(&reconciler->authority, reconciler->local_descriptor, reconciler->other_half_descriptor, transfer_pending(reconciler));
 }
 
 // Fill replies in place: returning the expanded frame by value leaves
@@ -187,12 +187,12 @@ static void transfer_reply(noah_profile_split_v1_frame_t *reply, noah_profile_sp
 
 // Why the store's answer to this copy is BUSY, for the sender's diagnostics.
 static noah_profile_split_v1_busy_reason_t store_busy_reason(const noah_profile_split_reconciler_t *reconciler, uint32_t generation, uint32_t payload_digest, uint32_t payload_length) {
-    const noah_profile_peer_store_backend_t *store = reconciler->config.peer_store;
+    const noah_profile_other_half_store_backend_t *store = reconciler->config.other_half_store;
 
-    if (noah_profile_peer_store_backend_holds_copy(store) && !noah_profile_peer_store_backend_copy_matches(store, generation, payload_digest, payload_length)) {
+    if (noah_profile_other_half_store_backend_holds_copy(store) && !noah_profile_other_half_store_backend_copy_matches(store, generation, payload_digest, payload_length)) {
         return NOAH_PROFILE_SPLIT_V1_BUSY_OTHER_COPY;
     }
-    if (noah_profile_peer_store_backend_working(store)) {
+    if (noah_profile_other_half_store_backend_working(store)) {
         return NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING;
     }
     return NOAH_PROFILE_SPLIT_V1_BUSY_NO_LEASE;
@@ -200,11 +200,11 @@ static noah_profile_split_v1_busy_reason_t store_busy_reason(const noah_profile_
 
 // An ACK/BUSY for one copy that says why and what this half holds.
 static void busy_reply(noah_profile_split_v1_frame_t *reply, const noah_profile_split_reconciler_t *reconciler, noah_profile_split_v1_busy_reason_t reason, uint32_t generation, uint32_t payload_digest, uint32_t payload_length) {
-    transfer_reply(reply, NOAH_PROFILE_SPLIT_V1_ACK, NOAH_PROFILE_SPLIT_V1_STATUS_BUSY, generation, payload_digest, busy_offset(reconciler->config.peer_store, generation, payload_digest, payload_length), payload_length);
+    transfer_reply(reply, NOAH_PROFILE_SPLIT_V1_ACK, NOAH_PROFILE_SPLIT_V1_STATUS_BUSY, generation, payload_digest, busy_offset(reconciler->config.other_half_store, generation, payload_digest, payload_length), payload_length);
     reply->busy_reason      = (uint8_t)reason;
-    reply->busy_store_state = (uint8_t)noah_profile_peer_store_backend_state(reconciler->config.peer_store);
+    reply->busy_store_state = (uint8_t)noah_profile_other_half_store_backend_state(reconciler->config.other_half_store);
     reply->busy_owner       = (uint8_t)reconciler->transfer_owner;
-    reply->busy_admission   = (uint8_t)noah_profile_candidate_store_backend_admission_owner(reconciler->config.peer_store->backend);
+    reply->busy_admission   = (uint8_t)noah_profile_candidate_store_backend_admission_owner(reconciler->config.other_half_store->backend);
 }
 
 static void frame_correlation(const noah_profile_split_v1_frame_t *frame, uint32_t *generation, uint32_t *digest, uint32_t *offset, uint32_t *length) {
@@ -274,8 +274,8 @@ static void invalidate_cached_response(noah_profile_split_reconciler_t *reconcil
 }
 
 // Copies the cached reply into the requester's `capacity`-byte buffer. A
-// reply too large for it (only a peer of another build asks for less than
-// the chunk it pulls) reads as an invalid frame.
+// reply too large for it (only the other half on another build asks for less
+// than the chunk it pulls) reads as an invalid frame.
 static bool read_cached_response(const noah_profile_split_reconciler_t *reconciler, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t capacity) {
     for (uint8_t attempt = 0u; attempt < NOAH_RUNTIME_PUBLICATION_READ_ATTEMPTS; attempt++) {
         uint8_t observed = noah_runtime_publication_observe(&reconciler->response_sequence);
@@ -304,32 +304,32 @@ static bool read_cached_response(const noah_profile_split_reconciler_t *reconcil
     return false;
 }
 
-static noah_profile_split_v1_status_t map_peer_error(noah_profile_peer_store_result_t result) {
+static noah_profile_split_v1_status_t map_other_half_error(noah_profile_other_half_store_result_t result) {
     switch (result) {
-        case NOAH_PROFILE_PEER_STORE_STALE:
+        case NOAH_PROFILE_OTHER_HALF_STORE_STALE:
             return NOAH_PROFILE_SPLIT_V1_STATUS_STALE;
-        case NOAH_PROFILE_PEER_STORE_CONFLICT:
+        case NOAH_PROFILE_OTHER_HALF_STORE_CONFLICT:
             return NOAH_PROFILE_SPLIT_V1_STATUS_CONFLICT;
-        case NOAH_PROFILE_PEER_STORE_CORRUPT:
-        case NOAH_PROFILE_PEER_STORE_CHUNK_CONFLICT:
+        case NOAH_PROFILE_OTHER_HALF_STORE_CORRUPT:
+        case NOAH_PROFILE_OTHER_HALF_STORE_CHUNK_CONFLICT:
             return NOAH_PROFILE_SPLIT_V1_STATUS_CORRUPT;
-        case NOAH_PROFILE_PEER_STORE_INCOMPATIBLE:
+        case NOAH_PROFILE_OTHER_HALF_STORE_INCOMPATIBLE:
             return NOAH_PROFILE_SPLIT_V1_STATUS_INCOMPATIBLE;
-        case NOAH_PROFILE_PEER_STORE_INVALID_METADATA:
+        case NOAH_PROFILE_OTHER_HALF_STORE_INVALID_METADATA:
             return NOAH_PROFILE_SPLIT_V1_STATUS_INVALID_FRAME;
-        case NOAH_PROFILE_PEER_STORE_RANGE_ERROR:
+        case NOAH_PROFILE_OTHER_HALF_STORE_RANGE_ERROR:
             return NOAH_PROFILE_SPLIT_V1_STATUS_RANGE_ERROR;
-        case NOAH_PROFILE_PEER_STORE_VALIDATION_ERROR:
+        case NOAH_PROFILE_OTHER_HALF_STORE_VALIDATION_ERROR:
             return NOAH_PROFILE_SPLIT_V1_STATUS_VALIDATION_ERROR;
-        case NOAH_PROFILE_PEER_STORE_DURABILITY_UNKNOWN:
-        case NOAH_PROFILE_PEER_STORE_STORAGE_ERROR:
+        case NOAH_PROFILE_OTHER_HALF_STORE_DURABILITY_UNKNOWN:
+        case NOAH_PROFILE_OTHER_HALF_STORE_STORAGE_ERROR:
         default:
             return NOAH_PROFILE_SPLIT_V1_STATUS_STORAGE_ERROR;
     }
 }
 
-static void peer_error_reply(noah_profile_split_v1_frame_t *reply, noah_profile_peer_store_result_t result, uint32_t generation, uint32_t digest, uint32_t offset, uint32_t length) {
-    transfer_reply(reply, NOAH_PROFILE_SPLIT_V1_ERROR, map_peer_error(result), generation, digest, offset, length);
+static void other_half_error_reply(noah_profile_split_v1_frame_t *reply, noah_profile_other_half_store_result_t result, uint32_t generation, uint32_t digest, uint32_t offset, uint32_t length) {
+    transfer_reply(reply, NOAH_PROFILE_SPLIT_V1_ERROR, map_other_half_error(result), generation, digest, offset, length);
 }
 
 static bool response_busy(const noah_profile_split_v1_frame_t *response) {
@@ -352,7 +352,7 @@ bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reco
     if (!noah_profile_split_v1_frame_decode(request, request_length, &decoded)) {
         return encode_invalid_response(response);
     }
-    reconciler->peer_activity_sequence++;
+    reconciler->other_half_activity_sequence++;
     NOAH_RUNTIME_PUBLICATION_BARRIER();
     if (decoded.kind == NOAH_PROFILE_SPLIT_V1_METADATA) {
         (void)publish_mailbox(reconciler, request, request_length);
@@ -379,12 +379,12 @@ bool noah_profile_split_reconciler_receive(noah_profile_split_reconciler_t *reco
 // Ends the copy this half receives or holds prepared, and gives its storage
 // back; a failed abort leaves the store's own rejection and says why.
 static bool release_remote_prepare(noah_profile_split_reconciler_t *reconciler) {
-    noah_profile_peer_store_result_t result;
+    noah_profile_other_half_store_result_t result;
 
-    clear_provisional_peer(reconciler, &reconciler->config.peer_store->descriptor);
-    result = noah_profile_peer_store_backend_abort(reconciler->config.peer_store, &reconciler->config.peer_store->descriptor);
-    if (result != NOAH_PROFILE_PEER_STORE_OK) {
-        reconciler->last_status = map_peer_error(result);
+    clear_provisional_other_half(reconciler, &reconciler->config.other_half_store->descriptor);
+    result = noah_profile_other_half_store_backend_abort(reconciler->config.other_half_store, &reconciler->config.other_half_store->descriptor);
+    if (result != NOAH_PROFILE_OTHER_HALF_STORE_OK) {
+        reconciler->last_status = map_other_half_error(result);
         return false;
     }
     reconciler->transfer_owner       = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
@@ -396,15 +396,15 @@ static bool release_remote_prepare(noah_profile_split_reconciler_t *reconciler) 
 // Only the push that sent a prepared copy commits or cancels it, and its
 // sender authorizes the commit only once its own saved profile is the copy.
 // A poll saying its sender holds no push carries that sender's saved
-// profile; the peer store answers whether that abandons its prepared copy
+// profile; the other-half store answers whether that abandons its prepared copy
 // (D-F34), and this half releases it unless it is pulling.
 static bool prepared_copy_abandoned(const noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request) {
-    return request->no_prepared_push && reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && noah_profile_peer_store_backend_prepared_copy_abandoned(reconciler->config.peer_store, &request->descriptor);
+    return request->no_prepared_push && reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && noah_profile_other_half_store_backend_prepared_copy_abandoned(reconciler->config.other_half_store, &request->descriptor);
 }
 
 static __attribute__((noinline)) void process_metadata(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request) {
-    reconciler->peer_descriptor = request->descriptor;
-    clear_provisional_peer(reconciler, &request->descriptor);
+    reconciler->other_half_descriptor = request->descriptor;
+    clear_provisional_other_half(reconciler, &request->descriptor);
     if (prepared_copy_abandoned(reconciler, request)) {
         (void)release_remote_prepare(reconciler);
     }
@@ -412,27 +412,27 @@ static __attribute__((noinline)) void process_metadata(noah_profile_split_reconc
 }
 
 static __attribute__((noinline)) void process_prepare_begin(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, const noah_profile_split_v1_frame_t *request) {
-    noah_profile_peer_store_result_t result;
+    noah_profile_other_half_store_result_t result;
     noah_profile_split_v1_frame_t    response;
-    noah_profile_peer_store_state_t  store_state;
+    noah_profile_other_half_store_state_t store_state;
 
-    observe_provisional_peer(reconciler, &request->descriptor);
+    observe_provisional_other_half(reconciler, &request->descriptor);
     if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL) {
         busy_reply(&response, reconciler, NOAH_PROFILE_SPLIT_V1_BUSY_PULLING, request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length);
         cache_response(reconciler, request_wire, request_length, &response);
         publish_authority(reconciler);
         return;
     }
-    result      = noah_profile_peer_store_backend_begin(reconciler->config.peer_store, &request->descriptor);
-    store_state = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
-    if (result == NOAH_PROFILE_PEER_STORE_OK || result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED || (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS && store_state == NOAH_PROFILE_PEER_STORE_RECEIVING)) {
-        uint32_t next_offset = noah_profile_peer_store_backend_next_offset(reconciler->config.peer_store);
+    result      = noah_profile_other_half_store_backend_begin(reconciler->config.other_half_store, &request->descriptor);
+    store_state = noah_profile_other_half_store_backend_state(reconciler->config.other_half_store);
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_OK || result == NOAH_PROFILE_OTHER_HALF_STORE_ALREADY_COMMITTED || (result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS && store_state == NOAH_PROFILE_OTHER_HALF_STORE_RECEIVING)) {
+        uint32_t next_offset = noah_profile_other_half_store_backend_next_offset(reconciler->config.other_half_store);
         transfer_reply(&response, NOAH_PROFILE_SPLIT_V1_ACK, NOAH_PROFILE_SPLIT_V1_STATUS_OK, request->descriptor.generation, request->descriptor.payload_digest, next_offset, request->descriptor.payload_length);
-        reconciler->transfer_owner = store_state == NOAH_PROFILE_PEER_STORE_RECEIVING ? NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH : NOAH_PROFILE_SPLIT_TRANSFER_NONE;
-    } else if (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS || result == NOAH_PROFILE_PEER_STORE_BUSY) {
+        reconciler->transfer_owner = store_state == NOAH_PROFILE_OTHER_HALF_STORE_RECEIVING ? NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH : NOAH_PROFILE_SPLIT_TRANSFER_NONE;
+    } else if (result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS || result == NOAH_PROFILE_OTHER_HALF_STORE_BUSY) {
         busy_reply(&response, reconciler, store_busy_reason(reconciler, request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length), request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length);
     } else {
-        peer_error_reply(&response, result, request->descriptor.generation, request->descriptor.payload_digest, 0u, request->descriptor.payload_length);
+        other_half_error_reply(&response, result, request->descriptor.generation, request->descriptor.payload_digest, 0u, request->descriptor.payload_length);
         reconciler->last_status = response.status;
     }
     cache_response(reconciler, request_wire, request_length, &response);
@@ -440,17 +440,17 @@ static __attribute__((noinline)) void process_prepare_begin(noah_profile_split_r
 }
 
 static __attribute__((noinline)) void process_prepare_durable(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, const noah_profile_split_v1_frame_t *request) {
-    noah_profile_peer_store_result_t result;
+    noah_profile_other_half_store_result_t result;
     noah_profile_split_v1_frame_t    response;
 
-    result = noah_profile_peer_store_backend_prepare_durable_begin(reconciler->config.peer_store, &request->descriptor);
-    if (result == NOAH_PROFILE_PEER_STORE_OK || result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED) {
+    result = noah_profile_other_half_store_backend_prepare_durable_begin(reconciler->config.other_half_store, &request->descriptor);
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_OK || result == NOAH_PROFILE_OTHER_HALF_STORE_ALREADY_COMMITTED) {
         transfer_reply(&response, NOAH_PROFILE_SPLIT_V1_ACK, NOAH_PROFILE_SPLIT_V1_STATUS_OK, request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length, request->descriptor.payload_length);
-    } else if (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS || result == NOAH_PROFILE_PEER_STORE_BUSY) {
+    } else if (result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS || result == NOAH_PROFILE_OTHER_HALF_STORE_BUSY) {
         busy_reply(&response, reconciler, store_busy_reason(reconciler, request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length), request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length);
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH;
     } else {
-        peer_error_reply(&response, result, request->descriptor.generation, request->descriptor.payload_digest, 0u, request->descriptor.payload_length);
+        other_half_error_reply(&response, result, request->descriptor.generation, request->descriptor.payload_digest, 0u, request->descriptor.payload_length);
         reconciler->last_status    = response.status;
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
     }
@@ -459,22 +459,22 @@ static __attribute__((noinline)) void process_prepare_durable(noah_profile_split
 }
 
 static __attribute__((noinline)) void process_payload_chunk(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, const noah_profile_split_v1_frame_t *request) {
-    noah_profile_peer_store_result_t result;
+    noah_profile_other_half_store_result_t result;
     noah_profile_split_v1_frame_t    response;
 
-    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH || !noah_profile_peer_store_backend_copy_matches(reconciler->config.peer_store, request->generation, request->payload_digest, request->payload_length)) {
+    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH || !noah_profile_other_half_store_backend_copy_matches(reconciler->config.other_half_store, request->generation, request->payload_digest, request->payload_length)) {
         busy_reply(&response, reconciler, store_busy_reason(reconciler, request->generation, request->payload_digest, request->payload_length), request->generation, request->payload_digest, request->payload_length);
         cache_response(reconciler, request_wire, request_length, &response);
         publish_authority(reconciler);
         return;
     }
-    result = noah_profile_peer_store_backend_write(reconciler->config.peer_store, request->generation, request->payload_digest, request->offset, request->chunk, request->chunk_length);
-    if (result == NOAH_PROFILE_PEER_STORE_OK) {
-        transfer_reply(&response, NOAH_PROFILE_SPLIT_V1_ACK, NOAH_PROFILE_SPLIT_V1_STATUS_OK, request->generation, request->payload_digest, noah_profile_peer_store_backend_next_offset(reconciler->config.peer_store), request->payload_length);
-    } else if (result == NOAH_PROFILE_PEER_STORE_BUSY || result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
+    result = noah_profile_other_half_store_backend_write(reconciler->config.other_half_store, request->generation, request->payload_digest, request->offset, request->chunk, request->chunk_length);
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_OK) {
+        transfer_reply(&response, NOAH_PROFILE_SPLIT_V1_ACK, NOAH_PROFILE_SPLIT_V1_STATUS_OK, request->generation, request->payload_digest, noah_profile_other_half_store_backend_next_offset(reconciler->config.other_half_store), request->payload_length);
+    } else if (result == NOAH_PROFILE_OTHER_HALF_STORE_BUSY || result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS) {
         busy_reply(&response, reconciler, store_busy_reason(reconciler, request->generation, request->payload_digest, request->payload_length), request->generation, request->payload_digest, request->payload_length);
     } else {
-        peer_error_reply(&response, result, request->generation, request->payload_digest, request->offset, request->payload_length);
+        other_half_error_reply(&response, result, request->generation, request->payload_digest, request->offset, request->payload_length);
         reconciler->last_status    = response.status;
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
     }
@@ -484,9 +484,9 @@ static __attribute__((noinline)) void process_payload_chunk(noah_profile_split_r
 
 // Keep response encoding off the source-read stack: an active snapshot and
 // compiled-domain serializer must retire before a reply frame is allocated.
-static __attribute__((noinline)) void cache_incoming_reuse_result(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, noah_profile_peer_store_result_t result, uint32_t now) {
-    noah_profile_peer_store_backend_t *store    = reconciler->config.peer_store;
-    uint32_t                           next     = noah_profile_peer_store_backend_next_offset(store);
+static __attribute__((noinline)) void cache_incoming_reuse_result(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, noah_profile_other_half_store_result_t result, uint32_t now) {
+    noah_profile_other_half_store_backend_t *store = reconciler->config.other_half_store;
+    uint32_t                           next     = noah_profile_other_half_store_backend_next_offset(store);
     noah_profile_split_v1_frame_t      response = {
         .kind           = NOAH_PROFILE_SPLIT_V1_ACK,
         .status         = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
@@ -496,18 +496,18 @@ static __attribute__((noinline)) void cache_incoming_reuse_result(noah_profile_s
         .payload_length = store->descriptor.payload_length,
     };
 
-    if (result == NOAH_PROFILE_PEER_STORE_BUSY || (result == NOAH_PROFILE_PEER_STORE_OK && next < reconciler->incoming_reuse_end)) {
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_BUSY || (result == NOAH_PROFILE_OTHER_HALF_STORE_OK && next < reconciler->incoming_reuse_end)) {
         response.status           = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
-        response.busy_reason      = result == NOAH_PROFILE_PEER_STORE_BUSY ? store_busy_reason(reconciler, response.generation, response.payload_digest, response.payload_length) : NOAH_PROFILE_SPLIT_V1_BUSY_COPYING;
-        response.busy_store_state = (uint8_t)noah_profile_peer_store_backend_state(store);
+        response.busy_reason      = result == NOAH_PROFILE_OTHER_HALF_STORE_BUSY ? store_busy_reason(reconciler, response.generation, response.payload_digest, response.payload_length) : NOAH_PROFILE_SPLIT_V1_BUSY_COPYING;
+        response.busy_store_state = (uint8_t)noah_profile_other_half_store_backend_state(store);
         response.busy_owner       = (uint8_t)reconciler->transfer_owner;
         response.busy_admission   = (uint8_t)noah_profile_candidate_store_backend_admission_owner(store->backend);
     } else {
         reconciler->incoming_reuse_active = false;
-        if (result != NOAH_PROFILE_PEER_STORE_OK) {
+        if (result != NOAH_PROFILE_OTHER_HALF_STORE_OK) {
             response.kind   = NOAH_PROFILE_SPLIT_V1_ERROR;
-            response.status = result == NOAH_PROFILE_PEER_STORE_SOURCE_UNAVAILABLE ? NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE : map_peer_error(result);
-            if (result != NOAH_PROFILE_PEER_STORE_SOURCE_UNAVAILABLE) {
+            response.status = result == NOAH_PROFILE_OTHER_HALF_STORE_SOURCE_UNAVAILABLE ? NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE : map_other_half_error(result);
+            if (result != NOAH_PROFILE_OTHER_HALF_STORE_SOURCE_UNAVAILABLE) {
                 response.offset            = reconciler->incoming_reuse_offset;
                 reconciler->last_status    = response.status;
                 reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
@@ -515,7 +515,7 @@ static __attribute__((noinline)) void cache_incoming_reuse_result(noah_profile_s
         }
     }
     // Polls collect the cached reply, so copying keeps its own lease alive.
-    if (result != NOAH_PROFILE_PEER_STORE_BUSY) {
+    if (result != NOAH_PROFILE_OTHER_HALF_STORE_BUSY) {
         reconciler->lease_activity_at    = now;
         reconciler->lease_activity_known = true;
     }
@@ -526,15 +526,15 @@ static __attribute__((noinline)) void cache_incoming_reuse_result(noah_profile_s
 // Copies only after mailbox admission has retired its decoded request and
 // wire buffers. The copy's reply is built after its source reader returns.
 static __attribute__((noinline)) void advance_incoming_reuse(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, uint32_t now) {
-    noah_profile_peer_store_backend_t *store = reconciler->config.peer_store;
-    noah_profile_peer_store_result_t   result;
+    noah_profile_other_half_store_backend_t *store = reconciler->config.other_half_store;
+    noah_profile_other_half_store_result_t result;
 
-    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH || noah_profile_peer_store_backend_state(store) != NOAH_PROFILE_PEER_STORE_RECEIVING) {
+    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH || noah_profile_other_half_store_backend_state(store) != NOAH_PROFILE_OTHER_HALF_STORE_RECEIVING) {
         reconciler->incoming_reuse_active = false;
-        cache_incoming_reuse_result(reconciler, request_wire, request_length, NOAH_PROFILE_PEER_STORE_BUSY, now);
+        cache_incoming_reuse_result(reconciler, request_wire, request_length, NOAH_PROFILE_OTHER_HALF_STORE_BUSY, now);
         return;
     }
-    result = noah_profile_peer_store_backend_reuse(store, store->descriptor.generation, store->descriptor.payload_digest, reconciler->incoming_reuse_offset, &reconciler->incoming_reuse_source, reconciler->incoming_reuse_source_offset, reconciler->incoming_reuse_end, NOAH_PROFILE_SPLIT_PEER_SCAN_BYTES);
+    result = noah_profile_other_half_store_backend_reuse(store, store->descriptor.generation, store->descriptor.payload_digest, reconciler->incoming_reuse_offset, &reconciler->incoming_reuse_source, reconciler->incoming_reuse_source_offset, reconciler->incoming_reuse_end, NOAH_PROFILE_SPLIT_OTHER_HALF_SCAN_BYTES);
     cache_incoming_reuse_result(reconciler, request_wire, request_length, result, now);
 }
 
@@ -549,7 +549,7 @@ static __attribute__((noinline)) void cache_reuse_busy_reply(noah_profile_split_
 }
 
 static __attribute__((noinline)) void process_payload_reuse(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, const noah_profile_split_v1_frame_t *request, uint32_t now) {
-    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH || !noah_profile_peer_store_backend_copy_matches(reconciler->config.peer_store, request->generation, request->payload_digest, request->payload_length)) {
+    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH || !noah_profile_other_half_store_backend_copy_matches(reconciler->config.other_half_store, request->generation, request->payload_digest, request->payload_length)) {
         cache_reuse_busy_reply(reconciler, request_wire, request_length, request);
         return;
     }
@@ -558,29 +558,29 @@ static __attribute__((noinline)) void process_payload_reuse(noah_profile_split_r
     reconciler->incoming_reuse_source_offset = request->reuse_source_offset;
     reconciler->incoming_reuse_end           = request->offset + request->reuse_length;
     reconciler->incoming_reuse_active        = true;
-    cache_incoming_reuse_result(reconciler, request_wire, request_length, NOAH_PROFILE_PEER_STORE_OK, now);
+    cache_incoming_reuse_result(reconciler, request_wire, request_length, NOAH_PROFILE_OTHER_HALF_STORE_OK, now);
 }
 
 static __attribute__((noinline)) void process_prepare_commit(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, const noah_profile_split_v1_frame_t *request) {
-    noah_profile_peer_store_result_t result;
+    noah_profile_other_half_store_result_t result;
     noah_profile_split_v1_frame_t    response;
 
-    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH && noah_profile_peer_store_backend_state(reconciler->config.peer_store) != NOAH_PROFILE_PEER_STORE_PREPARED && noah_profile_peer_store_backend_state(reconciler->config.peer_store) != NOAH_PROFILE_PEER_STORE_COMMITTED) {
+    if (reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH && noah_profile_other_half_store_backend_state(reconciler->config.other_half_store) != NOAH_PROFILE_OTHER_HALF_STORE_PREPARED && noah_profile_other_half_store_backend_state(reconciler->config.other_half_store) != NOAH_PROFILE_OTHER_HALF_STORE_COMMITTED) {
         busy_reply(&response, reconciler, store_busy_reason(reconciler, request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length), request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length);
         cache_response(reconciler, request_wire, request_length, &response);
         publish_authority(reconciler);
         return;
     }
-    result = noah_profile_peer_store_backend_state(reconciler->config.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED ? noah_profile_peer_store_backend_prepared_commit_begin(reconciler->config.peer_store, &request->descriptor) : noah_profile_peer_store_backend_commit_begin(reconciler->config.peer_store, &request->descriptor);
-    if (result == NOAH_PROFILE_PEER_STORE_OK || result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED) {
+    result = noah_profile_other_half_store_backend_state(reconciler->config.other_half_store) == NOAH_PROFILE_OTHER_HALF_STORE_PREPARED ? noah_profile_other_half_store_backend_prepared_commit_begin(reconciler->config.other_half_store, &request->descriptor) : noah_profile_other_half_store_backend_commit_begin(reconciler->config.other_half_store, &request->descriptor);
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_OK || result == NOAH_PROFILE_OTHER_HALF_STORE_ALREADY_COMMITTED) {
         transfer_reply(&response, NOAH_PROFILE_SPLIT_V1_ACK, NOAH_PROFILE_SPLIT_V1_STATUS_OK, request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length, request->descriptor.payload_length);
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
-        clear_provisional_peer(reconciler, &request->descriptor);
-    } else if (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS || result == NOAH_PROFILE_PEER_STORE_BUSY) {
+        clear_provisional_other_half(reconciler, &request->descriptor);
+    } else if (result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS || result == NOAH_PROFILE_OTHER_HALF_STORE_BUSY) {
         busy_reply(&response, reconciler, store_busy_reason(reconciler, request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length), request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length);
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH;
     } else {
-        peer_error_reply(&response, result, request->descriptor.generation, request->descriptor.payload_digest, 0u, request->descriptor.payload_length);
+        other_half_error_reply(&response, result, request->descriptor.generation, request->descriptor.payload_digest, 0u, request->descriptor.payload_length);
         reconciler->last_status    = response.status;
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
     }
@@ -591,40 +591,40 @@ static __attribute__((noinline)) void process_prepare_commit(noah_profile_split_
 }
 
 static __attribute__((noinline)) void process_abort(noah_profile_split_reconciler_t *reconciler, const uint8_t *request_wire, uint8_t request_length, const noah_profile_split_v1_frame_t *request) {
-    noah_profile_peer_store_result_t result;
+    noah_profile_other_half_store_result_t result;
     noah_profile_split_v1_frame_t    response;
-    const noah_profile_peer_store_backend_t *store        = reconciler->config.peer_store;
+    const noah_profile_other_half_store_backend_t *store  = reconciler->config.other_half_store;
     bool                                     matches_live = noah_profile_descriptor_equal(&store->descriptor, &request->descriptor);
 
-    clear_provisional_peer(reconciler, &request->descriptor);
-    if (noah_profile_peer_store_backend_abortable(store) && matches_live) {
-        result = noah_profile_peer_store_backend_abort(reconciler->config.peer_store, &request->descriptor);
-    } else if (noah_profile_peer_store_backend_holds_copy(store)) {
+    clear_provisional_other_half(reconciler, &request->descriptor);
+    if (noah_profile_other_half_store_backend_abortable(store) && matches_live) {
+        result = noah_profile_other_half_store_backend_abort(reconciler->config.other_half_store, &request->descriptor);
+    } else if (noah_profile_other_half_store_backend_holds_copy(store)) {
         // Another copy, or this one past the point an abort can end it.
-        result = NOAH_PROFILE_PEER_STORE_BUSY;
-    } else if (noah_profile_peer_store_backend_state(store) == NOAH_PROFILE_PEER_STORE_COMMITTED && matches_live) {
+        result = NOAH_PROFILE_OTHER_HALF_STORE_BUSY;
+    } else if (noah_profile_other_half_store_backend_state(store) == NOAH_PROFILE_OTHER_HALF_STORE_COMMITTED && matches_live) {
         // A no-op abort is successful only when the descriptor was never
         // admitted provisionally. Never report success for matching durable
         // state because the sender cannot safely infer that no marker landed.
-        result = NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED;
+        result = NOAH_PROFILE_OTHER_HALF_STORE_ALREADY_COMMITTED;
     } else {
         // IDLE/REJECTED or an unrelated durable descriptor proves that this
         // exact provisional lease is absent. ACK makes cancellation
         // idempotent after rejection or a lost request-before-delivery.
-        result = NOAH_PROFILE_PEER_STORE_OK;
+        result = NOAH_PROFILE_OTHER_HALF_STORE_OK;
     }
-    if (result == NOAH_PROFILE_PEER_STORE_OK) {
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_OK) {
         transfer_reply(&response, NOAH_PROFILE_SPLIT_V1_ACK, NOAH_PROFILE_SPLIT_V1_STATUS_OK, request->descriptor.generation, request->descriptor.payload_digest, 0u, request->descriptor.payload_length);
         if (matches_live) {
             reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
         }
-    } else if (result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED) {
+    } else if (result == NOAH_PROFILE_OTHER_HALF_STORE_ALREADY_COMMITTED) {
         transfer_reply(&response, NOAH_PROFILE_SPLIT_V1_ERROR, NOAH_PROFILE_SPLIT_V1_STATUS_CONFLICT, request->descriptor.generation, request->descriptor.payload_digest, 0u, request->descriptor.payload_length);
         reconciler->last_status = response.status;
-    } else if (result == NOAH_PROFILE_PEER_STORE_BUSY || result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
+    } else if (result == NOAH_PROFILE_OTHER_HALF_STORE_BUSY || result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS) {
         busy_reply(&response, reconciler, store_busy_reason(reconciler, request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length), request->descriptor.generation, request->descriptor.payload_digest, request->descriptor.payload_length);
     } else {
-        peer_error_reply(&response, result, request->descriptor.generation, request->descriptor.payload_digest, 0u, request->descriptor.payload_length);
+        other_half_error_reply(&response, result, request->descriptor.generation, request->descriptor.payload_digest, 0u, request->descriptor.payload_length);
     }
     cache_response(reconciler, request_wire, request_length, &response);
     publish_authority(reconciler);
@@ -662,7 +662,7 @@ static __attribute__((noinline)) void process_payload_request(noah_profile_split
 static void note_lease_activity(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *request, uint32_t now) {
     bool framed = request->kind == NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN || request->kind == NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE || request->kind == NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT || request->kind == NOAH_PROFILE_SPLIT_V1_ABORT;
 
-    if ((framed || request->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK || request->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) && noah_profile_peer_store_backend_state(reconciler->config.peer_store) == NOAH_PROFILE_PEER_STORE_RECEIVING && noah_profile_peer_store_backend_copy_matches(reconciler->config.peer_store, framed ? request->descriptor.generation : request->generation, framed ? request->descriptor.payload_digest : request->payload_digest, framed ? request->descriptor.payload_length : request->payload_length)) {
+    if ((framed || request->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK || request->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) && noah_profile_other_half_store_backend_state(reconciler->config.other_half_store) == NOAH_PROFILE_OTHER_HALF_STORE_RECEIVING && noah_profile_other_half_store_backend_copy_matches(reconciler->config.other_half_store, framed ? request->descriptor.generation : request->generation, framed ? request->descriptor.payload_digest : request->payload_digest, framed ? request->descriptor.payload_length : request->payload_length)) {
         reconciler->lease_activity_at    = now;
         reconciler->lease_activity_known = true;
     }
@@ -684,9 +684,9 @@ static __attribute__((noinline)) void process_mailbox(noah_profile_split_reconci
     // sender has moved on, and the store's next offset is the truth.
     reconciler->incoming_reuse_active = false;
     if (request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN) {
-        observe_provisional_peer(reconciler, &request.descriptor);
+        observe_provisional_other_half(reconciler, &request.descriptor);
     } else if (request.kind == NOAH_PROFILE_SPLIT_V1_ABORT) {
-        clear_provisional_peer(reconciler, &request.descriptor);
+        clear_provisional_other_half(reconciler, &request.descriptor);
     }
     if (mode == NOAH_PROFILE_SPLIT_RECONCILE_CONVERGENCE_ONLY && request.kind != NOAH_PROFILE_SPLIT_V1_METADATA && request.kind != NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST && request.kind != NOAH_PROFILE_SPLIT_V1_ABORT) {
         cache_response(reconciler, request_wire, request_length,
@@ -698,9 +698,9 @@ static __attribute__((noinline)) void process_mailbox(noah_profile_split_reconci
                            .offset           = request.offset,
                            .payload_length   = request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN || request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE || request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT || request.kind == NOAH_PROFILE_SPLIT_V1_ABORT ? request.descriptor.payload_length : request.payload_length,
                            .busy_reason      = NOAH_PROFILE_SPLIT_V1_BUSY_CONVERGENCE_ONLY,
-                           .busy_store_state = (uint8_t)noah_profile_peer_store_backend_state(reconciler->config.peer_store),
+                           .busy_store_state = (uint8_t)noah_profile_other_half_store_backend_state(reconciler->config.other_half_store),
                            .busy_owner       = (uint8_t)reconciler->transfer_owner,
-                           .busy_admission   = (uint8_t)noah_profile_candidate_store_backend_admission_owner(reconciler->config.peer_store->backend),
+                           .busy_admission   = (uint8_t)noah_profile_candidate_store_backend_admission_owner(reconciler->config.other_half_store->backend),
                        });
         publish_authority(reconciler);
         return;
@@ -739,7 +739,7 @@ static __attribute__((noinline)) void process_mailbox(noah_profile_split_reconci
     note_lease_activity(reconciler, &request, now);
 }
 
-static void update_remote_commit_response(noah_profile_split_reconciler_t *reconciler, noah_profile_peer_store_result_t result) {
+static void update_remote_commit_response(noah_profile_split_reconciler_t *reconciler, noah_profile_other_half_store_result_t result) {
     noah_profile_split_v1_frame_t request;
     noah_profile_split_v1_frame_t response;
     uint8_t                       request_wire[NOAH_PROFILE_SPLIT_V1_FRAME_SIZE];
@@ -749,20 +749,20 @@ static void update_remote_commit_response(noah_profile_split_reconciler_t *recon
         return;
     }
     memcpy(request_wire, reconciler->cached_request_wire, sizeof(request_wire));
-    if (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS) {
         // The cached BUSY must expose a completed phase, not remain frozen at
         // VALIDATING throughout the durable preparation that follows it.
         busy_reply(&response, reconciler, store_busy_reason(reconciler, request.descriptor.generation, request.descriptor.payload_digest, request.descriptor.payload_length), request.descriptor.generation, request.descriptor.payload_digest, request.descriptor.payload_length);
         cache_response(reconciler, request_wire, request_length, &response);
         return;
     }
-    if (result == NOAH_PROFILE_PEER_STORE_OK || result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED) {
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_OK || result == NOAH_PROFILE_OTHER_HALF_STORE_ALREADY_COMMITTED) {
         transfer_reply(&response, NOAH_PROFILE_SPLIT_V1_ACK, NOAH_PROFILE_SPLIT_V1_STATUS_OK, request.descriptor.generation, request.descriptor.payload_digest, request.descriptor.payload_length, request.descriptor.payload_length);
         if (request.kind == NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT) {
-            clear_provisional_peer(reconciler, &request.descriptor);
+            clear_provisional_other_half(reconciler, &request.descriptor);
         }
     } else {
-        peer_error_reply(&response, result, request.descriptor.generation, request.descriptor.payload_digest, 0u, request.descriptor.payload_length);
+        other_half_error_reply(&response, result, request.descriptor.generation, request.descriptor.payload_digest, 0u, request.descriptor.payload_length);
         reconciler->last_status = response.status;
     }
     cache_response(reconciler, request_wire, request_length, &response);
@@ -774,7 +774,7 @@ static void release_transient_busy_response(noah_profile_split_reconciler_t *rec
     if (!reconciler->cached_response_valid || !noah_profile_split_v1_frame_decode(reconciler->cached_response_wire, reconciler->cached_response_length, &response) || !response_busy(&response)) {
         return;
     }
-    if (reconciler->incoming_reuse_active || noah_profile_peer_store_backend_working(reconciler->config.peer_store)) {
+    if (reconciler->incoming_reuse_active || noah_profile_other_half_store_backend_working(reconciler->config.other_half_store)) {
         return;
     }
     // BUSY is cached long enough for one byte-identical retry to observe it.
@@ -786,18 +786,18 @@ static void release_transient_busy_response(noah_profile_split_reconciler_t *rec
 }
 
 static bool advance_store_transfer(noah_profile_split_reconciler_t *reconciler) {
-    noah_profile_peer_store_state_t  state = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
-    noah_profile_peer_store_result_t result;
+    noah_profile_other_half_store_state_t state = noah_profile_other_half_store_backend_state(reconciler->config.other_half_store);
+    noah_profile_other_half_store_result_t result;
 
-    if (!noah_profile_peer_store_backend_working(reconciler->config.peer_store)) {
+    if (!noah_profile_other_half_store_backend_working(reconciler->config.other_half_store)) {
         return false;
     }
-    result = noah_profile_peer_store_backend_step(reconciler->config.peer_store, NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX);
-    if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH && (result != NOAH_PROFILE_PEER_STORE_IN_PROGRESS || state != noah_profile_peer_store_backend_state(reconciler->config.peer_store))) {
+    result = noah_profile_other_half_store_backend_step(reconciler->config.other_half_store, NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX);
+    if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH && (result != NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS || state != noah_profile_other_half_store_backend_state(reconciler->config.other_half_store))) {
         update_remote_commit_response(reconciler, result);
     }
-    if (result != NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
-        reconciler->transfer_owner = noah_profile_peer_store_backend_state(reconciler->config.peer_store) == NOAH_PROFILE_PEER_STORE_PREPARED ? NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH : NOAH_PROFILE_SPLIT_TRANSFER_NONE;
+    if (result != NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS) {
+        reconciler->transfer_owner = noah_profile_other_half_store_backend_state(reconciler->config.other_half_store) == NOAH_PROFILE_OTHER_HALF_STORE_PREPARED ? NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH : NOAH_PROFILE_SPLIT_TRANSFER_NONE;
         refresh_local(reconciler);
         refresh_metadata_response(reconciler);
         publish_authority(reconciler);
@@ -809,15 +809,15 @@ static bool expire_remote_prepare(noah_profile_split_reconciler_t *reconciler, u
     // A lease this half is not pulling itself expires once its own copy has
     // been quiet for the lease time, whatever else crosses the link. That
     // includes a lease no transfer owns any more.
-    if (!(reconciler && reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && reconciler->lease_activity_known && noah_profile_peer_store_backend_state(reconciler->config.peer_store) == NOAH_PROFILE_PEER_STORE_RECEIVING && deadline_reached(now, reconciler->lease_activity_at + NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS))) {
+    if (!(reconciler && reconciler->transfer_owner != NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && reconciler->lease_activity_known && noah_profile_other_half_store_backend_state(reconciler->config.other_half_store) == NOAH_PROFILE_OTHER_HALF_STORE_RECEIVING && deadline_reached(now, reconciler->lease_activity_at + NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS))) {
         return false;
     }
     if (!release_remote_prepare(reconciler)) {
         publish_authority(reconciler);
         return true;
     }
-    reconciler->peer_activity_known = false;
-    invalidate_peer(reconciler);
+    reconciler->other_half_activity_known = false;
+    invalidate_other_half(reconciler);
     return true;
 }
 
@@ -833,17 +833,17 @@ static void retry_later(noah_profile_split_reconciler_t *reconciler, uint32_t no
     }
 }
 
-// The peer still holds this request: queued, behind a full mailbox it has not
-// reached yet, or copying a reuse range.
+// The other half still holds this request: queued, behind a full mailbox it has
+// not reached yet, or copying a reuse range.
 static bool request_held(const noah_profile_split_v1_frame_t *response) {
     return response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED || response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_MAILBOX_FULL || response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_COPYING || response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORAGE_PAUSED;
 }
 
 static void retry_admitted_mailbox(noah_profile_split_reconciler_t *reconciler, const noah_profile_split_v1_frame_t *response, uint32_t now) {
     // A fully received matching copy can need many validator scans. Poll its
-    // completion at a fixed pace; failure backoff would hide a ready peer for
-    // up to a second. The owner's pre-decision no-progress timeout remains.
-    if ((reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_DURABLE || reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT) && response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING && response->generation == reconciler->transfer_descriptor.generation && response->payload_digest == reconciler->transfer_descriptor.payload_digest && response->payload_length == reconciler->transfer_descriptor.payload_length && response->offset == reconciler->transfer_descriptor.payload_length && response->busy_owner == NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH && response->busy_admission == NOAH_PROFILE_STORAGE_ADMISSION_PEER && (response->busy_store_state == NOAH_PROFILE_PEER_STORE_VALIDATING || response->busy_store_state == NOAH_PROFILE_PEER_STORE_PREPARING || response->busy_store_state == NOAH_PROFILE_PEER_STORE_COMMITTING)) {
+    // completion at a fixed pace; failure backoff would hide a ready other half
+    // for up to a second. The owner's pre-decision no-progress timeout remains.
+    if ((reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_DURABLE || reconciler->state == NOAH_PROFILE_SPLIT_RECONCILER_PUSH_COMMIT) && response->busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_STORE_WORKING && response->generation == reconciler->transfer_descriptor.generation && response->payload_digest == reconciler->transfer_descriptor.payload_digest && response->payload_length == reconciler->transfer_descriptor.payload_length && response->offset == reconciler->transfer_descriptor.payload_length && response->busy_owner == NOAH_PROFILE_SPLIT_TRANSFER_REMOTE_PUSH && response->busy_admission == NOAH_PROFILE_STORAGE_ADMISSION_PEER && (response->busy_store_state == NOAH_PROFILE_OTHER_HALF_STORE_VALIDATING || response->busy_store_state == NOAH_PROFILE_OTHER_HALF_STORE_PREPARING || response->busy_store_state == NOAH_PROFILE_OTHER_HALF_STORE_COMMITTING)) {
         reconciler->attempt_immediate = false;
         reconciler->next_attempt_at   = now + NOAH_PROFILE_SPLIT_STORE_POLL_MS;
         // A correlated transition proves a bounded stage completed. Repeated
@@ -880,9 +880,9 @@ static void note_progress(noah_profile_split_reconciler_t *reconciler, uint32_t 
     reconciler->next_attempt_at   = now;
 }
 
-static void invalidate_peer(noah_profile_split_reconciler_t *reconciler) {
-    reconciler->peer_descriptor = unreadable_descriptor();
-    clear_provisional_peer(reconciler, NULL);
+static void invalidate_other_half(noah_profile_split_reconciler_t *reconciler) {
+    reconciler->other_half_descriptor = unreadable_descriptor();
+    clear_provisional_other_half(reconciler, NULL);
     publish_authority(reconciler);
 }
 
@@ -892,7 +892,7 @@ static void transport_lost(noah_profile_split_reconciler_t *reconciler, uint32_t
     }
     reconciler->last_status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
     reconciler->state       = reconciler->master ? NOAH_PROFILE_SPLIT_RECONCILER_DISCOVER : NOAH_PROFILE_SPLIT_RECONCILER_PASSIVE;
-    invalidate_peer(reconciler);
+    invalidate_other_half(reconciler);
     retry_later(reconciler, now);
 }
 
@@ -915,11 +915,12 @@ static bool rpc_exchange(noah_profile_split_reconciler_t *reconciler, const noah
             reconciler->busy_streak++;
         }
         // Admission is the expected first answer to every new request; keep
-        // the last BUSY that says why the peer is actually holding off.
+        // the last BUSY that says why the other half is actually holding off.
         if (response->busy_reason != NOAH_PROFILE_SPLIT_V1_BUSY_ADMITTED) {
             reconciler->last_busy_reason = response->busy_reason;
         }
-        // Every BUSY carries the peer's current store state and admission.
+        // Every BUSY carries the other half's current store state and
+        // admission.
         reconciler->last_busy_store_state = response->busy_store_state;
         reconciler->last_busy_owner       = response->busy_owner;
         reconciler->last_busy_admission   = response->busy_admission;
@@ -971,8 +972,8 @@ static void handle_protocol_error(noah_profile_split_reconciler_t *reconciler, c
 }
 
 // transfer_descriptor names a released push's unacknowledged ABORT, and the
-// peer may still hold its lease: any transfer now would only meet BUSY. Keep
-// polling until the cleanup is confirmed.
+// other half may still hold its lease: any transfer now would only meet BUSY.
+// Keep polling until the cleanup is confirmed.
 static bool orphan_defers_transfer(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
     if (!reconciler->orphan_pending) {
         return false;
@@ -988,12 +989,12 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
     reconciler->last_status = NOAH_PROFILE_SPLIT_V1_STATUS_OK;
     switch (authority_state) {
         case NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED:
-        case NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED:
-            if (reconciler->prepared_push_active && noah_profile_descriptor_equal(&reconciler->local_descriptor, &reconciler->transfer_descriptor) && noah_profile_descriptor_equal(&reconciler->peer_descriptor, &reconciler->transfer_descriptor)) {
+        case NOAH_PROFILE_SPLIT_AUTHORITY_SAVED_CONVERGED:
+            if (reconciler->prepared_push_active && noah_profile_descriptor_equal(&reconciler->local_descriptor, &reconciler->transfer_descriptor) && noah_profile_descriptor_equal(&reconciler->other_half_descriptor, &reconciler->transfer_descriptor)) {
                 clear_prepared_push(reconciler);
-            } else if (reconciler->prepared_push_active && !noah_profile_descriptor_equal(&reconciler->peer_descriptor, &reconciler->transfer_descriptor)) {
-                // Both halves still agree on the old profile and the peer does
-                // not hold this copy yet. Only a clear or a cancel ends a
+            } else if (reconciler->prepared_push_active && !noah_profile_descriptor_equal(&reconciler->other_half_descriptor, &reconciler->transfer_descriptor)) {
+                // Both halves still agree on the old profile and the other half
+                // does not hold this copy yet. Only a clear or a cancel ends a
                 // prepared push; parking it here leaves the host transaction
                 // unable to finish or cancel. Resume at the receiver's offset.
                 reconciler->transfer_offset       = 0u;
@@ -1015,7 +1016,7 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
             reconciler->state               = NOAH_PROFILE_SPLIT_RECONCILER_PUSH_BEGIN;
             publish_authority(reconciler);
             break;
-        case NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER:
+        case NOAH_PROFILE_SPLIT_AUTHORITY_OTHER_HALF_NEWER:
             if (orphan_defers_transfer(reconciler, now)) {
                 break;
             }
@@ -1026,7 +1027,7 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
                 publish_authority(reconciler);
                 break;
             }
-            reconciler->transfer_descriptor = reconciler->peer_descriptor;
+            reconciler->transfer_descriptor = reconciler->other_half_descriptor;
             reconciler->transfer_offset     = 0u;
             reconciler->state               = NOAH_PROFILE_SPLIT_RECONCILER_PULL_BEGIN;
             publish_authority(reconciler);
@@ -1041,7 +1042,7 @@ static void begin_authority_action(noah_profile_split_reconciler_t *reconciler, 
             stop_with_status(reconciler, NOAH_PROFILE_SPLIT_V1_STATUS_CORRUPT);
             break;
         case NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_UNREADABLE:
-        case NOAH_PROFILE_SPLIT_AUTHORITY_PEER_UNREADABLE:
+        case NOAH_PROFILE_SPLIT_AUTHORITY_OTHER_HALF_UNREADABLE:
         case NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA:
         case NOAH_PROFILE_SPLIT_AUTHORITY_UNINITIALIZED:
         default:
@@ -1072,9 +1073,9 @@ static void metadata_exchange(noah_profile_split_reconciler_t *reconciler, uint3
         handle_protocol_error(reconciler, &response, now);
         return;
     }
-    reconciler->peer_descriptor = response.descriptor;
+    reconciler->other_half_descriptor = response.descriptor;
     note_progress(reconciler, now);
-    begin_authority_action(reconciler, noah_profile_split_authority_compare(&reconciler->local_descriptor, &reconciler->peer_descriptor), now, mode);
+    begin_authority_action(reconciler, noah_profile_split_authority_compare(&reconciler->local_descriptor, &reconciler->other_half_descriptor), now, mode);
 }
 
 // Retries the ABORT a released push never had acknowledged. One RPC, at most
@@ -1093,7 +1094,7 @@ static void orphan_abort(noah_profile_split_reconciler_t *reconciler, uint32_t n
         publish_authority(reconciler);
         return;
     }
-    // Any other answer means the peer reports durable state for this
+    // Any other answer means the other half reports durable state for this
     // descriptor, which no cancelled push may produce. Stop fail closed and
     // keep the cleanup pending, as a refused cancel does.
     handle_protocol_error(reconciler, &response, now);
@@ -1105,7 +1106,8 @@ static void push_begin(noah_profile_split_reconciler_t *reconciler, uint32_t now
 
     if (reconciler->prepared_push_active) {
         // Once PREPARE_BEGIN is handed to the transport it may have reached the
-        // peer even when its reply is lost, so cancellation must send ABORT.
+        // other half even when its reply is lost, so cancellation must send
+        // ABORT.
         reconciler->prepared_remote_started = true;
     }
     if (!rpc_exchange(reconciler, &request, &response, now)) {
@@ -1224,8 +1226,8 @@ static void push_send(noah_profile_split_reconciler_t *reconciler, uint32_t now)
         return;
     }
     if (response_busy(&response)) {
-        // The peer is copying the range; its offset is how far it got. Keep
-        // collecting at the quick pace while that advances.
+        // The other half is copying the range; its offset is how far it got.
+        // Keep collecting at the quick pace while that advances.
         if (reuse && response.busy_reason == NOAH_PROFILE_SPLIT_V1_BUSY_COPYING && response_correlated(&response, &reconciler->transfer_descriptor) && response.offset >= reconciler->transfer_offset && response.offset < expected_offset) {
             if (response.offset > reconciler->outbound_reuse_progress) {
                 reconciler->outbound_reuse_progress = response.offset;
@@ -1250,7 +1252,7 @@ static void push_send(noah_profile_split_reconciler_t *reconciler, uint32_t now)
         retry_admitted_mailbox(reconciler, &response, now);
         return;
     }
-    // The peer's active profile is not the source, from the start of the
+    // The other half's active profile is not the source, from the start of the
     // range or from where it stopped matching. Its copy stays open at that
     // offset: send the rest of this copy as bytes.
     if (reuse && response.kind == NOAH_PROFILE_SPLIT_V1_ERROR && response.status == NOAH_PROFILE_SPLIT_V1_STATUS_SOURCE_UNAVAILABLE && response_correlated(&response, &reconciler->transfer_descriptor) && response.offset >= reconciler->transfer_offset && response.offset <= expected_offset) {
@@ -1326,11 +1328,11 @@ static void push_durable(noah_profile_split_reconciler_t *reconciler, uint32_t n
     publish_authority(reconciler);
 }
 
-// The peer did not acknowledge ABORT in time. Neither half holds a marker for
-// this descriptor, so releasing the push leaves durable authority untouched;
-// what may remain is the peer's provisional lease. Keep that as cleanup work
-// rather than letting it hold the host transaction, which cannot end while a
-// prepared push is active.
+// The other half did not acknowledge ABORT in time. Neither half holds a marker
+// for this descriptor, so releasing the push leaves durable authority
+// untouched; what may remain is the other half's provisional lease. Keep that
+// as cleanup work rather than letting it hold the host transaction, which
+// cannot end while a prepared push is active.
 static void release_unacknowledged_abort(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
     clear_prepared_push(reconciler);
     reconciler->orphan_pending  = true;
@@ -1389,13 +1391,13 @@ static void push_abort(noah_profile_split_reconciler_t *reconciler, uint32_t now
 }
 
 static void pull_begin(noah_profile_split_reconciler_t *reconciler, uint32_t now) {
-    noah_profile_peer_store_result_t result;
-    noah_profile_peer_store_state_t  state = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
+    noah_profile_other_half_store_result_t result;
+    noah_profile_other_half_store_state_t state = noah_profile_other_half_store_backend_state(reconciler->config.other_half_store);
 
-    if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && (state == NOAH_PROFILE_PEER_STORE_RECEIVING || state == NOAH_PROFILE_PEER_STORE_VALIDATING) && !noah_profile_descriptor_equal(&reconciler->config.peer_store->descriptor, &reconciler->transfer_descriptor)) {
-        result = noah_profile_peer_store_backend_abort(reconciler->config.peer_store, &reconciler->config.peer_store->descriptor);
-        if (result != NOAH_PROFILE_PEER_STORE_OK) {
-            stop_with_status(reconciler, map_peer_error(result));
+    if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL && (state == NOAH_PROFILE_OTHER_HALF_STORE_RECEIVING || state == NOAH_PROFILE_OTHER_HALF_STORE_VALIDATING) && !noah_profile_descriptor_equal(&reconciler->config.other_half_store->descriptor, &reconciler->transfer_descriptor)) {
+        result = noah_profile_other_half_store_backend_abort(reconciler->config.other_half_store, &reconciler->config.other_half_store->descriptor);
+        if (result != NOAH_PROFILE_OTHER_HALF_STORE_OK) {
+            stop_with_status(reconciler, map_other_half_error(result));
         } else {
             reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
         }
@@ -1403,24 +1405,24 @@ static void pull_begin(noah_profile_split_reconciler_t *reconciler, uint32_t now
         return;
     }
 
-    result = noah_profile_peer_store_backend_begin(reconciler->config.peer_store, &reconciler->transfer_descriptor);
-    state  = noah_profile_peer_store_backend_state(reconciler->config.peer_store);
+    result = noah_profile_other_half_store_backend_begin(reconciler->config.other_half_store, &reconciler->transfer_descriptor);
+    state  = noah_profile_other_half_store_backend_state(reconciler->config.other_half_store);
 
-    if (result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED) {
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_ALREADY_COMMITTED) {
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
         reconciler->state          = NOAH_PROFILE_SPLIT_RECONCILER_VERIFY;
-    } else if (result == NOAH_PROFILE_PEER_STORE_OK || (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS && state == NOAH_PROFILE_PEER_STORE_RECEIVING)) {
+    } else if (result == NOAH_PROFILE_OTHER_HALF_STORE_OK || (result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS && state == NOAH_PROFILE_OTHER_HALF_STORE_RECEIVING)) {
         reconciler->transfer_owner  = NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL;
-        reconciler->transfer_offset = noah_profile_peer_store_backend_next_offset(reconciler->config.peer_store);
+        reconciler->transfer_offset = noah_profile_other_half_store_backend_next_offset(reconciler->config.other_half_store);
         reconciler->state           = reconciler->transfer_offset == reconciler->transfer_descriptor.payload_length ? NOAH_PROFILE_SPLIT_RECONCILER_PULL_COMMIT_BEGIN : NOAH_PROFILE_SPLIT_RECONCILER_PULL_REQUEST;
-    } else if (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS && (state == NOAH_PROFILE_PEER_STORE_VALIDATING || state == NOAH_PROFILE_PEER_STORE_COMMITTING)) {
+    } else if (result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS && (state == NOAH_PROFILE_OTHER_HALF_STORE_VALIDATING || state == NOAH_PROFILE_OTHER_HALF_STORE_COMMITTING)) {
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_LOCAL_PULL;
         reconciler->state          = NOAH_PROFILE_SPLIT_RECONCILER_PULL_COMMIT_STEP;
-    } else if (result == NOAH_PROFILE_PEER_STORE_BUSY) {
+    } else if (result == NOAH_PROFILE_OTHER_HALF_STORE_BUSY) {
         reconciler->last_status = NOAH_PROFILE_SPLIT_V1_STATUS_BUSY;
         retry_later(reconciler, now);
     } else {
-        stop_with_status(reconciler, map_peer_error(result));
+        stop_with_status(reconciler, map_other_half_error(result));
     }
     publish_authority(reconciler);
 }
@@ -1454,45 +1456,45 @@ static void pull_request(noah_profile_split_reconciler_t *reconciler, uint32_t n
 }
 
 static void pull_write(noah_profile_split_reconciler_t *reconciler) {
-    noah_profile_peer_store_result_t result = noah_profile_peer_store_backend_write(reconciler->config.peer_store, reconciler->transfer_descriptor.generation, reconciler->transfer_descriptor.payload_digest, reconciler->transfer_offset, reconciler->outbound_chunk, reconciler->outbound_chunk_length);
+    noah_profile_other_half_store_result_t result = noah_profile_other_half_store_backend_write(reconciler->config.other_half_store, reconciler->transfer_descriptor.generation, reconciler->transfer_descriptor.payload_digest, reconciler->transfer_offset, reconciler->outbound_chunk, reconciler->outbound_chunk_length);
 
-    if (result != NOAH_PROFILE_PEER_STORE_OK) {
-        stop_with_status(reconciler, map_peer_error(result));
+    if (result != NOAH_PROFILE_OTHER_HALF_STORE_OK) {
+        stop_with_status(reconciler, map_other_half_error(result));
         return;
     }
-    reconciler->transfer_offset = noah_profile_peer_store_backend_next_offset(reconciler->config.peer_store);
+    reconciler->transfer_offset = noah_profile_other_half_store_backend_next_offset(reconciler->config.other_half_store);
     reconciler->state           = reconciler->transfer_offset == reconciler->transfer_descriptor.payload_length ? NOAH_PROFILE_SPLIT_RECONCILER_PULL_COMMIT_BEGIN : NOAH_PROFILE_SPLIT_RECONCILER_PULL_REQUEST;
     publish_authority(reconciler);
 }
 
 static void pull_commit_begin(noah_profile_split_reconciler_t *reconciler) {
-    noah_profile_peer_store_result_t result = noah_profile_peer_store_backend_commit_begin(reconciler->config.peer_store, &reconciler->transfer_descriptor);
+    noah_profile_other_half_store_result_t result = noah_profile_other_half_store_backend_commit_begin(reconciler->config.other_half_store, &reconciler->transfer_descriptor);
 
-    if (result == NOAH_PROFILE_PEER_STORE_OK || result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED) {
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_OK || result == NOAH_PROFILE_OTHER_HALF_STORE_ALREADY_COMMITTED) {
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
         reconciler->state          = NOAH_PROFILE_SPLIT_RECONCILER_VERIFY;
-    } else if (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
+    } else if (result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS) {
         reconciler->state = NOAH_PROFILE_SPLIT_RECONCILER_PULL_COMMIT_STEP;
     } else {
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
-        stop_with_status(reconciler, map_peer_error(result));
+        stop_with_status(reconciler, map_other_half_error(result));
     }
     publish_authority(reconciler);
 }
 
 static void pull_commit_step(noah_profile_split_reconciler_t *reconciler) {
-    noah_profile_peer_store_result_t result = noah_profile_peer_store_backend_step(reconciler->config.peer_store, NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX);
+    noah_profile_other_half_store_result_t result = noah_profile_other_half_store_backend_step(reconciler->config.other_half_store, NOAH_PROFILE_VALIDATOR_V1_STEP_READ_MAX);
 
-    if (result == NOAH_PROFILE_PEER_STORE_IN_PROGRESS) {
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_IN_PROGRESS) {
         return;
     }
     reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
-    if (result == NOAH_PROFILE_PEER_STORE_OK || result == NOAH_PROFILE_PEER_STORE_ALREADY_COMMITTED) {
+    if (result == NOAH_PROFILE_OTHER_HALF_STORE_OK || result == NOAH_PROFILE_OTHER_HALF_STORE_ALREADY_COMMITTED) {
         refresh_local(reconciler);
         refresh_metadata_response(reconciler);
         reconciler->state = NOAH_PROFILE_SPLIT_RECONCILER_VERIFY;
     } else {
-        stop_with_status(reconciler, map_peer_error(result));
+        stop_with_status(reconciler, map_other_half_error(result));
     }
     publish_authority(reconciler);
 }
@@ -1501,8 +1503,8 @@ static bool abort_transfer_for_role_change(noah_profile_split_reconciler_t *reco
     if (reconciler->transfer_owner == NOAH_PROFILE_SPLIT_TRANSFER_NONE) {
         return false;
     }
-    if (noah_profile_peer_store_backend_abortable(reconciler->config.peer_store)) {
-        (void)noah_profile_peer_store_backend_abort(reconciler->config.peer_store, &reconciler->config.peer_store->descriptor);
+    if (noah_profile_other_half_store_backend_abortable(reconciler->config.other_half_store)) {
+        (void)noah_profile_other_half_store_backend_abort(reconciler->config.other_half_store, &reconciler->config.other_half_store->descriptor);
         reconciler->transfer_owner = NOAH_PROFILE_SPLIT_TRANSFER_NONE;
         return true;
     }
@@ -1518,9 +1520,9 @@ void noah_profile_split_reconciler_init(noah_profile_split_reconciler_t *reconci
         reconciler->config = *config;
     }
     noah_profile_split_authority_init(&reconciler->authority);
-    reconciler->peer_descriptor = unreadable_descriptor();
+    reconciler->other_half_descriptor = unreadable_descriptor();
     reconciler->retry_ms        = NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
-    reconciler->state           = config && config->local_descriptor && config->local_read && config->exchange && config->peer_store ? NOAH_PROFILE_SPLIT_RECONCILER_PASSIVE : NOAH_PROFILE_SPLIT_RECONCILER_UNINITIALIZED;
+    reconciler->state           = config && config->local_descriptor && config->local_read && config->exchange && config->other_half_store ? NOAH_PROFILE_SPLIT_RECONCILER_PASSIVE : NOAH_PROFILE_SPLIT_RECONCILER_UNINITIALIZED;
     reconciler->initialized     = reconciler->state != NOAH_PROFILE_SPLIT_RECONCILER_UNINITIALIZED;
     if (reconciler->initialized) {
         refresh_local(reconciler);
@@ -1544,13 +1546,13 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
         publish_authority(reconciler);
     }
     release_transient_busy_response(reconciler);
-    reconciler->published_store_state = (uint8_t)noah_profile_peer_store_backend_state(reconciler->config.peer_store);
+    reconciler->published_store_state = (uint8_t)noah_profile_other_half_store_backend_state(reconciler->config.other_half_store);
     reconciler->published_owner       = (uint8_t)reconciler->transfer_owner;
-    reconciler->published_admission   = (uint8_t)noah_profile_candidate_store_backend_admission_owner(reconciler->config.peer_store->backend);
-    if (reconciler->observed_peer_activity_sequence != reconciler->peer_activity_sequence) {
-        reconciler->observed_peer_activity_sequence = reconciler->peer_activity_sequence;
-        reconciler->peer_activity_known             = true;
-        reconciler->last_peer_activity_at           = now_ms;
+    reconciler->published_admission   = (uint8_t)noah_profile_candidate_store_backend_admission_owner(reconciler->config.other_half_store->backend);
+    if (reconciler->observed_other_half_activity_sequence != reconciler->other_half_activity_sequence) {
+        reconciler->observed_other_half_activity_sequence = reconciler->other_half_activity_sequence;
+        reconciler->other_half_activity_known       = true;
+        reconciler->last_other_half_activity_at     = now_ms;
     }
     role_changed  = reconciler->role_known && reconciler->master != master;
     losing_master = role_changed && reconciler->master && !master;
@@ -1570,7 +1572,7 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
         }
         reconciler->next_attempt_at = now_ms;
         reconciler->retry_ms        = NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
-        invalidate_peer(reconciler);
+        invalidate_other_half(reconciler);
         if (abort_transfer_for_role_change(reconciler)) {
             publish_authority(reconciler);
             return true;
@@ -1594,9 +1596,9 @@ bool noah_profile_split_reconciler_scan_mode(noah_profile_split_reconciler_t *re
         if (!reconciler->prepared_push_active) {
             reconciler->state = NOAH_PROFILE_SPLIT_RECONCILER_PASSIVE;
         }
-        if (reconciler->peer_activity_known && deadline_reached(now_ms, reconciler->last_peer_activity_at + NOAH_PROFILE_SPLIT_PEER_TIMEOUT_MS)) {
-            reconciler->peer_activity_known = false;
-            invalidate_peer(reconciler);
+        if (reconciler->other_half_activity_known && deadline_reached(now_ms, reconciler->last_other_half_activity_at + NOAH_PROFILE_SPLIT_OTHER_HALF_TIMEOUT_MS)) {
+            reconciler->other_half_activity_known = false;
+            invalidate_other_half(reconciler);
         }
         return false;
     }
@@ -1687,8 +1689,9 @@ bool noah_profile_split_reconciler_prepared_push_begin(noah_profile_split_reconc
     if (reconciler->prepared_push_active) {
         return noah_profile_descriptor_equal(&reconciler->transfer_descriptor, descriptor);
     }
-    // The peer may still hold a released push's lease; a second provisional
-    // transfer would only meet BUSY. Wait for its cleanup to be confirmed.
+    // The other half may still hold a released push's lease; a second
+    // provisional transfer would only meet BUSY. Wait for its cleanup to be
+    // confirmed.
     if (reconciler->orphan_pending) {
         return false;
     }
@@ -1782,11 +1785,11 @@ bool noah_profile_split_reconciler_prepared_push_cancel(noah_profile_split_recon
     return true;
 }
 
-bool noah_profile_split_reconciler_provisional_peer_descriptor(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_descriptor_t *descriptor) {
-    if (!(reconciler && reconciler->initialized && descriptor && reconciler->provisional_peer_descriptor_known)) {
+bool noah_profile_split_reconciler_provisional_other_half_descriptor(const noah_profile_split_reconciler_t *reconciler, noah_profile_split_descriptor_t *descriptor) {
+    if (!(reconciler && reconciler->initialized && descriptor && reconciler->provisional_other_half_descriptor_known)) {
         return false;
     }
-    *descriptor = reconciler->provisional_peer_descriptor;
+    *descriptor = reconciler->provisional_other_half_descriptor;
     return true;
 }
 

@@ -270,13 +270,13 @@ static void test_auto_save_power_cuts(void) {
     auto_flash_edit(1u, true, &now);
     assert(noah_profile_owner_save(&auto_owner, 2u, auto_owner.working.session, auto_owner.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
     for (uint32_t guard = 0u; guard < 20000u && auto_owner.save.phase; guard++) auto_flash_scan(&now);
-    assert(auto_owner.save.last_result == NOAH_PROFILE_WORKING_OK && committed_generation(&auto_owner.store) == 1u);
+    assert(auto_owner.save.last_result == NOAH_PROFILE_WORKING_OK && saved_generation(&auto_owner.store) == 1u);
     auto_chip.operations = 0u;
     auto_snapshot = auto_chip;
     auto_owner.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_LIVE;
     auto_flash_edit(3u, false, &now);
     for (uint32_t guard = 0u; guard < 20000u && !auto_owner.save.keyboard_saves; guard++) auto_flash_scan(&now);
-    assert(auto_owner.save.keyboard_saves == 1u && committed_generation(&auto_owner.store) == 2u);
+    assert(auto_owner.save.keyboard_saves == 1u && saved_generation(&auto_owner.store) == 2u);
     uint32_t operations = auto_chip.operations;
     assert(operations >= 8u); // header, payload, markers and erases all traversed
     for (uint32_t cut = 1u; cut <= operations; cut++) {
@@ -290,8 +290,8 @@ static void test_auto_save_power_cuts(void) {
             auto_flash_boot(&now);
             // A torn last marker may already make generation 2 durable;
             // otherwise generation 1 must remain valid, never defaults.
-            assert(committed_generation(&auto_owner.store) == 1u || committed_generation(&auto_owner.store) == 2u);
-            assert(active_scalar(&auto_owner, NOAH_SETTING_DEFAULT_DPI) == (committed_generation(&auto_owner.store) == 1u ? 400u : 800u));
+            assert(saved_generation(&auto_owner.store) == 1u || saved_generation(&auto_owner.store) == 2u);
+            assert(active_scalar(&auto_owner, NOAH_SETTING_DEFAULT_DPI) == (saved_generation(&auto_owner.store) == 1u ? 400u : 800u));
         }
     }
     printf("automatic save: power cut before/halfway through all %u physical erase/program operations preserves a complete profile\n", operations);
@@ -335,7 +335,7 @@ static void test_an_apply_and_an_adjustment_land_in_the_order_made(void) {
     scan_until_converged(&left, &right, &now);
     assert(noah_profile_owner_save(&left, 2u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
     for (uint32_t guard = 0u; guard < 20000u && left.save.phase; guard++) scan_pair(&left, &right, &now);
-    assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && left.committed_descriptor.generation == 1u);
+    assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && left.saved_descriptor.generation == 1u);
     scan_until_converged(&left, &right, &now);
 
     // A DPI key queues 800; a new Apply waits until it publishes (the
@@ -353,7 +353,7 @@ static void test_an_apply_and_an_adjustment_land_in_the_order_made(void) {
     commit_valid_candidate_pair(&left, &right, 9u, 2u, &now);
     scan_until_converged(&left, &right, &now);
     auto_run_until(&left, &right, &now, 60000u);
-    assert(!left.working.active && !right.working.active && left.save.keyboard_saves == 0u && left.committed_descriptor.generation == 2u && right.committed_descriptor.generation == 2u);
+    assert(!left.working.active && !right.working.active && left.save.keyboard_saves == 0u && left.saved_descriptor.generation == 2u && right.saved_descriptor.generation == 2u);
 
     // An adjustment arriving while an admitted Apply runs lets it finish, then
     // publishes onto the applied profile (here without settings: the inherited
@@ -369,7 +369,7 @@ static void test_an_apply_and_an_adjustment_land_in_the_order_made(void) {
     assert_active_settings(&left, expected);
     assert_active_settings(&right, expected);
     auto_run_until(&left, &right, &now, 10000u);
-    assert(left.save.keyboard_saves == 1u && !left.working.active && left.committed_descriptor.generation == 4u && right.committed_descriptor.generation == 4u);
+    assert(left.save.keyboard_saves == 1u && !left.working.active && left.saved_descriptor.generation == 4u && right.saved_descriptor.generation == 4u);
     assert_active_settings(&left, expected);
     puts("an Apply admitted once a queued adjustment publishes replaces it; one admitted already finishes, then the adjustment follows it");
 }
@@ -403,7 +403,7 @@ static void test_adjustments_without_a_settings_domain(void) {
                 assert(left.save.keyboard_saves == 2u && !left.working.active);
             }
             left.working_sync.mode.mode = right.working_sync.mode.mode = mode;
-            uint32_t saves = left.save.keyboard_saves, generation = left.committed_descriptor.generation, writes = lm.writes + rm.writes;
+            uint32_t saves = left.save.keyboard_saves, generation = left.saved_descriptor.generation, writes = lm.writes + rm.writes;
             // Two adjustments coalesce; every other scalar stays the default.
             assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 800u));
             assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 1000u));
@@ -422,7 +422,7 @@ static void test_adjustments_without_a_settings_domain(void) {
                 continue;
             }
             // Live and Apply save an adjustment-only copy; the revision advanced.
-            assert(!left.working.active && left.save.keyboard_saves == saves + 1u && left.committed_descriptor.generation == generation + 1u && right.committed_descriptor.generation == generation + 1u);
+            assert(!left.working.active && left.save.keyboard_saves == saves + 1u && left.saved_descriptor.generation == generation + 1u && right.saved_descriptor.generation == generation + 1u);
             // A replug boots the saved profile with the adjusted values and every other default.
             boot_live_pair(&left, &lm, &right, &rm, &ll, &rl, &lw, &rw, 130u, &now);
             scan_until_converged(&left, &right, &now);
@@ -447,7 +447,7 @@ static void test_a_failed_automatic_save_is_reported_and_not_repeated(void) {
         auto_flash_edit(1u, true, &now);
         assert(noah_profile_owner_save(&auto_owner, 2u, auto_owner.working.session, auto_owner.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
         for (uint32_t guard = 0u; guard < 20000u && auto_owner.save.phase; guard++) auto_flash_scan(&now);
-        assert(auto_owner.save.last_result == NOAH_PROFILE_WORKING_OK && committed_generation(&auto_owner.store) == 1u);
+        assert(auto_owner.save.last_result == NOAH_PROFILE_WORKING_OK && saved_generation(&auto_owner.store) == 1u);
         auto_owner.working_sync.mode.mode = NOAH_PROFILE_EDIT_MODE_LIVE;
 
         // The chip refuses every write from now on.
@@ -456,7 +456,7 @@ static void test_a_failed_automatic_save_is_reported_and_not_repeated(void) {
         uint32_t revision = auto_owner.working.revision;
         auto_flash_run_attempt(&now);
         assert(auto_owner.save.last_automatic && auto_owner.save.last_result != NOAH_PROFILE_WORKING_OK && auto_owner.save.last_error != 0u);
-        assert(auto_owner.save.keyboard_saves == 0u && committed_generation(&auto_owner.store) == 1u);
+        assert(auto_owner.save.keyboard_saves == 0u && saved_generation(&auto_owner.store) == 1u);
         assert(auto_owner.working.active && auto_owner.working.revision == revision);
         // Reported through the ordinary Save status, and the edit stays unsaved.
         noah_profile_owner_working_status_t status;
@@ -484,7 +484,7 @@ static void test_a_failed_automatic_save_is_reported_and_not_repeated(void) {
             assert(auto_owner.save.keyboard_saves == 1u && auto_owner.save.last_automatic && auto_owner.save.last_result == NOAH_PROFILE_WORKING_OK);
         }
         for (uint32_t guard = 0u; guard < 20000u && (auto_owner.save.phase || auto_owner.working.active); guard++) auto_flash_scan(&now);
-        assert(!auto_owner.working.active && committed_generation(&auto_owner.store) == 2u);
+        assert(!auto_owner.working.active && saved_generation(&auto_owner.store) == 2u);
         assert(active_scalar(&auto_owner, NOAH_SETTING_DEFAULT_DPI) == (explicit_retry ? 800u : 1000u));
     }
     puts("a failed automatic save is reported, not repeated for its revision, and an explicit Save or a new edit retries it");
@@ -518,7 +518,7 @@ static void test_saving_the_saved_bytes_writes_nothing(void) {
         scan_until_converged(&left, &right, &now);
         assert(noah_profile_owner_save(&left, 20u, left.working.session, left.working.revision) == NOAH_PROFILE_WORKING_QUEUED);
         for (uint32_t guard = 0u; guard < 20000u && left.save.phase; guard++) scan_pair(&left, &right, &now);
-        assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && left.committed_descriptor.generation == 1u);
+        assert(left.save.last_result == NOAH_PROFILE_WORKING_OK && left.saved_descriptor.generation == 1u);
         scan_until_converged(&left, &right, &now);
         // DPI to 800, then back to the saved 400.
         write_u32(value, 800u);
@@ -541,7 +541,7 @@ static void test_saving_the_saved_bytes_writes_nothing(void) {
         }
         scan_until_converged(&left, &right, &now);
         assert(lm.writes + rm.writes == writes);
-        assert(left.committed_descriptor.generation == 1u && right.committed_descriptor.generation == 1u);
+        assert(left.saved_descriptor.generation == 1u && right.saved_descriptor.generation == 1u);
         assert(!left.working.active && !right.working.active);
         assert(left.working.revision == revision && right.working.revision == revision);
         assert(active_scalar(&left, NOAH_SETTING_DEFAULT_DPI) == 400u && active_scalar(&right, NOAH_SETTING_DEFAULT_DPI) == 400u);

@@ -18,8 +18,8 @@ half receives the computed result, and both run the same stages over it.
 flowchart TD
     qmk["QMK rgb_matrix_task: background effect into the LED buffer"] --> hook["rgb_matrix_indicators_advanced_user (hooks.c)"]
     hook --> run["noah_rgb_matrix_indicators_advanced_user (rgb/core/rgb_runtime.c)"]
-    run -->|"first chunk of a frame"| capture["capture one effective lighting frame; drop the source snapshot"]
-    capture --> view["rgb/core/rgb_effective_config.c → profile/runtime/effective_rgb_runtime.c"]
+    run -->|"first chunk of a frame"| capture["capture one lighting frame of the active profile; drop the source snapshot"]
+    capture --> view["rgb/core/rgb_active_profile_config.c → profile/runtime/active_profile_rgb_runtime.c"]
     run --> clip["clip the chunk to this half's LEDs"]
     clip --> stages["stages, in order, each into a scratch frame, then applied"]
     stages --> idle["lighting idle timeout (NOAH_PORTABLE_PROFILE_ENABLE)"]
@@ -32,32 +32,33 @@ flowchart TD
 
 QMK calls the hook once per LED chunk. `rgb_runtime_range_starts_frame`
 detects a frame's first chunk; there the render drops its source snapshot and
-captures one effective lighting frame (`noah_effective_rgb_frame_t`) that
-every stage of every chunk in that frame reads. `rgb_runtime_normalize_local_range` clips the range to the half's own
-LEDs (`RGB_MATRIX_SPLIT`), so each half draws only itself. Returning without
+captures one lighting frame of the active profile
+(`noah_active_profile_rgb_frame_t`) that every stage of every chunk in that
+frame reads. `rgb_runtime_normalize_local_range` clips the range to the half's
+own LEDs (`RGB_MATRIX_SPLIT`), so each half draws only itself. Returning without
 painting leaves QMK's background effect.
 
 ## The lighting view
 
-`profile_owner.c` registers `noah_effective_rgb_runtime_invalidate` among the
-active profile's invalidators ([profile-flow.md](profile-flow.md)). Each
+`profile_owner.c` registers `noah_active_profile_rgb_runtime_invalidate` among
+the active profile's invalidators ([profile-flow.md](profile-flow.md)). Each
 activation, on each half, publishes into a double bank under a
 `state/shared/runtime_publication.h` generation: the validated view of the
 active profile's lighting domain, or the compiled view
 (`profile_rgb_compiled_v1.c`) when the profile has none.
 
-- `rgb_effective_config.c` is the stages' only reader. Every accessor checks
-  the captured frame is still current and its stage bit is set, and reads one
-  record. Without an installed runtime (narrow host and feature builds) its
+- `rgb_active_profile_config.c` is the stages' only reader. Every accessor
+  checks the captured frame is still current and its stage bit is set, and reads
+  one record. Without an installed runtime (narrow host and feature builds) its
   weak fallbacks serve the compiled view.
-- Each stage asks `rgb_effective_config_frame_current` after painting and
+- Each stage asks `rgb_active_profile_config_frame_current` after painting and
   clears its scratch frame if a newer generation was published meanwhile, so
   a frame never shows two profiles.
 - The mapped-only key map (`rgb_layer_stage.c`) rebuilds when
-  `noah_effective_rgb_publication_epoch` moves, since the keymap changed with
-  the profile.
+  `noah_active_profile_rgb_publication_epoch` moves, since the keymap changed
+  with the profile.
 - The key runtime reads the tap-commit policy through the same view
-  (`key_feedback_tap_commit_mode` in `rgb_effective_config.c`), and a stale
+  (`key_feedback_tap_commit_mode` in `rgb_active_profile_config.c`), and a stale
   or busy read is off.
 
 ## Stages and their truth
@@ -69,7 +70,7 @@ active profile's lighting domain, or the compiled view
 | 1 | auto-mouse fade, instead | `automouse/rgb_automouse_stage.c`, `rgb_automouse.c` | QMK's auto-mouse timer through `compat/qmk_auto_mouse_contract.h` | base packet's quantized progress |
 | 2 | combo, beneath | `stages/rgb_combo_feedback_stage.c` | `combo_feedback_bitmaps` (`key/runtime/feedback.c`) | combo packet |
 | 3 | layer preview | `stages/rgb_preview_stage.c` | `key_feedback_preview_layer` (`feedback.c`) | base packet's preview layer |
-| 4 | pointing mode | `stages/rgb_pd_mode_stage.c` | `pd_mode_snapshot_with_owner_bitmap` (`pointing/runtime/pd_mode_snapshot.c`), local state | the same, remote display state the base packet applied |
+| 4 | pointing mode | `stages/rgb_pointing_mode_stage.c` | `pointing_mode_snapshot_with_owner_bitmap` (`pointing/runtime/pointing_mode_snapshot.c`), local state | the same, remote display state the base packet applied |
 | 5 | combo, above | `stages/rgb_combo_feedback_stage.c` | as 2 | as 2 |
 | 6 | key feedback | `stages/rgb_key_feedback_stage.c` | the four maps from `feedback.c` | semantic and branch packets |
 | 7 | idle timeout, only under `NOAH_PORTABLE_PROFILE_ENABLE` (the write path) | `rgb_runtime_render_range` (`rgb_runtime.c`) | `last_input_activity_elapsed` against the lighting idle timeout setting | the same; QMK mirrors activity |
@@ -84,18 +85,20 @@ active profile's lighting domain, or the compiled view
   `KEY_FEEDBACK_PREVIEW_DISPLAY_BRIDGE_MS` (20 ms) after the preview ends if
   that layer is now on, so the handoff to the layer stage does not flicker.
 - Both halves drop a pending tap-branch semantic on keys either combo bitmap
-  covers (`rgb_runtime_render_snapshot_suppress_combo_tap_branch_semantics`):
-  the key-feedback packets can lag the combo packet.
+  covers (`rgb_runtime_render_snapshot_suppress_combo_tap_branch_semantics`),
+  so a combo member's tap-branch colour is hidden on both halves: the slave
+  half's key-feedback packets can lag its combo packet, and the master half
+  does the same so the halves look alike.
 
 ## Who owns which fact
 
 | Fact | Owner | Lighting reads it through |
 | --- | --- | --- |
-| The lighting profile | the active profile (`profile/runtime/`) | `rgb_effective_config.c` |
+| The lighting profile | the active profile (`profile/runtime/`) | `rgb_active_profile_config.c` |
 | Layers that are on | `state/ownership/layer_ownership.c`, QMK `layer_state` | `layer_state` |
 | Active combos, owner keys, footprints | `compat/qmk_combo_origin.c`, `key/runtime/slot/origin_registry.c` | `combo_feedback_bitmaps` |
 | Presses, tap series, leases, pulses | `key/runtime/reducer/` (`key_runtime_core_state_t`) | `feedback.c`, which derives the maps on demand |
-| Running and locked pointing mode, its owner | `pointing/runtime/pd_mode_state.c` | `pd_mode_snapshot_with_owner_bitmap` |
+| Running and locked pointing mode, its owner | `pointing/runtime/pointing_mode_state.c` | `pointing_mode_snapshot_with_owner_bitmap` |
 | Auto-mouse timer | QMK | `compat/qmk_auto_mouse_contract.h` |
 | Last input | QMK, mirrored by split activity | `last_input_activity_elapsed` |
 
@@ -161,7 +164,7 @@ lights all its keys.
    which can preempt the main loop. Each publishes its domain into
    `split_runtime_sync_remote` between `noah_runtime_publication_begin` and
    `_end`; the base callback also hands the pointing identity to the pointing
-   runtime (`pd_mode_apply_remote_mode_ids_with_owner_bitmap`).
+   runtime (`pointing_mode_apply_remote_mode_ids_with_owner_bitmap`).
 4. At a frame's first use, the render copies the combo and key-feedback
    domains into `rgb_runtime_render_snapshot` through
    `split_runtime_sync_remote_read_*`; a read that meets a publication keeps
@@ -188,7 +191,7 @@ timestamps (QMK's split sync, the latter coalesced).
 - `run_rgb_layer_render_tests.sh`: the stages and their order on both halves,
   remote snapshots, localities, newest owner, auto-mouse fade, chunked frames,
   the idle timeout.
-- `run_effective_rgb_runtime_tests.sh`: the double bank, stale frames.
+- `run_active_profile_rgb_runtime_tests.sh`: the double bank, stale frames.
 - `run_rgb_validation_tests.sh`, `run_profile_rgb_v1_tests.sh`,
   `run_profile_rgb_v4_tests.sh`: the lighting domain and authored tables.
 - `run_runtime_debug_tests.sh`, `run_tap_depth_eight_tests.sh`: the

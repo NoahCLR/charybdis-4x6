@@ -5,7 +5,7 @@
 #include "noah_keymap_ids.h"
 #include "send_string.h"
 
-#include "../profile/runtime/effective_keymap_macros_runtime.h"
+#include "../profile/runtime/active_profile_keymap_macros_runtime.h"
 #include "macro_slot_provider.h"
 
 #ifndef NOAH_MACRO_SLOT_DELAY
@@ -33,7 +33,7 @@ static const macro_slot_provider_t profile_macro_provider = {
 // Keep the initial bank search's workspace off the window decoder's stack. It
 // counts terminators a chunk at a time rather than one read per byte.
 static __attribute__((noinline)) bool profile_macro_provider_find_slot(uint8_t slot, uint16_t *offset, uint16_t *remaining) {
-    uint16_t size = noah_effective_macro_bank_length();
+    uint16_t size = noah_active_profile_macro_bank_length();
     uint16_t base = 0;
     uint8_t  chunk[32];
 
@@ -41,7 +41,7 @@ static __attribute__((noinline)) bool profile_macro_provider_find_slot(uint8_t s
         return false;
     }
 
-    if (!noah_effective_macro_bank_read(size - 1u, chunk, 1u) || chunk[0] != 0) {
+    if (!noah_active_profile_macro_bank_read(size - 1u, chunk, 1u) || chunk[0] != 0) {
         return false;
     }
 
@@ -50,7 +50,7 @@ static __attribute__((noinline)) bool profile_macro_provider_find_slot(uint8_t s
             return false;
         }
         uint16_t length = (size_t)(size - base) < sizeof(chunk) ? (uint16_t)(size - base) : (uint16_t)sizeof(chunk);
-        if (!noah_effective_macro_bank_read(base, chunk, length)) return false;
+        if (!noah_active_profile_macro_bank_read(base, chunk, length)) return false;
         for (uint16_t index = 0; index < length && slot > 0; index++) {
             if (chunk[index] == 0) {
                 slot--;
@@ -70,7 +70,7 @@ static bool profile_macro_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir,
     if (!ir || !cursor) {
         return false;
     }
-    if (!noah_effective_macro_bank_is_live()) {
+    if (!noah_active_profile_macro_bank_is_live()) {
         const char *payload = macro_payloads[slot];
         if (!payload || !*payload) { *ir = (macro_payload_ir_t){0}; return true; }
         return macro_payload_compile(payload, ir);
@@ -85,7 +85,7 @@ static bool profile_macro_provider_load_ir(uint8_t slot, macro_payload_ir_t *ir,
 
     // The shared engine has one active window, and the cached slot offset
     // stays fixed throughout this synchronous decode.
-    return macro_payload_decode_qmk_window(ir, cursor, profile_macro_found.remaining, noah_effective_macro_read_byte, &profile_macro_found.offset);
+    return macro_payload_decode_qmk_window(ir, cursor, profile_macro_found.remaining, noah_active_profile_macro_read_byte, &profile_macro_found.offset);
 }
 
 bool noah_profile_macro_start(uint16_t action) {
@@ -94,7 +94,7 @@ bool noah_profile_macro_start(uint16_t action) {
     }
 
     static uint32_t publication;
-    uint32_t current = noah_effective_keymap_macros_publication();
+    uint32_t current = noah_active_profile_keymap_macros_publication();
     if (current != publication) {
         profile_macro_found.valid = false;
         macro_slot_provider_invalidate_all(&profile_macro_provider, profile_macro_slots);

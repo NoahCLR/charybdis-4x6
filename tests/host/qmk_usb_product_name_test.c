@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "users/noah/lib/compat/qmk_usb_product_name.h"
-#include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 #include "users/noah/lib/profile/schema/profile_settings_defaults.h"
 #include "users/noah/lib/profile/storage/profile_store_runtime.h"
 
@@ -42,10 +42,10 @@ bool noah_profile_settings_defaults_keyboard_name(noah_profile_keyboard_name_t *
 bool noah_profile_store_runtime_usb_restart_safe(void) {
     return settled;
 }
-void noah_effective_settings_keyboard_name(noah_profile_keyboard_name_t *name) {
+void noah_active_profile_settings_keyboard_name(noah_profile_keyboard_name_t *name) {
     *name = live_name;
 }
-uint32_t noah_effective_settings_publication(void) {
+uint32_t noah_active_profile_settings_publication(void) {
     return publication;
 }
 
@@ -72,13 +72,13 @@ static void serves(const char *text) {
 }
 // A booted, enumerated master half running `text`, or with nothing saved its
 // compiled defaults, with nothing in flight.
-static void boot(const char *committed, bool is_master) {
-    boot_found = committed != NULL;
-    boot_name  = boot_found ? name_of(committed) : (noah_profile_keyboard_name_t){0};
+static void boot(const char *saved, bool is_master) {
+    boot_found = saved != NULL;
+    boot_name  = boot_found ? name_of(saved) : (noah_profile_keyboard_name_t){0};
     master = is_master, usb_active = true, settled = true;
     restarts = 0;
     noah_qmk_usb_product_name_pre_init();
-    live_name = committed ? name_of(committed) : compiled_name;
+    live_name = saved ? name_of(saved) : compiled_name;
     publication++;
 }
 
@@ -103,7 +103,7 @@ static void test_encoding(void) {
     assert(noah_qmk_usb_product_name_encode(NULL, descriptor, sizeof(descriptor)) == 0u);
 }
 
-static void test_boot_serves_the_committed_name(void) {
+static void test_boot_serves_the_saved_name(void) {
     boot("Desk", true);
     assert(boot_reads == 1u);
     serves("Desk");
@@ -111,7 +111,7 @@ static void test_boot_serves_the_committed_name(void) {
     noah_qmk_usb_product_name_task();
     assert(restarts == 0u);
     serves("Desk");
-    // Nothing usable committed, and compiled defaults without a name: QMK's
+    // Nothing usable saved, and compiled defaults without a name: QMK's
     // built-in name.
     boot(NULL, true);
     serves(NULL);
@@ -185,7 +185,7 @@ static void test_half_without_usb_never_restarts(void) {
 }
 
 static void test_boot_activates_a_different_profile(void) {
-    // Boot read one name, the owner settled on another (the peer's newer
+    // Boot read one name, the owner settled on another (the other half's newer
     // profile, or a stored one it refused): restart to the running name.
     boot("Desk", true);
     publish("");
@@ -211,7 +211,7 @@ static void test_unencodable_name_settles(void) {
 
 int main(void) {
     test_encoding();
-    test_boot_serves_the_committed_name();
+    test_boot_serves_the_saved_name();
     test_boot_serves_the_compiled_name();
     test_rename_restarts_once_when_safe();
     test_half_without_usb_never_restarts();

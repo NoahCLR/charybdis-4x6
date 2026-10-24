@@ -19,7 +19,7 @@ static noah_profile_split_descriptor_t compiled_descriptor(void) {
     };
 }
 
-static noah_profile_split_descriptor_t committed_descriptor(uint32_t generation, uint8_t origin, uint32_t digest) {
+static noah_profile_split_descriptor_t saved_descriptor(uint32_t generation, uint8_t origin, uint32_t digest) {
     noah_profile_split_descriptor_t descriptor = compiled_descriptor();
 
     descriptor.generation     = generation;
@@ -71,87 +71,87 @@ static void assert_descriptors_equal(const noah_profile_split_descriptor_t *actu
 
 static void test_authority_decision_table(void) {
     noah_profile_split_descriptor_t absent     = compiled_descriptor();
-    noah_profile_split_descriptor_t local      = committed_descriptor(7u, 0u, UINT32_C(0x10203040));
-    noah_profile_split_descriptor_t peer       = local;
+    noah_profile_split_descriptor_t local      = saved_descriptor(7u, 0u, UINT32_C(0x10203040));
+    noah_profile_split_descriptor_t other_half = local;
     noah_profile_split_descriptor_t unreadable = {0};
 
-    assert(noah_profile_split_authority_compare(&unreadable, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_UNREADABLE);
-    assert(noah_profile_split_authority_compare(&absent, &unreadable) == NOAH_PROFILE_SPLIT_AUTHORITY_PEER_UNREADABLE);
+    assert(noah_profile_split_authority_compare(&unreadable, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_UNREADABLE);
+    assert(noah_profile_split_authority_compare(&absent, &unreadable) == NOAH_PROFILE_SPLIT_AUTHORITY_OTHER_HALF_UNREADABLE);
     assert(noah_profile_split_authority_compare(&absent, &absent) == NOAH_PROFILE_SPLIT_AUTHORITY_COMPILED_CONVERGED);
     assert(noah_profile_split_authority_compare(&local, &absent) == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_NEWER);
-    assert(noah_profile_split_authority_compare(&absent, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER);
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED);
+    assert(noah_profile_split_authority_compare(&absent, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_OTHER_HALF_NEWER);
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_SAVED_CONVERGED);
 
-    peer.generation = 8u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_PEER_NEWER);
-    peer.generation = 6u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_NEWER);
+    other_half.generation = 8u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_OTHER_HALF_NEWER);
+    other_half.generation = 6u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_LOCAL_NEWER);
 
-    peer             = local;
-    peer.origin_half = 1u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_CONCURRENT_COMMIT);
-    peer = local;
-    peer.payload_digest ^= 1u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
-    peer = local;
-    peer.payload_crc32 ^= 1u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
-    peer = local;
-    peer.domain_mask ^= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
-    peer = local;
-    peer.compiled_default_digest ^= 1u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE);
-    peer = local;
-    peer.action_abi_digest ^= 1u;
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE);
+    other_half       = local;
+    other_half.origin_half = 1u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_CONCURRENT_COMMIT);
+    other_half = local;
+    other_half.payload_digest ^= 1u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
+    other_half = local;
+    other_half.payload_crc32 ^= 1u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
+    other_half = local;
+    other_half.domain_mask ^= NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_CORRUPT_SAME_TUPLE);
+    other_half = local;
+    other_half.compiled_default_digest ^= 1u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE);
+    other_half = local;
+    other_half.action_abi_digest ^= 1u;
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_INCOMPATIBLE);
 
-    peer             = local;
-    peer.domain_mask = 0x80u;
-    assert(!noah_profile_split_descriptor_valid(&peer));
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
+    other_half       = local;
+    other_half.domain_mask = 0x80u;
+    assert(!noah_profile_split_descriptor_valid(&other_half));
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
 
-    peer               = local;
+    other_half         = local;
     local.schema_major = 1u;
-    peer.schema_major  = 1u;
+    other_half.schema_major = 1u;
     assert(!noah_profile_split_descriptor_valid(&local));
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
 
-    local            = committed_descriptor(7u, 0u, UINT32_C(0x10203040));
-    peer             = local;
-    peer.has_profile = false;
-    assert(!noah_profile_split_descriptor_valid(&peer));
-    assert(noah_profile_split_authority_compare(&local, &peer) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
+    local            = saved_descriptor(7u, 0u, UINT32_C(0x10203040));
+    other_half       = local;
+    other_half.has_profile = false;
+    assert(!noah_profile_split_descriptor_valid(&other_half));
+    assert(noah_profile_split_authority_compare(&local, &other_half) == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
 }
 
 static void test_authority_publication_and_activation_observer(void) {
     noah_profile_split_authority_t        authority;
     noah_profile_split_authority_status_t status;
     noah_profile_split_descriptor_t       absent     = compiled_descriptor();
-    noah_profile_split_descriptor_t       local      = committed_descriptor(9u, 1u, UINT32_C(0x99887766));
-    noah_profile_split_descriptor_t       peer       = local;
+    noah_profile_split_descriptor_t       local      = saved_descriptor(9u, 1u, UINT32_C(0x99887766));
+    noah_profile_split_descriptor_t       other_half = local;
     uint8_t                               unresolved = 99u;
 
     noah_profile_split_authority_init(&authority);
-    assert(noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(noah_profile_split_authority_other_half_observer(&authority, &unresolved));
     assert(unresolved == 1u);
 
     assert(noah_profile_split_authority_publish(&authority, absent, absent, false));
-    assert(noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(noah_profile_split_authority_other_half_observer(&authority, &unresolved));
     assert(unresolved == 0u);
-    assert(noah_profile_split_authority_publish(&authority, local, peer, true));
-    assert(noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(noah_profile_split_authority_publish(&authority, local, other_half, true));
+    assert(noah_profile_split_authority_other_half_observer(&authority, &unresolved));
     assert(unresolved == 1u);
-    assert(noah_profile_split_authority_publish(&authority, local, peer, false));
-    assert(noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(noah_profile_split_authority_publish(&authority, local, other_half, false));
+    assert(noah_profile_split_authority_other_half_observer(&authority, &unresolved));
     assert(unresolved == 0u);
 
-    peer.schema_major = 0u;
-    assert(!noah_profile_split_authority_publish(&authority, local, peer, false));
+    other_half.schema_major = 0u;
+    assert(!noah_profile_split_authority_publish(&authority, local, other_half, false));
     assert(noah_profile_split_authority_status(&authority, &status));
     assert(status.state == NOAH_PROFILE_SPLIT_AUTHORITY_INVALID_METADATA);
     assert(status.publication_count == 4u);
-    assert(noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(noah_profile_split_authority_other_half_observer(&authority, &unresolved));
     assert(unresolved == 1u);
 
     authority.status.publication_count = UINT32_MAX;
@@ -159,10 +159,10 @@ static void test_authority_publication_and_activation_observer(void) {
     assert(authority.status.publication_count == UINT32_MAX);
 
     authority.publication_sequence = 1u;
-    status.state                   = NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED;
+    status.state                   = NOAH_PROFILE_SPLIT_AUTHORITY_SAVED_CONVERGED;
     assert(!noah_profile_split_authority_status(&authority, &status));
-    assert(status.state == NOAH_PROFILE_SPLIT_AUTHORITY_COMMITTED_CONVERGED);
-    assert(!noah_profile_split_authority_peer_observer(&authority, &unresolved));
+    assert(status.state == NOAH_PROFILE_SPLIT_AUTHORITY_SAVED_CONVERGED);
+    assert(!noah_profile_split_authority_other_half_observer(&authority, &unresolved));
 }
 
 static void assert_round_trip(const noah_profile_split_v1_frame_t *expected) {
@@ -210,7 +210,7 @@ static void test_protocol_golden_frames(void) {
         0x04, 0x08, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00, 0x40, 0x30, 0x20, 0x10, 0x0E, 0x00, 0x00, 0x00, 0x41, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x41,
     };
     noah_profile_split_v1_frame_t metadata = {.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = compiled_descriptor()};
-    noah_profile_split_v1_frame_t begin    = {.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = committed_descriptor(7u, 1u, UINT32_C(0x10203040))};
+    noah_profile_split_v1_frame_t begin    = {.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = saved_descriptor(7u, 1u, UINT32_C(0x10203040))};
     noah_profile_split_v1_frame_t chunk    = {
         .kind           = NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK,
         .status         = NOAH_PROFILE_SPLIT_V1_STATUS_OK,
@@ -356,7 +356,7 @@ static void test_protocol_rejects_malformed_sized_frames(void) {
     wire[42] = 1u;
     refresh_crc_length(wire, length);
     assert(!noah_profile_split_v1_frame_decode(wire, length, &decoded));
-    // Kind 2 names the working copy over a committed base (D-F32); kind 3
+    // Kind 2 names the working copy over a saved base (D-F32); kind 3
     // names nothing.
     (void)noah_profile_split_v1_frame_encode(&reuse, wire, sizeof(wire));
     wire[40] = 2u;
@@ -475,7 +475,7 @@ static void test_protocol_descriptor_flags(void) {
 
     for (uint8_t origin = 0u; origin < 2u; origin++) {
         for (uint8_t flags = 0u; flags < 2u; flags++) {
-            frame.descriptor               = committed_descriptor(9u, origin, UINT32_C(0x01020304));
+            frame.descriptor               = saved_descriptor(9u, origin, UINT32_C(0x01020304));
             frame.descriptor.profile_flags = flags;
             assert(noah_profile_split_v1_frame_encode(&frame, wire, sizeof(wire)) == NOAH_PROFILE_SPLIT_V1_FRAME_SIZE);
             assert(wire[3] == (uint8_t)(0x03u | (origin << 3u) | (flags << 4u)));
@@ -498,10 +498,10 @@ static void test_protocol_descriptor_flags(void) {
 }
 
 // Flag bit 5 is a METADATA frame's alone: its sender holds no prepared push
-// (D-F34). It rides beside any descriptor, committed, compiled or unreadable,
+// (D-F34). It rides beside any descriptor, saved, compiled or unreadable,
 // and stays reserved in every other kind, where it is refused as before.
 static void test_protocol_no_prepared_push_flag(void) {
-    const noah_profile_split_descriptor_t descriptors[] = {committed_descriptor(9u, 1u, UINT32_C(0x01020304)), compiled_descriptor(), {0}};
+    const noah_profile_split_descriptor_t descriptors[] = {saved_descriptor(9u, 1u, UINT32_C(0x01020304)), compiled_descriptor(), {0}};
     const noah_profile_split_v1_kind_t    others[]      = {NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, NOAH_PROFILE_SPLIT_V1_PREPARE_DURABLE, NOAH_PROFILE_SPLIT_V1_PREPARE_COMMIT, NOAH_PROFILE_SPLIT_V1_ABORT};
     noah_profile_split_v1_frame_t         frame         = {.kind = NOAH_PROFILE_SPLIT_V1_METADATA, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK};
     noah_profile_split_v1_frame_t         decoded;
@@ -526,7 +526,7 @@ static void test_protocol_no_prepared_push_flag(void) {
             assert(!noah_profile_split_v1_frame_decode(wire, sizeof(wire), &decoded));
         }
     }
-    frame.descriptor = committed_descriptor(9u, 1u, UINT32_C(0x01020304));
+    frame.descriptor = saved_descriptor(9u, 1u, UINT32_C(0x01020304));
     for (unsigned index = 0u; index < sizeof(others) / sizeof(others[0]); index++) {
         frame.kind             = others[index];
         frame.no_prepared_push = false;
@@ -542,8 +542,8 @@ static void test_protocol_no_prepared_push_flag(void) {
 }
 
 // A pulled chunk travels in a reply as large as a pushed one (D-F28): the
-// requester sizes the reply buffer from its PAYLOAD_REQUEST, and the peer's
-// reply starts it, the rest zero.
+// requester sizes the reply buffer from its PAYLOAD_REQUEST, and the other
+// half's reply starts it, the rest zero.
 static void test_protocol_reply_buffers(void) {
     noah_profile_split_v1_frame_t request = {.kind = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 0u, .payload_length = 1089u};
     noah_profile_split_v1_frame_t chunk   = {.kind = NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 0u, .payload_length = 1089u};
@@ -601,7 +601,7 @@ static void test_protocol_reply_buffers(void) {
 // The split copy past 65,535 bytes (D-F28): a descriptor, chunk, pull request
 // and reuse range of a 100,000-byte copy round-trip with every field whole.
 static void test_protocol_over_64_kib(void) {
-    noah_profile_split_v1_frame_t begin = {.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = committed_descriptor(7u, 0u, UINT32_C(0x10203040))};
+    noah_profile_split_v1_frame_t begin = {.kind = NOAH_PROFILE_SPLIT_V1_PREPARE_BEGIN, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .descriptor = saved_descriptor(7u, 0u, UINT32_C(0x10203040))};
     noah_profile_split_v1_frame_t chunk = {.kind = NOAH_PROFILE_SPLIT_V1_PAYLOAD_CHUNK, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 70000u, .payload_length = 100000u, .chunk_length = 3u, .chunk = {1u, 2u, 3u}};
     noah_profile_split_v1_frame_t request = {.kind = NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST, .status = NOAH_PROFILE_SPLIT_V1_STATUS_OK, .generation = 7u, .payload_digest = UINT32_C(0x10203040), .offset = 99999u, .payload_length = 100000u};
     noah_profile_split_v1_frame_t reuse = {

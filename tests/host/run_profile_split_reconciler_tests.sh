@@ -42,7 +42,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_provider.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_authority.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_protocol_v1.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_reconciler.c" \
@@ -50,7 +50,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_store.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_transaction.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
-        "$ROOT/users/noah/lib/profile/storage/profile_peer_store_backend.c" \
+        "$ROOT/users/noah/lib/profile/storage/profile_other_half_store_backend.c" \
         -o "$BUILD_DIR/profile_split_reconciler_test_$name"
     "$BUILD_DIR/profile_split_reconciler_test_$name" "$ROOT/tests/fixtures/maximum_profile_v4.fixture"
 }

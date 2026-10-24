@@ -1,11 +1,11 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 #include "ownership_state.h"
 
 #include "../planning/scan_planner.h"
 #include "../trace/core_trace.h"
 
-#include "../../../pointing/defs/pd_modes.h"
-#include "../../../pointing/policy/pd_mode_policy.h"
+#include "../../../pointing/defs/pointing_modes.h"
+#include "../../../pointing/policy/pointing_mode_policy.h"
 #include "../feedback.h"
 #include "../../../action/action_dispatch.h"
 #include "../../../compat/qmk_mod_contract.h"
@@ -123,20 +123,20 @@ static bool key_runtime_core_keycode_owns_modifier_on_hold(uint16_t keycode) {
     return IS_QK_MOD_TAP(keycode);
 }
 
-static pd_mode_mask_t key_runtime_core_pd_mode_for_keycode(uint16_t keycode) {
-    return pd_mode_for_keycode(keycode);
+static pointing_mode_mask_t key_runtime_core_pointing_mode_for_keycode(uint16_t keycode) {
+    return pointing_mode_for_keycode(keycode);
 }
 
-static bool key_runtime_core_pd_mode_keeps_auto_mouse_anchored(pd_mode_mask_t mode) {
-    return mode != 0 && pd_mode_policy_mode_keeps_auto_mouse_anchored(mode);
+static bool key_runtime_core_pointing_mode_keeps_auto_mouse_anchored(pointing_mode_mask_t mode) {
+    return mode != 0 && pointing_mode_policy_mode_keeps_auto_mouse_anchored(mode);
 }
 
-static bool key_runtime_core_pd_mode_prefers_typing_layer(pd_mode_mask_t mode) {
-    return mode != 0 && pd_mode_policy_mode_prefers_typing_layer(mode);
+static bool key_runtime_core_pointing_mode_prefers_typing_layer(pointing_mode_mask_t mode) {
+    return mode != 0 && pointing_mode_policy_mode_prefers_typing_layer(mode);
 }
 
-static bool key_runtime_core_pd_mode_lock_owns_pointer_toggle(pd_mode_mask_t mode) {
-    return mode != 0 && pd_mode_has_trait(mode, PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE);
+static bool key_runtime_core_pointing_mode_lock_owns_pointer_toggle(pointing_mode_mask_t mode) {
+    return mode != 0 && pointing_mode_has_trait(mode, POINTING_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE);
 }
 
 #ifdef AUTO_MOUSE_DEFAULT_LAYER
@@ -149,7 +149,7 @@ static uint8_t key_runtime_core_default_pointer_layer(void) {
 }
 #endif
 
-static lease_t *key_runtime_core_find_pd_mode_lease(key_runtime_core_state_t *state, uint16_t owner_token_id, pd_mode_mask_t mode) {
+static lease_t *key_runtime_core_find_pointing_mode_lease(key_runtime_core_state_t *state, uint16_t owner_token_id, pointing_mode_mask_t mode) {
     if (!state) {
         return NULL;
     }
@@ -157,7 +157,7 @@ static lease_t *key_runtime_core_find_pd_mode_lease(key_runtime_core_state_t *st
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_PD_MODE && lease->owner_token_id == owner_token_id && lease->data.pd_mode == mode) {
+        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTING_MODE && lease->owner_token_id == owner_token_id && lease->data.pointing_mode == mode) {
             return lease;
         }
     }
@@ -320,14 +320,14 @@ static bool key_runtime_core_modifier_lease_activate(key_runtime_core_state_t *s
     return true;
 }
 
-static bool key_runtime_core_pd_mode_lease_activate(key_runtime_core_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, pd_mode_mask_t mode) {
+static bool key_runtime_core_pointing_mode_lease_activate(key_runtime_core_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, pointing_mode_mask_t mode) {
     lease_t *lease;
 
     if (!(state && mode != 0)) {
         return false;
     }
 
-    if (key_runtime_core_find_pd_mode_lease(state, owner_token_id, mode)) {
+    if (key_runtime_core_find_pointing_mode_lease(state, owner_token_id, mode)) {
         return false;
     }
 
@@ -338,10 +338,10 @@ static bool key_runtime_core_pd_mode_lease_activate(key_runtime_core_state_t *st
 
     *lease = (lease_t){
         .active               = true,
-        .kind                 = LEASE_KIND_PD_MODE,
+        .kind                 = LEASE_KIND_POINTING_MODE,
         .owner_token_id       = owner_token_id,
         .owner_packed_key_pos = key_runtime_keypos_pack(owner_key_pos),
-        .data.pd_mode         = mode,
+        .data.pointing_mode   = mode,
     };
     return true;
 }
@@ -507,7 +507,7 @@ static bool key_runtime_core_persistent_layer_intent_update(key_runtime_core_sta
     return true;
 }
 
-static bool key_runtime_core_persistent_pd_mode_lock_update(key_runtime_core_state_t *state, pd_mode_mask_t mode, bool active) {
+static bool key_runtime_core_persistent_pointing_mode_lock_update(key_runtime_core_state_t *state, pointing_mode_mask_t mode, bool active) {
     persistent_intent_t *empty_slot = NULL;
     bool                 changed    = false;
 
@@ -518,8 +518,8 @@ static bool key_runtime_core_persistent_pd_mode_lock_update(key_runtime_core_sta
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY; index++) {
         persistent_intent_t *intent = &state->persistent_intents[index];
 
-        if (intent->active && intent->kind == PERSISTENT_INTENT_KIND_PD_MODE_LOCK) {
-            if (intent->data.pd_mode == mode) {
+        if (intent->active && intent->kind == PERSISTENT_INTENT_KIND_POINTING_MODE_LOCK) {
+            if (intent->data.pointing_mode == mode) {
                 if (active) {
                     return changed;
                 }
@@ -551,15 +551,15 @@ static bool key_runtime_core_persistent_pd_mode_lock_update(key_runtime_core_sta
     }
 
     *empty_slot = (persistent_intent_t){
-        .active       = true,
-        .kind         = PERSISTENT_INTENT_KIND_PD_MODE_LOCK,
-        .data.pd_mode = mode,
+        .active             = true,
+        .kind               = PERSISTENT_INTENT_KIND_POINTING_MODE_LOCK,
+        .data.pointing_mode = mode,
     };
     state->persistent_intent_count++;
     return true;
 }
 
-static bool key_runtime_core_persistent_pointer_toggle_update(key_runtime_core_state_t *state, pd_mode_mask_t mode, bool active) {
+static bool key_runtime_core_persistent_pointer_toggle_update(key_runtime_core_state_t *state, pointing_mode_mask_t mode, bool active) {
     persistent_intent_t *empty_slot = NULL;
     bool                 changed    = false;
 
@@ -615,7 +615,7 @@ static bool key_runtime_core_persistent_pointer_toggle_update(key_runtime_core_s
     return true;
 }
 
-static bool key_runtime_core_clear_other_pd_mode_intents(key_runtime_core_state_t *state, pd_mode_mask_t keep_mode) {
+static bool key_runtime_core_clear_other_pointing_mode_intents(key_runtime_core_state_t *state, pointing_mode_mask_t keep_mode) {
     bool changed = false;
 
     if (!state) {
@@ -629,7 +629,7 @@ static bool key_runtime_core_clear_other_pd_mode_intents(key_runtime_core_state_
             continue;
         }
 
-        if (intent->kind == PERSISTENT_INTENT_KIND_PD_MODE_LOCK && intent->data.pd_mode != keep_mode) {
+        if (intent->kind == PERSISTENT_INTENT_KIND_POINTING_MODE_LOCK && intent->data.pointing_mode != keep_mode) {
             *intent = (persistent_intent_t){0};
             if (state->persistent_intent_count != 0u) {
                 state->persistent_intent_count--;
@@ -753,7 +753,7 @@ static bool key_runtime_core_release_pd_related_leases_for_token(key_runtime_cor
             continue;
         }
 
-        if (key_runtime_core_lease_kind(lease) == LEASE_KIND_PD_MODE || key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTER_ANCHOR) {
+        if (key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTING_MODE || key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTER_ANCHOR) {
             *lease = (lease_t){0};
             if (state->lease_count != 0u) {
                 state->lease_count--;
@@ -765,7 +765,7 @@ static bool key_runtime_core_release_pd_related_leases_for_token(key_runtime_cor
     return changed;
 }
 
-static bool key_runtime_core_pd_mode_leases_activate(key_runtime_core_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, pd_mode_mask_t mode) {
+static bool key_runtime_core_pointing_mode_leases_activate(key_runtime_core_state_t *state, uint16_t owner_token_id, keypos_t owner_key_pos, pointing_mode_mask_t mode) {
     bool changed = false;
 
     if (!(state && mode != 0)) {
@@ -775,21 +775,21 @@ static bool key_runtime_core_pd_mode_leases_activate(key_runtime_core_state_t *s
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
         lease_t *lease = &state->leases[index];
 
-        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_PD_MODE && lease->data.pd_mode != mode) {
+        if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTING_MODE && lease->data.pointing_mode != mode) {
             changed |= key_runtime_core_release_pd_related_leases_for_token(state, lease->owner_token_id);
         }
     }
 
-    changed |= key_runtime_core_clear_other_pd_mode_intents(state, mode);
-    changed |= key_runtime_core_pd_mode_lease_activate(state, owner_token_id, owner_key_pos, mode);
-    if (key_runtime_core_pd_mode_keeps_auto_mouse_anchored(mode)) {
-        changed |= key_runtime_core_pointer_anchor_lease_activate(state, owner_token_id, owner_key_pos, key_runtime_core_pd_mode_prefers_typing_layer(mode));
+    changed |= key_runtime_core_clear_other_pointing_mode_intents(state, mode);
+    changed |= key_runtime_core_pointing_mode_lease_activate(state, owner_token_id, owner_key_pos, mode);
+    if (key_runtime_core_pointing_mode_keeps_auto_mouse_anchored(mode)) {
+        changed |= key_runtime_core_pointer_anchor_lease_activate(state, owner_token_id, owner_key_pos, key_runtime_core_pointing_mode_prefers_typing_layer(mode));
     }
 
     return changed;
 }
 
-static bool key_runtime_core_press_token_attaches_pd_mode_on_press(const press_token_t *token) {
+static bool key_runtime_core_press_token_attaches_pointing_mode_on_press(const press_token_t *token) {
     return token && (!token->handled_key || key_runtime_slot_interaction_uses_implicit_hold(token->interaction));
 }
 
@@ -820,8 +820,8 @@ void key_runtime_core_shadow_projection_recompute(key_runtime_core_state_t *stat
                     projection.keyboard_managed_mod_mask |= lease->data.modifier.modifiers;
                 }
                 break;
-            case LEASE_KIND_PD_MODE:
-                projection.pd_mode_local_active = lease->data.pd_mode;
+            case LEASE_KIND_POINTING_MODE:
+                projection.pointing_mode_local_active = lease->data.pointing_mode;
                 break;
             case LEASE_KIND_POINTER_ANCHOR:
                 pointer_anchor_lease_active = true;
@@ -846,9 +846,9 @@ void key_runtime_core_shadow_projection_recompute(key_runtime_core_state_t *stat
             case PERSISTENT_INTENT_KIND_LAYER_ONESHOT:
                 projection.layer_state |= (layer_state_t)1u << intent->data.layer;
                 break;
-            case PERSISTENT_INTENT_KIND_PD_MODE_LOCK:
-                projection.pd_mode_local_locked = intent->data.pd_mode;
-                projection.pd_mode_local_active = intent->data.pd_mode;
+            case PERSISTENT_INTENT_KIND_POINTING_MODE_LOCK:
+                projection.pointing_mode_local_locked = intent->data.pointing_mode;
+                projection.pointing_mode_local_active = intent->data.pointing_mode;
                 break;
             case PERSISTENT_INTENT_KIND_POINTER_TOGGLE:
                 projection.pointer_toggle_enabled = true;
@@ -858,17 +858,17 @@ void key_runtime_core_shadow_projection_recompute(key_runtime_core_state_t *stat
         }
     }
 
-    projection.pointer_pd_mode_anchor_active = key_runtime_core_pd_mode_keeps_auto_mouse_anchored(projection.pd_mode_local_active);
-    projection.pointer_prefers_typing_layer  = key_runtime_core_pd_mode_prefers_typing_layer(projection.pd_mode_local_active);
-    projection.pointer_anchor_active         = projection.pointer_toggle_enabled || pointer_anchor_lease_active || projection.pointer_pd_mode_anchor_active;
+    projection.pointer_pointing_mode_anchor_active = key_runtime_core_pointing_mode_keeps_auto_mouse_anchored(projection.pointing_mode_local_active);
+    projection.pointer_prefers_typing_layer        = key_runtime_core_pointing_mode_prefers_typing_layer(projection.pointing_mode_local_active);
+    projection.pointer_anchor_active               = projection.pointer_toggle_enabled || pointer_anchor_lease_active || projection.pointer_pointing_mode_anchor_active;
 
     state->shadow_projection = projection;
 }
 
 void key_runtime_core_press_token_attach_press_leases(key_runtime_core_state_t *state, const press_token_t *token) {
-    bool           changed = false;
-    pd_mode_mask_t mode;
-    keypos_t       token_key_pos;
+    bool                 changed = false;
+    pointing_mode_mask_t mode;
+    keypos_t             token_key_pos;
 
     if (!(state && token && token->active)) {
         return;
@@ -888,10 +888,10 @@ void key_runtime_core_press_token_attach_press_leases(key_runtime_core_state_t *
         changed |= key_runtime_core_modifier_lease_activate(state, token->token_id, token_key_pos, key_runtime_core_modifier_mask_for_keycode(token->resolved_keycode), true);
     }
 
-    mode = key_runtime_core_pd_mode_for_keycode(token->resolved_keycode);
+    mode = key_runtime_core_pointing_mode_for_keycode(token->resolved_keycode);
     if (mode != 0) {
-        if (key_runtime_core_press_token_attaches_pd_mode_on_press(token)) {
-            changed |= key_runtime_core_pd_mode_leases_activate(state, token->token_id, token_key_pos, mode);
+        if (key_runtime_core_press_token_attaches_pointing_mode_on_press(token)) {
+            changed |= key_runtime_core_pointing_mode_leases_activate(state, token->token_id, token_key_pos, mode);
         }
     }
 
@@ -938,7 +938,7 @@ void key_runtime_core_press_token_attach_hold_leases(key_runtime_core_state_t *s
 void key_runtime_core_observe_held_action_register(keypos_t key_pos, uint16_t action) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     press_token_t            *token;
-    pd_mode_mask_t            mode;
+    pointing_mode_mask_t      mode;
 
     if (!(state && action != KC_NO && key_runtime_core_keypos_valid(key_pos))) {
         return;
@@ -946,11 +946,11 @@ void key_runtime_core_observe_held_action_register(keypos_t key_pos, uint16_t ac
 
     token = key_runtime_core_ownership_press_token_state(state, key_pos);
     (void)key_runtime_core_held_action_lease_activate(state, token ? token->token_id : 0u, key_pos, action);
-    mode = key_runtime_core_pd_mode_for_keycode(action);
+    mode = key_runtime_core_pointing_mode_for_keycode(action);
     if (mode != 0) {
         noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME, NOAH_TRACE_KEY_RUNTIME_EVENT_PD_HELD_REGISTER, mode, action);
     }
-    if (key_runtime_core_pd_mode_leases_activate(state, token ? token->token_id : 0u, key_pos, mode)) {
+    if (key_runtime_core_pointing_mode_leases_activate(state, token ? token->token_id : 0u, key_pos, mode)) {
         key_runtime_core_shadow_projection_recompute(state);
     }
 
@@ -978,7 +978,7 @@ void key_runtime_core_observe_held_action_register(keypos_t key_pos, uint16_t ac
 void key_runtime_core_observe_held_action_unregister(keypos_t key_pos, uint16_t action) {
     key_runtime_core_state_t *state = key_runtime_core_state();
     lease_t                  *lease;
-    pd_mode_mask_t            mode;
+    pointing_mode_mask_t      mode;
     uint16_t                  owner_token_id;
     bool                      changed = false;
 
@@ -997,7 +997,7 @@ void key_runtime_core_observe_held_action_unregister(keypos_t key_pos, uint16_t 
         state->lease_count--;
     }
 
-    mode = key_runtime_core_pd_mode_for_keycode(action);
+    mode = key_runtime_core_pointing_mode_for_keycode(action);
     if (mode != 0) {
         noah_runtime_trace_emit(NOAH_TRACE_KEY_RUNTIME, NOAH_TRACE_KEY_RUNTIME_EVENT_PD_HELD_UNREGISTER, mode, action);
     }
@@ -1012,11 +1012,11 @@ void key_runtime_core_observe_held_action_unregister(keypos_t key_pos, uint16_t 
                     continue;
                 }
 
-                if (key_runtime_core_lease_kind(lease) == LEASE_KIND_PD_MODE && lease->data.pd_mode != mode) {
+                if (key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTING_MODE && lease->data.pointing_mode != mode) {
                     continue;
                 }
 
-                if (key_runtime_core_lease_kind(lease) == LEASE_KIND_PD_MODE || key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTER_ANCHOR) {
+                if (key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTING_MODE || key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTER_ANCHOR) {
                     *lease = (lease_t){0};
                     if (state->lease_count != 0u) {
                         state->lease_count--;
@@ -1274,7 +1274,7 @@ void key_runtime_core_layer_oneshot_set(uint8_t layer, bool active) {
     }
 }
 
-void key_runtime_core_observe_pd_mode_lock_state(pd_mode_mask_t mode, bool active) {
+void key_runtime_core_observe_pointing_mode_lock_state(pointing_mode_mask_t mode, bool active) {
     key_runtime_core_state_t *state   = key_runtime_core_state();
     bool                      changed = false;
 
@@ -1286,16 +1286,16 @@ void key_runtime_core_observe_pd_mode_lock_state(pd_mode_mask_t mode, bool activ
         for (uint16_t index = 0; index < KEY_RUNTIME_CORE_LEASE_CAPACITY; index++) {
             lease_t *lease = &state->leases[index];
 
-            if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_PD_MODE && lease->data.pd_mode != mode) {
+            if (lease->active && key_runtime_core_lease_kind(lease) == LEASE_KIND_POINTING_MODE && lease->data.pointing_mode != mode) {
                 changed |= key_runtime_core_release_pd_related_leases_for_token(state, lease->owner_token_id);
             }
         }
 
-        changed |= key_runtime_core_clear_other_pd_mode_intents(state, mode);
+        changed |= key_runtime_core_clear_other_pointing_mode_intents(state, mode);
     }
 
-    changed |= key_runtime_core_persistent_pd_mode_lock_update(state, mode, active);
-    changed |= key_runtime_core_persistent_pointer_toggle_update(state, mode, active && key_runtime_core_pd_mode_lock_owns_pointer_toggle(mode));
+    changed |= key_runtime_core_persistent_pointing_mode_lock_update(state, mode, active);
+    changed |= key_runtime_core_persistent_pointer_toggle_update(state, mode, active && key_runtime_core_pointing_mode_lock_owns_pointer_toggle(mode));
 
     if (changed) {
         key_runtime_core_shadow_projection_recompute(state);

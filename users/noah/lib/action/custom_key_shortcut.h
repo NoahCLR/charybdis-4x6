@@ -47,7 +47,7 @@ static inline bool noah_custom_key_shortcut_present(noah_custom_key_shortcut_t s
     return shortcut.mods != 0u || shortcut.key != 0u;
 }
 
-// The live shortcut of custom key `slot` (0-127): the effective settings
+// The live shortcut of custom key `slot` (0-127): the active profile's settings
 // domain's, or before any is live the keymap's own. No shortcut, both fields
 // zero, for a slot out of range or a build without one.
 noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot);

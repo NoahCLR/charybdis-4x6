@@ -75,12 +75,12 @@ enum charybdis_keymap_layers {
 // Per-mode pointer DPI. Each mode can optionally override the normal pointer
 // DPI while it is active. Sniping always takes priority when active.
 // Dragscroll and pinch are excluded — the shared local dragscroll handler
-// owns their CPI through the pd-mode lifecycle.
+// owns their CPI through the pointing-mode lifecycle.
 // 0 means "keep normal pointer DPI" for that mode.
-#    define PD_MODE_VOLUME_DPI 400
-#    define PD_MODE_BRIGHTNESS_DPI 400
-#    define PD_MODE_ZOOM_DPI 400
-#    define PD_MODE_ARROW_DPI 400
+#    define POINTING_MODE_VOLUME_DPI 400
+#    define POINTING_MODE_BRIGHTNESS_DPI 400
+#    define POINTING_MODE_ZOOM_DPI 400
+#    define POINTING_MODE_ARROW_DPI 400
 
 // Normal DPI ladder: 400 to 3,400 in steps of 200.
 #    define CHARYBDIS_MINIMUM_DEFAULT_DPI 400
@@ -125,10 +125,10 @@ enum charybdis_keymap_layers {
 #    define NOAH_RGB_IDLE_TIMEOUT_MS 600000
 #    define RGB_MATRIX_TIMEOUT NOAH_RGB_IDLE_TIMEOUT_MS
 
-// PD-mode RGB feedback overlay.
-// Comment out RGB_PD_MODE_FEEDBACK_ENABLE to disable the stage entirely.
+// Pointing-mode RGB feedback overlay.
+// Comment out RGB_POINTING_MODE_FEEDBACK_ENABLE to disable the stage entirely.
 #    ifdef POINTING_DEVICE_ENABLE
-#        define RGB_PD_MODE_FEEDBACK_ENABLE
+#        define RGB_POINTING_MODE_FEEDBACK_ENABLE
 #    endif
 
 // Combo feedback overlay.

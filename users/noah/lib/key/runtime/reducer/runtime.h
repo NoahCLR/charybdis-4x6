@@ -22,7 +22,7 @@
 #include "../feedback_kind.h"
 #include "../planning/effect_queue.h"
 #include "../slot/slot_interaction.h"
-#include "../../../pointing/defs/pd_mode_flags.h"
+#include "../../../pointing/defs/pointing_mode_flags.h"
 #include "../../../state/modifiers/keyboard_mod_state.h"
 
 #define KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY ((uint16_t)(MATRIX_ROWS * MATRIX_COLS))
@@ -73,8 +73,8 @@ typedef struct {
 } runtime_pointer_report_t;
 
 typedef struct {
-    pd_mode_mask_t active_mode;
-    pd_mode_mask_t locked_mode;
+    pointing_mode_mask_t active_mode;
+    pointing_mode_mask_t locked_mode;
 } runtime_remote_snapshot_t;
 
 typedef struct {
@@ -112,8 +112,8 @@ typedef struct {
     uint8_t                        feedback_level;
     bool                           handled_key;
     bool                           tap_outcome_available;
-    bool                           pd_mode_was_locked_on_press;
-    bool                           pd_mode_lock_consumed_on_press;
+    bool                           pointing_mode_was_locked_on_press;
+    bool                           pointing_mode_lock_consumed_on_press;
     bool                           other_press_interrupted;
     bool                           momentary_layer_tap_interrupted;
     bool                           pending_release_emission;
@@ -196,7 +196,7 @@ typedef enum {
     LEASE_KIND_MODIFIER,
     LEASE_KIND_HELD_ACTION,
     LEASE_KIND_REPEAT,
-    LEASE_KIND_PD_MODE,
+    LEASE_KIND_POINTING_MODE,
     LEASE_KIND_POINTER_ANCHOR,
 } lease_kind_t;
 
@@ -214,7 +214,7 @@ typedef struct {
             bool    physical;
         } modifier;
         uint16_t       action;
-        pd_mode_mask_t pd_mode;
+        pointing_mode_mask_t pointing_mode;
         struct {
             uint16_t action;
             uint8_t  repeat_hz;
@@ -232,7 +232,7 @@ typedef enum {
     PERSISTENT_INTENT_KIND_NONE = 0,
     PERSISTENT_INTENT_KIND_LAYER_LOCK,
     PERSISTENT_INTENT_KIND_LAYER_ONESHOT,
-    PERSISTENT_INTENT_KIND_PD_MODE_LOCK,
+    PERSISTENT_INTENT_KIND_POINTING_MODE_LOCK,
     PERSISTENT_INTENT_KIND_POINTER_TOGGLE,
 } persistent_intent_kind_t;
 
@@ -241,11 +241,11 @@ typedef struct {
     persistent_intent_kind_t kind;
     union {
         uint8_t        layer;
-        pd_mode_mask_t pd_mode;
+        pointing_mode_mask_t pointing_mode;
         uint8_t        pointer_layer;
         struct {
             uint8_t        pointer_layer;
-            pd_mode_mask_t mode;
+            pointing_mode_mask_t mode;
         } pointer_toggle;
     } data;
 } persistent_intent_t;
@@ -256,10 +256,10 @@ typedef struct {
     keyboard_mod_state_t keyboard_mod_state;
     uint8_t              keyboard_managed_mod_mask;
     uint8_t              keyboard_physical_mod_mask;
-    pd_mode_mask_t       pd_mode_local_active;
-    pd_mode_mask_t       pd_mode_local_locked;
+    pointing_mode_mask_t pointing_mode_local_active;
+    pointing_mode_mask_t pointing_mode_local_locked;
     bool                 pointer_anchor_active;
-    bool                 pointer_pd_mode_anchor_active;
+    bool                 pointer_pointing_mode_anchor_active;
     bool                 pointer_prefers_typing_layer;
     bool                 pointer_toggle_enabled;
 } key_runtime_core_shadow_projection_t;
@@ -270,12 +270,12 @@ typedef struct {
     keyboard_mod_state_t keyboard_mod_state;
     uint8_t              keyboard_managed_mod_mask;
     uint8_t              keyboard_physical_mod_mask;
-    pd_mode_mask_t       pd_mode_local_active;
-    pd_mode_mask_t       pd_mode_local_locked;
-    pd_mode_mask_t       pd_mode_display_active;
-    pd_mode_mask_t       pd_mode_display_locked;
+    pointing_mode_mask_t pointing_mode_local_active;
+    pointing_mode_mask_t pointing_mode_local_locked;
+    pointing_mode_mask_t pointing_mode_display_active;
+    pointing_mode_mask_t pointing_mode_display_locked;
     bool                 pointer_anchor_active;
-    bool                 pointer_pd_mode_anchor_active;
+    bool                 pointer_pointing_mode_anchor_active;
     bool                 pointer_prefers_typing_layer;
     bool                 pointer_toggle_enabled;
     bool                 pointer_sniping_layer_active;
@@ -291,10 +291,10 @@ typedef struct {
     keyboard_mod_state_t core_shadow_keyboard_mod_state;
     uint8_t              core_shadow_keyboard_managed_mod_mask;
     uint8_t              core_shadow_keyboard_physical_mod_mask;
-    pd_mode_mask_t       core_shadow_pd_mode_local_active;
-    pd_mode_mask_t       core_shadow_pd_mode_local_locked;
+    pointing_mode_mask_t core_shadow_pointing_mode_local_active;
+    pointing_mode_mask_t core_shadow_pointing_mode_local_locked;
     bool                 core_shadow_pointer_anchor_active;
-    bool                 core_shadow_pointer_pd_mode_anchor_active;
+    bool                 core_shadow_pointer_pointing_mode_anchor_active;
     bool                 core_shadow_pointer_prefers_typing_layer;
     bool                 core_shadow_pointer_toggle_enabled;
     uint8_t              core_press_token_count;

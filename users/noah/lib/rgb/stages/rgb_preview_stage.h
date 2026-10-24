@@ -17,7 +17,7 @@
 
 #if defined(RGB_MATRIX_ENABLE) && defined(RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE)
 bool rgb_runtime_preview_stage_render(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max);
-bool rgb_runtime_preview_stage_render_effective(rgb_runtime_frame_t *frame, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max);
+bool rgb_runtime_preview_stage_render_active_profile(rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max);
 #elif defined(RGB_MATRIX_ENABLE)
 static inline bool rgb_runtime_preview_stage_render(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max) {
     (void)frame;
@@ -25,7 +25,7 @@ static inline bool rgb_runtime_preview_stage_render(rgb_runtime_frame_t *frame, 
     (void)led_max;
     return false;
 }
-static inline bool rgb_runtime_preview_stage_render_effective(rgb_runtime_frame_t *frame, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+static inline bool rgb_runtime_preview_stage_render_active_profile(rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
     (void)profile_frame;
     return rgb_runtime_preview_stage_render(frame, led_min, led_max);
 }
@@ -36,7 +36,7 @@ static inline bool rgb_runtime_preview_stage_render(void *frame, uint8_t led_min
     (void)led_max;
     return false;
 }
-static inline bool rgb_runtime_preview_stage_render_effective(void *frame, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+static inline bool rgb_runtime_preview_stage_render_active_profile(void *frame, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
     (void)profile_frame;
     return rgb_runtime_preview_stage_render(frame, led_min, led_max);
 }

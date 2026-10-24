@@ -10,8 +10,8 @@
 #include "process_internal.h"
 #include "trace.h"
 #include "noah_keymap_ids.h"
-#include "../../pointing/defs/pd_modes.h"
-#include "../../pointing/runtime/pd_mode_keyboard_event_internal.h"
+#include "../../pointing/defs/pointing_modes.h"
+#include "../../pointing/runtime/pointing_mode_keyboard_event_internal.h"
 #include "../../pointing/policy/pointer_layer_policy.h"
 #include "reducer/ownership_state.h"
 #include "reducer/runtime.h"
@@ -82,7 +82,7 @@ static void key_runtime_process_begin_keyboard_event_mod_mask(void) {
         return;
     }
 
-    masked_real_mods = pd_mode_active_keyboard_event_masked_real_mods();
+    masked_real_mods = pointing_mode_active_keyboard_event_masked_real_mods();
     if (!keyboard_mod_policy_begin_real_mod_mask(masked_real_mods)) {
         return;
     }
@@ -152,20 +152,20 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_release_slo
 // another mode is active by then, and before preflight, which could otherwise
 // drop it and leave the mode waiting for it. The reducer's token for it is
 // ordinary and non-handled, so finalizing it here retires everything it owns.
-static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode_release(key_runtime_process_ctx_t *ctx) {
+static key_runtime_process_stage_outcome_t key_runtime_process_stage_pointing_mode_release(key_runtime_process_ctx_t *ctx) {
     if (ctx->record->event.pressed || ctx->record->event.type != KEY_EVENT || !key_runtime_core_take_intercepted_release(ctx->record->event.key)) {
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 
-    (void)pd_mode_handle_key_event(ctx->keycode, ctx->record);
+    (void)pointing_mode_handle_key_event(ctx->keycode, ctx->record);
     (void)key_runtime_core_finalize_non_handled_release(ctx->record->event.key);
-    key_runtime_trace_message("process:pd_mode_key_release", "release of a press an active pd mode consumed");
+    key_runtime_trace_message("process:pointing_mode_key_release", "release of a press an active pointing mode consumed");
     return KEY_RUNTIME_PROCESS_RETURN_FALSE;
 }
 
 // Only presses are offered to the active mode; the release of a press it did
 // not take stays with the key's behavior, which owns what that press started.
-static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode(key_runtime_process_ctx_t *ctx) {
+static key_runtime_process_stage_outcome_t key_runtime_process_stage_pointing_mode(key_runtime_process_ctx_t *ctx) {
     bool key_event = ctx->record->event.type == KEY_EVENT;
     bool consumed;
 
@@ -175,7 +175,7 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode(key
     if (key_event) {
         key_runtime_core_offer_press_to_mode(ctx->record->event.key);
     }
-    consumed = pd_mode_handle_key_event(ctx->runtime_keycode, ctx->record);
+    consumed = pointing_mode_handle_key_event(ctx->runtime_keycode, ctx->record);
     if (key_event) {
         key_runtime_core_end_mode_offer(ctx->record->event.key, consumed);
     }
@@ -183,7 +183,7 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_pd_mode(key
         return KEY_RUNTIME_PROCESS_NEXT;
     }
 
-    key_runtime_trace_message("process:pd_mode_key_handler", "key event consumed by active pd mode");
+    key_runtime_trace_message("process:pointing_mode_key_handler", "key event consumed by active pointing mode");
     return KEY_RUNTIME_PROCESS_RETURN_FALSE;
 }
 
@@ -397,7 +397,7 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {
-        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "pd_mode_release", .handler = key_runtime_process_stage_pd_mode_release}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pd_mode", .handler = key_runtime_process_stage_pd_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "native_overlap", .handler = key_runtime_process_stage_native_overlap}, {.name = "idle_custom_key", .handler = key_runtime_process_stage_idle_custom_key},
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "pointing_mode_release", .handler = key_runtime_process_stage_pointing_mode_release}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pointing_mode", .handler = key_runtime_process_stage_pointing_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "native_overlap", .handler = key_runtime_process_stage_native_overlap}, {.name = "idle_custom_key", .handler = key_runtime_process_stage_idle_custom_key},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,

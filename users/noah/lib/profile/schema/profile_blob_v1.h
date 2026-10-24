@@ -24,7 +24,7 @@ enum {
     NOAH_PROFILE_DOMAIN_V1_RGB_VERSION          = NOAH_PROFILE_DOMAIN_VERSION_RGB,
     NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIOR_VERSION = NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS,
     NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS   = 16u,
-    NOAH_PROFILE_ACTION_V1_MAX_PD_MODES         = NOAH_PROFILE_PD_COUNT,
+    NOAH_PROFILE_ACTION_V1_MAX_POINTING_MODES   = NOAH_PROFILE_PD_COUNT,
     NOAH_PROFILE_ACTION_V1_MAX_MACRO_SLOTS      = 128u,
     NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS      = 128u,
 };
@@ -41,8 +41,8 @@ typedef enum {
     NOAH_PROFILE_ACTION_V1_QMK_KEYCODE       = 1u,
     NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY   = 2u,
     NOAH_PROFILE_ACTION_V1_LAYER_LOCK        = 3u,
-    NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY = 4u,
-    NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK      = 5u,
+    NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY = 4u,
+    NOAH_PROFILE_ACTION_V1_POINTING_MODE_LOCK = 5u,
     NOAH_PROFILE_ACTION_V1_MACRO             = 6u,
     // Kind 7 named the retired user macros in earlier action vocabularies;
     // this vocabulary (a different action ABI digest) gives it to custom keys.
@@ -145,7 +145,7 @@ typedef struct {
 // support is checked by the separate action-ABI compatibility layer.
 typedef struct {
     uint32_t max_logical_layers;
-    uint32_t max_pd_modes;
+    uint32_t max_pointing_modes;
     uint32_t max_macro_slots;
     uint32_t max_custom_keys;
 } noah_profile_action_v1_limits_t;

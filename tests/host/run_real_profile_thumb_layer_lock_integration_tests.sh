@@ -75,12 +75,12 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/key/runtime/planning/scan_planner.c" \
     "$ROOT/users/noah/lib/key/runtime/planning/tap_series_flush.c" \
     "$ROOT/users/noah/lib/compat/qmk_combo_origin.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_snapshot.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_registry.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_lifecycle.c" \
     "$ROOT/users/noah/lib/pointing/runtime/pd_runtime.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_key_runtime_bridge.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_state.c" \
     "$ROOT/users/noah/lib/pointing/policy/pointer_layer_policy.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/modifiers/keyboard_mod_policy.c" \

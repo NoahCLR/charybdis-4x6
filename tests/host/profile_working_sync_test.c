@@ -1,5 +1,5 @@
 // Working copy split sync (D-F32): two halves, each with its own provider
-// over the same saved profile, joined by the RPC the USB half drives, over
+// over the same saved profile, joined by the RPC the master half drives, over
 // the in-memory fault link.
 
 #include <assert.h>
@@ -23,7 +23,7 @@ enum {
 
 typedef struct {
     uint8_t                           bytes[CAPACITY];
-    noah_effective_profile_provider_t provider;
+    noah_active_profile_provider_t provider;
     noah_profile_working_copy_t       copy;
     noah_profile_working_sync_t       sync;
     noah_profile_edit_mode_record_t   stored_mode;
@@ -38,11 +38,11 @@ static uint8_t                           saved_bytes[CAPACITY];
 static uint32_t                          saved_length;
 static noah_profile_validator_v1_compatibility_t rules;
 static noah_profile_validator_v1_compatibility_t strict_rules;
-static noah_effective_profile_snapshot_t saved_snapshot;
-static half_t                            usb;
+static noah_active_profile_snapshot_t saved_snapshot;
+static half_t                            master;
 static half_t                            other;
 static uint32_t                          now;
-// The USB half's link to the other half.
+// The master half's link to the other half.
 static split_fault_link_t                link;
 // This exchange answers with a sealed reply of its request's kind, one
 // sequence behind (the answer to an earlier request), never delivering it.
@@ -53,7 +53,7 @@ static uint32_t no_reasons(void *context) {
     return 0u;
 }
 
-static void no_invalidator(void *context, uint32_t publication, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *view) {
+static void no_invalidator(void *context, uint32_t publication, noah_active_profile_identity_t previous, noah_active_profile_identity_t active, const noah_active_profile_snapshot_t *view) {
     (void)context;
     (void)publication;
     (void)previous;
@@ -93,7 +93,7 @@ static bool other_receive(void *context, const uint8_t *request, uint8_t request
     return noah_profile_working_sync_receive(&((half_t *)context)->sync, request, request_length, response, response_length);
 }
 
-static bool usb_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
+static bool master_exchange(void *context, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length) {
     split_fault_link_t *usb_link = context;
 
     if (stale_reply_at != 0u && stale_reply_at == usb_link->exchanges + 1u) {
@@ -141,13 +141,13 @@ static noah_profile_validator_v1_profile_t validate_whole(void) {
     return profile;
 }
 
-static void setup_half(half_t *half, uint32_t session, bool usb_half, const noah_profile_validator_v1_compatibility_t *peer_rules) {
-    noah_effective_profile_invalidator_t invalidator = {.callback = no_invalidator};
+static void setup_half(half_t *half, uint32_t session, bool master_half, const noah_profile_validator_v1_compatibility_t *other_half_rules) {
+    noah_active_profile_invalidator_t invalidator = {.callback = no_invalidator};
     noah_profile_edit_mode_storage_t     storage     = {.load = mode_load, .store = mode_store, .may_store = mode_may_store, .context = half};
 
-    assert(noah_effective_profile_provider_init(&half->provider, &saved_snapshot, no_reasons, NULL, &invalidator, 1u) == NOAH_EFFECTIVE_PROFILE_OK);
-    noah_profile_working_copy_init(&half->copy, half->bytes, CAPACITY, &half->provider, &rules, peer_rules, session);
-    noah_profile_working_sync_init(&half->sync, &half->copy, usb_half ? usb_exchange : NULL, usb_half ? &link : NULL, &storage);
+    assert(noah_active_profile_provider_init(&half->provider, &saved_snapshot, no_reasons, NULL, &invalidator, 1u) == NOAH_ACTIVE_PROFILE_OK);
+    noah_profile_working_copy_init(&half->copy, half->bytes, CAPACITY, &half->provider, &rules, other_half_rules, session);
+    noah_profile_working_sync_init(&half->sync, &half->copy, master_half ? master_exchange : NULL, master_half ? &link : NULL, &storage);
 }
 
 static void setup(void) {
@@ -159,23 +159,23 @@ static void setup(void) {
     strict_rules                     = rules;
     strict_rules.max_blob_size       = saved_length; // refuses any growth
     profile                          = validate_whole();
-    assert(noah_effective_profile_snapshot_make_compiled(&profile, &reader, 0u, &saved_snapshot) == NOAH_EFFECTIVE_PROFILE_OK);
-    memset(&usb, 0, sizeof(usb));
+    assert(noah_active_profile_snapshot_make_compiled(&profile, &reader, 0u, &saved_snapshot) == NOAH_ACTIVE_PROFILE_OK);
+    memset(&master, 0, sizeof(master));
     memset(&other, 0, sizeof(other));
-    setup_half(&usb, 0x1111u, true, &rules);
+    setup_half(&master, 0x1111u, true, &rules);
     setup_half(&other, 0x2222u, false, &rules);
     now            = 1000u;
     stale_reply_at = 0u;
-    link           = (split_fault_link_t){.receive = other_receive, .peer = &other};
+    link           = (split_fault_link_t){.receive = other_receive, .other_half = &other};
 }
 
 static void run(uint32_t scans) {
     for (uint32_t scan = 0u; scan < scans; scan++, now++) {
-        (void)noah_profile_working_sync_master_scan(&usb.sync, now);
-        (void)noah_profile_working_sync_peer_scan(&other.sync);
-        (void)noah_profile_working_copy_scan(&usb.copy);
+        (void)noah_profile_working_sync_master_scan(&master.sync, now);
+        (void)noah_profile_working_sync_slave_scan(&other.sync);
+        (void)noah_profile_working_copy_scan(&master.copy);
         (void)noah_profile_working_copy_scan(&other.copy);
-        (void)noah_profile_working_sync_store_mode(&usb.sync, now);
+        (void)noah_profile_working_sync_store_mode(&master.sync, now);
         (void)noah_profile_working_sync_store_mode(&other.sync, now);
     }
 }
@@ -183,7 +183,7 @@ static void run(uint32_t scans) {
 static bool run_until_converged(uint32_t limit) {
     for (uint32_t scan = 0u; scan < limit; scan += 10u) {
         run(10u);
-        if (noah_profile_working_sync_converged(&usb.sync, now)) {
+        if (noah_profile_working_sync_converged(&master.sync, now)) {
             return true;
         }
     }
@@ -195,16 +195,16 @@ static uint32_t crc_of(const uint8_t *bytes, uint32_t length) {
 }
 
 static void usb_edit(uint16_t transaction, const noah_profile_working_splice_t *splice, const uint8_t *bytes, uint32_t length) {
-    assert(noah_profile_working_copy_begin(&usb.copy, transaction, usb.copy.session, usb.copy.revision, 1u, length, 0u, false) == NOAH_PROFILE_WORKING_OK);
-    assert(noah_profile_working_copy_splice(&usb.copy, transaction, 0u, splice) == NOAH_PROFILE_WORKING_OK);
+    assert(noah_profile_working_copy_begin(&master.copy, transaction, master.copy.session, master.copy.revision, 1u, length, 0u, false) == NOAH_PROFILE_WORKING_OK);
+    assert(noah_profile_working_copy_splice(&master.copy, transaction, 0u, splice) == NOAH_PROFILE_WORKING_OK);
     if (length) {
-        assert(noah_profile_working_copy_data(&usb.copy, transaction, 0u, bytes, length) == NOAH_PROFILE_WORKING_OK);
+        assert(noah_profile_working_copy_data(&master.copy, transaction, 0u, bytes, length) == NOAH_PROFILE_WORKING_OK);
     }
-    assert(noah_profile_working_copy_commit(&usb.copy, transaction, crc_of(bytes, length)) == NOAH_PROFILE_WORKING_QUEUED);
-    for (uint32_t scan = 0u; scan < 4096u && noah_profile_working_copy_busy(&usb.copy); scan++) {
-        (void)noah_profile_working_copy_scan(&usb.copy);
+    assert(noah_profile_working_copy_commit(&master.copy, transaction, crc_of(bytes, length)) == NOAH_PROFILE_WORKING_QUEUED);
+    for (uint32_t scan = 0u; scan < 4096u && noah_profile_working_copy_busy(&master.copy); scan++) {
+        (void)noah_profile_working_copy_scan(&master.copy);
     }
-    assert(usb.copy.last_result == NOAH_PROFILE_WORKING_OK);
+    assert(master.copy.last_result == NOAH_PROFILE_WORKING_OK);
 }
 
 static void assert_same_profile(void) {
@@ -213,9 +213,9 @@ static void assert_same_profile(void) {
     noah_profile_working_status_t     a;
     noah_profile_working_status_t     b;
 
-    assert(noah_profile_working_copy_status(&usb.copy, &a) && noah_profile_working_copy_status(&other.copy, &b));
+    assert(noah_profile_working_copy_status(&master.copy, &a) && noah_profile_working_copy_status(&other.copy, &b));
     assert(a.length == b.length && a.session == b.session && a.revision == b.revision && a.active == b.active);
-    assert(noah_profile_working_copy_read(&usb.copy, 0u, left, a.length) && noah_profile_working_copy_read(&other.copy, 0u, right, b.length));
+    assert(noah_profile_working_copy_read(&master.copy, 0u, left, a.length) && noah_profile_working_copy_read(&other.copy, 0u, right, b.length));
     assert(memcmp(left, right, a.length) == 0);
 }
 
@@ -226,24 +226,24 @@ static void test_adopt_edit_revert(void) {
     noah_profile_working_splice_t macros = {.domain_id = NOAH_PROFILE_DOMAIN_V1_MACROS, .offset = 0u, .insert = 1u};
 
     setup();
-    assert(!noah_profile_working_sync_converged(&usb.sync, now));
-    // Both on the same saved profile: the other half takes the USB half's
+    assert(!noah_profile_working_sync_converged(&master.sync, now));
+    // Both on the same saved profile: the other half takes the master half's
     // identity, with nothing copied.
     assert(run_until_converged(200u));
     assert(other.copy.session == 0x1111u && other.copy.revision == 0u && !other.copy.active);
     // An edit is sent as the same edit and lands at the same revision.
     usb_edit(1u, &keymap, key, sizeof(key));
-    assert(!noah_profile_working_sync_converged(&usb.sync, now));
+    assert(!noah_profile_working_sync_converged(&master.sync, now));
     assert(run_until_converged(400u));
     assert(other.copy.active && other.copy.revision == 1u);
     assert_same_profile();
-    // A resizing edit, then Revert on the USB half: the other half follows.
+    // A resizing edit, then Revert on the master half: the other half follows.
     usb_edit(2u, &macros, &x, 1u);
     assert(run_until_converged(400u));
     assert_same_profile();
-    assert(noah_profile_working_copy_revert(&usb.copy, 3u, usb.copy.session, usb.copy.revision) == NOAH_PROFILE_WORKING_QUEUED);
+    assert(noah_profile_working_copy_revert(&master.copy, 3u, master.copy.session, master.copy.revision) == NOAH_PROFILE_WORKING_QUEUED);
     run(5u);
-    assert(!usb.copy.active);
+    assert(!master.copy.active);
     assert(run_until_converged(400u));
     assert(!other.copy.active && other.copy.revision == 3u);
     assert_same_profile();
@@ -303,11 +303,11 @@ static void test_revert_during_a_forward_does_not_stall(void) {
     assert(run_until_converged(200u));
     usb_edit(1u, &keymap, key, sizeof(key));
     run(1u);
-    assert(usb.sync.forward_phase != NOAH_PROFILE_WORKING_FORWARD_NONE && usb.sync.forward_phase != NOAH_PROFILE_WORKING_FORWARD_WAIT);
+    assert(master.sync.forward_phase != NOAH_PROFILE_WORKING_FORWARD_NONE && master.sync.forward_phase != NOAH_PROFILE_WORKING_FORWARD_WAIT);
     // Revert lands while the edit is on its way: the attempt ends, the
     // other half's half-received edit is aborted, and it follows Revert well
     // inside the 3 s a lost half takes.
-    assert(noah_profile_working_copy_revert(&usb.copy, 2u, usb.copy.session, usb.copy.revision) == NOAH_PROFILE_WORKING_QUEUED);
+    assert(noah_profile_working_copy_revert(&master.copy, 2u, master.copy.session, master.copy.revision) == NOAH_PROFILE_WORKING_QUEUED);
     started = now;
     assert(run_until_converged(500u));
     assert(now - started < 500u && !other.copy.active && other.copy.phase == NOAH_PROFILE_WORKING_PHASE_IDLE);
@@ -375,7 +375,7 @@ static uint32_t edit_with_fault(fault_t fault, uint32_t at, bool *fired) {
         assert(!"one fault wedged an edit");
     }
     assert_same_profile();
-    assert(usb.copy.revision == revision + 1u && other.copy.revision == revision + 1u);
+    assert(master.copy.revision == revision + 1u && other.copy.revision == revision + 1u);
     assert(other.copy.active && other.copy.last_result == NOAH_PROFILE_WORKING_OK);
     *fired = link.drop_before_delivery == 0u && link.drop_after_delivery == 0u && link.replay_previous == 0u && link.garble == 0u && link.inject == 0u && stale_reply_at == 0u && !link.corrupt_next_reply;
     return link.exchanges - base;
@@ -401,7 +401,7 @@ static void test_one_fault_anywhere_in_an_edit_lands_it_once(void) {
 }
 
 // The link drops in the middle of an edit for longer than the timeout: the
-// USB half forgets the other half and what they agreed on, and brings it
+// master half forgets the other half and what they agreed on, and brings it
 // back once the link returns.
 static void test_a_link_lost_past_the_timeout_brings_the_other_half_back(void) {
     const uint8_t                 x      = 'x';
@@ -411,13 +411,13 @@ static void test_a_link_lost_past_the_timeout_brings_the_other_half_back(void) {
     assert(run_until_converged(200u));
     usb_edit(1u, &macros, &x, 1u);
     run(1u);
-    assert(usb.sync.forward_phase != NOAH_PROFILE_WORKING_FORWARD_NONE && usb.sync.forward_phase != NOAH_PROFILE_WORKING_FORWARD_WAIT);
+    assert(master.sync.forward_phase != NOAH_PROFILE_WORKING_FORWARD_NONE && master.sync.forward_phase != NOAH_PROFILE_WORKING_FORWARD_WAIT);
     link.disconnected = true;
-    run(NOAH_PROFILE_WORKING_SYNC_PEER_TIMEOUT_MS + 10u);
-    assert(!usb.sync.peer.known && !usb.sync.agreed && !noah_profile_working_sync_converged(&usb.sync, now));
+    run(NOAH_PROFILE_WORKING_SYNC_SLAVE_TIMEOUT_MS + 10u);
+    assert(!master.sync.slave.known && !master.sync.agreed && !noah_profile_working_sync_converged(&master.sync, now));
     link.disconnected = false;
     assert(run_until_converged(20000u));
-    assert(other.copy.active && other.copy.session == usb.copy.session && other.copy.revision == usb.copy.revision);
+    assert(other.copy.active && other.copy.session == master.copy.session && other.copy.revision == master.copy.revision);
     assert_same_profile();
     puts("a link lost past the timeout forgets the other half, which is brought back when it returns");
 }
@@ -434,7 +434,7 @@ static void test_an_edit_the_other_half_refuses_stops(void) {
     // The other half refuses the growth, and then the whole copy, tried
     // once: the halves stay apart, reported, with no endless resending.
     assert(!run_until_converged(3000u));
-    assert(usb.sync.forward_failed_whole && noah_profile_working_sync_refused(&usb.sync));
+    assert(master.sync.forward_failed_whole && noah_profile_working_sync_refused(&master.sync));
     {
         uint32_t before = link.exchanges;
         run(3000u);
@@ -442,31 +442,31 @@ static void test_an_edit_the_other_half_refuses_stops(void) {
     }
     assert(!other.copy.active);
     // Revert brings them together again.
-    assert(noah_profile_working_copy_revert(&usb.copy, 2u, usb.copy.session, usb.copy.revision) == NOAH_PROFILE_WORKING_QUEUED);
-    assert(run_until_converged(400u) && !noah_profile_working_sync_refused(&usb.sync));
+    assert(noah_profile_working_copy_revert(&master.copy, 2u, master.copy.session, master.copy.revision) == NOAH_PROFILE_WORKING_QUEUED);
+    assert(run_until_converged(400u) && !noah_profile_working_sync_refused(&master.sync));
     assert_same_profile();
     puts("an edit the other half refuses is tried once whole, then the halves report apart until Revert");
 }
 
 static void test_edit_mode_follows_the_higher_counter(void) {
     setup();
-    assert(usb.sync.mode.mode == NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW && usb.sync.mode.counter == 0u);
+    assert(master.sync.mode.mode == NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW && master.sync.mode.counter == 0u);
     assert(run_until_converged(200u));
-    assert(noah_profile_working_sync_set_mode(&usb.sync, NOAH_PROFILE_EDIT_MODE_APPLY));
+    assert(noah_profile_working_sync_set_mode(&master.sync, NOAH_PROFILE_EDIT_MODE_APPLY));
     run(200u);
     assert(other.stored_mode.mode == NOAH_PROFILE_EDIT_MODE_APPLY && other.stored_mode.counter == 1u && other.sync.mode.counter == 1u);
     // The other half was set alone (say before a reconnect) with a higher
-    // counter: the USB half takes its record.
+    // counter: the master half takes its record.
     other.sync.mode = (noah_profile_edit_mode_record_t){.counter = 5u, .mode = NOAH_PROFILE_EDIT_MODE_LIVE};
     run(2500u);
-    assert(usb.sync.mode.counter == 5u && usb.sync.mode.mode == NOAH_PROFILE_EDIT_MODE_LIVE && usb.stored_mode.mode == NOAH_PROFILE_EDIT_MODE_LIVE);
+    assert(master.sync.mode.counter == 5u && master.sync.mode.mode == NOAH_PROFILE_EDIT_MODE_LIVE && master.stored_mode.mode == NOAH_PROFILE_EDIT_MODE_LIVE);
     // Equal counters that disagree are a conflict a new choice resolves.
     other.sync.mode = (noah_profile_edit_mode_record_t){.counter = 5u, .mode = NOAH_PROFILE_EDIT_MODE_APPLY};
     run(2500u);
-    assert(usb.sync.mode_conflict);
-    assert(noah_profile_working_sync_set_mode(&usb.sync, NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW) && usb.sync.mode.counter == 6u);
+    assert(master.sync.mode_conflict);
+    assert(noah_profile_working_sync_set_mode(&master.sync, NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW) && master.sync.mode.counter == 6u);
     run(200u);
-    assert(!usb.sync.mode_conflict && other.sync.mode.counter == 6u && other.sync.mode.mode == NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW);
+    assert(!master.sync.mode_conflict && other.sync.mode.counter == 6u && other.sync.mode.mode == NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW);
     puts("the edit mode follows the higher counter; equal counters that disagree are reported");
 }
 
@@ -475,32 +475,32 @@ static void test_edit_mode_is_written_on_a_quiet_keyboard(void) {
     assert(run_until_converged(200u));
     // Keys held on both halves: the mode holds and travels at once, but
     // nothing is written, on either half, until the keyboard is quiet.
-    usb.noisy   = true;
+    master.noisy = true;
     other.noisy = true;
-    assert(noah_profile_working_sync_set_mode(&usb.sync, NOAH_PROFILE_EDIT_MODE_APPLY));
+    assert(noah_profile_working_sync_set_mode(&master.sync, NOAH_PROFILE_EDIT_MODE_APPLY));
     run(300u);
-    assert(usb.sync.mode.counter == 1u && other.sync.mode.counter == 1u && other.sync.mode.mode == NOAH_PROFILE_EDIT_MODE_APPLY);
-    assert(usb.mode_attempts == 0u && other.mode_attempts == 0u && usb.sync.mode_store_pending);
-    usb.noisy   = false;
+    assert(master.sync.mode.counter == 1u && other.sync.mode.counter == 1u && other.sync.mode.mode == NOAH_PROFILE_EDIT_MODE_APPLY);
+    assert(master.mode_attempts == 0u && other.mode_attempts == 0u && master.sync.mode_store_pending);
+    master.noisy = false;
     other.noisy = false;
     run(5u);
-    assert(usb.mode_writes == 1u && other.mode_writes == 1u && other.stored_mode.counter == 1u && !usb.sync.mode_store_pending);
+    assert(master.mode_writes == 1u && other.mode_writes == 1u && other.stored_mode.counter == 1u && !master.sync.mode_store_pending);
     // A failing write is not retried on every poll: it backs off, and the
     // failure is reported until a later write succeeds.
-    usb.store_fails = true;
-    assert(noah_profile_working_sync_set_mode(&usb.sync, NOAH_PROFILE_EDIT_MODE_LIVE));
+    master.store_fails = true;
+    assert(noah_profile_working_sync_set_mode(&master.sync, NOAH_PROFILE_EDIT_MODE_LIVE));
     run(900u);
-    assert(usb.mode_attempts == 2u && usb.sync.mode_store_failed);
+    assert(master.mode_attempts == 2u && master.sync.mode_store_failed);
     run(2500u);
-    assert(usb.mode_attempts == 4u && usb.sync.mode_store_failed);
-    usb.store_fails = false;
+    assert(master.mode_attempts == 4u && master.sync.mode_store_failed);
+    master.store_fails = false;
     run(4100u);
-    assert(!usb.sync.mode_store_failed && !usb.sync.mode_store_pending && usb.stored_mode.mode == NOAH_PROFILE_EDIT_MODE_LIVE);
+    assert(!master.sync.mode_store_failed && !master.sync.mode_store_pending && master.stored_mode.mode == NOAH_PROFILE_EDIT_MODE_LIVE);
     puts("the edit mode is written only on a quiet keyboard, and a failing write backs off");
 }
 
 // A half whose owner stopped (D-F34) answers every poll saying so and acts on
-// nothing; the USB half only polls it, once a second, and tells its status.
+// nothing; the master half only polls it, once a second, and tells its status.
 static void test_a_stopped_half_says_so_and_takes_nothing(void) {
     const uint8_t                 key[2] = {0x06u, 0x00u};
     noah_profile_working_splice_t keymap = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .offset = KEYMAP_KEY, .remove = 2u, .insert = 2u};
@@ -510,24 +510,24 @@ static void test_a_stopped_half_says_so_and_takes_nothing(void) {
     other.sync.stopped = true;
     usb_edit(1u, &keymap, key, sizeof(key));
     run(50u);
-    assert(noah_profile_working_sync_peer_stopped(&usb.sync, now) && !noah_profile_working_sync_converged(&usb.sync, now));
-    assert(usb.sync.peer.flags & NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED);
+    assert(noah_profile_working_sync_slave_stopped(&master.sync, now) && !noah_profile_working_sync_converged(&master.sync, now));
+    assert(master.sync.slave.flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_STOPPED);
     // Nothing was adopted, reverted or edited on the stopped half.
     assert(other.copy.session == 0x2222u && other.copy.revision == 0u && !other.copy.active);
     before = link.exchanges;
     run(10000u);
     assert(link.exchanges - before <= 2u * 11u && !other.copy.active && other.copy.session == 0x2222u);
-    assert(noah_profile_working_sync_peer_stopped(&usb.sync, now));
+    assert(noah_profile_working_sync_slave_stopped(&master.sync, now));
     // Not heard from, it is no longer known to have stopped.
     other.sync.stopped = false;
     link.disconnected  = true;
-    run(NOAH_PROFILE_WORKING_SYNC_PEER_TIMEOUT_MS + 10u);
-    assert(!noah_profile_working_sync_peer_stopped(&usb.sync, now));
+    run(NOAH_PROFILE_WORKING_SYNC_SLAVE_TIMEOUT_MS + 10u);
+    assert(!noah_profile_working_sync_slave_stopped(&master.sync, now));
     // After a restart it is brought back as any other half is.
     link.disconnected = false;
     assert(run_until_converged(20000u));
     assert_same_profile();
-    puts("a stopped half says so on every reply and takes nothing; the USB half only polls it");
+    puts("a stopped half says so on every reply and takes nothing; the master half only polls it");
 }
 
 static void test_frames(void) {

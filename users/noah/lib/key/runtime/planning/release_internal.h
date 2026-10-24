@@ -27,7 +27,7 @@ typedef struct {
     bool                                  quick_tap;
     bool                                  quick_immediate_hold;
     bool                                  buffered_base_tap;
-    pd_mode_mask_t                        lock_tap_mode;
+    pointing_mode_mask_t                  lock_tap_mode;
     key_runtime_release_decision_t        decision;
 } key_runtime_core_active_release_resolution_t;
 

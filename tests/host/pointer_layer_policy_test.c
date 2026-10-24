@@ -3,23 +3,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/pointing/policy/pointer_layer_policy.h"
 #include "users/noah/lib/compat/qmk_tapping_contract.h"
 
-static bool           fake_auto_mouse_toggle;
-static int8_t         fake_auto_mouse_key_tracker;
-static uint8_t        fake_auto_mouse_layer;
-static pd_mode_mask_t fake_active_modes;
-static uint8_t        auto_mouse_keyevent_calls;
-static bool           auto_mouse_keyevent_pressed[8];
-static uint16_t       fake_anchored_behavior_keycode;
-static bool           fake_auto_mouse_enabled;
-static layer_state_t  fake_locked_layers;
-static layer_state_t  fake_held_layers;
-static uint8_t        auto_mouse_toggle_calls;
-static uint8_t        fake_source_layer;
-static uint8_t        auto_mouse_reset_presses;
+static bool                 fake_auto_mouse_toggle;
+static int8_t               fake_auto_mouse_key_tracker;
+static uint8_t              fake_auto_mouse_layer;
+static pointing_mode_mask_t fake_active_modes;
+static uint8_t              auto_mouse_keyevent_calls;
+static bool                 auto_mouse_keyevent_pressed[8];
+static uint16_t             fake_anchored_behavior_keycode;
+static bool                 fake_auto_mouse_enabled;
+static layer_state_t        fake_locked_layers;
+static layer_state_t        fake_held_layers;
+static uint8_t              auto_mouse_toggle_calls;
+static uint8_t              fake_source_layer;
+static uint8_t              auto_mouse_reset_presses;
 
 layer_state_t layer_state = 0;
 
@@ -108,18 +108,18 @@ bool layer_ownership_is_held(uint8_t layer) {
     return (fake_held_layers & ((layer_state_t)1u << layer)) != 0;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     switch (keycode) {
         case PD_SLOT_1:
-            return PD_MODE_VOLUME;
+            return POINTING_MODE_VOLUME;
         case PD_SLOT_4:
-            return PD_MODE_ARROW;
+            return POINTING_MODE_ARROW;
         default:
             return 0;
     }
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
 }
@@ -128,15 +128,15 @@ bool key_behavior_keeps_auto_mouse_anchored(uint16_t keycode) {
     return fake_anchored_behavior_keycode != KC_NO && keycode == fake_anchored_behavior_keycode;
 }
 
-bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
-    pd_mode_traits_t mode_traits = PD_MODE_TRAIT_NONE;
+bool pointing_mode_has_trait(pointing_mode_mask_t mode, pointing_mode_traits_t trait) {
+    pointing_mode_traits_t mode_traits = POINTING_MODE_TRAIT_NONE;
 
     switch (mode) {
-        case PD_MODE_VOLUME:
-            mode_traits = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED;
+        case POINTING_MODE_VOLUME:
+            mode_traits = POINTING_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED;
             break;
-        case PD_MODE_ARROW:
-            mode_traits = PD_MODE_TRAIT_PREFER_TYPING_LAYER;
+        case POINTING_MODE_ARROW:
+            mode_traits = POINTING_MODE_TRAIT_PREFER_TYPING_LAYER;
             break;
         default:
             break;
@@ -145,31 +145,31 @@ bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
     return (mode_traits & trait) == trait;
 }
 
-pd_mode_snapshot_t pd_mode_snapshot(void) {
-    pd_mode_snapshot_t snapshot = {
+pointing_mode_snapshot_t pointing_mode_snapshot(void) {
+    pointing_mode_snapshot_t snapshot = {
         .local.active_mode    = fake_active_modes,
-        .local.active_index   = PD_MODE_COUNT,
-        .local.locked_index   = PD_MODE_COUNT,
+        .local.active_index   = POINTING_MODE_COUNT,
+        .local.locked_index   = POINTING_MODE_COUNT,
         .display.active_mode  = fake_active_modes,
-        .display.active_index = PD_MODE_COUNT,
-        .display.locked_index = PD_MODE_COUNT,
+        .display.active_index = POINTING_MODE_COUNT,
+        .display.locked_index = POINTING_MODE_COUNT,
     };
 
-    for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
-        pd_mode_mask_t mode = (pd_mode_mask_t)1u << index;
+    for (uint8_t index = 0; index < POINTING_MODE_COUNT; index++) {
+        pointing_mode_mask_t mode = (pointing_mode_mask_t)1u << index;
 
         if ((fake_active_modes & mode) != 0) {
-            if (snapshot.local.active_index == PD_MODE_COUNT) {
+            if (snapshot.local.active_index == POINTING_MODE_COUNT) {
                 snapshot.local.active_index = index;
                 snapshot.local.active_mode  = mode;
             }
 
-            if (pd_mode_has_trait(mode, PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)) {
-                snapshot.local.active_traits |= PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED;
+            if (pointing_mode_has_trait(mode, POINTING_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED)) {
+                snapshot.local.active_traits |= POINTING_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED;
             }
 
-            if (pd_mode_has_trait(mode, PD_MODE_TRAIT_PREFER_TYPING_LAYER)) {
-                snapshot.local.active_traits |= PD_MODE_TRAIT_PREFER_TYPING_LAYER;
+            if (pointing_mode_has_trait(mode, POINTING_MODE_TRAIT_PREFER_TYPING_LAYER)) {
+                snapshot.local.active_traits |= POINTING_MODE_TRAIT_PREFER_TYPING_LAYER;
             }
         }
     }
@@ -178,9 +178,9 @@ pd_mode_snapshot_t pd_mode_snapshot(void) {
     return snapshot;
 }
 
-static void test_non_arrow_pd_mode_marks_layer_holds_as_mouse_records(void) {
+static void test_non_arrow_pointing_mode_marks_layer_holds_as_mouse_records(void) {
     test_reset_stubs();
-    fake_active_modes = PD_MODE_VOLUME;
+    fake_active_modes = POINTING_MODE_VOLUME;
 
     CHECK(pointer_layer_policy_is_mouse_record(MO(1)));
     CHECK(pointer_layer_policy_is_mouse_record(LT(2, KC_C)));
@@ -188,12 +188,12 @@ static void test_non_arrow_pd_mode_marks_layer_holds_as_mouse_records(void) {
 
 static void test_arrow_mode_does_not_anchor_layer_hold_keys(void) {
     test_reset_stubs();
-    fake_active_modes = PD_MODE_ARROW;
+    fake_active_modes = POINTING_MODE_ARROW;
 
     CHECK(!pointer_layer_policy_is_mouse_record(MO(1)));
 }
 
-static void test_non_arrow_pd_mode_keys_and_dpi_keys_count_as_mouse_records(void) {
+static void test_non_arrow_pointing_mode_keys_and_dpi_keys_count_as_mouse_records(void) {
     test_reset_stubs();
 
     CHECK(pointer_layer_policy_is_mouse_record(PD_SLOT_1));
@@ -204,9 +204,9 @@ static void test_non_arrow_pd_mode_keys_and_dpi_keys_count_as_mouse_records(void
     CHECK(pointer_layer_policy_is_mouse_record(S_D_RMOD));
 }
 
-// A keycode that is neither a mouse keycode nor a pd-mode key can still claim
-// the anchor through its authored behavior row, so QMK keeps the pointer layer
-// up across the press instead of resetting auto mouse on it.
+// A keycode that is neither a mouse keycode nor a pointing-mode key can still
+// claim the anchor through its authored behavior row, so QMK keeps the pointer
+// layer up across the press instead of resetting auto mouse on it.
 static void test_authored_anchor_row_counts_as_a_mouse_record(void) {
     test_reset_stubs();
 
@@ -332,7 +332,7 @@ static void test_mouse_button_actions_notify_auto_mouse(void) {
 
 static void test_arrow_mode_prefers_typing_layer_over_auto_mouse_layer(void) {
     test_reset_stubs();
-    fake_active_modes     = PD_MODE_ARROW;
+    fake_active_modes     = POINTING_MODE_ARROW;
     fake_auto_mouse_layer = 4;
 
     layer_state_t state = ((layer_state_t)1u << 0) | ((layer_state_t)1u << 4);
@@ -342,9 +342,9 @@ static void test_arrow_mode_prefers_typing_layer_over_auto_mouse_layer(void) {
     CHECK((next & ((layer_state_t)1u << 0)) != 0);
 }
 
-static void test_anchored_pd_mode_restores_auto_mouse_layer_when_dropped(void) {
+static void test_anchored_pointing_mode_restores_auto_mouse_layer_when_dropped(void) {
     test_reset_stubs();
-    fake_active_modes     = PD_MODE_VOLUME;
+    fake_active_modes     = POINTING_MODE_VOLUME;
     fake_auto_mouse_layer = 4;
 
     layer_state_t next = pointer_layer_policy_apply((layer_state_t)1u << 0);
@@ -384,9 +384,9 @@ static void test_auto_mouse_layer_coexists_with_non_nav_layers(void) {
     CHECK((next & ((layer_state_t)1u << 4)) != 0);
 }
 
-static void test_sniping_layer_strips_pd_mode_anchored_auto_mouse_layer(void) {
+static void test_sniping_layer_strips_pointing_mode_anchored_auto_mouse_layer(void) {
     test_reset_stubs();
-    fake_active_modes     = PD_MODE_VOLUME;
+    fake_active_modes     = POINTING_MODE_VOLUME;
     fake_auto_mouse_layer = 4;
 
     layer_state_t state = ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER) | ((layer_state_t)1u << 4);
@@ -423,7 +423,7 @@ static void test_debug_snapshot_reports_effective_anchor_inputs(void) {
     pointer_layer_policy_debug_snapshot_t snapshot;
 
     test_reset_stubs();
-    fake_active_modes           = PD_MODE_ARROW;
+    fake_active_modes           = POINTING_MODE_ARROW;
     fake_auto_mouse_toggle      = true;
     fake_auto_mouse_key_tracker = 2;
     fake_auto_mouse_layer       = 4;
@@ -431,7 +431,7 @@ static void test_debug_snapshot_reports_effective_anchor_inputs(void) {
     pointer_layer_policy_debug_snapshot((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER, &snapshot);
 
     CHECK(snapshot.auto_mouse_anchored);
-    CHECK(!snapshot.pd_mode_anchor_active);
+    CHECK(!snapshot.pointing_mode_anchor_active);
     CHECK(snapshot.prefers_typing_layer);
     CHECK(snapshot.auto_mouse_toggle_enabled);
     CHECK(snapshot.sniping_layer_active);
@@ -595,17 +595,17 @@ int main(void) {
     test_anchored_auto_mouse_layer_key_keeps_the_layer();
     test_settle_keeps_a_layer_something_else_holds();
     test_unsettled_press_settles_on_next_physical_record();
-    test_non_arrow_pd_mode_marks_layer_holds_as_mouse_records();
+    test_non_arrow_pointing_mode_marks_layer_holds_as_mouse_records();
     test_arrow_mode_does_not_anchor_layer_hold_keys();
-    test_non_arrow_pd_mode_keys_and_dpi_keys_count_as_mouse_records();
+    test_non_arrow_pointing_mode_keys_and_dpi_keys_count_as_mouse_records();
     test_authored_anchor_row_counts_as_a_mouse_record();
     test_mouse_button_actions_notify_auto_mouse();
     test_arrow_mode_prefers_typing_layer_over_auto_mouse_layer();
-    test_anchored_pd_mode_restores_auto_mouse_layer_when_dropped();
+    test_anchored_pointing_mode_restores_auto_mouse_layer_when_dropped();
     test_auto_mouse_toggle_restores_auto_mouse_layer_when_dropped();
     test_sniping_layer_strips_unanchored_auto_mouse_layer();
     test_auto_mouse_layer_coexists_with_non_nav_layers();
-    test_sniping_layer_strips_pd_mode_anchored_auto_mouse_layer();
+    test_sniping_layer_strips_pointing_mode_anchored_auto_mouse_layer();
     test_sniping_layer_strips_key_tracker_anchored_auto_mouse_layer();
     test_sniping_layer_blocks_anchored_auto_mouse_restore_when_pointer_missing();
     test_debug_snapshot_reports_effective_anchor_inputs();

@@ -132,8 +132,8 @@ static bool key_runtime_core_query_press_token_quick_tap_suppressed(const press_
     return token && token->interaction.contract.suppress_tap_on_layer_interrupt && token->momentary_layer_tap_interrupted;
 }
 
-static bool key_runtime_core_query_press_token_has_pd_mode_quick_lock_candidate(const press_token_t *token) {
-    return token && token->interaction.contract.quick_tap_pd_mode_lock != 0 && token->pd_mode_was_locked_on_press && !token->pd_mode_lock_consumed_on_press && !key_runtime_core_query_press_token_quick_tap_suppressed(token);
+static bool key_runtime_core_query_press_token_has_pointing_mode_quick_lock_candidate(const press_token_t *token) {
+    return token && token->interaction.contract.quick_tap_pointing_mode_lock != 0 && token->pointing_mode_was_locked_on_press && !token->pointing_mode_lock_consumed_on_press && !key_runtime_core_query_press_token_quick_tap_suppressed(token);
 }
 
 static bool key_runtime_core_query_press_token_owned_state_active(const key_runtime_core_state_t *state, const press_token_t *token) {
@@ -175,7 +175,7 @@ static void key_runtime_core_query_press_token_deferred_release_profile(const ke
     }
 
     if (!key_runtime_core_query_press_token_quick_tap_suppressed(token)) {
-        before = token->tap_outcome_available || key_runtime_core_query_press_token_has_pd_mode_quick_lock_candidate(token);
+        before = token->tap_outcome_available || key_runtime_core_query_press_token_has_pointing_mode_quick_lock_candidate(token);
     }
 
     after = token->interaction.contract.nonquick_release_dispatches_tap;
@@ -441,7 +441,7 @@ static bool key_runtime_core_query_hold_changes_other_keys(hold_behavior_t hold)
         return false;
     }
     desc = noah_action_describe(hold.action);
-    return noah_action_desc_is_layer_action(desc) || noah_action_desc_is_pd_mode_action(desc) || noah_qmk_real_mods_for_keycode(hold.action) != 0u;
+    return noah_action_desc_is_layer_action(desc) || noah_action_desc_is_pointing_mode_action(desc) || noah_qmk_real_mods_for_keycode(hold.action) != 0u;
 }
 
 // What a tap/hold key's hold does decides how a key pressed before its

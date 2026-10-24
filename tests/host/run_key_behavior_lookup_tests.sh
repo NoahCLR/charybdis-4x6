@@ -27,7 +27,7 @@ build_and_run() {
         "$ROOT/tests/host/key_behavior_lookup_test.c" \
         "$ROOT/users/noah/lib/action/action_kind.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_key_behavior_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_key_behavior_runtime.c" \
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
@@ -49,7 +49,7 @@ build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer
 ARM_CC="${ARM_CC:-arm-none-eabi-gcc}"
 for source in \
     "$ROOT/users/noah/lib/profile/runtime/profile_action_runtime_v1.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_key_behavior_runtime.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_key_behavior_runtime.c" \
     "$ROOT/users/noah/lib/key/behavior/key_behavior_lookup.c"
 do
     object="$BUILD_DIR/$(basename "$source" .c)_cortex_m0plus.o"

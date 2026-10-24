@@ -24,8 +24,8 @@ static uint32_t saved_length;
 static uint8_t  working_bytes[CAPACITY];
 
 static noah_profile_validator_v1_compatibility_t rules;
-static noah_effective_profile_provider_t         provider;
-static noah_effective_profile_snapshot_t         saved_snapshot;
+static noah_active_profile_provider_t            provider;
+static noah_active_profile_snapshot_t            saved_snapshot;
 static noah_profile_working_copy_t               copy;
 static uint32_t                                  boundary_reasons;
 
@@ -43,7 +43,7 @@ static uint32_t safe_boundary(void *context) {
     return boundary_reasons;
 }
 
-static void invalidate(void *context, uint32_t publication, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *view) {
+static void invalidate(void *context, uint32_t publication, noah_active_profile_identity_t previous, noah_active_profile_identity_t active, const noah_active_profile_snapshot_t *view) {
     (void)context;
     (void)publication;
     (void)previous;
@@ -99,14 +99,14 @@ static void setup(void) {
     static const noah_profile_reader_t *unused;
     noah_profile_validator_v1_profile_t profile;
     noah_profile_reader_t               reader = noah_profile_reader_from_memory(saved_bytes, saved_length);
-    noah_effective_profile_invalidator_t invalidator = {.callback = invalidate, .context = NULL};
+    noah_active_profile_invalidator_t invalidator = {.callback = invalidate, .context = NULL};
 
     (void)unused;
     rules                     = noah_profile_validator_v1_default_compatibility(ACTION_ABI_DIGEST);
     rules.placement_positions = POSITIONS;
     profile                   = validate_whole(saved_bytes, saved_length);
-    assert(noah_effective_profile_snapshot_make_compiled(&profile, &reader, 0u, &saved_snapshot) == NOAH_EFFECTIVE_PROFILE_OK);
-    assert(noah_effective_profile_provider_init(&provider, &saved_snapshot, safe_boundary, NULL, &invalidator, 1u) == NOAH_EFFECTIVE_PROFILE_OK);
+    assert(noah_active_profile_snapshot_make_compiled(&profile, &reader, 0u, &saved_snapshot) == NOAH_ACTIVE_PROFILE_OK);
+    assert(noah_active_profile_provider_init(&provider, &saved_snapshot, safe_boundary, NULL, &invalidator, 1u) == NOAH_ACTIVE_PROFILE_OK);
     memset(working_bytes, 0xA5, sizeof(working_bytes));
     noah_profile_working_copy_init(&copy, working_bytes, sizeof(working_bytes), &provider, &rules, &rules, SESSION);
     memset(&invalidations, 0, sizeof(invalidations));
@@ -145,11 +145,11 @@ static noah_profile_working_result_t edit(uint16_t transaction, const noah_profi
 }
 
 static void active_bytes(uint8_t *bytes, uint32_t *length) {
-    noah_effective_profile_snapshot_t active;
+    noah_active_profile_snapshot_t active;
 
-    assert(noah_effective_profile_provider_copy_active(&provider, &active) == NOAH_EFFECTIVE_PROFILE_OK);
+    assert(noah_active_profile_provider_copy_active(&provider, &active) == NOAH_ACTIVE_PROFILE_OK);
     *length = (uint32_t)active.profile.byte_length;
-    assert(noah_effective_profile_snapshot_read(&active, 0u, bytes, *length));
+    assert(noah_active_profile_snapshot_read(&active, 0u, bytes, *length));
 }
 
 static void test_keymap_edit_publishes_in_place(void) {
@@ -164,7 +164,7 @@ static void test_keymap_edit_publishes_in_place(void) {
     setup();
     assert(edit(1u, &splice, 1u, key, sizeof(key)) == NOAH_PROFILE_WORKING_OK);
     assert(copy.active && copy.revision == 1u);
-    assert(invalidations.count == 1u && invalidations.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY && invalidations.changed_mask == NOAH_PROFILE_DOMAIN_MASK_KEYMAP && invalidations.revision == 1u);
+    assert(invalidations.count == 1u && invalidations.kind == NOAH_ACTIVE_PROFILE_KIND_WORKING_COPY && invalidations.changed_mask == NOAH_PROFILE_DOMAIN_MASK_KEYMAP && invalidations.revision == 1u);
     memcpy(expected, saved_bytes, saved_length);
     memcpy(expected + keymap.offset + KEYMAP_KEY, key, sizeof(key));
     active_bytes(actual, &length);
@@ -178,7 +178,7 @@ static void test_keymap_edit_publishes_in_place(void) {
     assert(!copy.active && copy.revision == 2u && copy.last_result == NOAH_PROFILE_WORKING_OK);
     active_bytes(actual, &length);
     assert(length == saved_length && memcmp(actual, saved_bytes, length) == 0);
-    assert(invalidations.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS && invalidations.changed_mask == NOAH_PROFILE_DOMAIN_MASK_ALL);
+    assert(invalidations.kind == NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS && invalidations.changed_mask == NOAH_PROFILE_DOMAIN_MASK_ALL);
     // Nothing to revert: no publication.
     invalidations.count = 0u;
     assert(noah_profile_working_copy_revert(&copy, 3u, SESSION, 2u) == NOAH_PROFILE_WORKING_OK && invalidations.count == 0u && copy.revision == 2u);
@@ -274,13 +274,13 @@ static void test_create_and_drop_move_later_domains(void) {
     noah_profile_domain_range_t   behaviours = domain_range(saved_bytes, saved_length, NOAH_PROFILE_DOMAIN_V1_KEY_BEHAVIORS);
     noah_profile_working_splice_t drop       = {.domain_id = NOAH_PROFILE_DOMAIN_V1_RGB, .offset = 0u, .remove = rgb.length, .flags = NOAH_PROFILE_WORKING_SPLICE_DROP};
     noah_profile_working_splice_t create     = {.domain_id = NOAH_PROFILE_DOMAIN_V1_RGB, .insert = rgb.length, .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
-    noah_effective_profile_snapshot_t active;
+    noah_active_profile_snapshot_t active;
     noah_key_behavior_row_v1_view_t row_before;
     noah_key_behavior_row_v1_view_t row_after;
     noah_profile_codec_v1_error_t codec_error;
 
     setup();
-    assert(noah_effective_profile_provider_copy_active(&provider, &active) == NOAH_EFFECTIVE_PROFILE_OK);
+    assert(noah_active_profile_provider_copy_active(&provider, &active) == NOAH_ACTIVE_PROFILE_OK);
     assert(noah_key_behavior_domain_v1_row_at(&active.profile.key_behaviors, 0u, &row_before, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
     // Dropping the first domain moves the behaviours view down by its size
     // and header, and the behaviours still read the same rows.
@@ -291,7 +291,7 @@ static void test_create_and_drop_move_later_domains(void) {
     active_bytes(actual, &length);
     assert(length == saved_length - rgb.length - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE && memcmp(actual, expected, length) == 0);
     assert(invalidations.domain_mask == (NOAH_PROFILE_DOMAIN_MASK_ALL & ~NOAH_PROFILE_DOMAIN_MASK_RGB) && invalidations.key_behaviors_base == behaviours.offset - rgb.length - NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE);
-    assert(noah_effective_profile_provider_copy_active(&provider, &active) == NOAH_EFFECTIVE_PROFILE_OK);
+    assert(noah_active_profile_provider_copy_active(&provider, &active) == NOAH_ACTIVE_PROFILE_OK);
     assert(noah_key_behavior_domain_v1_row_at(&active.profile.key_behaviors, 0u, &row_after, &codec_error) == NOAH_PROFILE_CODEC_V1_OK && memcmp(&row_before, &row_after, sizeof(row_after)) == 0);
     // Creating it again restores the saved bytes exactly.
     assert(edit(2u, &create, 1u, saved_bytes + rgb.offset, rgb.length) == NOAH_PROFILE_WORKING_OK);

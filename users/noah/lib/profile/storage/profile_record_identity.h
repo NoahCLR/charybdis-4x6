@@ -38,9 +38,9 @@ static inline bool noah_profile_candidate_equal(const noah_profile_store_candida
 // The descriptor names this saved record: it is a readable profile descriptor
 // and every field of the tuple matches a record in the current store format.
 // A descriptor that is unreadable, or says no profile, names no record. The
-// owner asks this of its published descriptor; the peer store asks it only of
-// descriptors it admitted, which are readable profiles by then, so the two
-// once-separate copies of this check (one without the readability test)
+// owner asks this of its published descriptor; the other-half store asks it
+// only of descriptors it admitted, which are readable profiles by then, so the
+// two once-separate copies of this check (one without the readability test)
 // always agreed.
 static inline bool noah_profile_record_matches_descriptor(const noah_profile_store_record_t *record, const noah_profile_split_descriptor_t *descriptor) {
     return record && descriptor && descriptor->readable && descriptor->has_profile && record->slot != NOAH_PROFILE_SLOT_NONE && record->schema_major == descriptor->schema_major && record->schema_minor == descriptor->schema_minor && record->domain_mask == descriptor->domain_mask && record->flags == descriptor->profile_flags && record->payload_length == descriptor->payload_length && record->generation == descriptor->generation && record->origin_half == descriptor->origin_half && record->payload_crc32 == descriptor->payload_crc32 && record->payload_digest == descriptor->payload_digest && record->compiled_default_digest == descriptor->compiled_default_digest && record->action_abi_digest == descriptor->action_abi_digest && record->format_version == NOAH_PROFILE_STORE_FORMAT_VERSION;

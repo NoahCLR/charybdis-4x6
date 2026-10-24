@@ -72,7 +72,7 @@ the key's normal action while its row is disabled or its source layer is not
 allowed; the [participation policy](../participation-policy.md) states the
 whole rule.
 
-Held by: `tests/host/run_key_behavior_domain_v1_tests.sh` (`key_behavior_domain_v1_test.c`), `tests/host/run_key_behavior_lookup_tests.sh` (`key_behavior_lookup_test.c`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`pd_mode_key_runtime_integration_test.c`), `tests/host/run_participation_tests.sh`.
+Held by: `tests/host/run_key_behavior_domain_v1_tests.sh` (`key_behavior_domain_v1_test.c`), `tests/host/run_key_behavior_lookup_tests.sh` (`key_behavior_lookup_test.c`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`), `tests/host/run_participation_tests.sh`.
 
 ## Steps and branches
 

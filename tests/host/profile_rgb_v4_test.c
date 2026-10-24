@@ -31,8 +31,8 @@ int main(int argc, char **argv) {
     size_t         offset, cases = 0, rejected = 0;
 
     assert(argc == 2);
-    assert(NOAH_PROFILE_RGB_V1_FORMAT_VERSION == 4 && NOAH_PROFILE_RGB_V1_MAX_PD_MODES == 32);
-    assert(NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL == UINT32_MAX);
+    assert(NOAH_PROFILE_RGB_V1_FORMAT_VERSION == 4 && NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES == 32);
+    assert(NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL == UINT32_MAX);
     FILE *file = fopen(argv[1], "r");
     assert(file);
     assert(fscanf(file, "%u %u %u %u %lu", &stage, &layers, &brightness, &branches, &pd_mask) == 5);
@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
     limits.logical_layer_count    = (uint8_t)layers;
     limits.maximum_brightness     = (uint8_t)brightness;
     limits.tap_branch_color_count = (uint8_t)branches;
-    limits.supported_pd_mode_mask = (uint32_t)pd_mask;
+    limits.supported_pointing_mode_mask = (uint32_t)pd_mask;
     while (fscanf(file, "%31s %zu %63s %4095s", code, &offset, name, hex) == 4) {
         size_t length = strlen(hex) / 2;
         assert(length <= sizeof(payload));
@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
             assert(view.pd_color_count == 32);
             for (uint8_t slot = 0; slot < 32; slot++) {
                 noah_profile_rgb_v1_pd_color_t row;
-                assert(noah_profile_rgb_v1_pd_color_at(&view, slot, &row, &error) == NOAH_PROFILE_RGB_V1_OK && row.pd_mode_id == slot);
+                assert(noah_profile_rgb_v1_pd_color_at(&view, slot, &row, &error) == NOAH_PROFILE_RGB_V1_OK && row.pointing_mode_id == slot);
             }
         } else {
             rejected++;

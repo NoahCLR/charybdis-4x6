@@ -15,7 +15,7 @@
 #    include "../key/behavior/participation.h"
 #    include "../profile/protocol/profile_candidate_v1.h"
 #    include "../profile/protocol/profile_wire_v1.h"
-#    include "../profile/runtime/effective_settings_runtime.h"
+#    include "../profile/runtime/active_profile_settings_runtime.h"
 #    include "../profile/storage/profile_store_runtime.h"
 
 enum {
@@ -55,7 +55,7 @@ static bool zero_from(const uint8_t *data, uint8_t from) {
 }
 
 static uint16_t status_flags(const noah_profile_owner_working_status_t *status) {
-    return (uint16_t)((status->local.active ? NOAH_PROFILE_EDIT_WIRE_UNSAVED : 0u) | (status->peer_required ? NOAH_PROFILE_EDIT_WIRE_PEER_REQUIRED : 0u) | (status->halves_agree ? NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED : 0u) | (status->peer.known ? NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN : 0u) | (status->edits_blocked ? NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED : 0u) | (status->saved_compiled ? NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED : 0u) | (status->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE ? NOAH_PROFILE_EDIT_WIRE_SAVING : 0u) | (status->mode_conflict ? NOAH_PROFILE_EDIT_WIRE_MODE_CONFLICT : 0u) | ((status->local.phase == NOAH_PROFILE_WORKING_PHASE_WAITING_SAFE || status->local.phase == NOAH_PROFILE_WORKING_PHASE_REVERTING) && status->safe_boundary_reason_mask != 0u ? NOAH_PROFILE_EDIT_WIRE_WAITING_SAFE : 0u) | (status->storage_paused ? NOAH_PROFILE_EDIT_WIRE_STORAGE_PAUSED : 0u) | (status->peer_storage_paused ? NOAH_PROFILE_EDIT_WIRE_PEER_STORAGE_PAUSED : 0u) | (status->peer_refused ? NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED : 0u) | (status->mode_store_failed ? NOAH_PROFILE_EDIT_WIRE_MODE_NOT_STORED : 0u) | (status->adjustment_pending ? NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING : 0u) | (status->stopped ? NOAH_PROFILE_EDIT_WIRE_STOPPED : 0u) | (status->peer_stopped ? NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED : 0u));
+    return (uint16_t)((status->local.active ? NOAH_PROFILE_EDIT_WIRE_UNSAVED : 0u) | (status->other_half_required ? NOAH_PROFILE_EDIT_WIRE_SLAVE_REQUIRED : 0u) | (status->halves_agree ? NOAH_PROFILE_EDIT_WIRE_SLAVE_CONVERGED : 0u) | (status->slave.known ? NOAH_PROFILE_EDIT_WIRE_SLAVE_KNOWN : 0u) | (status->edits_blocked ? NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED : 0u) | (status->saved_compiled ? NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED : 0u) | (status->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE ? NOAH_PROFILE_EDIT_WIRE_SAVING : 0u) | (status->mode_conflict ? NOAH_PROFILE_EDIT_WIRE_MODE_CONFLICT : 0u) | ((status->local.phase == NOAH_PROFILE_WORKING_PHASE_WAITING_SAFE || status->local.phase == NOAH_PROFILE_WORKING_PHASE_REVERTING) && status->safe_boundary_reason_mask != 0u ? NOAH_PROFILE_EDIT_WIRE_WAITING_SAFE : 0u) | (status->storage_paused ? NOAH_PROFILE_EDIT_WIRE_STORAGE_PAUSED : 0u) | (status->slave_storage_paused ? NOAH_PROFILE_EDIT_WIRE_SLAVE_STORAGE_PAUSED : 0u) | (status->slave_refused ? NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED : 0u) | (status->mode_store_failed ? NOAH_PROFILE_EDIT_WIRE_MODE_NOT_STORED : 0u) | (status->adjustment_pending ? NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING : 0u) | (status->stopped ? NOAH_PROFILE_EDIT_WIRE_STOPPED : 0u) | (status->slave_stopped ? NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED : 0u));
 }
 
 // The answer to an edit SET: the result, then where the working copy now is,
@@ -86,7 +86,7 @@ static void handle_restart(uint8_t *data) {
     }
     acknowledged = noah_qmk_keyboard_restart_request();
     reply(data, NOAH_PROFILE_WORKING_OK);
-    data[NOAH_PROFILE_EDIT_WIRE_RESTART_PEER] = acknowledged ? 1u : 0u;
+    data[NOAH_PROFILE_EDIT_WIRE_RESTART_SLAVE] = acknowledged ? 1u : 0u;
 }
 
 #    if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE)
@@ -165,19 +165,19 @@ static void status_page(const noah_profile_owner_working_status_t *status, uint8
         payload[22] = status->mode.mode;
         payload[23] = status->local.splices_received;
     } else if (page == 1u) {
-        payload[0] = status->peer.phase;
-        payload[1] = status->peer.last_result;
-        put_u16(&payload[2], status->peer.transaction_id);
-        put_u32(&payload[4], status->peer.session);
-        put_u32(&payload[8], status->peer.revision);
-        payload[12] = status->peer.flags;
+        payload[0] = status->slave.phase;
+        payload[1] = status->slave.last_result;
+        put_u16(&payload[2], status->slave.transaction_id);
+        put_u32(&payload[4], status->slave.session);
+        put_u32(&payload[8], status->slave.revision);
+        payload[12] = status->slave.flags;
         payload[13] = status->save.phase;
         payload[14] = status->save.last_result;
         payload[15] = status->save.last_error;
         put_u16(&payload[16], status->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE ? status->save.transaction_id : 0u);
         put_u16(&payload[18], status->save.last_transaction_id);
         put_u32(&payload[20], status->local.staged_bytes);
-        payload[24] = status->peer.mode;
+        payload[24] = status->slave.mode;
     } else if (page == 2u) {
         const noah_profile_validator_v1_error_t *error = &status->local.error;
 
@@ -267,9 +267,9 @@ static bool handle_get(uint8_t *data) {
             }
             payload[0] = status.mode.mode;
             put_u32(&payload[1], status.mode.counter);
-            payload[5] = status.peer.mode;
-            put_u32(&payload[6], status.peer.mode_counter);
-            payload[10] = (uint8_t)((status.peer.known ? 1u : 0u) | (status.mode_conflict ? 2u : 0u) | (status.peer.known && status.peer.mode_counter == status.mode.counter && status.peer.mode == status.mode.mode ? 4u : 0u));
+            payload[5] = status.slave.mode;
+            put_u32(&payload[6], status.slave.mode_counter);
+            payload[10] = (uint8_t)((status.slave.known ? 1u : 0u) | (status.mode_conflict ? 2u : 0u) | (status.slave.known && status.slave.mode_counter == status.mode.counter && status.slave.mode == status.mode.mode ? 4u : 0u));
             get_status(data, NOAH_PROFILE_WIRE_V1_STATUS_OK, 11u);
             return true;
         default:

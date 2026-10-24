@@ -14,7 +14,7 @@
 #include "owned_keycode.h"
 #include "synthetic_record.h"
 #include "../compat/qmk_oneshot_contract.h"
-#include "../profile/runtime/effective_settings_runtime.h"
+#include "../profile/runtime/active_profile_settings_runtime.h"
 #include "../state/ownership/layer_ownership.h"
 
 typedef void (*noah_action_tap_impl_t)(noah_action_desc_t desc, keypos_t key_pos);
@@ -104,10 +104,10 @@ static void noah_action_goto_layer(noah_action_desc_t desc) {
     (void)layer_ownership_goto(desc.layer);
 }
 
-static void noah_action_toggle_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
-    const pd_mode_def_t *def = pd_mode_lock_action_lookup(desc.action);
+static void noah_action_toggle_pointing_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
+    const pointing_mode_def_t *def = pointing_mode_lock_action_lookup(desc.action);
     if (def) {
-        (void)pd_mode_toggle_lock_state_at(def->mode_flag, key_pos);
+        (void)pointing_mode_toggle_lock_state_at(def->mode_flag, key_pos);
     }
 }
 
@@ -140,12 +140,12 @@ static void noah_action_tap_layer_oneshot(noah_action_desc_t desc, keypos_t key_
     }
 }
 
-static void noah_action_tap_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
-    noah_action_toggle_pd_mode_lock(desc, key_pos);
+static void noah_action_tap_pointing_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
+    noah_action_toggle_pointing_mode_lock(desc, key_pos);
 }
 
-static void noah_action_press_pd_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
-    noah_action_toggle_pd_mode_lock(desc, key_pos);
+static void noah_action_press_pointing_mode_lock(noah_action_desc_t desc, keypos_t key_pos) {
+    noah_action_toggle_pointing_mode_lock(desc, key_pos);
 }
 
 static void noah_action_press_owned_momentary_layer(noah_action_desc_t desc, keypos_t key_pos) {

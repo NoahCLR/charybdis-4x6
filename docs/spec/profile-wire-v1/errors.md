@@ -6,8 +6,8 @@ candidate's admission and error ids, the validation results behind them,
 live-edit results, and the split protocol's statuses and busy reasons as
 Profile Wire reports them. The frames that carry these codes are
 [hid-channel.md](hid-channel.md), [candidate-transfer.md](candidate-transfer.md)
-and [live-edits.md](live-edits.md); the split protocol that produces the peer
-codes is [profile-split-v1.md](../profile-split-v1.md).
+and [live-edits.md](live-edits.md); the split protocol that produces the other
+half's codes is [profile-split-v1.md](../profile-split-v1.md).
 
 ## Read status
 

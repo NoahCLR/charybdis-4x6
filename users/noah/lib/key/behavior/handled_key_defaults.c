@@ -19,7 +19,7 @@ __attribute__((weak)) bool key_behavior_has_more_taps(uint16_t keycode, uint8_t 
     return false;
 }
 
-__attribute__((weak)) bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+__attribute__((weak)) bool key_behavior_future_tap_path_has_foreign_pointing_mode(uint16_t keycode, uint8_t count, pointing_mode_mask_t base_mode) {
     (void)keycode;
     (void)count;
     (void)base_mode;
@@ -42,8 +42,8 @@ bool is_layer_key(uint16_t keycode) {
     return noah_action_keycode_is_owned_momentary_layer(keycode) || IS_QK_LAYER_TAP(keycode);
 }
 
-pd_mode_mask_t handled_key_pd_mode_for_behavior(key_behavior_view_t behavior) {
-    return pd_mode_for_keycode(behavior.keycode);
+pointing_mode_mask_t handled_key_pointing_mode_for_behavior(key_behavior_view_t behavior) {
+    return pointing_mode_for_keycode(behavior.keycode);
 }
 
 bool handled_key_resolution_step_present(const handled_key_resolution_t *resolution) {
@@ -83,7 +83,7 @@ bool handled_key_resolution_uses_fallback_hold_behavior(const handled_key_resolu
 }
 
 bool handled_key_resolution_uses_deferred_stacked_pd_hold(const handled_key_resolution_t *resolution) {
-    return resolution && resolution->tap_count == 1 && resolution->pd_mode != 0 && resolution->step.tap.present && key_behavior_future_tap_path_has_foreign_pd_mode(resolution->keycode, resolution->tap_count, resolution->pd_mode);
+    return resolution && resolution->tap_count == 1 && resolution->pointing_mode != 0 && resolution->step.tap.present && key_behavior_future_tap_path_has_foreign_pointing_mode(resolution->keycode, resolution->tap_count, resolution->pointing_mode);
 }
 
 // A pressed custom key with a shortcut and no authored row of its own, or a
@@ -128,7 +128,7 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
         return resolution->step.hold;
     }
 
-    if (resolution->tap_count == 1 && resolution->pd_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
+    if (resolution->tap_count == 1 && resolution->pointing_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
         return (hold_behavior_t){
             .present = true,
             .action  = resolution->keycode,
@@ -163,8 +163,8 @@ hold_behavior_t handled_key_hold_behavior(const handled_key_resolution_t *resolu
     }
 
     if (handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
-        // Keep stacked PD modes out of the immediate activation path while the
-        // tap-count branch is unresolved.
+        // Keep stacked pointing modes out of the immediate activation path
+        // while the tap-count branch is unresolved.
         return (hold_behavior_t){
             .present = true,
             .action  = resolution->keycode,
@@ -210,7 +210,7 @@ uint8_t handled_key_tap_repeat_count_behavior(const handled_key_resolution_t *re
 }
 
 key_runtime_slot_hold_strategy_t handled_key_hold_strategy_behavior(const handled_key_resolution_t *resolution) {
-    if (resolution && resolution->tap_count == 1 && resolution->pd_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
+    if (resolution && resolution->tap_count == 1 && resolution->pointing_mode != 0 && !handled_key_resolution_uses_deferred_stacked_pd_hold(resolution)) {
         return KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT;
     }
     if (resolution && resolution->tap_count == 1 && !resolution->step.hold.present && noah_action_keycode_is_layer_mod(resolution->keycode)) {

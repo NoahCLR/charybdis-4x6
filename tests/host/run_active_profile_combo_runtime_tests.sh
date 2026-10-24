@@ -1,0 +1,33 @@
+#!/bin/sh
+set -eu
+. "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)/in_build_image.sh"
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+BUILD_DIR="$(mktemp -d)"
+trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
+. "$ROOT/tests/host/noah_host_qmk_env.sh"
+noah_host_export_qmk_cpath "$ROOT"
+build_and_run() {
+    name="$1"
+    shift
+    cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic "$@" \
+        -DRAW_ENABLE -DCOMBO_ENABLE -DNOAH_LIVE_PROFILE_OWNER_ENABLE -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        -DQMK_KEYBOARD_H='"qmk_stub.h"' \
+        -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
+        -include "$ROOT/tests/host/include/noah_compile_config.h" \
+        "$ROOT/tests/host/active_profile_combo_runtime_test.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_combo_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_provider.c" \
+        "$ROOT/users/noah/lib/compat/qmk_active_profile_combos.c" \
+        "$ROOT/users/noah/lib/compat/qmk_combo_readback.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+        "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
+        -o "$BUILD_DIR/test_$name"
+    "$BUILD_DIR/test_$name" "$ROOT/tests/fixtures/combo_domain_v3.fixture" "$ROOT/tests/fixtures/combo_output_behaviors_v1.fixture"
+}
+build_and_run normal
+build_and_run windowed -DCOMPILED_WINDOW=80
+build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer

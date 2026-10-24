@@ -6,7 +6,7 @@
 
 #include "../../../action/action_dispatch.h"
 #include "../../../compat/qmk_oneshot_contract.h"
-#include "../../../pointing/defs/pd_modes.h"
+#include "../../../pointing/defs/pointing_modes.h"
 
 static void key_runtime_core_release_effect_plan_push(key_runtime_core_release_effect_plan_t *plan, key_runtime_effect_t effect) {
     if (!plan) {
@@ -104,14 +104,14 @@ static void key_runtime_core_release_effect_plan_push_tap_commit_feedback_pulse(
     }
 }
 
-static void key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, pd_mode_mask_t mode) {
+static void key_runtime_core_release_effect_plan_push_pointing_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, pointing_mode_mask_t mode) {
     if (!(plan && mode != 0)) {
         return;
     }
 
     key_runtime_core_release_effect_plan_push(plan, (key_runtime_effect_t){
-                                                        .kind                  = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
-                                                        .data.pd_mode_lock_tap = {.pd_mode = mode, .key_pos = key_pos},
+                                                        .kind                        = KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_TAP,
+                                                        .data.pointing_mode_lock_tap = {.pointing_mode = mode, .key_pos = key_pos},
                                                     });
 }
 
@@ -132,11 +132,11 @@ static void key_runtime_core_release_effect_plan_push_delayed_action(key_runtime
                                                     });
 }
 
-static void key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, uint16_t action) {
-    const pd_mode_def_t *def = pd_mode_lock_action_lookup(action);
+static void key_runtime_core_release_effect_plan_push_action_or_pointing_mode_lock_tap(key_runtime_core_release_effect_plan_t *plan, keypos_t key_pos, uint16_t action) {
+    const pointing_mode_def_t *def = pointing_mode_lock_action_lookup(action);
 
     if (def) {
-        key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(plan, key_pos, def->mode_flag);
+        key_runtime_core_release_effect_plan_push_pointing_mode_lock_tap(plan, key_pos, def->mode_flag);
         return;
     }
 
@@ -231,15 +231,15 @@ bool key_runtime_core_resolve_active_release(keypos_t key_pos, key_runtime_core_
     held_action_active = key_runtime_core_owner_has_lease_kind(state, token->token_id, LEASE_KIND_HELD_ACTION);
     repeat_active      = key_runtime_core_owner_has_lease_kind(state, token->token_id, LEASE_KIND_REPEAT);
     query              = (key_runtime_release_query_t){
-        .interaction                     = &token->interaction,
-        .semantics                       = semantics,
-        .elapsed                         = elapsed,
-        .held_action_active              = held_action_active,
-        .repeat_active                   = repeat_active,
-        .other_press_interrupted         = token->other_press_interrupted,
-        .momentary_layer_tap_interrupted = token->momentary_layer_tap_interrupted,
-        .pd_mode_was_locked_on_press     = token->pd_mode_was_locked_on_press,
-        .pd_mode_lock_consumed_on_press  = token->pd_mode_lock_consumed_on_press,
+        .interaction                          = &token->interaction,
+        .semantics                            = semantics,
+        .elapsed                              = elapsed,
+        .held_action_active                   = held_action_active,
+        .repeat_active                        = repeat_active,
+        .other_press_interrupted              = token->other_press_interrupted,
+        .momentary_layer_tap_interrupted      = token->momentary_layer_tap_interrupted,
+        .pointing_mode_was_locked_on_press    = token->pointing_mode_was_locked_on_press,
+        .pointing_mode_lock_consumed_on_press = token->pointing_mode_lock_consumed_on_press,
     };
 
     *out = (key_runtime_core_active_release_resolution_t){
@@ -297,7 +297,7 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, const key_ru
                     out->settlement = KEY_RUNTIME_CORE_RELEASE_SLOT_SETTLEMENT_START_TAP_SERIES;
                     return true;
                 case KEY_RUNTIME_RELEASE_TAP_OUTCOME_DISPATCH_ACTION:
-                    key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, key_pos, contract.tap.action);
+                    key_runtime_core_release_effect_plan_push_action_or_pointing_mode_lock_tap(out, key_pos, contract.tap.action);
                     key_runtime_core_release_effect_plan_push_tap_commit_feedback_pulse(out, key_pos, contract.tap.action, resolution->interaction->selection.tap_count);
                     if (tap_keeps_layer) {
                         key_runtime_core_release_effect_plan_push_layer_release(out, key_pos);
@@ -308,10 +308,10 @@ bool key_runtime_core_plan_active_release_effects(keypos_t key_pos, const key_ru
                     return true;
             }
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_ACTION:
-            key_runtime_core_release_effect_plan_push_action_or_pd_mode_lock_tap(out, key_pos, resolution->decision.action);
+            key_runtime_core_release_effect_plan_push_action_or_pointing_mode_lock_tap(out, key_pos, resolution->decision.action);
             return true;
-        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
-            key_runtime_core_release_effect_plan_push_pd_mode_lock_tap(out, key_pos, resolution->decision.pd_mode_lock_tap);
+        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_POINTING_MODE_LOCK_TAP:
+            key_runtime_core_release_effect_plan_push_pointing_mode_lock_tap(out, key_pos, resolution->decision.pointing_mode_lock_tap);
             return true;
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_NONE:
         default:
@@ -434,7 +434,7 @@ bool key_runtime_core_resolve_pending_multi_tap_release(keypos_t key_pos, uint16
             };
             return true;
         }
-        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_PD_MODE_LOCK_TAP:
+        case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_POINTING_MODE_LOCK_TAP:
         case KEY_RUNTIME_RELEASE_DECISION_OUTCOME_NONE:
         default: {
             uint16_t held_lifecycle_action = key_runtime_core_pending_multi_tap_release_held_lifecycle_action(token, tap_action, elapsed);

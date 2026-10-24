@@ -89,7 +89,7 @@ static bool rgb_runtime_combo_feedback_stage_paint_locality(rgb_runtime_frame_t 
     return rgb_runtime_combo_feedback_stage_paint_range(frame, color, 0u, RGB_MATRIX_LED_COUNT, led_min, led_max);
 }
 
-static bool rgb_runtime_combo_feedback_stage_paint_group(rgb_runtime_frame_t *frame, const rgb_effective_combo_group_t *group, rgb_t color, uint8_t led_min, uint8_t led_max) {
+static bool rgb_runtime_combo_feedback_stage_paint_group(rgb_runtime_frame_t *frame, const rgb_active_profile_combo_group_t *group, rgb_t color, uint8_t led_min, uint8_t led_max) {
     bool painted = false;
 
     if (!(frame && group)) {
@@ -106,26 +106,26 @@ static bool rgb_runtime_combo_feedback_stage_paint_group(rgb_runtime_frame_t *fr
     return painted;
 }
 
-bool rgb_runtime_combo_feedback_stage_render_effective_frame(rgb_runtime_frame_t *frame, const noah_effective_rgb_frame_t *profile_frame, const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
-    combo_feedback_color_config_t feedback_config;
-    rgb_effective_combo_group_t   group_config;
-    rgb_t                         active_rgb;
-    bool                          painted = false;
-    uint8_t                       group_count;
+bool rgb_runtime_combo_feedback_stage_render_active_profile_frame(rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, const uint8_t *bitmap, uint8_t led_min, uint8_t led_max) {
+    combo_feedback_color_config_t    feedback_config;
+    rgb_active_profile_combo_group_t group_config;
+    rgb_t                            active_rgb;
+    bool                             painted = false;
+    uint8_t                          group_count;
 
     if (!frame) {
         return false;
     }
     rgb_runtime_frame_clear(frame, led_min, led_max);
-    if (!bitmap || !key_origin_bitmap_has_any(bitmap) || !rgb_effective_config_combo_stage_enabled(profile_frame) || !rgb_effective_config_combo_feedback(profile_frame, &feedback_config)) {
+    if (!bitmap || !key_origin_bitmap_has_any(bitmap) || !rgb_active_profile_config_combo_stage_enabled(profile_frame) || !rgb_active_profile_config_combo_feedback(profile_frame, &feedback_config)) {
         return false;
     }
     active_rgb = hsv_to_rgb(feedback_config.color);
     painted |= rgb_runtime_combo_feedback_stage_paint_locality(frame, active_rgb, feedback_config.locality, bitmap, led_min, led_max);
 
-    group_count = rgb_effective_config_combo_group_count(profile_frame);
+    group_count = rgb_active_profile_config_combo_group_count(profile_frame);
     for (uint8_t group = 0u; group < group_count; group++) {
-        if (!rgb_effective_config_combo_group_at(profile_frame, group, &group_config)) {
+        if (!rgb_active_profile_config_combo_group_at(profile_frame, group, &group_config)) {
             rgb_runtime_frame_clear(frame, led_min, led_max);
             return false;
         }
@@ -134,7 +134,7 @@ bool rgb_runtime_combo_feedback_stage_render_effective_frame(rgb_runtime_frame_t
         painted |= rgb_runtime_combo_feedback_stage_paint_group(frame, &group_config, group_rgb, led_min, led_max);
     }
 
-    if (!rgb_effective_config_frame_current(profile_frame)) {
+    if (!rgb_active_profile_config_frame_current(profile_frame)) {
         rgb_runtime_frame_clear(frame, led_min, led_max);
         return false;
     }

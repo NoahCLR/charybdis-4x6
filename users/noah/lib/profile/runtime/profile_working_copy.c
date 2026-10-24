@@ -50,17 +50,17 @@ static noah_profile_working_result_t finish(noah_profile_working_copy_t *copy, n
 }
 
 static void note_publications(noah_profile_working_copy_t *copy) {
-    noah_effective_profile_status_t status;
+    noah_active_profile_status_t status;
 
-    if (copy->provider && noah_effective_profile_provider_status(copy->provider, &status) == NOAH_EFFECTIVE_PROFILE_OK) {
+    if (copy->provider && noah_active_profile_provider_status(copy->provider, &status) == NOAH_ACTIVE_PROFILE_OK) {
         copy->publication_count = status.publication_count;
     }
 }
 
 bool noah_profile_working_copy_observe(noah_profile_working_copy_t *copy, bool same_content) {
-    noah_effective_profile_status_t status;
+    noah_active_profile_status_t status;
 
-    if (!copy || !copy->provider || noah_effective_profile_provider_status(copy->provider, &status) != NOAH_EFFECTIVE_PROFILE_OK || status.publication_count == copy->publication_count) {
+    if (!copy || !copy->provider || noah_active_profile_provider_status(copy->provider, &status) != NOAH_ACTIVE_PROFILE_OK || status.publication_count == copy->publication_count) {
         return false;
     }
     copy->publication_count = status.publication_count;
@@ -68,7 +68,7 @@ bool noah_profile_working_copy_observe(noah_profile_working_copy_t *copy, bool s
     return true;
 }
 
-void noah_profile_working_copy_init(noah_profile_working_copy_t *copy, uint8_t *bytes, uint32_t capacity, noah_effective_profile_provider_t *provider, const noah_profile_validator_v1_compatibility_t *host_rules, const noah_profile_validator_v1_compatibility_t *peer_rules, uint32_t session) {
+void noah_profile_working_copy_init(noah_profile_working_copy_t *copy, uint8_t *bytes, uint32_t capacity, noah_active_profile_provider_t *provider, const noah_profile_validator_v1_compatibility_t *host_rules, const noah_profile_validator_v1_compatibility_t *other_half_rules, uint32_t session) {
     if (!copy) {
         return;
     }
@@ -78,7 +78,7 @@ void noah_profile_working_copy_init(noah_profile_working_copy_t *copy, uint8_t *
     copy->reader     = noah_profile_reader_from_memory(bytes, copy->capacity);
     copy->provider   = provider;
     copy->host_rules = host_rules;
-    copy->peer_rules = peer_rules ? peer_rules : host_rules;
+    copy->other_half_rules = other_half_rules ? other_half_rules : host_rules;
     copy->session    = session;
     copy->error      = noah_profile_validator_v1_no_error();
     note_publications(copy);
@@ -97,14 +97,14 @@ bool noah_profile_working_copy_busy(const noah_profile_working_copy_t *copy) {
     return copy && copy->phase != NOAH_PROFILE_WORKING_PHASE_IDLE;
 }
 
-noah_profile_working_result_t noah_profile_working_copy_begin(noah_profile_working_copy_t *copy, uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags, bool from_peer) {
+noah_profile_working_result_t noah_profile_working_copy_begin(noah_profile_working_copy_t *copy, uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags, bool from_other_half) {
     bool replace = (flags & NOAH_PROFILE_WORKING_EDIT_REPLACE) != 0u;
     const noah_profile_validator_v1_compatibility_t *rules;
 
     if (!copy || !copy->bytes || !copy->provider || transaction_id == 0u) {
         return NOAH_PROFILE_WORKING_INVALID_ARGUMENT;
     }
-    rules = from_peer ? copy->peer_rules : copy->host_rules;
+    rules = from_other_half ? copy->other_half_rules : copy->host_rules;
     if (copy->phase != NOAH_PROFILE_WORKING_PHASE_IDLE) {
         // A repeated BEGIN whose answer was lost changes nothing.
         if (copy->phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING && copy->transaction_id == transaction_id && copy->splice_count == splice_count && copy->insert_total == insert_total && copy->flags == flags && copy->rules == rules && copy->target_revision == revision + 1u && session == copy->session) {
@@ -122,10 +122,10 @@ noah_profile_working_result_t noah_profile_working_copy_begin(noah_profile_worki
         // Never wraps back into an identity a host may still hold.
         return NOAH_PROFILE_WORKING_CAPACITY_EXCEEDED;
     }
-    if (noah_effective_profile_provider_copy_active(copy->provider, &copy->base) != NOAH_EFFECTIVE_PROFILE_OK) {
+    if (noah_active_profile_provider_copy_active(copy->provider, &copy->base) != NOAH_ACTIVE_PROFILE_OK) {
         return NOAH_PROFILE_WORKING_BUSY;
     }
-    if ((copy->base.identity.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY) != copy->active) {
+    if ((copy->base.identity.kind == NOAH_ACTIVE_PROFILE_KIND_WORKING_COPY) != copy->active) {
         return NOAH_PROFILE_WORKING_INVALID_STATE;
     }
     if (replace) {
@@ -275,14 +275,14 @@ static noah_profile_working_result_t read_layout(noah_profile_working_copy_t *co
     noah_profile_envelope_t walk;
 
     memset(copy->old_domains, 0, sizeof(copy->old_domains));
-    if (!noah_effective_profile_snapshot_read(&copy->base, 0u, header, sizeof(header)) || noah_profile_envelope_begin(&walk, header, copy->old_length, NULL) != NOAH_PROFILE_CODEC_V1_OK) {
+    if (!noah_active_profile_snapshot_read(&copy->base, 0u, header, sizeof(header)) || noah_profile_envelope_begin(&walk, header, copy->old_length, NULL) != NOAH_PROFILE_CODEC_V1_OK) {
         return NOAH_PROFILE_WORKING_READ_ERROR;
     }
     memcpy(copy->literal, header, sizeof(header));
     while (walk.index < walk.count) {
         noah_profile_domain_record_t record;
 
-        if (walk.byte_length - walk.offset < NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE || !noah_effective_profile_snapshot_read(&copy->base, walk.offset, header, NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE) || noah_profile_envelope_next(&walk, header, &record, NULL) != NOAH_PROFILE_CODEC_V1_OK) {
+        if (walk.byte_length - walk.offset < NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE || !noah_active_profile_snapshot_read(&copy->base, walk.offset, header, NOAH_PROFILE_BLOB_V1_DOMAIN_HEADER_SIZE) || noah_profile_envelope_next(&walk, header, &record, NULL) != NOAH_PROFILE_CODEC_V1_OK) {
             return NOAH_PROFILE_WORKING_READ_ERROR;
         }
         copy->old_domains[record.shape->index] = (noah_profile_working_domain_t){.payload_offset = record.offset, .length = record.length, .present = true};
@@ -572,7 +572,7 @@ static bool scan_load(noah_profile_working_copy_t *copy) {
     for (uint32_t done = 0u; done < count;) {
         uint32_t piece = count - done < NOAH_PROFILE_WORKING_LOAD_PIECE ? count - done : NOAH_PROFILE_WORKING_LOAD_PIECE;
 
-        if (!noah_effective_profile_snapshot_read(&copy->base, copy->load_offset, copy->bytes + copy->load_offset, piece)) {
+        if (!noah_active_profile_snapshot_read(&copy->base, copy->load_offset, copy->bytes + copy->load_offset, piece)) {
             (void)finish(copy, NOAH_PROFILE_WORKING_READ_ERROR);
             return true;
         }
@@ -736,20 +736,20 @@ bool noah_profile_working_copy_published_stream(const noah_profile_working_copy_
 }
 
 static bool scan_publish(noah_profile_working_copy_t *copy) {
-    const noah_effective_profile_identity_t *base = copy->active ? &copy->saved.identity : &copy->base.identity;
-    noah_effective_profile_snapshot_t        snapshot;
-    noah_effective_profile_result_t          result;
+    const noah_active_profile_identity_t *base = copy->active ? &copy->saved.identity : &copy->base.identity;
+    noah_active_profile_snapshot_t           snapshot;
+    noah_active_profile_result_t             result;
     bool                                     replace = (copy->flags & NOAH_PROFILE_WORKING_EDIT_REPLACE) != 0u;
 
-    if (noah_effective_profile_snapshot_make_working(&copy->next, &copy->reader, 0u, base, copy->session, copy->target_revision, &snapshot) != NOAH_EFFECTIVE_PROFILE_OK) {
+    if (noah_active_profile_snapshot_make_working(&copy->next, &copy->reader, 0u, base, copy->session, copy->target_revision, &snapshot) != NOAH_ACTIVE_PROFILE_OK) {
         (void)finish(copy, NOAH_PROFILE_WORKING_PUBLICATION_FAILED);
         return true;
     }
-    result = noah_effective_profile_provider_publish_in_place(copy->provider, &snapshot, copy->changed_mask, replace ? NULL : apply_plan, copy);
-    if (result == NOAH_EFFECTIVE_PROFILE_WAITING || result == NOAH_EFFECTIVE_PROFILE_BUSY || result == NOAH_EFFECTIVE_PROFILE_BACKING_REUSE_IN_PROGRESS) {
+    result = noah_active_profile_provider_publish_in_place(copy->provider, &snapshot, copy->changed_mask, replace ? NULL : apply_plan, copy);
+    if (result == NOAH_ACTIVE_PROFILE_WAITING || result == NOAH_ACTIVE_PROFILE_BUSY || result == NOAH_ACTIVE_PROFILE_BACKING_REUSE_IN_PROGRESS) {
         return false;
     }
-    if (result != NOAH_EFFECTIVE_PROFILE_PUBLISHED) {
+    if (result != NOAH_ACTIVE_PROFILE_PUBLISHED) {
         (void)finish(copy, NOAH_PROFILE_WORKING_PUBLICATION_FAILED);
         return true;
     }
@@ -765,12 +765,12 @@ static bool scan_publish(noah_profile_working_copy_t *copy) {
 }
 
 static bool scan_revert(noah_profile_working_copy_t *copy) {
-    noah_effective_profile_result_t result = noah_effective_profile_provider_publish_in_place(copy->provider, &copy->saved, NOAH_PROFILE_DOMAIN_MASK_ALL, NULL, NULL);
+    noah_active_profile_result_t result = noah_active_profile_provider_publish_in_place(copy->provider, &copy->saved, NOAH_PROFILE_DOMAIN_MASK_ALL, NULL, NULL);
 
-    if (result == NOAH_EFFECTIVE_PROFILE_WAITING || result == NOAH_EFFECTIVE_PROFILE_BUSY || result == NOAH_EFFECTIVE_PROFILE_BACKING_REUSE_IN_PROGRESS) {
+    if (result == NOAH_ACTIVE_PROFILE_WAITING || result == NOAH_ACTIVE_PROFILE_BUSY || result == NOAH_ACTIVE_PROFILE_BACKING_REUSE_IN_PROGRESS) {
         return false;
     }
-    if (result != NOAH_EFFECTIVE_PROFILE_PUBLISHED) {
+    if (result != NOAH_ACTIVE_PROFILE_PUBLISHED) {
         if (copy->settling) {
             // The copy stays; the Save that asked fails.
             copy->settling = false;
@@ -846,15 +846,15 @@ bool noah_profile_working_copy_note_replaced(noah_profile_working_copy_t *copy, 
 }
 
 bool noah_profile_working_copy_read(const noah_profile_working_copy_t *copy, uint32_t offset, uint8_t *bytes, uint32_t length) {
-    noah_effective_profile_snapshot_t active;
+    noah_active_profile_snapshot_t active;
 
-    return copy && copy->provider && noah_effective_profile_provider_copy_active(copy->provider, &active) == NOAH_EFFECTIVE_PROFILE_OK && noah_effective_profile_snapshot_read(&active, offset, bytes, length);
+    return copy && copy->provider && noah_active_profile_provider_copy_active(copy->provider, &active) == NOAH_ACTIVE_PROFILE_OK && noah_active_profile_snapshot_read(&active, offset, bytes, length);
 }
 
 bool noah_profile_working_copy_status(const noah_profile_working_copy_t *copy, noah_profile_working_status_t *status) {
-    noah_effective_profile_status_t provider;
+    noah_active_profile_status_t provider;
 
-    if (!copy || !status || !copy->provider || noah_effective_profile_provider_status(copy->provider, &provider) != NOAH_EFFECTIVE_PROFILE_OK) {
+    if (!copy || !status || !copy->provider || noah_active_profile_provider_status(copy->provider, &provider) != NOAH_ACTIVE_PROFILE_OK) {
         return false;
     }
     *status = (noah_profile_working_status_t){
@@ -871,9 +871,9 @@ bool noah_profile_working_copy_status(const noah_profile_working_copy_t *copy, n
         .error               = copy->error,
     };
     {
-        noah_effective_profile_snapshot_t active;
+        noah_active_profile_snapshot_t active;
 
-        if (noah_effective_profile_provider_copy_active(copy->provider, &active) == NOAH_EFFECTIVE_PROFILE_OK) {
+        if (noah_active_profile_provider_copy_active(copy->provider, &active) == NOAH_ACTIVE_PROFILE_OK) {
             status->length      = (uint32_t)active.profile.byte_length;
             status->domain_mask = active.profile.domain_mask;
         }

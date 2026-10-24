@@ -17,26 +17,26 @@
 #include "users/noah/lib/profile/schema/profile_compiled_defaults_v1.h"
 #include "users/noah/lib/profile/schema/profile_validator_v1.h"
 #include "users/noah/lib/compat/qmk_profile_capabilities.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 
-// The PD-mode table exactly as the pointing registry defines its rows
-// (pd_mode_registry.c: mode flag, keycode, lock action), and its two lookups,
-// without the registry's handlers: the action vocabulary and its digest read
-// only these fields.
-#define NOAH_PD_MODE_PROBE_ROW(name, mode_keycode) {.mode_flag = PD_MODE_##name, .keycode = mode_keycode, .lock_action = mode_keycode##_LOCK},
-const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_PROBE_ROW)};
-#undef NOAH_PD_MODE_PROBE_ROW
+// The pointing-mode table exactly as the pointing registry defines its rows
+// (pointing_mode_registry.c: mode flag, keycode, lock action), and its two
+// lookups, without the registry's handlers: the action vocabulary and its
+// digest read only these fields.
+#define NOAH_POINTING_MODE_PROBE_ROW(name, mode_keycode) {.mode_flag = POINTING_MODE_##name, .keycode = mode_keycode, .lock_action = mode_keycode##_LOCK},
+const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {NOAH_POINTING_MODE_LIST(NOAH_POINTING_MODE_PROBE_ROW)};
+#undef NOAH_POINTING_MODE_PROBE_ROW
 
-bool is_pd_mode_lock_action(uint16_t action) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].lock_action == action) return true;
+bool is_pointing_mode_lock_action(uint16_t action) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++) {
+        if (pointing_modes[i].lock_action == action) return true;
     }
     return false;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode) return pd_modes[i].mode_flag;
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++) {
+        if (pointing_modes[i].keycode != KC_NO && pointing_modes[i].keycode == keycode) return pointing_modes[i].mode_flag;
     }
     return 0;
 }

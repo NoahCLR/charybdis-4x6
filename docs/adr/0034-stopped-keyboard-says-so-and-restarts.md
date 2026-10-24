@@ -10,7 +10,7 @@ restart both halves over Raw HID (SET `0x28`, with a confirmation word), after
 keeping the unsaved edits itself to send back. A restart is a reset between
 main-loop passes, exactly as safe as unplugging, which the marker-last rule
 already makes safe anywhere in a save. It is never automatic, since only a
-client can keep what is unsaved. A USB half restarted alone tells the other
+client can keep what is unsaved. A master half restarted alone tells the other
 half it holds no prepared push, so an abandoned prepared copy is released and
 the halves rejoin.
 

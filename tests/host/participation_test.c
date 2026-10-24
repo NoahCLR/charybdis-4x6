@@ -1,12 +1,12 @@
 // The participation policy (participation-policy.md, D-F14) against fake
-// effective settings, behaviour rows and combo rows.
+// active profile's settings, behaviour rows and combo rows.
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "users/noah/lib/key/behavior/participation.h"
-#include "users/noah/lib/profile/runtime/effective_key_behavior_runtime.h"
-#include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_key_behavior_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 
 static bool combo_output_behaviors = true;
 bool noah_setting_combo_output_behaviors(void) { return combo_output_behaviors; }
@@ -21,27 +21,27 @@ uint8_t noah_setting_layer_record(uint8_t layer, uint8_t field) {
 }
 
 // Rows: KC_W live (flags/allowed below), KC_X compiled, everything else none.
-static noah_effective_key_behavior_row_t w_row;
-noah_effective_key_behavior_result_t     noah_effective_key_behavior_lookup(uint16_t keycode, noah_effective_key_behavior_row_t *row) {
+static noah_active_profile_key_behavior_row_t w_row;
+noah_active_profile_key_behavior_result_t noah_active_profile_key_behavior_lookup(uint16_t keycode, noah_active_profile_key_behavior_row_t *row) {
     if (keycode == KC_W) {
         *row = w_row;
-        return NOAH_EFFECTIVE_KEY_BEHAVIOR_OK;
+        return NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_OK;
     }
-    return keycode == KC_X ? NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK : NOAH_EFFECTIVE_KEY_BEHAVIOR_NOT_FOUND;
+    return keycode == KC_X ? NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_COMPILED_FALLBACK : NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_NOT_FOUND;
 }
 
 static const uint16_t inputs[] = {KC_A, KC_B, COMBO_END};
 static combo_t combos[] = {{.keys = inputs, .keycode = KC_W}, {.keys = inputs, .keycode = KC_W}};
 static uint8_t combo_flags[2];
-uint16_t noah_effective_combo_count(void) { return 2; }
-combo_t *noah_effective_combo_get(uint16_t index) { return index < 2 ? &combos[index] : NULL; }
-uint8_t noah_effective_combo_flags(uint16_t index) { return index < 2 ? combo_flags[index] : 0; }
+uint16_t noah_active_profile_combo_count(void) { return 2; }
+combo_t *noah_active_profile_combo_get(uint16_t index) { return index < 2 ? &combos[index] : NULL; }
+uint8_t noah_active_profile_combo_flags(uint16_t index) { return index < 2 ? combo_flags[index] : 0; }
 static bool     combo_enabled[2]       = {true, true};
 static uint32_t combo_layers[2]        = {UINT32_MAX, UINT32_MAX};
-bool            noah_effective_combo_enabled(uint16_t index) {
+bool            noah_active_profile_combo_enabled(uint16_t index) {
     return index < 2u && combo_enabled[index];
 }
-uint32_t noah_effective_combo_allowed_layers(uint16_t index) {
+uint32_t noah_active_profile_combo_allowed_layers(uint16_t index) {
     return index < 2u ? combo_layers[index] : 0u;
 }
 
@@ -55,7 +55,7 @@ static void defaults(void) {
     scalars[NOAH_SETTING_LAYER_BEHAVIORS]   = 0xffffu;
     noah_participation_set_behaviors_override(true);
     scalars[NOAH_SETTING_LAYER_COMBOS]      = 0xffffu;
-    w_row                                   = (noah_effective_key_behavior_row_t){.allowed_layers = 0xffffu};
+    w_row                                   = (noah_active_profile_key_behavior_row_t){.allowed_layers = 0xffffu};
     combo_enabled[0] = combo_enabled[1] = true;
     combo_layers[0] = combo_layers[1] = 0xffffu;
 }

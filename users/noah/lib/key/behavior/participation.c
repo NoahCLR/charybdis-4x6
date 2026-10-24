@@ -1,9 +1,9 @@
 #include "participation.h"
 
-#include "../../profile/runtime/effective_key_behavior_runtime.h"
-#include "../../profile/runtime/effective_settings_runtime.h"
+#include "../../profile/runtime/active_profile_key_behavior_runtime.h"
+#include "../../profile/runtime/active_profile_settings_runtime.h"
 #ifdef COMBO_ENABLE
-#    include "../../compat/qmk_effective_combos.h"
+#    include "../../compat/qmk_active_profile_combos.h"
 #endif
 
 // One bit per matrix position: set when that press bypassed its behaviour or
@@ -50,10 +50,10 @@ bool noah_participation_press_combo(keypos_t key_pos) {
 
 // Builds without the live-profile runtime use the compiled tables, whose rows
 // are always enabled; production supplies the strong definition.
-__attribute__((weak)) noah_effective_key_behavior_result_t noah_effective_key_behavior_lookup(uint16_t keycode, noah_effective_key_behavior_row_t *row) {
+__attribute__((weak)) noah_active_profile_key_behavior_result_t noah_active_profile_key_behavior_lookup(uint16_t keycode, noah_active_profile_key_behavior_row_t *row) {
     (void)keycode;
     (void)row;
-    return NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK;
+    return NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_COMPILED_FALLBACK;
 }
 
 static bool layer_bit(uint32_t mask, uint8_t layer) {
@@ -75,14 +75,14 @@ static bool placement_bit(uint8_t layer, uint8_t field, keypos_t key_pos) {
 // is one, whether it is enabled, and the layers it may act on. A compiled row
 // is enabled on every layer.
 static bool behavior_row(uint16_t keycode, bool *enabled, uint32_t *allowed_layers) {
-    noah_effective_key_behavior_row_t    row    = {0};
-    noah_effective_key_behavior_result_t result = noah_effective_key_behavior_lookup(keycode, &row);
+    noah_active_profile_key_behavior_row_t row  = {0};
+    noah_active_profile_key_behavior_result_t result = noah_active_profile_key_behavior_lookup(keycode, &row);
 
     *enabled        = true;
     *allowed_layers = UINT32_MAX;
-    if (result != NOAH_EFFECTIVE_KEY_BEHAVIOR_OK) {
+    if (result != NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_OK) {
         // No live row, or the compiled tables: those rows are always enabled.
-        return result == NOAH_EFFECTIVE_KEY_BEHAVIOR_COMPILED_FALLBACK;
+        return result == NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_COMPILED_FALLBACK;
     }
     *enabled        = (row.flags & NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_DISABLED) == 0u;
     *allowed_layers = row.allowed_layers;

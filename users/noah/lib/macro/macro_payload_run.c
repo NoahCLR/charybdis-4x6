@@ -5,7 +5,7 @@
 #include "../action/owned_keycode.h"
 #include "host_layout.h"
 #include "macro_payload_internal.h"
-#include "../profile/runtime/effective_settings_runtime.h"
+#include "../profile/runtime/active_profile_settings_runtime.h"
 #include "../compat/qmk_host.h"
 
 #if defined(NOAH_PORTABLE_PROFILE_ENABLE) && !defined(NOAH_HOST_QMK_STUB) && (!defined(QMK_REPORT_MODS_OVERRIDE) || !defined(QMK_REPORT_KEYS_FILTER))

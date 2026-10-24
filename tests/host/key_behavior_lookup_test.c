@@ -7,18 +7,18 @@
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/behavior/handled_key.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
-#include "users/noah/lib/pointing/defs/pd_mode_flags.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
-#include "users/noah/lib/profile/runtime/effective_key_behavior_runtime.h"
+#include "users/noah/lib/pointing/defs/pointing_mode_flags.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
+#include "users/noah/lib/profile/runtime/active_profile_key_behavior_runtime.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
 
 enum {
     TEST_LAYER_TAP_KEY              = 0x04,
     TEST_AUTHORED_LAYER_TAP         = LT(2, TEST_LAYER_TAP_KEY),
     TEST_BARE_LAYER_TAP             = LT(3, TEST_LAYER_TAP_KEY),
-    TEST_PD_MODE_KEY                = SAFE_RANGE + 0x0Fu,
+    TEST_POINTING_MODE_KEY          = SAFE_RANGE + 0x0Fu,
     TEST_TAP_ACTION                 = SAFE_RANGE + 0x10u,
-    TEST_PD_MODE_LOCK_KEY           = SAFE_RANGE + 0x11u,
+    TEST_POINTING_MODE_LOCK_KEY     = SAFE_RANGE + 0x11u,
     TEST_TRANSPARENT_PD_KEY         = SAFE_RANGE + 0x12u,
     TEST_TRANSPARENT_KEY            = SAFE_RANGE + 0x13u,
     TEST_MULTI_TAP_KEY              = SAFE_RANGE + 0x14u,
@@ -31,7 +31,7 @@ enum {
     TEST_LONG_HOLD_BEHAVIOR_KEY     = SAFE_RANGE + 0x1Bu,
     TEST_CHAIN_MULTI_TAP_KEY        = SAFE_RANGE + 0x1Cu,
     TEST_STACKED_PD_KEY             = SAFE_RANGE + 0x1Du,
-    TEST_OTHER_PD_MODE_KEY          = SAFE_RANGE + 0x1Eu,
+    TEST_OTHER_POINTING_MODE_KEY    = SAFE_RANGE + 0x1Eu,
     TEST_REPEAT_KEY                 = SAFE_RANGE + 0x1Fu,
 };
 
@@ -168,7 +168,7 @@ const key_behavior_t key_behaviors[] = {
         .tap_counts =
             {
                 [0] = {.tap = TAP_SENDS(KC_TRNS)},
-                [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_OTHER_PD_MODE_KEY)},
+                [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(TEST_OTHER_POINTING_MODE_KEY)},
             },
     },
     {
@@ -208,25 +208,25 @@ noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
 
 const uint8_t key_behavior_count = ARRAY_SIZE(key_behaviors);
 
-const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
-    [0] = {.mode_flag = 1u, .keycode = TEST_PD_MODE_KEY, .lock_action = TEST_PD_MODE_LOCK_KEY},
-    [1] = {.mode_flag = 2u, .keycode = TEST_OTHER_PD_MODE_KEY, .lock_action = TEST_OTHER_PD_MODE_KEY + 1u},
+const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {
+    [0] = {.mode_flag = 1u, .keycode = TEST_POINTING_MODE_KEY, .lock_action = TEST_POINTING_MODE_LOCK_KEY},
+    [1] = {.mode_flag = 2u, .keycode = TEST_OTHER_POINTING_MODE_KEY, .lock_action = TEST_OTHER_POINTING_MODE_KEY + 1u},
 };
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    if (keycode == TEST_PD_MODE_KEY || keycode == TEST_TRANSPARENT_PD_KEY || keycode == TEST_STACKED_PD_KEY) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
+    if (keycode == TEST_POINTING_MODE_KEY || keycode == TEST_TRANSPARENT_PD_KEY || keycode == TEST_STACKED_PD_KEY) {
         return 1u;
     }
 
-    if (keycode == TEST_OTHER_PD_MODE_KEY) {
+    if (keycode == TEST_OTHER_POINTING_MODE_KEY) {
         return 2u;
     }
 
     return 0u;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
-    return action == TEST_PD_MODE_LOCK_KEY;
+bool is_pointing_mode_lock_action(uint16_t action) {
+    return action == TEST_POINTING_MODE_LOCK_KEY;
 }
 
 bool layer_state_cmp(layer_state_t state, uint8_t layer) {
@@ -265,19 +265,19 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return true;
 }
 
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
     (void)action;
     return NULL;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
 void noah_dispatch_synthetic_tap(uint16_t keycode) {
@@ -472,8 +472,8 @@ static void test_empty_later_tap_repeats_the_first_tap(void) {
     CHECK(materialized.tap_repeat_count == 2u);
 }
 
-static void test_plain_pd_mode_key_is_handled_without_authored_behavior(void) {
-    key_behavior_view_t behavior = key_behavior_lookup(TEST_PD_MODE_KEY);
+static void test_plain_pointing_mode_key_is_handled_without_authored_behavior(void) {
+    key_behavior_view_t behavior = key_behavior_lookup(TEST_POINTING_MODE_KEY);
 
     CHECK(behavior.handled);
     CHECK(!behavior.is_momentary_layer);
@@ -507,8 +507,8 @@ static void test_handled_resolution_searches_authored_rows_once(void) {
     CHECK(counters.row_comparison_count == key_behavior_count);
 }
 
-static void test_pd_mode_lock_stays_out_of_handled_key_runtime(void) {
-    key_behavior_view_t behavior = key_behavior_lookup(TEST_PD_MODE_LOCK_KEY);
+static void test_pointing_mode_lock_stays_out_of_handled_key_runtime(void) {
+    key_behavior_view_t behavior = key_behavior_lookup(TEST_POINTING_MODE_LOCK_KEY);
 
     CHECK(!behavior.handled);
     CHECK(!behavior.is_momentary_layer);
@@ -562,12 +562,12 @@ static void test_transparent_tap_resolves_bare_lt_to_its_tap_keycode(void) {
     CHECK(materialized.tap_action == TEST_LAYER_TAP_KEY);
 }
 
-static void test_transparent_tap_stops_at_plain_pd_mode_key_without_tap_output(void) {
+static void test_transparent_tap_stops_at_plain_pointing_mode_key_without_tap_output(void) {
     keypos_t                   key_pos = test_keypos(0, 3);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
-    test_set_keymap_key(1, key_pos, TEST_PD_MODE_KEY);
+    test_set_keymap_key(1, key_pos, TEST_POINTING_MODE_KEY);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_PD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
@@ -655,21 +655,21 @@ static void test_transparent_hold_uses_lower_plain_key_normal_hold_behavior(void
     CHECK(!materialized.hold.present);
 }
 
-static void test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata(void) {
+static void test_transparent_hold_uses_lower_pointing_mode_behavior_and_metadata(void) {
     keypos_t                   key_pos = test_keypos(1, 1);
     handled_key_materialized_t materialized;
 
     test_reset_keymap();
-    test_set_keymap_key(1, key_pos, TEST_PD_MODE_KEY);
+    test_set_keymap_key(1, key_pos, TEST_POINTING_MODE_KEY);
     test_set_keymap_key(2, key_pos, TEST_TRANSPARENT_HOLD_KEY);
     layer_state = ((layer_state_t)1u << 1) | ((layer_state_t)1u << 2);
 
     materialized = test_materialize(handled_key_lookup(TEST_TRANSPARENT_HOLD_KEY), key_pos);
     CHECK(materialized.hold.present);
-    CHECK(materialized.hold.action == TEST_PD_MODE_KEY);
+    CHECK(materialized.hold.action == TEST_POINTING_MODE_KEY);
     CHECK(materialized.hold.style == HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE);
     CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_IMPLICIT);
-    CHECK(materialized.pd_mode == 1u);
+    CHECK(materialized.pointing_mode == 1u);
 }
 
 static void test_stacked_pd_first_tap_defers_implicit_hold_until_threshold(void) {
@@ -687,13 +687,13 @@ static void test_stacked_pd_first_tap_defers_implicit_hold_until_threshold(void)
     CHECK(materialized.hold.style == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
     CHECK(materialized.hold_strategy == KEY_RUNTIME_SLOT_HOLD_STRATEGY_DEFAULT);
     CHECK((materialized.flags & HANDLED_KEY_FLAG_IMPLICIT_HOLD) == 0);
-    CHECK(materialized.pd_mode == 1u);
+    CHECK(materialized.pointing_mode == 1u);
 
     materialized = test_materialize(handled_key_lookup_tap_count(TEST_STACKED_PD_KEY, 2), key_pos);
     CHECK(materialized.hold.present);
-    CHECK(materialized.hold.action == TEST_OTHER_PD_MODE_KEY);
+    CHECK(materialized.hold.action == TEST_OTHER_POINTING_MODE_KEY);
     CHECK(materialized.hold.style == HOLD_BEHAVIOR_PRESS_AND_HOLD_UNTIL_RELEASE);
-    CHECK(materialized.pd_mode == 1u);
+    CHECK(materialized.pointing_mode == 1u);
 }
 
 static void test_transparent_hold_uses_lower_layer_tap_metadata(void) {
@@ -850,10 +850,10 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
     noah_profile_action_v1_t              tap_one;
     noah_key_behavior_step_v1_t           steps[2];
     noah_key_behavior_row_v1_t            rows[1];
-    noah_effective_key_behavior_runtime_t runtime;
-    noah_effective_profile_snapshot_t     callback_view = {0};
-    noah_effective_profile_identity_t     active        = {.generation = 7u, .payload_digest = 0x1111u, .kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE};
-    noah_effective_key_behavior_row_t     token;
+    noah_active_profile_key_behavior_runtime_t runtime;
+    noah_active_profile_snapshot_t        callback_view = {0};
+    noah_active_profile_identity_t        active        = {.generation = 7u, .payload_digest = 0x1111u, .kind = NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE};
+    noah_active_profile_key_behavior_row_t token;
     key_behavior_view_t                   behavior;
     key_behavior_step_t                   step;
 
@@ -887,12 +887,12 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
     CHECK(noah_key_behavior_domain_v1_encode(rows, ARRAY_SIZE(rows), NULL, NULL, payload, sizeof(payload), &written, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
     CHECK(noah_key_behavior_domain_v1_decode(payload, written, NULL, NULL, &domain, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
 
-    noah_effective_key_behavior_runtime_init(&runtime);
-    CHECK(noah_effective_key_behavior_runtime_install(&runtime));
+    noah_active_profile_key_behavior_runtime_init(&runtime);
+    CHECK(noah_active_profile_key_behavior_runtime_install(&runtime));
     callback_view.identity              = active;
     callback_view.profile.domain_mask   = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
     callback_view.profile.key_behaviors = domain;
-    noah_effective_key_behavior_runtime_invalidate(&runtime, 1u, (noah_effective_profile_identity_t){0}, active, &callback_view);
+    noah_active_profile_key_behavior_runtime_invalidate(&runtime, 1u, (noah_active_profile_identity_t){0}, active, &callback_view);
 
     behavior = key_behavior_lookup(TEST_MULTI_TAP_KEY);
     CHECK(behavior.source_is_live && behavior.config == NULL && behavior.handled);
@@ -910,12 +910,12 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
     behavior = key_behavior_lookup(TEST_AUTHORED_LAYER_TAP);
     CHECK(!behavior.source_is_live && behavior.config == NULL && !behavior.has_multi_tap && behavior.authored_tap_depth == 0u);
 
-    CHECK(noah_effective_key_behavior_lookup(TEST_MULTI_TAP_KEY, &token) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK);
+    CHECK(noah_active_profile_key_behavior_lookup(TEST_MULTI_TAP_KEY, &token) == NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_OK);
     active.generation = 8u;
     active.payload_digest++;
     callback_view.identity = active;
-    noah_effective_key_behavior_runtime_invalidate(&runtime, 2u, (noah_effective_profile_identity_t){0}, active, &callback_view);
-    CHECK(noah_effective_key_behavior_runtime_step(&runtime, token.epoch, token.row_index, 1u, &step) == NOAH_EFFECTIVE_KEY_BEHAVIOR_STALE);
+    noah_active_profile_key_behavior_runtime_invalidate(&runtime, 2u, (noah_active_profile_identity_t){0}, active, &callback_view);
+    CHECK(noah_active_profile_key_behavior_runtime_step(&runtime, token.epoch, token.row_index, 1u, &step) == NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_STALE);
 
     // A validated RGB-only profile deliberately returns to direct compiled
     // behavior tables; it never replays the compiled virtual blob on this path.
@@ -923,11 +923,11 @@ static void test_live_profile_behavior_replaces_compiled_rows_atomically(void) {
     active.payload_digest++;
     callback_view.identity            = active;
     callback_view.profile.domain_mask = 0u;
-    noah_effective_key_behavior_runtime_invalidate(&runtime, 3u, (noah_effective_profile_identity_t){0}, active, &callback_view);
+    noah_active_profile_key_behavior_runtime_invalidate(&runtime, 3u, (noah_active_profile_identity_t){0}, active, &callback_view);
     behavior = key_behavior_lookup(TEST_AUTHORED_LAYER_TAP);
     CHECK(!behavior.source_is_live && behavior.config != NULL && behavior.handled);
 
-    noah_effective_key_behavior_runtime_uninstall(&runtime);
+    noah_active_profile_key_behavior_runtime_uninstall(&runtime);
 }
 
 // The whole table at the shared depth, through the live runtime's row index:
@@ -941,9 +941,9 @@ static void test_live_profile_row_empty_later_tap_repeats_its_first_tap(void) {
     noah_key_behavior_domain_v1_t         domain;
     noah_key_behavior_step_v1_t           steps[2];
     noah_key_behavior_row_v1_t            row;
-    noah_effective_key_behavior_runtime_t runtime;
-    noah_effective_profile_snapshot_t     callback_view = {0};
-    noah_effective_profile_identity_t     active        = {.generation = 9u, .payload_digest = 0x3333u, .kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE};
+    noah_active_profile_key_behavior_runtime_t runtime;
+    noah_active_profile_snapshot_t        callback_view = {0};
+    noah_active_profile_identity_t        active        = {.generation = 9u, .payload_digest = 0x3333u, .kind = NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE};
     key_behavior_view_t                   behavior;
     handled_key_materialized_t            materialized;
 
@@ -963,12 +963,12 @@ static void test_live_profile_row_empty_later_tap_repeats_its_first_tap(void) {
     CHECK(noah_key_behavior_domain_v1_encode(&row, 1u, NULL, NULL, payload, sizeof(payload), &written, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
     CHECK(noah_key_behavior_domain_v1_decode(payload, written, NULL, NULL, &domain, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
 
-    noah_effective_key_behavior_runtime_init(&runtime);
-    CHECK(noah_effective_key_behavior_runtime_install(&runtime));
+    noah_active_profile_key_behavior_runtime_init(&runtime);
+    CHECK(noah_active_profile_key_behavior_runtime_install(&runtime));
     callback_view.identity              = active;
     callback_view.profile.domain_mask   = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
     callback_view.profile.key_behaviors = domain;
-    noah_effective_key_behavior_runtime_invalidate(&runtime, 1u, (noah_effective_profile_identity_t){0}, active, &callback_view);
+    noah_active_profile_key_behavior_runtime_invalidate(&runtime, 1u, (noah_active_profile_identity_t){0}, active, &callback_view);
 
     behavior = key_behavior_lookup(KC_DELETE);
     CHECK(behavior.source_is_live && behavior.authored_tap_depth == 3u);
@@ -977,7 +977,7 @@ static void test_live_profile_row_empty_later_tap_repeats_its_first_tap(void) {
     layer_state = 1u;
     materialized = test_materialize(handled_key_lookup_tap_count(KC_DELETE, 2u), test_keypos(1, 1));
     CHECK(materialized.tap_action == KC_Z && materialized.tap_repeat_count == 2u);
-    noah_effective_key_behavior_runtime_uninstall(&runtime);
+    noah_active_profile_key_behavior_runtime_uninstall(&runtime);
 }
 
 static void test_live_profile_full_table_through_the_row_index(void) {
@@ -988,10 +988,10 @@ static void test_live_profile_full_table_through_the_row_index(void) {
     size_t                             written;
     noah_profile_codec_v1_error_t      codec_error;
     noah_key_behavior_domain_v1_t      domain;
-    noah_effective_key_behavior_runtime_t runtime;
-    noah_effective_profile_snapshot_t  callback_view = {0};
-    noah_effective_profile_identity_t  active        = {.generation = 11u, .payload_digest = 0x2222u, .kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE};
-    noah_effective_key_behavior_snapshot_t status;
+    noah_active_profile_key_behavior_runtime_t runtime;
+    noah_active_profile_snapshot_t     callback_view = {0};
+    noah_active_profile_identity_t     active        = {.generation = 11u, .payload_digest = 0x2222u, .kind = NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE};
+    noah_active_profile_key_behavior_snapshot_t status;
 
     for (uint8_t row = 0u; row < ROWS; row++) {
         for (uint8_t step = 0u; step < DEPTH; step++) {
@@ -1005,13 +1005,13 @@ static void test_live_profile_full_table_through_the_row_index(void) {
     CHECK(noah_key_behavior_domain_v1_decode(payload, written, NULL, NULL, &domain, &codec_error) == NOAH_PROFILE_CODEC_V1_OK);
     CHECK(domain.row_count == ROWS && domain.populated_step_count == ROWS * DEPTH);
 
-    noah_effective_key_behavior_runtime_init(&runtime);
-    CHECK(noah_effective_key_behavior_runtime_install(&runtime));
+    noah_active_profile_key_behavior_runtime_init(&runtime);
+    CHECK(noah_active_profile_key_behavior_runtime_install(&runtime));
     callback_view.identity              = active;
     callback_view.profile.domain_mask   = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS;
     callback_view.profile.key_behaviors = domain;
-    noah_effective_key_behavior_runtime_invalidate(&runtime, 1u, (noah_effective_profile_identity_t){0}, active, &callback_view);
-    CHECK(noah_effective_key_behavior_runtime_status(&runtime, &status) == NOAH_EFFECTIVE_KEY_BEHAVIOR_OK && status.indexed);
+    noah_active_profile_key_behavior_runtime_invalidate(&runtime, 1u, (noah_active_profile_identity_t){0}, active, &callback_view);
+    CHECK(noah_active_profile_key_behavior_runtime_status(&runtime, &status) == NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_OK && status.indexed);
 
     static const uint8_t probes[] = {0u, ROWS / 2u, ROWS - 1u};
     for (uint8_t probe = 0u; probe < ARRAY_SIZE(probes); probe++) {
@@ -1025,7 +1025,7 @@ static void test_live_profile_full_table_through_the_row_index(void) {
         CHECK(!key_behavior_view_has_more_taps(&behavior, DEPTH));
     }
     CHECK(!key_behavior_lookup((uint16_t)(0x0100u + ROWS)).source_is_live);
-    noah_effective_key_behavior_runtime_uninstall(&runtime);
+    noah_active_profile_key_behavior_runtime_uninstall(&runtime);
 }
 
 // A custom key with a shortcut and no row is a native key: it holds the
@@ -1115,20 +1115,20 @@ int main(void) {
     test_tap_toggle_layer_defers_to_an_authored_row_and_the_layer_count();
     test_row_without_steps_is_no_row();
     test_empty_later_tap_repeats_the_first_tap();
-    test_plain_pd_mode_key_is_handled_without_authored_behavior();
+    test_plain_pointing_mode_key_is_handled_without_authored_behavior();
     test_handled_resolution_searches_authored_rows_once();
-    test_pd_mode_lock_stays_out_of_handled_key_runtime();
+    test_pointing_mode_lock_stays_out_of_handled_key_runtime();
     test_repeat_rate_validation_helper_enforces_supported_range();
     test_transparent_tap_uses_lower_active_layer_tap_action();
     test_transparent_tap_falls_back_to_base_layer_tap_action();
     test_transparent_tap_resolves_bare_lt_to_its_tap_keycode();
-    test_transparent_tap_stops_at_plain_pd_mode_key_without_tap_output();
+    test_transparent_tap_stops_at_plain_pointing_mode_key_without_tap_output();
     test_transparent_tap_chains_through_lower_authored_transparency();
     test_transparent_tap_uses_current_tap_count_for_lower_handled_key();
     test_transparent_tap_inherits_lower_release_resolve_contract_for_terminal_branch();
     test_transparent_tap_inherits_lower_release_resolve_contract();
     test_transparent_hold_uses_lower_plain_key_normal_hold_behavior();
-    test_transparent_hold_uses_lower_pd_mode_behavior_and_metadata();
+    test_transparent_hold_uses_lower_pointing_mode_behavior_and_metadata();
     test_stacked_pd_first_tap_defers_implicit_hold_until_threshold();
     test_transparent_hold_uses_lower_layer_tap_metadata();
     test_transparent_hold_other_uses_lower_layer_tap_metadata();

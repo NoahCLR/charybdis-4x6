@@ -13,7 +13,7 @@ typedef enum {
     NOAH_PROFILE_STORE_RUNTIME_UNINITIALIZED = 0u,
     NOAH_PROFILE_STORE_RUNTIME_DISCOVERY_PENDING,
     NOAH_PROFILE_STORE_RUNTIME_COMPILED_FALLBACK,
-    NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND,
+    NOAH_PROFILE_STORE_RUNTIME_SAVED_FOUND,
     NOAH_PROFILE_STORE_RUNTIME_GENERATION_CONFLICT,
     NOAH_PROFILE_STORE_RUNTIME_STORAGE_ERROR,
     NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR,
@@ -21,16 +21,16 @@ typedef enum {
 
 noah_profile_store_runtime_state_t noah_profile_store_runtime_state(void);
 noah_profile_store_result_t        noah_profile_store_runtime_discovery_result(void);
-const noah_profile_store_record_t *noah_profile_store_runtime_committed(void);
+const noah_profile_store_record_t *noah_profile_store_runtime_saved(void);
 
-// Bounded read of the committed payload for host readback, in one store read:
+// Bounded read of the saved payload for host readback, in one store read:
 // length is at most NOAH_PROFILE_STORE_IO_CHUNK_MAX. Refuses any range outside
-// the committed record, so a malformed host request cannot walk storage.
-// Returns false when nothing is committed.
-bool noah_profile_store_runtime_read_committed(uint32_t offset, uint8_t *target, uint32_t length);
+// the saved record, so a malformed host request cannot walk storage.
+// Returns false when nothing is saved.
+bool noah_profile_store_runtime_read_saved(uint32_t offset, uint8_t *target, uint32_t length);
 
 // The compiled defaults this firmware was built with. A keyboard with no
-// committed profile is still running these, so the host can show what the
+// saved profile is still running these, so the host can show what the
 // board actually does rather than an empty editor. The canonical bytes are a
 // virtual view over authored const data; no payload-sized buffer is retained.
 bool noah_profile_store_runtime_compiled_metadata(noah_profile_compiled_v1_metadata_t *metadata);
@@ -41,16 +41,16 @@ bool noah_profile_store_runtime_read_compiled(uint32_t offset, uint8_t *target, 
 // runtime owner is never exposed for direct mutation.
 bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status);
 bool noah_profile_store_runtime_candidate_status(noah_profile_candidate_v1_status_t *status);
-bool noah_profile_store_runtime_peer_transfer(noah_profile_candidate_v1_peer_status_t *peer);
+bool noah_profile_store_runtime_other_half_transfer(noah_profile_candidate_v1_copy_status_t *other_half);
 bool noah_profile_store_runtime_candidate_receive(uint8_t *frame, size_t length);
 
-// The committed profile's keyboard name (D-F25), read before the owner starts
+// The saved profile's keyboard name (D-F25), read before the owner starts
 // so USB can enumerate with it. It borrows the runtime's not yet started store
 // and leaves it cleared; once the runtime has started it returns false. Boot
-// selection checks the profile's checksum and compatibility, but not the peer:
-// the activated profile is authoritative, so a different name there is only
-// corrected by a later USB restart. Empty, and false, when nothing usable is
-// committed.
+// selection checks the profile's checksum and compatibility, but not the other
+// half: the activated profile is authoritative, so a different name there is
+// only corrected by a later USB restart. Empty, and false, when nothing usable
+// is saved.
 bool noah_profile_store_runtime_boot_keyboard_name(noah_profile_keyboard_name_t *name);
 // The keyboard name of the profile `store` would boot, through its IO and
 // compatibility. The boot read above and tests use it.

@@ -29,7 +29,7 @@ else reads it, projects it, mirrors it or adapts QMK to it.
 
 | Runtime fact | Owner | Read or projected by |
 | --- | --- | --- |
-| The profile each half saves, runs and copies; the working copy | `lib/profile/` ([profile flow](profile-flow.md)) | every runtime, through the `profile/runtime/effective_*_runtime.c` views |
+| The profile each half saves, runs and copies; the working copy | `lib/profile/` ([profile flow](profile-flow.md)) | every runtime, through the `profile/runtime/active_profile_*_runtime.c` views |
 | What an action is and how it is dispatched; literal report usages | `lib/action/` | key runtime, macros, pointing outputs |
 | A key's effective behaviour and its participation | `lib/key/behavior/` | the key runtime's planners, validation |
 | Presses, tap series, leases, pending releases | `lib/key/runtime/reducer/` ([key press](key-press.md)) | planners, projection, feedback, trace |
@@ -56,9 +56,9 @@ else reads it, projects it, mirrors it or adapts QMK to it.
 - **Reducer, planner, projection.** Physical events enter the reducer first;
   planners decide; projection applies effects to the ledgers; only a ledger's
   aggregate transitions reach QMK's report (D-F55).
-- **The profile is read through views.** A runtime asks its effective view,
-  never the store or the compiled tables directly, so an activation swaps
-  every reader at one safe boundary (D-F40).
+- **The profile is read through views.** A runtime asks its view of the active
+  profile, never the store or the compiled tables directly, so an activation
+  swaps every reader at one safe boundary (D-F40).
 - **Callbacks copy, the scan works.** Candidate frames and split RPCs are
   copied into a mailbox; a live edit does only bounded RAM work on the working
   copy in its callback. Validation, flash and split sends run in bounded steps

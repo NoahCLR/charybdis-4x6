@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "users/noah/noah_keymap_ids.h"
-#include "users/noah/lib/profile/runtime/effective_keymap_macros_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_keymap_macros_runtime.h"
 #include "users/noah/lib/macro/profile_macro_provider.h"
 #include "users/noah/lib/macro/macro_slot_provider.h"
 
@@ -41,7 +41,7 @@ macro_payload_start_result_t macro_slot_provider_start(const macro_slot_provider
 static void u32(uint8_t *bytes, uint32_t value) {
     for (unsigned i = 0; i < 4; i++) bytes[i] = (uint8_t)(value >> (8 * i));
 }
-static noah_effective_profile_snapshot_t saved(void) {
+static noah_active_profile_snapshot_t saved(void) {
     memcpy(blob, "NLP1\4\0\2\1", 8);
     blob[8] = 0x60; blob[9] = 1; u32(blob + 10, 1920);
     blob[14] = KC_B;
@@ -49,8 +49,8 @@ static noah_effective_profile_snapshot_t saved(void) {
     blob[1934] = 0x70; blob[1935] = 1; u32(blob + 1936, 34903);
     memset(blob + 1940, 's', 34903 - 128);
     memset(blob + sizeof(blob) - 128, 0, 128);
-    return (noah_effective_profile_snapshot_t){
-        .identity = {.kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE, .generation = 1},
+    return (noah_active_profile_snapshot_t){
+        .identity = {.kind = NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE, .generation = 1},
         .reader = {.read = read_bytes, .length = sizeof(blob)},
         .profile = {.domain_mask = NOAH_PROFILE_DOMAIN_MASK_KEYMAP | NOAH_PROFILE_DOMAIN_MASK_MACROS, .byte_length = sizeof(blob)},
     };
@@ -64,8 +64,8 @@ int main(void) {
     assert(noah_profile_macro_start(QK_MACRO_0));
     assert(windows == 1 && first_text == 'a');
     assert(!noah_profile_macro_try_play(KC_A));
-    noah_effective_profile_snapshot_t view = saved();
-    noah_effective_keymap_macros_invalidate(NULL, 1, view.identity, view.identity, &view);
+    noah_active_profile_snapshot_t view = saved();
+    noah_active_profile_keymap_macros_invalidate(NULL, 1, view.identity, view.identity, &view);
     largest_read = 0;
     assert(keymap_key_to_keycode(0, (keypos_t){0, 0}) == KC_B);
     assert(keymap_key_to_keycode(15, (keypos_t){9, 5}) == KC_Y);
@@ -79,7 +79,7 @@ int main(void) {
     fail_reads = false;
     // Sparse domains and compiled fallback retain the authored data.
     view.profile.domain_mask = 0;
-    noah_effective_keymap_macros_invalidate(NULL, 2, view.identity, view.identity, &view);
+    noah_active_profile_keymap_macros_invalidate(NULL, 2, view.identity, view.identity, &view);
     assert(keymap_key_to_keycode(0, (keypos_t){0, 0}) == KC_A);
     assert(noah_profile_macro_start(QK_MACRO_0 + 127));
     assert(first_text == 'l' && windows == 1 && invalidations == 2);
@@ -88,13 +88,13 @@ int main(void) {
     view = saved();
     blob[8] = 0x61;
     blob[1934] = 0x71;
-    noah_effective_keymap_macros_invalidate(NULL, 3, view.identity, view.identity, &view);
-    assert(!noah_effective_keymap_is_live() && !noah_effective_macro_bank_is_live());
+    noah_active_profile_keymap_macros_invalidate(NULL, 3, view.identity, view.identity, &view);
+    assert(!noah_active_profile_keymap_is_live() && !noah_active_profile_macro_bank_is_live());
     assert(keymap_key_to_keycode(0, (keypos_t){0, 0}) == KC_A);
     assert(noah_profile_macro_start(QK_MACRO_0 + 127) && first_text == 'l');
     view = saved();
-    view.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
-    noah_effective_keymap_macros_invalidate(NULL, 3, view.identity, view.identity, &view);
+    view.identity.kind = NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
+    noah_active_profile_keymap_macros_invalidate(NULL, 3, view.identity, view.identity, &view);
     assert(keymap_key_to_keycode(0, (keypos_t){0, 0}) == KC_A);
     puts("profile keymap and macro runtime tests passed");
 }

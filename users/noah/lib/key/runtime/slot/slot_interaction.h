@@ -1,4 +1,4 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Key Runtime Interaction
 // ────────────────────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ typedef struct {
     key_runtime_slot_binding_t       binding;
     key_runtime_slot_hold_strategy_t hold_strategy;
     uint8_t                          layer;
-    pd_mode_mask_t                   pd_mode;
+    pointing_mode_mask_t             pointing_mode;
     uint16_t                         flags;
     handled_key_behavior_contract_t  contract;
 } key_runtime_slot_interaction_t;
@@ -95,7 +95,7 @@ static inline void key_runtime_slot_interaction_from_materialized_into(const han
             },
         .hold_strategy = materialized->hold_strategy,
         .layer         = materialized->layer,
-        .pd_mode       = materialized->pd_mode,
+        .pointing_mode = materialized->pointing_mode,
         .flags         = materialized->flags,
         .contract      = materialized->contract,
     };

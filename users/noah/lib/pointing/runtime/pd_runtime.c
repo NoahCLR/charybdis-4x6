@@ -1,12 +1,12 @@
-#include "../modes/pd_mode_configured.h"
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "../modes/pointing_mode_configured.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // PD Runtime
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../defs/pd_modes.h"
+#include "../defs/pointing_modes.h"
 #include "../policy/pointer_layer_policy.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../compat/qmk_pointing_contract.h"
@@ -103,7 +103,7 @@ report_mouse_t noah_pointing_device_task_user(report_mouse_t mouse_report) {
     // last layer change must hold it before QMK looks at its timeout.
     pointer_layer_policy_sync_layer_ownership_anchor();
 
-    pd_mode_mask_t active_mode_id = pd_mode_local_active_snapshot();
+    pointing_mode_mask_t active_mode_id = pointing_mode_local_active_snapshot();
 
 #    if defined(NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ENABLE)
     bool has_motion  = pd_runtime_report_has_motion(mouse_report);
@@ -142,11 +142,12 @@ layer_state_t noah_layer_state_set_user(layer_state_t state) {
 #    if defined(CHARYBDIS_AUTO_SNIPING_ENABLE)
     auto_sniping_active = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)));
 #    endif
-    pd_mode_set_auto_sniping_layer_active(auto_sniping_active);
+    pointing_mode_set_auto_sniping_layer_active(auto_sniping_active);
     // Sniping can temporarily own CPI, so queue a re-apply of the active
-    // pd-mode DPI policy after the layer-owned sniping state changes. Service
-    // the actual hardware write on scan instead of from this layer hook.
-    pd_mode_request_active_dpi_sync();
+    // pointing-mode DPI policy after the layer-owned sniping state changes.
+    // Service the actual hardware write on scan instead of from this layer
+    // hook.
+    pointing_mode_request_active_dpi_sync();
     result = pointer_layer_policy_apply(state);
 #else
     result = state;

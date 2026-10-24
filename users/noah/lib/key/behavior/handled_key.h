@@ -9,7 +9,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "../../pointing/defs/pd_mode_flags.h"
+#include "../../pointing/defs/pointing_mode_flags.h"
 #include "../runtime/types.h"
 #include "key_behavior.h"
 
@@ -21,7 +21,7 @@ typedef struct {
     uint16_t            long_hold_term;
     uint16_t            multi_tap_term;
     uint8_t             layer;
-    pd_mode_mask_t      pd_mode;
+    pointing_mode_mask_t pointing_mode;
     bool                has_more_taps;
     uint8_t             authored_tap_depth;
     // The first tap count's tap: what an empty tap at a later count repeats.
@@ -68,7 +68,7 @@ typedef handled_key_hold_semantics_t handled_key_hold_contract_t;
 typedef struct {
     handled_key_hold_semantics_t hold;
     handled_key_hold_semantics_t long_hold;
-    pd_mode_mask_t               quick_tap_pd_mode_lock;
+    pointing_mode_mask_t         quick_tap_pointing_mode_lock;
     bool                         suppress_tap_on_layer_interrupt;
     bool                         buffered_base_tap_dispatches_tap;
     bool                         quick_release_of_immediate_hold_dispatches_tap;
@@ -91,7 +91,7 @@ typedef struct {
     hold_behavior_t                  long_hold;
     key_runtime_slot_hold_strategy_t hold_strategy;
     uint8_t                          layer;
-    pd_mode_mask_t                   pd_mode;
+    pointing_mode_mask_t             pointing_mode;
     uint16_t                         flags;
     bool                             tap_resolves_on_press;
     handled_key_behavior_contract_t  contract;
@@ -117,7 +117,7 @@ static inline void handled_key_materialized_default_into(const handled_key_resol
 
     out->authored = *resolution;
     out->layer    = resolution->layer;
-    out->pd_mode  = resolution->pd_mode;
+    out->pointing_mode = resolution->pointing_mode;
     out->flags    = resolution->flags;
 }
 

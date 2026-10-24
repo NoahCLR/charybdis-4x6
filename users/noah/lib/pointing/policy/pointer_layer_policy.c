@@ -1,12 +1,12 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Pointer Layer Policy
 // ────────────────────────────────────────────────────────────────────────────
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "pd_mode_policy.h"
-#include "../defs/pd_modes.h"
+#include "pointing_mode_policy.h"
+#include "../defs/pointing_modes.h"
 #include "pointer_layer_policy.h"
 #include "../../action/action_dispatch.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
@@ -22,22 +22,22 @@ static inline bool pointer_layer_policy_is_mouse_button_action(uint16_t action) 
     return IS_MOUSEKEY_BUTTON(action);
 }
 
-static bool pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(uint16_t keycode) {
-    return pd_mode_policy_key_keeps_auto_mouse_anchored(keycode);
+static bool pointer_layer_policy_pointing_mode_key_keeps_auto_mouse_anchored(uint16_t keycode) {
+    return pointing_mode_policy_key_keeps_auto_mouse_anchored(keycode);
 }
 
-static inline bool pointer_layer_policy_auto_mouse_anchored(pd_mode_snapshot_t snapshot) {
-    return noah_qmk_contract_auto_mouse_toggle_enabled() || noah_qmk_contract_auto_mouse_key_tracker() != 0 || pd_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot);
+static inline bool pointer_layer_policy_auto_mouse_anchored(pointing_mode_snapshot_t snapshot) {
+    return noah_qmk_contract_auto_mouse_toggle_enabled() || noah_qmk_contract_auto_mouse_key_tracker() != 0 || pointing_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot);
 }
 
 bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
-    pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+    pointing_mode_snapshot_t snapshot = pointing_mode_snapshot();
 
-    if (pd_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot) && pointer_layer_policy_is_layer_hold_key(keycode)) {
+    if (pointing_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot) && pointer_layer_policy_is_layer_hold_key(keycode)) {
         return true;
     }
 
-    if (pointer_layer_policy_pd_mode_key_keeps_auto_mouse_anchored(keycode)) {
+    if (pointer_layer_policy_pointing_mode_key_keeps_auto_mouse_anchored(keycode)) {
         return true;
     }
 
@@ -153,12 +153,12 @@ void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord
 layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     pointer_layer_policy_sync_layer_ownership_anchor();
 
-    pd_mode_snapshot_t snapshot             = pd_mode_snapshot();
-    bool               prefers_typing_layer = pd_mode_policy_snapshot_prefers_typing_layer(snapshot);
-    bool               auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored(snapshot);
-    uint8_t            auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
-    layer_state_t      auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
-    bool               sniping_layer_active = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)));
+    pointing_mode_snapshot_t snapshot             = pointing_mode_snapshot();
+    bool                     prefers_typing_layer = pointing_mode_policy_snapshot_prefers_typing_layer(snapshot);
+    bool                     auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored(snapshot);
+    uint8_t                  auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
+    layer_state_t            auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
+    bool                     sniping_layer_active = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)));
 
     // Arrow mode consumes trackball motion as arrows, so keep the keyboard on
     // the current typing/nav surface instead of forcing the pointer layer back
@@ -187,20 +187,20 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
 }
 
 void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_policy_debug_snapshot_t *out) {
-    pd_mode_snapshot_t snapshot = pd_mode_snapshot();
+    pointing_mode_snapshot_t snapshot = pointing_mode_snapshot();
 
     if (!out) {
         return;
     }
 
     *out = (pointer_layer_policy_debug_snapshot_t){
-        .auto_mouse_anchored       = pointer_layer_policy_auto_mouse_anchored(snapshot),
-        .pd_mode_anchor_active     = pd_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot),
-        .prefers_typing_layer      = pd_mode_policy_snapshot_prefers_typing_layer(snapshot),
-        .auto_mouse_toggle_enabled = noah_qmk_contract_auto_mouse_toggle_enabled(),
-        .sniping_layer_active      = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER))),
-        .auto_mouse_key_tracker    = noah_qmk_contract_auto_mouse_key_tracker(),
-        .auto_mouse_layer          = noah_qmk_contract_auto_mouse_layer(),
+        .auto_mouse_anchored         = pointer_layer_policy_auto_mouse_anchored(snapshot),
+        .pointing_mode_anchor_active = pointing_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot),
+        .prefers_typing_layer        = pointing_mode_policy_snapshot_prefers_typing_layer(snapshot),
+        .auto_mouse_toggle_enabled   = noah_qmk_contract_auto_mouse_toggle_enabled(),
+        .sniping_layer_active        = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER))),
+        .auto_mouse_key_tracker      = noah_qmk_contract_auto_mouse_key_tracker(),
+        .auto_mouse_layer            = noah_qmk_contract_auto_mouse_layer(),
     };
 }
 

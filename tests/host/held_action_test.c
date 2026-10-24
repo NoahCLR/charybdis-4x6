@@ -103,12 +103,12 @@ static void test_reset_stubs(void) {
     timer_read_count             = 0;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
 }

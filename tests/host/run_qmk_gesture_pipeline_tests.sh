@@ -13,4 +13,4 @@ if [ -n "$callers" ]; then
     exit 1
 fi
 
-NOAH_TEST_QMK_GESTURES=1 sh "$ROOT/run_pd_mode_key_runtime_integration_tests.sh"
+NOAH_TEST_QMK_GESTURES=1 sh "$ROOT/run_pointing_mode_key_runtime_integration_tests.sh"

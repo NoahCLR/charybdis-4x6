@@ -27,7 +27,7 @@ flowchart TD
     pru --> plan["reducer plans into one effect plan"]
     plan --> transition["transition.c: trace, announce to split, project"]
     transition --> projection["projection/projection.c: effect → ledger"]
-    projection --> ledgers["held_action / held_repeat / layer_ownership / keyboard_mod_ownership / owned_keycode / pd_mode_state / feedback"]
+    projection --> ledgers["held_action / held_repeat / layer_ownership / keyboard_mod_ownership / owned_keycode / pointing_mode_state / feedback"]
     ledgers --> report["QMK sends the HID report"]
     pru --> finalize["finalize (hooks.c or post_process_record_user)"]
 ```
@@ -54,7 +54,7 @@ false.
 | Modifier refcounts: physical, report, managed | `state/ownership/keyboard_mod_ownership.c` | pre-process (physical), finalize (report), held actions (managed) |
 | Literal report usages | `action/owned_keycode.c` | taps, held-action leases, finalize |
 | Held actions and repeats | `key/ownership/held_action.c`, `held_repeat.c` | projected effects; repeats tick in housekeeping |
-| Pointing mode state | `pointing/runtime/pd_mode_state.c` | the pointing runtime |
+| Pointing mode state | `pointing/runtime/pointing_mode_state.c` | the pointing runtime |
 | Feedback pulses | core state, via `projection/feedback_projection.c` | projected effects; `feedback.c` reads them for lighting and split |
 | The HID report | QMK | only at aggregate 0→1 and 1→0 transitions of a ledger |
 
@@ -82,8 +82,8 @@ false.
    reducer observes the event
    (`key_runtime_core_observe_process_record_event_with_row`), allocating the
    press token. Then, in order, each stage may end processing:
-   `synthetic_passthrough` → `pd_mode_release` → `preflight` →
-   `release_slot_keycode` → `pd_mode` → `handled_key` →
+   `synthetic_passthrough` → `pointing_mode_release` → `preflight` →
+   `release_slot_keycode` → `pointing_mode` → `handled_key` →
    `non_handled_release_cleanup` → `direct_action` → `native_overlap` →
    `idle_custom_key`.
 5. **Preflight** (`preflight.c`): the reducer's moment before a press,
@@ -91,7 +91,7 @@ false.
    keys catch up missed scans, register due fallback holds and settle as taps
    (class 3 of D-F27); then pending tap series it ends are typed (a handled
    press ends only tap/hold keys' series; any other press ends all).
-6. **Pointing offer** (stage `pd_mode`): the active pointing mode sees the
+6. **Pointing offer** (stage `pointing_mode`): the active pointing mode sees the
    press before the behaviour. Consumed, the token becomes non-handled (below).
 7. **Handled press** (`press.c`): `key_runtime_core_handle_handled_key_press()`
    plans into a buffered plan: flush a series the press cannot continue, unlock
@@ -118,7 +118,7 @@ false.
    (D-F27, "Releases that wait"): they catch up missed scans and settle as
    taps, as at a press, but a release registers no fallback hold; only a press
    does (`key_runtime_core_interrupt_active_keys_on_other_press()`).
-3. The reducer observes the release by position. Stage `pd_mode_release`
+3. The reducer observes the release by position. Stage `pointing_mode_release`
    sends a release whose press a mode consumed to that mode, before preflight
    can drop it. Preflight drops a native modifier release while another owner
    still holds that modifier (`keyboard_mod_ownership_should_suppress_default`),
@@ -195,20 +195,20 @@ whose redundant edge it suppressed; every credited release retires its owner.
 
 ## Pointing modes: where keys enter the pointing runtime
 
-- **Offer.** Stage `pd_mode` calls `pd_mode_handle_key_event()` between
-  `key_runtime_core_offer_press_to_mode()` and `key_runtime_core_end_mode_offer()`.
-  Modes consume only mouse buttons. A consumed press stays down for others
-  (it interrupted them) but runs no tap, hold or tap series and owns no lease;
-  its release goes to the mode.
+- **Offer.** Stage `pointing_mode` calls `pointing_mode_handle_key_event()`
+  between `key_runtime_core_offer_press_to_mode()` and
+  `key_runtime_core_end_mode_offer()`. Modes consume only mouse buttons. A
+  consumed press stays down for others (it interrupted them) but runs no tap,
+  hold or tap series and owns no lease; its release goes to the mode.
 - **Masking.** Around each key event, the active mode's own modifiers are
   masked (`key_runtime_process_begin_keyboard_event_mod_mask`).
-- **Effects.** A held pointing keycode reaches `pd_mode_handle_keycode_press_at()`
+- **Effects.** A held pointing keycode reaches `pointing_mode_handle_keycode_press_at()`
   through `noah_action_press`; lock taps and lock states go through
   `projection/pd_projection.c`, which first unregisters any other mode's held
   action, since one mode runs at a time.
-- **The bridge back.** `pd_mode_state.c` reports a changed local lock through
-  `pd_mode_key_runtime_bridge_observe_local_lock_state()`, the only way the
-  pointing runtime writes into the reducer's shadow state.
+- **The bridge back.** `pointing_mode_state.c` reports a changed local lock
+  through `pointing_mode_key_runtime_bridge_observe_local_lock_state()`, the
+  only way the pointing runtime writes into the reducer's shadow state.
 
 ## Invariants that span files
 
@@ -273,7 +273,7 @@ tapping queue.
   `run_key_runtime_physical_ownership_integration_tests.sh`,
   `run_key_runtime_layer_lock_integration_tests.sh`,
   `run_real_profile_thumb_layer_lock_integration_tests.sh`.
-- Pointing offer, bridge and admission: `run_pd_mode_key_runtime_integration_tests.sh`.
+- Pointing offer, bridge and admission: `run_pointing_mode_key_runtime_integration_tests.sh`.
 - The real QMK combo and tapping engines, delayed records and the hold-gate
   guard: `run_qmk_gesture_pipeline_tests.sh`.
 - Adapters: `run_qmk_combo_origin_tests.sh`, `run_participation_tests.sh`,

@@ -13,8 +13,8 @@
 #include "../../key/runtime/api.h"
 #include "../../macro/macro_payload.h"
 #if defined(POINTING_DEVICE_ENABLE)
-#    include "../../pointing/defs/pd_modes.h"
-#    include "../../pointing/modes/pd_mode_configured.h"
+#    include "../../pointing/defs/pointing_modes.h"
+#    include "../../pointing/modes/pointing_mode_configured.h"
 #endif
 
 static void capture_runtime(noah_profile_activation_snapshot_t *snapshot) {
@@ -53,21 +53,21 @@ static void capture_runtime(noah_profile_activation_snapshot_t *snapshot) {
     // Retain the existing wire reason: a configured mode is persistent intent
     // until its lock/hold and any consumed button releases have drained. A
     // build without a pointing device has no mode to hold.
-    if (pd_mode_local_active_snapshot() || pd_mode_local_locked_snapshot() || noah_pd_engine_pending_release()) {
+    if (pointing_mode_local_active_snapshot() || pointing_mode_local_locked_snapshot() || noah_pd_engine_pending_release()) {
         if (snapshot->persistent_intent_count != UINT8_MAX) snapshot->persistent_intent_count++;
     }
 #endif
 }
 
-void noah_profile_activation_policy_init(noah_profile_activation_policy_t *policy, noah_profile_activation_peer_observer_fn peer_observer, void *peer_context) {
+void noah_profile_activation_policy_init(noah_profile_activation_policy_t *policy, noah_profile_activation_other_half_observer_fn other_half_observer, void *other_half_context) {
     if (!policy) {
         return;
     }
 
     *policy = (noah_profile_activation_policy_t){
-        .peer_observer = peer_observer,
-        .peer_context  = peer_context,
-        .initialized   = true,
+        .other_half_observer = other_half_observer,
+        .other_half_context  = other_half_context,
+        .initialized         = true,
     };
 }
 
@@ -107,8 +107,8 @@ uint32_t noah_profile_activation_reason_mask(const noah_profile_activation_snaps
     if (snapshot->combo_pending_count != 0u || snapshot->combo_active_count != 0u) {
         reason_mask |= NOAH_PROFILE_ACTIVATION_REASON_COMBO;
     }
-    if (snapshot->unresolved_peer_count != 0u) {
-        reason_mask |= NOAH_PROFILE_ACTIVATION_REASON_PEER;
+    if (snapshot->unresolved_other_half_count != 0u) {
+        reason_mask |= NOAH_PROFILE_ACTIVATION_REASON_SLAVE;
     }
     return reason_mask;
 }
@@ -118,19 +118,19 @@ uint32_t noah_profile_activation_policy_safe_boundary(void *context) {
     noah_profile_activation_snapshot_t snapshot;
     uint32_t                           reason_mask;
     uint32_t                           evaluation_count;
-    uint8_t                            unresolved_peer_count = 1u;
+    uint8_t                            unresolved_other_half_count = 1u;
 
     if (!(policy && policy->initialized)) {
         return NOAH_PROFILE_ACTIVATION_REASON_INTERNAL;
     }
 
     capture_runtime(&snapshot);
-    if (policy->peer_observer && !policy->peer_observer(policy->peer_context, &unresolved_peer_count)) {
-        unresolved_peer_count = 1u;
+    if (policy->other_half_observer && !policy->other_half_observer(policy->other_half_context, &unresolved_other_half_count)) {
+        unresolved_other_half_count = 1u;
     }
-    snapshot.unresolved_peer_count = unresolved_peer_count;
-    reason_mask                    = noah_profile_activation_reason_mask(&snapshot);
-    evaluation_count               = policy->evaluation_count;
+    snapshot.unresolved_other_half_count = unresolved_other_half_count;
+    reason_mask                          = noah_profile_activation_reason_mask(&snapshot);
+    evaluation_count                     = policy->evaluation_count;
     if (evaluation_count != UINT32_MAX) {
         evaluation_count++;
     }

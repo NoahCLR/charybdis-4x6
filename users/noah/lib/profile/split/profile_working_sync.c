@@ -152,19 +152,19 @@ bool noah_profile_working_sync_store_mode(noah_profile_working_sync_t *sync, uin
 // What this half runs when nothing is edited: generation, origin, and
 // whether that is the compiled defaults.
 static bool saved_base(const noah_profile_working_copy_t *copy, uint32_t *generation, uint8_t *origin, bool *compiled) {
-    noah_effective_profile_snapshot_t active;
-    const noah_effective_profile_identity_t *identity;
+    noah_active_profile_snapshot_t active;
+    const noah_active_profile_identity_t *identity;
 
     if (copy->active) {
         identity = &copy->saved.identity;
-    } else if (noah_effective_profile_provider_copy_active(copy->provider, &active) == NOAH_EFFECTIVE_PROFILE_OK) {
+    } else if (noah_active_profile_provider_copy_active(copy->provider, &active) == NOAH_ACTIVE_PROFILE_OK) {
         identity = &active.identity;
     } else {
         return false;
     }
     *generation = identity->generation;
     *origin     = identity->origin;
-    *compiled   = identity->kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS || (identity->kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY && identity->generation == 0u);
+    *compiled   = identity->kind == NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS || (identity->kind == NOAH_ACTIVE_PROFILE_KIND_WORKING_COPY && identity->generation == 0u);
     return true;
 }
 
@@ -186,7 +186,7 @@ static void fill_status(const noah_profile_working_sync_t *sync, uint8_t *reply)
         put_u32(&reply[REPLY_SAVED_GEN], generation);
         reply[REPLY_SAVED_ORIGIN] = origin;
     }
-    reply[REPLY_FLAGS] = (uint8_t)((status.active ? NOAH_PROFILE_WORKING_SYNC_PEER_ACTIVE : 0u) | (compiled ? NOAH_PROFILE_WORKING_SYNC_PEER_SAVED_COMPILED : 0u) | (sync->stopped ? NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED : 0u));
+    reply[REPLY_FLAGS] = (uint8_t)((status.active ? NOAH_PROFILE_WORKING_SYNC_SLAVE_ACTIVE : 0u) | (compiled ? NOAH_PROFILE_WORKING_SYNC_SLAVE_SAVED_COMPILED : 0u) | (sync->stopped ? NOAH_PROFILE_WORKING_SYNC_SLAVE_STOPPED : 0u));
     put_u32(&reply[REPLY_MODE_COUNTER], sync->mode.counter);
     reply[REPLY_MODE] = sync->mode.mode;
 }
@@ -268,7 +268,7 @@ static uint8_t process_request(noah_profile_working_sync_t *sync, const uint8_t 
         case NOAH_PROFILE_WORKING_SYNC_ABORT:
             return (uint8_t)noah_profile_working_copy_abort(copy, transaction);
         case NOAH_PROFILE_WORKING_SYNC_REVERT:
-            // The USB half's word: whatever this half was editing goes.
+            // The master half's word: whatever this half was editing goes.
             if (copy->phase != NOAH_PROFILE_WORKING_PHASE_IDLE && copy->phase != NOAH_PROFILE_WORKING_PHASE_REVERTING) {
                 (void)noah_profile_working_copy_abort(copy, copy->transaction_id);
             }
@@ -305,7 +305,7 @@ static uint8_t process_request(noah_profile_working_sync_t *sync, const uint8_t 
     }
 }
 
-bool noah_profile_working_sync_peer_scan(noah_profile_working_sync_t *sync) {
+bool noah_profile_working_sync_slave_scan(noah_profile_working_sync_t *sync) {
     uint8_t request[NOAH_PROFILE_WORKING_SYNC_FRAME_MAX];
     uint8_t reply[NOAH_PROFILE_WORKING_SYNC_FRAME_SIZE];
     uint8_t result;
@@ -329,17 +329,17 @@ bool noah_profile_working_sync_peer_scan(noah_profile_working_sync_t *sync) {
     return true;
 }
 
-// ── USB half ─────────────────────────────────────────────────────────────────
+// ── Master half ──────────────────────────────────────────────────────────────
 
-static bool peer_matches(const noah_profile_working_sync_t *sync) {
-    const noah_profile_working_peer_t *peer = &sync->peer;
+static bool slave_matches(const noah_profile_working_sync_t *sync) {
+    const noah_profile_working_slave_t *slave = &sync->slave;
     const noah_profile_working_copy_t *copy = sync->copy;
 
-    return peer->known && peer->session == copy->session && peer->revision == copy->revision && peer->phase == NOAH_PROFILE_WORKING_PHASE_IDLE && ((peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_ACTIVE) != 0u) == copy->active && !(peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED);
+    return slave->known && slave->session == copy->session && slave->revision == copy->revision && slave->phase == NOAH_PROFILE_WORKING_PHASE_IDLE && ((slave->flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_ACTIVE) != 0u) == copy->active && !(slave->flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_STOPPED);
 }
 
 bool noah_profile_working_sync_converged(const noah_profile_working_sync_t *sync, uint32_t now_ms) {
-    return sync && sync->copy && peer_matches(sync) && sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_NONE && !elapsed_at_least(now_ms, sync->peer.seen_at, NOAH_PROFILE_WORKING_SYNC_PEER_TIMEOUT_MS);
+    return sync && sync->copy && slave_matches(sync) && sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_NONE && !elapsed_at_least(now_ms, sync->slave.seen_at, NOAH_PROFILE_WORKING_SYNC_SLAVE_TIMEOUT_MS);
 }
 
 bool noah_profile_working_sync_set_mode(noah_profile_working_sync_t *sync, uint8_t mode) {
@@ -349,7 +349,7 @@ bool noah_profile_working_sync_set_mode(noah_profile_working_sync_t *sync, uint8
     if (!sync || !noah_profile_edit_mode_valid(mode) || !sync->mode_storage.store) {
         return false;
     }
-    counter = sync->mode.counter > sync->peer.mode_counter ? sync->mode.counter : sync->peer.mode_counter;
+    counter = sync->mode.counter > sync->slave.mode_counter ? sync->mode.counter : sync->slave.mode_counter;
     if (counter == UINT32_MAX) {
         return false;
     }
@@ -363,8 +363,8 @@ bool noah_profile_working_sync_refused(const noah_profile_working_sync_t *sync) 
     return sync && sync->copy && sync->copy->active && sync->forward_failed_whole && sync->forward_failed_revision == sync->copy->revision;
 }
 
-bool noah_profile_working_sync_peer_stopped(const noah_profile_working_sync_t *sync, uint32_t now_ms) {
-    return sync && sync->peer.known && (sync->peer.flags & NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED) && !elapsed_at_least(now_ms, sync->peer.seen_at, NOAH_PROFILE_WORKING_SYNC_PEER_TIMEOUT_MS);
+bool noah_profile_working_sync_slave_stopped(const noah_profile_working_sync_t *sync, uint32_t now_ms) {
+    return sync && sync->slave.known && (sync->slave.flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_STOPPED) && !elapsed_at_least(now_ms, sync->slave.seen_at, NOAH_PROFILE_WORKING_SYNC_SLAVE_TIMEOUT_MS);
 }
 
 static void begin_request(noah_profile_working_sync_t *sync, uint8_t kind, uint16_t transaction, uint32_t session, uint32_t revision) {
@@ -468,7 +468,7 @@ static void end_forward(noah_profile_working_sync_t *sync, bool failed) {
 
 static bool choose_request(noah_profile_working_sync_t *sync, uint32_t now) {
     const noah_profile_working_copy_t *copy = sync->copy;
-    noah_profile_working_peer_t       *peer = &sync->peer;
+    noah_profile_working_slave_t      *slave = &sync->slave;
     uint32_t                           generation;
     uint8_t                            origin;
     bool                               compiled;
@@ -483,7 +483,7 @@ static bool choose_request(noah_profile_working_sync_t *sync, uint32_t now) {
         }
         end_forward(sync, false);
     }
-    if (!peer->known || elapsed_at_least(now, peer->seen_at, sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_WAIT ? RETRY_MS : peer_matches(sync) || (peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED) ? NOAH_PROFILE_WORKING_SYNC_IDLE_POLL_MS : NOAH_PROFILE_WORKING_SYNC_POLL_MS)) {
+    if (!slave->known || elapsed_at_least(now, slave->seen_at, sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_WAIT ? RETRY_MS : slave_matches(sync) || (slave->flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_STOPPED) ? NOAH_PROFILE_WORKING_SYNC_IDLE_POLL_MS : NOAH_PROFILE_WORKING_SYNC_POLL_MS)) {
         if (!elapsed_at_least(now, sync->last_poll_at, RETRY_MS)) {
             return false;
         }
@@ -492,33 +492,33 @@ static bool choose_request(noah_profile_working_sync_t *sync, uint32_t now) {
         return true;
     }
     // A stopped other half takes nothing until it restarts: only polled.
-    if (sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_WAIT || (peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED)) {
+    if (sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_WAIT || (slave->flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_STOPPED)) {
         return false;
     }
     // The edit mode: the higher counter wins.
-    if (peer->mode_counter > sync->mode.counter) {
-        noah_profile_edit_mode_record_t record = {.counter = peer->mode_counter, .mode = peer->mode};
+    if (slave->mode_counter > sync->mode.counter) {
+        noah_profile_edit_mode_record_t record = {.counter = slave->mode_counter, .mode = slave->mode};
 
         if (noah_profile_edit_mode_valid(record.mode) && sync->mode_storage.store) {
             queue_mode(sync, record);
         }
-    } else if (peer->mode_counter < sync->mode.counter) {
+    } else if (slave->mode_counter < sync->mode.counter) {
         begin_request(sync, NOAH_PROFILE_WORKING_SYNC_MODE, 0u, copy->session, copy->revision);
         put_u32(&sync->request[FRAME_BODY], sync->mode.counter);
         sync->request[FRAME_BODY + 4u] = sync->mode.mode;
         seal_request(sync);
         return true;
     }
-    sync->mode_conflict = peer->mode_counter == sync->mode.counter && peer->mode != sync->mode.mode;
-    if (peer_matches(sync) || copy->phase != NOAH_PROFILE_WORKING_PHASE_IDLE) {
+    sync->mode_conflict = slave->mode_counter == sync->mode.counter && slave->mode != sync->mode.mode;
+    if (slave_matches(sync) || copy->phase != NOAH_PROFILE_WORKING_PHASE_IDLE) {
         return false;
     }
-    if (peer->phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING) {
-        begin_request(sync, NOAH_PROFILE_WORKING_SYNC_ABORT, peer->transaction_id, copy->session, copy->revision);
+    if (slave->phase == NOAH_PROFILE_WORKING_PHASE_RECEIVING) {
+        begin_request(sync, NOAH_PROFILE_WORKING_SYNC_ABORT, slave->transaction_id, copy->session, copy->revision);
         seal_request(sync);
         return true;
     }
-    if (peer->phase != NOAH_PROFILE_WORKING_PHASE_IDLE) {
+    if (slave->phase != NOAH_PROFILE_WORKING_PHASE_IDLE) {
         return false;
     }
     if (!saved_base(copy, &generation, &origin, &compiled)) {
@@ -526,24 +526,24 @@ static bool choose_request(noah_profile_working_sync_t *sync, uint32_t now) {
     }
     // Both halves must run the same saved profile first; the durable
     // reconciler sees to that.
-    if (peer->saved_generation != generation || peer->saved_origin != origin || ((peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_SAVED_COMPILED) != 0u) != compiled) {
+    if (slave->saved_generation != generation || slave->saved_origin != origin || ((slave->flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_SAVED_COMPILED) != 0u) != compiled) {
         return false;
     }
     // An edit the other half refused is followed by the whole working copy,
     // once: refused too, the halves stay apart until Revert or an Apply.
     refused = sync->forward_failed_revision == copy->revision;
-    if (copy->active && peer->session == copy->session && peer->revision + 1u == copy->revision && !(refused && sync->forward_failed_whole)) {
-        bool replace = refused || !(copy->published.valid && copy->published.revision == copy->revision && sync->agreed && sync->agreed_session == copy->session && sync->agreed_revision == peer->revision);
+    if (copy->active && slave->session == copy->session && slave->revision + 1u == copy->revision && !(refused && sync->forward_failed_whole)) {
+        bool replace = refused || !(copy->published.valid && copy->published.revision == copy->revision && sync->agreed && sync->agreed_session == copy->session && sync->agreed_revision == slave->revision);
 
         // A replacement needs the other half on its saved profile.
-        if (!replace || !(peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_ACTIVE)) {
+        if (!replace || !(slave->flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_ACTIVE)) {
             start_forward(sync, replace);
             return build_forward(sync);
         }
     }
     // REVERT and ADOPT reset the other half's bytes to its saved profile:
     // what was agreed before no longer describes them.
-    if (peer->flags & NOAH_PROFILE_WORKING_SYNC_PEER_ACTIVE) {
+    if (slave->flags & NOAH_PROFILE_WORKING_SYNC_SLAVE_ACTIVE) {
         begin_request(sync, NOAH_PROFILE_WORKING_SYNC_REVERT, sync->next_transaction, copy->session, copy->revision);
         sync->next_transaction = (uint16_t)(sync->next_transaction + 1u) ? (uint16_t)(sync->next_transaction + 1u) : 1u;
         sync->agreed           = false;
@@ -564,35 +564,35 @@ static bool choose_request(noah_profile_working_sync_t *sync, uint32_t now) {
     return true;
 }
 
-static void read_peer(noah_profile_working_sync_t *sync, const uint8_t *reply, uint32_t now) {
-    noah_profile_working_peer_t *peer = &sync->peer;
+static void read_slave(noah_profile_working_sync_t *sync, const uint8_t *reply, uint32_t now) {
+    noah_profile_working_slave_t *slave = &sync->slave;
 
-    peer->session          = get_u32(&reply[REPLY_SESSION]);
-    peer->revision         = get_u32(&reply[REPLY_REVISION]);
-    peer->phase            = reply[REPLY_PHASE];
-    peer->last_result      = reply[REPLY_LAST_RESULT];
-    peer->transaction_id   = get_u16(&reply[REPLY_TRANSACTION]);
-    peer->flags            = reply[REPLY_FLAGS];
-    peer->saved_generation = get_u32(&reply[REPLY_SAVED_GEN]);
-    peer->saved_origin     = reply[REPLY_SAVED_ORIGIN];
-    peer->mode_counter     = get_u32(&reply[REPLY_MODE_COUNTER]);
-    peer->mode             = reply[REPLY_MODE];
-    peer->seen_at          = now;
-    peer->known            = true;
-    if (peer_matches(sync)) {
+    slave->session         = get_u32(&reply[REPLY_SESSION]);
+    slave->revision        = get_u32(&reply[REPLY_REVISION]);
+    slave->phase           = reply[REPLY_PHASE];
+    slave->last_result = reply[REPLY_LAST_RESULT];
+    slave->transaction_id = get_u16(&reply[REPLY_TRANSACTION]);
+    slave->flags           = reply[REPLY_FLAGS];
+    slave->saved_generation = get_u32(&reply[REPLY_SAVED_GEN]);
+    slave->saved_origin = reply[REPLY_SAVED_ORIGIN];
+    slave->mode_counter = get_u32(&reply[REPLY_MODE_COUNTER]);
+    slave->mode            = reply[REPLY_MODE];
+    slave->seen_at         = now;
+    slave->known           = true;
+    if (slave_matches(sync)) {
         sync->agreed          = true;
-        sync->agreed_session  = peer->session;
-        sync->agreed_revision = peer->revision;
+        sync->agreed_session  = slave->session;
+        sync->agreed_revision = slave->revision;
     }
 }
 
 static void handle_reply(noah_profile_working_sync_t *sync, uint8_t kind, uint8_t result) {
-    const noah_profile_working_peer_t *peer = &sync->peer;
+    const noah_profile_working_slave_t *slave = &sync->slave;
 
     if (sync->forward_phase == NOAH_PROFILE_WORKING_FORWARD_WAIT) {
-        if (peer->phase == NOAH_PROFILE_WORKING_PHASE_IDLE && peer->transaction_id == sync->forward_transaction) {
-            end_forward(sync, !(peer->last_result == NOAH_PROFILE_WORKING_OK && peer->session == sync->copy->session && peer->revision == sync->forward_revision));
-        } else if (peer->phase == NOAH_PROFILE_WORKING_PHASE_IDLE) {
+        if (slave->phase == NOAH_PROFILE_WORKING_PHASE_IDLE && slave->transaction_id == sync->forward_transaction) {
+            end_forward(sync, !(slave->last_result == NOAH_PROFILE_WORKING_OK && slave->session == sync->copy->session && slave->revision == sync->forward_revision));
+        } else if (slave->phase == NOAH_PROFILE_WORKING_PHASE_IDLE) {
             // The other half no longer holds this edit at all.
             end_forward(sync, false);
         }
@@ -646,9 +646,9 @@ bool noah_profile_working_sync_master_scan(noah_profile_working_sync_t *sync, ui
     if (!sync || !sync->copy || !sync->exchange) {
         return false;
     }
-    if (sync->peer.known && elapsed_at_least(now_ms, sync->peer.seen_at, NOAH_PROFILE_WORKING_SYNC_PEER_TIMEOUT_MS)) {
+    if (sync->slave.known && elapsed_at_least(now_ms, sync->slave.seen_at, NOAH_PROFILE_WORKING_SYNC_SLAVE_TIMEOUT_MS)) {
         // It may have restarted meanwhile.
-        sync->peer.known    = false;
+        sync->slave.known = false;
         sync->agreed        = false;
         sync->forward_phase = NOAH_PROFILE_WORKING_FORWARD_NONE;
     }
@@ -672,7 +672,7 @@ bool noah_profile_working_sync_master_scan(noah_profile_working_sync_t *sync, ui
         return true;
     }
     sync->request_pending = false;
-    read_peer(sync, reply, now_ms);
+    read_slave(sync, reply, now_ms);
     handle_reply(sync, kind, result);
     return true;
 }

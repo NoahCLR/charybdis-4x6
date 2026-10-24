@@ -4,7 +4,7 @@
 
 #ifdef RAW_ENABLE
 #    include <string.h>
-#    include "qmk_effective_combos.h"
+#    include "qmk_active_profile_combos.h"
 #    include "../profile/protocol/profile_wire_v1.h"
 #    include "../profile/storage/profile_checksum.h"
 #    include "../profile/storage/profile_storage_layout.h"
@@ -47,8 +47,8 @@ bool get_combo_must_press_in_order(uint16_t index, combo_t *combo);
 // windows per combo; without it a per-combo hook is the user's own, so its
 // rows are reported as explicit.
 #        ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
-#            define NOAH_COMBO_READBACK_DEFAULT_TERM noah_effective_combo_default_term()
-#            define NOAH_COMBO_READBACK_FOLLOWS_DEFAULT(index) noah_effective_combo_follows_default(index)
+#            define NOAH_COMBO_READBACK_DEFAULT_TERM noah_active_profile_combo_default_term()
+#            define NOAH_COMBO_READBACK_FOLLOWS_DEFAULT(index) noah_active_profile_combo_follows_default(index)
 #        elif defined(COMBO_TERM_PER_COMBO)
 #            define NOAH_COMBO_READBACK_DEFAULT_TERM COMBO_TERM
 #            define NOAH_COMBO_READBACK_FOLLOWS_DEFAULT(index) false
@@ -155,7 +155,7 @@ static bool combo_metadata(uint8_t out[READOUT_PAGE]) {
     out[14] = READOUT_PAGES_PER_ROW;
 #    ifdef COMBO_ENABLE
 #        ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
-    if (!noah_effective_combo_valid()) return false;
+    if (!noah_active_profile_combo_valid()) return false;
 #        endif
     if (noah_qmk_combo_count() > NOAH_PROFILE_WIRE_V1_MAX_COMBOS) return false;
     out[1] = noah_qmk_combo_count();

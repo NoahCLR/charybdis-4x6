@@ -15,9 +15,9 @@
 #include "users/noah/lib/key/runtime/feedback.h"
 #include "users/noah/lib/key/runtime/api.h"
 #include "users/noah/lib/key/runtime/transition.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
-#include "users/noah/lib/pointing/runtime/pd_mode_internal.h"
-#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
+#include "users/noah/lib/pointing/runtime/pointing_mode_internal.h"
+#include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
 #include "users/noah/lib/key/runtime/planning/effect_plan.h"
 #include "users/noah/lib/key/runtime/reducer/ownership_state.h"
 #include "users/noah/lib/key/runtime/queue/pending_release_queue.h"
@@ -361,7 +361,7 @@ static handled_key_resolution_t test_handled_key_resolution(uint16_t keycode, ui
         .long_hold_term     = CUSTOM_LONGER_HOLD_TERM,
         .multi_tap_term     = (keycode == TEST_PENDING_MULTI_TAP_KEY || keycode == TEST_SPLIT_TERM_TAP_KEY) ? 180 : CUSTOM_MULTI_TAP_TERM,
         .layer              = layer,
-        .pd_mode            = pd_mode_for_keycode(keycode),
+        .pointing_mode      = pointing_mode_for_keycode(keycode),
         .has_more_taps      = has_more_taps,
         .authored_tap_depth = authored_tap_depth,
         .flags              = flags,
@@ -547,129 +547,129 @@ void send_keyboard_report(void) {
     send_keyboard_report_count++;
 }
 
-static uint8_t test_pd_mode_index(pd_mode_mask_t mode) {
+static uint8_t test_pointing_mode_index(pointing_mode_mask_t mode) {
     switch (mode) {
-        case PD_MODE_DRAGSCROLL:
-            return PD_MODE_INDEX_DRAGSCROLL;
-        case PD_MODE_VOLUME:
-            return PD_MODE_INDEX_VOLUME;
-        case PD_MODE_ARROW:
-            return PD_MODE_INDEX_ARROW;
+        case POINTING_MODE_DRAGSCROLL:
+            return POINTING_MODE_INDEX_DRAGSCROLL;
+        case POINTING_MODE_VOLUME:
+            return POINTING_MODE_INDEX_VOLUME;
+        case POINTING_MODE_ARROW:
+            return POINTING_MODE_INDEX_ARROW;
         default:
-            return PD_MODE_COUNT;
+            return POINTING_MODE_COUNT;
     }
 }
 
-const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {
-    [PD_MODE_INDEX_DRAGSCROLL] =
+const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {
+    [POINTING_MODE_INDEX_DRAGSCROLL] =
         {
-            .mode_flag   = PD_MODE_DRAGSCROLL,
+            .mode_flag   = POINTING_MODE_DRAGSCROLL,
             .keycode     = PD_SLOT_0,
             .lock_action = PD_SLOT_0_LOCK,
         },
-    [PD_MODE_INDEX_VOLUME] =
+    [POINTING_MODE_INDEX_VOLUME] =
         {
-            .mode_flag   = PD_MODE_VOLUME,
+            .mode_flag   = POINTING_MODE_VOLUME,
             .keycode     = PD_SLOT_1,
             .lock_action = PD_SLOT_1_LOCK,
         },
-    [PD_MODE_INDEX_ARROW] =
+    [POINTING_MODE_INDEX_ARROW] =
         {
-            .mode_flag   = PD_MODE_ARROW,
+            .mode_flag   = POINTING_MODE_ARROW,
             .keycode     = PD_SLOT_4,
             .lock_action = PD_SLOT_4_LOCK,
         },
 };
 
 // The policy each mode's effective slot implies, standing in for the registry.
-static const pd_mode_traits_t test_pd_mode_traits[PD_MODE_COUNT] = {
-    [PD_MODE_INDEX_DRAGSCROLL] = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | PD_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE,
-    [PD_MODE_INDEX_VOLUME]     = PD_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED,
-    [PD_MODE_INDEX_ARROW]      = PD_MODE_TRAIT_PREFER_TYPING_LAYER,
+static const pointing_mode_traits_t test_pointing_mode_traits[POINTING_MODE_COUNT] = {
+    [POINTING_MODE_INDEX_DRAGSCROLL] = POINTING_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED | POINTING_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE,
+    [POINTING_MODE_INDEX_VOLUME] = POINTING_MODE_TRAIT_KEEP_AUTO_MOUSE_ANCHORED,
+    [POINTING_MODE_INDEX_ARROW] = POINTING_MODE_TRAIT_PREFER_TYPING_LAYER,
 };
 
-const pd_mode_def_t *pd_mode_lookup(pd_mode_mask_t mode) {
-    uint8_t index = test_pd_mode_index(mode);
-    return index < PD_MODE_COUNT ? &pd_modes[index] : NULL;
+const pointing_mode_def_t *pointing_mode_lookup(pointing_mode_mask_t mode) {
+    uint8_t index = test_pointing_mode_index(mode);
+    return index < POINTING_MODE_COUNT ? &pointing_modes[index] : NULL;
 }
 
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
-    for (uint8_t index = 0; index < PD_MODE_COUNT; index++) {
-        if (pd_modes[index].lock_action == action) {
-            return &pd_modes[index];
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
+    for (uint8_t index = 0; index < POINTING_MODE_COUNT; index++) {
+        if (pointing_modes[index].lock_action == action) {
+            return &pointing_modes[index];
         }
     }
 
     return NULL;
 }
 
-uint8_t pd_mode_active_keyboard_event_masked_real_mods(void) {
+uint8_t pointing_mode_active_keyboard_event_masked_real_mods(void) {
     return 0;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
-    return pd_mode_lock_action_lookup(action) != NULL;
+bool is_pointing_mode_lock_action(uint16_t action) {
+    return pointing_mode_lock_action_lookup(action) != NULL;
 }
 
-bool pd_mode_has_trait(pd_mode_mask_t mode, pd_mode_traits_t trait) {
-    return (pd_mode_effective_traits(mode) & trait) == trait;
+bool pointing_mode_has_trait(pointing_mode_mask_t mode, pointing_mode_traits_t trait) {
+    return (pointing_mode_effective_traits(mode) & trait) == trait;
 }
 
-pd_mode_traits_t pd_mode_effective_traits(pd_mode_mask_t mode) {
-    uint8_t index = test_pd_mode_index(mode);
-    return index < PD_MODE_COUNT ? test_pd_mode_traits[index] : PD_MODE_TRAIT_NONE;
+pointing_mode_traits_t pointing_mode_effective_traits(pointing_mode_mask_t mode) {
+    uint8_t index = test_pointing_mode_index(mode);
+    return index < POINTING_MODE_COUNT ? test_pointing_mode_traits[index] : POINTING_MODE_TRAIT_NONE;
 }
 
 // The three modes above have a configured slot; every other slot is disabled.
 static const noah_pd_config_t test_pd_configured_slot = {.kind = NOAH_PD_KIND_DIRECTIONAL};
 
-const noah_pd_config_t *noah_effective_pd_for_mask(uint32_t mode) {
-    return test_pd_mode_index(mode) < PD_MODE_COUNT ? &test_pd_configured_slot : NULL;
+const noah_pd_config_t *noah_active_profile_pd_for_mask(uint32_t mode) {
+    return test_pointing_mode_index(mode) < POINTING_MODE_COUNT ? &test_pd_configured_slot : NULL;
 }
 
-bool pd_any_active_mode_has_trait(pd_mode_traits_t trait) {
-    return pd_mode_has_trait(pd_mode_local_active_snapshot(), trait);
+bool pd_any_active_mode_has_trait(pointing_mode_traits_t trait) {
+    return pointing_mode_has_trait(pointing_mode_local_active_snapshot(), trait);
 }
 
 bool is_keyboard_master(void) {
     return true;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     if (keycode == PD_SLOT_0) {
-        return PD_MODE_DRAGSCROLL;
+        return POINTING_MODE_DRAGSCROLL;
     }
 
     if (keycode == PD_SLOT_1) {
-        return PD_MODE_VOLUME;
+        return POINTING_MODE_VOLUME;
     }
 
     if (keycode == PD_SLOT_4) {
-        return PD_MODE_ARROW;
+        return POINTING_MODE_ARROW;
     }
 
     return 0;
 }
 
-void pd_mode_transition_activate(pd_mode_mask_t mode) {
-    pd_mode_set(mode);
+void pointing_mode_transition_activate(pointing_mode_mask_t mode) {
+    pointing_mode_set(mode);
 }
 
-void pd_mode_transition_deactivate(pd_mode_mask_t mode) {
-    pd_mode_clear(mode);
+void pointing_mode_transition_deactivate(pointing_mode_mask_t mode) {
+    pointing_mode_clear(mode);
 }
 
-void pd_mode_transition_lock(pd_mode_mask_t mode) {
-    pd_mode_set_locked(mode);
-    pd_mode_set(mode);
+void pointing_mode_transition_lock(pointing_mode_mask_t mode) {
+    pointing_mode_set_locked(mode);
+    pointing_mode_set(mode);
 }
 
-void pd_mode_transition_unlock(pd_mode_mask_t mode) {
-    pd_mode_clear_locked(mode);
-    pd_mode_clear(mode);
+void pointing_mode_transition_unlock(pointing_mode_mask_t mode) {
+    pointing_mode_clear_locked(mode);
+    pointing_mode_clear(mode);
 }
 
-void pd_mode_service_active_dpi_sync(void) {}
+void pointing_mode_service_active_dpi_sync(void) {}
 
 void noah_action_press(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
@@ -724,7 +724,7 @@ bool noah_synthetic_record_active(void) {
     return false;
 }
 
-bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
+bool pointing_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
     return false;
@@ -794,7 +794,7 @@ static void test_debug_reports_slot_phase_and_momentary_layer_interrupt_state(vo
 }
 
 static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
-    pd_mode_snapshot_t                        pd_snapshot;
+    pointing_mode_snapshot_t                  pd_snapshot;
     layer_ownership_debug_snapshot_t          layer_snapshot;
     held_action_debug_snapshot_t              held_action_snapshot;
     held_repeat_debug_snapshot_t              held_repeat_snapshot;
@@ -814,18 +814,18 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     noah_runtime_reset_for_test();
 
     test_arm_feedback_pulse(test_keypos(0, 0), KEY_FEEDBACK_PULSE_HOLD);
-    (void)pd_mode_apply_command((pd_mode_command_t){
-        .kind = PD_MODE_COMMAND_ACTIVATE,
-        .mode = PD_MODE_VOLUME,
+    (void)pointing_mode_apply_command((pointing_mode_command_t){
+        .kind = POINTING_MODE_COMMAND_ACTIVATE,
+        .mode = POINTING_MODE_VOLUME,
     });
-    pd_mode_apply_remote_snapshot(PD_MODE_ARROW, 0);
+    pointing_mode_apply_remote_snapshot(POINTING_MODE_ARROW, 0);
     test_stage_active_slot(KC_C, active_key);
     test_stage_pending_multi_tap(pending_key);
     noah_runtime_trace_reset();
 
     layer_ownership_set_lock_state(3, true);
     layer_ownership_momentary_press(layer_key, 2);
-    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SEND, PD_MODE_VOLUME, PD_MODE_ARROW);
+    noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_SEND, POINTING_MODE_VOLUME, POINTING_MODE_ARROW);
 
     held_action_register(action_key, TEST_ACTION);
     held_repeat_start(repeat_key, TEST_ACTION, 25);
@@ -835,7 +835,7 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     fake_oneshot_mods        = MOD_BIT(KC_LEFT_GUI);
     fake_oneshot_locked_mods = MOD_BIT(KC_RIGHT_GUI);
 
-    pd_snapshot = pd_mode_snapshot();
+    pd_snapshot = pointing_mode_snapshot();
     layer_ownership_debug_snapshot(&layer_snapshot);
     held_action_debug_snapshot(&held_action_snapshot);
     held_repeat_debug_snapshot(&held_repeat_snapshot);
@@ -846,9 +846,9 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     held_repeat_binding = test_find_held_repeat_binding(&held_repeat_snapshot, repeat_key, TEST_ACTION);
 
     CHECK(noah_runtime_debug_feedback_active());
-    CHECK(pd_snapshot.local.active_mode == PD_MODE_VOLUME);
+    CHECK(pd_snapshot.local.active_mode == POINTING_MODE_VOLUME);
     CHECK(pd_snapshot.local.locked_mode == 0);
-    CHECK(pd_snapshot.display.active_mode == PD_MODE_VOLUME);
+    CHECK(pd_snapshot.display.active_mode == POINTING_MODE_VOLUME);
     CHECK(noah_runtime_debug_slot_owner_keycode(active_key) == KC_C);
     CHECK(noah_runtime_debug_slot_tap_action(active_key) == KC_C);
     CHECK(!noah_runtime_debug_slot_momentary_tap_interrupted(active_key));
@@ -884,12 +884,12 @@ static void test_snapshot_captures_cross_subsystem_runtime_state(void) {
     CHECK(trace_snapshot.entries[1].event == NOAH_TRACE_LAYER_OWNERSHIP_EVENT_MOMENTARY_PRESS);
     CHECK(trace_snapshot.entries[2].kind == NOAH_TRACE_SPLIT_SYNC);
     CHECK(trace_snapshot.entries[2].event == NOAH_TRACE_SPLIT_SYNC_EVENT_SEND);
-    CHECK(trace_snapshot.entries[2].a == PD_MODE_VOLUME);
-    CHECK(trace_snapshot.entries[2].b == PD_MODE_ARROW);
+    CHECK(trace_snapshot.entries[2].a == POINTING_MODE_VOLUME);
+    CHECK(trace_snapshot.entries[2].b == POINTING_MODE_ARROW);
 }
 
 static void test_reset_clears_all_runtime_surfaces(void) {
-    pd_mode_snapshot_t                      pd_snapshot;
+    pointing_mode_snapshot_t                pd_snapshot;
     layer_ownership_debug_snapshot_t        layer_snapshot;
     held_action_debug_snapshot_t            held_action_snapshot;
     held_repeat_debug_snapshot_t            held_repeat_snapshot;
@@ -901,11 +901,11 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     noah_runtime_reset_for_test();
 
     test_arm_feedback_pulse(test_keypos(0, 0), KEY_FEEDBACK_PULSE_LONG_HOLD);
-    (void)pd_mode_apply_command((pd_mode_command_t){
-        .kind = PD_MODE_COMMAND_LOCK,
-        .mode = PD_MODE_ARROW,
+    (void)pointing_mode_apply_command((pointing_mode_command_t){
+        .kind = POINTING_MODE_COMMAND_LOCK,
+        .mode = POINTING_MODE_ARROW,
     });
-    pd_mode_apply_remote_snapshot(PD_MODE_VOLUME, PD_MODE_VOLUME);
+    pointing_mode_apply_remote_snapshot(POINTING_MODE_VOLUME, POINTING_MODE_VOLUME);
     test_stage_active_slot(KC_V, active_key);
 
     layer_ownership_set_lock_state(1, true);
@@ -916,7 +916,7 @@ static void test_reset_clears_all_runtime_surfaces(void) {
     fake_oneshot_locked_mods = MOD_BIT(KC_RIGHT_GUI);
 
     noah_runtime_reset_for_test();
-    pd_snapshot = pd_mode_snapshot();
+    pd_snapshot = pointing_mode_snapshot();
     layer_ownership_debug_snapshot(&layer_snapshot);
     held_action_debug_snapshot(&held_action_snapshot);
     held_repeat_debug_snapshot(&held_repeat_snapshot);
@@ -2678,7 +2678,7 @@ static void test_key_runtime_core_replacing_a_live_token_cleans_up_owned_leases(
     CHECK(snapshot.core_press_token_count == 1u);
 }
 
-static void test_key_runtime_core_pd_mode_press_creates_active_mode_and_pointer_anchor(void) {
+static void test_key_runtime_core_pointing_mode_press_creates_active_mode_and_pointer_anchor(void) {
     const key_runtime_core_shadow_projection_t *shadow;
     projection_snapshot_t                       snapshot;
     keypos_t                                    key_pos = test_keypos(1, 6);
@@ -2690,23 +2690,23 @@ static void test_key_runtime_core_pd_mode_press_creates_active_mode_and_pointer_
 
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow != NULL);
-    CHECK(shadow->pd_mode_local_active == PD_MODE_VOLUME);
-    CHECK(shadow->pd_mode_local_locked == 0);
+    CHECK(shadow->pointing_mode_local_active == POINTING_MODE_VOLUME);
+    CHECK(shadow->pointing_mode_local_locked == 0);
     CHECK(shadow->pointer_anchor_active);
-    CHECK(shadow->pointer_pd_mode_anchor_active);
+    CHECK(shadow->pointer_pointing_mode_anchor_active);
     CHECK(!shadow->pointer_prefers_typing_layer);
     CHECK(!shadow->pointer_toggle_enabled);
 
     snapshot = key_runtime_core_projection_snapshot_capture();
-    CHECK(snapshot.core_shadow_pd_mode_local_active == PD_MODE_VOLUME);
+    CHECK(snapshot.core_shadow_pointing_mode_local_active == POINTING_MODE_VOLUME);
     CHECK(snapshot.core_shadow_pointer_anchor_active);
-    CHECK(snapshot.core_shadow_pointer_pd_mode_anchor_active);
+    CHECK(snapshot.core_shadow_pointer_pointing_mode_anchor_active);
     CHECK(snapshot.core_lease_count == 2u);
 
     fake_time = (uint16_t)(fake_time + 10u);
     CHECK(!test_process_record(PD_SLOT_1, key_pos, false));
     shadow = key_runtime_core_shadow_projection();
-    CHECK(shadow->pd_mode_local_active == 0);
+    CHECK(shadow->pointing_mode_local_active == 0);
     CHECK(!shadow->pointer_anchor_active);
 }
 
@@ -2722,62 +2722,62 @@ static void test_key_runtime_core_arrow_mode_prefers_typing_without_pointer_anch
 
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow != NULL);
-    CHECK(shadow->pd_mode_local_active == PD_MODE_ARROW);
+    CHECK(shadow->pointing_mode_local_active == POINTING_MODE_ARROW);
     CHECK(!shadow->pointer_anchor_active);
-    CHECK(!shadow->pointer_pd_mode_anchor_active);
+    CHECK(!shadow->pointer_pointing_mode_anchor_active);
     CHECK(shadow->pointer_prefers_typing_layer);
     CHECK(!shadow->pointer_toggle_enabled);
 
     snapshot = key_runtime_core_projection_snapshot_capture();
-    CHECK(snapshot.core_shadow_pd_mode_local_active == PD_MODE_ARROW);
+    CHECK(snapshot.core_shadow_pointing_mode_local_active == POINTING_MODE_ARROW);
     CHECK(snapshot.core_shadow_pointer_prefers_typing_layer);
     CHECK(!snapshot.core_shadow_pointer_anchor_active);
     CHECK(snapshot.core_lease_count == 1u);
 }
 
-static void test_key_runtime_core_pd_mode_lock_observes_live_pd_mode_state(void) {
+static void test_key_runtime_core_pointing_mode_lock_observes_live_pointing_mode_state(void) {
     const key_runtime_core_shadow_projection_t *shadow;
     projection_snapshot_t                       snapshot;
 
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    CHECK(pd_mode_set_lock_state(PD_MODE_DRAGSCROLL, true));
+    CHECK(pointing_mode_set_lock_state(POINTING_MODE_DRAGSCROLL, true));
 
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow != NULL);
-    CHECK(shadow->pd_mode_local_active == PD_MODE_DRAGSCROLL);
-    CHECK(shadow->pd_mode_local_locked == PD_MODE_DRAGSCROLL);
+    CHECK(shadow->pointing_mode_local_active == POINTING_MODE_DRAGSCROLL);
+    CHECK(shadow->pointing_mode_local_locked == POINTING_MODE_DRAGSCROLL);
     CHECK(shadow->pointer_anchor_active);
-    CHECK(shadow->pointer_pd_mode_anchor_active);
+    CHECK(shadow->pointer_pointing_mode_anchor_active);
     CHECK(shadow->pointer_toggle_enabled);
 
     snapshot = key_runtime_core_projection_snapshot_capture();
-    CHECK(snapshot.core_shadow_pd_mode_local_active == PD_MODE_DRAGSCROLL);
-    CHECK(snapshot.core_shadow_pd_mode_local_locked == PD_MODE_DRAGSCROLL);
+    CHECK(snapshot.core_shadow_pointing_mode_local_active == POINTING_MODE_DRAGSCROLL);
+    CHECK(snapshot.core_shadow_pointing_mode_local_locked == POINTING_MODE_DRAGSCROLL);
     CHECK(snapshot.core_shadow_pointer_toggle_enabled);
     CHECK(snapshot.core_persistent_intent_count == 2u);
-    CHECK(snapshot.pd_mode_local_active == PD_MODE_DRAGSCROLL);
-    CHECK(snapshot.pd_mode_local_locked == PD_MODE_DRAGSCROLL);
+    CHECK(snapshot.pointing_mode_local_active == POINTING_MODE_DRAGSCROLL);
+    CHECK(snapshot.pointing_mode_local_locked == POINTING_MODE_DRAGSCROLL);
 
-    CHECK(pd_mode_set_lock_state(PD_MODE_DRAGSCROLL, false));
+    CHECK(pointing_mode_set_lock_state(POINTING_MODE_DRAGSCROLL, false));
     shadow = key_runtime_core_shadow_projection();
-    CHECK(shadow->pd_mode_local_active == 0);
-    CHECK(shadow->pd_mode_local_locked == 0);
+    CHECK(shadow->pointing_mode_local_active == 0);
+    CHECK(shadow->pointing_mode_local_locked == 0);
     CHECK(!shadow->pointer_anchor_active);
     CHECK(!shadow->pointer_toggle_enabled);
 
     snapshot = key_runtime_core_projection_snapshot_capture();
-    CHECK(snapshot.core_shadow_pd_mode_local_active == 0);
-    CHECK(snapshot.core_shadow_pd_mode_local_locked == 0);
+    CHECK(snapshot.core_shadow_pointing_mode_local_active == 0);
+    CHECK(snapshot.core_shadow_pointing_mode_local_locked == 0);
     CHECK(!snapshot.core_shadow_pointer_anchor_active);
     CHECK(!snapshot.core_shadow_pointer_toggle_enabled);
-    CHECK(snapshot.pd_mode_local_active == 0);
-    CHECK(snapshot.pd_mode_local_locked == 0);
+    CHECK(snapshot.pointing_mode_local_active == 0);
+    CHECK(snapshot.pointing_mode_local_locked == 0);
     CHECK(!snapshot.pointer_toggle_enabled);
 }
 
-static void test_key_runtime_core_activating_new_pd_mode_clears_foreign_mode_leases(void) {
+static void test_key_runtime_core_activating_new_pointing_mode_clears_foreign_mode_leases(void) {
     const key_runtime_core_shadow_projection_t *shadow;
     projection_snapshot_t                       snapshot;
     keypos_t                                    volume_pos = test_keypos(2, 6);
@@ -2789,23 +2789,23 @@ static void test_key_runtime_core_activating_new_pd_mode_clears_foreign_mode_lea
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_SLOT_1, volume_pos, fake_time);
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow != NULL);
-    CHECK(shadow->pd_mode_local_active == PD_MODE_VOLUME);
+    CHECK(shadow->pointing_mode_local_active == POINTING_MODE_VOLUME);
     CHECK(shadow->pointer_anchor_active);
 
     test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_SLOT_4, arrow_pos, fake_time);
     shadow = key_runtime_core_shadow_projection();
-    CHECK(shadow->pd_mode_local_active == PD_MODE_ARROW);
+    CHECK(shadow->pointing_mode_local_active == POINTING_MODE_ARROW);
     CHECK(!shadow->pointer_anchor_active);
     CHECK(shadow->pointer_prefers_typing_layer);
 
     snapshot = key_runtime_core_projection_snapshot_capture();
-    CHECK(snapshot.core_shadow_pd_mode_local_active == PD_MODE_ARROW);
+    CHECK(snapshot.core_shadow_pointing_mode_local_active == POINTING_MODE_ARROW);
     CHECK(snapshot.core_lease_count == 1u);
 
     fake_time = (uint16_t)(fake_time + 5u);
     CHECK(!test_process_record(PD_SLOT_1, volume_pos, false));
     shadow = key_runtime_core_shadow_projection();
-    CHECK(shadow->pd_mode_local_active == PD_MODE_ARROW);
+    CHECK(shadow->pointing_mode_local_active == POINTING_MODE_ARROW);
     CHECK(shadow->pointer_prefers_typing_layer);
 }
 
@@ -3191,21 +3191,21 @@ static void test_key_runtime_core_projector_executes_effects_and_pending_dispatc
     CHECK(last_emitted_action == TEST_ACTION);
 
     key_runtime_core_project_effect(&(key_runtime_effect_t){
-        .kind                  = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
-        .data.pd_mode_lock_tap = {.pd_mode = PD_MODE_ARROW, .key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS}},
+        .kind                  = KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_TAP,
+        .data.pointing_mode_lock_tap = {.pointing_mode = POINTING_MODE_ARROW, .key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS}},
     });
-    CHECK(pd_mode_local_locked_snapshot() == PD_MODE_ARROW);
+    CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_ARROW);
 
     key_runtime_core_project_effect(&(key_runtime_effect_t){
-        .kind = KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE,
-        .data.pd_mode_lock_state =
+        .kind = KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_STATE,
+        .data.pointing_mode_lock_state =
             {
-                .pd_mode = PD_MODE_ARROW,
+                .pointing_mode = POINTING_MODE_ARROW,
                 .key_pos = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
                 .locked  = false,
             },
     });
-    CHECK(pd_mode_local_locked_snapshot() == 0);
+    CHECK(pointing_mode_local_locked_snapshot() == 0);
 
     key_runtime_core_project_pending_release_dispatch(&(pending_release_t){
         .action = TEST_SECOND_ACTION,
@@ -3574,10 +3574,10 @@ int main(void) {
     test_key_runtime_core_layer_tap_hold_creates_and_retires_layer_lease();
     test_key_runtime_core_modifier_leases_keep_physical_and_managed_masks_separate();
     test_key_runtime_core_replacing_a_live_token_cleans_up_owned_leases();
-    test_key_runtime_core_pd_mode_press_creates_active_mode_and_pointer_anchor();
+    test_key_runtime_core_pointing_mode_press_creates_active_mode_and_pointer_anchor();
     test_key_runtime_core_arrow_mode_prefers_typing_without_pointer_anchor();
-    test_key_runtime_core_pd_mode_lock_observes_live_pd_mode_state();
-    test_key_runtime_core_activating_new_pd_mode_clears_foreign_mode_leases();
+    test_key_runtime_core_pointing_mode_lock_observes_live_pointing_mode_state();
+    test_key_runtime_core_activating_new_pointing_mode_clears_foreign_mode_leases();
     test_key_runtime_core_deferred_release_blocker_expires_after_tap_term();
     test_key_runtime_core_production_hooks_feed_blocker_queries();
     test_key_runtime_core_deferred_release_blocker_persists_after_tap_term_for_plain_tap();

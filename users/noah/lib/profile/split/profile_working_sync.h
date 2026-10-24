@@ -2,11 +2,11 @@
 // Working Copy Split Sync (D-F32)
 // ───────────────────────────────────────────────────────────────────────────
 //
-// Brings the other half's working copy to the USB half's, over a split RPC
+// Brings the other half's working copy to the master half's, over a split RPC
 // of its own (PUT_PROFILE_WORKING_SYNC), separate from the durable profile
 // reconciler: nothing here writes flash or touches a slot.
 //
-// The USB half is the only initiator. After each edit it publishes, it sends
+// The master half is the only initiator. After each edit it publishes, it sends
 // the same edit (BEGIN, SPLICE, DATA, COMMIT) and polls until the other half
 // reports the same session and revision. When the halves disagree in any
 // other way, it brings the other half back: REVERT a working copy that is
@@ -15,7 +15,7 @@
 // followed by one whole-copy replacement; if that is refused too, the halves
 // stay apart (reported) until Revert. It also carries the edit-mode record
 // both ways; each half writes it later, when its keyboard is quiet. Edits on
-// the USB half wait until the other half has caught up (profile_owner.c), so
+// the master half wait until the other half has caught up (profile_owner.c), so
 // at most one edit is ever behind.
 //
 // The other half's RPC callback runs on the split slave thread, which can
@@ -43,7 +43,7 @@ enum {
     // agree; a half not heard from for the timeout is unknown again.
     NOAH_PROFILE_WORKING_SYNC_POLL_MS        = 100u,
     NOAH_PROFILE_WORKING_SYNC_IDLE_POLL_MS   = 1000u,
-    NOAH_PROFILE_WORKING_SYNC_PEER_TIMEOUT_MS = 3000u,
+    NOAH_PROFILE_WORKING_SYNC_SLAVE_TIMEOUT_MS = 3000u,
     // A failed edit-mode write is tried again after this, doubling each time.
     NOAH_PROFILE_WORKING_SYNC_MODE_RETRY_MS     = 1000u,
     NOAH_PROFILE_WORKING_SYNC_MODE_RETRY_MAX_MS = 64000u,
@@ -66,11 +66,11 @@ enum {
     // Reply results beyond the working copy's own.
     NOAH_PROFILE_WORKING_SYNC_ADMITTED = 0xFEu, // queued; the answer comes on a retry
     NOAH_PROFILE_WORKING_SYNC_BUSY     = 0xFFu, // an earlier request is still unprocessed
-    NOAH_PROFILE_WORKING_SYNC_PEER_ACTIVE         = 1u << 0,
-    NOAH_PROFILE_WORKING_SYNC_PEER_SAVED_COMPILED = 1u << 1,
+    NOAH_PROFILE_WORKING_SYNC_SLAVE_ACTIVE        = 1u << 0,
+    NOAH_PROFILE_WORKING_SYNC_SLAVE_SAVED_COMPILED = 1u << 1,
     // The answering half's profile owner stopped: only a restart clears it
     // (D-F34). Its replies say where it stopped; it acts on nothing.
-    NOAH_PROFILE_WORKING_SYNC_PEER_STOPPED = 1u << 2,
+    NOAH_PROFILE_WORKING_SYNC_SLAVE_STOPPED = 1u << 2,
 };
 
 // One half's working copy as the other sees it.
@@ -87,7 +87,7 @@ typedef struct {
     uint8_t  saved_origin;
     uint8_t  mode;
     bool     known;
-} noah_profile_working_peer_t;
+} noah_profile_working_slave_t;
 
 typedef enum {
     NOAH_PROFILE_WORKING_FORWARD_NONE = 0u,
@@ -105,8 +105,8 @@ typedef struct {
     noah_profile_edit_mode_storage_t  mode_storage;
     noah_profile_edit_mode_record_t   mode;
 
-    // USB half: the other half as last heard, and the request in flight.
-    noah_profile_working_peer_t peer;
+    // Master half: the other half as last heard, and the request in flight.
+    noah_profile_working_slave_t slave;
     uint8_t                     request[NOAH_PROFILE_WORKING_SYNC_FRAME_MAX];
     uint8_t                     request_length;
     bool                        request_pending;
@@ -155,7 +155,7 @@ typedef struct {
 
 void noah_profile_working_sync_init(noah_profile_working_sync_t *sync, noah_profile_working_copy_t *copy, noah_profile_split_exchange_fn exchange, void *transport_context, const noah_profile_edit_mode_storage_t *mode_storage);
 
-// USB half, one scan grant: at most one exchange. True when it exchanged.
+// Master half, one scan grant: at most one exchange. True when it exchanged.
 bool noah_profile_working_sync_master_scan(noah_profile_working_sync_t *sync, uint32_t now_ms);
 // Whether the other half holds exactly this half's working copy (same
 // session and revision, nothing in progress), as last heard and recently.
@@ -169,7 +169,7 @@ bool noah_profile_working_sync_set_mode(noah_profile_working_sync_t *sync, uint8
 bool noah_profile_working_sync_refused(const noah_profile_working_sync_t *sync);
 // The other half answers that its owner stopped (D-F34), as last heard and
 // recently.
-bool noah_profile_working_sync_peer_stopped(const noah_profile_working_sync_t *sync, uint32_t now_ms);
+bool noah_profile_working_sync_slave_stopped(const noah_profile_working_sync_t *sync, uint32_t now_ms);
 
 // Both halves, one scan grant: writes a pending edit-mode record if the
 // storage allows it now. True when it tried.
@@ -177,7 +177,7 @@ bool noah_profile_working_sync_store_mode(noah_profile_working_sync_t *sync, uin
 
 // Other half: the RPC callback (slave thread) and the scan that answers.
 bool noah_profile_working_sync_receive(noah_profile_working_sync_t *sync, const uint8_t *request, uint8_t request_length, uint8_t *response, uint8_t response_length);
-bool noah_profile_working_sync_peer_scan(noah_profile_working_sync_t *sync);
+bool noah_profile_working_sync_slave_scan(noah_profile_working_sync_t *sync);
 
 // Frame codec, shared by both sides and the tests.
 uint8_t noah_profile_working_sync_frame_length(const uint8_t *frame, uint8_t capacity);

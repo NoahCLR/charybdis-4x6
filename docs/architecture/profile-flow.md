@@ -28,9 +28,9 @@ defaults run ([device-resident profile](../spec/device-resident-profile.md#autho
 | A half's saved generations in its two profile slots, boot selection | `profile/storage/profile_store.c` over `profile_flash_store.c` and `compat/qmk_profile_flash.c` |
 | A client's candidate and its phases | `profile/storage/profile_candidate_transaction.c` |
 | Writing a candidate into the slot not in use, asking for its activation | `profile/storage/profile_candidate_store_backend.c` |
-| A copy received from the other half: the master half's push, or a newer saved profile the master half pulls from the slave half | `profile/storage/profile_peer_store_backend.c` |
+| A copy received from the other half: the master half's push, or a newer saved profile the master half pulls from the slave half | `profile/storage/profile_other_half_store_backend.c` |
 | Which half's saved profile is newer, and whether the halves are converged | `profile/split/profile_split_authority.c`, fed by `profile_split_reconciler.c` |
-| The active profile and its publication | `profile/runtime/effective_profile_provider.c` |
+| The active profile and its publication | `profile/runtime/active_profile_provider.c` |
 | Whether now is a safe boundary | `profile/runtime/profile_activation_policy.c` |
 | The working copy, its session and revision | `profile/runtime/profile_working_copy.c` |
 | The slave half's working copy and the edit mode following the master half's | `profile/split/profile_working_sync.c` |
@@ -40,14 +40,14 @@ defaults run ([device-resident profile](../spec/device-resident-profile.md#autho
 | This half's physical origin | `compat/qmk_physical_half.c` |
 
 Runtimes read the active profile only through the views the provider's
-invalidators rebuild: `effective_keymap_macros_runtime.c` (read by
+invalidators rebuild: `active_profile_keymap_macros_runtime.c` (read by
 `compat/qmk_profile_keymap.c` and `macro/profile_macro_provider.c`),
-`effective_key_behavior_runtime.c` (`key/behavior/`),
-`effective_rgb_runtime.c` (`rgb/core/rgb_effective_config.c`),
-`effective_combo_runtime.c` (`compat/qmk_effective_combos.c`),
-`effective_settings_runtime.c` (`noah_setting()` everywhere; QMK's own
+`active_profile_key_behavior_runtime.c` (`key/behavior/`),
+`active_profile_rgb_runtime.c` (`rgb/core/rgb_active_profile_config.c`),
+`active_profile_combo_runtime.c` (`compat/qmk_active_profile_combos.c`),
+`active_profile_settings_runtime.c` (`noah_setting()` everywhere; QMK's own
 settings through `compat/qmk_portable_profile.c`'s apply hook) and
-`effective_pd_runtime.c` (`pointing/`). `initialize_runtime_graph` in
+`active_profile_pd_runtime.c` (`pointing/`). `initialize_runtime_graph` in
 `profile_owner.c` registers them in that order.
 
 ## Which context runs what
@@ -98,28 +98,29 @@ step each: the candidate, the reconciler, activation of a copy received
 from the other half, and the working copy. The candidate validates in the
 slot not in use; at `PREPARING_PEER`, `begin_or_advance_host_barrier` has the
 reconciler push it, reusing what the slave half already holds
-(`host_reuse_plan`, D-F19); the slave half's `profile_peer_store_backend.c`
-stores and validates it as a prepared copy; the master half's commit marker
-commits the Apply, then `advance_host_postcommit_barrier` waits for the slave
-half to commit its copy (D-F40). Contracts:
-[candidate transfer](../spec/profile-wire-v1/candidate-transfer.md),
-[commit sequence](../spec/logical-profile-transaction-v1.md#commit-sequence),
-[sending a prepared push](../spec/profile-split-v1.md#sending-a-prepared-push),
-[receiving a copy](../spec/profile-split-v1.md#receiving-a-copy).
+(`host_reuse_plan`, D-F19); the slave half's
+`profile_other_half_store_backend.c` stores and validates it as a prepared copy;
+the master half's commit marker commits the Apply, then
+`advance_host_postcommit_barrier` waits for the slave half to commit its copy
+(D-F40). Contracts: [candidate
+transfer](../spec/profile-wire-v1/candidate-transfer.md), [commit
+sequence](../spec/logical-profile-transaction-v1.md#commit-sequence), [sending a
+prepared push](../spec/profile-split-v1.md#sending-a-prepared-push), [receiving
+a copy](../spec/profile-split-v1.md#receiving-a-copy).
 
 ## Activation
 
 `profile_candidate_store_backend.c` asks the provider for the new generation
 and polls it. The provider evaluates `noah_profile_activation_policy_safe_boundary`
 once per poll; the slave-half reason comes from the owner's observer
-(`owner_peer_observer`), which reads the split authority. With no reason it
+(`owner_other_half_observer`), which reads the split authority. With no reason it
 switches its active bank and runs the invalidators in order, each passed the
 changed-domain mask. A copy from the other half (pushed to the slave half,
 or pulled by the master half, [repair and pull](../spec/profile-split-v1.md#repair-and-pull))
-lands in `profile_peer_store_backend.c`: once a reconciler step leaves it
-awaiting activation (`took_peer_copy`), the owner publishes its descriptor
-(`publish_validated_descriptor`) and `scan_peer_activation` activates it the
-same way. Contracts:
+lands in `profile_other_half_store_backend.c`: once a reconciler step leaves it
+awaiting activation (`took_other_half_copy`), the owner publishes its descriptor
+(`publish_validated_descriptor`) and `scan_other_half_activation` activates it
+the same way. Contracts:
 [activation](../spec/logical-profile-transaction-v1.md#activation),
 [safe boundary](../spec/authority-state-table.md#safe-boundary).
 
@@ -130,13 +131,13 @@ SET `0x20`–`0x27` reach `compat/qmk_profile_edit_channel.c`, then
 synchronously. The owner's working-copy subsystem (`scan_working`) runs, in
 order: a Save step, an edit's lease, `noah_profile_working_copy_scan` (load,
 check, publish), the edit-mode write, the keyboard's automatic step, then the
-working-copy protocol. Publication is `noah_effective_profile_provider_publish_in_place`:
+working-copy protocol. Publication is `noah_active_profile_provider_publish_in_place`:
 the bytes are rewritten inside it at the safe boundary and every invalidator
 runs; the combo, pointing and settings views skip a working copy that left
 their domain unchanged, while the keymap and macro, key-behaviour and
 lighting views rebuild on every publication. The master half's `noah_profile_working_sync_master_scan`
 then sends the same edit; the slave half's callback fills the mailbox and its
-`noah_profile_working_sync_peer_scan` runs the same steps. Save queues its
+`noah_profile_working_sync_slave_scan` runs the same steps. Save queues its
 commands into the candidate transaction's mailbox as a client would, with a
 candidate made of REUSE from the working copy, so it takes the Apply path
 above; a working copy whose bytes equal the saved profile writes nothing
@@ -173,9 +174,9 @@ between main-loop passes. Nothing on the path reads the owner. Contracts:
 - A new Raw HID request: a handler in `compat/qmk_profile_channel.c`'s
   dispatch (or `qmk_profile_edit_channel.c` for live edits), bounded, its
   work queued for the scan; capabilities in `compat/qmk_profile_capabilities.h`.
-- A new runtime reading the profile: an `effective_*_runtime.c` view with an
-  invalidator added in `initialize_runtime_graph`, under
-  `NOAH_EFFECTIVE_PROFILE_MAX_INVALIDATORS`.
+- A new runtime reading the profile: an `active_profile_*_runtime.c` view with
+  an invalidator added in `initialize_runtime_graph`, under
+  `NOAH_ACTIVE_PROFILE_MAX_INVALIDATORS`.
 - Every new step on the scan path runs on the reviewed stack paths
   (`tools/firmware_stack_budget_live_profile_owner.json`,
   [resource policy](../spec/resource-policy.md)).
@@ -186,14 +187,15 @@ between main-loop passes. Nothing on the path reads the owner. Contracts:
   `run_profile_store_runtime_owner_tests.sh`, `run_profile_store_runtime_tests.sh`
 - Grant and flash pacing: `run_qmk_durable_io_tests.sh`, `run_qmk_profile_flash_tests.sh`
 - Candidate and store: `run_profile_candidate_transaction_tests.sh`,
-  `run_profile_candidate_store_backend_tests.sh`, `run_profile_peer_store_backend_tests.sh`,
+  `run_profile_candidate_store_backend_tests.sh`, `run_profile_other_half_store_backend_tests.sh`,
   `run_profile_store_tests.sh`
 - Split protocol over `tests/host/split_fault_link.c`: `run_profile_split_foundation_tests.sh`,
   `run_profile_split_reconciler_tests.sh`, `run_profile_working_sync_tests.sh`;
   the QMK adapter: `run_qmk_profile_split_transport_tests.sh`
-- Activation and views: `run_effective_profile_provider_tests.sh`,
+- Activation and views: `run_active_profile_provider_tests.sh`,
   `run_profile_activation_policy_tests.sh`, `run_profile_keymap_macros_runtime_tests.sh`,
-  `run_effective_rgb_runtime_tests.sh`, `run_effective_combo_runtime_tests.sh`
+  `run_active_profile_rgb_runtime_tests.sh`,
+  `run_active_profile_combo_runtime_tests.sh`
 - Live edits: `run_profile_working_copy_tests.sh`, `run_qmk_profile_edit_channel_tests.sh`,
   `run_qmk_profile_adjustments_tests.sh`, `run_qmk_portable_profile_tests.sh`
 - Raw HID channel: `run_profile_wire_v1_tests.sh`

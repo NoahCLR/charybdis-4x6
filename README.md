@@ -4,7 +4,7 @@ This is the firmware I type on every day, for the
 [BastardKB Charybdis 4x6](https://bastardkb.com/) with an RP2040 controller.
 Pair it with **[Charybdis Ark](https://github.com/NoahCLR/charybdis-ark)**,
 its editor app, and you can change keys, layers, tap/hold behaviours, combos,
-macros, lighting and trackball modes on the connected keyboard. You don't write
+macros, lighting and pointing modes on the connected keyboard. You don't write
 any C and you don't reflash.
 
 ## What it does
@@ -21,7 +21,7 @@ any C and you don't reflash.
   tap, hold and long hold, and again on a double, triple or up to quintuple
   tap. Combos and custom keys use the same behaviours, and a custom key can
   hold a shortcut with modifiers from both sides (Left Ctrl + Right Alt + K).
-- **A trackball that changes roles.** Thirty-two pointing-mode slots turn the
+- **A trackball that changes roles.** Thirty-two pointing slots turn the
   ball into scrolling, volume, zoom, arrow keys, mouse-button clicks, macros
   or your own shortcuts, held or locked. A pointer layer comes up by itself
   when you move the ball, and sniping slows it down for precise work.

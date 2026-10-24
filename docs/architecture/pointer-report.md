@@ -12,7 +12,7 @@ How keys reach the pointing runtime is
 how its state is drawn is [rgb-render.md](rgb-render.md). The module's own
 layout is in [`pointing/README.md`](../../users/noah/lib/pointing/README.md).
 
-The rule: **`pd_mode_state.c` decides which mode runs, one engine turns
+The rule: **`pointing_mode_state.c` decides which mode runs, one engine turns
 motion into output for every pointing slot, and QMK keeps the report and
 auto-mouse, steered from outside.**
 
@@ -26,8 +26,8 @@ flowchart TD
     runtime --> anchor["pointer_layer_policy_sync_layer_ownership_anchor"]
     runtime --> noise["idle-noise filter, no mode only"]
     runtime -->|"no mode"| pass["report unchanged: the pointer moves"]
-    runtime -->|"mode running"| engine["noah_pd_engine_motion (modes/pd_mode_configured.c)"]
-    engine -->|scrolling| scroll["dragscroll_step (modes/pd_mode_dragscroll.c): wheel values, no motion"]
+    runtime -->|"mode running"| engine["noah_pd_engine_motion (modes/pointing_mode_configured.c)"]
+    engine -->|scrolling| scroll["dragscroll_step (modes/pointing_mode_dragscroll.c): wheel values, no motion"]
     engine -->|directional| dir["directional engine: taps, clicks, macro starts; an empty report"]
     dir --> ledger["owned-keycode ledger, macro engine"]
     pass --> qmk["QMK: auto-mouse task, mousekey buttons, send"]
@@ -50,10 +50,10 @@ buttons (where owned clicks land) and sends.
    `NOAH_POINTING_IDLE_NOISE_SUPPRESSION_ABS_MAX` counts after the quiet
    windows in `users/noah/config.h` is zeroed, so sensor drift cannot wake the
    pointer layer.
-3. **The mode.** `pd_mode_local_active_snapshot()` names the running mode;
+3. **The mode.** `pointing_mode_local_active_snapshot()` names the running mode;
    none passes the report on. Otherwise `noah_pd_engine_motion` runs the
    pointing slot `noah_pd_engine_enter` latched from
-   `noah_effective_pd_for_mask`. Scrolling
+   `noah_active_profile_pd_for_mask`. Scrolling
    returns the report with x and y zeroed and wheel values set. Directional
    sends its outputs through `emit_tap` and returns an empty report. Every
    mode runs this one engine (D-F45, D-F49); there are no per-mode handlers.
@@ -65,18 +65,19 @@ buttons (where owned clicks land) and sends.
 
 ## Which mode runs
 
-Every change is one `pd_mode_apply_command()` (`runtime/pd_mode_state.c`):
-key press and release, lock and unlock, and the slave half's remote snapshot.
-Activating a pointing slot unlocks any other lock and ends any other held mode first.
-Owner keys are kept per key position and cleared on every change of mode.
+Every change is one `pointing_mode_apply_command()`
+(`runtime/pointing_mode_state.c`): key press and release, lock and unlock, and
+the slave half's remote snapshot. Activating a pointing slot unlocks any other
+lock and ends any other held mode first. Owner keys are kept per key position
+and cleared on every change of mode.
 
-`runtime/pd_mode_lifecycle.c` carries each transition out:
-`pd_mode_registry_run_activate_hooks` and `_deactivate_hooks` enter and exit
-the engine, which owns a scrolling slot's held modifiers and the buttons a mode
-consumed; a consumed button stays owned past exit until its release
+`runtime/pointing_mode_lifecycle.c` carries each transition out:
+`pointing_mode_registry_run_activate_hooks` and `_deactivate_hooks` enter and
+exit the engine, which owns a scrolling slot's held modifiers and the buttons a
+mode consumed; a consumed button stays owned past exit until its release
 (`noah_pd_engine_pending_release`). Each transition also requests a DPI sync
 and traces itself. A changed local lock reaches the reducer through
-`pd_mode_key_runtime_bridge_observe_local_lock_state`.
+`pointing_mode_key_runtime_bridge_observe_local_lock_state`.
 
 ## The pointer layer
 
@@ -88,7 +89,7 @@ QMK rather than replacing it (D-F60).
 | `noah_pointing_device_init_user` | targets `AUTO_MOUSE_DEFAULT_LAYER` and enables auto-mouse |
 | `is_mouse_record_user` → `pointer_layer_policy_is_mouse_key_record` | mouse keys, anchoring pointing keys, layer holds while an anchoring mode runs, keys whose behaviour is a mouse gesture, DPI keys; a press resolved from the pointer layer counts for its own record and settles in finalize |
 | `noah_layer_state_set_user` → `pointer_layer_policy_apply` | a prefer-typing mode strips the layer; the auto-sniping layer strips a separate pointer layer; otherwise any anchor (QMK's toggle, its key tracker, an anchoring mode) forces it on |
-| `pd_mode_lifecycle.c` | a prefer-typing mode turns the layer off at activation; a locked anchoring mode adds one synthetic tracker count unless it owns QMK's toggle; a locked scrolling mode turns QMK's toggle on, and off at unlock only if it turned it on (registry lock hooks) |
+| `pointing_mode_lifecycle.c` | a prefer-typing mode turns the layer off at activation; a locked anchoring mode adds one synthetic tracker count unless it owns QMK's toggle; a locked scrolling mode turns QMK's toggle on, and off at unlock only if it turned it on (registry lock hooks) |
 | `owned_keycode.c`, `held_repeat.c` | a mouse button they hold counts as a tracker key event (`pointer_layer_policy_note_action`) |
 
 QMK zeroes its tracker whenever it resets auto-mouse, which a live settings
@@ -100,18 +101,18 @@ retaken when found gone; a mouse button's count
 ## DPI
 
 `noah_layer_state_set_user` and every mode transition only request a sync;
-`pd_mode_service_active_dpi_sync`, at the end of `noah_key_runtime_scan`,
-calls `pd_mode_apply_active_dpi`, which writes `pointing_device_set_cpi` in the
-order the spec gives, reading BK's default and sniping DPI through
+`pointing_mode_service_active_dpi_sync`, at the end of `noah_key_runtime_scan`,
+calls `pointing_mode_apply_active_dpi`, which writes `pointing_device_set_cpi`
+in the order the spec gives, reading BK's default and sniping DPI through
 `compat/qmk_pointing_contract.h`.
 
 ## The slave half
 
 The slave half runs no mode. `split/runtime_sync.c` samples the active and
 locked slot and their owner keys into the base packet; on the slave half the
-packet lands through `pd_mode_apply_remote_mode_ids_with_owner_bitmap` in a
-double-banked remote display state, which `pd_mode_snapshot().display` reads
-as one whole publication. Lighting reads that view on both halves.
+packet lands through `pointing_mode_apply_remote_mode_ids_with_owner_bitmap` in
+a double-banked remote display state, which `pointing_mode_snapshot().display`
+reads as one whole publication. Lighting reads that view on both halves.
 
 ## Invariants that span files
 
@@ -125,11 +126,11 @@ as one whole publication. Lighting reads that view on both halves.
 
 ## Where a change goes
 
-- Movement and outputs: `modes/pd_mode_configured.c`, `modes/pd_mode_dragscroll.c`,
+- Movement and outputs: `modes/pointing_mode_configured.c`, `modes/pointing_mode_dragscroll.c`,
   with [pd-mode-domain-v1.md](../spec/pd-mode-domain-v1.md).
-- Activation, locks, owner keys: `runtime/pd_mode_state.c`; side effects of a
-  transition: `runtime/pd_mode_lifecycle.c`; traits from a slot:
-  `runtime/pd_mode_registry.c`.
+- Activation, locks, owner keys: `runtime/pointing_mode_state.c`; side effects
+  of a transition: `runtime/pointing_mode_lifecycle.c`; traits from a slot:
+  `runtime/pointing_mode_registry.c`.
 - Pointer layer rules: `policy/pointer_layer_policy.c`; QMK's auto-mouse and
   pointing APIs only through `compat/qmk_auto_mouse_contract.h` and
   `compat/qmk_pointing_contract.h`.
@@ -138,11 +139,11 @@ as one whole publication. Lighting reads that view on both halves.
 
 ## Tests that hold it
 
-- Engine, movements and outputs: `run_pd_mode_handlers_tests.sh`.
+- Engine, movements and outputs: `run_pointing_mode_handlers_tests.sh`.
 - Activation, owners, locks, pointer layer and DPI: `run_pd_runtime_tests.sh`,
-  `run_pd_mode_tests.sh`, `run_pointer_layer_policy_tests.sh`.
+  `run_pointing_mode_tests.sh`, `run_pointer_layer_policy_tests.sh`.
 - Keys against the runtime, button overrides, held modifiers:
-  `run_pd_mode_key_runtime_integration_tests.sh`.
+  `run_pointing_mode_key_runtime_integration_tests.sh`.
 - Slots from the profile: `run_pd_profile_integration_tests.sh`; the safe
   boundary: `run_profile_activation_policy_tests.sh`.
 - The slave half's view: `run_split_runtime_sync_tests.sh`,

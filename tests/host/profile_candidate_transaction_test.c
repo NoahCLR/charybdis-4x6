@@ -549,11 +549,11 @@ static void test_operation_status_codec(void) {
 // Page 1 carries the save's copy to the other half. Page 0 is unchanged and
 // still refuses page 1, so a build without the owner keeps answering it with
 // UNKNOWN_PAGE.
-static void test_peer_status_page(void) {
-    const noah_profile_candidate_v1_peer_status_t peer = {
-        .phase                   = NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING,
+static void test_copy_status_page(void) {
+    const noah_profile_candidate_v1_copy_status_t other_half = {
+        .phase                   = NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_SENDING,
         .last_status             = 6u,
-        .flags                   = NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_CLEANUP_PENDING | NOAH_PROFILE_CANDIDATE_V1_PEER_FLAG_MASTER | 0x80u,
+        .flags                   = NOAH_PROFILE_CANDIDATE_V1_COPY_FLAG_PEER_CLEANUP_PENDING | NOAH_PROFILE_CANDIDATE_V1_COPY_FLAG_MASTER | 0x80u,
         .transfer_offset         = 0x00010102u,
         .transfer_length         = 0x00020304u,
         .retry_count             = 0x05060708u,
@@ -573,27 +573,27 @@ static void test_peer_status_page(void) {
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
 
     load_fixture("operation-status-request", frame);
-    assert(!noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(!noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
     frame[4] = 1u;
-    assert(noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
     // Layout 2 (D-F28): 32-bit transfer offset and length.
-    assert(frame[7] == 2u && frame[8] == NOAH_PROFILE_CANDIDATE_V1_PEER_PHASE_SENDING && frame[9] == 6u);
+    assert(frame[7] == 2u && frame[8] == NOAH_PROFILE_CANDIDATE_V1_COPY_PHASE_SENDING && frame[9] == 6u);
     assert(frame[10] == 0x03u); // unknown flag bits never reach the wire
     assert(frame[11] == 0x02u && frame[12] == 0x01u && frame[13] == 0x01u && frame[14] == 0x00u);
     assert(frame[15] == 0x04u && frame[16] == 0x03u && frame[17] == 0x02u && frame[18] == 0x00u);
     assert(frame[19] == 0x08u && frame[22] == 0x05u && frame[23] == 0x0cu && frame[26] == 0x09u);
-    // The peer's last BUSY: streak, reason, store state, and transfer owner
-    // with storage admission in the high nibble.
+    // The other half's last BUSY: streak, reason, store state, and transfer
+    // owner with storage admission in the high nibble.
     assert(frame[27] == 0x0eu && frame[28] == 0x0du && frame[29] == 2u && frame[30] == 3u && frame[31] == 0x21u);
     load_fixture("operation-status-request", frame);
     frame[4]  = 1u;
     frame[31] = 1u;
-    assert(noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
     load_fixture("operation-status-request", frame);
     frame[4] = 2u;
-    assert(noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK && frame[6] == 25u);
     assert(frame[7] == 2u && frame[8] == 1u);
     assert(frame[9] == 0x12u && frame[10] == 0x11u && frame[11] == 0x01u && frame[12] == 0x00u);
@@ -606,14 +606,14 @@ static void test_peer_status_page(void) {
     load_fixture("operation-status-request", frame);
     frame[4] = 2u;
     frame[31] = 1u;
-    assert(noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
     assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_MALFORMED);
     load_fixture("operation-status-request", frame);
     frame[4] = 3u;
-    assert(!noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, sizeof(frame)));
+    assert(!noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, sizeof(frame)));
     frame[4] = 1u;
-    assert(!noah_profile_candidate_v1_handle_peer_status_get(NULL, frame, sizeof(frame)));
-    assert(!noah_profile_candidate_v1_handle_peer_status_get(&peer, frame, 31u));
+    assert(!noah_profile_candidate_v1_handle_copy_status_get(NULL, frame, sizeof(frame)));
+    assert(!noah_profile_candidate_v1_handle_copy_status_get(&other_half, frame, 31u));
 }
 
 static void test_mailbox_and_begin_retries(void) {
@@ -1113,7 +1113,7 @@ static void test_split_authorization_barriers(void) {
     assert(fake.abort_calls == 2u && fake.commit_begin_calls == 0u);
 
     // Simultaneous-host arbitration has a distinct frozen outcome rather than
-    // impersonating a durable-peer supersession.
+    // impersonating a durable supersession by the other half.
     stage_validated(&transaction, &fake, 710u, profile, sizeof(profile), &metadata);
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, 710u);
     queue_and_scan(&transaction, &fake, frame);
@@ -1740,7 +1740,7 @@ int main(int argc, char **argv) {
     test_exact_frame_codecs();
     test_malformed_frame_matrix();
     test_operation_status_codec();
-    test_peer_status_page();
+    test_copy_status_page();
     test_mailbox_and_begin_retries();
     test_begin_retry_requires_identical_metadata();
     test_sequential_chunks_and_duplicate_rules();

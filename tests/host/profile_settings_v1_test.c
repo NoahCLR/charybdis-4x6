@@ -3,7 +3,7 @@
 #include <string.h>
 #include "users/noah/lib/compat/qmk_host.h"
 #include "users/noah/lib/profile/schema/profile_settings_v1.h"
-#include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 #include "profile_test_blob.h"
 static unsigned applied;
 void            noah_qmk_portable_apply(void) {
@@ -20,8 +20,8 @@ static uint8_t  bytes[NOAH_SETTINGS_MAX_SIZE + 2];
 static uint16_t length;
 static uint8_t  blob[NOAH_PROFILE_TEST_BLOB_PAYLOAD_OFFSET + sizeof(bytes)];
 // The current bytes as a validated profile's settings domain.
-static noah_effective_profile_snapshot_t settings_view(void) {
-    noah_effective_profile_snapshot_t view  = {0};
+static noah_active_profile_snapshot_t settings_view(void) {
+    noah_active_profile_snapshot_t view     = {0};
     size_t                            total = noah_profile_test_blob_wrap(blob, sizeof(blob), NOAH_PROFILE_DOMAIN_V1_SETTINGS, bytes, length);
     assert(total);
     view.reader               = noah_profile_reader_from_memory(blob, total);
@@ -397,14 +397,14 @@ static void test_publication(void) {
     bytes[shortcut_record(127, NOAH_CUSTOM_KEY_SHORTCUT_KEY)] = 0xd1; // a mouse button alone
     assert(valid());
     noah_profile_keyboard_name_t name = {.length = 1};
-    noah_effective_settings_keyboard_name(&name);
+    noah_active_profile_settings_keyboard_name(&name);
     assert(name.length == 0);
-    noah_effective_profile_snapshot_t view = settings_view();
-    uint32_t publication = noah_effective_settings_publication();
-    noah_effective_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
-    assert(applied == 1 && noah_effective_settings_length() == length);
-    assert(noah_effective_settings_publication() == publication + 1u);
-    noah_effective_settings_keyboard_name(&name);
+    noah_active_profile_snapshot_t view = settings_view();
+    uint32_t publication = noah_active_profile_settings_publication();
+    noah_active_profile_settings_invalidate(NULL, 1, view.identity, view.identity, &view);
+    assert(applied == 1 && noah_active_profile_settings_length() == length);
+    assert(noah_active_profile_settings_publication() == publication + 1u);
+    noah_active_profile_settings_keyboard_name(&name);
     assert(name.length == 4 && !memcmp(name.bytes, "Desk", 4));
     assert(!noah_setting_combo_output_behaviors());
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 200);
@@ -419,23 +419,23 @@ static void test_publication(void) {
     assert(!noah_custom_key_shortcut_present(noah_custom_key_shortcut(6)));
     assert(!noah_custom_key_shortcut_present(noah_custom_key_shortcut(128)));
     for (uint16_t i = 0; i < length; i++)
-        assert(noah_effective_settings_byte(i) == bytes[i]);
-    assert(noah_effective_settings_byte(length) == 0);
+        assert(noah_active_profile_settings_byte(i) == bytes[i]);
+    assert(noah_active_profile_settings_byte(length) == 0);
     // A profile without settings keeps the compiled snapshot's cache, and
     // those settings are pushed into QMK: the profile owns them (D-F32).
-    noah_effective_profile_snapshot_t compiled = view;
-    compiled.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
-    noah_effective_profile_snapshot_t partial = {0};
-    partial.identity.kind = NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE;
-    noah_effective_settings_invalidate(&compiled, 2, partial.identity, partial.identity, &partial);
-    assert(applied == 2 && noah_effective_settings_length() == length && noah_setting(NOAH_SETTING_TAPPING_TERM, 0) == 200);
+    noah_active_profile_snapshot_t compiled = view;
+    compiled.identity.kind = NOAH_ACTIVE_PROFILE_KIND_COMPILED_DEFAULTS;
+    noah_active_profile_snapshot_t partial = {0};
+    partial.identity.kind = NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE;
+    noah_active_profile_settings_invalidate(&compiled, 2, partial.identity, partial.identity, &partial);
+    assert(applied == 2 && noah_active_profile_settings_length() == length && noah_setting(NOAH_SETTING_TAPPING_TERM, 0) == 200);
     applied = 1;
     // A missing domain returns ownership to defaults.
     view.profile.domain_mask = 0;
-    noah_effective_settings_invalidate(NULL, 3, view.identity, view.identity, &view);
+    noah_active_profile_settings_invalidate(NULL, 3, view.identity, view.identity, &view);
     assert(noah_setting(NOAH_SETTING_TAPPING_TERM, 99) == 99);
-    assert(!noah_effective_settings_length() && !noah_effective_settings_byte(0));
-    noah_effective_settings_keyboard_name(&name);
+    assert(!noah_active_profile_settings_length() && !noah_active_profile_settings_byte(0));
+    noah_active_profile_settings_keyboard_name(&name);
     assert(name.length == 0);
     assert(noah_setting_combo_output_behaviors());
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE) == 0xA5u);
@@ -443,11 +443,11 @@ static void test_publication(void) {
     // The largest domain publishes whole.
     named(NOAH_SETTINGS_NAME_MAX, 'z');
     view = settings_view();
-    noah_effective_settings_invalidate(NULL, 4, view.identity, view.identity, &view);
-    assert(noah_effective_settings_length() == NOAH_SETTINGS_MAX_SIZE && noah_effective_settings_byte(NOAH_SETTINGS_MAX_SIZE - 1) == 'z');
+    noah_active_profile_settings_invalidate(NULL, 4, view.identity, view.identity, &view);
+    assert(noah_active_profile_settings_length() == NOAH_SETTINGS_MAX_SIZE && noah_active_profile_settings_byte(NOAH_SETTINGS_MAX_SIZE - 1) == 'z');
 }
 int main(void) {
-    noah_effective_settings_set_apply(noah_qmk_portable_apply);
+    noah_active_profile_settings_set_apply(noah_qmk_portable_apply);
     test_header_and_versions();
     test_scalar_encoding();
     test_adjustment_scalars();

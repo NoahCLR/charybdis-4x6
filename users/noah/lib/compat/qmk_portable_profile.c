@@ -8,14 +8,14 @@
 #    include "eeconfig.h"
 #    include "pointing_device_auto_mouse.h"
 #    include "noah_keymap_ids.h"
-#    include "../profile/runtime/effective_settings_runtime.h"
+#    include "../profile/runtime/active_profile_settings_runtime.h"
 #    include "../profile/schema/profile_settings_defaults.h"
 #    include "../profile/storage/profile_checksum.h"
 #    include "../profile/storage/profile_store_runtime.h"
 
 // Cold readback workspace, never used by key events or RGB rendering.
 void noah_qmk_portable_storage_init(void) {
-    noah_effective_settings_set_apply(noah_qmk_portable_apply);
+    noah_active_profile_settings_set_apply(noah_qmk_portable_apply);
 }
 // The dual-role setting is QMK's tapping term, and quick tap follows it. The
 // key runtime decides every dual-role key (D-F27) and reads the setting
@@ -69,13 +69,13 @@ uint32_t noah_qmk_portable_live_setting(uint8_t id) {
     }
 }
 static uint16_t settings_length(void) {
-    uint16_t length = noah_effective_settings_length();
+    uint16_t length = noah_active_profile_settings_length();
     return length ? length : noah_profile_settings_defaults_length();
 }
 // The profile is the only durable owner of the settings QMK holds (D-F32):
 // readback is the stored settings, never QMK's copy of them.
 static uint8_t settings_byte(uint16_t offset) {
-    return noah_effective_settings_length() ? noah_effective_settings_byte(offset) : noah_profile_settings_defaults_byte(offset);
+    return noah_active_profile_settings_length() ? noah_active_profile_settings_byte(offset) : noah_profile_settings_defaults_byte(offset);
 }
 // Up to 25 readback bytes of `kind` from `offset`; 0 past the end.
 static uint8_t readback_fill(uint8_t kind, uint16_t offset, uint8_t *target) {

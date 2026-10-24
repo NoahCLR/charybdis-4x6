@@ -83,20 +83,20 @@ bool noah_profile_compiled_v1_compatibility(const noah_profile_compiled_v1_t *pr
     return true;
 }
 
-void noah_effective_key_behavior_runtime_init(noah_effective_key_behavior_runtime_t *runtime) {
+void noah_active_profile_key_behavior_runtime_init(noah_active_profile_key_behavior_runtime_t *runtime) {
     memset(runtime, 0, sizeof(*runtime));
     runtime->initialized = true;
 }
 
-bool noah_effective_key_behavior_runtime_install(noah_effective_key_behavior_runtime_t *runtime) {
+bool noah_active_profile_key_behavior_runtime_install(noah_active_profile_key_behavior_runtime_t *runtime) {
     return runtime && runtime->initialized;
 }
 
-void noah_effective_key_behavior_runtime_uninstall(noah_effective_key_behavior_runtime_t *runtime) {
+void noah_active_profile_key_behavior_runtime_uninstall(noah_active_profile_key_behavior_runtime_t *runtime) {
     (void)runtime;
 }
 
-void noah_effective_key_behavior_runtime_invalidate(void *context, uint32_t publication_count, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *callback_view) {
+void noah_active_profile_key_behavior_runtime_invalidate(void *context, uint32_t publication_count, noah_active_profile_identity_t previous, noah_active_profile_identity_t active, const noah_active_profile_snapshot_t *callback_view) {
     (void)context;
     (void)publication_count;
     (void)previous;
@@ -104,21 +104,21 @@ void noah_effective_key_behavior_runtime_invalidate(void *context, uint32_t publ
     (void)callback_view;
 }
 
-void noah_effective_rgb_runtime_init(noah_effective_rgb_runtime_t *runtime) {
+void noah_active_profile_rgb_runtime_init(noah_active_profile_rgb_runtime_t *runtime) {
     memset(runtime, 0, sizeof(*runtime));
     runtime->banks[0].valid = runtime->banks[1].valid = true;
     runtime->initialized = true;
 }
 
-bool noah_effective_rgb_runtime_install(noah_effective_rgb_runtime_t *runtime) {
+bool noah_active_profile_rgb_runtime_install(noah_active_profile_rgb_runtime_t *runtime) {
     return runtime && runtime->initialized;
 }
 
-void noah_effective_rgb_runtime_uninstall(noah_effective_rgb_runtime_t *runtime) {
+void noah_active_profile_rgb_runtime_uninstall(noah_active_profile_rgb_runtime_t *runtime) {
     (void)runtime;
 }
 
-void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_count, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *callback_view) {
+void noah_active_profile_rgb_runtime_invalidate(void *context, uint32_t publication_count, noah_active_profile_identity_t previous, noah_active_profile_identity_t active, const noah_active_profile_snapshot_t *callback_view) {
     (void)context;
     (void)publication_count;
     (void)previous;
@@ -126,10 +126,10 @@ void noah_effective_rgb_runtime_invalidate(void *context, uint32_t publication_c
     (void)callback_view;
 }
 
-void noah_profile_activation_policy_init(noah_profile_activation_policy_t *policy, noah_profile_activation_peer_observer_fn observer, void *observer_context) {
+void noah_profile_activation_policy_init(noah_profile_activation_policy_t *policy, noah_profile_activation_other_half_observer_fn observer, void *observer_context) {
     memset(policy, 0, sizeof(*policy));
-    policy->peer_observer = observer;
-    policy->peer_context  = observer_context;
+    policy->other_half_observer = observer;
+    policy->other_half_context = observer_context;
     policy->initialized   = true;
 }
 
@@ -223,7 +223,7 @@ void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback) 
     registrations[transaction_id]++;
 }
 
-// Requests this half sent: only the USB half (is_keyboard_master) sends.
+// Requests this half sent: only the master half (is_keyboard_master) sends.
 static unsigned rpcs_sent;
 
 bool transaction_rpc_exec(int8_t transaction_id, uint8_t request_size, const void *request, uint8_t response_size, void *response) {
@@ -270,9 +270,9 @@ static void scan(void) {
 // Whether the owner has built its split reconciler: the save's copy to the
 // other half is readable only then.
 static bool reconciler_built(void) {
-    noah_profile_candidate_v1_peer_status_t peer;
+    noah_profile_candidate_v1_copy_status_t other_half;
 
-    return noah_profile_store_runtime_peer_transfer(&peer);
+    return noah_profile_store_runtime_other_half_transfer(&other_half);
 }
 
 static void scan_until_ready(void) {
@@ -289,12 +289,12 @@ static void test_an_empty_flash_boots_the_compiled_defaults(void) {
 
     boot();
     assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_DISCOVERY_PENDING);
-    assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     assert(flash.reads == 0u);
     scan_until_ready();
     assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_COMPILED_FALLBACK);
-    assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
-    assert(noah_profile_store_runtime_committed() == NULL);
+    assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
+    assert(noah_profile_store_runtime_saved() == NULL);
     assert(noah_profile_store_runtime_owner_status(&status) && status.owner_state == NOAH_PROFILE_OWNER_READY_COMPILED);
     assert(flash.reads > 0u && flash.erases == 0u && flash.programs == 0u);
 }
@@ -394,7 +394,7 @@ static void test_a_refused_registration_is_an_integration_error(void) {
     }
     assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_INTEGRATION_ERROR);
     assert(flash.reads == reads && flash.erases == 0u && flash.programs == 0u);
-    assert(!noah_profile_store_runtime_owner_status(&status) && noah_profile_store_runtime_committed() == NULL);
+    assert(!noah_profile_store_runtime_owner_status(&status) && noah_profile_store_runtime_saved() == NULL);
     assert(noah_profile_store_runtime_set_edit_mode(NOAH_PROFILE_EDIT_MODE_DEFAULT) == NOAH_PROFILE_WORKING_INVALID_STATE);
     assert(!noah_profile_store_runtime_usb_restart_safe());
 }
@@ -511,7 +511,7 @@ static void test_the_owner_runs_on_the_grants_clock(void) {
     scan_at(quiet + NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS - 1u);
     assert(candidate().state == NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE && candidate().error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_TIMEOUT);
     assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_COMPILED_FALLBACK);
-    // As the USB half it asked the other half (which never answers here).
+    // As the master half it asked the other half (which never answers here).
     assert(rpcs_sent != 0u);
 }
 

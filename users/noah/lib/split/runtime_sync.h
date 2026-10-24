@@ -28,7 +28,7 @@
 
 #include "../key/runtime/feedback.h"
 #include "../key/runtime/slot/origin_registry.h"
-#include "../pointing/defs/pd_mode_flags.h"
+#include "../pointing/defs/pointing_mode_flags.h"
 #include "../state/shared/runtime_publication.h"
 
 #ifndef RPC_M2S_BUFFER_SIZE
@@ -36,12 +36,12 @@
 #endif
 
 typedef struct __attribute__((packed)) {
-    uint16_t     automouse_progress;
-    pd_mode_id_t active_mode_id;
-    pd_mode_id_t locked_mode_id;
-#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    uint8_t pd_mode_owner_sides;
-    uint8_t pd_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint16_t           automouse_progress;
+    pointing_mode_id_t active_mode_id;
+    pointing_mode_id_t locked_mode_id;
+#ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+    uint8_t pointing_mode_owner_sides;
+    uint8_t pointing_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
     uint8_t key_preview_layer;
 } split_runtime_base_sync_packet_t;
@@ -62,12 +62,12 @@ typedef struct __attribute__((packed)) {
 } split_runtime_key_feedback_branch_packet_t;
 
 typedef struct {
-    uint16_t     automouse_progress;
-    pd_mode_id_t active_mode_id;
-    pd_mode_id_t locked_mode_id;
-#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
-    uint8_t pd_mode_owner_sides;
-    uint8_t pd_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
+    uint16_t           automouse_progress;
+    pointing_mode_id_t active_mode_id;
+    pointing_mode_id_t locked_mode_id;
+#ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
+    uint8_t pointing_mode_owner_sides;
+    uint8_t pointing_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 #endif
     uint8_t key_preview_layer;
     uint8_t combo_underlay_bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -116,14 +116,14 @@ typedef struct {
 } split_runtime_sync_debug_transport_t;
 #endif
 
-#ifdef RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
 #    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                                             \
         {                                                                                    \
             .automouse_progress                   = 0,                                       \
-            .active_mode_id                       = PD_MODE_ID_NONE,                         \
-            .locked_mode_id                       = PD_MODE_ID_NONE,                         \
-            .pd_mode_owner_sides                  = SPLIT_SIDE_MASK_NONE,                    \
-            .pd_mode_owner_bitmap                 = {0},                                     \
+            .active_mode_id                       = POINTING_MODE_ID_NONE,                   \
+            .locked_mode_id                       = POINTING_MODE_ID_NONE,                   \
+            .pointing_mode_owner_sides            = SPLIT_SIDE_MASK_NONE,                    \
+            .pointing_mode_owner_bitmap           = {0},                                     \
             .key_preview_layer                    = UINT8_MAX,                               \
             .combo_underlay_bitmap                = {0},                                     \
             .combo_overlay_bitmap                 = {0},                                     \
@@ -140,8 +140,8 @@ typedef struct {
 #    define SPLIT_RUNTIME_SYNC_REMOTE_EMPTY_INIT                                             \
         {                                                                                    \
             .automouse_progress                   = 0,                                       \
-            .active_mode_id                       = PD_MODE_ID_NONE,                         \
-            .locked_mode_id                       = PD_MODE_ID_NONE,                         \
+            .active_mode_id                       = POINTING_MODE_ID_NONE,                   \
+            .locked_mode_id                       = POINTING_MODE_ID_NONE,                   \
             .key_preview_layer                    = UINT8_MAX,                               \
             .combo_underlay_bitmap                = {0},                                     \
             .combo_overlay_bitmap                 = {0},                                     \

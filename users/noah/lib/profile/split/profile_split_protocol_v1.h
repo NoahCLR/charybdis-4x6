@@ -36,8 +36,9 @@ typedef enum {
     NOAH_PROFILE_SPLIT_V1_ACK            = 6u,
     NOAH_PROFILE_SPLIT_V1_ERROR          = 7u,
     // The current QMK master is the only RPC initiator. This request lets it
-    // pull a newer durable profile from the sibling without making USB role
-    // part of authority. The response is a correlated PAYLOAD_CHUNK.
+    // pull a newer durable profile from the slave half without making the
+    // master role part of authority. The response is a correlated
+    // PAYLOAD_CHUNK.
     NOAH_PROFILE_SPLIT_V1_PAYLOAD_REQUEST = 8u,
     // Kinds 9 and 11 bound a copy to the VIA store's identity. They are
     // retired with VIA (D-F31) and refused like any unknown kind.
@@ -90,7 +91,7 @@ typedef enum {
 
 // The active profile a PAYLOAD_REUSE range is read from, as Profile Wire's
 // candidate REUSE names it: compiled (kind 0, generation 0, origin 255),
-// committed (kind 1, nonzero generation, origin 0..1), or the working copy
+// saved (kind 1, nonzero generation, origin 0..1), or the working copy
 // (kind 2, D-F32: its base's generation and origin, session in crc32 and
 // revision in digest).
 typedef struct {

@@ -195,8 +195,8 @@ enum {
 enum {
     // The flags admission composes, pinned per row; the stopped flags are
     // never set by any of these rows.
-    ADMISSION_FLAGS = NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED | NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN | NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED | NOAH_PROFILE_EDIT_WIRE_SAVING | NOAH_PROFILE_EDIT_WIRE_WAITING_SAFE | NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING | NOAH_PROFILE_EDIT_WIRE_STOPPED | NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED,
-    AGREE = NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED | NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN,
+    ADMISSION_FLAGS = NOAH_PROFILE_EDIT_WIRE_SLAVE_CONVERGED | NOAH_PROFILE_EDIT_WIRE_SLAVE_KNOWN | NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED | NOAH_PROFILE_EDIT_WIRE_SAVING | NOAH_PROFILE_EDIT_WIRE_WAITING_SAFE | NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING | NOAH_PROFILE_EDIT_WIRE_STOPPED | NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED,
+    AGREE = NOAH_PROFILE_EDIT_WIRE_SLAVE_CONVERGED | NOAH_PROFILE_EDIT_WIRE_SLAVE_KNOWN,
     BLOCKED = NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED,
 };
 
@@ -226,8 +226,8 @@ static const struct {
     // Editing alone: no STALE, as nothing else holds the profile.
     [ROW_RECEIVING]            = {"receiving", {ANS_BUSY, ANS_BUSY, ANS_BUSY, ANS_STALE, ANS_OK, ANS_BUSY, ANS_MALFORMED, ANS_BUSY, ANS_BUSY}, false, AGREE | BLOCKED},
     // Saving comes first: even a stale Save is BUSY.
-    [ROW_CLIENT_SAVE]          = {"client save", {ANS_BUSY, ANS_STALE, ANS_BUSY, ANS_BUSY, ANS_BUSY, ANS_NOT_CLEAN, ANS_MALFORMED, ANS_BUSY, ANS_BUSY}, false, NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN | BLOCKED | NOAH_PROFILE_EDIT_WIRE_SAVING},
-    [ROW_KEYBOARD_SAVE]        = {"keyboard save", {ANS_BUSY, ANS_STALE, ANS_BUSY, ANS_BUSY, ANS_BUSY, ANS_NOT_CLEAN, ANS_MALFORMED, ANS_BUSY, ANS_BUSY}, false, NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN | BLOCKED | NOAH_PROFILE_EDIT_WIRE_SAVING},
+    [ROW_CLIENT_SAVE]          = {"client save", {ANS_BUSY, ANS_STALE, ANS_BUSY, ANS_BUSY, ANS_BUSY, ANS_NOT_CLEAN, ANS_MALFORMED, ANS_BUSY, ANS_BUSY}, false, NOAH_PROFILE_EDIT_WIRE_SLAVE_KNOWN | BLOCKED | NOAH_PROFILE_EDIT_WIRE_SAVING},
+    [ROW_KEYBOARD_SAVE]        = {"keyboard save", {ANS_BUSY, ANS_STALE, ANS_BUSY, ANS_BUSY, ANS_BUSY, ANS_NOT_CLEAN, ANS_MALFORMED, ANS_BUSY, ANS_BUSY}, false, NOAH_PROFILE_EDIT_WIRE_SLAVE_KNOWN | BLOCKED | NOAH_PROFILE_EDIT_WIRE_SAVING},
     // The mode is stored outside the profile: a staged Apply does not hold it.
     [ROW_APPLY_STAGED]         = {"Apply staged", {ANS_BUSY, ANS_STALE, ANS_BUSY, ANS_STALE, ANS_BUSY, ANS_OK, ANS_MALFORMED, ANS_OK, ANS_OK}, false, AGREE | BLOCKED},
     [ROW_APPLY_AND_ADJUSTMENT] = {"Apply and adjustment", {ANS_BUSY, ANS_STALE, ANS_BUSY, ANS_STALE, ANS_BUSY, ANS_NOT_CLEAN, ANS_MALFORMED, ANS_BUSY, ANS_OK}, false, AGREE | BLOCKED | NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING},
@@ -326,7 +326,7 @@ static noah_profile_owner_t *reach(uint8_t row) {
         case ROW_APART:
             rig.ll.link.disconnected = rig.rl.link.disconnected = true;
             rig.lw.disconnected = rig.rw.disconnected = true;
-            rig_scans(NOAH_PROFILE_WORKING_SYNC_PEER_TIMEOUT_MS + 100u);
+            rig_scans(NOAH_PROFILE_WORKING_SYNC_SLAVE_TIMEOUT_MS + 100u);
             break;
         default:
             break;
@@ -483,7 +483,7 @@ static void test_a_mode_change_waits_until_the_halves_agree(void) {
     erased_memory(&rig.lm);
     erased_memory(&rig.rm);
     rig.lm.mode = (noah_profile_edit_mode_record_t){.counter = 1u, .mode = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW};
-    // The right half was the USB half alone and changed the mode since.
+    // The right half was the master half alone and changed the mode since.
     rig.rm.mode = (noah_profile_edit_mode_record_t){.counter = 5u, .mode = NOAH_PROFILE_EDIT_MODE_APPLY};
     rig.ll = split_link_to(right);
     rig.rl = split_link_to(left);
@@ -494,13 +494,14 @@ static void test_a_mode_change_waits_until_the_halves_agree(void) {
     rig.now = 1000u;
     activation_block_reason = 0u;
     boot_live_pair(left, &rig.lm, right, &rig.rm, &rig.ll, &rig.rl, &rig.lw, &rig.rw, ++rig.session, &rig.now);
-    // Each half alone, as the USB half, for longer than the other is remembered.
-    for (uint32_t elapsed = 0u; elapsed <= NOAH_PROFILE_WORKING_SYNC_PEER_TIMEOUT_MS + 100u; elapsed += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
+    // Each half alone, as the master half, for longer than the other is
+    // remembered.
+    for (uint32_t elapsed = 0u; elapsed <= NOAH_PROFILE_WORKING_SYNC_SLAVE_TIMEOUT_MS + 100u; elapsed += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS) {
         (void)noah_profile_owner_scan(left, true, rig.now);
         (void)noah_profile_owner_scan(right, true, rig.now);
         rig.now += NOAH_PROFILE_SPLIT_RETRY_INITIAL_MS;
     }
-    assert(wire_mode(left, 1u, NOAH_PROFILE_EDIT_MODE_LIVE) == NOAH_PROFILE_WORKING_BUSY && !(wire_reply_flags() & NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED));
+    assert(wire_mode(left, 1u, NOAH_PROFILE_EDIT_MODE_LIVE) == NOAH_PROFILE_WORKING_BUSY && !(wire_reply_flags() & NOAH_PROFILE_EDIT_WIRE_SLAVE_CONVERGED));
     assert(wire_mode(right, 2u, NOAH_PROFILE_EDIT_MODE_LIVE) == NOAH_PROFILE_WORKING_BUSY);
     assert(left->working_sync.mode.counter == 1u && right->working_sync.mode.counter == 5u && rig.lm.mode_writes == 0u && rig.rm.mode_writes == 0u);
 
@@ -542,7 +543,7 @@ static void test_a_mode_change_waits_for_an_apply_copying_to_the_other_half(void
     simple_frame(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_COMMIT, RIG_APPLY);
     send_and_scan_pair(left, right, frame, &rig.now);
     for (uint32_t guard = 0u; guard < 4096u && left->host_transaction.status.state != NOAH_PROFILE_CANDIDATE_V1_STATE_IDLE; guard++) {
-        if (!asked && !(wire_flags(left) & NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED)) {
+        if (!asked && !(wire_flags(left) & NOAH_PROFILE_EDIT_WIRE_SLAVE_CONVERGED)) {
             assert(!left->working.active && !left->auto_save.pending && left->save.phase == NOAH_PROFILE_OWNER_SAVE_IDLE);
             assert(noah_profile_working_sync_converged(&left->working_sync, left->now_ms));
             assert(wire_mode(left, 1u, NOAH_PROFILE_EDIT_MODE_APPLY) == NOAH_PROFILE_WORKING_BUSY);
@@ -552,7 +553,7 @@ static void test_a_mode_change_waits_for_an_apply_copying_to_the_other_half(void
     }
     assert(asked);
     scan_until_converged(left, right, &rig.now);
-    assert(committed_generation(&left->store) == 1u && committed_generation(&right->store) == 1u);
+    assert(saved_generation(&left->store) == 1u && saved_generation(&right->store) == 1u);
     assert(wire_mode(left, 2u, NOAH_PROFILE_EDIT_MODE_APPLY) == NOAH_PROFILE_WORKING_OK);
     rig_scans(1000u);
     assert(right->working_sync.mode.mode == NOAH_PROFILE_EDIT_MODE_APPLY && right->working_sync.mode.counter == left->working_sync.mode.counter);
@@ -568,13 +569,13 @@ static void test_edit_status_flags_come_from_the_owner(void) {
 
     // Nothing saved yet: the compiled defaults, and the other half holds them.
     flags = wire_flags(left);
-    assert(flags == (NOAH_PROFILE_EDIT_WIRE_PEER_REQUIRED | AGREE | NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED));
+    assert(flags == (NOAH_PROFILE_EDIT_WIRE_SLAVE_REQUIRED | AGREE | NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED));
     rig_edit(1u);
     assert(wire_flags(left) == (flags | NOAH_PROFILE_EDIT_WIRE_UNSAVED));
     assert(wire_named(left, NOAH_PROFILE_WIRE_V1_VALUE_SAVE, 2u, left->working.session, left->working.revision) == NOAH_PROFILE_WORKING_QUEUED);
     for (uint32_t guard = 0u; guard < 20000u && left->save.phase != NOAH_PROFILE_OWNER_SAVE_IDLE; guard++) scan_pair(left, &rig.right, &rig.now);
     scan_until_converged(left, &rig.right, &rig.now);
-    assert(wire_flags(left) == (NOAH_PROFILE_EDIT_WIRE_PEER_REQUIRED | AGREE));
+    assert(wire_flags(left) == (NOAH_PROFILE_EDIT_WIRE_SLAVE_REQUIRED | AGREE));
 
     // A save here waiting for a quiet keyboard (the storage step's own hook).
     rig.lm.storage_paused = true;
@@ -613,7 +614,7 @@ static void test_edit_status_flags_come_from_the_owner(void) {
         memset(&auto_chip, 0, sizeof(auto_chip));
         memset(auto_chip.bytes, 255, sizeof(auto_chip.bytes));
         auto_flash_boot(&now);
-        assert(!(wire_flags(&auto_owner) & NOAH_PROFILE_EDIT_WIRE_PEER_REQUIRED));
+        assert(!(wire_flags(&auto_owner) & NOAH_PROFILE_EDIT_WIRE_SLAVE_REQUIRED));
     }
     puts("edit status flags 0-3, 5, 7, 9 and 12 come from the owner's own state");
 }

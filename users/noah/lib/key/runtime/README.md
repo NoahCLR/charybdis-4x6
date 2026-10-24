@@ -60,8 +60,8 @@ effects. A new owner-bearing store joins that scan and its host test.
 | Pending tap series | `tap_series_t` | `planning/tap_series_flush.c` flushes, `planning/scan_planner.c` resolves thresholds, `planning/release_planner.c` decides releases |
 | Release semantics (quick release, fallback suppression, buffered base tap, active and pending-series releases) | `planning/release_planner.c` | `deferred_release.c` queues blocked dispatches without re-deciding |
 | Held ownership (held actions, repeats, momentary layers, managed modifiers, pointing holds, pointer anchor) | `lease_t` | `projection/projection.c` writes out to `held_action.c`, `held_repeat.c`, `layer_ownership.c`, `keyboard_mod_ownership.c`, the pointing runtime |
-| Locks and the one-shot layer | `persistent_intent_t` | `layer_ownership.c` and `pd_mode_state.c` apply them, then report back through `key_runtime_core_layer_lock_set`, `key_runtime_core_layer_oneshot_set` and `pd_mode_key_runtime_bridge_observe_local_lock_state` |
-| Pointing mode state | `pd_mode_state.c` | the reducer requests changes as effects and observes locks through the bridge |
+| Locks and the one-shot layer | `persistent_intent_t` | `layer_ownership.c` and `pointing_mode_state.c` apply them, then report back through `key_runtime_core_layer_lock_set`, `key_runtime_core_layer_oneshot_set` and `pointing_mode_key_runtime_bridge_observe_local_lock_state` |
+| Pointing mode state | `pointing_mode_state.c` | the reducer requests changes as effects and observes locks through the bridge |
 | Feedback pulses | core pulse fields | `projection/feedback_projection.c` queues; `feedback.c`, lighting and split render |
 | Inspection | `reducer/state_query.c` reads only | `debug.c`, `feedback.c`, preflight, deferred release |
 

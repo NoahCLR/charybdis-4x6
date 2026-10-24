@@ -101,17 +101,17 @@ static void encode_status_page_zero(uint8_t *payload, const noah_profile_wire_v1
     write_u32(&payload[8], status->compiled_default_digest);
     write_u32(&payload[12], status->active_digest);
     write_u32(&payload[16], status->pending_digest);
-    write_u32(&payload[20], status->committed_digest);
+    write_u32(&payload[20], status->saved_digest);
     payload[24] = status->active_kind;
 }
 
 static void encode_status_page_one(uint8_t *payload, const noah_profile_wire_v1_device_status_t *status) {
     write_u32(&payload[0], status->active_generation);
     payload[4] = status->active_origin_half;
-    write_u32(&payload[5], status->committed_generation);
-    payload[9] = status->committed_origin_half;
-    write_u32(&payload[10], status->peer_generation);
-    payload[14] = status->peer_origin_half;
+    write_u32(&payload[5], status->saved_generation);
+    payload[9] = status->saved_origin_half;
+    write_u32(&payload[10], status->slave_generation);
+    payload[14] = status->slave_origin_half;
     write_u16(&payload[15], status->candidate_transaction_id);
     write_u16(&payload[17], status->last_committed_transaction_id);
     write_u16(&payload[19], status->conflict_count);

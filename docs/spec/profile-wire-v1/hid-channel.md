@@ -163,7 +163,7 @@ Page 0:
 | 8–11 | compiled-default digest |
 | 12–15 | active digest: the active profile's payload digest; for the working copy, its revision |
 | 16–19 | pending digest: a generation waiting to activate |
-| 20–23 | saved-profile (committed) digest |
+| 20–23 | saved-profile digest |
 | 24 | active kind, below |
 
 Page 1:
