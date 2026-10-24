@@ -60,6 +60,22 @@ typedef enum {
     NOAH_PROFILE_OWNER_CONCURRENT_COMMIT,
 } noah_profile_owner_state_t;
 
+// The boot has not yet activated the profile it settles on: the half runs its
+// compiled defaults, and profile status reports it pending (D-F61). Inline so
+// the status channel's tests hold the same states the owner runs.
+static inline bool noah_profile_owner_booting(noah_profile_owner_state_t state) {
+    switch (state) {
+        case NOAH_PROFILE_OWNER_VALIDATING_COMPILED:
+        case NOAH_PROFILE_OWNER_DISCOVERING:
+        case NOAH_PROFILE_OWNER_ADOPTING_COMMITTED:
+        case NOAH_PROFILE_OWNER_RECONCILING_COMMITTED:
+        case NOAH_PROFILE_OWNER_ACTIVATING_COMMITTED:
+            return true;
+        default:
+            return false;
+    }
+}
+
 typedef struct {
     noah_profile_store_io_t               store_io;
     noah_profile_split_exchange_fn        split_exchange;

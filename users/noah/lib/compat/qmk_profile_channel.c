@@ -63,6 +63,7 @@ static void noah_profile_channel_refresh_owner_capabilities(const noah_profile_o
 
 static void noah_profile_channel_latch_owner_status(const noah_profile_owner_status_t *owner) {
     noah_profile_wire_v1_device_status_t *status;
+    bool                                  booting;
 
     if (!owner) {
         return;
@@ -95,13 +96,19 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
         status->active_digest = owner->compiled_default_digest;
         status->active_kind   = NOAH_PROFILE_ACTIVE_COMPILED_ONLY;
     }
-    if (!noah_effective_pd_ready()) {
+    // Pending while the boot has not decided which profile runs (D-F61): its
+    // compiled defaults run meanwhile, and nothing has failed. After the boot,
+    // unpublished pointing slots are an activation that failed.
+    booting = noah_profile_owner_booting(owner->owner_state);
+    if (booting || !noah_effective_pd_ready()) {
         status->state_flags |= NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE;
         status->state_flags &= (uint16_t)~NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT;
         status->active_digest = 0;
         status->active_generation = 0;
         status->active_kind = NOAH_PROFILE_ACTIVE_PENDING;
-        status->last_error = NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED;
+        if (!booting) {
+            status->last_error = NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED;
+        }
     }
     if (owner->has_pending) {
         status->pending_digest = owner->pending.payload_digest;

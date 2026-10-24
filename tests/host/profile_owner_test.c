@@ -786,6 +786,66 @@ static void test_committed_reuse_saves_both_halves_and_reboots(bool reboot) {
     candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_PD;
 }
 
+// One status a scan, as a client polling profile status sees it. Until the
+// boot activates the profile it settles on, the owner reports booting, which
+// profile status reports pending (D-F61); after it, the compiled defaults run
+// only when nothing usable is saved.
+static void latch_boot_status(const noah_profile_owner_t *owner, bool saved, bool *decided, unsigned *booting_without_saved) {
+    noah_profile_owner_status_t status;
+
+    assert(noah_profile_owner_status(owner, &status));
+    if (noah_profile_owner_booting(status.owner_state)) {
+        assert(!*decided);
+        if (!status.has_committed) (*booting_without_saved)++;
+        return;
+    }
+    *decided = true;
+    assert(status.provider_known && status.candidate.error.code == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+    if (saved) {
+        assert(status.owner_state == NOAH_PROFILE_OWNER_READY_VALIDATED && status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE && status.has_committed);
+    } else {
+        assert(status.owner_state == NOAH_PROFILE_OWNER_READY_COMPILED && status.active.kind == NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS && !status.has_committed);
+    }
+}
+
+static void boot_pair_latching_status(noah_profile_owner_t *left, memory_t *left_memory, noah_profile_owner_t *right, memory_t *right_memory, split_link_t *left_link, split_link_t *right_link, uint32_t *now, bool saved) {
+    noah_profile_owner_state_t ready                 = saved ? NOAH_PROFILE_OWNER_READY_VALIDATED : NOAH_PROFILE_OWNER_READY_COMPILED;
+    bool                       decided               = false;
+    unsigned                   booting_without_saved = 0u;
+
+    initialize_pair(left, left_memory, right, right_memory, left_link, right_link, now);
+    latch_boot_status(left, saved, &decided, &booting_without_saved);
+    for (uint32_t guard = 0u; guard < 32768u && (left->state != ready || right->state != ready); guard++) {
+        scan_pair(left, right, now);
+        latch_boot_status(left, saved, &decided, &booting_without_saved);
+    }
+    assert(decided && left->state == ready && right->state == ready);
+    // The boot looks for the saved profile before it knows one: a status
+    // reporting the compiled defaults then would read as "nothing saved".
+    assert(booting_without_saved > 0u);
+}
+
+static void test_boot_status_is_pending_until_activation(void) {
+    noah_profile_owner_t left, right;
+    memory_t             left_memory = {0}, right_memory = {0};
+    split_link_t         left_link = split_link_to(&right), right_link = split_link_to(&left);
+    uint32_t             now = 0u;
+
+    candidate_blob    = long_profile;
+    candidate_length  = sizeof(long_profile);
+    candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_RGB | NOAH_PROFILE_CANDIDATE_V1_DOMAIN_PD;
+    memset(left_memory.bytes, 0xff, sizeof(left_memory.bytes));
+    memset(right_memory.bytes, 0xff, sizeof(right_memory.bytes));
+    boot_pair_latching_status(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now, false);
+    stage_valid_candidate_pair(&left, &right, 711u, &now);
+    commit_valid_candidate_pair(&left, &right, 711u, 1u, &now);
+    boot_pair_latching_status(&left, &left_memory, &right, &right_memory, &left_link, &right_link, &now, true);
+    assert_pair_profile(&left, &right, 1u);
+    candidate_blob    = compiled_blob;
+    candidate_length  = sizeof(compiled_blob);
+    candidate_domains = NOAH_PROFILE_CANDIDATE_V1_DOMAIN_PD;
+}
+
 static void test_long_profile_copy_reads_within_the_store_bound(void) {
     noah_profile_owner_t left, right;
     memory_t left_memory = {0}, right_memory = {0};
@@ -2623,6 +2683,7 @@ int main(void) {
     test_empty_boot_live_commit_and_timeout();
     test_committed_reuse_saves_both_halves_and_reboots(false);
     test_committed_reuse_saves_both_halves_and_reboots(true);
+    test_boot_status_is_pending_until_activation();
     test_long_profile_copy_reads_within_the_store_bound();
     test_two_consecutive_live_commits_use_distributed_prepare_barrier();
     test_simultaneous_hosts_choose_stable_physical_origin_before_durability();

@@ -80,7 +80,7 @@ location reports the location sentinels below.
 | 14 | `VALIDATION_REJECTED` | the blob failed validation; the location says where ([validation results](#validation-results)) |
 | 15 | `UNSUPPORTED_OPERATION` | the mailbox held an operation the transaction does not know |
 | 16 | `POISONED` | the candidate was poisoned by an earlier error; only abort ends it |
-| 17 | `ACTIVATION_FAILED` | the generation was saved but did not activate; also reported while the active profile's pointing slots are unpublished ([active kind](hid-channel.md#active-kind) 3) |
+| 17 | `ACTIVATION_FAILED` | the generation was saved but did not activate; also reported, with [active kind](hid-channel.md#active-kind) 3, by a half that stopped with its active profile's pointing slots unpublished. Never during a boot that has not yet decided which profile runs |
 | 18 | `DURABILITY_UNKNOWN` | completing or confirming the commit marker failed; read status and reconcile the saved generation before retrying |
 | 19 | `TIMEOUT` | the keyboard ended a candidate that made no progress before its commit ([candidate-transfer.md](candidate-transfer.md)) |
 | 20 | `PEER_SUPERSEDED` | the slave half holds a compatible generation at or above the one the candidate reserved; the candidate was cancelled before commit |

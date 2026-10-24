@@ -1056,18 +1056,11 @@ bool noah_profile_owner_storage_busy(const noah_profile_owner_t *owner) {
     if (!owner) {
         return false;
     }
-    switch (owner->state) {
-        case NOAH_PROFILE_OWNER_VALIDATING_COMPILED:
-        case NOAH_PROFILE_OWNER_DISCOVERING:
-        case NOAH_PROFILE_OWNER_ADOPTING_COMMITTED:
-        case NOAH_PROFILE_OWNER_RECONCILING_COMMITTED:
-        case NOAH_PROFILE_OWNER_ACTIVATING_COMMITTED:
-            return true;
-        case NOAH_PROFILE_OWNER_READY_COMPILED:
-        case NOAH_PROFILE_OWNER_READY_VALIDATED:
-            break;
-        default:
-            return false;
+    if (noah_profile_owner_booting(owner->state)) {
+        return true;
+    }
+    if (owner->state != NOAH_PROFILE_OWNER_READY_COMPILED && owner->state != NOAH_PROFILE_OWNER_READY_VALIDATED) {
+        return false;
     }
     switch (owner->host_transaction.status.state) {
         case NOAH_PROFILE_CANDIDATE_V1_STATE_RECEIVING:

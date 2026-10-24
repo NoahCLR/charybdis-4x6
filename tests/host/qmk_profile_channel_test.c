@@ -428,6 +428,87 @@ static void test_status_surfaces_coherent_owner_snapshot(void) {
     assert(frame[WIRE_PAYLOAD + 22u] == NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED);
     pd_ready = true;
 }
+
+// From reset until the boot activates the profile it settles on, the keyboard
+// runs its compiled defaults but has not decided which profile runs (D-F61):
+// pending, never "compiled defaults", and nothing failed. A saved profile is
+// found here, so kind 0 would read as "nothing saved".
+static void test_status_reports_pending_until_the_boot_activates(void) {
+    static const noah_profile_owner_state_t boot_states[] = {
+        NOAH_PROFILE_OWNER_VALIDATING_COMPILED, NOAH_PROFILE_OWNER_DISCOVERING, NOAH_PROFILE_OWNER_ADOPTING_COMMITTED, NOAH_PROFILE_OWNER_RECONCILING_COMMITTED, NOAH_PROFILE_OWNER_ACTIVATING_COMMITTED,
+    };
+    const noah_profile_owner_status_t       saved    = live_owner_status;
+    const noah_effective_profile_identity_t compiled = {.payload_digest = saved.compiled_default_digest, .kind = NOAH_EFFECTIVE_PROFILE_KIND_COMPILED_DEFAULTS};
+    uint8_t                                 frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE];
+
+    for (uint8_t index = 0u; index < sizeof(boot_states) / sizeof(boot_states[0]); index++) {
+        // Validating the compiled defaults comes before the runtimes, and the
+        // pointing slots, are installed.
+        const bool installed = boot_states[index] != NOAH_PROFILE_OWNER_VALIDATING_COMPILED;
+
+        memset(&live_owner_status, 0, sizeof(live_owner_status));
+        live_owner_status.owner_state             = boot_states[index];
+        live_owner_status.compiled_default_digest = saved.compiled_default_digest;
+        live_owner_status.candidate.error         = noah_profile_candidate_v1_no_error();
+        live_owner_status.provider_known          = installed;
+        live_owner_status.active                  = installed ? compiled : (noah_effective_profile_identity_t){0};
+        pd_ready                                  = installed;
+        if (boot_states[index] == NOAH_PROFILE_OWNER_RECONCILING_COMMITTED || boot_states[index] == NOAH_PROFILE_OWNER_ACTIVATING_COMMITTED) {
+            live_owner_status.committed     = saved.committed;
+            live_owner_status.has_committed = true;
+        }
+
+        make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, (uint8_t)(0x50u + index), 0u);
+        channel(frame, sizeof(frame));
+        assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+        assert(frame[WIRE_PAYLOAD + 24u] == NOAH_PROFILE_ACTIVE_PENDING);
+        assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) & NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE);
+        assert(!(read_u16(&frame[WIRE_PAYLOAD + 2u]) & NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT));
+        assert(read_u32(&frame[WIRE_PAYLOAD + 12u]) == 0u);
+        // What the boot found is still reported as found.
+        assert(!!(read_u16(&frame[WIRE_PAYLOAD + 2u]) & NOAH_PROFILE_STATE_COMMITTED_VALID) == live_owner_status.has_committed);
+        make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, (uint8_t)(0x58u + index), 1u);
+        channel(frame, sizeof(frame));
+        assert(frame[5] == NOAH_PROFILE_WIRE_V1_STATUS_OK);
+        assert(read_u32(&frame[WIRE_PAYLOAD]) == 0u);
+        assert(frame[WIRE_PAYLOAD + 22u] == NOAH_PROFILE_CANDIDATE_V1_ERROR_NONE);
+    }
+
+    // A boot that decided on the compiled defaults, nothing saved, says so.
+    memset(&live_owner_status, 0, sizeof(live_owner_status));
+    live_owner_status.owner_state             = NOAH_PROFILE_OWNER_READY_COMPILED;
+    live_owner_status.compiled_default_digest = saved.compiled_default_digest;
+    live_owner_status.provider_known          = true;
+    live_owner_status.active                  = compiled;
+    pd_ready                                  = true;
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x5Fu, 0u);
+    channel(frame, sizeof(frame));
+    assert(frame[WIRE_PAYLOAD + 24u] == NOAH_PROFILE_ACTIVE_COMPILED_ONLY);
+    assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT);
+    assert(read_u32(&frame[WIRE_PAYLOAD + 12u]) == saved.compiled_default_digest);
+
+    // A stopped owner reports what it runs.
+    live_owner_status.owner_state = NOAH_PROFILE_OWNER_STORAGE_ERROR;
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x60u, 0u);
+    channel(frame, sizeof(frame));
+    assert(frame[WIRE_PAYLOAD + 24u] == NOAH_PROFILE_ACTIVE_COMPILED_ONLY);
+    assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT);
+
+    // The owner stops when its runtimes are installed but the pointing slots
+    // are not published: an activation that failed.
+    live_owner_status.owner_state = NOAH_PROFILE_OWNER_INTEGRATION_ERROR;
+    pd_ready                      = false;
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x61u, 0u);
+    channel(frame, sizeof(frame));
+    assert(frame[WIRE_PAYLOAD + 24u] == NOAH_PROFILE_ACTIVE_PENDING);
+    assert(read_u16(&frame[WIRE_PAYLOAD + 2u]) == NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE);
+    make_request(frame, NOAH_PROFILE_WIRE_V1_VALUE_STATUS, 0x62u, 1u);
+    channel(frame, sizeof(frame));
+    assert(frame[WIRE_PAYLOAD + 22u] == NOAH_PROFILE_CANDIDATE_V1_ERROR_ACTIVATION_FAILED);
+    pd_ready = true;
+
+    live_owner_status = saved;
+}
 #endif
 
 static void test_hook_rejects_unsupported_or_malformed_commands(void) {
@@ -759,6 +840,7 @@ int main(void) {
     test_capability_hook();
 #ifdef NOAH_LIVE_PROFILE_OWNER_ENABLE
     test_status_surfaces_coherent_owner_snapshot();
+    test_status_reports_pending_until_the_boot_activates();
 #else
     test_status_surfaces_read_only_store_discovery();
 #endif
