@@ -324,7 +324,7 @@
 //
 // Valid combo outputs include plain keycodes, custom keys (CUSTOM_KEY_n),
 // macros (MACRO_n), MO(layer) (the layer stays on while the combo is
-// held), LOCK_LAYER(...), explicit pd-mode lock keycodes such as
+// held), LOCK_LAYER(...), explicit pointing-mode lock keycodes such as
 // PD_SLOT_4_LOCK, and keycodes that also have rows in key_behaviors[].
 //
 // If a combo emits a keycode that also has a row in key_behaviors[],
@@ -401,7 +401,7 @@
 //   - .keeps_auto_mouse_anchored counts the row's keycode as a mouse record, so
 //     pressing it keeps the pointer layer up instead of letting auto mouse
 //     reset on it. Only keys that drive the mouse through authored actions need
-//     it: mouse keycodes and pointer-mode keys already anchor on their own.
+//     it: mouse keycodes and pointing-mode keys already anchor on their own.
 //     Without it, a TAP_SENDS(KC_TRNS) tier on the pointer layer finds no lower
 //     layer to fall through to, because the press already took that layer down
 //
@@ -427,9 +427,9 @@
 //   - .long_hold is the long-hold tier
 // omit .tap to keep the key's normal tap behavior for that tap index
 // if .tap is set but hold/long_hold are omitted, keys that already have a
-// default held path keep using it. Stacked pd-mode rows are contained: if a
-// first-tap override can branch into another pd mode on a later hold, the
-// first pd mode waits until the hold threshold instead of activating
+// default held path keep using it. Stacked pointing-mode rows are contained: if
+// a first-tap override can branch into another pointing mode on a later hold,
+// the first pointing mode waits until the hold threshold instead of activating
 // immediately. Other keycodes keep the tap override and send it on release
 // .hold and .long_hold are independent: define either one by itself, or use
 // both together for a two-stage hold
@@ -449,7 +449,7 @@
 //     separate hold pulse
 //
 // action can be a plain keycode, a modded keycode, a macro, a layer lock,
-// a pointer-mode lock, or a supported QMK behavior keycode such as MT()/OSM()
+// a pointing-mode lock, or a supported QMK behavior keycode such as MT()/OSM()
 //   - Use LOCK_LAYER(layer) to toggle a layer lock.
 //     Locking the same layer again turns it off; different layers toggle
 //     independently and can stay active together.
@@ -459,9 +459,9 @@
 //     PRESS_AND_HOLD_UNTIL_RELEASE(TT(layer)). LM() and LT() are refused as
 //     actions inside key_behaviors[]; LT() remains supported as the keycode
 //     of a key_behavior row itself.
-//   - Use the generated *_LOCK keycode to toggle a pointer-mode lock.
+//   - Use the generated *_LOCK keycode to toggle a pointing-mode lock.
 //     Activating the same mode again unlocks it; pressing, holding or locking
-//     any other pointer-mode key also clears the previous lock.
+//     any other pointing-mode key also clears the previous lock.
 //   - Use MACRO_n for a macro, as a key or as the action in any helper:
 //     TAP_SENDS(MACRO_n), PRESS_AND_HOLD_UNTIL_RELEASE(MACRO_n).
 //     Its default contents come from MACROS(MACRO) above.
@@ -478,7 +478,7 @@
 //   TAP_SENDS(action)
 //     send action on a quick release instead of the key's normal tap
 //     use this for alternate tap output, media keys, macros, layer locks,
-//     and pointer-mode locks
+//     and pointing-mode locks
 //   TAP_SENDS(KC_TRNS)
 //     keep the lower active layer's tap output at this physical key while the
 //     authored row still owns this tap count's timing and branching
@@ -495,7 +495,7 @@
 //     macros use the same hold style for a held-triggered one-shot
 //     PRESS_AND_HOLD_UNTIL_RELEASE(KC_TRNS) uses the lower active layer's
 //     actual hold-tier behavior at the same key; if that lower key is a
-//     momentary layer or pd mode, its normal hold ownership comes through
+//     momentary layer or pointing mode, its normal hold ownership comes through
 //
 //   REPEAT_WHILE_HELD(action, hz)
 //     cross .tap_hold_term -> send action once immediately
@@ -536,7 +536,7 @@
 //             [0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_EXAMPLE))}, // tap index 0: normal tap, long-hold threshold action only
 //             [1] = {.tap = TAP_SENDS(S(KC_EXAMPLE))}, // tap index 1: alternate tap output
 //             [2] = {.tap = TAP_SENDS(KC_EXAMPLE), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_EXAMPLE)}, // tap index 2: tap once, or keep a held action active
-//             [3] = {.tap = TAP_SENDS(EXAMPLE_MODE_LOCK), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_EXAMPLE))}, // tap index 3: pointer-mode lock on tap, shifted held action
+//             [3] = {.tap = TAP_SENDS(EXAMPLE_MODE_LOCK), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_EXAMPLE))}, // tap index 3: pointing-mode lock on tap, shifted held action
 //             [4] = {.tap = TAP_SENDS(MACRO_n), .hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_EXAMPLE)), .long_hold = TAP_AT_HOLD_THRESHOLD(LOCK_LAYER(LAYER_EXAMPLE))}, // tap index 4: macro on tap, release action on hold, layer-lock threshold action on long hold
 //         },
 // }
@@ -584,7 +584,7 @@ const key_behavior_t
             // ─── Mouse-Button Keys ──────────────────────────────────────────────────────────
             {.keycode = MS_BTN3, .multi_tap_term = 100, .tap_hold_term = 100, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}}},
 
-            // ─── Pointer-Mode Keys ──────────────────────────────────────────────────────────
+            // ─── Pointing-Mode Keys ──────────────────────────────────────────────────────────
             {.keycode = PD_SLOT_2, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}}},
             {
                 .keycode = PD_SLOT_5,

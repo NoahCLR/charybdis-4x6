@@ -36,13 +36,13 @@ noah_profile_validator_v1_compatibility_t noah_profile_validator_v1_default_comp
     compatibility.action_abi_digest                 = action_abi_digest;
     compatibility.logical_layer_count               = NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS;
     compatibility.placement_positions               = NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS;
-    compatibility.supported_pd_mode_mask            = NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL;
+    compatibility.supported_pointing_mode_mask      = NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL;
     compatibility.macro_slot_count                  = NOAH_PROFILE_ACTION_V1_MAX_MACRO_SLOTS;
     compatibility.custom_key_count        = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     compatibility.behavior_limits                   = noah_key_behavior_domain_v1_default_limits();
     compatibility.rgb_limits                        = noah_profile_rgb_v1_default_limits();
     compatibility.rgb_limits.logical_layer_count    = compatibility.logical_layer_count;
-    compatibility.rgb_limits.supported_pd_mode_mask = compatibility.supported_pd_mode_mask;
+    compatibility.rgb_limits.supported_pointing_mode_mask = compatibility.supported_pointing_mode_mask;
     return compatibility;
 }
 
@@ -85,11 +85,11 @@ static bool behavior_limits_are_valid(const noah_key_behavior_limits_v1_t *limit
 static bool rgb_limits_are_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
     const noah_profile_rgb_v1_limits_t *limits = &compatibility->rgb_limits;
 
-    return (limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) == 0u && limits->max_payload_size != 0u && noah_profile_size_within(limits->max_payload_size, NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE) && limits->max_logical_layers <= NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS && limits->logical_layer_count == compatibility->logical_layer_count && limits->logical_layer_count <= limits->max_logical_layers && limits->tap_branch_color_count != 0u && limits->tap_branch_color_count <= NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS && limits->supported_pd_mode_mask == compatibility->supported_pd_mode_mask && (limits->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) == 0u;
+    return (limits->compiled_stage_mask & (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL) == 0u && limits->max_payload_size != 0u && noah_profile_size_within(limits->max_payload_size, NOAH_PROFILE_RGB_V1_MAX_PAYLOAD_SIZE) && limits->max_logical_layers <= NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS && limits->logical_layer_count == compatibility->logical_layer_count && limits->logical_layer_count <= limits->max_logical_layers && limits->tap_branch_color_count != 0u && limits->tap_branch_color_count <= NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS && limits->supported_pointing_mode_mask == compatibility->supported_pointing_mode_mask && (limits->supported_pointing_mode_mask & ~NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL) == 0u;
 }
 
 static bool compatibility_is_valid(const noah_profile_validator_v1_compatibility_t *compatibility) {
-    if (!compatibility || (compatibility->allowed_domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u || (compatibility->required_domain_mask & (uint8_t)~compatibility->allowed_domain_mask) != 0u || compatibility->max_blob_size < NOAH_PROFILE_BLOB_V1_HEADER_SIZE || compatibility->max_blob_size > NOAH_PROFILE_BLOB_V1_MAX_SIZE || compatibility->logical_layer_count > NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS || compatibility->placement_positions > NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS || (compatibility->supported_pd_mode_mask & ~NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL) != 0u || compatibility->macro_slot_count > NOAH_PROFILE_ACTION_V1_MAX_MACRO_SLOTS || compatibility->custom_key_count > NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS) {
+    if (!compatibility || (compatibility->allowed_domain_mask & (uint8_t)~NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS) != 0u || (compatibility->required_domain_mask & (uint8_t)~compatibility->allowed_domain_mask) != 0u || compatibility->max_blob_size < NOAH_PROFILE_BLOB_V1_HEADER_SIZE || compatibility->max_blob_size > NOAH_PROFILE_BLOB_V1_MAX_SIZE || compatibility->logical_layer_count > NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS || compatibility->placement_positions > NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS || (compatibility->supported_pointing_mode_mask & ~NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL) != 0u || compatibility->macro_slot_count > NOAH_PROFILE_ACTION_V1_MAX_MACRO_SLOTS || compatibility->custom_key_count > NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS) {
         return false;
     }
     return behavior_limits_are_valid(&compatibility->behavior_limits) && rgb_limits_are_valid(compatibility);
@@ -400,7 +400,8 @@ static noah_profile_validator_v1_result_t validate_combos(noah_profile_validator
     for (uint8_t input = 0; input < row.input_count; input++)
         if (!action_reference_is_valid(validator, &row.inputs[input])) goto invalid;
     // The row runs as the keycodes this build translates it to, under the
-    // combo module's native rule: the one the effective combo table applies.
+    // combo module's native rule: the one the active profile's combo table
+    // applies.
     if (validator->compatibility.runtime && validator->compatibility.runtime->combo_to_native) {
         bool (*to_native)(const noah_profile_action_v1_t *, uint16_t *) = validator->compatibility.runtime->combo_to_native;
         uint16_t native[NOAH_PROFILE_COMBO_V1_MAX_INPUTS], output;
@@ -526,9 +527,9 @@ static bool action_reference_is_valid(const noah_profile_validator_v1_t *validat
         case NOAH_PROFILE_ACTION_V1_LAYER_MOMENTARY:
         case NOAH_PROFILE_ACTION_V1_LAYER_LOCK:
             return action->operand < validator->compatibility.logical_layer_count;
-        case NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY:
-        case NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK:
-            return action->operand < NOAH_PROFILE_RGB_V1_MAX_PD_MODES && (validator->compatibility.supported_pd_mode_mask & (UINT32_C(1) << action->operand)) != 0u;
+        case NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY:
+        case NOAH_PROFILE_ACTION_V1_POINTING_MODE_LOCK:
+            return action->operand < NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES && (validator->compatibility.supported_pointing_mode_mask & (UINT32_C(1) << action->operand)) != 0u;
         case NOAH_PROFILE_ACTION_V1_MACRO:
             return action->operand < validator->compatibility.macro_slot_count;
         case NOAH_PROFILE_ACTION_V1_CUSTOM_KEY:

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 #include "key_runtime_scenario_harness.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/noah_keymap_ids.h"
 
@@ -19,7 +19,7 @@ enum {
     TEST_CHAIN_CONTINUE_TAP    = CUSTOM_KEY_0 + 0x27,
     TEST_SIBLING_KEY           = CUSTOM_KEY_0 + 0x28,
     TEST_SIBLING_TAP_ACTION    = CUSTOM_KEY_0 + 0x29,
-    TEST_PD_MODE_KEY           = CUSTOM_KEY_0 + 0x2A,
+    TEST_POINTING_MODE_KEY     = CUSTOM_KEY_0 + 0x2A,
     TEST_OTHER_LAYER           = 3,
     TEST_TAP_HOLD_TERM_MS      = 120,
     TEST_LONG_HOLD_TERM_MS     = 240,
@@ -885,13 +885,13 @@ static void test_release_with_interrupted_layer_tap_sibling_dispatches_immediate
 static void test_release_with_interrupted_consumed_pd_lock_does_not_relock(void) {
     static const char                       *case_name     = "release with interrupted consumed pd lock does not relock";
     static const key_runtime_scenario_step_t setup_steps[] = {
-        KEY_RUNTIME_SCENARIO_PRESS(TEST_PD_MODE_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_POINTING_MODE_KEY, 1, 1),
         KEY_RUNTIME_SCENARIO_ADVANCE(TEST_TAP_SETUP_ELAPSED_MS),
         KEY_RUNTIME_SCENARIO_SCAN(),
         KEY_RUNTIME_SCENARIO_PRESS(TEST_SIBLING_KEY, 1, 2),
     };
     static const key_runtime_scenario_step_t release_steps[] = {
-        KEY_RUNTIME_SCENARIO_RELEASE(TEST_PD_MODE_KEY, 1, 1),
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_POINTING_MODE_KEY, 1, 1),
     };
     static const key_runtime_scenario_step_t clear_sibling_steps[] = {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_SIBLING_KEY, 1, 2),
@@ -899,11 +899,11 @@ static void test_release_with_interrupted_consumed_pd_lock_does_not_relock(void)
     };
 
     key_runtime_scenario_reset();
-    key_runtime_scenario_define_pd_mode_key(TEST_PD_MODE_KEY, PD_MODE_VOLUME, true);
+    key_runtime_scenario_define_pointing_mode_key(TEST_POINTING_MODE_KEY, POINTING_MODE_VOLUME, true);
     test_configure_tap_release_key(TEST_SIBLING_KEY, TEST_SIBLING_TAP_ACTION);
 
     key_runtime_scenario_run(setup_steps, ARRAY_SIZE(setup_steps));
-    CHECK_CASE(case_name, !pd_mode_local_locked(PD_MODE_VOLUME));
+    CHECK_CASE(case_name, !pointing_mode_local_locked(POINTING_MODE_VOLUME));
     key_runtime_scenario_clear_effects();
     key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
 

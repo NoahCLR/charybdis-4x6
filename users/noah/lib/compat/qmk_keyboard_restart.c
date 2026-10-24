@@ -11,12 +11,12 @@
 #include "../profile/storage/profile_checksum.h"
 #include "../state/shared/runtime_publication.h"
 
-// Set by the Raw HID handler on the USB half, by the split slave thread on the
-// other; read by housekeeping. The time is written before the flag.
+// Set by the Raw HID handler on the master half, by the split slave thread on
+// the other; read by housekeeping. The time is written before the flag.
 static volatile bool restart_due;
 static uint32_t      restart_noted_at;
 static uint16_t      restart_delay_ms;
-static bool          restart_peer_acknowledged;
+static bool          restart_slave_acknowledged;
 
 void noah_qmk_keyboard_restart_encode(uint8_t kind, uint8_t frame[NOAH_QMK_KEYBOARD_RESTART_FRAME_SIZE]) {
     uint16_t crc;
@@ -68,11 +68,11 @@ static void restart_rpc(uint8_t request_size, const void *request, uint8_t respo
     if (response_size != NOAH_QMK_KEYBOARD_RESTART_FRAME_SIZE || !noah_qmk_keyboard_restart_frame_valid(request, request_size, NOAH_QMK_KEYBOARD_RESTART_REQUEST)) {
         return;
     }
-    note_restart(NOAH_QMK_KEYBOARD_RESTART_PEER_DELAY_MS);
+    note_restart(NOAH_QMK_KEYBOARD_RESTART_SLAVE_DELAY_MS);
     noah_qmk_keyboard_restart_encode(NOAH_QMK_KEYBOARD_RESTART_ACK, response);
 }
 
-static bool ask_peer(void) {
+static bool ask_slave(void) {
     uint8_t  request[NOAH_QMK_KEYBOARD_RESTART_FRAME_SIZE];
     uint8_t  reply[NOAH_QMK_KEYBOARD_RESTART_FRAME_SIZE];
     uint32_t started = timer_read32();
@@ -83,14 +83,14 @@ static bool ask_peer(void) {
         if (transaction_rpc_exec(PUT_KEYBOARD_RESTART, sizeof(request), request, sizeof(reply), reply) && noah_qmk_keyboard_restart_frame_valid(reply, sizeof(reply), NOAH_QMK_KEYBOARD_RESTART_ACK)) {
             return true;
         }
-        if (timer_elapsed32(started) >= NOAH_QMK_KEYBOARD_RESTART_PEER_WAIT_MS) {
+        if (timer_elapsed32(started) >= NOAH_QMK_KEYBOARD_RESTART_SLAVE_WAIT_MS) {
             return false;
         }
-        wait_ms(NOAH_QMK_KEYBOARD_RESTART_PEER_RETRY_MS);
+        wait_ms(NOAH_QMK_KEYBOARD_RESTART_SLAVE_RETRY_MS);
     }
 }
 #else
-static bool ask_peer(void) {
+static bool ask_slave(void) {
     return false;
 }
 #endif
@@ -99,10 +99,10 @@ static bool ask_peer(void) {
 // passes through.
 __attribute__((noinline)) bool noah_qmk_keyboard_restart_request(void) {
     if (!restart_due) {
-        restart_peer_acknowledged = ask_peer();
+        restart_slave_acknowledged = ask_slave();
         note_restart(NOAH_QMK_KEYBOARD_RESTART_USB_DELAY_MS);
     }
-    return restart_peer_acknowledged;
+    return restart_slave_acknowledged;
 }
 
 bool noah_qmk_keyboard_restart_pending(void) {
@@ -127,10 +127,10 @@ void noah_qmk_keyboard_restart_task(void) {
 
 #ifdef NOAH_QMK_KEYBOARD_RESTART_TEST
 void noah_qmk_keyboard_restart_reset_for_test(void) {
-    restart_due               = false;
-    restart_noted_at          = 0u;
-    restart_delay_ms          = 0u;
-    restart_peer_acknowledged = false;
+    restart_due                = false;
+    restart_noted_at           = 0u;
+    restart_delay_ms           = 0u;
+    restart_slave_acknowledged = false;
 #    if defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_USER)
     restart_registered = false;
 #    endif

@@ -8,10 +8,10 @@
 
 #if defined(COMBO_ENABLE)
 
-#    include "qmk_effective_combos.h"
+#    include "qmk_active_profile_combos.h"
 #    include "../profile/storage/profile_storage_layout.h"
 #    include "../split/runtime_sync.h"
-#    include "../profile/runtime/effective_settings_runtime.h"
+#    include "../profile/runtime/active_profile_settings_runtime.h"
 
 #    ifndef COMBO_ONLY_FROM_LAYER
 uint8_t combo_ref_from_layer(uint8_t layer);

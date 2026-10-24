@@ -243,14 +243,14 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return keycode == TEST_MULTI_TAP_KEY && count < 3;
 }
 
-bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+bool key_behavior_future_tap_path_has_foreign_pointing_mode(uint16_t keycode, uint8_t count, pointing_mode_mask_t base_mode) {
     (void)keycode;
     (void)count;
     (void)base_mode;
     return false;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
 }
@@ -279,35 +279,35 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
     dispatch_delayed_action(action, mods);
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
 }
 
-bool pd_mode_local_locked(pd_mode_mask_t mode) {
+bool pointing_mode_local_locked(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
-bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
+bool pointing_mode_set_lock_state(pointing_mode_mask_t mode, bool locked) {
     (void)mode;
     (void)locked;
     return false;
 }
 
-bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+bool pointing_mode_set_lock_state_at(pointing_mode_mask_t mode, bool locked, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_set_lock_state(mode, locked);
+    return pointing_mode_set_lock_state(mode, locked);
 }
 
 void split_runtime_sync(void) {}
@@ -338,7 +338,7 @@ bool noah_synthetic_record_active(void) {
     return false;
 }
 
-bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
+bool pointing_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
     return false;
@@ -467,9 +467,9 @@ void macro_payload_debug_snapshot(macro_payload_debug_snapshot_t *out) {
 bool is_oneshot_layer_active(void) {
     return false;
 }
-static bool test_no_unresolved_peer(void *context, uint8_t *unresolved_peer_count) {
+static bool test_no_unresolved_other_half(void *context, uint8_t *unresolved_other_half_count) {
     (void)context;
-    *unresolved_peer_count = 0u;
+    *unresolved_other_half_count = 0u;
     return true;
 }
 
@@ -482,7 +482,7 @@ static void test_custom_key_holds_its_shortcut_until_release(void) {
     uint32_t                         held_reasons;
 
     test_reset_state();
-    noah_profile_activation_policy_init(&policy, test_no_unresolved_peer, NULL);
+    noah_profile_activation_policy_init(&policy, test_no_unresolved_other_half, NULL);
     CHECK(noah_profile_activation_policy_safe_boundary(&policy) == 0u);
     CHECK(!key_runtime_integration_process_record(TEST_SHORTCUT_KEY, key_pos, true));
     CHECK(report_event_count == 1u);
@@ -514,7 +514,7 @@ static uint32_t live_edit_safe_boundary(void *context) {
     return noah_profile_activation_policy_safe_boundary(context);
 }
 
-static void live_edit_invalidated(void *context, uint32_t publication, noah_effective_profile_identity_t previous, noah_effective_profile_identity_t active, const noah_effective_profile_snapshot_t *view) {
+static void live_edit_invalidated(void *context, uint32_t publication, noah_active_profile_identity_t previous, noah_active_profile_identity_t active, const noah_active_profile_snapshot_t *view) {
     (void)publication;
     (void)previous;
     (void)view;
@@ -525,7 +525,7 @@ static void test_live_edit_waits_for_a_held_key(void) {
     static const uint8_t                 empty_profile[NOAH_PROFILE_BLOB_V1_HEADER_SIZE] = {'N', 'L', 'P', '1', NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR, NOAH_PROFILE_BLOB_V1_SCHEMA_MINOR, 0u, NOAH_PROFILE_BLOB_V1_CANONICAL_FLAG};
     static uint8_t                       working[8192];
     static uint8_t                       keymap[16u * 64u * 2u];
-    static noah_effective_profile_provider_t provider;
+    static noah_active_profile_provider_t provider;
     static noah_profile_working_copy_t   copy;
     noah_profile_validator_v1_compatibility_t rules = noah_profile_validator_v1_default_compatibility(0x1234u);
     noah_profile_reader_t                reader      = noah_profile_reader_from_memory(empty_profile, sizeof(empty_profile));
@@ -535,18 +535,18 @@ static void test_live_edit_waits_for_a_held_key(void) {
         .digest            = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, empty_profile, sizeof(empty_profile)),
         .action_abi_digest = 0x1234u,
     };
-    noah_effective_profile_snapshot_t    compiled;
+    noah_active_profile_snapshot_t       compiled;
     noah_profile_activation_policy_t     policy;
     uint8_t                              published_kind = 0u;
-    noah_effective_profile_invalidator_t invalidator   = {.callback = live_edit_invalidated, .context = &published_kind};
+    noah_active_profile_invalidator_t invalidator      = {.callback = live_edit_invalidated, .context = &published_kind};
     noah_profile_working_splice_t        create        = {.domain_id = NOAH_PROFILE_DOMAIN_V1_KEYMAP, .insert = sizeof(keymap), .flags = NOAH_PROFILE_WORKING_SPLICE_CREATE};
     keypos_t                             key_pos       = test_keypos(2, 1);
 
     test_reset_state();
     rules.required_domain_mask = 0u;
-    noah_profile_activation_policy_init(&policy, test_no_unresolved_peer, NULL);
-    CHECK(noah_effective_profile_snapshot_make_compiled(&profile, &reader, 0u, &compiled) == NOAH_EFFECTIVE_PROFILE_OK);
-    CHECK(noah_effective_profile_provider_init(&provider, &compiled, live_edit_safe_boundary, &policy, &invalidator, 1u) == NOAH_EFFECTIVE_PROFILE_OK);
+    noah_profile_activation_policy_init(&policy, test_no_unresolved_other_half, NULL);
+    CHECK(noah_active_profile_snapshot_make_compiled(&profile, &reader, 0u, &compiled) == NOAH_ACTIVE_PROFILE_OK);
+    CHECK(noah_active_profile_provider_init(&provider, &compiled, live_edit_safe_boundary, &policy, &invalidator, 1u) == NOAH_ACTIVE_PROFILE_OK);
     noah_profile_working_copy_init(&copy, working, sizeof(working), &provider, &rules, &rules, 77u);
 
     // Hold the shortcut, then send an edit that adds a keymap.
@@ -574,7 +574,7 @@ static void test_live_edit_waits_for_a_held_key(void) {
     for (uint32_t scan = 0u; scan < 16u && noah_profile_working_copy_busy(&copy); scan++) {
         (void)noah_profile_working_copy_scan(&copy);
     }
-    CHECK(copy.active && copy.revision == 1u && copy.last_result == NOAH_PROFILE_WORKING_OK && published_kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY);
+    CHECK(copy.active && copy.revision == 1u && copy.last_result == NOAH_PROFILE_WORKING_OK && published_kind == NOAH_ACTIVE_PROFILE_KIND_WORKING_COPY);
     test_assert_shortcut_ledger_empty();
     test_assert_runtime_quiescent(key_pos);
 }

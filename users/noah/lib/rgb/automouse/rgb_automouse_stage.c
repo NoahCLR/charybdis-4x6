@@ -73,30 +73,30 @@ static layer_state_t rgb_runtime_automouse_stage_state_without_layer(layer_state
 }
 
 bool rgb_runtime_automouse_stage_should_render(layer_state_t state) {
-    return rgb_runtime_automouse_stage_should_render_effective(state, NULL);
+    return rgb_runtime_automouse_stage_should_render_active_profile(state, NULL);
 }
 
-bool rgb_runtime_automouse_stage_should_render_effective(layer_state_t state, const noah_effective_rgb_frame_t *profile_frame) {
-    return rgb_effective_config_automouse_stage_enabled(profile_frame) && layer_state_cmp(state, noah_qmk_contract_auto_mouse_layer()) && automouse_rgb_should_render();
+bool rgb_runtime_automouse_stage_should_render_active_profile(layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame) {
+    return rgb_active_profile_config_automouse_stage_enabled(profile_frame) && layer_state_cmp(state, noah_qmk_contract_auto_mouse_layer()) && automouse_rgb_should_render();
 }
 
 bool rgb_runtime_automouse_stage_render(layer_state_t state, uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_automouse_stage_render_effective(state, NULL, led_min, led_max);
+    return rgb_runtime_automouse_stage_render_active_profile(state, NULL, led_min, led_max);
 }
 
-bool rgb_runtime_automouse_stage_render_effective(layer_state_t state, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+bool rgb_runtime_automouse_stage_render_active_profile(layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
     automouse_fade_end_config_t fade_config;
     uint8_t                     auto_mouse_layer = noah_qmk_contract_auto_mouse_layer();
     uint16_t                    progress         = automouse_rgb_current_progress();
     uint8_t                     blend            = automouse_rgb_blend_amount(progress);
     rgb_t                       end_color_rgb;
 
-    if (!rgb_effective_config_automouse(profile_frame, &fade_config)) {
+    if (!rgb_active_profile_config_automouse(profile_frame, &fade_config)) {
         return false;
     }
     end_color_rgb = hsv_to_rgb(fade_config.end_color);
 
-    bool start_painted = rgb_runtime_layer_stage_render_effective_frame(&rgb_runtime_frame_primary, state, profile_frame, led_min, led_max);
+    bool start_painted = rgb_runtime_layer_stage_render_active_profile_frame(&rgb_runtime_frame_primary, state, profile_frame, led_min, led_max);
     bool end_painted;
 
     if (fade_config.mode == END_COLOR_ON_ALL_KEYS) {
@@ -104,7 +104,7 @@ bool rgb_runtime_automouse_stage_render_effective(layer_state_t state, const noa
         end_painted = rgb_runtime_frame_fill(&rgb_runtime_frame_secondary, end_color_rgb, led_min, led_max);
     } else {
         layer_state_t end_state = rgb_runtime_automouse_stage_state_without_layer(state, auto_mouse_layer);
-        end_painted             = rgb_runtime_layer_stage_render_effective_frame(&rgb_runtime_frame_secondary, end_state, profile_frame, led_min, led_max);
+        end_painted             = rgb_runtime_layer_stage_render_active_profile_frame(&rgb_runtime_frame_secondary, end_state, profile_frame, led_min, led_max);
         rgb_runtime_automouse_stage_capture_base_effect(&rgb_runtime_frame_base_effect, led_min, led_max);
 
         for (uint8_t led = led_min; led < led_max; led++) {
@@ -132,7 +132,7 @@ bool rgb_runtime_automouse_stage_render_effective(layer_state_t state, const noa
     if (!start_painted && !end_painted) {
         return false;
     }
-    if (!rgb_effective_config_frame_current(profile_frame)) {
+    if (!rgb_active_profile_config_frame_current(profile_frame)) {
         return false;
     }
 

@@ -116,14 +116,14 @@ static noah_profile_validator_v1_compatibility_t compatibility(void) {
     value.required_domain_mask              = (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
     value.allowed_domain_mask               = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS;
     value.logical_layer_count               = 3u;
-    value.supported_pd_mode_mask            = 63u;
+    value.supported_pointing_mode_mask      = 63u;
     value.macro_slot_count                  = 11u;
     value.custom_key_count        = 3u;
     value.rgb_limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL;
     value.rgb_limits.logical_layer_count    = value.logical_layer_count;
     value.rgb_limits.maximum_brightness     = 200u;
     value.rgb_limits.tap_branch_color_count = 4u;
-    value.rgb_limits.supported_pd_mode_mask = value.supported_pd_mode_mask;
+    value.rgb_limits.supported_pointing_mode_mask = value.supported_pointing_mode_mask;
     return value;
 }
 
@@ -345,11 +345,11 @@ static void test_stable_action_cross_references(const char *fixture_path) {
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION);
     compatible.logical_layer_count               = 3u;
     compatible.rgb_limits.logical_layer_count    = 3u;
-    compatible.supported_pd_mode_mask            = (uint8_t)(NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL & (uint8_t)~(1u << 2u));
-    compatible.rgb_limits.supported_pd_mode_mask = compatible.supported_pd_mode_mask;
+    compatible.supported_pointing_mode_mask      = (uint8_t)(NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL & (uint8_t)~(1u << 2u));
+    compatible.rgb_limits.supported_pointing_mode_mask = compatible.supported_pointing_mode_mask;
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET);
-    compatible.supported_pd_mode_mask            = NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL;
-    compatible.rgb_limits.supported_pd_mode_mask = compatible.supported_pd_mode_mask;
+    compatible.supported_pointing_mode_mask      = NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL;
+    compatible.rgb_limits.supported_pointing_mode_mask = compatible.supported_pointing_mode_mask;
     compatible.custom_key_count        = 2u;
     expect_behavior_reference_failure(behavior, length, &compatible, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION);
 }
@@ -637,8 +637,8 @@ static void expect_native_refusal(const uint8_t *bytes, size_t length) {
 }
 
 // The firmware translates every action of a row and asks the combo module's
-// native rule, the one the effective combo table asks, so a profile it accepts
-// always materializes its combos.
+// native rule, the one the active profile's combo table asks, so a profile it
+// accepts always materializes its combos.
 static void test_combo_native_rule(void) {
     enum { DOMAIN = 8 + COMBO_TEST_ROW };
     uint8_t  bytes[8 + 6 + DOMAIN];

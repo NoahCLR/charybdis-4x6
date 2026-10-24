@@ -8,7 +8,7 @@ what they draw is [rgb-domain-v1.md](../../../../docs/spec/rgb-domain-v1.md#draw
 
 - `core/rgb_runtime.c`: the QMK hook's entry, the frame's captured lighting
   view and source snapshot, the stage order, the idle timeout.
-- `core/rgb_effective_config.c`: the stages' only reader of the lighting
+- `core/rgb_active_profile_config.c`: the stages' only reader of the lighting
   view, one accessor per record kind, each gated on its stage bit.
 - `core/rgb_validation.c`: checks the authored tables at post-init.
 - `core/rgb_helpers.h`, `core/rgb_config_helpers.h`: the authoring types and
@@ -23,10 +23,10 @@ what they draw is [rgb-domain-v1.md](../../../../docs/spec/rgb-domain-v1.md#draw
 
 - It renders into a caller-owned `rgb_runtime_frame_t` (a colour and a
   painted flag per LED) for one chunk `[led_min, led_max)`, given the
-  frame's captured `noah_effective_rgb_frame_t`. It clears its range first.
-- It reads lighting only through `rgb_effective_config_*`. A failed record
+  frame's captured `noah_active_profile_rgb_frame_t`. It clears its range first.
+- It reads lighting only through `rgb_active_profile_config_*`. A failed record
   read clears the frame and paints nothing, never part of a table.
-- After painting it calls `rgb_effective_config_frame_current` and clears
+- After painting it calls `rgb_active_profile_config_frame_current` and clears
   the frame if the view went stale.
 - `rgb_runtime.c` applies the frame with `rgb_runtime_layer_stage_apply_frame`,
   which sets only painted LEDs, so what the stage leaves unpainted shows

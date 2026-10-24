@@ -4,7 +4,7 @@ Each domain decodes to plain JSON values, field by field, following the specs
 in docs/spec/: RGB v4 (rgb-domain-v1.md), key behaviours v2, combos v3,
 settings v8, keymap v1 and macros v1 (profile-wire-v1/), sparse PD v3
 (pd-mode-domain-v1.md). An action is written as the native keycode it stands for, so a
-combo naming PD slot 5 as a semantic action and one naming it as the keycode
+combo naming pointing slot 5 as a semantic action and one naming it as the keycode
 0x7e85 read the same; nonzero action flags are kept beside it.
 """
 

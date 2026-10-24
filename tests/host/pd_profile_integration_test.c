@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "lib/profile/schema/profile_validator_v1.h"
-#include "lib/profile/runtime/effective_pd_runtime.h"
+#include "lib/profile/runtime/active_profile_pd_runtime.h"
 #include "lib/profile/storage/profile_checksum.h"
 #include "lib/profile/protocol/profile_candidate_v1.h"
 
@@ -83,11 +83,11 @@ static size_t load_domain(const char *path) {
     return length;
 }
 
-static void publish(noah_effective_profile_snapshot_t *snapshot) {
-    noah_effective_profile_identity_t identity = {0};
+static void publish(noah_active_profile_snapshot_t *snapshot) {
+    noah_active_profile_identity_t identity = {0};
     snapshot->profile = profile;
     snapshot->reader  = reader;
-    noah_effective_pd_invalidate(NULL, 0, identity, identity, snapshot);
+    noah_active_profile_pd_invalidate(NULL, 0, identity, identity, snapshot);
 }
 
 // Stored slots appear in the cache as stored, byte for byte: the typed cache
@@ -99,17 +99,17 @@ static void assert_cache_matches_domain(void) {
     for (uint8_t index = 0; index <= count; index++) {
         uint8_t stored = index < count ? blob[14 + 8 + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE] : NOAH_PROFILE_PD_V1_SLOT_COUNT;
         for (; next < stored; next++) {
-            const noah_pd_config_t *slot    = noah_effective_pd_record(next);
+            const noah_pd_config_t *slot    = noah_active_profile_pd_record(next);
             const noah_pd_config_t  omitted = {.id = next};
             assert(slot && memcmp(slot, &omitted, sizeof(omitted)) == 0);
-            assert(!noah_effective_pd_for_mask(UINT32_C(1) << next));
+            assert(!noah_active_profile_pd_for_mask(UINT32_C(1) << next));
         }
         if (index < count) {
-            assert(memcmp(noah_effective_pd_record(stored), blob + 14 + 8 + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE, NOAH_PROFILE_PD_V1_RECORD_SIZE) == 0);
+            assert(memcmp(noah_active_profile_pd_record(stored), blob + 14 + 8 + (size_t)index * NOAH_PROFILE_PD_V1_RECORD_SIZE, NOAH_PROFILE_PD_V1_RECORD_SIZE) == 0);
             next = (uint8_t)(stored + 1u);
         }
     }
-    assert(!noah_effective_pd_record(NOAH_PROFILE_PD_V1_SLOT_COUNT));
+    assert(!noah_active_profile_pd_record(NOAH_PROFILE_PD_V1_SLOT_COUNT));
 }
 
 int main(int argc, char **argv) {
@@ -123,20 +123,20 @@ int main(int argc, char **argv) {
     factory[0].directions[3].keycode = 5;
     factory[31] = factory[0];
     factory[31].id = 31;
-    noah_effective_pd_load_compiled_defaults(factory);
-    assert(noah_effective_pd_ready());
-    assert(noah_effective_pd_for_mask(1)->threshold_y == 60);
-    assert(!noah_effective_pd_for_mask(2));
+    noah_active_profile_pd_load_compiled_defaults(factory);
+    assert(noah_active_profile_pd_ready());
+    assert(noah_active_profile_pd_for_mask(1)->threshold_y == 60);
+    assert(!noah_active_profile_pd_for_mask(2));
     // Slot 31 is reached through the mask's top bit.
-    assert(noah_effective_pd_for_mask(UINT32_C(0x80000000)) == noah_effective_pd_record(31));
-    assert(!noah_effective_pd_for_mask(UINT32_C(0x80000001)));
+    assert(noah_active_profile_pd_for_mask(UINT32_C(0x80000000)) == noah_active_profile_pd_record(31));
+    assert(!noah_active_profile_pd_for_mask(UINT32_C(0x80000001)));
     factory[0].threshold_y = 0;
-    noah_effective_pd_load_compiled_defaults(factory);
-    assert(!noah_effective_pd_ready());
+    noah_active_profile_pd_load_compiled_defaults(factory);
+    assert(!noah_active_profile_pd_ready());
     assert(argc == 3);
 
-    noah_effective_profile_snapshot_t snapshot = {0};
-    noah_effective_profile_identity_t identity = {0};
+    noah_active_profile_snapshot_t snapshot = {0};
+    noah_active_profile_identity_t identity = {0};
     // The presets: eight stored records, slots 8..31 omitted.
     size_t presets_length = load_domain(argv[1]);
     assert(presets_length == 8 + 8 * NOAH_PROFILE_PD_V1_RECORD_SIZE);
@@ -144,29 +144,29 @@ int main(int argc, char **argv) {
     noah_profile_domain_range_t pd;
     assert(noah_profile_blob_v1_find_domain(&reader, 0, reader.length, NOAH_PROFILE_DOMAIN_V1_PD, &pd) && pd.offset == 14 && pd.length == presets_length && profile.domain_mask == 16);
     publish(&snapshot);
-    assert(noah_effective_pd_ready());
-    assert(noah_effective_pd_for_mask(1)->kind == NOAH_PD_KIND_SCROLLING);
-    assert(noah_effective_pd_for_mask(16)->axis == NOAH_PD_AXIS_DOMINANT);
-    assert(noah_effective_pd_for_mask(64)->axis == NOAH_PD_AXIS_HORIZONTAL);
-    assert(noah_effective_pd_for_mask(128)->axis == NOAH_PD_AXIS_HORIZONTAL);
-    assert(!noah_effective_pd_for_mask(256));
-    assert(!noah_effective_pd_for_mask(3));
+    assert(noah_active_profile_pd_ready());
+    assert(noah_active_profile_pd_for_mask(1)->kind == NOAH_PD_KIND_SCROLLING);
+    assert(noah_active_profile_pd_for_mask(16)->axis == NOAH_PD_AXIS_DOMINANT);
+    assert(noah_active_profile_pd_for_mask(64)->axis == NOAH_PD_AXIS_HORIZONTAL);
+    assert(noah_active_profile_pd_for_mask(128)->axis == NOAH_PD_AXIS_HORIZONTAL);
+    assert(!noah_active_profile_pd_for_mask(256));
+    assert(!noah_active_profile_pd_for_mask(3));
     assert_cache_matches_domain();
     // Every byte of the domain is rejected on read failure; no stale or
     // partly copied settings become available after a failed publication.
     for (failed_offset = 14; failed_offset < blob_length; failed_offset++) {
-        noah_effective_pd_invalidate(NULL, 1, identity, identity, &snapshot);
-        assert(!noah_effective_pd_ready());
+        noah_active_profile_pd_invalidate(NULL, 1, identity, identity, &snapshot);
+        assert(!noah_active_profile_pd_ready());
     }
     failed_offset = SIZE_MAX;
-    noah_effective_pd_invalidate(NULL, 2, identity, identity, &snapshot);
-    assert(noah_effective_pd_ready());
+    noah_active_profile_pd_invalidate(NULL, 2, identity, identity, &snapshot);
+    assert(noah_active_profile_pd_ready());
     for (uint8_t slot = 0; slot < 8; slot++) {
         size_t offset = 20 + (size_t)slot * NOAH_PROFILE_PD_V1_RECORD_SIZE + 90;
         blob[offset] = 1;
         assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
-        noah_effective_pd_invalidate(NULL, 3, identity, identity, &snapshot);
-        assert(!noah_effective_pd_ready());
+        noah_active_profile_pd_invalidate(NULL, 3, identity, identity, &snapshot);
+        assert(!noah_active_profile_pd_ready());
         blob[offset] = 0;
     }
     // The sparse rules hold in the incremental validator and the cache alike:
@@ -183,8 +183,8 @@ int main(int argc, char **argv) {
         blob[mutations[i].offset] = mutations[i].value;
         if (i == 3) memset(blob + 20 + 6 * 128 + 2, 0, 126); // ... with no name
         assert(validate() == NOAH_PROFILE_VALIDATOR_V1_INVALID_DOMAIN);
-        noah_effective_pd_invalidate(NULL, 4, identity, identity, &snapshot);
-        assert(!noah_effective_pd_ready());
+        noah_active_profile_pd_invalidate(NULL, 4, identity, identity, &snapshot);
+        assert(!noah_active_profile_pd_ready());
         blob[mutations[i].offset] = saved;
         if (i == 3) load_domain(argv[1]);
     }
@@ -205,9 +205,9 @@ int main(int argc, char **argv) {
     assert(load_domain(argv[2]) == NOAH_PROFILE_PD_V1_MAX_SIZE);
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_VALID);
     publish(&snapshot);
-    assert(noah_effective_pd_ready());
+    assert(noah_active_profile_pd_ready());
     assert_cache_matches_domain();
-    assert(noah_effective_pd_record(31)->name_length != 0);
+    assert(noah_active_profile_pd_record(31)->name_length != 0);
 
     // No slot stored: all 32 disabled, none activatable.
     memcpy(blob + 14, (uint8_t[]){NOAH_PROFILE_PD_V1_VERSION, 32, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0, 0, 0, 0, 0}, 8);
@@ -216,7 +216,7 @@ int main(int argc, char **argv) {
     blob_length = reader.length = 22;
     assert(validate() == NOAH_PROFILE_VALIDATOR_V1_VALID);
     publish(&snapshot);
-    assert(noah_effective_pd_ready());
+    assert(noah_active_profile_pd_ready());
     assert_cache_matches_domain();
     puts("configured PD profile validation and cache tests passed");
 }

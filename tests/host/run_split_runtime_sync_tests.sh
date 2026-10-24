@@ -28,7 +28,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DAUTOMOUSE_RGB_DEAD_TIME=20u \
     -DAUTOMOUSE_RGB_SYNC_STEP=10u \
     -DRGB_AUTOMOUSE_GRADIENT_ENABLE \
-    -DRGB_PD_MODE_ACTIVE_HALF_ENABLE \
+    -DRGB_POINTING_MODE_ACTIVE_HALF_ENABLE \
     -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

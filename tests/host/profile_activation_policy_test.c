@@ -11,11 +11,11 @@
 #include "users/noah/lib/profile/runtime/profile_activation_policy.h"
 
 #ifdef POINTING_DEVICE_ENABLE
-#    include "users/noah/lib/pointing/defs/pd_mode_flags.h"
-static pd_mode_mask_t pd_active, pd_locked;
+#    include "users/noah/lib/pointing/defs/pointing_mode_flags.h"
+static pointing_mode_mask_t pd_active, pd_locked;
 static bool pd_pending_release;
-pd_mode_mask_t pd_mode_local_active_snapshot(void) { return pd_active; }
-pd_mode_mask_t pd_mode_local_locked_snapshot(void) { return pd_locked; }
+pointing_mode_mask_t pointing_mode_local_active_snapshot(void) { return pd_active; }
+pointing_mode_mask_t pointing_mode_local_locked_snapshot(void) { return pd_locked; }
 bool noah_pd_engine_pending_release(void) { return pd_pending_release; }
 #endif
 
@@ -75,10 +75,10 @@ typedef struct {
     bool    succeeds;
     uint8_t unresolved_count;
     uint8_t calls;
-} peer_fixture_t;
+} other_half_fixture_t;
 
-static bool observe_peer(void *context, uint8_t *unresolved_count) {
-    peer_fixture_t *fixture = context;
+static bool observe_other_half(void *context, uint8_t *unresolved_count) {
+    other_half_fixture_t *fixture = context;
 
     assert(fixture);
     fixture->calls++;
@@ -118,22 +118,22 @@ static void test_reason_bits_are_exact_and_composable(void) {
         .oneshot_layer_active    = 1u,
         .macro_engine_state      = MACRO_PAYLOAD_ENGINE_WAITING,
         .combo_active_count      = 1u,
-        .unresolved_peer_count   = 1u,
+        .unresolved_other_half_count = 1u,
     };
-    assert(noah_profile_activation_reason_mask(&snapshot) == (NOAH_PROFILE_ACTIVATION_REASON_PHYSICAL_PRESS | NOAH_PROFILE_ACTIVATION_REASON_TAP_SERIES | NOAH_PROFILE_ACTIVATION_REASON_RUNTIME_LEASE | NOAH_PROFILE_ACTIVATION_REASON_DEFERRED_RELEASE | NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT | NOAH_PROFILE_ACTIVATION_REASON_OWNED_OUTPUT | NOAH_PROFILE_ACTIVATION_REASON_MODIFIER_OR_ONESHOT | NOAH_PROFILE_ACTIVATION_REASON_ONESHOT_LAYER | NOAH_PROFILE_ACTIVATION_REASON_MACRO | NOAH_PROFILE_ACTIVATION_REASON_COMBO | NOAH_PROFILE_ACTIVATION_REASON_PEER));
+    assert(noah_profile_activation_reason_mask(&snapshot) == (NOAH_PROFILE_ACTIVATION_REASON_PHYSICAL_PRESS | NOAH_PROFILE_ACTIVATION_REASON_TAP_SERIES | NOAH_PROFILE_ACTIVATION_REASON_RUNTIME_LEASE | NOAH_PROFILE_ACTIVATION_REASON_DEFERRED_RELEASE | NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT | NOAH_PROFILE_ACTIVATION_REASON_OWNED_OUTPUT | NOAH_PROFILE_ACTIVATION_REASON_MODIFIER_OR_ONESHOT | NOAH_PROFILE_ACTIVATION_REASON_ONESHOT_LAYER | NOAH_PROFILE_ACTIVATION_REASON_MACRO | NOAH_PROFILE_ACTIVATION_REASON_COMBO | NOAH_PROFILE_ACTIVATION_REASON_SLAVE));
 }
 
 static void test_runtime_capture_and_status(void) {
     noah_profile_activation_policy_t   policy;
     noah_profile_activation_snapshot_t snapshot;
-    peer_fixture_t                     peer = {.succeeds = true, .unresolved_count = 0u};
+    other_half_fixture_t               other_half = {.succeeds = true, .unresolved_count = 0u};
     uint32_t                           reasons;
     uint32_t                           evaluations;
 
     reset_activity();
-    noah_profile_activation_policy_init(&policy, observe_peer, &peer);
+    noah_profile_activation_policy_init(&policy, observe_other_half, &other_half);
     assert(noah_profile_activation_policy_safe_boundary(&policy) == 0u);
-    assert(peer.calls == 1u);
+    assert(other_half.calls == 1u);
 
     runtime_activity.press_token_count       = 1u;
     runtime_activity.tap_series_count        = 2u;
@@ -149,10 +149,10 @@ static void test_runtime_capture_and_status(void) {
     macro_activity.active_hold_count         = 7u;
     combo_activity.pending_count             = 8u;
     combo_activity.active_count              = 9u;
-    peer.unresolved_count                    = 10u;
+    other_half.unresolved_count              = 10u;
 
     reasons = noah_profile_activation_policy_safe_boundary(&policy);
-    assert((reasons & NOAH_PROFILE_ACTIVATION_REASON_PEER) != 0u);
+    assert((reasons & NOAH_PROFILE_ACTIVATION_REASON_SLAVE) != 0u);
     assert(noah_profile_activation_policy_status(&policy, &snapshot, &reasons, &evaluations));
     assert(snapshot.physical_press_count == 1u);
     assert(snapshot.tap_series_count == 2u);
@@ -174,33 +174,33 @@ static void test_runtime_capture_and_status(void) {
     assert(snapshot.macro_hold_count == 7u);
     assert(snapshot.combo_pending_count == 8u);
     assert(snapshot.combo_active_count == 9u);
-    assert(snapshot.unresolved_peer_count == 10u);
+    assert(snapshot.unresolved_other_half_count == 10u);
     assert(evaluations == 2u);
 }
 
-static void test_peer_observation_fails_closed(void) {
+static void test_other_half_observation_fails_closed(void) {
     noah_profile_activation_policy_t policy;
-    peer_fixture_t                   peer = {.succeeds = false, .unresolved_count = 0u};
+    other_half_fixture_t             other_half = {.succeeds = false, .unresolved_count = 0u};
 
     reset_activity();
     assert(noah_profile_activation_policy_safe_boundary(NULL) == NOAH_PROFILE_ACTIVATION_REASON_INTERNAL);
 
     noah_profile_activation_policy_init(&policy, NULL, NULL);
-    assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PEER);
-    assert(policy.last_snapshot.unresolved_peer_count == 1u);
+    assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_SLAVE);
+    assert(policy.last_snapshot.unresolved_other_half_count == 1u);
 
-    noah_profile_activation_policy_init(&policy, observe_peer, &peer);
-    assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PEER);
-    assert(peer.calls == 1u);
-    assert(policy.last_snapshot.unresolved_peer_count == 1u);
+    noah_profile_activation_policy_init(&policy, observe_other_half, &other_half);
+    assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_SLAVE);
+    assert(other_half.calls == 1u);
+    assert(policy.last_snapshot.unresolved_other_half_count == 1u);
 }
 
 static void test_evaluation_count_saturates(void) {
     noah_profile_activation_policy_t policy;
-    peer_fixture_t                   peer = {.succeeds = true, .unresolved_count = 0u};
+    other_half_fixture_t             other_half = {.succeeds = true, .unresolved_count = 0u};
 
     reset_activity();
-    noah_profile_activation_policy_init(&policy, observe_peer, &peer);
+    noah_profile_activation_policy_init(&policy, observe_other_half, &other_half);
     policy.evaluation_count = UINT32_MAX;
     assert(noah_profile_activation_policy_safe_boundary(&policy) == 0u);
     assert(policy.evaluation_count == UINT32_MAX);
@@ -209,12 +209,12 @@ static void test_evaluation_count_saturates(void) {
 static void test_status_fails_closed_during_publication(void) {
     noah_profile_activation_policy_t   policy;
     noah_profile_activation_snapshot_t snapshot    = {.physical_press_count = 99u};
-    peer_fixture_t                     peer        = {.succeeds = true, .unresolved_count = 0u};
+    other_half_fixture_t               other_half  = {.succeeds = true, .unresolved_count = 0u};
     uint32_t                           reasons     = 99u;
     uint32_t                           evaluations = 99u;
 
     reset_activity();
-    noah_profile_activation_policy_init(&policy, observe_peer, &peer);
+    noah_profile_activation_policy_init(&policy, observe_other_half, &other_half);
     policy.publication_sequence = 1u;
     assert(!noah_profile_activation_policy_status(&policy, &snapshot, &reasons, &evaluations));
     assert(snapshot.physical_press_count == 99u);
@@ -225,13 +225,13 @@ static void test_status_fails_closed_during_publication(void) {
 #ifdef POINTING_DEVICE_ENABLE
 static void test_configured_pd_blocks_until_release_and_does_not_wrap(void) {
     noah_profile_activation_policy_t policy;
-    peer_fixture_t peer = {.succeeds = true};
+    other_half_fixture_t other_half = {.succeeds = true};
     reset_activity();
-    noah_profile_activation_policy_init(&policy, observe_peer, &peer);
+    noah_profile_activation_policy_init(&policy, observe_other_half, &other_half);
     for (uint8_t i = 0; i < 32; i++) {
-        pd_active = (pd_mode_mask_t)1u << i;
+        pd_active = (pointing_mode_mask_t)1u << i;
         assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT);
-        pd_active = 0; pd_locked = (pd_mode_mask_t)1u << i;
+        pd_active = 0; pd_locked = (pointing_mode_mask_t)1u << i;
         assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT);
         pd_locked = 0;
     }
@@ -247,7 +247,7 @@ static void test_configured_pd_blocks_until_release_and_does_not_wrap(void) {
 int main(void) {
     test_reason_bits_are_exact_and_composable();
     test_runtime_capture_and_status();
-    test_peer_observation_fails_closed();
+    test_other_half_observation_fails_closed();
     test_evaluation_count_saturates();
     test_status_fails_closed_during_publication();
 

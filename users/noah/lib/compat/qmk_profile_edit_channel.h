@@ -20,10 +20,10 @@ enum {
 
     // Edit status page 0 flags.
     NOAH_PROFILE_EDIT_WIRE_UNSAVED          = 1u << 0,
-    NOAH_PROFILE_EDIT_WIRE_PEER_REQUIRED    = 1u << 1,
+    NOAH_PROFILE_EDIT_WIRE_SLAVE_REQUIRED   = 1u << 1,
     // The other half holds this session and revision with nothing in progress.
-    NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED   = 1u << 2,
-    NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN       = 1u << 3,
+    NOAH_PROFILE_EDIT_WIRE_SLAVE_CONVERGED  = 1u << 2,
+    NOAH_PROFILE_EDIT_WIRE_SLAVE_KNOWN      = 1u << 3,
     // Admission's edit begin would refuse a new edit now.
     NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED    = 1u << 4,
     NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED   = 1u << 5,
@@ -32,9 +32,9 @@ enum {
     NOAH_PROFILE_EDIT_WIRE_WAITING_SAFE     = 1u << 8,
     // A save on this half waits for a quiet keyboard before it can erase.
     NOAH_PROFILE_EDIT_WIRE_STORAGE_PAUSED   = 1u << 9,
-    // The other half's save waits for a quiet keyboard (USB half only).
-    NOAH_PROFILE_EDIT_WIRE_PEER_STORAGE_PAUSED = 1u << 10,
-    // The other half refused this working copy, edit and whole copy: apart
+    // The other half's save waits for a quiet keyboard (master half only).
+    NOAH_PROFILE_EDIT_WIRE_SLAVE_STORAGE_PAUSED = 1u << 10,
+    // The slave half refused this working copy, edit and whole copy: apart
     // until Revert or an Apply; Save answers BUSY meanwhile.
     NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED     = 1u << 11,
     // Writing the edit mode failed on this half; it is tried again.
@@ -45,7 +45,7 @@ enum {
     NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING = 1u << 13,
     // This half's profile owner stopped: only a restart clears it (D-F34).
     NOAH_PROFILE_EDIT_WIRE_STOPPED          = 1u << 14,
-    // The other half answers that its owner stopped (USB half only).
+    // The slave half answers that its owner stopped (master half only).
     NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED     = 1u << 15,
     NOAH_PROFILE_EDIT_WIRE_STATUS_FLAGS     = 0xFFFFu,
 
@@ -53,7 +53,7 @@ enum {
     // report cannot restart the keyboard. Its reply's byte 17 says whether
     // the other half acknowledged.
     NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM = 0x54534552u,
-    NOAH_PROFILE_EDIT_WIRE_RESTART_PEER    = 17u,
+    NOAH_PROFILE_EDIT_WIRE_RESTART_SLAVE   = 17u,
 };
 
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)

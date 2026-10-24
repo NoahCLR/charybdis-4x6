@@ -8,9 +8,9 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/runtime/trace.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
-#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
-#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
+#include "users/noah/lib/pointing/modes/pointing_mode_configured.h"
+#include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
 #include "users/noah/lib/key/runtime/trace/core_trace.h"
 #include "users/noah/lib/state/modifiers/keyboard_mod_state.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
@@ -26,8 +26,8 @@ static uint16_t fake_default_dpi;
 static uint16_t fake_sniping_dpi;
 static uint16_t fake_last_cpi;
 
-static const noah_pd_config_t trace_pd_slot = {.kind = NOAH_PD_KIND_DIRECTIONAL};
-const noah_pd_config_t *noah_effective_pd_for_mask(uint32_t mode) { return mode && !(mode & (mode - 1u)) ? &trace_pd_slot : NULL; }
+static const noah_pd_config_t trace_pointing_slot = {.kind = NOAH_PD_KIND_DIRECTIONAL};
+const noah_pd_config_t *noah_active_profile_pd_for_mask(uint32_t mode) { return mode && !(mode & (mode - 1u)) ? &trace_pointing_slot : NULL; }
 void noah_pd_engine_enter(const noah_pd_config_t *slot) { (void)slot; }
 void noah_pd_engine_exit(void) {}
 uint8_t noah_pd_engine_masked_mods(const noah_pd_config_t *slot) { (void)slot; return 0; }
@@ -344,20 +344,20 @@ static void test_key_runtime_and_layer_ownership_share_one_trace_buffer(void) {
     CHECK(snapshot.entries[4].b == test_pack_keypos(layer_key));
 }
 
-static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
+static void test_pointing_mode_and_split_sync_events_share_one_trace_buffer(void) {
     noah_runtime_trace_snapshot_t    snapshot;
     split_runtime_base_sync_packet_t packet = {
-        .active_mode_id    = pd_mode_id_from_mask(PD_MODE_ZOOM),
-        .locked_mode_id    = pd_mode_id_from_mask(PD_MODE_ZOOM),
+        .active_mode_id    = pointing_mode_id_from_mask(POINTING_MODE_ZOOM),
+        .locked_mode_id    = pointing_mode_id_from_mask(POINTING_MODE_ZOOM),
         .key_preview_layer = UINT8_MAX,
     };
 
     test_reset_stubs();
 
-    CHECK(pd_mode_handle_keycode_press(PD_SLOT_1));
-    CHECK(pd_mode_toggle_lock_state(PD_MODE_VOLUME));
-    CHECK(pd_mode_toggle_lock_state(PD_MODE_VOLUME));
-    pd_mode_apply_remote_snapshot(PD_MODE_ARROW, PD_MODE_ARROW);
+    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    CHECK(pointing_mode_toggle_lock_state(POINTING_MODE_VOLUME));
+    CHECK(pointing_mode_toggle_lock_state(POINTING_MODE_VOLUME));
+    pointing_mode_apply_remote_snapshot(POINTING_MODE_ARROW, POINTING_MODE_ARROW);
 
     split_runtime_sync_init();
     CHECK(rpc_register_count == 4u);
@@ -366,38 +366,38 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
     CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC) != NULL);
     CHECK(test_registered_callback(PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC) != NULL);
     CHECK(rpc_send_count == 4u);
-    CHECK(rpc_last_base_packet.active_mode_id == PD_MODE_ID_NONE);
-    CHECK(rpc_last_base_packet.locked_mode_id == PD_MODE_ID_NONE);
+    CHECK(rpc_last_base_packet.active_mode_id == POINTING_MODE_ID_NONE);
+    CHECK(rpc_last_base_packet.locked_mode_id == POINTING_MODE_ID_NONE);
 
     test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)(sizeof(packet), &packet, 0u, NULL);
 
     snapshot = test_trace_snapshot();
 
     CHECK(snapshot.count == 10u);
-    CHECK(snapshot.entries[0].kind == NOAH_TRACE_PD_MODE);
-    CHECK(snapshot.entries[0].event == NOAH_TRACE_PD_MODE_EVENT_KEY_PRESS);
-    CHECK(snapshot.entries[0].a == PD_MODE_VOLUME);
+    CHECK(snapshot.entries[0].kind == NOAH_TRACE_POINTING_MODE);
+    CHECK(snapshot.entries[0].event == NOAH_TRACE_POINTING_MODE_EVENT_KEY_PRESS);
+    CHECK(snapshot.entries[0].a == POINTING_MODE_VOLUME);
     CHECK(snapshot.entries[0].b == test_pack_keypos((keypos_t){.row = MATRIX_ROWS, .col = MATRIX_COLS}));
 
-    CHECK(snapshot.entries[1].event == NOAH_TRACE_PD_MODE_EVENT_ACTIVATE);
-    CHECK(snapshot.entries[1].a == PD_MODE_VOLUME);
-    CHECK(snapshot.entries[1].b == PD_MODE_VOLUME);
+    CHECK(snapshot.entries[1].event == NOAH_TRACE_POINTING_MODE_EVENT_ACTIVATE);
+    CHECK(snapshot.entries[1].a == POINTING_MODE_VOLUME);
+    CHECK(snapshot.entries[1].b == POINTING_MODE_VOLUME);
 
-    CHECK(snapshot.entries[2].event == NOAH_TRACE_PD_MODE_EVENT_LOCK);
-    CHECK(snapshot.entries[2].a == PD_MODE_VOLUME);
-    CHECK(snapshot.entries[2].b == PD_MODE_VOLUME);
+    CHECK(snapshot.entries[2].event == NOAH_TRACE_POINTING_MODE_EVENT_LOCK);
+    CHECK(snapshot.entries[2].a == POINTING_MODE_VOLUME);
+    CHECK(snapshot.entries[2].b == POINTING_MODE_VOLUME);
 
-    CHECK(snapshot.entries[3].event == NOAH_TRACE_PD_MODE_EVENT_DEACTIVATE);
-    CHECK(snapshot.entries[3].a == PD_MODE_VOLUME);
+    CHECK(snapshot.entries[3].event == NOAH_TRACE_POINTING_MODE_EVENT_DEACTIVATE);
+    CHECK(snapshot.entries[3].a == POINTING_MODE_VOLUME);
     CHECK(snapshot.entries[3].b == 0u);
 
-    CHECK(snapshot.entries[4].event == NOAH_TRACE_PD_MODE_EVENT_UNLOCK);
-    CHECK(snapshot.entries[4].a == PD_MODE_VOLUME);
+    CHECK(snapshot.entries[4].event == NOAH_TRACE_POINTING_MODE_EVENT_UNLOCK);
+    CHECK(snapshot.entries[4].a == POINTING_MODE_VOLUME);
     CHECK(snapshot.entries[4].b == 0u);
 
-    CHECK(snapshot.entries[5].event == NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT);
-    CHECK(snapshot.entries[5].a == PD_MODE_ARROW);
-    CHECK(snapshot.entries[5].b == PD_MODE_ARROW);
+    CHECK(snapshot.entries[5].event == NOAH_TRACE_POINTING_MODE_EVENT_REMOTE_SNAPSHOT);
+    CHECK(snapshot.entries[5].a == POINTING_MODE_ARROW);
+    CHECK(snapshot.entries[5].b == POINTING_MODE_ARROW);
 
     CHECK(snapshot.entries[6].kind == NOAH_TRACE_SPLIT_SYNC);
     CHECK(snapshot.entries[6].event == NOAH_TRACE_SPLIT_SYNC_EVENT_INIT);
@@ -411,13 +411,13 @@ static void test_pd_mode_and_split_sync_events_share_one_trace_buffer(void) {
 
     CHECK(snapshot.entries[8].kind == NOAH_TRACE_SPLIT_SYNC);
     CHECK(snapshot.entries[8].event == NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE);
-    CHECK(snapshot.entries[8].a == PD_MODE_ZOOM);
-    CHECK(snapshot.entries[8].b == PD_MODE_ZOOM);
+    CHECK(snapshot.entries[8].a == POINTING_MODE_ZOOM);
+    CHECK(snapshot.entries[8].b == POINTING_MODE_ZOOM);
 
-    CHECK(snapshot.entries[9].kind == NOAH_TRACE_PD_MODE);
-    CHECK(snapshot.entries[9].event == NOAH_TRACE_PD_MODE_EVENT_REMOTE_SNAPSHOT);
-    CHECK(snapshot.entries[9].a == PD_MODE_ZOOM);
-    CHECK(snapshot.entries[9].b == PD_MODE_ZOOM);
+    CHECK(snapshot.entries[9].kind == NOAH_TRACE_POINTING_MODE);
+    CHECK(snapshot.entries[9].event == NOAH_TRACE_POINTING_MODE_EVENT_REMOTE_SNAPSHOT);
+    CHECK(snapshot.entries[9].a == POINTING_MODE_ZOOM);
+    CHECK(snapshot.entries[9].b == POINTING_MODE_ZOOM);
 }
 
 static void test_split_failure_and_recovery_trace_is_bounded(void) {
@@ -519,8 +519,8 @@ static void test_key_runtime_core_input_events_round_trip_through_shared_trace_b
             .kind = RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT,
             .data.remote_snapshot =
                 {
-                    .active_mode = PD_MODE_ARROW,
-                    .locked_mode = PD_MODE_ARROW,
+                    .active_mode = POINTING_MODE_ARROW,
+                    .locked_mode = POINTING_MODE_ARROW,
                 },
         },
         {
@@ -569,8 +569,8 @@ static void test_key_runtime_core_input_events_round_trip_through_shared_trace_b
     CHECK(decoded[2].data.pointer_report.report.v == -3);
     CHECK(decoded[2].data.pointer_report.report.buttons == 0x15u);
     CHECK(decoded[3].kind == RUNTIME_EVENT_KIND_REMOTE_SNAPSHOT);
-    CHECK(decoded[3].data.remote_snapshot.active_mode == PD_MODE_ARROW);
-    CHECK(decoded[3].data.remote_snapshot.locked_mode == PD_MODE_ARROW);
+    CHECK(decoded[3].data.remote_snapshot.active_mode == POINTING_MODE_ARROW);
+    CHECK(decoded[3].data.remote_snapshot.locked_mode == POINTING_MODE_ARROW);
     CHECK(decoded[4].kind == RUNTIME_EVENT_KIND_KEY_UP);
     CHECK(decoded[4].data.key_event.keycode == KC_C);
     CHECK(decoded[5].kind == RUNTIME_EVENT_KIND_SCAN);
@@ -579,7 +579,7 @@ static void test_key_runtime_core_input_events_round_trip_through_shared_trace_b
 int main(void) {
     test_ring_buffer_retains_recent_tail_when_full();
     test_key_runtime_and_layer_ownership_share_one_trace_buffer();
-    test_pd_mode_and_split_sync_events_share_one_trace_buffer();
+    test_pointing_mode_and_split_sync_events_share_one_trace_buffer();
     test_split_failure_and_recovery_trace_is_bounded();
     test_key_runtime_decision_events_capture_release_hold_and_multi_tap_details();
     test_key_runtime_core_input_events_round_trip_through_shared_trace_buffer();

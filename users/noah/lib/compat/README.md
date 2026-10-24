@@ -95,14 +95,14 @@ tokens, tap series, release decisions, leases, locks, modifier or pointing
 ownership.
 
 It mirrors only what repairing that origin needs: physical member state
-observed in pre-process; the effective combo table (`noah_qmk_combo_get()`);
-QMK's active and disabled bits, in both the normal and `EXTRA_SHORT_COMBOS`
-layouts; combo keycode lookup through `COMBO_ONLY_FROM_LAYER` or
-`combo_ref_from_layer`; and one completion candidate per combo index, keyed by
-its physical completion generation. A combo completes again only after a
-member release, which makes QMK fire or drop the earlier completion, so a
-newer generation supersedes the older and a burst of combos cannot crowd one
-out.
+observed in pre-process; the active profile's combo table
+(`noah_qmk_combo_get()`); QMK's active and disabled bits, in both the normal and
+`EXTRA_SHORT_COMBOS` layouts; combo keycode lookup through
+`COMBO_ONLY_FROM_LAYER` or `combo_ref_from_layer`; and one completion candidate
+per combo index, keyed by its physical completion generation. A combo completes
+again only after a member release, which makes QMK fire or drop the earlier
+completion, so a newer generation supersedes the older and a burst of combos
+cannot crowd one out.
 
 **Lifecycle**, reconciled at the scan boundary (`noah_qmk_combo_origin_scan`):
 QMK marks a fired combo both active and disabled, so only a completion
@@ -155,5 +155,5 @@ Held by `run_qmk_combo_origin_tests.sh` (both combo layouts, the timerless
 branch compile-checked), `run_qmk_contract_checks.sh` (combo layouts, the
 pre-hook, matrix-scan and `combo_task()` order), `run_qmk_gesture_pipeline_tests.sh`
 (a combo tapped behind an undecided `LT`), `run_participation_tests.sh` and
-`run_pd_mode_key_runtime_integration_tests.sh` (same-output combos that wait
-together).
+`run_pointing_mode_key_runtime_integration_tests.sh` (same-output combos that
+wait together).

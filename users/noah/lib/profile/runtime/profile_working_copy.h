@@ -28,7 +28,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "effective_profile_provider.h"
+#include "active_profile_provider.h"
 #include "../schema/profile_validator_v1.h"
 
 enum {
@@ -129,7 +129,7 @@ typedef struct {
     bool     present;
 } noah_profile_working_domain_t;
 
-// The last published edit, kept until the next one so the USB half can send
+// The last published edit, kept until the next one so the master half can send
 // the same edit to the other half: its splices, and where its inserted bytes
 // now sit in the working copy, in stream order. A replacement's stream is the
 // whole working copy.
@@ -149,12 +149,12 @@ typedef struct {
     uint8_t                                         *bytes;
     uint32_t                                         capacity;
     noah_profile_reader_t                            reader; // bytes[0, capacity)
-    noah_effective_profile_provider_t               *provider;
+    noah_active_profile_provider_t                  *provider;
     const noah_profile_validator_v1_compatibility_t *host_rules; // edits from the host
-    const noah_profile_validator_v1_compatibility_t *peer_rules; // edits from the other half
+    const noah_profile_validator_v1_compatibility_t *other_half_rules; // edits from the other half
 
     // The working copy.
-    noah_effective_profile_snapshot_t saved; // what Revert returns to, while active
+    noah_active_profile_snapshot_t saved; // what Revert returns to, while active
     uint32_t                          session;
     uint32_t                          revision;
     bool                              active;
@@ -167,7 +167,7 @@ typedef struct {
 
     // The edit in progress.
     const noah_profile_validator_v1_compatibility_t *rules;
-    noah_effective_profile_snapshot_t                base; // the active snapshot the edit was made against
+    noah_active_profile_snapshot_t                   base; // the active snapshot the edit was made against
     noah_profile_working_splice_t                    splices[NOAH_PROFILE_WORKING_MAX_SPLICES];
     noah_profile_working_piece_t                     pieces[NOAH_PROFILE_WORKING_MAX_PIECES];
     noah_profile_working_domain_t                    old_domains[NOAH_PROFILE_DOMAIN_REGISTRY_COUNT];
@@ -217,17 +217,17 @@ typedef struct {
     noah_profile_validator_v1_error_t error; // of the last refused edit
 } noah_profile_working_status_t;
 
-void noah_profile_working_copy_init(noah_profile_working_copy_t *copy, uint8_t *bytes, uint32_t capacity, noah_effective_profile_provider_t *provider, const noah_profile_validator_v1_compatibility_t *host_rules, const noah_profile_validator_v1_compatibility_t *peer_rules, uint32_t session);
+void noah_profile_working_copy_init(noah_profile_working_copy_t *copy, uint8_t *bytes, uint32_t capacity, noah_active_profile_provider_t *provider, const noah_profile_validator_v1_compatibility_t *host_rules, const noah_profile_validator_v1_compatibility_t *other_half_rules, uint32_t session);
 
 // Takes `session` and `revision` as its own while no edit is in progress and
-// the saved profile is active. The other half adopts the USB half's identity
+// the saved profile is active. The other half adopts the master half's identity
 // this way when both run the same saved profile.
 bool noah_profile_working_copy_adopt(noah_profile_working_copy_t *copy, uint32_t session, uint32_t revision);
 
 // Admission, called where the edit arrives; each is bounded and copies at
-// most the bytes it is given. `from_peer` holds the edit to the other half's
+// most the bytes it is given. `from_other_half` holds the edit to the other half's
 // rules rather than a host's.
-noah_profile_working_result_t noah_profile_working_copy_begin(noah_profile_working_copy_t *copy, uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags, bool from_peer);
+noah_profile_working_result_t noah_profile_working_copy_begin(noah_profile_working_copy_t *copy, uint16_t transaction_id, uint32_t session, uint32_t revision, uint8_t splice_count, uint32_t insert_total, uint8_t flags, bool from_other_half);
 noah_profile_working_result_t noah_profile_working_copy_splice(noah_profile_working_copy_t *copy, uint16_t transaction_id, uint8_t index, const noah_profile_working_splice_t *splice);
 noah_profile_working_result_t noah_profile_working_copy_data(noah_profile_working_copy_t *copy, uint16_t transaction_id, uint32_t offset, const uint8_t *bytes, uint32_t count);
 // Every splice and inserted byte received, `crc32` over the inserted stream:

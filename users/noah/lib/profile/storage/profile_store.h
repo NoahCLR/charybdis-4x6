@@ -32,7 +32,7 @@ typedef enum {
     NOAH_PROFILE_STORE_OK = 0u,
     NOAH_PROFILE_STORE_INVALID_ARGUMENT,
     NOAH_PROFILE_STORE_IO_ERROR,
-    NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE,
+    NOAH_PROFILE_STORE_NO_SAVED_PROFILE,
     NOAH_PROFILE_STORE_INVALID_HEADER,
     NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA,
     NOAH_PROFILE_STORE_INCOMPATIBLE_COMPILED_DEFAULT,
@@ -166,7 +166,7 @@ typedef struct {
     noah_profile_store_io_t            io;
     noah_profile_store_reuse_guard_t   reuse_guard;
     noah_profile_store_compatibility_t compatibility;
-    noah_profile_store_record_t        committed;
+    noah_profile_store_record_t        saved;
     union {
         noah_profile_store_candidate_t candidate;
         struct {
@@ -210,7 +210,7 @@ typedef struct {
 // The one home of slot addressing; the flash backend places these addresses
 // on flash pages (D-F29). False for no slot. Always inlined: as a call, its
 // out-parameter would hold the caller's address on its stack, and the
-// owner's scan entry, which adopts a committed record, is on every reviewed
+// owner's scan entry, which adopts a saved record, is on every reviewed
 // storage path's frame.
 static inline __attribute__((always_inline)) bool noah_profile_store_slot_start(noah_profile_slot_t slot, noah_profile_storage_address_t *address) {
     if (!address || (slot != NOAH_PROFILE_SLOT_A && slot != NOAH_PROFILE_SLOT_B)) {
@@ -234,8 +234,8 @@ static inline __attribute__((always_inline)) bool noah_profile_store_slot_payloa
 
 // The record boot selection chose or the last commit made, or NULL while
 // the keyboard holds no saved profile.
-static inline const noah_profile_store_record_t *noah_profile_store_committed(const noah_profile_store_t *store) {
-    return store && store->committed.slot != NOAH_PROFILE_SLOT_NONE ? &store->committed : NULL;
+static inline const noah_profile_store_record_t *noah_profile_store_saved(const noah_profile_store_t *store) {
+    return store && store->saved.slot != NOAH_PROFILE_SLOT_NONE ? &store->saved : NULL;
 }
 
 // A prepare is admitted and has not finished or been aborted: the candidate
@@ -246,7 +246,7 @@ static inline bool noah_profile_store_prepare_active(const noah_profile_store_t 
 
 // No prepare is open and no destructive-write reservation is outstanding
 // (an end callback that failed leaves one): boot selection may run and a
-// committed record may be adopted or published.
+// saved record may be adopted or published.
 static inline bool noah_profile_store_settled(const noah_profile_store_t *store) {
     return store && !store->prepare_active && !store->reuse_active;
 }
@@ -317,17 +317,17 @@ noah_profile_store_result_t noah_profile_store_prepare_durable_step(noah_profile
 // Replaces the durable prepared marker with the logical decision marker. Once
 // this begins, failure is durability-unknown and must be resolved by boot scan.
 noah_profile_store_result_t noah_profile_store_prepared_commit_begin(noah_profile_store_t *store);
-noah_profile_store_result_t noah_profile_store_prepared_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *committed);
+noah_profile_store_result_t noah_profile_store_prepared_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *saved);
 // Starts and advances a marker-last commit without unbounded scan work. Begin
 // performs no storage I/O. This compatibility API runs both durable prepare and
 // decision phases. Each step performs one read or write of at most
 // byte_budget bytes, except the payload readback, which reads up to a flash
 // page (NOAH_PROFILE_STORAGE_PAGE_SIZE) a step in reads of at most
 // byte_budget; byte_budget must be 1..20. The final OK step returns the
-// committed record and releases the destructive-backing reservation.
+// saved record and releases the destructive-backing reservation.
 noah_profile_store_result_t noah_profile_store_prepare_commit_begin(noah_profile_store_t *store);
-noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *committed);
+noah_profile_store_result_t noah_profile_store_prepare_commit_step(noah_profile_store_t *store, uint8_t byte_budget, noah_profile_store_record_t *saved);
 // Cold/test convenience wrapper around begin + bounded steps.
-noah_profile_store_result_t noah_profile_store_prepare_commit(noah_profile_store_t *store, noah_profile_store_record_t *committed);
+noah_profile_store_result_t noah_profile_store_prepare_commit(noah_profile_store_t *store, noah_profile_store_record_t *saved);
 noah_profile_store_result_t noah_profile_store_prepare_abort(noah_profile_store_t *store);
 bool                        noah_profile_store_next_generation(const noah_profile_store_t *store, uint32_t *generation);

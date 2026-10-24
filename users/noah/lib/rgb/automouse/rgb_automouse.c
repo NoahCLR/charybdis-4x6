@@ -7,7 +7,7 @@
 #if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_MATRIX_ENABLE)
 
 #    include "../../compat/qmk_auto_mouse_contract.h"
-#    include "../../pointing/defs/pd_mode_flags.h"
+#    include "../../pointing/defs/pointing_mode_flags.h"
 #    include "../../split/runtime_sync.h"
 #    include "rgb_automouse.h"
 

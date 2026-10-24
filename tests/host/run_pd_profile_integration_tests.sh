@@ -30,12 +30,12 @@ for sanitizer in normal sanitized; do
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_pd_runtime.c" \
         -o "$BUILD_DIR/test"
     "$BUILD_DIR/test" "$BUILD_DIR/presets.bin" "$BUILD_DIR/full.bin"
 done
 # The record layout, alignment and byte-order assertions hold on the target too.
-for source in schema/profile_validator_v1.c schema/profile_pd_v1.c runtime/effective_pd_runtime.c; do
+for source in schema/profile_validator_v1.c schema/profile_pd_v1.c runtime/active_profile_pd_runtime.c; do
     arm-none-eabi-gcc -std=c11 -Wall -Wextra -Werror -pedantic \
         -mcpu=cortex-m0plus -mthumb -I"$ROOT/users/noah" \
         -c "$ROOT/users/noah/lib/profile/$source" -o "$BUILD_DIR/$(basename "$source" .c).o"

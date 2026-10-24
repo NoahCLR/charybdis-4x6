@@ -12,7 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../../../pointing/defs/pd_mode_flags.h"
+#include "../../../pointing/defs/pointing_mode_flags.h"
 #include "../slot/keypos_codec.h"
 #include "../delayed_action.h"
 #include "../feedback_kind.h"
@@ -27,8 +27,8 @@ typedef enum {
     KEY_RUNTIME_EFFECT_LAYER_PRESS,
     KEY_RUNTIME_EFFECT_LAYER_RELEASE,
     KEY_RUNTIME_EFFECT_FEEDBACK_PULSE,
-    KEY_RUNTIME_EFFECT_PD_MODE_LOCK_TAP,
-    KEY_RUNTIME_EFFECT_PD_MODE_LOCK_STATE,
+    KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_TAP,
+    KEY_RUNTIME_EFFECT_POINTING_MODE_LOCK_STATE,
     KEY_RUNTIME_EFFECT_DELAYED_ACTION,
     KEY_RUNTIME_EFFECT_LAYER_ONESHOT_CONSUME,
 } key_runtime_effect_kind_t;
@@ -67,14 +67,14 @@ typedef struct {
             uint8_t  tap_branch;
         } feedback_pulse;
         struct {
-            pd_mode_mask_t pd_mode;
-            keypos_t       key_pos;
-        } pd_mode_lock_tap;
+            pointing_mode_mask_t pointing_mode;
+            keypos_t             key_pos;
+        } pointing_mode_lock_tap;
         struct {
-            pd_mode_mask_t pd_mode;
-            keypos_t       key_pos;
-            bool           locked;
-        } pd_mode_lock_state;
+            pointing_mode_mask_t pointing_mode;
+            keypos_t             key_pos;
+            bool                 locked;
+        } pointing_mode_lock_state;
         struct {
             uint16_t                    action;
             key_runtime_packed_keypos_t packed_key_pos;

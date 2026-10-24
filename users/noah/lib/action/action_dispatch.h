@@ -27,7 +27,7 @@
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
 #include "action_kind_registry_list.h"
-#include "../pointing/defs/pd_modes.h"
+#include "../pointing/defs/pointing_modes.h"
 
 typedef struct {
     bool settle_pending_fallback_holds;
@@ -150,7 +150,7 @@ typedef enum {
     NOAH_ACTION_CAP_PRESS_ONLY                             = (1u << 0),
     NOAH_ACTION_CAP_REQUIRES_KEY_OWNER                     = (1u << 1),
     NOAH_ACTION_CAP_LAYER_AFFECTING                        = (1u << 2),
-    NOAH_ACTION_CAP_PD_MODE_AFFECTING                      = (1u << 3),
+    NOAH_ACTION_CAP_POINTING_MODE_AFFECTING                = (1u << 3),
     NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED             = (1u << 4),
     NOAH_ACTION_CAP_AUTHORED_TAP_SUPPORTED                 = (1u << 5),
     NOAH_ACTION_CAP_AUTHORED_HOLD_PRESS_AND_HOLD_SUPPORTED = (1u << 6),
@@ -168,7 +168,7 @@ typedef struct {
     noah_action_kind_t kind;
     uint16_t           action;
     uint8_t            layer;
-    pd_mode_mask_t     pd_mode;
+    pointing_mode_mask_t pointing_mode;
 } noah_action_desc_t;
 
 bool     noah_action_desc_has_capability(noah_action_desc_t desc, noah_action_cap_t capability);
@@ -250,8 +250,8 @@ static inline bool noah_action_desc_uses_shared_hold(noah_action_desc_t desc) {
     return !noah_action_desc_requires_owned_dispatch(desc);
 }
 
-static inline bool noah_action_desc_is_pd_mode_action(noah_action_desc_t desc) {
-    return noah_action_desc_has_capability(desc, NOAH_ACTION_CAP_PD_MODE_AFFECTING);
+static inline bool noah_action_desc_is_pointing_mode_action(noah_action_desc_t desc) {
+    return noah_action_desc_has_capability(desc, NOAH_ACTION_CAP_POINTING_MODE_AFFECTING);
 }
 
 static inline bool noah_action_desc_supported_as_behavior_keycode(noah_action_desc_t desc) {

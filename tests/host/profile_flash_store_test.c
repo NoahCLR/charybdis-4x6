@@ -269,7 +269,7 @@ static void test_reset_takes_the_slot_and_erases_ahead_of_writes(void) {
     static const uint8_t        pattern[4] = {1u, 2u, 3u, 4u};
 
     reset_chip(&flash_chip, 0x5Au);
-    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     io = noah_profile_flash_store_io(&half.flash);
     CHECK(io.read && io.write && io.reset && io.sync);
 
@@ -344,7 +344,7 @@ static void test_writes_never_land_on_unerased_flash(void) {
     static const uint8_t        pattern[4] = {1u, 2u, 3u, 4u};
 
     reset_chip(&flash_chip, 0x00u);
-    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     io = noah_profile_flash_store_io(&half.flash);
     CHECK(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + 3u * SECTOR));
     CHECK(io.write(io.context, NOAH_PROFILE_STORAGE_SLOT_HEADER_SIZE + 2u * SECTOR, pattern, sizeof(pattern)) && io.sync(io.context));
@@ -365,7 +365,7 @@ static void test_marker_steps_each_program_their_own_cell(void) {
     uint8_t                     byte;
 
     reset_chip(&flash_chip, 0x00u);
-    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     io = noah_profile_flash_store_io(&half.flash);
     CHECK(io.reset(io.context, NOAH_PROFILE_STORAGE_SLOT_A_START_ADDR, 64u));
     grant(&half, &flash_chip);
@@ -395,7 +395,7 @@ static void test_save_paces_and_reports_its_pauses(void) {
 
     build_profile(payload, LENGTH, 3u);
     reset_chip(&flash_chip, 0x00u);
-    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     CHECK(save(&half, &flash_chip, payload, LENGTH, 1u) == NOAH_PROFILE_STORE_OK);
     CHECK(flash_chip.nor_violations == 0u && flash_chip.double_programs == 0u);
 
@@ -440,9 +440,9 @@ static void sweep_power_cuts(uint32_t length, cut_mode_t mode) {
     build_profile(previous, length, 5u);
     build_profile(next, length, 6u);
     // Slot A holds generation 1 and slot B generation 2, so the save under
-    // test (3) erases a slot that held a committed profile.
+    // test (3) erases a slot that held a saved profile.
     reset_chip(&flash_chip, 0x00u);
-    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     CHECK(save(&half, &flash_chip, previous, length, 1u) == NOAH_PROFILE_STORE_OK);
     CHECK(save(&half, &flash_chip, previous, length, 2u) == NOAH_PROFILE_STORE_OK);
     memcpy(snapshot, flash_chip.bytes, sizeof(snapshot));
@@ -486,7 +486,7 @@ static void test_power_loss_at_every_flash_operation(void) {
     sweep_power_cuts(70000u, CUT_HALFWAY);
 }
 
-// An aborted save leaves its slot invalid and the committed one active.
+// An aborted save leaves its slot invalid and the saved one active.
 static void test_abort_invalidates_the_target(void) {
     static uint8_t                 payload[5000u];
     half_t                         half;
@@ -495,7 +495,7 @@ static void test_abort_invalidates_the_target(void) {
 
     build_profile(payload, sizeof(payload), 1u);
     reset_chip(&flash_chip, 0x00u);
-    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     CHECK(save(&half, &flash_chip, payload, sizeof(payload), 1u) == NOAH_PROFILE_STORE_OK);
     candidate = candidate_for(payload, sizeof(payload), 2u);
     CHECK(noah_profile_store_prepare_begin(&half.store, &candidate) == NOAH_PROFILE_STORE_OK);
@@ -517,7 +517,7 @@ static void test_abort_before_any_erase_touches_nothing(void) {
 
     build_profile(payload, sizeof(payload), 1u);
     reset_chip(&flash_chip, 0x00u);
-    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    CHECK(boot(&half, &flash_chip, &selected) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     CHECK(save(&half, &flash_chip, payload, sizeof(payload), 1u) == NOAH_PROFILE_STORE_OK);
     CHECK(save(&half, &flash_chip, payload, sizeof(payload), 2u) == NOAH_PROFILE_STORE_OK);
     memcpy(snapshot, flash_chip.bytes, sizeof(snapshot));

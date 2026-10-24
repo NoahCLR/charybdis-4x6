@@ -561,7 +561,7 @@ A flag back at once after a restart means the fault is in flash or the
 firmware. An EEPROM reset (bootmagic) erases the saved profiles and so
 clears a conflict in flash, at the cost of the saved profile.
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_stopped_test.inc`: `test_only_states_a_restart_leaves_are_stopped`, `test_a_storage_failure_in_a_save_stops_the_usb_half_and_says_so`, `test_a_half_that_cannot_read_its_slots_stops_and_is_heard`, `test_an_unknown_commit_marker_stops_until_a_restart_reads_it`, `test_two_profiles_of_one_generation_stop_the_owner`, `test_unreadable_compiled_defaults_stop_the_owner`, `test_authority_changing_after_the_decision_stops_the_owner`, `test_a_failed_runtime_install_stops_the_owner`, `test_a_slow_save_is_never_stopped`, `test_a_stop_during_an_adjustment_edit_refuses_edits_first`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_stopped_test.inc`: `test_only_states_a_restart_leaves_are_stopped`, `test_a_storage_failure_in_a_save_stops_the_master_half_and_says_so`, `test_a_half_that_cannot_read_its_slots_stops_and_is_heard`, `test_an_unknown_commit_marker_stops_until_a_restart_reads_it`, `test_two_profiles_of_one_generation_stop_the_owner`, `test_unreadable_compiled_defaults_stop_the_owner`, `test_authority_changing_after_the_decision_stops_the_owner`, `test_a_failed_runtime_install_stops_the_owner`, `test_a_slow_save_is_never_stopped`, `test_a_stop_during_an_adjustment_edit_refuses_edits_first`).
 
 ## Restart
 

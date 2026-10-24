@@ -157,7 +157,7 @@ static void commit_to(uint8_t *bytes, const uint8_t *payload, uint16_t length, u
                                 .compiled_default_digest = current_compiled_digest,
                                 .action_abi_digest       = 0u,
                             });
-    assert(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
+    assert(noah_profile_store_boot_select(&store, &selected) == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
     assert(noah_profile_store_prepare_begin(&store, &candidate) == NOAH_PROFILE_STORE_OK);
     assert(noah_profile_store_prepare_write(&store, 0u, payload, length) == NOAH_PROFILE_STORE_OK);
     assert(noah_profile_store_prepare_commit(&store, &selected) == NOAH_PROFILE_STORE_OK);
@@ -220,8 +220,8 @@ static bool read_name(uint8_t *bytes, noah_profile_keyboard_name_t *name) {
     return noah_profile_store_runtime_read_keyboard_name(&store, name);
 }
 
-// D-F25: the committed keyboard name, read before USB starts.
-static void test_keyboard_name_of_the_committed_profile(void) {
+// D-F25: the saved profile's keyboard name, read before USB starts.
+static void test_keyboard_name_of_the_saved_profile(void) {
     noah_profile_keyboard_name_t name = {.length = 9u};
 
     reset_eeprom(alternate_bytes);
@@ -265,7 +265,7 @@ static void test_boot_keyboard_name_before_the_runtime_starts(void) {
     assert(!noah_profile_store_runtime_boot_keyboard_name(&name) && name.length == 0u);
     // The borrowed store was left as the runtime expects to find it.
     noah_profile_store_runtime_matrix_scan();
-    assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND);
+    assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_SAVED_FOUND);
 }
 
 static void test_qmk_adapter_is_region_bounded_and_read_only(void) {
@@ -327,15 +327,15 @@ static void test_boot_discovery_runs_once_from_scan(void) {
     assert(qmk_read_calls == 0u);
     noah_profile_store_runtime_matrix_scan();
     assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_COMPILED_FALLBACK);
-    assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
-    assert(noah_profile_store_runtime_committed() == NULL);
+    assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
+    assert(noah_profile_store_runtime_saved() == NULL);
     assert(qmk_write_calls == 0u);
     reads_after_discovery = qmk_read_calls;
     noah_profile_store_runtime_matrix_scan();
     assert(qmk_read_calls == reads_after_discovery);
 }
 
-static void test_committed_metadata_is_discovered_without_activation(void) {
+static void test_saved_metadata_is_discovered_without_activation(void) {
     const noah_profile_store_record_t *record;
     noah_profile_store_candidate_t     candidate;
 
@@ -348,9 +348,9 @@ static void test_committed_metadata_is_discovered_without_activation(void) {
 
     noah_profile_store_runtime_init();
     noah_profile_store_runtime_matrix_scan();
-    assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND);
+    assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_SAVED_FOUND);
     assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_OK);
-    record = noah_profile_store_runtime_committed();
+    record = noah_profile_store_runtime_saved();
     assert(record != NULL);
     assert(record->slot == NOAH_PROFILE_SLOT_A);
     assert(record->generation == 7u);
@@ -397,7 +397,7 @@ static void test_equal_generation_divergence_is_reported(void) {
     noah_profile_store_runtime_matrix_scan();
     assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_GENERATION_CONFLICT);
     assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_GENERATION_CONFLICT);
-    assert(noah_profile_store_runtime_committed() == NULL);
+    assert(noah_profile_store_runtime_saved() == NULL);
     assert(qmk_write_calls == 0u);
 }
 
@@ -412,8 +412,8 @@ static void test_old_compiled_default_record_falls_back(void) {
     noah_profile_store_runtime_init();
     noah_profile_store_runtime_matrix_scan();
     assert(noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_COMPILED_FALLBACK);
-    assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE);
-    assert(noah_profile_store_runtime_committed() == NULL);
+    assert(noah_profile_store_runtime_discovery_result() == NOAH_PROFILE_STORE_NO_SAVED_PROFILE);
+    assert(noah_profile_store_runtime_saved() == NULL);
     assert(qmk_write_calls == 0u);
 }
 
@@ -421,11 +421,11 @@ int main(void) {
     // Boot order: before anything initializes the runtime.
     test_eeprom_reset_forgets_the_saved_profile_before_start();
     test_boot_keyboard_name_before_the_runtime_starts();
-    test_keyboard_name_of_the_committed_profile();
+    test_keyboard_name_of_the_saved_profile();
     test_qmk_adapter_is_region_bounded_and_read_only();
     test_qmk_write_adapter_is_slot_bounded();
     test_boot_discovery_runs_once_from_scan();
-    test_committed_metadata_is_discovered_without_activation();
+    test_saved_metadata_is_discovered_without_activation();
     test_equal_generation_divergence_is_reported();
     test_old_compiled_default_record_falls_back();
     puts("profile store runtime host tests passed");

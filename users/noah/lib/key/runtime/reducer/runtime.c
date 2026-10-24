@@ -1,5 +1,5 @@
 #include "../../../compat/qmk_gesture_timing.h"
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // Key Runtime Core Foundation
 // ────────────────────────────────────────────────────────────────────────────
@@ -12,7 +12,7 @@
 #include "../planning/scan_planner.h"
 #include "../planning/tap_series.h"
 
-#include "../../../pointing/defs/pd_modes.h"
+#include "../../../pointing/defs/pointing_modes.h"
 #include "../../behavior/handled_key_internal.h"
 #include "../../behavior/handled_key_policy.h"
 #include "../../behavior/key_behavior_lookup.h"
@@ -74,7 +74,7 @@ bool key_runtime_hot_path_test_active_indexes_consistent(void) {
 }
 #endif
 
-__attribute__((weak)) const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+__attribute__((weak)) const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
     (void)action;
     return NULL;
 }
@@ -590,7 +590,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
     uint8_t                        tap_count                   = 1u;
     bool                           handled                     = false;
     bool                           tap_outcome_available       = false;
-    bool                           pd_mode_was_locked_on_press = false;
+    bool                           pointing_mode_was_locked_on_press = false;
     bool                           typing                      = false;
     key_runtime_slot_phase_t       slot_phase                  = KEY_RUNTIME_SLOT_PHASE_IDLE;
 
@@ -644,7 +644,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
         hold_term_ms                = handled_key_resolution_tap_hold_term(resolution);
         long_hold_term_ms           = handled_key_resolution_long_hold_term(resolution);
         tap_outcome_available       = handled_key_resolution_has_multi_tap(resolution) || materialized.tap_action != KC_NO;
-        pd_mode_was_locked_on_press = materialized.pd_mode != 0 && state->shadow_projection.pd_mode_local_locked == materialized.pd_mode;
+        pointing_mode_was_locked_on_press = materialized.pointing_mode != 0 && state->shadow_projection.pointing_mode_local_locked == materialized.pointing_mode;
         slot_phase                  = hold_registers_on_press(materialized.hold) ? KEY_RUNTIME_SLOT_PHASE_PRESS_HELD_WINDOW : KEY_RUNTIME_SLOT_PHASE_TAP_WINDOW;
     }
 
@@ -677,7 +677,7 @@ static void key_runtime_core_press_token_begin(key_runtime_core_state_t *state, 
         .feedback_level              = KEY_RUNTIME_CORE_FEEDBACK_LEVEL_PRESS,
         .handled_key                 = handled,
         .tap_outcome_available       = tap_outcome_available,
-        .pd_mode_was_locked_on_press = pd_mode_was_locked_on_press,
+        .pointing_mode_was_locked_on_press = pointing_mode_was_locked_on_press,
         .typing                      = typing,
         .interaction                 = interaction,
         .slot_phase                  = slot_phase,
@@ -843,7 +843,7 @@ void key_runtime_core_end_mode_offer(keypos_t key_pos, bool consumed) {
     }
     token->handled_key                 = false;
     token->tap_outcome_available       = false;
-    token->pd_mode_was_locked_on_press = false;
+    token->pointing_mode_was_locked_on_press = false;
     token->interaction                 = key_runtime_slot_interaction_default();
     token->slot_phase                  = KEY_RUNTIME_SLOT_PHASE_IDLE;
     key_runtime_core_shadow_projection_recompute(state);
@@ -889,7 +889,7 @@ static bool key_runtime_core_press_token_allows_tap_release(const press_token_t 
 }
 
 static bool key_runtime_core_press_token_should_unlock_pd_lock_on_press(const press_token_t *token) {
-    return token && token->handled_key && token->pd_mode_was_locked_on_press && token->interaction.pd_mode != 0;
+    return token && token->handled_key && token->pointing_mode_was_locked_on_press && token->interaction.pointing_mode != 0;
 }
 
 static void key_runtime_core_apply_release_settlement(key_runtime_core_state_t *state, keypos_t key_pos, const key_runtime_core_release_effect_plan_t *release_plan, keyboard_mod_state_t keyboard_mod_state) {
@@ -934,7 +934,7 @@ static void key_runtime_core_apply_release_settlement(key_runtime_core_state_t *
 // cancels its quick tap), and nothing a pointing mode owns. Another key's
 // press decides it (D-F27).
 static bool key_runtime_core_press_token_settles_on_other_press(const press_token_t *token, keypos_t token_key_pos) {
-    return token->handled_key && token->interaction.pd_mode == 0 && !token->interaction.contract.suppress_tap_on_layer_interrupt && !key_runtime_slot_interaction_uses_fallback_hold(token->interaction) && !key_runtime_slot_interaction_uses_implicit_hold(token->interaction) && !key_runtime_core_press_token_hold_changes_other_keys(token) && !noah_action_desc_is_pd_mode_action(noah_action_describe(token->interaction.binding.tap_action)) && !key_runtime_core_press_offered_to_mode(token_key_pos);
+    return token->handled_key && token->interaction.pointing_mode == 0 && !token->interaction.contract.suppress_tap_on_layer_interrupt && !key_runtime_slot_interaction_uses_fallback_hold(token->interaction) && !key_runtime_slot_interaction_uses_implicit_hold(token->interaction) && !key_runtime_core_press_token_hold_changes_other_keys(token) && !noah_action_desc_is_pointing_mode_action(noah_action_describe(token->interaction.binding.tap_action)) && !key_runtime_core_press_offered_to_mode(token_key_pos);
 }
 
 // The release action a hold that waits for release would send now, if its
@@ -1171,8 +1171,8 @@ bool key_runtime_core_handle_handled_key_press(uint16_t keycode, keypos_t key_po
     }
 
     if (key_runtime_core_press_token_should_unlock_pd_lock_on_press(token)) {
-        key_runtime_core_effect_plan_push_pd_mode_lock_state(plan, token_key_pos, token->interaction.pd_mode, false);
-        token->pd_mode_lock_consumed_on_press = true;
+        key_runtime_core_effect_plan_push_pointing_mode_lock_state(plan, token_key_pos, token->interaction.pointing_mode, false);
+        token->pointing_mode_lock_consumed_on_press = true;
     }
 
     if (key_runtime_core_tap_series_can_accept_press(state, series, keycode, token->pressed_at)) {

@@ -6,7 +6,7 @@
 // list the keyboard under it. An empty name keeps QMK's built-in PRODUCT.
 // Hosts read the string when they enumerate the keyboard, so:
 //
-// - before USB starts, the name comes from the committed profile;
+// - before USB starts, the name comes from the saved profile;
 // - when the live name later differs from the one USB enumerated with (an
 //   Apply renamed the keyboard, or boot activated a different profile), the
 //   half on USB restarts USB once it is safe: the profile owner is settled on
@@ -32,7 +32,7 @@ enum {
 // Returns its size, or 0 for an empty or invalid name or too small a buffer.
 uint8_t noah_qmk_usb_product_name_encode(const noah_profile_keyboard_name_t *name, uint8_t *descriptor, uint8_t capacity);
 
-// keyboard_pre_init: serve the committed profile's name before USB starts.
+// keyboard_pre_init: serve the saved profile's name before USB starts.
 void noah_qmk_usb_product_name_pre_init(void);
 // housekeeping: restart USB under the live name when it changed and it is safe.
 void noah_qmk_usb_product_name_task(void);

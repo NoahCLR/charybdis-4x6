@@ -54,7 +54,7 @@ build_and_run() {
         "$KEYMAP_PATH/keymap.c" \
         "$KEYMAP_PATH/pd_config.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_pd_runtime.c" \
         "$KEYMAP_PATH/rgb_config.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_compiled_defaults_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
@@ -84,13 +84,13 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/runtime/profile_owner.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
         "$ROOT/users/noah/lib/profile/split/profile_working_sync.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_keymap_macros_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_keymap_macros_runtime.c" \
         "$ROOT/users/noah/lib/compat/qmk_profile_keymap.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_key_behavior_runtime.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_rgb_runtime.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_combo_runtime.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_settings_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_provider.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_key_behavior_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_rgb_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_combo_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_settings_runtime.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.c" \
         "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
         "$ROOT/users/noah/lib/profile/split/profile_split_authority.c" \
@@ -99,7 +99,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_store.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_transaction.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
-        "$ROOT/users/noah/lib/profile/storage/profile_peer_store_backend.c" \
+        "$ROOT/users/noah/lib/profile/storage/profile_other_half_store_backend.c" \
         -o "$bin"
     "$bin" "$BUILD_DIR/populated.bin" "$ROOT/tests/fixtures/maximum_profile_v4.fixture"
 }

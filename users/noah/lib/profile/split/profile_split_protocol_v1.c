@@ -43,8 +43,8 @@ enum {
     WIRE_REUSE_SOURCE_ORIGIN   = 41u,
     WIRE_REUSE_RESERVED        = 42u,
     WIRE_REUSE_KIND_COMPILED   = 0u,
-    WIRE_REUSE_KIND_COMMITTED  = 1u,
-    // The working copy (D-F32): over a committed base or the compiled one.
+    WIRE_REUSE_KIND_SAVED      = 1u,
+    // The working copy (D-F32): over a saved base or the compiled one.
     WIRE_REUSE_KIND_WORKING    = 2u,
     WIRE_REUSE_ORIGIN_COMPILED = 255u,
     WIRE_FLAG_HAS_PROFILE      = 1u << 0,
@@ -139,9 +139,9 @@ static bool transfer_shape_valid(const noah_profile_split_v1_frame_t *frame) {
         return false;
     }
     if (frame->kind == NOAH_PROFILE_SPLIT_V1_PAYLOAD_REUSE) {
-        bool committed_base = frame->reuse_source.generation != 0u && frame->reuse_source.origin <= 1u;
+        bool saved_base = frame->reuse_source.generation != 0u && frame->reuse_source.origin <= 1u;
         bool compiled_base  = frame->reuse_source.generation == 0u && frame->reuse_source.origin == WIRE_REUSE_ORIGIN_COMPILED;
-        bool source_valid   = frame->reuse_source.kind == WIRE_REUSE_KIND_COMMITTED ? committed_base : frame->reuse_source.kind == WIRE_REUSE_KIND_COMPILED ? compiled_base : frame->reuse_source.kind == WIRE_REUSE_KIND_WORKING && (committed_base || compiled_base);
+        bool source_valid   = frame->reuse_source.kind == WIRE_REUSE_KIND_SAVED ? saved_base : frame->reuse_source.kind == WIRE_REUSE_KIND_COMPILED ? compiled_base : frame->reuse_source.kind == WIRE_REUSE_KIND_WORKING && (saved_base || compiled_base);
 
         return frame->status == NOAH_PROFILE_SPLIT_V1_STATUS_OK && frame->generation != 0u && frame->payload_length >= NOAH_PROFILE_BLOB_V1_HEADER_SIZE && frame->reuse_length != 0u && frame->reuse_length <= frame->payload_length - frame->offset && frame->reuse_source_offset <= NOAH_PROFILE_BLOB_V1_MAX_SIZE - frame->reuse_length && source_valid;
     }

@@ -20,7 +20,7 @@ typedef enum {
 
 uint8_t                          behavior_get_layer(uint16_t keycode);
 bool                             is_layer_key(uint16_t keycode);
-pd_mode_mask_t                   handled_key_pd_mode_for_behavior(key_behavior_view_t behavior);
+pointing_mode_mask_t             handled_key_pointing_mode_for_behavior(key_behavior_view_t behavior);
 uint16_t                         handled_key_flags_from_behavior(key_behavior_view_t behavior);
 bool                             handled_key_resolution_step_present(const handled_key_resolution_t *resolution);
 bool                             handled_key_resolution_uses_fallback_hold_behavior(const handled_key_resolution_t *resolution);

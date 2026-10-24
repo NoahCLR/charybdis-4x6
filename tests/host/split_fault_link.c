@@ -43,7 +43,7 @@ bool split_fault_link_exchange(void *context, const uint8_t *request, uint8_t re
         return false;
     }
     assert(link->receive);
-    if (!link->receive(link->peer, delivered, request_length, response, response_length)) {
+    if (!link->receive(link->other_half, delivered, request_length, response, response_length)) {
         memset(response, 0, response_length);
     }
     // QMK's reply buffer keeps whatever this reply left in it.

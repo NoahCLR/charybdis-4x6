@@ -13,19 +13,19 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "../../profile/runtime/effective_rgb_runtime.h"
+#include "../../profile/runtime/active_profile_rgb_runtime.h"
 
 #if defined(RGB_MATRIX_ENABLE) && defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
 bool rgb_runtime_automouse_stage_should_render(layer_state_t state);
-bool rgb_runtime_automouse_stage_should_render_effective(layer_state_t state, const noah_effective_rgb_frame_t *profile_frame);
+bool rgb_runtime_automouse_stage_should_render_active_profile(layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame);
 bool rgb_runtime_automouse_stage_render(layer_state_t state, uint8_t led_min, uint8_t led_max);
-bool rgb_runtime_automouse_stage_render_effective(layer_state_t state, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max);
+bool rgb_runtime_automouse_stage_render_active_profile(layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max);
 #else
 static inline bool rgb_runtime_automouse_stage_should_render(layer_state_t state) {
     (void)state;
     return false;
 }
-static inline bool rgb_runtime_automouse_stage_should_render_effective(layer_state_t state, const noah_effective_rgb_frame_t *profile_frame) {
+static inline bool rgb_runtime_automouse_stage_should_render_active_profile(layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame) {
     (void)profile_frame;
     return rgb_runtime_automouse_stage_should_render(state);
 }
@@ -35,7 +35,7 @@ static inline bool rgb_runtime_automouse_stage_render(layer_state_t state, uint8
     (void)led_max;
     return false;
 }
-static inline bool rgb_runtime_automouse_stage_render_effective(layer_state_t state, const noah_effective_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+static inline bool rgb_runtime_automouse_stage_render_active_profile(layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
     (void)profile_frame;
     return rgb_runtime_automouse_stage_render(state, led_min, led_max);
 }

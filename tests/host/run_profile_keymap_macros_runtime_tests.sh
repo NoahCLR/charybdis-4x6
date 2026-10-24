@@ -15,7 +15,7 @@ for variant in normal sanitized; do
         -DQMK_KEYBOARD_H='"qmk_stub.h"' \
         -I"$ROOT" -I"$ROOT/users/noah" -I"$ROOT/tests/host/include" \
         "$ROOT/tests/host/profile_keymap_macros_runtime_test.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_keymap_macros_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_keymap_macros_runtime.c" \
         "$ROOT/users/noah/lib/compat/qmk_profile_keymap.c" \
         "$ROOT/users/noah/lib/macro/profile_macro_provider.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \

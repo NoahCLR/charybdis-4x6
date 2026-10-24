@@ -50,8 +50,8 @@ sh run_synthetic_record_tests.sh
 sh run_owned_keycode_tests.sh
 sh run_held_action_tests.sh
 sh run_layer_ownership_tests.sh
-sh run_pd_mode_tests.sh
-sh run_pd_mode_handlers_tests.sh
+sh run_pointing_mode_tests.sh
+sh run_pointing_mode_handlers_tests.sh
 sh run_pd_runtime_tests.sh
 sh run_pointer_layer_policy_tests.sh
 sh run_split_runtime_sync_tests.sh
@@ -69,10 +69,10 @@ sh run_qmk_portable_profile_tests.sh
 sh run_profile_validator_v1_tests.sh
 sh run_profile_keymap_macros_runtime_tests.sh
 sh run_profile_validator_work_budget_tests.sh
-sh run_effective_profile_provider_tests.sh
+sh run_active_profile_provider_tests.sh
 sh run_profile_working_copy_tests.sh
 sh run_profile_working_sync_tests.sh
-sh run_effective_rgb_runtime_tests.sh
+sh run_active_profile_rgb_runtime_tests.sh
 sh run_profile_activation_policy_tests.sh
 sh run_profile_split_foundation_tests.sh
 sh run_profile_split_reconciler_tests.sh
@@ -88,10 +88,10 @@ sh run_qmk_profile_edit_channel_tests.sh
 sh run_qmk_keyboard_restart_tests.sh
 sh run_qmk_profile_adjustments_tests.sh
 sh run_combo_readback_tests.sh
-sh run_effective_combo_runtime_tests.sh
+sh run_active_profile_combo_runtime_tests.sh
 sh run_profile_candidate_transaction_tests.sh
 sh run_profile_candidate_store_backend_tests.sh
-sh run_profile_peer_store_backend_tests.sh
+sh run_profile_other_half_store_backend_tests.sh
 sh run_runtime_diag_tests.sh
 sh run_pending_release_queue_tests.sh
 sh run_runtime_trace_tests.sh
@@ -102,7 +102,7 @@ sh run_keymap_validation_tests.sh
 sh run_all_profile_validation_tests.sh
 sh run_firmware_stack_budget_tool_tests.sh
 sh run_firmware_memory_budget_tool_tests.sh
-sh run_pd_mode_key_runtime_integration_tests.sh
+sh run_pointing_mode_key_runtime_integration_tests.sh
 sh run_action_dispatch_tests.sh
 sh run_delayed_action_tests.sh
 sh run_action_lifecycle_tests.sh
@@ -124,7 +124,7 @@ sh run_contract_probe.sh'
 
 # Checks that time a real thread against the wall clock run after the others,
 # one at a time, so the pool's load cannot starve them: the split frame CRC
-# harness waits 20 ms for its peer, as the link does.
+# harness waits 20 ms for its other half, as the link does.
 ALONE='sh run_split_frame_crc_tests.sh'
 
 run_checks() { # run_checks FIRST_NUMBER JOBS CHECKS

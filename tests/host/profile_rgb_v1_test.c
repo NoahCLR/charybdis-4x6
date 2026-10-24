@@ -86,7 +86,7 @@ static noah_profile_rgb_v1_limits_t fixture_limits(const char *path) {
     limits.logical_layer_count          = (uint8_t)fixture_uint(path, "codec.logical_layer_count");
     limits.maximum_brightness           = (uint8_t)fixture_uint(path, "codec.maximum_brightness");
     limits.tap_branch_color_count       = (uint8_t)fixture_uint(path, "codec.tap_branch_color_count");
-    limits.supported_pd_mode_mask       = (uint8_t)fixture_uint(path, "codec.supported_pd_mode_mask");
+    limits.supported_pointing_mode_mask = (uint8_t)fixture_uint(path, "codec.supported_pd_mode_mask");
     return limits;
 }
 
@@ -159,7 +159,7 @@ static void test_shared_golden_and_accessors(const char *fixture_path) {
     expect_result(noah_profile_rgb_v1_automouse(&view, &automouse, &error), NOAH_PROFILE_RGB_V1_OK);
     assert(automouse.mode == 2u && automouse.end_color.h == 8u && automouse.end_color.v == 10u);
     expect_result(noah_profile_rgb_v1_pd_color_at(&view, 5u, &pd, &error), NOAH_PROFILE_RGB_V1_OK);
-    assert(pd.pd_mode_id == 5u && pd.color.h == 61u && pd.color.v == 63u && pd.locality == 2u);
+    assert(pd.pointing_mode_id == 5u && pd.color.h == 61u && pd.color.v == 63u && pd.locality == 2u);
     expect_result(noah_profile_rgb_v1_pd_group_at(&view, 1u, &group_row, &error), NOAH_PROFILE_RGB_V1_OK);
     assert(group_row.selector == 1u && group_row.color.s == 71u && group_row.group_id == 1u);
     expect_result(noah_profile_rgb_v1_combo_feedback(&view, &combo, &error), NOAH_PROFILE_RGB_V1_OK);
@@ -336,7 +336,7 @@ static void test_headers_lengths_and_dictionary(const char *fixture_path) {
     mutated[5] = NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS + 1u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
     memcpy(mutated, valid, length);
-    mutated[7] = NOAH_PROFILE_RGB_V1_MAX_PD_MODES + 1u;
+    mutated[7] = NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES + 1u;
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_CAPACITY_EXCEEDED);
     memcpy(mutated, valid, length);
     mutated[10] = NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS + 1u;
@@ -433,7 +433,7 @@ static void test_fields_features_and_surfaces(const char *fixture_path) {
     limits     = fixture_limits(fixture_path);
     expect_decode(mutated, length, &limits, NOAH_PROFILE_RGB_V1_OK);
 
-    limits.supported_pd_mode_mask = 0x1fu;
+    limits.supported_pointing_mode_mask = 0x1fu;
     expect_decode(valid, length, &limits, NOAH_PROFILE_RGB_V1_INVALID_ID);
 
     limits                  = fixture_limits(fixture_path);
@@ -451,14 +451,14 @@ static void test_canonical_empty_forms(void) {
     uint8_t                      payload[40] = {0};
     noah_profile_rgb_v1_limits_t limits      = noah_profile_rgb_v1_default_limits();
 
-    payload[0]                    = NOAH_PROFILE_RGB_V1_FORMAT_VERSION;
-    payload[2]                    = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
-    payload[5]                    = 1u;
-    payload[12]                   = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
-    payload[13]                   = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
-    limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
-    limits.logical_layer_count    = 1u;
-    limits.supported_pd_mode_mask = 0u;
+    payload[0]                          = NOAH_PROFILE_RGB_V1_FORMAT_VERSION;
+    payload[2]                          = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
+    payload[5]                          = 1u;
+    payload[12]                         = NOAH_PROFILE_RGB_V1_PHYSICAL_LED_COUNT;
+    payload[13]                         = NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE;
+    limits.compiled_stage_mask          = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
+    limits.logical_layer_count          = 1u;
+    limits.supported_pointing_mode_mask = 0u;
     expect_decode(payload, sizeof(payload), &limits, NOAH_PROFILE_RGB_V1_OK);
     payload[21] = 1u;
     expect_decode(payload, sizeof(payload), &limits, NOAH_PROFILE_RGB_V1_UNSUPPORTED_STAGE_DATA);
@@ -502,9 +502,9 @@ static void test_maximum_dictionary_and_rows(void) {
         offset += 5u;
     }
     assert(offset + 4u + 4u + 11u == sizeof(payload));
-    limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
-    limits.logical_layer_count    = 1u;
-    limits.supported_pd_mode_mask = 0u;
+    limits.compiled_stage_mask          = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
+    limits.logical_layer_count          = 1u;
+    limits.supported_pointing_mode_mask = 0u;
     expect_result(noah_profile_rgb_v1_decode(payload, sizeof(payload), &limits, &view, &error), NOAH_PROFILE_RGB_V1_OK);
     assert(view.group_count == NOAH_PROFILE_RGB_V1_MAX_GROUPS);
     assert(view.layer_group_count == NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS);

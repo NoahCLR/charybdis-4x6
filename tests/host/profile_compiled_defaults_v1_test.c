@@ -11,9 +11,9 @@
 #include "users/noah/lib/profile/schema/profile_settings_defaults.h"
 #include "users/noah/lib/profile/runtime/profile_action_placement_v1.h"
 #include "users/noah/lib/profile/runtime/profile_action_runtime_v1.h"
-#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
 #include "users/noah/lib/profile/storage/profile_checksum.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/noah_keymap.h"
 #include "users/noah/lib/macro/macro_payload.h"
 
@@ -41,9 +41,9 @@ void noah_compiled_defaults_test_domain_write(uint8_t id) {
 
 void noah_compiled_defaults_test_behavior_visit(void) { behavior_visits++; }
 
-#define NOAH_PD_MODE_TEST_ROW(name, mode_keycode) [PD_MODE_INDEX_##name] = {.mode_flag = PD_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
-const pd_mode_def_t pd_modes[PD_MODE_COUNT] = {NOAH_PD_MODE_LIST(NOAH_PD_MODE_TEST_ROW)};
-#undef NOAH_PD_MODE_TEST_ROW
+#define NOAH_POINTING_MODE_TEST_ROW(name, mode_keycode) [POINTING_MODE_INDEX_##name] = {.mode_flag = POINTING_MODE_##name, .keycode = (mode_keycode), .lock_action = mode_keycode##_LOCK},
+const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {NOAH_POINTING_MODE_LIST(NOAH_POINTING_MODE_TEST_ROW)};
+#undef NOAH_POINTING_MODE_TEST_ROW
 
 static bool collect(void *context, const uint8_t *bytes, size_t length) {
     (void)context;
@@ -123,29 +123,30 @@ static noah_profile_validator_v1_compatibility_t compatibility(uint32_t action_a
     value.required_domain_mask                      = (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS);
     value.logical_layer_count                       = LAYER_COUNT;
     value.placement_positions = MATRIX_ROWS * MATRIX_COLS;
-    value.supported_pd_mode_mask                    = UINT32_MAX >> (32u - PD_MODE_COUNT);
+    value.supported_pointing_mode_mask              = UINT32_MAX >> (32u - POINTING_MODE_COUNT);
     value.macro_slot_count                          = MACRO_SLOT_COUNT;
     value.custom_key_count                = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS;
     value.rgb_limits.logical_layer_count            = LAYER_COUNT;
-    value.rgb_limits.supported_pd_mode_mask         = value.supported_pd_mode_mask;
+    value.rgb_limits.supported_pointing_mode_mask   = value.supported_pointing_mode_mask;
     value.rgb_limits.maximum_brightness             = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
     value.rgb_limits.tap_branch_color_count         = KEY_BEHAVIOR_MAX_TAP_COUNT - 1u;
     value.rgb_limits.compiled_stage_mask            = NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL;
     return value;
 }
 
-// Table lookups over the real pd_modes[], standing in for the pointing
-// registry so the placement check classifies pd-mode keys as the firmware does.
-bool is_pd_mode_lock_action(uint16_t action) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].lock_action == action) return true;
+// Table lookups over the real pointing_modes[], standing in for the pointing
+// registry so the placement check classifies pointing-mode keys as the firmware
+// does.
+bool is_pointing_mode_lock_action(uint16_t action) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++) {
+        if (pointing_modes[i].lock_action == action) return true;
     }
     return false;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    for (uint8_t i = 0; i < PD_MODE_COUNT; i++) {
-        if (pd_modes[i].keycode != KC_NO && pd_modes[i].keycode == keycode) return pd_modes[i].mode_flag;
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
+    for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++) {
+        if (pointing_modes[i].keycode != KC_NO && pointing_modes[i].keycode == keycode) return pointing_modes[i].mode_flag;
     }
     return 0;
 }
@@ -267,7 +268,7 @@ static void test_real_authored_profile(void) {
     assert(runtime_compatibility.allowed_domain_mask == allowed_domains);
     assert(runtime_compatibility.action_abi_digest == profile.metadata.action_abi_digest);
     assert(runtime_compatibility.logical_layer_count == LAYER_COUNT);
-    assert(PD_MODE_COUNT == 32 && runtime_compatibility.supported_pd_mode_mask == UINT32_MAX);
+    assert(POINTING_MODE_COUNT == 32 && runtime_compatibility.supported_pointing_mode_mask == UINT32_MAX);
     assert(runtime_compatibility.macro_slot_count == MACRO_SLOT_COUNT);
     assert(runtime_compatibility.custom_key_count == NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS);
     assert(runtime_compatibility.rgb_limits.logical_layer_count == LAYER_COUNT);
@@ -345,12 +346,12 @@ static void test_real_authored_profile(void) {
     assert(!noah_profile_reader_read(&reader, output_length - 1u, slice, 2u));
     // Boot and compiled fallback must warm the real PD cache without replaying
     // canonical behavior sorting for every 20-byte read in the same scan.
-    noah_effective_profile_snapshot_t snapshot = {.reader = reader};
+    noah_active_profile_snapshot_t snapshot = {.reader = reader};
     snapshot.profile.domain_mask = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_PD;
     snapshot.profile.byte_length = (uint16_t)output_length;
     behavior_visits = 0;
-    noah_effective_pd_invalidate(NULL, 0, snapshot.identity, snapshot.identity, &snapshot);
-    assert(noah_effective_pd_ready());
+    noah_active_profile_pd_invalidate(NULL, 0, snapshot.identity, snapshot.identity, &snapshot);
+    assert(noah_active_profile_pd_ready());
     // The sparse domain stores the authored slots that say something; the
     // cache holds all 32, omitted ones disabled with an empty name.
     const uint8_t *pd_payload = decoded.domains[4].payload;
@@ -359,7 +360,7 @@ static void test_real_authored_profile(void) {
     // A stored slot is its wire record byte for byte.
     uint8_t stored = 0;
     for (uint8_t slot = 0; slot < NOAH_PROFILE_PD_V1_SLOT_COUNT; slot++) {
-        const noah_pd_config_t *record  = noah_effective_pd_record(slot);
+        const noah_pd_config_t *record  = noah_active_profile_pd_record(slot);
         const noah_pd_config_t  omitted = {.id = slot};
         assert(record && record->id == slot);
         if (stored < pd_payload[3] && pd_payload[8 + stored * NOAH_PROFILE_PD_V1_RECORD_SIZE] == slot) {
@@ -371,7 +372,7 @@ static void test_real_authored_profile(void) {
     }
     assert(stored == pd_payload[3]);
     // Slots 0..7 carry the authored presets; slots 8..31 are empty.
-    assert(pd_payload[3] == 8 && noah_effective_pd_record(7)->kind == NOAH_PD_KIND_DIRECTIONAL && noah_effective_pd_record(8)->kind == NOAH_PD_KIND_DISABLED);
+    assert(pd_payload[3] == 8 && noah_active_profile_pd_record(7)->kind == NOAH_PD_KIND_DIRECTIONAL && noah_active_profile_pd_record(8)->kind == NOAH_PD_KIND_DISABLED);
     fprintf(stderr, "compiled PD cache warmup: %zu behavior-row sorts\n", behavior_visits);
     assert(behavior_visits == 0);
     // Exercise every PD byte and record boundary against the full golden stream.
@@ -420,11 +421,11 @@ static void test_semantic_action_translation(void) {
     assert(noah_profile_compiled_v1_action(LOCK_LAYER(LAYER_SYM), &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK && action.operand == LAYER_SYM);
     assert(noah_profile_compiled_v1_action(MACRO_10, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_MACRO && action.operand == 10u);
     assert(noah_profile_compiled_v1_action(CUSTOM_KEY_7, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_CUSTOM_KEY && action.operand == 7u);
-    assert(noah_profile_compiled_v1_action(pd_modes[PD_MODE_INDEX_ZOOM].keycode, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && action.operand == PD_MODE_INDEX_ZOOM);
-    assert(noah_profile_compiled_v1_action(pd_modes[PD_MODE_INDEX_ARROW].lock_action, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK && action.operand == PD_MODE_INDEX_ARROW);
+    assert(noah_profile_compiled_v1_action(pointing_modes[POINTING_MODE_INDEX_ZOOM].keycode, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY && action.operand == POINTING_MODE_INDEX_ZOOM);
+    assert(noah_profile_compiled_v1_action(pointing_modes[POINTING_MODE_INDEX_ARROW].lock_action, &action) == NOAH_PROFILE_COMPILED_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_POINTING_MODE_LOCK && action.operand == POINTING_MODE_INDEX_ARROW);
 
     const uint16_t round_trip_actions[] = {
-        KC_NO, KC_A, MO(LAYER_NAV), LOCK_LAYER(LAYER_SYM), MACRO_10, CUSTOM_KEY_7, CUSTOM_KEY_63, pd_modes[PD_MODE_INDEX_ZOOM].keycode, pd_modes[PD_MODE_INDEX_ARROW].lock_action,
+        KC_NO, KC_A, MO(LAYER_NAV), LOCK_LAYER(LAYER_SYM), MACRO_10, CUSTOM_KEY_7, CUSTOM_KEY_63, pointing_modes[POINTING_MODE_INDEX_ZOOM].keycode, pointing_modes[POINTING_MODE_INDEX_ARROW].lock_action,
     };
     for (size_t index = 0u; index < ARRAY_SIZE(round_trip_actions); index++) {
         assert(noah_profile_action_runtime_v1_from_native(round_trip_actions[index], &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK);
@@ -433,11 +434,11 @@ static void test_semantic_action_translation(void) {
     }
     // Every slot's hold and lock keycode reaches that slot and comes back, and
     // the codes either side of both blocks are not pointing keys.
-    for (uint8_t slot = 0u; slot < PD_MODE_COUNT; slot++) {
-        assert(noah_profile_action_runtime_v1_from_native(pd_modes[slot].keycode, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && action.operand == slot);
-        assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && native == pd_modes[slot].keycode);
-        assert(noah_profile_action_runtime_v1_from_native(pd_modes[slot].lock_action, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK && action.operand == slot);
-        assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && native == pd_modes[slot].lock_action);
+    for (uint8_t slot = 0u; slot < POINTING_MODE_COUNT; slot++) {
+        assert(noah_profile_action_runtime_v1_from_native(pointing_modes[slot].keycode, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY && action.operand == slot);
+        assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && native == pointing_modes[slot].keycode);
+        assert(noah_profile_action_runtime_v1_from_native(pointing_modes[slot].lock_action, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_POINTING_MODE_LOCK && action.operand == slot);
+        assert(noah_profile_action_runtime_v1_to_native(&action, &native) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && native == pointing_modes[slot].lock_action);
     }
     assert(noah_profile_action_runtime_v1_from_native(CUSTOM_KEY_63, &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_CUSTOM_KEY);
     assert(noah_profile_action_runtime_v1_from_native(LOCK_LAYER(0), &action) == NOAH_PROFILE_ACTION_RUNTIME_V1_OK && action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK && action.operand == 0u);

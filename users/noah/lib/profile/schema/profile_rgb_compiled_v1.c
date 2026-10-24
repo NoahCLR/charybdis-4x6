@@ -17,11 +17,11 @@ extern const uint8_t                               layer_led_group_count;
 extern const automouse_fade_end_config_t automouse_fade_end_config;
 #    endif
 
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-extern const pd_mode_color_t            pd_mode_colors[];
-extern const uint8_t                    pd_mode_color_count;
-extern const pd_mode_led_group_t *const pd_mode_led_groups;
-extern const uint8_t                    pd_mode_led_group_count;
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+extern const pointing_mode_color_t      pointing_mode_colors[];
+extern const uint8_t                    pointing_mode_color_count;
+extern const pointing_mode_led_group_t *const pointing_mode_led_groups;
+extern const uint8_t                    pointing_mode_led_group_count;
 #    endif
 
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
@@ -42,8 +42,8 @@ uint16_t noah_profile_rgb_compiled_v1_stage_mask(void) {
 #    ifdef RGB_AUTOMOUSE_GRADIENT_ENABLE
     mask |= NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE;
 #    endif
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-    mask |= NOAH_PROFILE_RGB_V1_STAGE_PD_MODE;
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+    mask |= NOAH_PROFILE_RGB_V1_STAGE_POINTING_MODE;
 #    endif
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
     mask |= NOAH_PROFILE_RGB_V1_STAGE_COMBO;
@@ -56,8 +56,8 @@ uint16_t noah_profile_rgb_compiled_v1_stage_mask(void) {
 
 static uint8_t rgb_group_row_count(void) {
     uint16_t count = saved_led_group_count + layer_led_group_count;
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-    count += pd_mode_led_group_count;
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+    count += pointing_mode_led_group_count;
 #    endif
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
     count += combo_feedback_led_group_count;
@@ -74,9 +74,9 @@ static const rgb_led_group_t *rgb_group_row_at(uint8_t index) {
     index = (uint8_t)(index - saved_led_group_count);
     if (index < layer_led_group_count) return &layer_led_groups[index].led_group;
     index = (uint8_t)(index - layer_led_group_count);
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-    if (index < pd_mode_led_group_count) return &pd_mode_led_groups[index].led_group;
-    index = (uint8_t)(index - pd_mode_led_group_count);
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+    if (index < pointing_mode_led_group_count) return &pointing_mode_led_groups[index].led_group;
+    index = (uint8_t)(index - pointing_mode_led_group_count);
 #    endif
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
     if (index < combo_feedback_led_group_count) return &combo_feedback_led_groups[index].led_group;
@@ -153,14 +153,14 @@ static noah_profile_compiled_v1_result_t rgb_group_bitmap_for_id(uint8_t id, uin
     return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, id, UINT8_MAX);
 }
 
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-static uint8_t pd_id_from_mask(pd_mode_mask_t mask) {
-    return pd_mode_id_from_mask(mask);
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+static uint8_t pd_id_from_mask(pointing_mode_mask_t mask) {
+    return pointing_mode_id_from_mask(mask);
 }
 
-static const pd_mode_color_t *pd_color_for_id(uint8_t id) {
-    for (uint8_t index = 0u; index < pd_mode_color_count; index++) {
-        if (pd_id_from_mask(pd_mode_colors[index].pointing_mode) == id) return &pd_mode_colors[index];
+static const pointing_mode_color_t *pd_color_for_id(uint8_t id) {
+    for (uint8_t index = 0u; index < pointing_mode_color_count; index++) {
+        if (pd_id_from_mask(pointing_mode_colors[index].pointing_mode) == id) return &pointing_mode_colors[index];
     }
     return NULL;
 }
@@ -175,8 +175,8 @@ static noah_profile_compiled_v1_result_t rgb_compiled_length(size_t *length, uin
     uint16_t                          group_rows = layer_led_group_count;
     size_t                            total;
     noah_profile_compiled_v1_result_t result;
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-    group_rows += pd_mode_led_group_count;
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+    group_rows += pointing_mode_led_group_count;
 #    endif
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
     group_rows += combo_feedback_led_group_count;
@@ -188,9 +188,9 @@ static noah_profile_compiled_v1_result_t rgb_compiled_length(size_t *length, uin
     result = rgb_group_count(groups, error);
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
     total = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + (size_t)*groups * NOAH_PROFILE_RGB_V1_GROUP_RECORD_SIZE + (size_t)LAYER_COUNT * NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE + (size_t)layer_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-    if (pd_mode_color_count != PD_MODE_COUNT) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
-    total += (size_t)pd_mode_color_count * NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE + (size_t)pd_mode_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+    if (pointing_mode_color_count != POINTING_MODE_COUNT) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, UINT8_MAX, UINT8_MAX);
+    total += (size_t)pointing_mode_color_count * NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE + (size_t)pointing_mode_led_group_count * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE;
 #    endif
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
     total += (size_t)combo_feedback_led_group_count * NOAH_PROFILE_RGB_V1_COMBO_GROUP_RECORD_SIZE;
@@ -219,8 +219,8 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
     (void)payload_length;
     if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
     if (!(emit_u8(writer, NOAH_PROFILE_RGB_V1_FORMAT_VERSION) && emit_u8(writer, 0u) && emit_u16(writer, noah_profile_rgb_compiled_v1_stage_mask()) && emit_u8(writer, group_count) && emit_u8(writer, LAYER_COUNT) && emit_u8(writer, layer_led_group_count)
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-          && emit_u8(writer, pd_mode_color_count) && emit_u8(writer, pd_mode_led_group_count)
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+          && emit_u8(writer, pointing_mode_color_count) && emit_u8(writer, pointing_mode_led_group_count)
 #    else
           && emit_u8(writer, 0u) && emit_u8(writer, 0u)
 #    endif
@@ -257,15 +257,15 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
 #    else
     if (!(emit_u8(writer, 0u) && emit_u8(writer, 0u) && emit_u8(writer, 0u) && emit_u8(writer, 0u))) return writer->result;
 #    endif
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-    for (uint8_t id = 0u; id < PD_MODE_COUNT; id++) {
-        const pd_mode_color_t *color = pd_color_for_id(id);
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+    for (uint8_t id = 0u; id < POINTING_MODE_COUNT; id++) {
+        const pointing_mode_color_t *color = pd_color_for_id(id);
         if (!color || !(emit_u8(writer, id) && emit_hsv(writer, color->color) && emit_u8(writer, color->locality))) return color ? writer->result : fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, id, UINT8_MAX);
     }
-    for (uint8_t index = 0u; index < pd_mode_led_group_count; index++) {
-        uint8_t selector = pd_mode_led_groups[index].pointing_mode == RGB_PD_MODE_GROUP_ALL ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : pd_id_from_mask(pd_mode_led_groups[index].pointing_mode);
-        if (selector != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && selector >= PD_MODE_COUNT) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, index, UINT8_MAX);
-        result = emit_group_row(writer, selector, pd_mode_led_groups[index].color, &pd_mode_led_groups[index].led_group, error);
+    for (uint8_t index = 0u; index < pointing_mode_led_group_count; index++) {
+        uint8_t selector = pointing_mode_led_groups[index].pointing_mode == RGB_POINTING_MODE_GROUP_ALL ? NOAH_PROFILE_RGB_V1_SELECTOR_ALL : pd_id_from_mask(pointing_mode_led_groups[index].pointing_mode);
+        if (selector != NOAH_PROFILE_RGB_V1_SELECTOR_ALL && selector >= POINTING_MODE_COUNT) return fail(error, NOAH_PROFILE_COMPILED_V1_INVALID_RGB, NOAH_PROFILE_COMPILED_V1_SURFACE_RGB, index, UINT8_MAX);
+        result = emit_group_row(writer, selector, pointing_mode_led_groups[index].color, &pointing_mode_led_groups[index].led_group, error);
         if (result != NOAH_PROFILE_COMPILED_V1_OK) return result;
     }
 #    endif
@@ -310,7 +310,7 @@ noah_profile_compiled_v1_result_t noah_profile_rgb_compiled_v1_write(compiled_wr
 // Maximum canonical RGB geometry: fixed records, sixteen bitmap groups,
 // eight layer colors, 32 PD colors, 32 stage rows total, four tap colors.
 // This is a structural bound, not a profile-sized buffer or a RAM claim.
-enum { RGB_DEFAULTS_CACHE_SIZE = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + NOAH_PROFILE_RGB_V1_MAX_GROUPS * NOAH_PROFILE_RGB_V1_GROUP_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS * NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_PD_MODES * NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE };
+enum { RGB_DEFAULTS_CACHE_SIZE = NOAH_PROFILE_RGB_V1_FIXED_PAYLOAD_SIZE + NOAH_PROFILE_RGB_V1_MAX_GROUPS * NOAH_PROFILE_RGB_V1_GROUP_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS * NOAH_PROFILE_RGB_V1_LAYER_COLOR_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES * NOAH_PROFILE_RGB_V1_PD_COLOR_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS * NOAH_PROFILE_RGB_V1_GROUP_ROW_RECORD_SIZE + NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS * NOAH_PROFILE_RGB_V1_COLOR_RECORD_SIZE };
 static uint8_t                    cached_bytes[RGB_DEFAULTS_CACHE_SIZE];
 static noah_profile_rgb_v1_view_t cached_view;
 static bool                       cached;
@@ -330,7 +330,7 @@ const noah_profile_rgb_v1_view_t *noah_profile_rgb_compiled_v1_view(void) {
         compiled_writer_t            writer = {.write = cache_write, .context = &sink};
         noah_profile_rgb_v1_limits_t limits = noah_profile_rgb_v1_default_limits();
         limits.logical_layer_count          = LAYER_COUNT;
-        limits.supported_pd_mode_mask       = UINT32_MAX >> (32u - PD_MODE_COUNT);
+        limits.supported_pointing_mode_mask = UINT32_MAX >> (32u - POINTING_MODE_COUNT);
 #    ifdef RGB_MATRIX_MAXIMUM_BRIGHTNESS
         limits.maximum_brightness = RGB_MATRIX_MAXIMUM_BRIGHTNESS;
 #    endif

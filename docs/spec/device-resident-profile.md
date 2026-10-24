@@ -59,7 +59,7 @@ A build without the live-profile owner (`NOAH_LIVE_PROFILE_OWNER=no`) only
 discovers: it runs boot selection over a read-only view of its slots, reports
 what it found, runs its compiled defaults and never saves.
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_test.c`, `test_empty_boot_live_commit_and_timeout`, `test_boot_status_is_pending_until_activation`), `tests/host/run_profile_wire_v1_tests.sh` (`qmk_profile_channel_test.c`, the pending kind through the boot), `tests/host/run_effective_profile_provider_tests.sh` (`effective_profile_provider_test.c`), `tests/host/run_profile_candidate_store_backend_tests.sh` (`profile_candidate_store_backend_test.c`, `test_override_disabled_commit_activates_compiled_fallback`), `tests/host/run_profile_store_runtime_tests.sh` (`profile_store_runtime_test.c`, `test_qmk_adapter_is_region_bounded_and_read_only`, `test_old_compiled_default_record_falls_back`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_test.c`, `test_empty_boot_live_commit_and_timeout`, `test_boot_status_is_pending_until_activation`), `tests/host/run_profile_wire_v1_tests.sh` (`qmk_profile_channel_test.c`, the pending kind through the boot), `tests/host/run_active_profile_provider_tests.sh` (`active_profile_provider_test.c`), `tests/host/run_profile_candidate_store_backend_tests.sh` (`profile_candidate_store_backend_test.c`, `test_override_disabled_commit_activates_compiled_fallback`), `tests/host/run_profile_store_runtime_tests.sh` (`profile_store_runtime_test.c`, `test_qmk_adapter_is_region_bounded_and_read_only`, `test_old_compiled_default_record_falls_back`).
 
 ## Profile domains
 
@@ -259,8 +259,8 @@ Held by: `tests/host/run_profile_flash_store_tests.sh` (`profile_flash_store_tes
 
 ## Writing a slot
 
-A save writes only the slot not holding the committed record (slot A when
-nothing is committed), so the previous saved profile stays whole until the
+A save writes only the slot not holding the saved record (slot A when
+nothing is saved), so the previous saved profile stays whole until the
 new one's marker is committed. The store admits a candidate only when:
 
 - boot selection has run, found no generation conflict, and no final marker
@@ -269,7 +269,7 @@ new one's marker is committed. The store admits a candidate only when:
 - it is format 6, schema 4.0, `8..130,048` bytes, with only known domain-mask
   and flag bits and origin 0 or 1;
 - its action-ABI and compiled-default digests are the build's;
-- its generation is strictly greater than the committed one.
+- its generation is strictly greater than the saved one.
 
 Then, in order:
 
@@ -336,7 +336,7 @@ Held by: `tests/host/run_profile_store_tests.sh` (`profile_store_test.c`, `test_
 ## Generations
 
 Generations are unsigned 32-bit and strictly increase. The store's next
-generation is the committed one plus one, or 1 when nothing is committed.
+generation is the saved one plus one, or 1 when nothing is saved.
 Zero is never a generation, and `UINT32_MAX` is terminal: the store offers no
 next generation after it and never wraps. A store in a generation conflict
 offers none either.

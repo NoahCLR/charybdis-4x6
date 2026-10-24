@@ -63,7 +63,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$KEYMAP_PATH/rgb_config.c" \
     "$ROOT/users/noah/lib/profile/protocol/profile_wire_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
-    "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
+    "$ROOT/users/noah/lib/profile/runtime/active_profile_pd_runtime.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_compiled_defaults_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
     "$ROOT/users/noah/lib/profile/schema/key_behavior_compiled_v1.c" \

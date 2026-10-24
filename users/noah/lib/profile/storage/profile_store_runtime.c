@@ -57,14 +57,14 @@ void noah_profile_store_runtime_init(void) {
     runtime_owner_initialized    = false;
     runtime_transport_registered = false;
     runtime_integration_error    = false;
-    discovery_result             = NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
+    discovery_result             = NOAH_PROFILE_STORE_NO_SAVED_PROFILE;
 #    if defined(SPLIT_KEYBOARD) && defined(SPLIT_TRANSACTION_IDS_USER)
     if (!noah_qmk_physical_half_origin(&origin) || !noah_profile_owner_init(&runtime_owner, &(noah_profile_owner_config_t){
                                                                                                 .store_io                = noah_qmk_profile_flash_io(),
                                                                                                 .split_exchange          = noah_qmk_profile_split_transport_exchange,
                                                                                                 .split_transport_context = NULL,
                                                                                                 .origin_half             = origin,
-                                                                                                .peer_required           = true,
+                                                                                                .other_half_required     = true,
                                                                                                 .working_bytes           = runtime_working_bytes,
                                                                                                 .working_capacity        = sizeof(runtime_working_bytes),
                                                                                                 .working_session         = noah_qmk_profile_working_session(),
@@ -105,7 +105,7 @@ void noah_profile_store_runtime_init(void) {
                                 .compiled_default_digest = compiled.metadata.digest,
                                 .action_abi_digest       = compiled.metadata.action_abi_digest,
                             });
-    discovery_result = NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE;
+    discovery_result = NOAH_PROFILE_STORE_NO_SAVED_PROFILE;
     runtime_state    = NOAH_PROFILE_STORE_RUNTIME_DISCOVERY_PENDING;
 #endif
 }
@@ -163,7 +163,7 @@ bool noah_qmk_durable_io_store_step(void *context, bool again, uint32_t now_ms) 
             break;
         case NOAH_PROFILE_OWNER_READY_VALIDATED:
         case NOAH_PROFILE_OWNER_ACTIVATING_COMMITTED:
-            runtime_state = NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND;
+            runtime_state = NOAH_PROFILE_STORE_RUNTIME_SAVED_FOUND;
             break;
         case NOAH_PROFILE_OWNER_GENERATION_CONFLICT:
         case NOAH_PROFILE_OWNER_CONCURRENT_COMMIT:
@@ -192,12 +192,12 @@ bool noah_qmk_durable_io_store_step(void *context, bool again, uint32_t now_ms) 
         return false;
     }
 
-    discovery_result = noah_profile_store_boot_select(&runtime_store, &runtime_store.committed);
+    discovery_result = noah_profile_store_boot_select(&runtime_store, &runtime_store.saved);
     switch (discovery_result) {
         case NOAH_PROFILE_STORE_OK:
-            runtime_state = NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND;
+            runtime_state = NOAH_PROFILE_STORE_RUNTIME_SAVED_FOUND;
             break;
-        case NOAH_PROFILE_STORE_NO_COMMITTED_PROFILE:
+        case NOAH_PROFILE_STORE_NO_SAVED_PROFILE:
             runtime_state = NOAH_PROFILE_STORE_RUNTIME_COMPILED_FALLBACK;
             break;
         case NOAH_PROFILE_STORE_GENERATION_CONFLICT:
@@ -223,16 +223,16 @@ noah_profile_store_result_t noah_profile_store_runtime_discovery_result(void) {
     return discovery_result;
 }
 
-const noah_profile_store_record_t *noah_profile_store_runtime_committed(void) {
+const noah_profile_store_record_t *noah_profile_store_runtime_saved(void) {
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
-    return runtime_owner_initialized && !runtime_integration_error ? noah_profile_owner_committed(&runtime_owner) : NULL;
+    return runtime_owner_initialized && !runtime_integration_error ? noah_profile_owner_saved(&runtime_owner) : NULL;
 #else
-    return runtime_state == NOAH_PROFILE_STORE_RUNTIME_COMMITTED_FOUND ? &runtime_store.committed : NULL;
+    return runtime_state == NOAH_PROFILE_STORE_RUNTIME_SAVED_FOUND ? &runtime_store.saved : NULL;
 #endif
 }
 
-bool noah_profile_store_runtime_read_committed(uint32_t offset, uint8_t *target, uint32_t length) {
-    const noah_profile_store_record_t *record = noah_profile_store_runtime_committed();
+bool noah_profile_store_runtime_read_saved(uint32_t offset, uint8_t *target, uint32_t length) {
+    const noah_profile_store_record_t *record = noah_profile_store_runtime_saved();
     const noah_profile_store_t        *store;
     noah_profile_storage_address_t  payload_start;
 
@@ -246,14 +246,14 @@ bool noah_profile_store_runtime_read_committed(uint32_t offset, uint8_t *target,
         return false;
     }
     // Bounds first: offset and length arrive from the host, so a request that
-    // runs past the committed payload is refused rather than clamped.
+    // runs past the saved payload is refused rather than clamped.
     if (offset > record->payload_length || length > record->payload_length - offset || !noah_profile_store_slot_payload_start(record->slot, &payload_start)) {
         return false;
     }
     return store->io.read(store->io.context, (payload_start + offset), target, length);
 }
 
-// The Profile Wire channel reads the committed payload a chunk at a time,
+// The Profile Wire channel reads the saved payload a chunk at a time,
 // and one store read covers a chunk.
 _Static_assert((uint32_t)NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE <= (uint32_t)NOAH_PROFILE_STORE_IO_CHUNK_MAX, "a Profile Wire readback chunk is one store read");
 
@@ -305,11 +305,11 @@ bool noah_profile_store_runtime_owner_status(noah_profile_owner_status_t *status
 #endif
 }
 
-bool noah_profile_store_runtime_peer_transfer(noah_profile_candidate_v1_peer_status_t *peer) {
+bool noah_profile_store_runtime_other_half_transfer(noah_profile_candidate_v1_copy_status_t *other_half) {
 #if defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
-    return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_peer_transfer(&runtime_owner, peer);
+    return runtime_owner_initialized && !runtime_integration_error && noah_profile_owner_other_half_transfer(&runtime_owner, other_half);
 #else
-    (void)peer;
+    (void)other_half;
     return false;
 #endif
 }

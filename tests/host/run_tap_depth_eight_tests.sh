@@ -21,7 +21,7 @@ printf '%s\n' \
     run_key_runtime_release_matrix_tests.sh \
     run_key_runtime_integration_harness_tests.sh \
     run_rgb_layer_render_tests.sh \
-    run_effective_rgb_runtime_tests.sh \
+    run_active_profile_rgb_runtime_tests.sh \
     run_split_runtime_sync_tests.sh \
     run_runtime_debug_tests.sh |
     xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)" -I{} sh -c 'PATH="$WRAP_DIR:$PATH" sh "$ROOT/$1" >/dev/null' runner {}

@@ -19,9 +19,9 @@
     const layer_led_group_t *const layer_led_groups      = (groups_); \
     const uint8_t                  layer_led_group_count = (uint8_t)(sizeof(groups_) / sizeof((groups_)[0]))
 
-#define EXPORT_PD_MODE_LED_GROUPS(groups_)                                \
-    const pd_mode_led_group_t *const pd_mode_led_groups      = (groups_); \
-    const uint8_t                    pd_mode_led_group_count = (uint8_t)(sizeof(groups_) / sizeof((groups_)[0]))
+#define EXPORT_POINTING_MODE_LED_GROUPS(groups_)                                      \
+    const pointing_mode_led_group_t *const pointing_mode_led_groups      = (groups_); \
+    const uint8_t                          pointing_mode_led_group_count = (uint8_t)(sizeof(groups_) / sizeof((groups_)[0]))
 
 #define EXPORT_COMBO_FEEDBACK_LED_GROUPS(groups_)                                       \
     const combo_feedback_led_group_t *const combo_feedback_led_groups      = (groups_); \
@@ -39,9 +39,9 @@
     const layer_led_group_t *const layer_led_groups      = (groups_); \
     const uint8_t                  layer_led_group_count = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
 
-#define EXPORT_PD_MODE_LED_GROUP_TABLE(groups_)                           \
-    const pd_mode_led_group_t *const pd_mode_led_groups      = (groups_); \
-    const uint8_t                    pd_mode_led_group_count = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
+#define EXPORT_POINTING_MODE_LED_GROUP_TABLE(groups_)                                 \
+    const pointing_mode_led_group_t *const pointing_mode_led_groups      = (groups_); \
+    const uint8_t                          pointing_mode_led_group_count = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
 
 #define EXPORT_COMBO_FEEDBACK_LED_GROUP_TABLE(groups_)                                  \
     const combo_feedback_led_group_t *const combo_feedback_led_groups      = (groups_); \
@@ -51,12 +51,12 @@
     const key_behavior_feedback_led_group_t *const key_behavior_feedback_led_groups      = (groups_); \
     const uint8_t                                  key_behavior_feedback_led_group_count = (uint8_t)(ARRAY_SIZE(groups_) - 1u)
 
-#if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-#    define _RGB_PD_MODE_COLOR_COUNT_DATA() const uint8_t pd_mode_color_count = (uint8_t)ARRAY_SIZE(pd_mode_colors);
-#    define _RGB_PD_MODE_LED_GROUP_DATA() EXPORT_PD_MODE_LED_GROUP_TABLE(pd_mode_led_groups_data);
+#if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+#    define _RGB_POINTING_MODE_COLOR_COUNT_DATA() const uint8_t pointing_mode_color_count = (uint8_t)ARRAY_SIZE(pointing_mode_colors);
+#    define _RGB_POINTING_MODE_LED_GROUP_DATA() EXPORT_POINTING_MODE_LED_GROUP_TABLE(pointing_mode_led_groups_data);
 #else
-#    define _RGB_PD_MODE_COLOR_COUNT_DATA()
-#    define _RGB_PD_MODE_LED_GROUP_DATA()
+#    define _RGB_POINTING_MODE_COLOR_COUNT_DATA()
+#    define _RGB_POINTING_MODE_LED_GROUP_DATA()
 #endif
 
 #if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
@@ -72,8 +72,8 @@
 #endif
 
 #define MATERIALIZE_RGB_CONFIG()                         \
-    _RGB_PD_MODE_COLOR_COUNT_DATA()                      \
-    _RGB_PD_MODE_LED_GROUP_DATA()                        \
+    _RGB_POINTING_MODE_COLOR_COUNT_DATA()                \
+    _RGB_POINTING_MODE_LED_GROUP_DATA()                  \
     _RGB_COMBO_FEEDBACK_LED_GROUP_DATA()                 \
     _RGB_KEY_BEHAVIOR_FEEDBACK_LED_GROUP_DATA()          \
     EXPORT_SAVED_LED_GROUP_TABLE(saved_led_groups_data); \

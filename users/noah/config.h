@@ -29,7 +29,7 @@
 #    define SERIAL_USART_TIMEOUT 5
 
 // Profile Apply copies the profile to the other half in split RPC frames, and
-// the USB half pulls the other half's newer profile in them. QMK sends each
+// the master half pulls the other half's newer profile in them. QMK sends each
 // RPC's own request and reply lengths, so these raise the ceiling for the
 // profile copy's payload chunks only (up to 106 profile bytes a frame, pushed
 // or pulled, instead of 10); every other split RPC keeps its 32-byte frames.
@@ -72,13 +72,14 @@
 // so both halves render layer-owned RGB from the same runtime and keymap data.
 #    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_COMBO_FEEDBACK_SYNC, PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC, PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC, PUT_PROFILE_SPLIT_SYNC, PUT_PROFILE_FLASH_DIAGNOSTICS, PUT_PROFILE_WORKING_SYNC, PUT_KEYBOARD_RESTART
 
-// Dynamic key-local placement for PD-mode RGB overlays.
-// Required only when a pd_mode_colors[] row uses RGB_KEY_HALF or
+// Dynamic key-local placement for pointing-mode RGB overlays.
+// Required only when a pointing_mode_colors[] row uses RGB_KEY_HALF or
 // RGB_KEYS_ONLY.
-// Comment out RGB_PD_MODE_ACTIVE_HALF_ENABLE to keep the split runtime packet
-// smaller and limit PD overlays to fixed left/right/both placement modes.
+// Comment out RGB_POINTING_MODE_ACTIVE_HALF_ENABLE to keep the split runtime
+// packet smaller and limit PD overlays to fixed left/right/both placement
+// modes.
 #    ifdef POINTING_DEVICE_ENABLE
-#        define RGB_PD_MODE_ACTIVE_HALF_ENABLE
+#        define RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
 #    endif
 
 #endif // SPLIT_KEYBOARD
@@ -154,11 +155,11 @@
 // report and retain at most this many whole-tap steps for later zero-motion
 // polls. Excess same-direction intent is dropped with diagnostics instead of
 // monopolizing the firmware loop.
-#    ifndef NOAH_PD_MODE_MAX_TAPS_PER_TICK
-#        define NOAH_PD_MODE_MAX_TAPS_PER_TICK 4
+#    ifndef NOAH_POINTING_MODE_MAX_TAPS_PER_TICK
+#        define NOAH_POINTING_MODE_MAX_TAPS_PER_TICK 4
 #    endif
-#    ifndef NOAH_PD_MODE_MAX_BACKLOG_TAPS
-#        define NOAH_PD_MODE_MAX_BACKLOG_TAPS 32
+#    ifndef NOAH_POINTING_MODE_MAX_BACKLOG_TAPS
+#        define NOAH_POINTING_MODE_MAX_BACKLOG_TAPS 32
 #    endif
 
 // Hi-res scroll: each scroll unit = 1/120th of a notch.

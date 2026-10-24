@@ -168,10 +168,10 @@ noah_profile_candidate_v1_decode_result_t noah_profile_candidate_v1_decode(const
         if (command->payload.reuse.source_offset > NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE - length) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 9u);
         }
-        bool committed_base = command->payload.reuse.source.generation != 0u && frame[30] <= 1u;
+        bool saved_base = command->payload.reuse.source.generation != 0u && frame[30] <= 1u;
         bool compiled_base  = command->payload.reuse.source.generation == 0u && frame[30] == UINT8_MAX;
         // Kind 2 is the working copy (D-F32), over either base.
-        if (frame[29] > 2u || (frame[29] == 0u && !compiled_base) || (frame[29] == 1u && !committed_base) || (frame[29] == 2u && !committed_base && !compiled_base)) {
+        if (frame[29] > 2u || (frame[29] == 0u && !compiled_base) || (frame[29] == 1u && !saved_base) || (frame[29] == 2u && !saved_base && !compiled_base)) {
             return fail(error, NOAH_PROFILE_CANDIDATE_V1_DECODE_MALFORMED, 29u);
         }
         return require_zero(frame, 31u, NOAH_PROFILE_WIRE_V1_REPORT_SIZE, error);
@@ -287,10 +287,10 @@ bool noah_profile_candidate_v1_handle_status_get(const noah_profile_candidate_v1
     return true; // Bytes 23..24 remain reserved zero.
 }
 
-bool noah_profile_candidate_v1_handle_peer_status_get(const noah_profile_candidate_v1_peer_status_t *peer, uint8_t *frame, size_t length) {
+bool noah_profile_candidate_v1_handle_copy_status_get(const noah_profile_candidate_v1_copy_status_t *other_half, uint8_t *frame, size_t length) {
     uint8_t *payload;
 
-    if (!peer || !frame || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE) {
+    if (!other_half || !frame || length != NOAH_PROFILE_WIRE_V1_REPORT_SIZE) {
         return false;
     }
     if (frame[FRAME_COMMAND] != NOAH_PROFILE_WIRE_V1_COMMAND_GET || frame[FRAME_CHANNEL] != NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL || frame[FRAME_VALUE] != NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS || (frame[FRAME_READ_PAGE] != 1u && frame[FRAME_READ_PAGE] != 2u)) {
@@ -307,28 +307,28 @@ bool noah_profile_candidate_v1_handle_peer_status_get(const noah_profile_candida
     payload[0] = 2u;
     if (page == 2u) {
         // The transfer length is page 1's; this page keeps the offset only.
-        payload[1] = peer->reuse_unavailable ? 1u : 0u;
-        write_u32(&payload[2], peer->reused_bytes);
-        write_u16(&payload[6], peer->reuse_exchanges);
-        write_u16(&payload[8], peer->source_unavailable_replies);
-        write_u32(&payload[10], peer->prepared_scans);
-        write_u32(&payload[14], peer->prepared_exchanges);
-        write_u32(&payload[18], peer->transfer_offset);
+        payload[1] = other_half->reuse_unavailable ? 1u : 0u;
+        write_u32(&payload[2], other_half->reused_bytes);
+        write_u16(&payload[6], other_half->reuse_exchanges);
+        write_u16(&payload[8], other_half->source_unavailable_replies);
+        write_u32(&payload[10], other_half->prepared_scans);
+        write_u32(&payload[14], other_half->prepared_exchanges);
+        write_u32(&payload[18], other_half->transfer_offset);
         return true; // Bytes 22..24 remain reserved zero.
     }
-    payload[1] = (uint8_t)peer->phase;
-    payload[2] = peer->last_status;
-    payload[3] = (uint8_t)(peer->flags & NOAH_PROFILE_CANDIDATE_V1_PEER_FLAGS_KNOWN);
-    write_u32(&payload[4], peer->transfer_offset);
-    write_u32(&payload[8], peer->transfer_length);
-    write_u32(&payload[12], peer->retry_count);
-    write_u32(&payload[16], peer->transport_failure_count);
-    write_u16(&payload[20], peer->busy_streak);
-    payload[22] = peer->busy_reason;
-    payload[23] = peer->busy_store_state;
+    payload[1] = (uint8_t)other_half->phase;
+    payload[2] = other_half->last_status;
+    payload[3] = (uint8_t)(other_half->flags & NOAH_PROFILE_CANDIDATE_V1_COPY_FLAGS_KNOWN);
+    write_u32(&payload[4], other_half->transfer_offset);
+    write_u32(&payload[8], other_half->transfer_length);
+    write_u32(&payload[12], other_half->retry_count);
+    write_u32(&payload[16], other_half->transport_failure_count);
+    write_u16(&payload[20], other_half->busy_streak);
+    payload[22] = other_half->busy_reason;
+    payload[23] = other_half->busy_store_state;
     // Transfer owner (0..2) in the low nibble, storage admission (0..2) in
     // the high one.
-    payload[24] = (uint8_t)((peer->busy_owner & 0x0Fu) | (uint8_t)(peer->busy_admission << 4u));
+    payload[24] = (uint8_t)((other_half->busy_owner & 0x0Fu) | (uint8_t)(other_half->busy_admission << 4u));
     return true;
 }
 

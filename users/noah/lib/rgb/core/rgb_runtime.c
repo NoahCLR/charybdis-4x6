@@ -1,16 +1,16 @@
-#include "lib/profile/runtime/effective_settings_runtime.h"
+#include "lib/profile/runtime/active_profile_settings_runtime.h"
 // ────────────────────────────────────────────────────────────────────────────
 // RGB Runtime
 // ────────────────────────────────────────────────────────────────────────────
 
 #include "rgb_runtime.h"
-#include "rgb_effective_config.h"
+#include "rgb_active_profile_config.h"
 #include "rgb_helpers.h"
 #include "../automouse/rgb_automouse_stage.h"
 #include "../stages/rgb_combo_feedback_stage.h"
 #include "../stages/rgb_key_feedback_stage.h"
 #include "../stages/rgb_layer_stage.h"
-#include "../stages/rgb_pd_mode_stage.h"
+#include "../stages/rgb_pointing_mode_stage.h"
 #include "../stages/rgb_preview_stage.h"
 #include "../../state/diagnostics/runtime_diag.h"
 #include "rgb_validation.h"
@@ -21,8 +21,8 @@
 #endif
 
 #ifdef RGB_MATRIX_ENABLE
-static rgb_runtime_frame_t        rgb_runtime_frame_primary;
-static noah_effective_rgb_frame_t rgb_runtime_profile_frame;
+static rgb_runtime_frame_t             rgb_runtime_frame_primary;
+static noah_active_profile_rgb_frame_t rgb_runtime_profile_frame;
 
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
 static uint16_t rgb_runtime_stage_pipeline_count;
@@ -82,11 +82,12 @@ static void rgb_runtime_render_snapshot_ensure_combo(void) {
 }
 
 #        ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
-// Split staleness only. The mirrored key-feedback packet can lag the combo
-// packet, so a key the slave now paints as part of a combo footprint may still
-// carry a tap-branch semantic from before. Dropping it here keeps a stale color
-// from stomping the live footprint; this is not a judgement about whether a combo
-// member should ever show its branch, which the engine map decides.
+// Hides a combo member's tap-branch colour on both halves. The slave half's
+// mirrored key-feedback packet can lag its combo packet, so a key it now paints
+// as part of a combo footprint may still carry a tap-branch semantic from
+// before; dropping it keeps a stale colour from stomping the live footprint.
+// The master half, whose state is never stale, does the same so the halves
+// look alike.
 static void rgb_runtime_render_snapshot_suppress_combo_tap_branch_semantics(void) {
     for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
         for (uint8_t col = 0; col < MATRIX_COLS; col++) {
@@ -181,7 +182,7 @@ static bool rgb_runtime_render_runtime_diag_stage(uint8_t led_min, uint8_t led_m
 }
 
 static bool rgb_runtime_render_layer_base_stage(uint8_t led_min, uint8_t led_max) {
-    rgb_runtime_layer_stage_render_effective_frame(&rgb_runtime_frame_primary, layer_state, &rgb_runtime_profile_frame, led_min, led_max);
+    rgb_runtime_layer_stage_render_active_profile_frame(&rgb_runtime_frame_primary, layer_state, &rgb_runtime_profile_frame, led_min, led_max);
     return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
 
@@ -190,8 +191,8 @@ static bool rgb_runtime_render_base_stage(uint8_t led_min, uint8_t led_max) {
     // The synthetic automouse destination is not a persistent board state.
     // Once this branch stops running, the next frame falls back to ordinary
     // layer rendering below.
-    if (rgb_runtime_automouse_stage_should_render_effective(layer_state, &rgb_runtime_profile_frame)) {
-        return rgb_runtime_automouse_stage_render_effective(layer_state, &rgb_runtime_profile_frame, led_min, led_max);
+    if (rgb_runtime_automouse_stage_should_render_active_profile(layer_state, &rgb_runtime_profile_frame)) {
+        return rgb_runtime_automouse_stage_render_active_profile(layer_state, &rgb_runtime_profile_frame, led_min, led_max);
     }
 
     return rgb_runtime_render_layer_base_stage(led_min, led_max);
@@ -204,13 +205,13 @@ static bool rgb_runtime_render_base_stage(uint8_t led_min, uint8_t led_max) {
 
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static bool rgb_runtime_render_preview_stage(uint8_t led_min, uint8_t led_max) {
-    return rgb_runtime_preview_stage_render_effective(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, led_min, led_max);
+    return rgb_runtime_preview_stage_render_active_profile(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, led_min, led_max);
 }
 #    endif
 
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-static bool rgb_runtime_render_pd_mode_stage(uint8_t led_min, uint8_t led_max) {
-    rgb_runtime_pd_mode_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, led_min, led_max);
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+static bool rgb_runtime_render_pointing_mode_stage(uint8_t led_min, uint8_t led_max) {
+    rgb_runtime_pointing_mode_stage_render_active_profile_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, led_min, led_max);
     return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
 #    endif
@@ -218,13 +219,13 @@ static bool rgb_runtime_render_pd_mode_stage(uint8_t led_min, uint8_t led_max) {
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
 static bool rgb_runtime_render_combo_underlay_stage(uint8_t led_min, uint8_t led_max) {
     rgb_runtime_render_snapshot_ensure_combo();
-    rgb_runtime_combo_feedback_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.combo_underlay_bitmap, led_min, led_max);
+    rgb_runtime_combo_feedback_stage_render_active_profile_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.combo_underlay_bitmap, led_min, led_max);
     return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
 
 static bool rgb_runtime_render_combo_overlay_stage(uint8_t led_min, uint8_t led_max) {
     rgb_runtime_render_snapshot_ensure_combo();
-    rgb_runtime_combo_feedback_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.combo_overlay_bitmap, led_min, led_max);
+    rgb_runtime_combo_feedback_stage_render_active_profile_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.combo_overlay_bitmap, led_min, led_max);
     return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
 #    endif
@@ -232,7 +233,7 @@ static bool rgb_runtime_render_combo_overlay_stage(uint8_t led_min, uint8_t led_
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
 static bool rgb_runtime_render_key_feedback_stage(uint8_t led_min, uint8_t led_max) {
     rgb_runtime_render_snapshot_ensure_key_feedback();
-    rgb_runtime_key_feedback_stage_render_effective_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.key_feedback_semantic_map, rgb_runtime_render_snapshot.key_feedback_tap_branch_map, rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap, rgb_runtime_render_snapshot.key_feedback_broad_owner_map, led_min, led_max);
+    rgb_runtime_key_feedback_stage_render_active_profile_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, rgb_runtime_render_snapshot.key_feedback_semantic_map, rgb_runtime_render_snapshot.key_feedback_tap_branch_map, rgb_runtime_render_snapshot.key_feedback_flash_visibility_bitmap, rgb_runtime_render_snapshot.key_feedback_broad_owner_map, led_min, led_max);
     return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
 #    endif
@@ -252,7 +253,7 @@ void noah_rgb_runtime_post_init(void) {
     };
 
     rgb_runtime_render_snapshot_invalidate();
-    (void)rgb_effective_config_capture_frame(&rgb_runtime_profile_frame);
+    (void)rgb_active_profile_config_capture_frame(&rgb_runtime_profile_frame);
 #    ifdef RGB_RUNTIME_RENDER_TEST_BACKEND
     rgb_runtime_stage_pipeline_count = 0u;
     rgb_runtime_early_exit_count     = 0u;
@@ -269,7 +270,7 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
 
     if (rgb_runtime_range_starts_frame(led_min, led_max)) {
         rgb_runtime_render_snapshot_invalidate();
-        (void)rgb_effective_config_capture_frame(&rgb_runtime_profile_frame);
+        (void)rgb_active_profile_config_capture_frame(&rgb_runtime_profile_frame);
     }
 
     if (!rgb_runtime_normalize_local_range(&led_min, &led_max)) {
@@ -295,8 +296,8 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
 #    ifdef RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE
     painted |= rgb_runtime_render_preview_stage(led_min, led_max);
 #    endif
-#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_PD_MODE_FEEDBACK_ENABLE)
-    painted |= rgb_runtime_render_pd_mode_stage(led_min, led_max);
+#    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
+    painted |= rgb_runtime_render_pointing_mode_stage(led_min, led_max);
 #    endif
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)
     painted |= rgb_runtime_render_combo_overlay_stage(led_min, led_max);

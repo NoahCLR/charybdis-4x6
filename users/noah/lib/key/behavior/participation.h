@@ -7,8 +7,8 @@
 // policy.md, D-F14). Every applicable scope must allow it: the master, the
 // press's source layer, the definition, and the placement (source layer, key
 // position). Callers pass the press context and act on the answer; none
-// rebuilds the policy. It reads the effective settings cache and the
-// effective behaviour and combo views, never storage.
+// rebuilds the policy. It reads the active profile's settings cache and
+// its behaviour and combo views, never storage.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 

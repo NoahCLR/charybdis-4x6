@@ -19,7 +19,7 @@ owned-keycode ledger, taken and given back by the scan-driven engine.
 flowchart TD
     key["key, behaviour or combo action QK_MACRO + n"] --> lifecycle["noah_action_tap_at / noah_action_press (action_lifecycle.c)"]
     lifecycle --> try["noah_profile_macro_try_play: the trigger is consumed"]
-    pointing["pointing output (pd_mode_configured.c emit_tap)"] --> start["noah_profile_macro_start"]
+    pointing["pointing output (pointing_mode_configured.c emit_tap)"] --> start["noah_profile_macro_start"]
     try --> start
     start --> provider["macro_slot_provider_start: preflight every window, keep the first"]
     provider --> source{"active profile has a macro domain?"}
@@ -57,15 +57,15 @@ one-byte metadata (unchecked, valid, invalid), `profile_macro_slots`;
 `macro_slot_provider.c` owns the one shared window of IR,
 `macro_slot_active_ir`.
 
-1. When `noah_effective_keymap_macros_publication()` has moved since the last
-   start, every slot becomes unchecked and the cached slot offset is dropped.
-   Activation happens only at a safe boundary, which waits for the engine to
-   be idle and hold nothing (`profile_activation_policy.c`), so no playback
-   spans two profiles.
+1. When `noah_active_profile_keymap_macros_publication()` has moved since the
+   last start, every slot becomes unchecked and the cached slot offset is
+   dropped. Activation happens only at a safe boundary, which waits for the
+   engine to be idle and hold nothing (`profile_activation_policy.c`), so no
+   playback spans two profiles.
 2. When the active profile is not the compiled defaults and holds a macro
-   domain (`noah_effective_macro_bank_is_live`), the provider walks the bank's
-   terminators 32 bytes at a time to the slot's start and decodes a window
-   from there (`macro_payload_decode_qmk_window`).
+   domain (`noah_active_profile_macro_bank_is_live`), the provider walks the
+   bank's terminators 32 bytes at a time to the slot's start and decodes a
+   window from there (`macro_payload_decode_qmk_window`).
    Otherwise it compiles the slot's authored `MACROS()` string
    (`macro_payloads`) into one window.
 3. **Preflight, before any output.** `macro_payload_preflight_begin` latches
@@ -204,6 +204,6 @@ steps and never reaches `macro/`. Its path is
 - Host layouts against their sources: `run_host_layout_tests.sh`.
 - Starting from actions: `run_action_lifecycle_tests.sh`,
   `run_action_dispatch_tests.sh`; from pointing outputs:
-  `run_pd_mode_handlers_tests.sh`; the press guard:
-  `run_pd_mode_key_runtime_integration_tests.sh`.
+  `run_pointing_mode_handlers_tests.sh`; the press guard:
+  `run_pointing_mode_key_runtime_integration_tests.sh`.
 - The safe boundary waiting for playback: `run_profile_activation_policy_tests.sh`.

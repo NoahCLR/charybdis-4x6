@@ -11,7 +11,7 @@
 #include <string.h>
 
 #include "qmk_split_diagnostics.h"
-#include "../profile/runtime/effective_pd_runtime.h"
+#include "../profile/runtime/active_profile_pd_runtime.h"
 
 #if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE) && !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
 #    error "live-profile mutation requires the live-profile owner"
@@ -81,10 +81,10 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
     if (owner->provider_known) {
         status->active_digest     = owner->active.payload_digest;
         status->active_generation = owner->active.generation;
-        if (owner->active.kind == NOAH_EFFECTIVE_PROFILE_KIND_VALIDATED_PROFILE) {
-            status->active_kind        = NOAH_PROFILE_ACTIVE_COMMITTED;
+        if (owner->active.kind == NOAH_ACTIVE_PROFILE_KIND_VALIDATED_PROFILE) {
+            status->active_kind        = NOAH_PROFILE_ACTIVE_SAVED;
             status->active_origin_half = owner->active.origin;
-        } else if (owner->active.kind == NOAH_EFFECTIVE_PROFILE_KIND_WORKING_COPY) {
+        } else if (owner->active.kind == NOAH_ACTIVE_PROFILE_KIND_WORKING_COPY) {
             status->active_kind        = NOAH_PROFILE_ACTIVE_WORKING;
             status->active_origin_half = owner->active.origin;
         } else {
@@ -100,7 +100,7 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
     // compiled defaults run meanwhile, and nothing has failed. After the boot,
     // unpublished pointing slots are an activation that failed.
     booting = noah_profile_owner_booting(owner->owner_state);
-    if (booting || !noah_effective_pd_ready()) {
+    if (booting || !noah_active_profile_pd_ready()) {
         status->state_flags |= NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE;
         status->state_flags &= (uint16_t)~NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT;
         status->active_digest = 0;
@@ -113,11 +113,11 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
     if (owner->has_pending) {
         status->pending_digest = owner->pending.payload_digest;
     }
-    if (owner->has_committed) {
-        status->state_flags |= NOAH_PROFILE_STATE_COMMITTED_VALID;
-        status->committed_digest      = owner->committed.payload_digest;
-        status->committed_generation  = owner->committed.generation;
-        status->committed_origin_half = owner->committed.origin_half;
+    if (owner->has_saved) {
+        status->state_flags |= NOAH_PROFILE_STATE_SAVED_VALID;
+        status->saved_digest          = owner->saved.payload_digest;
+        status->saved_generation      = owner->saved.generation;
+        status->saved_origin_half = owner->saved.origin_half;
     }
     if (owner->candidate_pending || owner->has_pending) {
         status->state_flags |= NOAH_PROFILE_STATE_CANDIDATE_PENDING;
@@ -125,11 +125,11 @@ static void noah_profile_channel_latch_owner_status(const noah_profile_owner_sta
     if (owner->has_pending && owner->safe_boundary_reason_mask != 0u) {
         status->state_flags |= NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY;
     }
-    if (owner->peer_known) {
+    if (owner->other_half_known) {
         status->state_flags |= NOAH_PROFILE_STATE_PEER_KNOWN;
-        if (owner->peer.has_profile) {
-            status->peer_generation  = owner->peer.generation;
-            status->peer_origin_half = owner->peer.origin_half;
+        if (owner->other_half.has_profile) {
+            status->slave_generation = owner->other_half.generation;
+            status->slave_origin_half = owner->other_half.origin_half;
         }
     }
     if (owner->saved_profiles_agree) {
@@ -161,18 +161,18 @@ static bool noah_profile_channel_refresh_owner(bool latch_status) {
 #    endif
 
 static void noah_profile_channel_refresh_store_status(void) {
-    const noah_profile_store_record_t *committed = noah_profile_store_runtime_committed();
+    const noah_profile_store_record_t *saved = noah_profile_store_runtime_saved();
 
     noah_profile_wire_v1_read_service.status = (noah_profile_wire_v1_device_status_t){
         .state_flags = NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT | NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE,
         .active_kind = NOAH_PROFILE_ACTIVE_COMPILED_ONLY,
     };
 
-    if (committed) {
-        noah_profile_wire_v1_read_service.status.state_flags |= NOAH_PROFILE_STATE_COMMITTED_VALID;
-        noah_profile_wire_v1_read_service.status.committed_digest      = committed->payload_digest;
-        noah_profile_wire_v1_read_service.status.committed_generation  = committed->generation;
-        noah_profile_wire_v1_read_service.status.committed_origin_half = committed->origin_half;
+    if (saved) {
+        noah_profile_wire_v1_read_service.status.state_flags |= NOAH_PROFILE_STATE_SAVED_VALID;
+        noah_profile_wire_v1_read_service.status.saved_digest          = saved->payload_digest;
+        noah_profile_wire_v1_read_service.status.saved_generation      = saved->generation;
+        noah_profile_wire_v1_read_service.status.saved_origin_half = saved->origin_half;
     } else if (noah_profile_store_runtime_state() == NOAH_PROFILE_STORE_RUNTIME_GENERATION_CONFLICT) {
         noah_profile_wire_v1_read_service.status.conflict_count = 1u;
     }
@@ -212,12 +212,12 @@ static void noah_profile_channel_write_u32(uint8_t *target, uint32_t value) {
     target[3] = (uint8_t)((value >> 24) & 0xffu);
 }
 
-// Committed-payload readback.
+// Saved-payload readback.
 //
-// Page 0 reports the committed generation, digest and length; pages 1..N carry
+// Page 0 reports the saved generation, digest and length; pages 1..N carry
 // raw payload bytes. Coherence is the host's job and is cheap: generation only
 // ever increases, so re-reading page 0 after the chunks proves nothing was
-// committed in between. That keeps a full report of payload in every chunk
+// saved in between. That keeps a full report of payload in every chunk
 // instead of spending four bytes per chunk on a sequence number.
 //
 // This is the read D-026 requires. The READ_SURFACE capability bit describes
@@ -261,7 +261,7 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
         }
         payload_length = compiled_metadata.byte_length;
     } else {
-        record = noah_profile_store_runtime_committed();
+        record = noah_profile_store_runtime_saved();
         if (!record) {
             memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
             data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
@@ -279,7 +279,7 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
         noah_profile_channel_write_u32(&data[9], payload_length);
         if (compiled) {
             // Compiled defaults have no generation: they are what the firmware
-            // was built with, not something committed.
+            // was built with, not something saved.
             noah_profile_channel_write_u32(&data[13], 0u);
             noah_profile_channel_write_u32(&data[17], compiled_metadata.digest);
             noah_profile_channel_write_u32(&data[21], compiled_metadata.crc32);
@@ -308,7 +308,7 @@ static bool noah_profile_channel_handle_payload_get(uint8_t *data, uint8_t lengt
     remaining = payload_length - offset;
     chunk     = remaining < NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE ? (uint8_t)remaining : NOAH_PROFILE_WIRE_V1_PAYLOAD_SIZE;
 
-    if (!(compiled ? noah_profile_store_runtime_read_compiled(offset, &data[7], chunk) : noah_profile_store_runtime_read_committed(offset, &data[7], chunk))) {
+    if (!(compiled ? noah_profile_store_runtime_read_compiled(offset, &data[7], chunk) : noah_profile_store_runtime_read_saved(offset, &data[7], chunk))) {
         memset(&data[5], 0, NOAH_PROFILE_WIRE_V1_REPORT_SIZE - 5u);
         data[5] = NOAH_PROFILE_WIRE_V1_STATUS_UNAVAILABLE;
         return true;
@@ -331,9 +331,9 @@ NOAH_PROFILE_CHANNEL_STACK_BOUNDARY static void noah_profile_channel_dispatch(ui
 #    ifdef NOAH_LIVE_PROFILE_MUTATION_ENABLE
     if (data && length == NOAH_PROFILE_WIRE_V1_REPORT_SIZE && data[0] == NOAH_PROFILE_WIRE_V1_COMMAND_GET && data[1] == NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL && data[2] == NOAH_PROFILE_CANDIDATE_V1_VALUE_STATUS) {
         noah_profile_candidate_v1_status_t      candidate;
-        noah_profile_candidate_v1_peer_status_t peer;
+        noah_profile_candidate_v1_copy_status_t other_half;
 
-        if ((data[4] == 1u || data[4] == 2u) && noah_profile_store_runtime_peer_transfer(&peer) && noah_profile_candidate_v1_handle_peer_status_get(&peer, data, length)) {
+        if ((data[4] == 1u || data[4] == 2u) && noah_profile_store_runtime_other_half_transfer(&other_half) && noah_profile_candidate_v1_handle_copy_status_get(&other_half, data, length)) {
             return;
         }
         if (noah_profile_store_runtime_candidate_status(&candidate) && noah_profile_candidate_v1_handle_status_get(&candidate, data, length)) {

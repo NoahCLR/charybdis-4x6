@@ -7,7 +7,7 @@ set -eu
 # not what a plain `qmk compile` produces. The live-profile owner needs
 # NOAH_PHYSICAL_HALF, since durable profile origin identity is side-specific,
 # so a build without it silently omits the owner and the keyboard has no
-# committed profile to read. See D-F35
+# saved profile to read. See D-F35
 # (docs/adr/0035-live-profile-owner-on-by-default.md).
 #
 # NOAH_PHYSICAL_HALF is deliberately not derived from FORCE_MASTER/FORCE_SLAVE.
@@ -293,8 +293,8 @@ fi
 
 echo
 if [ -n "$OWNER_ARGS" ]; then
-    echo "Built the 32-PD-slot factory-only comparison pair WITHOUT the live-profile owner."
+    echo "Built the 32-pointing-slot factory-only comparison pair WITHOUT the live-profile owner."
 else
-    echo "Built the 32-PD-slot pair."
+    echo "Built the 32-pointing-slot pair."
 fi
 echo "Flash the right half to the master side and the left half to the slave side."

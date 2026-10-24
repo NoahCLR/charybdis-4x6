@@ -66,8 +66,8 @@ noah_profile_compiled_v1_result_t noah_profile_compiled_v1_write(const noah_prof
 // Cold-path reader for validation, identity, export, and reset persistence.
 // Reads seek to intersecting domain envelopes/payloads, including ranges that
 // cross an envelope or domain. The reader borrows the immutable open handle.
-// Effective caches warm on cold paths; key events/RGB frames never regenerate
-// this profile.
+// The active profile's caches warm on cold paths; key events/RGB frames never
+// regenerate this profile.
 noah_profile_reader_t noah_profile_compiled_v1_reader(const noah_profile_compiled_v1_t *profile);
 
 // Builds the exact validator/runtime ceilings represented by this firmware

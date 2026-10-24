@@ -27,11 +27,11 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/tests/host/runtime_trace_test.c" \
     "$ROOT/users/noah/lib/key/runtime/trace.c" \
     "$ROOT/users/noah/lib/key/runtime/slot/origin_registry.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_snapshot.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_registry.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_lifecycle.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_key_runtime_bridge.c" \
-    "$ROOT/users/noah/lib/pointing/runtime/pd_mode_state.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_snapshot.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_registry.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_lifecycle.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_key_runtime_bridge.c" \
+    "$ROOT/users/noah/lib/pointing/runtime/pointing_mode_state.c" \
     "$ROOT/users/noah/lib/state/ownership/layer_ownership.c" \
     "$ROOT/users/noah/lib/state/diagnostics/runtime_diag.c" \
     "$ROOT/users/noah/lib/state/shared/runtime_shared_state.c" \

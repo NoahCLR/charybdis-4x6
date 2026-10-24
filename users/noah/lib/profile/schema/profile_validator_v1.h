@@ -119,7 +119,7 @@ typedef struct {
     // and rejects the combo domain at that row (INVALID_ACTION).
     bool (*combo_to_native)(const noah_profile_action_v1_t *action, uint16_t *native);
     // Whether the keyboard can run an action where the profile places it. Only
-    // a candidate the keyboard is asked to save is held to it; a committed
+    // a candidate the keyboard is asked to save is held to it; a saved
     // record and the compiled defaults are not, so a profile saved before a
     // rule existed still loads.
     bool (*placement_supported)(const noah_profile_action_v1_t *action, noah_profile_validator_v1_placement_t placement);
@@ -132,8 +132,9 @@ typedef struct {
     uint32_t action_abi_digest;
 
     // Exact compiled identities used by behavior cross-reference validation.
-    // One bit per PD slot; kept beside the other word so it adds no padding.
-    uint32_t supported_pd_mode_mask;
+    // One bit per pointing slot; kept beside the other word so it adds no
+    // padding.
+    uint32_t supported_pointing_mode_mask;
     uint8_t  logical_layer_count;
     // Matrix positions each settings placement bitmap covers (rows × columns).
     uint8_t  placement_positions;

@@ -7,10 +7,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "effective_key_behavior_runtime.h"
-#include "effective_profile_provider.h"
-#include "effective_rgb_runtime.h"
-#include "effective_combo_runtime.h"
+#include "active_profile_key_behavior_runtime.h"
+#include "active_profile_provider.h"
+#include "active_profile_rgb_runtime.h"
+#include "active_profile_combo_runtime.h"
 #include "profile_activation_policy.h"
 #include "../schema/profile_compiled_defaults_v1.h"
 #include "../schema/profile_settings_v1.h"
@@ -20,7 +20,7 @@
 #include "../split/profile_working_sync.h"
 #include "../storage/profile_candidate_store_backend.h"
 #include "../storage/profile_candidate_transaction.h"
-#include "../storage/profile_peer_store_backend.h"
+#include "../storage/profile_other_half_store_backend.h"
 #include "../storage/profile_store.h"
 
 enum {
@@ -35,8 +35,8 @@ enum {
     NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT = 16384u,
     // Ordinary host staging expires after 15 seconds without host-owned work.
     // Split preparation has a separate no-progress window: it bounds the
-    // longest stretch without transfer or correlated peer-phase progress, not
-    // the whole copy. Repeated BUSY replies never extend the deadline.
+    // longest stretch without transfer or correlated other-half phase progress,
+    // not the whole copy. Repeated BUSY replies never extend the deadline.
     NOAH_PROFILE_OWNER_HOST_TIMEOUT_MS             = 15000u,
     NOAH_PROFILE_OWNER_AUTO_SAVE_QUIET_MS           = 3000u,
     NOAH_PROFILE_OWNER_HOST_BARRIER_NO_PROGRESS_MS = 60000u,
@@ -81,14 +81,14 @@ typedef struct {
     noah_profile_split_exchange_fn        split_exchange;
     void                                 *split_transport_context;
     uint8_t                               origin_half;
-    bool                                  peer_required;
+    bool                                  other_half_required;
     // The working copy's buffer (D-F32): a slot payload's worth of RAM. Live
     // edits are refused without one.
     uint8_t                              *working_bytes;
     uint32_t                              working_capacity;
     // Names this boot's working copy; any value that differs between boots.
     uint32_t                              working_session;
-    // The working copy's own split RPC, from the USB half.
+    // The working copy's own split RPC, from the master half.
     noah_profile_split_exchange_fn        working_exchange;
     void                                 *working_transport_context;
     noah_profile_edit_mode_storage_t      edit_mode_storage;
@@ -178,9 +178,9 @@ typedef struct {
     bool                                 descriptor_known : 1;
     bool                                 started : 1;
     bool                                 local_published : 1;
-    bool                                 peer_commit_authorized : 1;
+    bool                                 other_half_commit_authorized : 1;
     bool                                 waiting_boundary : 1;
-    bool                                 peer_confirmed : 1;
+    bool                                 other_half_confirmed : 1;
     bool                                 cancel_pending : 1;
     uint8_t                              progress_phase;
     noah_profile_candidate_v1_error_id_t cancel_reason;   // NONE unless a cancel was asked
@@ -193,7 +193,7 @@ typedef struct {
     // Thumb-1 load's immediate offset (32 bytes for a byte), so no offset is
     // held in a register across the scan; 14 KB in, each would need one.
     bool                                 boot_activation_started : 1;
-    bool                                 peer_activation_started : 1;
+    bool                                 other_half_activation_started : 1;
     bool                                 host_activity_known : 1;
     bool                                 descriptor_readable : 1;
     bool                                 split_initialized : 1;
@@ -215,18 +215,18 @@ typedef struct {
     noah_profile_reader_t                     compiled_reader;
     noah_profile_validator_v1_compatibility_t compatibility;
     noah_profile_validator_v1_runtime_t       candidate_runtime;
-    noah_effective_profile_snapshot_t         compiled_snapshot;
+    noah_active_profile_snapshot_t            compiled_snapshot;
     noah_profile_owner_staging_t              staging;
     noah_profile_store_t                      store;
-    noah_effective_profile_provider_t         provider;
+    noah_active_profile_provider_t            provider;
     noah_profile_activation_policy_t          activation_policy;
-    noah_effective_key_behavior_runtime_t     key_behaviors;
-    noah_effective_rgb_runtime_t              rgb;
+    noah_active_profile_key_behavior_runtime_t key_behaviors;
+    noah_active_profile_rgb_runtime_t         rgb;
 #ifdef COMBO_ENABLE
-    noah_effective_combo_runtime_t combos;
+    noah_active_profile_combo_runtime_t combos;
 #endif
     noah_profile_candidate_transaction_t host_transaction;
-    noah_profile_peer_store_backend_t    peer_store;
+    noah_profile_other_half_store_backend_t other_half_store;
     noah_profile_split_reconciler_t      reconciler;
     // Edits are held to what a host's candidate is held to.
     noah_profile_validator_v1_compatibility_t edit_compatibility;
@@ -238,7 +238,7 @@ typedef struct {
     // The host's last frame of the edit it is sending: an edit not finished
     // within the host timeout is aborted, as an abandoned Apply is.
     uint32_t                             edit_activity_at;
-    noah_profile_split_descriptor_t      committed_descriptor;
+    noah_profile_split_descriptor_t      saved_descriptor;
     noah_profile_candidate_v1_error_t    adoption_error;
     noah_profile_store_result_t          discovery_result;
 } noah_profile_owner_t;
@@ -248,10 +248,10 @@ typedef struct {
 // no mutable owner pointer crosses the runtime boundary.
 typedef struct {
     noah_profile_owner_state_t           owner_state;
-    noah_effective_profile_identity_t    active;
-    noah_effective_profile_identity_t    pending;
-    noah_profile_split_descriptor_t      committed;
-    noah_profile_split_descriptor_t      peer;
+    noah_active_profile_identity_t       active;
+    noah_active_profile_identity_t       pending;
+    noah_profile_split_descriptor_t      saved;
+    noah_profile_split_descriptor_t      other_half;
     noah_profile_candidate_v1_status_t   candidate;
     noah_profile_split_authority_state_t authority_state;
     uint32_t                             compiled_default_digest;
@@ -261,22 +261,22 @@ typedef struct {
     uint8_t                              supported_domain_mask;
     bool                                 provider_known;
     bool                                 has_pending;
-    bool                                 has_committed;
+    bool                                 has_saved;
     bool                                 candidate_pending;
-    bool                                 peer_known;
+    bool                                 other_half_known;
     // The split authority holds both halves on one saved profile (or both on
     // the compiled defaults), with nothing in transfer (Profile Wire status
     // flag 5; D-F25's USB restart check).
     bool                                 saved_profiles_agree;
     bool                                 transfer_pending;
     bool                                 peer_cleanup_pending;
-    // Nothing is committed because a slot holds an earlier store format or retired test layout,
+    // Nothing is saved because a slot holds an earlier store format or retired test layout,
     // which is never read (D-F28): the keyboard runs its compiled defaults.
     bool                                 stored_earlier_format;
 } noah_profile_owner_status_t;
 
 // The save's copy to the other half, for candidate status page 1.
-bool noah_profile_owner_peer_transfer(const noah_profile_owner_t *owner, noah_profile_candidate_v1_peer_status_t *peer);
+bool noah_profile_owner_other_half_transfer(const noah_profile_owner_t *owner, noah_profile_candidate_v1_copy_status_t *other_half);
 
 // Initializes metadata and begins incremental validation of the compiled
 // canonical profile. It performs no EEPROM or split-transport I/O.
@@ -310,10 +310,10 @@ noah_profile_owner_state_t         noah_profile_owner_state(const noah_profile_o
 // no more; its status stays readable. A slow save is never one of these.
 bool                               noah_profile_owner_stopped(const noah_profile_owner_t *owner);
 noah_profile_store_result_t        noah_profile_owner_discovery_result(const noah_profile_owner_t *owner);
-const noah_profile_store_record_t *noah_profile_owner_committed(const noah_profile_owner_t *owner);
+const noah_profile_store_record_t *noah_profile_owner_saved(const noah_profile_owner_t *owner);
 
 // Read-only view of the backing store, for bounded host readback of the
-// committed payload. Callers must not mutate through it.
+// saved payload. Callers must not mutate through it.
 const noah_profile_store_t           *noah_profile_owner_store(const noah_profile_owner_t *owner);
 noah_profile_split_reconciler_t      *noah_profile_owner_split_reconciler(noah_profile_owner_t *owner);
 // The working copy's sync: this half's end of PUT_PROFILE_WORKING_SYNC. NULL
@@ -327,7 +327,7 @@ bool                                  noah_profile_owner_status(const noah_profi
 // profile activates at).
 bool                                  noah_profile_owner_usb_restart_safe(noah_profile_owner_t *owner);
 
-// Live edits (D-F32), from the Profile Wire channel on the USB half. Each
+// Live edits (D-F32), from the Profile Wire channel on the master half. Each
 // admission is bounded; the work happens in later scans. Every one answers
 // INVALID_STATE first while the owner is not ready or stopped (D-F34), then
 // INVALID_ARGUMENT for a malformed request, then what admission answers:
@@ -362,7 +362,7 @@ bool noah_profile_owner_pending_adjustment(const noah_profile_owner_t *owner, ui
 
 typedef struct {
     noah_profile_working_status_t   local;
-    noah_profile_working_peer_t     peer;
+    noah_profile_working_slave_t    slave;
     noah_profile_edit_mode_record_t mode;
     noah_profile_owner_save_t       save;
     uint32_t                        saved_generation;
@@ -370,7 +370,7 @@ typedef struct {
     uint8_t                         saved_origin;
     bool                            supported;      // this build and half can edit live
     bool                            saved_compiled; // nothing saved: the compiled defaults
-    bool                            peer_required;
+    bool                            other_half_required;
     // The other half holds this half's saved profile and working copy (same
     // session and revision, nothing in progress), heard within 3 s (edit
     // status flag 2).
@@ -379,11 +379,11 @@ typedef struct {
     bool                            edits_blocked;  // admission's edit row refuses a new edit now (flag 4)
     bool                            adjustment_pending; // a keyboard adjustment awaits publication; a new Apply is BUSY
     bool                            storage_paused; // a save here waits for a quiet keyboard
-    bool                            peer_storage_paused; // the other half's save waits for a quiet keyboard
-    bool                            peer_refused;        // the other half refused this working copy, whole
+    bool                            slave_storage_paused; // the other half's save waits for a quiet keyboard
+    bool                            slave_refused;       // the other half refused this working copy, whole
     bool                            mode_store_failed;   // writing the edit mode failed; it is tried again
     bool                            stopped;             // this half's owner stopped: only a restart clears it (D-F34)
-    bool                            peer_stopped;        // the other half answers that its owner stopped
+    bool                            slave_stopped;       // the other half answers that its owner stopped
 } noah_profile_owner_working_status_t;
 
 bool noah_profile_owner_working_status(const noah_profile_owner_t *owner, noah_profile_owner_working_status_t *status);

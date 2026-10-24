@@ -79,7 +79,7 @@ hold exactly that profile, or both hold none, with nothing in transfer. A
 newer saved profile on either half is copied to the other first. A keyboard
 without a slave half activates its record without waiting for another half.
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`test_boot_reconciles_different_generations_before_activation`, `test_committed_reuse_saves_both_halves_and_reboots`), `tests/host/run_profile_store_runtime_owner_tests.sh` (`test_an_empty_flash_boots_the_compiled_defaults`), `tests/host/run_profile_split_foundation_tests.sh` (`test_authority_publication_and_activation_observer`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`test_boot_reconciles_different_generations_before_activation`, `test_saved_reuse_saves_both_halves_and_reboots`), `tests/host/run_profile_store_runtime_owner_tests.sh` (`test_an_empty_flash_boots_the_compiled_defaults`), `tests/host/run_profile_split_foundation_tests.sh` (`test_authority_publication_and_activation_observer`).
 
 ## Commit sequence
 
@@ -121,12 +121,12 @@ returns.
 Both halves always prepare and validate the complete candidate; reusing
 ranges skips sending bytes, never a durable step
 ([D-F18](../adr/0018-differential-upload-builds-complete-candidate.md),
-[D-F19](../adr/0019-peer-copy-reuses-what-the-other-half-has.md)).
+[D-F19](../adr/0019-the-copy-reuses-what-the-other-half-has.md)).
 
 A keyboard without a slave half goes from validated straight to committing,
 writes steps 4–7 and activates.
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`test_two_consecutive_live_commits_use_distributed_prepare_barrier`, `test_commit_waits_for_a_safe_boundary_then_activates`, `test_activation_waits_for_a_safe_boundary_while_typing`, `test_link_lost_after_the_peer_commit_was_seen_still_activates`, `test_committed_reuse_saves_both_halves_and_reboots`, `test_empty_boot_live_commit_and_timeout`), `tests/host/run_profile_candidate_transaction_tests.sh` (`test_split_authorization_barriers`, `test_commit_activation_and_idempotent_retry`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_push_pauses_before_commit_then_authorizes`, `test_maximum_profile_prepares_and_commits_on_the_peer`), `tests/host/run_profile_candidate_store_backend_tests.sh` (`test_scan_owner_composes_bounded_commit_and_safe_activation`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`test_two_consecutive_live_commits_use_distributed_prepare_barrier`, `test_commit_waits_for_a_safe_boundary_then_activates`, `test_activation_waits_for_a_safe_boundary_while_typing`, `test_link_lost_after_the_other_half_commit_was_seen_still_activates`, `test_saved_reuse_saves_both_halves_and_reboots`, `test_empty_boot_live_commit_and_timeout`), `tests/host/run_profile_candidate_transaction_tests.sh` (`test_split_authorization_barriers`, `test_commit_activation_and_idempotent_retry`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_push_pauses_before_commit_then_authorizes`, `test_maximum_profile_prepares_and_commits_on_the_other_half`), `tests/host/run_profile_candidate_store_backend_tests.sh` (`test_scan_owner_composes_bounded_commit_and_safe_activation`).
 
 ## Two candidates at once
 
@@ -148,7 +148,7 @@ Once either marker is durable there is no tiebreak: two saved profiles of one
 generation from different origins are a concurrent commit
 ([authority state table](authority-state-table.md#ordering-between-the-halves)).
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`test_simultaneous_hosts_choose_stable_physical_origin_before_durability`, `test_peer_authority_supersedes_only_precommit_host_generation`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_crossed_prepare_begin_loser_abort_does_not_deadlock`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`test_simultaneous_hosts_choose_stable_physical_origin_before_durability`, `test_other_half_authority_supersedes_only_precommit_host_generation`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_crossed_prepare_begin_loser_abort_does_not_deadlock`).
 
 ## After the commit
 
@@ -207,7 +207,7 @@ a power loss ([live edits](profile-wire-v1/live-edits.md#why-a-restart-is-safe))
   identities, never by repeating a decision: a client reads candidate status
   and profile status ([candidate transfer](profile-wire-v1/candidate-transfer.md#retries-and-lost-replies)).
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`test_lost_link_after_decision_keeps_typing_and_resumes`, `test_peer_rebooted_while_unlinked_after_decision_resumes`, `test_committed_reuse_saves_both_halves_and_reboots`, `profile_owner_stopped_test.inc`: `test_a_restart_anywhere_in_a_save_keeps_a_whole_profile`, `test_stopped_owners_and_restarts`; `profile_owner_auto_save_test.inc`: `test_auto_save_power_cuts`), `tests/host/run_profile_flash_store_tests.sh` (`test_power_loss_at_every_flash_operation`), `tests/host/run_profile_store_tests.sh` (`test_durable_prepare_is_not_authority_until_decided`, `test_pd_header_power_loss_keeps_complete_generation`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_a_restarted_sender_settles_the_prepared_copy`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`test_lost_link_after_decision_keeps_typing_and_resumes`, `test_other_half_rebooted_while_unlinked_after_decision_resumes`, `test_saved_reuse_saves_both_halves_and_reboots`, `profile_owner_stopped_test.inc`: `test_a_restart_anywhere_in_a_save_keeps_a_whole_profile`, `test_stopped_owners_and_restarts`; `profile_owner_auto_save_test.inc`: `test_auto_save_power_cuts`), `tests/host/run_profile_flash_store_tests.sh` (`test_power_loss_at_every_flash_operation`), `tests/host/run_profile_store_tests.sh` (`test_durable_prepare_is_not_authority_until_decided`, `test_pd_header_power_loss_keeps_complete_generation`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_a_restarted_sender_settles_the_prepared_copy`).
 
 ## Cancellation
 
@@ -243,4 +243,4 @@ The path:
 An `ABORT` the slave half refuses because it holds that copy committed is
 not released: the reconciler stops with `CONFLICT`.
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`test_every_precommit_cancel_releases_the_candidate`, `test_decided_commit_is_never_cancelled`, `test_host_abort_is_coordinated_at_each_prepare_boundary`, `test_prepared_peer_is_aborted_before_host_timeout_releases_candidate`, `test_host_abort_ends_when_peer_never_acknowledges`, `test_local_known_commit_failure_aborts_prepared_peer_first`, `test_peer_store_write_failure_retries_then_fails_fast`), `tests/host/run_profile_candidate_transaction_tests.sh` (`test_abort_reset_and_no_timeout`, `test_explicit_precommit_expiry_never_crosses_durable_boundary`, `test_split_commit_failure_reports_and_cleans_known_precommit_failure`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_push_cancel_aborts_peer_lease`, `test_prepared_abort_is_bounded_when_peer_goes_silent`, `test_prepared_abort_is_bounded_when_peer_stays_busy`, `test_cancel_after_dropped_prepare_begin_releases_or_noops`, `test_cancel_refuses_matching_durable_peer`, `test_receiver_recovers_when_its_abort_write_fails`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`test_every_precommit_cancel_releases_the_candidate`, `test_decided_commit_is_never_cancelled`, `test_host_abort_is_coordinated_at_each_prepare_boundary`, `test_prepared_other_half_is_aborted_before_host_timeout_releases_candidate`, `test_host_abort_ends_when_other_half_never_acknowledges`, `test_local_known_commit_failure_aborts_prepared_other_half_first`, `test_other_half_store_write_failure_retries_then_fails_fast`), `tests/host/run_profile_candidate_transaction_tests.sh` (`test_abort_reset_and_no_timeout`, `test_explicit_precommit_expiry_never_crosses_durable_boundary`, `test_split_commit_failure_reports_and_cleans_known_precommit_failure`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_push_cancel_aborts_other_half_lease`, `test_prepared_abort_is_bounded_when_other_half_goes_silent`, `test_prepared_abort_is_bounded_when_other_half_stays_busy`, `test_cancel_after_dropped_prepare_begin_releases_or_noops`, `test_cancel_refuses_matching_durable_other_half`, `test_receiver_recovers_when_its_abort_write_fails`).

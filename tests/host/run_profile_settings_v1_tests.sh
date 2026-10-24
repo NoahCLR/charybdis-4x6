@@ -17,7 +17,7 @@ for variant in normal sanitized; do
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_settings_runtime.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_settings_runtime.c" \
         -o "$BUILD_DIR/test"
     "$BUILD_DIR/test"
 done

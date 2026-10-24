@@ -6,7 +6,7 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
-#include "users/noah/lib/pointing/modes/pd_mode_configured.h"
+#include "users/noah/lib/pointing/modes/pointing_mode_configured.h"
 
 static host_runtime_fixture_t fixture = HOST_RUNTIME_FIXTURE_INIT;
 static bool down[256];

@@ -19,7 +19,7 @@
 // sent.
 //
 // PRESS_IMMEDIATELY_UNTIL_RELEASE:
-//   internal runtime style used for implicit pd-mode momentary holds.
+//   internal runtime style used for implicit pointing-mode momentary holds.
 //   Not exposed as a keymap authoring macro.
 //
 // PRESS_AND_HOLD_UNTIL_RELEASE:
@@ -79,8 +79,8 @@ typedef struct {
 //   If omitted, the key keeps its normal tap behavior for that step.
 //   If present but hold/long_hold are both omitted, keys that already have a
 //   default held path keep using it (for example normal keys, LT()/MO(), and
-//   pd-mode keys). Stacked pd-mode rows defer that default hold until the hold
-//   threshold when a later tap-count branch can enter a different pd mode.
+//   pointing-mode keys). Stacked pointing-mode rows defer that default hold until the hold
+//   threshold when a later tap-count branch can enter a different pointing mode.
 //   Other keycodes keep the tap override and send it on release.
 //
 // hold:

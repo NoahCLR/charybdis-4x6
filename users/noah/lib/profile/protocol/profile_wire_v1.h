@@ -20,7 +20,7 @@ enum {
     // builds; see users/noah/lib/state/diagnostics/runtime_diag.h.
     NOAH_PROFILE_WIRE_V1_VALUE_PAYLOAD = 0x04u,
     // The compiled defaults the firmware was built with, served through the
-    // same page layout. A keyboard with nothing committed is still running
+    // same page layout. A keyboard with nothing saved is still running
     // something, and this is it.
     NOAH_PROFILE_WIRE_V1_VALUE_COMPILED = 0x05u,
     NOAH_PROFILE_WIRE_V1_VALUE_COMBOS   = 0x06u,
@@ -68,7 +68,7 @@ typedef enum {
 // No firmware behaviour depends on a bit: the word only describes the build.
 enum {
     // One half of a split keyboard: a save copies the profile to the other
-    // half, and status reports the peer.
+    // half, and status reports the other half.
     NOAH_PROFILE_FEATURE_SPLIT_KEYBOARD = 1u << 0,
     // The build saves profiles: candidate writes (with reuse and streaming
     // chunks), durable commit and activation. Set once the live-profile
@@ -90,26 +90,26 @@ static inline uint16_t noah_profile_wire_v1_wide_page(const uint8_t *frame) {
 
 enum {
     NOAH_PROFILE_STATE_ACTIVE_IS_COMPILED_DEFAULT = 1u << 0,
-    NOAH_PROFILE_STATE_COMMITTED_VALID            = 1u << 1,
+    NOAH_PROFILE_STATE_SAVED_VALID                = 1u << 1,
     NOAH_PROFILE_STATE_CANDIDATE_PENDING          = 1u << 2,
     NOAH_PROFILE_STATE_PREVIEW_ACTIVE             = 1u << 3,
     NOAH_PROFILE_STATE_PEER_KNOWN                 = 1u << 4,
     NOAH_PROFILE_STATE_PEER_CONVERGED             = 1u << 5,
     NOAH_PROFILE_STATE_WAITING_SAFE_BOUNDARY      = 1u << 6,
     NOAH_PROFILE_STATE_DIGESTS_UNAVAILABLE        = 1u << 7,
-    // A cancelled save's peer ABORT was never acknowledged; see
+    // A cancelled save's other-half ABORT was never acknowledged; see
     // NOAH_PROFILE_SPLIT_PREPARED_ABORT_TIMEOUT_MS. No new save starts until
-    // the peer confirms, and a peer that never does needs a restart.
+    // the other half confirms; if it never does, a restart clears it.
     NOAH_PROFILE_STATE_PEER_CLEANUP_PENDING = 1u << 8,
     // A slot holds a profile in an earlier store format. It is not read or
     // converted (D-F28), so the keyboard runs its compiled defaults until a
-    // save; the flag clears once a profile is committed.
+    // save; the flag clears once a profile is saved.
     NOAH_PROFILE_STATE_STORED_EARLIER_FORMAT = 1u << 9,
 };
 
 typedef enum {
     NOAH_PROFILE_ACTIVE_COMPILED_ONLY = 0u,
-    NOAH_PROFILE_ACTIVE_COMMITTED     = 1u,
+    NOAH_PROFILE_ACTIVE_SAVED         = 1u,
     NOAH_PROFILE_ACTIVE_PREVIEW       = 2u,
     NOAH_PROFILE_ACTIVE_PENDING       = 3u,
     // Unsaved live edits (D-F32): generation and origin are the saved base's,
@@ -156,14 +156,14 @@ typedef struct {
     uint32_t compiled_default_digest;
     uint32_t active_digest;
     uint32_t pending_digest;
-    uint32_t committed_digest;
+    uint32_t saved_digest;
     uint8_t  active_kind;
     uint32_t active_generation;
     uint8_t  active_origin_half;
-    uint32_t committed_generation;
-    uint8_t  committed_origin_half;
-    uint32_t peer_generation;
-    uint8_t  peer_origin_half;
+    uint32_t saved_generation;
+    uint8_t  saved_origin_half;
+    uint32_t slave_generation;
+    uint8_t  slave_origin_half;
     uint16_t candidate_transaction_id;
     uint16_t last_committed_transaction_id;
     uint16_t conflict_count;

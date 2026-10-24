@@ -115,12 +115,12 @@ engineering regression policies, not SRAM limits:
 | --- | ---: | --- |
 | Live-profile owner | 16,384 | `NOAH_PROFILE_OWNER_STATE_BUDGET_32BIT` |
 | Split reconciler | 1,024 | `NOAH_PROFILE_SPLIT_RECONCILER_STATE_BUDGET_32BIT` |
-| Effective-profile provider | 784 | `NOAH_EFFECTIVE_PROFILE_PROVIDER_STATE_BUDGET_32BIT` |
-| Effective key-behaviour runtime | 768 | `NOAH_EFFECTIVE_KEY_BEHAVIOR_RUNTIME_STATE_BUDGET_32BIT` |
+| Active-profile provider | 784 | `NOAH_ACTIVE_PROFILE_PROVIDER_STATE_BUDGET_32BIT` |
+| Active-profile key-behaviour runtime | 768 | `NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_RUNTIME_STATE_BUDGET_32BIT` |
 | Whole-profile validator | 400 | `NOAH_PROFILE_VALIDATOR_V1_EMBEDDED_STATE_BUDGET` |
 | Profile store | 384 | `NOAH_PROFILE_STORE_STATE_BUDGET_32BIT` |
-| Peer store | 256 | `NOAH_PROFILE_PEER_STORE_STATE_BUDGET_32BIT` |
-| Effective lighting runtime / frame | 192 / 80 | `NOAH_EFFECTIVE_RGB_RUNTIME_STATE_BUDGET_32BIT`, `NOAH_EFFECTIVE_RGB_FRAME_BUDGET_32BIT` |
+| Other-half store | 256 | `NOAH_PROFILE_OTHER_HALF_STORE_STATE_BUDGET_32BIT` |
+| Active-profile lighting runtime / frame | 192 / 80 | `NOAH_ACTIVE_PROFILE_RGB_RUNTIME_STATE_BUDGET_32BIT`, `NOAH_ACTIVE_PROFILE_RGB_FRAME_BUDGET_32BIT` |
 | Split authority | 128 | `NOAH_PROFILE_SPLIT_AUTHORITY_STATE_BUDGET_32BIT` |
 | Key-behaviour domain handle / its validation | 128 / 128 | `key_behavior_domain_v1.c`, `NOAH_KEY_BEHAVIOR_DOMAIN_V1_EMBEDDED_VALIDATION_BUDGET` |
 | Lighting domain view / its validation | 40 / 72 | `NOAH_PROFILE_RGB_V1_EMBEDDED_VIEW_BUDGET`, `NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET` |

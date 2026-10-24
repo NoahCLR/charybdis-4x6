@@ -69,7 +69,7 @@ live edits and Save are taken only in the two ready states.
 A keyboard without a slave half never enters `RECONCILING_COMMITTED`. Boot
 selection finding nothing goes straight to `READY_COMPILED`.
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_stopped_test.inc`: `test_only_states_a_restart_leaves_are_stopped`; `test_empty_boot_live_commit_and_timeout`, `test_boot_reconciles_different_generations_before_activation`), `tests/host/run_profile_store_runtime_owner_tests.sh` (`test_an_empty_flash_boots_the_compiled_defaults`), `tests/host/run_profile_candidate_store_backend_tests.sh` (`test_reboot_adopts_committed_profile_through_bounded_validator`, `test_override_disabled_commit_activates_compiled_fallback`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_stopped_test.inc`: `test_only_states_a_restart_leaves_are_stopped`; `test_empty_boot_live_commit_and_timeout`, `test_boot_reconciles_different_generations_before_activation`), `tests/host/run_profile_store_runtime_owner_tests.sh` (`test_an_empty_flash_boots_the_compiled_defaults`), `tests/host/run_profile_candidate_store_backend_tests.sh` (`test_reboot_adopts_saved_profile_through_bounded_validator`, `test_override_disabled_commit_activates_compiled_fallback`).
 
 ## Candidate phases on both halves
 
@@ -119,7 +119,7 @@ then releases the copy, or commits it by repair, at the first poll the
 restarted half sends ([split protocol](profile-split-v1.md#an-abandoned-prepared-copy)).
 A copy committing or of unknown durability is never released.
 
-Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_abort_is_bounded_when_peer_goes_silent`, `test_prepared_abort_is_bounded_when_peer_stays_busy`, `test_prepared_push_resumes_from_the_metadata_poll`, `test_prepared_push_survives_one_replayed_reply_anywhere`, `test_a_restarted_sender_settles_the_prepared_copy`, `test_a_paused_sender_keeps_the_prepared_copy`, `test_a_committing_copy_is_never_released`), `tests/host/run_profile_owner_tests.sh` (`test_host_abort_ends_when_peer_never_acknowledges`).
+Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_abort_is_bounded_when_other_half_goes_silent`, `test_prepared_abort_is_bounded_when_other_half_stays_busy`, `test_prepared_push_resumes_from_the_metadata_poll`, `test_prepared_push_survives_one_replayed_reply_anywhere`, `test_a_restarted_sender_settles_the_prepared_copy`, `test_a_paused_sender_keeps_the_prepared_copy`, `test_a_committing_copy_is_never_released`), `tests/host/run_profile_owner_tests.sh` (`test_host_abort_ends_when_other_half_never_acknowledges`).
 
 ## Profile status flags 5 and 8
 
@@ -128,7 +128,7 @@ Held by: `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_abor
 | 5 peer converged | this half's split authority holds both halves on the same saved profile, or both on the compiled defaults, with nothing in transfer |
 | 8 peer cleanup pending | an `ABORT` released unacknowledged is still owed to the slave half; no prepared push or transfer starts, so a new save's commit waits in state `8` until its lease ends it, until the slave half acknowledges or the keyboard restarts |
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`test_host_abort_ends_when_peer_never_acknowledges`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_abort_is_bounded_when_peer_goes_silent`). Flag 5's derivation from the split authority: no test.
+Held by: `tests/host/run_profile_owner_tests.sh` (`test_host_abort_ends_when_other_half_never_acknowledges`), `tests/host/run_profile_split_reconciler_tests.sh` (`test_prepared_abort_is_bounded_when_other_half_goes_silent`). Flag 5's derivation from the split authority: no test.
 
 ## Safe boundary
 
@@ -162,4 +162,4 @@ pending one stays observable. Edit status page 2 reports the reason mask
 - Each evaluation is published as one snapshot, so a status read never mixes
   counts from two evaluations.
 
-Held by: `tests/host/run_profile_activation_policy_tests.sh` (`profile_activation_policy_test.c`: `test_reason_bits_are_exact_and_composable`, `test_runtime_capture_and_status`, `test_peer_observation_fails_closed`, `test_status_fails_closed_during_publication`, `test_configured_pd_blocks_until_release_and_does_not_wrap`), `tests/host/run_profile_owner_tests.sh` (`test_commit_waits_for_a_safe_boundary_then_activates`, `test_activation_waits_for_a_safe_boundary_while_typing`, `test_link_lost_after_the_peer_commit_was_seen_still_activates`), `tests/host/run_profile_split_foundation_tests.sh` (`test_authority_publication_and_activation_observer`).
+Held by: `tests/host/run_profile_activation_policy_tests.sh` (`profile_activation_policy_test.c`: `test_reason_bits_are_exact_and_composable`, `test_runtime_capture_and_status`, `test_other_half_observation_fails_closed`, `test_status_fails_closed_during_publication`, `test_configured_pd_blocks_until_release_and_does_not_wrap`), `tests/host/run_profile_owner_tests.sh` (`test_commit_waits_for_a_safe_boundary_then_activates`, `test_activation_waits_for_a_safe_boundary_while_typing`, `test_link_lost_after_the_other_half_commit_was_seen_still_activates`), `tests/host/run_profile_split_foundation_tests.sh` (`test_authority_publication_and_activation_observer`).

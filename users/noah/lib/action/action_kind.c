@@ -58,10 +58,10 @@ static bool noah_action_keycode_is_pure_modifier_literal(uint16_t action) {
     }
 }
 
-// The firmware always links the live lookup (effective_settings_runtime.c),
-// which falls back to the keymap's shortcuts before a profile is live. This
-// default, no shortcuts, only serves host tests that link neither; a test
-// that needs shortcuts defines its own.
+// The firmware always links the live lookup
+// (active_profile_settings_runtime.c), which falls back to the keymap's
+// shortcuts before a profile is live. This default, no shortcuts, only serves
+// host tests that link neither; a test that needs shortcuts defines its own.
 __attribute__((weak)) noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
     (void)slot;
     return (noah_custom_key_shortcut_t){0};
@@ -165,11 +165,11 @@ bool noah_action_desc_dispatches_macro_preflight(noah_action_desc_t desc) {
     return noah_action_desc_has_dispatch_flag(desc, NOAH_ACTION_DISPATCH_MACRO_PREFLIGHT);
 }
 
-bool noah_action_desc_intercepts_pd_mode_press(noah_action_desc_t desc) {
+bool noah_action_desc_intercepts_pointing_mode_press(noah_action_desc_t desc) {
     return noah_action_desc_has_dispatch_flag(desc, NOAH_ACTION_DISPATCH_PD_PRESS_INTERCEPT);
 }
 
-bool noah_action_desc_intercepts_pd_mode_release(noah_action_desc_t desc) {
+bool noah_action_desc_intercepts_pointing_mode_release(noah_action_desc_t desc) {
     return noah_action_desc_has_dispatch_flag(desc, NOAH_ACTION_DISPATCH_PD_RELEASE_INTERCEPT);
 }
 
@@ -177,26 +177,26 @@ const noah_action_kind_def_t *noah_action_kind_def(noah_action_kind_t kind) {
     return kind < NOAH_ACTION_KIND_COUNT ? &noah_action_kind_defs[kind] : NULL;
 }
 
-static noah_action_desc_t noah_action_desc_build(noah_action_kind_t kind, uint16_t action, uint8_t layer, pd_mode_mask_t pd_mode) {
+static noah_action_desc_t noah_action_desc_build(noah_action_kind_t kind, uint16_t action, uint8_t layer, pointing_mode_mask_t pointing_mode) {
     return (noah_action_desc_t){
-        .kind    = kind,
-        .action  = action,
-        .layer   = layer,
-        .pd_mode = pd_mode,
+        .kind          = kind,
+        .action        = action,
+        .layer         = layer,
+        .pointing_mode = pointing_mode,
     };
 }
 
-bool noah_action_kind_match_literal(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
+bool noah_action_kind_match_literal(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
     if (!out) {
         return false;
     }
 
-    *out = noah_action_desc_build(NOAH_ACTION_KIND_LITERAL, action, 0, pd_mode);
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_LITERAL, action, 0, pointing_mode);
     return true;
 }
 
-bool noah_action_kind_match_layer_lock(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_layer_lock(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && (noah_action_keycode_is_layer_lock(action) || noah_action_keycode_is_layer_toggle(action)))) {
         return false;
@@ -206,8 +206,8 @@ bool noah_action_kind_match_layer_lock(uint16_t action, pd_mode_mask_t pd_mode, 
     return true;
 }
 
-bool noah_action_kind_match_layer_oneshot(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_layer_oneshot(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && noah_action_keycode_is_layer_oneshot(action))) {
         return false;
@@ -217,8 +217,8 @@ bool noah_action_kind_match_layer_oneshot(uint16_t action, pd_mode_mask_t pd_mod
     return true;
 }
 
-bool noah_action_kind_match_layer_mod(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_layer_mod(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && noah_action_keycode_is_layer_mod(action))) {
         return false;
@@ -228,8 +228,8 @@ bool noah_action_kind_match_layer_mod(uint16_t action, pd_mode_mask_t pd_mode, n
     return true;
 }
 
-bool noah_action_kind_match_layer_goto(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_layer_goto(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && noah_action_keycode_is_layer_goto(action))) {
         return false;
@@ -239,8 +239,8 @@ bool noah_action_kind_match_layer_goto(uint16_t action, pd_mode_mask_t pd_mode, 
     return true;
 }
 
-bool noah_action_kind_match_layer_hold(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_layer_hold(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && (noah_action_keycode_is_momentary(action) || noah_action_keycode_is_layer_tap_toggle(action)))) {
         return false;
@@ -250,8 +250,8 @@ bool noah_action_kind_match_layer_hold(uint16_t action, pd_mode_mask_t pd_mode, 
     return true;
 }
 
-bool noah_action_kind_match_layer_tap(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_layer_tap(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && noah_action_keycode_is_layer_tap(action))) {
         return false;
@@ -261,8 +261,8 @@ bool noah_action_kind_match_layer_tap(uint16_t action, pd_mode_mask_t pd_mode, n
     return true;
 }
 
-bool noah_action_kind_match_unsupported_layer_action(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_unsupported_layer_action(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && noah_action_keycode_is_raw_qmk_layer_action(action))) {
         return false;
@@ -272,8 +272,8 @@ bool noah_action_kind_match_unsupported_layer_action(uint16_t action, pd_mode_ma
     return true;
 }
 
-bool noah_action_kind_match_macro(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_macro(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && noah_action_keycode_is_macro(action))) {
         return false;
@@ -283,8 +283,8 @@ bool noah_action_kind_match_macro(uint16_t action, pd_mode_mask_t pd_mode, noah_
     return true;
 }
 
-bool noah_action_kind_match_qmk_behavior(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_qmk_behavior(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && noah_action_keycode_is_qmk_behavior(action))) {
         return false;
@@ -294,8 +294,8 @@ bool noah_action_kind_match_qmk_behavior(uint16_t action, pd_mode_mask_t pd_mode
     return true;
 }
 
-bool noah_action_kind_match_qmk_function(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_qmk_function(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && noah_action_keycode_is_qmk_function(action))) {
         return false;
@@ -305,8 +305,8 @@ bool noah_action_kind_match_qmk_function(uint16_t action, pd_mode_mask_t pd_mode
     return true;
 }
 
-bool noah_action_kind_match_custom_key(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_custom_key(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && NOAH_KEYCODE_IS_CUSTOM_KEY(action))) {
         return false;
@@ -320,8 +320,8 @@ bool noah_action_kind_match_custom_key(uint16_t action, pd_mode_mask_t pd_mode, 
 // the bank, anything after the blocks) does nothing wherever it is dispatched,
 // and is refused as a behaviour step or combo output. Every assigned family
 // matches first.
-bool noah_action_kind_match_unassigned_user(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_unassigned_user(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
     if (!(out && action >= QK_USER && action <= QK_USER_MAX)) {
         return false;
@@ -331,23 +331,23 @@ bool noah_action_kind_match_unassigned_user(uint16_t action, pd_mode_mask_t pd_m
     return true;
 }
 
-bool noah_action_kind_match_pd_mode_hold(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    if (!(out && pd_mode != 0)) {
+bool noah_action_kind_match_pointing_mode_hold(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    if (!(out && pointing_mode != 0)) {
         return false;
     }
 
-    *out = noah_action_desc_build(NOAH_ACTION_KIND_PD_MODE_HOLD, action, 0, pd_mode);
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_POINTING_MODE_HOLD, action, 0, pointing_mode);
     return true;
 }
 
-bool noah_action_kind_match_pd_mode_lock(uint16_t action, pd_mode_mask_t pd_mode, noah_action_desc_t *out) {
-    (void)pd_mode;
+bool noah_action_kind_match_pointing_mode_lock(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
 
-    if (!(out && is_pd_mode_lock_action(action))) {
+    if (!(out && is_pointing_mode_lock_action(action))) {
         return false;
     }
 
-    *out = noah_action_desc_build(NOAH_ACTION_KIND_PD_MODE_LOCK, action, 0, 0);
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_POINTING_MODE_LOCK, action, 0, 0);
     return true;
 }
 
@@ -371,9 +371,9 @@ bool noah_action_supported_at(uint16_t action, noah_action_placement_t placement
 }
 
 noah_action_desc_t noah_action_describe(uint16_t action) {
-    const noah_action_kind_def_t *best_def  = NULL;
-    noah_action_desc_t            best_desc = noah_action_desc_build(NOAH_ACTION_KIND_LITERAL, action, 0, 0);
-    pd_mode_mask_t                pd_mode   = pd_mode_for_keycode(action);
+    const noah_action_kind_def_t *best_def      = NULL;
+    noah_action_desc_t            best_desc     = noah_action_desc_build(NOAH_ACTION_KIND_LITERAL, action, 0, 0);
+    pointing_mode_mask_t          pointing_mode = pointing_mode_for_keycode(action);
 
     for (uint8_t kind = 0; kind < NOAH_ACTION_KIND_COUNT; kind++) {
         const noah_action_kind_def_t *def = noah_action_kind_def((noah_action_kind_t)kind);
@@ -383,7 +383,7 @@ noah_action_desc_t noah_action_describe(uint16_t action) {
             continue;
         }
 
-        if (!def->match(action, pd_mode, &candidate)) {
+        if (!def->match(action, pointing_mode, &candidate)) {
             continue;
         }
 

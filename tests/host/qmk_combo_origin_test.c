@@ -7,7 +7,7 @@
 #include "noah_real_profile_keyboard.h"
 #include "users/noah/lib/compat/qmk_combo_origin.h"
 #include "users/noah/lib/key/behavior/participation.h"
-#include "users/noah/lib/profile/runtime/effective_settings_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 
 enum {
     TEST_BURST_COMBOS     = 5,
@@ -32,11 +32,11 @@ static bool test_combo_output_behaviors = true;
 bool noah_setting_combo_output_behaviors(void) { return test_combo_output_behaviors; }
 uint32_t noah_setting(uint8_t id, uint32_t fallback) { (void)id; return fallback; }
 uint8_t noah_setting_layer_record(uint8_t layer, uint8_t field) { return field == NOAH_SETTINGS_LAYER_REFERENCE ? layer : 0; }
-uint16_t noah_effective_combo_count(void) { return noah_combo_count; }
-combo_t *noah_effective_combo_get(uint16_t index) { return index < noah_combo_count ? &key_combos[index] : NULL; }
-bool noah_effective_combo_enabled(uint16_t index) { return index < noah_combo_count; }
-uint32_t noah_effective_combo_allowed_layers(uint16_t index) { (void)index; return 0xffff; }
-uint8_t noah_effective_combo_flags(uint16_t index) { return test_combo_flags[index]; }
+uint16_t noah_active_profile_combo_count(void) { return noah_combo_count; }
+combo_t *noah_active_profile_combo_get(uint16_t index) { return index < noah_combo_count ? &key_combos[index] : NULL; }
+bool noah_active_profile_combo_enabled(uint16_t index) { return index < noah_combo_count; }
+uint32_t noah_active_profile_combo_allowed_layers(uint16_t index) { (void)index; return 0xffff; }
+uint8_t noah_active_profile_combo_flags(uint16_t index) { return test_combo_flags[index]; }
 uint16_t get_combo_term(uint16_t index, combo_t *combo) { (void)index; (void)combo; return COMBO_TERM; }
 uint16_t noah_qmk_combo_hold_term(void) { return TAPPING_TERM; }
 #endif

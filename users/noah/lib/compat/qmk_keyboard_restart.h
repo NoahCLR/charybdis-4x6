@@ -3,7 +3,7 @@
 // ───────────────────────────────────────────────────────────────────────────
 //
 // Restarts both halves when a client asks (Profile Wire SET 0x28): the way
-// out of a stopped profile owner, and never automatic. The USB half asks the
+// out of a stopped profile owner, and never automatic. The master half asks the
 // other half over a split RPC of its own and waits for its acknowledgement or
 // a short timeout; the Profile Wire reply goes out; then each half resets
 // itself from housekeeping, between main-loop passes, so never inside a flash
@@ -24,25 +24,25 @@ enum {
     NOAH_QMK_KEYBOARD_RESTART_VERSION    = 1u,
     // "REST", little-endian.
     NOAH_QMK_KEYBOARD_RESTART_CONFIRM = 0x54534552u,
-    // The USB half asks again every few milliseconds until the other half
+    // The master half asks again every few milliseconds until the other half
     // acknowledges or this long has passed. A 4 KiB erase there (45 ms
     // typical) holds its split thread off for that long.
-    NOAH_QMK_KEYBOARD_RESTART_PEER_WAIT_MS  = 250u,
-    NOAH_QMK_KEYBOARD_RESTART_PEER_RETRY_MS = 5u,
+    NOAH_QMK_KEYBOARD_RESTART_SLAVE_WAIT_MS  = 250u,
+    NOAH_QMK_KEYBOARD_RESTART_SLAVE_RETRY_MS = 5u,
     // Each half restarts this long after it took the request, so its own
-    // answer goes out first: the Profile Wire reply on the USB half, the
+    // answer goes out first: the Profile Wire reply on the master half, the
     // acknowledgement on the other.
-    NOAH_QMK_KEYBOARD_RESTART_USB_DELAY_MS  = 50u,
-    NOAH_QMK_KEYBOARD_RESTART_PEER_DELAY_MS = 20u,
+    NOAH_QMK_KEYBOARD_RESTART_USB_DELAY_MS   = 50u,
+    NOAH_QMK_KEYBOARD_RESTART_SLAVE_DELAY_MS = 20u,
 };
 
 void noah_qmk_keyboard_restart_encode(uint8_t kind, uint8_t frame[NOAH_QMK_KEYBOARD_RESTART_FRAME_SIZE]);
 // Whether `frame` is exactly the frame of `kind`.
 bool noah_qmk_keyboard_restart_frame_valid(const void *frame, uint8_t length, uint8_t kind);
 
-// USB half, from the Raw HID handler: asks the other half to restart, waiting
-// for its acknowledgement, and schedules this half's restart. True when the
-// other half acknowledged. Asked again before the restart, it asks nothing
+// Master half, from the Raw HID handler: asks the other half to restart,
+// waiting for its acknowledgement, and schedules this half's restart. True when
+// the other half acknowledged. Asked again before the restart, it asks nothing
 // and answers as the first time.
 bool noah_qmk_keyboard_restart_request(void);
 // Whether this half's restart is scheduled.

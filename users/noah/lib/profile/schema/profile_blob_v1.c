@@ -145,7 +145,7 @@ static noah_profile_codec_v1_result_t validate_domain(const noah_profile_domain_
 noah_profile_action_v1_limits_t noah_profile_action_v1_default_limits(void) {
     noah_profile_action_v1_limits_t limits = {
         .max_logical_layers        = NOAH_PROFILE_ACTION_V1_MAX_LOGICAL_LAYERS,
-        .max_pd_modes              = NOAH_PROFILE_ACTION_V1_MAX_PD_MODES,
+        .max_pointing_modes        = NOAH_PROFILE_ACTION_V1_MAX_POINTING_MODES,
         .max_macro_slots           = NOAH_PROFILE_ACTION_V1_MAX_MACRO_SLOTS,
         .max_custom_keys = NOAH_PROFILE_ACTION_V1_MAX_CUSTOM_KEYS,
     };
@@ -334,7 +334,7 @@ static noah_profile_codec_v1_result_t validate_action(const noah_profile_action_
         return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, offset, UINT8_MAX, 0u);
     }
     limits = supplied_limits ? *supplied_limits : noah_profile_action_v1_default_limits();
-    if (limits.max_logical_layers > UINT32_C(0x10000) || limits.max_pd_modes > UINT32_C(0x10000) || limits.max_macro_slots > UINT32_C(0x10000) || limits.max_custom_keys > UINT32_C(0x10000)) {
+    if (limits.max_logical_layers > UINT32_C(0x10000) || limits.max_pointing_modes > UINT32_C(0x10000) || limits.max_macro_slots > UINT32_C(0x10000) || limits.max_custom_keys > UINT32_C(0x10000)) {
         return fail(error, NOAH_PROFILE_CODEC_V1_INVALID_ARGUMENT, offset, UINT8_MAX, 0u);
     }
     if (action->flags != 0u) {
@@ -353,9 +353,9 @@ static noah_profile_codec_v1_result_t validate_action(const noah_profile_action_
         case NOAH_PROFILE_ACTION_V1_LAYER_LOCK:
             capacity = limits.max_logical_layers;
             break;
-        case NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY:
-        case NOAH_PROFILE_ACTION_V1_PD_MODE_LOCK:
-            capacity = limits.max_pd_modes;
+        case NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY:
+        case NOAH_PROFILE_ACTION_V1_POINTING_MODE_LOCK:
+            capacity = limits.max_pointing_modes;
             break;
         case NOAH_PROFILE_ACTION_V1_MACRO:
             capacity = limits.max_macro_slots;

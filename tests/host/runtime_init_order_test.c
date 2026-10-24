@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "users/noah/lib/profile/runtime/effective_pd_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
 #include "users/noah/lib/state/diagnostics/runtime_diag.h"
 #include "users/noah/noah_runtime.h"
 
@@ -70,9 +70,9 @@ const noah_pd_config_t noah_pd_defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT];
 
 // An image without a profile owner warms the pointing slots from the compiled
 // defaults; with one, the owner publishes them.
-void noah_effective_pd_load_compiled_defaults(const noah_pd_config_t defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT]) {
+void noah_active_profile_pd_load_compiled_defaults(const noah_pd_config_t defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT]) {
     CHECK(defaults == noah_pd_defaults);
-    test_log_stage("effective_pd_load_compiled_defaults");
+    test_log_stage("active_profile_pd_load_compiled_defaults");
 }
 
 void noah_record_admission_reset(void) {
@@ -188,7 +188,7 @@ static void test_keyboard_post_init_order(void) {
         // core state.
         "runtime_shared_state_post_init", "qmk_combo_origin_init", "record_admission_reset", "macro_payload_engine_init", "profile_store_runtime_init",
 #ifndef NOAH_LIVE_PROFILE_OWNER_ENABLE
-        "effective_pd_load_compiled_defaults",
+        "active_profile_pd_load_compiled_defaults",
 #endif
         "rgb_runtime_post_init", "split_runtime_sync_init",
     };

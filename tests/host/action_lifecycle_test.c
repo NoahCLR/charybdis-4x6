@@ -8,7 +8,7 @@
 #include "users/noah/lib/action/action_kind_internal.h"
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/synthetic_record.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/noah_keymap_ids.h"
 
 enum {
@@ -56,8 +56,8 @@ static uint8_t                    shortcut_tap_calls;
 static noah_custom_key_shortcut_t shortcut_tap_parts;
 static noah_custom_key_shortcut_t test_custom_shortcut; // TEST_CUSTOM_ACTION's
 
-static const pd_mode_def_t test_pd_mode_def = {
-    .mode_flag   = PD_MODE_ARROW,
+static const pointing_mode_def_t test_pointing_mode_def = {
+    .mode_flag   = POINTING_MODE_ARROW,
     .keycode     = PD_SLOT_4,
     .lock_action = PD_SLOT_4_LOCK,
 };
@@ -116,20 +116,20 @@ static void test_reset_stubs(void) {
     owned_unregister_result   = false;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     return action == PD_SLOT_4_LOCK;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
-    return keycode == PD_SLOT_4 ? PD_MODE_ARROW : 0;
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
+    return keycode == PD_SLOT_4 ? POINTING_MODE_ARROW : 0;
 }
 
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
-    return action == PD_SLOT_4_LOCK ? &test_pd_mode_def : NULL;
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
+    return action == PD_SLOT_4_LOCK ? &test_pointing_mode_def : NULL;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
-    CHECK(mode == PD_MODE_ARROW);
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
+    CHECK(mode == POINTING_MODE_ARROW);
     pd_toggle_calls++;
     if (pd_toggle_result) {
         split_runtime_sync();
@@ -137,12 +137,12 @@ bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
     return pd_toggle_result;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     pd_toggle_key_pos = key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
-bool pd_mode_handle_keycode_press(uint16_t keycode) {
+bool pointing_mode_handle_keycode_press(uint16_t keycode) {
     if (keycode == PD_SLOT_4) {
         pd_press_calls++;
         return pd_press_result;
@@ -150,12 +150,12 @@ bool pd_mode_handle_keycode_press(uint16_t keycode) {
     return false;
 }
 
-bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
+bool pointing_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
     pd_press_key_pos = key_pos;
-    return pd_mode_handle_keycode_press(keycode);
+    return pointing_mode_handle_keycode_press(keycode);
 }
 
-bool pd_mode_handle_keycode_release(uint16_t keycode) {
+bool pointing_mode_handle_keycode_release(uint16_t keycode) {
     if (keycode == PD_SLOT_4) {
         pd_release_calls++;
         return pd_release_result;
@@ -163,9 +163,9 @@ bool pd_mode_handle_keycode_release(uint16_t keycode) {
     return false;
 }
 
-bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
+bool pointing_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
     pd_release_key_pos = key_pos;
-    return pd_mode_handle_keycode_release(keycode);
+    return pointing_mode_handle_keycode_release(keycode);
 }
 
 bool layer_ownership_toggle_lock_state(uint8_t layer) {
@@ -305,8 +305,8 @@ static void test_invalid_action_kind_is_rejected_consistently(void) {
     CHECK(!noah_action_kind_metadata_defined(invalid.kind));
     CHECK(!noah_action_desc_has_capability(invalid, NOAH_ACTION_CAP_BEHAVIOR_KEYCODE_SUPPORTED));
     CHECK(!noah_action_desc_dispatches_macro_preflight(invalid));
-    CHECK(!noah_action_desc_intercepts_pd_mode_press(invalid));
-    CHECK(!noah_action_desc_intercepts_pd_mode_release(invalid));
+    CHECK(!noah_action_desc_intercepts_pointing_mode_press(invalid));
+    CHECK(!noah_action_desc_intercepts_pointing_mode_release(invalid));
     CHECK(!noah_action_desc_keeps_registered_feedback(invalid));
     CHECK(noah_action_desc_preview_layer(invalid) == UINT8_MAX);
     CHECK(!noah_action_desc_is_runtime_handled_keycode(invalid));
@@ -470,7 +470,7 @@ static void test_tap_ignores_raw_layer_actions(void) {
     CHECK(synthetic_qmk_tap_call.keycode == KC_NO);
 }
 
-static void test_press_routes_pd_mode_momentary_qmk_custom_and_plain(void) {
+static void test_press_routes_pointing_mode_momentary_qmk_custom_and_plain(void) {
     keypos_t key_pos = test_keypos(1, 2);
 
     test_reset_stubs();
@@ -542,7 +542,7 @@ static void test_press_ignores_raw_layer_actions_and_one_shot_actions(void) {
     CHECK(register_code16_call.keycode == KC_NO);
 }
 
-static void test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plain(void) {
+static void test_release_routes_press_only_pointing_mode_momentary_qmk_custom_and_plain(void) {
     keypos_t key_pos = test_keypos(4, 5);
 
     test_reset_stubs();
@@ -663,7 +663,7 @@ static void test_qmk_functions_dispatch_as_synthetic_qmk_records(void) {
 
 // An unassigned userspace code sends nothing, whichever way it is dispatched.
 static void test_unassigned_userspace_codes_send_nothing(void) {
-    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + PD_MODE_COUNT, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, QK_USER_MAX};
+    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, QK_USER_MAX};
     keypos_t       key_pos      = {.row = 1, .col = 2};
     for (size_t index = 0; index < ARRAY_SIZE(unassigned); index++) {
         test_reset_stubs();
@@ -689,9 +689,9 @@ int main(void) {
     test_tap_at_preserves_pd_lock_origin_key_pos();
     test_tap_routes_macro_custom_qmk_and_plain_actions();
     test_tap_ignores_raw_layer_actions();
-    test_press_routes_pd_mode_momentary_qmk_custom_and_plain();
+    test_press_routes_pointing_mode_momentary_qmk_custom_and_plain();
     test_press_ignores_raw_layer_actions_and_one_shot_actions();
-    test_release_routes_press_only_pd_mode_momentary_qmk_custom_and_plain();
+    test_release_routes_press_only_pointing_mode_momentary_qmk_custom_and_plain();
     test_release_ignores_raw_layer_actions();
     test_qmk_functions_dispatch_as_synthetic_qmk_records();
 

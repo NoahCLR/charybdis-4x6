@@ -28,7 +28,7 @@ fire. Zero rows is an explicit table with no combos; a profile without the
 domain runs the compiled defaults' combos ([device-resident profile](../device-resident-profile.md)).
 A payload shorter than `8 + 20 × row count` is refused before any row is read.
 
-Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_effective_combo_runtime_tests.sh` (`effective_combo_runtime_test.c`), `tests/fixtures/combo_domain_v3.fixture`.
+Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_active_profile_combo_runtime_tests.sh` (`active_profile_combo_runtime_test.c`), `tests/fixtures/combo_domain_v3.fixture`.
 
 ## Rows
 
@@ -77,7 +77,7 @@ keyboard accepts always materialises its combos.
 Validation reads the header in one step, a row's fixed part in one, then its
 inputs four at a time (16 bytes), never more than 20 bytes a step.
 
-Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_effective_combo_runtime_tests.sh` (`effective_combo_runtime_test.c`), `tests/fixtures/combo_domain_v3.fixture`.
+Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_active_profile_combo_runtime_tests.sh` (`active_profile_combo_runtime_test.c`), `tests/fixtures/combo_domain_v3.fixture`.
 
 ## The native table
 
@@ -98,7 +98,7 @@ QMK runs combos in its long-combo representation (`EXTRA_LONG_COMBOS`): a
 Its queue of completed combos (`COMBO_BUFFER_LENGTH`, four) is a separate
 limit.
 
-Held by: `tests/host/run_effective_combo_runtime_tests.sh` (`effective_combo_runtime_test.c`), `tests/host/run_profile_domain_owner_round_trip_tests.sh` (`tests/fixtures/maximum_profile_v4.fixture`).
+Held by: `tests/host/run_active_profile_combo_runtime_tests.sh` (`active_profile_combo_runtime_test.c`), `tests/host/run_profile_domain_owner_round_trip_tests.sh` (`tests/fixtures/maximum_profile_v4.fixture`).
 
 ## Combo output behaviour permission encoding
 
@@ -118,7 +118,7 @@ decide whether it fires. Settings readback carries header byte 5 unchanged.
 The vetoes, the origin layer and release pairing are
 [the participation policy](../participation-policy.md)'s.
 
-Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`), `tests/host/run_effective_combo_runtime_tests.sh` (`effective_combo_runtime_test.c`), `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_test.c`), `tests/fixtures/combo_output_behaviors_v1.fixture`.
+Held by: `tests/host/run_participation_tests.sh` (`participation_test.c`), `tests/host/run_active_profile_combo_runtime_tests.sh` (`active_profile_combo_runtime_test.c`), `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_test.c`), `tests/fixtures/combo_output_behaviors_v1.fixture`.
 
 ## Native combo readback — GET `0x06`
 
@@ -194,4 +194,4 @@ Error replies carry an empty, zero payload. A build without combos answers a
 valid empty table: zero rows, enable 0, no flags, both timings zero, and each
 layer its own reference.
 
-Held by: `tests/host/run_combo_readback_tests.sh` (`qmk_combo_readback_test.c`), `tests/host/run_effective_combo_runtime_tests.sh` (`effective_combo_runtime_test.c`), `tests/fixtures/combo_readback_v3.fixture`.
+Held by: `tests/host/run_combo_readback_tests.sh` (`qmk_combo_readback_test.c`), `tests/host/run_active_profile_combo_runtime_tests.sh` (`active_profile_combo_runtime_test.c`), `tests/fixtures/combo_readback_v3.fixture`.

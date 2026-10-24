@@ -35,7 +35,7 @@ void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord
 
 typedef struct {
     bool    auto_mouse_anchored;
-    bool    pd_mode_anchor_active;
+    bool    pointing_mode_anchor_active;
     bool    prefers_typing_layer;
     bool    auto_mouse_toggle_enabled;
     bool    sniping_layer_active;

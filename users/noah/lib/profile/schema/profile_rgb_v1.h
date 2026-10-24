@@ -18,7 +18,7 @@ enum {
     NOAH_PROFILE_RGB_V1_LED_BITMAP_SIZE       = 8u,
     NOAH_PROFILE_RGB_V1_MAX_GROUPS            = 16u,
     NOAH_PROFILE_RGB_V1_MAX_LOGICAL_LAYERS    = 16u,
-    NOAH_PROFILE_RGB_V1_MAX_PD_MODES          = NOAH_PROFILE_PD_COUNT,
+    NOAH_PROFILE_RGB_V1_MAX_POINTING_MODES    = NOAH_PROFILE_PD_COUNT,
     NOAH_PROFILE_RGB_V1_MAX_STAGE_GROUP_ROWS  = 32u,
     // Taps past the first: the shared tap depth minus one (D-F14).
     NOAH_PROFILE_RGB_V1_MAX_TAP_BRANCH_COLORS = NOAH_PROFILE_TAP_DEPTH - 1u,
@@ -28,7 +28,7 @@ enum {
     NOAH_PROFILE_RGB_V1_SELECTOR_ALL          = 0xffu,
     NOAH_PROFILE_RGB_V1_STAGE_LAYER           = 1u << 0,
     NOAH_PROFILE_RGB_V1_STAGE_AUTOMOUSE       = 1u << 1,
-    NOAH_PROFILE_RGB_V1_STAGE_PD_MODE         = 1u << 2,
+    NOAH_PROFILE_RGB_V1_STAGE_POINTING_MODE   = 1u << 2,
     NOAH_PROFILE_RGB_V1_STAGE_COMBO           = 1u << 3,
     NOAH_PROFILE_RGB_V1_STAGE_KEY_BEHAVIOR    = 1u << 4,
     NOAH_PROFILE_RGB_V1_STAGE_MASK_ALL        = 0x1fu,
@@ -41,8 +41,9 @@ enum {
     NOAH_PROFILE_RGB_V1_EMBEDDED_VALIDATION_BUDGET = 72u,
 };
 
-// One bit per PD slot; 32 slots fill the word, so it is not an enum constant.
-#define NOAH_PROFILE_RGB_V1_PD_MODE_MASK_ALL (UINT32_MAX >> (32u - NOAH_PROFILE_PD_COUNT))
+// One bit per pointing slot; 32 slots fill the word, so it is not an enum
+// constant.
+#define NOAH_PROFILE_RGB_V1_POINTING_MODE_MASK_ALL (UINT32_MAX >> (32u - NOAH_PROFILE_PD_COUNT))
 
 // Record geometry shared by decoding and the authored writer.
 enum {
@@ -127,7 +128,7 @@ typedef struct {
     uint8_t  max_logical_layers;
     uint8_t  maximum_brightness;
     uint8_t  tap_branch_color_count;
-    uint32_t supported_pd_mode_mask;
+    uint32_t supported_pointing_mode_mask;
 } noah_profile_rgb_v1_limits_t;
 
 typedef struct {
@@ -159,7 +160,7 @@ typedef struct {
 } noah_profile_rgb_v1_automouse_t;
 
 typedef struct {
-    uint8_t                   pd_mode_id;
+    uint8_t                   pointing_mode_id;
     noah_profile_rgb_v1_hsv_t color;
     uint8_t                   locality;
 } noah_profile_rgb_v1_pd_color_t;

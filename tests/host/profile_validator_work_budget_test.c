@@ -186,10 +186,10 @@ static void run_maximum_rgb_profile(void) {
     compatibility.required_domain_mask              = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     compatibility.allowed_domain_mask               = NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB;
     compatibility.logical_layer_count               = 1u;
-    compatibility.supported_pd_mode_mask            = 0u;
+    compatibility.supported_pointing_mode_mask      = 0u;
     compatibility.rgb_limits.compiled_stage_mask    = NOAH_PROFILE_RGB_V1_STAGE_LAYER;
     compatibility.rgb_limits.logical_layer_count    = 1u;
-    compatibility.rgb_limits.supported_pd_mode_mask = 0u;
+    compatibility.rgb_limits.supported_pointing_mode_mask = 0u;
     assert(noah_profile_validator_v1_begin(&validator, &reader, 0u, &declaration, &compatibility, &error) == NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS);
 
     noah_profile_validator_v1_result_t result = NOAH_PROFILE_VALIDATOR_V1_IN_PROGRESS;

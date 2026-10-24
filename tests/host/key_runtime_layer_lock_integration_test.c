@@ -9,7 +9,7 @@
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
-#include "users/noah/lib/pointing/defs/pd_modes.h"
+#include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/state/ownership/layer_ownership.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/lib/state/shared/runtime_reset.h"
@@ -270,7 +270,7 @@ bool key_behavior_has_more_taps(uint16_t keycode, uint8_t count) {
     return keycode == TEST_MULTI_TAP_KEY && count < 2;
 }
 
-bool key_behavior_future_tap_path_has_foreign_pd_mode(uint16_t keycode, uint8_t count, pd_mode_mask_t base_mode) {
+bool key_behavior_future_tap_path_has_foreign_pointing_mode(uint16_t keycode, uint8_t count, pointing_mode_mask_t base_mode) {
     (void)keycode;
     (void)count;
     (void)base_mode;
@@ -357,69 +357,69 @@ void pointer_layer_policy_take_back_qmk_toggle(uint16_t keycode, const keyrecord
     (void)record;
 }
 
-bool is_pd_mode_lock_action(uint16_t action) {
+bool is_pointing_mode_lock_action(uint16_t action) {
     (void)action;
     return false;
 }
 
-const pd_mode_def_t *pd_mode_lock_action_lookup(uint16_t action) {
+const pointing_mode_def_t *pointing_mode_lock_action_lookup(uint16_t action) {
     (void)action;
     return NULL;
 }
 
-bool pd_mode_toggle_lock_state(pd_mode_mask_t mode) {
+bool pointing_mode_toggle_lock_state(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }
 
-bool pd_mode_toggle_lock_state_at(pd_mode_mask_t mode, keypos_t key_pos) {
+bool pointing_mode_toggle_lock_state_at(pointing_mode_mask_t mode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_toggle_lock_state(mode);
+    return pointing_mode_toggle_lock_state(mode);
 }
 
-bool pd_mode_set_lock_state(pd_mode_mask_t mode, bool locked) {
+bool pointing_mode_set_lock_state(pointing_mode_mask_t mode, bool locked) {
     (void)mode;
     (void)locked;
     return false;
 }
 
-bool pd_mode_set_lock_state_at(pd_mode_mask_t mode, bool locked, keypos_t key_pos) {
+bool pointing_mode_set_lock_state_at(pointing_mode_mask_t mode, bool locked, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_set_lock_state(mode, locked);
+    return pointing_mode_set_lock_state(mode, locked);
 }
 
-bool pd_mode_handle_keycode_press(uint16_t keycode) {
+bool pointing_mode_handle_keycode_press(uint16_t keycode) {
     (void)keycode;
     return false;
 }
 
-bool pd_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
+bool pointing_mode_handle_keycode_press_at(uint16_t keycode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_handle_keycode_press(keycode);
+    return pointing_mode_handle_keycode_press(keycode);
 }
 
-bool pd_mode_handle_keycode_release(uint16_t keycode) {
+bool pointing_mode_handle_keycode_release(uint16_t keycode) {
     (void)keycode;
     return false;
 }
 
-bool pd_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
+bool pointing_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos) {
     (void)key_pos;
-    return pd_mode_handle_keycode_release(keycode);
+    return pointing_mode_handle_keycode_release(keycode);
 }
 
-bool pd_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
+bool pointing_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
     (void)keycode;
     (void)record;
     return false;
 }
 
-pd_mode_mask_t pd_mode_for_keycode(uint16_t keycode) {
+pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;
 }
 
-bool pd_mode_local_locked(pd_mode_mask_t mode) {
+bool pointing_mode_local_locked(pointing_mode_mask_t mode) {
     (void)mode;
     return false;
 }

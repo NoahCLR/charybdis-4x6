@@ -24,7 +24,7 @@ A profile stores a slot's colour only in the lighting domain, one row per slot
 whether or not the slot is stored here (D-F09,
 [ADR](../adr/0009-thirty-two-pointing-slots-stored-sparsely.md)).
 
-Held by: `tests/host/run_pd_mode_tests.sh` (`pd_mode_profile_registry_test.c`), `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the required domain mask).
+Held by: `tests/host/run_pointing_mode_tests.sh` (`pointing_mode_profile_registry_test.c`), `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the required domain mask).
 
 ## Keycodes
 
@@ -50,7 +50,7 @@ Profiles store slot keys as action kinds 4 (held) and 5 (locked)
 ([action encoding](profile-wire-v1/blob-and-digests.md#action-encoding)), so
 a block move changes the action-ABI digest and nothing else.
 
-Held by: `tests/host/run_pd_mode_tests.sh` (`pd_mode_profile_registry_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the keycode assertions).
+Held by: `tests/host/run_pointing_mode_tests.sh` (`pointing_mode_profile_registry_test.c`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the keycode assertions).
 
 ## Header
 
@@ -264,7 +264,7 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 Changing modes releases only the old mode's outputs and clears its banked
 motion, axis and movement state.
 
-Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_an_empty_slot_hold_key_owns_nothing`, the owner tests), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`pd_mode_key_runtime_integration_test.c`, `test_interrupted_locked_pd_mode_press_unlocks_on_press_and_releases_momentary_hold`, `test_upper_slot_hold_lock_dpi_and_disabled_slot`, `test_last_slot_hold_lock_dpi_and_disabled_slot`).
+Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_an_empty_slot_hold_key_owns_nothing`, the owner tests), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_interrupted_locked_pointing_mode_press_unlocks_on_press_and_releases_momentary_hold`, `test_upper_slot_hold_lock_dpi_and_disabled_slot`, `test_last_slot_hold_lock_dpi_and_disabled_slot`).
 
 ## Pointer layer and DPI
 
@@ -280,7 +280,7 @@ a directional mode's DPI when it has one; otherwise the normal DPI. The normal
 and sniping DPI are [settings](profile-wire-v1/settings-domain.md#scalars)
 scalars 18 and 19.
 
-Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_layer_state_set_*`, `test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset`), `tests/host/run_pointer_layer_policy_tests.sh`, `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_upper_slot_hold_lock_dpi_and_disabled_slot`).
+Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_layer_state_set_*`, `test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset`), `tests/host/run_pointer_layer_policy_tests.sh`, `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_upper_slot_hold_lock_dpi_and_disabled_slot`).
 
 ## Directional movement
 
@@ -321,7 +321,7 @@ on only a direction more than 90° from the one that sent may send, a whole
 step of its own, and its sending spends the movement in turn. Other motion is
 dropped, not banked. A step that sends nothing leaves the movement unspent.
 
-Held by: `tests/host/run_pd_mode_handlers_tests.sh` (`pd_mode_handlers_test.c`, `test_configured_eight_directions`, `test_configured_empty_directions_and_single_axes`, `test_configured_dominant_axis`, `test_configured_once_per_movement`).
+Held by: `tests/host/run_pointing_mode_handlers_tests.sh` (`pointing_mode_handlers_test.c`, `test_configured_eight_directions`, `test_configured_empty_directions_and_single_axes`, `test_configured_dominant_axis`, `test_configured_once_per_movement`).
 
 ## Scrolling movement
 
@@ -348,7 +348,7 @@ saturates at ±2^24 counts.
 - Held modifiers are owned for as long as the mode runs. Keys typed meanwhile
   do not see a modifier only the mode holds.
 
-Held by: `tests/host/run_pd_mode_handlers_tests.sh` (`pd_mode_handlers_test.c`, the `test_dragscroll_*` tests, `test_configured_scroll_one_axis`), `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_pinch_masks_mode_owned_gui_*`, `test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain_key_processing`).
+Held by: `tests/host/run_pointing_mode_handlers_tests.sh` (`pointing_mode_handlers_test.c`, the `test_dragscroll_*` tests, `test_configured_scroll_one_axis`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_pinch_masks_mode_owned_gui_*`, `test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain_key_processing`).
 
 ## Outputs
 
@@ -371,7 +371,7 @@ Held by: `tests/host/run_pd_mode_handlers_tests.sh` (`pd_mode_handlers_test.c`, 
   when playback starts. An empty, unplayable or busy slot sends nothing; a
   refused start is not queued.
 
-Held by: `tests/host/run_pd_mode_handlers_tests.sh` (`pd_mode_handlers_test.c`, `test_configured_mouse_button_clicks`, `test_configured_macro_start_accounting`; `pd_output_ownership_test.c`), `tests/host/run_owned_keycode_tests.sh` (`owned_keycode_test.c`, `test_literal_tap_never_releases_another_owners_usage`, `test_click_never_releases_a_physically_held_button`, `test_fresh_modifier_settles_before_a_mouse_button`).
+Held by: `tests/host/run_pointing_mode_handlers_tests.sh` (`pointing_mode_handlers_test.c`, `test_configured_mouse_button_clicks`, `test_configured_macro_start_accounting`; `pd_output_ownership_test.c`), `tests/host/run_owned_keycode_tests.sh` (`owned_keycode_test.c`, `test_literal_tap_never_releases_another_owners_usage`, `test_click_never_releases_a_physically_held_button`, `test_fresh_modifier_settles_before_a_mouse_button`).
 
 ## Button overrides at runtime
 
@@ -382,7 +382,7 @@ press the mode takes never reaches the button's own behaviour, and its release
 goes to the mode that took it, even after another mode replaced it. The
 release of a press the mode did not take stays with the behaviour.
 
-Held by: `tests/host/run_pd_mode_key_runtime_integration_tests.sh` (`test_consumed_buttons_run_no_authored_behavior`, `test_button_release_follows_its_press_across_mode_changes`, `test_configured_consume_button_runs_nothing`, `test_configured_button_click_runs_no_behaviour`, `test_factory_arrow_paste_button_never_holds_itself`), `tests/host/run_pd_mode_handlers_tests.sh` (`test_configured_release_ownership_and_custom_slot`).
+Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_consumed_buttons_run_no_authored_behavior`, `test_button_release_follows_its_press_across_mode_changes`, `test_configured_consume_button_runs_nothing`, `test_configured_button_click_runs_no_behaviour`, `test_factory_arrow_paste_button_never_holds_itself`), `tests/host/run_pointing_mode_handlers_tests.sh` (`test_configured_release_ownership_and_custom_slot`).
 
 ## Effective slots and publication
 

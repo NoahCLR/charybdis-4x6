@@ -129,7 +129,7 @@ static size_t encode_representative(uint8_t *output, size_t capacity, noah_profi
     };
     static const noah_key_behavior_row_v1_t rows[] = {
         // Disabled, and allowed on layers 0 and 2 only: both kept as stored.
-        {.target = {.kind = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, .operand = 2u}, .flags = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_DISABLED, .allowed_layers = 0x0005u, .steps = pd_steps, .step_count = 1u},
+        {.target = {.kind = NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY, .operand = 2u}, .flags = NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_DISABLED, .allowed_layers = 0x0005u, .steps = pd_steps, .step_count = 1u},
         {
             .target         = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x1234u},
             .tap_hold_term  = 150u,
@@ -200,7 +200,7 @@ static void test_incremental_validation(const char *fixture_path) {
         NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, NOAH_KEY_BEHAVIOR_FIELD_V1_HOLD_ACTION, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION, NOAH_KEY_BEHAVIOR_FIELD_V1_LONG_HOLD_ACTION, NOAH_KEY_BEHAVIOR_FIELD_V1_TARGET, NOAH_KEY_BEHAVIOR_FIELD_V1_TAP_ACTION,
     };
     static const uint8_t expected_kinds[] = {
-        NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_MACRO, NOAH_PROFILE_ACTION_V1_LAYER_LOCK, NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, NOAH_PROFILE_ACTION_V1_CUSTOM_KEY,
+        NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, NOAH_PROFILE_ACTION_V1_MACRO, NOAH_PROFILE_ACTION_V1_LAYER_LOCK, NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY, NOAH_PROFILE_ACTION_V1_CUSTOM_KEY,
     };
     static const uint16_t                           expected_operands[] = {0x1234u, 0x28u, 10u, 3u, 2u, 2u};
     uint8_t                                         payload[TEST_BUFFER_SIZE];
@@ -325,9 +325,9 @@ static void test_shared_vectors_and_reader(const char *fixture_path) {
     assert(step.tap_index == 2u && step.tap.kind == NOAH_PROFILE_ACTION_V1_MACRO && step.tap.operand == 10u);
     assert(step.long_hold.style == NOAH_KEY_BEHAVIOR_HOLD_V1_TAP_AT_THRESHOLD && step.long_hold.action.kind == NOAH_PROFILE_ACTION_V1_LAYER_LOCK);
     expect_result(noah_key_behavior_domain_v1_row_at(&domain, 1u, &row, &error), NOAH_PROFILE_CODEC_V1_OK);
-    assert(row.target.kind == NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY && row.target.operand == 2u && row.step_count == 1u);
+    assert(row.target.kind == NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY && row.target.operand == 2u && row.step_count == 1u);
     assert(row.flags == NOAH_KEY_BEHAVIOR_DOMAIN_V1_ROW_FLAG_DISABLED && row.allowed_layers == 0x0005u);
-    target = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_PD_MODE_MOMENTARY, .operand = 2u};
+    target = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_POINTING_MODE_MOMENTARY, .operand = 2u};
     expect_result(noah_key_behavior_domain_v1_find_target(&domain, &target, &found_row, &found, &error), NOAH_PROFILE_CODEC_V1_OK);
     assert(found && found_row.row_index == 1u);
     target = (noah_profile_action_v1_t){.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = 0x4321u};
@@ -500,7 +500,7 @@ static void test_decode_rejections(const char *fixture_path) {
     limits.max_payload_size = (uint16_t)(length - 1u);
     expect_result(noah_key_behavior_domain_v1_decode(valid, length, &limits, NULL, &domain, &error), NOAH_PROFILE_CODEC_V1_CAPACITY_EXCEEDED);
     noah_profile_action_v1_limits_t action_limits = noah_profile_action_v1_default_limits();
-    action_limits.max_pd_modes                    = 2u;
+    action_limits.max_pointing_modes              = 2u;
     expect_result(noah_key_behavior_domain_v1_decode(valid, length, NULL, &action_limits, &domain, &error), NOAH_PROFILE_CODEC_V1_INVALID_OPERAND);
 }
 

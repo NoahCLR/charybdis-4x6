@@ -26,7 +26,7 @@ build_and_run() {
         -I"$ROOT/users/noah" \
         "$ROOT/tests/host/profile_working_copy_test.c" \
         "$ROOT/users/noah/lib/profile/runtime/profile_working_copy.c" \
-        "$ROOT/users/noah/lib/profile/runtime/effective_profile_provider.c" \
+        "$ROOT/users/noah/lib/profile/runtime/active_profile_provider.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \

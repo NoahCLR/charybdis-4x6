@@ -91,8 +91,8 @@ uint32_t noah_qmk_portable_live_setting(uint8_t id) {
 }
 
 // Edit status page 0's flags are wire bits (docs/spec/profile-wire-v1/live-edits.md).
-_Static_assert(NOAH_PROFILE_EDIT_WIRE_UNSAVED == 0x0001u && NOAH_PROFILE_EDIT_WIRE_PEER_REQUIRED == 0x0002u && NOAH_PROFILE_EDIT_WIRE_PEER_CONVERGED == 0x0004u && NOAH_PROFILE_EDIT_WIRE_PEER_KNOWN == 0x0008u && NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED == 0x0010u && NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED == 0x0020u && NOAH_PROFILE_EDIT_WIRE_SAVING == 0x0040u && NOAH_PROFILE_EDIT_WIRE_MODE_CONFLICT == 0x0080u, "edit status flags 0-7");
-_Static_assert(NOAH_PROFILE_EDIT_WIRE_WAITING_SAFE == 0x0100u && NOAH_PROFILE_EDIT_WIRE_STORAGE_PAUSED == 0x0200u && NOAH_PROFILE_EDIT_WIRE_PEER_STORAGE_PAUSED == 0x0400u && NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED == 0x0800u && NOAH_PROFILE_EDIT_WIRE_MODE_NOT_STORED == 0x1000u && NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING == 0x2000u && NOAH_PROFILE_EDIT_WIRE_STOPPED == 0x4000u && NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED == 0x8000u && NOAH_PROFILE_EDIT_WIRE_STATUS_FLAGS == 0xFFFFu, "edit status flags 8-15");
+_Static_assert(NOAH_PROFILE_EDIT_WIRE_UNSAVED == 0x0001u && NOAH_PROFILE_EDIT_WIRE_SLAVE_REQUIRED == 0x0002u && NOAH_PROFILE_EDIT_WIRE_SLAVE_CONVERGED == 0x0004u && NOAH_PROFILE_EDIT_WIRE_SLAVE_KNOWN == 0x0008u && NOAH_PROFILE_EDIT_WIRE_EDITS_BLOCKED == 0x0010u && NOAH_PROFILE_EDIT_WIRE_SAVED_COMPILED == 0x0020u && NOAH_PROFILE_EDIT_WIRE_SAVING == 0x0040u && NOAH_PROFILE_EDIT_WIRE_MODE_CONFLICT == 0x0080u, "edit status flags 0-7");
+_Static_assert(NOAH_PROFILE_EDIT_WIRE_WAITING_SAFE == 0x0100u && NOAH_PROFILE_EDIT_WIRE_STORAGE_PAUSED == 0x0200u && NOAH_PROFILE_EDIT_WIRE_SLAVE_STORAGE_PAUSED == 0x0400u && NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED == 0x0800u && NOAH_PROFILE_EDIT_WIRE_MODE_NOT_STORED == 0x1000u && NOAH_PROFILE_EDIT_WIRE_ADJUSTMENT_PENDING == 0x2000u && NOAH_PROFILE_EDIT_WIRE_STOPPED == 0x4000u && NOAH_PROFILE_EDIT_WIRE_PEER_STOPPED == 0x8000u && NOAH_PROFILE_EDIT_WIRE_STATUS_FLAGS == 0xFFFFu, "edit status flags 8-15");
 
 static uint8_t frame[32];
 
@@ -214,16 +214,16 @@ static void test_restart(void) {
     assert(frame[5] == 'R' && frame[6] == 'E' && frame[7] == 'S' && frame[8] == 'T');
     assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && restart_requests == 1u);
     assert(frame[0] == 0x07u && frame[2] == 0x28u && frame[3] == 0x02u && frame[4] == 0x01u && frame[5] == NOAH_PROFILE_WORKING_OK);
-    assert(frame[6] == fake.local.phase && u32(&frame[7]) == fake.local.session && u32(&frame[11]) == fake.local.revision && frame[NOAH_PROFILE_EDIT_WIRE_RESTART_PEER] == 1u);
-    for (uint8_t i = NOAH_PROFILE_EDIT_WIRE_RESTART_PEER + 1u; i < sizeof(frame); i++) assert(frame[i] == 0u);
+    assert(frame[6] == fake.local.phase && u32(&frame[7]) == fake.local.session && u32(&frame[11]) == fake.local.revision && frame[NOAH_PROFILE_EDIT_WIRE_RESTART_SLAVE] == 1u);
+    for (uint8_t i = NOAH_PROFILE_EDIT_WIRE_RESTART_SLAVE + 1u; i < sizeof(frame); i++) assert(frame[i] == 0u);
     restart_acknowledged = false;
     restart_frame(3u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM);
-    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && restart_requests == 2u && frame[5] == NOAH_PROFILE_WORKING_OK && frame[NOAH_PROFILE_EDIT_WIRE_RESTART_PEER] == 0u);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && restart_requests == 2u && frame[5] == NOAH_PROFILE_WORKING_OK && frame[NOAH_PROFILE_EDIT_WIRE_RESTART_SLAVE] == 0u);
     restart_acknowledged = true;
     // Taken whatever the owner's state and edit mode: stopped on both halves,
     // in Apply, mid-save.
     fake.stopped      = true;
-    fake.peer_stopped = true;
+    fake.slave_stopped = true;
     fake.mode.mode    = NOAH_PROFILE_EDIT_MODE_APPLY;
     fake.save.phase   = NOAH_PROFILE_OWNER_SAVE_REUSE;
     restart_frame(4u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM);
@@ -236,7 +236,7 @@ static void test_restart(void) {
     const uint32_t wrong[] = {0u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM ^ 1u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM ^ 0x80000000u, 0x52455354u};
     for (uint8_t i = 0u; i < sizeof(wrong) / sizeof(wrong[0]); i++) {
         restart_frame(5u, wrong[i]);
-        assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WORKING_INVALID_ARGUMENT && frame[NOAH_PROFILE_EDIT_WIRE_RESTART_PEER] == 0u);
+        assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WORKING_INVALID_ARGUMENT && frame[NOAH_PROFILE_EDIT_WIRE_RESTART_SLAVE] == 0u);
     }
     restart_frame(0u, NOAH_PROFILE_EDIT_WIRE_RESTART_CONFIRM);
     assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[5] == NOAH_PROFILE_WORKING_INVALID_ARGUMENT);
@@ -266,17 +266,17 @@ static void test_gets(void) {
     {
         uint16_t flags = (uint16_t)(frame[9] | frame[10] << 8u);
 
-        fake.peer_storage_paused = true;
+        fake.slave_storage_paused = true;
         get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
-        assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && (frame[9] | frame[10] << 8u) == (flags | NOAH_PROFILE_EDIT_WIRE_PEER_STORAGE_PAUSED));
-        fake.peer_storage_paused = false;
-        fake.peer_refused        = true;
+        assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && (frame[9] | frame[10] << 8u) == (flags | NOAH_PROFILE_EDIT_WIRE_SLAVE_STORAGE_PAUSED));
+        fake.slave_storage_paused = false;
+        fake.slave_refused       = true;
         get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 0u);
         assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && (frame[9] | frame[10] << 8u) == (flags | NOAH_PROFILE_EDIT_WIRE_PEER_REFUSED));
-        fake.peer_refused = false;
+        fake.slave_refused = false;
     }
     get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 1u);
-    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && u32(&frame[11]) == fake.peer.session && u32(&frame[15]) == fake.peer.revision);
+    assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && u32(&frame[11]) == fake.slave.session && u32(&frame[15]) == fake.slave.revision);
     get(NOAH_PROFILE_WIRE_V1_VALUE_EDIT_STATUS, 2u);
     assert(noah_qmk_profile_edit_channel(frame, sizeof(frame)) && frame[7] == fake.local.error.code && frame[8] == fake.local.error.domain_id && u32(&frame[25]) == fake.local.length);
     fake.save.automatic = true;
@@ -332,12 +332,12 @@ int main(void) {
     fake.local.error.domain_id = 0x60u;
     fake.saved_generation      = 5u;
     fake.saved_origin          = 1u;
-    fake.peer.known            = true;
-    fake.peer.session          = 0x01020304u;
-    fake.peer.revision         = 42u;
-    fake.peer.mode             = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW;
-    fake.peer.mode_counter     = 3u;
-    fake.peer_required         = true;
+    fake.slave.known           = true;
+    fake.slave.session         = 0x01020304u;
+    fake.slave.revision        = 42u;
+    fake.slave.mode            = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW;
+    fake.slave.mode_counter = 3u;
+    fake.other_half_required   = true;
     fake.mode                  = (noah_profile_edit_mode_record_t){.counter = 3u, .mode = NOAH_PROFILE_EDIT_MODE_LIVE_REVIEW};
 #if defined(NOAH_LIVE_PROFILE_MUTATION_ENABLE)
     test_sets();

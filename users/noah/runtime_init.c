@@ -24,7 +24,7 @@
 #include "lib/compat/qmk_portable_profile.h"
 #include "lib/compat/qmk_usb_product_name.h"
 #include "lib/profile/storage/profile_store_runtime_hooks.h"
-#include "lib/profile/runtime/effective_pd_runtime.h"
+#include "lib/profile/runtime/active_profile_pd_runtime.h"
 #include "lib/rgb/core/rgb_runtime.h"
 #include "lib/state/diagnostics/runtime_diag.h"
 #include "lib/state/shared/runtime_reset.h"
@@ -34,7 +34,7 @@ typedef void (*noah_runtime_init_stage_fn_t)(void);
 
 #if !defined(NOAH_LIVE_PROFILE_OWNER_ENABLE)
 static void noah_runtime_init_compiled_pd(void) {
-    noah_effective_pd_load_compiled_defaults(noah_pd_defaults);
+    noah_active_profile_pd_load_compiled_defaults(noah_pd_defaults);
 }
 #endif
 

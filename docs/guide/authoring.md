@@ -150,7 +150,7 @@ behaviour.
   pass), the background effect, `NOAH_RGB_IDLE_TIMEOUT_MS`, the key feedback
   flash interval and the auto-mouse fade's hold, `AUTOMOUSE_RGB_DEAD_TIME`,
   which must stay below `AUTO_MOUSE_TIME`. Comment out
-  `RGB_PD_MODE_FEEDBACK_ENABLE`, `RGB_COMBO_FEEDBACK_ENABLE`,
+  `RGB_POINTING_MODE_FEEDBACK_ENABLE`, `RGB_COMBO_FEEDBACK_ENABLE`,
   `RGB_KEY_BEHAVIOR_FEEDBACK_ENABLE` (which takes the layer preview with it)
   or `RGB_AUTOMOUSE_GRADIENT_ENABLE` to leave that stage out of the build.
 - **Host**: `NOAH_DEFAULT_HOST_OS` (0 Auto, 1 macOS, 2 Windows, 3 Linux),
@@ -172,17 +172,19 @@ Colours are `HSV(hue, saturation, value)`, each 0 to 255:
 - `layer_colors[]`: one row per layer, `.color` and `.mode` (`ALL_KEYS` or
   `KEYS_MAPPED_ON_THIS_LAYER_ONLY`). `HSV(0, 0, 0)` is no colour.
 - `RGB_LED_GROUP(...)` names LEDs by the map at the top of the file;
-  `layer_led_groups_data`, `pd_mode_led_groups_data`,
+  `layer_led_groups_data`, `pointing_mode_led_groups_data`,
   `combo_feedback_led_groups_data` and `key_behavior_feedback_led_groups_data`
   paint them per layer, pointing mode or kind of feedback, with
-  `RGB_LAYER_GROUP_ALL`, `RGB_PD_MODE_GROUP_ALL` and `KEY_FEEDBACK_GROUP_ALL`
-  for all of them. In a group row, `HSV(0, 0, 0)` takes the stage's colour.
-  `saved_led_groups_data` keeps groups no stage uses yet, for Ark to offer.
+  `RGB_LAYER_GROUP_ALL`, `RGB_POINTING_MODE_GROUP_ALL` and
+  `KEY_FEEDBACK_GROUP_ALL` for all of them. In a group row, `HSV(0, 0, 0)` takes
+  the stage's colour. `saved_led_groups_data` keeps groups no stage uses yet,
+  for Ark to offer.
 - `automouse_fade_end_config`: `FOLLOW_REAL_DESTINATION`,
   `END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW` or `END_COLOR_ON_ALL_KEYS`, and
   the `end_color`.
-- `pd_mode_colors[]`: a colour and `.locality` for every pointing slot
-  (`PD_MODE_DRAGSCROLL`… `PD_MODE_PINCH`, then `PD_MODE_SLOT_6` to `_31`).
+- `pointing_mode_colors[]`: a colour and `.locality` for every pointing slot
+  (`POINTING_MODE_DRAGSCROLL`… `POINTING_MODE_PINCH`, then
+  `POINTING_MODE_SLOT_6` to `_31`).
 - `combo_feedback_colors` and `key_behavior_feedback_colors`: the colours,
   `.tap_commit_mode` (`KEY_FEEDBACK_TAP_COMMIT_OFF` or
   `KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS`) and `.locality`.
@@ -195,7 +197,7 @@ bottom.
 
 `noah_pd_defaults[]` has one record per slot, all 32 in order. To add a mode,
 fill an empty slot's record and give it a name; then place `PD_SLOT_n` or
-`PD_SLOT_n_LOCK` in the keymap and give it a colour in `pd_mode_colors[]`.
+`PD_SLOT_n_LOCK` in the keymap and give it a colour in `pointing_mode_colors[]`.
 
 ```c
 {.id=6, .name="Undo / Redo", .kind=1, .axis=1, .dpi=100, .threshold_x=40,
