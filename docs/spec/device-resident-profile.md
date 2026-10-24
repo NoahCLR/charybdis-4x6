@@ -29,7 +29,16 @@ chooses; a working copy never survives a replug or a restart (D-F32,
 [`0032`](../adr/0032-live-edits-working-copy-and-save.md);
 [live edits](profile-wire-v1/live-edits.md#the-working-copy)). The halves then
 compare their saved generations ([split protocol](profile-split-v1.md#authority)).
-A half runs its compiled defaults when:
+
+Until it activates the profile its boot settles on, a half runs its compiled
+defaults: from reset, through boot selection, validating the selected record
+and waiting until both halves hold the same saved profile, to its activation
+at a safe boundary ([owner states](authority-state-table.md#owner-states)).
+Meanwhile profile status reports the active profile pending, never the
+compiled defaults, so a client cannot mistake a booting keyboard for one with
+nothing saved (D-F61, [active kind](profile-wire-v1/hid-channel.md#active-kind) 3).
+
+After the boot, a half runs its compiled defaults when:
 
 - no slot holds a record it can use: both slots are empty, interrupted,
   corrupt, in an earlier format, or bound to another build's digests;
@@ -50,7 +59,7 @@ A build without the live-profile owner (`NOAH_LIVE_PROFILE_OWNER=no`) only
 discovers: it runs boot selection over a read-only view of its slots, reports
 what it found, runs its compiled defaults and never saves.
 
-Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_test.c`, `test_empty_boot_live_commit_and_timeout`), `tests/host/run_effective_profile_provider_tests.sh` (`effective_profile_provider_test.c`), `tests/host/run_profile_candidate_store_backend_tests.sh` (`profile_candidate_store_backend_test.c`, `test_override_disabled_commit_activates_compiled_fallback`), `tests/host/run_profile_store_runtime_tests.sh` (`profile_store_runtime_test.c`, `test_qmk_adapter_is_region_bounded_and_read_only`, `test_old_compiled_default_record_falls_back`).
+Held by: `tests/host/run_profile_owner_tests.sh` (`profile_owner_test.c`, `test_empty_boot_live_commit_and_timeout`, `test_boot_status_is_pending_until_activation`), `tests/host/run_profile_wire_v1_tests.sh` (`qmk_profile_channel_test.c`, the pending kind through the boot), `tests/host/run_effective_profile_provider_tests.sh` (`effective_profile_provider_test.c`), `tests/host/run_profile_candidate_store_backend_tests.sh` (`profile_candidate_store_backend_test.c`, `test_override_disabled_commit_activates_compiled_fallback`), `tests/host/run_profile_store_runtime_tests.sh` (`profile_store_runtime_test.c`, `test_qmk_adapter_is_region_bounded_and_read_only`, `test_old_compiled_default_record_falls_back`).
 
 ## Profile domains
 
