@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Write the maximum profile fixture (D-F14), or check it is current.
 
-Every table at its simultaneous maximum in one schema 4.0 blob: RGB v4 with
+Every table at its simultaneous maximum in one schema 4.1 blob: RGB v4 with
 sixteen groups, sixteen layer colours and 32 group rows; 128 behaviour rows of
-five full steps (640 steps); 128 combos of sixteen inputs; settings v8 with
+five full steps (640 steps); 128 combos of sixteen inputs; settings v9 with
 a shortcut on every custom key and every one of its 273 names at 32 bytes of
-UTF-8; and 32 pointing slots, each
-named with 32 bytes; the full 1,920-byte matrix and 34,903-byte macro bank.
+UTF-8; and 32 pointing slots (v4), each named with 32 bytes and sixteen of
+them linked to a layer each; the full 1,920-byte matrix and 34,903-byte macro bank.
 Values reach the edges the plan names: layers 7, 8 and
 15, combo rows 31, 32, 63, 64 and 127, macros and custom keys 0, 63, 64 and
 127. It is test evidence built from the byte specs, not from firmware code.
@@ -153,7 +153,7 @@ def settings() -> bytes:
     scalars = [0] * 31
     scalars[0:4] = [200, 220, 600, 180]  # tapping, tap/hold, long hold, multi tap
     scalars[4:8] = [1, 15, 1200, 25]  # auto mouse on layer 15
-    scalars[8:10] = [1, 8]  # auto sniping on layer 8
+    scalars[8:10] = [1, (1 << 8) | (1 << 15)]  # auto sniping on layers 8 and 15
     scalars[15:17] = [250, 300]
     scalars[17] = 600000
     scalars[18:21] = [1600, 200, 1]
@@ -163,7 +163,7 @@ def settings() -> bytes:
     scalars[24] = 0
     scalars[25:27] = [100, 8]
     scalars[28:31] = [1, 0xFF7F, 0x7FFF]  # behaviours off on layer 7, combos off on 15
-    out = bytearray([8, LAYERS, 31, 128, 128, 0, 128, 0])
+    out = bytearray([9, LAYERS, 31, 128, 128, 0, 128, 0])
     out += b"".join(struct.pack("<I", v) for v in scalars)
     for layer in range(LAYERS):
         reference = (layer + 1) % LAYERS
@@ -180,7 +180,7 @@ def settings() -> bytes:
 
 
 def pointing() -> bytes:
-    vectors = json.loads((ROOT / "tests/fixtures/pd_mode_domain_v3.json").read_text())
+    vectors = json.loads((ROOT / "tests/fixtures/pd_mode_domain_v4.json").read_text())
     full = bytearray.fromhex(next(v for v in vectors["valid"] if v["name"] == "full")["hex"])
     assert len(full) == 8 + 32 * 128
     for slot in range(32):
@@ -188,6 +188,14 @@ def pointing() -> bytes:
         encoded = name(f"Slot {slot} ")
         full[record + 8] = len(encoded)
         full[record + 96:record + 128] = encoded
+    # Every layer linked once (D-F62), each direction, the light switch where
+    # the layer starts the mode.
+    linked = [slot for slot in range(32) if full[8 + 128 * slot + 1] != 0][:LAYERS]
+    assert len(linked) == LAYERS
+    for layer, slot in enumerate(linked):
+        record = 8 + 128 * slot
+        direction = 1 + layer % 3
+        full[record + 9:record + 12] = bytes([layer, direction, 1 if direction & 2 else 0])
     return bytes(full)
 
 
@@ -201,8 +209,8 @@ def macros() -> bytes:
 
 
 def blob() -> tuple[bytes, list[tuple[int, int, bytes]]]:
-    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 8, settings()), (0x50, 3, pointing()), (0x60, 1, keymap()), (0x70, 1, macros())]
-    out = bytearray(b"NLP1" + bytes([4, 0, len(domains), 1]))
+    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 9, settings()), (0x50, 4, pointing()), (0x60, 1, keymap()), (0x70, 1, macros())]
+    out = bytearray(b"NLP1" + bytes([4, 1, len(domains), 1]))
     for domain_id, version, payload in domains:
         out += bytes([domain_id, version]) + struct.pack("<I", len(payload)) + payload
     assert len(out) + ALLOWANCE <= PAYLOAD_MAX

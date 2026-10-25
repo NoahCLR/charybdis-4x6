@@ -32,6 +32,7 @@ typedef struct {
 typedef struct {
     pointing_mode_mask_t active_mode;
     pointing_mode_mask_t locked_mode;
+    bool                 active_light;
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
     split_side_mask_t owner_sides;
     uint8_t           owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -41,6 +42,8 @@ typedef struct {
 typedef struct {
     pointing_mode_mask_t local_active_mode;
     pointing_mode_mask_t local_locked_mode;
+    // What the active mode runs from (pointing_mode_source_t).
+    uint8_t              local_active_source;
     // The single owner key and owner sides: those of the owners below while
     // any key holds the mode, otherwise the key that locked or activated it.
     bool           local_owner_key_pos_valid;
@@ -78,6 +81,7 @@ static inline pointing_mode_remote_display_state_t *pointing_mode_remote_display
 typedef struct {
     pointing_mode_mask_t active_mode;
     pointing_mode_mask_t locked_mode;
+    bool                 active_light;
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
     split_side_mask_t owner_sides;
 #endif
@@ -90,8 +94,9 @@ static inline pointing_mode_remote_identity_t pointing_mode_remote_display_ident
         uint8_t                               generation = noah_runtime_publication_observe(&state->remote_display_generation);
         const pointing_mode_remote_display_state_t *slot = &state->remote_display[noah_runtime_publication_slot(generation)];
 
-        observed.active_mode = slot->active_mode;
-        observed.locked_mode = slot->locked_mode;
+        observed.active_mode  = slot->active_mode;
+        observed.locked_mode  = slot->locked_mode;
+        observed.active_light = slot->active_light;
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
         observed.owner_sides = slot->owner_sides;
 #endif

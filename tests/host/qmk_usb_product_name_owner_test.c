@@ -25,6 +25,9 @@ bool is_pointing_mode_lock_action(uint16_t action) {
         if (pointing_modes[i].lock_action == action) return true;
     return false;
 }
+// No mode runs here, so publishing the slots ends none and starts none.
+void pointing_mode_end_layer_started_mode(void) {}
+void pointing_mode_reevaluate_layer_links(void) {}
 pointing_mode_mask_t pointing_mode_for_keycode(uint16_t key) {
     for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++)
         if (pointing_modes[i].keycode == key) return pointing_modes[i].mode_flag;

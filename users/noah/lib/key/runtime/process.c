@@ -147,46 +147,6 @@ static key_runtime_process_stage_outcome_t key_runtime_process_stage_release_slo
     return KEY_RUNTIME_PROCESS_NEXT;
 }
 
-// A release goes to whoever took its press. A press a pointing mode consumed
-// never reached the key's behavior, so its release goes to the mode even if
-// another mode is active by then, and before preflight, which could otherwise
-// drop it and leave the mode waiting for it. The reducer's token for it is
-// ordinary and non-handled, so finalizing it here retires everything it owns.
-static key_runtime_process_stage_outcome_t key_runtime_process_stage_pointing_mode_release(key_runtime_process_ctx_t *ctx) {
-    if (ctx->record->event.pressed || ctx->record->event.type != KEY_EVENT || !key_runtime_core_take_intercepted_release(ctx->record->event.key)) {
-        return KEY_RUNTIME_PROCESS_NEXT;
-    }
-
-    (void)pointing_mode_handle_key_event(ctx->keycode, ctx->record);
-    (void)key_runtime_core_finalize_non_handled_release(ctx->record->event.key);
-    key_runtime_trace_message("process:pointing_mode_key_release", "release of a press an active pointing mode consumed");
-    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
-}
-
-// Only presses are offered to the active mode; the release of a press it did
-// not take stays with the key's behavior, which owns what that press started.
-static key_runtime_process_stage_outcome_t key_runtime_process_stage_pointing_mode(key_runtime_process_ctx_t *ctx) {
-    bool key_event = ctx->record->event.type == KEY_EVENT;
-    bool consumed;
-
-    if (!ctx->record->event.pressed) {
-        return KEY_RUNTIME_PROCESS_NEXT;
-    }
-    if (key_event) {
-        key_runtime_core_offer_press_to_mode(ctx->record->event.key);
-    }
-    consumed = pointing_mode_handle_key_event(ctx->runtime_keycode, ctx->record);
-    if (key_event) {
-        key_runtime_core_end_mode_offer(ctx->record->event.key, consumed);
-    }
-    if (!consumed) {
-        return KEY_RUNTIME_PROCESS_NEXT;
-    }
-
-    key_runtime_trace_message("process:pointing_mode_key_handler", "key event consumed by active pointing mode");
-    return KEY_RUNTIME_PROCESS_RETURN_FALSE;
-}
-
 static key_runtime_process_stage_outcome_t key_runtime_process_stage_handled_key(key_runtime_process_ctx_t *ctx) {
     const handled_key_resolution_t *resolution;
     const press_token_t            *token;
@@ -397,7 +357,7 @@ bool noah_pre_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
     static const key_runtime_process_stage_entry_t stages[] = {
-        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "pointing_mode_release", .handler = key_runtime_process_stage_pointing_mode_release}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "pointing_mode", .handler = key_runtime_process_stage_pointing_mode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "native_overlap", .handler = key_runtime_process_stage_native_overlap}, {.name = "idle_custom_key", .handler = key_runtime_process_stage_idle_custom_key},
+        {.name = "synthetic_passthrough", .handler = key_runtime_process_stage_synthetic_passthrough}, {.name = "preflight", .handler = key_runtime_process_stage_preflight}, {.name = "release_slot_keycode", .handler = key_runtime_process_stage_release_slot_keycode}, {.name = "handled_key", .handler = key_runtime_process_stage_handled_key}, {.name = "non_handled_release_cleanup", .handler = key_runtime_process_stage_non_handled_release_cleanup}, {.name = "direct_action", .handler = key_runtime_process_stage_direct_action}, {.name = "native_overlap", .handler = key_runtime_process_stage_native_overlap}, {.name = "idle_custom_key", .handler = key_runtime_process_stage_idle_custom_key},
     };
     key_runtime_process_ctx_t ctx = {
         .keycode         = keycode,

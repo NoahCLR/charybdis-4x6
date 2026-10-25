@@ -8,8 +8,8 @@ which records are mouse records, holds one count on QMK's key tracker while
 `layer_ownership` keeps the layer or a locked anchoring mode runs that does
 not own QMK's toggle, lets a locked scrolling mode own QMK's auto-mouse
 toggle, and corrects the layer state in `layer_state_set_user`: a
-prefer-typing mode strips the layer, the auto-sniping layer strips a separate
-pointer layer, and otherwise any anchor (QMK's toggle, its key tracker, an
+prefer-typing mode strips the layer, an auto-sniping layer or a mode its
+layer started (D-F62) strips a separate pointer layer, and otherwise any anchor (QMK's toggle, its key tracker, an
 anchoring mode) forces it on. QMK's own settings,
 its lighting fade timer and its `MO()`/`TT()` accounting keep working
 unchanged. The cost is coupling to QMK internals: QMK zeroes its tracker

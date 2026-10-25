@@ -338,12 +338,6 @@ bool noah_synthetic_record_active(void) {
     return false;
 }
 
-bool pointing_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-    return false;
-}
-
 static void test_assert_runtime_quiescent(keypos_t source_pos) {
     CHECK(noah_runtime_debug_active_slot_count() == 0);
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 0);

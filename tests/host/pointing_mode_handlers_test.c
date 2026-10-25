@@ -265,21 +265,6 @@ bool owned_keycode_release(owned_keycode_lease_t *lease) {
     return true;
 }
 
-static keyrecord_t test_record(bool pressed) {
-    return (keyrecord_t){
-        .event =
-            {
-                .key =
-                    {
-                        .row = 1,
-                        .col = 2,
-                    },
-                .type    = KEY_EVENT,
-                .pressed = pressed,
-            },
-    };
-}
-
 static void test_dragscroll_prime_horizontal_lock_with_residual(uint32_t start_time) {
     report_mouse_t report;
 
@@ -825,7 +810,11 @@ static noah_pd_config_t fixture_slot(uint8_t preset) {
     noah_pd_config_t slot = {0};
     memcpy(&slot, pd_engine_fixture + 8 + preset * NOAH_PROFILE_PD_V1_MODE_SIZE, NOAH_PROFILE_PD_V1_MODE_SIZE);
     slot.name_length = 0;
-    memset(slot.name_reserved, 0, sizeof(slot.name_reserved));
+    // Version 1's name field is the link and its reserved bytes now, and the
+    // frozen Arrow's button records are retired.
+    slot.linked_layer = slot.link_direction = slot.link_light = 0;
+    memset(slot.link_reserved, 0, sizeof(slot.link_reserved));
+    memset(slot.retired_buttons, 0, sizeof(slot.retired_buttons));
     return slot;
 }
 
@@ -1161,37 +1150,10 @@ static void test_configured_scroll_one_axis(void) {
     noah_pd_engine_exit();
 }
 
-static void test_configured_release_ownership_and_custom_slot(void) {
-    noah_pd_config_t slot = fixture_slot(FIXTURE_ARROW);
-    slot.id               = 7; // Identity/name do not select Arrow's behavior.
+// A slot's record, not its id or name, decides what it does.
+static void test_configured_custom_slot_runs_its_own_record(void) {
+    noah_pd_config_t slot;
     test_reset_stubs();
-    noah_pd_engine_enter(&slot);
-    keyrecord_t first = test_record(true), second = test_record(true);
-    second.event.key.col++;
-    CHECK(noah_pd_engine_key(MS_BTN1, &first));
-    CHECK(noah_pd_engine_key(MS_BTN1, &second));
-    CHECK(engine_mod_owners[5] == 2);
-    first.event.pressed = false;
-    CHECK(noah_pd_engine_key(MS_BTN1, &first));
-    CHECK(engine_mod_owners[5] == 1 && (fake_mods & MOD_BIT(KC_RIGHT_SHIFT)));
-    // Switching releases old owned output but retains the old release route.
-    noah_pd_engine_enter(&slot);
-    CHECK(engine_mod_owners[5] == 0 && noah_pd_engine_pending_release());
-    first.event.pressed = true;
-    CHECK(noah_pd_engine_key(MS_BTN1, &first));
-    second.event.pressed = false;
-    CHECK(noah_pd_engine_key(MS_BTN1, &second));
-    CHECK(engine_mod_owners[5] == 1); // Late old release cannot release new Shift.
-    first.event.pressed = false;
-    CHECK(noah_pd_engine_key(MS_BTN1, &first));
-    CHECK(!noah_pd_engine_pending_release());
-    first.event.pressed = true;
-    CHECK(noah_pd_engine_key(MS_BTN2, &first));
-    CHECK(literal_tap_calls[0].keycode == G(KC_C));
-    noah_pd_engine_exit();
-    first.event.pressed = false;
-    CHECK(noah_pd_engine_key(MS_BTN2, &first));
-    CHECK(!noah_pd_engine_pending_release());
     slot                                            = fixture_slot(FIXTURE_VOLUME);
     slot.id                                         = 7;
     slot.threshold_y                                = 1;
@@ -1260,26 +1222,6 @@ static void test_configured_mouse_button_clicks(void) {
         clicks += click_call_count;
     }
     CHECK(clicks == 1);
-
-    // Button overrides: a button tapping its own number clicks once, with no
-    // second pass through the override; its release sends nothing.
-    slot.buttons[0] = (noah_pd_button_t){.kind = NOAH_PD_BUTTON_TAP, .tap = {MS_BTN1, NOAH_PD_TAP_INHERIT, 0}};
-    slot.buttons[1] = (noah_pd_button_t){.kind = NOAH_PD_BUTTON_TAP, .tap = {MS_BTN4, NOAH_PD_TAP_EXACT, 0}};
-    slot.buttons[2] = (noah_pd_button_t){0};
-    noah_pd_engine_enter(&slot);
-    keyrecord_t button = test_record(true);
-    test_clear_logs();
-    CHECK(noah_pd_engine_key(MS_BTN1, &button));
-    CHECK(click_call_count == 1 && click_calls[0].keycode == MS_BTN1 && !click_calls[0].exact);
-    button.event.pressed = false;
-    CHECK(noah_pd_engine_key(MS_BTN1, &button));
-    CHECK(click_call_count == 1);
-    button.event.pressed = true;
-    CHECK(noah_pd_engine_key(MS_BTN2, &button));
-    CHECK(click_call_count == 2 && click_calls[1].keycode == MS_BTN4 && click_calls[1].exact);
-    button.event.pressed = false;
-    CHECK(noah_pd_engine_key(MS_BTN2, &button));
-    CHECK(!noah_pd_engine_pending_release());
     noah_pd_engine_exit();
 }
 
@@ -1307,7 +1249,7 @@ static void test_configured_macro_start_accounting(void) {
 
 int main(void) {
     test_dragscroll_slot_carries_the_authored_tuning();
-    test_configured_release_ownership_and_custom_slot();
+    test_configured_custom_slot_runs_its_own_record();
     test_configured_eight_directions();
     test_configured_dominant_axis();
     test_configured_empty_directions_and_single_axes();

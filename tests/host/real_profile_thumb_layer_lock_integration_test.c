@@ -886,7 +886,6 @@ void noah_pd_engine_exit(void) {
 }
 void noah_pd_engine_enter(const noah_pd_config_t *slot) { active_pd_record = slot; }
 report_mouse_t noah_pd_engine_motion(report_mouse_t report) { return report; }
-bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; return false; }
 uint8_t noah_pd_engine_masked_mods(const noah_pd_config_t *slot) { (void)slot; return 0; }
 
 bool is_keyboard_master(void) {

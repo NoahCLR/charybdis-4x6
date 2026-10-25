@@ -17,7 +17,6 @@ bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
         case NOAH_SETTING_BEHAVIORS_ENABLED:
             return v <= 1;
         case NOAH_SETTING_AUTO_MOUSE_LAYER:
-        case NOAH_SETTING_AUTO_SNIPING_LAYER:
             return v < layers;
         case NOAH_SETTING_AUTO_MOUSE_DEBOUNCE:
             return v <= 255;
@@ -29,6 +28,7 @@ bool noah_profile_setting_v1_valid(uint8_t id, uint32_t v, uint8_t layers) {
             return !(v >> 24);
         case NOAH_SETTING_DEFAULT_LAYERS:
             return v && !(v & ~bank);
+        case NOAH_SETTING_AUTO_SNIPING_LAYERS:
         case NOAH_SETTING_LAYER_BEHAVIORS:
         case NOAH_SETTING_LAYER_COMBOS:
             return !(v & ~bank);

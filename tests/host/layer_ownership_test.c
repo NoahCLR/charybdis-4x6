@@ -385,6 +385,44 @@ static void test_oneshot_shares_its_layer_with_locks_holds_and_goto(void) {
     CHECK(layer_state == 0);
 }
 
+// A pointing mode its key runs owns the layer it brings beside the key holds
+// and locks (D-F62): the layer stays on while any owner keeps it, and a new
+// layer turns on before the one it replaces turns off.
+static void test_a_pointing_mode_owns_its_layer_beside_holds_and_locks(void) {
+    keypos_t key = test_keypos(1, 1);
+
+    test_reset_stubs();
+    CHECK(layer_ownership_pointing_mode_layer() == LAYER_OWNERSHIP_NO_LAYER);
+    CHECK(layer_ownership_set_pointing_mode_layer(4));
+    CHECK(layer_state == test_layer_mask(4) && layer_ownership_pointing_mode_layer() == 4);
+    CHECK(!layer_ownership_set_pointing_mode_layer(4));
+    CHECK(layer_on_calls[4] == 1);
+
+    // Held by a key too: the mode letting go leaves it on until the key does.
+    layer_ownership_momentary_press(key, 4);
+    CHECK(layer_ownership_set_pointing_mode_layer(LAYER_OWNERSHIP_NO_LAYER));
+    CHECK(layer_state == test_layer_mask(4));
+    CHECK(layer_ownership_momentary_release(key));
+    CHECK(layer_state == 0);
+
+    // Locked too: the lock keeps it.
+    CHECK(layer_ownership_set_pointing_mode_layer(5));
+    CHECK(layer_ownership_set_lock_state(5, true));
+    CHECK(layer_ownership_set_pointing_mode_layer(LAYER_OWNERSHIP_NO_LAYER));
+    CHECK(layer_state == test_layer_mask(5));
+    CHECK(layer_ownership_set_lock_state(5, false));
+    CHECK(layer_state == 0);
+
+    // Another mode's layer replaces it: on first, then the old one off.
+    CHECK(layer_ownership_set_pointing_mode_layer(6));
+    layer_off_calls[6] = 0;
+    CHECK(layer_ownership_set_pointing_mode_layer(7));
+    CHECK(layer_state == test_layer_mask(7) && layer_off_calls[6] == 1);
+    // Out of range is no layer.
+    CHECK(layer_ownership_set_pointing_mode_layer(LAYER_COUNT));
+    CHECK(layer_state == 0 && layer_ownership_pointing_mode_layer() == LAYER_OWNERSHIP_NO_LAYER);
+}
+
 static void test_invalid_layer_requests_are_ignored(void) {
     keypos_t key_pos = test_keypos(4, 4);
 
@@ -413,6 +451,7 @@ int main(void) {
     test_toggled_layer_survives_a_momentary_hold_of_itself();
     test_oneshot_arms_until_consumed_and_quick_double_tap_cancels();
     test_oneshot_shares_its_layer_with_locks_holds_and_goto();
+    test_a_pointing_mode_owns_its_layer_beside_holds_and_locks();
     test_invalid_layer_requests_are_ignored();
 
     puts("layer_ownership host tests passed");

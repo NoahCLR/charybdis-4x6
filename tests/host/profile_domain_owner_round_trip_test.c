@@ -22,6 +22,9 @@ bool is_pointing_mode_lock_action(uint16_t action) {
         if (pointing_modes[i].lock_action == action) return true;
     return false;
 }
+// No mode runs here, so publishing the slots ends none and starts none.
+void pointing_mode_end_layer_started_mode(void) {}
+void pointing_mode_reevaluate_layer_links(void) {}
 pointing_mode_mask_t pointing_mode_for_keycode(uint16_t key) {
     for (uint8_t i = 0; i < POINTING_MODE_COUNT; i++)
         if (pointing_modes[i].keycode == key) return pointing_modes[i].mode_flag;
@@ -130,6 +133,7 @@ static uint8_t submit_transfer(size_t length, bool reuse) {
     reused_bytes = 0;
     frame_header(frame, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN);
     frame[5] = NOAH_PROFILE_SCHEMA_MAJOR;
+    frame[6] = NOAH_PROFILE_SCHEMA_MINOR;
     frame[7] = NOAH_PROFILE_DOMAIN_MASK_ALL;
     u32(frame + 8, (uint32_t)length);
     u32(frame + 12, crc(candidate, length));

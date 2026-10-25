@@ -2,7 +2,7 @@
 
 The trackball moves the pointer until a **pointing mode** takes it over. A
 mode either scrolls or sends keys and shortcuts as the ball moves, and runs
-while its key is held or locked. Ark's
+while its key is held or locked, or while its linked layer is on. Ark's
 [Pointing](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/pointing.md)
 page edits every setting below.
 
@@ -40,12 +40,36 @@ click or a macro.
   against the direction that sent.
 - A macro started while another is playing is dropped.
 
-While a mode runs it can also give mouse buttons 1 to 3 another job: pass
-through, do nothing, tap a shortcut, or hold modifiers.
+Mouse buttons 1 to 3 click as usual in every mode. To give a mode keys of its
+own, link it to a layer that holds them.
+
+## Linked layers
+
+A slot can be linked to one layer, in one direction or both:
+
+- **The mode turns its layer on.** While its key holds or locks the mode, the
+  layer is on too, so the keys that mode needs sit under my hand. The layer
+  goes off with the mode unless something else, a held layer key or a lock,
+  still keeps it on.
+- **The layer turns its mode on.** While the layer is on, held or locked, the
+  mode runs, with no second key. With two such layers on, the higher one's
+  mode runs.
+- **Both.** A mode and a layer that behave as one thing, whichever I start.
+  Letting go of either key ends both; nothing stays stuck on.
+
+A mode's key always wins over a layer: pressing another mode's key on a
+linked layer runs that mode, and letting go of it brings the layer's mode
+back. A mode a layer started never brings the pointer layer up over that
+layer, so its keys stay put while the ball moves. It shows the layer's
+lighting, unless the slot is set to show the mode's own light; a mode started
+by its key always shows its own. A slot links at most one layer and a layer
+belongs to at most one slot, and a link to the pointer layer or a default
+layer does nothing.
 
 ## The slots I ship
 
-The compiled defaults fill the first eight slots; 8 to 31 start empty.
+The compiled defaults fill the first eight slots; 8 to 31 start empty. None
+of them is linked to a layer.
 
 | Slot | Mode | What the ball does |
 | --- | --- | --- |
@@ -53,7 +77,7 @@ The compiled defaults fill the first eight slots; 8 to 31 start empty.
 | 1 | Volume | up and down change the volume |
 | 2 | Brightness | up and down change screen brightness |
 | 3 | Zoom | up and down send Cmd+= and Cmd+- |
-| 4 | Arrow | sends arrow keys; button 1 holds Shift, 2 copies, 3 pastes |
+| 4 | Arrow | sends arrow keys |
 | 5 | Pinch | scrolls up and down with Left Cmd held |
 | 6 | Undo / Redo | left and right send Cmd+Z and Shift+Cmd+Z |
 | 7 | Back / Forward | left and right click mouse buttons 4 and 5, once per movement |
@@ -72,7 +96,9 @@ dual-role keys held for their layer or modifiers don't. A mode either keeps the 
 layer; Arrow gives way, so the arrows sit on whatever you were typing on.
 
 **Sniping** slows the pointer for precise work. It comes on by itself while
-the sniping layer is on (Navigation, in my profile).
+any of the auto-sniping layers is on (Navigation alone, in my profile), and
+strips a separate pointer layer so those layers keep their keys. Switching
+auto-sniping off keeps the layers chosen for when it comes back on.
 
 The DPI keys step the pointer speed (400 to 3,400 in steps of 200) and the
 sniping speed (100 to 400 in steps of 100). A mode can run at its own DPI.

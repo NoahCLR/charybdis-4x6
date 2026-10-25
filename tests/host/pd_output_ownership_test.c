@@ -63,23 +63,16 @@ bool process_record(keyrecord_t *record) {
 }
 bool process_record_user(uint16_t key, keyrecord_t *record) { return true; }
 
-static void emit(bool button) {
-    if (button) {
-        keyrecord_t record = {.event = {.type = KEY_EVENT, .pressed = true, .key = {.row = 1, .col = 1}}};
-        assert(noah_pd_engine_key(MS_BTN1, &record));
-        record.event.pressed = false;
-        assert(noah_pd_engine_key(MS_BTN1, &record));
-    } else {
-        noah_pd_engine_motion((report_mouse_t){.x = 1});
-    }
+static void emit(void) {
+    noah_pd_engine_motion((report_mouse_t){.x = 1});
 }
 
-static void check_shared_output(uint16_t output, uint8_t policy, bool physical, bool button) {
+static void check_shared_output(uint16_t output, uint8_t policy, bool physical) {
     host_runtime_fixture_reset(&fixture);
     owned_keycode_reset_for_test();
     memset(down, 0, sizeof(down));
     presses = releases = 0;
-    // Motion to the right and button 1 both tap the output.
+    // Motion to the right taps the output.
     noah_pd_tap_t tap = {output, policy, policy == NOAH_PD_TAP_MASK ? MOD_BIT(KC_LEFT_CTRL) : 0};
     slot = (noah_pd_config_t){
         .kind        = NOAH_PD_KIND_DIRECTIONAL,
@@ -87,7 +80,6 @@ static void check_shared_output(uint16_t output, uint8_t policy, bool physical, 
         .threshold_x = 1,
         .threshold_y = 1,
         .directions  = {[NOAH_PD_DIRECTION_RIGHT] = tap},
-        .buttons     = {{.kind = NOAH_PD_BUTTON_TAP, .tap = tap}},
     };
     noah_pd_engine_enter(&slot);
     fixture.mods = MOD_BIT(KC_LEFT_CTRL);
@@ -103,7 +95,7 @@ static void check_shared_output(uint16_t output, uint8_t policy, bool physical, 
     if (output == S(KC_LEFT)) expected_tap_mods |= MOD_BIT(KC_LEFT_SHIFT);
     if (output == RSFT(KC_LEFT)) expected_tap_mods |= MOD_BIT(KC_RIGHT_SHIFT);
     verify_tap_mods = true;
-    emit(button);
+    emit();
     verify_tap_mods = false;
     assert(down[KC_LEFT]);
     assert(presses == 1 && releases == 0);
@@ -119,7 +111,7 @@ static void check_shared_output(uint16_t output, uint8_t policy, bool physical, 
     // With no other owner, the same output produces one balanced tap.
     noah_pd_engine_enter(&slot);
     verify_tap_mods = true;
-    emit(button);
+    emit();
     verify_tap_mods = false;
     assert(!down[KC_LEFT] && presses == 2 && releases == 2);
     assert(get_mods() == MOD_BIT(KC_LEFT_CTRL));
@@ -134,7 +126,6 @@ int main(void) {
     for (uint8_t i = 0; i < ARRAY_SIZE(outputs); i++)
         for (uint8_t policy = 0; policy < 3; policy++)
             for (uint8_t physical = 0; physical < 2; physical++)
-                for (uint8_t button = 0; button < 2; button++)
-                    check_shared_output(outputs[i], policy, physical, button);
-    puts("PD direction and button taps preserve physical and managed output owners under every modifier policy");
+                check_shared_output(outputs[i], policy, physical);
+    puts("PD direction taps preserve physical and managed output owners under every modifier policy");
 }

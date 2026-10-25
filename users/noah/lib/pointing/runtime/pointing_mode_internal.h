@@ -21,6 +21,13 @@ void pointing_mode_clear_locked(pointing_mode_mask_t mode);
 // Leaf local transitions: mutate one mode and run its lifecycle side effects
 // without performing any cross-mode orchestration or split-runtime sync.
 void pointing_mode_transition_activate(pointing_mode_mask_t mode);
+void pointing_mode_transition_activate_from(pointing_mode_mask_t mode, pointing_mode_source_t source);
+// A key holds or locks the mode its layer runs: the key becomes its source,
+// with a key-started mode's auto-mouse side effects (D-F62).
+void pointing_mode_transition_take_from_layer(pointing_mode_mask_t mode);
+// The key that ran the mode let it go while its linked layer still starts it:
+// it keeps running, unlocked, with its layer as its source (D-F62).
+void pointing_mode_transition_hand_to_layer(pointing_mode_mask_t mode);
 void pointing_mode_transition_deactivate(pointing_mode_mask_t mode);
 void pointing_mode_transition_lock(pointing_mode_mask_t mode);
 void pointing_mode_transition_unlock(pointing_mode_mask_t mode);

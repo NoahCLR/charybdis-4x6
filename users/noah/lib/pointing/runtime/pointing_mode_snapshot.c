@@ -38,6 +38,15 @@ static void pointing_mode_snapshot_fill_view(pointing_mode_snapshot_view_t *view
     view->locked_index  = pointing_mode_snapshot_mode_index(locked_mode);
     view->owner_sides   = owner_sides;
     view->active_traits = pointing_mode_effective_traits(active_mode);
+    view->active_source = POINTING_MODE_SOURCE_NONE;
+    view->active_light  = false;
+}
+
+// A mode its layer started shows the layer's lighting unless its slot's light
+// switch is on (D-F62); a mode its key runs always shows its own.
+static void pointing_mode_snapshot_fill_local_source(pointing_mode_snapshot_view_t *view, const pointing_mode_runtime_shared_state_t *state) {
+    view->active_source = view->active_mode != 0 ? (pointing_mode_source_t)state->local_active_source : POINTING_MODE_SOURCE_NONE;
+    view->active_light  = view->active_source == POINTING_MODE_SOURCE_KEY || (view->active_source == POINTING_MODE_SOURCE_LAYER && pointing_mode_layer_started_light(view->active_mode));
 }
 
 pointing_mode_snapshot_t pointing_mode_snapshot(void) {
@@ -52,6 +61,7 @@ pointing_mode_snapshot_t pointing_mode_snapshot(void) {
 #endif
 
     pointing_mode_snapshot_fill_view(&snapshot.local, state->local_active_mode, state->local_locked_mode, local_owner_sides);
+    pointing_mode_snapshot_fill_local_source(&snapshot.local, state);
 
     if (is_keyboard_master()) {
         snapshot.display = snapshot.local;
@@ -70,6 +80,7 @@ pointing_mode_snapshot_t pointing_mode_snapshot(void) {
 #endif
 
     pointing_mode_snapshot_fill_view(&snapshot.display, display.active_mode, display.locked_mode, display_owner_sides);
+    snapshot.display.active_light = display.active_mode != 0 && display.active_light;
     return snapshot;
 }
 
@@ -93,6 +104,7 @@ pointing_mode_snapshot_t pointing_mode_snapshot_with_owner_bitmap(uint8_t *out_o
 #endif
 
     pointing_mode_snapshot_fill_view(&snapshot.local, state->local_active_mode, state->local_locked_mode, local_owner_sides);
+    pointing_mode_snapshot_fill_local_source(&snapshot.local, state);
 
     if (is_keyboard_master()) {
         snapshot.display = snapshot.local;
@@ -107,6 +119,7 @@ pointing_mode_snapshot_t pointing_mode_snapshot_with_owner_bitmap(uint8_t *out_o
 #endif
 
         pointing_mode_snapshot_fill_view(&snapshot.display, display.active_mode, display.locked_mode, display_owner_sides);
+        snapshot.display.active_light = display.active_mode != 0 && display.active_light;
     }
 
     if (out_has_owner_keys) {

@@ -8,6 +8,8 @@
 #include "pointing_mode_runtime_shared_state_internal.h"
 #include "../../key/runtime/slot/origin_registry.h"
 #include "../../state/diagnostics/runtime_trace.h"
+#include "../../state/ownership/layer_ownership.h"
+#include "../../compat/qmk_auto_mouse_contract.h"
 #include "../policy/pointing_mode_policy.h"
 #include "pointing_mode_key_runtime_bridge.h"
 #include "pointing_mode_internal.h"
@@ -42,7 +44,29 @@ static void pointing_mode_publish_seam_reached(void) {}
 #endif
 
 static bool pointing_mode_snapshot_view_changed(pointing_mode_snapshot_view_t before, pointing_mode_snapshot_view_t after) {
-    return before.active_mode != after.active_mode || before.locked_mode != after.locked_mode || before.owner_sides != after.owner_sides;
+    return before.active_mode != after.active_mode || before.locked_mode != after.locked_mode || before.owner_sides != after.owner_sides || before.active_source != after.active_source || before.active_light != after.active_light;
+}
+
+static pointing_mode_source_t pointing_mode_local_source(void) {
+    return (pointing_mode_source_t)pointing_mode_shared_state()->local_active_source;
+}
+
+// A mode its layer started outside the layer-state hook has no hook to strip
+// a separate pointer layer for it, so once the command is done the pointer
+// layer goes off, and the hook keeps it off while the mode runs.
+//
+// A layer change made inside a command (the layer a mode brings, released or
+// taken) runs the layer-state hook, which re-enters pointing_mode_apply_command
+// with a layer-state command. That is safe because every such change happens
+// while a key source still runs the mode, so the nested command leaves the
+// links waiting; the source changes only after the layer it brought has gone.
+// The strip runs once the outer state is final, never from a nested call.
+static bool pointing_mode_layer_policy_refresh_due;
+
+static void pointing_mode_strip_pointer_layer(void) {
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    noah_qmk_contract_auto_mouse_layer_off();
+#endif
 }
 
 static split_side_mask_t pointing_mode_command_owner_sides(pointing_mode_command_t command) {
@@ -330,16 +354,70 @@ static bool pointing_mode_apply_lock_mode(pointing_mode_mask_t mode) {
     return changed;
 }
 
-static bool pointing_mode_apply_unlock_mode(pointing_mode_mask_t mode) {
-    if (!mode || !pointing_mode_local_locked(mode)) {
+// The layer the running mode brings: only a mode its key runs owns one, so a
+// two-way link cannot keep itself on (D-F62).
+_Static_assert(POINTING_MODE_NO_LAYER == LAYER_OWNERSHIP_NO_LAYER, "no linked layer is no layer to own");
+
+static void pointing_mode_sync_brought_layer(void) {
+    pointing_mode_mask_t active = POINTING_MODE_LOCAL_ACTIVE_MODE;
+    uint8_t              layer  = active != 0 && pointing_mode_local_source() == POINTING_MODE_SOURCE_KEY ? pointing_mode_brought_layer(active) : POINTING_MODE_NO_LAYER;
+
+    (void)layer_ownership_set_pointing_mode_layer(layer);
+}
+
+static void pointing_mode_start_layer_mode(pointing_mode_mask_t mode, bool in_layer_hook) {
+    pointing_mode_transition_activate_from(mode, POINTING_MODE_SOURCE_LAYER);
+    noah_runtime_trace_emit(NOAH_TRACE_POINTING_MODE, NOAH_TRACE_POINTING_MODE_EVENT_LAYER_START, mode, 0u);
+    pointing_mode_layer_policy_refresh_due |= !in_layer_hook;
+}
+
+// While a key runs a mode, layer links wait. Otherwise the highest linked
+// layer that is on decides, and a mode its layer no longer starts ends.
+static bool pointing_mode_apply_layer_links(layer_state_t state, bool in_layer_hook) {
+    pointing_mode_mask_t active = POINTING_MODE_LOCAL_ACTIVE_MODE;
+    pointing_mode_mask_t wanted;
+
+    if (active != 0 && pointing_mode_local_source() != POINTING_MODE_SOURCE_LAYER) {
         return false;
     }
-
-    pointing_mode_transition_unlock(mode);
+    wanted = pointing_mode_layer_started_mode(state);
+    if (wanted == active) {
+        return false;
+    }
+    if (active != 0) {
+        pointing_mode_transition_deactivate(active);
+    }
+    if (wanted != 0) {
+        pointing_mode_start_layer_mode(wanted, in_layer_hook);
+    }
     return true;
 }
 
-static bool pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_t active_mode, pointing_mode_mask_t locked_mode, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
+// The key that ran `mode` let it go: released, unlocked or deactivated. The
+// layer it brought goes first, while the key still runs the mode, so the
+// layer change waits like any other; then the layer links decide what runs.
+// The mode keeps running, without a restart, when its own layer starts it.
+static void pointing_mode_end_key_source(pointing_mode_mask_t mode) {
+    pointing_mode_mask_t layer_mode;
+
+    (void)layer_ownership_set_pointing_mode_layer(LAYER_OWNERSHIP_NO_LAYER);
+    layer_mode = pointing_mode_layer_started_mode(layer_state);
+    if (layer_mode == mode) {
+        pointing_mode_transition_hand_to_layer(mode);
+        pointing_mode_layer_policy_refresh_due = true;
+        return;
+    }
+    if (pointing_mode_local_locked(mode)) {
+        pointing_mode_transition_unlock(mode);
+    } else {
+        pointing_mode_transition_deactivate(mode);
+    }
+    if (layer_mode != 0) {
+        pointing_mode_start_layer_mode(layer_mode, false);
+    }
+}
+
+static bool pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_t active_mode, pointing_mode_mask_t locked_mode, bool active_light, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
     // Remote sync only mirrors mode state for the slave half's policy/UI.
     // Do not replay local side effects such as dragscroll or auto-mouse
     // ownership changes from this path. Keep only one effective mode so the
@@ -347,7 +425,7 @@ static bool pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_t act
     pointing_mode_runtime_shared_state_t       *state     = pointing_mode_shared_state();
     const pointing_mode_remote_display_state_t *published = pointing_mode_remote_display_published(state);
     pointing_mode_remote_display_state_t       *pending   = pointing_mode_remote_display_pending(state);
-    bool                                        changed   = published->active_mode != active_mode || published->locked_mode != locked_mode;
+    bool                                        changed   = published->active_mode != active_mode || published->locked_mode != locked_mode || published->active_light != active_light;
 
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
     changed |= published->owner_sides != owner_sides;
@@ -361,8 +439,9 @@ static bool pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_t act
     (void)owner_bitmap;
 #endif
 
-    pending->locked_mode = locked_mode;
-    pending->active_mode = active_mode;
+    pending->locked_mode  = locked_mode;
+    pending->active_mode  = active_mode;
+    pending->active_light = active_light;
     pointing_mode_publish_seam_reached();
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
     pending->owner_sides = owner_sides;
@@ -527,13 +606,27 @@ bool pd_any_local_mode_locked(void) {
     return POINTING_MODE_LOCAL_LOCKED_MODE != 0;
 }
 
+bool pointing_mode_local_key_source_active(void) {
+    return POINTING_MODE_LOCAL_ACTIVE_MODE != 0 && pointing_mode_local_source() == POINTING_MODE_SOURCE_KEY;
+}
+
+bool pointing_mode_local_light_snapshot(void) {
+    return pointing_mode_snapshot().local.active_light;
+}
+
+pointing_mode_source_t pointing_mode_local_source_snapshot(void) {
+    return POINTING_MODE_LOCAL_ACTIVE_MODE != 0 ? pointing_mode_local_source() : POINTING_MODE_SOURCE_NONE;
+}
+
 bool pd_any_display_mode_locked(void) {
     return pointing_mode_snapshot().display.locked_mode != 0;
 }
 
 pointing_mode_apply_result_t pointing_mode_apply_command(pointing_mode_command_t command) {
-    pointing_mode_apply_result_t result = pointing_mode_apply_result_begin();
-    pointing_mode_mask_t         mode   = command.mode;
+    pointing_mode_apply_result_t result       = pointing_mode_apply_result_begin();
+    pointing_mode_mask_t         mode         = command.mode;
+    bool                         keyed        = false;
+    bool                         layer_before = result.before.local.active_source == POINTING_MODE_SOURCE_LAYER;
 
     switch (command.kind) {
         case POINTING_MODE_COMMAND_ACTIVATE:
@@ -542,12 +635,18 @@ pointing_mode_apply_result_t pointing_mode_apply_command(pointing_mode_command_t
                 (void)pointing_mode_clear_local_owners(result.before.local.active_mode);
                 pointing_mode_sync_local_owner_state(pointing_mode_command_owner_key_pos(command), pointing_mode_command_owner_sides(command));
             }
+            keyed = true;
             break;
         case POINTING_MODE_COMMAND_DEACTIVATE:
             result.handled = mode != 0;
-            if (pointing_mode_apply_deactivate_mode(mode)) {
+            if (pointing_mode_local_active(mode)) {
                 (void)pointing_mode_clear_local_owners(result.before.local.active_mode);
                 pointing_mode_sync_local_owner_state(pointing_mode_invalid_owner_key_pos(), SPLIT_SIDE_MASK_NONE);
+                if (pointing_mode_local_source() == POINTING_MODE_SOURCE_KEY) {
+                    pointing_mode_end_key_source(mode);
+                } else {
+                    (void)pointing_mode_apply_deactivate_mode(mode);
+                }
             }
             break;
         case POINTING_MODE_COMMAND_LOCK:
@@ -556,12 +655,14 @@ pointing_mode_apply_result_t pointing_mode_apply_command(pointing_mode_command_t
                 (void)pointing_mode_clear_local_owners(result.before.local.active_mode);
                 pointing_mode_sync_local_owner_state(pointing_mode_command_owner_key_pos(command), pointing_mode_command_owner_sides(command));
             }
+            keyed = true;
             break;
         case POINTING_MODE_COMMAND_UNLOCK:
             result.handled = mode != 0;
-            if (pointing_mode_apply_unlock_mode(mode)) {
+            if (pointing_mode_local_locked(mode)) {
                 (void)pointing_mode_clear_local_owners(result.before.local.active_mode);
                 pointing_mode_sync_local_owner_state(pointing_mode_invalid_owner_key_pos(), SPLIT_SIDE_MASK_NONE);
+                pointing_mode_end_key_source(mode);
             }
             break;
         case POINTING_MODE_COMMAND_KEY_PRESS:
@@ -586,6 +687,7 @@ pointing_mode_apply_result_t pointing_mode_apply_command(pointing_mode_command_t
                         pointing_mode_sync_local_owners_state();
                     }
                 }
+                keyed = true;
             }
             break;
         case POINTING_MODE_COMMAND_KEY_RELEASE:
@@ -594,31 +696,81 @@ pointing_mode_apply_result_t pointing_mode_apply_command(pointing_mode_command_t
             if (mode != 0) {
                 noah_runtime_trace_emit(NOAH_TRACE_POINTING_MODE, NOAH_TRACE_POINTING_MODE_EVENT_KEY_RELEASE, mode, pointing_mode_trace_pack_keypos(pointing_mode_command_owner_key_pos(command)));
             }
-            if (mode != 0 && pointing_mode_local_active(mode) && !pointing_mode_local_locked(mode)) {
-                bool owner_changed = pointing_mode_local_owner_remove(mode, pointing_mode_command_owner_key_pos(command));
+            if (mode != 0 && pointing_mode_local_active(mode) && !pointing_mode_local_locked(mode) && pointing_mode_local_source() == POINTING_MODE_SOURCE_KEY) {
+                (void)pointing_mode_local_owner_remove(mode, pointing_mode_command_owner_key_pos(command));
 
                 if (pointing_mode_first_local_owner()) {
                     pointing_mode_sync_local_owners_state();
                 } else {
-                    bool mode_changed = pointing_mode_apply_deactivate_mode(mode);
-
-                    if (mode_changed || owner_changed) {
-                        pointing_mode_sync_local_owner_state(pointing_mode_invalid_owner_key_pos(), SPLIT_SIDE_MASK_NONE);
-                    }
+                    pointing_mode_end_key_source(mode);
+                    pointing_mode_sync_local_owner_state(pointing_mode_invalid_owner_key_pos(), SPLIT_SIDE_MASK_NONE);
                 }
             }
             break;
         case POINTING_MODE_COMMAND_REMOTE_SNAPSHOT:
             result.handled = true;
-            (void)pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_from_id(command.active_mode_id), pointing_mode_mask_from_id(command.locked_mode_id), command.owner_sides, pointing_mode_command_owner_bitmap(command));
+            (void)pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_from_id(command.active_mode_id), pointing_mode_mask_from_id(command.locked_mode_id), command.active_light, command.owner_sides, pointing_mode_command_owner_bitmap(command));
+            break;
+        case POINTING_MODE_COMMAND_LAYER_STATE:
+            result.handled = true;
+            (void)pointing_mode_apply_layer_links(command.layer_state, true);
             break;
         case POINTING_MODE_COMMAND_NONE:
         default:
             break;
     }
 
+    // A mode its key starts or locks runs from that key, even one its layer
+    // ran a moment ago. The layer it brings turns on once it runs; the
+    // layer-state hook then sees a key source and leaves the links waiting.
+    if (keyed) {
+        if (mode != 0 && pointing_mode_local_active(mode)) {
+            if (layer_before && result.before.local.active_mode == mode) {
+                pointing_mode_transition_take_from_layer(mode);
+            } else {
+                pointing_mode_shared_state()->local_active_source = POINTING_MODE_SOURCE_KEY;
+            }
+        }
+        pointing_mode_sync_brought_layer();
+    }
     pointing_mode_apply_result_finish(&result);
+    if (pointing_mode_layer_policy_refresh_due) {
+        pointing_mode_layer_policy_refresh_due = false;
+        pointing_mode_strip_pointer_layer();
+    }
     return result;
+}
+
+void pointing_mode_apply_layer_state(layer_state_t state) {
+    (void)pointing_mode_apply_command((pointing_mode_command_t){
+        .kind          = POINTING_MODE_COMMAND_LAYER_STATE,
+        .owner_key_pos = pointing_mode_invalid_owner_key_pos(),
+        .layer_state   = state,
+    });
+}
+
+void pointing_mode_end_layer_started_mode(void) {
+    pointing_mode_mask_t active = POINTING_MODE_LOCAL_ACTIVE_MODE;
+
+    if (active != 0 && pointing_mode_local_source() == POINTING_MODE_SOURCE_LAYER) {
+        (void)pointing_mode_apply_command((pointing_mode_command_t){
+            .kind          = POINTING_MODE_COMMAND_DEACTIVATE,
+            .mode          = active,
+            .owner_key_pos = pointing_mode_invalid_owner_key_pos(),
+        });
+    }
+}
+
+void pointing_mode_reevaluate_layer_links(void) {
+    // The slave half runs no mode of its own; it mirrors the master's.
+    if (!is_keyboard_master()) {
+        return;
+    }
+    if (pointing_mode_apply_layer_links(layer_state, false) && pointing_mode_local_source() == POINTING_MODE_SOURCE_LAYER) {
+        pointing_mode_strip_pointer_layer();
+    }
+    pointing_mode_layer_policy_refresh_due = false;
+    pointing_mode_sync_brought_layer();
 }
 
 void pointing_mode_activate(pointing_mode_mask_t mode) {
@@ -638,14 +790,15 @@ void pointing_mode_deactivate(pointing_mode_mask_t mode) {
 }
 
 void pointing_mode_apply_remote_mode_ids(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides) {
-    pointing_mode_apply_remote_mode_ids_with_owner_bitmap(active_mode_id, locked_mode_id, owner_sides, NULL);
+    pointing_mode_apply_remote_mode_ids_with_owner_bitmap(active_mode_id, locked_mode_id, true, owner_sides, NULL);
 }
 
-void pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
+void pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, bool active_light, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
     (void)pointing_mode_apply_command((pointing_mode_command_t){
         .kind           = POINTING_MODE_COMMAND_REMOTE_SNAPSHOT,
         .active_mode_id = active_mode_id,
         .locked_mode_id = locked_mode_id,
+        .active_light   = active_light,
         .owner_sides    = owner_sides,
         .owner_key_pos  = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
         .owner_bitmap   = owner_bitmap,

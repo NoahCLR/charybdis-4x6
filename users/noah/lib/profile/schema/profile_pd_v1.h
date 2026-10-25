@@ -1,6 +1,7 @@
 // PD domain contract (D-F14): 32 slots, stored sparsely, in 128-byte records.
-// Version 3 keeps version 2's mode bytes where they were and moves the name to
-// the shared counted rule: its length in byte 8, its UTF-8 in bytes 96..127.
+// Version 3 moved the name to the shared counted rule: its length in byte 8,
+// its UTF-8 in bytes 96..127. Version 4 links a slot to a layer in bytes 9..11
+// (D-F62) and retires the mouse button records, bytes 52..69, as reserved zero.
 #pragma once
 
 #include <stdbool.h>
@@ -22,7 +23,7 @@ enum {
     NOAH_PROFILE_PD_V1_NAME_OFFSET = NOAH_PROFILE_PD_V1_MODE_SIZE,
     NOAH_PROFILE_PD_V1_NAME_MAX    = NOAH_PROFILE_NAME_MAX,
     NOAH_PROFILE_PD_V1_STEP_READ_MAX = 20,
-    // Every slot present: the largest payload a version-2 domain can have.
+    // Every slot present: the largest payload the domain can have.
     NOAH_PROFILE_PD_V1_MAX_SIZE = NOAH_PROFILE_PD_V1_HEADER_SIZE + NOAH_PROFILE_PD_V1_SLOT_COUNT * NOAH_PROFILE_PD_V1_RECORD_SIZE,
 };
 
@@ -74,13 +75,16 @@ enum {
     NOAH_PD_TAP_MASK,        // the modifiers in mask are hidden
     NOAH_PD_TAP_EXACT,       // the shortcut alone
 };
-// What a mouse button does while the mode runs (noah_pd_button_t.kind).
+// A link's direction (link_direction): which way a slot and its linked layer
+// start each other. Zero is no link.
 enum {
-    NOAH_PD_BUTTON_PASS = 0,       // its own behaviour, as without the mode
-    NOAH_PD_BUTTON_CONSUME,        // nothing
-    NOAH_PD_BUTTON_TAP,            // its tap
-    NOAH_PD_BUTTON_HOLD_MODIFIERS, // its modifiers, until it is released
+    NOAH_PD_LINK_NONE              = 0,
+    NOAH_PD_LINK_MODE_TURNS_LAYER_ON = 1u << 0,
+    NOAH_PD_LINK_LAYER_TURNS_MODE_ON = 1u << 1,
+    NOAH_PD_LINK_BOTH              = NOAH_PD_LINK_MODE_TURNS_LAYER_ON | NOAH_PD_LINK_LAYER_TURNS_MODE_ON,
 };
+// The layers a link can name.
+enum { NOAH_PD_LINK_LAYER_COUNT = 16 };
 // The straight directions, in their order in directions[].
 enum {
     NOAH_PD_DIRECTION_LEFT = 0,
@@ -107,7 +111,7 @@ typedef enum {
     NOAH_PROFILE_PD_V1_INVALID_POLICY,
     NOAH_PROFILE_PD_V1_INVALID_ACTION,
     NOAH_PROFILE_PD_V1_INVALID_PARAMETER,
-    // A present version-2 record that says nothing: disabled with no name.
+    // A present record that says nothing: disabled with no name.
     // Such a slot is stored by leaving it out.
     NOAH_PROFILE_PD_V1_NONCANONICAL,
     NOAH_PROFILE_PD_V1_READ_ERROR,
@@ -130,11 +134,6 @@ typedef struct {
     uint8_t  mask;
 } noah_pd_tap_t;
 typedef struct {
-    uint8_t       kind; // NOAH_PD_BUTTON_*
-    uint8_t       modifiers;
-    noah_pd_tap_t tap;
-} noah_pd_button_t;
-typedef struct {
     uint8_t  id;
     uint8_t  kind;           // NOAH_PD_KIND_*
     uint8_t  pointer_layer;  // NOAH_PD_POINTER_LAYER_*
@@ -143,11 +142,17 @@ typedef struct {
     uint8_t  held_modifiers; // owned while a scrolling slot is active
     uint8_t  reserved;
     // The encoder writes the name's length here; authored data leaves it zero.
-    uint8_t          name_length;
-    uint8_t          name_reserved[23];
-    uint16_t         threshold_x, threshold_y; // directional step sizes, in sensor counts
-    noah_pd_tap_t    directions[4];            // NOAH_PD_DIRECTION_*
-    noah_pd_button_t buttons[3];               // mouse buttons 1..3
+    uint8_t       name_length;
+    // The linked layer, which way the link goes (NOAH_PD_LINK_*; zero, with
+    // every link byte zero, is no link), and whether a mode its layer started
+    // shows its own light.
+    uint8_t       linked_layer;
+    uint8_t       link_direction;
+    uint8_t       link_light;
+    uint8_t       link_reserved[20];
+    uint16_t      threshold_x, threshold_y; // directional step sizes, in sensor counts
+    noah_pd_tap_t directions[4];            // NOAH_PD_DIRECTION_*
+    uint8_t       retired_buttons[18];      // version 3's mouse button records; zero
     union {
         struct { // scrolling slots
             struct {
@@ -178,7 +183,7 @@ typedef struct {
 extern const noah_pd_config_t noah_pd_defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT];
 // The structure's bytes with name_length filled in from the name.
 void noah_profile_pd_v1_encode_record(const noah_pd_config_t *config, uint8_t output[NOAH_PROFILE_PD_V1_RECORD_SIZE]);
-// Whether a version-2 domain stores the slot: it is configured, or disabled
+// Whether a version-4 domain stores the slot: it is configured, or disabled
 // with a name. Its kind and name length decide it.
 bool noah_profile_pd_v1_record_present(const uint8_t *record);
 
@@ -187,22 +192,24 @@ bool noah_profile_pd_v1_tap_key_valid(uint16_t keycode);
 
 // Cold byte validators; they allocate no profile/cache state. They take any
 // buffer, aligned or not, and read each byte by its noah_pd_config_t field.
-// The header and entry APIs let a bounded reader validate a version-2 domain
+// The header and entry APIs let a bounded reader validate the domain
 // one record at a time without holding the whole payload.
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *record, size_t length, uint8_t slot, noah_profile_pd_v1_error_t *error);
-// Version 2: the 8-byte header against the whole payload length. On success
+// The 8-byte header against the whole payload length. On success
 // *record_count is the number of records that follow.
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_header(const uint8_t header[8], size_t payload_length, uint8_t *record_count, noah_profile_pd_v1_error_t *error);
-// Version 2: one present record, whose slot ID must be at least
+// One present record, whose slot ID must be at least
 // minimum_slot (zero for the first record, the previous ID plus one after) and
 // below the slot count, and which must not be a disabled record without a name.
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_entry(const uint8_t *record, size_t length, uint8_t minimum_slot, noah_profile_pd_v1_error_t *error);
-// A whole version-2 payload.
+// A whole payload.
 noah_profile_pd_v1_result_t noah_profile_pd_v1_validate(const uint8_t *bytes, size_t length, noah_profile_pd_v1_error_t *error);
 
 // Shared sparse-record traversal. The cursor also accepts encoded authored
 // records, so compiled output follows the same ordering/presence contract.
-typedef struct { uint8_t count, index, minimum; } noah_profile_pd_v1_cursor_t;
+// linked_layers is every layer an earlier record links, so no two slots name
+// one layer.
+typedef struct { uint8_t count, index, minimum; uint16_t linked_layers; } noah_profile_pd_v1_cursor_t;
 noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_begin(noah_profile_pd_v1_cursor_t *cursor, const uint8_t header[8], size_t length, noah_profile_pd_v1_error_t *error);
 noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_next(noah_profile_pd_v1_cursor_t *cursor, const uint8_t record[NOAH_PROFILE_PD_V1_RECORD_SIZE], noah_profile_pd_v1_error_t *error);
 uint8_t noah_profile_pd_v1_default_record_count(const noah_pd_config_t defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT]);

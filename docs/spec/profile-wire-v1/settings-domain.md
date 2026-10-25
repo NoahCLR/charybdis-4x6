@@ -1,6 +1,6 @@
 # Settings domain `0x40` and its readback
 
-Domain `0x40`, version 8, holds the keyboard-wide settings: 31 scalar
+Domain `0x40`, version 9, holds the keyboard-wide settings: 31 scalar
 settings, a record per layer, each custom key's shortcut, and the names of the
 layers, macros, custom keys and the keyboard. GET `0x07` reads the active
 settings back and GET `0x08` reports the lighting and key-option metadata a
@@ -32,7 +32,7 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 
 | Offset | Value |
 | ---: | --- |
-| 0 | version, `8`; equal to the envelope's domain version |
+| 0 | version, `9`; equal to the envelope's domain version |
 | 1 | layer count, `16` |
 | 2 | scalar count, `31` |
 | 3 | macro-name count, `128` |
@@ -41,7 +41,7 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 | 6 | custom-key-shortcut count, `128` |
 | 7 | reserved, zero |
 
-Every byte but 5 must be exactly its value. Firmware accepts only version 8
+Every byte but 5 must be exactly its value. Firmware accepts only version 9
 and refuses every earlier one (D-F10,
 [ADR](../../adr/0010-firmware-accepts-only-current-formats.md)).
 
@@ -63,8 +63,8 @@ Unless the table says otherwise a scalar is at most 65,535.
 | 5 | pointer layer for auto-mouse | layer | `AUTO_MOUSE_DEFAULT_LAYER` |
 | 6 | auto-mouse timeout, ms | nonzero | `AUTO_MOUSE_TIME` |
 | 7 | auto-mouse debounce, ms | at most 255 | `AUTO_MOUSE_DEBOUNCE` |
-| 8 | auto-sniping on | boolean | 1 |
-| 9 | auto-sniping layer | layer | `CHARYBDIS_AUTO_SNIPING_LAYER` |
+| 8 | auto-sniping on: the master switch for scalar 9's layers | boolean | 1 |
+| 9 | auto-sniping layers: sniping runs while any of them is on (D-F62) | layer mask, may be empty | `1 << CHARYBDIS_AUTO_SNIPING_LAYER` |
 | 10–14 | retired | zero | 0 |
 | 15 | key-feedback flash half-period, ms | nonzero | `RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS` |
 | 16 | auto-mouse fade delay: how long the colour holds before it fades, ms | below scalar 6 | `AUTOMOUSE_RGB_DEAD_TIME` |

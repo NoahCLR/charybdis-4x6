@@ -1,5 +1,5 @@
 {
- "description": "Noah's keyboard profile as the authored defaults must reproduce it, in tests/host/profile_logical_form.py's logical form. Derived from his backup of 2026-10-19 (portable document version 3: profile schema 3.0, action ABI 0x837cf479, sixteen layers, 128 macro streams) by decoding it with the schema-3 codecs; the schema-3 and schema-4 domain versions are the same, so every value carries over unchanged. The backup's empty Delete row (0x004c, no steps) is left out, as the authored defaults dropped it: a row without steps is no row (firmware D-F27), so no key changes. tests/host/folded_keyboard_profile_test.py compares the compiled defaults with it, domain by domain.",
+ "description": "Noah's keyboard profile as the authored defaults must reproduce it, in tests/host/profile_logical_form.py's logical form. Derived from his backup of 2026-10-19 (portable document version 3: profile schema 3.0, action ABI 0x837cf479, sixteen layers, 128 macro streams) by decoding it with the schema-3 codecs; the schema-3 and schema-4 domain versions are the same, so every value carries over unchanged. The backup's empty Delete row (0x004c, no steps) is left out, as the authored defaults dropped it: a row without steps is no row (firmware D-F27), so no key changes. The Backspace row (0x002a) comes from his export of 2026-10-25, the one difference that export had from these defaults. Since pointing version 4 the backup's Arrow mouse button overrides are not carried (version 4 retired them; Noah does not use them, 2026-10-25), and settings version 9 holds its auto-sniping layer, Navigation (3), as the layer mask 8. tests/host/folded_keyboard_profile_test.py compares the compiled defaults with it, domain by domain.",
  "differences": [],
  "domains": {
   "rgb": {
@@ -558,6 +558,29 @@
      {
       "tap": 1,
       "tapAction": "0x0235"
+     }
+    ]
+   },
+   {
+    "key": "0x002a",
+    "tapHoldTerm": 0,
+    "longerHoldTerm": 500,
+    "multiTapTerm": 0,
+    "flags": 0,
+    "allowedLayers": 65535,
+    "steps": [
+     {
+      "tap": 0,
+      "hold": {
+       "mode": 4,
+       "repeatHz": 0,
+       "action": "0x042a"
+      },
+      "longHold": {
+       "mode": 2,
+       "repeatHz": 0,
+       "action": "0x082a"
+      }
      }
     ]
    },
@@ -1180,7 +1203,7 @@
     "AUTO_MOUSE_TIMEOUT": 1200,
     "AUTO_MOUSE_DEBOUNCE": 25,
     "AUTO_SNIPING_ENABLED": 1,
-    "AUTO_SNIPING_LAYER": 3,
+    "AUTO_SNIPING_LAYERS": 8,
     "DRAGSCROLL_DPI": 0,
     "VOLUME_DPI": 0,
     "BRIGHTNESS_DPI": 0,
@@ -1350,35 +1373,11 @@
       "mask": 0
      }
     ],
-    "buttons": [
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     }
-    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
     "scroll": [2, 3, 6, 8, 8, 80, 55, 7, 4, 5, 4, 4, 2]
    },
    "1": {
@@ -1412,35 +1411,11 @@
       "mask": 0
      }
     ],
-    "buttons": [
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     }
-    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
     "diagonals": [
      {
       "keycode": "0x0000",
@@ -1497,35 +1472,11 @@
       "mask": 0
      }
     ],
-    "buttons": [
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     }
-    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
     "diagonals": [
      {
       "keycode": "0x0000",
@@ -1582,35 +1533,11 @@
       "mask": 0
      }
     ],
-    "buttons": [
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     }
-    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
     "diagonals": [
      {
       "keycode": "0x0000",
@@ -1667,35 +1594,11 @@
       "mask": 68
      }
     ],
-    "buttons": [
-     {
-      "kind": 3,
-      "modifiers": 32,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 2,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0806",
-       "policy": 2,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 2,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0819",
-       "policy": 2,
-       "mask": 0
-      }
-     }
-    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
     "diagonals": [
      {
       "keycode": "0x0000",
@@ -1752,35 +1655,11 @@
       "mask": 0
      }
     ],
-    "buttons": [
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     }
-    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
     "scroll": [2, 3, 6, 8, 8, 80, 55, 7, 4, 5, 4, 4, 2]
    },
    "6": {
@@ -1814,35 +1693,11 @@
       "mask": 0
      }
     ],
-    "buttons": [
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     }
-    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
     "diagonals": [
      {
       "keycode": "0x0000",
@@ -1899,35 +1754,11 @@
       "mask": 0
      }
     ],
-    "buttons": [
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     },
-     {
-      "kind": 0,
-      "modifiers": 0,
-      "tap": {
-       "keycode": "0x0000",
-       "policy": 0,
-       "mask": 0
-      }
-     }
-    ],
+    "link": {
+     "layer": 0,
+     "direction": 0,
+     "light": 0
+    },
     "diagonals": [
      {
       "keycode": "0x0000",

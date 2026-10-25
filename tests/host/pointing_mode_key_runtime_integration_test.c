@@ -433,6 +433,11 @@ static layer_state_t test_layer_mask(uint8_t layer) {
     return (layer_state_t)1u << layer;
 }
 
+#ifndef NOAH_TEST_QMK_GESTURES
+static uint8_t       test_pointing_mode_layer = LAYER_OWNERSHIP_NO_LAYER;
+static layer_state_t test_held_layers;
+#endif
+
 static void test_reset_keymap(void) {
     for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
         for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
@@ -542,6 +547,10 @@ static void test_reset_state(void) {
     layer_state_set_count                  = 0;
     layer_off_count                        = 0;
     layer_state                            = test_layer_mask(TEST_LAYER_BASE);
+#ifndef NOAH_TEST_QMK_GESTURES
+    test_pointing_mode_layer               = LAYER_OWNERSHIP_NO_LAYER;
+    test_held_layers                       = 0;
+#endif
     fake_mods                              = 0;
     fake_weak_mods                         = 0;
     fake_oneshot_mods                      = 0;
@@ -993,6 +1002,36 @@ bool layer_ownership_toggle_lock_state(uint8_t layer) {
 bool layer_ownership_goto(uint8_t layer) {
     (void)layer;
     return true;
+}
+
+// Layer ownership as it applies a pointing mode's layer: on beside the layers
+// a test holds, off when the mode lets go unless the test still holds it.
+bool layer_ownership_set_pointing_mode_layer(uint8_t layer) {
+    uint8_t previous = test_pointing_mode_layer;
+
+    if (layer == previous) {
+        return false;
+    }
+    test_pointing_mode_layer = layer;
+    if (layer != LAYER_OWNERSHIP_NO_LAYER && !layer_state_cmp(layer_state, layer)) {
+        layer_on(layer);
+    }
+    if (previous != LAYER_OWNERSHIP_NO_LAYER && !(test_held_layers & ((layer_state_t)1u << previous))) {
+        layer_off(previous);
+    }
+    return true;
+}
+
+static void test_hold_layer(uint8_t layer, bool held) {
+    if (held) {
+        test_held_layers |= (layer_state_t)1u << layer;
+        layer_on(layer);
+    } else {
+        test_held_layers &= ~((layer_state_t)1u << layer);
+        if (layer != test_pointing_mode_layer) {
+            layer_off(layer);
+        }
+    }
 }
 
 #endif
@@ -2258,10 +2297,12 @@ static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
 // taps paste. A consumed press never reaches the button's own behavior, so
 // after the release nothing the behavior would have started may remain.
 
+#ifndef NOAH_TEST_QMK_GESTURES
 static void test_lock_arrow(void) {
     action_dispatch(PD_SLOT_4_LOCK);
     CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_ARROW);
 }
+#endif
 
 static void test_assert_button_quiescent(keypos_t pos) {
     CHECK(noah_runtime_debug_active_slot_count() == 0);
@@ -2273,20 +2314,6 @@ static void test_assert_button_quiescent(keypos_t pos) {
     CHECK(!key_runtime_core_repeat_active_at(pos));
     CHECK(!noah_runtime_debug_pending_fallback_slot_key_pos(&(keypos_t){0}));
     CHECK(fake_mods == 0 && fake_managed_mods == 0);
-    CHECK(!key_runtime_core_take_intercepted_release(pos));
-    CHECK(!noah_pd_engine_pending_release());
-}
-
-// While consumed, a held button holds nothing of its own at any point.
-static void test_hold_consumed_button(uint16_t button, keypos_t pos, uint16_t held_ms) {
-    for (uint16_t elapsed = 0; elapsed < held_ms; elapsed += 20u) {
-        key_runtime_integration_advance(&fake_time, 20u);
-        key_runtime_integration_scan();
-        CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_NO);
-        CHECK(!key_runtime_core_repeat_active_at(pos));
-        CHECK((fake_mods & MOD_BIT(KC_LEFT_ALT)) == 0);
-    }
-    (void)button;
 }
 
 static void test_release_and_settle(uint16_t button, keypos_t pos) {
@@ -2295,147 +2322,44 @@ static void test_release_and_settle(uint16_t button, keypos_t pos) {
     key_runtime_integration_scan();
 }
 
-static void test_factory_arrow_paste_button_never_holds_itself(void) {
-    const uint16_t durations[] = {40u, 101u, 1000u};
+// Mouse buttons 1-3 run as they would without a mode, in every mode, Arrow
+// included: pointing version 4 retired the per-mode button overrides.
+static void test_mouse_buttons_run_their_behaviour_in_every_mode(void) {
+    const uint16_t locks[] = {PD_SLOT_4_LOCK, PD_SLOT_1_LOCK};
+    keypos_t       pos     = test_keypos(4, 0);
+    keypos_t       third   = test_keypos(4, 2);
 
-    for (uint8_t index = 0; index < ARRAY_SIZE(durations); index++) {
-        keypos_t pos = test_keypos(4, 2);
-
+    for (uint8_t index = 0; index < ARRAY_SIZE(locks); index++) {
         test_reset_state();
-        test_lock_arrow();
-        CHECK(!key_runtime_integration_process_record(MS_BTN3, pos, true));
-        CHECK(tap_code16_count == 1u && last_tap_code16 == G(KC_V));
-        test_hold_consumed_button(MS_BTN3, pos, durations[index]);
-        test_release_and_settle(MS_BTN3, pos);
-        CHECK(tap_code16_count == 1u);
+        action_dispatch(locks[index]);
+        CHECK(pointing_mode_local_locked_snapshot() != 0);
+
+        // A tap types the button's own tap.
+        CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
+        CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, false));
+        key_runtime_integration_advance(&fake_time, TEST_PD_MULTI_TAP_TERM + 1u);
+        key_runtime_integration_scan();
+        CHECK(tap_code16_count == 1u && last_tap_code16 == KC_A);
         test_assert_button_quiescent(pos);
+
+        // A hold holds the button's own hold until the release.
+        CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
+        key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1u);
+        key_runtime_integration_scan();
+        CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_LEFT_ALT);
+        test_release_and_settle(MS_BTN1, pos);
+        test_assert_button_quiescent(pos);
+
+        // Button 3 holds itself; no shortcut of the mode's goes out.
+        CHECK(!key_runtime_integration_process_record(MS_BTN3, third, true));
+        key_runtime_integration_advance(&fake_time, 101u);
+        key_runtime_integration_scan();
+        CHECK(noah_runtime_debug_slot_held_action_keycode(third) == MS_BTN3);
+        test_release_and_settle(MS_BTN3, third);
+        CHECK(tap_code16_count == 1u);
+        test_assert_button_quiescent(third);
+        CHECK(pointing_mode_local_locked_snapshot() != 0);
     }
-}
-
-// A tap/hold and a repeating behavior on buttons Arrow consumes: neither the
-// tap, the hold, nor the repeat runs, and each button's override still does.
-static void test_consumed_buttons_run_no_authored_behavior(void) {
-    keypos_t shift_pos = test_keypos(4, 0);
-    keypos_t copy_pos  = test_keypos(4, 1);
-
-    test_reset_state();
-    test_lock_arrow();
-    CHECK(!key_runtime_integration_process_record(MS_BTN1, shift_pos, true));
-    CHECK((fake_mods & MOD_BIT(KC_RIGHT_SHIFT)) != 0);
-    test_hold_consumed_button(MS_BTN1, shift_pos, TEST_PD_TAP_HOLD_TERM + 40u);
-    test_release_and_settle(MS_BTN1, shift_pos);
-    CHECK(tap_code16_count == 0u);
-    test_assert_button_quiescent(shift_pos);
-
-    CHECK(!key_runtime_integration_process_record(MS_BTN2, copy_pos, true));
-    CHECK(tap_code16_count == 1u && last_tap_code16 == G(KC_C));
-    test_hold_consumed_button(MS_BTN2, copy_pos, TEST_PD_TAP_HOLD_TERM + 200u);
-    test_release_and_settle(MS_BTN2, copy_pos);
-    CHECK(tap_code16_count == 1u);
-    test_assert_button_quiescent(copy_pos);
-
-    // Short presses resolve the same way as long ones.
-    CHECK(!key_runtime_integration_process_record(MS_BTN1, shift_pos, true));
-    test_release_and_settle(MS_BTN1, shift_pos);
-    CHECK(tap_code16_count == 1u);
-    test_assert_button_quiescent(shift_pos);
-}
-
-// A release goes to whoever took the press, across a change of mode.
-static void test_button_release_follows_its_press_across_mode_changes(void) {
-    keypos_t pos = test_keypos(4, 0);
-
-    // Consumed by Arrow, released after Arrow was unlocked: the mode's Shift
-    // ends, and the button's own behavior still never runs.
-    test_reset_state();
-    test_lock_arrow();
-    CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
-    action_dispatch(PD_SLOT_4_LOCK);
-    CHECK(pointing_mode_local_locked_snapshot() == 0);
-    test_hold_consumed_button(MS_BTN1, pos, TEST_PD_TAP_HOLD_TERM + 40u);
-    test_release_and_settle(MS_BTN1, pos);
-    CHECK(tap_code16_count == 0u);
-    test_assert_button_quiescent(pos);
-
-    // Pressed before Arrow, released under it: the behavior took the press,
-    // so its Alt hold ends on the release instead of the mode swallowing it.
-    test_reset_state();
-    CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
-    key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1u);
-    key_runtime_integration_scan();
-    CHECK(noah_runtime_debug_slot_held_action_keycode(pos) == KC_LEFT_ALT);
-    test_lock_arrow();
-    test_release_and_settle(MS_BTN1, pos);
-    test_assert_button_quiescent(pos);
-    action_dispatch(PD_SLOT_4_LOCK);
-    CHECK(pointing_mode_local_active_snapshot() == 0 && pointing_mode_local_locked_snapshot() == 0);
-}
-
-// Another key pressed while a consumed button is held behaves as usual.
-static void test_consumed_button_is_an_ordinary_interrupting_press(void) {
-    keypos_t button_pos = test_keypos(4, 2);
-    keypos_t key_pos    = test_keypos(1, 1);
-
-    test_reset_state();
-    test_lock_arrow();
-    CHECK(!key_runtime_integration_process_record(MS_BTN3, button_pos, true));
-    CHECK(!key_runtime_integration_process_record(TEST_HANDLED_TAP_KEY, key_pos, true));
-    CHECK(!key_runtime_integration_process_record(TEST_HANDLED_TAP_KEY, key_pos, false));
-    test_hold_consumed_button(MS_BTN3, button_pos, 200u);
-    CHECK(tap_code16_count == 2u && last_tap_code16 == KC_J);
-    test_release_and_settle(MS_BTN3, button_pos);
-    test_assert_button_quiescent(button_pos);
-    test_assert_button_quiescent(key_pos);
-
-    // Unlocked with nothing held, the buttons are ordinary again.
-    action_dispatch(PD_SLOT_4_LOCK);
-    CHECK(pointing_mode_local_active_snapshot() == 0 && pointing_mode_local_locked_snapshot() == 0);
-    CHECK(!key_runtime_integration_process_record(MS_BTN1, button_pos, true));
-    CHECK(!key_runtime_integration_process_record(MS_BTN1, button_pos, false));
-    key_runtime_integration_advance(&fake_time, TEST_PD_MULTI_TAP_TERM + 1u);
-    key_runtime_integration_scan();
-    CHECK(last_tap_code16 == KC_A);
-}
-
-// A slot may simply consume a button; its behavior must not run either.
-static void test_configured_consume_button_runs_nothing(void) {
-    keypos_t pos = test_keypos(4, 0);
-
-    test_reset_state();
-    noah_pd_config_t volume = noah_pd_defaults[1];
-    volume.buttons[0]       = (noah_pd_button_t){.kind = NOAH_PD_BUTTON_CONSUME};
-    noah_profile_pd_v1_encode_record(&volume, configured_pd_records[1]);
-    publish_configured_pd();
-    action_dispatch(PD_SLOT_1_LOCK);
-    CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_VOLUME);
-    CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
-    test_hold_consumed_button(MS_BTN1, pos, TEST_PD_TAP_HOLD_TERM + 40u);
-    test_release_and_settle(MS_BTN1, pos);
-    CHECK(tap_code16_count == 0u);
-    test_assert_button_quiescent(pos);
-}
-
-// A button override that clicks a mouse button sends just that click. It never
-// passes through key processing, so neither the mode's overrides nor the
-// clicked button's own behaviour (button 3's double-tap-hold here) run.
-static void test_configured_button_click_runs_no_behaviour(void) {
-    keypos_t pos = test_keypos(4, 0);
-
-    test_reset_state();
-    noah_pd_config_t volume = noah_pd_defaults[1];
-    volume.buttons[0]       = (noah_pd_button_t){.kind = NOAH_PD_BUTTON_TAP, .tap = {.keycode = MS_BTN3}};
-    noah_profile_pd_v1_encode_record(&volume, configured_pd_records[1]);
-    publish_configured_pd();
-    action_dispatch(PD_SLOT_1_LOCK);
-    CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_VOLUME);
-    CHECK(!key_runtime_integration_process_record(MS_BTN1, pos, true));
-    CHECK(tap_code16_count == 1u && last_tap_code16 == MS_BTN3);
-    test_hold_consumed_button(MS_BTN1, pos, TEST_PD_TAP_HOLD_TERM + 40u);
-    test_release_and_settle(MS_BTN1, pos);
-    key_runtime_integration_advance(&fake_time, TEST_PD_MULTI_TAP_TERM + 1u);
-    key_runtime_integration_scan();
-    CHECK(tap_code16_count == 1u && last_tap_code16 == MS_BTN3);
-    test_assert_button_quiescent(pos);
 }
 
 #ifndef NOAH_TEST_QMK_GESTURES
@@ -2556,13 +2480,10 @@ static void test_mode_tap_registers_every_due_fallback_hold_in_key_order(void) {
 }
 
 // Only due holds register: a key whose hold is already on (a later press
-// registered it) is not registered again, and a press offered to the mode
-// whose tap goes out holds nothing of its own.
+// registered it) is not registered again.
 static void test_mode_tap_registers_only_due_fallback_holds(void) {
-    keypos_t    first_pos  = test_keypos(1, 0);
-    keypos_t    second_pos = test_keypos(3, 0);
-    keypos_t    button_pos = test_keypos(4, 2);
-    keyrecord_t button     = test_record(button_pos, true);
+    keypos_t first_pos  = test_keypos(1, 0);
+    keypos_t second_pos = test_keypos(3, 0);
 
     test_reset_state();
     test_lock_arrow();
@@ -2580,30 +2501,294 @@ static void test_mode_tap_registers_only_due_fallback_holds(void) {
     test_release_fallback_hold(KC_F20, KC_F23, first_pos);
     test_assert_button_quiescent(first_pos);
     test_assert_button_quiescent(second_pos);
+}
+#endif
 
-    // Button 3's factory row falls back to holding the button. Offered to
-    // Arrow, which taps paste for it, the press is the mode's: the tap
-    // registers the other due key's hold and not the button's. This is the
-    // record path's mode stage for a press begun without preflight.
+#ifndef NOAH_TEST_QMK_GESTURES
+// ── Linked layers (D-F62) ───────────────────────────────────────────────────
+//
+// Volume starts on layer 5 and Zoom on layer 6, showing its own light;
+// Dragscroll brings layer 4; Brightness and layer 7 start each other. Arrow's
+// link to the pointer layer and Pinch's to the base layer, a default layer,
+// do nothing.
+enum {
+    TEST_LAYER_VOLUME     = 5,
+    TEST_LAYER_ZOOM       = 6,
+    TEST_LAYER_DRAGSCROLL = 4,
+    TEST_LAYER_BOTH       = 7,
+};
+
+static void test_link_slot(uint8_t slot, uint8_t layer, uint8_t direction, bool light) {
+    noah_pd_config_t record = noah_pd_defaults[slot];
+
+    record.linked_layer   = layer;
+    record.link_direction = direction;
+    record.link_light     = light ? 1u : 0u;
+    noah_profile_pd_v1_encode_record(&record, configured_pd_records[slot]);
+}
+
+static void test_reset_linked_layers(void) {
     test_reset_state();
-    test_lock_arrow();
-    test_begin_press_without_preflight(KC_F20, first_pos);
-    test_begin_press_without_preflight(MS_BTN3, button_pos);
-    button.event.time = fake_time;
-    noah_runtime_trace_reset();
-    key_runtime_core_offer_press_to_mode(button_pos);
-    CHECK(pointing_mode_handle_key_event(MS_BTN3, &button));
-    key_runtime_core_end_mode_offer(button_pos, true);
-    CHECK(test_traced_fallback_registrations() == 1u);
-    CHECK(host_out_count == 2u);
-    CHECK(host_out_is(0, 'R', KC_F20));
-    CHECK(host_out_is(1, 'T', G(KC_V)));
-    CHECK(noah_runtime_debug_slot_held_action_keycode(first_pos) == KC_F20);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(button_pos) == KC_NO);
-    test_release_and_settle(MS_BTN3, button_pos);
-    test_release_fallback_hold(KC_F20, KC_F23, first_pos);
-    test_assert_button_quiescent(button_pos);
-    test_assert_button_quiescent(first_pos);
+    test_link_slot(1, TEST_LAYER_VOLUME, NOAH_PD_LINK_LAYER_TURNS_MODE_ON, false);
+    test_link_slot(3, TEST_LAYER_ZOOM, NOAH_PD_LINK_LAYER_TURNS_MODE_ON, true);
+    test_link_slot(0, TEST_LAYER_DRAGSCROLL, NOAH_PD_LINK_MODE_TURNS_LAYER_ON, false);
+    test_link_slot(2, TEST_LAYER_BOTH, NOAH_PD_LINK_BOTH, false);
+    test_link_slot(4, TEST_LAYER_POINTER, NOAH_PD_LINK_BOTH, false);
+    test_link_slot(5, TEST_LAYER_BASE, NOAH_PD_LINK_LAYER_TURNS_MODE_ON, false);
+    publish_configured_pd();
+}
+
+static bool test_runs(pointing_mode_mask_t mode, pointing_mode_source_t source) {
+    return pointing_mode_local_active_snapshot() == mode && pointing_mode_local_source_snapshot() == (mode ? source : POINTING_MODE_SOURCE_NONE);
+}
+
+static bool test_layer_on(uint8_t layer) {
+    return (layer_state & test_layer_mask(layer)) != 0;
+}
+
+// A linked layer runs its mode while it is on, held or locked; the highest
+// linked layer that is on decides.
+static void test_a_linked_layer_runs_its_mode(void) {
+    test_reset_linked_layers();
+
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    CHECK(!pointing_mode_local_locked_snapshot());
+    test_hold_layer(TEST_LAYER_ZOOM, true);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_ZOOM, false);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+
+    // A layer that stays on, as a locked one does, keeps its mode until it
+    // goes off.
+    test_hold_layer(TEST_LAYER_ZOOM, true);
+    for (uint8_t scan = 0; scan < 8; scan++) {
+        key_runtime_integration_advance(&fake_time, 500u);
+        key_runtime_integration_scan();
+    }
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_ZOOM, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+}
+
+// A mode its key runs beats one its layer started; when the key lets go, the
+// layer's mode runs again. The layer's own mode key makes the key its source,
+// and handing back to the layer does not restart the mode.
+static void test_a_key_source_beats_a_layer_source(void) {
+    keypos_t pos = test_keypos(0, 0);
+
+    test_reset_linked_layers();
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, true));
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_KEY));
+    // While the key runs Zoom, the layers wait.
+    test_hold_layer(TEST_LAYER_ZOOM, true);
+    test_hold_layer(TEST_LAYER_ZOOM, false);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_KEY));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, false));
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+
+    // Locked from its key, then unlocked: back to the layer's mode.
+    action_dispatch(PD_SLOT_3_LOCK);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_KEY) && pointing_mode_local_locked_snapshot() == POINTING_MODE_ZOOM);
+    action_dispatch(PD_SLOT_3_LOCK);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER) && !pointing_mode_local_locked_snapshot());
+
+    // Locked from its own key while its layer runs it, then unlocked: the
+    // layer takes it back, unlocked, without a restart.
+    action_dispatch(PD_SLOT_1_LOCK);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_KEY) && pointing_mode_local_locked_snapshot() == POINTING_MODE_VOLUME);
+    uint8_t unlock_exits = reset_dragscroll_count;
+    action_dispatch(PD_SLOT_1_LOCK);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER) && !pointing_mode_local_locked_snapshot());
+    CHECK(reset_dragscroll_count == unlock_exits);
+
+    // Volume's own key while its layer runs it: the key holds it, and on the
+    // release the layer takes it back without a restart.
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, pos, true));
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_KEY));
+    uint8_t exits = reset_dragscroll_count;
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, pos, false));
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    CHECK(reset_dragscroll_count == exits);
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+}
+
+// A mode its key runs owns the layer it brings, held or locked, beside the
+// layer's other owners.
+static void test_a_key_started_mode_brings_its_layer(void) {
+    keypos_t pos = test_keypos(0, 0);
+
+    test_reset_linked_layers();
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, pos, true));
+    CHECK(test_runs(POINTING_MODE_DRAGSCROLL, POINTING_MODE_SOURCE_KEY));
+    CHECK(test_layer_on(TEST_LAYER_DRAGSCROLL));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, pos, false));
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+    CHECK(!test_layer_on(TEST_LAYER_DRAGSCROLL));
+
+    action_dispatch(PD_SLOT_0_LOCK);
+    CHECK(test_layer_on(TEST_LAYER_DRAGSCROLL));
+    for (uint8_t scan = 0; scan < 4; scan++) {
+        key_runtime_integration_advance(&fake_time, 500u);
+        key_runtime_integration_scan();
+    }
+    CHECK(test_layer_on(TEST_LAYER_DRAGSCROLL));
+    action_dispatch(PD_SLOT_0_LOCK);
+    CHECK(!test_layer_on(TEST_LAYER_DRAGSCROLL));
+
+    // Another owner keeps the layer when the mode ends.
+    test_hold_layer(TEST_LAYER_DRAGSCROLL, true);
+    action_dispatch(PD_SLOT_0_LOCK);
+    action_dispatch(PD_SLOT_0_LOCK);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+    CHECK(test_layer_on(TEST_LAYER_DRAGSCROLL));
+    test_hold_layer(TEST_LAYER_DRAGSCROLL, false);
+    CHECK(!test_layer_on(TEST_LAYER_DRAGSCROLL));
+
+    // A mode its layer started owns no layer.
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    CHECK(test_pointing_mode_layer == LAYER_OWNERSHIP_NO_LAYER);
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+}
+
+// Both ways: the layer key and the mode key each leave neither on when let go.
+static void test_a_two_way_link_never_latches(void) {
+    keypos_t pos = test_keypos(0, 0);
+
+    test_reset_linked_layers();
+    test_hold_layer(TEST_LAYER_BOTH, true);
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_BOTH, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_BOTH));
+
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, true));
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_BOTH));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, false));
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_BOTH));
+
+    action_dispatch(PD_SLOT_2_LOCK);
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_BOTH));
+    action_dispatch(PD_SLOT_2_LOCK);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_BOTH));
+
+    // Crossed: the mode key, then the layer key, the mode key let go first.
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, true));
+    test_hold_layer(TEST_LAYER_BOTH, true);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, false));
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER) && test_layer_on(TEST_LAYER_BOTH));
+    test_hold_layer(TEST_LAYER_BOTH, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_BOTH));
+}
+
+// A key that takes over the mode its layer started gives it a key-started
+// mode's auto-mouse side effects: locked, an anchoring mode anchors the
+// pointer layer as it would from nothing, and gives the anchor back when its
+// layer takes it again.
+static void test_a_key_taking_over_a_layer_started_mode_anchors_as_from_nothing(void) {
+    test_reset_linked_layers();
+    action_dispatch(PD_SLOT_1_LOCK);
+    CHECK(auto_mouse_key_tracker == 1);
+    action_dispatch(PD_SLOT_1_LOCK);
+    CHECK(auto_mouse_key_tracker == 0);
+
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER) && auto_mouse_key_tracker == 0);
+    action_dispatch(PD_SLOT_1_LOCK);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_KEY) && auto_mouse_key_tracker == 1);
+    action_dispatch(PD_SLOT_1_LOCK);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER) && auto_mouse_key_tracker == 0);
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && auto_mouse_key_tracker == 0);
+}
+
+// A mode its layer started never brings the pointer layer: a separate one is
+// stripped while it runs, and it comes back to auto-mouse afterwards.
+static void test_a_layer_started_mode_strips_the_pointer_layer(void) {
+    keypos_t pos = test_keypos(0, 0);
+
+    test_reset_linked_layers();
+    test_hold_layer(TEST_LAYER_POINTER, true);
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    CHECK(!test_layer_on(TEST_LAYER_POINTER) && test_layer_on(TEST_LAYER_VOLUME));
+    layer_on(TEST_LAYER_POINTER); // the ball moves: auto-mouse turns it on again
+    CHECK(!test_layer_on(TEST_LAYER_POINTER));
+
+    // Started when a key lets go, outside the layer-state hook, too.
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, true));
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    layer_on(TEST_LAYER_POINTER);
+    CHECK(test_layer_on(TEST_LAYER_POINTER));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, false));
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    CHECK(!test_layer_on(TEST_LAYER_POINTER));
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+}
+
+// Links to the pointer layer or a default layer do nothing either way.
+static void test_links_to_the_pointer_layer_or_a_default_layer_are_inert(void) {
+    keypos_t pos = test_keypos(0, 0);
+
+    test_reset_linked_layers();
+    test_hold_layer(TEST_LAYER_POINTER, true);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+    test_hold_layer(TEST_LAYER_POINTER, false);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_4, pos, true));
+    CHECK(test_runs(POINTING_MODE_ARROW, POINTING_MODE_SOURCE_KEY));
+    CHECK(test_pointing_mode_layer == LAYER_OWNERSHIP_NO_LAYER && !test_layer_on(TEST_LAYER_POINTER));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_4, pos, false));
+    // The base layer is on everywhere; Pinch's link to it never starts Pinch.
+    test_hold_layer(TEST_LAYER_BASE, true);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+}
+
+// A mode its layer started shows the layer's lighting unless its slot's
+// switch is on; a mode its key runs shows its own.
+static void test_a_layer_started_mode_shows_its_light_only_when_its_slot_says(void) {
+    keypos_t pos = test_keypos(0, 0);
+
+    test_reset_linked_layers();
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    CHECK(!pointing_mode_snapshot().local.active_light && !pointing_mode_snapshot().display.active_light);
+    CHECK(!pointing_mode_local_light_snapshot());
+    test_hold_layer(TEST_LAYER_ZOOM, true);
+    CHECK(pointing_mode_snapshot().display.active_light && pointing_mode_local_light_snapshot());
+    test_hold_layer(TEST_LAYER_ZOOM, false);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, pos, true));
+    CHECK(pointing_mode_snapshot().display.active_light);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, pos, false));
+    CHECK(!pointing_mode_snapshot().display.active_light);
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+}
+
+// A mode its layer started does not hold up an activation; at the boundary it
+// ends, and the new generation's links decide what the layers that are on run.
+static void test_a_layer_started_mode_ends_at_activation(void) {
+    test_reset_linked_layers();
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    CHECK(!pointing_mode_local_key_source_active());
+
+    // The new generation links layer 5 to Brightness instead.
+    pointing_mode_end_layer_started_mode();
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+    test_link_slot(1, 0, NOAH_PD_LINK_NONE, false);
+    test_link_slot(2, TEST_LAYER_VOLUME, NOAH_PD_LINK_LAYER_TURNS_MODE_ON, false);
+    publish_configured_pd();
+    pointing_mode_reevaluate_layer_links();
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+
+    // A mode its key holds still holds the activation back.
+    action_dispatch(PD_SLOT_3_LOCK);
+    CHECK(pointing_mode_local_key_source_active());
+    action_dispatch(PD_SLOT_3_LOCK);
 }
 #endif
 
@@ -5203,12 +5388,18 @@ int main(int argc, char **argv) {
     return 0;
 #endif
     test_ordinary_mouse_button_double_tap_hold();
-    test_factory_arrow_paste_button_never_holds_itself();
-    test_consumed_buttons_run_no_authored_behavior();
-    test_button_release_follows_its_press_across_mode_changes();
-    test_consumed_button_is_an_ordinary_interrupting_press();
-    test_configured_consume_button_runs_nothing();
-    test_configured_button_click_runs_no_behaviour();
+    test_mouse_buttons_run_their_behaviour_in_every_mode();
+#ifndef NOAH_TEST_QMK_GESTURES
+    test_a_linked_layer_runs_its_mode();
+    test_a_key_source_beats_a_layer_source();
+    test_a_key_started_mode_brings_its_layer();
+    test_a_two_way_link_never_latches();
+    test_a_key_taking_over_a_layer_started_mode_anchors_as_from_nothing();
+    test_a_layer_started_mode_strips_the_pointer_layer();
+    test_links_to_the_pointer_layer_or_a_default_layer_are_inert();
+    test_a_layer_started_mode_shows_its_light_only_when_its_slot_says();
+    test_a_layer_started_mode_ends_at_activation();
+#endif
 #ifndef NOAH_TEST_QMK_GESTURES
     test_mode_tap_registers_held_key_fallback_hold_first();
     test_mode_tap_registers_every_due_fallback_hold_in_key_order();

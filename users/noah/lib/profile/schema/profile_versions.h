@@ -6,6 +6,10 @@
 // store format 6 and Profile Wire 2 open the new base (D-F28): every length
 // and offset inside a profile is 32 bits wide.
 #define NOAH_PROFILE_SCHEMA_MAJOR 4u
+// A later capability raises the minor (D-F28): 4.1 links pointing slots to
+// layers and makes auto-sniping's layer a set (pointing v4, settings v9,
+// D-F62).
+#define NOAH_PROFILE_SCHEMA_MINOR 1u
 // A 128 KiB profile slot less the first kilobyte its header and commit
 // marker take on flash (D-F29).
 #define NOAH_PROFILE_PAYLOAD_MAX 130048u

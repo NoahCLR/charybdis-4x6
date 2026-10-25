@@ -84,22 +84,12 @@
         },
         {
           "caller": "process_record_user",
-          "callee": "key_runtime_process_stage_pointing_mode_release",
-          "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
-        },
-        {
-          "caller": "process_record_user",
           "callee": "key_runtime_process_stage_preflight",
           "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
         },
         {
           "caller": "process_record_user",
           "callee": "key_runtime_process_stage_release_slot_keycode",
-          "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
-        },
-        {
-          "caller": "process_record_user",
-          "callee": "key_runtime_process_stage_pointing_mode",
           "reason": "GCC 15 inlines the userspace process flow into the chained keymap process_record_user; its stage table invokes this handler indirectly."
         },
         {
@@ -375,14 +365,6 @@
         {
           "name": "handled press projection deciding which fallback holds are due",
           "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_pending_fallback_holds"]
-        },
-        {
-          "name": "pointing-mode release stage tap with fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_pointing_mode_release", "noah_pd_engine_key", "emit_tap", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
-        },
-        {
-          "name": "pointing-mode press stage tap with fallback settlement",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_pointing_mode", "noah_pd_engine_key", "emit_tap", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "noah_action_press", "pointing_mode_apply_command", "pointing_mode_snapshot", "pointing_mode_snapshot_fill_view"]
         },
         {
           "name": "release slot keycode stage token lookup",

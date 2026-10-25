@@ -17,7 +17,7 @@ enum {
     MAX_PREPARE_TIME_MS = 60000u,
 };
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
 static const uint8_t max_profile[NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE];
 // Fault sweeps plant one fault at every exchange of a copy, so their cost
 // grows with the square of its length. The protocol does not depend on
@@ -2549,7 +2549,7 @@ static uint8_t wide_profile[WIDE_LENGTH];
 // byte, then refused: an RGB domain keeps 16-bit internal offsets (D-F28),
 // and no profile the schema accepts reaches 64 KiB yet.
 static void make_wide_profile(void) {
-    memcpy(wide_profile, (const uint8_t[]){'N', 'L', 'P', '1', NOAH_PROFILE_SCHEMA_MAJOR, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
+    memcpy(wide_profile, (const uint8_t[]){'N', 'L', 'P', '1', NOAH_PROFILE_SCHEMA_MAJOR, NOAH_PROFILE_SCHEMA_MINOR, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
     wide_profile[10] = (uint8_t)(WIDE_LENGTH - 14u);
     wide_profile[11] = (uint8_t)((WIDE_LENGTH - 14u) >> 8u);
     wide_profile[12] = (uint8_t)((WIDE_LENGTH - 14u) >> 16u);

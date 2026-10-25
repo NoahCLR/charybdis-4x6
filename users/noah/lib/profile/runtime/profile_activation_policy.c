@@ -14,7 +14,6 @@
 #include "../../macro/macro_payload.h"
 #if defined(POINTING_DEVICE_ENABLE)
 #    include "../../pointing/defs/pointing_modes.h"
-#    include "../../pointing/modes/pointing_mode_configured.h"
 #endif
 
 static void capture_runtime(noah_profile_activation_snapshot_t *snapshot) {
@@ -50,10 +49,10 @@ static void capture_runtime(noah_profile_activation_snapshot_t *snapshot) {
         .combo_active_count  = combo.active_count,
     };
 #if defined(POINTING_DEVICE_ENABLE)
-    // Retain the existing wire reason: a configured mode is persistent intent
-    // until its lock/hold and any consumed button releases have drained. A
-    // build without a pointing device has no mode to hold.
-    if (pointing_mode_local_active_snapshot() || pointing_mode_local_locked_snapshot() || noah_pd_engine_pending_release()) {
+    // A mode its key holds or locks is persistent intent until it ends; one its
+    // layer started is not, and ends at the boundary instead (D-F62). A build
+    // without a pointing device has no mode to hold.
+    if (pointing_mode_local_key_source_active()) {
         if (snapshot->persistent_intent_count != UINT8_MAX) snapshot->persistent_intent_count++;
     }
 #endif

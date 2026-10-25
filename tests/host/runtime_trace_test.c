@@ -31,7 +31,6 @@ const noah_pd_config_t *noah_active_profile_pd_for_mask(uint32_t mode) { return 
 void noah_pd_engine_enter(const noah_pd_config_t *slot) { (void)slot; }
 void noah_pd_engine_exit(void) {}
 uint8_t noah_pd_engine_masked_mods(const noah_pd_config_t *slot) { (void)slot; return 0; }
-bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; return false; }
 
 static uint8_t                          rpc_register_count;
 static int8_t                           rpc_registered_ids[4];

@@ -48,9 +48,9 @@ typedef struct {
     bool                saw_pristine_marker;
 } reuse_guard_state_t;
 
-static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
-static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 3u, 0u, 0u, 0u, 1u, 2u, 3u};
-static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, 0x20u, NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, 2u, 0u, 0u, 0u, 4u, 5u};
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
+static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 4u, 1u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 3u, 0u, 0u, 0u, 1u, 2u, 3u};
+static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 4u, 1u, 1u, 1u, 0x20u, NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, 2u, 0u, 0u, 0u, 4u, 5u};
 
 // The flash backend refuses a read or write over the store's I/O bound; one
 // here fails the test.
@@ -108,7 +108,7 @@ static noah_profile_store_io_t io_for(fake_eeprom_t *memory) {
 }
 
 static noah_profile_store_compatibility_t compatibility(void) {
-    return (noah_profile_store_compatibility_t){.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = 0u, .compiled_default_digest = COMPILED_DIGEST, .action_abi_digest = ACTION_ABI_DIGEST};
+    return (noah_profile_store_compatibility_t){.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = NOAH_PROFILE_SCHEMA_MINOR, .compiled_default_digest = COMPILED_DIGEST, .action_abi_digest = ACTION_ABI_DIGEST};
 }
 
 static bool reuse_begin(void *context, noah_profile_slot_t slot) {
@@ -182,7 +182,7 @@ static noah_profile_store_candidate_t candidate_for(const uint8_t *payload, uint
     return (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_STORE_FORMAT_VERSION,
         .schema_major            = NOAH_PROFILE_SCHEMA_MAJOR,
-        .schema_minor            = 0u,
+        .schema_minor            = NOAH_PROFILE_SCHEMA_MINOR,
         .domain_mask             = domain_mask,
         .flags                   = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
         .payload_length          = length,
@@ -896,7 +896,7 @@ static void test_boot_selection_state_machine_is_scan_bounded(void) {
 // These are storage-envelope fixtures: domain bodies are opaque to this layer.
 // The schema validator remains responsible for semantic payload validation.
 static uint16_t pd_payload(uint8_t *payload, uint8_t mask) {
-    const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
+    const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
     uint16_t length = sizeof(header);
     memcpy(payload, header, sizeof(header));
     for (uint8_t domain = 0u; domain < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; domain++) {
@@ -958,7 +958,7 @@ static noah_profile_store_result_t commit_pd(noah_profile_store_t *store, const 
 // a profile with named macros (settings v4) once passed validation on both
 // halves and was then refused here on every try.
 static void test_pd_store_accepts_every_settings_version_the_validator_does(void) {
-    for (uint8_t version = 1u; version <= 8u; version++) {
+    for (uint8_t version = 1u; version <= 9u; version++) {
         uint8_t                        payload[48];
         uint16_t                       length = pd_payload(payload, 1u << 3u);
         noah_profile_store_t           store;
@@ -971,7 +971,7 @@ static void test_pd_store_accepts_every_settings_version_the_validator_does(void
         initialize_pd_store(&store);
         noah_profile_store_result_t result = commit_pd(&store, payload, &candidate);
         CHECK((result == NOAH_PROFILE_STORE_OK) == (version == NOAH_PROFILE_DOMAIN_VERSION_SETTINGS));
-        CHECK(NOAH_PROFILE_DOMAIN_VERSION_SETTINGS == 8u);
+        CHECK(NOAH_PROFILE_DOMAIN_VERSION_SETTINGS == 9u);
     }
 }
 
@@ -1001,8 +1001,8 @@ static void test_pd_store_accepts_every_combo_version_the_validator_does(void) {
     }
 }
 
-// The 32-slot domains: the store keeps only RGB v3 and PD v2, the versions
-// the validator accepts. An eight-slot RGB v2 or PD v1 never reaches it.
+// The 32-slot domains: the store keeps only the RGB and PD versions the
+// validator accepts, RGB v4 and PD v4. An earlier one never reaches it.
 static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
     const struct { uint8_t mask, id; } domains[] = {{1u << 0u, 0x10u}, {1u << 4u, 0x50u}};
     for (size_t d = 0u; d < sizeof(domains) / sizeof(domains[0]); d++) {
@@ -1019,7 +1019,7 @@ static void test_pd_store_accepts_only_32_slot_rgb_and_pd_versions(void) {
             reset_eeprom(&eeprom);
             initialize_pd_store(&store);
             CHECK((commit_pd(&store, payload, &candidate) == NOAH_PROFILE_STORE_OK) == accepted);
-            CHECK(accepted == (version == (domains[d].id == 0x10u ? 4u : 3u)));
+            CHECK(accepted == (version == 4u));
         }
     }
 }
@@ -1103,7 +1103,7 @@ static void test_pd_header_rejects_bad_contracts_before_writing(void) {
                 candidate.format_version = 2u;
                 break;
             case 6: candidate.schema_major = 1u; break;
-            case 7: candidate.schema_minor = 1u; break;
+            case 7: candidate.schema_minor = NOAH_PROFILE_SCHEMA_MINOR + 1u; break;
             case 8:
                 candidate.format_version = 0u;
                 break;
@@ -1337,7 +1337,7 @@ static void test_payload_over_64_kib_round_trips(void) {
     uint8_t                        span[40];
     noah_profile_store_result_t    result;
 
-    memcpy(payload, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
+    memcpy(payload, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 1u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
     payload[10] = (uint8_t)(WIDE - 14u);
     payload[11] = (uint8_t)((WIDE - 14u) >> 8u);
     payload[12] = (uint8_t)((WIDE - 14u) >> 16u);

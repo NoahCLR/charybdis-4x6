@@ -21,6 +21,7 @@ typedef struct {
     layer_state_t                      applied_layer_state;
     layer_state_t                      locked_mask;
     layer_state_t                      oneshot_mask;
+    layer_state_t                      pointing_mode_layer_mask;
     uint8_t                            momentary_refcounts[LAYER_COUNT];
     layer_ownership_binding_snapshot_t bindings[LAYER_OWNERSHIP_BINDING_CAPACITY];
 } layer_ownership_debug_snapshot_t;
@@ -42,6 +43,14 @@ bool layer_ownership_goto(uint8_t layer);
 bool    layer_ownership_oneshot_tap(uint8_t layer, uint16_t now, uint16_t double_tap_ms);
 bool    layer_ownership_oneshot_consume(void);
 uint8_t layer_ownership_oneshot_layer(void);
+
+// A pointing mode its key started owns its linked layer while it runs, beside
+// the key holds and locks (D-F62): the layer stays on while any owner keeps
+// it. LAYER_OWNERSHIP_NO_LAYER releases it. A new layer turns on before the
+// one it replaces turns off.
+#define LAYER_OWNERSHIP_NO_LAYER UINT8_MAX
+bool    layer_ownership_set_pointing_mode_layer(uint8_t layer);
+uint8_t layer_ownership_pointing_mode_layer(void);
 
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer);
 bool layer_ownership_momentary_release(keypos_t key_pos);

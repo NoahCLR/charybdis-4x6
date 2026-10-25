@@ -3,8 +3,8 @@
 How one trackball report crosses the userspace on the master half: where the
 running pointing mode turns it into scrolling or directional actions, how the
 pointer layer and DPI follow, and how the slave half learns what runs. What a
-mode does (activation, locks, movements, outputs, button overrides, the
-pointer layer and DPI order) is the contract in
+mode does (activation, locks, linked layers, movements, outputs, the pointer
+layer and DPI order) is the contract in
 [pd-mode-domain-v1.md](../spec/pd-mode-domain-v1.md); the packet is
 [split-activity-sync.md](../spec/split-activity-sync.md#runtime-state-packets).
 How keys reach the pointing runtime is
@@ -66,17 +66,32 @@ buttons (where owned clicks land) and sends.
 ## Which mode runs
 
 Every change is one `pointing_mode_apply_command()`
-(`runtime/pointing_mode_state.c`): key press and release, lock and unlock, and
-the slave half's remote snapshot. Activating a pointing slot unlocks any other
-lock and ends any other held mode first. Owner keys are kept per key position
-and cleared on every change of mode.
+(`runtime/pointing_mode_state.c`): key press and release, lock and unlock, a
+change of the layers (`POINTING_MODE_COMMAND_LAYER_STATE`, from
+`noah_layer_state_set_user`), and the slave half's remote snapshot. Activating
+a pointing slot unlocks any other lock and ends any other held mode first.
+Owner keys are kept per key position and cleared on every change of mode.
+
+The running mode has a source, its key or its linked layer (D-F62). Linked
+layers are read from the effective slots (`pointing_mode_layer_started_mode`
+in `runtime/pointing_mode_registry.c`); the layer-state command applies them
+only while no key runs a mode, and every end of a key source (release, unlock,
+deactivate) evaluates them again, first letting go of the layer the mode
+brought so that layer change waits like any other. A mode its key runs brings
+its layer through `layer_ownership_set_pointing_mode_layer`; a mode its layer
+started brings none. A layer source started outside the hook turns the
+pointer layer off once the command is done, and the hook keeps it off. Before
+the pointing slots are republished the profile owner ends a layer-started
+mode, and evaluates the new links once every runtime has published
+(`owner_pd_invalidate` in `profile_owner.c`).
 
 `runtime/pointing_mode_lifecycle.c` carries each transition out:
 `pointing_mode_registry_run_activate_hooks` and `_deactivate_hooks` enter and
-exit the engine, which owns a scrolling slot's held modifiers and the buttons a
-mode consumed; a consumed button stays owned past exit until its release
-(`noah_pd_engine_pending_release`). Each transition also requests a DPI sync
-and traces itself. A changed local lock reaches the reducer through
+exit the engine, which owns a scrolling slot's held modifiers. A layer-started
+activation skips the auto-mouse side effects, and handing a key-started mode to
+its own layer (`pointing_mode_transition_hand_to_layer`) unlocks it without
+leaving the engine. Each transition also requests a DPI sync and traces
+itself. A changed local lock reaches the reducer through
 `pointing_mode_key_runtime_bridge_observe_local_lock_state`.
 
 ## The pointer layer
@@ -88,7 +103,7 @@ QMK rather than replacing it (D-F60).
 | --- | --- |
 | `noah_pointing_device_init_user` | targets `AUTO_MOUSE_DEFAULT_LAYER` and enables auto-mouse |
 | `is_mouse_record_user` → `pointer_layer_policy_is_mouse_key_record` | mouse keys, anchoring pointing keys, layer holds while an anchoring mode runs, keys whose behaviour is a mouse gesture, DPI keys; a press resolved from the pointer layer counts for its own record and settles in finalize |
-| `noah_layer_state_set_user` → `pointer_layer_policy_apply` | a prefer-typing mode strips the layer; the auto-sniping layer strips a separate pointer layer; otherwise any anchor (QMK's toggle, its key tracker, an anchoring mode) forces it on |
+| `noah_layer_state_set_user` → `pointer_layer_policy_apply` | after the linked layers have decided the mode: a prefer-typing mode strips the layer; an auto-sniping layer or a mode its layer started strips a separate pointer layer; otherwise any anchor (QMK's toggle, its key tracker, an anchoring mode its key runs) forces it on |
 | `pointing_mode_lifecycle.c` | a prefer-typing mode turns the layer off at activation; a locked anchoring mode adds one synthetic tracker count unless it owns QMK's toggle; a locked scrolling mode turns QMK's toggle on, and off at unlock only if it turned it on (registry lock hooks) |
 | `owned_keycode.c`, `held_repeat.c` | a mouse button they hold counts as a tracker key event (`pointer_layer_policy_note_action`) |
 
@@ -109,7 +124,9 @@ in the order the spec gives, reading BK's default and sniping DPI through
 ## The slave half
 
 The slave half runs no mode. `split/runtime_sync.c` samples the active and
-locked slot and their owner keys into the base packet; on the slave half the
+locked slot, whether the active mode shows its light
+(`pointing_mode_local_light_snapshot`) and their owner keys into the base
+packet; on the slave half the
 packet lands through `pointing_mode_apply_remote_mode_ids_with_owner_bitmap` in
 a double-banked remote display state, which `pointing_mode_snapshot().display`
 reads as one whole publication. Lighting reads that view on both halves.
@@ -119,10 +136,12 @@ reads as one whole publication. Lighting reads that view on both halves.
 - **One mode at a time**, on the master half only; the slave half only shows.
 - **The motion path reads no storage.** The engine trusts the latched slot,
   which stays unchanged until exit, since a new profile activates only once no
-  mode runs or holds a consumed button (`profile_activation_policy.c`).
-- **The engine owns nothing on the report** but its held modifiers and
-  consumed buttons. `noah_pd_engine_exit` releases every held modifier; a
-  consumed button stays consumed until `noah_pd_engine_key` sees its release.
+  key runs a mode (`profile_activation_policy.c`) and a layer-started mode
+  ends before the slots are republished.
+- **The engine owns nothing on the report** but its held modifiers.
+  `noah_pd_engine_exit` releases every held modifier.
+- **No link latches.** Only a mode its key runs owns a layer, and one slot
+  links each layer.
 
 ## Where a change goes
 
@@ -142,8 +161,9 @@ reads as one whole publication. Lighting reads that view on both halves.
 - Engine, movements and outputs: `run_pointing_mode_handlers_tests.sh`.
 - Activation, owners, locks, pointer layer and DPI: `run_pd_runtime_tests.sh`,
   `run_pointing_mode_tests.sh`, `run_pointer_layer_policy_tests.sh`.
-- Keys against the runtime, button overrides, held modifiers:
-  `run_pointing_mode_key_runtime_integration_tests.sh`.
+- Keys and linked layers against the runtime, mouse buttons in a mode, held
+  modifiers: `run_pointing_mode_key_runtime_integration_tests.sh`,
+  `run_layer_ownership_tests.sh`.
 - Slots from the profile: `run_pd_profile_integration_tests.sh`; the safe
   boundary: `run_profile_activation_policy_tests.sh`.
 - The slave half's view: `run_split_runtime_sync_tests.sh`,

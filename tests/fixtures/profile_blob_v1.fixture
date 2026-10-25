@@ -1,11 +1,11 @@
-# Shared schema 4.0 blob/action golden vectors (D-F28).
+# Shared schema 4.1 blob/action golden vectors (D-F28, D-F62).
 # Consumed by both the firmware C host suite and the Charybdis Ark JavaScript suite.
-blob.empty.hex=4e4c503104000001
-blob.empty.fnv1a32=9174b87b
-blob.empty.crc32=b2342ebb
-blob.ordered.hex=4e4c503104000201100404000000deadbeef200203000000000102
-blob.ordered.fnv1a32=a368f3ed
-blob.ordered.crc32=0cb8c141
+blob.empty.hex=4e4c503104010001
+blob.empty.fnv1a32=ce5b68a0
+blob.empty.crc32=b3f6448c
+blob.ordered.hex=4e4c503104010201100404000000deadbeef200203000000000102
+blob.ordered.fnv1a32=f84918bc
+blob.ordered.crc32=1b90a581
 action.NONE.operand=0
 action.NONE.hex=00000000
 action.QMK_KEYCODE.operand=4660

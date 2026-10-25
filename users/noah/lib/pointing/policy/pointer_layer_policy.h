@@ -24,6 +24,11 @@ bool          pointer_layer_policy_is_mouse_action(uint16_t action);
 void          pointer_layer_policy_note_action(uint16_t action, bool pressed);
 layer_state_t pointer_layer_policy_apply(layer_state_t state);
 
+// The auto-sniping layers that are on in `state`: none with its master switch
+// off. The one answer to "is a sniping layer on" for the layer-state hook,
+// DPI and the pointer layer strip.
+layer_state_t pointer_layer_policy_sniping_layers_on(layer_state_t state);
+
 // Layer locks belong to the runtime (layer_ownership), so a lock on the
 // pointer layer is the only thing that keeps it locked. The sync holds
 // QMK's auto-mouse on while that lock lasts, as a held mouse key would; it is
@@ -39,6 +44,7 @@ typedef struct {
     bool    prefers_typing_layer;
     bool    auto_mouse_toggle_enabled;
     bool    sniping_layer_active;
+    bool    layer_started_mode_active;
     int8_t  auto_mouse_key_tracker;
     uint8_t auto_mouse_layer;
 } pointer_layer_policy_debug_snapshot_t;

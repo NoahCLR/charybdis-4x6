@@ -166,7 +166,9 @@ bool rgb_runtime_pointing_mode_stage_render_active_profile_frame(rgb_runtime_fra
     snapshot    = pointing_mode_snapshot_with_owner_bitmap(owner_bitmap, &has_owner_keys);
     active_mode = snapshot.display.active_index;
     rgb_runtime_pointing_mode_stage_clear_frame(frame, led_min, led_max);
-    if (active_mode >= POINTING_MODE_COUNT || !rgb_active_profile_config_pd_stage_enabled(profile_frame) || !rgb_active_profile_config_pd_color(profile_frame, active_mode, &active_config)) {
+    // A mode its layer started leaves the layer's lighting showing unless its
+    // slot's light switch is on (D-F62); both halves read the same answer.
+    if (active_mode >= POINTING_MODE_COUNT || !snapshot.display.active_light || !rgb_active_profile_config_pd_stage_enabled(profile_frame) || !rgb_active_profile_config_pd_color(profile_frame, active_mode, &active_config)) {
         return false;
     }
     active_rgb = hsv_to_rgb(active_config.color);

@@ -804,61 +804,6 @@ void key_runtime_core_observe_process_record_event_with_row(uint16_t keycode, ke
     }
 }
 
-void key_runtime_core_offer_press_to_mode(keypos_t key_pos) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-
-    if (state && key_runtime_core_keypos_valid(key_pos)) {
-        key_origin_bitmap_add_keypos(state->pd_intercepted_bitmap, key_pos);
-    }
-}
-
-bool key_runtime_core_press_offered_to_mode(keypos_t key_pos) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-
-    return state && key_runtime_core_keypos_valid(key_pos) && key_origin_bitmap_has_keypos(state->pd_intercepted_bitmap, key_pos);
-}
-
-void key_runtime_core_end_mode_offer(keypos_t key_pos, bool consumed) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-    press_token_t            *token;
-    tap_series_t             *series;
-
-    if (!(state && key_runtime_core_keypos_valid(key_pos))) {
-        return;
-    }
-    if (!consumed) {
-        key_origin_bitmap_remove_keypos(state->pd_intercepted_bitmap, key_pos);
-        return;
-    }
-    token = key_runtime_core_press_token_state(state, key_pos);
-    if (!(token && token->active)) {
-        return;
-    }
-    key_runtime_core_release_leases_for_token(state, token->token_id);
-    // Reaching a mode takes another key's press, which already flushed any
-    // series this key had pending, so the series here counts only this press.
-    series = key_runtime_core_tap_series_state(state, key_pos);
-    if (series && series->active) {
-        key_runtime_core_tap_series_clear(state, series);
-    }
-    token->handled_key                 = false;
-    token->tap_outcome_available       = false;
-    token->pointing_mode_was_locked_on_press = false;
-    token->interaction                 = key_runtime_slot_interaction_default();
-    token->slot_phase                  = KEY_RUNTIME_SLOT_PHASE_IDLE;
-    key_runtime_core_shadow_projection_recompute(state);
-}
-
-bool key_runtime_core_take_intercepted_release(keypos_t key_pos) {
-    key_runtime_core_state_t *state = key_runtime_core_state();
-
-    if (!(state && key_runtime_core_keypos_valid(key_pos) && key_origin_bitmap_has_keypos(state->pd_intercepted_bitmap, key_pos))) {
-        return false;
-    }
-    key_origin_bitmap_remove_keypos(state->pd_intercepted_bitmap, key_pos);
-    return true;
-}
-
 void key_runtime_core_observe_scan_cycle(uint16_t now) {
     key_runtime_core_apply_event(&(runtime_event_t){.kind = RUNTIME_EVENT_KIND_SCAN}, now);
 }
@@ -933,8 +878,8 @@ static void key_runtime_core_apply_release_settlement(key_runtime_core_state_t *
 // (MO, TT, OSL, LM: its layer is on from the press, and another key's press
 // cancels its quick tap), and nothing a pointing mode owns. Another key's
 // press decides it (D-F27).
-static bool key_runtime_core_press_token_settles_on_other_press(const press_token_t *token, keypos_t token_key_pos) {
-    return token->handled_key && token->interaction.pointing_mode == 0 && !token->interaction.contract.suppress_tap_on_layer_interrupt && !key_runtime_slot_interaction_uses_fallback_hold(token->interaction) && !key_runtime_slot_interaction_uses_implicit_hold(token->interaction) && !key_runtime_core_press_token_hold_changes_other_keys(token) && !noah_action_desc_is_pointing_mode_action(noah_action_describe(token->interaction.binding.tap_action)) && !key_runtime_core_press_offered_to_mode(token_key_pos);
+static bool key_runtime_core_press_token_settles_on_other_press(const press_token_t *token) {
+    return token->handled_key && token->interaction.pointing_mode == 0 && !token->interaction.contract.suppress_tap_on_layer_interrupt && !key_runtime_slot_interaction_uses_fallback_hold(token->interaction) && !key_runtime_slot_interaction_uses_implicit_hold(token->interaction) && !key_runtime_core_press_token_hold_changes_other_keys(token) && !noah_action_desc_is_pointing_mode_action(noah_action_describe(token->interaction.binding.tap_action));
 }
 
 // The release action a hold that waits for release would send now, if its
@@ -965,7 +910,7 @@ static void key_runtime_core_settle_on_other_press(key_runtime_core_state_t *sta
     delayed_action_mods_t mods;
     bool                  tap_pending;
 
-    if (!key_runtime_core_press_token_settles_on_other_press(token, token_key_pos)) {
+    if (!key_runtime_core_press_token_settles_on_other_press(token)) {
         return;
     }
 

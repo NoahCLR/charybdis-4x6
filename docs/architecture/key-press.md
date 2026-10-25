@@ -82,27 +82,24 @@ false.
    reducer observes the event
    (`key_runtime_core_observe_process_record_event_with_row`), allocating the
    press token. Then, in order, each stage may end processing:
-   `synthetic_passthrough` → `pointing_mode_release` → `preflight` →
-   `release_slot_keycode` → `pointing_mode` → `handled_key` →
-   `non_handled_release_cleanup` → `direct_action` → `native_overlap` →
-   `idle_custom_key`.
+   `synthetic_passthrough` → `preflight` → `release_slot_keycode` →
+   `handled_key` → `non_handled_release_cleanup` → `direct_action` →
+   `native_overlap` → `idle_custom_key`.
 5. **Preflight** (`preflight.c`): the reducer's moment before a press,
    `key_runtime_core_settle_before_press()`, on a streaming plan: other active
    keys catch up missed scans, register due fallback holds and settle as taps
    (class 3 of D-F27); then pending tap series it ends are typed (a handled
    press ends only tap/hold keys' series; any other press ends all).
-6. **Pointing offer** (stage `pointing_mode`): the active pointing mode sees the
-   press before the behaviour. Consumed, the token becomes non-handled (below).
-7. **Handled press** (`press.c`): `key_runtime_core_handle_handled_key_press()`
+6. **Handled press** (`press.c`): `key_runtime_core_handle_handled_key_press()`
    plans into a buffered plan: flush a series the press cannot continue, unlock
    a pointing mode the key itself has locked, join the tap series, turn on a
    momentary layer, register a hold that goes on at the press. Planning returns
    before `key_runtime_transition_execute_event_plan()` projects.
-8. **Unhandled press**: `direct_action` dispatches layer and pointing locks,
+7. **Unhandled press**: `direct_action` dispatches layer and pointing locks,
    `TO()` and macros; `native_overlap` keeps a usage another owner holds
    without a second edge; `idle_custom_key` swallows a custom key with neither
    shortcut nor row; the rest go to QMK's default action.
-9. **Finalize** (`noah_process_record_user_finalize`): credit report
+8. **Finalize** (`noah_process_record_user_finalize`): credit report
    ownership to a press QMK processed, end the pointing mode's modifier mask,
    use up a one-shot layer by QMK's rule (MT excepted: its release planner
    plans `KEY_RUNTIME_EFFECT_LAYER_ONESHOT_CONSUME`), settle auto-mouse.
@@ -118,9 +115,7 @@ false.
    (D-F27, "Releases that wait"): they catch up missed scans and settle as
    taps, as at a press, but a release registers no fallback hold; only a press
    does (`key_runtime_core_interrupt_active_keys_on_other_press()`).
-3. The reducer observes the release by position. Stage `pointing_mode_release`
-   sends a release whose press a mode consumed to that mode, before preflight
-   can drop it. Preflight drops a native modifier release while another owner
+3. The reducer observes the release by position. Preflight drops a native modifier release while another owner
    still holds that modifier (`keyboard_mod_ownership_should_suppress_default`),
    still retiring the token's leases. Stage `release_slot_keycode` swaps in
    the token's `resolved_keycode`, so a layer change while held cannot change
@@ -188,18 +183,16 @@ tap replays the modifiers it was planned under
 (`keyboard_mod_policy_begin_action_replay`); every save, mask and replay of
 modifier state goes through `state/modifiers/keyboard_mod_policy.h`.
 
-Report ownership is settled after behaviours and modes had their turn: a press
-they consumed owns no native usage, so it cannot hold a managed owner's usage
+Report ownership is settled after behaviours had their turn: a press they
+consumed owns no native usage, so it cannot hold a managed owner's usage
 down. Finalize credits a press QMK processed; `native_overlap` credits a press
 whose redundant edge it suppressed; every credited release retires its owner.
 
 ## Pointing modes: where keys enter the pointing runtime
 
-- **Offer.** Stage `pointing_mode` calls `pointing_mode_handle_key_event()`
-  between `key_runtime_core_offer_press_to_mode()` and
-  `key_runtime_core_end_mode_offer()`. Modes consume only mouse buttons. A
-  consumed press stays down for others (it interrupted them) but runs no tap,
-  hold or tap series and owns no lease; its release goes to the mode.
+- **No offer.** A pointing mode takes no key press: mouse buttons run their
+  own behaviour in every mode (D-F62 retired the button overrides), and a
+  mode's own keys come from its linked layer, an ordinary layer.
 - **Masking.** Around each key event, the active mode's own modifiers are
   masked (`key_runtime_process_begin_keyboard_event_mod_mask`).
 - **Effects.** A held pointing keycode reaches `pointing_mode_handle_keycode_press_at()`
@@ -209,6 +202,10 @@ whose redundant edge it suppressed; every credited release retires its owner.
 - **The bridge back.** `pointing_mode_state.c` reports a changed local lock
   through `pointing_mode_key_runtime_bridge_observe_local_lock_state()`, the
   only way the pointing runtime writes into the reducer's shadow state.
+- **Layers.** A layer change from a key reaches the pointing runtime through
+  QMK's layer-state hook, where linked layers start and end their modes; a
+  mode its key runs brings its linked layer through `layer_ownership`, as one
+  more owner (D-F62).
 
 ## Invariants that span files
 
@@ -273,7 +270,7 @@ tapping queue.
   `run_key_runtime_physical_ownership_integration_tests.sh`,
   `run_key_runtime_layer_lock_integration_tests.sh`,
   `run_real_profile_thumb_layer_lock_integration_tests.sh`.
-- Pointing offer, bridge and admission: `run_pointing_mode_key_runtime_integration_tests.sh`.
+- Pointing keys, linked layers, the bridge and admission: `run_pointing_mode_key_runtime_integration_tests.sh`.
 - The real QMK combo and tapping engines, delayed records and the hold-gate
   guard: `run_qmk_gesture_pipeline_tests.sh`.
 - Adapters: `run_qmk_combo_origin_tests.sh`, `run_participation_tests.sh`,

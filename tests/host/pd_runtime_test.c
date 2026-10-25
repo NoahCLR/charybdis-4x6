@@ -9,6 +9,7 @@
 #include "users/noah/lib/pointing/modes/pointing_mode_configured.h"
 #include "users/noah/lib/pointing/modes/pointing_mode_handlers.h"
 #include "users/noah/lib/profile/runtime/active_profile_pd_runtime.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 #include "users/noah/lib/state/ownership/keyboard_mod_ownership.h"
 #include "host_runtime_reset_fixture.h"
 
@@ -78,6 +79,23 @@ static bool report_mouse_equal(report_mouse_t lhs, report_mouse_t rhs) {
     return lhs.x == rhs.x && lhs.y == rhs.y && lhs.h == rhs.h && lhs.v == rhs.v && lhs.buttons == rhs.buttons;
 }
 
+static uint8_t       brought_layer = UINT8_MAX;
+static layer_state_t held_layers;
+static uint32_t      sniping_layers_setting;
+static uint32_t      sniping_on_setting;
+
+// The active profile's settings, as far as the pointing runtime reads them.
+uint32_t noah_setting(uint8_t id, uint32_t fallback) {
+    switch (id) {
+        case NOAH_SETTING_AUTO_SNIPING_ENABLED:
+            return sniping_on_setting;
+        case NOAH_SETTING_AUTO_SNIPING_LAYERS:
+            return sniping_layers_setting;
+        default:
+            return fallback;
+    }
+}
+
 static void test_reset_runtime(void) {
     host_runtime_fixture_reset_userspace_runtime();
 }
@@ -85,6 +103,10 @@ static void test_reset_runtime(void) {
 static void test_reset_stubs(void) {
     host_runtime_fixture_reset(&runtime_fixture);
     test_reset_runtime();
+    brought_layer          = UINT8_MAX;
+    held_layers            = 0;
+    sniping_on_setting     = 1u;
+    sniping_layers_setting = (uint32_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER;
 
     current_cpi                        = 0;
     cpi_set_count                      = 0;
@@ -219,6 +241,21 @@ bool layer_ownership_is_held(uint8_t layer) {
     return false;
 }
 
+// The layer a running mode brings, as layer ownership would apply it: on
+// beside the layers the test holds, through the layer-state hook.
+static void test_apply_layers(void) {
+    layer_state_t state = held_layers | (brought_layer < 32u ? (layer_state_t)1u << brought_layer : 0u);
+
+    layer_state = noah_layer_state_set_user(state);
+}
+
+bool layer_ownership_set_pointing_mode_layer(uint8_t layer) {
+    if (layer == brought_layer) return false;
+    brought_layer = layer;
+    test_apply_layers();
+    return true;
+}
+
 void set_auto_mouse_layer(uint8_t layer) {
     auto_mouse_layer = layer;
 }
@@ -314,7 +351,6 @@ void noah_pd_engine_exit(void) {
     active_pd_record = NULL;
 }
 uint8_t noah_pd_engine_masked_mods(const noah_pd_config_t *slot) { (void)slot; return 0; }
-bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) { (void)keycode; (void)record; return false; }
 report_mouse_t noah_pd_engine_motion(report_mouse_t report) {
     if (!active_pd_record) return report;
     switch (active_pd_record->id) {
@@ -615,6 +651,31 @@ static void test_layer_state_set_enables_sniping_and_blocks_dpi_restore_while_sn
     CHECK(cpi_set_count == 1);
     CHECK((next & ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER)) != 0);
     CHECK((next & ((layer_state_t)1u << AUTO_MOUSE_DEFAULT_LAYER)) == 0);
+}
+
+// Auto-sniping runs while any of its layers is on and takes the sniping DPI;
+// its master switch turns all of them off without forgetting them.
+static void test_layer_state_set_snipes_on_every_sniping_layer(void) {
+    const uint8_t layers[] = {2, 6};
+
+    for (uint8_t index = 0; index < ARRAY_SIZE(layers); index++) {
+        test_reset_stubs();
+        sniping_layers_setting = ((uint32_t)1u << 2) | ((uint32_t)1u << 6);
+        (void)noah_layer_state_set_user(((layer_state_t)1u << 0) | ((layer_state_t)1u << layers[index]));
+        CHECK(pointing_mode_auto_sniping_layer_active());
+        pointing_mode_service_active_dpi_sync();
+        CHECK(current_cpi == sniping_dpi);
+    }
+
+    test_reset_stubs();
+    sniping_layers_setting = ((uint32_t)1u << 2) | ((uint32_t)1u << 6);
+    (void)noah_layer_state_set_user(((layer_state_t)1u << 0) | ((layer_state_t)1u << 5));
+    CHECK(!pointing_mode_auto_sniping_layer_active());
+    sniping_on_setting = 0u;
+    (void)noah_layer_state_set_user(((layer_state_t)1u << 0) | ((layer_state_t)1u << 6));
+    CHECK(!pointing_mode_auto_sniping_layer_active());
+    pointing_mode_service_active_dpi_sync();
+    CHECK(current_cpi == default_dpi);
 }
 
 static void test_is_mouse_record_user_delegates_pointer_layer_policy(void) {
@@ -949,6 +1010,7 @@ int main(void) {
     test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_after_sniping_drops();
     test_layer_state_set_strips_pointer_layer_for_arrow_mode();
     test_layer_state_set_enables_sniping_and_blocks_dpi_restore_while_sniping_layer_active();
+    test_layer_state_set_snipes_on_every_sniping_layer();
     test_is_mouse_record_user_delegates_pointer_layer_policy();
     test_an_empty_slot_hold_key_owns_nothing();
     test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset();

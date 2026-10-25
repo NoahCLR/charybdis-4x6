@@ -1130,6 +1130,7 @@ static void test_slave_combo_overlay_stays_visible_over_remote_pointing_mode(voi
     fake_is_master                           = false;
     layer_state                              = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.active_mode_id = pointing_mode_id_from_mask(POINTING_MODE_ARROW);
+    split_runtime_sync_remote.active_mode_light = 1u;
     test_feedback_bitmap_set(split_runtime_sync_remote.combo_overlay_bitmap, 4, 0);
 
     CHECK(render_output());
@@ -1144,6 +1145,7 @@ static void test_slave_combo_underlay_stays_below_remote_pointing_mode(void) {
     fake_is_master                           = false;
     layer_state                              = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.active_mode_id = pointing_mode_id_from_mask(POINTING_MODE_ARROW);
+    split_runtime_sync_remote.active_mode_light = 1u;
     test_feedback_bitmap_set(split_runtime_sync_remote.combo_underlay_bitmap, 4, 0);
 
     CHECK(render_output());
@@ -1158,6 +1160,7 @@ static void test_slave_frame_keeps_last_coherent_combo_snapshot(void) {
     fake_is_master                           = false;
     layer_state                              = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.active_mode_id = pointing_mode_id_from_mask(POINTING_MODE_ARROW);
+    split_runtime_sync_remote.active_mode_light = 1u;
     test_feedback_bitmap_set(split_runtime_sync_remote.combo_overlay_bitmap, 4, 0);
 
     CHECK(render_output());
@@ -1595,6 +1598,7 @@ static void test_slave_full_scene_preserves_remote_preview_and_locked_pointing_m
     layer_state                                 = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
     split_runtime_sync_remote.locked_mode_id    = pointing_mode_id_from_mask(POINTING_MODE_VOLUME);
+    split_runtime_sync_remote.active_mode_light = 1u;
     test_remote_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_LONG_HOLD_ACTIVE_FLASHING);
 
     CHECK(render_output());
@@ -1618,6 +1622,7 @@ static void test_slave_full_scene_feedback_overrides_remote_preview_and_locked_p
     layer_state                                 = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.key_preview_layer = LAYER_NUM;
     split_runtime_sync_remote.locked_mode_id    = pointing_mode_id_from_mask(POINTING_MODE_VOLUME);
+    split_runtime_sync_remote.active_mode_light = 1u;
     test_remote_feedback_semantic_add(0, 0, KEY_FEEDBACK_SEMANTIC_TAP_BRANCH_PENDING);
 
     CHECK(render_output());
@@ -1887,6 +1892,7 @@ static void test_slave_pointing_mode_overlay_uses_remote_display_state_and_trigg
     fake_is_master                                = false;
     layer_state                                   = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.active_mode_id      = pointing_mode_id_from_mask(POINTING_MODE_ZOOM);
+    split_runtime_sync_remote.active_mode_light = 1u;
     split_runtime_sync_remote.pointing_mode_owner_sides = SPLIT_SIDE_MASK_LEFT;
 
     CHECK(render_output());
@@ -1897,12 +1903,32 @@ static void test_slave_pointing_mode_overlay_uses_remote_display_state_and_trigg
     check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
 }
 
+// A mode its layer started on the master, light switch off: the slave half
+// shows the layer's lighting too, from the mirrored state alone (D-F62).
+static void test_slave_layer_started_mode_without_its_light_shows_the_layer(void) {
+    test_reset();
+
+    fake_is_master                                      = false;
+    layer_state                                         = (layer_state_t)1u << LAYER_SYM;
+    split_runtime_sync_remote.active_mode_id            = pointing_mode_id_from_mask(POINTING_MODE_ZOOM);
+    split_runtime_sync_remote.active_mode_light         = 0u;
+    split_runtime_sync_remote.pointing_mode_owner_sides = SPLIT_SIDE_MASK_LEFT;
+
+    CHECK(render_output());
+
+    check_led(0, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(3, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(4, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+    check_led(7, rgb_from_hsv(layer_colors[LAYER_SYM].color));
+}
+
 static void test_slave_pointing_mode_overlay_uses_remote_trigger_keys(void) {
     test_reset();
 
     fake_is_master                           = false;
     layer_state                              = (layer_state_t)1u << LAYER_SYM;
     split_runtime_sync_remote.active_mode_id = pointing_mode_id_from_mask(POINTING_MODE_PINCH);
+    split_runtime_sync_remote.active_mode_light = 1u;
     key_origin_bitmap_fill_single(split_runtime_sync_remote.pointing_mode_owner_bitmap, (keypos_t){.row = 4, .col = 1});
 
     CHECK(render_output());
@@ -2093,6 +2119,7 @@ static void test_slave_locked_pointing_mode_clamps_remote_automouse_progress(voi
     layer_state                                  = (layer_state_t)1u << LAYER_POINTER;
     split_runtime_sync_remote.automouse_progress = AUTOMOUSE_RGB_ACTIVE_SPAN / 2u;
     split_runtime_sync_remote.locked_mode_id     = pointing_mode_id_from_mask(POINTING_MODE_VOLUME);
+    split_runtime_sync_remote.active_mode_light = 1u;
 
     CHECK(render_output());
 
@@ -2558,6 +2585,7 @@ int main(int argc, char **argv) {
     test_pointing_mode_overlay_paints_trigger_keys_on_master();
     test_pointing_mode_overlay_trigger_keys_falls_back_both_without_owner();
     test_slave_pointing_mode_overlay_uses_remote_display_state_and_trigger_half();
+    test_slave_layer_started_mode_without_its_light_shows_the_layer();
     test_slave_pointing_mode_overlay_uses_remote_trigger_keys();
     test_automouse_uses_configured_target_layer();
     test_disabled_automouse_paints_plain_layer_lighting();

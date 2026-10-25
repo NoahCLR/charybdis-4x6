@@ -30,7 +30,7 @@ enum {
 // Every profile the keyboard runs carries its pointing slots (the PD domain);
 // this one carries it with every slot disabled.
 static const uint8_t compiled_blob[] = {
-    'N', 'L', 'P', '1', 4u, 0u, 1u, 1u,
+    'N', 'L', 'P', '1', 4u, 1u, 1u, 1u,
     NOAH_PROFILE_DOMAIN_V1_PD, NOAH_PROFILE_DOMAIN_VERSION_PD, NOAH_PROFILE_PD_V1_HEADER_SIZE, 0u, 0u, 0u,
     NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0u, 0u, 0u, 0u, 0u,
 };
@@ -456,7 +456,7 @@ static void write_u32(uint8_t *target, uint32_t value) {
 // A host's Apply begins: the candidate declared, no bytes sent yet.
 static void begin_candidate(uint16_t transaction_id) {
     uint8_t frame[NOAH_PROFILE_WIRE_V1_REPORT_SIZE] = {
-        NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET, NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, (uint8_t)transaction_id, (uint8_t)(transaction_id >> 8u), NOAH_PROFILE_SCHEMA_MAJOR, 0u, 0u,
+        NOAH_PROFILE_CANDIDATE_V1_COMMAND_SET, NOAH_PROFILE_WIRE_V1_CUSTOM_CHANNEL, NOAH_PROFILE_CANDIDATE_V1_VALUE_BEGIN, (uint8_t)transaction_id, (uint8_t)(transaction_id >> 8u), NOAH_PROFILE_SCHEMA_MAJOR, NOAH_PROFILE_SCHEMA_MINOR, 0u,
     };
 
     write_u32(&frame[8], sizeof(compiled_blob));

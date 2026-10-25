@@ -5,12 +5,16 @@
 
 #include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/lib/pointing/policy/pointer_layer_policy.h"
+#include "users/noah/lib/profile/runtime/active_profile_settings_runtime.h"
 #include "users/noah/lib/compat/qmk_tapping_contract.h"
 
 static bool                 fake_auto_mouse_toggle;
 static int8_t               fake_auto_mouse_key_tracker;
 static uint8_t              fake_auto_mouse_layer;
 static pointing_mode_mask_t fake_active_modes;
+static pointing_mode_source_t fake_active_source;
+static uint32_t             fake_sniping_enabled;
+static uint32_t             fake_sniping_layers;
 static uint8_t              auto_mouse_keyevent_calls;
 static bool                 auto_mouse_keyevent_pressed[8];
 static uint16_t             fake_anchored_behavior_keycode;
@@ -41,6 +45,9 @@ static void test_reset_stubs(void) {
     fake_auto_mouse_key_tracker    = 0;
     fake_auto_mouse_layer          = 4;
     fake_active_modes              = 0;
+    fake_active_source             = POINTING_MODE_SOURCE_KEY;
+    fake_sniping_enabled           = 1u;
+    fake_sniping_layers            = (uint32_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER;
     auto_mouse_keyevent_calls      = 0;
     layer_state                    = 0;
     fake_anchored_behavior_keycode = KC_NO;
@@ -145,6 +152,18 @@ bool pointing_mode_has_trait(pointing_mode_mask_t mode, pointing_mode_traits_t t
     return (mode_traits & trait) == trait;
 }
 
+// The active profile's settings, as far as the policy reads them.
+uint32_t noah_setting(uint8_t id, uint32_t fallback) {
+    switch (id) {
+        case NOAH_SETTING_AUTO_SNIPING_ENABLED:
+            return fake_sniping_enabled;
+        case NOAH_SETTING_AUTO_SNIPING_LAYERS:
+            return fake_sniping_layers;
+        default:
+            return fallback;
+    }
+}
+
 pointing_mode_snapshot_t pointing_mode_snapshot(void) {
     pointing_mode_snapshot_t snapshot = {
         .local.active_mode    = fake_active_modes,
@@ -174,7 +193,8 @@ pointing_mode_snapshot_t pointing_mode_snapshot(void) {
         }
     }
 
-    snapshot.display = snapshot.local;
+    snapshot.local.active_source = fake_active_modes != 0 ? fake_active_source : POINTING_MODE_SOURCE_NONE;
+    snapshot.display             = snapshot.local;
     return snapshot;
 }
 
@@ -419,6 +439,56 @@ static void test_sniping_layer_blocks_anchored_auto_mouse_restore_when_pointer_m
     CHECK((next & ((layer_state_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER)) != 0);
 }
 
+// Auto-sniping follows a set of layers: each one that is on strips a separate
+// pointer layer, and its master switch turns all of them off.
+static void test_every_sniping_layer_strips_the_pointer_layer(void) {
+    const layer_state_t pointer = (layer_state_t)1u << 4;
+
+    test_reset_stubs();
+    fake_auto_mouse_layer = 4;
+    fake_auto_mouse_toggle = true;
+    fake_sniping_layers   = ((uint32_t)1u << 2) | ((uint32_t)1u << 7);
+
+    CHECK((pointer_layer_policy_apply(((layer_state_t)1u << 2) | pointer) & pointer) == 0);
+    CHECK((pointer_layer_policy_apply(((layer_state_t)1u << 7) | pointer) & pointer) == 0);
+    CHECK((pointer_layer_policy_apply(((layer_state_t)1u << 5) | pointer) & pointer) != 0);
+    CHECK(pointer_layer_policy_sniping_layers_on(((layer_state_t)1u << 7) | ((layer_state_t)1u << 5)) == ((layer_state_t)1u << 7));
+
+    fake_sniping_enabled = 0u;
+    CHECK(pointer_layer_policy_sniping_layers_on(((layer_state_t)1u << 2) | ((layer_state_t)1u << 7)) == 0u);
+    CHECK((pointer_layer_policy_apply(((layer_state_t)1u << 7) | pointer) & pointer) != 0);
+
+    // The pointer layer as a sniping layer strips nothing.
+    fake_sniping_enabled = 1u;
+    fake_sniping_layers  = pointer;
+    CHECK((pointer_layer_policy_apply(pointer) & pointer) != 0);
+}
+
+// A mode its layer started never anchors the pointer layer and strips a
+// separate one, whatever anchors it (D-F62).
+static void test_a_layer_started_mode_strips_the_pointer_layer(void) {
+    const layer_state_t pointer = (layer_state_t)1u << 4;
+    const layer_state_t linked  = (layer_state_t)1u << 6;
+
+    test_reset_stubs();
+    fake_auto_mouse_layer = 4;
+    fake_active_modes     = POINTING_MODE_VOLUME;
+    fake_active_source    = POINTING_MODE_SOURCE_LAYER;
+
+    CHECK(!pointer_layer_policy_is_mouse_record(MO(1)));
+    CHECK((pointer_layer_policy_apply(linked | pointer) & pointer) == 0);
+    CHECK((pointer_layer_policy_apply(linked) & pointer) == 0);
+    fake_auto_mouse_toggle = true;
+    CHECK((pointer_layer_policy_apply(linked | pointer) & pointer) == 0);
+    CHECK((pointer_layer_policy_apply(linked | pointer) & linked) != 0);
+
+    // The same mode from its key anchors the pointer layer as before.
+    fake_auto_mouse_toggle = false;
+    fake_active_source     = POINTING_MODE_SOURCE_KEY;
+    CHECK(pointer_layer_policy_is_mouse_record(MO(1)));
+    CHECK((pointer_layer_policy_apply(linked) & pointer) != 0);
+}
+
 static void test_debug_snapshot_reports_effective_anchor_inputs(void) {
     pointer_layer_policy_debug_snapshot_t snapshot;
 
@@ -608,6 +678,8 @@ int main(void) {
     test_sniping_layer_strips_pointing_mode_anchored_auto_mouse_layer();
     test_sniping_layer_strips_key_tracker_anchored_auto_mouse_layer();
     test_sniping_layer_blocks_anchored_auto_mouse_restore_when_pointer_missing();
+    test_every_sniping_layer_strips_the_pointer_layer();
+    test_a_layer_started_mode_strips_the_pointer_layer();
     test_debug_snapshot_reports_effective_anchor_inputs();
     test_pointer_layer_lock_anchors_auto_mouse_once();
     test_layer_lock_anchor_needs_the_auto_mouse_layer_and_auto_mouse_on();

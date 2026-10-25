@@ -39,6 +39,9 @@ typedef struct __attribute__((packed)) {
     uint16_t           automouse_progress;
     pointing_mode_id_t active_mode_id;
     pointing_mode_id_t locked_mode_id;
+    // Whether the active mode shows its own light (D-F62): a mode its layer
+    // started shows the layer's unless its slot says otherwise.
+    uint8_t active_mode_light;
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
     uint8_t pointing_mode_owner_sides;
     uint8_t pointing_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -65,6 +68,7 @@ typedef struct {
     uint16_t           automouse_progress;
     pointing_mode_id_t active_mode_id;
     pointing_mode_id_t locked_mode_id;
+    uint8_t            active_mode_light;
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
     uint8_t pointing_mode_owner_sides;
     uint8_t pointing_mode_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -122,6 +126,7 @@ typedef struct {
             .automouse_progress                   = 0,                                       \
             .active_mode_id                       = POINTING_MODE_ID_NONE,                   \
             .locked_mode_id                       = POINTING_MODE_ID_NONE,                   \
+            .active_mode_light                    = 0,                                       \
             .pointing_mode_owner_sides            = SPLIT_SIDE_MASK_NONE,                    \
             .pointing_mode_owner_bitmap           = {0},                                     \
             .key_preview_layer                    = UINT8_MAX,                               \
@@ -142,6 +147,7 @@ typedef struct {
             .automouse_progress                   = 0,                                       \
             .active_mode_id                       = POINTING_MODE_ID_NONE,                   \
             .locked_mode_id                       = POINTING_MODE_ID_NONE,                   \
+            .active_mode_light                    = 0,                                       \
             .key_preview_layer                    = UINT8_MAX,                               \
             .combo_underlay_bitmap                = {0},                                     \
             .combo_overlay_bitmap                 = {0},                                     \

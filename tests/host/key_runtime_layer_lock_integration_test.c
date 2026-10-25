@@ -408,12 +408,6 @@ bool pointing_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos)
     return pointing_mode_handle_keycode_release(keycode);
 }
 
-bool pointing_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-    return false;
-}
-
 pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
     (void)keycode;
     return 0;

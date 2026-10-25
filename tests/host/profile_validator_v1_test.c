@@ -207,7 +207,7 @@ static void test_golden_incremental_phases(const char *fixture_path) {
 
 static void test_identity_capacity_and_masks(const char *fixture_path) {
     uint8_t                                   full[TEST_BUFFER_SIZE];
-    uint8_t                                   empty[NOAH_PROFILE_BLOB_V1_HEADER_SIZE] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
+    uint8_t                                   empty[NOAH_PROFILE_BLOB_V1_HEADER_SIZE] = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
     size_t                                    full_length                             = fixture_hex(fixture_path, "profile.full.hex", full, sizeof(full));
     noah_profile_validator_v1_compatibility_t compatible                              = compatibility();
     noah_profile_validator_v1_declaration_t   declaration                             = declaration_for(full, full_length, (NOAH_PROFILE_VALIDATOR_V1_DOMAIN_RGB | NOAH_PROFILE_VALIDATOR_V1_DOMAIN_KEY_BEHAVIORS));
@@ -220,9 +220,9 @@ static void test_identity_capacity_and_masks(const char *fixture_path) {
     expect_result(noah_profile_validator_v1_begin(&validator, &reader, 0u, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_ACTION_ABI);
     assert(state.calls == 0u);
     declaration.action_abi_digest--;
-    declaration.schema_minor = 1u;
+    declaration.schema_minor = NOAH_PROFILE_SCHEMA_MINOR + 1u;
     expect_result(noah_profile_validator_v1_begin(&validator, &reader, 0u, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INCOMPATIBLE_SCHEMA);
-    declaration.schema_minor = 0u;
+    declaration.schema_minor = NOAH_PROFILE_SCHEMA_MINOR;
     declaration.flags        = 1u;
     expect_result(noah_profile_validator_v1_begin(&validator, &reader, 0u, &declaration, &compatible, &error), NOAH_PROFILE_VALIDATOR_V1_INVALID_BLOB);
     declaration.flags        = 0u;
@@ -464,7 +464,7 @@ static size_t combo_row(uint8_t *out, uint8_t inputs, uint8_t flags, uint16_t te
     return (size_t)(p - out);
 }
 static size_t combo_profile(uint8_t *bytes, uint8_t rows, uint8_t inputs, uint16_t domain_length) {
-    const uint8_t head[] = {'N', 'L', 'P', '1', 4, 0, 1, 1, 0x30, NOAH_PROFILE_DOMAIN_VERSION_COMBOS, (uint8_t)domain_length, (uint8_t)(domain_length >> 8), 0, 0, rows, 0, 0, 0, 60, 0, 200, 0};
+    const uint8_t head[] = {'N', 'L', 'P', '1', 4, 1, 1, 1, 0x30, NOAH_PROFILE_DOMAIN_VERSION_COMBOS, (uint8_t)domain_length, (uint8_t)(domain_length >> 8), 0, 0, rows, 0, 0, 0, 60, 0, 200, 0};
     size_t        length = sizeof(head);
     memcpy(bytes, head, sizeof(head));
     for (unsigned row = 0; row < rows; row++)
@@ -571,7 +571,7 @@ static void test_combo_domain(void) {
 
 // Rows of different lengths, the default window, and retired versions.
 static void test_combo_domain_v3(void) {
-    uint8_t bytes[8 + 6 + 8 + 20 + 24] = {'N', 'L', 'P', '1', 4, 0, 1, 1, 0x30, NOAH_PROFILE_DOMAIN_VERSION_COMBOS, 52, 0, 0, 0, 2, 0, 0, 0, 60, 0, 150, 0};
+    uint8_t bytes[8 + 6 + 8 + 20 + 24] = {'N', 'L', 'P', '1', 4, 1, 1, 1, 0x30, NOAH_PROFILE_DOMAIN_VERSION_COMBOS, 52, 0, 0, 0, 2, 0, 0, 0, 60, 0, 150, 0};
     combo_row(&bytes[22], 2, 0, 0, 0xffffu, 41, 4);  // follows the default window
     combo_row(&bytes[42], 3, 6, 45, 0x0005u, 41, 6); // its own window, tap and order, layers 0 and 2
     noah_profile_validator_v1_compatibility_t compatible = compatibility();
@@ -671,7 +671,7 @@ static void test_combo_native_rule(void) {
 
 // A profile of one domain: the blob header, its 6-byte envelope, its payload.
 static size_t single_domain_profile(uint8_t *bytes, uint8_t id, uint8_t version, const uint8_t *payload, uint32_t length) {
-    const uint8_t head[] = {'N', 'L', 'P', '1', 4, 0, 1, 1, id, version, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), (uint8_t)(length >> 24)};
+    const uint8_t head[] = {'N', 'L', 'P', '1', 4, 1, 1, 1, id, version, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), (uint8_t)(length >> 24)};
     memcpy(bytes, head, sizeof(head));
     memcpy(&bytes[sizeof(head)], payload, length);
     return sizeof(head) + length;

@@ -1,9 +1,9 @@
 # Pointing domain `0x50`
 
-Domain `0x50`, version 3, holds the profile's 32 pointing slots: what each
+Domain `0x50`, version 4, holds the profile's 32 pointing slots: what each
 pointing mode is, how its movement turns ball motion into scrolling or
-directional actions, and what its mouse-button overrides do. This file also
-states how the firmware runs a pointing mode. The domain id, envelope and the
+directional actions, and the layer it is linked to. This file also states how
+the firmware runs a pointing mode. The domain id, envelope and the
 four-byte action encoding are [blob and digests](profile-wire-v1/blob-and-digests.md)'s;
 where the domain is stored and which domains a half admits is the
 [device-resident profile](device-resident-profile.md)'s; each slot's colour is
@@ -15,8 +15,9 @@ the slave half is the [split runtime state](split-activity-sync.md)'s.
 The keyboard has 32 pointing slots, ids `0..31`. A slot holds a pointing mode
 or is empty. Keys reach a slot by its id, so a slot keeps its keys when its
 mode changes, and nothing depends on a slot's name. One pointing mode runs at
-a time; outside a mode the ball moves the pointer. Auto-sniping is a layer and
-DPI policy and uses no slot.
+a time, started by its key or by its [linked layer](#linked-layers); outside a
+mode the ball moves the pointer. Auto-sniping is a layer and DPI policy and
+uses no slot.
 
 The pointing domain is required in every profile the keyboard validates
 (`MISSING_DOMAIN` otherwise, [errors](profile-wire-v1/errors.md#validation-results)).
@@ -60,7 +61,7 @@ bytes, at most 4,104.
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | version, `3` |
+| 0 | 1 | version, `4` |
 | 1 | 1 | slot capacity, `32` |
 | 2 | 1 | record size, `128` |
 | 3 | 1 | record count `n`, `0..32` |
@@ -68,14 +69,14 @@ bytes, at most 4,104.
 
 | Refusal | Offset | When |
 | --- | ---: | --- |
-| `INVALID_HEADER` | 0, 1, 2 | a byte other than `3`, `32`, `128` |
+| `INVALID_HEADER` | 0, 1, 2 | a byte other than `4`, `32`, `128` |
 | `INVALID_HEADER` | 3 | a count above 32 |
 | `RESERVED` | 4..7 | the first nonzero reserved byte |
 | `INVALID_LENGTH` | 0 | a payload shorter than 8 bytes, or a length other than `8 + 128 × n` |
 
-The empty domain is `03 20 80 00 00 00 00 00`: every slot empty with no name.
+The empty domain is `04 20 80 00 00 00 00 00`: every slot empty with no name.
 
-Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`), `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integration_test.c`), `tests/fixtures/pd_mode_domain_v3.json`.
+Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`), `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integration_test.c`), `tests/fixtures/pd_mode_domain_v4.json`.
 
 ## Records
 
@@ -93,10 +94,13 @@ strictly ascending id, each below 32.
 | 6 | 1 | held modifiers (scrolling); zero in directional modes |
 | 7 | 1 | reserved, zero |
 | 8 | 1 | name length in bytes, `0..32` |
-| 9 | 23 | reserved, zero |
+| 9 | 1 | linked layer, `0..15` ([linked layers](#linked-layers)) |
+| 10 | 1 | link direction: no link `0`; bit 0 the mode turns its layer on, bit 1 the layer turns its mode on; both `3` |
+| 11 | 1 | link light: `1` shows the mode's own light when its layer starts it, `0` the layer's |
+| 12 | 20 | reserved, zero |
 | 32, 34 | 2 each | directional thresholds X and Y, in sensor counts |
 | 36, 40, 44, 48 | 4 each | taps: left, right, up, down |
-| 52, 58, 64 | 6 each | mouse buttons 1, 2, 3 |
+| 52 | 18 | reserved, zero: version 3's mouse button records |
 | 70 | 20 | scrolling or directional fields, below |
 | 90 | 6 | reserved, zero |
 | 96 | 32 | name, UTF-8, `length` bytes, the rest zero |
@@ -128,7 +132,7 @@ The record is the C structure `noah_pd_config_t` byte for byte:
 `profile_pd_v1.c` asserts every field's offset against this table, its
 alignment and little-endian byte order.
 
-Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`), `tests/fixtures/pd_mode_domain_v3.json`.
+Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`), `tests/fixtures/pd_mode_domain_v4.json`.
 
 ## Record rules
 
@@ -138,12 +142,16 @@ record-relative inside a record and payload-relative for the whole domain:
 | Refusal | Offset | When |
 | --- | ---: | --- |
 | `INVALID_ID` | 0 | an id at or past 32, or not above the previous record's |
-| `RESERVED` | 7, 9 or 90 | a nonzero reserved byte |
+| `RESERVED` | 7, 12, 52 or 90 | a nonzero reserved byte: 7, 12..31, 52..69 or 90..95 |
 | `INVALID_NAME` | 8 | a name that breaks [the name rule](#names) |
 | `INVALID_POLICY` | 1 | kind above 2, pointer layer above 1, or axis above 3 |
-| `INVALID_PARAMETER` | 2 | an empty slot with any nonzero byte in 2..6 or 32..89 |
+| `INVALID_POLICY` | 10 | a link direction above 3 |
+| `INVALID_POLICY` | 11 | a link light above 1 |
+| `INVALID_PARAMETER` | 2 | an empty slot with any nonzero byte in 2..6, 9..11 or 32..89: an empty slot has no link |
 | `INVALID_NAME` | 8 | a mode with an empty name |
-| `INVALID_ACTION` | tap or button | a straight-direction tap or a button record that breaks [taps](#taps) or [mouse buttons](#mouse-buttons) |
+| `INVALID_PARAMETER` | 9 | a linked layer at or past 16, or a direction of `0` with a nonzero layer or light: no link leaves bytes 9..11 zero |
+| `INVALID_PARAMETER` | 11 | the link light without bit 1 of the direction |
+| `INVALID_ACTION` | tap | a straight-direction tap that breaks [taps](#taps) |
 | `NONCANONICAL` | 1 | a present record that is empty with no name |
 
 Then, by kind:
@@ -167,11 +175,18 @@ Then, by kind:
   are each at least 1:1; sustain does not exceed start; decay is at least 2;
   invert is at most 3. Held modifiers are any modifier mask.
 
+Across records, no two slots name one layer, whichever way each link goes: a
+record whose link names a layer an earlier record's link names is refused
+`INVALID_PARAMETER` at its byte 9. A slot without a link names no layer, so
+its zero layer byte repeats freely. One slot per layer keeps links from
+starting each other in a chain (D-F62,
+[ADR](../adr/0062-pointing-slots-link-to-layers.md)).
+
 Integer bounds are otherwise the fields' widths. Validation reads the header
 in one step, then each record in steps of at most 20 bytes, and holds no more
-than one record.
+than one record and a 16-bit mask of the layers earlier links name.
 
-Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`, `check_sparse_rules`, `test_bounded_iterator`), `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integration_test.c`), `tests/fixtures/pd_mode_domain_v3.json` (`invalid`).
+Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`, `check_sparse_rules`, `check_links`, `check_retired_buttons`, `test_bounded_iterator`), `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integration_test.c`), `tests/fixtures/pd_mode_domain_v4.json` (`invalid`, the `link-*`, `duplicate-linked-layer` and `retired-button-record` vectors).
 
 ## Names
 
@@ -181,7 +196,7 @@ control or DEL, a length that does not cut a sequence, and zero bytes after
 it. A full 32-byte name has no terminator. A mode needs a name; an empty slot
 may keep one, and is then stored.
 
-Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`, `check_names`), `tests/fixtures/pd_mode_domain_v3.json` (`longest-name`, the `name-*` vectors).
+Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`, `check_names`), `tests/fixtures/pd_mode_domain_v4.json` (`longest-name`, the `name-*` vectors).
 
 ## Taps
 
@@ -207,23 +222,18 @@ acceleration, modified mouse buttons, modified consumer or system codes,
 layer and pointing keycodes, custom keys. No output of a mode can activate a
 mode or leave a hold unbalanced.
 
-Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`), `tests/fixtures/pd_mode_domain_v3.json` (`mouse-buttons`, `macros`, `mouse-movement-tap`, `modified-mouse-button-tap`, `macro-*`).
+Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`), `tests/fixtures/pd_mode_domain_v4.json` (`mouse-buttons`, `macros`, `mouse-movement-tap`, `modified-mouse-button-tap`, `macro-*`).
 
-## Mouse buttons
+## Mouse buttons in a mode
 
-Each of buttons 1–3 has a six-byte record that applies while the mode runs:
+Mouse buttons 1–3 run as they would without a mode, in every mode: their own
+behaviour, its tap, hold and repeat. Version 3's per-mode button overrides
+(pass through, consume, tap, hold modifiers) are retired; a mode gets its own
+keys from its [linked layer](#linked-layers) instead (D-F62). A mode still
+clicks buttons from its movement ([D-F22](../adr/0022-pointing-modes-click-mouse-buttons.md),
+[outputs](#outputs)).
 
-| Offset | Size | Field |
-| ---: | ---: | --- |
-| 0 | 1 | kind: pass through `0`, consume `1`, tap `2`, hold modifiers `3` |
-| 1 | 1 | modifiers |
-| 2 | 4 | tap |
-
-Pass through and consume have bytes 1..5 zero. Tap has modifiers zero and a
-nonempty valid tap. Hold modifiers has a nonzero modifier mask and the tap
-zero. Kind above 3 is refused. Both movements use button records.
-
-Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`), `tests/fixtures/pd_mode_domain_v3.json` (`mouse-buttons`).
+Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_mouse_buttons_run_their_behaviour_in_every_mode`).
 
 ## Compiled defaults
 
@@ -236,19 +246,22 @@ The compiled domain stores the slots that hold a mode or a name:
 | 1 | Volume | vertical, threshold 60 | volume up / down, DPI 400 |
 | 2 | Brightness | vertical, threshold 60 | brightness up / down, DPI 400 |
 | 3 | Zoom | vertical, threshold 80 | Cmd = / Cmd −, DPI 400 |
-| 4 | Arrow | dominant axis, thresholds 40 / 50 | arrows, up and down hiding both Alts; button 1 holds right Shift, buttons 2 and 3 Cmd C and Cmd V exact; prefers typing; DPI 400 |
+| 4 | Arrow | dominant axis, thresholds 40 / 50 | arrows, up and down hiding both Alts; prefers typing; DPI 400 |
 | 5 | Pinch | scrolling, vertical only | holds left Cmd; DPI 100 |
 | 6 | Undo / Redo | horizontal, threshold 40 | Cmd Z / Shift Cmd Z, DPI 100 |
 | 7 | Back / Forward | horizontal, threshold 60 | mouse buttons 4 / 5, once per movement |
 | 8–31 | — | empty | not stored |
 
-Both scrolling slots take their tuning from the userspace `NOAH_DRAGSCROLL_*`
-values. The compiled encoder and validators are the ones every profile uses;
+No compiled slot has a link. Both scrolling slots take their tuning from the
+userspace `NOAH_DRAGSCROLL_*` values. The compiled encoder and validators are the ones every profile uses;
 the compiled domain is checked against the golden compiled profile.
 
-Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, `tests/fixtures/compiled_profile_pd_v2.fixture`), `tests/fixtures/pd_mode_domain_v3.json` (`presets`), `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integration_test.c`).
+Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, `tests/fixtures/compiled_profile_pd_v2.fixture`), `tests/fixtures/pd_mode_domain_v4.json` (`presets`), `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integration_test.c`).
 
 ## Activation and locks
+
+A running mode has a source: its key, held or locked as below, or its
+[linked layer](#linked-layers). These rules are a key source's.
 
 - Pressing `PD_SLOT_n` activates slot `n` while it is held; the mode ends
   when the last key holding it is released. Two keys may hold one mode; the
@@ -258,13 +271,45 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 - Pressing a slot's hold key while that slot is locked unlocks it; the mode
   stays on until the key is released.
 - Activating or locking a slot first unlocks any other locked mode and ends
-  any other held mode. The new mode's owner keys replace the old one's.
+  any other held mode, or a mode a layer started. The new mode's owner keys
+  replace the old one's.
 - A slot with no mode never activates: its keys are inert and own nothing.
+- When a key source ends, the [layer links](#linked-layers) decide what runs
+  next.
 
 Changing modes releases only the old mode's outputs and clears its banked
 motion, axis and movement state.
 
 Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_an_empty_slot_hold_key_owns_nothing`, the owner tests), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_interrupted_locked_pointing_mode_press_unlocks_on_press_and_releases_momentary_hold`, `test_upper_slot_hold_lock_dpi_and_disabled_slot`, `test_last_slot_hold_lock_dpi_and_disabled_slot`).
+
+## Linked layers
+
+A slot that holds a mode may be linked to one layer, its linked layer, in a
+direction: the mode turns its layer on (bit 0), the layer turns its mode on
+(bit 1), or both (D-F62, [ADR](../adr/0062-pointing-slots-link-to-layers.md)).
+
+- **The layer starts its mode.** While no key runs a mode, the highest layer
+  that is on and whose slot's link turns its mode on runs that mode; when no
+  such layer is on, no mode runs. The links are evaluated again whenever the
+  layers change and whenever a key source ends, so letting go of a mode key
+  on a linked layer returns to that layer's mode, and a locked layer keeps its
+  mode until it is unlocked. A mode its layer started is never locked.
+- **A key source beats a layer source.** While a key holds or locks a mode,
+  the links wait. Pressing a mode's key while its layer runs it makes the key
+  its source, held or locked as today, with a key-started mode's pointer
+  layer side effects; when the key lets go and the layer still starts it, it
+  keeps running from the layer without restarting.
+- **The mode brings its layer.** A mode its key runs, through a link that
+  turns its layer on, owns that layer for as long as it runs, held or locked,
+  as one more layer owner beside the key holds and locks: the layer stays on
+  while any owner keeps it. A mode its layer started owns no layer, so a
+  two-way link never keeps itself on: letting go of either key leaves
+  neither on.
+- **Inert links.** A link to the pointer layer (settings scalar 5) or to a
+  default layer (scalar 23) starts nothing and brings nothing; this domain
+  cannot see the settings, so validation admits it.
+
+Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_a_linked_layer_runs_its_mode`, `test_a_key_source_beats_a_layer_source`, `test_a_key_started_mode_brings_its_layer`, `test_a_two_way_link_never_latches`, `test_a_key_taking_over_a_layer_started_mode_anchors_as_from_nothing`, `test_links_to_the_pointer_layer_or_a_default_layer_are_inert`), `tests/host/run_layer_ownership_tests.sh` (`layer_ownership_test.c`, `test_a_pointing_mode_owns_its_layer_beside_holds_and_locks`).
 
 ## Pointer layer and DPI
 
@@ -272,15 +317,34 @@ Pointer layer `0` keeps the pointer layer on while the mode runs: a locked
 mode anchors auto-mouse, and a locked scrolling mode turns QMK's auto-mouse
 toggle on, then off again at unlock if the lock turned it on. Pointer layer
 `1` prefers typing: activation turns the pointer layer off, and it stays off
-while the mode runs.
+while the mode runs. Both are a key-started mode's: a mode its layer started
+never anchors the pointer layer or owns QMK's auto-mouse toggle, and while it
+runs a separate pointer layer is stripped, as an auto-sniping layer strips it,
+so the linked layer keeps its keys while the ball moves.
 
 The sensor's DPI follows, in order: a scrolling mode's DPI, or the normal DPI
-when it inherits; the sniping DPI while sniping or on the auto-sniping layer;
-a directional mode's DPI when it has one; otherwise the normal DPI. The normal
-and sniping DPI are [settings](profile-wire-v1/settings-domain.md#scalars)
-scalars 18 and 19.
+when it inherits; the sniping DPI while sniping or while any auto-sniping
+layer is on; a directional mode's DPI when it has one; otherwise the normal
+DPI, whichever source runs the mode. The normal and sniping DPI are
+[settings](profile-wire-v1/settings-domain.md#scalars) scalars 18 and 19;
+auto-sniping's master switch and its layers are scalars 8 and 9. One
+predicate answers which auto-sniping layers are on for the layer-state hook,
+DPI and the pointer layer strip; an auto-sniping layer that is the pointer
+layer strips nothing.
 
-Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_layer_state_set_*`, `test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset`), `tests/host/run_pointer_layer_policy_tests.sh`, `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_upper_slot_hold_lock_dpi_and_disabled_slot`).
+Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_layer_state_set_*`, `test_a_locked_modes_anchor_is_not_taken_back_after_a_qmk_reset`), `tests/host/run_pointer_layer_policy_tests.sh` (`test_every_sniping_layer_strips_the_pointer_layer`, `test_a_layer_started_mode_strips_the_pointer_layer`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_upper_slot_hold_lock_dpi_and_disabled_slot`, `test_a_layer_started_mode_strips_the_pointer_layer`).
+
+## Lighting of a running mode
+
+A mode its key runs paints its colour in the lighting domain's pointing-mode
+stage. A mode its layer started paints nothing there, so the layer's lighting
+shows, unless its slot's link light is on; then it paints exactly as a
+key-started mode does ([drawing](rgb-domain-v1.md#drawing)). The slave half
+learns only whether the running mode shows its light, in the mirrored mode
+state ([split runtime state](split-activity-sync.md)), so both halves light
+alike.
+
+Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_a_layer_started_mode_shows_its_light_only_when_its_slot_says`), `tests/host/run_rgb_layer_render_tests.sh` (`rgb_pd_active_profile_test.c`; `rgb_layer_render_test.c`, `test_slave_layer_started_mode_without_its_light_shows_the_layer`), `tests/host/run_split_runtime_sync_tests.sh` (`test_slave_rpcs_apply_exact_remote_state`, `test_tick_sends_base_packet_when_only_the_mode_light_changes`).
 
 ## Directional movement
 
@@ -359,11 +423,10 @@ Held by: `tests/host/run_pointing_mode_handlers_tests.sh` (`pointing_mode_handle
   policy 2 hides all of them, each restoring them after; policy 0 keeps them.
 - **Clicks** count as one output each, go through the owned-keycode ledger as
   one balanced press and release, and never release a button another owner
-  holds. They reach neither the mode's button overrides nor the button's
-  behaviour. The modifier policy applies; when hiding modifiers changes what
-  the host sees, the click waits 8 ms after that report, and the modifiers
-  return 8 ms after the button is up. A click drops the report's pending
-  motion first.
+  holds. They never reach the button's behaviour. The modifier policy
+  applies; when hiding modifiers changes what the host sees, the click waits
+  8 ms after that report, and the modifiers return 8 ms after the button is
+  up. A click drops the report's pending motion first.
 - **Macro starts** begin playback through the profile macro provider after
   settling pending fallback holds; playback inherits the held modifiers and
   keeps the macro's own protection. A start counts against the per-report
@@ -372,17 +435,6 @@ Held by: `tests/host/run_pointing_mode_handlers_tests.sh` (`pointing_mode_handle
   refused start is not queued.
 
 Held by: `tests/host/run_pointing_mode_handlers_tests.sh` (`pointing_mode_handlers_test.c`, `test_configured_mouse_button_clicks`, `test_configured_macro_start_accounting`; `pd_output_ownership_test.c`), `tests/host/run_owned_keycode_tests.sh` (`owned_keycode_test.c`, `test_literal_tap_never_releases_another_owners_usage`, `test_click_never_releases_a_physically_held_button`, `test_fresh_modifier_settles_before_a_mouse_button`).
-
-## Button overrides at runtime
-
-While a mode runs, a press of mouse button 1, 2 or 3 follows its record: pass
-through runs the button as without the mode; consume does nothing; tap sends
-its tap at the press; hold modifiers owns its modifiers until the release. A
-press the mode takes never reaches the button's own behaviour, and its release
-goes to the mode that took it, even after another mode replaced it. The
-release of a press the mode did not take stays with the behaviour.
-
-Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_consumed_buttons_run_no_authored_behavior`, `test_button_release_follows_its_press_across_mode_changes`, `test_configured_consume_button_runs_nothing`, `test_configured_button_click_runs_no_behaviour`, `test_factory_arrow_paste_button_never_holds_itself`), `tests/host/run_pointing_mode_handlers_tests.sh` (`test_configured_release_ownership_and_custom_slot`).
 
 ## Effective slots and publication
 
@@ -400,18 +452,23 @@ Warming the slots from the compiled defaults reads the compiled pointing
 payload directly, sorting no behaviour row.
 
 A new generation or working copy activates only at the safe boundary: with a
-mode active or locked, or a consumed button release pending, activation waits
-and reports the persistent-intent reason. It never force-releases a key.
+mode its key holds or locks, activation waits and reports the
+persistent-intent reason. It never force-releases a key. A mode its layer
+started does not hold activation up (D-F62): when the slots are about to be
+republished it ends, so no engine holds a slot that changes, and once the new
+generation is active its links are evaluated against the layers that are on.
+A working-copy edit to other domains keeps the slots and the running mode, and
+evaluates the links again with the new settings.
 
-Held by: `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integration_test.c`, `assert_cache_matches_domain`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the cache warm-up), `tests/host/run_profile_activation_policy_tests.sh` (`profile_activation_policy_test.c`, `test_configured_pd_blocks_until_release_and_does_not_wrap`), `tests/host/run_profile_wire_v1_tests.sh` (`qmk_profile_channel_test.c`, the pending kind).
+Held by: `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integration_test.c`, `assert_cache_matches_domain`), `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compiled_defaults_v1_test.c`, the cache warm-up), `tests/host/run_profile_activation_policy_tests.sh` (`profile_activation_policy_test.c`, `test_a_key_started_mode_holds_activation_and_a_layer_started_one_does_not`), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_a_layer_started_mode_ends_at_activation`), `tests/host/run_profile_wire_v1_tests.sh` (`qmk_profile_channel_test.c`, the pending kind).
 
 ## Compatibility
 
-The firmware reads only version 3 (D-F10,
+The firmware reads only version 4 (D-F10,
 [ADR](../adr/0010-firmware-accepts-only-current-formats.md)): another
-envelope version is `UNKNOWN_DOMAIN_VERSION`, and a version-2 payload's
+envelope version is `UNKNOWN_DOMAIN_VERSION`, and a version-3 payload's
 header is `INVALID_HEADER` at 0. Nothing is translated. A saved profile in an
 older format or action vocabulary is not used; the
 [device-resident profile](device-resident-profile.md) says what runs instead.
 
-Held by: `tests/host/run_profile_blob_v1_tests.sh` (`profile_blob_v1_test.c`), `tests/fixtures/pd_mode_domain_v3.json` (`version-2-payload`, `wrong-record-size`).
+Held by: `tests/host/run_profile_blob_v1_tests.sh` (`profile_blob_v1_test.c`), `tests/fixtures/pd_mode_domain_v4.json` (`version-3-payload`, `wrong-record-size`).

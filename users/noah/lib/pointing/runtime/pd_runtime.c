@@ -140,9 +140,12 @@ layer_state_t noah_layer_state_set_user(layer_state_t state) {
 #ifdef POINTING_DEVICE_ENABLE
     bool auto_sniping_active = false;
 #    if defined(CHARYBDIS_AUTO_SNIPING_ENABLE)
-    auto_sniping_active = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)));
+    auto_sniping_active = pointer_layer_policy_sniping_layers_on(state) != 0u;
 #    endif
     pointing_mode_set_auto_sniping_layer_active(auto_sniping_active);
+    // A linked layer starts or ends its mode before the pointer layer policy
+    // reads which mode runs (D-F62).
+    pointing_mode_apply_layer_state(state);
     // Sniping can temporarily own CPI, so queue a re-apply of the active
     // pointing-mode DPI policy after the layer-owned sniping state changes.
     // Service the actual hardware write on scan instead of from this layer

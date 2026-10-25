@@ -286,13 +286,28 @@ _Avoid_: protected playback, input protection
 
 **Pointing mode**:
 A role the trackball takes instead of moving the pointer, either scrolling or
-directional, while its key is held or locked; one runs at a time.
+directional, while its key is held or locked or its linked layer is on; one
+runs at a time.
 _Avoid_: pd mode, PD-mode, pointer mode, trackball mode
 
 **Pointing slot**:
 One of 32 fixed, numbered places that holds a pointing mode or is empty; keys
 reach the slot, so a slot keeps its keys when its mode changes.
 _Avoid_: PD slot, pointing-mode slot, mode slot
+
+**Linked layer**:
+The one layer a pointing slot is tied to, in a direction: the mode turns its
+layer on, the layer turns its mode on, or both (D-F62).
+_Avoid_: mode layer, pointing layer, layer binding
+
+**Direction** (of a link):
+Which way a pointing slot and its linked layer start each other.
+_Avoid_: link mode, link kind
+
+**Source** (of a pointing mode):
+What runs a mode: its key, held or locked, or its linked layer. A key source
+beats a layer source.
+_Avoid_: trigger, origin, owner (for this)
 
 **Movement**:
 Whether a pointing mode turns ball motion into scrolling or into directional
@@ -302,6 +317,11 @@ _Avoid_: engine, engine family, kind
 **Pointer layer**:
 The layer meant for trackball work, turned on by moving the ball.
 _Avoid_: mouse layer, auto-mouse layer, pointing layer
+
+**Auto-sniping layers**:
+The layers whose being on turns sniping on by itself, behind one master
+switch; one of them is an auto-sniping layer.
+_Avoid_: sniping layer, the auto-sniping layer (for the set)
 
 **Auto-mouse**:
 Turning the pointer layer on when the ball moves and off again after a quiet

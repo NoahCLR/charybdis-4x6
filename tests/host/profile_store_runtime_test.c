@@ -22,8 +22,8 @@ static uint32_t qmk_write_calls;
 static uint32_t current_compiled_digest = TEST_COMPILED_DIGEST;
 static bool     eeprom_magic_valid      = true;
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
-static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 1u, 0u, 0u, 0u, 0xA5u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
+static const uint8_t rgb_profile[]   = {'N', 'L', 'P', '1', 4u, 1u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 1u, 0u, 0u, 0u, 0xA5u};
 
 noah_profile_compiled_v1_result_t noah_profile_compiled_v1_open(noah_profile_compiled_v1_t *profile, noah_profile_compiled_v1_error_t *error) {
     (void)error;
@@ -174,7 +174,7 @@ static uint16_t settings_profile(uint8_t *blob, const char *name) {
     uint16_t length      = (uint16_t)(NOAH_SETTINGS_MIN_SIZE + name_length);
     uint8_t *payload     = blob + 14;
 
-    memcpy(blob, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, NOAH_PROFILE_DOMAIN_V1_SETTINGS, NOAH_SETTINGS_VERSION, (uint8_t)length, (uint8_t)(length >> 8), 0u, 0u}, 14);
+    memcpy(blob, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 1u, 1u, 1u, NOAH_PROFILE_DOMAIN_V1_SETTINGS, NOAH_SETTINGS_VERSION, (uint8_t)length, (uint8_t)(length >> 8), 0u, 0u}, 14);
     memset(payload, 0, length);
     memcpy(payload, (const uint8_t[]){NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES}, 5);
     payload[length - 1u - name_length] = name_length;

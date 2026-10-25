@@ -12,11 +12,9 @@
 
 #ifdef POINTING_DEVICE_ENABLE
 #    include "users/noah/lib/pointing/defs/pointing_mode_flags.h"
-static pointing_mode_mask_t pd_active, pd_locked;
-static bool pd_pending_release;
-pointing_mode_mask_t pointing_mode_local_active_snapshot(void) { return pd_active; }
-pointing_mode_mask_t pointing_mode_local_locked_snapshot(void) { return pd_locked; }
-bool noah_pd_engine_pending_release(void) { return pd_pending_release; }
+static pointing_mode_mask_t   pd_active;
+static pointing_mode_source_t pd_source;
+bool pointing_mode_local_key_source_active(void) { return pd_active != 0 && pd_source == POINTING_MODE_SOURCE_KEY; }
 #endif
 
 static noah_key_runtime_activity_snapshot_t   runtime_activity;
@@ -223,23 +221,24 @@ static void test_status_fails_closed_during_publication(void) {
 }
 
 #ifdef POINTING_DEVICE_ENABLE
-static void test_configured_pd_blocks_until_release_and_does_not_wrap(void) {
+// A mode its key holds or locks holds activation back; one its layer started
+// does not (D-F62): it ends at the boundary instead.
+static void test_a_key_started_mode_holds_activation_and_a_layer_started_one_does_not(void) {
     noah_profile_activation_policy_t policy;
     other_half_fixture_t other_half = {.succeeds = true};
     reset_activity();
     noah_profile_activation_policy_init(&policy, observe_other_half, &other_half);
     for (uint8_t i = 0; i < 32; i++) {
         pd_active = (pointing_mode_mask_t)1u << i;
+        pd_source = POINTING_MODE_SOURCE_KEY;
         assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT);
-        pd_active = 0; pd_locked = (pointing_mode_mask_t)1u << i;
-        assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT);
-        pd_locked = 0;
+        pd_source = POINTING_MODE_SOURCE_LAYER;
+        assert(noah_profile_activation_policy_safe_boundary(&policy) == 0);
     }
-    pd_pending_release = true;
-    assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT);
+    pd_source = POINTING_MODE_SOURCE_KEY;
     runtime_activity.persistent_intent_count = UINT8_MAX;
     assert(noah_profile_activation_policy_safe_boundary(&policy) == NOAH_PROFILE_ACTIVATION_REASON_PERSISTENT_INTENT);
-    runtime_activity.persistent_intent_count = 0; pd_pending_release = false;
+    runtime_activity.persistent_intent_count = 0; pd_active = 0;
     assert(noah_profile_activation_policy_safe_boundary(&policy) == 0);
 }
 #endif
@@ -252,7 +251,7 @@ int main(void) {
     test_status_fails_closed_during_publication();
 
 #ifdef POINTING_DEVICE_ENABLE
-    test_configured_pd_blocks_until_release_and_does_not_wrap();
+    test_a_key_started_mode_holds_activation_and_a_layer_started_one_does_not();
 #endif
     puts("profile activation policy host tests passed");
     return 0;

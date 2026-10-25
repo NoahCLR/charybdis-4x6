@@ -70,12 +70,23 @@ static inline pointing_mode_mask_t pointing_mode_mask_from_id(pointing_mode_id_t
     return (pointing_mode_mask_t)1u << id;
 }
 
+// What a running mode runs from (D-F62): its key, held or locked, or its
+// linked layer. A key source beats a layer source.
+typedef enum {
+    POINTING_MODE_SOURCE_NONE = 0,
+    POINTING_MODE_SOURCE_KEY,
+    POINTING_MODE_SOURCE_LAYER,
+} pointing_mode_source_t;
+
 // ─── Read-only state queries ────────────────────────────────────────────────
 //
 // Local queries report the authoritative runtime state on the current half.
 // Display queries report what UI consumers should render: local state on the
 // master half, mirrored split-sync state on the slave half.
 
+// active_source is this half's own; the slave half's display view knows
+// only whether the running mode shows its light (active_light), which the
+// master half mirrors to it.
 typedef struct {
     pointing_mode_mask_t   active_mode;
     pointing_mode_mask_t   locked_mode;
@@ -83,6 +94,8 @@ typedef struct {
     uint8_t                active_index;
     uint8_t                locked_index;
     split_side_mask_t      owner_sides;
+    pointing_mode_source_t active_source;
+    bool                   active_light;
 } pointing_mode_snapshot_view_t;
 
 typedef struct {
@@ -108,6 +121,13 @@ bool              pointing_mode_display_active(pointing_mode_mask_t mode);
 bool              pointing_mode_display_locked(pointing_mode_mask_t mode);
 bool              pd_any_local_mode_active(void);
 bool              pd_any_local_mode_locked(void);
+// A mode runs from its key, held or locked: what holds up a profile
+// activation. A mode its layer started does not (D-F62).
+bool              pointing_mode_local_key_source_active(void);
+// Whether the local active mode shows its own light: what the master half
+// mirrors to the slave half (D-F62).
+bool              pointing_mode_local_light_snapshot(void);
+pointing_mode_source_t pointing_mode_local_source_snapshot(void);
 bool              pd_any_display_mode_locked(void);
 split_side_mask_t pointing_mode_local_owner_sides_snapshot(void);
 split_side_mask_t pointing_mode_display_owner_sides_snapshot(void);

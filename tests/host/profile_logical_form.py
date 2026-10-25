@@ -117,7 +117,7 @@ def combos(data: bytes) -> dict:
 
 SETTING_NAMES = [
     "TAPPING_TERM", "TAP_HOLD_TERM", "LONG_HOLD_TERM", "MULTI_TAP_TERM", "AUTO_MOUSE_ENABLED", "AUTO_MOUSE_LAYER", "AUTO_MOUSE_TIMEOUT",
-    "AUTO_MOUSE_DEBOUNCE", "AUTO_SNIPING_ENABLED", "AUTO_SNIPING_LAYER", "DRAGSCROLL_DPI", "VOLUME_DPI", "BRIGHTNESS_DPI", "ZOOM_DPI",
+    "AUTO_MOUSE_DEBOUNCE", "AUTO_SNIPING_ENABLED", "AUTO_SNIPING_LAYERS", "DRAGSCROLL_DPI", "VOLUME_DPI", "BRIGHTNESS_DPI", "ZOOM_DPI",
     "ARROW_DPI", "FEEDBACK_PERIOD", "AUTO_MOUSE_DEAD_TIME", "RGB_TIMEOUT", "DEFAULT_DPI", "SNIPING_DPI", "COMBOS_ENABLED", "RGB_MODE",
     "RGB_COLOR", "DEFAULT_LAYERS", "KEYMAP_OPTIONS", "AUTO_MOUSE_DELAY", "AUTO_MOUSE_THRESHOLD", "UNICODE_HOST_MODE", "BEHAVIORS_ENABLED",
     "LAYER_BEHAVIORS", "LAYER_COMBOS",
@@ -125,7 +125,7 @@ SETTING_NAMES = [
 
 
 def settings(data: bytes) -> dict:
-    assert list(data[:8]) == [8, 16, 31, 128, 128, data[5], 128, 0]
+    assert list(data[:8]) == [9, 16, 31, 128, 128, data[5], 128, 0]
     value = {"flags": data[5], "values": {name: _u32(data, 8 + 4 * index) for index, name in enumerate(SETTING_NAMES)}}
     value["layers"] = [{"comboReference": data[at], "bypass": data[at + 1 : at + 9].hex(), "exclusion": data[at + 9 : at + 17].hex()}
                        for at in range(132, 404, 17)]
@@ -147,14 +147,14 @@ def _tap(record, at):
 
 
 def pointing(data: bytes) -> dict:
-    assert list(data[:3]) == [3, 32, 128] and data[4:8] == b"\0\0\0\0" and len(data) == 8 + 128 * data[3]
+    assert list(data[:3]) == [4, 32, 128] and data[4:8] == b"\0\0\0\0" and len(data) == 8 + 128 * data[3]
     slots = {}
     for index in range(data[3]):
         record = data[8 + 128 * index : 136 + 128 * index]
         slot = {"kind": record[1], "pointerLayer": record[2], "axis": record[3], "dpi": _u16(record, 4), "heldModifiers": record[6],
                 "name": record[96 : 96 + record[8]].decode("utf-8"), "thresholdX": _u16(record, 32), "thresholdY": _u16(record, 34),
                 "directions": [_tap(record, 36 + 4 * n) for n in range(4)],
-                "buttons": [{"kind": record[52 + 6 * n], "modifiers": record[53 + 6 * n], "tap": _tap(record, 54 + 6 * n)} for n in range(3)]}
+                "link": {"layer": record[9], "direction": record[10], "light": record[11]}}
         if record[1] == 2:
             slot["scroll"] = [_u16(record, 70 + 2 * n) for n in range(7)] + list(record[84:90])
         else:

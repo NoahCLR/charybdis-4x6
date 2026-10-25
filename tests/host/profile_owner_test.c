@@ -22,10 +22,10 @@ _Static_assert((unsigned)NOAH_PROFILE_SPLIT_V1_FRAME_MAX <= (unsigned)SPLIT_FAUL
 #define TEST_PD_DOMAIN NOAH_PROFILE_DOMAIN_V1_PD, NOAH_PROFILE_DOMAIN_VERSION_PD, NOAH_PROFILE_PD_V1_HEADER_SIZE, 0u, 0u, 0u, \
                        NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0u, 0u, 0u, 0u, 0u
 
-static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, TEST_PD_DOMAIN};
+static const uint8_t compiled_blob[] = {'N', 'L', 'P', '1', 4u, 1u, 1u, 1u, TEST_PD_DOMAIN};
 
 static const uint8_t long_profile[] = {
-    0x4eu, 0x4cu, 0x50u, 0x31u, 0x04u, 0x00u, 0x02u, 0x01u, 0x10u, 0x04u, 0x4fu, 0x02u, 0x00u, 0x00u, 0x04u, 0x00u,
+    0x4eu, 0x4cu, 0x50u, 0x31u, 0x04u, 0x01u, 0x02u, 0x01u, 0x10u, 0x04u, 0x4fu, 0x02u, 0x00u, 0x00u, 0x04u, 0x00u,
     0x1fu, 0x00u, 0x10u, 0x10u, 0x0cu, 0x20u, 0x0cu, 0x00u, 0x04u, 0x08u, 0x3au, 0x08u, 0x00u, 0x00u, 0x00u, 0x00u,
     0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x01u, 0x01u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u,
     0x02u, 0x02u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u, 0x03u, 0x03u, 0x03u, 0x00u, 0x00u, 0x00u, 0x00u, 0x00u,
@@ -323,7 +323,7 @@ static noah_profile_candidate_v1_metadata_t metadata(void) {
     return (noah_profile_candidate_v1_metadata_t){
         .store_format_version = NOAH_PROFILE_LOGICAL_STORE_VERSION,
         .schema_major         = NOAH_PROFILE_SCHEMA_MAJOR,
-        .schema_minor         = 0u,
+        .schema_minor         = NOAH_PROFILE_SCHEMA_MINOR,
         .requested_domains    = candidate_domains,
         .payload_length       = candidate_length,
         .crc32                = crc_of(candidate_blob, candidate_length),

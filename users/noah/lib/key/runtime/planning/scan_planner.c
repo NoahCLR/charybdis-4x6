@@ -315,11 +315,7 @@ static bool key_runtime_core_fallback_hold_due(key_runtime_core_state_t *state, 
         return false;
     }
 
-    if (key_runtime_core_scan_press_token_has_runtime_owned_state(state, token) || token->resolved_keycode == KC_NO) {
-        return false;
-    }
-
-    return !key_runtime_core_press_offered_to_mode(key_runtime_core_scan_press_token_key_pos(state, token));
+    return !(key_runtime_core_scan_press_token_has_runtime_owned_state(state, token) || token->resolved_keycode == KC_NO);
 }
 
 static key_runtime_effect_t key_runtime_core_fallback_hold_register(const key_runtime_core_state_t *state, const press_token_t *token) {

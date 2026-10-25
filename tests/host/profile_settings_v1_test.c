@@ -39,9 +39,9 @@ static uint16_t layer_record(uint8_t layer, uint8_t field) {
 }
 // A canonical domain: every name `size` bytes of `fill`.
 static void named(uint8_t size, char fill) {
-    const uint32_t values[NOAH_SETTINGS_COUNT] = {200, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff};
+    const uint32_t values[NOAH_SETTINGS_COUNT] = {200, 150, 400, 150, 1, 4, 1200, 25, 1, 0x8, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff};
     memset(bytes, 0, sizeof(bytes));
-    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {8, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
+    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {9, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
     memcpy(bytes, header, sizeof(header));
     for (uint8_t i = 0; i < NOAH_SETTINGS_COUNT; i++)
         set_scalar(i, values[i]);
@@ -81,12 +81,12 @@ static void put_name(uint16_t index, const char *text, uint8_t size) {
 static void test_header_and_versions(void) {
     defaults();
     assert(valid());
-    for (uint8_t version = 0; version <= 8; version++) {
+    for (uint8_t version = 0; version <= 9; version++) {
         defaults();
         bytes[0] = version;
         assert(valid() == (version == NOAH_SETTINGS_VERSION));
     }
-    assert(NOAH_SETTINGS_VERSION == 8);
+    assert(NOAH_SETTINGS_VERSION == 9);
     for (uint8_t at = 1; at < NOAH_SETTINGS_HEADER_SIZE; at++) {
         defaults();
         bytes[at]++;
@@ -145,8 +145,17 @@ static void test_scalars(void) {
     set_scalar(NOAH_SETTING_AUTO_MOUSE_ENABLED, 2);
     assert(!valid());
     assert(!noah_profile_setting_v1_valid(NOAH_SETTING_DEFAULT_DPI, 401, 16));
-    assert(!noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_SNIPING_LAYER, 16, 16));
-    assert(noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_SNIPING_LAYER, 15, 16));
+    // Auto-sniping's layers are a mask of layers 0-15 and may be empty, so its
+    // master switch can turn it off without losing them.
+    assert(noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_SNIPING_LAYERS, 0, 16));
+    assert(noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_SNIPING_LAYERS, 0x8004u, 16));
+    assert(noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_SNIPING_LAYERS, 0xffffu, 16));
+    assert(!noah_profile_setting_v1_valid(NOAH_SETTING_AUTO_SNIPING_LAYERS, 0x10000u, 16));
+    defaults();
+    set_scalar(NOAH_SETTING_AUTO_SNIPING_LAYERS, 0x0c00u);
+    assert(valid());
+    set_scalar(NOAH_SETTING_AUTO_SNIPING_LAYERS, 0x10000u);
+    assert(!valid());
 }
 // The scalar encoding against the spec's literal layout: scalar `id` is four
 // little-endian bytes at 8 + 4 * id, and layer records follow at 132.

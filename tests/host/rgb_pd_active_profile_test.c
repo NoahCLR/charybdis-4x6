@@ -195,6 +195,16 @@ static void test_compiled_and_live_pd_rendering(const char *fixture_path) {
     fake_snapshot.display.active_index = POINTING_MODE_INDEX_VOLUME;
     fake_snapshot.display.active_mode  = POINTING_MODE_VOLUME;
 
+    // A mode its layer started, its light switch off: the layer's lighting
+    // shows, so this stage paints nothing on either half (D-F62).
+    fake_snapshot.display.active_light = false;
+    CHECK(!rgb_runtime_pointing_mode_stage_render_frame(&frame, 0u, RGB_MATRIX_LED_COUNT));
+    for (uint8_t led = 0u; led < RGB_MATRIX_LED_COUNT; led++) {
+        check_unpainted(&frame, led);
+    }
+
+    // A mode its key runs, or its layer with the switch on, shows its own.
+    fake_snapshot.display.active_light = true;
     CHECK(rgb_runtime_pointing_mode_stage_render_frame(&frame, 0u, RGB_MATRIX_LED_COUNT));
     check_led(&frame, 0u, compiled_color);
     check_led(&frame, 1u, compiled_color);

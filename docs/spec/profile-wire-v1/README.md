@@ -48,7 +48,7 @@ protocol-version or firmware-version read. Capability page 0
 | Identity | Value in this firmware | Where |
 | --- | --- | --- |
 | Profile Wire version | major `2`, minor `0` | page 0 bytes 2–3 |
-| Profile schema version | major `4`, minor `0` | page 0 bytes 4–5, and blob header bytes 4–5 |
+| Profile schema version | major `4`, minor `1` (D-F62: pointing v4, settings v9) | page 0 bytes 4–5, and blob header bytes 4–5 |
 | Capability layout | `3`, three pages | page 0 bytes 0–1 |
 | Firmware version | `NOAH_FIRMWARE_VERSION`, never zero | page 0 bytes 17–20 |
 | Action-ABI digest | see [blob-and-digests.md](blob-and-digests.md#action-abi-digest) | page 0 bytes 13–16 |
@@ -84,7 +84,7 @@ client can tell which vectors this firmware answers to.
 | `combo_domain_v3.fixture`, `combo_output_behaviors_v1.fixture` | Combo domain `0x30` version 3 payloads | `run_active_profile_combo_runtime_tests.sh` |
 | `combo_readback_v3.fixture` | Native combo readback (GET `0x06`) pages | `run_combo_readback_tests.sh` |
 | `rgb_domain_v1.fixture`, `rgb_domain_v4.json` | Lighting domain `0x10` vectors | `run_profile_rgb_v1_tests.sh`, `run_profile_rgb_v4_tests.sh`, `run_active_profile_rgb_runtime_tests.sh`, `run_rgb_layer_render_tests.sh` |
-| `pd_mode_domain_v3.json` | Pointing domain `0x50` version 3 vectors | `run_profile_pd_v1_tests.sh`, `run_pd_profile_integration_tests.sh`, `run_profile_compiled_defaults_v1_tests.sh` |
+| `pd_mode_domain_v4.json` | Pointing domain `0x50` version 4 vectors | `run_profile_pd_v1_tests.sh`, `run_pd_profile_integration_tests.sh`, `run_profile_compiled_defaults_v1_tests.sh` |
 | `pd_mode_domain_v1.json` | A test-only snapshot of the compiled pointing modes | `run_pointing_mode_handlers_tests.sh` |
 | `folded_keyboard_profile.json` | Noah's profile in logical form, which the compiled defaults must reproduce | `run_profile_compiled_defaults_v1_tests.sh` |
 | `host_layouts_v1.json` | The host layout catalogue | `tools/host_layouts/build.py`, `run_host_layout_tests.sh` |
