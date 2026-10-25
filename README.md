@@ -23,8 +23,10 @@ any C and you don't reflash.
   hold a shortcut with modifiers from both sides (Left Ctrl + Right Alt + K).
 - **A trackball that changes roles.** Thirty-two pointing slots turn the
   ball into scrolling, volume, zoom, arrow keys, mouse-button clicks, macros
-  or your own shortcuts, held or locked. A pointer layer comes up by itself
-  when you move the ball, and sniping slows it down for precise work.
+  or your own shortcuts, held or locked, or on whenever a layer is. A mode
+  can bring its own layer of keys with it. A pointer layer comes up by itself
+  when you move the ball, and sniping slows it down for precise work on the
+  layers you pick.
 - **Lights that tell you what is going on.** They show which layer and mode
   are on, which keys made a combo, which tap count a key is on and whether a
   hold has started, and they fade as the pointer layer is about to drop.

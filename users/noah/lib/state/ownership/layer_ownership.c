@@ -66,7 +66,7 @@ static int16_t layer_ownership_find_free_slot(void) {
 
 static bool layer_ownership_should_be_active(uint8_t layer) {
     noah_layer_ownership_state_t *state = layer_ownership_state();
-    return layer < LAYER_COUNT && (state->momentary_refcounts[layer] > 0 || ((state->locked_mask | state->oneshot_mask) & layer_ownership_mask_for_layer(layer)) != 0);
+    return layer < LAYER_COUNT && (state->momentary_refcounts[layer] > 0 || ((state->locked_mask | state->oneshot_mask | state->pointing_mode_layer_mask) & layer_ownership_mask_for_layer(layer)) != 0);
 }
 
 static bool layer_ownership_apply_layer(uint8_t layer) {
@@ -234,6 +234,34 @@ bool layer_ownership_oneshot_consume(void) {
     return armed != UINT8_MAX && layer_ownership_oneshot_set(armed, false);
 }
 
+uint8_t layer_ownership_pointing_mode_layer(void) {
+    layer_state_t mask = layer_ownership_state()->pointing_mode_layer_mask;
+
+    return mask ? (uint8_t)__builtin_ctz(mask) : LAYER_OWNERSHIP_NO_LAYER;
+}
+
+bool layer_ownership_set_pointing_mode_layer(uint8_t layer) {
+    noah_layer_ownership_state_t *state    = layer_ownership_state();
+    uint8_t                       previous = layer_ownership_pointing_mode_layer();
+
+    if (layer >= LAYER_COUNT) {
+        layer = LAYER_OWNERSHIP_NO_LAYER;
+    }
+    if (layer == previous) {
+        return false;
+    }
+
+    state->pointing_mode_layer_mask = layer == LAYER_OWNERSHIP_NO_LAYER ? 0u : layer_ownership_mask_for_layer(layer);
+    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_POINTING_MODE, layer, previous);
+    if (layer != LAYER_OWNERSHIP_NO_LAYER) {
+        layer_ownership_apply_layer(layer);
+    }
+    if (previous != LAYER_OWNERSHIP_NO_LAYER) {
+        layer_ownership_apply_layer(previous);
+    }
+    return true;
+}
+
 void layer_ownership_momentary_press(keypos_t key_pos, uint8_t layer) {
     noah_layer_ownership_state_t *state = layer_ownership_state();
 
@@ -309,6 +337,7 @@ void layer_ownership_debug_snapshot(layer_ownership_debug_snapshot_t *out) {
         .applied_layer_state = layer_state,
         .locked_mask         = state->locked_mask,
         .oneshot_mask        = state->oneshot_mask,
+        .pointing_mode_layer_mask  = state->pointing_mode_layer_mask,
     };
 
     memcpy(out->momentary_refcounts, state->momentary_refcounts, sizeof(state->momentary_refcounts));

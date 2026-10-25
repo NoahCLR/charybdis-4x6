@@ -29,7 +29,7 @@ typedef struct {
     uint32_t                               compiled_digest;
 } fixture_t;
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
 
 static uint32_t always_safe(void *context) {
     (void)context;
@@ -469,7 +469,7 @@ static void test_copy_over_64_kib(void) {
 // checksums are sound, and the validator refuses the domain at its end, since
 // RGB keeps 16-bit internal offsets (D-F28).
 static void make_wide_rgb_blob(uint8_t *blob, uint32_t length) {
-    memcpy(blob, (const uint8_t[]){'N', 'L', 'P', '1', NOAH_PROFILE_SCHEMA_MAJOR, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
+    memcpy(blob, (const uint8_t[]){'N', 'L', 'P', '1', NOAH_PROFILE_SCHEMA_MAJOR, NOAH_PROFILE_SCHEMA_MINOR, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
     blob[10] = (uint8_t)(length - 14u);
     blob[11] = (uint8_t)((length - 14u) >> 8u);
     blob[12] = (uint8_t)((length - 14u) >> 16u);

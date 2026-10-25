@@ -7,6 +7,9 @@
 #include "profile_action_placement_v1.h"
 #include "active_profile_settings_runtime.h"
 #include "active_profile_keymap_macros_runtime.h"
+#if defined(POINTING_DEVICE_ENABLE)
+#    include "../../pointing/defs/pointing_modes.h"
+#endif
 
 #include <limits.h>
 #include <stddef.h>
@@ -268,6 +271,22 @@ enum {
 };
 _Static_assert((unsigned)OWNER_INVALIDATOR_COUNT <= (unsigned)NOAH_ACTIVE_PROFILE_MAX_INVALIDATORS, "the provider holds every runtime's invalidator");
 
+#if defined(POINTING_DEVICE_ENABLE)
+// A mode its layer started does not hold up an activation (D-F62), so one may
+// run when the pointing slots are about to change: it ends first, so no engine
+// holds a slot that changes. The slots publish last, so the links of the new
+// generation are then evaluated against the layers that are on with its
+// settings (default layers, the pointer layer) already live.
+static void owner_pd_invalidate(void *context, uint32_t publication, noah_active_profile_identity_t previous, noah_active_profile_identity_t active, const noah_active_profile_snapshot_t *view) {
+    // A working-copy edit to other domains keeps the slots (D-F32).
+    if (!(view && active.kind == NOAH_ACTIVE_PROFILE_KIND_WORKING_COPY && !(view->changed_domain_mask & NOAH_PROFILE_DOMAIN_MASK_PD))) {
+        pointing_mode_end_layer_started_mode();
+    }
+    noah_active_profile_pd_invalidate(context, publication, previous, active, view);
+    pointing_mode_reevaluate_layer_links();
+}
+#endif
+
 // Boot only: kept out of line so its locals do not widen the durable I/O
 // step's frame on every scan.
 static __attribute__((noinline)) bool initialize_runtime_graph(noah_profile_owner_t *owner) {
@@ -307,7 +326,11 @@ static __attribute__((noinline)) bool initialize_runtime_graph(noah_profile_owne
 #ifdef NOAH_PORTABLE_PROFILE_ENABLE
     invalidators[invalidator_count++] = (noah_active_profile_invalidator_t){.callback = noah_active_profile_settings_invalidate, .context = &owner->compiled_snapshot};
 #endif
+#if defined(POINTING_DEVICE_ENABLE)
+    invalidators[invalidator_count++] = (noah_active_profile_invalidator_t){.callback = owner_pd_invalidate, .context = NULL};
+#else
     invalidators[invalidator_count++] = (noah_active_profile_invalidator_t){.callback = noah_active_profile_pd_invalidate, .context = NULL};
+#endif
     observer         = owner->config.other_half_required ? owner_other_half_observer : no_other_half_observer;
     observer_context = owner->config.other_half_required ? owner : NULL;
     noah_profile_activation_policy_init(&owner->activation_policy, observer, observer_context);

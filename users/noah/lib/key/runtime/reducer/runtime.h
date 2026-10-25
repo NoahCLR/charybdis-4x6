@@ -359,9 +359,6 @@ typedef struct {
     uint8_t                              keyboard_event_masked_real_mods;
     bool                                 keyboard_event_mask_active;
     uint8_t                              default_report_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
-    // Physical presses an active pointing mode is being offered or consumed;
-    // see key_runtime_core_offer_press_to_mode().
-    uint8_t pd_intercepted_bitmap[KEY_ORIGIN_BITMAP_SIZE];
 } key_runtime_core_state_t;
 
 #ifdef KEY_RUNTIME_HOT_PATH_TEST_INSTRUMENTATION
@@ -405,19 +402,6 @@ __attribute__((noinline)) void key_runtime_core_observe_process_record_event(uin
 // if its keycode had no behaviour row.
 void key_runtime_core_observe_process_record_event_with_row(uint16_t keycode, keyrecord_t *record, bool use_row);
 void                           key_runtime_core_observe_scan_cycle(uint16_t now);
-// A physical press is offered to the active pointing mode before the key's
-// behavior sees it. While offered it is not a behavior press yet: an output
-// the mode emits cannot settle this key's pending fallback hold. The offer
-// ends consumed or not. Consumed, the key stays down, so its release still
-// matches its token and other keys still saw a press interrupt them, but the
-// token becomes an ordinary non-handled press: the key's own tap, hold,
-// repeat and multi-tap never run for it, and it owns no lease. Modes consume
-// only mouse buttons, which own no layer or modifier on hold. Its release
-// then belongs to the mode, which take_intercepted_release() says once.
-void                           key_runtime_core_offer_press_to_mode(keypos_t key_pos);
-void                           key_runtime_core_end_mode_offer(keypos_t key_pos, bool consumed);
-bool                           key_runtime_core_press_offered_to_mode(keypos_t key_pos);
-bool                           key_runtime_core_take_intercepted_release(keypos_t key_pos);
 // The reducer's cross-key work happens at two moments. Before a press is
 // resolved, the keys it interrupts settle, then released keys' pending taps it
 // ends are typed: every one for a press without a behaviour, a tap/hold key's

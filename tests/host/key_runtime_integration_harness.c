@@ -125,6 +125,22 @@ __attribute__((weak)) pointing_mode_mask_t pointing_mode_local_locked_snapshot(v
     return 0u;
 }
 
+__attribute__((weak)) bool pointing_mode_local_key_source_active(void) {
+    return false;
+}
+
+__attribute__((weak)) bool pointing_mode_local_light_snapshot(void) {
+    return false;
+}
+
+__attribute__((weak)) void pointing_mode_apply_layer_state(layer_state_t state) {
+    (void)state;
+}
+
+__attribute__((weak)) void pointing_mode_end_layer_started_mode(void) {}
+
+__attribute__((weak)) void pointing_mode_reevaluate_layer_links(void) {}
+
 __attribute__((weak)) pointing_mode_mask_t pointing_mode_display_active_snapshot(void) {
     return 0u;
 }

@@ -1,4 +1,6 @@
 #include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -15,9 +17,9 @@ static uint8_t hex_nibble(char c) {
     return (uint8_t)(c - 'a' + 10);
 }
 
-// Each line of the converted pd_mode_domain_v3.json: expected code name,
+// Each line of the converted pd_mode_domain_v4.json: expected code name,
 // payload-relative offset, case name, payload hex.
-static size_t check_v3_vectors(const char *path) {
+static size_t check_v4_vectors(const char *path) {
     static char    hex[2 * (NOAH_PROFILE_PD_V1_MAX_SIZE + NOAH_PROFILE_PD_V1_RECORD_SIZE) + 2];
     static uint8_t payload[NOAH_PROFILE_PD_V1_MAX_SIZE + NOAH_PROFILE_PD_V1_RECORD_SIZE];
     char           code[32], name[64];
@@ -31,11 +33,11 @@ static size_t check_v3_vectors(const char *path) {
         noah_profile_pd_v1_error_t  error;
         noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate(payload, length, &error);
         if (strcmp(result_names[result], code) != 0 || error.offset != offset) {
-            fprintf(stderr, "PD v3 vector %s: expected %s at %zu, got %s at %zu\n", name, code, offset, result_names[result], error.offset);
+            fprintf(stderr, "PD v4 vector %s: expected %s at %zu, got %s at %zu\n", name, code, offset, result_names[result], error.offset);
             assert(false);
         }
         assert(error.code == result);
-        if (strcmp(name, "version-2-payload") == 0) assert(result != NOAH_PROFILE_PD_V1_OK);
+        if (strcmp(name, "version-3-payload") == 0) assert(result != NOAH_PROFILE_PD_V1_OK);
         cases++;
     }
     assert(feof(file));
@@ -50,8 +52,8 @@ static void check_sparse_rules(void) {
     const noah_pd_config_t     named = {.id = 31, .name = "Kept"};
     const noah_pd_config_t     empty = {.id = 30};
 
-    // Header: version 3, capacity 32, record size 128, count, four zero bytes.
-    memcpy(payload, (const uint8_t[]){3, 32, 128, 0, 0, 0, 0, 0}, 8);
+    // Header: version 4, capacity 32, record size 128, count, four zero bytes.
+    memcpy(payload, (const uint8_t[]){NOAH_PROFILE_PD_V1_VERSION, 32, 128, 0, 0, 0, 0, 0}, 8);
     assert(noah_profile_pd_v1_validate_header(payload, 8, &count, &error) == NOAH_PROFILE_PD_V1_OK && count == 0);
     assert(noah_profile_pd_v1_validate_header(payload, 136, &count, &error) == NOAH_PROFILE_PD_V1_INVALID_LENGTH);
     assert(noah_profile_pd_v1_validate_header(NULL, 8, &count, &error) == NOAH_PROFILE_PD_V1_INVALID_ARGUMENT);
@@ -91,7 +93,7 @@ static bool iterator_read(void *context, size_t offset, uint8_t *out, size_t len
     return true;
 }
 static void test_bounded_iterator(void) {
-    uint8_t payload[8 + 2 * 128] = {3, 32, 128, 2};
+    uint8_t payload[8 + 2 * 128] = {NOAH_PROFILE_PD_V1_VERSION, 32, 128, 2};
     noah_pd_config_t config = {.id = 0, .name = "First"};
     noah_profile_pd_v1_encode_record(&config, payload + 8);
     config.id = 31; strcpy(config.name, "Last");
@@ -122,11 +124,11 @@ static void test_bounded_iterator(void) {
     assert(error.code == NOAH_PROFILE_PD_V1_READ_ERROR && error.offset == 28 && iterator.cursor.index == 0);
 }
 
-// A frozen 96-byte record as a version-3 one: the old 24-byte name field is
+// A frozen 96-byte record as a current one: the old 24-byte name field is
 // copied verbatim to the name area and its length is its first zero (33, past
 // the limit, when it has none), so a name the old rule refused (unterminated,
 // cut UTF-8, a control, junk after the terminator) is refused again.
-static void v3_from_frozen(const uint8_t *frozen, uint8_t out[NOAH_PROFILE_PD_V1_RECORD_SIZE]) {
+static void current_from_frozen(const uint8_t *frozen, uint8_t out[NOAH_PROFILE_PD_V1_RECORD_SIZE]) {
     uint8_t length = 0;
     while (length < 24 && frozen[8 + length]) length++;
     memset(out, 0, NOAH_PROFILE_PD_V1_RECORD_SIZE);
@@ -153,8 +155,107 @@ static void check_names(void) {
     record[8] = 19; // cuts the four-byte sequence
     assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_INVALID_NAME && error.offset == 8);
     record[8] = 20;
-    record[9] = 1; // version 2's name field stays zero
-    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_RESERVED && error.offset == 9);
+    record[12] = 1; // version 2's name field past the link stays zero
+    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_RESERVED && error.offset == 12);
+}
+
+// Bytes 9..11 link a slot to a layer (D-F62): the layer, below 16; the
+// direction, mode turns layer on 1, layer turns mode on 2, both 3; the light
+// switch, only beside "layer turns mode on". No link leaves all three zero.
+static void check_links(void) {
+    const noah_pd_config_t     mode = {.id = 2, .name = "Linked", .kind = 1, .threshold_y = 60, .directions = {[2] = {4, 0, 0}, [3] = {5, 0, 0}}};
+    uint8_t                    record[NOAH_PROFILE_PD_V1_RECORD_SIZE];
+    noah_profile_pd_v1_error_t error;
+
+    assert(offsetof(noah_pd_config_t, linked_layer) == 9 && offsetof(noah_pd_config_t, link_direction) == 10 && offsetof(noah_pd_config_t, link_light) == 11);
+    for (uint8_t layer = 0; layer < 16; layer++) {
+        for (uint8_t direction = NOAH_PD_LINK_MODE_TURNS_LAYER_ON; direction <= NOAH_PD_LINK_BOTH; direction++) {
+            for (uint8_t light = 0; light <= 1; light++) {
+                noah_profile_pd_v1_encode_record(&mode, record);
+                record[9] = layer, record[10] = direction, record[11] = light;
+                bool lit_without_layer_start = light && !(direction & NOAH_PD_LINK_LAYER_TURNS_MODE_ON);
+                noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error);
+                assert(lit_without_layer_start ? result == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 11 : result == NOAH_PROFILE_PD_V1_OK);
+            }
+        }
+    }
+    noah_profile_pd_v1_encode_record(&mode, record);
+    record[9] = 16, record[10] = NOAH_PD_LINK_BOTH;
+    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 9);
+    record[9] = 3, record[10] = NOAH_PD_LINK_NONE;
+    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 9);
+    record[9] = 0, record[11] = 1;
+    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 9);
+    record[11] = 2, record[10] = NOAH_PD_LINK_LAYER_TURNS_MODE_ON;
+    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_POLICY && error.offset == 11);
+    record[11] = 0, record[10] = 4;
+    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_POLICY && error.offset == 10);
+
+    // An empty slot has no link.
+    const noah_pd_config_t empty = {.id = 2, .name = "Empty"};
+    for (uint8_t at = 9; at <= 11; at++) {
+        noah_profile_pd_v1_encode_record(&empty, record);
+        record[at] = 1;
+        assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 2);
+    }
+
+    // No two slots name one layer, whichever way each link goes; the second
+    // is refused at its layer byte.
+    uint8_t                payload[8 + 3 * NOAH_PROFILE_PD_V1_RECORD_SIZE] = {NOAH_PROFILE_PD_V1_VERSION, 32, 128, 3};
+    const noah_pd_config_t first  = {.id = 0, .name = "First", .kind = 1, .threshold_y = 60, .linked_layer = 5, .link_direction = NOAH_PD_LINK_MODE_TURNS_LAYER_ON};
+    noah_pd_config_t       second = {.id = 4, .name = "Second", .kind = 1, .threshold_y = 60, .linked_layer = 6, .link_direction = NOAH_PD_LINK_LAYER_TURNS_MODE_ON, .link_light = 1};
+    noah_pd_config_t       third  = {.id = 9, .name = "Third", .kind = 2, .scroll = {2, 3, 6, 8, 8, 80, 55}, .scroll_policy = {7, 4, 5, 4, 4, 0}, .linked_layer = 7, .link_direction = NOAH_PD_LINK_BOTH};
+    noah_profile_pd_v1_encode_record(&first, payload + 8);
+    noah_profile_pd_v1_encode_record(&second, payload + 8 + 128);
+    noah_profile_pd_v1_encode_record(&third, payload + 8 + 256);
+    assert(noah_profile_pd_v1_validate(payload, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_OK);
+    third.linked_layer = 5;
+    noah_profile_pd_v1_encode_record(&third, payload + 8 + 256);
+    assert(noah_profile_pd_v1_validate(payload, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 8 + 256 + 9);
+    third.linked_layer = 6, third.link_direction = NOAH_PD_LINK_MODE_TURNS_LAYER_ON;
+    noah_profile_pd_v1_encode_record(&third, payload + 8 + 256);
+    assert(noah_profile_pd_v1_validate(payload, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 8 + 256 + 9);
+    // Unlinked slots name no layer, so layer byte zero repeats freely.
+    second.linked_layer = 0, second.link_direction = NOAH_PD_LINK_NONE, second.link_light = 0;
+    third.linked_layer = 0, third.link_direction = NOAH_PD_LINK_NONE;
+    noah_profile_pd_v1_encode_record(&second, payload + 8 + 128);
+    noah_profile_pd_v1_encode_record(&third, payload + 8 + 256);
+    assert(noah_profile_pd_v1_validate(payload, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_OK);
+}
+
+// Version 4 retired the mouse button records: bytes 52..69 are reserved zero
+// in every slot.
+static void check_retired_buttons(void) {
+    const noah_pd_config_t     mode = {.id = 4, .name = "Arrow", .kind = 1, .axis = NOAH_PD_AXIS_DOMINANT, .threshold_x = 40, .threshold_y = 50};
+    uint8_t                    record[NOAH_PROFILE_PD_V1_RECORD_SIZE];
+    noah_profile_pd_v1_error_t error;
+
+    for (size_t at = 52; at < 70; at++) {
+        noah_profile_pd_v1_encode_record(&mode, record);
+        assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 4, &error) == NOAH_PROFILE_PD_V1_OK);
+        record[at] = 1;
+        assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 4, &error) == NOAH_PROFILE_PD_V1_RESERVED && error.offset == 52);
+    }
+}
+
+// A frozen case as the current validator sees it, its button records cleared
+// when asked.
+static noah_profile_pd_v1_result_t frozen_validate(const uint8_t *bytes, size_t length, bool clear_buttons, noah_profile_pd_v1_error_t *error) {
+    const uint8_t               frozen_header[8] = {1, 8, 96, 0, 0, 0, 0, 0};
+    noah_profile_pd_v1_result_t result           = NOAH_PROFILE_PD_V1_INVALID_HEADER;
+
+    error->code   = result;
+    error->offset = 0;
+    if (length == 776 && memcmp(bytes, frozen_header, 8) == 0) {
+        for (uint8_t slot = 0; slot < 8; slot++) {
+            uint8_t record[NOAH_PROFILE_PD_V1_RECORD_SIZE];
+            current_from_frozen(bytes + 8 + slot * 96, record);
+            if (clear_buttons) memset(record + 52, 0, 18);
+            result = noah_profile_pd_v1_validate_record(record, sizeof(record), slot, error);
+            if (result != NOAH_PROFILE_PD_V1_OK) break;
+        }
+    }
+    return result;
 }
 
 int main(int argc, char **argv) {
@@ -162,14 +263,16 @@ int main(int argc, char **argv) {
     assert(argc == 3);
     check_sparse_rules();
     check_names();
-    size_t v3_cases = check_v3_vectors(argv[2]);
-    assert(v3_cases >= 25);
+    check_links();
+    check_retired_buttons();
+    size_t v4_cases = check_v4_vectors(argv[2]);
+    assert(v4_cases >= 25);
     // The frozen cross-language corpus is the retired eight-slot version 1:
     // its records are version 2's, so it keeps checking every record rule.
     FILE *file = fopen(argv[1], "rb");
     assert(file);
     uint8_t                    bytes[777];
-    size_t count = 0, accepted = 0, rejected = 0;
+    size_t count = 0, accepted = 0, rejected = 0, retired = 0;
     noah_profile_pd_v1_error_t error;
     for (;;) {
         int expected = fgetc(file);
@@ -181,25 +284,32 @@ int main(int argc, char **argv) {
         assert(fread(bytes, 1, length, file) == length);
         // Frozen vectors exercise the unchanged 96-byte record rules. The
         // retired envelope is test input only; production has no decoder.
-        noah_profile_pd_v1_result_t result = NOAH_PROFILE_PD_V1_INVALID_HEADER;
-        error.code                         = result;
-        error.offset                       = 0;
-        const uint8_t frozen_header[8]     = {1, 8, 96, 0, 0, 0, 0, 0};
-        if (length == 776 && memcmp(bytes, frozen_header, 8) == 0) {
-            result = NOAH_PROFILE_PD_V1_OK;
+        // Version 4 retired the mouse button records: a case that stored one
+        // is refused as it is, and one accepted before is accepted again with
+        // those bytes cleared, so it keeps checking every other record rule.
+        const uint8_t frozen_header[8] = {1, 8, 96, 0, 0, 0, 0, 0};
+        bool          frozen           = length == 776 && memcmp(bytes, frozen_header, 8) == 0;
+        bool          stored_buttons   = false;
+        if (frozen) {
             for (uint8_t slot = 0; slot < 8; slot++) {
-                uint8_t record[NOAH_PROFILE_PD_V1_RECORD_SIZE];
-                v3_from_frozen(bytes + 8 + slot * 96, record);
-                result = noah_profile_pd_v1_validate_record(record, sizeof(record), slot, &error);
-                if (result != NOAH_PROFILE_PD_V1_OK) break;
+                for (size_t at = 52; at < 70; at++) stored_buttons |= bytes[8 + slot * 96 + at] != 0;
             }
         }
-        if ((result == NOAH_PROFILE_PD_V1_OK) != (expected != 0)) {
-            fprintf(stderr, "PD corpus case %zu: expected valid=%d, code=%u offset=%zu\n", count, expected, result, error.offset);
+        noah_profile_pd_v1_result_t result = frozen_validate(bytes, length, false, &error);
+        if ((result == NOAH_PROFILE_PD_V1_OK) != (expected != 0 && !stored_buttons)) {
+            fprintf(stderr, "PD corpus case %zu: expected valid=%d, code=%u offset=%zu\n", count, expected != 0 && !stored_buttons, result, error.offset);
             return 1;
+        }
+        if (stored_buttons && expected) {
+            noah_profile_pd_v1_error_t cleared;
+            if (frozen_validate(bytes, length, true, &cleared) != NOAH_PROFILE_PD_V1_OK) {
+                fprintf(stderr, "PD corpus case %zu: refused with its button records cleared, code=%u offset=%zu\n", count, cleared.code, cleared.offset);
+                return 1;
+            }
         }
         assert(error.code == result);
         if (expected) accepted++; else rejected++;
+        if (stored_buttons && expected) retired++;
         count++;
     }
     assert(!ferror(file));
@@ -250,17 +360,13 @@ int main(int argc, char **argv) {
     }
     assert(!noah_profile_pd_v1_tap_key_valid(0x01d3));
     assert(!noah_profile_pd_v1_tap_key_valid(0x02d4));
-    // Buttons 3 and 4 in a direction and in a button override, under every
-    // modifier policy; a masked policy still needs its mask.
+    // Buttons 3 and 4 in a direction, under every modifier policy; a masked
+    // policy still needs its mask.
     noah_profile_pd_v1_encode_record(&vertical, record);
     const uint8_t clicks[][4] = {{0xd3, 0, 0, 0}, {0xd4, 0, 1, 0x02}, {0xd8, 0, 2, 0}, {0xd1, 0, 0, 0}};
     for (size_t i = 0; i < 4; i++) {
         memcpy(record + 44, clicks[i], 4);
         assert(noah_profile_pd_v1_validate_record(record, NOAH_PROFILE_PD_V1_RECORD_SIZE, 1, &error) == NOAH_PROFILE_PD_V1_OK);
-        record[58] = 2;
-        memcpy(record + 60, clicks[i], 4);
-        assert(noah_profile_pd_v1_validate_record(record, NOAH_PROFILE_PD_V1_RECORD_SIZE, 1, &error) == NOAH_PROFILE_PD_V1_OK);
-        memset(record + 58, 0, 6);
     }
     const uint8_t rejected_mouse[][4] = {{0xd0, 0, 0, 0}, {0xd9, 0, 0, 0}, {0xd3, 0x01, 0, 0}, {0xd3, 0, 1, 0}};
     for (size_t i = 0; i < 4; i++) {
@@ -269,12 +375,11 @@ int main(int argc, char **argv) {
     }
     // Macros 0-127 are accepted at every tap place, inherit only.
     const noah_pd_config_t macros = {.id = 0, .name = "Macros", .kind = 1, .axis = NOAH_PD_AXIS_EIGHT, .threshold_x = 10, .threshold_y = 10};
-    const size_t places[] = {36, 40, 44, 48, 70, 74, 78, 82, 54, 60, 66};
+    const size_t places[] = {36, 40, 44, 48, 70, 74, 78, 82};
     for (size_t place = 0; place < sizeof(places) / sizeof(places[0]); place++) {
         for (uint16_t key = 0x7700; key <= 0x777f; key++) {
             noah_profile_pd_v1_encode_record(&macros, record);
             size_t at = places[place];
-            if (at == 54 || at == 60 || at == 66) record[at - 2] = 2;
             record[at] = (uint8_t)key; record[at + 1] = (uint8_t)(key >> 8);
             assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_OK);
             record[at + 2] = 1; record[at + 3] = 2;
@@ -288,6 +393,6 @@ int main(int argc, char **argv) {
     assert(!noah_profile_pd_v1_tap_key_valid(0x76ff));
     assert(!noah_profile_pd_v1_tap_key_valid(0x7780));
     assert(!noah_profile_pd_v1_tap_key_valid(0x7f00));
-    printf("PD domain: %zu version-3 vectors and %zu frozen cross-language record cases (%zu valid, %zu rejected) passed\n", v3_cases, count, accepted, rejected);
+    printf("PD domain: %zu version-4 vectors and %zu frozen cross-language record cases (%zu valid, %zu of them only with their button records cleared; %zu rejected) passed\n", v4_cases, count, accepted, retired, rejected);
     return 0;
 }

@@ -7,9 +7,9 @@
 // its id).
 // A returned slot stays valid and unchanged until the next publication.
 // Publication (activation, or an in-place working-copy edit that changed the
-// PD domain) runs only at the provider's safe boundary: no mode active or
-// locked and no consumed button release pending, so an engine holding a slot
-// never sees it change. Movement and key paths do no storage read, decode,
+// PD domain) runs only at the provider's safe boundary: no mode its key holds
+// or locks, and a mode its layer started ends before the slots change
+// (profile_owner.c), so an engine holding a slot never sees it change. Movement and key paths do no storage read, decode,
 // copy or allocation.
 // Read on the main loop (pointing task, key processing, scan). The split
 // sync receive also reaches it, through pointing_mode_apply_command's snapshot

@@ -467,7 +467,7 @@ static void validate_portable_import(const noah_profile_compiled_v1_t *compiled,
     memset(&placement_log, 0, sizeof(placement_log));
     noah_profile_validator_v1_declaration_t declaration = {
         .schema_major      = NOAH_PROFILE_BLOB_V1_SCHEMA_MAJOR,
-        .schema_minor      = 0,
+        .schema_minor      = NOAH_PROFILE_SCHEMA_MINOR,
         .domain_mask       = NOAH_PROFILE_VALIDATOR_V1_KNOWN_DOMAINS,
         .byte_length       = length,
         .crc32             = noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, output, length)),

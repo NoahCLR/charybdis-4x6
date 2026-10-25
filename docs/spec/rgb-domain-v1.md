@@ -230,7 +230,10 @@ paints nothing, what is beneath shows.
    rows as though it were on. It draws the layer stage's data, so it follows
    the layer bit.
 5. **Pointing mode**: the running slot's colour in its locality, then its
-   rows.
+   rows. A mode its linked layer started paints nothing here, so its layer's
+   lighting shows, unless its slot's link light is on (D-F62,
+   [pointing domain](pd-mode-domain-v1.md#lighting-of-a-running-mode)); both
+   halves draw the same.
 6. **Combo feedback, above**: every other active combo. A combo whose output
    holds a momentary layer paints in neither; the layer stage shows the hold.
 7. **Key feedback**, below.

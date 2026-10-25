@@ -18,7 +18,7 @@ Eight bytes, then the domains:
 | ---: | ---: | --- |
 | 0 | 4 | ASCII magic `NLP1` |
 | 4 | 1 | schema major, `4` |
-| 5 | 1 | schema minor, `0` |
+| 5 | 1 | schema minor, `1` |
 | 6 | 1 | domain count, `0..7` |
 | 7 | 1 | flags: exactly `0x01` (bit 0 canonical encoding; bits 1–7 reserved) |
 

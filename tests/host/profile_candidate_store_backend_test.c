@@ -19,8 +19,8 @@ static uint32_t      eeprom_last_read_length;
 static uint32_t      eeprom_largest_read_length;
 static uint32_t      eeprom_last_write_length;
 static uint32_t      safe_boundary_reasons;
-static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 0u, 0u, 1u};
-static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x04\x00\x01\x01\x20\x02\x42\x00\x00\x00\x02\x00"
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
+static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x04\x01\x01\x01\x20\x02\x42\x00\x00\x00\x02\x00"
                                           "\x03\x00\x24\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02"
                                           "\xff\xff\x00\x00\x00\x02\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00"
                                           "\x0a\x00\x02\x00\x03\x00\x03\x00\x16\x00\x04\x00\x02\x00\x00\x00"
@@ -484,7 +484,7 @@ static void test_scan_owner_composes_bounded_commit_and_safe_activation(void) {
     interface     = noah_profile_candidate_store_backend_interface(&backend);
     compatibility = (noah_profile_candidate_compatibility_t){
         .schema_major          = NOAH_PROFILE_SCHEMA_MAJOR,
-        .schema_minor          = 0u,
+        .schema_minor          = NOAH_PROFILE_SCHEMA_MINOR,
         .supported_domain_mask = 0u,
         .max_payload_length    = NOAH_PROFILE_CANDIDATE_V1_MAX_BLOB_SIZE,
         .action_abi_digest     = ACTION_ABI_DIGEST,
@@ -835,7 +835,7 @@ static void test_reuse_source_checks_active_identity_and_lease(void) {
 // checksums are sound, and the validator refuses the domain at its end, since
 // RGB keeps 16-bit internal offsets (D-F28).
 static void make_wide_rgb_blob(uint8_t *blob, uint32_t length) {
-    memcpy(blob, (const uint8_t[]){'N', 'L', 'P', '1', NOAH_PROFILE_SCHEMA_MAJOR, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
+    memcpy(blob, (const uint8_t[]){'N', 'L', 'P', '1', NOAH_PROFILE_SCHEMA_MAJOR, NOAH_PROFILE_SCHEMA_MINOR, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
     blob[10] = (uint8_t)(length - 14u);
     blob[11] = (uint8_t)((length - 14u) >> 8u);
     blob[12] = (uint8_t)((length - 14u) >> 16u);

@@ -39,6 +39,12 @@ version 3 the only ones the firmware accepts. The PD corpus is unchanged: it is
 version 1, and its runner moves each frozen record into the current record
 layout and checks it with the current record validator.
 
+PD version 4 retired the mouse button records (bytes 52..69 reserved, D-F62).
+Every frozen case stores Arrow's buttons, so each is now refused as it is; the
+runner also checks that each case accepted before is accepted again with those
+bytes cleared, so the corpus still checks every other record rule. The bytes
+and the stored expectations are unchanged.
+
 Do not regenerate expected results just to make a changed validator pass.
 Review intentional contract changes and extend firmware-owned vectors alongside
 the C tests. Ark can independently propose vectors from its integration corpus;
@@ -51,4 +57,4 @@ suite verifies its current implementation rather than these frozen expectations.
 Pointing macro triggers (D-F23) extend the tap vocabulary to `0x7700..0x777f`
 with inherited modifiers only. The frozen PD corpus was reviewed: it contains
 no newly accepted record, so its bytes and expectations remain unchanged.
-New cases live in `pd_mode_domain_v3.json` and the cold validator host test.
+New cases live in `pd_mode_domain_v4.json` and the cold validator host test.

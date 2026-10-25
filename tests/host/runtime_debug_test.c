@@ -655,6 +655,35 @@ void pointing_mode_transition_activate(pointing_mode_mask_t mode) {
     pointing_mode_set(mode);
 }
 
+void pointing_mode_transition_activate_from(pointing_mode_mask_t mode, pointing_mode_source_t source) {
+    (void)source;
+    pointing_mode_set(mode);
+}
+
+void pointing_mode_transition_take_from_layer(pointing_mode_mask_t mode) {
+    (void)mode;
+}
+
+void pointing_mode_transition_hand_to_layer(pointing_mode_mask_t mode) {
+    pointing_mode_clear_locked(mode);
+}
+
+// No slot here links a layer.
+pointing_mode_mask_t pointing_mode_layer_started_mode(layer_state_t state) {
+    (void)state;
+    return 0;
+}
+
+uint8_t pointing_mode_brought_layer(pointing_mode_mask_t mode) {
+    (void)mode;
+    return POINTING_MODE_NO_LAYER;
+}
+
+bool pointing_mode_layer_started_light(pointing_mode_mask_t mode) {
+    (void)mode;
+    return false;
+}
+
 void pointing_mode_transition_deactivate(pointing_mode_mask_t mode) {
     pointing_mode_clear(mode);
 }
@@ -721,12 +750,6 @@ void dispatch_delayed_action_at(keypos_t key_pos, uint16_t action, delayed_actio
 }
 
 bool noah_synthetic_record_active(void) {
-    return false;
-}
-
-bool pointing_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
     return false;
 }
 

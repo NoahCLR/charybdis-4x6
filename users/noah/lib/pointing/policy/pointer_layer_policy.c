@@ -13,6 +13,20 @@
 #include "../../key/behavior/key_behavior_lookup.h"
 #include "../../state/ownership/layer_ownership.h"
 
+#ifdef CHARYBDIS_AUTO_SNIPING_LAYER
+#    define POINTER_LAYER_POLICY_COMPILED_SNIPING_LAYERS ((uint32_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER)
+#else
+#    define POINTER_LAYER_POLICY_COMPILED_SNIPING_LAYERS 0u
+#endif
+
+static layer_state_t pointer_layer_policy_sniping_layers(void) {
+    return (layer_state_t)noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYERS, POINTER_LAYER_POLICY_COMPILED_SNIPING_LAYERS);
+}
+
+layer_state_t pointer_layer_policy_sniping_layers_on(layer_state_t state) {
+    return noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) ? state & pointer_layer_policy_sniping_layers() : 0u;
+}
+
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
 static inline bool pointer_layer_policy_is_layer_hold_key(uint16_t keycode) {
     return noah_action_keycode_is_owned_momentary_layer(keycode) || IS_QK_LAYER_TAP(keycode);
@@ -158,21 +172,22 @@ layer_state_t pointer_layer_policy_apply(layer_state_t state) {
     bool                     auto_mouse_anchored  = pointer_layer_policy_auto_mouse_anchored(snapshot);
     uint8_t                  auto_mouse_layer     = noah_qmk_contract_auto_mouse_layer();
     layer_state_t            auto_mouse_mask      = (layer_state_t)1 << auto_mouse_layer;
-    bool                     sniping_layer_active = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)));
 
     // Arrow mode consumes trackball motion as arrows, so keep the keyboard on
     // the current typing/nav surface instead of forcing the pointer layer back
     // underneath it. Holding NAV can still expose the pointer-button layout.
-    if (prefers_typing_layer && auto_mouse_layer != noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)) {
+    if (prefers_typing_layer && !(pointer_layer_policy_sniping_layers() & auto_mouse_mask)) {
         state &= ~auto_mouse_mask;
         return state;
     }
 
-    // Auto-sniping must stay authoritative while mousing. If the sniping
-    // layer is active and auto-mouse targets some other layer, strip that
-    // separate pointer layer regardless of anchors so NAV keeps keymap
-    // precedence and sniping stays enabled.
-    if (sniping_layer_active && auto_mouse_layer != noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER)) {
+    // Auto-sniping must stay authoritative while mousing. If a sniping layer
+    // other than the pointer layer is on, strip that separate pointer layer
+    // regardless of anchors so NAV keeps keymap precedence and sniping stays
+    // enabled. A mode its layer started strips it the same way, so its layer
+    // keeps its keys while the ball moves (D-F62); a link never names the
+    // pointer layer.
+    if ((pointer_layer_policy_sniping_layers_on(state) & ~auto_mouse_mask) || pointing_mode_policy_snapshot_layer_started(snapshot)) {
         state &= ~auto_mouse_mask;
         return state;
     }
@@ -198,7 +213,8 @@ void pointer_layer_policy_debug_snapshot(layer_state_t state, pointer_layer_poli
         .pointing_mode_anchor_active = pointing_mode_policy_snapshot_keeps_auto_mouse_anchored(snapshot),
         .prefers_typing_layer        = pointing_mode_policy_snapshot_prefers_typing_layer(snapshot),
         .auto_mouse_toggle_enabled   = noah_qmk_contract_auto_mouse_toggle_enabled(),
-        .sniping_layer_active        = (noah_setting(NOAH_SETTING_AUTO_SNIPING_ENABLED, 1) && layer_state_cmp(state, noah_setting(NOAH_SETTING_AUTO_SNIPING_LAYER, CHARYBDIS_AUTO_SNIPING_LAYER))),
+        .sniping_layer_active        = pointer_layer_policy_sniping_layers_on(state) != 0u,
+        .layer_started_mode_active   = pointing_mode_policy_snapshot_layer_started(snapshot),
         .auto_mouse_key_tracker      = noah_qmk_contract_auto_mouse_key_tracker(),
         .auto_mouse_layer            = noah_qmk_contract_auto_mouse_layer(),
     };

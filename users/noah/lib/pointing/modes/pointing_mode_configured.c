@@ -10,9 +10,6 @@
 #include "../../state/modifiers/keyboard_mod_policy.h"
 
 static const noah_pd_config_t *active;
-// Per-origin release ownership survives mode replacement. A consumed bit is
-// retained after releasing modifiers so an old release cannot hit a new mode.
-static struct { uint8_t modifiers; bool consumed; } buttons[MATRIX_ROWS][MATRIX_COLS];
 static uint8_t scroll_modifiers;
 
 static void owned_modifiers(uint8_t mask, bool pressed) {
@@ -24,7 +21,7 @@ static void owned_modifiers(uint8_t mask, bool pressed) {
 }
 
 // A mouse button clicks through the owned ledger, never through QMK's key
-// processing, so it cannot reach a mode's button overrides or release a button
+// processing, so it cannot reach the button's behaviour or release a button
 // held elsewhere.
 static bool emit_tap(const noah_pd_tap_t *tap) {
     uint16_t key = tap->keycode;
@@ -271,12 +268,6 @@ static void directional(report_mouse_t report) {
 void noah_pd_engine_exit(void) {
     owned_modifiers(scroll_modifiers, false);
     scroll_modifiers = 0;
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-            owned_modifiers(buttons[row][col].modifiers, false);
-            buttons[row][col].modifiers = 0;
-        }
-    }
     active = NULL;
     direction = (direction_state_t){.held = DIRECTION_NONE};
     reset_dragscroll_mode();
@@ -301,33 +292,4 @@ report_mouse_t noah_pd_engine_motion(report_mouse_t report) {
     return pointing_mode_freeze_mouse();
 }
 
-bool noah_pd_engine_key(uint16_t keycode, keyrecord_t *record) {
-    if (!record || record->event.key.row >= MATRIX_ROWS || record->event.key.col >= MATRIX_COLS) return false;
-    uint8_t row = record->event.key.row, col = record->event.key.col;
-    if (buttons[row][col].consumed) {
-        if (!record->event.pressed) {
-            owned_modifiers(buttons[row][col].modifiers, false);
-            buttons[row][col].modifiers = 0;
-            buttons[row][col].consumed = false;
-        }
-        return true;
-    }
-    if (!active || !record->event.pressed || keycode < QK_MOUSE_BUTTON_1 || keycode > QK_MOUSE_BUTTON_1 + 2u) return false;
-    const noah_pd_button_t *button = &active->buttons[keycode - QK_MOUSE_BUTTON_1];
-    if (button->kind == NOAH_PD_BUTTON_PASS) return false;
-    buttons[row][col].consumed = true;
-    if (button->kind == NOAH_PD_BUTTON_TAP) emit_tap(&button->tap);
-    if (button->kind == NOAH_PD_BUTTON_HOLD_MODIFIERS) {
-        buttons[row][col].modifiers = button->modifiers;
-        owned_modifiers(button->modifiers, true);
-    }
-    return true;
-}
-
-bool noah_pd_engine_pending_release(void) {
-    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        for (uint8_t col = 0; col < MATRIX_COLS; col++) if (buttons[row][col].consumed) return true;
-    }
-    return false;
-}
 #endif

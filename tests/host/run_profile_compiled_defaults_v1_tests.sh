@@ -128,7 +128,7 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
 # The golden compiled PD domain is the shared "presets" vector, and its RGB
 # domain is version 4 with a colour for each of the sixteen layers and a row
 # for each of the 32 slots.
-python3 - "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" "$ROOT/tests/fixtures/pd_mode_domain_v3.json" <<'PY'
+python3 - "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" "$ROOT/tests/fixtures/pd_mode_domain_v4.json" <<'PY'
 import json, struct, sys
 from pathlib import Path
 fields = dict(line.split("=", 1) for line in Path(sys.argv[1]).read_text().splitlines() if "=" in line)
@@ -139,7 +139,7 @@ for _ in range(blob[6]):
     domains[blob[offset]] = (blob[offset + 1], blob[offset + 6 : offset + 6 + length])
     offset += 6 + length
 presets = next(case for case in json.loads(Path(sys.argv[2]).read_text())["valid"] if case["name"] == "presets")
-assert domains[0x50] == (3, bytes.fromhex(presets["hex"])), "compiled PD domain differs from the presets vector"
+assert domains[0x50] == (4, bytes.fromhex(presets["hex"])), "compiled PD domain differs from the presets vector"
 assert domains[0x10][0] == 4 and domains[0x10][1][0] == 4 and domains[0x10][1][5] == 16 and domains[0x10][1][7] == 32
 PY
 

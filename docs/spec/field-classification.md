@@ -102,7 +102,7 @@ Held by: `tests/host/run_real_profile_validation_tests.sh` (`real_profile_valida
 | `CHARYBDIS_DEFAULT_DPI_CONFIG_STEP`, `CHARYBDIS_SNIPING_DPI_CONFIG_STEP` | capability | QMK's DPI ladders; the settings domain accepts 400–3,400 in steps of 200 and 100–400 in steps of 100 |
 | `CHARYBDIS_DRAGSCROLL_DPI`, `POINTING_MODE_VOLUME_DPI`, `POINTING_MODE_BRIGHTNESS_DPI`, `POINTING_MODE_ZOOM_DPI`, `POINTING_MODE_ARROW_DPI` | profile data | pointing slots' DPI, through `pd_config.c` |
 | `CHARYBDIS_AUTO_SNIPING_ENABLE` | capability | |
-| `CHARYBDIS_AUTO_SNIPING_LAYER` | profile data | settings scalar 9 |
+| `CHARYBDIS_AUTO_SNIPING_LAYER` | profile data | settings scalar 9, the one layer of the compiled auto-sniping layers |
 | `POINTING_DEVICE_AUTO_MOUSE_ENABLE` | capability | |
 | `AUTO_MOUSE_DEFAULT_LAYER`, `AUTO_MOUSE_TIME` | profile data | settings scalars 5 and 6 |
 | `AUTO_MOUSE_DELAY`, `AUTO_MOUSE_THRESHOLD` | profile data | settings scalars 25 and 26; the keymap redefines both to read them |
@@ -127,7 +127,7 @@ Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_t
 
 | Authored | Class | Where it lives |
 | --- | --- | --- |
-| `noah_pd_defaults[]`: each slot's name, movement, pointer-layer policy, axis, DPI, held modifiers, thresholds, directional outputs, mouse-button overrides, scroll tuning | profile data | pointing `0x50`; a disabled slot without a name is not stored |
+| `noah_pd_defaults[]`: each slot's name, movement, pointer-layer policy, axis, DPI, held modifiers, thresholds, directional outputs, linked layer, scroll tuning | profile data | pointing `0x50`; a disabled slot without a name is not stored |
 | `NOAH_DRAGSCROLL_*` in `users/noah/config.h`, the thresholds in `pointing_mode_defaults.h` | profile data | the scrolling and directional slots' fields, through `noah_pd_defaults[]` |
 | The 32 pointing slots | ceiling | part of the action-ABI digest (D-F09, [ADR](../adr/0009-thirty-two-pointing-slots-stored-sparsely.md)) |
 | The scrolling and directional movement code, its per-scan output limits | capability | |
@@ -135,7 +135,7 @@ Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_t
 Keys reach a slot by its number, so a slot keeps its keys when its mode
 changes (D-F50, [ADR](../adr/0050-pointing-keycodes-name-slots.md)).
 
-Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (the compiled pointing domain equals the `presets` vector), `tests/fixtures/pd_mode_domain_v3.json`.
+Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (the compiled pointing domain equals the `presets` vector), `tests/fixtures/pd_mode_domain_v4.json`.
 
 ## Ceilings outside the authored files
 

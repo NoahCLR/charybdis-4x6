@@ -218,9 +218,13 @@ fill an empty slot's record and give it a name; then place `PD_SLOT_n` or
   shortcut, `MS_BTN1` to `MS_BTN8` or a macro; a macro takes policy 0 and
   mask 0. `.direction_output =
   NOAH_PD_DIRECTION_OUTPUT_ONCE` sends once per movement.
-- `.buttons`: mouse buttons 1 to 3, each `{kind, modifiers, tap}`: kind 0
-  passes through, 1 does nothing, 2 taps `tap`, 3 holds `modifiers` until
-  released.
+- `.linked_layer`, `.link_direction` and `.link_light`: the slot's linked
+  layer and which way it goes, `NOAH_PD_LINK_MODE_TURNS_LAYER_ON`,
+  `NOAH_PD_LINK_LAYER_TURNS_MODE_ON` or `NOAH_PD_LINK_BOTH`; `.link_light = 1`
+  shows the mode's own light when its layer starts it. Leave all three out
+  for no link ([linked layers](pointing.md#linked-layers)). Mouse buttons 1
+  to 3 keep their own behaviour in every mode; a linked layer gives a mode
+  keys of its own.
 - Scrolling: `.held_modifiers` held while it scrolls, and the scroll tuning;
   `SCROLL_TUNING`, as Dragscroll uses it, gives the defaults.
 

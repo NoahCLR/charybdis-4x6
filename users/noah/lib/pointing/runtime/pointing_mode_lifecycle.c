@@ -112,6 +112,10 @@ void pointing_mode_apply_active_dpi(void) {
 }
 
 void pointing_mode_transition_activate(pointing_mode_mask_t mode) {
+    pointing_mode_transition_activate_from(mode, POINTING_MODE_SOURCE_KEY);
+}
+
+void pointing_mode_transition_activate_from(pointing_mode_mask_t mode, pointing_mode_source_t source) {
     bool was_active = pointing_mode_local_active(mode);
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     bool was_any_mode_active = pd_any_local_mode_active();
@@ -121,9 +125,15 @@ void pointing_mode_transition_activate(pointing_mode_mask_t mode) {
     if (!was_active) {
         pointing_mode_set(mode);
     }
+    pointing_mode_runtime_shared_state()->local_active_source = (uint8_t)source;
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    pointing_mode_auto_mouse_activate(mode, was_any_mode_active, locked);
+    // A mode its layer started never anchors the pointer layer or owns QMK's
+    // auto-mouse toggle; the layer-state hook strips a separate pointer layer
+    // while it runs (D-F62).
+    if (source == POINTING_MODE_SOURCE_KEY) {
+        pointing_mode_auto_mouse_activate(mode, was_any_mode_active, locked);
+    }
 #endif
 
     pointing_mode_request_active_dpi_sync();
@@ -140,6 +150,9 @@ static void pointing_mode_transition_deactivate_with_lock_state(pointing_mode_ma
     bool was_any_mode_active = pd_any_local_mode_active();
 #endif
     pointing_mode_clear(mode);
+    if (!pd_any_local_mode_active()) {
+        pointing_mode_runtime_shared_state()->local_active_source = POINTING_MODE_SOURCE_NONE;
+    }
 
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
     pointing_mode_auto_mouse_deactivate(mode, was_any_mode_active, was_locked);
@@ -171,6 +184,36 @@ void pointing_mode_transition_lock(pointing_mode_mask_t mode) {
     }
 }
 
+void pointing_mode_transition_hand_to_layer(pointing_mode_mask_t mode) {
+    bool was_locked = pointing_mode_local_locked(mode);
+
+    if (!pointing_mode_local_active(mode)) {
+        return;
+    }
+    if (was_locked) {
+        pointing_mode_registry_run_unlock_hooks(mode);
+        pointing_mode_clear_locked(mode);
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+        if (pointing_mode_auto_mouse_uses_synthetic_anchor(mode, was_locked)) {
+            pointing_mode_auto_mouse_sync_anchor(false);
+        }
+#endif
+        noah_runtime_trace_emit(NOAH_TRACE_POINTING_MODE, NOAH_TRACE_POINTING_MODE_EVENT_UNLOCK, mode, pointing_mode_local_locked_snapshot());
+    }
+    pointing_mode_runtime_shared_state()->local_active_source = POINTING_MODE_SOURCE_LAYER;
+    pointing_mode_request_active_dpi_sync();
+}
+
+void pointing_mode_transition_take_from_layer(pointing_mode_mask_t mode) {
+    pointing_mode_runtime_shared_state()->local_active_source = POINTING_MODE_SOURCE_KEY;
+#ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
+    // Its layer started it with none of a key-started mode's auto-mouse side
+    // effects, so they run now as though it started from nothing.
+    pointing_mode_auto_mouse_activate(mode, false, pointing_mode_local_locked(mode));
+#endif
+    pointing_mode_request_active_dpi_sync();
+}
+
 void pointing_mode_transition_unlock(pointing_mode_mask_t mode) {
     bool was_locked = pointing_mode_local_locked(mode);
 
@@ -182,8 +225,4 @@ void pointing_mode_transition_unlock(pointing_mode_mask_t mode) {
     pointing_mode_clear_locked(mode);
     pointing_mode_transition_deactivate_with_lock_state(mode, was_locked);
     noah_runtime_trace_emit(NOAH_TRACE_POINTING_MODE, NOAH_TRACE_POINTING_MODE_EVENT_UNLOCK, mode, pointing_mode_local_locked_snapshot());
-}
-
-bool pointing_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
-    return noah_pd_engine_key(keycode, record);
 }

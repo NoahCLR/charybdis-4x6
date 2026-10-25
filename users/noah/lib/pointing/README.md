@@ -13,7 +13,7 @@ what a mode does is [pd-mode-domain-v1.md](../../../../docs/spec/pd-mode-domain-
   (lighting, the key runtime); `pointing_modes.h` is the full API.
 - `modes/`: the one engine every pointing slot runs.
   `pointing_mode_configured.c` holds the latched pointing slot, the directional
-  path, button overrides and `emit_tap`; `pointing_mode_dragscroll.c` is the
+  path and `emit_tap`; `pointing_mode_dragscroll.c` is the
   scrolling path every scrolling pointing slot drives.
 - `policy/`: `pointing_mode_policy.h` answers trait questions about a mode, a
   key or a snapshot; `pointer_layer_policy.c` steers QMK's auto-mouse.
@@ -27,10 +27,13 @@ what a mode does is [pd-mode-domain-v1.md](../../../../docs/spec/pd-mode-domain-
 ## State
 
 `pointing_mode_runtime_shared_state_t` (`runtime/pointing_mode_runtime_shared_state_internal.h`)
-is the one store: the local active and locked mode, the owner keys (one entry
-per key position, every entry the active mode's), the slave half's mirrored
-display state in two banks under a publication counter, and three flags
-(synthetic auto-mouse anchor, DPI sync pending, auto-sniping layer).
+is the one store: the local active and locked mode and the active mode's
+source (its key or its linked layer, D-F62), the owner keys (one entry per key
+position, every entry the active mode's), the slave half's mirrored display
+state in two banks under a publication counter (with whether the active mode
+shows its light), and three flags (synthetic auto-mouse anchor, DPI sync
+pending, an auto-sniping layer on). The layer a key-started mode brings is
+`layer_ownership`'s, not this store's.
 
 - Local state changes only through `pointing_mode_apply_command()`; each command
   returns a before-and-after snapshot. Split sync samples the state on its
@@ -44,6 +47,14 @@ display state in two banks under a publication counter, and three flags
 - `pointing_mode_snapshot()` and `pointing_mode_snapshot_with_owner_bitmap()`
   are the readers for lighting and policy; take identity and owner keys from one
   call so they come from one publication.
+
+## Linked layers
+
+`pointing_mode_layer_started_mode()`, `pointing_mode_brought_layer()` and
+`pointing_mode_layer_started_light()` read a slot's link from its effective
+record, leaving out links to the pointer layer or a default layer. The command
+model applies them: the layer-state command while no key runs a mode, and the
+end of every key source.
 
 ## Traits
 

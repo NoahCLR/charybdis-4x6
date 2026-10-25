@@ -52,8 +52,8 @@ uint32_t noah_profile_settings_default(uint8_t id) {
             return AUTO_MOUSE_DEBOUNCE;
         case NOAH_SETTING_AUTO_SNIPING_ENABLED:
             return 1;
-        case NOAH_SETTING_AUTO_SNIPING_LAYER:
-            return CHARYBDIS_AUTO_SNIPING_LAYER;
+        case NOAH_SETTING_AUTO_SNIPING_LAYERS:
+            return UINT32_C(1) << CHARYBDIS_AUTO_SNIPING_LAYER;
         case NOAH_SETTING_FEEDBACK_PERIOD:
             return RGB_KEY_BEHAVIOR_FEEDBACK_FLASH_HALF_PERIOD_MS;
         case NOAH_SETTING_AUTO_MOUSE_DEAD_TIME:

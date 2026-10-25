@@ -14,11 +14,14 @@ PD_FIELD_AT(noah_pd_config_t, dpi, 4);
 PD_FIELD_AT(noah_pd_config_t, held_modifiers, 6);
 PD_FIELD_AT(noah_pd_config_t, reserved, 7);
 PD_FIELD_AT(noah_pd_config_t, name_length, NOAH_PROFILE_PD_V1_NAME_LENGTH);
-PD_FIELD_AT(noah_pd_config_t, name_reserved, 9);
+PD_FIELD_AT(noah_pd_config_t, linked_layer, 9);
+PD_FIELD_AT(noah_pd_config_t, link_direction, 10);
+PD_FIELD_AT(noah_pd_config_t, link_light, 11);
+PD_FIELD_AT(noah_pd_config_t, link_reserved, 12);
 PD_FIELD_AT(noah_pd_config_t, threshold_x, 32);
 PD_FIELD_AT(noah_pd_config_t, threshold_y, 34);
 PD_FIELD_AT(noah_pd_config_t, directions, 36);
-PD_FIELD_AT(noah_pd_config_t, buttons, 52);
+PD_FIELD_AT(noah_pd_config_t, retired_buttons, 52);
 PD_FIELD_AT(noah_pd_config_t, scroll, 70);
 PD_FIELD_AT(noah_pd_config_t, scroll.threshold_h, 70);
 PD_FIELD_AT(noah_pd_config_t, scroll.threshold_v, 72);
@@ -42,10 +45,7 @@ PD_FIELD_AT(noah_pd_config_t, name, NOAH_PROFILE_PD_V1_NAME_OFFSET);
 PD_FIELD_AT(noah_pd_tap_t, keycode, 0);
 PD_FIELD_AT(noah_pd_tap_t, policy, 2);
 PD_FIELD_AT(noah_pd_tap_t, mask, 3);
-PD_FIELD_AT(noah_pd_button_t, kind, 0);
-PD_FIELD_AT(noah_pd_button_t, modifiers, 1);
-PD_FIELD_AT(noah_pd_button_t, tap, 2);
-_Static_assert(sizeof(noah_pd_tap_t) == 4 && sizeof(noah_pd_button_t) == 6, "PD tap and button records are 4 and 6 bytes");
+_Static_assert(sizeof(noah_pd_tap_t) == 4, "a PD tap is 4 bytes");
 _Static_assert(sizeof(noah_pd_config_t) == NOAH_PROFILE_PD_V1_RECORD_SIZE, "a PD record is 128 bytes");
 // The cache holds the structure, so every 16-bit field reads aligned, and its
 // bytes are the wire's only on a little-endian target (the RP2040 and every
@@ -61,8 +61,7 @@ _Static_assert(__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__, "PD records are little
 // Every byte of a field, or from one field up to (not including) another.
 #define ZERO(p, member)           zero((p) + AT(member), SIZE(member))
 #define ZERO_UNTIL(p, first, end) zero((p) + AT(first), AT(end) - AT(first))
-#define TAP_AT(member)    offsetof(noah_pd_tap_t, member)
-#define BUTTON_AT(member) offsetof(noah_pd_button_t, member)
+#define TAP_AT(member) offsetof(noah_pd_tap_t, member)
 
 void noah_profile_pd_v1_encode_record(const noah_pd_config_t *config, uint8_t output[NOAH_PROFILE_PD_V1_RECORD_SIZE]) {
     uint8_t length = 0;
@@ -122,26 +121,23 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *p,
     if (!p || slot >= NOAH_PROFILE_PD_V1_SLOT_COUNT) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
     if (length != NOAH_PROFILE_PD_V1_RECORD_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
     if (U8(p, id) != slot) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ID, AT(id));
-    if (U8(p, reserved) || !ZERO(p, name_reserved) || !ZERO(p, tail_reserved)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, U8(p, reserved) ? AT(reserved) : !ZERO(p, name_reserved) ? AT(name_reserved) : AT(tail_reserved));
+    if (U8(p, reserved) || !ZERO(p, link_reserved) || !ZERO(p, retired_buttons) || !ZERO(p, tail_reserved)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, U8(p, reserved) ? AT(reserved) : !ZERO(p, link_reserved) ? AT(link_reserved) : !ZERO(p, retired_buttons) ? AT(retired_buttons) : AT(tail_reserved));
     if (!name_valid(p)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_NAME, AT(name_length));
     if (U8(p, kind) > NOAH_PD_KIND_SCROLLING || U8(p, pointer_layer) > NOAH_PD_POINTER_LAYER_PREFER_TYPING || U8(p, axis) > NOAH_PD_AXIS_EIGHT) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, AT(kind));
+    if (U8(p, link_direction) > NOAH_PD_LINK_BOTH) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, AT(link_direction));
+    if (U8(p, link_light) > 1u) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, AT(link_light));
     if (U8(p, kind) == NOAH_PD_KIND_DISABLED) {
-        // Everything but the ID and the name is zero.
-        if (!ZERO_UNTIL(p, pointer_layer, name_length) || !ZERO_UNTIL(p, threshold_x, tail_reserved)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(pointer_layer));
+        // Everything but the ID and the name is zero: an empty slot has no link.
+        if (!ZERO_UNTIL(p, pointer_layer, name_length) || !ZERO_UNTIL(p, linked_layer, link_reserved) || !ZERO_UNTIL(p, threshold_x, tail_reserved)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(pointer_layer));
         return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
     }
     if (!U8(p, name_length)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_NAME, AT(name_length));
+    // A link names a layer and a direction; no link leaves every link byte zero.
+    if (U8(p, linked_layer) >= NOAH_PD_LINK_LAYER_COUNT || (U8(p, link_direction) == NOAH_PD_LINK_NONE && (U8(p, linked_layer) || U8(p, link_light)))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(linked_layer));
+    // The light switch only says how a mode its layer started is shown.
+    if (U8(p, link_light) && !(U8(p, link_direction) & NOAH_PD_LINK_LAYER_TURNS_MODE_ON)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(link_light));
     for (size_t i = AT(directions); i < AT(directions) + SIZE(directions); i += sizeof(noah_pd_tap_t)) {
         if (!tap_valid(p + i)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ACTION, i);
-    }
-    for (size_t i = AT(buttons); i < AT(buttons) + SIZE(buttons); i += sizeof(noah_pd_button_t)) {
-        const uint8_t *button = p + i;
-        uint8_t        kind   = button[BUTTON_AT(kind)];
-        if (kind > NOAH_PD_BUTTON_HOLD_MODIFIERS || (kind <= NOAH_PD_BUTTON_CONSUME && !zero(button + BUTTON_AT(modifiers), sizeof(noah_pd_button_t) - BUTTON_AT(modifiers))) ||
-            (kind == NOAH_PD_BUTTON_TAP && (button[BUTTON_AT(modifiers)] || !u16(button + BUTTON_AT(tap) + TAP_AT(keycode)) || !tap_valid(button + BUTTON_AT(tap)))) ||
-            (kind == NOAH_PD_BUTTON_HOLD_MODIFIERS && (!button[BUTTON_AT(modifiers)] || !zero(button + BUTTON_AT(tap), sizeof(noah_pd_tap_t))))) {
-            return fail(error, NOAH_PROFILE_PD_V1_INVALID_ACTION, i);
-        }
     }
     if (U8(p, kind) == NOAH_PD_KIND_DIRECTIONAL && U8(p, axis) == NOAH_PD_AXIS_EIGHT) {
         // Both axes are read, so both need a threshold; the diagonals sit
@@ -164,10 +160,10 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *p,
         if (!ZERO(p, diagonal_reserved)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, AT(diagonal_reserved));
         if ((U8(p, axis) != NOAH_PD_AXIS_VERTICAL && !U16(p, threshold_x)) || (U8(p, axis) != NOAH_PD_AXIS_HORIZONTAL && !U16(p, threshold_y))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(threshold_x));
         if ((U8(p, axis) == NOAH_PD_AXIS_VERTICAL && (U16(p, threshold_x) || !ZERO_UNTIL(p, directions[NOAH_PD_DIRECTION_LEFT], directions[NOAH_PD_DIRECTION_UP]))) ||
-            (U8(p, axis) == NOAH_PD_AXIS_HORIZONTAL && (U16(p, threshold_y) || !ZERO_UNTIL(p, directions[NOAH_PD_DIRECTION_UP], buttons)))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(threshold_x));
+            (U8(p, axis) == NOAH_PD_AXIS_HORIZONTAL && (U16(p, threshold_y) || !ZERO_UNTIL(p, directions[NOAH_PD_DIRECTION_UP], retired_buttons)))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(threshold_x));
     } else {
         // The axis is which axes it scrolls; the directional fields are zero.
-        if (U8(p, axis) > NOAH_PD_SCROLL_VERTICAL || !ZERO_UNTIL(p, threshold_x, buttons)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(axis));
+        if (U8(p, axis) > NOAH_PD_SCROLL_VERTICAL || !ZERO_UNTIL(p, threshold_x, retired_buttons)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(axis));
         if (!U16(p, scroll.threshold_h) || !U16(p, scroll.threshold_v) || !U16(p, scroll.divisor_h) || !U16(p, scroll.divisor_v) ||
             !U16(p, scroll.axis_timeout_ms) || U16(p, scroll.expiry_ms) < U16(p, scroll.axis_timeout_ms) ||
             !U8(p, scroll_policy.start_num) || !U8(p, scroll_policy.start_den) || !U8(p, scroll_policy.sustain_num) || !U8(p, scroll_policy.sustain_den) ||
@@ -217,6 +213,13 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_next(noah_profile_pd_v1_cu
     if (!cursor || cursor->index >= cursor->count) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
     noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_entry(record, NOAH_PROFILE_PD_V1_RECORD_SIZE, cursor->minimum, error);
     if (result != NOAH_PROFILE_PD_V1_OK) return result;
+    // One slot per layer, in any direction, so links cannot start each other
+    // in a chain (D-F62).
+    if (U8(record, link_direction) != NOAH_PD_LINK_NONE) {
+        uint16_t layer = (uint16_t)(1u << U8(record, linked_layer));
+        if (cursor->linked_layers & layer) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(linked_layer));
+        cursor->linked_layers |= layer;
+    }
     cursor->minimum = (uint8_t)(U8(record, id) + 1u);
     cursor->index++;
     return result;

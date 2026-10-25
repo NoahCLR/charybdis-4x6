@@ -93,6 +93,12 @@ static inline pointing_mode_snapshot_t host_runtime_fixture_pointing_mode_snapsh
 
     local_view.owner_sides   = local_owner_sides;
     display_view.owner_sides = display_owner_sides;
+    // The fixture's local modes run from their keys, so they show their own
+    // light; the slave half shows what the master mirrored.
+    local_view.active_source  = local_active != 0 ? POINTING_MODE_SOURCE_KEY : POINTING_MODE_SOURCE_NONE;
+    local_view.active_light   = local_active != 0;
+    display_view.active_source = is_master ? local_view.active_source : POINTING_MODE_SOURCE_NONE;
+    display_view.active_light  = display_active != 0 && (is_master ? local_view.active_light : remote.active_mode_light != 0u);
 
     return (pointing_mode_snapshot_t){
         .local   = local_view,

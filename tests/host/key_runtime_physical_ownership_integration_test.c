@@ -398,12 +398,6 @@ bool noah_synthetic_record_active(void) {
     return false;
 }
 
-bool pointing_mode_handle_key_event(uint16_t keycode, keyrecord_t *record) {
-    (void)keycode;
-    (void)record;
-    return false;
-}
-
 static void test_activate_single_hold(uint16_t keycode, keypos_t key_pos) {
     CHECK(!key_runtime_integration_process_record(keycode, key_pos, true));
 

@@ -475,7 +475,7 @@ static noah_profile_store_result_t validate_candidate(const noah_profile_store_t
     if (!candidate || candidate->payload_length < PROFILE_BLOB_HEADER_SIZE || candidate->payload_length > NOAH_PROFILE_STORAGE_SLOT_PAYLOAD_MAX || candidate->generation == 0u || candidate->origin_half > 1u || candidate->schema_major > 15u || candidate->schema_minor > 15u || (candidate->flags & (uint8_t)~NOAH_PROFILE_STORE_ALLOWED_FLAGS) != 0u || candidate->format_version != NOAH_PROFILE_STORE_FORMAT_VERSION) {
         return NOAH_PROFILE_STORE_INVALID_ARGUMENT;
     }
-    if (candidate->schema_major != store->compatibility.schema_major || candidate->schema_minor != store->compatibility.schema_minor || (candidate->schema_major != NOAH_PROFILE_SCHEMA_MAJOR || candidate->schema_minor != 0u)) {
+    if (candidate->schema_major != store->compatibility.schema_major || candidate->schema_minor != store->compatibility.schema_minor || (candidate->schema_major != NOAH_PROFILE_SCHEMA_MAJOR || candidate->schema_minor != NOAH_PROFILE_SCHEMA_MINOR)) {
         return NOAH_PROFILE_STORE_INCOMPATIBLE_SCHEMA;
     }
     if (candidate->action_abi_digest != store->compatibility.action_abi_digest) {

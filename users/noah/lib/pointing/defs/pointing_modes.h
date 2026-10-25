@@ -31,6 +31,9 @@ typedef struct {
 
 _Static_assert(POINTING_MODE_KEYCODE_COUNT == POINTING_MODE_COUNT, "pointing-mode keycode count in custom_keycodes enum doesn't match POINTING_MODE_COUNT — keep the pointing-mode keycode block dense and update both together");
 
+// No linked layer.
+#define POINTING_MODE_NO_LAYER UINT8_MAX
+
 typedef enum {
     POINTING_MODE_COMMAND_NONE = 0,
     POINTING_MODE_COMMAND_ACTIVATE,
@@ -40,6 +43,9 @@ typedef enum {
     POINTING_MODE_COMMAND_KEY_PRESS,
     POINTING_MODE_COMMAND_KEY_RELEASE,
     POINTING_MODE_COMMAND_REMOTE_SNAPSHOT,
+    // The layers changed to layer_state: the layer links decide what runs
+    // when no key runs a mode (D-F62). The layer-state hook sends it.
+    POINTING_MODE_COMMAND_LAYER_STATE,
 } pointing_mode_command_kind_t;
 
 typedef struct {
@@ -51,6 +57,8 @@ typedef struct {
     split_side_mask_t            owner_sides;
     keypos_t                     owner_key_pos;
     const uint8_t               *owner_bitmap;
+    bool                         active_light;
+    layer_state_t                layer_state;
 } pointing_mode_command_t;
 
 typedef struct {
@@ -65,7 +73,15 @@ extern const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT];
 
 pointing_mode_apply_result_t pointing_mode_apply_command(pointing_mode_command_t command);
 void                         pointing_mode_apply_remote_mode_ids(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides);
-void                         pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides, const uint8_t *owner_bitmap);
+void                         pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, bool active_light, split_side_mask_t owner_sides, const uint8_t *owner_bitmap);
+// The layer-state hook's command.
+void                         pointing_mode_apply_layer_state(layer_state_t state);
+// After a new profile generation or working copy is published: the links it
+// holds are evaluated against the layers that are on (D-F62).
+void                         pointing_mode_reevaluate_layer_links(void);
+// Before the pointing slots are republished: a mode its layer started ends,
+// so no engine holds a slot that changes (D-F62).
+void                         pointing_mode_end_layer_started_mode(void);
 void                         pointing_mode_apply_remote_snapshot(pointing_mode_mask_t active_flags, pointing_mode_mask_t locked_flags);
 
 const pointing_mode_def_t *pointing_mode_lookup(pointing_mode_mask_t mode);
@@ -86,7 +102,6 @@ bool pointing_mode_handle_keycode_release_at(uint16_t keycode, keypos_t key_pos)
 bool pointing_mode_local_owner_bitmap_snapshot(uint8_t *out_bitmap);
 bool pointing_mode_display_owner_bitmap_snapshot(uint8_t *out_bitmap);
 
-bool                 pointing_mode_handle_key_event(uint16_t keycode, keyrecord_t *record);
 pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode);
 
 // Queue or service the active mode's DPI policy on the normal scan path
@@ -105,3 +120,14 @@ void pointing_mode_apply_active_dpi(void);
 // The policy traits the mode's effective slot implies; none for a disabled or
 // unknown mode.
 pointing_mode_traits_t pointing_mode_effective_traits(pointing_mode_mask_t mode);
+
+// Linked layers, from the effective slots (D-F62). A link to the pointer layer
+// or to a default layer is inert: it starts nothing and brings nothing.
+// The mode the highest linked layer that is on in `state` starts, through a
+// link that turns its mode on; zero when none.
+pointing_mode_mask_t pointing_mode_layer_started_mode(layer_state_t state);
+// The layer `mode` brings while its key runs it, through a link that turns its
+// layer on; POINTING_MODE_NO_LAYER when none.
+uint8_t              pointing_mode_brought_layer(pointing_mode_mask_t mode);
+// Whether `mode` shows its own light when its layer started it.
+bool                 pointing_mode_layer_started_light(pointing_mode_mask_t mode);

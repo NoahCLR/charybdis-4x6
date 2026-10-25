@@ -50,7 +50,7 @@ static noah_profile_validator_v1_profile_t profile;
 static noah_profile_validator_v1_result_t validate(void) {
     noah_profile_validator_v1_t validator;
     noah_profile_validator_v1_declaration_t declaration = {
-        .schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .domain_mask = 16, .byte_length = blob_length, .action_abi_digest = 42,
+        .schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = NOAH_PROFILE_SCHEMA_MINOR, .domain_mask = 16, .byte_length = blob_length, .action_abi_digest = 42,
         .crc32 = noah_profile_crc32_finish(noah_profile_crc32_update(NOAH_PROFILE_CRC32_INITIAL, blob, blob_length)),
         .digest = noah_profile_fnv1a_update(NOAH_PROFILE_FNV1A_INITIAL, blob, blob_length),
     };
@@ -70,14 +70,14 @@ static noah_profile_validator_v1_result_t validate(void) {
     return result;
 }
 
-// Frames one PD domain payload as a whole schema-2 blob.
+// Frames one PD domain payload as a whole current-schema blob.
 static size_t load_domain(const char *path) {
     FILE *file = fopen(path, "rb");
     assert(file);
     size_t length = fread(blob + 14, 1, sizeof(blob) - 14, file);
     assert(feof(file));
     fclose(file);
-    memcpy(blob, (uint8_t[]){'N', 'L', 'P', '1', 4, 0, 1, 1, 0x50, NOAH_PROFILE_PD_V1_VERSION, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), 0}, 14);
+    memcpy(blob, (uint8_t[]){'N', 'L', 'P', '1', 4, 1, 1, 1, 0x50, NOAH_PROFILE_PD_V1_VERSION, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), 0}, 14);
     blob_length   = 14 + length;
     reader.length = blob_length;
     return length;

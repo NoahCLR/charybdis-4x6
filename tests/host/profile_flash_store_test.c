@@ -154,13 +154,13 @@ static void reset_chip(fake_flash_t *chip, uint8_t fill) {
 }
 
 static noah_profile_store_compatibility_t compatibility(void) {
-    return (noah_profile_store_compatibility_t){.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = 0u, .compiled_default_digest = COMPILED_DIGEST, .action_abi_digest = ACTION_ABI_DIGEST};
+    return (noah_profile_store_compatibility_t){.schema_major = NOAH_PROFILE_SCHEMA_MAJOR, .schema_minor = NOAH_PROFILE_SCHEMA_MINOR, .compiled_default_digest = COMPILED_DIGEST, .action_abi_digest = ACTION_ABI_DIGEST};
 }
 
 // A canonical blob of `length` bytes: one RGB domain filling it, its bytes
 // a pattern of `seed`.
 static void build_profile(uint8_t *payload, uint32_t length, uint8_t seed) {
-    static const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 0u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB};
+    static const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 1u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB};
     uint32_t             domain   = length - 14u;
 
     memcpy(payload, header, sizeof(header));
@@ -177,7 +177,7 @@ static noah_profile_store_candidate_t candidate_for(const uint8_t *payload, uint
     return (noah_profile_store_candidate_t){
         .format_version          = NOAH_PROFILE_STORE_FORMAT_VERSION,
         .schema_major            = NOAH_PROFILE_SCHEMA_MAJOR,
-        .schema_minor            = 0u,
+        .schema_minor            = NOAH_PROFILE_SCHEMA_MINOR,
         .domain_mask             = 1u,
         .flags                   = NOAH_PROFILE_STORE_FLAG_OVERRIDE,
         .payload_length          = length,

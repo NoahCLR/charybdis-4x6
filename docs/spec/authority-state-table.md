@@ -145,7 +145,7 @@ pending one stays observable. Edit status page 2 reports the reason mask
 | 1 | tap series | the key runtime's open tap series |
 | 2 | runtime lease | the key runtime's leases, held and repeating actions and momentary ownership included |
 | 3 | deferred release | the key runtime's pending releases |
-| 4 | persistent intent | the key runtime's layer, pointing-mode and pointer locks, and a pointing mode active, locked or still releasing a consumed button |
+| 4 | persistent intent | the key runtime's layer, pointing-mode and pointer locks, and a pointing mode its key holds or locks; a mode its layer started is not one (D-F62) |
 | 5 | owned output | managed HID usages held, mouse buttons included |
 | 6 | modifier or one-shot | real, weak, one-shot or locked one-shot modifiers |
 | 7 | one-shot layer | QMK's one-shot layer |
@@ -162,4 +162,4 @@ pending one stays observable. Edit status page 2 reports the reason mask
 - Each evaluation is published as one snapshot, so a status read never mixes
   counts from two evaluations.
 
-Held by: `tests/host/run_profile_activation_policy_tests.sh` (`profile_activation_policy_test.c`: `test_reason_bits_are_exact_and_composable`, `test_runtime_capture_and_status`, `test_other_half_observation_fails_closed`, `test_status_fails_closed_during_publication`, `test_configured_pd_blocks_until_release_and_does_not_wrap`), `tests/host/run_profile_owner_tests.sh` (`test_commit_waits_for_a_safe_boundary_then_activates`, `test_activation_waits_for_a_safe_boundary_while_typing`, `test_link_lost_after_the_other_half_commit_was_seen_still_activates`), `tests/host/run_profile_split_foundation_tests.sh` (`test_authority_publication_and_activation_observer`).
+Held by: `tests/host/run_profile_activation_policy_tests.sh` (`profile_activation_policy_test.c`: `test_reason_bits_are_exact_and_composable`, `test_runtime_capture_and_status`, `test_other_half_observation_fails_closed`, `test_status_fails_closed_during_publication`, `test_a_key_started_mode_holds_activation_and_a_layer_started_one_does_not`), `tests/host/run_profile_owner_tests.sh` (`test_commit_waits_for_a_safe_boundary_then_activates`, `test_activation_waits_for_a_safe_boundary_while_typing`, `test_link_lost_after_the_other_half_commit_was_seen_still_activates`), `tests/host/run_profile_split_foundation_tests.sh` (`test_authority_publication_and_activation_observer`).

@@ -566,6 +566,7 @@ const key_behavior_t
 
             // ─── Editing / System Keys ───────────────────────────────────────────────────────
             {.keycode = KC_ESC, .tap_counts = {[0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))}, [1] = {.tap = TAP_SENDS(S(KC_GRV))}}},
+            {.keycode = KC_BSPC, .longer_hold_term = 500, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_BSPC)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_BSPC))}}},
             {.keycode = KC_LEFT_SHIFT, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_CAPS)}}},
             {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(PD_SLOT_4_LOCK)}, [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_6)}}},
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},

@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
     if (named) assert(fclose(named) == 0);
     assert(length == NOAH_SETTINGS_MIN_SIZE + 4 + 5 + 32 + 15 + 32 + 11 + 4);
     const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
-    assert(NOAH_SETTINGS_VERSION == 8u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
+    assert(NOAH_SETTINGS_VERSION == 9u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
     keyrecord_t record = {0};
     assert(get_tapping_term(0, &record) == TAPPING_TERM && get_quick_tap_term(0, &record) == TAPPING_TERM);
