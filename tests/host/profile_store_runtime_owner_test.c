@@ -30,7 +30,7 @@ enum {
 // Every profile the keyboard runs carries its pointing slots (the PD domain);
 // this one carries it with every slot disabled.
 static const uint8_t compiled_blob[] = {
-    'N', 'L', 'P', '1', 4u, 1u, 1u, 1u,
+    'N', 'L', 'P', '1', 4u, 2u, 1u, 1u,
     NOAH_PROFILE_DOMAIN_V1_PD, NOAH_PROFILE_DOMAIN_VERSION_PD, NOAH_PROFILE_PD_V1_HEADER_SIZE, 0u, 0u, 0u,
     NOAH_PROFILE_PD_V1_VERSION, NOAH_PROFILE_PD_V1_SLOT_COUNT, NOAH_PROFILE_PD_V1_RECORD_SIZE, 0u, 0u, 0u, 0u, 0u,
 };

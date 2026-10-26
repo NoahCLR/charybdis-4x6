@@ -170,6 +170,12 @@ uint32_t last_matrix_activity_elapsed(void) {
     return fake_last_matrix_idle_ms;
 }
 
+// No custom key here turns a layer on (D-F26); the pointer layer policy asks.
+bool noah_custom_key_has_layers(uint16_t keycode) {
+    (void)keycode;
+    return false;
+}
+
 bool is_keyboard_master(void) {
     return fake_is_master;
 }

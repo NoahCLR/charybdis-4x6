@@ -30,7 +30,10 @@
 #define KEY_RUNTIME_CORE_ACTIVE_BITMAP_WORD_COUNT ((KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY + 31u) / 32u)
 #define KEY_RUNTIME_CORE_LEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 4u))
 #define KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY ((uint16_t)(KEY_RUNTIME_CORE_PRESS_TOKEN_CAPACITY * 2u))
-#define KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY 16u
+// The intents the table holds: a pointing mode's lock and its pointer toggle,
+// one of each at a time, with room to spare. Layer locks and one-shot layers
+// are masks beside it (persistent_layer_locks, persistent_layer_oneshots).
+#define KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY 4u
 #define KEY_RUNTIME_CORE_EFFECT_PLAN_CAPACITY 16u
 
 #ifndef KEY_RUNTIME_CORE_TOKEN_ID_MAX
@@ -323,6 +326,8 @@ typedef struct {
     lease_t                              leases[KEY_RUNTIME_CORE_LEASE_CAPACITY];
     pending_release_slot_t               pending_releases[KEY_RUNTIME_CORE_PENDING_RELEASE_CAPACITY];
     persistent_intent_t                  persistent_intents[KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY];
+    layer_state_t                        persistent_layer_locks;
+    layer_state_t                        persistent_layer_oneshots;
     key_runtime_core_shadow_projection_t shadow_projection;
     uint16_t                             current_time;
     uint16_t                             next_token_id;

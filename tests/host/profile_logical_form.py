@@ -2,7 +2,7 @@
 
 Each domain decodes to plain JSON values, field by field, following the specs
 in docs/spec/: RGB v4 (rgb-domain-v1.md), key behaviours v2, combos v3,
-settings v8, keymap v1 and macros v1 (profile-wire-v1/), sparse PD v3
+settings v10, keymap v1 and macros v1 (profile-wire-v1/), sparse PD v3
 (pd-mode-domain-v1.md). An action is written as the native keycode it stands for, so a
 combo naming pointing slot 5 as a semantic action and one naming it as the keycode
 0x7e85 read the same; nonzero action flags are kept beside it.
@@ -125,12 +125,15 @@ SETTING_NAMES = [
 
 
 def settings(data: bytes) -> dict:
-    assert list(data[:8]) == [9, 16, 31, 128, 128, data[5], 128, 0]
+    assert list(data[:8]) == [10, 16, 31, 128, 128, data[5], 128, 0]
     value = {"flags": data[5], "values": {name: _u32(data, 8 + 4 * index) for index, name in enumerate(SETTING_NAMES)}}
     value["layers"] = [{"comboReference": data[at], "bypass": data[at + 1 : at + 9].hex(), "exclusion": data[at + 9 : at + 17].hex()}
                        for at in range(132, 404, 17)]
-    value["customKeyShortcuts"] = {slot: [data[404 + 2 * slot], data[405 + 2 * slot]] for slot in range(128) if data[404 + 2 * slot] or data[405 + 2 * slot]}
-    names, offset = [], 660
+    # Each shortcut: its modifier mask, its key, its layer mask and the layer
+    # kind they act as (D-F26).
+    records = {slot: data[404 + 5 * slot : 409 + 5 * slot] for slot in range(128)}
+    value["customKeyShortcuts"] = {slot: [r[0], r[1], r[2] | r[3] << 8, r[4]] for slot, r in records.items() if any(r)}
+    names, offset = [], 1044
     for _ in range(16 + 128 + 128 + 1):
         names.append(data[offset + 1 : offset + 1 + data[offset]].decode("utf-8"))
         offset += 1 + data[offset]

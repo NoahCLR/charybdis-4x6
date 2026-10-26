@@ -18,7 +18,7 @@ Eight bytes, then the domains:
 | ---: | ---: | --- |
 | 0 | 4 | ASCII magic `NLP1` |
 | 4 | 1 | schema major, `4` |
-| 5 | 1 | schema minor, `1` |
+| 5 | 1 | schema minor, `2` |
 | 6 | 1 | domain count, `0..7` |
 | 7 | 1 | flags: exactly `0x01` (bit 0 canonical encoding; bits 1–7 reserved) |
 
@@ -166,7 +166,7 @@ output. A combo holds its output while it is held.
 | `LT()` | yes | no | no | no | no |
 | `TG()`, `TO()`, `LOCK_LAYER()` | yes | yes | yes | yes | yes |
 | `DF()`, `PDF()`, and any layer keycode naming a layer at or above the layer count | no | no | no | no | no |
-| Any other keycode in QMK's user range `0x7e40..0x7fff`: the inert `0x7e40..0x7e7f` block, layer locks past the layer count, `0x7ee0..0x7eff`, `0x7f80..0x7fff` | no | no | no | no | no |
+| Any other keycode in QMK's user range `0x7e40..0x7fff`: the inert `0x7e40..0x7e7f` block, layer locks past the layer count, `0x7ee0..0x7eff`, and `0x7f80..0x7fff`, which only the runtime sends (`CUSTOM_KEY_LAYER_TAP(n)`, D-F26) | no | no | no | no | no |
 
 A refused behaviour action is `INVALID_REFERENCE` at its row, tap index and
 field; a refused combo output refuses the combo domain at its row; a refused

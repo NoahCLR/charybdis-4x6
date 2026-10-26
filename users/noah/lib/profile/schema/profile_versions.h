@@ -8,8 +8,9 @@
 #define NOAH_PROFILE_SCHEMA_MAJOR 4u
 // A later capability raises the minor (D-F28): 4.1 links pointing slots to
 // layers and makes auto-sniping's layer a set (pointing v4, settings v9,
-// D-F62).
-#define NOAH_PROFILE_SCHEMA_MINOR 1u
+// D-F62); 4.2 lets a custom key's shortcut turn layers on (settings v10,
+// D-F26).
+#define NOAH_PROFILE_SCHEMA_MINOR 2u
 // A 128 KiB profile slot less the first kilobyte its header and commit
 // marker take on flash (D-F29).
 #define NOAH_PROFILE_PAYLOAD_MAX 130048u

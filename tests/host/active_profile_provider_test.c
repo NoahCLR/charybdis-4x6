@@ -13,8 +13,8 @@ enum {
     REASON_MACRO_BUSY = 1u << 3,
 };
 
-static const uint8_t canonical_empty_profile[]    = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
-static const uint8_t canonical_behavior_profile[] = "\x4e\x4c\x50\x31\x04\x01\x01\x01\x20\x02\x42\x00\x00\x00\x02\x00"
+static const uint8_t canonical_empty_profile[]    = {'N', 'L', 'P', '1', 4u, 2u, 0u, 1u};
+static const uint8_t canonical_behavior_profile[] = "\x4e\x4c\x50\x31\x04\x02\x01\x01\x20\x02\x42\x00\x00\x00\x02\x00"
                                                     "\x03\x00\x24\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02"
                                                     "\xff\xff\x00\x00\x00\x02\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00"
                                                     "\x0a\x00\x02\x00\x03\x00\x03\x00\x16\x00\x04\x00\x02\x00\x00\x00"
@@ -576,7 +576,7 @@ static void test_keymap_and_macro_publication_requires_safe_boundary(void) {
     for (size_t domain = 0; domain < 2; domain++) {
         uint8_t bytes[14 + 2048] = {0};
         uint16_t payload_length = domain == 0 ? 2048 : 128;
-        memcpy(bytes, "NLP1\4\1\1\1", 8);
+        memcpy(bytes, "NLP1\4\2\1\1", 8);
         bytes[8] = ids[domain]; bytes[9] = 1;
         bytes[10] = (uint8_t)payload_length; bytes[11] = (uint8_t)(payload_length >> 8);
         noah_profile_reader_t reader = noah_profile_reader_from_memory(bytes, 14 + payload_length);

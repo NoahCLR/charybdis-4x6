@@ -61,6 +61,15 @@ static uint8_t               owned_part_release_mods[16];
 static uint8_t               owned_part_release_count;
 // The live shortcuts, as the settings runtime would report them.
 static noah_custom_key_shortcut_t test_shortcuts[CUSTOM_KEY_SLOT_COUNT];
+// The layers each held shortcut owns in layer ownership, by key.
+typedef struct {
+    keypos_t      key_pos;
+    layer_state_t layers;
+} shortcut_layer_call_t;
+static shortcut_layer_call_t shortcut_layer_presses[8];
+static uint8_t               shortcut_layer_press_count;
+static keypos_t              shortcut_layer_releases[8];
+static uint8_t               shortcut_layer_release_count;
 static uint16_t              fake_time;
 static uint8_t               timer_read_count;
 layer_state_t                layer_state;
@@ -99,6 +108,8 @@ static void test_reset_stubs(void) {
     owned_part_count             = 0;
     owned_part_release_count     = 0;
     memset(test_shortcuts, 0, sizeof(test_shortcuts));
+    shortcut_layer_press_count   = 0;
+    shortcut_layer_release_count = 0;
     fake_time                    = 1000;
     timer_read_count             = 0;
 }
@@ -236,6 +247,30 @@ bool owned_keycode_release(owned_keycode_lease_t *lease) {
 
 noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
     return slot < CUSTOM_KEY_SLOT_COUNT ? test_shortcuts[slot] : (noah_custom_key_shortcut_t){0};
+}
+
+void layer_ownership_shortcut_press(keypos_t key_pos, layer_state_t layers) {
+    CHECK(shortcut_layer_press_count < ARRAY_SIZE(shortcut_layer_presses));
+    shortcut_layer_presses[shortcut_layer_press_count++] = (shortcut_layer_call_t){.key_pos = key_pos, .layers = layers};
+}
+
+bool layer_ownership_shortcut_release(keypos_t key_pos) {
+    CHECK(shortcut_layer_release_count < ARRAY_SIZE(shortcut_layer_releases));
+    shortcut_layer_releases[shortcut_layer_release_count++] = key_pos;
+    return true;
+}
+
+// A held Lock or Move to shortcut acts on its set at the press (D-F26).
+static layer_state_t lock_set_layers, goto_set_layers;
+
+bool layer_ownership_toggle_lock_set(layer_state_t layers) {
+    lock_set_layers = layers;
+    return true;
+}
+
+bool layer_ownership_goto_set(layer_state_t layers) {
+    goto_set_layers = layers;
+    return true;
 }
 
 static void test_shared_action_refcounts_press_and_release(void) {
@@ -423,6 +458,71 @@ static void test_custom_key_shortcut_parts_and_absence(void) {
     CHECK(!held_action_survives_flush(key_pos, CUSTOM_KEY_7));
 }
 
+// A held shortcut's layers are owned by the key holding it (D-F26), beside its
+// modifiers and key: on with the press, released by that key, whatever the
+// profile says by then. A shortcut of layers alone holds no report lease.
+static void test_custom_key_holds_its_layers_through_layer_ownership(void) {
+    keypos_t key_a = test_keypos(6, 0);
+    keypos_t key_b = test_keypos(6, 1);
+
+    test_reset_stubs();
+    test_shortcuts[8] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_GUI), .layers = 0x0218};
+    test_shortcuts[9] = (noah_custom_key_shortcut_t){.layers = 0x0004};
+
+    held_action_register(key_a, CUSTOM_KEY_8);
+    CHECK(owned_part_count == 1 && owned_part_calls[0].mods == MOD_BIT(KC_LEFT_GUI));
+    CHECK(shortcut_layer_press_count == 1 && shortcut_layer_presses[0].key_pos.row == 6 && shortcut_layer_presses[0].key_pos.col == 0 && shortcut_layer_presses[0].layers == 0x0218);
+
+    held_action_register(key_b, CUSTOM_KEY_9);
+    CHECK(owned_part_count == 1);
+    CHECK(shortcut_layer_press_count == 2 && shortcut_layer_presses[1].key_pos.col == 1 && shortcut_layer_presses[1].layers == 0x0004);
+    CHECK(held_action_survives_flush(key_b, CUSTOM_KEY_9));
+
+    test_shortcuts[8] = (noah_custom_key_shortcut_t){0};
+    held_action_unregister(key_a, CUSTOM_KEY_8);
+    CHECK(owned_release_count == 1 && owned_part_release_mods[0] == MOD_BIT(KC_LEFT_GUI));
+    CHECK(shortcut_layer_release_count == 1 && shortcut_layer_releases[0].col == 0);
+    CHECK(held_action_release_owned_by_key(key_b));
+    CHECK(owned_release_count == 1);
+    CHECK(shortcut_layer_release_count == 2 && shortcut_layer_releases[1].col == 1);
+    CHECK(press_call_count == 0 && release_call_count == 0);
+}
+
+// Held, a Lock or Move to shortcut acts on its layers at the press, as TG()
+// and TO() do, and holds none; Tap-toggle and One-shot hold them as Hold does.
+// Its keys are held either way.
+static void test_held_custom_key_acts_on_its_layers_by_kind(void) {
+    keypos_t key_pos = test_keypos(6, 2);
+
+    test_reset_stubs();
+    lock_set_layers = goto_set_layers = 0;
+    test_shortcuts[10] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_SHIFT), .layers = 0x0030, .layer_kind = NOAH_SHORTCUT_LAYERS_LOCK};
+    held_action_register(key_pos, CUSTOM_KEY_10);
+    CHECK(lock_set_layers == 0x0030 && goto_set_layers == 0 && shortcut_layer_press_count == 0);
+    CHECK(owned_part_count == 1 && owned_part_calls[0].mods == MOD_BIT(KC_LEFT_SHIFT));
+    held_action_unregister(key_pos, CUSTOM_KEY_10);
+    CHECK(lock_set_layers == 0x0030 && owned_release_count == 1);
+
+    test_reset_stubs();
+    lock_set_layers = goto_set_layers = 0;
+    test_shortcuts[10] = (noah_custom_key_shortcut_t){.layers = 0x0030, .layer_kind = NOAH_SHORTCUT_LAYERS_MOVE};
+    held_action_register(key_pos, CUSTOM_KEY_10);
+    CHECK(goto_set_layers == 0x0030 && lock_set_layers == 0 && shortcut_layer_press_count == 0);
+    held_action_unregister(key_pos, CUSTOM_KEY_10);
+
+    for (uint8_t kind = NOAH_SHORTCUT_LAYERS_TAP_TOGGLE; kind <= NOAH_SHORTCUT_LAYERS_ONESHOT; kind++) {
+        test_reset_stubs();
+        lock_set_layers = goto_set_layers = 0;
+        test_shortcuts[10] = (noah_custom_key_shortcut_t){.layers = 0x0030, .layer_kind = kind};
+        held_action_register(key_pos, CUSTOM_KEY_10);
+        CHECK(shortcut_layer_press_count == 1 && shortcut_layer_presses[0].layers == 0x0030);
+        CHECK(lock_set_layers == 0 && goto_set_layers == 0);
+        held_action_unregister(key_pos, CUSTOM_KEY_10);
+        CHECK(shortcut_layer_release_count == 1);
+    }
+    test_shortcuts[10] = (noah_custom_key_shortcut_t){0};
+}
+
 static void test_release_owned_by_key_reports_missing_bindings(void) {
     test_reset_stubs();
 
@@ -579,6 +679,8 @@ int main(void) {
     test_failed_literal_acquire_never_falls_back_to_unscoped_release();
     test_custom_key_holds_its_shortcut_through_an_exact_lease();
     test_custom_key_shortcut_parts_and_absence();
+    test_custom_key_holds_its_layers_through_layer_ownership();
+    test_held_custom_key_acts_on_its_layers_by_kind();
     test_release_owned_by_key_reports_missing_bindings();
     test_repeat_tick_returns_without_timer_work_when_idle();
     test_repeat_binding_taps_immediately_and_on_tick_until_release();

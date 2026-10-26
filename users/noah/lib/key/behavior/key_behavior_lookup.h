@@ -17,7 +17,7 @@ typedef struct {
     uint8_t               source_row;
     bool                  source_is_live;
     bool                  handled;
-    bool                  is_momentary_layer; // holds its layer from the press: MO(), TT(), OSL(), LM()
+    bool                  is_momentary_layer; // holds its layer from the press: MO(), TT(), OSL(), LM(), a Tap-toggle or One-shot custom key
     bool                  is_layer_tap;       // specifically authored LT() row
     bool                  has_multi_tap;
     uint8_t               authored_tap_depth; // branch count; a quick run past it types the first tap (D-F33)

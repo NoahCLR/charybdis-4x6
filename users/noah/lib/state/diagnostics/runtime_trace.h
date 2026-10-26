@@ -60,6 +60,8 @@ typedef enum {
     NOAH_TRACE_LAYER_OWNERSHIP_EVENT_OVERFLOW,
     NOAH_TRACE_LAYER_OWNERSHIP_EVENT_ONESHOT,
     NOAH_TRACE_LAYER_OWNERSHIP_EVENT_POINTING_MODE,
+    // a: the layers a key's held shortcut now owns, zero once released; b: the key.
+    NOAH_TRACE_LAYER_OWNERSHIP_EVENT_SHORTCUT,
 } noah_trace_layer_ownership_event_t;
 
 typedef enum {

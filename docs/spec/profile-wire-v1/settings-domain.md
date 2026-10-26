@@ -1,6 +1,6 @@
 # Settings domain `0x40` and its readback
 
-Domain `0x40`, version 9, holds the keyboard-wide settings: 31 scalar
+Domain `0x40`, version 10, holds the keyboard-wide settings: 31 scalar
 settings, a record per layer, each custom key's shortcut, and the names of the
 layers, macros, custom keys and the keyboard. GET `0x07` reads the active
 settings back and GET `0x08` reports the lighting and key-option metadata a
@@ -18,10 +18,10 @@ a toggle changes these values, and how they reach QMK, is
 | 0 | 8 | header |
 | 8 | 124 | 31 scalars, `u32` each, scalar 0 first |
 | 132 | 272 | 16 layer records of 17 bytes, layer 0 first |
-| 404 | 256 | 128 custom-key shortcuts of 2 bytes, custom key 0 first |
-| 660 | 273 to 9,009 | 273 counted names |
+| 404 | 640 | 128 custom-key shortcuts of 5 bytes, custom key 0 first |
+| 1,044 | 273 to 9,009 | 273 counted names |
 
-The domain is 933 bytes with every name empty and 9,669 with every name 32
+The domain is 1,317 bytes with every name empty and 10,053 with every name 32
 bytes; any other length is refused. The fixed part comes first so every field
 before the names sits at a known offset. Validation consumes one byte at a
 time from reads of at most 20 bytes; any refusal is `INVALID_DOMAIN`.
@@ -32,7 +32,7 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 
 | Offset | Value |
 | ---: | --- |
-| 0 | version, `9`; equal to the envelope's domain version |
+| 0 | version, `10`; equal to the envelope's domain version |
 | 1 | layer count, `16` |
 | 2 | scalar count, `31` |
 | 3 | macro-name count, `128` |
@@ -41,7 +41,7 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 | 6 | custom-key-shortcut count, `128` |
 | 7 | reserved, zero |
 
-Every byte but 5 must be exactly its value. Firmware accepts only version 9
+Every byte but 5 must be exactly its value. Firmware accepts only version 10
 and refuses every earlier one (D-F10,
 [ADR](../../adr/0010-firmware-accepts-only-current-formats.md)).
 
@@ -139,19 +139,25 @@ Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_tes
 
 ## Custom-key shortcuts
 
-Each custom key's two-byte shortcut (D-F26,
+Each custom key's five-byte shortcut (D-F26,
 [ADR](../../adr/0026-custom-key-carries-a-shortcut.md)):
 
 | Offset | Field |
 | ---: | --- |
 | 0 | modifiers, HID report order: bit 0 Left Ctrl, 1 Left Shift, 2 Left Alt, 3 Left GUI, 4 Right Ctrl, 5 Right Shift, 6 Right Alt, 7 Right GUI; any combination |
 | 1 | key: `0x00` none, a basic key `0x04..0xa4` (`KC_A`–`KC_EXSEL`), or a mouse button `0xd1..0xd8` (`MS_BTN1`–`MS_BTN8`) |
+| 2–3 | layers, `u16`: bit `n` names layer `n`; never bit 0 or a bit of scalar 23 |
+| 4 | layer kind, the layer key the layers act as, all together: `0` Hold (`MO()`), `1` Lock (`TG()`), `2` Move to (`TO()`), `3` Tap-toggle (`TT()`), `4` One-shot (`OSL()`); `0` when no layer is named |
 
-Both zero means no shortcut; modifiers alone and a key alone are shortcuts.
-Modifier keys belong in the mask; media, system, mouse-movement and every
-non-basic keycode are refused. The firmware does not check that a behaviour
-step naming a custom key has a shortcut; one without sends nothing. What a
-shortcut does is [key press](../../architecture/key-press.md#from-an-action-to-the-report)'s.
+All zero means no shortcut; any part alone (modifiers, a key, layers) is a
+shortcut. Modifier keys belong in the mask; media, system, mouse-movement and
+every non-basic keycode are refused. The base layer and the default layers are
+always on, so a shortcut naming one is refused; the check reads scalar 23 from the
+same domain, so a profile whose default layers include a layer a shortcut
+names is refused too. A layer kind above `4`, or any kind but Hold without a
+layer, is refused, so a shortcut has one record. The firmware does not check that a behaviour step
+naming a custom key has a shortcut; one without sends nothing. What a shortcut
+does is [key press](../../architecture/key-press.md#from-an-action-to-the-report)'s.
 
 Held by: `tests/host/run_profile_settings_v1_tests.sh` (`profile_settings_v1_test.c`).
 
@@ -245,7 +251,7 @@ byte 5; bytes 6 onward are zero. Page 0's 12-byte payload:
 | 8 | 4 | FNV-1a 32-bit digest of the domain |
 
 Page `p ≥ 1` returns domain bytes `25 × (p − 1)` onward, 25 at a time with an
-exact short final chunk; the largest domain needs 387 chunk pages. Page 0
+exact short final chunk; the largest domain needs 403 chunk pages. Page 0
 computes its checksums over the bytes as they are at that moment, and chunks
 stream from the active copy rather than a snapshot, so a consistent read is
 page 0, every chunk, then page 0 again with equal bytes and checksums matching

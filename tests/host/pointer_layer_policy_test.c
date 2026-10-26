@@ -227,6 +227,23 @@ static void test_non_arrow_pointing_mode_keys_and_dpi_keys_count_as_mouse_record
 // A keycode that is neither a mouse keycode nor a pointing-mode key can still
 // claim the anchor through its authored behavior row, so QMK keeps the pointer
 // layer up across the press instead of resetting auto mouse on it.
+// A custom key whose shortcut turns layers on is a layer key (D-F26): like
+// MO() of another layer under QMK, it never tears the pointer layer down.
+static uint16_t fake_layer_custom_key;
+
+bool noah_custom_key_has_layers(uint16_t keycode) {
+    return keycode == fake_layer_custom_key;
+}
+
+static void test_custom_key_with_layers_counts_as_a_mouse_record(void) {
+    test_reset_stubs();
+    fake_layer_custom_key = CUSTOM_KEY_7;
+
+    CHECK(pointer_layer_policy_is_mouse_record(CUSTOM_KEY_7));
+    CHECK(!pointer_layer_policy_is_mouse_record(CUSTOM_KEY_8));
+    fake_layer_custom_key = KC_NO;
+}
+
 static void test_authored_anchor_row_counts_as_a_mouse_record(void) {
     test_reset_stubs();
 
@@ -668,6 +685,7 @@ int main(void) {
     test_non_arrow_pointing_mode_marks_layer_holds_as_mouse_records();
     test_arrow_mode_does_not_anchor_layer_hold_keys();
     test_non_arrow_pointing_mode_keys_and_dpi_keys_count_as_mouse_records();
+    test_custom_key_with_layers_counts_as_a_mouse_record();
     test_authored_anchor_row_counts_as_a_mouse_record();
     test_mouse_button_actions_notify_auto_mouse();
     test_arrow_mode_prefers_typing_layer_over_auto_mouse_layer();

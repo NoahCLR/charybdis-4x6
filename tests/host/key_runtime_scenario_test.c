@@ -4,6 +4,7 @@
 
 #include "key_runtime_scenario_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/custom_key_shortcut.h"
 #include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
@@ -25,11 +26,19 @@ enum {
     TEST_MULTI_TAP_KEY_TWO = CUSTOM_KEY_0 + 0x3A,
     TEST_TAP_ACTION_TWO    = CUSTOM_KEY_0 + 0x3B,
     TEST_ALT_ACTION_TWO    = CUSTOM_KEY_0 + 0x3C,
+    // Custom keys whose shortcut is layers alone, and modifiers alone (D-F26).
+    TEST_LAYER_SHORTCUT    = CUSTOM_KEY_0 + 0x3D,
+    TEST_HYPER_SHORTCUT    = CUSTOM_KEY_0 + 0x3E,
     // Charybdis's SNIPING_MODE: a QMK function only QMK's key processing runs.
     TEST_SNIPING_KEY       = QK_KB_4,
     TEST_NUM_LAYER         = 1,
     TEST_OTHER_LAYER       = 2,
 };
+
+noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    if (slot == (uint8_t)(TEST_HYPER_SHORTCUT - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = 0x0f};
+    return slot == (uint8_t)(TEST_LAYER_SHORTCUT - CUSTOM_KEY_0) ? (noah_custom_key_shortcut_t){.layers = (uint16_t)(1u << TEST_OTHER_LAYER)} : (noah_custom_key_shortcut_t){0};
+}
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -712,7 +721,8 @@ static void test_press_on_other_handled_position_keeps_foreign_pending_multi_tap
 
 // Another key's press settles a down key's repeated tap when its hold is an
 // output of its own, typing it first (D-F27). A hold that changes other keys,
-// here a modifier, keeps the chain waiting for its own decision.
+// here a modifier or a custom key whose shortcut turns a layer on or is
+// modifiers alone, keeps the chain waiting for its own decision.
 static void test_other_press_settles_active_same_key_multi_tap_chain(void) {
     static const key_runtime_scenario_step_t setup[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 1, 1),
@@ -727,9 +737,13 @@ static void test_other_press_settles_active_same_key_multi_tap_chain(void) {
         KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 1, 1),
     };
 
-    for (uint8_t hold_changes_keys = 0; hold_changes_keys < 2u; hold_changes_keys++) {
+    static const uint16_t holds[] = {TEST_HOLD_ACTION, KC_LEFT_SHIFT, TEST_LAYER_SHORTCUT, TEST_HYPER_SHORTCUT};
+
+    for (uint8_t variant = 0; variant < ARRAY_SIZE(holds); variant++) {
+        bool hold_changes_keys = variant != 0u;
+
         key_runtime_scenario_reset();
-        test_configure_multi_tap_hold_key(hold_changes_keys ? (hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_SHIFT) : (hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(TEST_HOLD_ACTION), hold_behavior_none());
+        test_configure_multi_tap_hold_key((hold_behavior_t)PRESS_AND_HOLD_UNTIL_RELEASE(holds[variant]), hold_behavior_none());
         test_configure_fallback_tap_key(TEST_HOLD_KEY_TWO, TEST_HOLD_ACTION_TWO);
         key_runtime_scenario_run(setup, ARRAY_SIZE(setup));
 

@@ -5,6 +5,7 @@
 #include "../reducer/state_query.h"
 
 #include "../../../action/action_dispatch.h"
+#include "../../../action/custom_key_shortcut.h"
 #include "../../../compat/qmk_oneshot_contract.h"
 #include "../../../pointing/defs/pointing_modes.h"
 
@@ -59,14 +60,20 @@ static void key_runtime_core_release_effect_plan_push_release_owned_state(key_ru
 }
 
 // A tap that keeps the tapped key's own layer on: OSL() arming its one-shot,
-// or a lock of the very layer the key holds (TT()'s last tap). The layer
-// itself shows the result, so such a tap needs no feedback window, and it goes
-// before the key's layer release so the layer never drops in between.
+// or a lock of the very layer the key holds (TT()'s last tap), and the same of
+// a dual-role custom key's layers (D-F26): its One-shot tap, or its
+// Tap-toggle's last tap. The layer itself shows the result, so such a tap
+// needs no feedback window, and it goes before the key's layer release so the
+// layer never drops in between.
 static bool key_runtime_release_tap_keeps_own_layer(const key_runtime_slot_interaction_t *interaction, uint16_t action) {
     noah_action_desc_t desc;
 
     if (!(interaction && key_runtime_slot_interaction_is_momentary_layer(*interaction) && action != KC_NO)) {
         return false;
+    }
+    if (noah_custom_key_momentary_layers_named(interaction->layer)) {
+        uint8_t slot = (uint8_t)(interaction->layer & ~NOAH_CUSTOM_KEY_MOMENTARY_LAYERS);
+        return action == CUSTOM_KEY_LAYER_TAP(slot) || (action == CUSTOM_KEY_0 + slot && noah_custom_key_shortcut(slot).layer_kind == NOAH_SHORTCUT_LAYERS_ONESHOT);
     }
     desc = noah_action_describe(action);
     return noah_action_desc_tap_keeps_layer(desc) || (noah_action_desc_is_layer_lock(desc) && desc.layer == interaction->layer);

@@ -2,6 +2,7 @@
 #include "state_query.h"
 
 #include "../../../action/action_dispatch.h"
+#include "../../../action/custom_key_shortcut.h"
 #include "../../../compat/qmk_mod_contract.h"
 
 #include "ownership_state.h"
@@ -432,8 +433,9 @@ bool key_runtime_core_has_other_active_press_token(keypos_t key_pos) {
     return false;
 }
 
-// A hold that changes the keys pressed after it: a layer, modifiers, or a
-// pointing mode, which can mask modifiers and take over buttons.
+// A hold that changes the keys pressed after it: a layer, modifiers, a custom
+// key whose shortcut is either (D-F26), or a pointing mode, which can mask
+// modifiers and take over buttons.
 static bool key_runtime_core_query_hold_changes_other_keys(hold_behavior_t hold) {
     noah_action_desc_t desc;
 
@@ -441,7 +443,7 @@ static bool key_runtime_core_query_hold_changes_other_keys(hold_behavior_t hold)
         return false;
     }
     desc = noah_action_describe(hold.action);
-    return noah_action_desc_is_layer_action(desc) || noah_action_desc_is_pointing_mode_action(desc) || noah_qmk_real_mods_for_keycode(hold.action) != 0u;
+    return noah_action_desc_is_layer_action(desc) || noah_custom_key_hold_changes_other_keys(hold.action) || noah_action_desc_is_pointing_mode_action(desc) || noah_qmk_real_mods_for_keycode(hold.action) != 0u;
 }
 
 // What a tap/hold key's hold does decides how a key pressed before its

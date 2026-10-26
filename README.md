@@ -20,7 +20,9 @@ any C and you don't reflash.
 - **Keys that do more than one thing.** Each key can do something different on
   tap, hold and long hold, and again on a double, triple or up to quintuple
   tap. Combos and custom keys use the same behaviours, and a custom key can
-  hold a shortcut with modifiers from both sides (Left Ctrl + Right Alt + K).
+  hold a shortcut with modifiers from both sides (Left Ctrl + Right Alt + K)
+  and any number of layers with it, held, locked, moved to, tap-toggled or
+  one-shot together.
 - **A trackball that changes roles.** Thirty-two pointing slots turn the
   ball into scrolling, volume, zoom, arrow keys, mouse-button clicks, macros
   or your own shortcuts, held or locked, or on whenever a layer is. A mode

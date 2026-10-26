@@ -52,10 +52,27 @@ static bool layer_record_byte(uint8_t b, uint16_t offset, uint8_t layers, uint8_
     return used >= 8u || !(b >> used);
 }
 
-// A shortcut record is its report modifier mask, any eight bits, then its
-// key, from the shortcut vocabulary (custom_key_shortcut.h).
-static bool shortcut_byte(uint8_t b, uint16_t offset) {
-    return (offset - NOAH_SETTINGS_SHORTCUTS_OFFSET) % NOAH_SETTINGS_SHORTCUT_SIZE != NOAH_CUSTOM_KEY_SHORTCUT_KEY || noah_custom_key_shortcut_key_valid(b);
+// A shortcut record is its report modifier mask, any eight bits, its key,
+// from the shortcut vocabulary (custom_key_shortcut.h), its layer mask, which
+// names neither the base layer nor a default layer (those are always on), and
+// the layer key its layers act as: Hold without layers, so one shortcut has one
+// record.
+static bool shortcut_byte(noah_profile_settings_v1_validation_t *s, uint8_t b, uint16_t offset) {
+    uint16_t always_on = (uint16_t)(s->default_layers | 1u);
+    switch ((offset - NOAH_SETTINGS_SHORTCUTS_OFFSET) % NOAH_SETTINGS_SHORTCUT_SIZE) {
+        case NOAH_CUSTOM_KEY_SHORTCUT_KEY:
+            return noah_custom_key_shortcut_key_valid(b);
+        case NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO:
+            s->shortcut_has_layers = b != 0u;
+            return !(b & (uint8_t)always_on);
+        case NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI:
+            s->shortcut_has_layers |= b != 0u;
+            return !(b & (uint8_t)(always_on >> 8));
+        case NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND:
+            return b < NOAH_SHORTCUT_LAYER_KIND_COUNT && (s->shortcut_has_layers || b == NOAH_SHORTCUT_LAYERS_HOLD);
+        default:
+            return true;
+    }
 }
 
 static bool name_byte(noah_profile_settings_v1_validation_t *s, uint8_t b) {
@@ -91,6 +108,7 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
         if (part != NOAH_SETTINGS_SCALAR_SIZE - 1) return true;
         if (!noah_profile_setting_v1_valid(id, s->value, layers)) return false;
         if (id == NOAH_SETTING_AUTO_MOUSE_TIMEOUT) s->timeout = s->value;
+        if (id == NOAH_SETTING_DEFAULT_LAYERS) s->default_layers = (uint16_t)s->value;
         if (id == NOAH_SETTING_AUTO_MOUSE_DEAD_TIME) {
             s->dead_time = s->value;
             if (!s->timeout || s->dead_time >= s->timeout) return false;
@@ -98,7 +116,7 @@ bool noah_profile_settings_v1_consume(noah_profile_settings_v1_validation_t *s, 
         return true;
     }
     if (offset < NOAH_SETTINGS_SHORTCUTS_OFFSET) return layer_record_byte(b, offset, layers, positions);
-    if (offset < NOAH_SETTINGS_FIXED_SIZE) return shortcut_byte(b, offset);
+    if (offset < NOAH_SETTINGS_FIXED_SIZE) return shortcut_byte(s, b, offset);
     return name_byte(s, b);
 }
 

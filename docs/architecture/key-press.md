@@ -177,8 +177,22 @@ modifiers through `keyboard_mod_ownership` (QMK's `register_mods` is
 overridden in `compat/qmk_mod_contract`); layer keycodes through
 `layer_ownership`; other QMK behaviours as a synthetic record, which re-enters
 QMK's processing and passes stage `synthetic_passthrough`. A custom key
-sent as an action sends only its shortcut (`owned_keycode_tap_parts`), and a
-held one keeps its shortcut through its held action's lease (D-F26). A delayed
+sent as an action sends only its shortcut (`owned_keycode_tap_parts`), its
+layers acting as their layer kind: Hold's and Tap-toggle's on around the tap
+(`layer_ownership_shortcut_tap_begin`/`_end`), Lock's and Move to's locked
+first (`layer_ownership_toggle_lock_set`, `_goto_set`), One-shot's armed after
+it (`layer_ownership_oneshot_tap_set`). A held one keeps its shortcut through
+its held action's lease and its layers through `layer_ownership_shortcut_press`,
+owned by the holding key beside its own layer hold, or locks or moves to them
+at the press (D-F26). A Tap-toggle or One-shot custom key is a momentary layer
+key: the runtime names its own hold `0x80 | slot`, which the projection binds
+as its shortcut's layers (`layer_ownership_shortcut_momentary_press`, an owner
+apart from a held custom key at the same key) and the reducer leases layer by
+layer, holds its keys and modifiers from the press beside
+them, and leaves its tap only `CUSTOM_KEY_LAYER_TAP(n)`, the layer part. A
+hold that sends a custom key whose shortcut turns layers on, or is modifiers
+alone, changes other keys as a layer or modifier hold does (D-F27;
+`noah_custom_key_hold_changes_other_keys`). A delayed
 tap replays the modifiers it was planned under
 (`keyboard_mod_policy_begin_action_replay`); every save, mask and replay of
 modifier state goes through `state/modifiers/keyboard_mod_policy.h`.

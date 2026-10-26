@@ -114,17 +114,10 @@ bool layer_ownership_is_locked(uint8_t layer) {
     return layer < LAYER_COUNT && (state->locked_mask & layer_ownership_mask_for_layer(layer)) != 0;
 }
 
-// Whether a key holds this layer (MO(), TT(), OSL(), LM() or a behaviour's
-// layer hold), as opposed to a lock.
+// Whether a key holds this layer (MO(), TT(), OSL(), LM(), a behaviour's
+// layer hold or a shortcut's layers), as opposed to a lock.
 bool layer_ownership_is_held(uint8_t layer) {
-    noah_layer_ownership_state_t *state = layer_ownership_state();
-
-    for (uint16_t i = 0; i < ARRAY_SIZE(state->bindings); i++) {
-        if (state->bindings[i].active && state->bindings[i].layer == layer) {
-            return true;
-        }
-    }
-    return false;
+    return layer < LAYER_COUNT && layer_ownership_state()->momentary_refcounts[layer] > 0u;
 }
 
 bool layer_ownership_set_lock_state(uint8_t layer, bool locked) {
@@ -159,21 +152,56 @@ bool layer_ownership_toggle_lock_state(uint8_t layer) {
     return layer_ownership_set_lock_state(layer, !layer_ownership_is_locked(layer));
 }
 
-bool layer_ownership_goto(uint8_t layer) {
-    if (layer >= LAYER_COUNT) {
+// Layers past the keymap are left out.
+static layer_state_t layer_ownership_keymap_layers(layer_state_t layers) {
+    return LAYER_COUNT >= sizeof(layer_state_t) * 8u ? layers : (layer_state_t)(layers & (((layer_state_t)1u << LAYER_COUNT) - 1u));
+}
+
+// The layers of a set a lock can hold: the base layer is never locked.
+static layer_state_t layer_ownership_lockable_layers(layer_state_t layers) {
+    return (layer_state_t)(layer_ownership_keymap_layers(layers) & ~layer_ownership_mask_for_layer(0u));
+}
+
+bool layer_ownership_toggle_lock_set(layer_state_t layers) {
+    noah_layer_ownership_state_t *state   = layer_ownership_state();
+    bool                          changed = false;
+
+    layers = layer_ownership_lockable_layers(layers);
+    if (!layers) {
         return false;
     }
 
-    // The target locks before the others release, so the keyboard never
-    // passes through the base layer on its way to the target.
-    bool changed = layer != 0u && layer_ownership_set_lock_state(layer, true);
+    bool lock = (state->locked_mask & layers) != layers;
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+        if (layers & layer_ownership_mask_for_layer(layer)) {
+            changed |= layer_ownership_set_lock_state(layer, lock);
+        }
+    }
+    return changed;
+}
+
+bool layer_ownership_goto_set(layer_state_t layers) {
+    bool changed = false;
+
+    // The targets lock before the others release, so the keyboard never
+    // passes through the base layer on its way to them.
+    layers = layer_ownership_lockable_layers(layers);
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+        if (layers & layer_ownership_mask_for_layer(layer)) {
+            changed |= layer_ownership_set_lock_state(layer, true);
+        }
+    }
     for (uint8_t other = 0u; other < LAYER_COUNT; other++) {
-        if (other != layer || layer == 0u) {
+        if (!(layers & layer_ownership_mask_for_layer(other))) {
             changed |= layer_ownership_set_lock_state(other, false);
         }
     }
 
     return layer_ownership_oneshot_consume() || changed;
+}
+
+bool layer_ownership_goto(uint8_t layer) {
+    return layer < LAYER_COUNT && layer_ownership_goto_set(layer_ownership_mask_for_layer(layer));
 }
 
 uint8_t layer_ownership_oneshot_layer(void) {
@@ -188,50 +216,63 @@ uint8_t layer_ownership_oneshot_layer(void) {
     return UINT8_MAX;
 }
 
-static bool layer_ownership_oneshot_set(uint8_t layer, bool armed) {
-    noah_layer_ownership_state_t *state = layer_ownership_state();
-    layer_state_t                 mask  = layer_ownership_mask_for_layer(layer);
+layer_state_t layer_ownership_oneshot_layers(void) {
+    return layer_ownership_state()->oneshot_mask;
+}
 
-    if (layer >= LAYER_COUNT || ((state->oneshot_mask & mask) != 0) == armed) {
+// Arms `armed` in place of what was armed: the layers that join turn on
+// before the ones that leave turn off.
+static bool layer_ownership_oneshot_arm(layer_state_t armed) {
+    noah_layer_ownership_state_t *state    = layer_ownership_state();
+    layer_state_t                 previous = state->oneshot_mask;
+
+    if (armed == previous) {
         return false;
     }
 
-    state->oneshot_mask = armed ? mask : 0u;
-    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_ONESHOT, layer, armed ? 1u : 0u);
-    layer_ownership_apply_layer(layer);
-    key_runtime_core_layer_oneshot_set(layer, armed);
+    state->oneshot_mask = armed;
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+        if ((armed & ~previous) & layer_ownership_mask_for_layer(layer)) {
+            noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_ONESHOT, layer, 1u);
+            layer_ownership_apply_layer(layer);
+            key_runtime_core_layer_oneshot_set(layer, true);
+        }
+    }
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+        if ((previous & ~armed) & layer_ownership_mask_for_layer(layer)) {
+            noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_ONESHOT, layer, 0u);
+            layer_ownership_apply_layer(layer);
+            key_runtime_core_layer_oneshot_set(layer, false);
+        }
+    }
     return true;
 }
 
-bool layer_ownership_oneshot_tap(uint8_t layer, uint16_t now, uint16_t double_tap_ms) {
+bool layer_ownership_oneshot_tap_set(layer_state_t layers, uint16_t now, uint16_t double_tap_ms) {
     noah_layer_ownership_state_t *state = layer_ownership_state();
-    uint8_t                       armed = layer_ownership_oneshot_layer();
 
-    if (layer >= LAYER_COUNT) {
+    layers = layer_ownership_keymap_layers(layers);
+    if (!layers) {
         return false;
     }
-    if (armed == layer) {
+    if (state->oneshot_mask == layers) {
         if ((uint16_t)(now - state->oneshot_armed_at) < double_tap_ms) {
-            return layer_ownership_oneshot_set(layer, false);
+            return layer_ownership_oneshot_arm(0u);
         }
         state->oneshot_armed_at = now;
         return false;
     }
 
-    // The new layer turns on before the replaced one turns off.
     state->oneshot_armed_at = now;
-    bool changed = layer_ownership_oneshot_set(layer, true);
-    if (armed != UINT8_MAX) {
-        layer_ownership_apply_layer(armed);
-        key_runtime_core_layer_oneshot_set(armed, false);
-    }
-    return changed;
+    return layer_ownership_oneshot_arm(layers);
+}
+
+bool layer_ownership_oneshot_tap(uint8_t layer, uint16_t now, uint16_t double_tap_ms) {
+    return layer < LAYER_COUNT && layer_ownership_oneshot_tap_set(layer_ownership_mask_for_layer(layer), now, double_tap_ms);
 }
 
 bool layer_ownership_oneshot_consume(void) {
-    uint8_t armed = layer_ownership_oneshot_layer();
-
-    return armed != UINT8_MAX && layer_ownership_oneshot_set(armed, false);
+    return layer_ownership_oneshot_arm(0u);
 }
 
 layer_state_t layer_ownership_pointing_mode_layers(void) {
@@ -242,9 +283,7 @@ bool layer_ownership_set_pointing_mode_layers(layer_state_t layers) {
     noah_layer_ownership_state_t *state    = layer_ownership_state();
     layer_state_t                 previous = state->pointing_mode_layer_mask;
 
-    for (uint8_t layer = LAYER_COUNT; layer < sizeof(layer_state_t) * 8u; layer++) {
-        layers &= ~layer_ownership_mask_for_layer(layer);
-    }
+    layers = layer_ownership_keymap_layers(layers);
     if (layers == previous) {
         return false;
     }
@@ -313,6 +352,119 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return layer_ownership_remove_slot((uint16_t)slot);
 }
 
+// Each layer of `layers` gains or loses one key owner; a layer whose first
+// owner arrives turns on, one whose last leaves turns off.
+static void layer_ownership_shortcut_acquire(layer_state_t layers) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+        if ((layers & layer_ownership_mask_for_layer(layer)) && state->momentary_refcounts[layer]++ == 0u) {
+            layer_ownership_apply_layer(layer);
+        }
+    }
+}
+
+static bool layer_ownership_shortcut_drop(layer_state_t layers) {
+    noah_layer_ownership_state_t *state   = layer_ownership_state();
+    bool                          changed = false;
+
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+        if ((layers & layer_ownership_mask_for_layer(layer)) && state->momentary_refcounts[layer] > 0u && --state->momentary_refcounts[layer] == 0u) {
+            changed |= layer_ownership_apply_layer(layer);
+        }
+    }
+    return changed;
+}
+
+static int16_t layer_ownership_find_shortcut_slot(keypos_t key_pos) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->shortcut_bindings); i++) {
+        if ((state->shortcut_bindings[i].held | state->shortcut_bindings[i].momentary) && layer_ownership_keypos_equal(state->shortcut_bindings[i].key_pos, key_pos)) {
+            return (int16_t)i;
+        }
+    }
+    return -1;
+}
+
+// The binding's layers for one owner.
+static layer_state_t *layer_ownership_shortcut_owned(layer_ownership_shortcut_binding_t *binding, bool momentary) {
+    return momentary ? &binding->momentary : &binding->held;
+}
+
+static void layer_ownership_shortcut_bind(keypos_t key_pos, bool momentary, layer_state_t layers) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+    int16_t                       slot  = layer_ownership_find_shortcut_slot(key_pos);
+    layer_state_t                 previous;
+
+    layers = layer_ownership_keymap_layers(layers);
+    if (slot < 0) {
+        if (!layers) {
+            return;
+        }
+        for (uint16_t i = 0; i < ARRAY_SIZE(state->shortcut_bindings) && slot < 0; i++) {
+            if (!(state->shortcut_bindings[i].held | state->shortcut_bindings[i].momentary)) {
+                slot = (int16_t)i;
+            }
+        }
+        if (slot < 0) {
+            layer_ownership_log_binding_overflow(key_pos, (uint8_t)__builtin_ctz(layers));
+            return;
+        }
+        state->shortcut_bindings[slot] = (layer_ownership_shortcut_binding_t){.key_pos = key_pos};
+    }
+
+    layer_state_t *owned = layer_ownership_shortcut_owned(&state->shortcut_bindings[slot], momentary);
+    previous             = *owned;
+    *owned               = layers;
+    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_SHORTCUT, layers, layer_ownership_trace_pack_keypos(key_pos));
+    layer_ownership_shortcut_acquire(layers);
+    (void)layer_ownership_shortcut_drop(previous);
+}
+
+static bool layer_ownership_shortcut_unbind(keypos_t key_pos, bool momentary) {
+    noah_layer_ownership_state_t *state = layer_ownership_state();
+    int16_t                       slot  = layer_ownership_find_shortcut_slot(key_pos);
+
+    if (slot < 0) {
+        return false;
+    }
+
+    layer_state_t *owned  = layer_ownership_shortcut_owned(&state->shortcut_bindings[slot], momentary);
+    layer_state_t  layers = *owned;
+    if (!layers) {
+        return false;
+    }
+    *owned = 0u;
+    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_SHORTCUT, 0u, layer_ownership_trace_pack_keypos(key_pos));
+    (void)layer_ownership_shortcut_drop(layers);
+    return true;
+}
+
+void layer_ownership_shortcut_press(keypos_t key_pos, layer_state_t layers) {
+    layer_ownership_shortcut_bind(key_pos, false, layers);
+}
+
+bool layer_ownership_shortcut_release(keypos_t key_pos) {
+    return layer_ownership_shortcut_unbind(key_pos, false);
+}
+
+void layer_ownership_shortcut_momentary_press(keypos_t key_pos, layer_state_t layers) {
+    layer_ownership_shortcut_bind(key_pos, true, layers);
+}
+
+bool layer_ownership_shortcut_momentary_release(keypos_t key_pos) {
+    return layer_ownership_shortcut_unbind(key_pos, true);
+}
+
+void layer_ownership_shortcut_tap_begin(layer_state_t layers) {
+    layer_ownership_shortcut_acquire(layer_ownership_keymap_layers(layers));
+}
+
+void layer_ownership_shortcut_tap_end(layer_state_t layers) {
+    (void)layer_ownership_shortcut_drop(layer_ownership_keymap_layers(layers));
+}
+
 void layer_ownership_momentary_owner_bitmap(uint8_t *out_bitmap) {
     noah_layer_ownership_state_t *state = layer_ownership_state();
 
@@ -324,6 +476,11 @@ void layer_ownership_momentary_owner_bitmap(uint8_t *out_bitmap) {
     for (uint16_t i = 0; i < ARRAY_SIZE(state->bindings); i++) {
         if (state->bindings[i].active) {
             key_origin_bitmap_add_keypos(out_bitmap, state->bindings[i].key_pos);
+        }
+    }
+    for (uint16_t i = 0; i < ARRAY_SIZE(state->shortcut_bindings); i++) {
+        if (state->shortcut_bindings[i].held | state->shortcut_bindings[i].momentary) {
+            key_origin_bitmap_add_keypos(out_bitmap, state->shortcut_bindings[i].key_pos);
         }
     }
 }

@@ -19,8 +19,8 @@ static uint32_t      eeprom_last_read_length;
 static uint32_t      eeprom_largest_read_length;
 static uint32_t      eeprom_last_write_length;
 static uint32_t      safe_boundary_reasons;
-static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
-static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x04\x01\x01\x01\x20\x02\x42\x00\x00\x00\x02\x00"
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 2u, 0u, 1u};
+static const uint8_t behavior_profile[] = "\x4e\x4c\x50\x31\x04\x02\x01\x01\x20\x02\x42\x00\x00\x00\x02\x00"
                                           "\x03\x00\x24\x00\x01\x00\x34\x12\x96\x00\x90\x01\xaf\x00\x01\x02"
                                           "\xff\xff\x00\x00\x00\x02\x03\x19\x01\x00\x28\x00\x02\x05\x06\x00"
                                           "\x0a\x00\x02\x00\x03\x00\x03\x00\x16\x00\x04\x00\x02\x00\x00\x00"

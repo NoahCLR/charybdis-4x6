@@ -12,6 +12,7 @@
 
 #include "noah_keymap_ids.h"
 #include "../../action/action_dispatch.h"
+#include "../../action/custom_key_shortcut.h"
 #include "../../compat/qmk_tapping_contract.h"
 #include "../../pointing/defs/pointing_modes.h"
 #include "../../profile/runtime/active_profile_key_behavior_runtime.h"
@@ -67,10 +68,18 @@ _Static_assert(NOAH_QMK_TAPPING_TOGGLE <= KEY_BEHAVIOR_MAX_TAP_COUNT, "TT() lock
 
 // A TT(n) key with no authored row holds its layer like MO(n), and its
 // TAPPING_TOGGLE-th tap sends LOCK_LAYER(n), so the lock is the same one TG(n)
-// and LOCK_LAYER(n) toggle. An authored row with steps replaces this, as it
+// and LOCK_LAYER(n) toggle. A custom key whose shortcut's layers are
+// Tap-toggle (D-F26) does the same with its set: it holds its shortcut from
+// each press, and the TAPPING_TOGGLE-th tap sends CUSTOM_KEY_LAYER_TAP(n),
+// which locks the set as one. An authored row with steps replaces this, as it
 // would any key's default taps.
+static bool key_behavior_keycode_is_custom_tap_toggle(uint16_t keycode) {
+    noah_custom_key_shortcut_t shortcut = noah_custom_key_shortcut_for_keycode(keycode);
+    return shortcut.layers != 0u && shortcut.layer_kind == NOAH_SHORTCUT_LAYERS_TAP_TOGGLE;
+}
+
 static uint8_t key_behavior_tap_toggle_depth(uint16_t keycode) {
-    return noah_action_keycode_is_layer_tap_toggle(keycode) ? (uint8_t)NOAH_QMK_TAPPING_TOGGLE : 0u;
+    return noah_action_keycode_is_layer_tap_toggle(keycode) || key_behavior_keycode_is_custom_tap_toggle(keycode) ? (uint8_t)NOAH_QMK_TAPPING_TOGGLE : 0u;
 }
 
 static key_behavior_step_t key_behavior_tap_toggle_step(uint16_t keycode, uint8_t tap_count) {
@@ -79,7 +88,7 @@ static key_behavior_step_t key_behavior_tap_toggle_step(uint16_t keycode, uint8_
     }
 
     return (key_behavior_step_t){
-        .tap = TAP_SENDS(LOCK_LAYER(QK_LAYER_TAP_TOGGLE_GET_LAYER(keycode))),
+        .tap = TAP_SENDS(NOAH_KEYCODE_IS_CUSTOM_KEY(keycode) ? CUSTOM_KEY_LAYER_TAP(keycode - CUSTOM_KEY_0) : LOCK_LAYER(QK_LAYER_TAP_TOGGLE_GET_LAYER(keycode))),
     };
 }
 
@@ -248,11 +257,12 @@ bool key_behavior_future_tap_path_has_foreign_pointing_mode(uint16_t keycode, ui
     return false;
 }
 
-// QMK's dual-role keys: LT(), MT(), OSM(), TT() and OSL(). They hold at the
+// QMK's dual-role keys: LT(), MT(), OSM(), TT() and OSL(), and a custom key
+// whose shortcut's layers are Tap-toggle or One-shot (D-F26). They hold at the
 // dual-role setting unless a row sets its own time; every other row holds at
 // the tap/hold setting.
 static bool key_behavior_keycode_is_dual_role(uint16_t keycode) {
-    return noah_action_keycode_dual_role_hold(keycode) != KC_NO || noah_action_keycode_is_layer_tap_toggle(keycode) || noah_action_keycode_is_layer_oneshot(keycode);
+    return noah_action_keycode_dual_role_hold(keycode) != KC_NO || noah_action_keycode_is_layer_tap_toggle(keycode) || noah_action_keycode_is_layer_oneshot(keycode) || noah_custom_key_is_dual_role(keycode);
 }
 
 // use_row false resolves the key as if it had no authored row: the normal
@@ -289,7 +299,7 @@ static key_behavior_view_t key_behavior_view_build(uint16_t keycode, bool use_ro
         .source_row         = live.row_index,
         .source_is_live     = row_steps && live_result == NOAH_ACTIVE_PROFILE_KEY_BEHAVIOR_OK,
         .handled            = row_steps || dual_role || noah_action_desc_is_runtime_handled_keycode(desc),
-        .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc),
+        .is_momentary_layer = noah_action_desc_is_momentary_layer_keycode(desc) || noah_custom_key_is_dual_role(keycode),
         .is_layer_tap       = custom_lt,
         .has_multi_tap      = tap_depth > 1u,
         .authored_tap_depth = tap_depth,

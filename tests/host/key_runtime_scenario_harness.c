@@ -4,6 +4,7 @@
 
 #include "users/noah/lib/action/action_lifecycle.h"
 #include "users/noah/lib/action/action_dispatch.h"
+#include "users/noah/lib/action/custom_key_shortcut.h"
 #include "users/noah/lib/key/behavior/handled_key.h"
 #include "users/noah/lib/key/ownership/held_action.h"
 #include "users/noah/lib/key/runtime/api.h"
@@ -712,6 +713,26 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
         .data.key_pos = key_pos,
     });
     return true;
+}
+
+// A dual-role custom key's own hold binds its shortcut's layers (D-F26),
+// logged as the layer press it is; its release is the key's layer release,
+// already logged.
+void layer_ownership_shortcut_momentary_press(keypos_t key_pos, layer_state_t layers) {
+    (void)layers;
+    key_runtime_scenario_log_effect((key_runtime_scenario_effect_t){
+        .kind = KEY_RUNTIME_EFFECT_LAYER_PRESS,
+        .data.layer_press =
+            {
+                .key_pos = key_pos,
+                .layer   = NOAH_CUSTOM_KEY_MOMENTARY_LAYERS,
+            },
+    });
+}
+
+bool layer_ownership_shortcut_momentary_release(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
 }
 
 uint8_t layer_ownership_oneshot_layer(void) {

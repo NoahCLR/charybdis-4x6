@@ -23,25 +23,32 @@
 // keycode is: held while the key is held, tapped when it is tapped. Its
 // key_behaviors[] row, if any, works on top of that. Without either it does
 // nothing. A behaviour step on another key may send a custom key; it sends
-// only its shortcut. All 128 slots are listed here so the slot limit stays
-// visible in keymap.c.
+// only its shortcut, layers included. All 128 slots are listed here so the
+// slot limit stays visible in keymap.c.
 // Each row is one of:
-//   KEY(CUSTOM_KEY_n, "name")                       no shortcut
-//   SHORTCUT(CUSTOM_KEY_n, "name", mods, key)       a shortcut
+//   KEY(CUSTOM_KEY_n, "name")                             no shortcut
+//   SHORTCUT(CUSTOM_KEY_n, "name", mods, key, layers)     a shortcut
 // The name is what Charybdis Ark shows for the key: at most 32 bytes of
-// UTF-8. Use an empty string for an unused slot. A shortcut is one key plus
-// any modifiers, left and right mixed: `mods` is SHORTCUT_MODS() of modifier
-// keys (SHORTCUT_NO_MODS for none; never a QMK MOD_* constant) and `key` a
-// basic key (KC_A–KC_EXSEL, no modifier keys) or a mouse button
-// (MS_BTN1–MS_BTN8), or KC_NO for modifiers alone, e.g.
-//   SHORTCUT(CUSTOM_KEY_4, "Hyper K", SHORTCUT_MODS(KC_LCTL, KC_RALT), KC_K)
+// UTF-8. Use an empty string for an unused slot. A shortcut is one key, any
+// modifiers, left and right mixed, and any layers, each optional: `mods` is
+// SHORTCUT_MODS() of modifier keys (SHORTCUT_NO_MODS for none; never a QMK
+// MOD_* constant), `key` a basic key (KC_A–KC_EXSEL, no modifier keys) or a
+// mouse button (MS_BTN1–MS_BTN8), or KC_NO for none, and `layers`
+// SHORTCUT_LAYERS() of the layers it holds on while held, never the base
+// (SHORTCUT_NO_LAYERS for none); SHORTCUT_LOCK_LAYERS(),
+// SHORTCUT_MOVE_TO_LAYERS(), SHORTCUT_TAP_TOGGLE_LAYERS() and
+// SHORTCUT_ONESHOT_LAYERS() act on them as TG(), TO(), TT() and OSL() do, e.g.
+//   SHORTCUT(CUSTOM_KEY_4, "Hyper K", SHORTCUT_MODS(KC_LCTL, KC_RALT), KC_K, SHORTCUT_NO_LAYERS)
+//   SHORTCUT(CUSTOM_KEY_5, "Cmd + Nav", SHORTCUT_MODS(KC_LGUI), KC_NO, SHORTCUT_LAYERS(LAYER_NAV))
+//   SHORTCUT(CUSTOM_KEY_6, "Nav + Sym", SHORTCUT_NO_MODS, KC_NO, SHORTCUT_LOCK_LAYERS(LAYER_NAV, LAYER_SYM))
 // A profile saved from Charybdis Ark keeps its own names and shortcuts.
 #define CUSTOM_KEYS(KEY, SHORTCUT)                                              \
     KEY(CUSTOM_KEY_0, "Right Thumb")                                            \
     KEY(CUSTOM_KEY_1, "Left Thumb")                                             \
     KEY(CUSTOM_KEY_2, "Click Spam")                                             \
     KEY(CUSTOM_KEY_3, "Vorssaint Radial")                                       \
-    SHORTCUT(CUSTOM_KEY_4, "VoiceInk", SHORTCUT_MODS(KC_LCTL, KC_LALT), KC_SPC) \
+    SHORTCUT(CUSTOM_KEY_4, "VoiceInk", SHORTCUT_MODS(KC_LCTL, KC_LALT), KC_SPC, \
+             SHORTCUT_NO_LAYERS)                                                \
     KEY(CUSTOM_KEY_5, "")                                                       \
     KEY(CUSTOM_KEY_6, "")                                                       \
     KEY(CUSTOM_KEY_7, "")                                                       \
