@@ -10,6 +10,8 @@ layer_state_t layer_state;
 
 static uint8_t layer_on_calls[LAYER_COUNT];
 static uint8_t layer_off_calls[LAYER_COUNT];
+// The order of the latest layer_on and layer_off call per layer, from one count.
+static uint8_t layer_call_count, layer_on_order[LAYER_COUNT], layer_off_order[LAYER_COUNT];
 
 static void test_fail(const char *expr, const char *file, int line) {
     fprintf(stderr, "test failed: %s (%s:%d)\n", expr, file, line);
@@ -38,6 +40,9 @@ static void test_reset_stubs(void) {
     layer_state = 0;
     memset(layer_on_calls, 0, sizeof(layer_on_calls));
     memset(layer_off_calls, 0, sizeof(layer_off_calls));
+    layer_call_count = 0u;
+    memset(layer_on_order, 0, sizeof(layer_on_order));
+    memset(layer_off_order, 0, sizeof(layer_off_order));
     layer_ownership_reset_for_test();
 }
 
@@ -49,12 +54,14 @@ void layer_on(uint8_t layer) {
     CHECK(layer < LAYER_COUNT);
     layer_state |= test_layer_mask(layer);
     layer_on_calls[layer]++;
+    layer_on_order[layer] = ++layer_call_count;
 }
 
 void layer_off(uint8_t layer) {
     CHECK(layer < LAYER_COUNT);
     layer_state &= (layer_state_t)~test_layer_mask(layer);
     layer_off_calls[layer]++;
+    layer_off_order[layer] = ++layer_call_count;
 }
 
 void clear_mods(void) {}
@@ -385,42 +392,48 @@ static void test_oneshot_shares_its_layer_with_locks_holds_and_goto(void) {
     CHECK(layer_state == 0);
 }
 
-// A pointing mode its key runs owns the layer it brings beside the key holds
-// and locks (D-F62): the layer stays on while any owner keeps it, and a new
-// layer turns on before the one it replaces turns off.
-static void test_a_pointing_mode_owns_its_layer_beside_holds_and_locks(void) {
+// A pointing mode its key runs owns the layers its key turns on beside the key holds
+// and locks (D-F62): each stays on while any owner keeps it, and the layers
+// that join turn on before the ones that leave turn off.
+static void test_a_pointing_mode_owns_its_layers_beside_holds_and_locks(void) {
     keypos_t key = test_keypos(1, 1);
 
     test_reset_stubs();
-    CHECK(layer_ownership_pointing_mode_layer() == LAYER_OWNERSHIP_NO_LAYER);
-    CHECK(layer_ownership_set_pointing_mode_layer(4));
-    CHECK(layer_state == test_layer_mask(4) && layer_ownership_pointing_mode_layer() == 4);
-    CHECK(!layer_ownership_set_pointing_mode_layer(4));
+    CHECK(layer_ownership_pointing_mode_layers() == 0u);
+    CHECK(layer_ownership_set_pointing_mode_layers(test_layer_mask(4)));
+    CHECK(layer_state == test_layer_mask(4) && layer_ownership_pointing_mode_layers() == test_layer_mask(4));
+    CHECK(!layer_ownership_set_pointing_mode_layers(test_layer_mask(4)));
     CHECK(layer_on_calls[4] == 1);
 
     // Held by a key too: the mode letting go leaves it on until the key does.
     layer_ownership_momentary_press(key, 4);
-    CHECK(layer_ownership_set_pointing_mode_layer(LAYER_OWNERSHIP_NO_LAYER));
+    CHECK(layer_ownership_set_pointing_mode_layers(0u));
     CHECK(layer_state == test_layer_mask(4));
     CHECK(layer_ownership_momentary_release(key));
     CHECK(layer_state == 0);
 
-    // Locked too: the lock keeps it.
-    CHECK(layer_ownership_set_pointing_mode_layer(5));
+    // Several at once; a lock keeps one of them.
+    CHECK(layer_ownership_set_pointing_mode_layers(test_layer_mask(5) | test_layer_mask(9)));
+    CHECK(layer_state == (test_layer_mask(5) | test_layer_mask(9)));
     CHECK(layer_ownership_set_lock_state(5, true));
-    CHECK(layer_ownership_set_pointing_mode_layer(LAYER_OWNERSHIP_NO_LAYER));
+    CHECK(layer_ownership_set_pointing_mode_layers(0u));
     CHECK(layer_state == test_layer_mask(5));
     CHECK(layer_ownership_set_lock_state(5, false));
     CHECK(layer_state == 0);
 
-    // Another mode's layer replaces it: on first, then the old one off.
-    CHECK(layer_ownership_set_pointing_mode_layer(6));
-    layer_off_calls[6] = 0;
-    CHECK(layer_ownership_set_pointing_mode_layer(7));
-    CHECK(layer_state == test_layer_mask(7) && layer_off_calls[6] == 1);
-    // Out of range is no layer.
-    CHECK(layer_ownership_set_pointing_mode_layer(LAYER_COUNT));
-    CHECK(layer_state == 0 && layer_ownership_pointing_mode_layer() == LAYER_OWNERSHIP_NO_LAYER);
+    // Another mode's layers replace them: the new ones on first, then the old
+    // ones off; a layer in both stays on throughout.
+    CHECK(layer_ownership_set_pointing_mode_layers(test_layer_mask(6) | test_layer_mask(7)));
+    layer_off_calls[6] = layer_off_calls[7] = 0;
+    layer_on_calls[7] = layer_on_calls[8] = 0;
+    CHECK(layer_ownership_set_pointing_mode_layers(test_layer_mask(7) | test_layer_mask(8)));
+    CHECK(layer_state == (test_layer_mask(7) | test_layer_mask(8)));
+    CHECK(layer_off_calls[6] == 1 && layer_off_calls[7] == 0 && layer_on_calls[7] == 0 && layer_on_calls[8] == 1);
+    CHECK(layer_on_order[8] < layer_off_order[6]);
+    // Layers past the keymap are left out.
+    CHECK(layer_ownership_set_pointing_mode_layers(0u));
+    CHECK(!layer_ownership_set_pointing_mode_layers((layer_state_t)(~UINT32_C(0) << LAYER_COUNT)));
+    CHECK(layer_state == 0 && layer_ownership_pointing_mode_layers() == 0u);
 }
 
 static void test_invalid_layer_requests_are_ignored(void) {
@@ -451,7 +464,7 @@ int main(void) {
     test_toggled_layer_survives_a_momentary_hold_of_itself();
     test_oneshot_arms_until_consumed_and_quick_double_tap_cancels();
     test_oneshot_shares_its_layer_with_locks_holds_and_goto();
-    test_a_pointing_mode_owns_its_layer_beside_holds_and_locks();
+    test_a_pointing_mode_owns_its_layers_beside_holds_and_locks();
     test_invalid_layer_requests_are_ignored();
 
     puts("layer_ownership host tests passed");

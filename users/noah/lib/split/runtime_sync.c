@@ -137,9 +137,8 @@ static split_runtime_base_sync_packet_t split_runtime_sync_build_base_packet(uin
         .automouse_progress = 0,
 #    endif
 #    ifdef POINTING_DEVICE_ENABLE
-        .active_mode_id    = pointing_mode_id_from_mask(pointing_mode_local_active_snapshot()),
-        .locked_mode_id    = pointing_mode_id_from_mask(pointing_mode_local_locked_snapshot()),
-        .active_mode_light = pointing_mode_local_light_snapshot() ? 1u : 0u,
+        .active_mode_id = pointing_mode_id_from_mask(pointing_mode_local_active_snapshot()),
+        .locked_mode_id = pointing_mode_id_from_mask(pointing_mode_local_locked_snapshot()),
 #        ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
         .pointing_mode_owner_sides = pointing_mode_local_owner_sides_snapshot(),
 #        endif
@@ -369,7 +368,6 @@ static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_si
     split_runtime_sync_remote.automouse_progress = packet->automouse_progress;
     split_runtime_sync_remote.active_mode_id     = packet->active_mode_id;
     split_runtime_sync_remote.locked_mode_id     = packet->locked_mode_id;
-    split_runtime_sync_remote.active_mode_light  = packet->active_mode_light;
     split_runtime_sync_publish_seam_reached(SPLIT_RUNTIME_SYNC_DOMAIN_BASE);
 #    ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
     split_runtime_sync_remote.pointing_mode_owner_sides = packet->pointing_mode_owner_sides;
@@ -380,7 +378,7 @@ static void split_runtime_sync_slave_base_rpc(uint8_t initiator2target_buffer_si
 
     noah_runtime_trace_emit(NOAH_TRACE_SPLIT_SYNC, NOAH_TRACE_SPLIT_SYNC_EVENT_RECEIVE, pointing_mode_mask_from_id(packet->active_mode_id), pointing_mode_mask_from_id(packet->locked_mode_id));
 #    ifdef POINTING_DEVICE_ENABLE
-    pointing_mode_apply_remote_mode_ids_with_owner_bitmap(packet->active_mode_id, packet->locked_mode_id, packet->active_mode_light != 0u,
+    pointing_mode_apply_remote_mode_ids_with_owner_bitmap(packet->active_mode_id, packet->locked_mode_id,
 #        ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
                                                           packet->pointing_mode_owner_sides, packet->pointing_mode_owner_bitmap
 #        else

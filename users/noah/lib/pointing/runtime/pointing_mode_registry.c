@@ -26,46 +26,71 @@ pointing_mode_traits_t pointing_mode_effective_traits(pointing_mode_mask_t mode)
     return traits;
 }
 
-// A link to the pointer layer or to a default layer would run its mode all the
-// time, so it does nothing; the slot's validation cannot see the settings.
-static bool pointing_mode_link_live(const noah_pd_config_t *slot) {
-    uint8_t layer = slot->linked_layer;
+// The layers a link never names to any effect, and that never end a mode: a
+// default layer or the pointer layer, either of which would run a mode all the
+// time. The slot's validation cannot see the settings.
+static layer_state_t pointing_mode_inert_layers(void) {
+    layer_state_t inert = (layer_state_t)noah_setting(NOAH_SETTING_DEFAULT_LAYERS, 1u);
 
-    if (slot->link_direction == NOAH_PD_LINK_NONE || layer >= NOAH_PD_LINK_LAYER_COUNT || layer >= LAYER_COUNT) return false;
-    if (noah_setting(NOAH_SETTING_DEFAULT_LAYERS, 1u) & (UINT32_C(1) << layer)) return false;
 #ifdef POINTING_DEVICE_AUTO_MOUSE_ENABLE
-    if (layer == noah_qmk_contract_auto_mouse_layer()) return false;
+    uint8_t pointer = noah_qmk_contract_auto_mouse_layer();
+    if (pointer < sizeof(layer_state_t) * 8u) inert |= (layer_state_t)1u << pointer;
 #endif
-    return true;
+    return inert;
+}
+
+static int8_t pointing_mode_highest_layer(layer_state_t layers) {
+    return layers ? (int8_t)(sizeof(unsigned int) * 8u - 1u - (unsigned)__builtin_clz((unsigned int)layers)) : -1;
+}
+
+// Every layer a slot's link names: the layers that start its mode and those
+// its key turns on.
+static uint16_t pointing_mode_slot_link_layers(const noah_pd_config_t *slot) {
+    return (uint16_t)(slot->linked_layers | slot->link_turns_on);
+}
+
+// Whether a layer that is on in `state` ends the mode `slot`'s layers started,
+// the highest of them that is on being `top`. The pointer layer and a default
+// layer (`inert`) never end it: a mode its layer started strips the one, and
+// the other is on everywhere.
+static bool pointing_mode_link_ended(const noah_pd_config_t *slot, layer_state_t state, int8_t top, layer_state_t inert) {
+    layer_state_t others = state & ~inert;
+
+    if (slot->link_ends == NOAH_PD_LINK_ENDS_HIGHER_LAYER) return (others & ~(layer_state_t)(((layer_state_t)2u << top) - 1u)) != 0u;
+    if (slot->link_ends == NOAH_PD_LINK_ENDS_OTHER_LAYER) return (others & ~(layer_state_t)pointing_mode_slot_link_layers(slot)) != 0u;
+    return false;
 }
 
 pointing_mode_mask_t pointing_mode_layer_started_mode(layer_state_t state) {
     pointing_mode_mask_t mode          = 0;
-    int16_t              highest_layer = -1;
+    int8_t               highest_layer = -1;
+    layer_state_t        inert         = pointing_mode_inert_layers();
 
-    // One slot links each layer (the domain refuses a second), so the highest
-    // layer names one mode.
+    // No layer starts two modes (the domain refuses it), so the highest
+    // linked layer that is on names one mode.
     for (uint8_t slot = 0; slot < POINTING_MODE_COUNT; slot++) {
         const noah_pd_config_t *record = noah_active_profile_pd_for_mask(pointing_mode_mask_from_id(slot));
+        int8_t                  top;
 
-        if (!(record && (record->link_direction & NOAH_PD_LINK_LAYER_TURNS_MODE_ON) && pointing_mode_link_live(record))) continue;
-        if (!(state & ((layer_state_t)1u << record->linked_layer)) || (int16_t)record->linked_layer <= highest_layer) continue;
-        highest_layer = record->linked_layer;
+        if (!record) continue;
+        top = pointing_mode_highest_layer(state & (layer_state_t)(record->linked_layers & ~inert));
+        if (top <= highest_layer || pointing_mode_link_ended(record, state, top, inert)) continue;
+        highest_layer = top;
         mode          = pointing_mode_mask_from_id(slot);
     }
     return mode;
 }
 
-uint8_t pointing_mode_brought_layer(pointing_mode_mask_t mode) {
+uint16_t pointing_mode_key_turns_on(pointing_mode_mask_t mode) {
     const noah_pd_config_t *slot = noah_active_profile_pd_for_mask(mode);
 
-    return slot && (slot->link_direction & NOAH_PD_LINK_MODE_TURNS_LAYER_ON) && pointing_mode_link_live(slot) ? slot->linked_layer : POINTING_MODE_NO_LAYER;
+    return slot ? (uint16_t)(slot->link_turns_on & ~pointing_mode_inert_layers()) : 0u;
 }
 
-bool pointing_mode_layer_started_light(pointing_mode_mask_t mode) {
+uint16_t pointing_mode_link_layers(pointing_mode_mask_t mode) {
     const noah_pd_config_t *slot = noah_active_profile_pd_for_mask(mode);
 
-    return slot && slot->link_light;
+    return slot ? (uint16_t)(pointing_mode_slot_link_layers(slot) & ~pointing_mode_inert_layers()) : 0u;
 }
 
 static inline bool pointing_mode_registry_has_trait(pointing_mode_mask_t mode, pointing_mode_traits_t trait) {

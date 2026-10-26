@@ -25,8 +25,8 @@ void pointing_mode_transition_activate_from(pointing_mode_mask_t mode, pointing_
 // A key holds or locks the mode its layer runs: the key becomes its source,
 // with a key-started mode's auto-mouse side effects (D-F62).
 void pointing_mode_transition_take_from_layer(pointing_mode_mask_t mode);
-// The key that ran the mode let it go while its linked layer still starts it:
-// it keeps running, unlocked, with its layer as its source (D-F62).
+// The key that ran the mode let it go while its linked layers still start it:
+// it keeps running, unlocked, with its layers as its source (D-F62).
 void pointing_mode_transition_hand_to_layer(pointing_mode_mask_t mode);
 void pointing_mode_transition_deactivate(pointing_mode_mask_t mode);
 void pointing_mode_transition_lock(pointing_mode_mask_t mode);

@@ -143,7 +143,7 @@ layer_state_t noah_layer_state_set_user(layer_state_t state) {
     auto_sniping_active = pointer_layer_policy_sniping_layers_on(state) != 0u;
 #    endif
     pointing_mode_set_auto_sniping_layer_active(auto_sniping_active);
-    // A linked layer starts or ends its mode before the pointer layer policy
+    // Linked layers start or end their mode before the pointer layer policy
     // reads which mode runs (D-F62).
     pointing_mode_apply_layer_state(state);
     // Sniping can temporarily own CPI, so queue a re-apply of the active

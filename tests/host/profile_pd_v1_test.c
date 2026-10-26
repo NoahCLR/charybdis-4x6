@@ -155,69 +155,79 @@ static void check_names(void) {
     record[8] = 19; // cuts the four-byte sequence
     assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_INVALID_NAME && error.offset == 8);
     record[8] = 20;
-    record[12] = 1; // version 2's name field past the link stays zero
-    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_RESERVED && error.offset == 12);
+    record[16] = 1; // version 2's name field past the link stays zero
+    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 0, &error) == NOAH_PROFILE_PD_V1_RESERVED && error.offset == 16);
 }
 
-// Bytes 9..11 link a slot to a layer (D-F62): the layer, below 16; the
-// direction, mode turns layer on 1, layer turns mode on 2, both 3; the light
-// switch, only beside "layer turns mode on". No link leaves all three zero.
+// Bytes 11..15 link a slot to layers (D-F62): byte 11 what ends a mode its
+// linked layers started, nothing (0), a higher layer (1) or any other layer
+// (2), which needs linked layers; bytes 12..13 the linked layers, bit n layer
+// n; bytes 14..15 the layers its key turns on, any mix. Bytes 9 and 10 and
+// 16..31 are reserved. No link leaves every link byte zero.
 static void check_links(void) {
     const noah_pd_config_t     mode = {.id = 2, .name = "Linked", .kind = 1, .threshold_y = 60, .directions = {[2] = {4, 0, 0}, [3] = {5, 0, 0}}};
     uint8_t                    record[NOAH_PROFILE_PD_V1_RECORD_SIZE];
     noah_profile_pd_v1_error_t error;
 
-    assert(offsetof(noah_pd_config_t, linked_layer) == 9 && offsetof(noah_pd_config_t, link_direction) == 10 && offsetof(noah_pd_config_t, link_light) == 11);
-    for (uint8_t layer = 0; layer < 16; layer++) {
-        for (uint8_t direction = NOAH_PD_LINK_MODE_TURNS_LAYER_ON; direction <= NOAH_PD_LINK_BOTH; direction++) {
-            for (uint8_t light = 0; light <= 1; light++) {
+    assert(offsetof(noah_pd_config_t, link_ends) == 11 && offsetof(noah_pd_config_t, linked_layers) == 12 && offsetof(noah_pd_config_t, link_turns_on) == 14 && offsetof(noah_pd_config_t, link_reserved) == 16);
+    const uint16_t sets[] = {0x0000, 0x0001, 0x0040, 0x8000, 0x0141, 0xffff};
+    for (size_t linked = 0; linked < sizeof(sets) / sizeof(sets[0]); linked++) {
+        for (size_t turns_on = 0; turns_on < sizeof(sets) / sizeof(sets[0]); turns_on++) {
+            for (uint8_t ends = NOAH_PD_LINK_ENDS_NOTHING; ends <= NOAH_PD_LINK_ENDS_OTHER_LAYER; ends++) {
                 noah_profile_pd_v1_encode_record(&mode, record);
-                record[9] = layer, record[10] = direction, record[11] = light;
-                bool lit_without_layer_start = light && !(direction & NOAH_PD_LINK_LAYER_TURNS_MODE_ON);
+                record[11] = ends;
+                record[12] = (uint8_t)sets[linked], record[13] = (uint8_t)(sets[linked] >> 8);
+                record[14] = (uint8_t)sets[turns_on], record[15] = (uint8_t)(sets[turns_on] >> 8);
                 noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error);
-                assert(lit_without_layer_start ? result == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 11 : result == NOAH_PROFILE_PD_V1_OK);
+                if (!sets[linked] && ends) {
+                    assert(result == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 11);
+                } else {
+                    assert(result == NOAH_PROFILE_PD_V1_OK);
+                }
             }
         }
     }
     noah_profile_pd_v1_encode_record(&mode, record);
-    record[9] = 16, record[10] = NOAH_PD_LINK_BOTH;
-    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 9);
-    record[9] = 3, record[10] = NOAH_PD_LINK_NONE;
-    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 9);
-    record[9] = 0, record[11] = 1;
-    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 9);
-    record[11] = 2, record[10] = NOAH_PD_LINK_LAYER_TURNS_MODE_ON;
+    record[11] = 3, record[12] = 0x08;
     assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_POLICY && error.offset == 11);
-    record[11] = 0, record[10] = 4;
-    assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_POLICY && error.offset == 10);
+    // The reserved link bytes: 9 and 10 before the link, 16..31 after it.
+    record[11] = 0;
+    for (size_t at = 9; at < 32; at++) {
+        if (at >= 11 && at < 16) continue;
+        record[at] = 1;
+        assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_RESERVED && error.offset == (at < 11 ? 9u : 16u));
+        record[at] = 0;
+    }
 
     // An empty slot has no link.
     const noah_pd_config_t empty = {.id = 2, .name = "Empty"};
-    for (uint8_t at = 9; at <= 11; at++) {
+    for (uint8_t at = 11; at <= 15; at++) {
         noah_profile_pd_v1_encode_record(&empty, record);
         record[at] = 1;
         assert(noah_profile_pd_v1_validate_record(record, sizeof(record), 2, &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 2);
     }
 
-    // No two slots name one layer, whichever way each link goes; the second
-    // is refused at its layer byte.
+    // No layer starts two modes: a later slot's linked layers that an earlier
+    // slot links are refused at byte 12. The layers keys turn on may repeat,
+    // and may be layers another slot links.
     uint8_t                payload[8 + 3 * NOAH_PROFILE_PD_V1_RECORD_SIZE] = {NOAH_PROFILE_PD_V1_VERSION, 32, 128, 3};
-    const noah_pd_config_t first  = {.id = 0, .name = "First", .kind = 1, .threshold_y = 60, .linked_layer = 5, .link_direction = NOAH_PD_LINK_MODE_TURNS_LAYER_ON};
-    noah_pd_config_t       second = {.id = 4, .name = "Second", .kind = 1, .threshold_y = 60, .linked_layer = 6, .link_direction = NOAH_PD_LINK_LAYER_TURNS_MODE_ON, .link_light = 1};
-    noah_pd_config_t       third  = {.id = 9, .name = "Third", .kind = 2, .scroll = {2, 3, 6, 8, 8, 80, 55}, .scroll_policy = {7, 4, 5, 4, 4, 0}, .linked_layer = 7, .link_direction = NOAH_PD_LINK_BOTH};
+    const noah_pd_config_t first  = {.id = 0, .name = "First", .kind = 1, .threshold_y = 60, .link_turns_on = 0x0060};
+    noah_pd_config_t       second = {.id = 4, .name = "Second", .kind = 1, .threshold_y = 60, .linked_layers = 0x0140, .link_ends = NOAH_PD_LINK_ENDS_HIGHER_LAYER, .link_turns_on = 0x0120};
+    noah_pd_config_t       third  = {.id = 9, .name = "Third", .kind = 2, .scroll = {2, 3, 6, 8, 8, 80, 55}, .scroll_policy = {7, 4, 5, 4, 4, 0}, .linked_layers = 0x8080, .link_ends = NOAH_PD_LINK_ENDS_OTHER_LAYER, .link_turns_on = 0x81e0};
     noah_profile_pd_v1_encode_record(&first, payload + 8);
     noah_profile_pd_v1_encode_record(&second, payload + 8 + 128);
     noah_profile_pd_v1_encode_record(&third, payload + 8 + 256);
     assert(noah_profile_pd_v1_validate(payload, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_OK);
-    third.linked_layer = 5;
+    third.linked_layers = 0x8100;
     noah_profile_pd_v1_encode_record(&third, payload + 8 + 256);
-    assert(noah_profile_pd_v1_validate(payload, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 8 + 256 + 9);
-    third.linked_layer = 6, third.link_direction = NOAH_PD_LINK_MODE_TURNS_LAYER_ON;
+    assert(noah_profile_pd_v1_validate(payload, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 8 + 256 + 12);
+    // A layer an earlier key turns on may start a later slot's mode.
+    third.linked_layers = 0x8020;
     noah_profile_pd_v1_encode_record(&third, payload + 8 + 256);
-    assert(noah_profile_pd_v1_validate(payload, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_INVALID_PARAMETER && error.offset == 8 + 256 + 9);
-    // Unlinked slots name no layer, so layer byte zero repeats freely.
-    second.linked_layer = 0, second.link_direction = NOAH_PD_LINK_NONE, second.link_light = 0;
-    third.linked_layer = 0, third.link_direction = NOAH_PD_LINK_NONE;
+    assert(noah_profile_pd_v1_validate(payload, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_OK);
+    // Unlinked slots start nothing, so their zero link bytes repeat freely.
+    second = (noah_pd_config_t){.id = 4, .name = "Second", .kind = 1, .threshold_y = 60};
+    third.linked_layers = 0, third.link_ends = NOAH_PD_LINK_ENDS_NOTHING, third.link_turns_on = 0;
     noah_profile_pd_v1_encode_record(&second, payload + 8 + 128);
     noah_profile_pd_v1_encode_record(&third, payload + 8 + 256);
     assert(noah_profile_pd_v1_validate(payload, sizeof(payload), &error) == NOAH_PROFILE_PD_V1_OK);

@@ -129,10 +129,6 @@ __attribute__((weak)) bool pointing_mode_local_key_source_active(void) {
     return false;
 }
 
-__attribute__((weak)) bool pointing_mode_local_light_snapshot(void) {
-    return false;
-}
-
 __attribute__((weak)) void pointing_mode_apply_layer_state(layer_state_t state) {
     (void)state;
 }

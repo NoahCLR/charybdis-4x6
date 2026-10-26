@@ -14,10 +14,11 @@ PD_FIELD_AT(noah_pd_config_t, dpi, 4);
 PD_FIELD_AT(noah_pd_config_t, held_modifiers, 6);
 PD_FIELD_AT(noah_pd_config_t, reserved, 7);
 PD_FIELD_AT(noah_pd_config_t, name_length, NOAH_PROFILE_PD_V1_NAME_LENGTH);
-PD_FIELD_AT(noah_pd_config_t, linked_layer, 9);
-PD_FIELD_AT(noah_pd_config_t, link_direction, 10);
-PD_FIELD_AT(noah_pd_config_t, link_light, 11);
-PD_FIELD_AT(noah_pd_config_t, link_reserved, 12);
+PD_FIELD_AT(noah_pd_config_t, link_head_reserved, 9);
+PD_FIELD_AT(noah_pd_config_t, link_ends, 11);
+PD_FIELD_AT(noah_pd_config_t, linked_layers, 12);
+PD_FIELD_AT(noah_pd_config_t, link_turns_on, 14);
+PD_FIELD_AT(noah_pd_config_t, link_reserved, 16);
 PD_FIELD_AT(noah_pd_config_t, threshold_x, 32);
 PD_FIELD_AT(noah_pd_config_t, threshold_y, 34);
 PD_FIELD_AT(noah_pd_config_t, directions, 36);
@@ -121,21 +122,22 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate_record(const uint8_t *p,
     if (!p || slot >= NOAH_PROFILE_PD_V1_SLOT_COUNT) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ARGUMENT, 0);
     if (length != NOAH_PROFILE_PD_V1_RECORD_SIZE) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
     if (U8(p, id) != slot) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ID, AT(id));
-    if (U8(p, reserved) || !ZERO(p, link_reserved) || !ZERO(p, retired_buttons) || !ZERO(p, tail_reserved)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, U8(p, reserved) ? AT(reserved) : !ZERO(p, link_reserved) ? AT(link_reserved) : !ZERO(p, retired_buttons) ? AT(retired_buttons) : AT(tail_reserved));
+    if (U8(p, reserved)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, AT(reserved));
+    if (!ZERO(p, link_head_reserved)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, AT(link_head_reserved));
+    if (!ZERO(p, link_reserved)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, AT(link_reserved));
+    if (!ZERO(p, retired_buttons)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, AT(retired_buttons));
+    if (!ZERO(p, tail_reserved)) return fail(error, NOAH_PROFILE_PD_V1_RESERVED, AT(tail_reserved));
     if (!name_valid(p)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_NAME, AT(name_length));
     if (U8(p, kind) > NOAH_PD_KIND_SCROLLING || U8(p, pointer_layer) > NOAH_PD_POINTER_LAYER_PREFER_TYPING || U8(p, axis) > NOAH_PD_AXIS_EIGHT) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, AT(kind));
-    if (U8(p, link_direction) > NOAH_PD_LINK_BOTH) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, AT(link_direction));
-    if (U8(p, link_light) > 1u) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, AT(link_light));
+    if (U8(p, link_ends) > NOAH_PD_LINK_ENDS_OTHER_LAYER) return fail(error, NOAH_PROFILE_PD_V1_INVALID_POLICY, AT(link_ends));
     if (U8(p, kind) == NOAH_PD_KIND_DISABLED) {
         // Everything but the ID and the name is zero: an empty slot has no link.
-        if (!ZERO_UNTIL(p, pointer_layer, name_length) || !ZERO_UNTIL(p, linked_layer, link_reserved) || !ZERO_UNTIL(p, threshold_x, tail_reserved)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(pointer_layer));
+        if (!ZERO_UNTIL(p, pointer_layer, name_length) || !ZERO_UNTIL(p, link_ends, link_reserved) || !ZERO_UNTIL(p, threshold_x, tail_reserved)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(pointer_layer));
         return fail(error, NOAH_PROFILE_PD_V1_OK, 0);
     }
     if (!U8(p, name_length)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_NAME, AT(name_length));
-    // A link names a layer and a direction; no link leaves every link byte zero.
-    if (U8(p, linked_layer) >= NOAH_PD_LINK_LAYER_COUNT || (U8(p, link_direction) == NOAH_PD_LINK_NONE && (U8(p, linked_layer) || U8(p, link_light)))) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(linked_layer));
-    // The light switch only says how a mode its layer started is shown.
-    if (U8(p, link_light) && !(U8(p, link_direction) & NOAH_PD_LINK_LAYER_TURNS_MODE_ON)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(link_light));
+    // What ends a mode its linked layers started needs linked layers.
+    if (U8(p, link_ends) != NOAH_PD_LINK_ENDS_NOTHING && !U16(p, linked_layers)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(link_ends));
     for (size_t i = AT(directions); i < AT(directions) + SIZE(directions); i += sizeof(noah_pd_tap_t)) {
         if (!tap_valid(p + i)) return fail(error, NOAH_PROFILE_PD_V1_INVALID_ACTION, i);
     }
@@ -213,13 +215,12 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_next(noah_profile_pd_v1_cu
     if (!cursor || cursor->index >= cursor->count) return fail(error, NOAH_PROFILE_PD_V1_INVALID_LENGTH, 0);
     noah_profile_pd_v1_result_t result = noah_profile_pd_v1_validate_entry(record, NOAH_PROFILE_PD_V1_RECORD_SIZE, cursor->minimum, error);
     if (result != NOAH_PROFILE_PD_V1_OK) return result;
-    // One slot per layer, in any direction, so links cannot start each other
-    // in a chain (D-F62).
-    if (U8(record, link_direction) != NOAH_PD_LINK_NONE) {
-        uint16_t layer = (uint16_t)(1u << U8(record, linked_layer));
-        if (cursor->linked_layers & layer) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(linked_layer));
-        cursor->linked_layers |= layer;
-    }
+    // No layer starts two modes (D-F62). The layers keys turn on may repeat:
+    // a key source beats a layer source and a mode its layers started owns no
+    // layer, so no link can start another or keep itself on.
+    uint16_t linked = U16(record, linked_layers);
+    if (cursor->starting_layers & linked) return fail(error, NOAH_PROFILE_PD_V1_INVALID_PARAMETER, AT(linked_layers));
+    cursor->starting_layers |= linked;
     cursor->minimum = (uint8_t)(U8(record, id) + 1u);
     cursor->index++;
     return result;

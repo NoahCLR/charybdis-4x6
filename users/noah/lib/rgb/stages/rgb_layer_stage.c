@@ -191,7 +191,9 @@ bool rgb_runtime_frame_fill(rgb_runtime_frame_t *frame, rgb_t color, uint8_t led
     return true;
 }
 
-static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t selected_layer, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+// Layers first..end-1 only, each with its own rows; a split render lets a
+// linked pointing mode paint between them.
+static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t selected_layer, uint8_t first, uint8_t end, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
     rgb_active_profile_layer_profile_t profile;
     bool                          painted = false;
 
@@ -199,7 +201,7 @@ static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame,
         return false;
     }
 
-    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+    for (uint8_t layer = first; layer < end; layer++) {
         if (!rgb_runtime_layer_stage_selection_contains(state, selected_layer, layer)) {
             continue;
         }
@@ -223,7 +225,7 @@ static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame,
         }
 
         if (group_config.selector == RGB_LAYER_GROUP_ALL) {
-            for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+            for (uint8_t layer = first; layer < end; layer++) {
                 if (rgb_runtime_layer_stage_selection_contains(state, selected_layer, layer)) {
                     painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, &profile, &group_config, layer, led_min, led_max);
                 }
@@ -231,7 +233,7 @@ static bool rgb_runtime_layer_stage_render_selection(rgb_runtime_frame_t *frame,
             continue;
         }
 
-        if (group_config.selector < LAYER_COUNT && rgb_runtime_layer_stage_selection_contains(state, selected_layer, group_config.selector)) {
+        if (group_config.selector >= first && group_config.selector < end && rgb_runtime_layer_stage_selection_contains(state, selected_layer, group_config.selector)) {
             painted |= rgb_runtime_layer_stage_paint_group_for_layer(frame, &profile, &group_config, group_config.selector, led_min, led_max);
         }
     }
@@ -244,14 +246,18 @@ bool rgb_runtime_layer_stage_render_frame(rgb_runtime_frame_t *frame, layer_stat
 }
 
 bool rgb_runtime_layer_stage_render_active_profile_frame(rgb_runtime_frame_t *frame, layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+    return rgb_runtime_layer_stage_render_active_profile_layers_frame(frame, state, 0u, LAYER_COUNT, profile_frame, led_min, led_max);
+}
+
+bool rgb_runtime_layer_stage_render_active_profile_layers_frame(rgb_runtime_frame_t *frame, layer_state_t state, uint8_t first, uint8_t end, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
     bool painted;
 
-    if (!frame) {
+    if (!frame || first > end || end > LAYER_COUNT) {
         return false;
     }
 
     rgb_runtime_frame_clear(frame, led_min, led_max);
-    painted = rgb_runtime_layer_stage_render_selection(frame, state, RGB_LAYER_GROUP_ALL, profile_frame, led_min, led_max);
+    painted = rgb_runtime_layer_stage_render_selection(frame, state, RGB_LAYER_GROUP_ALL, first, end, profile_frame, led_min, led_max);
     if (!rgb_active_profile_config_frame_current(profile_frame)) {
         rgb_runtime_frame_clear(frame, led_min, led_max);
         return false;
@@ -271,7 +277,7 @@ bool rgb_runtime_layer_stage_render_active_profile_selected_frame(rgb_runtime_fr
     }
 
     rgb_runtime_frame_clear(frame, led_min, led_max);
-    painted = rgb_runtime_layer_stage_render_selection(frame, 0, layer, profile_frame, led_min, led_max);
+    painted = rgb_runtime_layer_stage_render_selection(frame, 0, layer, 0u, LAYER_COUNT, profile_frame, led_min, led_max);
     if (!rgb_active_profile_config_frame_current(profile_frame)) {
         rgb_runtime_frame_clear(frame, led_min, led_max);
         return false;

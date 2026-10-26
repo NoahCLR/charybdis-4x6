@@ -674,14 +674,14 @@ pointing_mode_mask_t pointing_mode_layer_started_mode(layer_state_t state) {
     return 0;
 }
 
-uint8_t pointing_mode_brought_layer(pointing_mode_mask_t mode) {
+uint16_t pointing_mode_key_turns_on(pointing_mode_mask_t mode) {
     (void)mode;
-    return POINTING_MODE_NO_LAYER;
+    return 0u;
 }
 
-bool pointing_mode_layer_started_light(pointing_mode_mask_t mode) {
+uint16_t pointing_mode_link_layers(pointing_mode_mask_t mode) {
     (void)mode;
-    return false;
+    return 0u;
 }
 
 void pointing_mode_transition_deactivate(pointing_mode_mask_t mode) {

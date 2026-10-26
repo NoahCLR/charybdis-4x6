@@ -143,11 +143,29 @@ static bool rgb_runtime_pointing_mode_stage_paint_group(rgb_runtime_frame_t *fra
     return painted;
 }
 
+_Static_assert(POINTING_MODE_NO_LAYER == UINT8_MAX, "the stub without pointing lighting answers UINT8_MAX for no layer");
+
+uint8_t rgb_runtime_pointing_mode_stage_beneath_layer(layer_state_t state, const noah_active_profile_rgb_frame_t *profile_frame) {
+    pointing_mode_snapshot_t snapshot = pointing_mode_snapshot();
+    layer_state_t            on       = snapshot.display.active_mode != 0 ? state & (layer_state_t)pointing_mode_link_layers(snapshot.display.active_mode) : 0u;
+    pointing_mode_color_t    config;
+
+    // A mode with nothing to paint, its stage off, leaves the layer stack whole.
+    if (!on || !rgb_active_profile_config_pd_color(profile_frame, snapshot.display.active_index, &config)) {
+        return POINTING_MODE_NO_LAYER;
+    }
+    return (uint8_t)__builtin_ctz((unsigned int)on);
+}
+
 bool rgb_runtime_pointing_mode_stage_render_frame(rgb_runtime_frame_t *frame, uint8_t led_min, uint8_t led_max) {
     return rgb_runtime_pointing_mode_stage_render_active_profile_frame(frame, NULL, led_min, led_max);
 }
 
 bool rgb_runtime_pointing_mode_stage_render_active_profile_frame(rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t led_min, uint8_t led_max) {
+    return rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(frame, profile_frame, POINTING_MODE_NO_LAYER, led_min, led_max);
+}
+
+bool rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(rgb_runtime_frame_t *frame, const noah_active_profile_rgb_frame_t *profile_frame, uint8_t beneath_layer, uint8_t led_min, uint8_t led_max) {
     // Mirrored identity and owner keys are rendered together, so they come from
     // one published generation rather than two independent reads.
     uint8_t                       owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -166,9 +184,12 @@ bool rgb_runtime_pointing_mode_stage_render_active_profile_frame(rgb_runtime_fra
     snapshot    = pointing_mode_snapshot_with_owner_bitmap(owner_bitmap, &has_owner_keys);
     active_mode = snapshot.display.active_index;
     rgb_runtime_pointing_mode_stage_clear_frame(frame, led_min, led_max);
-    // A mode its layer started leaves the layer's lighting showing unless its
-    // slot's light switch is on (D-F62); both halves read the same answer.
-    if (active_mode >= POINTING_MODE_COUNT || !snapshot.display.active_light || !rgb_active_profile_config_pd_stage_enabled(profile_frame) || !rgb_active_profile_config_pd_color(profile_frame, active_mode, &active_config)) {
+    // Painted beneath a layer, the mode is the one the same snapshot links to
+    // it, so a publication between the two reads cannot mix two modes.
+    if (beneath_layer != POINTING_MODE_NO_LAYER && !(beneath_layer < LAYER_COUNT && ((layer_state_t)pointing_mode_link_layers(snapshot.display.active_mode) & ((layer_state_t)1u << beneath_layer)))) {
+        return false;
+    }
+    if (active_mode >= POINTING_MODE_COUNT || !rgb_active_profile_config_pd_stage_enabled(profile_frame) || !rgb_active_profile_config_pd_color(profile_frame, active_mode, &active_config)) {
         return false;
     }
     active_rgb = hsv_to_rgb(active_config.color);

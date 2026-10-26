@@ -71,7 +71,7 @@ build's packed C struct, sent whole.
 
 | RPC | Packet |
 | --- | --- |
-| `PUT_SPLIT_RUNTIME_BASE_SYNC` | auto-mouse fade progress, active and locked pointing slot, whether the active mode shows its own light (a mode its linked layer started may not, D-F62), the pointing mode's owning half and keys (when `RGB_POINTING_MODE_ACTIVE_HALF_ENABLE`), key preview layer |
+| `PUT_SPLIT_RUNTIME_BASE_SYNC` | auto-mouse fade progress, active and locked pointing slot, the pointing mode's owning half and keys (when `RGB_POINTING_MODE_ACTIVE_HALF_ENABLE`), key preview layer |
 | `PUT_SPLIT_COMBO_FEEDBACK_SYNC` | combo feedback underlay and overlay key bitmaps |
 | `PUT_SPLIT_KEY_FEEDBACK_SEMANTIC_SYNC` | key feedback flash visibility and semantic map |
 | `PUT_SPLIT_KEY_FEEDBACK_BRANCH_SYNC` | key feedback owner map and tap branch map |

@@ -70,8 +70,6 @@ static int8_t   rpc_send_ids[RPC_SEND_SCRIPT_CAPACITY];
 
 static uint8_t              remote_snapshot_apply_count;
 static pointing_mode_mask_t remote_snapshot_active;
-static bool                 remote_snapshot_light;
-static bool                 fake_pd_active_light;
 static pointing_mode_mask_t remote_snapshot_locked;
 static split_side_mask_t    remote_snapshot_owner_sides;
 static uint8_t              remote_snapshot_owner_bitmap[KEY_ORIGIN_BITMAP_SIZE];
@@ -97,7 +95,6 @@ static void test_reset_stubs(void) {
     fake_pd_active_flags    = POINTING_MODE_ZOOM;
     fake_pd_locked_flags    = 0;
     fake_pd_owner_sides     = SPLIT_SIDE_MASK_RIGHT;
-    fake_pd_active_light    = true;
     key_origin_bitmap_clear(fake_pd_owner_bitmap);
     key_origin_bitmap_fill_single(fake_pd_owner_bitmap, (keypos_t){.row = 4, .col = 0});
     key_origin_bitmap_clear(fake_combo_underlay_bitmap);
@@ -149,7 +146,6 @@ static void test_reset_stubs(void) {
     memset(rpc_send_ids, -1, sizeof(rpc_send_ids));
     remote_snapshot_apply_count = 0;
     remote_snapshot_active      = 0;
-    remote_snapshot_light       = false;
     remote_snapshot_locked      = 0;
     remote_snapshot_owner_sides = SPLIT_SIDE_MASK_NONE;
     key_origin_bitmap_clear(remote_snapshot_owner_bitmap);
@@ -226,10 +222,6 @@ split_side_mask_t pointing_mode_local_owner_sides_snapshot(void) {
     return fake_pd_owner_sides;
 }
 
-bool pointing_mode_local_light_snapshot(void) {
-    return fake_pd_active_light;
-}
-
 bool pointing_mode_local_owner_bitmap_snapshot(uint8_t *out_bitmap) {
     pd_owner_bitmap_read_count++;
     key_origin_bitmap_copy(out_bitmap, fake_pd_owner_bitmap);
@@ -296,9 +288,8 @@ uint8_t key_feedback_preview_layer(void) {
     return fake_key_preview_layer;
 }
 
-void pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, bool active_light, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
+void pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
     remote_snapshot_apply_count++;
-    remote_snapshot_light       = active_light;
     remote_snapshot_active      = pointing_mode_mask_from_id(active_mode_id);
     remote_snapshot_locked      = pointing_mode_mask_from_id(locked_mode_id);
     remote_snapshot_owner_sides = owner_sides;
@@ -310,7 +301,7 @@ void pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t ac
 }
 
 void pointing_mode_apply_remote_mode_ids(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides) {
-    pointing_mode_apply_remote_mode_ids_with_owner_bitmap(active_mode_id, locked_mode_id, true, owner_sides, NULL);
+    pointing_mode_apply_remote_mode_ids_with_owner_bitmap(active_mode_id, locked_mode_id, owner_sides, NULL);
 }
 
 void transaction_register_rpc(int8_t transaction_id, slave_callback_t callback) {
@@ -416,9 +407,9 @@ static void test_init_registers_rpcs_and_sends_initial_packets_on_master(void) {
     test_reset_stubs();
 
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
-    CHECK(sizeof(split_runtime_base_sync_packet_t) == (size_t)(7u + KEY_ORIGIN_BITMAP_SIZE));
+    CHECK(sizeof(split_runtime_base_sync_packet_t) == (size_t)(6u + KEY_ORIGIN_BITMAP_SIZE));
 #else
-    CHECK(sizeof(split_runtime_base_sync_packet_t) == 6u);
+    CHECK(sizeof(split_runtime_base_sync_packet_t) == 5u);
 #endif
     CHECK(sizeof(split_runtime_combo_feedback_packet_t) == (size_t)(2u * KEY_ORIGIN_BITMAP_SIZE));
     CHECK(sizeof(split_runtime_key_feedback_semantic_packet_t) == (size_t)(KEY_ORIGIN_BITMAP_SIZE + KEY_FEEDBACK_SEMANTIC_MAP_SIZE));
@@ -1006,23 +997,6 @@ static void test_tick_sends_base_packet_when_only_pd_owner_bitmap_changes(void) 
 }
 #endif
 
-// Whether the running mode shows its light travels in the base packet and is
-// sent when it changes, like the mode itself; it adds no exchange (D-F62).
-static void test_tick_sends_base_packet_when_only_the_mode_light_changes(void) {
-    test_reset_stubs();
-
-    split_runtime_sync_init();
-    CHECK(rpc_last_base_packet.active_mode_light == 1u);
-    test_reset_rpc_send_counts();
-
-    fake_pd_active_light = false;
-    split_runtime_sync_tick();
-
-    CHECK(rpc_send_count == 1u);
-    CHECK(rpc_send_count_base == 1u);
-    CHECK(rpc_last_base_packet.active_mode_light == 0u);
-}
-
 static void test_idle_packets_use_idle_heartbeat(void) {
     test_reset_stubs();
     test_set_idle_runtime_state();
@@ -1089,7 +1063,6 @@ static void test_slave_rpcs_apply_exact_remote_state(void) {
         .automouse_progress = 42u,
         .active_mode_id     = pointing_mode_id_from_mask(POINTING_MODE_ARROW),
         .locked_mode_id     = pointing_mode_id_from_mask(POINTING_MODE_VOLUME),
-        .active_mode_light  = 1u,
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
         .pointing_mode_owner_sides  = SPLIT_SIDE_MASK_LEFT,
         .pointing_mode_owner_bitmap = {0x08u},
@@ -1143,13 +1116,6 @@ static void test_slave_rpcs_apply_exact_remote_state(void) {
     CHECK(remote_snapshot_apply_count == 1u);
     CHECK(remote_snapshot_active == pointing_mode_mask_from_id(base_packet.active_mode_id));
     CHECK(remote_snapshot_locked == pointing_mode_mask_from_id(base_packet.locked_mode_id));
-    CHECK(split_runtime_sync_remote.active_mode_light == 1u && remote_snapshot_light);
-
-    // A mode its layer started without its light: the slave half learns it
-    // from the same packet (D-F62).
-    base_packet.active_mode_light = 0u;
-    test_registered_callback(PUT_SPLIT_RUNTIME_BASE_SYNC)(sizeof(base_packet), &base_packet, 0u, NULL);
-    CHECK(split_runtime_sync_remote.active_mode_light == 0u && !remote_snapshot_light);
 }
 
 static void test_slave_base_rpc_ignores_short_packets(void) {
@@ -1458,7 +1424,6 @@ int main(void) {
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
     test_tick_sends_base_packet_when_only_pd_owner_bitmap_changes();
 #endif
-    test_tick_sends_base_packet_when_only_the_mode_light_changes();
     test_idle_packets_use_idle_heartbeat();
     test_idle_tick_keeps_combo_immediate_and_skips_key_feedback_builders_until_due_or_dirty();
     test_slave_rpcs_apply_exact_remote_state();

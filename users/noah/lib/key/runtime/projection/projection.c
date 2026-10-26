@@ -28,9 +28,12 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             noah_emit_action_tap_at(key_runtime_effect_dispatch_action_key_pos(effect), effect->data.dispatch_action.action, NOAH_EMIT_POLICY_SETTLE_FALLBACK_HOLDS);
             return;
         case KEY_RUNTIME_EFFECT_HELD_ACTION_REGISTER:
-            key_runtime_core_pd_projection_preempt_held_action(effect->data.held_action.action);
+            // A pointing mode's key runs its mode before another key's hold
+            // is preempted, so the new mode replaces the old one directly and
+            // a layer both keys turn on stays on (D-F62).
             key_runtime_core_observe_held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
             held_action_register(effect->data.held_action.key_pos, effect->data.held_action.action);
+            key_runtime_core_pd_projection_preempt_held_action(effect->data.held_action.action);
             return;
         case KEY_RUNTIME_EFFECT_HELD_ACTION_UNREGISTER:
             held_action_unregister(effect->data.held_action.key_pos, effect->data.held_action.action);

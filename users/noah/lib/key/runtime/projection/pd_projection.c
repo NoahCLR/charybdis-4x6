@@ -82,18 +82,22 @@ void key_runtime_core_pd_projection_preempt_held_action(uint16_t action) {
     key_runtime_core_pd_projection_preempt_held_actions_for_mode(pointing_mode_for_keycode(action));
 }
 
+// The lock runs its mode before other keys' holds are preempted, as a held
+// mode does (projection.c).
 void key_runtime_core_pd_projection_project_lock_tap(pointing_mode_mask_t mode, keypos_t key_pos) {
-    if (key_runtime_core_pd_projection_lock_tap_will_activate(mode)) {
-        key_runtime_core_pd_projection_preempt_held_actions_for_mode(mode);
-    }
+    bool activates = key_runtime_core_pd_projection_lock_tap_will_activate(mode);
 
     (void)pointing_mode_toggle_lock_state_at(mode, key_pos);
+    if (activates) {
+        key_runtime_core_pd_projection_preempt_held_actions_for_mode(mode);
+    }
 }
 
 void key_runtime_core_pd_projection_project_lock_state(pointing_mode_mask_t mode, bool locked, keypos_t key_pos) {
-    if (locked && key_runtime_core_pd_projection_lock_tap_will_activate(mode)) {
-        key_runtime_core_pd_projection_preempt_held_actions_for_mode(mode);
-    }
+    bool activates = locked && key_runtime_core_pd_projection_lock_tap_will_activate(mode);
 
     (void)pointing_mode_set_lock_state_at(mode, locked, key_pos);
+    if (activates) {
+        key_runtime_core_pd_projection_preempt_held_actions_for_mode(mode);
+    }
 }

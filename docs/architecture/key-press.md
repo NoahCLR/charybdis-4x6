@@ -192,20 +192,22 @@ whose redundant edge it suppressed; every credited release retires its owner.
 
 - **No offer.** A pointing mode takes no key press: mouse buttons run their
   own behaviour in every mode (D-F62 retired the button overrides), and a
-  mode's own keys come from its linked layer, an ordinary layer.
+  mode's own keys come from a layer its link turns on, an ordinary layer.
 - **Masking.** Around each key event, the active mode's own modifiers are
   masked (`key_runtime_process_begin_keyboard_event_mod_mask`).
 - **Effects.** A held pointing keycode reaches `pointing_mode_handle_keycode_press_at()`
   through `noah_action_press`; lock taps and lock states go through
-  `projection/pd_projection.c`, which first unregisters any other mode's held
-  action, since one mode runs at a time.
+  `projection/pd_projection.c`. A held pointing keycode or a lock that runs
+  its mode then unregisters any other mode's held action, since one mode runs
+  at a time: the new mode replaces the old one directly, so the layers both
+  keys turn on stay on (D-F62).
 - **The bridge back.** `pointing_mode_state.c` reports a changed local lock
   through `pointing_mode_key_runtime_bridge_observe_local_lock_state()`, the
   only way the pointing runtime writes into the reducer's shadow state.
 - **Layers.** A layer change from a key reaches the pointing runtime through
   QMK's layer-state hook, where linked layers start and end their modes; a
-  mode its key runs brings its linked layer through `layer_ownership`, as one
-  more owner (D-F62).
+  mode its key runs turns its link's layers on through `layer_ownership`, as
+  one more owner (D-F62).
 
 ## Invariants that span files
 

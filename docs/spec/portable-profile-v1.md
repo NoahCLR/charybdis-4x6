@@ -119,7 +119,7 @@ together:
 | Key behaviours `0x20` | layer actions as a row's target, tap or holds (action kinds 2 and 3, and kind-1 layer keycodes); each row's allowed-layers mask |
 | Combos `0x30` | layer actions as inputs or output; each row's allowed-layers mask |
 | Settings `0x40` | scalar 5 (auto-mouse pointer layer); scalars 9 (auto-sniping layers), 23 (default layers), 29 and 30 (layer masks); the layer records, by position, and each record's combo reference layer; the layer names, by position |
-| Pointing `0x50` | each linked slot's linked layer (byte 9 of its record, D-F62) |
+| Pointing `0x50` | each slot's linked layers and the layers its key turns on (bytes 12..13 and 14..15 of its record, D-F62) |
 | Lighting `0x10` | each layer colour's layer id; each layer group row's selector (a layer, or `0xff` for all) |
 
 In the pointing domain only a link names a layer: a slot's pointer-layer byte

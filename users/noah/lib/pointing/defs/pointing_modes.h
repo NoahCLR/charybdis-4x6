@@ -31,9 +31,6 @@ typedef struct {
 
 _Static_assert(POINTING_MODE_KEYCODE_COUNT == POINTING_MODE_COUNT, "pointing-mode keycode count in custom_keycodes enum doesn't match POINTING_MODE_COUNT — keep the pointing-mode keycode block dense and update both together");
 
-// No linked layer.
-#define POINTING_MODE_NO_LAYER UINT8_MAX
-
 typedef enum {
     POINTING_MODE_COMMAND_NONE = 0,
     POINTING_MODE_COMMAND_ACTIVATE,
@@ -57,7 +54,6 @@ typedef struct {
     split_side_mask_t            owner_sides;
     keypos_t                     owner_key_pos;
     const uint8_t               *owner_bitmap;
-    bool                         active_light;
     layer_state_t                layer_state;
 } pointing_mode_command_t;
 
@@ -73,7 +69,7 @@ extern const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT];
 
 pointing_mode_apply_result_t pointing_mode_apply_command(pointing_mode_command_t command);
 void                         pointing_mode_apply_remote_mode_ids(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides);
-void                         pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, bool active_light, split_side_mask_t owner_sides, const uint8_t *owner_bitmap);
+void                         pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides, const uint8_t *owner_bitmap);
 // The layer-state hook's command.
 void                         pointing_mode_apply_layer_state(layer_state_t state);
 // After a new profile generation or working copy is published: the links it
@@ -121,13 +117,13 @@ void pointing_mode_apply_active_dpi(void);
 // unknown mode.
 pointing_mode_traits_t pointing_mode_effective_traits(pointing_mode_mask_t mode);
 
-// Linked layers, from the effective slots (D-F62). A link to the pointer layer
-// or to a default layer is inert: it starts nothing and brings nothing.
-// The mode the highest linked layer that is on in `state` starts, through a
-// link that turns its mode on; zero when none.
+// Links, from the effective slots (D-F62). A default layer or the pointer
+// layer in a link is inert: it starts nothing and is never turned on.
+// The mode whose highest linked layer that is on in `state` ranks highest,
+// unless what its link says ends it is on too (a higher layer, or any other
+// layer, neither counting the pointer layer or a default layer). Zero when
+// none.
 pointing_mode_mask_t pointing_mode_layer_started_mode(layer_state_t state);
-// The layer `mode` brings while its key runs it, through a link that turns its
-// layer on; POINTING_MODE_NO_LAYER when none.
-uint8_t              pointing_mode_brought_layer(pointing_mode_mask_t mode);
-// Whether `mode` shows its own light when its layer started it.
-bool                 pointing_mode_layer_started_light(pointing_mode_mask_t mode);
+// The live layers `mode`'s key turns on while it runs the mode, bit n layer n;
+// any layers, including ones that start another mode.
+uint16_t             pointing_mode_key_turns_on(pointing_mode_mask_t mode);

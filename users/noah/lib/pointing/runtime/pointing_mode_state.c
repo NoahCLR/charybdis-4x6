@@ -44,7 +44,7 @@ static void pointing_mode_publish_seam_reached(void) {}
 #endif
 
 static bool pointing_mode_snapshot_view_changed(pointing_mode_snapshot_view_t before, pointing_mode_snapshot_view_t after) {
-    return before.active_mode != after.active_mode || before.locked_mode != after.locked_mode || before.owner_sides != after.owner_sides || before.active_source != after.active_source || before.active_light != after.active_light;
+    return before.active_mode != after.active_mode || before.locked_mode != after.locked_mode || before.owner_sides != after.owner_sides || before.active_source != after.active_source;
 }
 
 static pointing_mode_source_t pointing_mode_local_source(void) {
@@ -55,11 +55,12 @@ static pointing_mode_source_t pointing_mode_local_source(void) {
 // a separate pointer layer for it, so once the command is done the pointer
 // layer goes off, and the hook keeps it off while the mode runs.
 //
-// A layer change made inside a command (the layer a mode brings, released or
-// taken) runs the layer-state hook, which re-enters pointing_mode_apply_command
-// with a layer-state command. That is safe because every such change happens
-// while a key source still runs the mode, so the nested command leaves the
-// links waiting; the source changes only after the layer it brought has gone.
+// A layer change made inside a command (the layers a mode's key turns on,
+// released or taken) runs the layer-state hook, which re-enters
+// pointing_mode_apply_command with a layer-state command. That is safe because
+// every such change happens while a key source still runs the mode, so the
+// nested command leaves the links waiting; the source changes only after the
+// layers it turned on have gone.
 // The strip runs once the outer state is final, never from a nested call.
 static bool pointing_mode_layer_policy_refresh_due;
 
@@ -354,15 +355,14 @@ static bool pointing_mode_apply_lock_mode(pointing_mode_mask_t mode) {
     return changed;
 }
 
-// The layer the running mode brings: only a mode its key runs owns one, so a
-// two-way link cannot keep itself on (D-F62).
-_Static_assert(POINTING_MODE_NO_LAYER == LAYER_OWNERSHIP_NO_LAYER, "no linked layer is no layer to own");
-
-static void pointing_mode_sync_brought_layer(void) {
+// The layers the running mode's key turns on: only a mode its key runs owns
+// any, so a key that turns on its own linked layers cannot keep itself on
+// (D-F62).
+static void pointing_mode_sync_key_turns_on(void) {
     pointing_mode_mask_t active = POINTING_MODE_LOCAL_ACTIVE_MODE;
-    uint8_t              layer  = active != 0 && pointing_mode_local_source() == POINTING_MODE_SOURCE_KEY ? pointing_mode_brought_layer(active) : POINTING_MODE_NO_LAYER;
+    uint16_t             layers = active != 0 && pointing_mode_local_source() == POINTING_MODE_SOURCE_KEY ? pointing_mode_key_turns_on(active) : 0u;
 
-    (void)layer_ownership_set_pointing_mode_layer(layer);
+    (void)layer_ownership_set_pointing_mode_layers(layers);
 }
 
 static void pointing_mode_start_layer_mode(pointing_mode_mask_t mode, bool in_layer_hook) {
@@ -372,7 +372,7 @@ static void pointing_mode_start_layer_mode(pointing_mode_mask_t mode, bool in_la
 }
 
 // While a key runs a mode, layer links wait. Otherwise the highest linked
-// layer that is on decides, and a mode its layer no longer starts ends.
+// layer that is on decides, and a mode its layers no longer start ends.
 static bool pointing_mode_apply_layer_links(layer_state_t state, bool in_layer_hook) {
     pointing_mode_mask_t active = POINTING_MODE_LOCAL_ACTIVE_MODE;
     pointing_mode_mask_t wanted;
@@ -394,13 +394,13 @@ static bool pointing_mode_apply_layer_links(layer_state_t state, bool in_layer_h
 }
 
 // The key that ran `mode` let it go: released, unlocked or deactivated. The
-// layer it brought goes first, while the key still runs the mode, so the
+// layers it turned on go first, while the key still runs the mode, so the
 // layer change waits like any other; then the layer links decide what runs.
-// The mode keeps running, without a restart, when its own layer starts it.
+// The mode keeps running, without a restart, when its own layers start it.
 static void pointing_mode_end_key_source(pointing_mode_mask_t mode) {
     pointing_mode_mask_t layer_mode;
 
-    (void)layer_ownership_set_pointing_mode_layer(LAYER_OWNERSHIP_NO_LAYER);
+    (void)layer_ownership_set_pointing_mode_layers(0u);
     layer_mode = pointing_mode_layer_started_mode(layer_state);
     if (layer_mode == mode) {
         pointing_mode_transition_hand_to_layer(mode);
@@ -417,7 +417,7 @@ static void pointing_mode_end_key_source(pointing_mode_mask_t mode) {
     }
 }
 
-static bool pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_t active_mode, pointing_mode_mask_t locked_mode, bool active_light, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
+static bool pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_t active_mode, pointing_mode_mask_t locked_mode, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
     // Remote sync only mirrors mode state for the slave half's policy/UI.
     // Do not replay local side effects such as dragscroll or auto-mouse
     // ownership changes from this path. Keep only one effective mode so the
@@ -425,7 +425,7 @@ static bool pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_t act
     pointing_mode_runtime_shared_state_t       *state     = pointing_mode_shared_state();
     const pointing_mode_remote_display_state_t *published = pointing_mode_remote_display_published(state);
     pointing_mode_remote_display_state_t       *pending   = pointing_mode_remote_display_pending(state);
-    bool                                        changed   = published->active_mode != active_mode || published->locked_mode != locked_mode || published->active_light != active_light;
+    bool                                        changed   = published->active_mode != active_mode || published->locked_mode != locked_mode;
 
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
     changed |= published->owner_sides != owner_sides;
@@ -439,9 +439,8 @@ static bool pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_t act
     (void)owner_bitmap;
 #endif
 
-    pending->locked_mode  = locked_mode;
-    pending->active_mode  = active_mode;
-    pending->active_light = active_light;
+    pending->locked_mode = locked_mode;
+    pending->active_mode = active_mode;
     pointing_mode_publish_seam_reached();
 #ifdef RGB_POINTING_MODE_ACTIVE_HALF_ENABLE
     pending->owner_sides = owner_sides;
@@ -610,10 +609,6 @@ bool pointing_mode_local_key_source_active(void) {
     return POINTING_MODE_LOCAL_ACTIVE_MODE != 0 && pointing_mode_local_source() == POINTING_MODE_SOURCE_KEY;
 }
 
-bool pointing_mode_local_light_snapshot(void) {
-    return pointing_mode_snapshot().local.active_light;
-}
-
 pointing_mode_source_t pointing_mode_local_source_snapshot(void) {
     return POINTING_MODE_LOCAL_ACTIVE_MODE != 0 ? pointing_mode_local_source() : POINTING_MODE_SOURCE_NONE;
 }
@@ -709,7 +704,7 @@ pointing_mode_apply_result_t pointing_mode_apply_command(pointing_mode_command_t
             break;
         case POINTING_MODE_COMMAND_REMOTE_SNAPSHOT:
             result.handled = true;
-            (void)pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_from_id(command.active_mode_id), pointing_mode_mask_from_id(command.locked_mode_id), command.active_light, command.owner_sides, pointing_mode_command_owner_bitmap(command));
+            (void)pointing_mode_apply_remote_display_snapshot(pointing_mode_mask_from_id(command.active_mode_id), pointing_mode_mask_from_id(command.locked_mode_id), command.owner_sides, pointing_mode_command_owner_bitmap(command));
             break;
         case POINTING_MODE_COMMAND_LAYER_STATE:
             result.handled = true;
@@ -721,7 +716,7 @@ pointing_mode_apply_result_t pointing_mode_apply_command(pointing_mode_command_t
     }
 
     // A mode its key starts or locks runs from that key, even one its layer
-    // ran a moment ago. The layer it brings turns on once it runs; the
+    // ran a moment ago. The layers its key turns on come on once it runs; the
     // layer-state hook then sees a key source and leaves the links waiting.
     if (keyed) {
         if (mode != 0 && pointing_mode_local_active(mode)) {
@@ -731,7 +726,7 @@ pointing_mode_apply_result_t pointing_mode_apply_command(pointing_mode_command_t
                 pointing_mode_shared_state()->local_active_source = POINTING_MODE_SOURCE_KEY;
             }
         }
-        pointing_mode_sync_brought_layer();
+        pointing_mode_sync_key_turns_on();
     }
     pointing_mode_apply_result_finish(&result);
     if (pointing_mode_layer_policy_refresh_due) {
@@ -770,7 +765,7 @@ void pointing_mode_reevaluate_layer_links(void) {
         pointing_mode_strip_pointer_layer();
     }
     pointing_mode_layer_policy_refresh_due = false;
-    pointing_mode_sync_brought_layer();
+    pointing_mode_sync_key_turns_on();
 }
 
 void pointing_mode_activate(pointing_mode_mask_t mode) {
@@ -790,15 +785,14 @@ void pointing_mode_deactivate(pointing_mode_mask_t mode) {
 }
 
 void pointing_mode_apply_remote_mode_ids(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides) {
-    pointing_mode_apply_remote_mode_ids_with_owner_bitmap(active_mode_id, locked_mode_id, true, owner_sides, NULL);
+    pointing_mode_apply_remote_mode_ids_with_owner_bitmap(active_mode_id, locked_mode_id, owner_sides, NULL);
 }
 
-void pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, bool active_light, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
+void pointing_mode_apply_remote_mode_ids_with_owner_bitmap(pointing_mode_id_t active_mode_id, pointing_mode_id_t locked_mode_id, split_side_mask_t owner_sides, const uint8_t *owner_bitmap) {
     (void)pointing_mode_apply_command((pointing_mode_command_t){
         .kind           = POINTING_MODE_COMMAND_REMOTE_SNAPSHOT,
         .active_mode_id = active_mode_id,
         .locked_mode_id = locked_mode_id,
-        .active_light   = active_light,
         .owner_sides    = owner_sides,
         .owner_key_pos  = {.row = MATRIX_ROWS, .col = MATRIX_COLS},
         .owner_bitmap   = owner_bitmap,
