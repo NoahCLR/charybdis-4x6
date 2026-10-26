@@ -79,7 +79,7 @@ Page 0, the identity (see [README.md](README.md#version-identity)):
 | 0 | capability layout, `3` |
 | 1 | capability page count, `3` |
 | 2–3 | Profile Wire major `2`, minor `0` |
-| 4–5 | schema major `4`, minor `1` |
+| 4–5 | schema major `4`, minor `2` |
 | 6 | report size, `32` |
 | 7 | candidate chunk capacity: `20` when feature bit 1 is set, otherwise `0` |
 | 8 | profile status page count, `2` |

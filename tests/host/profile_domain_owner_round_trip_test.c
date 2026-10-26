@@ -415,7 +415,7 @@ static void test_maximum_profile(void) {
     // Every over-limit or malformed edit is refused whole; the active
     // generation and what it publishes stay as they were.
     size_t     rgb = domain_offset(0x10), behaviors = domain_offset(0x20), combos = domain_offset(0x30), settings = domain_offset(0x40), pd = domain_offset(0x50);
-    size_t     first_combo = combos + 8, names = settings + 404;
+    size_t     first_combo = combos + 8, names = settings + NOAH_SETTINGS_FIXED_SIZE;
     mutation_t mutations[] = {
         {"seventeen layer colours", rgb + 5, 17},
         {"a layer-colour row for layer 16", rgb + 16 + 9 * 16 + 5 * 15, 16},
@@ -432,6 +432,7 @@ static void test_maximum_profile(void) {
         {"a name cut inside a character", names + 32, 0xc3},
         {"layer behaviours bit 16", settings + 8 + 4 * 29 + 2, 1},
         {"a combo reference layer of 16", settings + 132, 16},
+        {"a shortcut naming the base layer", settings + NOAH_SETTINGS_SHORTCUTS_OFFSET + NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO, 0x03},
         {"a placement bit past position 59", settings + 132 + 8, 0x10},
         {"a 33-byte pointing-slot name", pd + 8 + 8, 33},
     };

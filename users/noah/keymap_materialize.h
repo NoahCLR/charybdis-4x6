@@ -12,12 +12,18 @@
 #define _KEYMAP_CUSTOM_KEY_NAME_CHECK(keycode_, name_)                                                                         \
     _Static_assert(NOAH_KEYCODE_IS_CUSTOM_KEY(keycode_), #keycode_ ": CUSTOM_KEYS rows name custom keys");                      \
     _Static_assert(sizeof(name_) <= NOAH_MACRO_NAME_SIZE, #keycode_ ": a custom key name holds at most 32 bytes of UTF-8");
-// SHORTCUT(keycode, name, mods, key) also gives the key its shortcut (D-F26):
-// modifiers written as SHORTCUT_MODS(...) or SHORTCUT_NO_MODS, then a key from
-// the shortcut vocabulary. SHORTCUT_MODS names modifier keys, left and right
-// mixed, and builds the 8-bit report mask from them. A bare number or a QMK
-// MOD_* constant is refused: QMK's right-hand MOD_RALT (0x14) reads as Right
-// Ctrl + Left Alt in a report mask, so it would compile to the wrong keys.
+// SHORTCUT(keycode, name, mods, key, layers) also gives the key its shortcut
+// (D-F26): modifiers written as SHORTCUT_MODS(...) or SHORTCUT_NO_MODS, a key
+// from the shortcut vocabulary, then the layers it turns on while held,
+// written as SHORTCUT_LAYERS(...) or SHORTCUT_NO_LAYERS. SHORTCUT_MODS names
+// modifier keys, left and right mixed, and builds the 8-bit report mask from
+// them. A bare number or a QMK MOD_* constant is refused: QMK's right-hand
+// MOD_RALT (0x14) reads as Right Ctrl + Left Alt in a report mask, so it would
+// compile to the wrong keys. SHORTCUT_LAYERS names layers 1-15 of the bank's
+// sixteen; the base layer is always on, and so is refused, as is a bare mask.
+// It holds them as MO() does; SHORTCUT_LOCK_LAYERS, SHORTCUT_MOVE_TO_LAYERS,
+// SHORTCUT_TAP_TOGGLE_LAYERS and SHORTCUT_ONESHOT_LAYERS name them the same way
+// and act on them as TG(), TO(), TT() and OSL() do.
 #define _KEYMAP_SHORTCUT_MODS_TAG 0x100
 #define _KEYMAP_SHORTCUT_NOT_A_MOD 0x200
 #define _KEYMAP_SHORTCUT_MOD_BIT(key_) (IS_MODIFIER_KEYCODE(key_) ? MOD_BIT(key_) : _KEYMAP_SHORTCUT_NOT_A_MOD)
@@ -32,15 +38,51 @@
 #define _KEYMAP_SHORTCUT_MODS_PICK(a1_, a2_, a3_, a4_, a5_, a6_, a7_, a8_, count_, ...) _KEYMAP_SHORTCUT_MODS_##count_
 #define SHORTCUT_MODS(...) (_KEYMAP_SHORTCUT_MODS_TAG | _KEYMAP_SHORTCUT_MODS_PICK(__VA_ARGS__, 8, 7, 6, 5, 4, 3, 2, 1, 0)(__VA_ARGS__))
 #define SHORTCUT_NO_MODS _KEYMAP_SHORTCUT_MODS_TAG
-#define _KEYMAP_CUSTOM_KEY_SHORTCUT_NAME_ENTRY(keycode_, name_, mods_, key_) _KEYMAP_CUSTOM_KEY_NAME_ENTRY(keycode_, name_)
-#define _KEYMAP_CUSTOM_KEY_SHORTCUT_CHECK(keycode_, name_, mods_, key_)                                                         \
+#define _KEYMAP_SHORTCUT_LAYERS_TAG 0x10000L
+#define _KEYMAP_SHORTCUT_NOT_A_LAYER 0x20000L
+#define _KEYMAP_SHORTCUT_LAYER_BIT(layer_) ((layer_) > 0 && (layer_) < NOAH_CUSTOM_KEY_SHORTCUT_LAYERS ? (1L << ((layer_) & (NOAH_CUSTOM_KEY_SHORTCUT_LAYERS - 1))) : _KEYMAP_SHORTCUT_NOT_A_LAYER)
+#define _KEYMAP_SHORTCUT_LAYERS_1(a_) _KEYMAP_SHORTCUT_LAYER_BIT(a_)
+#define _KEYMAP_SHORTCUT_LAYERS_2(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_1(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_3(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_2(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_4(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_3(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_5(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_4(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_6(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_5(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_7(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_6(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_8(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_7(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_9(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_8(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_10(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_9(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_11(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_10(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_12(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_11(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_13(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_12(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_14(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_13(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_15(a_, ...) (_KEYMAP_SHORTCUT_LAYER_BIT(a_) | _KEYMAP_SHORTCUT_LAYERS_14(__VA_ARGS__))
+#define _KEYMAP_SHORTCUT_LAYERS_PICK(a1_, a2_, a3_, a4_, a5_, a6_, a7_, a8_, a9_, a10_, a11_, a12_, a13_, a14_, a15_, count_, ...) _KEYMAP_SHORTCUT_LAYERS_##count_
+// The layer kind rides above the tag, in bits 20-22, and its complement in
+// bits 24-26, so two forms OR'ed together, or a bare mask, never read as one.
+#define _KEYMAP_SHORTCUT_KIND_SHIFT 20
+#define _KEYMAP_SHORTCUT_KIND_CHECK_SHIFT 24
+#define _KEYMAP_SHORTCUT_KIND_BITS(kind_) (((long)(kind_) << _KEYMAP_SHORTCUT_KIND_SHIFT) | ((long)(~(kind_) & 0x7) << _KEYMAP_SHORTCUT_KIND_CHECK_SHIFT))
+#define _KEYMAP_SHORTCUT_KIND_LAYERS(kind_, ...) (_KEYMAP_SHORTCUT_LAYERS_TAG | _KEYMAP_SHORTCUT_KIND_BITS(kind_) | _KEYMAP_SHORTCUT_LAYERS_PICK(__VA_ARGS__, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)(__VA_ARGS__))
+#define SHORTCUT_LAYERS(...) _KEYMAP_SHORTCUT_KIND_LAYERS(NOAH_SHORTCUT_LAYERS_HOLD, __VA_ARGS__)
+#define SHORTCUT_LOCK_LAYERS(...) _KEYMAP_SHORTCUT_KIND_LAYERS(NOAH_SHORTCUT_LAYERS_LOCK, __VA_ARGS__)
+#define SHORTCUT_MOVE_TO_LAYERS(...) _KEYMAP_SHORTCUT_KIND_LAYERS(NOAH_SHORTCUT_LAYERS_MOVE, __VA_ARGS__)
+#define SHORTCUT_TAP_TOGGLE_LAYERS(...) _KEYMAP_SHORTCUT_KIND_LAYERS(NOAH_SHORTCUT_LAYERS_TAP_TOGGLE, __VA_ARGS__)
+#define SHORTCUT_ONESHOT_LAYERS(...) _KEYMAP_SHORTCUT_KIND_LAYERS(NOAH_SHORTCUT_LAYERS_ONESHOT, __VA_ARGS__)
+#define SHORTCUT_NO_LAYERS (_KEYMAP_SHORTCUT_LAYERS_TAG | _KEYMAP_SHORTCUT_KIND_BITS(NOAH_SHORTCUT_LAYERS_HOLD))
+#define _KEYMAP_SHORTCUT_KIND_OF(layers_) ((uint8_t)(((layers_) >> _KEYMAP_SHORTCUT_KIND_SHIFT) & 0x7))
+#define _KEYMAP_SHORTCUT_KIND_WELL_FORMED(layers_) ((((layers_) >> _KEYMAP_SHORTCUT_KIND_CHECK_SHIFT) & 0x7) == (~((layers_) >> _KEYMAP_SHORTCUT_KIND_SHIFT) & 0x7))
+#define _KEYMAP_CUSTOM_KEY_SHORTCUT_NAME_ENTRY(keycode_, name_, mods_, key_, layers_) _KEYMAP_CUSTOM_KEY_NAME_ENTRY(keycode_, name_)
+#define _KEYMAP_CUSTOM_KEY_SHORTCUT_CHECK(keycode_, name_, mods_, key_, layers_)                                                \
     _KEYMAP_CUSTOM_KEY_NAME_CHECK(keycode_, name_)                                                                              \
     _Static_assert(((mods_) & ~0xff) == _KEYMAP_SHORTCUT_MODS_TAG,                                                              \
                    #keycode_ ": write a shortcut's modifiers as SHORTCUT_MODS(KC_LCTL, ...) of modifier keys, or SHORTCUT_NO_MODS"); \
     _Static_assert(NOAH_CUSTOM_KEY_SHORTCUT_KEY_VALID(key_), #keycode_ ": a shortcut's key is a basic key or a mouse button");   \
-    _Static_assert(((mods_) & 0xff) != 0 || (key_) != KC_NO, #keycode_ ": a SHORTCUT row holds a shortcut; use KEY for none");
-#define _KEYMAP_CUSTOM_KEY_NO_SHORTCUT(keycode_, name_) [((keycode_) - CUSTOM_KEY_0)] = {0u, 0u},
-#define _KEYMAP_CUSTOM_KEY_SHORTCUT_ENTRY(keycode_, name_, mods_, key_) [((keycode_) - CUSTOM_KEY_0)] = {(uint8_t)(mods_), (uint8_t)(key_)},
+    _Static_assert(((layers_) & ~(0xffffL | (0x7L << _KEYMAP_SHORTCUT_KIND_SHIFT) | (0x7L << _KEYMAP_SHORTCUT_KIND_CHECK_SHIFT))) == _KEYMAP_SHORTCUT_LAYERS_TAG && _KEYMAP_SHORTCUT_KIND_WELL_FORMED(layers_) && _KEYMAP_SHORTCUT_KIND_OF(layers_) < NOAH_SHORTCUT_LAYER_KIND_COUNT, \
+                   #keycode_ ": write a shortcut's layers as SHORTCUT_LAYERS(...) of layers 1-15 (or the LOCK, MOVE_TO, TAP_TOGGLE or ONESHOT form), or SHORTCUT_NO_LAYERS"); \
+    _Static_assert(((mods_) & 0xff) != 0 || (key_) != KC_NO || ((layers_) & 0xffff) != 0, #keycode_ ": a SHORTCUT row holds a shortcut; use KEY for none"); \
+    _Static_assert(_KEYMAP_SHORTCUT_KIND_OF(layers_) == NOAH_SHORTCUT_LAYERS_HOLD || ((layers_) & 0xffff) != 0, #keycode_ ": a layer kind needs layers");
+#define _KEYMAP_CUSTOM_KEY_NO_SHORTCUT(keycode_, name_) [((keycode_) - CUSTOM_KEY_0)] = {0u},
+#define _KEYMAP_CUSTOM_KEY_SHORTCUT_ENTRY(keycode_, name_, mods_, key_, layers_) [((keycode_) - CUSTOM_KEY_0)] = {(uint8_t)(mods_), (uint8_t)(key_), (uint8_t)(layers_), (uint8_t)((layers_) >> 8), _KEYMAP_SHORTCUT_KIND_OF(layers_)},
 #define _KEYMAP_STRIP_PARENS(...) __VA_ARGS__
 // COMBO(result, keys) follows COMBO_TERM; COMBO_WINDOW(result, keys, ms) has
 // its own window.

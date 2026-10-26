@@ -14,6 +14,7 @@
 #include "../../action/custom_key_shortcut.h"
 #include "noah_keymap_ids.h"
 #include "../../state/ownership/keyboard_mod_ownership.h"
+#include "../../state/ownership/layer_ownership.h"
 #include "../../state/shared/runtime_context_internal.h"
 #include "held_action.h"
 #include "held_repeat.h"
@@ -163,6 +164,9 @@ static void held_action_remove_slot(uint16_t slot) {
         if (state->action_leases[slot].active) {
             (void)owned_keycode_release(&state->action_leases[slot]);
         }
+        if (NOAH_KEYCODE_IS_CUSTOM_KEY(action)) {
+            (void)layer_ownership_shortcut_release(key_pos);
+        }
         return;
     }
 
@@ -249,12 +253,22 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
 
     if (NOAH_KEYCODE_IS_CUSTOM_KEY(action)) {
         // A custom key holds its shortcut (D-F26) through this binding's lease,
-        // which records the parts it registered: a shortcut changed while held
-        // still releases exactly those. Without a shortcut it holds nothing.
+        // which records the parts it registered, and its layers through layer
+        // ownership, which records them by key: a shortcut changed while held
+        // still releases exactly what it took. Lock and Move to act on their
+        // layers at the press instead, as TG() and TO() do, and hold none.
+        // Without a shortcut it holds nothing.
         noah_custom_key_shortcut_t shortcut = noah_custom_key_shortcut_for_keycode(action);
 
         held_action_slot_set_uses_lease(state, (uint16_t)slot, true);
-        if (noah_custom_key_shortcut_present(shortcut)) {
+        if (shortcut.layers && shortcut.layer_kind == NOAH_SHORTCUT_LAYERS_LOCK) {
+            (void)layer_ownership_toggle_lock_set(shortcut.layers);
+        } else if (shortcut.layers && shortcut.layer_kind == NOAH_SHORTCUT_LAYERS_MOVE) {
+            (void)layer_ownership_goto_set(shortcut.layers);
+        } else if (shortcut.layers) {
+            layer_ownership_shortcut_press(key_pos, shortcut.layers);
+        }
+        if (noah_custom_key_shortcut_has_report_parts(shortcut)) {
             (void)owned_keycode_acquire_parts(shortcut.mods, shortcut.key, &state->action_leases[slot]);
         }
         return true;

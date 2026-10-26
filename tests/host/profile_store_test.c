@@ -48,9 +48,9 @@ typedef struct {
     bool                saw_pristine_marker;
 } reuse_guard_state_t;
 
-static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
-static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 4u, 1u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 3u, 0u, 0u, 0u, 1u, 2u, 3u};
-static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 4u, 1u, 1u, 1u, 0x20u, NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, 2u, 0u, 0u, 0u, 4u, 5u};
+static const uint8_t empty_profile[]    = {'N', 'L', 'P', '1', 4u, 2u, 0u, 1u};
+static const uint8_t rgb_profile[]      = {'N', 'L', 'P', '1', 4u, 2u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB, 3u, 0u, 0u, 0u, 1u, 2u, 3u};
+static const uint8_t behavior_profile[] = {'N', 'L', 'P', '1', 4u, 2u, 1u, 1u, 0x20u, NOAH_PROFILE_DOMAIN_VERSION_KEY_BEHAVIORS, 2u, 0u, 0u, 0u, 4u, 5u};
 
 // The flash backend refuses a read or write over the store's I/O bound; one
 // here fails the test.
@@ -896,7 +896,7 @@ static void test_boot_selection_state_machine_is_scan_bounded(void) {
 // These are storage-envelope fixtures: domain bodies are opaque to this layer.
 // The schema validator remains responsible for semantic payload validation.
 static uint16_t pd_payload(uint8_t *payload, uint8_t mask) {
-    const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 1u, 0u, 1u};
+    const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 2u, 0u, 1u};
     uint16_t length = sizeof(header);
     memcpy(payload, header, sizeof(header));
     for (uint8_t domain = 0u; domain < NOAH_PROFILE_DOMAIN_REGISTRY_COUNT; domain++) {
@@ -958,7 +958,7 @@ static noah_profile_store_result_t commit_pd(noah_profile_store_t *store, const 
 // a profile with named macros (settings v4) once passed validation on both
 // halves and was then refused here on every try.
 static void test_pd_store_accepts_every_settings_version_the_validator_does(void) {
-    for (uint8_t version = 1u; version <= 9u; version++) {
+    for (uint8_t version = 1u; version <= 10u; version++) {
         uint8_t                        payload[48];
         uint16_t                       length = pd_payload(payload, 1u << 3u);
         noah_profile_store_t           store;
@@ -971,7 +971,7 @@ static void test_pd_store_accepts_every_settings_version_the_validator_does(void
         initialize_pd_store(&store);
         noah_profile_store_result_t result = commit_pd(&store, payload, &candidate);
         CHECK((result == NOAH_PROFILE_STORE_OK) == (version == NOAH_PROFILE_DOMAIN_VERSION_SETTINGS));
-        CHECK(NOAH_PROFILE_DOMAIN_VERSION_SETTINGS == 9u);
+        CHECK(NOAH_PROFILE_DOMAIN_VERSION_SETTINGS == 10u);
     }
 }
 
@@ -1337,7 +1337,7 @@ static void test_payload_over_64_kib_round_trips(void) {
     uint8_t                        span[40];
     noah_profile_store_result_t    result;
 
-    memcpy(payload, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 1u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
+    memcpy(payload, (const uint8_t[]){'N', 'L', 'P', '1', 4u, 2u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB}, 10u);
     payload[10] = (uint8_t)(WIDE - 14u);
     payload[11] = (uint8_t)((WIDE - 14u) >> 8u);
     payload[12] = (uint8_t)((WIDE - 14u) >> 16u);

@@ -324,6 +324,37 @@ bool layer_ownership_momentary_release(keypos_t key_pos) {
     return false;
 }
 
+// No custom key here turns a layer on (D-F26).
+void layer_ownership_shortcut_press(keypos_t key_pos, layer_state_t layers) {
+    (void)key_pos;
+    (void)layers;
+}
+
+bool layer_ownership_shortcut_release(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
+void layer_ownership_shortcut_momentary_press(keypos_t key_pos, layer_state_t layers) {
+    (void)key_pos;
+    (void)layers;
+}
+
+bool layer_ownership_shortcut_momentary_release(keypos_t key_pos) {
+    (void)key_pos;
+    return false;
+}
+
+bool layer_ownership_toggle_lock_set(layer_state_t layers) {
+    (void)layers;
+    return false;
+}
+
+bool layer_ownership_goto_set(layer_state_t layers) {
+    (void)layers;
+    return false;
+}
+
 void noah_action_press(keypos_t key_pos, uint16_t action) {
     (void)key_pos;
     (void)action;

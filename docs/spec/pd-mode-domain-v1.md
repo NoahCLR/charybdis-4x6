@@ -43,7 +43,7 @@ keycode names its slot; the mode comes from the active profile (D-F50,
 | `0x7ec0..0x7edf` | `LOCK_LAYER(n)`, toggle layer `n`'s lock | 16 (`0x7ec0..0x7ecf`) |
 | `0x7ee0..0x7eff` | unassigned: inert | — |
 | `0x7f00..0x7f7f` | `CUSTOM_KEY_0..127` | 128 |
-| `0x7f80..0x7fff` | unassigned: inert | — |
+| `0x7f80..0x7fff` | `CUSTOM_KEY_LAYER_TAP(n)`, the runtime's own: what custom key `n`'s tap does to its layers (D-F26); inert on a key, never stored | — |
 | `0x7700..0x777f` | `QK_MACRO_0..127`, QMK's macro block | 128 |
 
 Slot `n`'s mode flag is bit `n` of a 32-bit mask; slot 31 is the top bit.

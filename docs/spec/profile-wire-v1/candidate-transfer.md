@@ -100,7 +100,7 @@ Held by: `tests/host/run_profile_candidate_transaction_tests.sh` (`test_mailbox_
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 5 | 1 | schema major, `4` |
-| 6 | 1 | schema minor, `1` |
+| 6 | 1 | schema minor, `2` |
 | 7 | 1 | requested-domain mask: bit *n* is the *n*th domain of the registry ([blob and digests](blob-and-digests.md)): RGB, key behaviours, combos, settings, pointing, keymap, macros |
 | 8 | 4 | blob length, `8`–`130048` |
 | 12 | 4 | CRC-32 of the exact blob |

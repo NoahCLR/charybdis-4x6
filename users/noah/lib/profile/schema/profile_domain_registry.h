@@ -13,7 +13,7 @@
     X(RGB,           rgb,           0x10u, 4u) \
     X(KEY_BEHAVIORS, key_behaviors, 0x20u, 2u) \
     X(COMBOS,        combos,        0x30u, 3u) \
-    X(SETTINGS,      settings,      0x40u, 9u) \
+    X(SETTINGS,      settings,      0x40u, 10u) \
     X(PD,            pd,            0x50u, 4u) \
     X(KEYMAP,        keymap,        0x60u, 1u) \
     X(MACROS,        macros,        0x70u, 1u)

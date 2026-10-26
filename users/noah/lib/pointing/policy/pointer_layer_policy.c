@@ -9,6 +9,7 @@
 #include "../defs/pointing_modes.h"
 #include "pointer_layer_policy.h"
 #include "../../action/action_dispatch.h"
+#include "../../action/custom_key_shortcut.h"
 #include "../../compat/qmk_auto_mouse_contract.h"
 #include "../../key/behavior/key_behavior_lookup.h"
 #include "../../state/ownership/layer_ownership.h"
@@ -52,6 +53,15 @@ bool pointer_layer_policy_is_mouse_record(uint16_t keycode) {
     }
 
     if (pointer_layer_policy_pointing_mode_key_keeps_auto_mouse_anchored(keycode)) {
+        return true;
+    }
+
+    // A custom key whose shortcut turns layers on is a layer key (D-F26), and
+    // QMK's process_auto_mouse() lets a layer key pass without tearing the
+    // pointer layer down. It cannot see a custom key as one, so the key counts
+    // as a mouse key for its record instead: the pointer layer stays while it
+    // is held, as it would under MO() of another layer.
+    if (noah_custom_key_has_layers(keycode)) {
         return true;
     }
 

@@ -23,7 +23,8 @@ so a held record is processed once, on replay.
   a handled key, down in its `TAP_WINDOW`, whose hold changes other keys
   (`key_runtime_core_press_token_hold_changes_other_keys()`: every `LT`, `MT`
   and `OSM`, a layer held until release, or a first hold tier that is a layer
-  action, modifiers alone or a pointing mode). A hold that went on at the
+  action, modifiers alone, a custom key whose shortcut is modifiers alone or
+  turns layers on, or a pointing mode). A hold that went on at the
   press (`PRESS_HELD_WINDOW`) is not undecided.
 - **What waits**: every press while a key is undecided or a record is held; a
   release whose press is held; a modifier's or layer key's release while a key

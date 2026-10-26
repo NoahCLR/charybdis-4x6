@@ -41,7 +41,7 @@ static uint16_t layer_record(uint8_t layer, uint8_t field) {
 static void named(uint8_t size, char fill) {
     const uint32_t values[NOAH_SETTINGS_COUNT] = {200, 150, 400, 150, 1, 4, 1200, 25, 1, 0x8, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff};
     memset(bytes, 0, sizeof(bytes));
-    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {9, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
+    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {10, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
     memcpy(bytes, header, sizeof(header));
     for (uint8_t i = 0; i < NOAH_SETTINGS_COUNT; i++)
         set_scalar(i, values[i]);
@@ -81,12 +81,12 @@ static void put_name(uint16_t index, const char *text, uint8_t size) {
 static void test_header_and_versions(void) {
     defaults();
     assert(valid());
-    for (uint8_t version = 0; version <= 9; version++) {
+    for (uint8_t version = 0; version <= 10; version++) {
         defaults();
         bytes[0] = version;
         assert(valid() == (version == NOAH_SETTINGS_VERSION));
     }
-    assert(NOAH_SETTINGS_VERSION == 9);
+    assert(NOAH_SETTINGS_VERSION == 10);
     for (uint8_t at = 1; at < NOAH_SETTINGS_HEADER_SIZE; at++) {
         defaults();
         bytes[at]++;
@@ -267,12 +267,13 @@ static void test_layer_records(void) {
 static uint16_t shortcut_record(uint8_t slot, uint8_t field) {
     return (uint16_t)(NOAH_SETTINGS_SHORTCUTS_OFFSET + slot * NOAH_SETTINGS_SHORTCUT_SIZE + field);
 }
-// v8 (D-F26): one modifier mask and one key per custom key, between the layer
-// records and the names. Any mask is valid; the key is a basic key, a mouse
-// button, or none.
+// D-F26: one modifier mask, one key, one layer mask and one layer kind per
+// custom key, between the layer records and the names. Any modifier mask is valid; the key is a
+// basic key, a mouse button, or none.
 static void test_shortcuts(void) {
     assert(NOAH_SETTINGS_SHORTCUTS_OFFSET == NOAH_SETTINGS_LAYER_RECORDS_OFFSET + NOAH_SETTINGS_LAYERS * NOAH_SETTINGS_LAYER_RECORD_SIZE);
-    assert(NOAH_SETTINGS_FIXED_SIZE == NOAH_SETTINGS_SHORTCUTS_OFFSET + 256);
+    assert(NOAH_SETTINGS_FIXED_SIZE == NOAH_SETTINGS_SHORTCUTS_OFFSET + 640);
+    assert(NOAH_SETTINGS_MIN_SIZE == 1317 && NOAH_SETTINGS_MAX_SIZE == 10053);
     assert(NOAH_SETTINGS_SHORTCUT_COUNT_OFFSET == 6);
     for (unsigned mods = 0; mods <= 255; mods++) {
         defaults();
@@ -297,6 +298,64 @@ static void test_shortcuts(void) {
     defaults();
     bytes[NOAH_SETTINGS_SHORTCUT_COUNT_OFFSET] = 64;
     assert(!valid());
+}
+// v10 (D-F26): a shortcut's layers are bytes 2..3, little-endian. Any layer
+// may be named but the ones always on: layer 0 and the default layers
+// (scalar 23), which the same domain states before the shortcuts.
+static void test_shortcut_layers(void) {
+    for (uint8_t layer = 0; layer < NOAH_SETTINGS_LAYERS; layer++) {
+        defaults();
+        uint16_t mask = (uint16_t)(1u << layer);
+        bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO)] = (uint8_t)mask;
+        bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI)] = (uint8_t)(mask >> 8);
+        assert(valid() == (layer != 0));
+    }
+    defaults();
+    bytes[shortcut_record(127, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO)] = 0xfe;
+    bytes[shortcut_record(127, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI)] = 0xff;
+    assert(valid());
+    // Layers 2 and 9 are default layers too: a shortcut may not name them.
+    set_scalar(NOAH_SETTING_DEFAULT_LAYERS, (1u << 0) | (1u << 2) | (1u << 9));
+    assert(!valid());
+    bytes[shortcut_record(127, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO)] = 0xfa;
+    assert(!valid());
+    bytes[shortcut_record(127, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI)] = 0xfd;
+    assert(valid());
+    // Layers alone are a shortcut.
+    assert(noah_custom_key_shortcut_present((noah_custom_key_shortcut_t){.layers = 0x0002}));
+}
+// v10 (D-F26): byte 4 is the layer key a shortcut's layers act as. Any kind
+// with layers; without them only Hold, so one shortcut has one record.
+static void test_shortcut_layer_kind(void) {
+    assert(NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND == 4 && NOAH_SETTINGS_SHORTCUT_SIZE == 5);
+    for (uint16_t kind = 0; kind <= 0xff; kind++) {
+        defaults();
+        bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI)]  = 0x01; // layer 8
+        bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND)] = (uint8_t)kind;
+        assert(valid() == (kind < NOAH_SHORTCUT_LAYER_KIND_COUNT));
+    }
+    assert(NOAH_SHORTCUT_LAYER_KIND_COUNT == 5);
+    // A kind without layers is refused, even beside modifiers and a key; the
+    // record before it naming layers does not count for this one.
+    defaults();
+    bytes[shortcut_record(8, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO)] = 0x02;
+    bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_MODS)]       = 0x08;
+    bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_KEY)]        = 0x2c;
+    bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND)] = NOAH_SHORTCUT_LAYERS_LOCK;
+    assert(!valid());
+    bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND)] = NOAH_SHORTCUT_LAYERS_HOLD;
+    assert(valid());
+    // Layers in either byte allow a kind.
+    bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO)]  = 0x04;
+    bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND)] = NOAH_SHORTCUT_LAYERS_ONESHOT;
+    assert(valid());
+    // Tap-toggle and One-shot make their key dual-role; the others do not.
+    for (uint8_t kind = 0; kind < NOAH_SHORTCUT_LAYER_KIND_COUNT; kind++) {
+        noah_custom_key_shortcut_t shortcut = {.layers = 0x0002, .layer_kind = kind};
+        assert(noah_custom_key_shortcut_is_dual_role(shortcut) == (kind == NOAH_SHORTCUT_LAYERS_TAP_TOGGLE || kind == NOAH_SHORTCUT_LAYERS_ONESHOT));
+        shortcut.layers = 0;
+        assert(!noah_custom_key_shortcut_is_dual_role(shortcut));
+    }
 }
 static void test_names(void) {
     // 32 bytes is the limit for every name, layers, macros and custom keys.
@@ -336,7 +395,7 @@ static void test_names(void) {
     // the last custom key's and 272 the keyboard's; a name in any is read in
     // order.
     assert(NOAH_SETTINGS_NAME_COUNT == 273 && NOAH_SETTINGS_KEYBOARD_NAME_RECORD == 272);
-    assert(NOAH_SETTINGS_MIN_SIZE == 933 && NOAH_SETTINGS_MAX_SIZE == 9669);
+    assert(NOAH_SETTINGS_MIN_SIZE == 1317 && NOAH_SETTINGS_MAX_SIZE == 10053);
     defaults();
     put_name(272, "Keyboard", 8);
     put_name(271, "Last custom", 11);
@@ -404,6 +463,10 @@ static void test_publication(void) {
     bytes[shortcut_record(4, NOAH_CUSTOM_KEY_SHORTCUT_KEY)]  = 0x0e; // K
     bytes[shortcut_record(5, NOAH_CUSTOM_KEY_SHORTCUT_MODS)] = 0x0f; // Hyper alone
     bytes[shortcut_record(127, NOAH_CUSTOM_KEY_SHORTCUT_KEY)] = 0xd1; // a mouse button alone
+    bytes[shortcut_record(6, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO)] = 0x06; // layers 1 and 2
+    bytes[shortcut_record(6, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI)] = 0x80; // and 15, alone
+    bytes[shortcut_record(4, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI)] = 0x01; // and layer 8
+    bytes[shortcut_record(6, NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND)] = NOAH_SHORTCUT_LAYERS_MOVE;
     assert(valid());
     noah_profile_keyboard_name_t name = {.length = 1};
     noah_active_profile_settings_keyboard_name(&name);
@@ -422,10 +485,12 @@ static void test_publication(void) {
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_BYPASS + 7) == 0x08);
     assert(noah_setting_layer_record(15, NOAH_SETTINGS_LAYER_REFERENCE) == 15);
     assert(noah_setting_layer_record(16, NOAH_SETTINGS_LAYER_REFERENCE) == 0);
-    assert(noah_custom_key_shortcut(4).mods == 0x41 && noah_custom_key_shortcut(4).key == 0x0e);
-    assert(noah_custom_key_shortcut(5).mods == 0x0f && noah_custom_key_shortcut(5).key == 0);
+    assert(noah_custom_key_shortcut(4).mods == 0x41 && noah_custom_key_shortcut(4).key == 0x0e && noah_custom_key_shortcut(4).layers == 0x0100);
+    assert(noah_custom_key_shortcut(5).mods == 0x0f && noah_custom_key_shortcut(5).key == 0 && noah_custom_key_shortcut(5).layers == 0);
     assert(noah_custom_key_shortcut(127).mods == 0 && noah_custom_key_shortcut(127).key == 0xd1);
-    assert(!noah_custom_key_shortcut_present(noah_custom_key_shortcut(6)));
+    assert(noah_custom_key_shortcut(6).mods == 0 && noah_custom_key_shortcut(6).key == 0 && noah_custom_key_shortcut(6).layers == 0x8006);
+    assert(noah_custom_key_shortcut(6).layer_kind == NOAH_SHORTCUT_LAYERS_MOVE && noah_custom_key_shortcut(4).layer_kind == NOAH_SHORTCUT_LAYERS_HOLD);
+    assert(!noah_custom_key_shortcut_present(noah_custom_key_shortcut(7)));
     assert(!noah_custom_key_shortcut_present(noah_custom_key_shortcut(128)));
     for (uint16_t i = 0; i < length; i++)
         assert(noah_active_profile_settings_byte(i) == bytes[i]);
@@ -448,7 +513,7 @@ static void test_publication(void) {
     assert(name.length == 0);
     assert(noah_setting_combo_output_behaviors());
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE) == 0xA5u);
-    assert(noah_custom_key_shortcut(4).mods == 0xA5u && noah_custom_key_shortcut(4).key == 0xA5u);
+    assert(noah_custom_key_shortcut(4).mods == 0xA5u && noah_custom_key_shortcut(4).key == 0xA5u && noah_custom_key_shortcut(4).layers == 0xA5A5u);
     // The largest domain publishes whole.
     named(NOAH_SETTINGS_NAME_MAX, 'z');
     view = settings_view();
@@ -480,6 +545,8 @@ int main(void) {
     assert(noah_host_layout_id(UINT32_C(0x01090103)) == 9u);
     test_layer_records();
     test_shortcuts();
+    test_shortcut_layers();
+    test_shortcut_layer_kind();
     test_names();
     test_keyboard_name();
     test_publication();

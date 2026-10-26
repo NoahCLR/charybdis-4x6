@@ -6,9 +6,9 @@
 #include "profile_name_v1.h"
 #include "../../action/custom_key_shortcut.h"
 
-// Settings v8 (D-F14, D-F25, D-F26) stores, in order: an eight-byte header,
+// Settings v10 (D-F14, D-F25, D-F26) stores, in order: an eight-byte header,
 // the scalar policy, one fixed record per layer (its combo reference layer and
-// its two placement bitmaps), one two-byte shortcut per custom key, then every
+// its two placement bitmaps), one five-byte shortcut per custom key, then every
 // name counted: a length byte and at most 32 bytes of UTF-8, the layers'
 // first, then the macros', then the custom keys', then the keyboard's own
 // name. The fixed part comes first so its fields sit at known offsets.
@@ -178,6 +178,9 @@ typedef struct {
     bool                   in_name;
     noah_profile_name_v1_t current;
     uint32_t               value, timeout, dead_time;
+    // Scalar 23's layers, read before the shortcuts that may not name them.
+    uint16_t               default_layers;
+    bool                   shortcut_has_layers; // the record being read names a layer
 } noah_profile_settings_v1_validation_t;
 // One byte per call, permitting the whole-profile owner to retain its 20-byte
 // per-step I/O ceiling. False rejects the candidate before publication.

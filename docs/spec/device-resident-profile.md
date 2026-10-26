@@ -95,7 +95,7 @@ Held by: `tests/host/run_profile_validator_v1_tests.sh` (`profile_validator_v1_t
 
 The firmware accepts only the formats it writes (D-F10,
 [`0010`](../adr/0010-firmware-accepts-only-current-formats.md)): Profile
-Wire 2.0, profile schema 4.1, each domain at its registry version, and store
+Wire 2.0, profile schema 4.2, each domain at its registry version, and store
 format 6 (D-F28, [`0028`](../adr/0028-new-base-32-bit-profile-lengths.md)).
 Nothing in another format is translated:
 
@@ -219,9 +219,9 @@ byte 36. Integers are little-endian.
 The format is keyed into the header, which has no magic: the CRC16 is
 CRC-16/CCITT (polynomial `0x1021`, initial `0xFFFF`, not reflected, no final
 XOR) over the store format byte `6` followed by bytes 0–32. The schema is
-implied by the format: the firmware's own, 4.1. A record an earlier firmware
-wrote under format 6 with schema 4.0 holds earlier domain versions, so its
-validation refuses it (D-F62); the payload digest is not stored and is computed
+implied by the format: the firmware's own, 4.2. A record an earlier firmware
+wrote under format 6 with schema 4.0 or 4.1 holds earlier domain versions, so
+its validation refuses it (D-F62, D-F26); the payload digest is not stored and is computed
 from the payload whenever it is read whole. The origin half is the physical
 half that made the generation ([split protocol](profile-split-v1.md#physical-origin)).
 
@@ -268,7 +268,7 @@ new one's marker is committed. The store admits a candidate only when:
 - boot selection has run, found no generation conflict, and no final marker
   waits to be confirmed;
 - no other save is open;
-- it is format 6, schema 4.1, `8..130,048` bytes, with only known domain-mask
+- it is format 6, schema 4.2, `8..130,048` bytes, with only known domain-mask
   and flag bits and origin 0 or 1;
 - its action-ABI and compiled-default digests are the build's;
 - its generation is strictly greater than the saved one.
@@ -436,14 +436,14 @@ Every ceiling holds at once (D-F14, [`0014`](../adr/0014-bigger-profiles.md)):
 
 `tests/fixtures/maximum_profile_v4.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table
-at its ceiling and every name at 32 bytes, in 74,801 bytes:
+at its ceiling and every name at 32 bytes, in 75,185 bytes:
 
 | Domain | Bytes |
 | --- | ---: |
 | Lighting `0x10` | 591 |
 | Key behaviours `0x20` | 13,828 |
 | Combos `0x30` | 9,736 |
-| Settings `0x40` | 9,669 |
+| Settings `0x40` | 10,053 |
 | Pointing `0x50` | 4,104 |
 | Keymap `0x60` | 1,920 |
 | Macros `0x70` | 34,903 |

@@ -174,7 +174,9 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 //   0x7ec0–0x7edf  LOCK_LAYER(n)        toggle layer n's lock   (32 reserved)
 //   0x7ee0–0x7eff  unassigned: inert, refused as a step or combo output
 //   0x7f00–0x7f7f  CUSTOM_KEY_0–127     named keys: their shortcut and behaviour
-//   0x7f80–0x7fff  unassigned: inert, refused as a step or combo output
+//   0x7f80–0x7fff  CUSTOM_KEY_LAYER_TAP(n)  runtime only: what custom key
+//                  n's own tap does to its layers; inert on a key, refused as
+//                  a step or combo output
 //
 // Custom keys moved to their own block in D-F14: 128 do not fit beside the
 // pointing holds. Their old codes are never reread as anything else: they
@@ -183,7 +185,8 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 // A custom key does what its shortcut and its key_behaviors[] row say (D-F26):
 // without either it does nothing. Place it on a layer or as a combo output. Its
 // name and shortcut come from CUSTOM_KEYS in keymap.c until Charybdis Ark
-// changes them. A behaviour step may send one; it sends only its shortcut.
+// changes them. A behaviour step may send one; it sends only its shortcut,
+// layers included.
 // PD_SLOT_n holds a configurable pointing slot; add a key_behaviors[] row for
 // explicit tap, hold, long-hold or multi-tap behavior on top of that default.
 // LOCK_LAYER(n) toggles a layer lock from actions authored in key_behaviors[].
@@ -194,6 +197,7 @@ _Static_assert((QK_MACRO_0 + MACRO_SLOT_COUNT - 1) <= QK_MACRO_MAX, "Macro slot 
 #define NOAH_KEYCODE_LAYER_LOCK_BASE (SAFE_RANGE + 0x80)
 #define NOAH_KEYCODE_USERSPACE_END (SAFE_RANGE + 0xa0)
 #define NOAH_KEYCODE_CUSTOM_KEY_BASE (SAFE_RANGE + 0xc0)
+#define NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE (SAFE_RANGE + 0x140)
 #define NOAH_KEYCODE_RETIRED_CUSTOM_KEY_RESERVED 64
 #define NOAH_KEYCODE_CUSTOM_KEY_RESERVED 128
 #define NOAH_KEYCODE_PD_RESERVED 32
@@ -352,11 +356,19 @@ _Static_assert(PD_SLOT_0 == 0x7e80 && PD_SLOT_31 == 0x7e9f && PD_SLOT_31 - PD_SL
 _Static_assert(PD_SLOT_0_LOCK == 0x7ea0 && PD_SLOT_31_LOCK == 0x7ebf && PD_SLOT_31_LOCK - PD_SLOT_0_LOCK + 1 <= NOAH_KEYCODE_PD_RESERVED && NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED == NOAH_KEYCODE_LAYER_LOCK_BASE, "pointing locks stay inside their block");
 _Static_assert(LAYER_COUNT <= NOAH_KEYCODE_LAYER_LOCK_RESERVED && NOAH_KEYCODE_LAYER_LOCK_BASE + NOAH_KEYCODE_LAYER_LOCK_RESERVED == NOAH_KEYCODE_USERSPACE_END, "layer locks stay inside their block");
 _Static_assert(NOAH_KEYCODE_USERSPACE_END - 1 <= QK_USER_MAX, "userspace keycodes stay in QMK's user range");
+_Static_assert(NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE == CUSTOM_KEY_127 + 1 && NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE + CUSTOM_KEY_SLOT_COUNT - 1 == QK_USER_MAX, "custom keys' runtime layer taps fill the last block of QMK's user range");
 
 #define POINTING_MODE_KEYCODE_COUNT POINTING_MODE_COUNT
 #define POINTING_MODE_LOCK_KEYCODE_COUNT POINTING_MODE_COUNT
 #define LOCK_LAYER(layer_) (LAYER_LOCK_BASE + (layer_))
 #define NOAH_KEYCODE_IS_CUSTOM_KEY(keycode_) ((keycode_) >= CUSTOM_KEY_0 && (keycode_) <= CUSTOM_KEY_127)
+// The runtime's own action for what custom key `slot_`'s own tap does to its
+// layers when the key held its shortcut from the press (D-F26): a One-shot
+// shortcut's tap arms them, as OSL()'s tap does, and a Tap-toggle shortcut's
+// last tap locks them, as TT()'s sends LOCK_LAYER(n). Never stored: a profile
+// refuses it everywhere.
+#define CUSTOM_KEY_LAYER_TAP(slot_) (NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE + (slot_))
+#define NOAH_KEYCODE_IS_CUSTOM_KEY_LAYER_TAP(keycode_) ((keycode_) >= NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE && (keycode_) <= NOAH_KEYCODE_CUSTOM_KEY_LAYER_TAP_BASE + CUSTOM_KEY_SLOT_COUNT - 1)
 
 extern const char *const macro_payloads[MACRO_SLOT_COUNT];
 // The same macros already in the bank encoding, generated at build time, so
@@ -365,8 +377,9 @@ extern const uint8_t  authored_macro_bank[];
 extern const uint16_t authored_macro_bank_size;
 extern const char        macro_names[MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
 extern const char        custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
-// Each custom key's authored shortcut, as settings v8 stores it: the report
-// modifier mask, then the key; both zero for none.
+// Each custom key's authored shortcut, as settings v10 stores it: the report
+// modifier mask, the key, the layer mask, low byte first, then the layer kind;
+// all zero for none.
 extern const uint8_t custom_key_shortcuts[CUSTOM_KEY_SLOT_COUNT][NOAH_CUSTOM_KEY_SHORTCUT_SIZE];
 extern const char        layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE];
 #ifdef COMBO_ENABLE

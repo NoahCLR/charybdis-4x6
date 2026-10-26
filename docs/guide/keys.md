@@ -181,15 +181,40 @@ A **custom key** is a key of your own: 128 of them, each with a name, an
 optional **shortcut** and an optional behaviour. Put one on a layer or make
 it a combo's output.
 
-The shortcut is one key and any modifiers, left and right mixed (Left Ctrl +
-Right Alt + K), or modifiers alone, or a mouse button. It is the custom key's
-own action: held while you hold the key, tapped when you tap it. Unlike a
-macro it stays down; unlike `C(A(KC_K))` its modifiers can come from both
-sides.
+The shortcut is one key, any modifiers, left and right mixed (Left Ctrl +
+Right Alt + K), and any layers, each of them optional: modifiers alone, a
+mouse button, or layers alone are shortcuts too. It is the custom key's own
+action: held while you hold the key, tapped when you tap it. Unlike a macro
+it stays down; unlike `C(A(KC_K))` its modifiers can come from both sides;
+unlike `MO()` it can hold several layers at once (Left Cmd + Navigation +
+Extra).
+
+Its layers act together as one layer key, the shortcut's **layer kind**:
+
+- **Hold**, as `MO()`: on while the shortcut is held, off when you let go,
+  unless something else keeps them on (a lock, another key holding the same
+  layer, or a pointing mode's key). Tapped, they are on only for the tap.
+- **Lock**, as `TG()`: pressing the key locks them all on, or, when all are
+  locked already, all off.
+- **Move to**, as `TO()`: pressing the key locks them alone; every other lock
+  goes. Layers you are holding stay on until you let go.
+- **Tap-toggle**, as `TT()`: on while the key is held; its fifth quick tap
+  locks them all, as Lock does.
+- **One-shot**, as `OSL()`: on while the key is held; a tap turns them on for
+  the next key press only, and a quick second tap cancels it.
+
+The shortcut's keys and modifiers work the same with every kind. With
+Tap-toggle and One-shot the key is a dual-role key, as `TT()` and `OSL()` are:
+its layers go on at the press, and so do its keys and modifiers unless its
+behaviour sets a hold, so a key you roll in while it is down goes out at once
+on them. A layer that starts a pointing mode
+starts it. The base layer and the default layers are always on, so a shortcut
+cannot name them.
 
 A behaviour on the custom key works on top: the tiers it leaves empty send the
 shortcut. A behaviour on another key that sends a custom key sends only its
-shortcut, never its behaviour. A custom key with neither does nothing.
+shortcut, layers included, never its behaviour; so does a combo whose output
+it is. A custom key with neither does nothing.
 
 ## Where behaviours and combos run
 

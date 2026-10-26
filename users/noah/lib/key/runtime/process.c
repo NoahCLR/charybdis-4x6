@@ -17,6 +17,7 @@
 #include "reducer/runtime.h"
 #include "reducer/state_query.h"
 #include "../../action/synthetic_record.h"
+#include "../../action/custom_key_shortcut.h"
 #include "../../action/owned_keycode.h"
 #include "../../compat/qmk_combo_origin.h"
 #include "../../macro/macro_input_guard.h"
@@ -419,12 +420,13 @@ bool noah_process_record_user(uint16_t keycode, keyrecord_t *record) {
 
 // QMK's rule for what uses up a one-shot layer (process_record in action.c):
 // any press except a modifier, a one-shot modifier, a mod-tap still held, or
-// OSL() itself. It is released once that press has been processed, so the
-// press still resolved on the one-shot layer. Every MT() is the runtime's
-// (D-F27): its release planner consumes the layer for a qualifying tap,
-// including a delayed multi-tap, so its press never does.
+// OSL() itself, and so a custom key whose shortcut is One-shot (D-F26). It is
+// released once that press has been processed, so the press still resolved on
+// the one-shot layer. Every MT() is the runtime's (D-F27): its release planner
+// consumes the layer for a qualifying tap, including a delayed multi-tap, so
+// its press never does.
 static bool key_runtime_process_press_uses_oneshot_layer(uint16_t keycode) {
-    return !(IS_MODIFIER_KEYCODE(keycode) || IS_QK_ONE_SHOT_MOD(keycode) || IS_QK_ONE_SHOT_LAYER(keycode) || IS_QK_MOD_TAP(keycode));
+    return !(IS_MODIFIER_KEYCODE(keycode) || IS_QK_ONE_SHOT_MOD(keycode) || IS_QK_ONE_SHOT_LAYER(keycode) || IS_QK_MOD_TAP(keycode) || noah_custom_key_is_oneshot(keycode));
 }
 
 static void key_runtime_process_settle_oneshot_layer(uint16_t keycode, const keyrecord_t *record) {

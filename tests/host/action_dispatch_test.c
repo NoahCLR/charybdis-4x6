@@ -834,12 +834,23 @@ static void test_custom_key_shortcut_is_its_native_action(void) {
 static void test_unassigned_userspace_codes_are_refused_everywhere(void) {
     // The retired custom-key block (D-F14) is unassigned: its first and last
     // codes invoke nothing, neither a custom key nor a pointing hold.
-    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED - 1, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, NOAH_KEYCODE_CUSTOM_KEY_BASE - 1, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + 63, CUSTOM_KEY_127 + 1, QK_USER_MAX};
+    const uint16_t unassigned[] = {NOAH_KEYCODE_PD_HOLD_BASE + POINTING_MODE_COUNT, NOAH_KEYCODE_PD_LOCK_BASE + NOAH_KEYCODE_PD_RESERVED - 1, LAYER_LOCK_BASE + LAYER_COUNT, NOAH_KEYCODE_USERSPACE_END, NOAH_KEYCODE_CUSTOM_KEY_BASE - 1, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE, NOAH_KEYCODE_RETIRED_CUSTOM_KEY_BASE + 63};
     const noah_action_placement_t placements[] = {NOAH_ACTION_PLACEMENT_KEY, NOAH_ACTION_PLACEMENT_BEHAVIOR_TAP, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_PRESS_AND_HOLD, NOAH_ACTION_PLACEMENT_BEHAVIOR_HOLD_OTHER, NOAH_ACTION_PLACEMENT_COMBO_OUTPUT};
     for (uint8_t i = 0; i < ARRAY_SIZE(unassigned); i++) {
         CHECK(noah_action_describe(unassigned[i]).kind == NOAH_ACTION_KIND_UNASSIGNED_USER);
         for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++)
             CHECK(!noah_action_supported_at(unassigned[i], placements[p]));
+    }
+    // The last block is the runtime's own (what a Tap-toggle or One-shot custom
+    // key's tap does to its layers, D-F26): it names its kind, and a profile
+    // still places it nowhere.
+    const uint16_t runtime_only[] = {CUSTOM_KEY_127 + 1, CUSTOM_KEY_LAYER_TAP(0), CUSTOM_KEY_LAYER_TAP(CUSTOM_KEY_SLOT_COUNT - 1), QK_USER_MAX};
+    for (uint8_t i = 0; i < ARRAY_SIZE(runtime_only); i++) {
+        CHECK(noah_action_describe(runtime_only[i]).kind == NOAH_ACTION_KIND_CUSTOM_KEY_LAYER_TAP);
+        for (uint8_t p = 0; p < ARRAY_SIZE(placements); p++)
+            CHECK(!noah_action_supported_at(runtime_only[i], placements[p]));
+        const noah_profile_action_v1_t stored = {.kind = NOAH_PROFILE_ACTION_V1_QMK_KEYCODE, .operand = runtime_only[i]};
+        CHECK(!noah_profile_action_placement_v1_supported(&stored, NOAH_PROFILE_VALIDATOR_V1_PLACEMENT_BEHAVIOR_TAP));
     }
     CHECK(noah_action_describe(CUSTOM_KEY_63).kind == NOAH_ACTION_KIND_CUSTOM_KEY);
     CHECK(noah_action_describe(CUSTOM_KEY_127).kind == NOAH_ACTION_KIND_CUSTOM_KEY);

@@ -97,6 +97,7 @@ _Static_assert(MACRO_SLOT_COUNT == NOAH_SETTINGS_MACRO_NAMES, "Settings name eve
 _Static_assert(NOAH_MACRO_NAME_SIZE == NOAH_SETTINGS_NAME_MAX + 1u, "A macro or custom-key name is at most 32 bytes");
 _Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_SETTINGS_CUSTOM_KEY_NAMES, "Settings name every custom key");
 _Static_assert(CUSTOM_KEY_SLOT_COUNT == NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, "Settings hold every custom key's shortcut");
+_Static_assert(NOAH_CUSTOM_KEY_SHORTCUT_LAYERS == NOAH_SETTINGS_LAYERS, "A shortcut's layer mask covers the settings' layer bank");
 _Static_assert(MATRIX_ROWS * MATRIX_COLS <= NOAH_SETTINGS_PLACEMENT_MAX_POSITIONS, "A placement bitmap covers the whole matrix");
 static uint8_t name_length(const char *name) {
     uint8_t length = 0;

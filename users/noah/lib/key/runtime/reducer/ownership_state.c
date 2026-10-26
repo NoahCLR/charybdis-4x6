@@ -467,43 +467,30 @@ static bool key_runtime_core_repeat_lease_activate(key_runtime_core_state_t *sta
     return true;
 }
 
+// Layer locks and one-shot layers are kept as masks, one bit a layer, so a
+// shortcut locking or arming a set of layers (D-F26) never crowds out the
+// pointing mode's intents; each layer still counts as one intent.
 static bool key_runtime_core_persistent_layer_intent_update(key_runtime_core_state_t *state, persistent_intent_kind_t kind, uint8_t layer, bool active) {
-    persistent_intent_t *empty_slot = NULL;
+    layer_state_t *mask;
 
-    if (!(state && layer < 32u)) {
+    if (!(state && layer < LAYER_COUNT)) {
         return false;
     }
 
-    for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY; index++) {
-        persistent_intent_t *intent = &state->persistent_intents[index];
-
-        if (intent->active && intent->kind == kind && intent->data.layer == layer) {
-            if (active) {
-                return false;
-            }
-
-            *intent = (persistent_intent_t){0};
-            if (state->persistent_intent_count != 0u) {
-                state->persistent_intent_count--;
-            }
-            return true;
-        }
-
-        if (!intent->active && !empty_slot) {
-            empty_slot = intent;
-        }
-    }
-
-    if (!(active && empty_slot)) {
+    mask = kind == PERSISTENT_INTENT_KIND_LAYER_LOCK ? &state->persistent_layer_locks : &state->persistent_layer_oneshots;
+    if (((*mask & ((layer_state_t)1u << layer)) != 0u) == active) {
         return false;
     }
 
-    *empty_slot = (persistent_intent_t){
-        .active     = true,
-        .kind       = kind,
-        .data.layer = layer,
-    };
-    state->persistent_intent_count++;
+    if (active) {
+        *mask |= (layer_state_t)1u << layer;
+        state->persistent_intent_count++;
+    } else {
+        *mask &= (layer_state_t) ~((layer_state_t)1u << layer);
+        if (state->persistent_intent_count != 0u) {
+            state->persistent_intent_count--;
+        }
+    }
     return true;
 }
 
@@ -831,6 +818,9 @@ void key_runtime_core_shadow_projection_recompute(key_runtime_core_state_t *stat
         }
     }
 
+    projection.locked_layer_mask |= state->persistent_layer_locks;
+    projection.layer_state |= state->persistent_layer_locks | state->persistent_layer_oneshots;
+
     for (uint16_t index = 0; index < KEY_RUNTIME_CORE_PERSISTENT_INTENT_CAPACITY; index++) {
         const persistent_intent_t *intent = &state->persistent_intents[index];
 
@@ -839,13 +829,6 @@ void key_runtime_core_shadow_projection_recompute(key_runtime_core_state_t *stat
         }
 
         switch (intent->kind) {
-            case PERSISTENT_INTENT_KIND_LAYER_LOCK:
-                projection.locked_layer_mask |= (layer_state_t)1u << intent->data.layer;
-                projection.layer_state |= (layer_state_t)1u << intent->data.layer;
-                break;
-            case PERSISTENT_INTENT_KIND_LAYER_ONESHOT:
-                projection.layer_state |= (layer_state_t)1u << intent->data.layer;
-                break;
             case PERSISTENT_INTENT_KIND_POINTING_MODE_LOCK:
                 projection.pointing_mode_local_locked = intent->data.pointing_mode;
                 projection.pointing_mode_local_active = intent->data.pointing_mode;
@@ -881,6 +864,18 @@ void key_runtime_core_press_token_attach_press_leases(key_runtime_core_state_t *
 
         if (layer != UINT8_MAX) {
             changed |= key_runtime_core_layer_lease_activate(state, token->token_id, token_key_pos, layer);
+        }
+    }
+
+    // A Tap-toggle or One-shot custom key holds its shortcut's layers from the
+    // press, as TT() and OSL() hold theirs (D-F26): one lease per layer.
+    if (noah_custom_key_is_dual_role(token->resolved_keycode)) {
+        layer_state_t layers = noah_custom_key_shortcut_for_keycode(token->resolved_keycode).layers;
+
+        for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+            if (layers & ((layer_state_t)1u << layer)) {
+                changed |= key_runtime_core_layer_lease_activate(state, token->token_id, token_key_pos, layer);
+            }
         }
     }
 
@@ -1205,15 +1200,6 @@ uint16_t key_runtime_core_held_action_keycode_at(keypos_t key_pos) {
     return key_runtime_core_key_pos_held_action_keycode(key_runtime_core_state(), key_pos);
 }
 
-// A custom key held for its shortcut holds real modifiers like a mods-only
-// keycode when the shortcut is modifiers alone (D-F26). A profile waits to
-// activate while it is held, so the shortcut it holds is the current one.
-static bool key_runtime_core_custom_key_holds_mods_only(uint16_t action) {
-    noah_custom_key_shortcut_t shortcut = noah_custom_key_shortcut_for_keycode(action);
-
-    return shortcut.mods != 0u && shortcut.key == 0u;
-}
-
 bool key_runtime_core_holds_layer_or_mods_at(keypos_t key_pos) {
     const key_runtime_core_state_t *state = key_runtime_core_state();
 
@@ -1236,7 +1222,7 @@ bool key_runtime_core_holds_layer_or_mods_at(keypos_t key_pos) {
                 }
                 break;
             case LEASE_KIND_HELD_ACTION:
-                if (noah_qmk_real_mods_for_keycode(lease->data.action) != 0u || key_runtime_core_custom_key_holds_mods_only(lease->data.action) || noah_action_desc_is_layer_action(noah_action_describe(lease->data.action))) {
+                if (noah_qmk_real_mods_for_keycode(lease->data.action) != 0u || noah_custom_key_hold_changes_other_keys(lease->data.action) || noah_action_desc_is_layer_action(noah_action_describe(lease->data.action))) {
                     return true;
                 }
                 break;

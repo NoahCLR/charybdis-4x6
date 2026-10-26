@@ -43,10 +43,11 @@ game layer, order it just above the base layer and reach it with `TO()`.
 `CUSTOM_KEYS(KEY, SHORTCUT)` lists all 128 custom keys, one row each:
 
 ```c
-#define CUSTOM_KEYS(KEY, SHORTCUT)                                              \
-    KEY(CUSTOM_KEY_0, "Right Thumb")                                            \
-    SHORTCUT(CUSTOM_KEY_4, "Hyper K", SHORTCUT_MODS(KC_LCTL, KC_RALT), KC_K)    \
-    KEY(CUSTOM_KEY_5, "")                                                       \
+#define CUSTOM_KEYS(KEY, SHORTCUT)                                                                 \
+    KEY(CUSTOM_KEY_0, "Right Thumb")                                                               \
+    SHORTCUT(CUSTOM_KEY_4, "Hyper K", SHORTCUT_MODS(KC_LCTL, KC_RALT), KC_K, SHORTCUT_NO_LAYERS)   \
+    SHORTCUT(CUSTOM_KEY_5, "Cmd + Nav", SHORTCUT_MODS(KC_LGUI), KC_NO, SHORTCUT_LAYERS(LAYER_NAV)) \
+    KEY(CUSTOM_KEY_6, "")                                                                          \
     ...
 ```
 
@@ -54,7 +55,15 @@ A name is at most 32 bytes; `""` leaves the slot unused. Name the modifier
 keys in `SHORTCUT_MODS(...)`, or write `SHORTCUT_NO_MODS`; a QMK `MOD_*`
 constant doesn't compile, since `MOD_RALT` would mean other keys here. The
 key is a basic key (`KC_A` to `KC_EXSEL`), a mouse button (`MS_BTN1` to
-`MS_BTN8`) or `KC_NO` for modifiers alone.
+`MS_BTN8`) or `KC_NO` for none. Name the layers it holds on in
+`SHORTCUT_LAYERS(...)`, any of layers 1 to 15, or write `SHORTCUT_NO_LAYERS`;
+the base layer is always on, so it doesn't compile, and a profile whose default
+layers include one a shortcut names is refused. To act on the layers as
+another layer key does, all of them together, name them in
+`SHORTCUT_LOCK_LAYERS(...)` (`TG()`), `SHORTCUT_MOVE_TO_LAYERS(...)` (`TO()`),
+`SHORTCUT_TAP_TOGGLE_LAYERS(...)` (`TT()`) or `SHORTCUT_ONESHOT_LAYERS(...)`
+(`OSL()`) instead ([keys](keys.md#custom-keys)); one row takes one of these
+forms, never two. A row holds at least one of the three.
 
 ### Macros
 

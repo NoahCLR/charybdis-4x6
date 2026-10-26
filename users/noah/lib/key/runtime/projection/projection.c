@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "../../../action/action_dispatch.h"
+#include "../../../action/custom_key_shortcut.h"
 #include "../../../pointing/policy/pointer_layer_policy.h"
 #include "../../../state/ownership/keyboard_mod_ownership.h"
 #include "../../../state/ownership/layer_ownership.h"
@@ -48,10 +49,16 @@ void key_runtime_core_project_effect(const key_runtime_effect_t *effect) {
             held_repeat_start(effect->data.repeat.key_pos, effect->data.repeat.action, effect->data.repeat.repeat_hz);
             return;
         case KEY_RUNTIME_EFFECT_LAYER_PRESS:
-            layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
+            // A dual-role custom key's own hold is its shortcut's layers (D-F26).
+            if (noah_custom_key_momentary_layers_named(effect->data.layer_press.layer)) {
+                layer_ownership_shortcut_momentary_press(effect->data.layer_press.key_pos, noah_custom_key_shortcut((uint8_t)(effect->data.layer_press.layer & ~NOAH_CUSTOM_KEY_MOMENTARY_LAYERS)).layers);
+            } else {
+                layer_ownership_momentary_press(effect->data.layer_press.key_pos, effect->data.layer_press.layer);
+            }
             return;
         case KEY_RUNTIME_EFFECT_LAYER_RELEASE:
-            layer_ownership_momentary_release(effect->data.key_pos);
+            (void)layer_ownership_momentary_release(effect->data.key_pos);
+            (void)layer_ownership_shortcut_momentary_release(effect->data.key_pos);
             return;
         case KEY_RUNTIME_EFFECT_LAYER_ONESHOT_CONSUME:
             (void)layer_ownership_oneshot_consume();

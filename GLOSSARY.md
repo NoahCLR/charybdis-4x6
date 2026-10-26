@@ -209,9 +209,16 @@ and an optional behaviour.
 _Avoid_: user keycode, owned keycode, custom keycode
 
 **Shortcut**:
-A custom key's own action: one key and any modifiers, held while the custom
-key is held and tapped when it is tapped.
+A custom key's own action: one key, any modifiers and any layers, each
+optional, held while the custom key is held and tapped when it is tapped; its
+layers act together as one layer key, its layer kind (D-F26).
 _Avoid_: chord, hotkey, key combo
+
+**Layer kind**:
+The layer key a shortcut's layers act as, all of them together: Hold
+(`MO()`), Lock (`TG()`), Move to (`TO()`), Tap-toggle (`TT()`) or One-shot
+(`OSL()`) (D-F26).
+_Avoid_: layer mode, layer action (of a shortcut)
 
 **Action**:
 What a key, behaviour, combo or pointing mode sends, stored as one keycode.

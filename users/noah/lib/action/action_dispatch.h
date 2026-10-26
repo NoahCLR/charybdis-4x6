@@ -219,7 +219,7 @@ static inline bool noah_action_desc_is_layer_oneshot(noah_action_desc_t desc) {
 // top of the combo's is untested. Layer actions the runtime does not own are
 // refused everywhere.
 static inline bool noah_action_desc_supported_as_combo_output(noah_action_desc_t desc) {
-    return desc.kind != NOAH_ACTION_KIND_LAYER_TAP && desc.kind != NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION && desc.kind != NOAH_ACTION_KIND_UNASSIGNED_USER;
+    return desc.kind != NOAH_ACTION_KIND_LAYER_TAP && desc.kind != NOAH_ACTION_KIND_UNSUPPORTED_LAYER_ACTION && desc.kind != NOAH_ACTION_KIND_UNASSIGNED_USER && desc.kind != NOAH_ACTION_KIND_CUSTOM_KEY_LAYER_TAP;
 }
 
 static inline bool noah_action_desc_is_macro(noah_action_desc_t desc) {

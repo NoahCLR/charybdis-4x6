@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Write the maximum profile fixture (D-F14), or check it is current.
 
-Every table at its simultaneous maximum in one schema 4.1 blob: RGB v4 with
+Every table at its simultaneous maximum in one schema 4.2 blob: RGB v4 with
 sixteen groups, sixteen layer colours and 32 group rows; 128 behaviour rows of
-five full steps (640 steps); 128 combos of sixteen inputs; settings v9 with
-a shortcut on every custom key and every one of its 273 names at 32 bytes of
-UTF-8; and 32 pointing slots (v4), each named with 32 bytes, with every layer
-starting one of them; the full 1,920-byte matrix and 34,903-byte macro bank.
+five full steps (640 steps); 128 combos of sixteen inputs; settings v10 with
+a shortcut on every custom key, most with layers, and every one of its 273
+names at 32 bytes of UTF-8; and 32 pointing slots (v4), each named with 32
+bytes, with every layer starting one of them; the full 1,920-byte matrix and
+34,903-byte macro bank.
 Values reach the edges the plan names: layers 7, 8 and
 15, combo rows 31, 32, 63, 64 and 127, macros and custom keys 0, 63, 64 and
 127. It is test evidence built from the byte specs, not from firmware code.
@@ -135,18 +136,25 @@ def combos() -> bytes:
 
 
 def shortcuts() -> bytes:
-    """Settings v8 (D-F26): a modifier mask and a key for each custom key.
+    """Settings v10 (D-F26): a modifier mask, a key, a layer mask and the layer
+    kind for each custom key.
 
     Slot 0 mixes sides (Left Ctrl + Right Alt + K), 63 holds modifiers alone
-    (Hyper), 64 a mouse button alone, 127 every modifier and the last basic
-    key; the rest cycle through the key vocabulary.
+    (Hyper), 64 a mouse button alone, 65 layers alone as a One-shot, 127 every
+    modifier, the last basic key and every layer but the base as a Tap-toggle;
+    the rest cycle through the key vocabulary, the layers (never the base, the
+    one default layer here) and the five layer kinds, Hold without layers.
     """
-    records = [((slot * 37) & 0xFF, 0x04 + slot % 0xA1) for slot in range(128)]
-    records[0] = (0x41, 0x0E)
-    records[63] = (0x0F, 0x00)
-    records[64] = (0x00, 0xD1)
-    records[127] = (0xFF, 0xA4)
-    return b"".join(bytes(record) for record in records)
+    records = []
+    for slot in range(128):
+        layers = (slot * 0x0203) & 0xFFFE
+        records.append(((slot * 37) & 0xFF, 0x04 + slot % 0xA1, layers, slot % 5 if layers else 0))
+    records[0] = (0x41, 0x0E, 0x0000, 0)
+    records[63] = (0x0F, 0x00, 0x0000, 0)
+    records[64] = (0x00, 0xD1, 0x0000, 0)
+    records[65] = (0x00, 0x00, 0x8102, 4)
+    records[127] = (0xFF, 0xA4, 0xFFFE, 3)
+    return b"".join(struct.pack("<BBHB", *record) for record in records)
 
 
 def settings() -> bytes:
@@ -163,7 +171,7 @@ def settings() -> bytes:
     scalars[24] = 0
     scalars[25:27] = [100, 8]
     scalars[28:31] = [1, 0xFF7F, 0x7FFF]  # behaviours off on layer 7, combos off on 15
-    out = bytearray([9, LAYERS, 31, 128, 128, 0, 128, 0])
+    out = bytearray([10, LAYERS, 31, 128, 128, 0, 128, 0])
     out += b"".join(struct.pack("<I", v) for v in scalars)
     for layer in range(LAYERS):
         reference = (layer + 1) % LAYERS
@@ -175,7 +183,7 @@ def settings() -> bytes:
     for label in names:
         encoded = name(label)
         out += bytes([len(encoded)]) + encoded
-    assert len(out) == 9669
+    assert len(out) == 10053
     return bytes(out)
 
 
@@ -212,8 +220,8 @@ def macros() -> bytes:
 
 
 def blob() -> tuple[bytes, list[tuple[int, int, bytes]]]:
-    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 9, settings()), (0x50, 4, pointing()), (0x60, 1, keymap()), (0x70, 1, macros())]
-    out = bytearray(b"NLP1" + bytes([4, 1, len(domains), 1]))
+    domains = [(0x10, 4, rgb()), (0x20, 2, behaviors()), (0x30, 3, combos()), (0x40, 10, settings()), (0x50, 4, pointing()), (0x60, 1, keymap()), (0x70, 1, macros())]
+    out = bytearray(b"NLP1" + bytes([4, 2, len(domains), 1]))
     for domain_id, version, payload in domains:
         out += bytes([domain_id, version]) + struct.pack("<I", len(payload)) + payload
     assert len(out) + ALLOWANCE <= PAYLOAD_MAX

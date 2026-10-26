@@ -75,6 +75,25 @@ bool noah_custom_key_has_shortcut(uint16_t keycode) {
     return noah_custom_key_shortcut_present(noah_custom_key_shortcut_for_keycode(keycode));
 }
 
+bool noah_custom_key_has_layers(uint16_t keycode) {
+    return noah_custom_key_shortcut_for_keycode(keycode).layers != 0u;
+}
+
+bool noah_custom_key_hold_changes_other_keys(uint16_t keycode) {
+    noah_custom_key_shortcut_t shortcut = noah_custom_key_shortcut_for_keycode(keycode);
+
+    return (shortcut.mods != 0u && shortcut.key == 0u) || shortcut.layers != 0u;
+}
+
+bool noah_custom_key_is_dual_role(uint16_t keycode) {
+    return noah_custom_key_shortcut_is_dual_role(noah_custom_key_shortcut_for_keycode(keycode));
+}
+
+bool noah_custom_key_is_oneshot(uint16_t keycode) {
+    noah_custom_key_shortcut_t shortcut = noah_custom_key_shortcut_for_keycode(keycode);
+    return shortcut.layers != 0u && shortcut.layer_kind == NOAH_SHORTCUT_LAYERS_ONESHOT;
+}
+
 // A custom key with a shortcut stands where an ordinary key's own keycode
 // does (D-F26): it is its default tap and its fallback hold, and without a
 // row of its own the runtime holds it from the press. Without a shortcut it
@@ -313,6 +332,20 @@ bool noah_action_kind_match_custom_key(uint16_t action, pointing_mode_mask_t poi
     }
 
     *out = noah_action_desc_build(NOAH_ACTION_KIND_CUSTOM_KEY, action, 0, 0);
+    return true;
+}
+
+// The runtime's own CUSTOM_KEY_LAYER_TAP(n) (D-F26): what custom key n's tap
+// does to its layers when the key held its shortcut from the press. It is
+// supported nowhere a profile places an action, and does nothing pressed.
+bool noah_action_kind_match_custom_key_layer_tap(uint16_t action, pointing_mode_mask_t pointing_mode, noah_action_desc_t *out) {
+    (void)pointing_mode;
+
+    if (!(out && NOAH_KEYCODE_IS_CUSTOM_KEY_LAYER_TAP(action))) {
+        return false;
+    }
+
+    *out = noah_action_desc_build(NOAH_ACTION_KIND_CUSTOM_KEY_LAYER_TAP, action, 0, 0);
     return true;
 }
 
