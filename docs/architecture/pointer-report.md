@@ -72,14 +72,15 @@ change of the layers (`POINTING_MODE_COMMAND_LAYER_STATE`, from
 a pointing slot unlocks any other lock and ends any other held mode first.
 Owner keys are kept per key position and cleared on every change of mode.
 
-The running mode has a source, its key or its linked layer (D-F62). Linked
-layers are read from the effective slots (`pointing_mode_layer_started_mode`
-in `runtime/pointing_mode_registry.c`); the layer-state command applies them
-only while no key runs a mode, and every end of a key source (release, unlock,
-deactivate) evaluates them again, first letting go of the layer the mode
-brought so that layer change waits like any other. A mode its key runs brings
-its layer through `layer_ownership_set_pointing_mode_layer`; a mode its layer
-started brings none. A layer source started outside the hook turns the
+The running mode has a source, its key or its linked layers (D-F62). Links
+are read from the effective slots (`pointing_mode_layer_started_mode`, with
+what ends a mode its layers started, in `runtime/pointing_mode_registry.c`);
+the layer-state command applies them only while no key runs a mode, and every
+end of a key source (release, unlock, deactivate) evaluates them again, first
+letting go of the layers the mode's key turned on so that layer change waits
+like any other. A mode its key runs turns its layers on through
+`layer_ownership_set_pointing_mode_layers`; a mode its layers started turns
+none on. A layer source started outside the hook turns the
 pointer layer off once the command is done, and the hook keeps it off. Before
 the pointing slots are republished the profile owner ends a layer-started
 mode, and evaluates the new links once every runtime has published
@@ -124,9 +125,7 @@ in the order the spec gives, reading BK's default and sniping DPI through
 ## The slave half
 
 The slave half runs no mode. `split/runtime_sync.c` samples the active and
-locked slot, whether the active mode shows its light
-(`pointing_mode_local_light_snapshot`) and their owner keys into the base
-packet; on the slave half the
+locked slot and their owner keys into the base packet; on the slave half the
 packet lands through `pointing_mode_apply_remote_mode_ids_with_owner_bitmap` in
 a double-banked remote display state, which `pointing_mode_snapshot().display`
 reads as one whole publication. Lighting reads that view on both halves.
@@ -140,8 +139,8 @@ reads as one whole publication. Lighting reads that view on both halves.
   ends before the slots are republished.
 - **The engine owns nothing on the report** but its held modifiers.
   `noah_pd_engine_exit` releases every held modifier.
-- **No link latches.** Only a mode its key runs owns a layer, and one slot
-  links each layer.
+- **No link latches.** Only a mode its key runs owns a layer, a key source
+  beats a layer source, and no layer starts two modes.
 
 ## Where a change goes
 

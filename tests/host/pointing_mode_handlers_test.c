@@ -812,7 +812,9 @@ static noah_pd_config_t fixture_slot(uint8_t preset) {
     slot.name_length = 0;
     // Version 1's name field is the link and its reserved bytes now, and the
     // frozen Arrow's button records are retired.
-    slot.linked_layer = slot.link_direction = slot.link_light = 0;
+    memset(slot.link_head_reserved, 0, sizeof(slot.link_head_reserved));
+    slot.link_ends     = 0;
+    slot.linked_layers = slot.link_turns_on = 0;
     memset(slot.link_reserved, 0, sizeof(slot.link_reserved));
     memset(slot.retired_buttons, 0, sizeof(slot.retired_buttons));
     return slot;

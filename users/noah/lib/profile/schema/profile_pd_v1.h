@@ -1,6 +1,6 @@
 // PD domain contract (D-F14): 32 slots, stored sparsely, in 128-byte records.
 // Version 3 moved the name to the shared counted rule: its length in byte 8,
-// its UTF-8 in bytes 96..127. Version 4 links a slot to a layer in bytes 9..11
+// its UTF-8 in bytes 96..127. Version 4 links a slot to layers in bytes 11..15
 // (D-F62) and retires the mouse button records, bytes 52..69, as reserved zero.
 #pragma once
 
@@ -75,16 +75,15 @@ enum {
     NOAH_PD_TAP_MASK,        // the modifiers in mask are hidden
     NOAH_PD_TAP_EXACT,       // the shortcut alone
 };
-// A link's direction (link_direction): which way a slot and its linked layer
-// start each other. Zero is no link.
+// What ends a mode its linked layers started (link_ends), until that layer
+// goes off: nothing, a layer above the highest linked layer that is on, or any
+// layer outside both of the link's sets that is on. The pointer layer and a
+// default layer never end it.
 enum {
-    NOAH_PD_LINK_NONE              = 0,
-    NOAH_PD_LINK_MODE_TURNS_LAYER_ON = 1u << 0,
-    NOAH_PD_LINK_LAYER_TURNS_MODE_ON = 1u << 1,
-    NOAH_PD_LINK_BOTH              = NOAH_PD_LINK_MODE_TURNS_LAYER_ON | NOAH_PD_LINK_LAYER_TURNS_MODE_ON,
+    NOAH_PD_LINK_ENDS_NOTHING = 0,
+    NOAH_PD_LINK_ENDS_HIGHER_LAYER,
+    NOAH_PD_LINK_ENDS_OTHER_LAYER,
 };
-// The layers a link can name.
-enum { NOAH_PD_LINK_LAYER_COUNT = 16 };
 // The straight directions, in their order in directions[].
 enum {
     NOAH_PD_DIRECTION_LEFT = 0,
@@ -143,13 +142,15 @@ typedef struct {
     uint8_t  reserved;
     // The encoder writes the name's length here; authored data leaves it zero.
     uint8_t       name_length;
-    // The linked layer, which way the link goes (NOAH_PD_LINK_*; zero, with
-    // every link byte zero, is no link), and whether a mode its layer started
-    // shows its own light.
-    uint8_t       linked_layer;
-    uint8_t       link_direction;
-    uint8_t       link_light;
-    uint8_t       link_reserved[20];
+    // The link (D-F62): what ends a mode its linked layers started
+    // (NOAH_PD_LINK_ENDS_*); the linked layers, which start the mode; and the
+    // layers its key turns on while it runs the mode. In both masks bit n is
+    // layer n. Every link byte zero is no link.
+    uint8_t       link_head_reserved[2];
+    uint8_t       link_ends;
+    uint16_t      linked_layers;
+    uint16_t      link_turns_on;
+    uint8_t       link_reserved[16];
     uint16_t      threshold_x, threshold_y; // directional step sizes, in sensor counts
     noah_pd_tap_t directions[4];            // NOAH_PD_DIRECTION_*
     uint8_t       retired_buttons[18];      // version 3's mouse button records; zero
@@ -207,9 +208,9 @@ noah_profile_pd_v1_result_t noah_profile_pd_v1_validate(const uint8_t *bytes, si
 
 // Shared sparse-record traversal. The cursor also accepts encoded authored
 // records, so compiled output follows the same ordering/presence contract.
-// linked_layers is every layer an earlier record links, so no two slots name
-// one layer.
-typedef struct { uint8_t count, index, minimum; uint16_t linked_layers; } noah_profile_pd_v1_cursor_t;
+// starting_layers is every layer an earlier record's link starts its mode
+// from, so no layer starts two modes.
+typedef struct { uint8_t count, index, minimum; uint16_t starting_layers; } noah_profile_pd_v1_cursor_t;
 noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_begin(noah_profile_pd_v1_cursor_t *cursor, const uint8_t header[8], size_t length, noah_profile_pd_v1_error_t *error);
 noah_profile_pd_v1_result_t noah_profile_pd_v1_cursor_next(noah_profile_pd_v1_cursor_t *cursor, const uint8_t record[NOAH_PROFILE_PD_V1_RECORD_SIZE], noah_profile_pd_v1_error_t *error);
 uint8_t noah_profile_pd_v1_default_record_count(const noah_pd_config_t defaults[NOAH_PROFILE_PD_V1_SLOT_COUNT]);

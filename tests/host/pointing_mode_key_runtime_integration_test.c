@@ -350,6 +350,7 @@ static uint16_t              sniping_dpi;
 static uint8_t               split_sync_count;
 static uint8_t               layer_state_set_count;
 static uint8_t               layer_off_count;
+static uint8_t               layer_off_counts[LAYER_COUNT];
 static uint8_t               fake_mods;
 static uint8_t               fake_weak_mods;
 static uint8_t               fake_oneshot_mods;
@@ -434,7 +435,7 @@ static layer_state_t test_layer_mask(uint8_t layer) {
 }
 
 #ifndef NOAH_TEST_QMK_GESTURES
-static uint8_t       test_pointing_mode_layer = LAYER_OWNERSHIP_NO_LAYER;
+static layer_state_t test_pointing_mode_layers;
 static layer_state_t test_held_layers;
 #endif
 
@@ -546,9 +547,10 @@ static void test_reset_state(void) {
     split_sync_count                       = 0;
     layer_state_set_count                  = 0;
     layer_off_count                        = 0;
+    memset(layer_off_counts, 0, sizeof(layer_off_counts));
     layer_state                            = test_layer_mask(TEST_LAYER_BASE);
 #ifndef NOAH_TEST_QMK_GESTURES
-    test_pointing_mode_layer               = LAYER_OWNERSHIP_NO_LAYER;
+    test_pointing_mode_layers              = 0;
     test_held_layers                       = 0;
 #endif
     fake_mods                              = 0;
@@ -630,6 +632,7 @@ void layer_on(uint8_t layer) {
 
 void layer_off(uint8_t layer) {
     layer_off_count++;
+    if (layer < LAYER_COUNT) layer_off_counts[layer]++;
     test_apply_layer_state(layer_state & (layer_state_t) ~((layer_state_t)1u << layer));
 }
 
@@ -1004,20 +1007,25 @@ bool layer_ownership_goto(uint8_t layer) {
     return true;
 }
 
-// Layer ownership as it applies a pointing mode's layer: on beside the layers
-// a test holds, off when the mode lets go unless the test still holds it.
-bool layer_ownership_set_pointing_mode_layer(uint8_t layer) {
-    uint8_t previous = test_pointing_mode_layer;
+// Layer ownership as it applies a pointing mode's layers: on beside the
+// layers a test holds, off when the mode lets go unless the test still holds
+// them.
+bool layer_ownership_set_pointing_mode_layers(layer_state_t layers) {
+    layer_state_t previous = test_pointing_mode_layers;
 
-    if (layer == previous) {
+    if (layers == previous) {
         return false;
     }
-    test_pointing_mode_layer = layer;
-    if (layer != LAYER_OWNERSHIP_NO_LAYER && !layer_state_cmp(layer_state, layer)) {
-        layer_on(layer);
+    test_pointing_mode_layers = layers;
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+        if ((layers & ~previous & test_layer_mask(layer)) && !layer_state_cmp(layer_state, layer)) {
+            layer_on(layer);
+        }
     }
-    if (previous != LAYER_OWNERSHIP_NO_LAYER && !(test_held_layers & ((layer_state_t)1u << previous))) {
-        layer_off(previous);
+    for (uint8_t layer = 0; layer < LAYER_COUNT; layer++) {
+        if ((previous & ~layers & ~test_held_layers & test_layer_mask(layer)) != 0u) {
+            layer_off(layer);
+        }
     }
     return true;
 }
@@ -1028,7 +1036,7 @@ static void test_hold_layer(uint8_t layer, bool held) {
         layer_on(layer);
     } else {
         test_held_layers &= ~((layer_state_t)1u << layer);
-        if (layer != test_pointing_mode_layer) {
+        if (!(test_pointing_mode_layers & test_layer_mask(layer))) {
             layer_off(layer);
         }
     }
@@ -2507,34 +2515,48 @@ static void test_mode_tap_registers_only_due_fallback_holds(void) {
 #ifndef NOAH_TEST_QMK_GESTURES
 // ── Linked layers (D-F62) ───────────────────────────────────────────────────
 //
-// Volume starts on layer 5 and Zoom on layer 6, showing its own light;
-// Dragscroll brings layer 4; Brightness and layer 7 start each other. Arrow's
-// link to the pointer layer and Pinch's to the base layer, a default layer,
-// do nothing.
+// Layers 5 and 8 start Volume, 6 and 10 start Zoom, which a higher layer
+// ends, and 13 and 14 start Undo / Redo, which any other layer ends and whose
+// key turns on layer 15. Dragscroll's key turns on layer 4; Brightness's key
+// turns on its own linked layers, 7 and 11; Back / Forward's key turns on
+// layer 4 too, and layer 5, which starts Volume. Arrow's link to the pointer
+// layer and Pinch's to the base layer, a default layer, do nothing.
 enum {
     TEST_LAYER_VOLUME     = 5,
+    TEST_LAYER_VOLUME_TOO = 8,
     TEST_LAYER_ZOOM       = 6,
+    TEST_LAYER_ZOOM_TOO   = 10,
     TEST_LAYER_DRAGSCROLL = 4,
-    TEST_LAYER_BOTH       = 7,
+    TEST_LAYER_OWN        = 7,
+    TEST_LAYER_OWN_TOO    = 11,
+    TEST_LAYER_UNDO       = 13,
+    TEST_LAYER_UNDO_TOO   = 14,
+    TEST_LAYER_UNDO_KEY   = 15,
 };
+#define TEST_MODE_UNDO pointing_mode_mask_from_id(6)
+#define TEST_MODE_BACK pointing_mode_mask_from_id(7)
 
-static void test_link_slot(uint8_t slot, uint8_t layer, uint8_t direction, bool light) {
+static void test_link_slot(uint8_t slot, layer_state_t layers, layer_state_t turns_on, uint8_t ends) {
     noah_pd_config_t record = noah_pd_defaults[slot];
 
-    record.linked_layer   = layer;
-    record.link_direction = direction;
-    record.link_light     = light ? 1u : 0u;
+    record.linked_layers = (uint16_t)layers;
+    record.link_turns_on = (uint16_t)turns_on;
+    record.link_ends     = ends;
     noah_profile_pd_v1_encode_record(&record, configured_pd_records[slot]);
 }
 
 static void test_reset_linked_layers(void) {
     test_reset_state();
-    test_link_slot(1, TEST_LAYER_VOLUME, NOAH_PD_LINK_LAYER_TURNS_MODE_ON, false);
-    test_link_slot(3, TEST_LAYER_ZOOM, NOAH_PD_LINK_LAYER_TURNS_MODE_ON, true);
-    test_link_slot(0, TEST_LAYER_DRAGSCROLL, NOAH_PD_LINK_MODE_TURNS_LAYER_ON, false);
-    test_link_slot(2, TEST_LAYER_BOTH, NOAH_PD_LINK_BOTH, false);
-    test_link_slot(4, TEST_LAYER_POINTER, NOAH_PD_LINK_BOTH, false);
-    test_link_slot(5, TEST_LAYER_BASE, NOAH_PD_LINK_LAYER_TURNS_MODE_ON, false);
+    const layer_state_t own = test_layer_mask(TEST_LAYER_OWN) | test_layer_mask(TEST_LAYER_OWN_TOO);
+
+    test_link_slot(1, test_layer_mask(TEST_LAYER_VOLUME) | test_layer_mask(TEST_LAYER_VOLUME_TOO), 0, NOAH_PD_LINK_ENDS_NOTHING);
+    test_link_slot(3, test_layer_mask(TEST_LAYER_ZOOM) | test_layer_mask(TEST_LAYER_ZOOM_TOO), 0, NOAH_PD_LINK_ENDS_HIGHER_LAYER);
+    test_link_slot(6, test_layer_mask(TEST_LAYER_UNDO) | test_layer_mask(TEST_LAYER_UNDO_TOO), test_layer_mask(TEST_LAYER_UNDO_KEY), NOAH_PD_LINK_ENDS_OTHER_LAYER);
+    test_link_slot(0, 0, test_layer_mask(TEST_LAYER_DRAGSCROLL), NOAH_PD_LINK_ENDS_NOTHING);
+    test_link_slot(2, own, own, NOAH_PD_LINK_ENDS_NOTHING);
+    test_link_slot(7, 0, test_layer_mask(TEST_LAYER_DRAGSCROLL) | test_layer_mask(TEST_LAYER_VOLUME), NOAH_PD_LINK_ENDS_NOTHING);
+    test_link_slot(4, test_layer_mask(TEST_LAYER_POINTER), test_layer_mask(TEST_LAYER_POINTER), NOAH_PD_LINK_ENDS_NOTHING);
+    test_link_slot(5, test_layer_mask(TEST_LAYER_BASE), 0, NOAH_PD_LINK_ENDS_NOTHING);
     publish_configured_pd();
 }
 
@@ -2558,6 +2580,25 @@ static void test_a_linked_layer_runs_its_mode(void) {
     CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_LAYER));
     test_hold_layer(TEST_LAYER_ZOOM, false);
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+
+    // Any linked layer starts its mode, and it runs while any of them is on.
+    test_hold_layer(TEST_LAYER_VOLUME_TOO, true);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    test_hold_layer(TEST_LAYER_VOLUME_TOO, false);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+
+    // Among slots, the one whose highest linked layer that is on ranks
+    // highest wins: Brightness's 7 over Volume's 5, Volume's 8 over 7.
+    test_hold_layer(TEST_LAYER_OWN, true);
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_VOLUME_TOO, true);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_VOLUME_TOO, false);
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_OWN, false);
     test_hold_layer(TEST_LAYER_VOLUME, false);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
 
@@ -2617,9 +2658,9 @@ static void test_a_key_source_beats_a_layer_source(void) {
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
 }
 
-// A mode its key runs owns the layer it brings, held or locked, beside the
-// layer's other owners.
-static void test_a_key_started_mode_brings_its_layer(void) {
+// A mode its key runs owns the layers its key turns on, held or locked, beside the
+// layers' other owners: a layer of its own, or its own linked layers.
+static void test_a_key_started_mode_turns_on_its_layers(void) {
     keypos_t pos = test_keypos(0, 0);
 
     test_reset_linked_layers();
@@ -2649,39 +2690,64 @@ static void test_a_key_started_mode_brings_its_layer(void) {
     test_hold_layer(TEST_LAYER_DRAGSCROLL, false);
     CHECK(!test_layer_on(TEST_LAYER_DRAGSCROLL));
 
+    // Brightness's key turns on both its linked layers and takes both away.
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, true));
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_KEY));
+    CHECK(test_layer_on(TEST_LAYER_OWN) && test_layer_on(TEST_LAYER_OWN_TOO));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, false));
+    CHECK(!test_layer_on(TEST_LAYER_OWN) && !test_layer_on(TEST_LAYER_OWN_TOO));
+    // Locked, then another owner keeps one of them when the mode ends.
+    action_dispatch(PD_SLOT_2_LOCK);
+    CHECK(test_layer_on(TEST_LAYER_OWN) && test_layer_on(TEST_LAYER_OWN_TOO));
+    test_hold_layer(TEST_LAYER_OWN_TOO, true);
+    action_dispatch(PD_SLOT_2_LOCK);
+    CHECK(!test_layer_on(TEST_LAYER_OWN) && test_layer_on(TEST_LAYER_OWN_TOO));
+    // Still on, its layer starts Brightness again.
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_OWN_TOO, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_OWN_TOO));
+
+    // Undo / Redo's key turns on a layer outside its linked layers.
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_6, pos, true));
+    CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_KEY));
+    CHECK(test_layer_on(TEST_LAYER_UNDO_KEY) && !test_layer_on(TEST_LAYER_UNDO) && !test_layer_on(TEST_LAYER_UNDO_TOO));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_6, pos, false));
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_UNDO_KEY));
+
     // A mode its layer started owns no layer.
     test_hold_layer(TEST_LAYER_VOLUME, true);
-    CHECK(test_pointing_mode_layer == LAYER_OWNERSHIP_NO_LAYER);
+    CHECK(test_pointing_mode_layers == 0u);
     test_hold_layer(TEST_LAYER_VOLUME, false);
 }
 
-// Both ways: the layer key and the mode key each leave neither on when let go.
-static void test_a_two_way_link_never_latches(void) {
+// A key that turns on its own linked layers: the layer key and the mode key
+// each leave neither on when let go.
+static void test_a_key_turning_on_its_own_layers_never_latches(void) {
     keypos_t pos = test_keypos(0, 0);
 
     test_reset_linked_layers();
-    test_hold_layer(TEST_LAYER_BOTH, true);
+    test_hold_layer(TEST_LAYER_OWN, true);
     CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER));
-    test_hold_layer(TEST_LAYER_BOTH, false);
-    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_BOTH));
+    test_hold_layer(TEST_LAYER_OWN, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_OWN));
 
     CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, true));
-    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_BOTH));
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_OWN));
     CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, false));
-    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_BOTH));
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_OWN));
 
     action_dispatch(PD_SLOT_2_LOCK);
-    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_BOTH));
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_OWN));
     action_dispatch(PD_SLOT_2_LOCK);
-    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_BOTH));
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_OWN));
 
     // Crossed: the mode key, then the layer key, the mode key let go first.
     CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, true));
-    test_hold_layer(TEST_LAYER_BOTH, true);
+    test_hold_layer(TEST_LAYER_OWN, true);
     CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, false));
-    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER) && test_layer_on(TEST_LAYER_BOTH));
-    test_hold_layer(TEST_LAYER_BOTH, false);
-    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_BOTH));
+    CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER) && test_layer_on(TEST_LAYER_OWN) && !test_layer_on(TEST_LAYER_OWN_TOO));
+    test_hold_layer(TEST_LAYER_OWN, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_OWN));
 }
 
 // A key that takes over the mode its layer started gives it a key-started
@@ -2705,7 +2771,7 @@ static void test_a_key_taking_over_a_layer_started_mode_anchors_as_from_nothing(
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && auto_mouse_key_tracker == 0);
 }
 
-// A mode its layer started never brings the pointer layer: a separate one is
+// A mode its layer started never turns the pointer layer on: a separate one is
 // stripped while it runs, and it comes back to auto-mouse afterwards.
 static void test_a_layer_started_mode_strips_the_pointer_layer(void) {
     keypos_t pos = test_keypos(0, 0);
@@ -2740,30 +2806,217 @@ static void test_links_to_the_pointer_layer_or_a_default_layer_are_inert(void) {
     test_hold_layer(TEST_LAYER_POINTER, false);
     CHECK(!key_runtime_integration_process_record(PD_SLOT_4, pos, true));
     CHECK(test_runs(POINTING_MODE_ARROW, POINTING_MODE_SOURCE_KEY));
-    CHECK(test_pointing_mode_layer == LAYER_OWNERSHIP_NO_LAYER && !test_layer_on(TEST_LAYER_POINTER));
+    CHECK(test_pointing_mode_layers == 0u && !test_layer_on(TEST_LAYER_POINTER));
     CHECK(!key_runtime_integration_process_record(PD_SLOT_4, pos, false));
     // The base layer is on everywhere; Pinch's link to it never starts Pinch.
     test_hold_layer(TEST_LAYER_BASE, true);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
 }
 
-// A mode its layer started shows the layer's lighting unless its slot's
-// switch is on; a mode its key runs shows its own.
-static void test_a_layer_started_mode_shows_its_light_only_when_its_slot_says(void) {
+// A link a higher layer ends starts its mode only while the highest of its
+// linked layers that is on is the highest layer on: a higher layer ends it
+// and letting go brings it back; its own linked layers never end it. Other
+// links, and a mode its key runs, keep running under a higher layer.
+static void test_a_higher_layer_ends_a_link_that_says_so(void) {
+    const uint8_t higher = 9u, highest = 12u;
+    keypos_t      pos    = test_keypos(0, 0);
+
+    test_reset_linked_layers();
+    test_hold_layer(TEST_LAYER_ZOOM, true);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(higher, true);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+    test_hold_layer(higher, false);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_LAYER));
+
+    // Against the highest linked layer that is on: with 10 on, 9 is below it.
+    test_hold_layer(TEST_LAYER_ZOOM_TOO, true);
+    test_hold_layer(higher, true);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_ZOOM_TOO, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+    test_hold_layer(TEST_LAYER_ZOOM_TOO, true);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(highest, true);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+    test_hold_layer(highest, false);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(higher, false);
+    test_hold_layer(TEST_LAYER_ZOOM_TOO, false);
+
+    // With Zoom ended, a lower link no layer ends takes over.
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    test_hold_layer(higher, true);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(higher, false);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_ZOOM, false);
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+
+    // A pointer layer above it is no higher layer: it is stripped instead.
+    auto_mouse_layer_target = highest;
+    test_hold_layer(TEST_LAYER_ZOOM, true);
+    layer_on(highest);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_LAYER));
+    CHECK(!test_layer_on(highest));
+    test_hold_layer(TEST_LAYER_ZOOM, false);
+    auto_mouse_layer_target = TEST_LAYER_POINTER;
+
+    // From its key, Zoom keeps running under a higher layer.
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, true));
+    test_hold_layer(higher, true);
+    CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_KEY));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, false));
+    test_hold_layer(higher, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+}
+
+// A link any other layer ends starts its mode only while no layer outside its
+// link is on: a lower or higher layer ends it, and letting go brings it back.
+// Its linked layers, the layer its key turns on, the pointer layer and a
+// default layer never end it, and a mode its key runs is never ended.
+static void test_any_other_layer_ends_a_link_that_says_so(void) {
+    const uint8_t lower = TEST_LAYER_SYM, higher = 9u;
+    keypos_t      pos   = test_keypos(0, 0);
+
+    test_reset_linked_layers();
+    test_hold_layer(TEST_LAYER_UNDO, true);
+    CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(lower, true);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+    test_hold_layer(lower, false);
+    CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(higher, true);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+    test_hold_layer(higher, false);
+    CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_LAYER));
+
+    // Its own link's layers do not end it.
+    test_hold_layer(TEST_LAYER_UNDO_TOO, true);
+    test_hold_layer(TEST_LAYER_UNDO_KEY, true);
+    CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_UNDO_KEY, false);
+    test_hold_layer(TEST_LAYER_UNDO_TOO, false);
+
+    // Nor does the pointer layer, stripped instead, or the base layer, a
+    // default layer that is on everywhere.
+    test_hold_layer(TEST_LAYER_BASE, true);
+    CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_LAYER));
+    layer_on(TEST_LAYER_POINTER);
+    CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_LAYER) && !test_layer_on(TEST_LAYER_POINTER));
+
+    // Ended by a lower layer that starts its own mode, that mode runs.
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+    CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_LAYER));
+    test_hold_layer(TEST_LAYER_UNDO, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+
+    // From its key, it keeps running over another layer.
+    test_hold_layer(lower, true);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_6, pos, true));
+    CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_KEY));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_6, pos, false));
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+    test_hold_layer(lower, false);
+}
+
+// Each half reads which layers a running mode paints beneath from its own
+// slots: every live layer of its link, linked or turned on by its key.
+static void test_a_running_mode_names_its_link_layers(void) {
+    test_reset_linked_layers();
+    CHECK(pointing_mode_link_layers(POINTING_MODE_VOLUME) == (test_layer_mask(TEST_LAYER_VOLUME) | test_layer_mask(TEST_LAYER_VOLUME_TOO)));
+    CHECK(pointing_mode_link_layers(POINTING_MODE_DRAGSCROLL) == test_layer_mask(TEST_LAYER_DRAGSCROLL));
+    CHECK(pointing_mode_link_layers(POINTING_MODE_BRIGHTNESS) == (test_layer_mask(TEST_LAYER_OWN) | test_layer_mask(TEST_LAYER_OWN_TOO)));
+    CHECK(pointing_mode_link_layers(TEST_MODE_UNDO) == (test_layer_mask(TEST_LAYER_UNDO) | test_layer_mask(TEST_LAYER_UNDO_TOO) | test_layer_mask(TEST_LAYER_UNDO_KEY)));
+    CHECK(pointing_mode_link_layers(POINTING_MODE_ARROW) == 0u);
+    CHECK(pointing_mode_link_layers(POINTING_MODE_PINCH) == 0u);
+    CHECK(pointing_mode_link_layers(TEST_MODE_BACK) == (test_layer_mask(TEST_LAYER_DRAGSCROLL) | test_layer_mask(TEST_LAYER_VOLUME)));
+    CHECK(pointing_mode_link_layers(pointing_mode_mask_from_id(8)) == 0u);
+}
+
+// Two keys may turn on one layer. Pressing the second while the first holds
+// its mode runs the second mode before the first key's hold is preempted, so
+// the shared layer stays on throughout; letting go of the first key then
+// changes nothing, and the second key takes the layer away.
+static void test_two_keys_turn_on_one_layer(void) {
+    keypos_t first = test_keypos(0, 0), second = test_keypos(0, 1);
+
+    test_reset_linked_layers();
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, first, true));
+    CHECK(test_runs(POINTING_MODE_DRAGSCROLL, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_DRAGSCROLL));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, second, true));
+    CHECK(test_runs(TEST_MODE_BACK, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_DRAGSCROLL) && test_layer_on(TEST_LAYER_VOLUME));
+    CHECK(layer_off_counts[TEST_LAYER_DRAGSCROLL] == 0);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, first, false));
+    CHECK(test_runs(TEST_MODE_BACK, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_DRAGSCROLL));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, second, false));
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_DRAGSCROLL) && !test_layer_on(TEST_LAYER_VOLUME));
+}
+
+// The modes its layers started since the last trace reset.
+static uint8_t test_traced_layer_starts(void) {
+    noah_runtime_trace_snapshot_t snapshot;
+    uint8_t                       count = 0;
+
+    noah_runtime_trace_snapshot(&snapshot);
+    CHECK(!snapshot.overflowed);
+    for (uint16_t index = 0; index < snapshot.count; index++) {
+        if (snapshot.entries[index].kind == NOAH_TRACE_POINTING_MODE && snapshot.entries[index].event == NOAH_TRACE_POINTING_MODE_EVENT_LAYER_START) {
+            count++;
+        }
+    }
+    return count;
+}
+
+// A key replacing another key's mode, both turning on a layer that starts a
+// third mode while a layer key also holds it: the third mode never starts in
+// between, and comes back from its layer once the keys let go.
+static void test_a_key_replacing_another_starts_no_mode_in_between(void) {
+    keypos_t first = test_keypos(0, 0), second = test_keypos(0, 1);
+
+    test_reset_linked_layers();
+    test_link_slot(0, 0, test_layer_mask(TEST_LAYER_DRAGSCROLL) | test_layer_mask(TEST_LAYER_VOLUME), NOAH_PD_LINK_ENDS_NOTHING);
+    publish_configured_pd();
+    test_hold_layer(TEST_LAYER_VOLUME, true);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, first, true));
+    CHECK(test_runs(TEST_MODE_BACK, POINTING_MODE_SOURCE_KEY));
+    noah_runtime_trace_reset();
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, second, true));
+    CHECK(test_runs(POINTING_MODE_DRAGSCROLL, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_DRAGSCROLL));
+    CHECK(test_traced_layer_starts() == 0u);
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, first, false));
+    CHECK(test_runs(POINTING_MODE_DRAGSCROLL, POINTING_MODE_SOURCE_KEY));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, second, false));
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER) && !test_layer_on(TEST_LAYER_DRAGSCROLL));
+    test_hold_layer(TEST_LAYER_VOLUME, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
+}
+
+// A key may turn on a layer that starts another mode. While the key runs its
+// own mode the links wait, so that layer starts nothing; when the key lets go
+// its layers go off and nothing starts. Kept on by another owner, the layer
+// starts its own mode once the key's mode ends.
+static void test_a_key_turns_on_a_layer_another_mode_starts_from(void) {
     keypos_t pos = test_keypos(0, 0);
 
     test_reset_linked_layers();
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, pos, true));
+    CHECK(test_runs(TEST_MODE_BACK, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_VOLUME));
+    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, pos, false));
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_VOLUME));
+
+    // Locked, with the layer also held: unlocking hands over to Volume.
+    action_dispatch(PD_SLOT_7_LOCK);
     test_hold_layer(TEST_LAYER_VOLUME, true);
-    CHECK(!pointing_mode_snapshot().local.active_light && !pointing_mode_snapshot().display.active_light);
-    CHECK(!pointing_mode_local_light_snapshot());
-    test_hold_layer(TEST_LAYER_ZOOM, true);
-    CHECK(pointing_mode_snapshot().display.active_light && pointing_mode_local_light_snapshot());
-    test_hold_layer(TEST_LAYER_ZOOM, false);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, pos, true));
-    CHECK(pointing_mode_snapshot().display.active_light);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, pos, false));
-    CHECK(!pointing_mode_snapshot().display.active_light);
+    CHECK(test_runs(TEST_MODE_BACK, POINTING_MODE_SOURCE_KEY));
+    action_dispatch(PD_SLOT_7_LOCK);
+    CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
+    CHECK(test_layer_on(TEST_LAYER_VOLUME) && !test_layer_on(TEST_LAYER_DRAGSCROLL));
     test_hold_layer(TEST_LAYER_VOLUME, false);
+    CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
 }
 
 // A mode its layer started does not hold up an activation; at the boundary it
@@ -2777,8 +3030,8 @@ static void test_a_layer_started_mode_ends_at_activation(void) {
     // The new generation links layer 5 to Brightness instead.
     pointing_mode_end_layer_started_mode();
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
-    test_link_slot(1, 0, NOAH_PD_LINK_NONE, false);
-    test_link_slot(2, TEST_LAYER_VOLUME, NOAH_PD_LINK_LAYER_TURNS_MODE_ON, false);
+    test_link_slot(1, 0, 0, NOAH_PD_LINK_ENDS_NOTHING);
+    test_link_slot(2, test_layer_mask(TEST_LAYER_VOLUME), 0, NOAH_PD_LINK_ENDS_NOTHING);
     publish_configured_pd();
     pointing_mode_reevaluate_layer_links();
     CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER));
@@ -5392,12 +5645,17 @@ int main(int argc, char **argv) {
 #ifndef NOAH_TEST_QMK_GESTURES
     test_a_linked_layer_runs_its_mode();
     test_a_key_source_beats_a_layer_source();
-    test_a_key_started_mode_brings_its_layer();
-    test_a_two_way_link_never_latches();
+    test_a_key_started_mode_turns_on_its_layers();
+    test_a_key_turning_on_its_own_layers_never_latches();
     test_a_key_taking_over_a_layer_started_mode_anchors_as_from_nothing();
     test_a_layer_started_mode_strips_the_pointer_layer();
     test_links_to_the_pointer_layer_or_a_default_layer_are_inert();
-    test_a_layer_started_mode_shows_its_light_only_when_its_slot_says();
+    test_a_higher_layer_ends_a_link_that_says_so();
+    test_any_other_layer_ends_a_link_that_says_so();
+    test_a_running_mode_names_its_link_layers();
+    test_two_keys_turn_on_one_layer();
+    test_a_key_replacing_another_starts_no_mode_in_between();
+    test_a_key_turns_on_a_layer_another_mode_starts_from();
     test_a_layer_started_mode_ends_at_activation();
 #endif
 #ifndef NOAH_TEST_QMK_GESTURES

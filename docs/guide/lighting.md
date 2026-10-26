@@ -1,8 +1,8 @@
 # Lighting
 
 The LEDs are feedback: they show which layer and pointing mode are on, which
-keys made a combo, which tap count a key is on and whether a hold has
-started. Ark's
+keys made a combo, which tap count a key is on and whether a hold has started.
+Ark's
 [Lighting](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/lighting.md)
 page edits all of it and paints its board the way the keyboard will.
 
@@ -17,7 +17,10 @@ Lighting is drawn in **stages**, each painting over the one before:
 2. **Layer colours**: each layer on, from the base layer up.
 3. **Auto-mouse fade**: replaces the layer colours while the pointer layer
    times out.
-4. **Pointing modes**: the running mode's colour.
+4. **Pointing modes**: the running mode's colour. A mode whose link has a
+   layer on paints beneath the lowest such layer instead, inside stage 2, so
+   the link's layers show their keys over the mode's colour ([linked
+   layers](pointing.md#linked-layers)).
 5. **Combo feedback**: the keys of a combo you are holding.
 6. **Key feedback**: tap counts, holds and long holds.
 
@@ -91,11 +94,11 @@ Pointing modes, combo feedback and key feedback each choose where they paint:
 
 An **LED group** paints chosen LEDs, such as the thumb keys or the trackball
 LED, over a stage's own colour, while a given layer, pointing mode, combo
-feedback or kind of key feedback is showing (or any of them). A group colour with saturation and
-brightness at 0 takes the stage's colour; any other colour paints as itself.
-Rows paint in order, so a later row wins an LED they share. In key feedback,
-rows for any kind of feedback paint first, so rows for one kind paint over
-them.
+feedback or kind of key feedback is showing (or any of them). A group colour
+with saturation and brightness at 0 takes the stage's colour; any other colour
+paints as itself. Rows paint in order, so a later row wins an LED they share.
+In key feedback, rows for any kind of feedback paint first, so rows for one
+kind paint over them.
 
 ## Brightness and the lighting keys
 

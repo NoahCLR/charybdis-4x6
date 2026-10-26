@@ -234,30 +234,32 @@ bool layer_ownership_oneshot_consume(void) {
     return armed != UINT8_MAX && layer_ownership_oneshot_set(armed, false);
 }
 
-uint8_t layer_ownership_pointing_mode_layer(void) {
-    layer_state_t mask = layer_ownership_state()->pointing_mode_layer_mask;
-
-    return mask ? (uint8_t)__builtin_ctz(mask) : LAYER_OWNERSHIP_NO_LAYER;
+layer_state_t layer_ownership_pointing_mode_layers(void) {
+    return layer_ownership_state()->pointing_mode_layer_mask;
 }
 
-bool layer_ownership_set_pointing_mode_layer(uint8_t layer) {
+bool layer_ownership_set_pointing_mode_layers(layer_state_t layers) {
     noah_layer_ownership_state_t *state    = layer_ownership_state();
-    uint8_t                       previous = layer_ownership_pointing_mode_layer();
+    layer_state_t                 previous = state->pointing_mode_layer_mask;
 
-    if (layer >= LAYER_COUNT) {
-        layer = LAYER_OWNERSHIP_NO_LAYER;
+    for (uint8_t layer = LAYER_COUNT; layer < sizeof(layer_state_t) * 8u; layer++) {
+        layers &= ~layer_ownership_mask_for_layer(layer);
     }
-    if (layer == previous) {
+    if (layers == previous) {
         return false;
     }
 
-    state->pointing_mode_layer_mask = layer == LAYER_OWNERSHIP_NO_LAYER ? 0u : layer_ownership_mask_for_layer(layer);
-    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_POINTING_MODE, layer, previous);
-    if (layer != LAYER_OWNERSHIP_NO_LAYER) {
-        layer_ownership_apply_layer(layer);
+    state->pointing_mode_layer_mask = layers;
+    noah_runtime_trace_emit(NOAH_TRACE_LAYER_OWNERSHIP, NOAH_TRACE_LAYER_OWNERSHIP_EVENT_POINTING_MODE, layers, previous);
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+        if ((layers & ~previous) & layer_ownership_mask_for_layer(layer)) {
+            layer_ownership_apply_layer(layer);
+        }
     }
-    if (previous != LAYER_OWNERSHIP_NO_LAYER) {
-        layer_ownership_apply_layer(previous);
+    for (uint8_t layer = 0u; layer < LAYER_COUNT; layer++) {
+        if ((previous & ~layers) & layer_ownership_mask_for_layer(layer)) {
+            layer_ownership_apply_layer(layer);
+        }
     }
     return true;
 }

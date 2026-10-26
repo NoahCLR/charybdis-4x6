@@ -181,9 +181,29 @@ static bool rgb_runtime_render_runtime_diag_stage(uint8_t led_min, uint8_t led_m
     return true;
 }
 
+// A running mode whose link names a layer that is on paints in the stack
+// directly beneath the lowest such layer, so the link's layers show their keys
+// over the mode's colour (D-F62); the pointing-mode stage then leaves it alone.
+// Set only when it painted there: if the mode changed between the two reads,
+// the pointing-mode stage paints the one now running.
+static bool rgb_runtime_pointing_mode_painted_beneath;
+
 static bool rgb_runtime_render_layer_base_stage(uint8_t led_min, uint8_t led_max) {
-    rgb_runtime_layer_stage_render_active_profile_frame(&rgb_runtime_frame_primary, layer_state, &rgb_runtime_profile_frame, led_min, led_max);
-    return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
+    uint8_t beneath = rgb_runtime_pointing_mode_stage_beneath_layer(layer_state, &rgb_runtime_profile_frame);
+    bool    painted;
+
+    if (beneath >= LAYER_COUNT) {
+        rgb_runtime_layer_stage_render_active_profile_frame(&rgb_runtime_frame_primary, layer_state, &rgb_runtime_profile_frame, led_min, led_max);
+        return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
+    }
+
+    rgb_runtime_layer_stage_render_active_profile_layers_frame(&rgb_runtime_frame_primary, layer_state, 0u, beneath, &rgb_runtime_profile_frame, led_min, led_max);
+    painted = rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
+    rgb_runtime_pointing_mode_painted_beneath = rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, beneath, led_min, led_max);
+    painted |= rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
+    rgb_runtime_layer_stage_render_active_profile_layers_frame(&rgb_runtime_frame_primary, layer_state, beneath, LAYER_COUNT, &rgb_runtime_profile_frame, led_min, led_max);
+    painted |= rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
+    return painted;
 }
 
 #    if defined(POINTING_DEVICE_AUTO_MOUSE_ENABLE) && defined(RGB_AUTOMOUSE_GRADIENT_ENABLE)
@@ -211,6 +231,9 @@ static bool rgb_runtime_render_preview_stage(uint8_t led_min, uint8_t led_max) {
 
 #    if defined(POINTING_DEVICE_ENABLE) && defined(RGB_POINTING_MODE_FEEDBACK_ENABLE)
 static bool rgb_runtime_render_pointing_mode_stage(uint8_t led_min, uint8_t led_max) {
+    if (rgb_runtime_pointing_mode_painted_beneath) {
+        return false;
+    }
     rgb_runtime_pointing_mode_stage_render_active_profile_frame(&rgb_runtime_frame_primary, &rgb_runtime_profile_frame, led_min, led_max);
     return rgb_runtime_layer_stage_apply_frame(&rgb_runtime_frame_primary, led_min, led_max);
 }
@@ -288,6 +311,7 @@ static bool rgb_runtime_render_range(uint8_t led_min, uint8_t led_max) {
         return true;
     }
 
+    rgb_runtime_pointing_mode_painted_beneath = false;
     painted |= rgb_runtime_render_base_stage(led_min, led_max);
 
 #    if defined(COMBO_ENABLE) && defined(RGB_COMBO_FEEDBACK_ENABLE)

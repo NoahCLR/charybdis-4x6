@@ -127,7 +127,7 @@ Held by: `tests/host/run_qmk_portable_profile_tests.sh` (`qmk_portable_profile_t
 
 | Authored | Class | Where it lives |
 | --- | --- | --- |
-| `noah_pd_defaults[]`: each slot's name, movement, pointer-layer policy, axis, DPI, held modifiers, thresholds, directional outputs, linked layer, scroll tuning | profile data | pointing `0x50`; a disabled slot without a name is not stored |
+| `noah_pd_defaults[]`: each slot's name, movement, pointer-layer policy, axis, DPI, held modifiers, thresholds, directional outputs, link, scroll tuning | profile data | pointing `0x50`; a disabled slot without a name is not stored |
 | `NOAH_DRAGSCROLL_*` in `users/noah/config.h`, the thresholds in `pointing_mode_defaults.h` | profile data | the scrolling and directional slots' fields, through `noah_pd_defaults[]` |
 | The 32 pointing slots | ceiling | part of the action-ABI digest (D-F09, [ADR](../adr/0009-thirty-two-pointing-slots-stored-sparsely.md)) |
 | The scrolling and directional movement code, its per-scan output limits | capability | |

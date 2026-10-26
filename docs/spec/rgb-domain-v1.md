@@ -217,7 +217,14 @@ paints nothing, what is beneath shows.
 
 1. **Layer**: every layer that is on, the base layer always, lowest first, so
    a higher layer covers a lower one; a black layer colour paints nothing.
-   Then the layer rows.
+   Then the layer rows. While a layer of a running pointing mode's link is
+   on and the mode has a colour to paint (the pointing-mode stage is on), the
+   stage draws in two parts: the layers below the lowest such layer
+   and their rows, then the mode's colour and rows as stage 5 would paint
+   them, then that layer, the layers above and their rows (D-F62). The rows of the layers below no
+   longer cover those above in that case, and the stages after this one
+   (combo feedback beneath, the layer preview) paint over the mode. While the
+   auto-mouse fade replaces this stage, the mode paints in stage 5 instead.
 2. **Auto-mouse fade**, in place of the layer stage while the pointer layer
    is on and the fade has begun. It begins after the auto-mouse fade delay,
    blends from the layer stage toward its mode's end over the rest of the
@@ -230,10 +237,8 @@ paints nothing, what is beneath shows.
    rows as though it were on. It draws the layer stage's data, so it follows
    the layer bit.
 5. **Pointing mode**: the running slot's colour in its locality, then its
-   rows. A mode its linked layer started paints nothing here, so its layer's
-   lighting shows, unless its slot's link light is on (D-F62,
-   [pointing domain](pd-mode-domain-v1.md#lighting-of-a-running-mode)); both
-   halves draw the same.
+   rows, unless stage 1 already painted it beneath a layer of its link
+   ([pointing domain](pd-mode-domain-v1.md#lighting-of-a-running-mode)).
 6. **Combo feedback, above**: every other active combo. A combo whose output
    holds a momentary layer paints in neither; the layer stage shows the hold.
 7. **Key feedback**, below.

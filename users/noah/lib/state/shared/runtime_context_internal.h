@@ -23,7 +23,7 @@ typedef struct {
     uint8_t                            momentary_refcounts[LAYER_COUNT];
     layer_state_t                      locked_mask;
     layer_state_t                      oneshot_mask;
-    // The layer the running pointing mode brings (D-F62), or none.
+    // The layers the running pointing mode's key turns on (D-F62).
     layer_state_t                      pointing_mode_layer_mask;
     uint16_t                           oneshot_armed_at;
 } noah_layer_ownership_state_t;

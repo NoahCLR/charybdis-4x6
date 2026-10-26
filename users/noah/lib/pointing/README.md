@@ -3,14 +3,16 @@
 The pointing runtime and its one engine. How a report and a key cross it is
 [pointer-report.md](../../../../docs/architecture/pointer-report.md) and
 [key-press.md](../../../../docs/architecture/key-press.md#pointing-modes-where-keys-enter-the-pointing-runtime);
-what a mode does is [pd-mode-domain-v1.md](../../../../docs/spec/pd-mode-domain-v1.md).
+what a mode does is
+[pd-mode-domain-v1.md](../../../../docs/spec/pd-mode-domain-v1.md).
 
 ## Layout
 
 - `defs/`: fixed identities. `pointing_mode_manifest.h` lists the 32 pointing
-  slots with their hold keycodes and the traits enum; `pointing_mode_flags.h` holds mode ids
-  and read-only queries for modules that must not pull in the pointing API
-  (lighting, the key runtime); `pointing_modes.h` is the full API.
+  slots with their hold keycodes and the traits enum; `pointing_mode_flags.h`
+  holds mode ids and read-only queries for modules that must not pull in the
+  pointing API (lighting, the key runtime); `pointing_modes.h` is the full
+  API.
 - `modes/`: the one engine every pointing slot runs.
   `pointing_mode_configured.c` holds the latched pointing slot, the directional
   path and `emit_tap`; `pointing_mode_dragscroll.c` is the
@@ -26,14 +28,14 @@ what a mode does is [pd-mode-domain-v1.md](../../../../docs/spec/pd-mode-domain-
 
 ## State
 
-`pointing_mode_runtime_shared_state_t` (`runtime/pointing_mode_runtime_shared_state_internal.h`)
-is the one store: the local active and locked mode and the active mode's
-source (its key or its linked layer, D-F62), the owner keys (one entry per key
-position, every entry the active mode's), the slave half's mirrored display
-state in two banks under a publication counter (with whether the active mode
-shows its light), and three flags (synthetic auto-mouse anchor, DPI sync
-pending, an auto-sniping layer on). The layer a key-started mode brings is
-`layer_ownership`'s, not this store's.
+`pointing_mode_runtime_shared_state_t`
+(`runtime/pointing_mode_runtime_shared_state_internal.h`) is the one store:
+the local active and locked mode and the active mode's source (its key or its
+linked layers, D-F62), the owner keys (one entry per key position, every entry
+the active mode's), the slave half's mirrored display state in two banks under
+a publication counter, and three flags (synthetic auto-mouse anchor, DPI sync
+pending, an auto-sniping layer on). The layers a key-started mode's key turns
+on are `layer_ownership`'s, not this store's.
 
 - Local state changes only through `pointing_mode_apply_command()`; each command
   returns a before-and-after snapshot. Split sync samples the state on its
@@ -50,9 +52,11 @@ pending, an auto-sniping layer on). The layer a key-started mode brings is
 
 ## Linked layers
 
-`pointing_mode_layer_started_mode()`, `pointing_mode_brought_layer()` and
-`pointing_mode_layer_started_light()` read a slot's link from its effective
-record, leaving out links to the pointer layer or a default layer. The command
+`pointing_mode_layer_started_mode()` (with what ends a mode its layers
+started), `pointing_mode_key_turns_on()` and `pointing_mode_link_layers()`
+(every layer of the link; a running mode paints beneath the lowest that is on,
+read by lighting on both halves) read a slot's link from its effective record,
+leaving out the pointer layer and a default layer. The command
 model applies them: the layer-state command while no key runs a mode, and the
 end of every key source.
 

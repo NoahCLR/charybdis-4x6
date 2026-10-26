@@ -80,6 +80,18 @@ pointing_mode_snapshot_t pointing_mode_snapshot_with_owner_bitmap(uint8_t *out_o
     return fake_snapshot;
 }
 
+pointing_mode_snapshot_t pointing_mode_snapshot(void) {
+    return fake_snapshot;
+}
+
+// The running mode's link; none unless a test sets one, so a running mode
+// paints in its own stage.
+static uint16_t fake_link_layers;
+
+uint16_t pointing_mode_link_layers(pointing_mode_mask_t mode) {
+    return mode != 0 ? fake_link_layers : 0u;
+}
+
 uint8_t rgb_matrix_map_row_column_to_led(uint8_t row, uint8_t column, uint8_t *led_i) {
     if (!(led_i && row < MATRIX_ROWS && column < MATRIX_COLS)) {
         return 0u;
@@ -195,16 +207,6 @@ static void test_compiled_and_live_pd_rendering(const char *fixture_path) {
     fake_snapshot.display.active_index = POINTING_MODE_INDEX_VOLUME;
     fake_snapshot.display.active_mode  = POINTING_MODE_VOLUME;
 
-    // A mode its layer started, its light switch off: the layer's lighting
-    // shows, so this stage paints nothing on either half (D-F62).
-    fake_snapshot.display.active_light = false;
-    CHECK(!rgb_runtime_pointing_mode_stage_render_frame(&frame, 0u, RGB_MATRIX_LED_COUNT));
-    for (uint8_t led = 0u; led < RGB_MATRIX_LED_COUNT; led++) {
-        check_unpainted(&frame, led);
-    }
-
-    // A mode its key runs, or its layer with the switch on, shows its own.
-    fake_snapshot.display.active_light = true;
     CHECK(rgb_runtime_pointing_mode_stage_render_frame(&frame, 0u, RGB_MATRIX_LED_COUNT));
     check_led(&frame, 0u, compiled_color);
     check_led(&frame, 1u, compiled_color);
@@ -236,6 +238,22 @@ static void test_compiled_and_live_pd_rendering(const char *fixture_path) {
     for (uint8_t led = RGB_LEFT_LED_COUNT; led < RGB_MATRIX_LED_COUNT; led++) {
         check_led(&frame, led, live_color);
     }
+
+    // A linked mode paints beneath the lowest layer of its link that is on,
+    // and there only while that link still names it (D-F62).
+    fake_link_layers = (uint16_t)((1u << 1) | (1u << 2));
+    CHECK(rgb_runtime_pointing_mode_stage_beneath_layer(0u, &profile_frame) == POINTING_MODE_NO_LAYER);
+    CHECK(rgb_runtime_pointing_mode_stage_beneath_layer((layer_state_t)((1u << 1) | (1u << 2)), &profile_frame) == 1u);
+    CHECK(rgb_runtime_pointing_mode_stage_beneath_layer((layer_state_t)1u << 2, &profile_frame) == 2u);
+    CHECK(rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(&frame, &profile_frame, 2u, 0u, RGB_MATRIX_LED_COUNT));
+    check_led(&frame, 0u, live_color);
+    CHECK(!rgb_runtime_pointing_mode_stage_render_active_profile_beneath_frame(&frame, &profile_frame, 0u, 0u, RGB_MATRIX_LED_COUNT));
+    // With its stage off the mode has nothing to paint, so the layer stack
+    // stays whole and its rows keep their order.
+    noah_active_profile_rgb_frame_t stage_off = profile_frame;
+    stage_off.view.stage_enable_mask &= (uint16_t)~NOAH_PROFILE_RGB_V1_STAGE_POINTING_MODE;
+    CHECK(rgb_runtime_pointing_mode_stage_beneath_layer((layer_state_t)1u << 2, &stage_off) == POINTING_MODE_NO_LAYER);
+    fake_link_layers = 0u;
 
     noah_active_profile_identity_t next             = test_identity(2u);
     noah_active_profile_snapshot_t behavior_only = {.identity = next};

@@ -66,7 +66,7 @@ active profile's lighting domain, or the compiled view
 | Order | Stage | Code | Master half reads | Slave half reads |
 | ---: | --- | --- | --- | --- |
 | 0 | boot indicator | `rgb_runtime.c` | `noah_runtime_diag_indicator_active` (`state/diagnostics/runtime_diag.c`) | the same, its own boot |
-| 1 | layer | `stages/rgb_layer_stage.c` | `layer_state` | `layer_state`, mirrored by QMK (`SPLIT_LAYER_STATE_ENABLE`) |
+| 1 | layer, with a linked pointing mode painted beneath the lowest layer of its link that is on (`rgb_runtime_render_layer_base_stage` splits the stack, D-F62) | `stages/rgb_layer_stage.c`, `stages/rgb_pointing_mode_stage.c` | `layer_state`; the running mode's link, `pointing_mode_link_layers` (`pointing/runtime/pointing_mode_registry.c`) | `layer_state`, mirrored by QMK (`SPLIT_LAYER_STATE_ENABLE`); the mirrored mode's link from its own pointing slots |
 | 1 | auto-mouse fade, instead | `automouse/rgb_automouse_stage.c`, `rgb_automouse.c` | QMK's auto-mouse timer through `compat/qmk_auto_mouse_contract.h` | base packet's quantized progress |
 | 2 | combo, beneath | `stages/rgb_combo_feedback_stage.c` | `combo_feedback_bitmaps` (`key/runtime/feedback.c`) | combo packet |
 | 3 | layer preview | `stages/rgb_preview_stage.c` | `key_feedback_preview_layer` (`feedback.c`) | base packet's preview layer |
@@ -99,6 +99,7 @@ active profile's lighting domain, or the compiled view
 | Active combos, owner keys, footprints | `compat/qmk_combo_origin.c`, `key/runtime/slot/origin_registry.c` | `combo_feedback_bitmaps` |
 | Presses, tap series, leases, pulses | `key/runtime/reducer/` (`key_runtime_core_state_t`) | `feedback.c`, which derives the maps on demand |
 | Running and locked pointing mode, its owner | `pointing/runtime/pointing_mode_state.c` | `pointing_mode_snapshot_with_owner_bitmap` |
+| A pointing slot's link | the active profile's pointing slots (`profile/runtime/active_profile_pd_runtime.c`) | `pointing_mode_link_layers` |
 | Auto-mouse timer | QMK | `compat/qmk_auto_mouse_contract.h` |
 | Last input | QMK, mirrored by split activity | `last_input_activity_elapsed` |
 

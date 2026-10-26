@@ -79,7 +79,7 @@ static bool report_mouse_equal(report_mouse_t lhs, report_mouse_t rhs) {
     return lhs.x == rhs.x && lhs.y == rhs.y && lhs.h == rhs.h && lhs.v == rhs.v && lhs.buttons == rhs.buttons;
 }
 
-static uint8_t       brought_layer = UINT8_MAX;
+static layer_state_t turned_on_layers;
 static layer_state_t held_layers;
 static uint32_t      sniping_layers_setting;
 static uint32_t      sniping_on_setting;
@@ -103,7 +103,7 @@ static void test_reset_runtime(void) {
 static void test_reset_stubs(void) {
     host_runtime_fixture_reset(&runtime_fixture);
     test_reset_runtime();
-    brought_layer          = UINT8_MAX;
+    turned_on_layers         = 0u;
     held_layers            = 0;
     sniping_on_setting     = 1u;
     sniping_layers_setting = (uint32_t)1u << CHARYBDIS_AUTO_SNIPING_LAYER;
@@ -241,17 +241,17 @@ bool layer_ownership_is_held(uint8_t layer) {
     return false;
 }
 
-// The layer a running mode brings, as layer ownership would apply it: on
+// The layers a running mode's key turns on, as layer ownership would apply them: on
 // beside the layers the test holds, through the layer-state hook.
 static void test_apply_layers(void) {
-    layer_state_t state = held_layers | (brought_layer < 32u ? (layer_state_t)1u << brought_layer : 0u);
+    layer_state_t state = held_layers | turned_on_layers;
 
     layer_state = noah_layer_state_set_user(state);
 }
 
-bool layer_ownership_set_pointing_mode_layer(uint8_t layer) {
-    if (layer == brought_layer) return false;
-    brought_layer = layer;
+bool layer_ownership_set_pointing_mode_layers(layer_state_t layers) {
+    if (layers == turned_on_layers) return false;
+    turned_on_layers = layers;
     test_apply_layers();
     return true;
 }

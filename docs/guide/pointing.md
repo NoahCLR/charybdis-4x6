@@ -2,7 +2,7 @@
 
 The trackball moves the pointer until a **pointing mode** takes it over. A
 mode either scrolls or sends keys and shortcuts as the ball moves, and runs
-while its key is held or locked, or while its linked layer is on. Ark's
+while its key is held or locked, or while one of its linked layers is on. Ark's
 [Pointing](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/pointing.md)
 page edits every setting below.
 
@@ -41,35 +41,48 @@ click or a macro.
 - A macro started while another is playing is dropped.
 
 Mouse buttons 1 to 3 click as usual in every mode. To give a mode keys of its
-own, link it to a layer that holds them.
+own, have its key turn on a layer that holds them.
 
 ## Linked layers
 
-A slot can be linked to one layer, in one direction or both:
+A slot's link has three parts:
 
-- **The mode turns its layer on.** While its key holds or locks the mode, the
-  layer is on too, so the keys that mode needs sit under my hand. The layer
-  goes off with the mode unless something else, a held layer key or a lock,
-  still keeps it on.
-- **The layer turns its mode on.** While the layer is on, held or locked, the
-  mode runs, with no second key. With two such layers on, the higher one's
-  mode runs.
-- **Both.** A mode and a layer that behave as one thing, whichever I start.
-  Letting go of either key ends both; nothing stays stuck on.
+- **Linked layers**, any set of layers. While any of them is on, held or
+  locked, the mode runs, with no second key. With linked layers of two slots
+  on, the slot whose highest linked layer that is on is higher runs, unless
+  what ends it is on too; then the other runs.
+- **Layers its key turns on**, a second set, any layers. While the key holds
+  or locks the mode those layers are on too, so the keys that mode needs sit
+  under my hand. Each goes off with the mode unless something else, a held
+  layer key or a lock, still keeps it on. A key that turns on the mode's own
+  linked layers makes the mode and its layers one thing, whichever I start,
+  and letting go of either key ends both; nothing stays stuck on. Several
+  keys may turn on one layer, and a key may turn on a layer that starts
+  another mode: that mode waits while the key runs its own, and starts from
+  the layer only if something else keeps it on after the key lets go.
+- **What ends it**: nothing, a higher layer, or any other layer. Then that
+  layer ends the mode its layers started, and it comes back when that layer
+  goes off. A higher layer is one above the highest linked layer that is on;
+  any other layer is any layer in neither set, below or above. The pointer
+  layer and the default layers never end it.
 
 A mode's key always wins over a layer: pressing another mode's key on a
-linked layer runs that mode, and letting go of it brings the layer's mode
-back. A mode a layer started never brings the pointer layer up over that
-layer, so its keys stay put while the ball moves. It shows the layer's
-lighting, unless the slot is set to show the mode's own light; a mode started
-by its key always shows its own. A slot links at most one layer and a layer
-belongs to at most one slot, and a link to the pointer layer or a default
-layer does nothing.
+linked layer runs that mode, and letting go of it returns to the layer's
+mode; nothing ends a mode its key runs. A mode a layer started never turns
+the pointer layer on over that layer, so its keys stay put while the ball
+moves.
+
+While a linked mode runs with a layer of its link on, however it started, its
+colour lights the board beneath the lowest of those layers, from either set,
+and each of them paints its own keys over it: with the layers coloured "only mapped keys" I see
+which keys they hold on the mode's colour. A layer above covers both. A layer
+starts at most one slot's mode, and the pointer layer or a default layer in a
+link does nothing.
 
 ## The slots I ship
 
 The compiled defaults fill the first eight slots; 8 to 31 start empty. None
-of them is linked to a layer.
+of them has a link.
 
 | Slot | Mode | What the ball does |
 | --- | --- | --- |
@@ -90,10 +103,11 @@ without it, it is Cmd-scroll. Zoom needs no app.
 
 **Auto-mouse** turns the **pointer layer** on when the ball moves and off
 again after a quiet timeout (1.2 s in my profile). Mouse keys, mode keys, the
-DPI keys and behaviours marked as mouse keys keep it on. A typing key turns
-it off once the ball is still; modifiers, modified keys such as Cmd+C, and
-dual-role keys held for their layer or modifiers don't. A mode either keeps the pointer layer on under it or gives way to the typing
-layer; Arrow gives way, so the arrows sit on whatever you were typing on.
+DPI keys and behaviours marked as mouse keys keep it on. A typing key turns it
+off once the ball is still; modifiers, modified keys such as Cmd+C, and
+dual-role keys held for their layer or modifiers don't. A mode either keeps
+the pointer layer on under it or gives way to the typing layer; Arrow gives
+way, so the arrows sit on whatever you were typing on.
 
 **Sniping** slows the pointer for precise work. It comes on by itself while
 any of the auto-sniping layers is on (Navigation alone, in my profile), and

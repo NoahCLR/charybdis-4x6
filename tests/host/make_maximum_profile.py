@@ -5,8 +5,8 @@ Every table at its simultaneous maximum in one schema 4.1 blob: RGB v4 with
 sixteen groups, sixteen layer colours and 32 group rows; 128 behaviour rows of
 five full steps (640 steps); 128 combos of sixteen inputs; settings v9 with
 a shortcut on every custom key and every one of its 273 names at 32 bytes of
-UTF-8; and 32 pointing slots (v4), each named with 32 bytes and sixteen of
-them linked to a layer each; the full 1,920-byte matrix and 34,903-byte macro bank.
+UTF-8; and 32 pointing slots (v4), each named with 32 bytes, with every layer
+starting one of them; the full 1,920-byte matrix and 34,903-byte macro bank.
 Values reach the edges the plan names: layers 7, 8 and
 15, combo rows 31, 32, 63, 64 and 127, macros and custom keys 0, 63, 64 and
 127. It is test evidence built from the byte specs, not from firmware code.
@@ -188,14 +188,17 @@ def pointing() -> bytes:
         encoded = name(f"Slot {slot} ")
         full[record + 8] = len(encoded)
         full[record + 96:record + 128] = encoded
-    # Every layer linked once (D-F62), each direction, the light switch where
-    # the layer starts the mode.
-    linked = [slot for slot in range(32) if full[8 + 128 * slot + 1] != 0][:LAYERS]
-    assert len(linked) == LAYERS
-    for layer, slot in enumerate(linked):
+    # Every layer starts one mode (D-F62): eight slots link two layers each.
+    # Their keys turn on, in turn, their own linked layers, a layer the next
+    # slot links, or every layer; what ends them cycles through nothing, a
+    # higher layer and any other layer.
+    configured = [slot for slot in range(32) if full[8 + 128 * slot + 1] != 0]
+    for index, slot in enumerate(configured[:LAYERS // 2]):
+        layers = 0b11 << (2 * index)
+        turns_on = [layers, 1 << ((2 * index + 2) % LAYERS), 0xFFFF][index % 3]
         record = 8 + 128 * slot
-        direction = 1 + layer % 3
-        full[record + 9:record + 12] = bytes([layer, direction, 1 if direction & 2 else 0])
+        full[record + 11] = index % 3
+        full[record + 12:record + 16] = struct.pack("<HH", layers, turns_on)
     return bytes(full)
 
 

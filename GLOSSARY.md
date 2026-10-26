@@ -286,8 +286,8 @@ _Avoid_: protected playback, input protection
 
 **Pointing mode**:
 A role the trackball takes instead of moving the pointer, either scrolling or
-directional, while its key is held or locked or its linked layer is on; one
-runs at a time.
+directional, while its key is held or locked or one of its linked layers is
+on; one runs at a time.
 _Avoid_: pd mode, PD-mode, pointer mode, trackball mode
 
 **Pointing slot**:
@@ -295,17 +295,29 @@ One of 32 fixed, numbered places that holds a pointing mode or is empty; keys
 reach the slot, so a slot keeps its keys when its mode changes.
 _Avoid_: PD slot, pointing-mode slot, mode slot
 
-**Linked layer**:
-The one layer a pointing slot is tied to, in a direction: the mode turns its
-layer on, the layer turns its mode on, or both (D-F62).
-_Avoid_: mode layer, pointing layer, layer binding
+**Link** (of a pointing slot):
+Its linked layers, the layers its key turns on, and what ends it (D-F62). No
+layer starts two modes; any number of keys may turn one on.
+_Avoid_: binding, layer binding
 
-**Direction** (of a link):
-Which way a pointing slot and its linked layer start each other.
-_Avoid_: link mode, link kind
+**Linked layers**:
+The set of layers that start a pointing slot's mode while any of them is on.
+_Avoid_: mode layers, pointing layers, trigger layers
+
+**Turns on** (of a link):
+The set of layers a mode's key turns on while it runs the mode: any layers,
+its own linked layers among them or not, and layers another mode starts from.
+_Avoid_: direction (retired), chosen layer (retired), brings, brought layer
+
+**Ends on** (of a link):
+What ends a mode its linked layers started, until that layer goes off:
+nothing, a higher layer (one above the highest linked layer that is on), or
+any other layer (one outside both of the link's sets). The pointer layer and a default layer
+never end it.
+_Avoid_: top only (retired), exclusive, yield
 
 **Source** (of a pointing mode):
-What runs a mode: its key, held or locked, or its linked layer. A key source
+What runs a mode: its key, held or locked, or its linked layers. A key source
 beats a layer source.
 _Avoid_: trigger, origin, owner (for this)
 

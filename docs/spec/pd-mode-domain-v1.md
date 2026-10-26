@@ -2,7 +2,7 @@
 
 Domain `0x50`, version 4, holds the profile's 32 pointing slots: what each
 pointing mode is, how its movement turns ball motion into scrolling or
-directional actions, and the layer it is linked to. This file also states how
+directional actions, and the layers it is linked to. This file also states how
 the firmware runs a pointing mode. The domain id, envelope and the
 four-byte action encoding are [blob and digests](profile-wire-v1/blob-and-digests.md)'s;
 where the domain is stored and which domains a half admits is the
@@ -15,7 +15,7 @@ the slave half is the [split runtime state](split-activity-sync.md)'s.
 The keyboard has 32 pointing slots, ids `0..31`. A slot holds a pointing mode
 or is empty. Keys reach a slot by its id, so a slot keeps its keys when its
 mode changes, and nothing depends on a slot's name. One pointing mode runs at
-a time, started by its key or by its [linked layer](#linked-layers); outside a
+a time, started by its key or by its [linked layers](#linked-layers); outside a
 mode the ball moves the pointer. Auto-sniping is a layer and DPI policy and
 uses no slot.
 
@@ -94,10 +94,11 @@ strictly ascending id, each below 32.
 | 6 | 1 | held modifiers (scrolling); zero in directional modes |
 | 7 | 1 | reserved, zero |
 | 8 | 1 | name length in bytes, `0..32` |
-| 9 | 1 | linked layer, `0..15` ([linked layers](#linked-layers)) |
-| 10 | 1 | link direction: no link `0`; bit 0 the mode turns its layer on, bit 1 the layer turns its mode on; both `3` |
-| 11 | 1 | link light: `1` shows the mode's own light when its layer starts it, `0` the layer's |
-| 12 | 20 | reserved, zero |
+| 9 | 2 | reserved, zero |
+| 11 | 1 | what ends a mode its linked layers started ([linked layers](#linked-layers)): nothing `0`, a higher layer `1`, any other layer `2` |
+| 12 | 2 | linked layers, the layers that start the mode: bit `n` is layer `n`, little-endian |
+| 14 | 2 | the layers the mode's key turns on while it runs the mode, the same way |
+| 16 | 16 | reserved, zero |
 | 32, 34 | 2 each | directional thresholds X and Y, in sensor counts |
 | 36, 40, 44, 48 | 4 each | taps: left, right, up, down |
 | 52 | 18 | reserved, zero: version 3's mouse button records |
@@ -142,15 +143,13 @@ record-relative inside a record and payload-relative for the whole domain:
 | Refusal | Offset | When |
 | --- | ---: | --- |
 | `INVALID_ID` | 0 | an id at or past 32, or not above the previous record's |
-| `RESERVED` | 7, 12, 52 or 90 | a nonzero reserved byte: 7, 12..31, 52..69 or 90..95 |
+| `RESERVED` | 7, 9, 16, 52 or 90 | a nonzero reserved byte: 7, 9..10, 16..31, 52..69 or 90..95, at the first field that has one |
 | `INVALID_NAME` | 8 | a name that breaks [the name rule](#names) |
 | `INVALID_POLICY` | 1 | kind above 2, pointer layer above 1, or axis above 3 |
-| `INVALID_POLICY` | 10 | a link direction above 3 |
-| `INVALID_POLICY` | 11 | a link light above 1 |
-| `INVALID_PARAMETER` | 2 | an empty slot with any nonzero byte in 2..6, 9..11 or 32..89: an empty slot has no link |
+| `INVALID_POLICY` | 11 | what ends the mode above 2 |
+| `INVALID_PARAMETER` | 2 | an empty slot with any nonzero byte in 2..6, 11..15 or 32..89: an empty slot has no link |
 | `INVALID_NAME` | 8 | a mode with an empty name |
-| `INVALID_PARAMETER` | 9 | a linked layer at or past 16, or a direction of `0` with a nonzero layer or light: no link leaves bytes 9..11 zero |
-| `INVALID_PARAMETER` | 11 | the link light without bit 1 of the direction |
+| `INVALID_PARAMETER` | 11 | anything ending the mode (`1` or `2`) with no linked layers: so no link leaves bytes 11..15 zero |
 | `INVALID_ACTION` | tap | a straight-direction tap that breaks [taps](#taps) |
 | `NONCANONICAL` | 1 | a present record that is empty with no name |
 
@@ -175,18 +174,19 @@ Then, by kind:
   are each at least 1:1; sustain does not exceed start; decay is at least 2;
   invert is at most 3. Held modifiers are any modifier mask.
 
-Across records, no two slots name one layer, whichever way each link goes: a
-record whose link names a layer an earlier record's link names is refused
-`INVALID_PARAMETER` at its byte 9. A slot without a link names no layer, so
-its zero layer byte repeats freely. One slot per layer keeps links from
-starting each other in a chain (D-F62,
+Across records, no layer starts two modes: a record whose linked layers
+include a layer an earlier record links is refused `INVALID_PARAMETER` at its
+byte 12. The layers keys turn on are not exclusive: two keys may turn on one
+layer, and a key may turn on a layer another slot links. A key source beats a
+layer source and a mode its layers started owns no layer, so links still
+cannot start each other in a chain or keep themselves on (D-F62,
 [ADR](../adr/0062-pointing-slots-link-to-layers.md)).
 
 Integer bounds are otherwise the fields' widths. Validation reads the header
 in one step, then each record in steps of at most 20 bytes, and holds no more
-than one record and a 16-bit mask of the layers earlier links name.
+than one record and a 16-bit mask of the layers earlier records link.
 
-Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`, `check_sparse_rules`, `check_links`, `check_retired_buttons`, `test_bounded_iterator`), `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integration_test.c`), `tests/fixtures/pd_mode_domain_v4.json` (`invalid`, the `link-*`, `duplicate-linked-layer` and `retired-button-record` vectors).
+Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`, `check_sparse_rules`, `check_links`, `check_retired_buttons`, `test_bounded_iterator`), `tests/host/run_pd_profile_integration_tests.sh` (`pd_profile_integration_test.c`), `tests/fixtures/pd_mode_domain_v4.json` (`invalid`, the `reserved-link-*`, `link-*`, `duplicate-linked-layer` and `retired-button-record` vectors).
 
 ## Names
 
@@ -229,7 +229,7 @@ Held by: `tests/host/run_profile_pd_v1_tests.sh` (`profile_pd_v1_test.c`), `test
 Mouse buttons 1–3 run as they would without a mode, in every mode: their own
 behaviour, its tap, hold and repeat. Version 3's per-mode button overrides
 (pass through, consume, tap, hold modifiers) are retired; a mode gets its own
-keys from its [linked layer](#linked-layers) instead (D-F62). A mode still
+keys from a layer its [link](#linked-layers) turns on instead (D-F62). A mode still
 clicks buttons from its movement ([D-F22](../adr/0022-pointing-modes-click-mouse-buttons.md),
 [outputs](#outputs)).
 
@@ -261,7 +261,7 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 ## Activation and locks
 
 A running mode has a source: its key, held or locked as below, or its
-[linked layer](#linked-layers). These rules are a key source's.
+[linked layers](#linked-layers). These rules are a key source's.
 
 - Pressing `PD_SLOT_n` activates slot `n` while it is held; the mode ends
   when the last key holding it is released. Two keys may hold one mode; the
@@ -284,32 +284,48 @@ Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_an_emp
 
 ## Linked layers
 
-A slot that holds a mode may be linked to one layer, its linked layer, in a
-direction: the mode turns its layer on (bit 0), the layer turns its mode on
-(bit 1), or both (D-F62, [ADR](../adr/0062-pointing-slots-link-to-layers.md)).
+A slot that holds a mode may have a link (D-F62,
+[ADR](../adr/0062-pointing-slots-link-to-layers.md)): its **linked layers**,
+a set of layers that start the mode; the layers the mode's key **turns on**
+while it runs the mode, a second set, any layers; and what **ends** a mode its
+linked layers started.
 
-- **The layer starts its mode.** While no key runs a mode, the highest layer
-  that is on and whose slot's link turns its mode on runs that mode; when no
-  such layer is on, no mode runs. The links are evaluated again whenever the
-  layers change and whenever a key source ends, so letting go of a mode key
-  on a linked layer returns to that layer's mode, and a locked layer keeps its
-  mode until it is unlocked. A mode its layer started is never locked.
+- **The layers start their mode.** While no key runs a mode, a slot runs from
+  its layers while any of its linked layers is on. Among slots, the one whose
+  highest linked layer that is on ranks highest wins; when none is on, no mode
+  runs. The links are evaluated again whenever the layers change and whenever
+  a key source ends, so letting go of a mode key on a linked layer returns to
+  that layer's mode, and a locked layer keeps its mode until it is unlocked. A
+  mode its layers started is never locked.
+- **What ends it.** A link with byte 11 `1` runs its mode from its layers only
+  while the highest of its linked layers that is on is the highest layer on;
+  with `2`, only while no layer outside both of its sets is on. The pointer layer and a default layer never
+  end it. That layer ends the mode, and the mode comes back when it goes off;
+  another slot's linked layers may run their own mode meanwhile. A mode its
+  key runs is never ended this way.
 - **A key source beats a layer source.** While a key holds or locks a mode,
-  the links wait. Pressing a mode's key while its layer runs it makes the key
+  the links wait. Pressing a mode's key while its layers run it makes the key
   its source, held or locked as today, with a key-started mode's pointer
-  layer side effects; when the key lets go and the layer still starts it, it
-  keeps running from the layer without restarting.
-- **The mode brings its layer.** A mode its key runs, through a link that
-  turns its layer on, owns that layer for as long as it runs, held or locked,
-  as one more layer owner beside the key holds and locks: the layer stays on
-  while any owner keeps it. A mode its layer started owns no layer, so a
-  two-way link never keeps itself on: letting go of either key leaves
-  neither on.
-- **Inert links.** A link to the pointer layer (settings scalar 5) or to a
-  default layer (scalar 23) starts nothing and brings nothing; this domain
+  layer side effects; when the key lets go and its layers still start it, it
+  keeps running from them without restarting.
+- **The key turns layers on.** A mode its key runs owns each layer its key
+  turns on for as long as it runs, held or locked, as one more layer owner
+  beside the key holds and locks: each stays on while any owner keeps it. A
+  mode its layers started owns no layer, so a key that turns on its own
+  linked layers never keeps itself on: letting go of either key leaves
+  neither on. A key may turn on a layer that starts another mode: while the
+  key runs its mode the links wait, so that mode does not start; when the key
+  lets go its layers go off first, so that mode starts only if another owner
+  keeps the layer on. Two keys may turn on one layer: pressing the second
+  while the first holds its mode runs the second mode in place of the first
+  before the first key's hold is let go, so the second key's layers turn on
+  before the first's that it does not share go off; a layer both turn on
+  stays on, and a layer one of them turns on starts no other mode in between.
+- **Inert layers.** The pointer layer (settings scalar 5) or a default layer
+  (scalar 23) in a link starts nothing and is never turned on; this domain
   cannot see the settings, so validation admits it.
 
-Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_a_linked_layer_runs_its_mode`, `test_a_key_source_beats_a_layer_source`, `test_a_key_started_mode_brings_its_layer`, `test_a_two_way_link_never_latches`, `test_a_key_taking_over_a_layer_started_mode_anchors_as_from_nothing`, `test_links_to_the_pointer_layer_or_a_default_layer_are_inert`), `tests/host/run_layer_ownership_tests.sh` (`layer_ownership_test.c`, `test_a_pointing_mode_owns_its_layer_beside_holds_and_locks`).
+Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`pointing_mode_key_runtime_integration_test.c`, `test_a_linked_layer_runs_its_mode`, `test_a_key_source_beats_a_layer_source`, `test_a_key_started_mode_turns_on_its_layers`, `test_a_key_turning_on_its_own_layers_never_latches`, `test_a_key_taking_over_a_layer_started_mode_anchors_as_from_nothing`, `test_a_higher_layer_ends_a_link_that_says_so`, `test_any_other_layer_ends_a_link_that_says_so`, `test_links_to_the_pointer_layer_or_a_default_layer_are_inert`, `test_two_keys_turn_on_one_layer`, `test_a_key_replacing_another_starts_no_mode_in_between`, `test_a_key_turns_on_a_layer_another_mode_starts_from`), `tests/host/run_layer_ownership_tests.sh` (`layer_ownership_test.c`, `test_a_pointing_mode_owns_its_layers_beside_holds_and_locks`).
 
 ## Pointer layer and DPI
 
@@ -320,7 +336,7 @@ toggle on, then off again at unlock if the lock turned it on. Pointer layer
 while the mode runs. Both are a key-started mode's: a mode its layer started
 never anchors the pointer layer or owns QMK's auto-mouse toggle, and while it
 runs a separate pointer layer is stripped, as an auto-sniping layer strips it,
-so the linked layer keeps its keys while the ball moves.
+so its linked layers keep their keys while the ball moves.
 
 The sensor's DPI follows, in order: a scrolling mode's DPI, or the normal DPI
 when it inherits; the sniping DPI while sniping or while any auto-sniping
@@ -336,15 +352,20 @@ Held by: `tests/host/run_pd_runtime_tests.sh` (`pd_runtime_test.c`, `test_layer_
 
 ## Lighting of a running mode
 
-A mode its key runs paints its colour in the lighting domain's pointing-mode
-stage. A mode its layer started paints nothing there, so the layer's lighting
-shows, unless its slot's link light is on; then it paints exactly as a
-key-started mode does ([drawing](rgb-domain-v1.md#drawing)). The slave half
-learns only whether the running mode shows its light, in the mirrored mode
-state ([split runtime state](split-activity-sync.md)), so both halves light
-alike.
+A running mode paints its colour, in its locality, and its rows. A mode whose
+link names a live layer that is on (in either of its sets),
+whichever source runs it, paints in the lighting domain's layer stage directly
+beneath the lowest such layer: the layers below, then the mode, then that
+layer and every layer above. Every layer of the link that is on so paints over
+the mode: a layer coloured "only mapped keys" shows its keys over the mode's
+colour, and a higher layer covers both. While the pointing-mode stage is off
+the mode has nothing to paint and the layer stage draws as without it. Any
+other running mode paints in the pointing-mode stage,
+above the layers ([drawing](rgb-domain-v1.md#drawing)). Each half decides from
+the mirrored mode, its own pointing slots and the synced layer state, so both
+halves light alike with no extra state to send (D-F62).
 
-Held by: `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_a_layer_started_mode_shows_its_light_only_when_its_slot_says`), `tests/host/run_rgb_layer_render_tests.sh` (`rgb_pd_active_profile_test.c`; `rgb_layer_render_test.c`, `test_slave_layer_started_mode_without_its_light_shows_the_layer`), `tests/host/run_split_runtime_sync_tests.sh` (`test_slave_rpcs_apply_exact_remote_state`, `test_tick_sends_base_packet_when_only_the_mode_light_changes`).
+Held by: `tests/host/run_rgb_layer_render_tests.sh` (`rgb_layer_render_test.c`, `test_linked_mode_paints_beneath_its_layer`, on both halves; `rgb_pd_active_profile_test.c`, the stage off), `tests/host/run_pointing_mode_key_runtime_integration_tests.sh` (`test_a_running_mode_names_its_link_layers`).
 
 ## Directional movement
 

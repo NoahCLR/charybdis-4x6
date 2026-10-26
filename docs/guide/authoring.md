@@ -20,8 +20,9 @@ names, timings or colours of mine, and you shouldn't need to touch it.
 
 Flashing a pair with different compiled defaults, even one colour changed,
 starts the keyboard from them: a saved profile is used only by firmware with
-the same compiled defaults ([Installing](installing.md#what-happens-to-your-profile)).
-Back up in Ark first and restore the backup afterwards.
+the same compiled defaults
+([Installing](installing.md#what-happens-to-your-profile)). Back up in Ark
+first and restore the backup afterwards.
 
 ## `keymap.c`
 
@@ -72,9 +73,8 @@ MACRO(MACRO_10, "Select All + Copy", "{KC_LGUI,KC_A}{50}{KC_LGUI,KC_C}")
 
 After changing the macros, regenerate `authored_macro_bank.h`:
 
-```sh
-NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh tests/host/run_real_profile_validation_tests.sh
-```
+```sh NOAH_WRITE_AUTHORED_MACRO_BANK=1 sh
+tests/host/run_real_profile_validation_tests.sh ```
 
 A stale copy fails the build. Authored macros play uninterruptibly only when
 they need Unicode entry ([Macros](macros.md#uninterruptible-playback)).
@@ -218,13 +218,12 @@ fill an empty slot's record and give it a name; then place `PD_SLOT_n` or
   shortcut, `MS_BTN1` to `MS_BTN8` or a macro; a macro takes policy 0 and
   mask 0. `.direction_output =
   NOAH_PD_DIRECTION_OUTPUT_ONCE` sends once per movement.
-- `.linked_layer`, `.link_direction` and `.link_light`: the slot's linked
-  layer and which way it goes, `NOAH_PD_LINK_MODE_TURNS_LAYER_ON`,
-  `NOAH_PD_LINK_LAYER_TURNS_MODE_ON` or `NOAH_PD_LINK_BOTH`; `.link_light = 1`
-  shows the mode's own light when its layer starts it. Leave all three out
-  for no link ([linked layers](pointing.md#linked-layers)). Mouse buttons 1
-  to 3 keep their own behaviour in every mode; a linked layer gives a mode
-  keys of its own.
+- The link ([linked layers](pointing.md#linked-layers)): `.linked_layers`,
+  a mask of the layers that start the mode (`1u << NAV`); `.link_turns_on`, a
+  mask of the layers its key turns on; and `.link_ends`,
+  `NOAH_PD_LINK_ENDS_HIGHER_LAYER` or `NOAH_PD_LINK_ENDS_OTHER_LAYER`, what
+  ends a mode its layers started. Leave them out for no link. Mouse buttons 1 to 3 keep their own behaviour in every
+  mode; a layer the link turns on gives a mode keys of its own.
 - Scrolling: `.held_modifiers` held while it scrolls, and the scroll tuning;
   `SCROLL_TUNING`, as Dragscroll uses it, gives the defaults.
 
