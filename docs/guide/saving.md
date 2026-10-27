@@ -4,7 +4,7 @@ Everything you can change without a reflash is one **profile**: the keymap,
 behaviours, combos, macros, custom keys, pointing modes, lighting, settings
 and the keyboard's name. Each half keeps its own copy, and the two keep each
 other up to date over the cable. Ark's
-[Review and Apply](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/review-and-apply.md)
+[Review and save](https://github.com/NoahCLR/charybdis-ark/blob/dev/docs/guide/review-and-save.md)
 page is the app's side of this; this page is the keyboard's.
 
 ## What the keyboard runs
