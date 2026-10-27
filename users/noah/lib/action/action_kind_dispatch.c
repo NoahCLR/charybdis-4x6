@@ -159,7 +159,7 @@ static void noah_action_release_owned_momentary_layer(noah_action_desc_t desc, k
 
 // A custom key sent as an action sends only its shortcut (D-F26), never its
 // own behaviour, so a step can never recurse into another key's row. One
-// without a shortcut sends nothing. A tap sends its keys through one lease for
+// without a shortcut sends nothing. A tap sends its modifiers and keys through one lease for
 // the tap's length, and its layers do what a tap of their layer key does: Hold
 // and Tap-toggle turn them on around the keys, Lock and Move to lock them
 // first, as a tap of TG() or TO() would, and One-shot arms them after the keys,
@@ -181,7 +181,7 @@ static void noah_action_tap_custom_key(noah_action_desc_t desc, keypos_t key_pos
         layer_ownership_shortcut_tap_begin(shortcut.layers);
     }
     if (noah_custom_key_shortcut_has_report_parts(shortcut)) {
-        (void)owned_keycode_tap_parts(shortcut.mods, shortcut.key);
+        (void)owned_keycode_tap_chord(shortcut.mods, shortcut.keys);
     }
     if (around) {
         layer_ownership_shortcut_tap_end(shortcut.layers);

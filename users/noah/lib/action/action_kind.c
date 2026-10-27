@@ -9,6 +9,7 @@
 #include "action_kind_internal.h"
 
 #include "noah_keymap_ids.h"
+#include "../compat/qmk_report_usage_contract.h"
 
 #define NOAH_ACTION_DISPATCH_STANDARD (NOAH_ACTION_DISPATCH_MACRO_PREFLIGHT | NOAH_ACTION_DISPATCH_PD_PRESS_INTERCEPT | NOAH_ACTION_DISPATCH_PD_RELEASE_INTERCEPT)
 
@@ -82,7 +83,7 @@ bool noah_custom_key_has_layers(uint16_t keycode) {
 bool noah_custom_key_hold_changes_other_keys(uint16_t keycode) {
     noah_custom_key_shortcut_t shortcut = noah_custom_key_shortcut_for_keycode(keycode);
 
-    return (shortcut.mods != 0u && shortcut.key == 0u) || shortcut.layers != 0u;
+    return (shortcut.mods != 0u && !noah_custom_key_shortcut_has_keys(shortcut)) || shortcut.layers != 0u;
 }
 
 bool noah_custom_key_is_dual_role(uint16_t keycode) {

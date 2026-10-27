@@ -97,9 +97,14 @@ bool owned_keycode_release(owned_keycode_lease_t *lease) {
 }
 
 // No custom key here has a shortcut (D-F26); these only satisfy the link.
-bool owned_keycode_acquire_parts(uint8_t mods, uint8_t basic, owned_keycode_lease_t *lease) {
+bool owned_keycode_acquire_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS], owned_keycode_chord_lease_t *lease) {
     (void)mods;
-    (void)basic;
+    (void)keys;
+    (void)lease;
+    return false;
+}
+
+bool owned_keycode_release_chord(owned_keycode_chord_lease_t *lease) {
     (void)lease;
     return false;
 }

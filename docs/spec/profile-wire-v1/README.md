@@ -48,7 +48,7 @@ protocol-version or firmware-version read. Capability page 0
 | Identity | Value in this firmware | Where |
 | --- | --- | --- |
 | Profile Wire version | major `2`, minor `0` | page 0 bytes 2–3 |
-| Profile schema version | major `4`, minor `2` (D-F62: pointing v4; D-F26: settings v10) | page 0 bytes 4–5, and blob header bytes 4–5 |
+| Profile schema version | major `4`, minor `3` (D-F62: pointing v4; D-F26: settings v11) | page 0 bytes 4–5, and blob header bytes 4–5 |
 | Capability layout | `3`, three pages | page 0 bytes 0–1 |
 | Firmware version | `NOAH_FIRMWARE_VERSION`, never zero | page 0 bytes 17–20 |
 | Action-ABI digest | see [blob-and-digests.md](blob-and-digests.md#action-abi-digest) | page 0 bytes 13–16 |

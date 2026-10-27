@@ -92,7 +92,7 @@ static uint8_t noah_emit_host_mods(keyboard_mod_state_t state) {
 
 // The button leaves on the mouse endpoint, which drains apart from the
 // keyboard's, so a modifier change sent just before it can still reach the
-// host after it (see owned_keycode_acquire_components()). When hiding
+// host after it (see owned_keycode_acquire_usages()). When hiding
 // modifiers changes what the host sees, the button waits for that report and
 // the modifiers come back only once the button is up.
 void noah_emit_owned_click(uint16_t keycode, uint8_t masked_mods, bool exact) {

@@ -49,6 +49,10 @@ typedef struct {
     uint8_t                                              tap_count;
     bool                                                 keeps_own_layer; // the action keeps the key's own layer on
     bool                                                 consumes_oneshot;
+    // This press holds an action or a repeat, as an implicit hold does from
+    // the press (a dual-role custom key's shortcut, D-F26): the release lets go
+    // of it, as an active release does.
+    bool                                                 release_owned_state;
 } key_runtime_core_pending_multi_tap_release_resolution_t;
 
 // What a release does to its key's tap series. The reducer applies it, and a

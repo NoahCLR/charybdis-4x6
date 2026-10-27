@@ -186,7 +186,7 @@ static void test_auto_save_modes_and_adjustments(void) {
             // that host edit merely because the keyboard was adjusted too.
             assert(noah_profile_owner_adjust(&left, NOAH_SETTING_DEFAULT_DPI, 1200u));
             // Long enough for the adjustment to reach the other half (about
-            // 1,050 ms for settings v10's domain), short of the quiet period.
+            // 1,200 ms for settings v11's domain), short of the quiet period.
             auto_scans(&left, &right, &now, 1500u);
             write_u32(value, 1400u);
             assert(live_edit(&left, &right, 50u, &dpi, value, 4u, &now) == NOAH_PROFILE_WORKING_OK);

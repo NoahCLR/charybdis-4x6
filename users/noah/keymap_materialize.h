@@ -12,10 +12,11 @@
 #define _KEYMAP_CUSTOM_KEY_NAME_CHECK(keycode_, name_)                                                                         \
     _Static_assert(NOAH_KEYCODE_IS_CUSTOM_KEY(keycode_), #keycode_ ": CUSTOM_KEYS rows name custom keys");                      \
     _Static_assert(sizeof(name_) <= NOAH_MACRO_NAME_SIZE, #keycode_ ": a custom key name holds at most 32 bytes of UTF-8");
-// SHORTCUT(keycode, name, mods, key, layers) also gives the key its shortcut
-// (D-F26): modifiers written as SHORTCUT_MODS(...) or SHORTCUT_NO_MODS, a key
-// from the shortcut vocabulary, then the layers it turns on while held,
-// written as SHORTCUT_LAYERS(...) or SHORTCUT_NO_LAYERS. SHORTCUT_MODS names
+// SHORTCUT(keycode, name, mods, keys, layers) also gives the key its shortcut
+// (D-F26): modifiers written as SHORTCUT_MODS(...) or SHORTCUT_NO_MODS, up to
+// six keys from the shortcut vocabulary written as SHORTCUT_KEYS(...) in the
+// order they are pressed, or SHORTCUT_NO_KEYS, then the layers it turns on
+// while held, written as SHORTCUT_LAYERS(...) or SHORTCUT_NO_LAYERS. SHORTCUT_MODS names
 // modifier keys, left and right mixed, and builds the 8-bit report mask from
 // them. A bare number or a QMK MOD_* constant is refused: QMK's right-hand
 // MOD_RALT (0x14) reads as Right Ctrl + Left Alt in a report mask, so it would
@@ -23,7 +24,9 @@
 // sixteen; the base layer is always on, and so is refused, as is a bare mask.
 // It holds them as MO() does; SHORTCUT_LOCK_LAYERS, SHORTCUT_MOVE_TO_LAYERS,
 // SHORTCUT_TAP_TOGGLE_LAYERS and SHORTCUT_ONESHOT_LAYERS name them the same way
-// and act on them as TG(), TO(), TT() and OSL() do.
+// and act on them as TG(), TO(), TT() and OSL() do. SHORTCUT_KEYS refuses a
+// bare key, KC_NO, a seventh key, the same key twice, a second system key, a
+// second media key, and two of its forms combined.
 #define _KEYMAP_SHORTCUT_MODS_TAG 0x100
 #define _KEYMAP_SHORTCUT_NOT_A_MOD 0x200
 #define _KEYMAP_SHORTCUT_MOD_BIT(key_) (IS_MODIFIER_KEYCODE(key_) ? MOD_BIT(key_) : _KEYMAP_SHORTCUT_NOT_A_MOD)
@@ -38,6 +41,58 @@
 #define _KEYMAP_SHORTCUT_MODS_PICK(a1_, a2_, a3_, a4_, a5_, a6_, a7_, a8_, count_, ...) _KEYMAP_SHORTCUT_MODS_##count_
 #define SHORTCUT_MODS(...) (_KEYMAP_SHORTCUT_MODS_TAG | _KEYMAP_SHORTCUT_MODS_PICK(__VA_ARGS__, 8, 7, 6, 5, 4, 3, 2, 1, 0)(__VA_ARGS__))
 #define SHORTCUT_NO_MODS _KEYMAP_SHORTCUT_MODS_TAG
+// The keys ride one byte each in bits 0-47, below the tag; a code that is no
+// shortcut key sets a bit the check refuses. Bits 49-56 seal the form with the
+// complement of its keys' sum, so two forms OR'ed together, or a bare number,
+// never read as one: OR'ing two seals sets bits the complement of the OR'ed
+// keys' sum lacks.
+#define _KEYMAP_SHORTCUT_KEYS_TAG (1ULL << 60)
+#define _KEYMAP_SHORTCUT_NOT_A_KEY (1ULL << 57)
+#define _KEYMAP_SHORTCUT_KEYS_SEAL_SHIFT 49
+#define _KEYMAP_SHORTCUT_KEYS_SEAL(sum_) ((unsigned long long)(~(unsigned)(sum_) & 0xffu) << _KEYMAP_SHORTCUT_KEYS_SEAL_SHIFT)
+#define _KEYMAP_SHORTCUT_KEY_AT(key_, index_) ((unsigned)(key_) <= 0xff && NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_KEY((unsigned)(key_)) ? (unsigned long long)(key_) << (8 * (index_)) : _KEYMAP_SHORTCUT_NOT_A_KEY)
+#define _KEYMAP_SHORTCUT_KEYS_1(a_) _KEYMAP_SHORTCUT_KEY_AT(a_, 0)
+#define _KEYMAP_SHORTCUT_KEYS_2(a_, b_) (_KEYMAP_SHORTCUT_KEYS_1(a_) | _KEYMAP_SHORTCUT_KEY_AT(b_, 1))
+#define _KEYMAP_SHORTCUT_KEYS_3(a_, b_, c_) (_KEYMAP_SHORTCUT_KEYS_2(a_, b_) | _KEYMAP_SHORTCUT_KEY_AT(c_, 2))
+#define _KEYMAP_SHORTCUT_KEYS_4(a_, b_, c_, d_) (_KEYMAP_SHORTCUT_KEYS_3(a_, b_, c_) | _KEYMAP_SHORTCUT_KEY_AT(d_, 3))
+#define _KEYMAP_SHORTCUT_KEYS_5(a_, b_, c_, d_, e_) (_KEYMAP_SHORTCUT_KEYS_4(a_, b_, c_, d_) | _KEYMAP_SHORTCUT_KEY_AT(e_, 4))
+#define _KEYMAP_SHORTCUT_KEYS_6(a_, b_, c_, d_, e_, f_) (_KEYMAP_SHORTCUT_KEYS_5(a_, b_, c_, d_, e_) | _KEYMAP_SHORTCUT_KEY_AT(f_, 5))
+#define _KEYMAP_SHORTCUT_KEYS_7(...) _KEYMAP_SHORTCUT_NOT_A_KEY
+#define _KEYMAP_SHORTCUT_KEYS_SUM_1(a_) ((unsigned)(a_))
+#define _KEYMAP_SHORTCUT_KEYS_SUM_2(a_, b_) (_KEYMAP_SHORTCUT_KEYS_SUM_1(a_) + (unsigned)(b_))
+#define _KEYMAP_SHORTCUT_KEYS_SUM_3(a_, b_, c_) (_KEYMAP_SHORTCUT_KEYS_SUM_2(a_, b_) + (unsigned)(c_))
+#define _KEYMAP_SHORTCUT_KEYS_SUM_4(a_, b_, c_, d_) (_KEYMAP_SHORTCUT_KEYS_SUM_3(a_, b_, c_) + (unsigned)(d_))
+#define _KEYMAP_SHORTCUT_KEYS_SUM_5(a_, b_, c_, d_, e_) (_KEYMAP_SHORTCUT_KEYS_SUM_4(a_, b_, c_, d_) + (unsigned)(e_))
+#define _KEYMAP_SHORTCUT_KEYS_SUM_6(a_, b_, c_, d_, e_, f_) (_KEYMAP_SHORTCUT_KEYS_SUM_5(a_, b_, c_, d_, e_) + (unsigned)(f_))
+#define _KEYMAP_SHORTCUT_KEYS_SUM_7(...) 0u
+#define _KEYMAP_SHORTCUT_KEYS_COUNT(a1_, a2_, a3_, a4_, a5_, a6_, a7_, count_, ...) count_
+#define _KEYMAP_SHORTCUT_KEYS_FORM_(count_, ...) (_KEYMAP_SHORTCUT_KEYS_TAG | _KEYMAP_SHORTCUT_KEYS_##count_(__VA_ARGS__) | _KEYMAP_SHORTCUT_KEYS_SEAL(_KEYMAP_SHORTCUT_KEYS_SUM_##count_(__VA_ARGS__)))
+#define _KEYMAP_SHORTCUT_KEYS_FORM(count_, ...) _KEYMAP_SHORTCUT_KEYS_FORM_(count_, __VA_ARGS__)
+#define SHORTCUT_KEYS(...) _KEYMAP_SHORTCUT_KEYS_FORM(_KEYMAP_SHORTCUT_KEYS_COUNT(__VA_ARGS__, 7, 6, 5, 4, 3, 2, 1, 0), __VA_ARGS__)
+#define SHORTCUT_NO_KEYS (_KEYMAP_SHORTCUT_KEYS_TAG | _KEYMAP_SHORTCUT_KEYS_SEAL(0u))
+#define _KEYMAP_SHORTCUT_KEY(keys_, index_) ((uint8_t)((keys_) >> (8 * (index_))))
+// What the checks read back from a form: each of its six bytes a shortcut key
+// or zero, packed from the first, and its seal the complement of their sum.
+#define _KEYMAP_SHORTCUT_KEY_BYTE_VALID(keys_, i_) (_KEYMAP_SHORTCUT_KEY(keys_, i_) == 0 || NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_KEY(_KEYMAP_SHORTCUT_KEY(keys_, i_)))
+#define _KEYMAP_SHORTCUT_KEY_BYTE_PACKED(keys_, i_) (_KEYMAP_SHORTCUT_KEY(keys_, i_) == 0 || _KEYMAP_SHORTCUT_KEY(keys_, (i_) - 1) != 0)
+#define _KEYMAP_SHORTCUT_KEYS_BYTES_SUM(keys_)                                                                                         \
+    ((unsigned)_KEYMAP_SHORTCUT_KEY(keys_, 0) + _KEYMAP_SHORTCUT_KEY(keys_, 1) + _KEYMAP_SHORTCUT_KEY(keys_, 2) + _KEYMAP_SHORTCUT_KEY(keys_, 3) + \
+     _KEYMAP_SHORTCUT_KEY(keys_, 4) + _KEYMAP_SHORTCUT_KEY(keys_, 5))
+#define _KEYMAP_SHORTCUT_KEYS_WELL_FORMED(keys_)                                                                                                                       \
+    (_KEYMAP_SHORTCUT_KEY_BYTE_VALID(keys_, 0) && _KEYMAP_SHORTCUT_KEY_BYTE_VALID(keys_, 1) && _KEYMAP_SHORTCUT_KEY_BYTE_VALID(keys_, 2) &&                        \
+     _KEYMAP_SHORTCUT_KEY_BYTE_VALID(keys_, 3) && _KEYMAP_SHORTCUT_KEY_BYTE_VALID(keys_, 4) && _KEYMAP_SHORTCUT_KEY_BYTE_VALID(keys_, 5) &&                        \
+     _KEYMAP_SHORTCUT_KEY_BYTE_PACKED(keys_, 1) && _KEYMAP_SHORTCUT_KEY_BYTE_PACKED(keys_, 2) && _KEYMAP_SHORTCUT_KEY_BYTE_PACKED(keys_, 3) &&                      \
+     _KEYMAP_SHORTCUT_KEY_BYTE_PACKED(keys_, 4) && _KEYMAP_SHORTCUT_KEY_BYTE_PACKED(keys_, 5) &&                                                                   \
+     (((keys_) >> _KEYMAP_SHORTCUT_KEYS_SEAL_SHIFT) & 0xffu) == (~_KEYMAP_SHORTCUT_KEYS_BYTES_SUM(keys_) & 0xffu))
+#define _KEYMAP_SHORTCUT_SAME(keys_, i_, j_) (_KEYMAP_SHORTCUT_KEY(keys_, i_) != 0 && _KEYMAP_SHORTCUT_KEY(keys_, i_) == _KEYMAP_SHORTCUT_KEY(keys_, j_))
+#define _KEYMAP_SHORTCUT_KEYS_DISTINCT(keys_)                                                                                                    \
+    !(_KEYMAP_SHORTCUT_SAME(keys_, 0, 1) || _KEYMAP_SHORTCUT_SAME(keys_, 0, 2) || _KEYMAP_SHORTCUT_SAME(keys_, 0, 3) || _KEYMAP_SHORTCUT_SAME(keys_, 0, 4) || \
+      _KEYMAP_SHORTCUT_SAME(keys_, 0, 5) || _KEYMAP_SHORTCUT_SAME(keys_, 1, 2) || _KEYMAP_SHORTCUT_SAME(keys_, 1, 3) || _KEYMAP_SHORTCUT_SAME(keys_, 1, 4) || \
+      _KEYMAP_SHORTCUT_SAME(keys_, 1, 5) || _KEYMAP_SHORTCUT_SAME(keys_, 2, 3) || _KEYMAP_SHORTCUT_SAME(keys_, 2, 4) || _KEYMAP_SHORTCUT_SAME(keys_, 2, 5) || \
+      _KEYMAP_SHORTCUT_SAME(keys_, 3, 4) || _KEYMAP_SHORTCUT_SAME(keys_, 3, 5) || _KEYMAP_SHORTCUT_SAME(keys_, 4, 5))
+#define _KEYMAP_SHORTCUT_KEYS_COUNT_OF(keys_, is_)                                                                                    \
+    ((is_(_KEYMAP_SHORTCUT_KEY(keys_, 0)) ? 1 : 0) + (is_(_KEYMAP_SHORTCUT_KEY(keys_, 1)) ? 1 : 0) + (is_(_KEYMAP_SHORTCUT_KEY(keys_, 2)) ? 1 : 0) + \
+     (is_(_KEYMAP_SHORTCUT_KEY(keys_, 3)) ? 1 : 0) + (is_(_KEYMAP_SHORTCUT_KEY(keys_, 4)) ? 1 : 0) + (is_(_KEYMAP_SHORTCUT_KEY(keys_, 5)) ? 1 : 0))
 #define _KEYMAP_SHORTCUT_LAYERS_TAG 0x10000L
 #define _KEYMAP_SHORTCUT_NOT_A_LAYER 0x20000L
 #define _KEYMAP_SHORTCUT_LAYER_BIT(layer_) ((layer_) > 0 && (layer_) < NOAH_CUSTOM_KEY_SHORTCUT_LAYERS ? (1L << ((layer_) & (NOAH_CUSTOM_KEY_SHORTCUT_LAYERS - 1))) : _KEYMAP_SHORTCUT_NOT_A_LAYER)
@@ -71,18 +126,25 @@
 #define SHORTCUT_NO_LAYERS (_KEYMAP_SHORTCUT_LAYERS_TAG | _KEYMAP_SHORTCUT_KIND_BITS(NOAH_SHORTCUT_LAYERS_HOLD))
 #define _KEYMAP_SHORTCUT_KIND_OF(layers_) ((uint8_t)(((layers_) >> _KEYMAP_SHORTCUT_KIND_SHIFT) & 0x7))
 #define _KEYMAP_SHORTCUT_KIND_WELL_FORMED(layers_) ((((layers_) >> _KEYMAP_SHORTCUT_KIND_CHECK_SHIFT) & 0x7) == (~((layers_) >> _KEYMAP_SHORTCUT_KIND_SHIFT) & 0x7))
-#define _KEYMAP_CUSTOM_KEY_SHORTCUT_NAME_ENTRY(keycode_, name_, mods_, key_, layers_) _KEYMAP_CUSTOM_KEY_NAME_ENTRY(keycode_, name_)
-#define _KEYMAP_CUSTOM_KEY_SHORTCUT_CHECK(keycode_, name_, mods_, key_, layers_)                                                \
+#define _KEYMAP_CUSTOM_KEY_SHORTCUT_NAME_ENTRY(keycode_, name_, mods_, keys_, layers_) _KEYMAP_CUSTOM_KEY_NAME_ENTRY(keycode_, name_)
+#define _KEYMAP_CUSTOM_KEY_SHORTCUT_CHECK(keycode_, name_, mods_, keys_, layers_)                                               \
     _KEYMAP_CUSTOM_KEY_NAME_CHECK(keycode_, name_)                                                                              \
     _Static_assert(((mods_) & ~0xff) == _KEYMAP_SHORTCUT_MODS_TAG,                                                              \
                    #keycode_ ": write a shortcut's modifiers as SHORTCUT_MODS(KC_LCTL, ...) of modifier keys, or SHORTCUT_NO_MODS"); \
-    _Static_assert(NOAH_CUSTOM_KEY_SHORTCUT_KEY_VALID(key_), #keycode_ ": a shortcut's key is a basic key or a mouse button");   \
+    _Static_assert(((keys_) & ~(0xffffffffffffULL | (0xffULL << _KEYMAP_SHORTCUT_KEYS_SEAL_SHIFT))) == _KEYMAP_SHORTCUT_KEYS_TAG,  \
+                   #keycode_ ": write a shortcut's keys as SHORTCUT_KEYS(...) of at most six keyboard, media, system or mouse keys, or SHORTCUT_NO_KEYS"); \
+    _Static_assert(_KEYMAP_SHORTCUT_KEYS_WELL_FORMED(keys_), #keycode_ ": write a shortcut's keys as one SHORTCUT_KEYS(...), never two combined or a bare number"); \
+    _Static_assert(_KEYMAP_SHORTCUT_KEYS_DISTINCT(keys_), #keycode_ ": a shortcut names each key once");                       \
+    _Static_assert(_KEYMAP_SHORTCUT_KEYS_COUNT_OF(keys_, NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_SYSTEM) <= 1 && _KEYMAP_SHORTCUT_KEYS_COUNT_OF(keys_, NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_CONSUMER) <= 1, \
+                   #keycode_ ": a shortcut holds at most one system key and one media key");                                \
     _Static_assert(((layers_) & ~(0xffffL | (0x7L << _KEYMAP_SHORTCUT_KIND_SHIFT) | (0x7L << _KEYMAP_SHORTCUT_KIND_CHECK_SHIFT))) == _KEYMAP_SHORTCUT_LAYERS_TAG && _KEYMAP_SHORTCUT_KIND_WELL_FORMED(layers_) && _KEYMAP_SHORTCUT_KIND_OF(layers_) < NOAH_SHORTCUT_LAYER_KIND_COUNT, \
                    #keycode_ ": write a shortcut's layers as SHORTCUT_LAYERS(...) of layers 1-15 (or the LOCK, MOVE_TO, TAP_TOGGLE or ONESHOT form), or SHORTCUT_NO_LAYERS"); \
-    _Static_assert(((mods_) & 0xff) != 0 || (key_) != KC_NO || ((layers_) & 0xffff) != 0, #keycode_ ": a SHORTCUT row holds a shortcut; use KEY for none"); \
+    _Static_assert(((mods_) & 0xff) != 0 || ((keys_) & 0xff) != 0 || ((layers_) & 0xffff) != 0, #keycode_ ": a SHORTCUT row holds a shortcut; use KEY for none"); \
     _Static_assert(_KEYMAP_SHORTCUT_KIND_OF(layers_) == NOAH_SHORTCUT_LAYERS_HOLD || ((layers_) & 0xffff) != 0, #keycode_ ": a layer kind needs layers");
 #define _KEYMAP_CUSTOM_KEY_NO_SHORTCUT(keycode_, name_) [((keycode_) - CUSTOM_KEY_0)] = {0u},
-#define _KEYMAP_CUSTOM_KEY_SHORTCUT_ENTRY(keycode_, name_, mods_, key_, layers_) [((keycode_) - CUSTOM_KEY_0)] = {(uint8_t)(mods_), (uint8_t)(key_), (uint8_t)(layers_), (uint8_t)((layers_) >> 8), _KEYMAP_SHORTCUT_KIND_OF(layers_)},
+#define _KEYMAP_CUSTOM_KEY_SHORTCUT_ENTRY(keycode_, name_, mods_, keys_, layers_)                                                                                       \
+    [((keycode_) - CUSTOM_KEY_0)] = {(uint8_t)(mods_), _KEYMAP_SHORTCUT_KEY(keys_, 0), _KEYMAP_SHORTCUT_KEY(keys_, 1), _KEYMAP_SHORTCUT_KEY(keys_, 2), _KEYMAP_SHORTCUT_KEY(keys_, 3), \
+                                     _KEYMAP_SHORTCUT_KEY(keys_, 4), _KEYMAP_SHORTCUT_KEY(keys_, 5), (uint8_t)(layers_), (uint8_t)((layers_) >> 8), _KEYMAP_SHORTCUT_KIND_OF(layers_)},
 #define _KEYMAP_STRIP_PARENS(...) __VA_ARGS__
 // COMBO(result, keys) follows COMBO_TERM; COMBO_WINDOW(result, keys, ms) has
 // its own window.

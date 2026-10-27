@@ -6,6 +6,7 @@
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/custom_key_shortcut.h"
 #include "users/noah/lib/action/owned_keycode.h"
+#include "users/noah/lib/key/runtime/reducer/ownership_state.h"
 #include "users/noah/lib/key/runtime/reducer/runtime.h"
 #include "users/noah/lib/state/diagnostics/runtime_debug.h"
 #include "users/noah/noah_keymap_ids.h"
@@ -973,6 +974,68 @@ static void test_double_tap_threshold_hold_with_intermediate_scan_registers_once
     CHECK(!key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(3, 1)));
 }
 
+// A later tap's press that holds an action, released while its tap series is
+// pending, lets go of it with the release, as the first tap's release would:
+// the pending multi-tap release plans the owned-state release whatever its
+// outcome. Here the second tap's hold goes down at the press.
+static void test_pending_multi_tap_release_lets_go_of_an_action_held_at_the_press(void) {
+    static const key_runtime_scenario_step_t press_steps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 2), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 2), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 2), KEY_RUNTIME_SCENARIO_ADVANCE(20),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 2),
+    };
+    bool released = false;
+
+    key_runtime_scenario_reset();
+    test_configure_multi_tap_hold_key((hold_behavior_t){.present = true, .action = TEST_HOLD_ACTION, .style = HOLD_BEHAVIOR_PRESS_IMMEDIATELY_UNTIL_RELEASE}, hold_behavior_none());
+    key_runtime_scenario_run(press_steps, ARRAY_SIZE(press_steps));
+    CHECK(key_runtime_scenario_slot_held_action_keycode(test_keypos(3, 2)) == TEST_HOLD_ACTION);
+    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(3, 2)));
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+    for (uint8_t index = 0u; index < key_runtime_scenario_effect_count(); index++) {
+        const key_runtime_scenario_effect_t *effect = key_runtime_scenario_effect_at(index);
+
+        if (effect->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY && effect->data.key_pos.row == 3 && effect->data.key_pos.col == 2) released = true;
+    }
+    CHECK(released);
+    CHECK(key_runtime_scenario_slot_held_action_keycode(test_keypos(3, 2)) == KC_NO);
+}
+
+// The same for a repeat the press holds: its release ends it. No authored hold
+// starts a repeat on a later tap before its tap series is settled (a repeat
+// starts at the hold threshold, which ends the series), so the repeat is
+// started here through the reducer's own entry for one, as the projection
+// does.
+static void test_pending_multi_tap_release_lets_go_of_a_repeat_its_press_holds(void) {
+    static const key_runtime_scenario_step_t press_steps[] = {
+        KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 3), KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 3), KEY_RUNTIME_SCENARIO_ADVANCE(40), KEY_RUNTIME_SCENARIO_PRESS(TEST_MULTI_TAP_KEY, 3, 3), KEY_RUNTIME_SCENARIO_ADVANCE(20),
+    };
+    static const key_runtime_scenario_step_t release_steps[] = {
+        KEY_RUNTIME_SCENARIO_RELEASE(TEST_MULTI_TAP_KEY, 3, 3),
+    };
+    bool released = false;
+
+    key_runtime_scenario_reset();
+    test_configure_multi_tap_key();
+    key_runtime_scenario_run(press_steps, ARRAY_SIZE(press_steps));
+    key_runtime_core_observe_repeat_start(test_keypos(3, 3), TEST_HOLD_ACTION, 25);
+    CHECK(key_runtime_core_repeat_active_at(test_keypos(3, 3)));
+    CHECK(key_runtime_scenario_slot_has_pending_multi_tap(test_keypos(3, 3)));
+
+    key_runtime_scenario_clear_effects();
+    key_runtime_scenario_run(release_steps, ARRAY_SIZE(release_steps));
+    for (uint8_t index = 0u; index < key_runtime_scenario_effect_count(); index++) {
+        const key_runtime_scenario_effect_t *effect = key_runtime_scenario_effect_at(index);
+
+        if (effect->kind == KEY_RUNTIME_EFFECT_RELEASE_OWNED_STATE_BY_KEY && effect->data.key_pos.row == 3 && effect->data.key_pos.col == 3) released = true;
+    }
+    CHECK(released);
+    CHECK(!key_runtime_core_repeat_active_at(test_keypos(3, 3)));
+}
+
 static void test_repeat_hold_with_intermediate_scans_starts_once_and_releases_once(void) {
     static const key_runtime_scenario_step_t scenario[] = {
         KEY_RUNTIME_SCENARIO_PRESS(TEST_HOLD_KEY_THREE, 6, 0), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(60), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_ADVANCE(100), KEY_RUNTIME_SCENARIO_SCAN(), KEY_RUNTIME_SCENARIO_RELEASE(TEST_HOLD_KEY_THREE, 6, 0),
@@ -1250,10 +1313,13 @@ static void test_owned_usage_does_not_suppress_its_authored_behavior(void) {
     CHECK(key_runtime_scenario_unregister_code_count() == 1u);
 }
 
+
 int main(void) {
     test_overlapping_native_owners_survive_either_release_order();
     test_owned_usage_does_not_suppress_its_authored_behavior();
     test_qmk_function_key_with_only_a_double_tap_branch_still_holds();
+    test_pending_multi_tap_release_lets_go_of_an_action_held_at_the_press();
+    test_pending_multi_tap_release_lets_go_of_a_repeat_its_press_holds();
     test_qmk_function_key_with_only_a_double_tap_branch_taps_and_double_taps();
     test_single_tap_waits_for_multi_tap_timeout_before_dispatching();
     test_base_tap_commit_feedback_can_be_suppressed();

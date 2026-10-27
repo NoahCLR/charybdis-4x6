@@ -124,6 +124,9 @@ false.
    pending tap series, then the active press, then plans an unmatched release
    for a handled keycode. The release planner returns a settlement; the reducer
    applies it to the series (start, preserve, end) and appends the effects.
+   Either way, a held action or repeat the press took is released with it, so
+   a later tap of a series that held from its press (a Tap-toggle or One-shot
+   custom key's shortcut) leaves nothing held.
 5. `deferred_release.c` moves dispatches blocked by another key's live tap into
    the pending-release queue, unchanged. The plan is projected, and only after
    the release helper returns does `key_runtime_deferred_release_drain_dispatches()`
@@ -177,12 +180,14 @@ modifiers through `keyboard_mod_ownership` (QMK's `register_mods` is
 overridden in `compat/qmk_mod_contract`); layer keycodes through
 `layer_ownership`; other QMK behaviours as a synthetic record, which re-enters
 QMK's processing and passes stage `synthetic_passthrough`. A custom key
-sent as an action sends only its shortcut (`owned_keycode_tap_parts`), its
+sent as an action sends only its shortcut (`owned_keycode_tap_chord`: the
+modifiers, then each key in order, released in reverse), its
 layers acting as their layer kind: Hold's and Tap-toggle's on around the tap
 (`layer_ownership_shortcut_tap_begin`/`_end`), Lock's and Move to's locked
 first (`layer_ownership_toggle_lock_set`, `_goto_set`), One-shot's armed after
 it (`layer_ownership_oneshot_tap_set`). A held one keeps its shortcut through
-its held action's lease and its layers through `layer_ownership_shortcut_press`,
+its held action's lease, which records the keys it pressed
+(`owned_keycode_acquire_chord`), and its layers through `layer_ownership_shortcut_press`,
 owned by the holding key beside its own layer hold, or locks or moves to them
 at the press (D-F26). A Tap-toggle or One-shot custom key is a momentary layer
 key: the runtime names its own hold `0x80 | slot`, which the projection binds
@@ -293,6 +298,8 @@ tapping queue.
   `run_qmk_contract_checks.sh` (fork hook order and record layouts).
 - Ledgers: `run_owned_keycode_tests.sh`, `run_keyboard_mod_ownership_tests.sh`,
   `run_held_action_tests.sh`, `run_layer_ownership_tests.sh`.
+- The owned output into QMK's real reports (a shortcut's keyboard, media,
+  system and mouse reports, in order): `run_owned_keycode_qmk_report_tests.sh`.
 - Wiring: `run_hook_chaining_tests.sh`, `run_runtime_init_order_tests.sh`,
   `run_feature_gate_compile_tests.sh`, `run_runtime_debug_tests.sh`,
   `run_runtime_trace_tests.sh`.

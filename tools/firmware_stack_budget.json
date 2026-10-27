@@ -144,7 +144,7 @@
         },
         {
           "name": "handled press fallback settlement preempting a held pointing mode",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "key_runtime_core_pd_projection_preempt_held_actions_for_mode", "held_action_unregister", "held_action_or_modifier_release_owned_by_key", "held_action_remove_slot", "noah_action_release", "pointing_mode_apply_command", "pointing_mode_apply_activate_mode", "pointing_mode_transition_unlock", "pointing_mode_transition_deactivate_with_lock_state", "noah_pd_engine_exit", "owned_modifiers", "keyboard_mod_ownership_unregister", "keyboard_mod_ownership_unregister_mods", "send_6kro_report", "macro_payload_output_keys"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_key_runtime_settle_pending_fallback_hold", "key_runtime_core_project_effect", "key_runtime_core_pd_projection_preempt_held_actions_for_mode", "held_action_unregister", "held_action_or_modifier_release_owned_by_key", "held_action_remove_slot", "noah_action_release", "pointing_mode_apply_command", "pointing_mode_apply_activate_mode", "pointing_mode_transition_unlock", "pointing_mode_transition_deactivate_with_lock_state", "noah_pd_engine_exit", "keyboard_mod_ownership_unregister", "keyboard_mod_ownership_unregister_mods", "send_6kro_report", "macro_payload_output_keys"]
         },
         {
           "name": "handled press literal action projection",
@@ -172,15 +172,15 @@
         },
         {
           "name": "handled press custom-key shortcut hold",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "owned_keycode_acquire_parts", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "owned_keycode_acquire_chord", "owned_keycode_acquire_usages", "register_code", "send_6kro_report"]
         },
         {
           "name": "handled press custom-key shortcut tap",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_tap_custom_key", "owned_keycode_acquire_parts", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_press", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "noah_emit_action_tap_at", "noah_action_tap_custom_key", "owned_keycode_acquire_chord", "owned_keycode_acquire_usages", "register_code", "send_6kro_report"]
         },
         {
           "name": "handled release custom-key shortcut release",
-          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "held_action_unregister", "held_action_or_modifier_release_owned_by_key", "held_action_remove_slot", "owned_keycode_release", "owned_keycode_release_components", "unregister_code", "send_6kro_report"]
+          "functions": ["main", "action_exec", "action_tapping_process", "process_tapping", "waiting_buffer_scan_tap", "process_record", "process_record_user", "key_runtime_process_stage_handled_key", "key_runtime_process_handled_key_release", "key_runtime_transition_execute_event_plan", "key_runtime_transition_execute_plan", "key_runtime_transition_drain_plan", "key_runtime_core_project_effect", "held_action_unregister", "held_action_or_modifier_release_owned_by_key", "held_action_remove_slot", "owned_keycode_release_chord", "owned_keycode_release_usages", "unregister_code", "send_6kro_report"]
         },
         {
           "name": "handled release bounded deferred fallback settlement",
@@ -216,11 +216,11 @@
         },
         {
           "name": "matrix scan macro text press",
-          "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_strokes", "macro_payload_start_transient", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "macro_payload_start_text_char", "macro_payload_start_strokes", "macro_payload_start_transient", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_usages", "register_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan macro transient chord press",
-          "functions": ["main", "matrix_scan", "macro_payload_start_transient", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "macro_payload_start_transient", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_usages", "register_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan macro persistent hold press",
@@ -228,7 +228,7 @@
         },
         {
           "name": "matrix scan macro owned release",
-          "functions": ["main", "matrix_scan", "macro_payload_key_release", "owned_keycode_release", "owned_keycode_release_components", "unregister_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "macro_payload_key_release", "owned_keycode_release", "owned_keycode_release_usages", "unregister_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan macro provider completion",
@@ -260,7 +260,7 @@
         },
         {
           "name": "matrix scan macro persistent hold owned press",
-          "functions": ["main", "matrix_scan", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_components", "register_code", "send_6kro_report"]
+          "functions": ["main", "matrix_scan", "macro_payload_key_acquire", "owned_keycode_acquire", "owned_keycode_acquire_usages", "register_code", "send_6kro_report"]
         },
         {
           "name": "matrix scan live-profile boot discovery",

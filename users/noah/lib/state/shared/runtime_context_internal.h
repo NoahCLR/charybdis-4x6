@@ -42,11 +42,19 @@ typedef struct {
     uint16_t                           oneshot_armed_at;
 } noah_layer_ownership_state_t;
 
+// What a held action's binding took from the owned output: a literal
+// keycode's lease, or the chord lease holding a custom key's shortcut's
+// modifiers and keys (D-F26). The binding's action says which.
+typedef union {
+    owned_keycode_lease_t       keycode;
+    owned_keycode_chord_lease_t shortcut;
+} held_action_lease_t;
+
 typedef struct {
     held_action_binding_snapshot_t modifiers[HELD_ACTION_BINDING_CAPACITY];
     uint8_t                        modifier_refcounts[8];
     held_action_binding_snapshot_t actions[HELD_ACTION_BINDING_CAPACITY];
-    owned_keycode_lease_t          action_leases[HELD_ACTION_BINDING_CAPACITY];
+    held_action_lease_t            action_leases[HELD_ACTION_BINDING_CAPACITY];
     uint8_t                        action_lease_managed[(HELD_ACTION_BINDING_CAPACITY + 7u) / 8u];
 } noah_held_action_state_t;
 

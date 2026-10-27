@@ -181,13 +181,21 @@ A **custom key** is a key of your own: 128 of them, each with a name, an
 optional **shortcut** and an optional behaviour. Put one on a layer or make
 it a combo's output.
 
-The shortcut is one key, any modifiers, left and right mixed (Left Ctrl +
-Right Alt + K), and any layers, each of them optional: modifiers alone, a
-mouse button, or layers alone are shortcuts too. It is the custom key's own
-action: held while you hold the key, tapped when you tap it. Unlike a macro
-it stays down; unlike `C(A(KC_K))` its modifiers can come from both sides;
-unlike `MO()` it can hold several layers at once (Left Cmd + Navigation +
-Extra).
+The shortcut is up to six keys held together, any modifiers, left and right
+mixed (Left Ctrl + Right Alt + K), and any layers, each of them optional:
+modifiers alone, a mouse button, or layers alone are shortcuts too. It is the
+custom key's own action: held while you hold the key, tapped when you tap it.
+Unlike a macro it stays down; unlike `C(A(KC_K))` its modifiers can come from
+both sides; unlike `MO()` it can hold several layers at once (Left Cmd +
+Navigation + Extra).
+
+Its keys are keyboard keys, media and system keys (play/pause, volume,
+sleep) and mouse keys (buttons, the wheel, cursor movement), in the order you
+want them pressed: Shift + A + S + D holds Shift, then A, S and D, and lets go
+of D, S, A, then Shift. At most six, whatever the build, and at most one media
+key and one system key, since the computer reads one of each at a time. So a
+media key works wherever only the shortcut runs: behind a behaviour, from a
+bypassed key, or as a combo's output.
 
 Its layers act together as one layer key, the shortcut's **layer kind**:
 

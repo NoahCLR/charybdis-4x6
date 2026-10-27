@@ -99,8 +99,8 @@
         },
         {
           "caller": "noah_profile_candidate_store_backend_activation_step",
-          "callee": "noah_active_profile_pd_invalidate",
-          "reason": "Provider publication invokes the validated immutable PD cache invalidator."
+          "callee": "owner_pd_invalidate",
+          "reason": "Provider publication invokes the owner's PD invalidator, which ends a layer-started mode around the validated immutable PD cache invalidator."
         },
         {
           "caller": "noah_profile_reader_read",
@@ -327,15 +327,15 @@
         },
         {
           "name": "PD compiled cache initialization",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "noah_active_profile_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_pd_v1_validate_record", "tap_valid"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "initialize_runtime_graph", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "compiled_reader_read", "write_domain", "noah_profile_pd_v1_validate_record", "tap_valid"]
         },
         {
           "name": "PD published cache slot flash read",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "owner_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_reader_read", "staged_reader_read", "flash_read", "read_flash", "rp2040_read"]
         },
         {
           "name": "PD published record validation",
-          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "noah_active_profile_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_pd_v1_validate_record", "tap_valid"]
+          "functions": ["main", "matrix_scan", "noah_qmk_durable_io_matrix_scan", "noah_qmk_durable_io_profile_step", "scan_running", "noah_profile_candidate_store_backend_activation_step", "owner_pd_invalidate", "publish_pd_cache", "noah_profile_pd_v1_iterator_step", "noah_profile_pd_v1_validate_record", "tap_valid"]
         },
         {
           "name": "Compiled profile initial RGB materialization",

@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
     if (named) assert(fclose(named) == 0);
     assert(length == NOAH_SETTINGS_MIN_SIZE + 4 + 5 + 32 + 15 + 32 + 11 + 4);
     const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {NOAH_SETTINGS_VERSION, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
-    assert(NOAH_SETTINGS_VERSION == 10u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
+    assert(NOAH_SETTINGS_VERSION == 11u && NOAH_SETTINGS_LAYERS == LAYER_COUNT && !memcmp(bytes, header, sizeof(header)));
     assert(u32(bytes + NOAH_SETTINGS_SCALARS_OFFSET + NOAH_SETTING_TAPPING_TERM * 4) == TAPPING_TERM);
     keyrecord_t record = {0};
     assert(get_tapping_term(0, &record) == TAPPING_TERM && get_quick_tap_term(0, &record) == TAPPING_TERM);
@@ -249,7 +249,7 @@ int main(int argc, char **argv) {
     // Then each custom key's shortcut, the keymap's until a profile has its own.
     for (uint8_t slot = 0; slot < CUSTOM_KEY_SLOT_COUNT; slot++) {
         memcpy(expected + NOAH_SETTINGS_SHORTCUTS_OFFSET + slot * NOAH_SETTINGS_SHORTCUT_SIZE, custom_key_shortcuts[slot], NOAH_SETTINGS_SHORTCUT_SIZE);
-        assert(noah_custom_key_shortcut(slot).mods == custom_key_shortcuts[slot][0] && noah_custom_key_shortcut(slot).key == custom_key_shortcuts[slot][1] && noah_custom_key_shortcut(slot).layers == (custom_key_shortcuts[slot][2] | custom_key_shortcuts[slot][3] << 8));
+        assert(noah_custom_key_shortcut(slot).mods == custom_key_shortcuts[slot][0] && !memcmp(noah_custom_key_shortcut(slot).keys, &custom_key_shortcuts[slot][NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET], NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT) && noah_custom_key_shortcut(slot).layers == (custom_key_shortcuts[slot][NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO] | custom_key_shortcuts[slot][NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI] << 8));
     }
     // Then every name counted: the layers', each macro's, each custom key's,
     // and the keyboard's, which is empty until someone names it.

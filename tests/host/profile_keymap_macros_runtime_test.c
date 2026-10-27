@@ -42,7 +42,7 @@ static void u32(uint8_t *bytes, uint32_t value) {
     for (unsigned i = 0; i < 4; i++) bytes[i] = (uint8_t)(value >> (8 * i));
 }
 static noah_active_profile_snapshot_t saved(void) {
-    memcpy(blob, "NLP1\4\2\2\1", 8);
+    memcpy(blob, "NLP1\4\3\2\1", 8);
     blob[8] = 0x60; blob[9] = 1; u32(blob + 10, 1920);
     blob[14] = KC_B;
     blob[14 + 1918] = KC_Y;

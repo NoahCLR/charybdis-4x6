@@ -6,6 +6,7 @@
 #include "key_runtime_integration_harness.h"
 #include "users/noah/lib/action/action_dispatch.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/key/behavior/key_behavior_lookup.h"
 #include "users/noah/lib/key/runtime/delayed_action.h"
@@ -301,9 +302,9 @@ void owned_keycode_tap_literal(uint16_t keycode) {
 }
 
 // No custom key here has a shortcut (D-F26); this only satisfies the link.
-bool owned_keycode_tap_parts(uint8_t mods, uint8_t basic) {
+bool owned_keycode_tap_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS]) {
     (void)mods;
-    (void)basic;
+    (void)keys;
     return false;
 }
 

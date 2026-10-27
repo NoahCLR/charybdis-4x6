@@ -427,7 +427,7 @@ static noah_profile_store_compatibility_t compatibility(void) {
 // Commits a small profile of generation `generation` as a save on a quiet
 // keyboard would, through a backend of its own.
 static void commit(uint32_t generation) {
-    static const uint8_t           payload[] = {'N', 'L', 'P', '1', 4u, 2u, 0u, 1u};
+    static const uint8_t           payload[] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
     noah_profile_flash_store_t     flash;
     noah_profile_store_t           store;
     noah_profile_store_record_t    record;

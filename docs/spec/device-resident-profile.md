@@ -436,14 +436,14 @@ Every ceiling holds at once (D-F14, [`0014`](../adr/0014-bigger-profiles.md)):
 
 `tests/fixtures/maximum_profile_v4.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table
-at its ceiling and every name at 32 bytes, in 75,185 bytes:
+at its ceiling and every name at 32 bytes, in 75,825 bytes:
 
 | Domain | Bytes |
 | --- | ---: |
 | Lighting `0x10` | 591 |
 | Key behaviours `0x20` | 13,828 |
 | Combos `0x30` | 9,736 |
-| Settings `0x40` | 10,053 |
+| Settings `0x40` | 10,693 |
 | Pointing `0x50` | 4,104 |
 | Keymap `0x60` | 1,920 |
 | Macros `0x70` | 34,903 |

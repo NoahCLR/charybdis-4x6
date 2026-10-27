@@ -173,7 +173,7 @@ the macro's own key short.
 ## Custom-key shortcuts are not playback
 
 A custom key's shortcut (D-F26) is the key's own action, sent in the key
-event through `owned_keycode_tap_parts` or a held action's lease; it plays no
+event through `owned_keycode_tap_chord` or a held action's lease; it plays no
 steps and never reaches `macro/`. Its path is
 [key-press.md](key-press.md#from-an-action-to-the-report).
 

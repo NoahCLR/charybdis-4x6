@@ -811,7 +811,7 @@ noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
 // without a row. Without one it keeps having no native action.
 static void test_custom_key_shortcut_is_its_native_action(void) {
     memset(test_shortcuts, 0, sizeof(test_shortcuts));
-    test_shortcuts[9] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), .key = KC_K};
+    test_shortcuts[9] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), .keys = {KC_K}};
     test_shortcuts[10] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_RIGHT_GUI)};
 
     noah_action_desc_t with    = noah_action_describe(CUSTOM_KEY_9);

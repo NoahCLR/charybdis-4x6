@@ -160,7 +160,7 @@ static noah_profile_store_compatibility_t compatibility(void) {
 // A canonical blob of `length` bytes: one RGB domain filling it, its bytes
 // a pattern of `seed`.
 static void build_profile(uint8_t *payload, uint32_t length, uint8_t seed) {
-    static const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 2u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB};
+    static const uint8_t header[] = {'N', 'L', 'P', '1', 4u, 3u, 1u, 1u, 0x10u, NOAH_PROFILE_DOMAIN_VERSION_RGB};
     uint32_t             domain   = length - 14u;
 
     memcpy(payload, header, sizeof(header));
