@@ -15,7 +15,7 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
-#include "noah_keymap_ids.h"     // PD_SLOT_1, PD_SLOT_2, etc.
+#include "noah_keymap_ids.h"     // PD_MODE_1, PD_MODE_2, etc.
 #include "pointing_mode_flags.h" // POINTING_MODE_* constants, state queries
 
 typedef struct pointing_mode_lifecycle_hooks pointing_mode_lifecycle_hooks_t;

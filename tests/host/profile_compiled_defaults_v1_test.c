@@ -25,8 +25,8 @@ enum {
 // pointing slots or layers renumbers nothing.
 // Custom keys moved once, to their own block (D-F14); the others did not.
 _Static_assert(CUSTOM_KEY_0 == 0x7f00 && CUSTOM_KEY_63 == 0x7f3f && CUSTOM_KEY_64 == 0x7f40 && CUSTOM_KEY_127 == 0x7f7f, "preserve custom key identities");
-_Static_assert(PD_SLOT_0 == 0x7e80 && PD_SLOT_5 == 0x7e85 && PD_SLOT_6 == 0x7e86 && PD_SLOT_7 == 0x7e87, "preserve PD hold identities");
-_Static_assert(PD_SLOT_0_LOCK == 0x7ea0 && PD_SLOT_5_LOCK == 0x7ea5 && PD_SLOT_6_LOCK == 0x7ea6 && PD_SLOT_7_LOCK == 0x7ea7, "preserve PD lock identities");
+_Static_assert(PD_MODE_0 == 0x7e80 && PD_MODE_5 == 0x7e85 && PD_MODE_6 == 0x7e86 && PD_MODE_7 == 0x7e87, "preserve PD hold identities");
+_Static_assert(PD_MODE_0_LOCK == 0x7ea0 && PD_MODE_5_LOCK == 0x7ea5 && PD_MODE_6_LOCK == 0x7ea6 && PD_MODE_7_LOCK == 0x7ea7, "preserve PD lock identities");
 _Static_assert(LAYER_LOCK_BASE == 0x7ec0 && LOCK_LAYER(7) == 0x7ec7 && LOCK_LAYER(15) == 0x7ecf, "preserve layer lock identities");
 
 static uint8_t     output[OUTPUT_CAPACITY];

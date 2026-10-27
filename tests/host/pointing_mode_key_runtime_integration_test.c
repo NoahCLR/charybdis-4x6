@@ -49,7 +49,7 @@
 #    define KC_DOT 0x0037u
 #endif
 #define TEST_PINCH_ZOOM_TAP MACRO_6
-#    define TEST_PINCH_SINGLE_STEP {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_5)}
+#    define TEST_PINCH_SINGLE_STEP {.tap = TAP_SENDS(KC_TRNS), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_MODE_5)}
 
 enum {
     TEST_PD_HOLD_KEY       = CUSTOM_KEY_0 + 0x10,
@@ -273,7 +273,7 @@ const key_behavior_t key_behaviors[] = {
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts[0] =
             {
-                .tap = TAP_SENDS(PD_SLOT_4_LOCK),
+                .tap = TAP_SENDS(PD_MODE_4_LOCK),
             },
     },
     {
@@ -304,7 +304,7 @@ const key_behavior_t key_behaviors[] = {
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts[0] =
             {
-                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_1),
+                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_MODE_1),
             },
     },
     {
@@ -338,23 +338,23 @@ const key_behavior_t key_behaviors[] = {
             },
     },
     {
-        .keycode        = PD_SLOT_1,
+        .keycode        = PD_MODE_1,
         .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts[1] =
             {
-                .tap  = TAP_SENDS(PD_SLOT_1_LOCK),
-                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_2),
+                .tap  = TAP_SENDS(PD_MODE_1_LOCK),
+                .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_MODE_2),
             },
     },
     {
-        .keycode        = PD_SLOT_5,
+        .keycode        = PD_MODE_5,
         .tap_hold_term  = TEST_PD_TAP_HOLD_TERM,
         .multi_tap_term = TEST_PD_MULTI_TAP_TERM,
         .tap_counts =
             {
                 [0] = TEST_PINCH_SINGLE_STEP,
-                [1] = {.tap = TAP_SENDS(TEST_PINCH_ZOOM_TAP), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_3)},
+                [1] = {.tap = TAP_SENDS(TEST_PINCH_ZOOM_TAP), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_MODE_3)},
             },
     },
     // The factory row: a single press falls back to holding the button itself.
@@ -484,7 +484,7 @@ static void test_set_keymap_key(uint8_t layer, keypos_t key_pos, uint16_t keycod
 }
 
 static void test_configure_pinch_transparent_profile_path(keypos_t key_pos) {
-    test_set_keymap_key(TEST_LAYER_POINTER, key_pos, PD_SLOT_5);
+    test_set_keymap_key(TEST_LAYER_POINTER, key_pos, PD_MODE_5);
     test_set_keymap_key(TEST_LAYER_BASE, key_pos, LT(TEST_LAYER_SYM, KC_J));
     layer_state = test_layer_mask(TEST_LAYER_BASE) | test_layer_mask(TEST_LAYER_POINTER);
 }
@@ -1469,26 +1469,26 @@ static void test_a_qmk_charybdis_key_has_the_policy_write_its_cpi_again(void) {
 static void test_authored_single_press_preserves_default_pointing_mode_hold(void) {
     keypos_t                             key_pos       = test_keypos(1, 2);
     const key_runtime_integration_step_t press_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_1, 1, 2),
     };
     const key_runtime_integration_step_t release_steps[] = {
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_1, 1, 2),
         KEY_RUNTIME_INTEGRATION_SCAN(),
     };
 
     test_reset_state();
 
-    CHECK(key_behavior_lookup(PD_SLOT_1).config != NULL);
-    CHECK(pointing_mode_for_keycode(PD_SLOT_1) == POINTING_MODE_VOLUME);
+    CHECK(key_behavior_lookup(PD_MODE_1).config != NULL);
+    CHECK(pointing_mode_for_keycode(PD_MODE_1) == POINTING_MODE_VOLUME);
     CHECK(pointing_mode_local_active_snapshot() == 0);
 
     key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
     CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_VOLUME);
     CHECK(pointing_mode_local_active(POINTING_MODE_VOLUME));
     CHECK(pointing_mode_local_locked_snapshot() == 0);
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_1);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_MODE_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_MODE_1);
     CHECK(split_sync_count == 0);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
@@ -1505,13 +1505,13 @@ static void test_authored_single_press_preserves_default_pointing_mode_hold(void
 static void test_authored_single_press_pointing_mode_hold_dispatches_plain_taps_immediately(void) {
     keypos_t                             key_pos              = test_keypos(1, 2);
     const key_runtime_integration_step_t hold_and_tap_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_1, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
         KEY_RUNTIME_INTEGRATION_PRESS(TEST_HANDLED_TAP_KEY, 1, 3),
         KEY_RUNTIME_INTEGRATION_RELEASE(TEST_HANDLED_TAP_KEY, 1, 3),
     };
     const key_runtime_integration_step_t release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_1, 1, 2),
     };
 
     test_reset_state();
@@ -1519,8 +1519,8 @@ static void test_authored_single_press_pointing_mode_hold_dispatches_plain_taps_
     key_runtime_integration_run(&fake_time, hold_and_tap_steps, ARRAY_SIZE(hold_and_tap_steps));
     CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_VOLUME);
     CHECK(pointing_mode_local_active(POINTING_MODE_VOLUME));
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_1);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_MODE_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_MODE_1);
     CHECK(tap_code16_count == 1);
     CHECK(last_tap_code16 == KC_J);
     CHECK(delayed_action_count == 0);
@@ -1642,13 +1642,13 @@ static void test_authored_layer_hold_dispatches_authored_plain_tap_immediately(v
 static void test_interrupted_locked_pointing_mode_press_unlocks_on_press_and_releases_momentary_hold(void) {
     keypos_t                             key_pos               = test_keypos(1, 2);
     const key_runtime_integration_step_t press_and_interrupt[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_1, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
         KEY_RUNTIME_INTEGRATION_PRESS(KC_J, 1, 3),
         KEY_RUNTIME_INTEGRATION_RELEASE(KC_J, 1, 3),
     };
     const key_runtime_integration_step_t release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_1, 1, 2),
     };
 
     test_reset_state();
@@ -1661,8 +1661,8 @@ static void test_interrupted_locked_pointing_mode_press_unlocks_on_press_and_rel
     CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_VOLUME);
     CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(!pointing_mode_local_locked(POINTING_MODE_VOLUME));
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_1);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_MODE_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_MODE_1);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
     CHECK(pointing_mode_local_active_snapshot() == 0);
@@ -1677,18 +1677,18 @@ static void test_authored_pointing_mode_hold_dispatches_authored_tap_key_immedia
     keypos_t                             hold_pos     = test_keypos(1, 2);
     keypos_t                             child_pos    = test_keypos(3, 5);
     const key_runtime_integration_step_t hold_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_1, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
         KEY_RUNTIME_INTEGRATION_PRESS(KC_RIGHT_ALT, 3, 5),
         KEY_RUNTIME_INTEGRATION_RELEASE(KC_RIGHT_ALT, 3, 5),
     };
     const key_runtime_integration_step_t release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_1, 1, 2),
     };
 
     test_reset_state();
 
-    CHECK(key_behavior_lookup(PD_SLOT_1).config != NULL);
+    CHECK(key_behavior_lookup(PD_MODE_1).config != NULL);
     CHECK(key_behavior_lookup(KC_RIGHT_ALT).config != NULL);
 
     key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
@@ -1710,10 +1710,10 @@ static void test_authored_layer_hold_releases_authored_pointing_mode_child_clean
         KEY_RUNTIME_INTEGRATION_PRESS(TEST_LAYER_HOLD_KEY, 1, 4),
         KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1),
         KEY_RUNTIME_INTEGRATION_SCAN(),
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_1, 1, 2),
     };
     const key_runtime_integration_step_t child_release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_1, 1, 2),
     };
     const key_runtime_integration_step_t parent_release_steps[] = {
         KEY_RUNTIME_INTEGRATION_RELEASE(TEST_LAYER_HOLD_KEY, 1, 4),
@@ -1722,13 +1722,13 @@ static void test_authored_layer_hold_releases_authored_pointing_mode_child_clean
     test_reset_state();
 
     CHECK(key_behavior_lookup(TEST_LAYER_HOLD_KEY).config != NULL);
-    CHECK(key_behavior_lookup(PD_SLOT_1).config != NULL);
+    CHECK(key_behavior_lookup(PD_MODE_1).config != NULL);
 
     key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
     CHECK(noah_runtime_debug_active_slot_count() == 2);
     CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == TEST_LAYER_HOLD_KEY);
-    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_SLOT_1);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_MODE_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_MODE_1);
 
     key_runtime_integration_run(&fake_time, child_release_steps, ARRAY_SIZE(child_release_steps));
     CHECK(noah_runtime_debug_active_slot_count() == 1);
@@ -1744,26 +1744,26 @@ static void test_authored_pointing_mode_hold_releases_authored_pointing_mode_chi
     keypos_t                             hold_pos     = test_keypos(1, 2);
     keypos_t                             child_pos    = test_keypos(2, 4);
     const key_runtime_integration_step_t hold_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(10), KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_5, 2, 4), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_1, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(10), KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_5, 2, 4), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(),
     };
     const key_runtime_integration_step_t child_release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_5, 2, 4),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_5, 2, 4),
     };
     const key_runtime_integration_step_t parent_release_steps[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_1, 1, 2),
     };
 
     test_reset_state();
     test_configure_pinch_transparent_profile_path(child_pos);
 
-    CHECK(key_behavior_lookup(PD_SLOT_1).config != NULL);
-    CHECK(key_behavior_lookup(PD_SLOT_5).config != NULL);
+    CHECK(key_behavior_lookup(PD_MODE_1).config != NULL);
+    CHECK(key_behavior_lookup(PD_MODE_5).config != NULL);
 
     key_runtime_integration_run(&fake_time, hold_steps, ARRAY_SIZE(hold_steps));
     CHECK(noah_runtime_debug_active_slot_count() == 2);
-    CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == PD_SLOT_1);
-    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_SLOT_5);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_SLOT_5);
+    CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == PD_MODE_1);
+    CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_MODE_5);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_MODE_5);
 
     key_runtime_integration_run(&fake_time, child_release_steps, ARRAY_SIZE(child_release_steps));
     CHECK(noah_runtime_debug_active_slot_count() == 1);
@@ -1791,7 +1791,7 @@ static void test_authored_hold_action_activates_pointing_mode_while_held(void) {
     CHECK(pointing_mode_local_active(POINTING_MODE_VOLUME));
     CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == TEST_PD_HOLD_KEY);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_MODE_1);
 
     key_runtime_integration_run(&fake_time, &scenario[3], 2);
     CHECK(pointing_mode_local_active_snapshot() == 0);
@@ -1803,13 +1803,13 @@ static void test_authored_hold_action_activates_pointing_mode_while_held(void) {
 
 static void test_authored_double_tap_lock_locks_pointing_mode(void) {
     const key_runtime_integration_step_t setup[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_1, 1, 2),
         KEY_RUNTIME_INTEGRATION_ADVANCE(20),
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_1, 1, 2),
     };
     const key_runtime_integration_step_t release[] = {
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_1, 1, 2),
     };
     keypos_t key_pos = test_keypos(1, 2);
 
@@ -1828,7 +1828,7 @@ static void test_authored_double_tap_lock_locks_pointing_mode(void) {
 static void test_authored_second_press_hold_branches_into_other_pointing_mode(void) {
     keypos_t                             key_pos    = test_keypos(1, 2);
     const key_runtime_integration_step_t scenario[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_1, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_1, 1, 2), KEY_RUNTIME_INTEGRATION_SCAN(),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_1, 1, 2), KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_1, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(20), KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_1, 1, 2), KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_TAP_HOLD_TERM + 1), KEY_RUNTIME_INTEGRATION_SCAN(), KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_1, 1, 2), KEY_RUNTIME_INTEGRATION_SCAN(),
     };
 
     test_reset_state();
@@ -1839,8 +1839,8 @@ static void test_authored_second_press_hold_branches_into_other_pointing_mode(vo
     CHECK(pointing_mode_local_active(POINTING_MODE_BRIGHTNESS));
     CHECK(pointing_mode_local_locked_snapshot() == 0);
     CHECK(!pointing_mode_local_active(POINTING_MODE_VOLUME));
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_1);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_2);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_MODE_1);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_MODE_2);
 
     key_runtime_integration_run(&fake_time, &scenario[6], 2);
     CHECK(pointing_mode_local_active_snapshot() == 0);
@@ -1865,7 +1865,7 @@ static void test_right_alt_single_tap_locks_arrow_mode_without_leaking_ralt_stat
 
     CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, right_alt_pos, true));
     CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_RIGHT_ALT);
-    CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == PD_SLOT_4_LOCK);
+    CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == PD_MODE_4_LOCK);
     CHECK(noah_runtime_debug_slot_held_action_keycode(right_alt_pos) == KC_NO);
 
     CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, right_alt_pos, false));
@@ -1910,7 +1910,7 @@ static void test_direct_pd_lock_press_uses_physical_trigger_half(void) {
 
     test_reset_state();
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_4_LOCK, left_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_4_LOCK, left_pos, true));
     CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_ARROW);
     CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_ARROW);
     CHECK(pointing_mode_local_owner_sides_snapshot() == SPLIT_SIDE_MASK_LEFT);
@@ -1930,7 +1930,7 @@ static void test_gui_double_tap_hold_with_right_alt_lock_child_keeps_runtime_qui
 
         CHECK(!key_runtime_integration_process_record(KC_RIGHT_ALT, right_alt_pos, true));
         CHECK(noah_runtime_debug_slot_owner_keycode(right_alt_pos) == KC_RIGHT_ALT);
-        CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == PD_SLOT_4_LOCK);
+        CHECK(noah_runtime_debug_slot_tap_action(right_alt_pos) == PD_MODE_4_LOCK);
         CHECK(noah_runtime_debug_slot_held_action_keycode(right_alt_pos) == KC_NO);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
@@ -1982,20 +1982,20 @@ static void test_dragscroll_child_overlap_stays_quiescent(uint16_t parent_keycod
             key_runtime_integration_scan();
         }
 
-        CHECK(!key_runtime_integration_process_record(PD_SLOT_0, child_pos, true));
+        CHECK(!key_runtime_integration_process_record(PD_MODE_0, child_pos, true));
         CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_DRAGSCROLL);
         CHECK(pointing_mode_local_active(POINTING_MODE_DRAGSCROLL));
         CHECK(pointing_mode_local_locked_snapshot() == 0);
-        CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_SLOT_0);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_SLOT_0);
+        CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_MODE_0);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_MODE_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
         CHECK(reset_dragscroll_count == 1); // Entry clears the shared scroll accumulator.
 
         key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
         key_runtime_integration_scan();
         CHECK(pointing_mode_local_active(POINTING_MODE_DRAGSCROLL));
-        CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_SLOT_0);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_SLOT_0);
+        CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == PD_MODE_0);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == PD_MODE_0);
         CHECK(noah_runtime_debug_deferred_release_count() == 0);
 
         if (release_parent_first) {
@@ -2004,7 +2004,7 @@ static void test_dragscroll_child_overlap_stays_quiescent(uint16_t parent_keycod
             CHECK(pointing_mode_local_active(POINTING_MODE_DRAGSCROLL));
         }
 
-        CHECK(!key_runtime_integration_process_record(PD_SLOT_0, child_pos, false));
+        CHECK(!key_runtime_integration_process_record(PD_MODE_0, child_pos, false));
         CHECK(noah_runtime_debug_slot_owner_keycode(child_pos) == KC_NO);
         CHECK(noah_runtime_debug_slot_held_action_keycode(child_pos) == KC_NO);
 
@@ -2033,11 +2033,11 @@ static void test_authored_layer_hold_with_dragscroll_child_stays_quiescent(void)
 static void test_pinch_single_tap_defers_mode_owned_gui_from_delayed_replay(void) {
     keypos_t                             key_pos       = test_keypos(2, 4);
     const key_runtime_integration_step_t press_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_5, 2, 4),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_5, 2, 4),
     };
     const key_runtime_integration_step_t release_steps[] = {
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_5, 2, 4),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_5, 2, 4),
     };
     const key_runtime_integration_step_t flush_steps[] = {
         KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_MULTI_TAP_TERM + 1),
@@ -2048,13 +2048,13 @@ static void test_pinch_single_tap_defers_mode_owned_gui_from_delayed_replay(void
     test_configure_pinch_transparent_profile_path(key_pos);
     fake_mods = MOD_BIT(KC_LEFT_SHIFT);
 
-    CHECK(key_behavior_lookup(PD_SLOT_5).config != NULL);
-    CHECK(pointing_mode_for_keycode(PD_SLOT_5) == POINTING_MODE_PINCH);
+    CHECK(key_behavior_lookup(PD_MODE_5).config != NULL);
+    CHECK(pointing_mode_for_keycode(PD_MODE_5) == POINTING_MODE_PINCH);
 
     key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
     CHECK(!pointing_mode_local_active(POINTING_MODE_PINCH));
     CHECK(fake_mods == MOD_BIT(KC_LEFT_SHIFT));
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_5);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_MODE_5);
     CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == KC_NO);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
@@ -2073,11 +2073,11 @@ static void test_pinch_single_tap_defers_mode_owned_gui_from_delayed_replay(void
 static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_replay(void) {
     keypos_t                             key_pos       = test_keypos(2, 4);
     const key_runtime_integration_step_t press_steps[] = {
-        KEY_RUNTIME_INTEGRATION_PRESS(PD_SLOT_5, 2, 4),
+        KEY_RUNTIME_INTEGRATION_PRESS(PD_MODE_5, 2, 4),
     };
     const key_runtime_integration_step_t release_steps[] = {
         KEY_RUNTIME_INTEGRATION_ADVANCE(10),
-        KEY_RUNTIME_INTEGRATION_RELEASE(PD_SLOT_5, 2, 4),
+        KEY_RUNTIME_INTEGRATION_RELEASE(PD_MODE_5, 2, 4),
     };
     const key_runtime_integration_step_t flush_steps[] = {
         KEY_RUNTIME_INTEGRATION_ADVANCE(TEST_PD_MULTI_TAP_TERM + 1),
@@ -2100,7 +2100,7 @@ static void test_pinch_single_tap_preserves_physically_held_gui_on_delayed_repla
     key_runtime_integration_run(&fake_time, press_steps, ARRAY_SIZE(press_steps));
     CHECK(!pointing_mode_local_active(POINTING_MODE_PINCH));
     CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_5);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_MODE_5);
 
     key_runtime_integration_run(&fake_time, release_steps, ARRAY_SIZE(release_steps));
     CHECK(!pointing_mode_local_active(POINTING_MODE_PINCH));
@@ -2124,7 +2124,7 @@ static void test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processi
     test_configure_pinch_transparent_profile_path(pinch_key_pos);
     fake_mods = MOD_BIT(KC_LEFT_SHIFT);
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_key_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
     test_flush_pending_tap_branch();
@@ -2138,7 +2138,7 @@ static void test_pinch_masks_mode_owned_gui_during_concurrent_plain_key_processi
     noah_post_process_record_user(KC_C, &plain_press);
     CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_key_pos, false));
     CHECK(!pointing_mode_local_active(POINTING_MODE_PINCH));
 }
 
@@ -2153,7 +2153,7 @@ static void test_pinch_masks_mode_owned_gui_from_a_tap_run(void) {
         test_reset_state();
         test_configure_pinch_transparent_profile_path(pinch_key_pos);
 
-        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, true));
+        CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_key_pos, true));
         key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
         key_runtime_integration_scan();
         test_flush_pending_tap_branch();
@@ -2177,7 +2177,7 @@ static void test_pinch_masks_mode_owned_gui_from_a_tap_run(void) {
         CHECK(!key_runtime_integration_process_record(TEST_TRIPLE_TAP_KEY, key_pos, false));
         CHECK(delayed_action_count == 0);
 
-        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, false));
+        CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_key_pos, false));
         CHECK(!pointing_mode_local_active(POINTING_MODE_PINCH));
         key_runtime_integration_advance(&fake_time, 101);
         key_runtime_integration_scan();
@@ -2199,7 +2199,7 @@ static void test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain
     test_configure_pinch_transparent_profile_path(pinch_key_pos);
     fake_mods = MOD_BIT(KC_LEFT_SHIFT);
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_key_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
     CHECK(pointing_mode_local_active(POINTING_MODE_PINCH));
@@ -2215,7 +2215,7 @@ static void test_pinch_keeps_physically_held_gui_visible_during_concurrent_plain
     noah_post_process_record_user(KC_C, &plain_press);
     CHECK(fake_mods == (MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_GUI)));
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_key_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_key_pos, false));
     CHECK(!pointing_mode_local_active(POINTING_MODE_PINCH));
 }
 
@@ -2226,21 +2226,21 @@ static void test_pinch_double_tap_hold_zoom_branch_keeps_projection_coherent(voi
     test_reset_state();
     test_configure_pinch_transparent_profile_path(key_pos);
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, key_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, key_pos, true));
     key_runtime_integration_advance(&fake_time, 10);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, key_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, key_pos, false));
     CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(noah_runtime_debug_pending_multi_tap_slot_count() == 1);
 
     key_runtime_integration_advance(&fake_time, 20);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, key_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, key_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
     test_flush_pending_tap_branch();
 
     CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_ZOOM);
-    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_SLOT_5);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_SLOT_3);
+    CHECK(noah_runtime_debug_slot_owner_keycode(key_pos) == PD_MODE_5);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(key_pos) == PD_MODE_3);
     CHECK(fake_managed_mods == 0);
     CHECK((fake_mods & MOD_BIT(KC_LEFT_GUI)) == 0);
 
@@ -2248,7 +2248,7 @@ static void test_pinch_double_tap_hold_zoom_branch_keeps_projection_coherent(voi
     CHECK(snapshot.core_shadow_pointing_mode_local_active == POINTING_MODE_ZOOM);
     CHECK(snapshot.core_shadow_pointer_pointing_mode_anchor_active);
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, key_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, key_pos, false));
     key_runtime_integration_scan();
 
     CHECK(pointing_mode_local_active_snapshot() == 0);
@@ -2273,36 +2273,36 @@ static void test_volume_pinch_zoom_volume_alternation_keeps_projection_coherent(
     test_reset_state();
     test_configure_pinch_transparent_profile_path(pinch_pos);
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_1, volume_pos, true));
     CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_VOLUME);
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_shadow_pointing_mode_local_active == POINTING_MODE_VOLUME);
 
     key_runtime_integration_advance(&fake_time, 10);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_1, volume_pos, false));
     key_runtime_integration_scan();
     CHECK(pointing_mode_local_active_snapshot() == 0);
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_shadow_pointing_mode_local_active == 0);
 
     key_runtime_integration_advance(&fake_time, 20);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_pos, true));
     key_runtime_integration_advance(&fake_time, 10);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_pos, false));
     CHECK(pointing_mode_local_active_snapshot() == 0);
 
     key_runtime_integration_advance(&fake_time, 20);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_pos, true));
     key_runtime_integration_advance(&fake_time, TEST_PD_TAP_HOLD_TERM + 1);
     key_runtime_integration_scan();
     test_flush_pending_tap_branch();
     CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_ZOOM);
-    CHECK(noah_runtime_debug_slot_owner_keycode(pinch_pos) == PD_SLOT_5);
-    CHECK(noah_runtime_debug_slot_held_action_keycode(pinch_pos) == PD_SLOT_3);
+    CHECK(noah_runtime_debug_slot_owner_keycode(pinch_pos) == PD_MODE_5);
+    CHECK(noah_runtime_debug_slot_held_action_keycode(pinch_pos) == PD_MODE_3);
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_shadow_pointing_mode_local_active == POINTING_MODE_ZOOM);
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_pos, false));
     key_runtime_integration_scan();
     CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(noah_runtime_debug_slot_owner_keycode(pinch_pos) == KC_NO);
@@ -2310,12 +2310,12 @@ static void test_volume_pinch_zoom_volume_alternation_keeps_projection_coherent(
     CHECK(snapshot.core_shadow_pointing_mode_local_active == 0);
 
     key_runtime_integration_advance(&fake_time, 20);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_1, volume_pos, true));
     CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_VOLUME);
     snapshot = key_runtime_core_projection_snapshot_capture();
     CHECK(snapshot.core_shadow_pointing_mode_local_active == POINTING_MODE_VOLUME);
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, volume_pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_1, volume_pos, false));
     key_runtime_integration_scan();
     CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(noah_runtime_debug_active_slot_count() == 0);
@@ -2335,9 +2335,9 @@ static void test_pinch_double_tap_salvos_stay_quiescent(void) {
     test_configure_pinch_transparent_profile_path(pinch_pos);
 
     for (uint8_t salvo = 0; salvo < 4; salvo++) {
-        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
+        CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_pos, true));
         key_runtime_integration_advance(&fake_time, 10);
-        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
+        CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_pos, false));
         key_runtime_integration_scan();
 
         CHECK(pointing_mode_local_active_snapshot() == 0);
@@ -2348,9 +2348,9 @@ static void test_pinch_double_tap_salvos_stay_quiescent(void) {
         CHECK(snapshot.core_shadow_pointing_mode_local_active == 0);
 
         key_runtime_integration_advance(&fake_time, 20);
-        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, true));
+        CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_pos, true));
         key_runtime_integration_advance(&fake_time, 10);
-        CHECK(!key_runtime_integration_process_record(PD_SLOT_5, pinch_pos, false));
+        CHECK(!key_runtime_integration_process_record(PD_MODE_5, pinch_pos, false));
         key_runtime_integration_scan();
 
         CHECK(pointing_mode_local_active_snapshot() == 0);
@@ -2394,7 +2394,7 @@ static void test_gui_double_tap_hold_with_authored_pd_hold_keeps_processed_child
         CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_VOLUME);
         CHECK(pointing_mode_local_active(POINTING_MODE_VOLUME));
         CHECK(noah_runtime_debug_slot_owner_keycode(hold_pos) == TEST_PD_HOLD_KEY);
-        CHECK(noah_runtime_debug_slot_held_action_keycode(hold_pos) == PD_SLOT_1);
+        CHECK(noah_runtime_debug_slot_held_action_keycode(hold_pos) == PD_MODE_1);
 
         CHECK(!key_runtime_integration_process_record(TEST_HANDLED_TAP_KEY, child_pos, true));
 
@@ -2442,38 +2442,38 @@ static void test_upper_slot_hold_lock_dpi_and_disabled_slot(uint8_t slot) {
     test_reset_state();
     // The slot starts disabled: its lock leaves the current one alone.
     CHECK(noah_pd_defaults[slot].kind == 0);
-    action_dispatch(PD_SLOT_1_LOCK);
+    action_dispatch(PD_MODE_1_LOCK);
     CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_VOLUME);
-    action_dispatch((uint16_t)(PD_SLOT_0_LOCK + slot));
+    action_dispatch((uint16_t)(PD_MODE_0_LOCK + slot));
     CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_VOLUME);
-    action_dispatch(PD_SLOT_1_LOCK);
+    action_dispatch(PD_MODE_1_LOCK);
     CHECK(pointing_mode_local_active_snapshot() == 0);
     noah_pd_config_t last = noah_pd_defaults[1];
     last.id = slot; last.dpi = 1200;
     noah_profile_pd_v1_encode_record(&last, configured_pd_records[slot]);
     publish_configured_pd();
-    CHECK(!key_runtime_integration_process_record((uint16_t)(PD_SLOT_0 + slot), pos, true));
+    CHECK(!key_runtime_integration_process_record((uint16_t)(PD_MODE_0 + slot), pos, true));
     CHECK(pointing_mode_local_active_snapshot() == mode);
     key_runtime_integration_scan(); // CPI synchronization is scan-owned.
     CHECK(current_cpi == 1200);
-    CHECK(!key_runtime_integration_process_record((uint16_t)(PD_SLOT_0 + slot), pos, false));
+    CHECK(!key_runtime_integration_process_record((uint16_t)(PD_MODE_0 + slot), pos, false));
     key_runtime_integration_scan();
     CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(current_cpi == default_dpi);
-    action_dispatch((uint16_t)(PD_SLOT_0_LOCK + slot));
+    action_dispatch((uint16_t)(PD_MODE_0_LOCK + slot));
     CHECK(pointing_mode_local_locked_snapshot() == mode);
-    action_dispatch((uint16_t)(PD_SLOT_0_LOCK + slot));
+    action_dispatch((uint16_t)(PD_MODE_0_LOCK + slot));
     CHECK(pointing_mode_local_locked_snapshot() == 0);
 }
 
 static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
-    CHECK(PD_SLOT_8 == PD_SLOT_0 + 8 && PD_SLOT_31 == PD_SLOT_0 + 31 && PD_SLOT_31_LOCK == PD_SLOT_0_LOCK + 31);
+    CHECK(PD_MODE_8 == PD_MODE_0 + 8 && PD_MODE_31 == PD_MODE_0 + 31 && PD_MODE_31_LOCK == PD_MODE_0_LOCK + 31);
     // Slot 8 is the first the authored defaults leave disabled.
     test_upper_slot_hold_lock_dpi_and_disabled_slot(8);
     // Slot 31 proves the upper-bound identity path: the mask's top bit, the
     // last keycodes of both blocks and the last cache row.
     test_upper_slot_hold_lock_dpi_and_disabled_slot(31);
-    CHECK(pointing_mode_mask_from_id(31) == (pointing_mode_mask_t)POINTING_MODE_SLOT_31);
+    CHECK(pointing_mode_mask_from_id(31) == (pointing_mode_mask_t)POINTING_MODE_31);
 }
 
 // ── Mouse buttons a pointing mode consumes ─────────────────────────────────
@@ -2484,7 +2484,7 @@ static void test_last_slot_hold_lock_dpi_and_disabled_slot(void) {
 
 #ifndef NOAH_TEST_QMK_GESTURES
 static void test_lock_arrow(void) {
-    action_dispatch(PD_SLOT_4_LOCK);
+    action_dispatch(PD_MODE_4_LOCK);
     CHECK(pointing_mode_local_locked_snapshot() == POINTING_MODE_ARROW);
 }
 #endif
@@ -2510,7 +2510,7 @@ static void test_release_and_settle(uint16_t button, keypos_t pos) {
 // Mouse buttons 1-3 run as they would without a mode, in every mode, Arrow
 // included: pointing version 4 retired the per-mode button overrides.
 static void test_mouse_buttons_run_their_behaviour_in_every_mode(void) {
-    const uint16_t locks[] = {PD_SLOT_4_LOCK, PD_SLOT_1_LOCK};
+    const uint16_t locks[] = {PD_MODE_4_LOCK, PD_MODE_1_LOCK};
     keypos_t       pos     = test_keypos(4, 0);
     keypos_t       third   = test_keypos(4, 2);
 
@@ -2799,36 +2799,36 @@ static void test_a_key_source_beats_a_layer_source(void) {
 
     test_reset_linked_layers();
     test_hold_layer(TEST_LAYER_VOLUME, true);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_3, pos, true));
     CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_KEY));
     // While the key runs Zoom, the layers wait.
     test_hold_layer(TEST_LAYER_ZOOM, true);
     test_hold_layer(TEST_LAYER_ZOOM, false);
     CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_KEY));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_3, pos, false));
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
 
     // Locked from its key, then unlocked: back to the layer's mode.
-    action_dispatch(PD_SLOT_3_LOCK);
+    action_dispatch(PD_MODE_3_LOCK);
     CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_KEY) && pointing_mode_local_locked_snapshot() == POINTING_MODE_ZOOM);
-    action_dispatch(PD_SLOT_3_LOCK);
+    action_dispatch(PD_MODE_3_LOCK);
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER) && !pointing_mode_local_locked_snapshot());
 
     // Locked from its own key while its layer runs it, then unlocked: the
     // layer takes it back, unlocked, without a restart.
-    action_dispatch(PD_SLOT_1_LOCK);
+    action_dispatch(PD_MODE_1_LOCK);
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_KEY) && pointing_mode_local_locked_snapshot() == POINTING_MODE_VOLUME);
     uint8_t unlock_exits = reset_dragscroll_count;
-    action_dispatch(PD_SLOT_1_LOCK);
+    action_dispatch(PD_MODE_1_LOCK);
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER) && !pointing_mode_local_locked_snapshot());
     CHECK(reset_dragscroll_count == unlock_exits);
 
     // Volume's own key while its layer runs it: the key holds it, and on the
     // release the layer takes it back without a restart.
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_1, pos, true));
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_KEY));
     uint8_t exits = reset_dragscroll_count;
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_1, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_1, pos, false));
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
     CHECK(reset_dragscroll_count == exits);
     test_hold_layer(TEST_LAYER_VOLUME, false);
@@ -2841,43 +2841,43 @@ static void test_a_key_started_mode_turns_on_its_layers(void) {
     keypos_t pos = test_keypos(0, 0);
 
     test_reset_linked_layers();
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_0, pos, true));
     CHECK(test_runs(POINTING_MODE_DRAGSCROLL, POINTING_MODE_SOURCE_KEY));
     CHECK(test_layer_on(TEST_LAYER_DRAGSCROLL));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_0, pos, false));
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
     CHECK(!test_layer_on(TEST_LAYER_DRAGSCROLL));
 
-    action_dispatch(PD_SLOT_0_LOCK);
+    action_dispatch(PD_MODE_0_LOCK);
     CHECK(test_layer_on(TEST_LAYER_DRAGSCROLL));
     for (uint8_t scan = 0; scan < 4; scan++) {
         key_runtime_integration_advance(&fake_time, 500u);
         key_runtime_integration_scan();
     }
     CHECK(test_layer_on(TEST_LAYER_DRAGSCROLL));
-    action_dispatch(PD_SLOT_0_LOCK);
+    action_dispatch(PD_MODE_0_LOCK);
     CHECK(!test_layer_on(TEST_LAYER_DRAGSCROLL));
 
     // Another owner keeps the layer when the mode ends.
     test_hold_layer(TEST_LAYER_DRAGSCROLL, true);
-    action_dispatch(PD_SLOT_0_LOCK);
-    action_dispatch(PD_SLOT_0_LOCK);
+    action_dispatch(PD_MODE_0_LOCK);
+    action_dispatch(PD_MODE_0_LOCK);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
     CHECK(test_layer_on(TEST_LAYER_DRAGSCROLL));
     test_hold_layer(TEST_LAYER_DRAGSCROLL, false);
     CHECK(!test_layer_on(TEST_LAYER_DRAGSCROLL));
 
     // Brightness's key turns on both its linked layers and takes both away.
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_2, pos, true));
     CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_KEY));
     CHECK(test_layer_on(TEST_LAYER_OWN) && test_layer_on(TEST_LAYER_OWN_TOO));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_2, pos, false));
     CHECK(!test_layer_on(TEST_LAYER_OWN) && !test_layer_on(TEST_LAYER_OWN_TOO));
     // Locked, then another owner keeps one of them when the mode ends.
-    action_dispatch(PD_SLOT_2_LOCK);
+    action_dispatch(PD_MODE_2_LOCK);
     CHECK(test_layer_on(TEST_LAYER_OWN) && test_layer_on(TEST_LAYER_OWN_TOO));
     test_hold_layer(TEST_LAYER_OWN_TOO, true);
-    action_dispatch(PD_SLOT_2_LOCK);
+    action_dispatch(PD_MODE_2_LOCK);
     CHECK(!test_layer_on(TEST_LAYER_OWN) && test_layer_on(TEST_LAYER_OWN_TOO));
     // Still on, its layer starts Brightness again.
     CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER));
@@ -2885,10 +2885,10 @@ static void test_a_key_started_mode_turns_on_its_layers(void) {
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_OWN_TOO));
 
     // Undo / Redo's key turns on a layer outside its linked layers.
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_6, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_6, pos, true));
     CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_KEY));
     CHECK(test_layer_on(TEST_LAYER_UNDO_KEY) && !test_layer_on(TEST_LAYER_UNDO) && !test_layer_on(TEST_LAYER_UNDO_TOO));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_6, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_6, pos, false));
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_UNDO_KEY));
 
     // A mode its layer started owns no layer.
@@ -2908,20 +2908,20 @@ static void test_a_key_turning_on_its_own_layers_never_latches(void) {
     test_hold_layer(TEST_LAYER_OWN, false);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_OWN));
 
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_2, pos, true));
     CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_OWN));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_2, pos, false));
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_OWN));
 
-    action_dispatch(PD_SLOT_2_LOCK);
+    action_dispatch(PD_MODE_2_LOCK);
     CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_OWN));
-    action_dispatch(PD_SLOT_2_LOCK);
+    action_dispatch(PD_MODE_2_LOCK);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_OWN));
 
     // Crossed: the mode key, then the layer key, the mode key let go first.
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_2, pos, true));
     test_hold_layer(TEST_LAYER_OWN, true);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_2, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_2, pos, false));
     CHECK(test_runs(POINTING_MODE_BRIGHTNESS, POINTING_MODE_SOURCE_LAYER) && test_layer_on(TEST_LAYER_OWN) && !test_layer_on(TEST_LAYER_OWN_TOO));
     test_hold_layer(TEST_LAYER_OWN, false);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_OWN));
@@ -2933,16 +2933,16 @@ static void test_a_key_turning_on_its_own_layers_never_latches(void) {
 // layer takes it again.
 static void test_a_key_taking_over_a_layer_started_mode_anchors_as_from_nothing(void) {
     test_reset_linked_layers();
-    action_dispatch(PD_SLOT_1_LOCK);
+    action_dispatch(PD_MODE_1_LOCK);
     CHECK(auto_mouse_key_tracker == 1);
-    action_dispatch(PD_SLOT_1_LOCK);
+    action_dispatch(PD_MODE_1_LOCK);
     CHECK(auto_mouse_key_tracker == 0);
 
     test_hold_layer(TEST_LAYER_VOLUME, true);
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER) && auto_mouse_key_tracker == 0);
-    action_dispatch(PD_SLOT_1_LOCK);
+    action_dispatch(PD_MODE_1_LOCK);
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_KEY) && auto_mouse_key_tracker == 1);
-    action_dispatch(PD_SLOT_1_LOCK);
+    action_dispatch(PD_MODE_1_LOCK);
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER) && auto_mouse_key_tracker == 0);
     test_hold_layer(TEST_LAYER_VOLUME, false);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && auto_mouse_key_tracker == 0);
@@ -2963,11 +2963,11 @@ static void test_a_layer_started_mode_strips_the_pointer_layer(void) {
 
     // Started when a key lets go, outside the layer-state hook, too.
     test_hold_layer(TEST_LAYER_VOLUME, false);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_3, pos, true));
     test_hold_layer(TEST_LAYER_VOLUME, true);
     layer_on(TEST_LAYER_POINTER);
     CHECK(test_layer_on(TEST_LAYER_POINTER));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_3, pos, false));
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
     CHECK(!test_layer_on(TEST_LAYER_POINTER));
     test_hold_layer(TEST_LAYER_VOLUME, false);
@@ -2981,10 +2981,10 @@ static void test_links_to_the_pointer_layer_or_a_default_layer_are_inert(void) {
     test_hold_layer(TEST_LAYER_POINTER, true);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
     test_hold_layer(TEST_LAYER_POINTER, false);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_4, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_4, pos, true));
     CHECK(test_runs(POINTING_MODE_ARROW, POINTING_MODE_SOURCE_KEY));
     CHECK(test_pointing_mode_layers == 0u && !test_layer_on(TEST_LAYER_POINTER));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_4, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_4, pos, false));
     // The base layer is on everywhere; Pinch's link to it never starts Pinch.
     test_hold_layer(TEST_LAYER_BASE, true);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
@@ -3040,10 +3040,10 @@ static void test_a_higher_layer_ends_a_link_that_says_so(void) {
     auto_mouse_layer_target = TEST_LAYER_POINTER;
 
     // From its key, Zoom keeps running under a higher layer.
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_3, pos, true));
     test_hold_layer(higher, true);
     CHECK(test_runs(POINTING_MODE_ZOOM, POINTING_MODE_SOURCE_KEY));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_3, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_3, pos, false));
     test_hold_layer(higher, false);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
 }
@@ -3092,9 +3092,9 @@ static void test_any_other_layer_ends_a_link_that_says_so(void) {
 
     // From its key, it keeps running over another layer.
     test_hold_layer(lower, true);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_6, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_6, pos, true));
     CHECK(test_runs(TEST_MODE_UNDO, POINTING_MODE_SOURCE_KEY));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_6, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_6, pos, false));
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
     test_hold_layer(lower, false);
 }
@@ -3121,14 +3121,14 @@ static void test_two_keys_turn_on_one_layer(void) {
     keypos_t first = test_keypos(0, 0), second = test_keypos(0, 1);
 
     test_reset_linked_layers();
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, first, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_0, first, true));
     CHECK(test_runs(POINTING_MODE_DRAGSCROLL, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_DRAGSCROLL));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, second, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_7, second, true));
     CHECK(test_runs(TEST_MODE_BACK, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_DRAGSCROLL) && test_layer_on(TEST_LAYER_VOLUME));
     CHECK(layer_off_counts[TEST_LAYER_DRAGSCROLL] == 0);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, first, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_0, first, false));
     CHECK(test_runs(TEST_MODE_BACK, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_DRAGSCROLL));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, second, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_7, second, false));
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_DRAGSCROLL) && !test_layer_on(TEST_LAYER_VOLUME));
 }
 
@@ -3158,15 +3158,15 @@ static void test_a_key_replacing_another_starts_no_mode_in_between(void) {
     publish_configured_pd();
     test_hold_layer(TEST_LAYER_VOLUME, true);
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, first, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_7, first, true));
     CHECK(test_runs(TEST_MODE_BACK, POINTING_MODE_SOURCE_KEY));
     noah_runtime_trace_reset();
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, second, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_0, second, true));
     CHECK(test_runs(POINTING_MODE_DRAGSCROLL, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_DRAGSCROLL));
     CHECK(test_traced_layer_starts() == 0u);
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, first, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_7, first, false));
     CHECK(test_runs(POINTING_MODE_DRAGSCROLL, POINTING_MODE_SOURCE_KEY));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_0, second, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_0, second, false));
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER) && !test_layer_on(TEST_LAYER_DRAGSCROLL));
     test_hold_layer(TEST_LAYER_VOLUME, false);
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
@@ -3180,16 +3180,16 @@ static void test_a_key_turns_on_a_layer_another_mode_starts_from(void) {
     keypos_t pos = test_keypos(0, 0);
 
     test_reset_linked_layers();
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, pos, true));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_7, pos, true));
     CHECK(test_runs(TEST_MODE_BACK, POINTING_MODE_SOURCE_KEY) && test_layer_on(TEST_LAYER_VOLUME));
-    CHECK(!key_runtime_integration_process_record(PD_SLOT_7, pos, false));
+    CHECK(!key_runtime_integration_process_record(PD_MODE_7, pos, false));
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE) && !test_layer_on(TEST_LAYER_VOLUME));
 
     // Locked, with the layer also held: unlocking hands over to Volume.
-    action_dispatch(PD_SLOT_7_LOCK);
+    action_dispatch(PD_MODE_7_LOCK);
     test_hold_layer(TEST_LAYER_VOLUME, true);
     CHECK(test_runs(TEST_MODE_BACK, POINTING_MODE_SOURCE_KEY));
-    action_dispatch(PD_SLOT_7_LOCK);
+    action_dispatch(PD_MODE_7_LOCK);
     CHECK(test_runs(POINTING_MODE_VOLUME, POINTING_MODE_SOURCE_LAYER));
     CHECK(test_layer_on(TEST_LAYER_VOLUME) && !test_layer_on(TEST_LAYER_DRAGSCROLL));
     test_hold_layer(TEST_LAYER_VOLUME, false);
@@ -3216,9 +3216,9 @@ static void test_a_layer_started_mode_ends_at_activation(void) {
     CHECK(test_runs(0, POINTING_MODE_SOURCE_NONE));
 
     // A mode its key holds still holds the activation back.
-    action_dispatch(PD_SLOT_3_LOCK);
+    action_dispatch(PD_MODE_3_LOCK);
     CHECK(pointing_mode_local_key_source_active());
-    action_dispatch(PD_SLOT_3_LOCK);
+    action_dispatch(PD_MODE_3_LOCK);
 }
 #endif
 
@@ -3347,8 +3347,8 @@ uint16_t gesture_keycode(uint8_t row, uint8_t col) {
     if (row == 7 && col < 4) return KC_F9 + col;
     if (row == 7 && col < 8) return KC_F13 + (col - 4);
     static const uint16_t keys[2][8] = {
-        {PD_SLOT_5, MS_BTN1, MS_BTN3, LT(3,KC_SLSH), LT(2,KC_A), KC_COMM, PD_SLOT_0, MS_BTN2},
-        {KC_M, KC_DOT, KC_N, G(KC_C), G(KC_V), PD_SLOT_1, KC_D, LT(3,KC_F)},
+        {PD_MODE_5, MS_BTN1, MS_BTN3, LT(3,KC_SLSH), LT(2,KC_A), KC_COMM, PD_MODE_0, MS_BTN2},
+        {KC_M, KC_DOT, KC_N, G(KC_C), G(KC_V), PD_MODE_1, KC_D, LT(3,KC_F)},
     };
     return row >= 4 && row < 6 && col < 8 ? keys[row-4][col] : KC_NO;
 }
@@ -5785,7 +5785,7 @@ static void test_qmk_combo_output_outlasts_the_dual_role_term(void) {
 // first key's tap is not sent (D-F27).
 static void test_qmk_keys_holding_from_the_press_hold_no_keys_back(void) {
     const struct { uint16_t code; uint16_t tap; } keys[] = {
-        {LM(TEST_LAYER_NAV, MOD_LSFT), KC_NO}, {PD_SLOT_2, KC_NO}, {PD_SLOT_2, KC_TRNS},
+        {LM(TEST_LAYER_NAV, MOD_LSFT), KC_NO}, {PD_MODE_2, KC_NO}, {PD_MODE_2, KC_TRNS},
     };
     for (unsigned i = 0; i < ARRAY_SIZE(keys); i++) {
         const bool lm = IS_QK_LAYER_MOD(keys[i].code);

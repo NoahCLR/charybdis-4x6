@@ -9,8 +9,8 @@ page edits every setting below.
 ## Slots and their keys
 
 There are 32 **pointing slots**, numbered 0 to 31. Each holds a mode or is
-empty, and each has two keys: `PD_SLOT_n` runs the mode while held, and
-`PD_SLOT_n_LOCK` locks it on until pressed again. Keys point at the slot, not
+empty, and each has two keys: `PD_MODE_n` runs the mode while held, and
+`PD_MODE_n_LOCK` locks it on until pressed again. Keys point at the slot, not
 the mode, so changing or clearing a mode keeps its keys where they are. A key
 for an empty slot does nothing.
 

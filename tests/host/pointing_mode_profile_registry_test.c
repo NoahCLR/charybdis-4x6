@@ -8,10 +8,10 @@ int main(void) {
     // Thirty-two slots: slot n holds at 0x7e80 + n and toggles at 0x7ea0 + n,
     // filling both reserved blocks; slot 31's flag is the mask's top bit.
     assert(POINTING_MODE_COUNT == 32);
-    assert(PD_SLOT_0 == 0x7e80 && PD_SLOT_7 == 0x7e87 && PD_SLOT_8 == 0x7e88 && PD_SLOT_31 == 0x7e9f);
-    assert(PD_SLOT_0_LOCK == 0x7ea0 && PD_SLOT_7_LOCK == 0x7ea7 && PD_SLOT_8_LOCK == 0x7ea8 && PD_SLOT_31_LOCK == 0x7ebf);
-    assert((pointing_mode_mask_t)POINTING_MODE_SLOT_31 == UINT32_C(0x80000000));
-    assert((pointing_mode_mask_t)POINTING_MODE_SLOT_16 == UINT32_C(0x00010000));
+    assert(PD_MODE_0 == 0x7e80 && PD_MODE_7 == 0x7e87 && PD_MODE_8 == 0x7e88 && PD_MODE_31 == 0x7e9f);
+    assert(PD_MODE_0_LOCK == 0x7ea0 && PD_MODE_7_LOCK == 0x7ea7 && PD_MODE_8_LOCK == 0x7ea8 && PD_MODE_31_LOCK == 0x7ebf);
+    assert((pointing_mode_mask_t)POINTING_MODE_31 == UINT32_C(0x80000000));
+    assert((pointing_mode_mask_t)POINTING_MODE_16 == UINT32_C(0x00010000));
     assert(pointing_mode_id_from_mask(UINT32_C(0x80000000)) == 31);
     assert(pointing_mode_id_from_mask(UINT32_C(0x80000001)) == POINTING_MODE_ID_NONE);
     assert(pointing_mode_id_from_mask(0) == POINTING_MODE_ID_NONE);

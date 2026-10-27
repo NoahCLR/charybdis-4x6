@@ -336,7 +336,7 @@
 // Valid combo outputs include plain keycodes, custom keys (CUSTOM_KEY_n),
 // macros (MACRO_n), MO(layer) (the layer stays on while the combo is
 // held), LOCK_LAYER(...), explicit pointing-mode lock keycodes such as
-// PD_SLOT_4_LOCK, and keycodes that also have rows in key_behaviors[].
+// PD_MODE_4_LOCK, and keycodes that also have rows in key_behaviors[].
 //
 // If a combo emits a keycode that also has a row in key_behaviors[],
 // that emitted key can reuse the same custom behavior handling.
@@ -358,13 +358,13 @@
 // hold threshold, set in Charybdis Ark.
 #define COMBOS(COMBO, COMBO_WINDOW)                                                                       \
     COMBO(KC_TAB, (KC_D, LT(LAYER_NAV, KC_F)))                                                            \
-    COMBO(CUSTOM_KEY_2, (PD_SLOT_5, MS_BTN3))                                                             \
+    COMBO(CUSTOM_KEY_2, (PD_MODE_5, MS_BTN3))                                                             \
     COMBO(KC_LGUI, (KC_N, KC_M))                                                                          \
     COMBO(G(KC_N), (KC_M, KC_COMM, KC_DOT, LT(LAYER_NAV, KC_SLSH)))                                       \
-    COMBO(G(KC_N), (MS_BTN1, MS_BTN2, PD_SLOT_0, LT(LAYER_NAV, KC_SLSH)))                                 \
-    COMBO(KC_LGUI, (MS_BTN1, PD_SLOT_1))                                                                  \
+    COMBO(G(KC_N), (MS_BTN1, MS_BTN2, PD_MODE_0, LT(LAYER_NAV, KC_SLSH)))                                 \
+    COMBO(KC_LGUI, (MS_BTN1, PD_MODE_1))                                                                  \
     COMBO(G(KC_A), (G(KC_C), G(KC_V)))                                                                    \
-    COMBO(G(KC_T), (MS_BTN1, MS_BTN2, PD_SLOT_0))                                                         \
+    COMBO(G(KC_T), (MS_BTN1, MS_BTN2, PD_MODE_0))                                                         \
     COMBO(G(KC_T), (KC_M, KC_COMM, KC_DOT))                                                               \
     COMBO(MS_BTN6, (MS_BTN1, MS_BTN2))                                                                    \
     COMBO(MO(LAYER_EXTRA_1), (CUSTOM_KEY_1, KC_BSPC))                                                     \
@@ -579,7 +579,7 @@ const key_behavior_t
             {.keycode = KC_ESC, .tap_counts = {[0] = {.long_hold = TAP_AT_HOLD_THRESHOLD(LAG(KC_ESC))}, [1] = {.tap = TAP_SENDS(S(KC_GRV))}}},
             {.keycode = KC_BSPC, .longer_hold_term = 500, .tap_counts = {[0] = {.hold = TAP_ON_RELEASE_AFTER_HOLD(A(KC_BSPC)), .long_hold = TAP_AT_HOLD_THRESHOLD(G(KC_BSPC))}}},
             {.keycode = KC_LEFT_SHIFT, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_CAPS)}}},
-            {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(PD_SLOT_4_LOCK)}, [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_6)}}},
+            {.keycode = KC_RIGHT_ALT, .tap_counts = {[0] = {.tap = TAP_SENDS(PD_MODE_4_LOCK)}, [1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_MODE_6)}}},
             {.keycode = KC_ENT, .tap_counts = {[0] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(S(KC_ENT))}}},
             {.keycode = KC_LEFT_GUI, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(KC_LEFT_ALT)}, [2] = {.tap = TAP_SENDS(OSM(MOD_LSFT))}}},
 
@@ -597,24 +597,24 @@ const key_behavior_t
             {.keycode = MS_BTN3, .multi_tap_term = 100, .tap_hold_term = 100, .tap_counts = {[1] = {.hold = PRESS_AND_HOLD_UNTIL_RELEASE(MS_BTN7)}}},
 
             // ─── Pointing-Mode Keys ──────────────────────────────────────────────────────────
-            {.keycode = PD_SLOT_2, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}}},
+            {.keycode = PD_MODE_2, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}}},
             {
-                .keycode = PD_SLOT_5,
+                .keycode = PD_MODE_5,
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(KC_TRNS)},
-                        [1] = {.tap = TAP_SENDS(MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_SLOT_3)},
+                        [1] = {.tap = TAP_SENDS(MACRO_6), .hold = PRESS_AND_HOLD_UNTIL_RELEASE(PD_MODE_3)},
                     },
             },
-            {.keycode = PD_SLOT_1, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
+            {.keycode = PD_MODE_1, .tap_counts = {[0] = {.tap = TAP_SENDS(KC_TRNS)}, [1] = {.tap = TAP_SENDS(KC_MUTE)}}},
 
             // Dragscroll: single tap '.', hold = momentary, double-tap hold = lock.
             {
-                .keycode = PD_SLOT_0,
+                .keycode = PD_MODE_0,
                 .tap_counts =
                     {
                         [0] = {.tap = TAP_SENDS(KC_TRNS)},
-                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(PD_SLOT_0_LOCK)},
+                        [1] = {.hold = TAP_AT_HOLD_THRESHOLD(PD_MODE_0_LOCK)},
                     },
             },
 
@@ -761,7 +761,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
             KC_LEFT_SHIFT,      MACRO_16,           _______,      MACRO_12,           _______,           _______,          MACRO_1,           KC_LEFT,           KC_DOWN,          KC_RIGHT,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-              KC_LEFT_ALT,      MACRO_15,      MACRO_14,      MACRO_13,           _______,           _______,          MACRO_0,           MS_BTN1,           MS_BTN2,         PD_SLOT_0,           _______,           _______,
+              KC_LEFT_ALT,      MACRO_15,      MACRO_14,      MACRO_13,           _______,           _______,          MACRO_0,           MS_BTN1,           MS_BTN2,         PD_MODE_0,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                            _______,           _______,           _______,              _______,           _______,
                                                                                               _______,           _______,              _______
@@ -774,9 +774,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
                   _______,           _______,           _______,           _______,           _______,           _______,              _______,           _______,           _______,           _______,           _______,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,            PD_SLOT_2,         PD_SLOT_5,           MS_BTN3,      CUSTOM_KEY_3,         PD_SLOT_7,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,            PD_MODE_2,         PD_MODE_5,           MS_BTN3,      CUSTOM_KEY_3,         PD_MODE_7,           _______,
   // ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-                  _______,           _______,           _______,           _______,           _______,           _______,            PD_SLOT_1,           MS_BTN1,           MS_BTN2,         PD_SLOT_0,           _______,           _______,
+                  _______,           _______,           _______,           _______,           _______,           _______,            PD_MODE_1,           MS_BTN1,           MS_BTN2,         PD_MODE_0,           _______,           _______,
   // ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤ ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                            _______,           _______,           _______,              _______,           _______,
                                                                                               _______,           _______,              _______

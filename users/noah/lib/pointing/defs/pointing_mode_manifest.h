@@ -12,41 +12,42 @@ enum {
     POINTING_MODE_TRAIT_LOCK_OWNS_AUTO_MOUSE_TOGGLE = (pointing_mode_traits_t)1u << 3,
 };
 
-// The configurable pointing slots in ID order. Slot n holds with PD_SLOT_n and
-// toggles with PD_SLOT_n_LOCK (noah_keymap_ids.h). Thirty-two fill both
-// keycode blocks. The names here only name the slot's C constants
-// (POINTING_MODE_*, POINTING_MODE_INDEX_*); a slot's name and settings come from the
-// keymap's compiled defaults (noah_pd_defaults in pd_config.c).
+// The configurable pointing modes in slot order: PD_MODE_n holds slot n's mode
+// and PD_MODE_n_LOCK locks it (noah_keymap_ids.h). Thirty-two fill both
+// keycode blocks. The names here only name the modes' C constants
+// (POINTING_MODE_*, POINTING_MODE_INDEX_*): the six factory presets, then the
+// slot number. A mode's name and settings come from the keymap's compiled
+// defaults (noah_pd_defaults in pd_config.c).
 #define NOAH_POINTING_MODE_LIST(MODE) \
-    MODE(DRAGSCROLL, PD_SLOT_0)       \
-    MODE(VOLUME, PD_SLOT_1)           \
-    MODE(BRIGHTNESS, PD_SLOT_2)       \
-    MODE(ZOOM, PD_SLOT_3)             \
-    MODE(ARROW, PD_SLOT_4)            \
-    MODE(PINCH, PD_SLOT_5)            \
-    MODE(SLOT_6, PD_SLOT_6)           \
-    MODE(SLOT_7, PD_SLOT_7)           \
-    MODE(SLOT_8, PD_SLOT_8)           \
-    MODE(SLOT_9, PD_SLOT_9)           \
-    MODE(SLOT_10, PD_SLOT_10)         \
-    MODE(SLOT_11, PD_SLOT_11)         \
-    MODE(SLOT_12, PD_SLOT_12)         \
-    MODE(SLOT_13, PD_SLOT_13)         \
-    MODE(SLOT_14, PD_SLOT_14)         \
-    MODE(SLOT_15, PD_SLOT_15)         \
-    MODE(SLOT_16, PD_SLOT_16)         \
-    MODE(SLOT_17, PD_SLOT_17)         \
-    MODE(SLOT_18, PD_SLOT_18)         \
-    MODE(SLOT_19, PD_SLOT_19)         \
-    MODE(SLOT_20, PD_SLOT_20)         \
-    MODE(SLOT_21, PD_SLOT_21)         \
-    MODE(SLOT_22, PD_SLOT_22)         \
-    MODE(SLOT_23, PD_SLOT_23)         \
-    MODE(SLOT_24, PD_SLOT_24)         \
-    MODE(SLOT_25, PD_SLOT_25)         \
-    MODE(SLOT_26, PD_SLOT_26)         \
-    MODE(SLOT_27, PD_SLOT_27)         \
-    MODE(SLOT_28, PD_SLOT_28)         \
-    MODE(SLOT_29, PD_SLOT_29)         \
-    MODE(SLOT_30, PD_SLOT_30)         \
-    MODE(SLOT_31, PD_SLOT_31)
+    MODE(DRAGSCROLL, PD_MODE_0)       \
+    MODE(VOLUME, PD_MODE_1)           \
+    MODE(BRIGHTNESS, PD_MODE_2)       \
+    MODE(ZOOM, PD_MODE_3)             \
+    MODE(ARROW, PD_MODE_4)            \
+    MODE(PINCH, PD_MODE_5)            \
+    MODE(6, PD_MODE_6)                \
+    MODE(7, PD_MODE_7)                \
+    MODE(8, PD_MODE_8)                \
+    MODE(9, PD_MODE_9)                \
+    MODE(10, PD_MODE_10)              \
+    MODE(11, PD_MODE_11)              \
+    MODE(12, PD_MODE_12)              \
+    MODE(13, PD_MODE_13)              \
+    MODE(14, PD_MODE_14)              \
+    MODE(15, PD_MODE_15)              \
+    MODE(16, PD_MODE_16)              \
+    MODE(17, PD_MODE_17)              \
+    MODE(18, PD_MODE_18)              \
+    MODE(19, PD_MODE_19)              \
+    MODE(20, PD_MODE_20)              \
+    MODE(21, PD_MODE_21)              \
+    MODE(22, PD_MODE_22)              \
+    MODE(23, PD_MODE_23)              \
+    MODE(24, PD_MODE_24)              \
+    MODE(25, PD_MODE_25)              \
+    MODE(26, PD_MODE_26)              \
+    MODE(27, PD_MODE_27)              \
+    MODE(28, PD_MODE_28)              \
+    MODE(29, PD_MODE_29)              \
+    MODE(30, PD_MODE_30)              \
+    MODE(31, PD_MODE_31)

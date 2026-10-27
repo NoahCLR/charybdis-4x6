@@ -569,20 +569,20 @@ const pointing_mode_def_t pointing_modes[POINTING_MODE_COUNT] = {
     [POINTING_MODE_INDEX_DRAGSCROLL] =
         {
             .mode_flag   = POINTING_MODE_DRAGSCROLL,
-            .keycode     = PD_SLOT_0,
-            .lock_action = PD_SLOT_0_LOCK,
+            .keycode     = PD_MODE_0,
+            .lock_action = PD_MODE_0_LOCK,
         },
     [POINTING_MODE_INDEX_VOLUME] =
         {
             .mode_flag   = POINTING_MODE_VOLUME,
-            .keycode     = PD_SLOT_1,
-            .lock_action = PD_SLOT_1_LOCK,
+            .keycode     = PD_MODE_1,
+            .lock_action = PD_MODE_1_LOCK,
         },
     [POINTING_MODE_INDEX_ARROW] =
         {
             .mode_flag   = POINTING_MODE_ARROW,
-            .keycode     = PD_SLOT_4,
-            .lock_action = PD_SLOT_4_LOCK,
+            .keycode     = PD_MODE_4,
+            .lock_action = PD_MODE_4_LOCK,
         },
 };
 
@@ -641,15 +641,15 @@ bool is_keyboard_master(void) {
 }
 
 pointing_mode_mask_t pointing_mode_for_keycode(uint16_t keycode) {
-    if (keycode == PD_SLOT_0) {
+    if (keycode == PD_MODE_0) {
         return POINTING_MODE_DRAGSCROLL;
     }
 
-    if (keycode == PD_SLOT_1) {
+    if (keycode == PD_MODE_1) {
         return POINTING_MODE_VOLUME;
     }
 
-    if (keycode == PD_SLOT_4) {
+    if (keycode == PD_MODE_4) {
         return POINTING_MODE_ARROW;
     }
 
@@ -2716,7 +2716,7 @@ static void test_key_runtime_core_pointing_mode_press_creates_active_mode_and_po
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_SLOT_1, key_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_MODE_1, key_pos, fake_time);
 
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow != NULL);
@@ -2734,7 +2734,7 @@ static void test_key_runtime_core_pointing_mode_press_creates_active_mode_and_po
     CHECK(snapshot.core_lease_count == 2u);
 
     fake_time = (uint16_t)(fake_time + 10u);
-    CHECK(!test_process_record(PD_SLOT_1, key_pos, false));
+    CHECK(!test_process_record(PD_MODE_1, key_pos, false));
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow->pointing_mode_local_active == 0);
     CHECK(!shadow->pointer_anchor_active);
@@ -2748,7 +2748,7 @@ static void test_key_runtime_core_arrow_mode_prefers_typing_without_pointer_anch
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_SLOT_4, key_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_MODE_4, key_pos, fake_time);
 
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow != NULL);
@@ -2816,13 +2816,13 @@ static void test_key_runtime_core_activating_new_pointing_mode_clears_foreign_mo
     test_reset_stubs();
     noah_runtime_reset_for_test();
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_SLOT_1, volume_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_MODE_1, volume_pos, fake_time);
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow != NULL);
     CHECK(shadow->pointing_mode_local_active == POINTING_MODE_VOLUME);
     CHECK(shadow->pointer_anchor_active);
 
-    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_SLOT_4, arrow_pos, fake_time);
+    test_key_runtime_core_apply_key_event(RUNTIME_EVENT_KIND_KEY_DOWN, PD_MODE_4, arrow_pos, fake_time);
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow->pointing_mode_local_active == POINTING_MODE_ARROW);
     CHECK(!shadow->pointer_anchor_active);
@@ -2833,7 +2833,7 @@ static void test_key_runtime_core_activating_new_pointing_mode_clears_foreign_mo
     CHECK(snapshot.core_lease_count == 1u);
 
     fake_time = (uint16_t)(fake_time + 5u);
-    CHECK(!test_process_record(PD_SLOT_1, volume_pos, false));
+    CHECK(!test_process_record(PD_MODE_1, volume_pos, false));
     shadow = key_runtime_core_shadow_projection();
     CHECK(shadow->pointing_mode_local_active == POINTING_MODE_ARROW);
     CHECK(shadow->pointer_prefers_typing_layer);

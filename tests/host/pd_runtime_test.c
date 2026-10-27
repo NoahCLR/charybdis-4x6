@@ -474,7 +474,7 @@ static void test_pointing_device_task_dispatches_active_local_mode_and_tracks_la
     report_mouse_t input = {.x = 10, .y = 20, .h = 30, .v = 40, .buttons = 0};
     report_mouse_t output;
 
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_1));
     output = noah_pointing_device_task_user(input);
 
     CHECK(report_mouse_equal(output, (report_mouse_t){.x = 13, .y = 20, .h = 30, .v = 40, .buttons = 1}));
@@ -482,7 +482,7 @@ static void test_pointing_device_task_dispatches_active_local_mode_and_tracks_la
     CHECK(brightness_handler_calls == 0);
     CHECK(pointing_mode_local_active(POINTING_MODE_VOLUME));
 
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_2));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_2));
     output = noah_pointing_device_task_user(input);
 
     CHECK(report_mouse_equal(output, (report_mouse_t){.x = 10, .y = 15, .h = 30, .v = 40, .buttons = 2}));
@@ -495,7 +495,7 @@ static void test_pointing_device_task_dispatches_active_local_mode_and_tracks_la
 static void test_pointing_device_task_dispatches_zero_report_to_active_mode(void) {
     test_reset_stubs();
 
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_1));
     report_mouse_t output = noah_pointing_device_task_user((report_mouse_t){0});
 
     CHECK(report_mouse_equal(output, (report_mouse_t){.x = 3, .buttons = 1}));
@@ -556,7 +556,7 @@ static void test_pointing_device_task_keeps_small_motion_in_active_local_mode(vo
     fake_timer_ms            = 300000u;
     fake_last_input_idle_ms  = 5000u;
     fake_last_matrix_idle_ms = 300000u;
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_1));
 
     report_mouse_t input = {.x = 1, .y = 0, .h = 0, .v = 0, .buttons = 0};
 
@@ -610,7 +610,7 @@ static void test_pointing_device_task_recent_matrix_activity_delays_arm_window(v
 static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_after_sniping_drops(void) {
     test_reset_stubs();
 
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_1));
     pointing_mode_set_auto_sniping_layer_active(true);
     pointing_mode_service_active_dpi_sync();
     CHECK(current_cpi == sniping_dpi);
@@ -632,7 +632,7 @@ static void test_layer_state_set_restores_active_mode_dpi_and_pointer_layer_afte
 static void test_layer_state_set_strips_pointer_layer_for_arrow_mode(void) {
     test_reset_stubs();
 
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_4));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_4));
     pointing_mode_service_active_dpi_sync();
     CHECK(current_cpi == POINTING_MODE_ARROW_DPI);
     cpi_set_count = 0;
@@ -714,7 +714,7 @@ static void test_layer_changes_write_the_cpi_only_when_it_changes(void) {
     pointing_mode_service_active_dpi_sync();
     CHECK(current_cpi == default_dpi && cpi_set_count == 2);
     // A mode with its own DPI, the same, and back.
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_1));
     pointing_mode_service_active_dpi_sync();
     CHECK(current_cpi == POINTING_MODE_VOLUME_DPI && cpi_set_count == 3);
     (void)noah_layer_state_set_user(pointer);
@@ -800,7 +800,7 @@ static void test_a_cpi_the_sensor_lost_is_restored_within_a_period(void) {
 // The CPI written is the one the policy works out now, here the active mode's.
 static void test_the_refresh_writes_the_cpi_the_policy_intends(void) {
     test_reset_stubs();
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_1));
     test_dpi_pass(10u);
     CHECK(current_cpi == POINTING_MODE_VOLUME_DPI && cpi_set_count == 1);
     current_cpi = 500;
@@ -863,17 +863,17 @@ static void test_is_mouse_record_user_delegates_pointer_layer_policy(void) {
 
     keyrecord_t record = {0};
 
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_1));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_1));
     CHECK(noah_is_mouse_record_user(MO(1), &record));
-    CHECK(noah_is_mouse_record_user(PD_SLOT_1, &record));
+    CHECK(noah_is_mouse_record_user(PD_MODE_1, &record));
     CHECK(noah_is_mouse_record_user(DPI_MOD, &record));
-    CHECK(!noah_is_mouse_record_user(PD_SLOT_4, &record));
+    CHECK(!noah_is_mouse_record_user(PD_MODE_4, &record));
     CHECK(!noah_is_mouse_record_user(KC_C, &record));
 
     test_reset_stubs();
-    CHECK(pointing_mode_handle_keycode_press(PD_SLOT_4));
+    CHECK(pointing_mode_handle_keycode_press(PD_MODE_4));
     CHECK(!noah_is_mouse_record_user(MO(1), &record));
-    CHECK(!noah_is_mouse_record_user(PD_SLOT_4, &record));
+    CHECK(!noah_is_mouse_record_user(PD_MODE_4, &record));
 }
 
 // A slot with no record (here slot 7) is inert: its hold key neither
@@ -885,24 +885,24 @@ static void test_an_empty_slot_hold_key_owns_nothing(void) {
     keypos_t       owner;
 
     test_reset_stubs();
-    CHECK(pointing_mode_for_keycode(PD_SLOT_0 + 7u) != 0 && !noah_active_profile_pd_for_mask(pointing_mode_for_keycode(PD_SLOT_0 + 7u)));
+    CHECK(pointing_mode_for_keycode(PD_MODE_0 + 7u) != 0 && !noah_active_profile_pd_for_mask(pointing_mode_for_keycode(PD_MODE_0 + 7u)));
 
     // With nothing active.
-    (void)pointing_mode_handle_keycode_press_at(PD_SLOT_0 + 7u, empty_key);
+    (void)pointing_mode_handle_keycode_press_at(PD_MODE_0 + 7u, empty_key);
     CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(!pointing_mode_local_owner_key_pos_snapshot(&owner));
     CHECK(pointing_mode_snapshot().local.owner_sides == SPLIT_SIDE_MASK_NONE);
-    (void)pointing_mode_handle_keycode_release_at(PD_SLOT_0 + 7u, empty_key);
+    (void)pointing_mode_handle_keycode_release_at(PD_MODE_0 + 7u, empty_key);
     CHECK(!pointing_mode_local_owner_key_pos_snapshot(&owner));
 
     // While another mode is held: its owner stays its own.
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, volume_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, volume_key));
     CHECK(pointing_mode_local_owner_key_pos_snapshot(&owner) && owner.row == volume_key.row && owner.col == volume_key.col);
-    (void)pointing_mode_handle_keycode_press_at(PD_SLOT_0 + 7u, empty_key);
+    (void)pointing_mode_handle_keycode_press_at(PD_MODE_0 + 7u, empty_key);
     CHECK(pointing_mode_local_active_snapshot() == POINTING_MODE_VOLUME);
     CHECK(pointing_mode_local_owner_key_pos_snapshot(&owner) && owner.row == volume_key.row && owner.col == volume_key.col);
-    (void)pointing_mode_handle_keycode_release_at(PD_SLOT_0 + 7u, empty_key);
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, volume_key));
+    (void)pointing_mode_handle_keycode_release_at(PD_MODE_0 + 7u, empty_key);
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, volume_key));
     CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(!pointing_mode_local_owner_key_pos_snapshot(&owner));
     CHECK(pointing_mode_snapshot().local.owner_sides == SPLIT_SIDE_MASK_NONE);
@@ -911,10 +911,10 @@ static void test_an_empty_slot_hold_key_owns_nothing(void) {
     // key: the empty slot's key does not become one.
     CHECK(pointing_mode_set_lock_state(POINTING_MODE_VOLUME, true));
     CHECK(!pointing_mode_local_owner_key_pos_snapshot(&owner));
-    (void)pointing_mode_handle_keycode_press_at(PD_SLOT_0 + 7u, empty_key);
+    (void)pointing_mode_handle_keycode_press_at(PD_MODE_0 + 7u, empty_key);
     CHECK(pointing_mode_local_locked(POINTING_MODE_VOLUME) && !pointing_mode_local_owner_key_pos_snapshot(&owner));
     CHECK(pointing_mode_snapshot().local.owner_sides == SPLIT_SIDE_MASK_NONE);
-    (void)pointing_mode_handle_keycode_release_at(PD_SLOT_0 + 7u, empty_key);
+    (void)pointing_mode_handle_keycode_release_at(PD_MODE_0 + 7u, empty_key);
     CHECK(pointing_mode_set_lock_state(POINTING_MODE_VOLUME, false));
 }
 
@@ -980,25 +980,25 @@ static void test_two_keys_holding_one_mode_both_own_it(void) {
 
     test_reset_stubs();
 
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, left_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, left_key));
     CHECK(pointing_mode_local_active(POINTING_MODE_VOLUME));
     CHECK(test_owner_key_is(left_key));
     CHECK(test_owner_bitmap_is(&left_key, 1));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_LEFT));
 
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, right_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, right_key));
     CHECK(pointing_mode_local_active(POINTING_MODE_VOLUME));
     CHECK(test_owner_bitmap_is(both_keys, 2));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_BOTH));
 
     // Releasing one keeps the mode, owned by the other.
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, left_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, left_key));
     CHECK(pointing_mode_local_active(POINTING_MODE_VOLUME));
     CHECK(test_owner_key_is(right_key));
     CHECK(test_owner_bitmap_is(&right_key, 1));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_RIGHT));
 
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, right_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, right_key));
     CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(!test_owner_key_is(right_key));
     CHECK(test_owner_bitmap_is(NULL, 0));
@@ -1015,13 +1015,13 @@ static void test_the_owner_key_is_the_first_key_to_hold_the_mode(void) {
 
     test_reset_stubs();
 
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, first_key));
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, second_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, first_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, second_key));
     CHECK(test_owner_key_is(first_key));
 
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, first_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, first_key));
     CHECK(test_owner_key_is(second_key));
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, second_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, second_key));
     CHECK(pointing_mode_local_active_snapshot() == 0);
 }
 
@@ -1035,20 +1035,20 @@ static void test_a_later_key_takes_a_released_owners_place(void) {
 
     test_reset_stubs();
 
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, first_key));
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, second_key));
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, first_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, first_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, second_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, first_key));
     CHECK(test_owner_key_is(second_key));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_LEFT));
 
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, third_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, third_key));
     CHECK(test_owner_key_is(third_key));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_BOTH));
 
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, third_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, third_key));
     CHECK(test_owner_key_is(second_key));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_LEFT));
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, second_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, second_key));
     CHECK(pointing_mode_local_active_snapshot() == 0);
 }
 
@@ -1059,10 +1059,10 @@ static void test_a_repeated_press_is_one_owner(void) {
 
     test_reset_stubs();
 
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, key));
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, key));
     CHECK(test_owner_bitmap_is(&key, 1));
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, key));
     CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_NONE));
 }
@@ -1075,19 +1075,19 @@ static void test_a_new_mode_drops_the_old_modes_owners(void) {
 
     test_reset_stubs();
 
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, volume_key));
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_3, zoom_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, volume_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_3, zoom_key));
     CHECK(pointing_mode_local_active(POINTING_MODE_ZOOM));
     CHECK(test_owner_key_is(zoom_key));
     CHECK(test_owner_bitmap_is(&zoom_key, 1));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_RIGHT));
 
-    (void)pointing_mode_handle_keycode_release_at(PD_SLOT_1, volume_key);
+    (void)pointing_mode_handle_keycode_release_at(PD_MODE_1, volume_key);
     CHECK(pointing_mode_local_active(POINTING_MODE_ZOOM));
     CHECK(test_owner_key_is(zoom_key));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_RIGHT));
 
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_3, zoom_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_3, zoom_key));
     CHECK(pointing_mode_local_active_snapshot() == 0);
     CHECK(test_owner_bitmap_is(NULL, 0));
 }
@@ -1101,16 +1101,16 @@ static void test_a_lock_key_replaces_the_holding_owners(void) {
 
     test_reset_stubs();
 
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, left_key));
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, right_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, left_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, right_key));
     CHECK(pointing_mode_set_lock_state_at(POINTING_MODE_VOLUME, true, lock_key));
     CHECK(pointing_mode_local_locked(POINTING_MODE_VOLUME));
     CHECK(test_owner_key_is(lock_key));
     CHECK(test_owner_bitmap_is(&lock_key, 1));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_RIGHT));
 
-    (void)pointing_mode_handle_keycode_release_at(PD_SLOT_1, left_key);
-    (void)pointing_mode_handle_keycode_release_at(PD_SLOT_1, right_key);
+    (void)pointing_mode_handle_keycode_release_at(PD_MODE_1, left_key);
+    (void)pointing_mode_handle_keycode_release_at(PD_MODE_1, right_key);
     CHECK(pointing_mode_local_locked(POINTING_MODE_VOLUME));
     CHECK(test_owner_key_is(lock_key));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_RIGHT));
@@ -1137,12 +1137,12 @@ static void test_a_combo_owner_owns_its_footprint(void) {
     key_origin_bitmap_add_keypos(bitmap, member_key);
     CHECK(key_origin_registry_set_bitmap(owner_key, bitmap));
 
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, owner_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, owner_key));
     CHECK(test_owner_key_is(owner_key));
     CHECK(test_owner_bitmap_is(footprint, 2));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_BOTH));
 
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, owner_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, owner_key));
     CHECK(test_owner_bitmap_is(NULL, 0));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_NONE));
     key_origin_registry_reset();
@@ -1162,14 +1162,14 @@ static void test_owner_sides_are_taken_at_the_press(void) {
     key_origin_bitmap_add_keypos(bitmap, owner_key);
     key_origin_bitmap_add_keypos(bitmap, member_key);
     CHECK(key_origin_registry_set_bitmap(owner_key, bitmap));
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, owner_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, owner_key));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_BOTH));
 
     CHECK(key_origin_registry_set_bitmap(owner_key, NULL));
-    CHECK(pointing_mode_handle_keycode_press_at(PD_SLOT_1, later_key));
+    CHECK(pointing_mode_handle_keycode_press_at(PD_MODE_1, later_key));
     CHECK(test_owner_sides_are(SPLIT_SIDE_MASK_BOTH));
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, later_key));
-    CHECK(pointing_mode_handle_keycode_release_at(PD_SLOT_1, owner_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, later_key));
+    CHECK(pointing_mode_handle_keycode_release_at(PD_MODE_1, owner_key));
     key_origin_registry_reset();
 }
 
