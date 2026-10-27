@@ -7,6 +7,14 @@ its editor app, and you can change keys, layers, tap/hold behaviours, combos,
 macros, lighting and pointing modes on the connected keyboard. You don't write
 any C and you don't reflash.
 
+**See it before you flash anything.** Open
+[Ark's demo](https://ark.ncleroy.dev) and choose **Explore a demo**: Ark opens
+on a complete setup exported from a real keyboard running this firmware, with
+no keyboard connected, and every screen works. It shows what this firmware can
+do far better than this page can explain, because there you can open every
+behaviour, combo, macro, pointing mode and lighting setting and change it. The
+demo runs in any browser on a computer.
+
 ## What it does
 
 - **The keyboard keeps its own profile.** Keys, layers, behaviours, combos,
@@ -88,6 +96,8 @@ pair yourself.
 
 - [Firmware guide](docs/guide/README.md): what the keyboard does, installing
   and recovering, and authoring in C
+- [Ark's demo](https://ark.ncleroy.dev) (choose **Explore a demo**), to try
+  everything the firmware does without a keyboard
 - [Ark's guide](https://github.com/NoahCLR/charybdis-ark/tree/dev/docs/guide),
   for editing the keyboard
 - [Development](docs/development.md) and the
