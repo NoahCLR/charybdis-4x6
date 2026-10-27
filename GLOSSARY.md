@@ -101,14 +101,17 @@ _Avoid_: features, feature flags, version check
 
 **Edit mode**:
 How a client's edits reach the keyboard, stored on both halves outside every
-profile: **Live + review** (each edit runs at once and waits for Save; the
-default), **Live** (each edit runs at once and the keyboard saves after a quiet
-interval) or **Apply mode** (the keyboard changes only by an Apply).
-_Avoid_: save mode, sync mode, review mode, auto-save mode, draft mode
+profile, listed in this order: **Live edit** (each edit runs at once and the
+keyboard saves after a quiet interval), **Live preview + save** (each edit runs
+at once and waits for Save; the default) or **Review and save** (the keyboard
+changes only by an Apply, which clients show as Save).
+_Avoid_: save mode, sync mode, review mode, auto-save mode, draft mode, Live +
+review, Live (for the mode), Apply mode
 
 **Live edit**:
 A change to the working copy that takes effect on both halves at the next
-safe boundary, without a save.
+safe boundary, without a save. Both live edit modes make them; the mode named
+Live edit also has the keyboard save them by itself.
 _Avoid_: patch, delta, hot edit
 
 **Session**:

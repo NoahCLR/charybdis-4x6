@@ -4,9 +4,9 @@
 //
 // How Ark's edits reach this keyboard. Stored outside the profile, in QMK's
 // EEPROM user datablock on each half (qmk_profile_edit_mode.c), never in a
-// profile, a review or a backup. A keyboard never set is in Live + review.
-// Live saves after the quiet period; Apply saves only adjustment-key edits;
-// Live + review waits for an explicit Save.
+// profile, a review or a backup. A keyboard never set is in Live preview +
+// save. Live edit saves after the quiet period; Live preview + save waits for
+// an explicit Save; Review and save saves only adjustment-key edits.
 #pragma once
 
 #include <stdbool.h>
