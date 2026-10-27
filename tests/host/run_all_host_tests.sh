@@ -48,6 +48,7 @@ sh run_runtime_init_order_tests.sh
 sh run_keyboard_mod_ownership_tests.sh
 sh run_synthetic_record_tests.sh
 sh run_owned_keycode_tests.sh
+sh run_owned_keycode_qmk_report_tests.sh
 sh run_held_action_tests.sh
 sh run_layer_ownership_tests.sh
 sh run_pointing_mode_tests.sh

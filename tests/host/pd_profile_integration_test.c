@@ -77,7 +77,7 @@ static size_t load_domain(const char *path) {
     size_t length = fread(blob + 14, 1, sizeof(blob) - 14, file);
     assert(feof(file));
     fclose(file);
-    memcpy(blob, (uint8_t[]){'N', 'L', 'P', '1', 4, 2, 1, 1, 0x50, NOAH_PROFILE_PD_V1_VERSION, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), 0}, 14);
+    memcpy(blob, (uint8_t[]){'N', 'L', 'P', '1', 4, 3, 1, 1, 0x50, NOAH_PROFILE_PD_V1_VERSION, (uint8_t)length, (uint8_t)(length >> 8), (uint8_t)(length >> 16), 0}, 14);
     blob_length   = 14 + length;
     reader.length = blob_length;
     return length;

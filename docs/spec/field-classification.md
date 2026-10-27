@@ -37,7 +37,7 @@ Held by: `tests/host/run_profile_compiled_defaults_v1_tests.sh` (`profile_compil
 | `keymaps[][][]` | profile data | keymap `0x60`, every layer of the bank |
 | `layer_names[]` | profile data | settings `0x40`, layer names 0–15 |
 | `CUSTOM_KEYS`: each row's name | profile data | settings `0x40`, custom-key names |
-| `CUSTOM_KEYS`: a `SHORTCUT` row's modifiers, key, layers and layer kind | profile data | settings `0x40`, custom-key shortcuts (D-F26, [ADR](../adr/0026-custom-key-carries-a-shortcut.md)) |
+| `CUSTOM_KEYS`: a `SHORTCUT` row's modifiers, keys, layers and layer kind | profile data | settings `0x40`, custom-key shortcuts (D-F26, [ADR](../adr/0026-custom-key-carries-a-shortcut.md)) |
 | `MACROS`: each row's payload | profile data | macros `0x70`; generated in the bank encoding as `authored_macro_bank.h` |
 | `MACROS`: each row's name | profile data | settings `0x40`, macro names (D-F43, [ADR](../adr/0043-macros-have-names-user-macros-retired.md)) |
 | `COMBOS`: each row's inputs and output | profile data | combos `0x30`, a row |

@@ -55,7 +55,8 @@ static uint16_t              owned_release_calls[16];
 static uint8_t               owned_acquire_count;
 static uint8_t               owned_release_count;
 static int16_t               owned_failed_acquire_keycode;
-static owned_keycode_lease_t owned_part_calls[16];
+static owned_keycode_chord_lease_t owned_part_calls[16];
+static owned_keycode_chord_lease_t owned_chord_release_calls[16];
 static uint8_t               owned_part_count;
 static uint8_t               owned_part_release_mods[16];
 static uint8_t               owned_part_release_count;
@@ -226,11 +227,25 @@ bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
     return true;
 }
 
-bool owned_keycode_acquire_parts(uint8_t mods, uint8_t basic, owned_keycode_lease_t *lease) {
+bool owned_keycode_acquire_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS], owned_keycode_chord_lease_t *lease) {
     CHECK(lease != NULL && !lease->active);
     CHECK(owned_part_count < ARRAY_SIZE(owned_part_calls));
-    *lease                             = (owned_keycode_lease_t){.active = true, .has_basic = basic != KC_NO, .basic = basic, .mods = mods};
+    *lease = (owned_keycode_chord_lease_t){.active = true, .mods = mods};
+    memcpy(lease->keys, keys, OWNED_KEYCODE_CHORD_KEYS);
     owned_part_calls[owned_part_count++] = *lease;
+    return true;
+}
+
+// A released chord is counted with the keycode releases, by its first key.
+bool owned_keycode_release_chord(owned_keycode_chord_lease_t *lease) {
+    CHECK(lease != NULL);
+    CHECK(lease->active);
+    CHECK(owned_release_count < ARRAY_SIZE(owned_release_calls));
+    owned_chord_release_calls[owned_release_count] = *lease;
+    owned_release_calls[owned_release_count++]     = lease->keys[0];
+    CHECK(owned_part_release_count < ARRAY_SIZE(owned_part_release_mods));
+    owned_part_release_mods[owned_part_release_count++] = lease->mods;
+    *lease = (owned_keycode_chord_lease_t){0};
     return true;
 }
 
@@ -410,11 +425,11 @@ static void test_custom_key_holds_its_shortcut_through_an_exact_lease(void) {
     keypos_t key_b = test_keypos(5, 1);
 
     test_reset_stubs();
-    test_shortcuts[4] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), .key = KC_K};
+    test_shortcuts[4] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), .keys = {KC_K}};
 
     held_action_register(key_a, CUSTOM_KEY_4);
     CHECK(owned_part_count == 1);
-    CHECK(owned_part_calls[0].mods == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)) && owned_part_calls[0].basic == KC_K && owned_part_calls[0].has_basic);
+    CHECK(owned_part_calls[0].mods == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)) && owned_part_calls[0].keys[0] == KC_K && owned_part_calls[0].keys[1] == KC_NO);
     CHECK(owned_acquire_count == 0 && press_call_count == 0);
     CHECK(held_action_survives_flush(key_a, CUSTOM_KEY_4));
 
@@ -422,7 +437,7 @@ static void test_custom_key_holds_its_shortcut_through_an_exact_lease(void) {
     // while both are held.
     held_action_register(key_b, CUSTOM_KEY_4);
     CHECK(owned_part_count == 2);
-    test_shortcuts[4] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_GUI), .key = KC_J};
+    test_shortcuts[4] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_GUI), .keys = {KC_J}};
 
     held_action_unregister(key_b, CUSTOM_KEY_4);
     CHECK(owned_release_count == 1 && owned_release_calls[0] == KC_K && owned_part_release_mods[0] == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)));
@@ -432,6 +447,27 @@ static void test_custom_key_holds_its_shortcut_through_an_exact_lease(void) {
     CHECK(!held_action_survives_flush(key_a, CUSTOM_KEY_4));
 }
 
+// A shortcut's modifiers and keys go down as one lease, the keys in order, and
+// come back up as exactly those keys, even when the profile changes the
+// shortcut meanwhile.
+static void test_custom_key_holds_its_shortcut_keys_through_one_lease(void) {
+    static const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS] = {KC_A, KC_S, KC_MEDIA_PLAY_PAUSE, MS_BTN2, KC_UP, KC_SYSTEM_SLEEP};
+    keypos_t             key_pos                         = test_keypos(5, 3);
+
+    test_reset_stubs();
+    test_shortcuts[8] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_SHIFT)};
+    memcpy(test_shortcuts[8].keys, keys, sizeof(keys));
+
+    held_action_register(key_pos, CUSTOM_KEY_8);
+    CHECK(owned_part_count == 1 && owned_part_calls[0].mods == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(!memcmp(owned_part_calls[0].keys, keys, sizeof(keys)));
+    test_shortcuts[8] = (noah_custom_key_shortcut_t){.keys = {KC_Z}};
+    held_action_unregister(key_pos, CUSTOM_KEY_8);
+    CHECK(owned_release_count == 1 && !memcmp(owned_chord_release_calls[0].keys, keys, sizeof(keys)));
+    CHECK(owned_part_release_mods[0] == MOD_BIT(KC_LEFT_SHIFT));
+    CHECK(owned_acquire_count == 0 && press_call_count == 0 && release_call_count == 0);
+}
+
 // Modifiers alone and a key alone are both shortcuts; a custom key without
 // one holds nothing and never reaches generic dispatch.
 static void test_custom_key_shortcut_parts_and_absence(void) {
@@ -439,14 +475,14 @@ static void test_custom_key_shortcut_parts_and_absence(void) {
 
     test_reset_stubs();
     test_shortcuts[5] = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_LEFT_SHIFT) | MOD_BIT(KC_LEFT_ALT) | MOD_BIT(KC_LEFT_GUI)};
-    test_shortcuts[6] = (noah_custom_key_shortcut_t){.key = MS_BTN1};
+    test_shortcuts[6] = (noah_custom_key_shortcut_t){.keys = {MS_BTN1}};
 
     held_action_register(key_pos, CUSTOM_KEY_5);
-    CHECK(owned_part_count == 1 && owned_part_calls[0].mods == 0x0f && !owned_part_calls[0].has_basic);
+    CHECK(owned_part_count == 1 && owned_part_calls[0].mods == 0x0f && owned_part_calls[0].keys[0] == KC_NO);
     // Rebinding the same owner releases the old shortcut before the new one.
     held_action_register(key_pos, CUSTOM_KEY_6);
     CHECK(owned_release_count == 1 && owned_part_release_mods[0] == 0x0f);
-    CHECK(owned_part_count == 2 && owned_part_calls[1].mods == 0u && owned_part_calls[1].basic == MS_BTN1);
+    CHECK(owned_part_count == 2 && owned_part_calls[1].mods == 0u && owned_part_calls[1].keys[0] == MS_BTN1);
     held_action_unregister(key_pos, CUSTOM_KEY_6);
     CHECK(owned_release_count == 2 && owned_release_calls[1] == MS_BTN1);
 
@@ -678,6 +714,7 @@ int main(void) {
     test_literal_actions_keep_one_exact_lease_per_physical_owner();
     test_failed_literal_acquire_never_falls_back_to_unscoped_release();
     test_custom_key_holds_its_shortcut_through_an_exact_lease();
+    test_custom_key_holds_its_shortcut_keys_through_one_lease();
     test_custom_key_shortcut_parts_and_absence();
     test_custom_key_holds_its_layers_through_layer_ownership();
     test_held_custom_key_acts_on_its_layers_by_kind();

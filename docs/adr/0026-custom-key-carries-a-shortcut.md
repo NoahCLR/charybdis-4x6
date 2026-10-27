@@ -74,3 +74,32 @@ over the build before shortcut layers. The fixed record keeps each
 shortcut at a known offset, read in constant time, and validated a byte at a
 time like the rest (resource policy: a conservative design on its own merits,
 not a claim of capacity).
+
+Amended (Noah, 2026-10-27): a shortcut holds up to six keys in place of one,
+all held together, beside its modifiers and its layers, which are unchanged.
+A key is a basic keycode for a usage the host sees: a keyboard key, a system
+or consumer (media) key, or a mouse key that moves, clicks or scrolls; mouse-key
+acceleration sends nothing of its own, only changing how fast the other mouse
+keys move, and stays out, as do macros, QMK functions,
+pointing modes and dual-role keycodes, which are a behaviour's job. Held, the
+modifiers go down first, then each key in order; they come back up in
+reverse, the keys last first, then the modifiers. Tapped, all of them go down
+and come back up inside the one tap. Six is the 6-key report's limit, whatever
+the build: NKRO was weighed and rejected, so a profile means the same on every
+build. The system and consumer reports carry one usage each, so a shortcut
+holds at most one system key and one consumer key. The modifiers stay held, as
+before; a One-shot or locked modifier was weighed and rejected as a behaviour's
+job. QMK's Layer Lock key (`QK_LLCK`) is not a layer kind.
+
+Each record grew from five bytes to ten (settings version 11, schema 4.3):
+modifiers, six key bytes packed from the first, then the layer mask and kind.
+A shared pool of keys was the fallback if fixed records did not fit; they do:
+with the settings RAM copy grown by the longer records, and each held action's
+lease grown to hold every key (a held custom key keeps the modifiers and keys
+it pressed, so a shortcut changed while held releases exactly that), each
+half's linked static RAM stays under the
+[resource policy](../spec/resource-policy.md)'s tripwire, so there is no pool.
+That tripwire is a regression line, not capacity, and no runtime high-water
+was measured. Fixed records keep every key at a known offset, validated a byte
+at a time like the rest, where a pool would add a count, a variable offset and
+a second place a shortcut lives.

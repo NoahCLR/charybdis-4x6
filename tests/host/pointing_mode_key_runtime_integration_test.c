@@ -79,6 +79,9 @@ enum {
     TEST_OSL_SHIFT_SHORTCUT_KEY = CUSTOM_KEY_0 + 0x1d,
     // One-shot of layer 9 whose own row holds TEST_HIGH_SHORTCUT_KEY (layer 12).
     TEST_OSL_ROW_SHORTCUT_KEY   = CUSTOM_KEY_0 + 0x1e,
+    // A shortcut of keys (D-F26): Left Shift with A and Play, and layers 9 and
+    // 12 of the kind test_keys_shortcut_kind names.
+    TEST_KEYS_SHORTCUT_KEY     = CUSTOM_KEY_0 + 0x1f,
     TEST_PD_TAP_HOLD_TERM  = 120,
     TEST_PD_MULTI_TAP_TERM = 150,
     TEST_LAYER_BASE        = 0,
@@ -829,7 +832,10 @@ bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
 // TEST_SHORTCUT_KEY's shortcut is modifiers only, TEST_LAYER_SHORTCUT_KEY's
 // and TEST_LAYER_ROW_KEY's layers only (D-F26). The modifier lease holds them in the report, as the
 // ledger does, and its release lets go of exactly what it took.
+static uint8_t test_keys_shortcut_kind;
+
 noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
+    if (slot == (uint8_t)(TEST_KEYS_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_SHIFT), .keys = {KC_A, KC_MEDIA_PLAY_PAUSE}, .layers = TEST_KIND_LAYERS, .layer_kind = test_keys_shortcut_kind};
     if (slot == (uint8_t)(TEST_HIGH_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.layers = 1u << 12};
     if (slot == (uint8_t)(TEST_LOCK_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.layers = TEST_KIND_LAYERS, .layer_kind = NOAH_SHORTCUT_LAYERS_LOCK};
     if (slot == (uint8_t)(TEST_MOVE_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.layers = 1u << 12, .layer_kind = NOAH_SHORTCUT_LAYERS_MOVE};
@@ -838,7 +844,7 @@ noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
     if (slot == (uint8_t)(TEST_OSL_ROW_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.layers = 1u << 9, .layer_kind = NOAH_SHORTCUT_LAYERS_ONESHOT};
     if (slot == (uint8_t)(TEST_OSL_SHIFT_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_SHIFT), .layers = TEST_KIND_LAYERS, .layer_kind = NOAH_SHORTCUT_LAYERS_ONESHOT};
     if (slot == (uint8_t)(TEST_LAYER_SHORTCUT_KEY - CUSTOM_KEY_0) || slot == (uint8_t)(TEST_LAYER_ROW_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.layers = TEST_SHORTCUT_LAYERS};
-    return slot == (uint8_t)(TEST_SHORTCUT_KEY - CUSTOM_KEY_0) ? (noah_custom_key_shortcut_t){.mods = 0x0f, .key = 0} : (noah_custom_key_shortcut_t){0};
+    return slot == (uint8_t)(TEST_SHORTCUT_KEY - CUSTOM_KEY_0) ? (noah_custom_key_shortcut_t){.mods = 0x0f, .keys = {0}} : (noah_custom_key_shortcut_t){0};
 }
 
 bool owned_keycode_release(owned_keycode_lease_t *lease) {
@@ -850,23 +856,50 @@ bool owned_keycode_release(owned_keycode_lease_t *lease) {
     return true;
 }
 
-bool owned_keycode_acquire_parts(uint8_t mods, uint8_t basic, owned_keycode_lease_t *lease) {
-    if (!lease || lease->active || basic != KC_NO || mods == 0u) {
+// A chord lease's keys reach the host as 'C' when one goes down and 'X' when
+// it is let go, in the order the owned output sends them; its modifiers are
+// held in the report, as the ledger holds them.
+static void test_chord_lease_key_out(char kind, uint8_t key) {
+#ifdef NOAH_TEST_QMK_GESTURES
+    gesture_out_add(kind, key);
+#else
+    host_out_add(kind, key);
+#endif
+}
+
+bool owned_keycode_acquire_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS], owned_keycode_chord_lease_t *lease) {
+    if (!lease || lease->active || (mods == 0u && keys[0] == KC_NO)) {
         return false;
     }
-    *lease = (owned_keycode_lease_t){.active = true, .mods = mods};
+    *lease = (owned_keycode_chord_lease_t){.active = true, .mods = mods};
     fake_mods |= mods;
+    for (uint8_t key = 0; key < OWNED_KEYCODE_CHORD_KEYS && keys[key] != KC_NO; key++) {
+        lease->keys[key] = keys[key];
+        test_chord_lease_key_out('C', keys[key]);
+    }
+    return true;
+}
+
+bool owned_keycode_release_chord(owned_keycode_chord_lease_t *lease) {
+    if (!(lease && lease->active)) {
+        return false;
+    }
+    for (uint8_t key = OWNED_KEYCODE_CHORD_KEYS; key-- > 0u;) {
+        if (lease->keys[key] != KC_NO) test_chord_lease_key_out('X', lease->keys[key]);
+    }
+    fake_mods &= (uint8_t)~lease->mods;
+    *lease = (owned_keycode_chord_lease_t){0};
     return true;
 }
 
 // How many shortcut taps went out, for the tests that count them.
 static unsigned test_shortcut_part_taps;
 
-bool owned_keycode_tap_parts(uint8_t mods, uint8_t basic) {
-    (void)mods;
-    (void)basic;
+bool owned_keycode_tap_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS]) {
+    owned_keycode_chord_lease_t lease = {0};
+
     test_shortcut_part_taps++;
-    return false;
+    return owned_keycode_acquire_chord(mods, keys, &lease) && owned_keycode_release_chord(&lease);
 }
 
 void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
@@ -3475,6 +3508,121 @@ static void test_qmk_shortcut_layer_kinds_act_as_their_layer_keys(void) {
     CHECK(noah_runtime_debug_active_slot_count() == 0 && noah_runtime_debug_pending_multi_tap_slot_count() == 0);
     gesture_second_code = KC_NO;
 }
+// A shortcut's keys, in the order they reached the host: 'C' down, 'X' up.
+static uint8_t gesture_shortcut_key_events(char kinds[8], uint8_t codes[8], layer_state_t layers[8]) {
+    uint8_t count = 0;
+    for (uint8_t i = 0; i < gesture_out_count && count < 8u; i++) {
+        if (gesture_out[i].kind != 'C' && gesture_out[i].kind != 'X') continue;
+        kinds[count] = gesture_out[i].kind;
+        codes[count] = (uint8_t)gesture_out[i].code;
+        layers[count++] = gesture_out[i].layers;
+        CHECK(gesture_out[i].mods & MOD_BIT(KC_LEFT_SHIFT));
+    }
+    return count;
+}
+// The shortcut's keys went down in order and came up in reverse, once: A, Play, then
+// Play, A.
+static void gesture_check_shortcut_keys_once(layer_state_t layers_while_down) {
+    char          kinds[8];
+    uint8_t       codes[8];
+    layer_state_t layers[8];
+    CHECK(gesture_shortcut_key_events(kinds, codes, layers) == 4u);
+    CHECK(kinds[0] == 'C' && codes[0] == KC_A && kinds[1] == 'C' && codes[1] == KC_MEDIA_PLAY_PAUSE);
+    CHECK(kinds[2] == 'X' && codes[2] == KC_MEDIA_PLAY_PAUSE && kinds[3] == 'X' && codes[3] == KC_A);
+    CHECK((layers[0] & TEST_KIND_LAYERS) == layers_while_down && (layers[1] & TEST_KIND_LAYERS) == layers_while_down);
+}
+// Every one of the shortcut's keys that went down since gesture_out was cleared
+// came back up after it, A and Play `presses` times each, and none is down now.
+static void gesture_check_shortcut_keys_all_up(uint8_t presses) {
+    static const uint8_t keys[] = {KC_A, KC_MEDIA_PLAY_PAUSE};
+    CHECK(gesture_out_count < ARRAY_SIZE(gesture_out));
+    for (uint8_t k = 0; k < ARRAY_SIZE(keys); k++) {
+        uint8_t downs = 0, ups = 0;
+        for (uint8_t i = 0; i < gesture_out_count; i++) {
+            if (gesture_out[i].code != keys[k]) continue;
+            if (gesture_out[i].kind == 'C') downs++;
+            if (gesture_out[i].kind == 'X') ups++;
+            CHECK(ups <= downs);
+        }
+        CHECK(downs == presses && ups == presses);
+    }
+}
+// A shortcut of keys with layers of each kind (D-F26), through the real runtime and layer
+// ownership from the custom key itself: its keys go down in order with Shift,
+// all held, and come up in reverse, while its layers do what their kind does.
+static void test_qmk_shortcut_keys_with_layers_of_each_kind(void) {
+    // Hold: the keys go down on its layers, which go off with the release.
+    test_reset_state(); fake_time = 46000; gesture_second_code = TEST_KEYS_SHORTCUT_KEY; test_keys_shortcut_kind = NOAH_SHORTCUT_LAYERS_HOLD;
+    gesture_out_count = 0;
+    gesture_at(3,3,true); gesture_advance(400);
+    CHECK(layer_ownership_is_held(9) && layer_ownership_is_held(12) && (gesture_report_mods() & MOD_BIT(KC_LEFT_SHIFT)));
+    gesture_at(3,3,false); gesture_advance(500);
+    gesture_check_shortcut_keys_once(TEST_KIND_LAYERS);
+    CHECK((layer_state & TEST_KIND_LAYERS) == 0 && !(gesture_report_mods() & MOD_BIT(KC_LEFT_SHIFT)));
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+
+    // Lock: the press locks both layers and the keys go down on them; the next
+    // press releases both.
+    test_reset_state(); fake_time = 47000; gesture_second_code = TEST_KEYS_SHORTCUT_KEY; test_keys_shortcut_kind = NOAH_SHORTCUT_LAYERS_LOCK;
+    gesture_out_count = 0;
+    gesture_kind_tap(20); gesture_advance(500);
+    gesture_check_shortcut_keys_once(TEST_KIND_LAYERS);
+    CHECK(layer_ownership_is_locked(9) && layer_ownership_is_locked(12));
+    gesture_out_count = 0;
+    gesture_kind_tap(20); gesture_advance(500);
+    gesture_check_shortcut_keys_once(0);
+    CHECK((layer_state & TEST_KIND_LAYERS) == 0 && noah_runtime_debug_active_slot_count() == 0);
+
+    // Move to: both layers lock alone, every other lock goes.
+    test_reset_state(); fake_time = 48000; gesture_second_code = TEST_KEYS_SHORTCUT_KEY; test_keys_shortcut_kind = NOAH_SHORTCUT_LAYERS_MOVE;
+    CHECK(layer_ownership_set_lock_state(3, true));
+    gesture_out_count = 0;
+    gesture_kind_tap(20); gesture_advance(500);
+    gesture_check_shortcut_keys_once(TEST_KIND_LAYERS);
+    CHECK(layer_ownership_is_locked(9) && layer_ownership_is_locked(12) && !layer_ownership_is_locked(3));
+    CHECK(layer_ownership_goto(0) && noah_runtime_debug_active_slot_count() == 0);
+
+    // Tap-toggle: a dual-role key, so its keys go down at the press beside its
+    // layers; the TAPPING_TOGGLE-th quick tap locks both.
+    test_reset_state(); fake_time = 49000; gesture_second_code = TEST_KEYS_SHORTCUT_KEY; test_keys_shortcut_kind = NOAH_SHORTCUT_LAYERS_TAP_TOGGLE;
+    gesture_out_count = 0;
+    gesture_at(3,3,true); gesture_advance(5);
+    CHECK(gesture_out_count > 0 && (layer_state & TEST_KIND_LAYERS) == TEST_KIND_LAYERS);
+    gesture_at(3,3,false); gesture_advance(500);
+    gesture_check_shortcut_keys_once(TEST_KIND_LAYERS);
+    CHECK((layer_state & TEST_KIND_LAYERS) == 0);
+    gesture_out_count = 0;
+    for (uint8_t tap = 0; tap < NOAH_QMK_TAPPING_TOGGLE; tap++) gesture_kind_tap(20);
+    gesture_advance(500);
+    CHECK(layer_ownership_is_locked(9) && layer_ownership_is_locked(12));
+    gesture_check_shortcut_keys_all_up(NOAH_QMK_TAPPING_TOGGLE);
+    gesture_out_count = 0;
+    for (uint8_t tap = 0; tap < NOAH_QMK_TAPPING_TOGGLE; tap++) gesture_kind_tap(20);
+    gesture_advance(500);
+    // Every quick tap's press let go of its modifiers and keys with its release.
+    CHECK((layer_state & TEST_KIND_LAYERS) == 0 && noah_runtime_debug_active_slot_count() == 0);
+    CHECK(!(gesture_report_mods() & MOD_BIT(KC_LEFT_SHIFT)) && noah_runtime_debug_slot_held_action_keycode(test_keypos(3,3)) == KC_NO);
+    gesture_check_shortcut_keys_all_up(NOAH_QMK_TAPPING_TOGGLE);
+
+    // One-shot: the keys go down at the press with both layers on, and come up
+    // at the release; the tap arms both layers for the next key.
+    test_reset_state(); fake_time = 50000; gesture_second_code = TEST_KEYS_SHORTCUT_KEY; test_keys_shortcut_kind = NOAH_SHORTCUT_LAYERS_ONESHOT;
+    gesture_out_count = 0;
+    gesture_kind_tap(20); gesture_advance(500);
+    gesture_check_shortcut_keys_once(TEST_KIND_LAYERS);
+    CHECK(layer_ownership_oneshot_layers() == TEST_KIND_LAYERS && !(gesture_report_mods() & MOD_BIT(KC_LEFT_SHIFT)));
+    CHECK(layer_ownership_oneshot_consume() && (layer_state & TEST_KIND_LAYERS) == 0);
+    CHECK(noah_runtime_debug_active_slot_count() == 0);
+    // A quick second tap cancels the first, and its press's keys come back
+    // up with its release: nothing stays held.
+    gesture_out_count = 0;
+    gesture_kind_tap(20); gesture_kind_tap(20); gesture_advance(500);
+    CHECK(layer_ownership_oneshot_layers() == 0 && (layer_state & TEST_KIND_LAYERS) == 0 && !layer_ownership_is_held(9));
+    CHECK(!(gesture_report_mods() & MOD_BIT(KC_LEFT_SHIFT)) && noah_runtime_debug_slot_held_action_keycode(test_keypos(3,3)) == KC_NO);
+    gesture_check_shortcut_keys_all_up(2);
+    gesture_second_code = KC_NO;
+    test_keys_shortcut_kind     = NOAH_SHORTCUT_LAYERS_HOLD;
+}
 static void test_qmk_combo_consumes_second_press(void) {
     test_reset_state(); fake_time = 2000;
     gesture_event(true); gesture_advance(40); gesture_event(false);
@@ -5913,6 +6061,7 @@ int main(int argc, char **argv) {
     test_qmk_combo_consumes_second_press();
     test_qmk_combo_output_holds_its_shortcut_layers();
     test_qmk_shortcut_layer_kinds_act_as_their_layer_keys();
+    test_qmk_shortcut_keys_with_layers_of_each_kind();
     test_qmk_member_hold_uses_physical_duration();
     test_qmk_authored_layer_tap_has_one_clock();
     test_qmk_bypassed_authored_layer_tap_keeps_default();

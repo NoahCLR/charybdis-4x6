@@ -2,39 +2,50 @@
 // Custom Key Shortcuts
 // ────────────────────────────────────────────────────────────────────────────
 //
-// A custom key may carry a shortcut (D-F26): one key, any of the eight
-// modifiers, left and right mixed, and any set of layers with the layer key
-// they act as, each part optional. The shortcut is the custom key's own
-// action, the way an ordinary key's own keycode is: held while the key is
+// A custom key may carry a shortcut (D-F26): up to six keys held together,
+// any of the eight modifiers, left and right mixed, and any set of layers with the
+// layer key they act as, each part optional. The shortcut is the custom key's
+// own action, the way an ordinary key's own keycode is: held while the key is
 // held, tapped when it is tapped, and what a behaviour row's unauthored cells
-// and bypasses fall back to. Its layers act as one layer key on all of them:
-// held as MO() holds (on while it is held, through layer ownership, and only
-// for a tap's length when it is tapped), locked as TG() locks, moved to as TO()
-// moves, held and locked on the TAPPING_TOGGLE-th tap as TT() does, or held
-// and one-shot as OSL() is. A step on another key that names a custom key
-// sends only that key's shortcut, layers included, never its behaviour.
+// and bypasses fall back to. Its modifiers go down first, then its keys in
+// order, all held together, and they come back up in reverse. Its layers act
+// as one layer key on all of them: held as MO() holds (on while it is held,
+// through layer ownership, and only for a tap's length when it is tapped),
+// locked as TG() locks, moved to as TO() moves, held and locked on the
+// TAPPING_TOGGLE-th tap as TT() does, or held and one-shot as OSL() is. A step
+// on another key that names a custom key sends only that key's shortcut,
+// layers included, never its behaviour.
 //
-// Stored in settings v10 as five bytes per slot, in slot order: an 8-bit HID
+// Stored in settings v11 as ten bytes per slot, in slot order: an 8-bit HID
 // report modifier mask (bit 0 Left Ctrl, 1 Left Shift, 2 Left Alt, 3 Left GUI,
-// 4 Right Ctrl, 5 Right Shift, 6 Right Alt, 7 Right GUI), the key, the 16-bit
-// layer mask, low byte first, then the layer kind. All zero means no shortcut;
-// any one part alone (a held Hyper, a key, layers) is a shortcut. The base
-// layer and the default layers are always on, so a shortcut never names them,
-// and without layers the kind is Hold.
+// 4 Right Ctrl, 5 Right Shift, 6 Right Alt, 7 Right GUI), six key bytes in the
+// order they are pressed, zero after the last, the 16-bit layer mask, low byte
+// first, then the layer kind. All zero means no shortcut; any one part alone (a
+// held Hyper, a key, layers) is a shortcut. The base layer and the default
+// layers are always on, so a shortcut never names them, and without layers the
+// kind is Hold.
 // ────────────────────────────────────────────────────────────────────────────
 #pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
 
+// How many keys a shortcut holds: six, the 6-key report's limit, whatever the
+// build (no NKRO). This header owns the number; the owned output's chord takes
+// its size from it, and compat/qmk_report_usage_contract.h holds it to QMK's
+// report.
+enum { NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT = 6 };
+
+// The record's bytes.
 enum {
-    NOAH_CUSTOM_KEY_SHORTCUT_MODS      = 0, // record byte 0: report modifier mask
-    NOAH_CUSTOM_KEY_SHORTCUT_KEY       = 1, // record byte 1: the key, zero for none
-    NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO = 2, // record bytes 2..3: the layer mask, little-endian
-    NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI = 3,
-    NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND = 4, // record byte 4: the layer key its layers act as
-    NOAH_CUSTOM_KEY_SHORTCUT_SIZE      = 5,
+    NOAH_CUSTOM_KEY_SHORTCUT_MODS        = 0, // record byte 0: report modifier mask
+    NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET = 1, // record bytes 1..6: the keys in press order, zero after the last
+    NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO   = 7, // record bytes 7..8: the layer mask, little-endian
+    NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI   = 8,
+    NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND  = 9, // record byte 9: the layer key its layers act as
+    NOAH_CUSTOM_KEY_SHORTCUT_SIZE        = 10,
 };
+_Static_assert(NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT == NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO, "the record holds every key between its modifiers and its layers");
 
 // The layer key a shortcut's layers act as, all of them together.
 typedef enum {
@@ -48,29 +59,51 @@ typedef enum {
 
 typedef struct {
     uint8_t  mods;
-    uint8_t  key;
+    uint8_t  keys[NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT]; // in press order, zero after the last
     uint16_t layers;
     uint8_t  layer_kind;
 } noah_custom_key_shortcut_t;
 
-// The keys a shortcut may hold: none, the keyboard usages QMK's basic
-// keycodes name (KC_A 0x04 through KC_EXSEL 0xa4), or mouse buttons 1-8
-// (0xd1-0xd8, after the modifiers so Cmd+click works). Modifiers belong in the
-// mask; media and system keys, mouse movement and every non-basic keycode
-// (layers, macros, pointing modes, custom keys) stay out. Every accepted key is
-// a basic keycode, so one byte holds it.
-#define NOAH_CUSTOM_KEY_SHORTCUT_KEY_VALID(key_) ((key_) == 0 || ((key_) >= 0x04 && (key_) <= 0xa4) || ((key_) >= 0xd1 && (key_) <= 0xd8))
-// A shortcut's layer mask is 16 bits: layers 0-15, the bank settings v10
+// The keys a shortcut may hold: the basic keycodes for usages a host sees.
+// Keyboard keys (KC_A 0x04 through KC_EXSEL 0xa4), the system keys (0xa5-0xa7),
+// the consumer (media) keys (0xa8-0xc2), and the mouse keys that move, click
+// and scroll (0xcd-0xdc), by QMK's ranges in quantum/keycodes.h;
+// compat/qmk_report_usage_contract.h holds these numbers to the selected QMK's.
+// Modifiers belong in the mask; mouse-key acceleration (0xdd-0xdf) sends
+// nothing of its own, and every non-basic
+// keycode (layers, macros, pointing modes, custom keys) is a behaviour's job.
+// Every key is a basic keycode, so one byte holds it. The system and consumer
+// reports carry one usage each, so a shortcut holds at most one of each.
+#define NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_SYSTEM(key_) ((key_) >= 0xa5 && (key_) <= 0xa7)
+#define NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_CONSUMER(key_) ((key_) >= 0xa8 && (key_) <= 0xc2)
+#define NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_KEY(key_) (((key_) >= 0x04 && (key_) <= 0xc2) || ((key_) >= 0xcd && (key_) <= 0xdc))
+// A shortcut's layer mask is 16 bits: layers 0-15, the bank settings v11
 // stores, of which a shortcut may name 1-15.
 #define NOAH_CUSTOM_KEY_SHORTCUT_LAYERS 16
 
+// A key byte: a key, or zero for none.
 static inline bool noah_custom_key_shortcut_key_valid(uint8_t key) {
-    return NOAH_CUSTOM_KEY_SHORTCUT_KEY_VALID(key);
+    return key == 0u || NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_KEY(key);
 }
 
-// The parts that reach the report: its modifiers and its key.
+// How many keys a shortcut's key list holds: they are packed from the first,
+// and zero ends them. Every reader of a key list counts it here.
+static inline uint8_t noah_custom_key_shortcut_key_count(const uint8_t keys[NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT]) {
+    uint8_t count = 0u;
+
+    while (count < NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT && keys[count] != 0u) {
+        count++;
+    }
+    return count;
+}
+
+static inline bool noah_custom_key_shortcut_has_keys(noah_custom_key_shortcut_t shortcut) {
+    return noah_custom_key_shortcut_key_count(shortcut.keys) != 0u;
+}
+
+// The parts that reach the report: its modifiers and its keys.
 static inline bool noah_custom_key_shortcut_has_report_parts(noah_custom_key_shortcut_t shortcut) {
-    return shortcut.mods != 0u || shortcut.key != 0u;
+    return shortcut.mods != 0u || noah_custom_key_shortcut_has_keys(shortcut);
 }
 
 static inline bool noah_custom_key_shortcut_present(noah_custom_key_shortcut_t shortcut) {
@@ -79,12 +112,14 @@ static inline bool noah_custom_key_shortcut_present(noah_custom_key_shortcut_t s
 
 // A shortcut from its stored record of NOAH_CUSTOM_KEY_SHORTCUT_SIZE bytes.
 static inline noah_custom_key_shortcut_t noah_custom_key_shortcut_from_record(const uint8_t *record) {
-    return (noah_custom_key_shortcut_t){
-        .mods   = record[NOAH_CUSTOM_KEY_SHORTCUT_MODS],
-        .key    = record[NOAH_CUSTOM_KEY_SHORTCUT_KEY],
-        .layers = (uint16_t)(record[NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO] | (record[NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI] << 8)),
+    noah_custom_key_shortcut_t shortcut = {
+        .mods       = record[NOAH_CUSTOM_KEY_SHORTCUT_MODS],
+        .layers     = (uint16_t)(record[NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO] | (record[NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI] << 8)),
         .layer_kind = record[NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND],
     };
+    for (uint8_t key = 0u; key < NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT; key++)
+        shortcut.keys[key] = record[NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + key];
+    return shortcut;
 }
 
 // Tap-toggle and One-shot shortcuts make their key a dual-role key, as TT()

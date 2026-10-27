@@ -45,17 +45,22 @@ game layer, order it just above the base layer and reach it with `TO()`.
 ```c
 #define CUSTOM_KEYS(KEY, SHORTCUT)                                                                 \
     KEY(CUSTOM_KEY_0, "Right Thumb")                                                               \
-    SHORTCUT(CUSTOM_KEY_4, "Hyper K", SHORTCUT_MODS(KC_LCTL, KC_RALT), KC_K, SHORTCUT_NO_LAYERS)   \
-    SHORTCUT(CUSTOM_KEY_5, "Cmd + Nav", SHORTCUT_MODS(KC_LGUI), KC_NO, SHORTCUT_LAYERS(LAYER_NAV)) \
-    KEY(CUSTOM_KEY_6, "")                                                                          \
+    SHORTCUT(CUSTOM_KEY_4, "Hyper K", SHORTCUT_MODS(KC_LCTL, KC_RALT), SHORTCUT_KEYS(KC_K), SHORTCUT_NO_LAYERS)        \
+    SHORTCUT(CUSTOM_KEY_5, "Cmd + Nav", SHORTCUT_MODS(KC_LGUI), SHORTCUT_NO_KEYS, SHORTCUT_LAYERS(LAYER_NAV))           \
+    SHORTCUT(CUSTOM_KEY_6, "ASD + Play", SHORTCUT_NO_MODS, SHORTCUT_KEYS(KC_A, KC_S, KC_D, KC_MPLY), SHORTCUT_NO_LAYERS) \
+    KEY(CUSTOM_KEY_7, "")                                                                                               \
     ...
 ```
 
 A name is at most 32 bytes; `""` leaves the slot unused. Name the modifier
 keys in `SHORTCUT_MODS(...)`, or write `SHORTCUT_NO_MODS`; a QMK `MOD_*`
-constant doesn't compile, since `MOD_RALT` would mean other keys here. The
-key is a basic key (`KC_A` to `KC_EXSEL`), a mouse button (`MS_BTN1` to
-`MS_BTN8`) or `KC_NO` for none. Name the layers it holds on in
+constant doesn't compile, since `MOD_RALT` would mean other keys here. Name
+up to six keys in `SHORTCUT_KEYS(...)`, in the order they go down, or write
+`SHORTCUT_NO_KEYS`: keyboard keys (`KC_A` to `KC_EXSEL`, no modifier keys),
+media and system keys (`KC_MPLY`, `KC_VOLU`, `KC_PWR`, …; at most one of
+each) and mouse keys (`MS_BTN1` to `MS_BTN8`, `MS_WHLU`, `MS_UP`, …), each
+once; a bare key, `KC_NO`, a seventh key or a repeated one doesn't compile.
+Name the layers it holds on in
 `SHORTCUT_LAYERS(...)`, any of layers 1 to 15, or write `SHORTCUT_NO_LAYERS`;
 the base layer is always on, so it doesn't compile, and a profile whose default
 layers include one a shortcut names is refused. To act on the layers as

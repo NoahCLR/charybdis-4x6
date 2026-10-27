@@ -75,36 +75,32 @@ bool owned_keycode_is_supported(uint16_t keycode) {
     return owned_keycode_decompose(keycode, &components);
 }
 
-static bool owned_keycode_acquire_basic(uint8_t basic) {
-    uint8_t *managed = &owned_keycode_state.managed_refcounts[basic];
-
-    if (*managed == UINT8_MAX) {
-        if (owned_keycode_state.saturation_count != UINT16_MAX) {
-            owned_keycode_state.saturation_count++;
-        }
-        return false;
+static void owned_keycode_note_saturation(void) {
+    if (owned_keycode_state.saturation_count != UINT16_MAX) {
+        owned_keycode_state.saturation_count++;
     }
-    if ((*managed)++ == 0u) {
+}
+
+static void owned_keycode_note_underflow(void) {
+    if (owned_keycode_state.underflow_count != UINT16_MAX) {
+        owned_keycode_state.underflow_count++;
+    }
+}
+
+// Precondition: the usage's managed count is below UINT8_MAX.
+static void owned_keycode_acquire_basic(uint8_t basic) {
+    if (owned_keycode_state.managed_refcounts[basic]++ == 0u) {
         owned_keycode_state.managed_usage_count++;
         if (owned_keycode_state.physical_refcounts[basic] == 0u) {
             pointer_layer_policy_note_action(basic, true);
             register_code(basic);
         }
     }
-    return true;
 }
 
-static bool owned_keycode_release_basic(uint8_t basic) {
-    uint8_t *managed = &owned_keycode_state.managed_refcounts[basic];
-
-    if (*managed == 0u) {
-        if (owned_keycode_state.underflow_count != UINT16_MAX) {
-            owned_keycode_state.underflow_count++;
-        }
-        return false;
-    }
-    (*managed)--;
-    if (*managed == 0u) {
+// Precondition: the usage's managed count is above zero.
+static void owned_keycode_release_basic(uint8_t basic) {
+    if (--owned_keycode_state.managed_refcounts[basic] == 0u) {
         if (owned_keycode_state.managed_usage_count != 0u) {
             owned_keycode_state.managed_usage_count--;
         }
@@ -113,9 +109,14 @@ static bool owned_keycode_release_basic(uint8_t basic) {
             pointer_layer_policy_note_action(basic, false);
         }
     }
-    return true;
 }
 
+// Every lease takes its usages here, a literal keycode's (its modifiers and at
+// most one key) and a chord's alike: `mods` and the first `count` of `keys`.
+//
+// The ledger is asked first whether it can take all of them, so a lease it
+// cannot hold sends no report at all.
+//
 // Modifiers reach the host report before the usage they qualify, matching
 // QMK's own register_code16(). Registering the usage first ships one report
 // with the bare usage down, which the host has already committed as an
@@ -129,55 +130,66 @@ static bool owned_keycode_release_basic(uint8_t basic) {
 // host that samples modifier state at button-down then sees a bare click, which
 // is how PRESS_AND_HOLD_UNTIL_RELEASE(A(MS_BTN2)) reaches a window manager as a
 // plain right-drag some of the time. Let a fresh modifier settle across a few
-// frames before the button goes down. A modifier that was already down needs no
-// head start: no report was sent for it, so there is nothing to outrun.
-static bool owned_keycode_acquire_components(const owned_keycode_lease_t *components) {
+// frames before the first button goes down. A modifier that was already down
+// needs no head start: no report was sent for it, so there is nothing to
+// outrun.
+static bool owned_keycode_acquire_usages(uint8_t mods, const uint8_t *keys, uint8_t count) {
     bool modifier_report_sent = false;
 
-    if (components->mods != 0u && !keyboard_mod_ownership_can_register_mods(components->mods)) {
-        if (owned_keycode_state.saturation_count != UINT16_MAX) {
-            owned_keycode_state.saturation_count++;
-        }
-        return false;
-    }
-
-    if (components->mods != 0u) {
-        modifier_report_sent = keyboard_mod_ownership_register_mods(components->mods);
-    }
-
-    if (components->has_basic) {
-        if (modifier_report_sent && IS_MOUSEKEY_BUTTON(components->basic)) {
-            wait_ms(OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS);
-        }
-        if (!owned_keycode_acquire_basic(components->basic)) {
-            if (components->mods != 0u) {
-                keyboard_mod_ownership_unregister_mods(components->mods);
-            }
+    for (uint8_t key = 0u; key < count; key++) {
+        if (owned_keycode_state.managed_refcounts[keys[key]] == UINT8_MAX) {
+            owned_keycode_note_saturation();
             return false;
         }
     }
-
-    return true;
-}
-
-// Teardown mirrors the acquire order: the usage leaves the report first, so a
-// modifier never outlives the usage it was qualifying.
-static bool owned_keycode_release_components(const owned_keycode_lease_t *components) {
-    if ((components->has_basic && owned_keycode_state.managed_refcounts[components->basic] == 0u) || (components->mods != 0u && !keyboard_mod_ownership_can_unregister_mods(components->mods))) {
-        if (owned_keycode_state.underflow_count != UINT16_MAX) {
-            owned_keycode_state.underflow_count++;
-        }
+    if (mods != 0u && !keyboard_mod_ownership_can_register_mods(mods)) {
+        owned_keycode_note_saturation();
         return false;
     }
 
-    if (components->has_basic) {
-        (void)owned_keycode_release_basic(components->basic);
+    if (mods != 0u) {
+        modifier_report_sent = keyboard_mod_ownership_register_mods(mods);
     }
-    if (components->mods != 0u) {
-        keyboard_mod_ownership_unregister_mods(components->mods);
+    for (uint8_t key = 0u; key < count; key++) {
+        if (modifier_report_sent && IS_MOUSEKEY_BUTTON(keys[key])) {
+            wait_ms(OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS);
+            modifier_report_sent = false;
+        }
+        owned_keycode_acquire_basic(keys[key]);
+    }
+    return true;
+}
+
+// Teardown mirrors the acquire order: the keys leave the report last first,
+// then the modifiers, so a modifier never outlives a usage it was qualifying.
+// Nothing is let go unless all of it can be.
+static bool owned_keycode_release_usages(uint8_t mods, const uint8_t *keys, uint8_t count) {
+    for (uint8_t key = 0u; key < count; key++) {
+        if (owned_keycode_state.managed_refcounts[keys[key]] == 0u) {
+            owned_keycode_note_underflow();
+            return false;
+        }
+    }
+    if (mods != 0u && !keyboard_mod_ownership_can_unregister_mods(mods)) {
+        owned_keycode_note_underflow();
+        return false;
     }
 
+    while (count != 0u) {
+        owned_keycode_release_basic(keys[--count]);
+    }
+    if (mods != 0u) {
+        keyboard_mod_ownership_unregister_mods(mods);
+    }
     return true;
+}
+
+static bool owned_keycode_acquire_components(const owned_keycode_lease_t *components) {
+    return owned_keycode_acquire_usages(components->mods, &components->basic, components->has_basic ? 1u : 0u);
+}
+
+static bool owned_keycode_release_components(const owned_keycode_lease_t *components) {
+    return owned_keycode_release_usages(components->mods, &components->basic, components->has_basic ? 1u : 0u);
 }
 
 bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
@@ -199,37 +211,6 @@ bool owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease) {
     return true;
 }
 
-bool owned_keycode_acquire_parts(uint8_t mods, uint8_t basic, owned_keycode_lease_t *lease) {
-    owned_keycode_lease_t candidate = {.mods = mods, .basic = basic, .has_basic = basic != KC_NO};
-
-    if (!lease || lease->active) {
-        return false;
-    }
-    *lease = (owned_keycode_lease_t){0};
-    if ((candidate.has_basic && (IS_MODIFIER_KEYCODE(basic) || !owned_keycode_is_report_usage(basic))) || (!candidate.has_basic && mods == 0u)) {
-        owned_keycode_note_unsupported();
-        return false;
-    }
-    if (!owned_keycode_acquire_components(&candidate)) {
-        return false;
-    }
-    candidate.active = true;
-    *lease           = candidate;
-    return true;
-}
-
-bool owned_keycode_tap_parts(uint8_t mods, uint8_t basic) {
-    owned_keycode_lease_t lease = {0};
-    uint16_t              delay = (basic == KC_CAPS_LOCK) ? TAP_HOLD_CAPS_DELAY : TAP_CODE_DELAY;
-
-    if (!owned_keycode_acquire_parts(mods, basic, &lease)) {
-        return false;
-    }
-    wait_ms(delay);
-    (void)owned_keycode_release(&lease);
-    return true;
-}
-
 bool owned_keycode_release(owned_keycode_lease_t *lease) {
     bool released;
 
@@ -246,6 +227,82 @@ bool owned_keycode_release(owned_keycode_lease_t *lease) {
     released = owned_keycode_release_components(lease);
     *lease   = (owned_keycode_lease_t){0};
     return released;
+}
+
+// A chord's keys are report usages, none a modifier (those are its mask) and
+// none named twice.
+static bool owned_keycode_chord_keys_supported(const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS], uint8_t count) {
+    for (uint8_t key = 0u; key < count; key++) {
+        if (IS_MODIFIER_KEYCODE(keys[key]) || !owned_keycode_is_report_usage(keys[key])) {
+            return false;
+        }
+        for (uint8_t before = 0u; before < key; before++) {
+            if (keys[before] == keys[key]) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool owned_keycode_acquire_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS], owned_keycode_chord_lease_t *lease) {
+    owned_keycode_chord_lease_t candidate = {.mods = mods};
+    uint8_t                     count;
+
+    if (!lease || lease->active || !keys) {
+        return false;
+    }
+    *lease = (owned_keycode_chord_lease_t){0};
+    count  = noah_custom_key_shortcut_key_count(keys);
+    if ((count == 0u && mods == 0u) || !owned_keycode_chord_keys_supported(keys, count)) {
+        owned_keycode_note_unsupported();
+        return false;
+    }
+    for (uint8_t key = 0u; key < count; key++) {
+        candidate.keys[key] = keys[key];
+    }
+    if (!owned_keycode_acquire_usages(mods, candidate.keys, count)) {
+        return false;
+    }
+    candidate.active = true;
+    *lease           = candidate;
+    return true;
+}
+
+bool owned_keycode_release_chord(owned_keycode_chord_lease_t *lease) {
+    bool released;
+
+    if (!lease) {
+        return false;
+    }
+    if (!lease->active) {
+        if (owned_keycode_state.idempotent_release_count != UINT16_MAX) {
+            owned_keycode_state.idempotent_release_count++;
+        }
+        return true;
+    }
+    released = owned_keycode_release_usages(lease->mods, lease->keys, noah_custom_key_shortcut_key_count(lease->keys));
+    *lease   = (owned_keycode_chord_lease_t){0};
+    return released;
+}
+
+// A tap holds the whole chord for one tap delay, Caps Lock's longer one when
+// the chord has it, as tap_code() would.
+bool owned_keycode_tap_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS]) {
+    owned_keycode_chord_lease_t lease = {0};
+    uint16_t                    delay = TAP_CODE_DELAY;
+    uint8_t                     count;
+
+    if (!owned_keycode_acquire_chord(mods, keys, &lease)) {
+        return false;
+    }
+    count = noah_custom_key_shortcut_key_count(lease.keys);
+    for (uint8_t key = 0u; key < count; key++) {
+        if (lease.keys[key] == KC_CAPS_LOCK) delay = TAP_HOLD_CAPS_DELAY;
+    }
+    wait_ms(delay);
+    (void)owned_keycode_release_chord(&lease);
+    return true;
 }
 
 bool owned_keycode_register(uint16_t keycode) {
@@ -303,16 +360,14 @@ void owned_keycode_track_physical_event(uint16_t keycode, keyrecord_t *record) {
     physical = &owned_keycode_state.physical_refcounts[components.basic];
     if (record->event.pressed) {
         if (*physical == UINT8_MAX) {
-            if (owned_keycode_state.saturation_count != UINT16_MAX) {
-                owned_keycode_state.saturation_count++;
-            }
+            owned_keycode_note_saturation();
             return;
         }
         (*physical)++;
     } else if (*physical != 0u) {
         (*physical)--;
-    } else if (owned_keycode_state.underflow_count != UINT16_MAX) {
-        owned_keycode_state.underflow_count++;
+    } else {
+        owned_keycode_note_underflow();
     }
 }
 

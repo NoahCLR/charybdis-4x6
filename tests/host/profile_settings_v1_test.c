@@ -41,7 +41,7 @@ static uint16_t layer_record(uint8_t layer, uint8_t field) {
 static void named(uint8_t size, char fill) {
     const uint32_t values[NOAH_SETTINGS_COUNT] = {200, 150, 400, 150, 1, 4, 1200, 25, 1, 0x8, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff};
     memset(bytes, 0, sizeof(bytes));
-    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {10, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
+    const uint8_t header[NOAH_SETTINGS_HEADER_SIZE] = {11, NOAH_SETTINGS_LAYERS, NOAH_SETTINGS_COUNT, NOAH_SETTINGS_MACRO_NAMES, NOAH_SETTINGS_CUSTOM_KEY_NAMES, 0, NOAH_SETTINGS_CUSTOM_KEY_SHORTCUTS, 0};
     memcpy(bytes, header, sizeof(header));
     for (uint8_t i = 0; i < NOAH_SETTINGS_COUNT; i++)
         set_scalar(i, values[i]);
@@ -81,12 +81,12 @@ static void put_name(uint16_t index, const char *text, uint8_t size) {
 static void test_header_and_versions(void) {
     defaults();
     assert(valid());
-    for (uint8_t version = 0; version <= 10; version++) {
+    for (uint8_t version = 0; version <= 11; version++) {
         defaults();
         bytes[0] = version;
         assert(valid() == (version == NOAH_SETTINGS_VERSION));
     }
-    assert(NOAH_SETTINGS_VERSION == 10);
+    assert(NOAH_SETTINGS_VERSION == 11);
     for (uint8_t at = 1; at < NOAH_SETTINGS_HEADER_SIZE; at++) {
         defaults();
         bytes[at]++;
@@ -267,13 +267,13 @@ static void test_layer_records(void) {
 static uint16_t shortcut_record(uint8_t slot, uint8_t field) {
     return (uint16_t)(NOAH_SETTINGS_SHORTCUTS_OFFSET + slot * NOAH_SETTINGS_SHORTCUT_SIZE + field);
 }
-// D-F26: one modifier mask, one key, one layer mask and one layer kind per
-// custom key, between the layer records and the names. Any modifier mask is valid; the key is a
-// basic key, a mouse button, or none.
+// D-F26: one modifier mask, six key bytes, one layer mask and one layer kind
+// per custom key, between the layer records and the names. Any modifier mask
+// is valid; a key is a keyboard, system, media or mouse key, or none.
 static void test_shortcuts(void) {
     assert(NOAH_SETTINGS_SHORTCUTS_OFFSET == NOAH_SETTINGS_LAYER_RECORDS_OFFSET + NOAH_SETTINGS_LAYERS * NOAH_SETTINGS_LAYER_RECORD_SIZE);
-    assert(NOAH_SETTINGS_FIXED_SIZE == NOAH_SETTINGS_SHORTCUTS_OFFSET + 640);
-    assert(NOAH_SETTINGS_MIN_SIZE == 1317 && NOAH_SETTINGS_MAX_SIZE == 10053);
+    assert(NOAH_SETTINGS_FIXED_SIZE == NOAH_SETTINGS_SHORTCUTS_OFFSET + 1280);
+    assert(NOAH_SETTINGS_MIN_SIZE == 1957 && NOAH_SETTINGS_MAX_SIZE == 10693);
     assert(NOAH_SETTINGS_SHORTCUT_COUNT_OFFSET == 6);
     for (unsigned mods = 0; mods <= 255; mods++) {
         defaults();
@@ -282,15 +282,29 @@ static void test_shortcuts(void) {
     }
     for (unsigned key = 0; key <= 255; key++) {
         defaults();
-        bytes[shortcut_record(0, NOAH_CUSTOM_KEY_SHORTCUT_KEY)] = (uint8_t)key;
-        bool expected = key == 0 || (key >= 0x04 && key <= 0xa4) || (key >= 0xd1 && key <= 0xd8);
+        bytes[shortcut_record(0, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET)] = (uint8_t)key;
+        bool expected = key == 0 || (key >= 0x04 && key <= 0xc2) || (key >= 0xcd && key <= 0xdc);
         assert(valid() == expected);
         assert(noah_custom_key_shortcut_key_valid((uint8_t)key) == expected);
+        // Any key byte takes the same keys.
+        defaults();
+        bytes[shortcut_record(3, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET)]                                     = 0x1e;
+        bytes[shortcut_record(3, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + 1)]                                 = 0x1f;
+        bytes[shortcut_record(3, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + 2)]                                 = 0x20;
+        bytes[shortcut_record(3, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + 3)]                                 = 0x21;
+        bytes[shortcut_record(3, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + 4)]                                 = 0x22;
+        bytes[shortcut_record(3, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT - 1)] = (uint8_t)key;
+        assert(valid() == (expected && !(key >= 0x1e && key <= 0x22)));
     }
-    // Modifier keys belong in the mask, media keys and mouse movement nowhere.
+    // Modifier keys belong in the mask; mouse-key acceleration, the codes
+    // between the media and mouse keys, and anything below KC_A are no keys.
     assert(!noah_custom_key_shortcut_key_valid(0xe0) && !noah_custom_key_shortcut_key_valid(0xe7));
-    assert(!noah_custom_key_shortcut_key_valid(0xa5) && !noah_custom_key_shortcut_key_valid(0xcd) && !noah_custom_key_shortcut_key_valid(0xd9));
+    assert(!noah_custom_key_shortcut_key_valid(0xdd) && !noah_custom_key_shortcut_key_valid(0xdf));
+    assert(!noah_custom_key_shortcut_key_valid(0xc3) && !noah_custom_key_shortcut_key_valid(0xcc));
     assert(!noah_custom_key_shortcut_key_valid(0x01) && !noah_custom_key_shortcut_key_valid(0x03));
+    // System, media, mouse movement, wheel and buttons are keys.
+    assert(noah_custom_key_shortcut_key_valid(0xa5) && noah_custom_key_shortcut_key_valid(0xae) && noah_custom_key_shortcut_key_valid(0xcd));
+    assert(noah_custom_key_shortcut_key_valid(0xd9) && noah_custom_key_shortcut_key_valid(0xdc) && noah_custom_key_shortcut_key_valid(0xd8));
     // The header counts 128 shortcut records and nothing else.
     defaults();
     bytes[NOAH_SETTINGS_SHORTCUT_COUNT_OFFSET] = 0;
@@ -299,7 +313,63 @@ static void test_shortcuts(void) {
     bytes[NOAH_SETTINGS_SHORTCUT_COUNT_OFFSET] = 64;
     assert(!valid());
 }
-// v10 (D-F26): a shortcut's layers are bytes 2..3, little-endian. Any layer
+static void set_keys(uint8_t slot, const uint8_t keys[NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT]) {
+    for (uint8_t key = 0; key < NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT; key++)
+        bytes[shortcut_record(slot, (uint8_t)(NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + key))] = keys[key];
+}
+// v11 (D-F26): a shortcut holds up to six keys together in record bytes 1..6,
+// in the order they are pressed and packed from the first, each named once,
+// with at most one system key and one media key, since those reports carry one
+// usage each.
+static void test_shortcut_keys(void) {
+    static const uint8_t accepted[][NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT] = {
+        {0x04, 0x16, 0x07, 0x50, 0x52, 0xa4}, // A S D Left Up ExSel: six
+        {0xae, 0xa5, 0xd1, 0xd9, 0xcd, 0x2c}, // Play, Power, a click, the wheel, the cursor, Space
+        {0xc2, 0},                            // a media key alone
+        {0xa7, 0xa9, 0},                      // one system and one media key
+        {0x04, 0x05, 0},
+    };
+    static const uint8_t refused[][NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT] = {
+        {0, 0x04},                            // a key after none
+        {0x04, 0, 0x05},
+        {0x04, 0x04},                         // the same key twice
+        {0x04, 0x05, 0x06, 0x07, 0x08, 0x04},
+        {0xae, 0xa9},                         // two media keys
+        {0xa8, 0x04, 0xc2},
+        {0xa5, 0xa6},                         // two system keys
+        {0xa5, 0x04, 0x05, 0x06, 0x07, 0xa7},
+        {0x04, 0xe1},                         // a modifier key
+        {0x04, 0xdd},                         // mouse-key acceleration
+        {0x04, 0x01},                         // KC_TRANSPARENT
+    };
+    for (size_t i = 0; i < sizeof(accepted) / sizeof(accepted[0]); i++) {
+        defaults();
+        set_keys(17, accepted[i]);
+        assert(valid());
+        noah_custom_key_shortcut_t shortcut = noah_custom_key_shortcut_from_record(&bytes[shortcut_record(17, 0)]);
+        assert(!memcmp(shortcut.keys, accepted[i], NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT) && noah_custom_key_shortcut_has_keys(shortcut));
+    }
+    for (size_t i = 0; i < sizeof(refused) / sizeof(refused[0]); i++) {
+        defaults();
+        set_keys(17, refused[i]);
+        assert(!valid());
+    }
+    // Each record's keys are its own: the same six keys twice are two
+    // shortcuts.
+    defaults();
+    set_keys(17, accepted[0]);
+    set_keys(18, accepted[0]);
+    assert(valid());
+    // A media key held by two shortcuts is one each.
+    defaults();
+    set_keys(17, accepted[2]);
+    set_keys(18, accepted[2]);
+    assert(valid());
+    // Keys alone are a shortcut; modifiers alone have none.
+    assert(noah_custom_key_shortcut_present((noah_custom_key_shortcut_t){.keys = {0x04}}));
+    assert(!noah_custom_key_shortcut_has_keys((noah_custom_key_shortcut_t){.mods = 0x01}));
+}
+// v10 (D-F26): a shortcut's layers are record bytes 7..8 since v11, little-endian. Any layer
 // may be named but the ones always on: layer 0 and the default layers
 // (scalar 23), which the same domain states before the shortcuts.
 static void test_shortcut_layers(void) {
@@ -324,10 +394,10 @@ static void test_shortcut_layers(void) {
     // Layers alone are a shortcut.
     assert(noah_custom_key_shortcut_present((noah_custom_key_shortcut_t){.layers = 0x0002}));
 }
-// v10 (D-F26): byte 4 is the layer key a shortcut's layers act as. Any kind
+// v10 (D-F26): byte 9 since v11 is the layer key a shortcut's layers act as. Any kind
 // with layers; without them only Hold, so one shortcut has one record.
 static void test_shortcut_layer_kind(void) {
-    assert(NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND == 4 && NOAH_SETTINGS_SHORTCUT_SIZE == 5);
+    assert(NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND == 9 && NOAH_SETTINGS_SHORTCUT_SIZE == 10);
     for (uint16_t kind = 0; kind <= 0xff; kind++) {
         defaults();
         bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI)]  = 0x01; // layer 8
@@ -340,7 +410,7 @@ static void test_shortcut_layer_kind(void) {
     defaults();
     bytes[shortcut_record(8, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO)] = 0x02;
     bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_MODS)]       = 0x08;
-    bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_KEY)]        = 0x2c;
+    bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET)]        = 0x2c;
     bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND)] = NOAH_SHORTCUT_LAYERS_LOCK;
     assert(!valid());
     bytes[shortcut_record(9, NOAH_CUSTOM_KEY_SHORTCUT_LAYER_KIND)] = NOAH_SHORTCUT_LAYERS_HOLD;
@@ -395,7 +465,7 @@ static void test_names(void) {
     // the last custom key's and 272 the keyboard's; a name in any is read in
     // order.
     assert(NOAH_SETTINGS_NAME_COUNT == 273 && NOAH_SETTINGS_KEYBOARD_NAME_RECORD == 272);
-    assert(NOAH_SETTINGS_MIN_SIZE == 1317 && NOAH_SETTINGS_MAX_SIZE == 10053);
+    assert(NOAH_SETTINGS_MIN_SIZE == 1957 && NOAH_SETTINGS_MAX_SIZE == 10693);
     defaults();
     put_name(272, "Keyboard", 8);
     put_name(271, "Last custom", 11);
@@ -460,9 +530,12 @@ static void test_publication(void) {
     bytes[layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE)] = 2;
     bytes[layer_record(9, NOAH_SETTINGS_LAYER_BYPASS + 7)] = 0x08;
     bytes[shortcut_record(4, NOAH_CUSTOM_KEY_SHORTCUT_MODS)] = 0x41; // Left Ctrl + Right Alt
-    bytes[shortcut_record(4, NOAH_CUSTOM_KEY_SHORTCUT_KEY)]  = 0x0e; // K
+    bytes[shortcut_record(4, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET)]  = 0x0e; // K
     bytes[shortcut_record(5, NOAH_CUSTOM_KEY_SHORTCUT_MODS)] = 0x0f; // Hyper alone
-    bytes[shortcut_record(127, NOAH_CUSTOM_KEY_SHORTCUT_KEY)] = 0xd1; // a mouse button alone
+    bytes[shortcut_record(127, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET)] = 0xd1; // a mouse button alone
+    bytes[shortcut_record(8, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET)]     = 0xae; // Play, then A and S
+    bytes[shortcut_record(8, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + 1)] = 0x04;
+    bytes[shortcut_record(8, NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + 2)] = 0x16;
     bytes[shortcut_record(6, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO)] = 0x06; // layers 1 and 2
     bytes[shortcut_record(6, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI)] = 0x80; // and 15, alone
     bytes[shortcut_record(4, NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_HI)] = 0x01; // and layer 8
@@ -485,10 +558,11 @@ static void test_publication(void) {
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_BYPASS + 7) == 0x08);
     assert(noah_setting_layer_record(15, NOAH_SETTINGS_LAYER_REFERENCE) == 15);
     assert(noah_setting_layer_record(16, NOAH_SETTINGS_LAYER_REFERENCE) == 0);
-    assert(noah_custom_key_shortcut(4).mods == 0x41 && noah_custom_key_shortcut(4).key == 0x0e && noah_custom_key_shortcut(4).layers == 0x0100);
-    assert(noah_custom_key_shortcut(5).mods == 0x0f && noah_custom_key_shortcut(5).key == 0 && noah_custom_key_shortcut(5).layers == 0);
-    assert(noah_custom_key_shortcut(127).mods == 0 && noah_custom_key_shortcut(127).key == 0xd1);
-    assert(noah_custom_key_shortcut(6).mods == 0 && noah_custom_key_shortcut(6).key == 0 && noah_custom_key_shortcut(6).layers == 0x8006);
+    assert(noah_custom_key_shortcut(4).mods == 0x41 && noah_custom_key_shortcut(4).keys[0] == 0x0e && noah_custom_key_shortcut(4).keys[1] == 0 && noah_custom_key_shortcut(4).layers == 0x0100);
+    assert(noah_custom_key_shortcut(5).mods == 0x0f && noah_custom_key_shortcut(5).keys[0] == 0 && noah_custom_key_shortcut(5).layers == 0);
+    assert(noah_custom_key_shortcut(127).mods == 0 && noah_custom_key_shortcut(127).keys[0] == 0xd1);
+    assert(noah_custom_key_shortcut(6).mods == 0 && noah_custom_key_shortcut(6).keys[0] == 0 && noah_custom_key_shortcut(6).layers == 0x8006);
+    assert(!memcmp(noah_custom_key_shortcut(8).keys, (const uint8_t[NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT]){0xae, 0x04, 0x16}, NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT));
     assert(noah_custom_key_shortcut(6).layer_kind == NOAH_SHORTCUT_LAYERS_MOVE && noah_custom_key_shortcut(4).layer_kind == NOAH_SHORTCUT_LAYERS_HOLD);
     assert(!noah_custom_key_shortcut_present(noah_custom_key_shortcut(7)));
     assert(!noah_custom_key_shortcut_present(noah_custom_key_shortcut(128)));
@@ -513,7 +587,7 @@ static void test_publication(void) {
     assert(name.length == 0);
     assert(noah_setting_combo_output_behaviors());
     assert(noah_setting_layer_record(9, NOAH_SETTINGS_LAYER_REFERENCE) == 0xA5u);
-    assert(noah_custom_key_shortcut(4).mods == 0xA5u && noah_custom_key_shortcut(4).key == 0xA5u && noah_custom_key_shortcut(4).layers == 0xA5A5u);
+    assert(noah_custom_key_shortcut(4).mods == 0xA5u && noah_custom_key_shortcut(4).keys[0] == 0xA5u && noah_custom_key_shortcut(4).keys[5] == 0xA5u && noah_custom_key_shortcut(4).layers == 0xA5A5u);
     // The largest domain publishes whole.
     named(NOAH_SETTINGS_NAME_MAX, 'z');
     view = settings_view();
@@ -545,6 +619,7 @@ int main(void) {
     assert(noah_host_layout_id(UINT32_C(0x01090103)) == 9u);
     test_layer_records();
     test_shortcuts();
+    test_shortcut_keys();
     test_shortcut_layers();
     test_shortcut_layer_kind();
     test_names();

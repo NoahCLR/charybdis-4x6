@@ -161,11 +161,13 @@ static void held_action_remove_slot(uint16_t slot) {
     held_action_slot_set_uses_lease(state, slot, false);
 
     if (lease_managed) {
-        if (state->action_leases[slot].active) {
-            (void)owned_keycode_release(&state->action_leases[slot]);
-        }
         if (NOAH_KEYCODE_IS_CUSTOM_KEY(action)) {
+            if (state->action_leases[slot].shortcut.active) {
+                (void)owned_keycode_release_chord(&state->action_leases[slot].shortcut);
+            }
             (void)layer_ownership_shortcut_release(key_pos);
+        } else if (state->action_leases[slot].keycode.active) {
+            (void)owned_keycode_release(&state->action_leases[slot].keycode);
         }
         return;
     }
@@ -253,7 +255,7 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
 
     if (NOAH_KEYCODE_IS_CUSTOM_KEY(action)) {
         // A custom key holds its shortcut (D-F26) through this binding's lease,
-        // which records the parts it registered, and its layers through layer
+        // which records the modifiers and keys it registered, and its layers through layer
         // ownership, which records them by key: a shortcut changed while held
         // still releases exactly what it took. Lock and Move to act on their
         // layers at the press instead, as TG() and TO() do, and hold none.
@@ -269,14 +271,14 @@ static bool held_action_register_owned(keypos_t key_pos, uint16_t action) {
             layer_ownership_shortcut_press(key_pos, shortcut.layers);
         }
         if (noah_custom_key_shortcut_has_report_parts(shortcut)) {
-            (void)owned_keycode_acquire_parts(shortcut.mods, shortcut.key, &state->action_leases[slot]);
+            (void)owned_keycode_acquire_chord(shortcut.mods, shortcut.keys, &state->action_leases[slot].shortcut);
         }
         return true;
     }
 
     if (owned_keycode_is_supported(action)) {
         held_action_slot_set_uses_lease(state, (uint16_t)slot, true);
-        (void)owned_keycode_acquire(action, &state->action_leases[slot]);
+        (void)owned_keycode_acquire(action, &state->action_leases[slot].keycode);
         return true;
     }
 

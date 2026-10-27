@@ -27,6 +27,10 @@ enum {
     TEST_OTHER_SHORTCUT_KEY    = CUSTOM_KEY_6,
     TEST_SHORTCUT_MODS         = 0x41u,
     TEST_OTHER_SHORTCUT_MODS   = 0x01u,
+    // A shortcut of keys (D-F26): Left Shift with A, S and Play held together; the
+    // profile may change it to Z alone while it is held.
+    TEST_KEYS_SHORTCUT_KEY     = CUSTOM_KEY_7,
+    TEST_KEYS_SHORTCUT_MODS    = 0x02u,
     TEST_REPORT_EVENT_CAPACITY = 16,
 };
 
@@ -37,6 +41,7 @@ typedef struct {
 } test_report_event_t;
 
 static test_report_event_t report_events[TEST_REPORT_EVENT_CAPACITY];
+static bool                test_keys_shortcut_changed;
 static uint8_t             report_event_count;
 
 static uint16_t fake_time;
@@ -96,6 +101,7 @@ static void test_reset_state(void) {
     last_delayed_action        = KC_NO;
     last_delayed_mods          = (delayed_action_mods_t){0};
     report_event_count         = 0;
+    test_keys_shortcut_changed         = false;
     noah_runtime_reset_for_test();
     send_keyboard_report_count = 0;
 }
@@ -182,8 +188,9 @@ void unregister_code(uint8_t keycode) {
 }
 
 noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
-    if (slot == (uint8_t)(TEST_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = TEST_SHORTCUT_MODS, .key = KC_K};
-    if (slot == (uint8_t)(TEST_OTHER_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = TEST_OTHER_SHORTCUT_MODS, .key = KC_J};
+    if (slot == (uint8_t)(TEST_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = TEST_SHORTCUT_MODS, .keys = {KC_K}};
+    if (slot == (uint8_t)(TEST_OTHER_SHORTCUT_KEY - CUSTOM_KEY_0)) return (noah_custom_key_shortcut_t){.mods = TEST_OTHER_SHORTCUT_MODS, .keys = {KC_J}};
+    if (slot == (uint8_t)(TEST_KEYS_SHORTCUT_KEY - CUSTOM_KEY_0)) return test_keys_shortcut_changed ? (noah_custom_key_shortcut_t){.keys = {KC_Z}} : (noah_custom_key_shortcut_t){.mods = TEST_KEYS_SHORTCUT_MODS, .keys = {KC_A, KC_S, KC_MEDIA_PLAY_PAUSE}};
     return (noah_custom_key_shortcut_t){0};
 }
 
@@ -650,8 +657,53 @@ static void test_overlapping_shortcuts_keep_a_shared_modifier(void) {
     test_assert_runtime_quiescent(second);
 }
 
+// A held shortcut of keys (D-F26): the modifiers, then each key in order, all
+// held together, a media key among them; released last first, then the modifiers.
+// Changed while held, it still lets go of exactly the keys it pressed.
+static void test_custom_key_holds_its_shortcut_keys_in_order(void) {
+    static const uint8_t keys[] = {KC_A, KC_S, KC_MEDIA_PLAY_PAUSE};
+    keypos_t             key_pos = test_keypos(2, 5);
+
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(TEST_KEYS_SHORTCUT_KEY, key_pos, true));
+    CHECK(report_event_count == 3u && get_mods() == TEST_KEYS_SHORTCUT_MODS);
+    for (uint8_t i = 0; i < 3u; i++) {
+        test_check_report_event(i, keys[i], true, TEST_KEYS_SHORTCUT_MODS);
+    }
+    CHECK(owned_keycode_managed_usage_count() == 3u);
+    key_runtime_integration_advance(&fake_time, 400);
+    key_runtime_integration_scan();
+    CHECK(report_event_count == 3u);
+
+    test_keys_shortcut_changed = true;
+    CHECK(!key_runtime_integration_process_record(TEST_KEYS_SHORTCUT_KEY, key_pos, false));
+    CHECK(report_event_count == 6u);
+    for (uint8_t i = 0; i < 3u; i++) {
+        test_check_report_event((uint8_t)(3u + i), keys[2u - i], false, TEST_KEYS_SHORTCUT_MODS);
+    }
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(key_pos);
+
+    // Tapped, the same keys go down and up inside the tap, once.
+    test_reset_state();
+    CHECK(!key_runtime_integration_process_record(TEST_KEYS_SHORTCUT_KEY, key_pos, true));
+    key_runtime_integration_advance(&fake_time, 20);
+    CHECK(!key_runtime_integration_process_record(TEST_KEYS_SHORTCUT_KEY, key_pos, false));
+    key_runtime_integration_advance(&fake_time, 400);
+    key_runtime_integration_scan();
+    CHECK(report_event_count == 6u);
+    for (uint8_t i = 0; i < 3u; i++) {
+        test_check_report_event(i, keys[i], true, TEST_KEYS_SHORTCUT_MODS);
+        test_check_report_event((uint8_t)(3u + i), keys[2u - i], false, TEST_KEYS_SHORTCUT_MODS);
+    }
+    CHECK(emitted_action_count == 0u && delayed_action_count == 0u);
+    test_assert_shortcut_ledger_empty();
+    test_assert_runtime_quiescent(key_pos);
+}
+
 int main(void) {
     test_custom_key_holds_its_shortcut_until_release();
+    test_custom_key_holds_its_shortcut_keys_in_order();
     test_live_edit_waits_for_a_held_key();
     test_custom_key_quick_tap_sends_its_shortcut_once();
     test_overlapping_shortcuts_keep_a_shared_modifier();

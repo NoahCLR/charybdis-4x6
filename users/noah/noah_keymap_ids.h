@@ -377,9 +377,9 @@ extern const uint8_t  authored_macro_bank[];
 extern const uint16_t authored_macro_bank_size;
 extern const char        macro_names[MACRO_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
 extern const char        custom_key_names[CUSTOM_KEY_SLOT_COUNT][NOAH_MACRO_NAME_SIZE];
-// Each custom key's authored shortcut, as settings v10 stores it: the report
-// modifier mask, the key, the layer mask, low byte first, then the layer kind;
-// all zero for none.
+// Each custom key's authored shortcut, as settings v11 stores it: the report
+// modifier mask, six key bytes in press order, zero after the last, the layer
+// mask, low byte first, then the layer kind; all zero for none.
 extern const uint8_t custom_key_shortcuts[CUSTOM_KEY_SLOT_COUNT][NOAH_CUSTOM_KEY_SHORTCUT_SIZE];
 extern const char        layer_names[LAYER_COUNT][NOAH_LAYER_NAME_SIZE];
 #ifdef COMBO_ENABLE

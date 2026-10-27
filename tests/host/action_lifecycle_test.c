@@ -8,6 +8,7 @@
 #include "users/noah/lib/action/action_kind_dispatch_internal.h"
 #include "users/noah/lib/action/action_kind_internal.h"
 #include "users/noah/lib/action/action_lifecycle.h"
+#include "users/noah/lib/action/owned_keycode.h"
 #include "users/noah/lib/action/synthetic_record.h"
 #include "users/noah/lib/pointing/defs/pointing_modes.h"
 #include "users/noah/noah_keymap_ids.h"
@@ -54,7 +55,7 @@ static bool pd_release_result;
 static bool owned_register_result;
 static bool owned_unregister_result;
 static uint8_t                    shortcut_tap_calls;
-static noah_custom_key_shortcut_t shortcut_tap_parts;
+static noah_custom_key_shortcut_t shortcut_tapped;
 static noah_custom_key_shortcut_t test_custom_shortcut; // TEST_CUSTOM_ACTION's
 // The order a tapped shortcut's parts arrive in: 'L' its layers on, 'T' its
 // key and modifiers tapped, 'l' its layers off.
@@ -99,7 +100,7 @@ static void test_reset_stubs(void) {
     layer_press_call          = (test_call_t){0};
     layer_release_call        = (test_call_t){0};
     shortcut_tap_calls        = 0;
-    shortcut_tap_parts        = (noah_custom_key_shortcut_t){0};
+    shortcut_tapped        = (noah_custom_key_shortcut_t){0};
     memset(shortcut_tap_order, 0, sizeof(shortcut_tap_order));
     shortcut_tap_order_count = 0;
     shortcut_tap_layers_on   = 0;
@@ -295,10 +296,11 @@ bool layer_ownership_oneshot_tap_set(layer_state_t layers, uint16_t now, uint16_
     return true;
 }
 
-bool owned_keycode_tap_parts(uint8_t mods, uint8_t basic) {
+bool owned_keycode_tap_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS]) {
     shortcut_tap_note('T');
     shortcut_tap_calls++;
-    shortcut_tap_parts = (noah_custom_key_shortcut_t){.mods = mods, .key = basic};
+    shortcut_tapped = (noah_custom_key_shortcut_t){.mods = mods};
+    memcpy(shortcut_tapped.keys, keys, OWNED_KEYCODE_CHORD_KEYS);
     return true;
 }
 
@@ -487,23 +489,30 @@ static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
     CHECK(literal_tap_call.keycode == KC_NO);
 
     test_reset_stubs();
-    test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), .key = KC_K};
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT), .keys = {KC_K}};
 
     noah_action_tap(TEST_CUSTOM_ACTION);
     CHECK(shortcut_tap_calls == 1);
-    CHECK(shortcut_tap_parts.mods == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)) && shortcut_tap_parts.key == KC_K);
+    CHECK(shortcut_tapped.mods == (MOD_BIT(KC_LEFT_CTRL) | MOD_BIT(KC_RIGHT_ALT)) && shortcut_tapped.keys[0] == KC_K && shortcut_tapped.keys[1] == KC_NO);
     CHECK(synthetic_tap_call.keycode == KC_NO && synthetic_record_call.keycode == KC_NO);
     CHECK(literal_tap_call.keycode == KC_NO);
     CHECK(!strcmp(shortcut_tap_order, "T"));
 
+    // A shortcut's keys tap as one: every key, in order, through one tap.
+    test_reset_stubs();
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_SHIFT), .keys = {KC_A, KC_S, KC_D, KC_MEDIA_PLAY_PAUSE, MS_BTN1, KC_SYSTEM_SLEEP}};
+    noah_action_tap(TEST_CUSTOM_ACTION);
+    CHECK(shortcut_tap_calls == 1 && !strcmp(shortcut_tap_order, "T"));
+    CHECK(!memcmp(shortcut_tapped.keys, test_custom_shortcut.keys, NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT) && shortcut_tapped.mods == MOD_BIT(KC_LEFT_SHIFT));
+
     // Its layers are on only for the tap: on before its key and modifiers,
     // off after them. Layers alone tap only the layers.
     test_reset_stubs();
-    test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_GUI), .key = KC_J, .layers = 0x0024};
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_GUI), .keys = {KC_J}, .layers = 0x0024};
     noah_action_tap(TEST_CUSTOM_ACTION);
     CHECK(!strcmp(shortcut_tap_order, "LTl"));
     CHECK(shortcut_tap_layers_on == 0x0024 && shortcut_tap_layers_off == 0x0024);
-    CHECK(shortcut_tap_parts.mods == MOD_BIT(KC_LEFT_GUI) && shortcut_tap_parts.key == KC_J);
+    CHECK(shortcut_tapped.mods == MOD_BIT(KC_LEFT_GUI) && shortcut_tapped.keys[0] == KC_J);
 
     test_reset_stubs();
     test_custom_shortcut = (noah_custom_key_shortcut_t){.layers = 0x8000};
@@ -529,7 +538,7 @@ static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
         test_custom_shortcut = (noah_custom_key_shortcut_t){.mods = MOD_BIT(KC_LEFT_SHIFT), .layers = 0x0050, .layer_kind = kinds[i].kind};
         noah_action_tap(TEST_CUSTOM_ACTION);
         CHECK(!strcmp(shortcut_tap_order, kinds[i].order));
-        CHECK(shortcut_tap_parts.mods == MOD_BIT(KC_LEFT_SHIFT));
+        CHECK(shortcut_tapped.mods == MOD_BIT(KC_LEFT_SHIFT));
         CHECK(kinds[i].kind == NOAH_SHORTCUT_LAYERS_TAP_TOGGLE ? shortcut_tap_layers_on == 0x0050 : shortcut_kind_layers == 0x0050);
     }
 
@@ -546,11 +555,11 @@ static void test_tap_routes_macro_custom_qmk_and_plain_actions(void) {
     // last tap locks them, One-shot arms them, and nothing else is sent. It is
     // the runtime's own and supported nowhere a profile stores an action.
     test_reset_stubs();
-    test_custom_shortcut = (noah_custom_key_shortcut_t){.key = KC_ESC, .layers = 0x0006, .layer_kind = NOAH_SHORTCUT_LAYERS_TAP_TOGGLE};
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.keys = {KC_ESC}, .layers = 0x0006, .layer_kind = NOAH_SHORTCUT_LAYERS_TAP_TOGGLE};
     noah_action_tap(CUSTOM_KEY_LAYER_TAP(TEST_CUSTOM_ACTION - CUSTOM_KEY_0));
     CHECK(!strcmp(shortcut_tap_order, "K") && shortcut_kind_layers == 0x0006 && shortcut_tap_calls == 0);
     test_reset_stubs();
-    test_custom_shortcut = (noah_custom_key_shortcut_t){.key = KC_ESC, .layers = 0x0006, .layer_kind = NOAH_SHORTCUT_LAYERS_ONESHOT};
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.keys = {KC_ESC}, .layers = 0x0006, .layer_kind = NOAH_SHORTCUT_LAYERS_ONESHOT};
     noah_action_tap(CUSTOM_KEY_LAYER_TAP(TEST_CUSTOM_ACTION - CUSTOM_KEY_0));
     CHECK(!strcmp(shortcut_tap_order, "O") && shortcut_kind_layers == 0x0006 && shortcut_tap_calls == 0);
     for (uint8_t kind = NOAH_SHORTCUT_LAYERS_HOLD; kind <= NOAH_SHORTCUT_LAYERS_MOVE; kind++) {
@@ -619,7 +628,7 @@ static void test_press_routes_pointing_mode_momentary_qmk_custom_and_plain(void)
 
     // A held custom key is owned by its held-action lease; generic press
     // dispatch has no owner for it and sends nothing.
-    test_custom_shortcut = (noah_custom_key_shortcut_t){.key = KC_K};
+    test_custom_shortcut = (noah_custom_key_shortcut_t){.keys = {KC_K}};
     noah_action_press(key_pos, TEST_CUSTOM_ACTION);
     noah_action_release(key_pos, TEST_CUSTOM_ACTION);
     CHECK(synthetic_record_call.keycode == KC_NO);

@@ -209,9 +209,9 @@ and an optional behaviour.
 _Avoid_: user keycode, owned keycode, custom keycode
 
 **Shortcut**:
-A custom key's own action: one key, any modifiers and any layers, each
-optional, held while the custom key is held and tapped when it is tapped; its
-layers act together as one layer key, its layer kind (D-F26).
+A custom key's own action: up to six keys held together, any modifiers and
+any layers, each optional, held while the custom key is held and tapped when it
+is tapped; its layers act together as one layer key, its layer kind (D-F26).
 _Avoid_: chord, hotkey, key combo
 
 **Layer kind**:

@@ -14,9 +14,11 @@
 
 #include QMK_KEYBOARD_H // IWYU pragma: keep
 
+#include "custom_key_shortcut.h"
+
 // Head start given to a freshly registered modifier before a mouse button it
 // qualifies goes down. Spans several 1ms USB frames so the two reports cannot
-// share one. See owned_keycode_acquire_components().
+// share one. See owned_keycode_acquire_usages().
 #ifndef OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS
 #    define OWNED_KEYCODE_MOD_TO_MOUSE_SETTLE_MS 8u
 #endif
@@ -28,6 +30,18 @@ typedef struct {
     uint8_t mods;
 } owned_keycode_lease_t;
 
+// The most keys one chord holds: as many as a custom key's shortcut holds
+// (D-F26), the chord lease's one user, whose header owns the number. A chord's
+// keys take the form of a shortcut's key list: in press order, KC_NO after the
+// last (noah_custom_key_shortcut_key_count()).
+#define OWNED_KEYCODE_CHORD_KEYS NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT
+
+typedef struct {
+    bool    active;
+    uint8_t mods;
+    uint8_t keys[OWNED_KEYCODE_CHORD_KEYS]; // in press order, KC_NO after the last
+} owned_keycode_chord_lease_t;
+
 typedef struct {
     uint8_t  physical_count;
     uint8_t  managed_count;
@@ -38,15 +52,19 @@ typedef struct {
 } owned_keycode_debug_snapshot_t;
 
 bool     owned_keycode_acquire(uint16_t keycode, owned_keycode_lease_t *lease);
-// One lease for parts no single keycode can name: `mods` is an 8-bit report
-// modifier mask, left and right mixable, and `basic` a basic keycode or KC_NO
-// (a custom key's shortcut, D-F26). The modifiers go down before the usage
-// and, ahead of a mouse button, get its head start; owned_keycode_release()
-// takes them back in reverse. False, with nothing held, when the ledger is
-// saturated or `basic` is not a report usage.
-bool     owned_keycode_acquire_parts(uint8_t mods, uint8_t basic, owned_keycode_lease_t *lease);
-bool     owned_keycode_tap_parts(uint8_t mods, uint8_t basic);
 bool     owned_keycode_release(owned_keycode_lease_t *lease);
+// One lease for a chord no single keycode can name: `mods` is an 8-bit report
+// modifier mask, left and right mixable, and `keys` up to
+// OWNED_KEYCODE_CHORD_KEYS report usages in press order, KC_NO after the last.
+// The modifiers go down first and, ahead of the first mouse button, get its
+// head start; then each key in order, all held together.
+// owned_keycode_release_chord() lets go of the keys in reverse, then the
+// modifiers. False, with nothing held and no report sent, when the ledger
+// cannot take all of it, the chord is empty or a key is a modifier or no
+// report usage.
+bool     owned_keycode_acquire_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS], owned_keycode_chord_lease_t *lease);
+bool     owned_keycode_tap_chord(uint8_t mods, const uint8_t keys[OWNED_KEYCODE_CHORD_KEYS]);
+bool     owned_keycode_release_chord(owned_keycode_chord_lease_t *lease);
 bool     owned_keycode_is_supported(uint16_t keycode);
 bool     owned_keycode_register(uint16_t keycode);
 bool     owned_keycode_unregister(uint16_t keycode);

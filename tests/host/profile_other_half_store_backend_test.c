@@ -29,7 +29,7 @@ typedef struct {
     uint32_t                               compiled_digest;
 } fixture_t;
 
-static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 2u, 0u, 1u};
+static const uint8_t empty_profile[] = {'N', 'L', 'P', '1', 4u, 3u, 0u, 1u};
 
 static uint32_t always_safe(void *context) {
     (void)context;

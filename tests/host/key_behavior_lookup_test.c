@@ -202,7 +202,7 @@ const key_behavior_t key_behaviors[] = {
 // CUSTOM_KEY_100 (with a row) and CUSTOM_KEY_101 (without) have shortcuts;
 // CUSTOM_KEY_102 has neither (D-F26).
 noah_custom_key_shortcut_t noah_custom_key_shortcut(uint8_t slot) {
-    if (slot == 100u || slot == 101u) return (noah_custom_key_shortcut_t){.mods = 0x41u, .key = KC_K};
+    if (slot == 100u || slot == 101u) return (noah_custom_key_shortcut_t){.mods = 0x41u, .keys = {KC_K}};
     return (noah_custom_key_shortcut_t){0};
 }
 

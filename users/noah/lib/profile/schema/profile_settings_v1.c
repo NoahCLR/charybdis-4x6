@@ -52,16 +52,33 @@ static bool layer_record_byte(uint8_t b, uint16_t offset, uint8_t layers, uint8_
     return used >= 8u || !(b >> used);
 }
 
-// A shortcut record is its report modifier mask, any eight bits, its key,
-// from the shortcut vocabulary (custom_key_shortcut.h), its layer mask, which
-// names neither the base layer nor a default layer (those are always on), and
-// the layer key its layers act as: Hold without layers, so one shortcut has one
-// record.
+// A shortcut's key at `index` of its record, given the keys before it: a
+// key from the shortcut vocabulary (custom_key_shortcut.h), packed after the
+// keys before it, never one of them, and never a second system or consumer
+// key; or zero, after the last. The candidate arrives a byte at a time, so this
+// holds a record to the key-list form noah_custom_key_shortcut_key_count()
+// reads (zero ends the keys) one byte at a time instead of counting a whole
+// list: a record it accepts is one that function counts correctly.
+static bool shortcut_key_byte(noah_profile_settings_v1_validation_t *s, uint8_t b, uint8_t index) {
+    bool system = NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_SYSTEM(b), consumer = NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_CONSUMER(b);
+    if (!noah_custom_key_shortcut_key_valid(b)) return false;
+    for (uint8_t before = 0u; before < index; before++) {
+        uint8_t earlier = s->shortcut_keys[before];
+        if (b != 0u && (earlier == 0u || earlier == b || (system && NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_SYSTEM(earlier)) || (consumer && NOAH_CUSTOM_KEY_SHORTCUT_KEY_IS_CONSUMER(earlier)))) return false;
+    }
+    if (index < NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT - 1) s->shortcut_keys[index] = b;
+    return true;
+}
+
+// A shortcut record is its report modifier mask, any eight bits, its keys,
+// its layer mask, which names neither the base layer nor a default layer
+// (those are always on), and the layer key its layers act as: Hold without
+// layers, so one shortcut has one record.
 static bool shortcut_byte(noah_profile_settings_v1_validation_t *s, uint8_t b, uint16_t offset) {
     uint16_t always_on = (uint16_t)(s->default_layers | 1u);
-    switch ((offset - NOAH_SETTINGS_SHORTCUTS_OFFSET) % NOAH_SETTINGS_SHORTCUT_SIZE) {
-        case NOAH_CUSTOM_KEY_SHORTCUT_KEY:
-            return noah_custom_key_shortcut_key_valid(b);
+    uint8_t  field     = (uint8_t)((offset - NOAH_SETTINGS_SHORTCUTS_OFFSET) % NOAH_SETTINGS_SHORTCUT_SIZE);
+    if (field >= NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET && field < NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET + NOAH_CUSTOM_KEY_SHORTCUT_KEY_COUNT) return shortcut_key_byte(s, b, (uint8_t)(field - NOAH_CUSTOM_KEY_SHORTCUT_KEYS_OFFSET));
+    switch (field) {
         case NOAH_CUSTOM_KEY_SHORTCUT_LAYERS_LO:
             s->shortcut_has_layers = b != 0u;
             return !(b & (uint8_t)always_on);
